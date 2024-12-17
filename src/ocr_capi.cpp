@@ -1,4 +1,4 @@
-#include "wrzs_capi.h"
+#include "ocr_capi.h"
 #include "utils.h"
 #include "fastdeploy/vision.h"
 
@@ -6,9 +6,6 @@ using DBDetector = fastdeploy::vision::ocr::DBDetector;
 using Recognizer = fastdeploy::vision::ocr::Recognizer;
 using PPOCRv4 = fastdeploy::pipeline::PPOCRv4;
 
-WPoint get_center_point(WRect rect) {
-    return WPoint{rect.x + rect.width / 2, rect.y + rect.height / 2};
-}
 
 WRect get_template_position(WImage *shot_img, WImage *template_img) {
     cv::Mat shot_mat = wimage_to_mat(shot_img);
@@ -47,7 +44,7 @@ OCRModelHandle create_ocr_model(const char *model_dir, const char *dict_file, in
 //    det_model->GetPostprocessor().SetDetDBThresh(0.3);
     det_model->GetPostprocessor().SetDetDBBoxThresh(0.6);
     det_model->GetPostprocessor().SetDetDBUnclipRatio(1.5);
-    det_model->GetPostprocessor().SetDetDBScoreMode("slow");
+    det_model->GetPostprocessor().SetDetDBScoreMode("fast");
 //    det_model.GetPostprocessor().SetUseDilation(0);
     auto ocr_model = new fastdeploy::pipeline::PPOCRv4(det_model, rec_model);
     ocr_model->SetRecBatchSize(6);
@@ -63,7 +60,6 @@ WRect get_text_position(OCRModelHandle model, WImage *image, const char *text) {
     fastdeploy::vision::OCRResult res;
     auto ocr_model = static_cast<PPOCRv4 *> (model);
     bool res_status = ocr_model->Predict(cv_image, &res);
-    std::cout << res.Str() << std::endl;
     if (!res_status) {
         return WRect{0, 0, 0, 0};
     }
@@ -74,7 +70,6 @@ WRect get_text_position(OCRModelHandle model, WImage *image, const char *text) {
                 polygon.emplace_back(res.boxes[i][j * 2], res.boxes[i][j * 2 + 1]);
             }
             cv::Rect boundingRect = cv::boundingRect(polygon);
-            std::cout << boundingRect << std::endl;
             return WRect{boundingRect.x, boundingRect.y, boundingRect.width, boundingRect.height};
         }
     }
@@ -128,11 +123,12 @@ StatusCode text_rec_buffer(OCRModelHandle model, WImage *image, WOCRResult *out_
     return StatusCode::Success;
 }
 
-void free_wimage(WImage *img) {
-    img->width = 0;
-    img->height = 0;
-    img->type = WImageType::WImageType_BGR;
-    free(img->data);
+void print_ocr_result(WOCRResult *result) {
+    if (!result) return;
+    for (int i = 0; i < result->size; ++i) {
+        std::cout << "box: " << format_polygon(result->boxes[i]) << "text: "
+                  << result->texts[i] << " score: " << result->scores[i] << std::endl;
+    }
 }
 
 void free_ocr_result(WOCRResult *result) {
@@ -150,15 +146,10 @@ void free_ocr_result(WOCRResult *result) {
 
 void free_ocr_model(OCRModelHandle model) {
     delete static_cast<PPOCRv4 *>(model);
-    model = nullptr;
 }
 
-WImage *read_image(const char *path) {
-    cv::Mat image = cv::imread(path);
-    if (!image.empty()) {
-        return mat_to_wimage(image);
-    }
-    return nullptr;
-}
+
+
+
 
 
