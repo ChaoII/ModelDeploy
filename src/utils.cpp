@@ -4,15 +4,11 @@
 #include "utils.h"
 
 cv::Mat wimage_to_mat(WImage *image) {
-    WImageType type = image->type;
     int cv_type = CV_8UC3;
-    switch (type) {
-        case WImageType::WImageType_GRAY:
-            cv_type = CV_8UC1;
-            break;
-        default:
-            cv_type = CV_8UC3;
-            break;
+    if (image->channels == 1) {
+        cv_type = CV_8UC1;
+    } else if (image->channels == 4) {
+        cv_type = CV_8UC4;
     }
     return {image->height, image->width, cv_type, image->data};
 }
@@ -23,26 +19,17 @@ WImage *mat_to_wimage(const cv::Mat &mat) {
     // 设置宽度和高度
     wImage->width = mat.cols;
     wImage->height = mat.rows;
+    wImage->channels = mat.channels();
     wImage->data = (unsigned char *) malloc(mat.total() * mat.elemSize());
     // 复制数据
     std::memcpy(wImage->data, mat.data, mat.total() * mat.elemSize());
     // 设置图像类型
-    switch (mat.type()) {
-        case CV_8UC1:
-            wImage->type = WImageType_GRAY;
-            break;
-        case CV_8UC3:
-            wImage->type = WImageType_BGR;
-            break;
-        default:
-            return nullptr;
-    }
     return wImage;
 }
 
 
 void print_rect(WRect rect) {
-    std::cout << "rect: [" << rect.x << "," << rect.y << "," << rect.width << "," << rect.height << "]" << std::endl;
+    std::cout << format_rect(rect) << std::endl;
 }
 
 void draw_rect(WImage *image, WRect rect, WColor color) {
@@ -108,12 +95,63 @@ WImage *crop_image(WImage *image, WRect rect) {
 }
 
 WImage *clone_image(WImage *image) {
-    auto cv_image = wimage_to_mat(image).clone();
-    return mat_to_wimage(cv_image);
+    auto new_image = (WImage *) malloc(sizeof(WImage));
+    new_image->width = image->width;
+    new_image->height = image->height;
+    new_image->channels = image->channels;
+    auto total_bytes = image->width * image->height * image->channels * sizeof(unsigned char);
+    new_image->data = (unsigned char *) malloc(total_bytes);
+    std::memcpy(new_image->data, image->data, total_bytes);
+    return new_image;
 }
 
 WImage *from_compressed_bytes(const unsigned char *bytes, int size) {
     std::vector<unsigned char> buffer(bytes, bytes + size);
     cv::Mat img_decompressed = cv::imdecode(buffer, cv::IMREAD_COLOR);
     return mat_to_wimage(img_decompressed);
+}
+
+WImage *read_image(const char *path) {
+    cv::Mat image = cv::imread(path);
+    if (!image.empty()) {
+        return mat_to_wimage(image);
+    }
+    return nullptr;
+}
+
+void free_wimage(WImage *image) {
+    if (image != nullptr) {
+        if (image->data != nullptr) {
+            free(image->data);
+            image->data = nullptr;  // 将指针置为 nullptr
+            image->width = 0;
+            image->height = 0;
+            image->channels = 0;
+        }
+        free(image);
+    }
+}
+
+WPoint get_center_point(WRect rect) {
+    return WPoint{rect.x + rect.width / 2, rect.y + rect.height / 2};
+}
+
+std::string format_polygon(WPolygon polygon) {
+    std::ostringstream os;
+    os << "polygon: [";
+    for (int i = 0; i < polygon.size; i++) {
+        os << "[" << polygon.points[i].x << "," << polygon.points[i].y << "]";
+        if (i != polygon.size - 1) {
+            os << ",";
+        }
+    }
+    os << "]";
+    return os.str();
+}
+
+std::string format_rect(WRect rect) {
+    std::ostringstream os;
+    os << "WRect {" << "x: " << rect.x << ", " << "y: " << rect.y << ", "
+       << "width: " << rect.width << ", " << "height: " << rect.height << "}";
+    return os.str();
 }

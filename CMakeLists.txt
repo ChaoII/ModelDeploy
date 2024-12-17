@@ -15,7 +15,12 @@ endif ()
 add_definitions(-DWRZSLABLIB)
 # 添加FastDeploy依赖头文件
 include_directories(${FASTDEPLOY_INCS})
-add_library(${LIB_NAME} SHARED wrzs_capi.cpp utils.cpp)
+include_directories(${CMAKE_SOURCE_DIR})
+
+file(GLOB SDK_SOURCE ${CMAKE_SOURCE_DIR}/src/*.cpp)
+
+
+add_library(${LIB_NAME} SHARED ${SDK_SOURCE})
 target_link_libraries(${LIB_NAME} ${FASTDEPLOY_LIBS})
 
 if (BUILD_TEST)
