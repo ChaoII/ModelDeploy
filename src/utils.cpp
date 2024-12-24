@@ -138,14 +138,14 @@ WPoint get_center_point(WRect rect) {
 
 std::string format_polygon(WPolygon polygon) {
     std::ostringstream os;
-    os << "polygon: [";
+    os << "polygon: {";
     for (int i = 0; i < polygon.size; i++) {
-        os << "[" << polygon.points[i].x << "," << polygon.points[i].y << "]";
+        os << "[" << polygon.data[i].x << "," << polygon.data[i].y << "]";
         if (i != polygon.size - 1) {
             os << ",";
         }
     }
-    os << "]";
+    os << "}";
     return os.str();
 }
 
@@ -155,3 +155,8 @@ std::string format_rect(WRect rect) {
        << "width: " << rect.width << ", " << "height: " << rect.height << "}";
     return os.str();
 }
+
+WModel *allocate_model() {
+    return (WModel *) malloc(sizeof(WModel));
+}
+

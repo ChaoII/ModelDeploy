@@ -11,19 +11,21 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-typedef void *DetectionModelHandle;
 
 
-EXPORT_DECL DetectionModelHandle create_detection_model(const char *model_dir, int thread_num = 8);
+EXPORT_DECL StatusCode create_detection_model(WModel *model, const char *model_dir, int thread_num = 8,
+                                              ModelFormat format = ModelFormat::ONNX);
 
-EXPORT_DECL void set_detection_input_size(DetectionModelHandle model, WSize size);
+EXPORT_DECL StatusCode set_detection_input_size(WModel *model, WSize size);
 
-EXPORT_DECL WDetectionResult* detection_predict(DetectionModelHandle model, WImage *image,
-                                               int draw_result, WColor color, double alpha, int is_save_result);
+EXPORT_DECL StatusCode detection_predict(WModel *model, WDetectionResults *results, WImage *image,
+                                         int draw_result, WColor color, double alpha, int is_save_result);
 
-EXPORT_DECL void print_detection_result(WDetectionResult *result);
+EXPORT_DECL void print_detection_result(WDetectionResults *result);
 
-EXPORT_DECL void free_detection_result(WDetectionResult *result);
+EXPORT_DECL void free_detection_result(WDetectionResults *result);
+
+EXPORT_DECL void free_detection_model(WModel *model);
 
 #ifdef __cplusplus
 }

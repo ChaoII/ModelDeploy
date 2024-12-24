@@ -98,3 +98,5 @@ EXPORT_DECL std::string format_polygon(WPolygon polygon);
 
 EXPORT_DECL std::string format_rect(WRect rect);
 
+EXPORT_DECL WModel *allocate_model();
+
