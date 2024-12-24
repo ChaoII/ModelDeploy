@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.26)
 project(demo)
 
 set(CMAKE_CXX_STANDARD 17)
-set(LIB_NAME "wrzs_sdk")
+set(LIB_NAME "model_deploy_sdk")
 
 option(BUILD_TEST "build unittest" ON)
 
@@ -12,7 +12,7 @@ if (MSVC)
     add_compile_options(/utf-8)
 endif ()
 
-add_definitions(-DWRZSLABLIB)
+add_definitions(-DMODEL_DEPLOY_LIB)
 # 添加FastDeploy依赖头文件
 include_directories(${FASTDEPLOY_INCS})
 include_directories(${CMAKE_SOURCE_DIR})

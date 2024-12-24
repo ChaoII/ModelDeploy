@@ -19,9 +19,9 @@ StatusCode test_create_ocr_model(OCRModelParameters *parameters) {
 StatusCode test_ocr_model_predict(OCRModelParameters *parameters) {
     WModel model;
     create_ocr_model(&model, parameters);
-    auto im = read_image("test_ocr.png");
+    auto im = read_image("../../tests/test_images/test_ocr.png");
     WOCRResults result;
-    return ocr_model_predict(&model, im, &result, 1, {255, 255, 0}, 0.5, 1);
+    return ocr_model_predict(&model, im, &result);
 }
 
 void test_release_ocr_result1() {
@@ -33,14 +33,14 @@ void test_release_ocr_result1() {
 WRect test_get_text_position(const char *text) {
     WModel model;
     OCRModelParameters parameters{
-            "models",
-            "key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/models/ocr",
+            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8
     };
     create_ocr_model(&model, &parameters);
-    WImage *im = read_image("test_ocr.png");
+    WImage *im = read_image("../../tests/test_images/test_ocr.png");
     return get_text_position(&model, im, text);
 }
 
@@ -78,8 +78,8 @@ void test_release_ocr_result2() {
 void test_release_ocr_model() {
     WModel model;
     OCRModelParameters parameters{
-            "models",
-            "key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/models/ocr",
+            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8
@@ -90,15 +90,15 @@ void test_release_ocr_model() {
 
 TEST_CASE("test create ocr model function", "[create_ocr_model]") {
     OCRModelParameters parameters1{
-            "models",
-            "key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/models/ocr",
+            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8
     };
     OCRModelParameters parameters2{
-            "models",
-            "key.txt", 1, ModelFormat::PaddlePaddle,
+            "../../tests/models/ocr",
+            "../../tests/key.txt", 1, ModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "fast",
             1, 4
@@ -111,18 +111,17 @@ TEST_CASE("test create ocr model function", "[create_ocr_model]") {
 
 TEST_CASE("test ocr model predict function", "[ocr_model_predict]") {
     OCRModelParameters parameters{
-            "models",
-            "key.txt", 1, ModelFormat::PaddlePaddle,
+            "../../tests/models/ocr",
+            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
-            1.5, "fast",
-            1, 4
-    };
+            1.5, "slow",
+            0, 8};
     REQUIRE (test_ocr_model_predict(&parameters) == StatusCode::Success);
 }
 
 TEST_CASE("test get text position", "[get_text_position]") {
-    REQUIRE(almost_equal_rect(test_get_text_position("暂停测试"), {655, 808, 74, 30}));
-    REQUIRE(almost_equal_rect(test_get_text_position("暂停测试"), {775, 806, 97, 30}));
+    REQUIRE(almost_equal_rect(test_get_text_position("暂停测试"), {665, 808, 74, 30}));
+    REQUIRE(almost_equal_rect(test_get_text_position("开始测试"), {775, 806, 97, 30}));
 }
 
 TEST_CASE("test release ocr result", "[release_detection_result]") {

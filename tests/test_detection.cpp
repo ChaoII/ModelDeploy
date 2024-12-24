@@ -22,11 +22,11 @@ StatusCode test_set_detection_input_size(const char *model_path, ModelFormat for
 
 StatusCode test_detection_model_predict() {
     WModel model;
-    create_detection_model(&model, "best.onnx", 8);
+    create_detection_model(&model, "../../tests/models/best.onnx", 8);
     set_detection_input_size(&model, {1440, 1440});
-    auto im = read_image("test_detection.png");
+    auto im = read_image("../../tests/test_images/test_detection.png");
     WDetectionResults result;
-    return detection_predict(&model, &result, im, 1, {255, 255, 0}, 0.5, 1);
+    return detection_predict(&model, im, &result);
 }
 
 void test_release_detection_result1() {
@@ -50,19 +50,22 @@ void test_release_detection_result2() {
 
 void test_release_detection_model() {
     WModel model;
-    create_detection_model(&model, "best.onnx", 8);
+    create_detection_model(&model, "../../tests/models/best.onnx", 8);
     return free_detection_model(&model);
 }
 
 TEST_CASE("test create detection model function", "[create_detection_model]") {
-    REQUIRE (test_create_detection_model("best.onnx", ModelFormat::ONNX) == StatusCode::Success);
-    REQUIRE (test_create_detection_model("ppyoloe", ModelFormat::PaddlePaddle) == StatusCode::Success);
-    REQUIRE (test_create_detection_model("picodet_lcnet", ModelFormat::PaddlePaddle) == StatusCode::Success);
+    REQUIRE (test_create_detection_model("../../tests/models/best.onnx", ModelFormat::ONNX) == StatusCode::Success);
+    REQUIRE (test_create_detection_model("../../tests/models/ppyoloe", ModelFormat::PaddlePaddle) ==
+             StatusCode::Success);
+    REQUIRE (test_create_detection_model("../../tests/models/picodet_lcnet", ModelFormat::PaddlePaddle) ==
+             StatusCode::Success);
 }
 
 TEST_CASE("test set detection input size function", "[set_detection_input_size]") {
-    REQUIRE (test_set_detection_input_size("best.onnx", ModelFormat::ONNX) == StatusCode::Success);
-    REQUIRE (test_set_detection_input_size("ppyoloe", ModelFormat::PaddlePaddle) == StatusCode::CallError);
+    REQUIRE (test_set_detection_input_size("../../tests/models/best.onnx", ModelFormat::ONNX) == StatusCode::Success);
+    REQUIRE (test_set_detection_input_size("../../tests/models/ppyoloe", ModelFormat::PaddlePaddle) ==
+             StatusCode::CallError);
 }
 
 TEST_CASE("test detection model predict function", "[detection_model_predict]") {
