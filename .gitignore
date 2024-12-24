@@ -1,10 +1,9 @@
 
 build
-test_images
 .idea
 # Prerequisites
 *.d
-
+models
 # Compiled Object files
 *.slo
 *.lo
