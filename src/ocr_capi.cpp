@@ -24,35 +24,41 @@ WRect get_template_position(WImage *shot_img, WImage *template_img) {
     return WRect{min_loc.x, min_loc.y, w, h};
 }
 
-OCRModelHandle create_ocr_model(const char *model_dir, const char *dict_file, int thread_num) {
+WModel *create_ocr_model(OCRModelParameters *parameters) {
     fastdeploy::SetLogger(false);
     fastdeploy::RuntimeOption option;
     option.UseOrtBackend();
-    option.SetCpuThreadNum(thread_num);
+    option.SetCpuThreadNum(parameters->thread_num);
 
-    auto det_model_file = std::string(model_dir) + "/det/" + "inference.pdmodel";
-    auto det_params_file = std::string(model_dir) + "/det/" + "inference.pdiparams";
-    auto rec_model_file = std::string(model_dir) + "/rec/" + "inference.pdmodel";
-    auto rec_params_file = std::string(model_dir) + "/rec/" + "inference.pdiparams";
+    auto det_model_file = std::string(parameters->model_dir) + "/det/" + "inference.pdmodel";
+    auto det_params_file = std::string(parameters->model_dir) + "/det/" + "inference.pdiparams";
+    auto rec_model_file = std::string(parameters->model_dir) + "/rec/" + "inference.pdmodel";
+    auto rec_params_file = std::string(parameters->model_dir) + "/rec/" + "inference.pdiparams";
 
     auto det_model = new DBDetector(det_model_file, det_params_file, option);
-    auto rec_model = new Recognizer(rec_model_file, rec_params_file, dict_file, option);
+    auto rec_model = new Recognizer(rec_model_file, rec_params_file, parameters->dict_path, option);
     assert(det_model.Initialized());
     assert(rec_model.Initialized());
 
-    det_model->GetPreprocessor().SetMaxSideLen(960);
-//    det_model->GetPostprocessor().SetDetDBThresh(0.3);
-    det_model->GetPostprocessor().SetDetDBBoxThresh(0.6);
-    det_model->GetPostprocessor().SetDetDBUnclipRatio(1.5);
-    det_model->GetPostprocessor().SetDetDBScoreMode("fast");
-//    det_model.GetPostprocessor().SetUseDilation(0);
+    det_model->GetPreprocessor().SetMaxSideLen(parameters->max_side_len);
+    det_model->GetPostprocessor().SetDetDBThresh(parameters->det_db_thresh);
+    det_model->GetPostprocessor().SetDetDBBoxThresh(parameters->det_db_box_thresh);
+    det_model->GetPostprocessor().SetDetDBUnclipRatio(parameters->det_db_unclip_ratio);
+    det_model->GetPostprocessor().SetDetDBScoreMode(parameters->det_db_score_mode);
+    det_model->GetPostprocessor().SetUseDilation(parameters->use_dilation);
+    auto model = (WModel *) malloc(sizeof(WModel));
     auto ocr_model = new fastdeploy::pipeline::PPOCRv4(det_model, rec_model);
-    ocr_model->SetRecBatchSize(6);
+    auto model_name = ocr_model->ModelName();
+    model->format = parameters->format;
+    model->model_content = ocr_model;
+    model->model_name = (char *) malloc((ocr_model->ModelName().size() + 1) * sizeof(char));
+    model_name.copy(model->model_name, model_name.size());
+    ocr_model->SetRecBatchSize(parameters->rec_batch_size);
     if (!(ocr_model->Initialized())) {
         std::cerr << "Failed to initialize PP-OCR." << std::endl;
         return nullptr;
     }
-    return ocr_model;
+    return model;
 }
 
 WRect get_text_position(OCRModelHandle model, WImage *image, const char *text) {
