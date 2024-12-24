@@ -11,26 +11,63 @@
 
 int main() {
     SetConsoleOutputCP(CP_UTF8);
-    DetectionModelHandle model1 = create_detection_model("best.onnx", 8);
-    set_detection_input_size(model1, {1440, 1440});
-    auto im = read_image("003.png");
-    auto result = detection_predict(model1, im, 1, {255, 255, 0}, 0.5, 1);
-    print_detection_result(result);
-    free_detection_result(result);
-    free_wimage(im);
-    free_ocr_model(model1);
+    StatusCode ret = StatusCode::Success;
+//    WModel model;
+//    if ((ret = create_detection_model(&model, "best.onnx", 8)) != 0) {
+//        std::cout << ret << std::endl;
+//        return 0;
+//    }
+//    if ((ret = set_detection_input_size(&model, {1440, 1440})) != 0) {
+//        std::cout << ret << std::endl;
+//        return 0;
+//    }
+//    WImage image;
+//    auto im = read_image("test_detection.png");
+//    WDetectionResults result;
+//    if ((ret = detection_predict(&model, &result, im, 1, {255, 255, 0}, 0.5, 1)) != 0) {
+//        std::cout << ret << std::endl;
+//        return 0;
+//    }
+//    print_detection_result(&result);
+//    free_detection_result(&result);
+//    free_wimage(im);
+//    free_detection_model(&model);
 
 
-//    // 读取图片
-//    auto image = read_image("../test_images/shot_image.png");
-//    // 需要查找的文本
-//    const char *text = "暂停测试";
-//    // 创建模型句柄
-//    OCRModelHandle model = create_ocr_model("models", "key.txt", 6);
-//    // 获取文本目标位置
-//    auto rect = get_text_position(model, image, text);
+    // 读取图片
+    auto image = read_image("../test_images/shot_image.png");
+    // 需要查找的文本
+    const char *text = "开始测试";
+    // 创建模型句柄
+    WModel model;
+    OCRModelParameters parameters = {
+            "models",
+            "key.txt",
+            8,
+            PaddlePaddle,
+            960,
+            0.3,
+            0.6,
+            1.5,
+            "slow",
+            0,
+            8
+    };
+    if ((ret = create_ocr_model(&model, &parameters)) != 0) {
+        std::cout << ret << std::endl;
+        return 0;
+    }
+    // 获取文本目标位置
+    WOCRResults results;
+    if ((ret = ocr_model_predict(&model, image, &results, 1, {255, 0, 0}, 0.5, 1)) != 0) {
+        std::cout << ret << std::endl;
+        return 0;
+    }
+    print_ocr_result(&results);
+    free_ocr_result(&results);
+    auto rect = get_text_position(&model, image, text);
 //    // 打印文本信息
-//    print_rect(rect);
+    print_rect(rect);
 //    // 先裁剪再绘制，不然image是指针传递，在绘制时会修改原始image
 //    WImage *roi = crop_image(image, rect);
 //    // 在原始画面上绘制文本结果
@@ -41,10 +78,10 @@ int main() {
 //    // 显示原始画面
 //    show_image(image);
 //    // 显示目标文本所在画面
-////    show_image(roi);
-//
-//    //释放资源
+//    show_image(roi);
+
+    //释放资源
 //    free_wimage(roi);
-//    free_wimage(image);
-//    free_ocr_model(model);
+    free_wimage(image);
+    free_ocr_model(&model);
 }
