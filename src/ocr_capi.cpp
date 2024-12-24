@@ -1,5 +1,5 @@
 #include "ocr_capi.h"
-#include "utils.h"
+#include "utils_internal.h"
 #include "fastdeploy/vision.h"
 
 using DBDetector = fastdeploy::vision::ocr::DBDetector;
@@ -76,9 +76,7 @@ WRect get_text_position(WModel *model, WImage *image, const char *text) {
 }
 
 
-StatusCode ocr_model_predict(WModel *model, WImage *image, WOCRResults *results, int draw_result,
-                             WColor color, double alpha, int is_save_result) {
-    cv::FontFace font("msyh.ttc");
+StatusCode ocr_model_predict(WModel *model, WImage *image, WOCRResults *results) {
     auto cv_image = wimage_to_mat(image);
     fastdeploy::vision::OCRResult res;
     auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
@@ -103,19 +101,6 @@ StatusCode ocr_model_predict(WModel *model, WImage *image, WOCRResults *results,
             polygon.data[j] = {res.boxes[i][j * 2], res.boxes[i][j * 2 + 1]};
         }
         results->data[i].box = polygon;
-        if (draw_result) {
-            auto p1 = cv::Point(res.boxes[i][0], res.boxes[i][1]);
-            auto p2 = cv::Point(res.boxes[i][2], res.boxes[i][3]);
-            auto p3 = cv::Point(res.boxes[i][4], res.boxes[i][5]);
-            auto p4 = cv::Point(res.boxes[i][6], res.boxes[i][7]);
-            draw_transparent_rectangle(cv_image, {p1, p2, p3, p4},
-                                       cv::Scalar(color.b, color.g, color.r), alpha);
-            cv::putText(cv_image, res.text[i], cv::Point(p1.x, p1.y - 3),
-                        cv::Scalar(color.b, color.g, color.r), font, 20);
-        }
-    }
-    if (is_save_result > 0) {
-        cv::imwrite("vis_result.jpg", cv_image);
     }
     return StatusCode::Success;
 }
@@ -126,6 +111,50 @@ void print_ocr_result(WOCRResults *result) {
         std::cout << "box: " << format_polygon(result->data[i].box) << " text: "
                   << result->data[i].text << " score: " << result->data[i].score << std::endl;
     }
+}
+
+void draw_ocr_result(WImage *image, WOCRResults *results, const char *font_path, int font_size, WColor color,
+                     double alpha, int save_result) {
+    cv::Mat cv_image, overlay;
+    cv_image = wimage_to_mat(image);
+    cv_image.copyTo(overlay);
+    cv::FontFace font(font_path);
+    cv::Scalar cv_color(color.b, color.g, color.r);
+    // 绘制半透明部分（填充矩形）
+    for (int i = 0; i < results->size; ++i) {
+        auto polygon = results->data[i].box;
+        std::vector<cv::Point> points;
+        points.reserve(polygon.size);
+        for (int j = 0; j < polygon.size; ++j) {
+            points.emplace_back(polygon.data[j].x, polygon.data[j].y);
+        }
+        cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
+        auto size = cv::getTextSize(cv::Size(0, 0), results->data[i].text,
+                                    {points[0].x, points[0].y}, font, font_size);
+        cv::rectangle(cv_image, size, cv_color, -1, cv::LINE_AA, 0);
+
+    }
+    cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
+    // 绘制非半透明部分（矩形边框、文字等）
+    for (int i = 0; i < results->size; ++i) {
+        auto polygon = results->data[i].box;
+        std::vector<cv::Point> points;
+        points.reserve(polygon.size);
+        for (int j = 0; j < polygon.size; ++j) {
+            points.emplace_back(polygon.data[j].x, polygon.data[j].y);
+        }
+        cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
+        auto size = cv::getTextSize(cv::Size(0, 0), results->data[i].text,
+                                    {points[0].x, points[0].y}, font, font_size);
+        cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
+        cv::putText(cv_image, results->data[i].text, {points[0].x, points[0].y - 2},
+                    cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
+    }
+
+    if (save_result) {
+        cv::imwrite("vis_result.jpg", cv_image);
+    }
+
 }
 
 void free_ocr_result(WOCRResults *result) {

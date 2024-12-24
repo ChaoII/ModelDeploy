@@ -5,18 +5,11 @@
 
 #include "decl.h"
 #include "types.h"
-#include <opencv2/opencv.hpp>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/// 将WImage转换为cv::Mat
-/// \param image
-/// \return
-EXPORT_DECL cv::Mat wimage_to_mat(WImage *image);
-
-/// 将cv::Mat转换为WImage
-/// \param mat
-/// \return
-EXPORT_DECL WImage *mat_to_wimage(const cv::Mat &mat);
 
 /// 打印位置信息
 /// \param rect
@@ -26,32 +19,29 @@ EXPORT_DECL void print_rect(WRect rect);
 /// \param image 原始图像
 /// \param rect 矩形
 /// \param color 绘制颜色
-EXPORT_DECL void draw_rect(WImage *image, WRect rect, WColor color);
+EXPORT_DECL void draw_rect(WImage *image, WRect rect, WColor color, double alpha);
 
-/// 在图像上绘制半透明矩形框
+/// 在图像上绘制半透明多边形
 /// \param image cv::Mat
 /// \param points 多边形点集合
 /// \param color 颜色
 /// \param alpha 不透明度
-EXPORT_DECL void draw_transparent_rectangle(cv::Mat &image, const std::vector<cv::Point> &points,
-                                            const cv::Scalar &color, double alpha);
+EXPORT_DECL void draw_polygon(WImage *image, WPolygon *polygon, WColor color, double alpha);
 /// 在图像上绘制文字
 /// \param image 原始图像
 /// \param rect 位置
+/// \param font_path 字体路径
+/// \param font_size 字体大小
 /// \param text 文本
 /// \param color 颜色
 /// \param alpha 不透明度
-EXPORT_DECL void draw_text(WImage *image, WRect rect, const char *text, WColor color, double alpha);
+EXPORT_DECL void
+draw_text(WImage *image, WRect rect, const char *text, const char *font_path, int font_size, WColor color,
+          double alpha);
 
 /// 弹窗显示image
 /// \param image
 EXPORT_DECL void show_image(WImage *image);
-
-/// 判断字符串是否包含子串
-/// \param str 原始字符串
-/// \param sub_str 子串
-/// \return 是否包含子串
-EXPORT_DECL bool contains_substring(const std::string &str, const std::string &sub_str);
 
 /// 获取按钮的可用状态，当像素点的阈值小于pix_threshold，并且此值的像素点的数量所占的百分比大于rate_threshold，则认为按钮是可用的
 /// \param image 灰度图像或彩色图像
@@ -91,12 +81,9 @@ EXPORT_DECL void free_wimage(WImage *img);
 /// \return WImage指针
 EXPORT_DECL WImage *read_image(const char *path);
 
-/// 格式化输出多边形
-/// \param polygon
-/// \return
-EXPORT_DECL std::string format_polygon(WPolygon polygon);
-
-EXPORT_DECL std::string format_rect(WRect rect);
-
+/// 开辟一个WModel指针
 EXPORT_DECL WModel *allocate_model();
 
+#ifdef __cplusplus
+}
+#endif

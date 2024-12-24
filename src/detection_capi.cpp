@@ -2,8 +2,10 @@
 // Created by AC on 2024-12-17.
 //
 #include "detection_capi.h"
+#include "utils_internal.h"
 #include "utils.h"
 #include "fastdeploy/vision.h"
+#include <map>
 
 using YOLOv8 = fastdeploy::vision::detection::YOLOv8;
 using PPYOLOE = fastdeploy::vision::detection::PPYOLOE;
@@ -45,8 +47,7 @@ StatusCode set_detection_input_size(WModel *model, WSize size) {
     return StatusCode::Success;
 }
 
-StatusCode detection_predict(WModel *model, WDetectionResults *results, WImage *image,
-                             int draw_result, WColor color, double alpha, int is_save_result) {
+StatusCode detection_predict(WModel *model, WImage *image, WDetectionResults *results) {
     auto cv_image = wimage_to_mat(image);
     fastdeploy::vision::DetectionResult res;
     auto detection_model = static_cast<YOLOv8 *> (model->model_content);
@@ -66,11 +67,6 @@ StatusCode detection_predict(WModel *model, WDetectionResults *results, WImage *
         results->data[i].box = {int(box[0]), int(box[1]), int(box[2] - box[0]), int(box[3] - box[1])};
         results->data[i].score = res.scores[i];
         results->data[i].label_id = res.label_ids[i];
-    }
-    auto vis_image = fastdeploy::vision::VisDetection(cv_image, res, 0.3);
-    cv::imwrite("asd.jpg", vis_image);
-    if (is_save_result > 0) {
-        cv::imwrite("vis_result.jpg", cv_image);
     }
     return StatusCode::Success;
 }
@@ -97,4 +93,43 @@ void free_detection_model(WModel *model) {
     if (!model) return;
     free(model->model_name);
     delete static_cast<YOLOv8 *>(model->model_content);
+}
+
+
+void draw_detection_result(WImage *image, WDetectionResults *result, const char *font_path, int font_size,
+                           double alpha, int save_result) {
+    cv::Mat cv_image, overlay;
+    cv_image = wimage_to_mat(image);
+    cv_image.copyTo(overlay);
+    cv::FontFace font(font_path);
+    // 根据label_id获取颜色
+    std::map<int, cv::Scalar> color_map;
+    // 绘制半透明部分（填充矩形）
+    for (int i = 0; i < result->size; ++i) {
+        auto class_id = result->data[i].label_id;
+        if (color_map.find(class_id) == color_map.end()) {
+            color_map[class_id] = get_random_color();
+        }
+        auto box = result->data[i].box;
+        auto cv_color = color_map[class_id];
+        cv::rectangle(overlay, {box.x, box.y, box.width, box.height}, cv_color, -1);
+        auto size = cv::getTextSize(cv::Size(0, 0), std::to_string(class_id), cv::Point(box.x, box.y), font, font_size);
+        cv::rectangle(overlay, size, cv_color, -1);
+    }
+    cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
+    // 绘制非半透明部分（矩形边框、文字等）
+    for (int i = 0; i < result->size; ++i) {
+        auto class_id = result->data[i].label_id;
+        auto box = result->data[i].box;
+        auto cv_color = color_map[class_id];
+        cv::rectangle(cv_image, cv::Rect(box.x, box.y, box.width, box.height), cv_color, 1, cv::LINE_AA, 0);
+        auto size = cv::getTextSize(cv::Size(0, 0), std::to_string(class_id),
+                                    cv::Point(box.x, box.y), font, font_size);
+        cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
+        cv::putText(cv_image, std::to_string(class_id), cv::Point(box.x, box.y - 2),
+                    cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
+    }
+    if (save_result) {
+        cv::imwrite("vis_result.jpg", cv_image);
+    }
 }
