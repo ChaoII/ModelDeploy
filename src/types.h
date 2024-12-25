@@ -4,17 +4,17 @@
 
 #pragma once
 
-enum ModelFormat {
+enum MDModelFormat {
     ONNX = 0,
     PaddlePaddle = 1,
 };
 
-enum ModelType {
+enum MDModelType {
     OCR = 0,
     Detection = 1,
 };
 
-enum StatusCode {
+enum MDStatusCode {
     Success = 0x00,
     CallError = 0x01,
     ModelInitializeFailed = 0x03,
@@ -26,22 +26,22 @@ enum StatusCode {
 
 typedef struct {
     char *model_name;
-    ModelType type;
-    ModelFormat format;
+    MDModelType type;
+    MDModelFormat format;
     void *model_content;
-} WModel;
+} MDModel;
 
 typedef struct {
     int x;
     int y;
-} WPoint;
+} MDPoint;
 
 typedef struct {
     int x;
     int y;
     int width;
     int height;
-} WRect;
+} MDRect;
 
 
 typedef struct {
@@ -49,12 +49,12 @@ typedef struct {
     int height;
     int channels;
     unsigned char *data;
-} WImage;
+} MDImage;
 
 typedef struct {
-    WPoint *data;
+    MDPoint *data;
     size_t size;
-} WPolygon;
+} MDPolygon;
 
 typedef struct {
     /// ocr model directory;
@@ -64,7 +64,7 @@ typedef struct {
     /// thread num default is 8
     int thread_num;
     /// model format default is PaddlePaddle
-    ModelFormat format;
+    MDModelFormat format;
     /// maximum side length default 960
     int max_side_len;
     /// db threshold default 0.3
@@ -79,41 +79,41 @@ typedef struct {
     int use_dilation;
     /// recognition batch size default is 8, unusually set the same as thread_num
     int rec_batch_size;
-} OCRModelParameters;
+} MDOCRModelParameters;
 
 typedef struct {
-    WPolygon box;
+    MDPolygon box;
     char *text;
     float score;
-} WOCRResult;
+} MDOCRResult;
 
 typedef struct {
-    WOCRResult *data;
+    MDOCRResult *data;
     size_t size;
-} WOCRResults;
+} MDOCRResults;
 
 
 typedef struct {
     unsigned char r;
     unsigned char g;
     unsigned char b;
-} WColor;
+} MDColor;
 
 typedef struct {
     int width;
     int height;
-} WSize;
+} MDSize;
 
 typedef struct {
-    WRect box;
+    MDRect box;
     int label_id;
     float score;
-} WDetectionResult;
+} MDDetectionResult;
 
 
 typedef struct {
-    WDetectionResult *data;
+    MDDetectionResult *data;
     size_t size;
-} WDetectionResults;
+} MDDetectionResults;
 
 

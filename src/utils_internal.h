@@ -5,15 +5,15 @@
 #include "opencv2/opencv.hpp"
 #include "types.h"
 
-/// 将WImage转换为cv::Mat
+/// 将MDImage转换为cv::Mat
 /// \param image
 /// \return
-cv::Mat wimage_to_mat(WImage *image);
+cv::Mat md_image_to_mat(MDImage *image);
 
-/// 将cv::Mat转换为WImage
+/// 将cv::Mat转换为MDImage
 /// \param mat
 /// \return
-WImage *mat_to_wimage(const cv::Mat &mat);
+MDImage *mat_to_md_image(const cv::Mat &mat);
 
 
 void draw_rect_internal(cv::Mat &cv_image, const cv::Rect &rect, const cv::Scalar &cv_color, double alpha);
@@ -34,10 +34,10 @@ void draw_text_internal(cv::Mat &cv_image, const cv::Point &point, const std::st
 bool contains_substring(const std::string &str, const std::string &sub_str);
 
 /// 格式化输出多边形
-std::string format_polygon(WPolygon polygon);
+std::string format_polygon(MDPolygon polygon);
 
 /// 格式化输出矩形
-std::string format_rect(WRect rect);
+std::string format_rect(MDRect rect);
 
 /// 生成随机色
 cv::Scalar get_random_color();

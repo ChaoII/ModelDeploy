@@ -6,59 +6,59 @@
 #include <catch2/catch_test_macros.hpp>
 
 
-bool almost_equal_rect(WRect rect1, WRect rect2) {
+bool almost_equal_rect(MDRect rect1, MDRect rect2) {
     return rect1.x == rect2.x && rect1.y == rect2.y && rect1.width == rect2.width && rect1.height == rect2.height;
 }
 
-StatusCode test_create_ocr_model(OCRModelParameters *parameters) {
-    WModel model;
-    return create_ocr_model(&model, parameters);
+MDStatusCode test_create_ocr_model(MDOCRModelParameters *parameters) {
+    MDModel model;
+    return md_create_ocr_model(&model, parameters);
 }
 
 
-StatusCode test_ocr_model_predict(OCRModelParameters *parameters) {
-    WModel model;
-    create_ocr_model(&model, parameters);
-    auto im = read_image("../../tests/test_images/test_ocr.png");
-    WOCRResults result;
-    return ocr_model_predict(&model, im, &result);
+MDStatusCode test_ocr_model_predict(MDOCRModelParameters *parameters) {
+    MDModel model;
+    md_create_ocr_model(&model, parameters);
+    auto im = md_read_image("../../tests/test_images/test_ocr.png");
+    MDOCRResults result;
+    return md_ocr_model_predict(&model, im, &result);
 }
 
 void test_release_ocr_result1() {
-    WOCRResults result{nullptr, 0};
-    free_ocr_result(&result);
+    MDOCRResults result{nullptr, 0};
+    md_free_ocr_result(&result);
 }
 
 
-WRect test_get_text_position(const char *text) {
-    WModel model;
-    OCRModelParameters parameters{
+MDRect test_get_text_position(const char *text) {
+    MDModel model;
+    MDOCRModelParameters parameters{
             "../../tests/models/ocr",
-            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/key.txt", 8, MDModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8
     };
-    create_ocr_model(&model, &parameters);
-    WImage *im = read_image("../../tests/test_images/test_ocr.png");
-    return get_text_position(&model, im, text);
+md_create_ocr_model(&model, &parameters);
+    MDImage *im = md_read_image("../../tests/test_images/test_ocr.png");
+    return md_get_text_position(&model, im, text);
 }
 
 void test_release_ocr_result2() {
-    WOCRResults result;
+    MDOCRResults result;
     result.size = 2;
-    result.data = (WOCRResult *) malloc(sizeof(WOCRResult) * result.size);
-    WPolygon polygon0;
+    result.data = (MDOCRResult *) malloc(sizeof(MDOCRResult) * result.size);
+    MDPolygon polygon0;
     polygon0.size = 4;
-    polygon0.data = (WPoint *) malloc(sizeof(WPoint) * polygon0.size);
+    polygon0.data = (MDPoint *) malloc(sizeof(MDPoint) * polygon0.size);
     polygon0.data[0] = {0, 0};
     polygon0.data[1] = {100, 0};
     polygon0.data[2] = {100, 100};
     polygon0.data[3] = {0, 100};
 
-    WPolygon polygon1;
+    MDPolygon polygon1;
     polygon1.size = 4;
-    polygon1.data = (WPoint *) malloc(sizeof(WPoint) * polygon0.size);
+    polygon1.data = (MDPoint *) malloc(sizeof(MDPoint) * polygon0.size);
     polygon1.data[0] = {10, 10};
     polygon1.data[1] = {120, 10};
     polygon1.data[2] = {120, 150};
@@ -72,51 +72,51 @@ void test_release_ocr_result2() {
     memcpy(result.data[1].text, "world", 5);
     result.data[0].score = 0.5;
     result.data[1].score = 0.6;
-    free_ocr_result(&result);
+md_free_ocr_result(&result);
 }
 
 void test_release_ocr_model() {
-    WModel model;
-    OCRModelParameters parameters{
+    MDModel model;
+    MDOCRModelParameters parameters{
             "../../tests/models/ocr",
-            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/key.txt", 8, MDModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8
     };
-    create_ocr_model(&model, &parameters);
-    return free_ocr_model(&model);
+md_create_ocr_model(&model, &parameters);
+    return md_free_ocr_model(&model);
 }
 
 TEST_CASE("test create ocr model function", "[create_ocr_model]") {
-    OCRModelParameters parameters1{
+    MDOCRModelParameters parameters1{
             "../../tests/models/ocr",
-            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/key.txt", 8, MDModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8
     };
-    OCRModelParameters parameters2{
+    MDOCRModelParameters parameters2{
             "../../tests/models/ocr",
-            "../../tests/key.txt", 1, ModelFormat::PaddlePaddle,
+            "../../tests/key.txt", 1, MDModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "fast",
             1, 4
     };
 
-    REQUIRE(test_create_ocr_model(&parameters1) == StatusCode::Success);
-    REQUIRE(test_create_ocr_model(&parameters2) == StatusCode::Success);
+    REQUIRE(test_create_ocr_model(&parameters1) == MDStatusCode::Success);
+    REQUIRE(test_create_ocr_model(&parameters2) == MDStatusCode::Success);
 }
 
 
 TEST_CASE("test ocr model predict function", "[ocr_model_predict]") {
-    OCRModelParameters parameters{
+    MDOCRModelParameters parameters{
             "../../tests/models/ocr",
-            "../../tests/key.txt", 8, ModelFormat::PaddlePaddle,
+            "../../tests/key.txt", 8, MDModelFormat::PaddlePaddle,
             960, 0.3, 0.6,
             1.5, "slow",
             0, 8};
-    REQUIRE (test_ocr_model_predict(&parameters) == StatusCode::Success);
+    REQUIRE (test_ocr_model_predict(&parameters) == MDStatusCode::Success);
 }
 
 TEST_CASE("test get text position", "[get_text_position]") {
