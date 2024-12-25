@@ -7,9 +7,9 @@ using Recognizer = fastdeploy::vision::ocr::Recognizer;
 using PPOCRv4 = fastdeploy::pipeline::PPOCRv4;
 
 
-StatusCode create_ocr_model(WModel *model, OCRModelParameters *parameters) {
+MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameters) {
     if (!model) {
-        return StatusCode::MemoryAllocatedFailed;
+        return MDStatusCode::MemoryAllocatedFailed;
     }
     fastdeploy::SetLogger(false);
     fastdeploy::RuntimeOption option;
@@ -25,11 +25,11 @@ StatusCode create_ocr_model(WModel *model, OCRModelParameters *parameters) {
     auto rec_model = new Recognizer(rec_model_file, rec_params_file, parameters->dict_path, option);
     if (!det_model->Initialized()) {
         std::cerr << "Failed to initialize OCR detection model." << std::endl;
-        return StatusCode::OCRDetModelInitializeFailed;
+        return MDStatusCode::OCRDetModelInitializeFailed;
     }
     if (!rec_model->Initialized()) {
         std::cerr << "Failed to initialize OCR recognition model." << std::endl;
-        return StatusCode::OCRRecModelInitializeFailed;
+        return MDStatusCode::OCRRecModelInitializeFailed;
     }
 
     det_model->GetPreprocessor().SetMaxSideLen(parameters->max_side_len);
@@ -41,7 +41,7 @@ StatusCode create_ocr_model(WModel *model, OCRModelParameters *parameters) {
 
     auto ocr_model = new fastdeploy::pipeline::PPOCRv4(det_model, rec_model);
     auto model_name = ocr_model->ModelName();
-    model->type = ModelType::OCR;
+    model->type = MDModelType::OCR;
     model->format = parameters->format;
     model->model_content = ocr_model;
     model->model_name = (char *) malloc((ocr_model->ModelName().size() + 1) * sizeof(char));
@@ -49,18 +49,18 @@ StatusCode create_ocr_model(WModel *model, OCRModelParameters *parameters) {
     ocr_model->SetRecBatchSize(parameters->rec_batch_size);
     if (!(ocr_model->Initialized())) {
         std::cerr << "Failed to initialize OCR model." << std::endl;
-        return StatusCode::ModelInitializeFailed;
+        return MDStatusCode::ModelInitializeFailed;
     }
-    return StatusCode::Success;
+    return MDStatusCode::Success;
 }
 
-WRect get_text_position(WModel *model, WImage *image, const char *text) {
-    cv::Mat cv_image = wimage_to_mat(image);
+MDRect md_get_text_position(MDModel *model, MDImage *image, const char *text) {
+    cv::Mat cv_image = md_image_to_mat(image);
     fastdeploy::vision::OCRResult res;
     auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
     bool res_status = ocr_model->Predict(cv_image, &res);
     if (!res_status) {
-        return WRect{0, 0, 0, 0};
+        return MDRect{0, 0, 0, 0};
     }
     for (int i = 0; i < res.boxes.size(); ++i) {
         std::vector<cv::Point> polygon;
@@ -69,43 +69,43 @@ WRect get_text_position(WModel *model, WImage *image, const char *text) {
                 polygon.emplace_back(res.boxes[i][j * 2], res.boxes[i][j * 2 + 1]);
             }
             cv::Rect boundingRect = cv::boundingRect(polygon);
-            return WRect{boundingRect.x, boundingRect.y, boundingRect.width, boundingRect.height};
+            return MDRect{boundingRect.x, boundingRect.y, boundingRect.width, boundingRect.height};
         }
     }
-    return WRect{0, 0, 0, 0};
+    return MDRect{0, 0, 0, 0};
 }
 
 
-StatusCode ocr_model_predict(WModel *model, WImage *image, WOCRResults *results) {
-    auto cv_image = wimage_to_mat(image);
+MDStatusCode md_ocr_model_predict(MDModel *model, MDImage *image, MDOCRResults *results) {
+    auto cv_image = md_image_to_mat(image);
     fastdeploy::vision::OCRResult res;
     auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
     bool res_status = ocr_model->Predict(cv_image, &res);
     if (!res_status) {
-        return StatusCode::ModelPredictFailed;
+        return MDStatusCode::ModelPredictFailed;
     }
     auto r_size = res.boxes.size();
     results->size = r_size;
     if (r_size == 0) {
         results->data = nullptr;
-        return StatusCode::Success;
+        return MDStatusCode::Success;
     }
-    results->data = (WOCRResult *) malloc(sizeof(WOCRResult) * r_size);
+    results->data = (MDOCRResult *) malloc(sizeof(MDOCRResult) * r_size);
     for (int i = 0; i < r_size; ++i) {
         auto text = res.text[i];
         results->data[i].text = (char *) malloc(text.size() + 1);
         memcpy(results->data[i].text, text.c_str(), text.size() + 1);
         results->data[i].score = res.rec_scores[i];
-        WPolygon polygon{(WPoint *) malloc(sizeof(WPoint) * 4), 4};
+        MDPolygon polygon{(MDPoint *) malloc(sizeof(MDPoint) * 4), 4};
         for (int j = 0; j < 4; ++j) {
             polygon.data[j] = {res.boxes[i][j * 2], res.boxes[i][j * 2 + 1]};
         }
         results->data[i].box = polygon;
     }
-    return StatusCode::Success;
+    return MDStatusCode::Success;
 }
 
-void print_ocr_result(WOCRResults *result) {
+void md_print_ocr_result(MDOCRResults *result) {
     if (!result) return;
     for (int i = 0; i < result->size; ++i) {
         std::cout << "box: " << format_polygon(result->data[i].box) << " text: "
@@ -113,10 +113,10 @@ void print_ocr_result(WOCRResults *result) {
     }
 }
 
-void draw_ocr_result(WImage *image, WOCRResults *results, const char *font_path, int font_size, WColor color,
+void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path, int font_size, MDColor color,
                      double alpha, int save_result) {
     cv::Mat cv_image, overlay;
-    cv_image = wimage_to_mat(image);
+    cv_image = md_image_to_mat(image);
     cv_image.copyTo(overlay);
     cv::FontFace font(font_path);
     cv::Scalar cv_color(color.b, color.g, color.r);
@@ -157,7 +157,7 @@ void draw_ocr_result(WImage *image, WOCRResults *results, const char *font_path,
 
 }
 
-void free_ocr_result(WOCRResults *result) {
+void md_free_ocr_result(MDOCRResults *result) {
     if (!result) return;
     for (int i = 0; i < result->size; ++i) {
         free(result->data[i].text);
@@ -167,7 +167,7 @@ void free_ocr_result(WOCRResults *result) {
     result->size = 0;
 }
 
-void free_ocr_model(WModel *model) {
+void md_free_ocr_model(MDModel *model) {
     if (!model) return;
     free(model->model_name);
     delete static_cast<PPOCRv4 *>(model->model_content);

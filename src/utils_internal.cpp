@@ -4,7 +4,7 @@
 #include "utils_internal.h"
 #include <random>
 
-cv::Mat wimage_to_mat(WImage *image) {
+cv::Mat md_image_to_mat(MDImage *image) {
     int cv_type = CV_8UC3;
     if (image->channels == 1) {
         cv_type = CV_8UC1;
@@ -15,8 +15,8 @@ cv::Mat wimage_to_mat(WImage *image) {
 }
 
 
-WImage *mat_to_wimage(const cv::Mat &mat) {
-    auto wImage = (WImage *) malloc(sizeof(WImage));
+MDImage *mat_to_md_image(const cv::Mat &mat) {
+    auto wImage = (MDImage *) malloc(sizeof(MDImage));
     // 设置宽度和高度
     wImage->width = mat.cols;
     wImage->height = mat.rows;
@@ -65,7 +65,7 @@ bool contains_substring(const std::string &str, const std::string &sub_str) {
     return str.find(sub_str) != std::string::npos;
 }
 
-std::string format_polygon(WPolygon polygon) {
+std::string format_polygon(MDPolygon polygon) {
     std::ostringstream os;
     os << "polygon: {";
     for (int i = 0; i < polygon.size; i++) {
@@ -78,9 +78,9 @@ std::string format_polygon(WPolygon polygon) {
     return os.str();
 }
 
-std::string format_rect(WRect rect) {
+std::string format_rect(MDRect rect) {
     std::ostringstream os;
-    os << "WRect {" << "x: " << rect.x << ", " << "y: " << rect.y << ", "
+    os << "MDRect {" << "x: " << rect.x << ", " << "y: " << rect.y << ", "
        << "width: " << rect.width << ", " << "height: " << rect.height << "}";
     return os.str();
 }
@@ -89,5 +89,7 @@ cv::Scalar get_random_color() {
     std::random_device rd;  // 获取随机数种子
     std::mt19937 gen(rd()); // 使用Mersenne Twister算法生成随机数
     std::uniform_int_distribution<> dis(0, 255); // 定义随机数范围为1到255
-    return cv::Scalar(dis(gen), dis(gen), dis(gen));
+    return {static_cast<double>((int) dis(gen)),
+            static_cast<double>((int) dis(gen)),
+            static_cast<double>((int) dis(gen))};
 }
