@@ -3,6 +3,7 @@
 #include "src/detection_capi.h"
 #include "src/utils.h"
 #include <chrono>
+#include "src/face/face_capi.h"
 
 #ifdef _WIN32
 

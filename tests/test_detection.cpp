@@ -63,7 +63,8 @@ TEST_CASE("test create detection model function", "[create_detection_model]") {
 }
 
 TEST_CASE("test set detection input size function", "[set_detection_input_size]") {
-    REQUIRE (test_set_detection_input_size("../../tests/models/best.onnx", MDModelFormat::ONNX) == MDStatusCode::Success);
+    REQUIRE (test_set_detection_input_size("../../tests/models/best.onnx", MDModelFormat::ONNX) ==
+             MDStatusCode::Success);
     REQUIRE (test_set_detection_input_size("../../tests/models/ppyoloe", MDModelFormat::PaddlePaddle) ==
              MDStatusCode::CallError);
 }
