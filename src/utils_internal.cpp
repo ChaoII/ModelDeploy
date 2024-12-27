@@ -5,28 +5,44 @@
 #include <random>
 
 cv::Mat md_image_to_mat(MDImage *image) {
+    if (!image) {
+        return {};
+    }
     int cv_type = CV_8UC3;
     if (image->channels == 1) {
         cv_type = CV_8UC1;
     } else if (image->channels == 4) {
         cv_type = CV_8UC4;
     }
-    return {image->height, image->width, cv_type, image->data};
+    auto mat = cv::Mat(image->height, image->width, cv_type, image->data);
+    return mat;
 }
 
 
-MDImage *mat_to_md_image(const cv::Mat &mat) {
-    auto wImage = (MDImage *) malloc(sizeof(MDImage));
+MDImage* mat_to_md_image(const cv::Mat &mat) {
+    auto md_image = (MDImage*)malloc(sizeof(MDImage));
     // 设置宽度和高度
-    wImage->width = mat.cols;
-    wImage->height = mat.rows;
-    wImage->channels = mat.channels();
-    wImage->data = (unsigned char *) malloc(mat.total() * mat.elemSize());
+    md_image->width = mat.cols;
+    md_image->height = mat.rows;
+    md_image->channels = mat.channels();
+    md_image->data = (unsigned char *) malloc(mat.total() * mat.elemSize());
     // 复制数据
-    std::memcpy(wImage->data, mat.data, mat.total() * mat.elemSize());
+    std::memcpy(md_image->data, mat.data, mat.total() * mat.elemSize());
     // 设置图像类型
-    return wImage;
+    return md_image;
 }
+
+#ifdef BUILD_FACE
+SeetaImageData md_image_to_seeta_image(MDImage *image) {
+    SeetaImageData seeta_image{
+            .width = image->width,
+            .height = image->height,
+            .channels = image->channels,
+            .data = image->data
+    };
+    return seeta_image;
+}
+#endif
 
 void draw_rect_internal(cv::Mat &cv_image, const cv::Rect &rect, const cv::Scalar &cv_color, double alpha) {
     cv::Mat overlay;

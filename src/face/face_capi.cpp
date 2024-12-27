@@ -3,107 +3,107 @@
 //
 
 #include "face_capi.h"
+#include "face_model.h"
+#include "../utils_internal.h"
 
 
-#include <opencv2/opencv.hpp>
-#include <seeta/FaceDetector.h>
-#include <seeta/FaceLandmarker.h>
-#include <seeta/FaceRecognizer.h>
-#include <seeta/FaceTracker.h>
-#include <seeta/FaceAntiSpoofing.h>
-
-
-using namespace std;
-using namespace seeta;
-
-MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int thread_num = 8) {
-
-    ModelSetting fd_setting;
-    fd_setting.append(model_dir + "face_detector.csta");
-    fd_setting.set_device(ModelSetting::CPU);
-    FD_ = std::make_shared<FaceDetector>(fd_setting);
-    FD_->set(seeta::FaceDetector::PROPERTY_NUMBER_THREADS, face_recognition_thread_num);
-    // face_land_marker
-    ModelSetting pd_setting;
-    pd_setting.append(model_dir + "face_landmarker_pts5.csta");
-    pd_setting.set_device(ModelSetting::CPU);
-    FL_ = std::make_shared<FaceLandmarker>(pd_setting);
-    //face_recognizer
-    ModelSetting fr_setting;
-    fr_setting.append(model_dir + "face_recognizer.csta");
-    fr_setting.set_device(ModelSetting::CPU);
-    FR_ = std::make_shared<FaceRecognizer>(fr_setting);
-    FR_->set(seeta::FaceRecognizer::PROPERTY_NUMBER_THREADS, face_recognition_thread_num);
-    // face_anti_spoofing
-    seeta::ModelSetting fs_setting;
-    fs_setting.append(model_dir + "fas_first.csta");
-    fs_setting.set_device(ModelSetting::CPU);
-    FS_ = std::make_shared<FaceAntiSpoofing>(fs_setting);
-    FS_->set(seeta::FaceAntiSpoofing::PROPERTY_NUMBER_THREADS, face_recognition_thread_num);
-    // unsupported set thread number
-
+MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int flag, int thread_num) {
+    auto face_model = new FaceModel(model_dir, flag, thread_num);
+    model->type = MDModelType::FACE;
+    model->format = MDModelFormat::Tennis;
+    model->model_content = face_model;
+    std::string model_name = "FaceNet";
+    model->model_name = (char *) malloc((model_name.size() + 1) * sizeof(char));
+    memcpy(model->model_name, model_name.c_str(), model_name.size() + 1);
+    return MDStatusCode::Success;
 }
 
 
-
-bool SeetaFace::extractFeature(cv::Mat &img, float *feature) {
-
-    SeetaImageData data = utils::cvMatToSImg(img);
-    auto faces = FD_->detect(data);
-    if (faces.size <= 0) {
-        return false;
+MDStatusCode md_extract_feature(MDModel *model, MDImage *image, MDFaceFeature *md_feature) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    auto seeta_image = md_image_to_seeta_image(image);
+    auto faces = face_model->face_detection(seeta_image);
+    if (faces.empty()) {
+        return MDStatusCode::NotFoundFace;
     }
-    SeetaPointF points[5];
-    FL_->mark(data, faces.data[0].pos, points);
-    FR_->Extract(data, points, feature);
-    return true;
+    auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    auto features = face_model->extract_feature(seeta_image, points);
+    md_feature->size = features.size();
+    md_feature->data = (float *) malloc(features.size() * sizeof(float));
+    memcpy(md_feature->data, features.data(), features.size() * sizeof(float));
+    return MDStatusCode::Success;
 }
 
-std::vector<SeetaFaceInfo> SeetaFace::faceDetection(cv::Mat &img) {
-    SeetaImageData data = utils::cvMatToSImg(img);
-    auto faces_ = FD_->detect(data);
-    std::vector<SeetaFaceInfo> faces;
-    for (int i = 0; i < faces_.size; i++) {
-        faces.push_back(faces_.data[i]);
+MDStatusCode md_face_anti_spoofing(MDModel *model, MDImage *image, MDFaceAntiSpoofingResult *result) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    auto seeta_image = md_image_to_seeta_image(image);
+    auto faces = face_model->face_detection(seeta_image);
+    if (faces.empty()) {
+        return MDStatusCode::NotFoundFace;
     }
-    // 排序，将人脸由大到小进行排列
-    std::partial_sort(faces.begin(), faces.begin() + 1, faces.end(),
-                      [](SeetaFaceInfo a, SeetaFaceInfo b) {
-                          return a.pos.width > b.pos.width;
-                      });
-    return faces;
+    auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    *result = (MDFaceAntiSpoofingResult) face_model->face_anti_spoofing(seeta_image, faces[0].pos, points);
+    return MDStatusCode::Success;
 }
 
-QPair<int64_t, float> SeetaFace::faceRecognition(cv::Mat &img, std::vector<SeetaPointF> points) {
-    SeetaImageData data = utils::cvMatToSImg(img);
-    unique_ptr<float[]> feature(new float[FR_->GetExtractFeatureSize()]);
-    FR_->Extract(data, points.data(), feature.get());
-    SearchResult result = VectorSearch::getInstance().search(feature.get(), 3);
-    return {result.I[0], result.D[0]};
-}
 
-std::vector<SeetaPointF> SeetaFace::faceMarker(cv::Mat &img, const SeetaRect &rect) {
-    SeetaImageData data = utils::cvMatToSImg(img);
-    int point_nums = FL_->number();
-    std::vector<SeetaPointF> points(point_nums);
-    FL_->mark(data, rect, points.data());
-    return points;
-}
-
-bool SeetaFace::faceQualityAuthorize(cv::Mat &img) {
-    shared_ptr<float> feature(new float[FR_->GetExtractFeatureSize()]);
-    bool rt = extractFeature(img, feature.get());
-    if (!rt) {
-        return false;
+MDStatusCode
+md_quality_evaluate(MDModel *model, MDImage *image, MDFaceQualityEvaluateType type, MDFACEQualityEvaluateRule *result) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    auto seeta_image = md_image_to_seeta_image(image);
+    auto faces = face_model->face_detection(seeta_image);
+    if (faces.empty()) {
+        return MDStatusCode::NotFoundFace;
     }
-    return true;
+    auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    auto r = face_model->quality_evaluate(seeta_image, faces[0].pos, points, FaceModel::QualityEvaluateType(type));
+    *result = (MDFACEQualityEvaluateRule) r.level;
+    return MDStatusCode::Success;
 }
 
-Status SeetaFace::faceAntiSpoofing(cv::Mat &img, const SeetaRect &rect, std::vector<SeetaPointF> points) {
-    SeetaImageData data = utils::cvMatToSImg(img);
-    return FS_->Predict(data, rect, points.data());
+MDStatusCode md_age_predict(MDModel *model, MDImage *image, int *age) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    auto seeta_image = md_image_to_seeta_image(image);
+    auto faces = face_model->face_detection(seeta_image);
+    if (faces.empty()) {
+        return MDStatusCode::NotFoundFace;
+    }
+    auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    *age = face_model->age_predict(seeta_image, points);
+    return Success;
 }
 
+MDStatusCode md_gender_predict(MDModel *model, MDImage *image, MDGenderResult *gender) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    auto seeta_image = md_image_to_seeta_image(image);
+    auto faces = face_model->face_detection(seeta_image);
+    if (faces.empty()) {
+        return MDStatusCode::NotFoundFace;
+    }
+    auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    *gender = (MDGenderResult) face_model->gender_predict(seeta_image, points);
+    return Success;
+}
+
+MDStatusCode md_eye_state_predict(MDModel *model, MDImage *image, MDEyeStateResult *eye_state) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    auto seeta_image = md_image_to_seeta_image(image);
+    auto faces = face_model->face_detection(seeta_image);
+    if (faces.empty()) {
+        return MDStatusCode::NotFoundFace;
+    }
+    auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    auto eye_state_result = face_model->eye_state_predict(seeta_image, points);
+    eye_state->left_eye = (MDEyeState) eye_state_result.first;
+    eye_state->right_eye = (MDEyeState) eye_state_result.second;
+    return Success;
+}
 
 
 

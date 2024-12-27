@@ -44,7 +44,7 @@ MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameter
     model->type = MDModelType::OCR;
     model->format = parameters->format;
     model->model_content = ocr_model;
-    model->model_name = (char *) malloc((ocr_model->ModelName().size() + 1) * sizeof(char));
+    model->model_name = (char *) malloc((model_name.size() + 1) * sizeof(char));
     memcpy(model->model_name, model_name.c_str(), model_name.size() + 1);
     ocr_model->SetRecBatchSize(parameters->rec_batch_size);
     if (!(ocr_model->Initialized())) {
@@ -54,7 +54,7 @@ MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameter
     return MDStatusCode::Success;
 }
 
-MDRect md_get_text_position(MDModel *model, MDImage *image, const char *text) {
+MDRect md_get_text_position(MDModel *model, MDImage* image, const char *text) {
     cv::Mat cv_image = md_image_to_mat(image);
     fastdeploy::vision::OCRResult res;
     auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
@@ -113,13 +113,13 @@ void md_print_ocr_result(MDOCRResults *result) {
     }
 }
 
-void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path, int font_size, MDColor color,
+void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path, int font_size, MDColor* color,
                      double alpha, int save_result) {
     cv::Mat cv_image, overlay;
     cv_image = md_image_to_mat(image);
     cv_image.copyTo(overlay);
     cv::FontFace font(font_path);
-    cv::Scalar cv_color(color.b, color.g, color.r);
+    cv::Scalar cv_color(color->b, color->g, color->r);
     // 绘制半透明部分（填充矩形）
     for (int i = 0; i < results->size; ++i) {
         auto polygon = results->data[i].box;

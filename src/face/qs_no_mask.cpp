@@ -3,13 +3,14 @@
 //
 
 #include "qs_no_mask.h"
+
 namespace seeta {
     QualityOfNoMask::QualityOfNoMask(std::shared_ptr<seeta::FaceLandmarker> ld_) {
         m_marker = std::move(ld_);
     }
 
-    QualityResult
-    QualityOfNoMask::check(const SeetaImageData &image, const SeetaRect &face, const SeetaPointF *points, int32_t N) {
+    QualityResult QualityOfNoMask::check(const SeetaImageData &image, const SeetaRect &face,
+                                         const SeetaPointF *points, int32_t N) {
         auto mask_points = m_marker->mark_v2(image, face);
         int mask_count = 0;
         for (auto point: mask_points) {

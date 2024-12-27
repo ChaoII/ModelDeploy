@@ -28,20 +28,54 @@ using Status = seeta::FaceAntiSpoofing::Status;
 
 class FaceModel {
 public:
-    explicit FaceModel(const std::string &model_dir, int thread_num);
 
-    bool extract_feature(const SeetaImageData &image, std::vector<float> &feature);
+    enum class QualityEvaluateType : int {
+        BRIGHTNESS = 0,
+        CLARITY = 1,
+        INTEGRITY = 2,
+        POSE = 3,
+        RESOLUTION = 4,
+        CLEAR = 5,
+        NO_MASK = 6
+    };
+
+
+
+
+public:
+    explicit FaceModel(const std::string &model_dir,
+                       int flag,
+                       int thread_num = 1);
+
+    std::vector<float> extract_feature(const SeetaImageData &image, std::vector<SeetaPointF> points);
 
     std::vector<SeetaFaceInfo> face_detection(const SeetaImageData &image);
 
     std::vector<SeetaPointF> face_marker(const SeetaImageData &image, const SeetaRect &rect);
 
-    bool face_quality_authorize(const SeetaImageData &image);
+    /// 设置 spoofing 阈值
+    /// \param clarity_threshold 默认为0.3
+    /// \param reality_threshold 默认为0.8
+    void set_anti_spoofing_threshold(float clarity_threshold, float reality_threshold);
 
     Status face_anti_spoofing(const SeetaImageData &image, const SeetaRect &rect, std::vector<SeetaPointF> points);
 
 
+    seeta::QualityResult quality_evaluate(const SeetaImageData &image, const SeetaRect &face,
+                                          const std::vector<SeetaPointF> &points, QualityEvaluateType type);
+
+
+    int age_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points);
+
+    seeta::GenderPredictor::GENDER gender_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points);
+
+    std::pair<seeta::EyeStateDetector::EYE_STATE, seeta::EyeStateDetector::EYE_STATE>
+    eye_state_predict(const SeetaImageData &img, const std::vector<SeetaPointF> &points);
+
+
 private:
+
+    int flag_;
     std::shared_ptr<seeta::FaceDetector> detect_ = nullptr;
     std::shared_ptr<seeta::FaceLandmarker> landmark_ = nullptr;
     std::shared_ptr<seeta::FaceRecognizer> recognize_ = nullptr;
