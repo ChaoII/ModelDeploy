@@ -40,8 +40,6 @@ public:
     };
 
 
-
-
 public:
     explicit FaceModel(const std::string &model_dir,
                        int flag,
@@ -64,6 +62,7 @@ public:
     seeta::QualityResult quality_evaluate(const SeetaImageData &image, const SeetaRect &face,
                                           const std::vector<SeetaPointF> &points, QualityEvaluateType type);
 
+    bool check_flag(int flag_check);
 
     int age_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points);
 
