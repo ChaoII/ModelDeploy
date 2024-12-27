@@ -64,7 +64,7 @@ FaceModel::FaceModel(const std::string &model_dir, int flag, int thread_num) {
         age_ = std::make_shared<seeta::AgePredictor>(age_setting);
     }
 
-    if (flag_ & MD_FACE_EYE_STATE) {
+    if (flag_ & MD_FACE_GENDER_ATTRIBUTE) {
         seeta::ModelSetting gender_setting;
         gender_setting.append(model_dir + "/gender_predictor.csta");
         gender_setting.set_device(ModelSetting::CPU);
@@ -83,7 +83,7 @@ FaceModel::FaceModel(const std::string &model_dir, int flag, int thread_num) {
 std::vector<float> FaceModel::extract_feature(const SeetaImageData &image, std::vector<SeetaPointF> points) {
     if (!(flag_ & MD_FACE_RECOGNITION)) throw std::runtime_error("FACE_RECOGNITION flag is not enabled");
     assert(points.size() == 5);
-    std::vector<float> feature;
+    std::vector<float> feature(recognize_->GetExtractFeatureSize());
     recognize_->Extract(image, points.data(), feature.data());
     return feature;
 }
@@ -153,6 +153,10 @@ seeta::QualityResult FaceModel::quality_evaluate(const SeetaImageData &image,
     }
 }
 
+bool FaceModel::check_flag(int flag_check) {
+    return flag_ & flag_check;
+}
+
 int FaceModel::age_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points) {
     if (!(flag_ & MD_FACE_AGE_ATTRIBUTE)) throw std::runtime_error("FACE_AGE_ATTRIBUTE flag is not enabled");
     assert(points.size() == 5);
@@ -178,3 +182,5 @@ FaceModel::eye_state_predict(const SeetaImageData &img,
     eye_state_->Detect(img, points.data(), left_eye, right_eye);
     return std::make_pair(left_eye, right_eye);
 }
+
+
