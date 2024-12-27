@@ -42,7 +42,7 @@ EXPORT_DECL void md_print_ocr_result(MDOCRResults *results);
 /// \param alpha 不透明度
 /// \param save_result 是否保存结果
 EXPORT_DECL void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path,
-                                 int font_size, MDColor color, double alpha, int save_result);
+                                 int font_size, MDColor* color, double alpha, int save_result);
 
 /// 释放文本识别结果
 EXPORT_DECL void md_free_ocr_result(MDOCRResults *results);

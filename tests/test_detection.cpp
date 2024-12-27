@@ -26,7 +26,7 @@ MDStatusCode test_detection_model_predict() {
     md_set_detection_input_size(&model, {1440, 1440});
     auto im = md_read_image("../../tests/test_images/test_detection.png");
     MDDetectionResults result;
-    return md_detection_predict(&model, im, &result);
+    return md_detection_predict(&model, &im, &result);
 }
 
 void test_release_detection_result1() {

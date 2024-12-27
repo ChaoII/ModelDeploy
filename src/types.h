@@ -4,24 +4,42 @@
 
 #pragma once
 
+#define MD_FACE_DETECT             0b00000001
+#define MD_FACE_LANDMARK           0b00000001 << 1
+#define MD_FACE_RECOGNITION        0b00000001 << 2
+#define MD_FACE_ANTI_SPOOfING      0b00000001 << 3
+#define MD_FACE_QUALITY_EVALUATE   0b00000001 << 4
+#define MD_FACE_AGE_ATTRIBUTE      0b00000001 << 5
+#define MD_FACE_GENDER_ATTRIBUTE   0b00000001 << 6
+#define MD_FACE_EYE_STATE          0b00000001 << 7
+
+
+#define MD_MASK (MD_FACE_DETECT | MD_FACE_LANDMARK | MD_FACE_RECOGNITION)
+
+
 enum MDModelFormat {
     ONNX = 0,
     PaddlePaddle = 1,
+    Tennis = 2,
 };
 
 enum MDModelType {
     OCR = 0,
     Detection = 1,
+    FACE = 2,
 };
 
 enum MDStatusCode {
     Success = 0x00,
     CallError = 0x01,
-    ModelInitializeFailed = 0x03,
-    ModelPredictFailed = 0x04,
-    MemoryAllocatedFailed = 0x05,
-    OCRDetModelInitializeFailed = 0x06,
-    OCRRecModelInitializeFailed = 0x07,
+    ModelInitializeFailed = 0x02,
+    ModelPredictFailed = 0x03,
+    MemoryAllocatedFailed = 0x04,
+    OCRDetModelInitializeFailed = 0x05,
+    OCRRecModelInitializeFailed = 0x06,
+
+    ModelTypeError = 0x07,
+    NotFoundFace = 0x08,
 };
 
 typedef struct {
@@ -117,3 +135,47 @@ typedef struct {
 } MDDetectionResults;
 
 
+typedef struct {
+    float *data;
+    size_t size;
+} MDFaceFeature;
+
+
+enum MDFaceAntiSpoofingResult {
+    REAL = 0,
+    SPOOF = 1,
+    FUZZY = 2,
+    DETECTING = 3
+};
+
+enum MDFaceQualityEvaluateType {
+    BRIGHTNESS = 0,
+    CLARITY = 1,
+    INTEGRITY = 2,
+    POSE = 3,
+    RESOLUTION = 4,
+    CLEAR = 5,
+    NO_MASK = 6
+};
+
+enum MDFACEQualityEvaluateRule {
+    LOW = 0,
+    MEDIUM = 1,
+    HIGH = 2
+};
+
+enum MDGenderResult {
+    MALE = 0,
+    FEMALE = 1
+};
+enum MDEyeState {
+    EYE_CLOSE = 0,
+    EYE_OPEN = 1,
+    EYE_RANDOM = 2,
+    EYE_UNKNOWN = 3
+};
+
+typedef struct {
+    MDEyeState left_eye;
+    MDEyeState right_eye;
+} MDEyeStateResult;

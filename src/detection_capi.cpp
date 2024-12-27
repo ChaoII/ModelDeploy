@@ -10,7 +10,8 @@
 using YOLOv8 = fastdeploy::vision::detection::YOLOv8;
 using PPYOLOE = fastdeploy::vision::detection::PPYOLOE;
 
-MDStatusCode md_create_detection_model(MDModel *model, const char *model_dir, int thread_num, MDModelFormat model_format) {
+MDStatusCode
+md_create_detection_model(MDModel *model, const char *model_dir, int thread_num, MDModelFormat model_format) {
     if (!model) {
         return MDStatusCode::MemoryAllocatedFailed;
     }
@@ -40,14 +41,17 @@ MDStatusCode md_create_detection_model(MDModel *model, const char *model_dir, in
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_set_detection_input_size(MDModel *model, MDSize size) {
+MDStatusCode md_set_detection_input_size(const MDModel *model, const MDSize size) {
+
+
+    if (!model) return MDStatusCode::MemoryAllocatedFailed;
     if (model->format == MDModelFormat::PaddlePaddle) return MDStatusCode::CallError;
     auto detection_model = static_cast<YOLOv8 *> (model->model_content);
     detection_model->GetPreprocessor().SetSize({size.height, size.height});
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_detection_predict(MDModel *model, MDImage *image, MDDetectionResults *results) {
+MDStatusCode md_detection_predict(const MDModel *model, MDImage *image, MDDetectionResults *results) {
     auto cv_image = md_image_to_mat(image);
     fastdeploy::vision::DetectionResult res;
     auto detection_model = static_cast<YOLOv8 *> (model->model_content);
@@ -72,8 +76,8 @@ MDStatusCode md_detection_predict(MDModel *model, MDImage *image, MDDetectionRes
 }
 
 
-void md_print_detection_result(MDDetectionResults *result) {
-    if (!result) return;
+void md_print_detection_result(const MDDetectionResults *result) {
+
     for (int i = 0; i < result->size; ++i) {
         std::cout << "box: " << format_rect(result->data[i].box) << " label_id: "
                   << result->data[i].label_id << " score: " << result->data[i].score << std::endl;
@@ -81,7 +85,7 @@ void md_print_detection_result(MDDetectionResults *result) {
 }
 
 
-void md_draw_detection_result(MDImage *image, MDDetectionResults *result, const char *font_path, int font_size,
+void md_draw_detection_result(MDImage *image, const MDDetectionResults *result, const char *font_path, int font_size,
                               double alpha, int save_result) {
     cv::Mat cv_image, overlay;
     cv_image = md_image_to_mat(image);
@@ -109,10 +113,10 @@ void md_draw_detection_result(MDImage *image, MDDetectionResults *result, const 
         auto cv_color = color_map[class_id];
         cv::rectangle(cv_image, cv::Rect(box.x, box.y, box.width, box.height), cv_color, 1, cv::LINE_AA, 0);
         auto size = cv::getTextSize(cv::Size(0, 0), std::to_string(class_id),
-        cv::Point(box.x, box.y), font, font_size);
+                                    cv::Point(box.x, box.y), font, font_size);
         cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
         cv::putText(cv_image, std::to_string(class_id), cv::Point(box.x, box.y - 2),
-        cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
+                    cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
     }
     if (save_result) {
         cv::imwrite("vis_result.jpg", cv_image);
@@ -120,20 +124,25 @@ void md_draw_detection_result(MDImage *image, MDDetectionResults *result, const 
 }
 
 
-
 void md_free_detection_result(MDDetectionResults *result) {
-    if (result != nullptr) {
-        if (result->size > 0 && result->data != nullptr) {
-            free(result->data);
-        }
+    if (result == nullptr) return;
+    if (result->size > 0 && result->data != nullptr) {
+        result->size = 0;
+        free(result->data);
+        result->data = nullptr;
     }
+
 }
 
 
 void md_free_detection_model(MDModel *model) {
-    if (!model) return;
-    free(model->model_name);
+    if (model == nullptr) return;
+    if (model->model_name != nullptr) {
+        free(model->model_name);
+        model->model_name = nullptr;
+    }
     delete static_cast<YOLOv8 *>(model->model_content);
+    model->model_content = nullptr;
 }
 
 

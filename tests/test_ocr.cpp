@@ -21,7 +21,7 @@ MDStatusCode test_ocr_model_predict(MDOCRModelParameters *parameters) {
     md_create_ocr_model(&model, parameters);
     auto im = md_read_image("../../tests/test_images/test_ocr.png");
     MDOCRResults result;
-    return md_ocr_model_predict(&model, im, &result);
+    return md_ocr_model_predict(&model, &im, &result);
 }
 
 void test_release_ocr_result1() {
@@ -40,8 +40,8 @@ MDRect test_get_text_position(const char *text) {
             0, 8
     };
 md_create_ocr_model(&model, &parameters);
-    MDImage *im = md_read_image("../../tests/test_images/test_ocr.png");
-    return md_get_text_position(&model, im, text);
+    auto im = md_read_image("../../tests/test_images/test_ocr.png");
+    return md_get_text_position(&model, &im, text);
 }
 
 void test_release_ocr_result2() {
