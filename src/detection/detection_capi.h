@@ -5,8 +5,8 @@
 #pragma once
 
 
-#include "decl.h"
-#include "types.h"
+#include "../decl.h"
+#include "../types.h"
 
 #ifdef __cplusplus
 extern "C" {

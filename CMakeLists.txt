@@ -29,7 +29,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 list(APPEND DEPENDS ${FASTDEPLOY_LIBS})
 add_definitions(-DMODEL_DEPLOY_LIB)
 # 添加FastDeploy依赖头文件
-file(GLOB SDK_SOURCE ${CMAKE_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE SDK_SOURCE ${CMAKE_SOURCE_DIR}/src/*.cpp)
 if (BUILD_FACE)
     set(SEETA_PATH "E:/develop/SeetaFace" CACHE PATH "seeta face directory")
     include_directories(${SEETA_PATH}/include)

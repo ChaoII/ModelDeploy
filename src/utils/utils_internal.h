@@ -8,7 +8,7 @@
 #include "seeta/CStruct.h"
 #endif
 
-#include "types.h"
+#include "../types.h"
 
 /// 将MDImage转换为cv::Mat
 /// \param image

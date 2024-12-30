@@ -7,8 +7,8 @@
 namespace seeta {
 
     QualityOfClarityEx::QualityOfClarityEx(const std::string &model_dir) {
-        m_lbn = std::make_shared<QualityOfLBN>(ModelSetting("quality_lbn.csta"));
-        m_marker = std::make_shared<FaceLandmarker>(ModelSetting("face_landmarker_pts68.csta"));
+        m_lbn = std::make_shared<QualityOfLBN>(ModelSetting(model_dir + "/quality_lbn.csta"));
+        m_marker = std::make_shared<FaceLandmarker>(ModelSetting(model_dir + "/face_landmarker_pts68.csta"));
     }
 
     QualityResult QualityOfClarityEx::check(const SeetaImageData &image, const SeetaRect &face,
