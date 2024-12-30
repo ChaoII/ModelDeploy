@@ -4,7 +4,7 @@
 
 #include "face_capi.h"
 #include "face_model.h"
-#include "../utils_internal.h"
+#include "../utils/utils_internal.h"
 
 
 MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int flag, int thread_num) {
@@ -18,7 +18,7 @@ MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int fla
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_face_detection(MDModel *model, MDImage *image, MDDetectionResults *result) {
+MDStatusCode md_face_detection(const MDModel *model, MDImage *image, MDDetectionResults *result) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
@@ -42,14 +42,14 @@ MDStatusCode md_face_detection(MDModel *model, MDImage *image, MDDetectionResult
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_face_marker(MDModel *model, MDImage *image, MDRect rect, MDLandMarkResult *result) {
+MDStatusCode md_face_marker(const MDModel *model, MDImage *image, const MDRect *rect, MDLandMarkResult *result) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
     if (!face_model->check_flag(MD_FACE_LANDMARK)) {
         return MDStatusCode::FaceLandmarkFlagNotSetError;
     }
-    auto points = face_model->face_marker(seeta_image, {rect.x, rect.y, rect.width, rect.height});
+    auto points = face_model->face_marker(seeta_image, {rect->x, rect->y, rect->width, rect->height});
     if (points.empty()) {
         return MDStatusCode::NotFoundLandmark;
     }
@@ -62,7 +62,8 @@ MDStatusCode md_face_marker(MDModel *model, MDImage *image, MDRect rect, MDLandM
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_face_feature(MDModel *model, MDImage *image, MDLandMarkResult *points, MDFaceFeature *feature) {
+MDStatusCode
+md_face_feature(const MDModel *model, MDImage *image, const MDLandMarkResult *points, MDFaceFeature *feature) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     if (!face_model->check_flag(MD_FACE_RECOGNITION)) {
@@ -85,7 +86,7 @@ MDStatusCode md_face_feature(MDModel *model, MDImage *image, MDLandMarkResult *p
 }
 
 
-MDStatusCode md_face_feature_e2e(MDModel *model, MDImage *image, MDFaceFeature *md_feature) {
+MDStatusCode md_face_feature_e2e(const MDModel *model, MDImage *image, MDFaceFeature *md_feature) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     if (!face_model->check_flag(MD_FACE_DETECT)) {
@@ -110,7 +111,21 @@ MDStatusCode md_face_feature_e2e(MDModel *model, MDImage *image, MDFaceFeature *
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_face_anti_spoofing(MDModel *model, MDImage *image, MDFaceAntiSpoofingResult *result) {
+MDStatusCode md_face_feature_compare(const MDModel *model, const MDFaceFeature *feature1,
+                                     const MDFaceFeature *feature2, float *similarity) {
+    if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
+    auto face_model = static_cast<FaceModel *>(model->model_content);
+    if (!face_model->check_flag(MD_FACE_RECOGNITION)) {
+        return MDStatusCode::FaceRecognitionFlagNotSetError;
+    }
+    int size = face_model->get_feature_size();
+    auto feature1_vec = std::vector<float>(feature1->data, feature1->data + size);
+    auto feature2_vec = std::vector<float>(feature2->data, feature2->data + size);
+    *similarity = face_model->face_feature_compare(feature1_vec, feature2_vec);
+    return MDStatusCode::Success;
+}
+
+MDStatusCode md_face_anti_spoofing(const MDModel *model, MDImage *image, MDFaceAntiSpoofingResult *result) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
@@ -132,24 +147,34 @@ MDStatusCode md_face_anti_spoofing(MDModel *model, MDImage *image, MDFaceAntiSpo
     return MDStatusCode::Success;
 }
 
-
-MDStatusCode
-md_face_quality_evaluate(MDModel *model, MDImage *image, MDFaceQualityEvaluateType type,
-                         MDFACEQualityEvaluateResult *result) {
+MDStatusCode md_face_quality_evaluate(const MDModel *model, MDImage *image,
+                                      MDFaceQualityEvaluateType type, MDFaceQualityEvaluateResult *result) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
+    if (!face_model->check_flag(MD_FACE_DETECT)) {
+        return MDStatusCode::FaceDetectionFlagNotSetError;
+    }
     auto faces = face_model->face_detection(seeta_image);
     if (faces.empty()) {
         return MDStatusCode::NotFoundFace;
     }
+    if (!face_model->check_flag(MD_FACE_LANDMARK)) {
+        return MDStatusCode::FaceLandmarkFlagNotSetError;
+    }
     auto points = face_model->face_marker(seeta_image, faces[0].pos);
+    if (points.empty()) {
+        return MDStatusCode::NotFoundLandmark;
+    }
+    if (!face_model->check_flag(MD_FACE_QUALITY_EVALUATE)) {
+        return MDStatusCode::FaceQualityEvaluateFlagNotSetError;
+    }
     auto r = face_model->quality_evaluate(seeta_image, faces[0].pos, points, FaceModel::QualityEvaluateType(type));
-    *result = (MDFACEQualityEvaluateResult) r.level;
+    *result = (MDFaceQualityEvaluateResult) r.level;
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_face_age_predict(MDModel *model, MDImage *image, int *age) {
+MDStatusCode md_face_age_predict(const MDModel *model, MDImage *image, int *age) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
@@ -174,7 +199,7 @@ MDStatusCode md_face_age_predict(MDModel *model, MDImage *image, int *age) {
     return Success;
 }
 
-MDStatusCode md_face_gender_predict(MDModel *model, MDImage *image, MDGenderResult *gender) {
+MDStatusCode md_face_gender_predict(const MDModel *model, MDImage *image, MDGenderResult *gender) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
@@ -199,7 +224,7 @@ MDStatusCode md_face_gender_predict(MDModel *model, MDImage *image, MDGenderResu
     return Success;
 }
 
-MDStatusCode md_face_eye_state_predict(MDModel *model, MDImage *image, MDEyeStateResult *eye_state) {
+MDStatusCode md_face_eye_state_predict(const MDModel *model, MDImage *image, MDEyeStateResult *eye_state) {
     if (model->type != MDModelType::FACE) return MDStatusCode::ModelTypeError;
     auto face_model = static_cast<FaceModel *>(model->model_content);
     auto seeta_image = md_image_to_seeta_image(image);
@@ -239,6 +264,24 @@ void md_free_face_feature(MDFaceFeature *feature) {
         free(feature->data);
         feature->data = nullptr;
         feature->size = 0;
+    }
+}
+
+void md_print_face_anti_spoofing_result(MDFaceAntiSpoofingResult result) {
+    switch (result) {
+        case MDFaceAntiSpoofingResult::REAL:
+            printf("real\n");
+            break;
+        case MDFaceAntiSpoofingResult::SPOOF:
+            printf("spoof\n");
+            break;
+        case MDFaceAntiSpoofingResult::FUZZY:
+            printf("fuzzy\n");
+        case MDFaceAntiSpoofingResult::DETECTING:
+            printf("detecting\n");
+            break;
+        default:
+            printf("unknown\n");
     }
 }
 

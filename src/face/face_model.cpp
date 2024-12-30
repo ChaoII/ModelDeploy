@@ -53,7 +53,7 @@ FaceModel::FaceModel(const std::string &model_dir, int flag, int thread_num) {
         qs_integrity_ = std::make_shared<seeta::QualityOfIntegrity>();
         qs_pose_ = std::make_shared<seeta::QualityOfPose>();
         qs_resolution_ = std::make_shared<seeta::QualityOfResolution>();
-        qs_clear_ = std::make_shared<seeta::QualityOfClarityEx>(model_dir);
+        qs_clarity_ex_ = std::make_shared<seeta::QualityOfClarityEx>(model_dir);
         qs_no_mask_ = std::make_shared<seeta::QualityOfNoMask>(landmark_);
     }
 
@@ -86,6 +86,16 @@ std::vector<float> FaceModel::extract_feature(const SeetaImageData &image, std::
     std::vector<float> feature(recognize_->GetExtractFeatureSize());
     recognize_->Extract(image, points.data(), feature.data());
     return feature;
+}
+
+int FaceModel::get_feature_size() const {
+    if (!(flag_ & MD_FACE_RECOGNITION)) throw std::runtime_error("FACE_RECOGNITION flag is not enabled");
+    return recognize_->GetExtractFeatureSize();
+}
+
+float FaceModel::face_feature_compare(std::vector<float> feature1, std::vector<float> feature2) {
+    if (!(flag_ & MD_FACE_RECOGNITION)) throw std::runtime_error("MD_FACE_RECOGNITION flag is not enabled");
+    return recognize_->CalculateSimilarity(feature1.data(), feature2.data());
 }
 
 std::vector<SeetaFaceInfo> FaceModel::face_detection(const SeetaImageData &image) {
@@ -144,8 +154,8 @@ seeta::QualityResult FaceModel::quality_evaluate(const SeetaImageData &image,
             return qs_pose_->check(image, face, points.data(), int(points.size()));
         case QualityEvaluateType::RESOLUTION:
             return qs_resolution_->check(image, face, points.data(), int(points.size()));
-        case QualityEvaluateType::CLEAR:
-            return qs_clear_->check(image, face, points.data(), int(points.size()));
+        case QualityEvaluateType::CLARITY_EX:
+            return qs_clarity_ex_->check(image, face, points.data(), int(points.size()));
         case QualityEvaluateType::NO_MASK:
             return qs_no_mask_->check(image, face, points.data(), int(points.size()));
         default:
@@ -153,7 +163,7 @@ seeta::QualityResult FaceModel::quality_evaluate(const SeetaImageData &image,
     }
 }
 
-bool FaceModel::check_flag(int flag_check) {
+bool FaceModel::check_flag(int flag_check) const {
     return flag_ & flag_check;
 }
 
@@ -182,5 +192,7 @@ FaceModel::eye_state_predict(const SeetaImageData &img,
     eye_state_->Detect(img, points.data(), left_eye, right_eye);
     return std::make_pair(left_eye, right_eye);
 }
+
+
 
 

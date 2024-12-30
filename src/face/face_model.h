@@ -35,7 +35,7 @@ public:
         INTEGRITY = 2,
         POSE = 3,
         RESOLUTION = 4,
-        CLEAR = 5,
+        CLARITY_EX = 5,
         NO_MASK = 6
     };
 
@@ -58,11 +58,15 @@ public:
 
     Status face_anti_spoofing(const SeetaImageData &image, const SeetaRect &rect, std::vector<SeetaPointF> points);
 
+    float face_feature_compare(std::vector<float> feature1, std::vector<float> feature2);
 
     seeta::QualityResult quality_evaluate(const SeetaImageData &image, const SeetaRect &face,
                                           const std::vector<SeetaPointF> &points, QualityEvaluateType type);
 
-    bool check_flag(int flag_check);
+
+    [[nodiscard]] int get_feature_size() const;
+
+    [[nodiscard]] bool check_flag(int flag_check) const;
 
     int age_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points);
 
@@ -89,7 +93,7 @@ private:
     std::shared_ptr<seeta::QualityOfIntegrity> qs_integrity_ = nullptr;
     std::shared_ptr<seeta::QualityOfPose> qs_pose_ = nullptr;
     std::shared_ptr<seeta::QualityOfResolution> qs_resolution_ = nullptr;
-    std::shared_ptr<seeta::QualityOfClarityEx> qs_clear_ = nullptr;
+    std::shared_ptr<seeta::QualityOfClarityEx> qs_clarity_ex_ = nullptr;
     std::shared_ptr<seeta::QualityOfNoMask> qs_no_mask_ = nullptr;
 };
 

@@ -1,8 +1,8 @@
 //
 // Created by AC on 2024-12-16.
 //
-#include "../src/ocr_capi.h"
-#include "../src/utils.h"
+#include "../src/ocr/ocr_capi.h"
+#include "../src/utils/utils.h"
 #include <catch2/catch_test_macros.hpp>
 
 

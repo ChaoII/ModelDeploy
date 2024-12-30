@@ -1,5 +1,5 @@
 #include "ocr_capi.h"
-#include "utils_internal.h"
+#include "../utils/utils_internal.h"
 #include "fastdeploy/vision.h"
 
 using DBDetector = fastdeploy::vision::ocr::DBDetector;
