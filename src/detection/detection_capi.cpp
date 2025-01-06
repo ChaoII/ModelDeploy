@@ -2,8 +2,8 @@
 // Created by AC on 2024-12-17.
 //
 #include "detection_capi.h"
-#include "../utils/utils_internal.h"
-#include "../utils/utils.h"
+#include "../utils/internal/utils.h"
+#include "src/utils/utils_capi.h"
 #include "fastdeploy/vision.h"
 #include <map>
 

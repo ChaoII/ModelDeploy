@@ -4,7 +4,7 @@
 
 
 #include "../src/detection//detection_capi.h"
-#include "../src/utils/utils.h"
+#include "src/utils/utils_capi.h"
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 

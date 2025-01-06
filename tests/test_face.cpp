@@ -3,7 +3,7 @@
 //
 
 #include "../src/face/face_capi.h"
-#include "../src/utils/utils.h"
+#include "src/utils/utils_capi.h"
 #include <catch2/catch_test_macros.hpp>
 
 MDStatusCode test_md_create_face_model() {
