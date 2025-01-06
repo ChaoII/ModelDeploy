@@ -3,8 +3,8 @@
 //
 
 #include "face_capi.h"
-#include "face_model.h"
-#include "../utils/utils_internal.h"
+#include "internal/face_model.h"
+#include "../utils/internal/utils.h"
 
 
 MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int flag, int thread_num) {

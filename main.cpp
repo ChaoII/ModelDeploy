@@ -1,30 +1,35 @@
 #include <iostream>
 #include "src/ocr/ocr_capi.h"
 #include "src/detection/detection_capi.h"
-#include "src/utils/utils.h"
+#include "src/utils/utils_capi.h"
 #include <chrono>
+
+#ifdef BUILD_FACE
+
 #include "src/face/face_capi.h"
 
+#endif
 #ifdef _WIN32
 
 #include <Windows.h>
 
 #endif
 
+#ifdef BUILD_FACE
 
 int test_face() {
     MDStatusCode ret;
     MDModel model;
     ret = md_create_face_model(&model, "../tests/models/seetaface", MD_MASK, 1);
     std::cout << "create model result: " << ret << std::endl;
-    auto image = md_read_image("../tests/test_images/test_face1.jpg");
+    auto image = md_read_image("../tests/test_images/test_face3.jpg");
 
     std::cout << "====================face detection==========================" << std::endl;
     MDDetectionResults r_face_detect;
     ret = md_face_detection(&model, &image, &r_face_detect);
     std::cout << "face detection " << (ret ? "failed" : "success") << std::endl;
     std::cout << "face size is: " << r_face_detect.size << std::endl;
-//    md_draw_detection_result(&image, &r_face_detect, "../tests/msyh.ttc", 20, 0.5, 1);
+     md_draw_detection_result(&image, &r_face_detect, "../tests/msyh.ttc", 20, 0.5, 1);
     md_show_image(&image);
     md_free_detection_result(&r_face_detect);
 
@@ -94,8 +99,10 @@ int test_face() {
 
     md_free_image(&image);
 
-    return ret;
+    return 0;
 }
+
+#endif
 
 int test_detection() {
     MDStatusCode ret;
@@ -109,13 +116,14 @@ int test_detection() {
         std::cout << ret << std::endl;
         return ret;
     }
+
     auto im = md_read_image("../tests/test_images/test_detection.png");
+
     MDDetectionResults result;
     if ((ret = md_detection_predict(&model, &im, &result)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     md_draw_detection_result(&im, &result, "../tests/msyh.ttc", 20, 0.5, 1);
     std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
@@ -123,6 +131,7 @@ int test_detection() {
     md_show_image(&im);
     md_print_detection_result(&result);
     md_free_detection_result(&result);
+
     md_free_image(&im);
     md_free_detection_model(&model);
     return ret;
@@ -131,7 +140,7 @@ int test_detection() {
 int test_ocr() {
     MDStatusCode ret;
     //读取图片
-    auto image = md_read_image("../tests/test_images/test_ocr.png");
+    auto image = md_read_image("../tests/test_images/test_ocr1.png");
     // 需要查找的文本
     const char *text = "暂停测试";
     // 创建模型句柄
@@ -159,9 +168,9 @@ int test_ocr() {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDColor color = {255, 0, 255};
+    MDColor color = {0, 0, 255};
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 0);
+    md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
     std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "cost: " << diff.count() << std::endl;
     md_print_ocr_result(&results);
@@ -170,20 +179,21 @@ int test_ocr() {
     // 打印文本信息
     md_print_rect(&rect);
     // 先裁剪再绘制，不然image是指针传递，在绘制时会修改原始image
-    auto roi = md_crop_image(&image, &rect);
-    // 在原始画面上绘制文本结果
+    if (rect.width>0 && rect.height>0){
+        auto roi = md_crop_image(&image, &rect);
+        // 在原始画面上绘制文本结果
+        md_draw_text(&image, &rect, text, "../tests/msyh.ttc", 15, &color, 0.5);
+        auto enable = md_get_button_enable_status(&roi, 50, 0.05);
+        // 判断按钮是否可用
+        std::cout << "enable: " << enable << std::endl;
+        md_show_image(&roi);
+        // 释放资源
+        md_free_image(&roi);
+    }
 
-    md_draw_text(&image, &rect, text, "../tests/msyh.ttc", 15, &color, 0.5);
-    // 判断按钮是否可用
-    auto enable = md_get_button_enable_status(&roi, 50, 0.05);
-    std::cout << "enable: " << enable << std::endl;
     // 显示原始画面
     md_show_image(&image);
     // 显示目标文本所在画面
-    md_show_image(&roi);
-
-    // 释放资源
-    md_free_image(&roi);
     md_free_image(&image);
     md_free_ocr_model(&model);
     return ret;
@@ -193,7 +203,9 @@ int test_ocr() {
 int main() {
     SetConsoleOutputCP(CP_UTF8);
 
-//    test_detection();
+    test_detection();
 //    test_ocr();
-    test_face();
+#ifdef BUILD_FACE
+//    test_face();
+#endif
 }

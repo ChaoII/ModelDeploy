@@ -1,0 +1,90 @@
+message("===========================build asr===========================")
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set(TARGET_NAME "funasr")
+set(CMAKE_CXX_STANDARD 11)
+include(TestBigEndian)
+test_big_endian(BIG_ENDIAN)
+if (BIG_ENDIAN)
+    message("Big endian system")
+else ()
+    message("Little endian system")
+endif ()
+
+# for onnxruntime
+IF (WIN32)
+    add_compile_options(/wd4291 /wd4305 /wd4244 /wd4828 /wd4251 /wd4275)
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
+endif ()
+
+include_directories(${CMAKE_SOURCE_DIR}/src/asr)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/json/include)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/kaldi-native-fbank)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/yaml-cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/jieba/include)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/jieba/include/limonp/include)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/kaldi)
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/json/include)
+include_directories(${ORT_LIB_PATH}/../include)
+
+set(ONNXRUNTIME_DIR ${ORT_LIB_PATH}/..)
+
+# build openfst
+# fst depend on glog and gflags
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/glog/src)
+set(BUILD_TESTING OFF)
+add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/glog)
+include_directories(${glog_BINARY_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/3rd_party/gflags)
+add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/gflags)
+include_directories(${gflags_BINARY_DIR}/include)
+add_subdirectory(${PROJECT_SOURCE_DIR}/3rd_party/openfst)
+include_directories(${openfst_SOURCE_DIR}/src/include)
+if (WIN32)
+    include_directories(${openfst_SOURCE_DIR}/src/lib)
+    set(YAML_BUILD_SHARED_LIBS ON)
+endif ()
+
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/yaml-cpp)
+add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/kaldi-native-fbank/kaldi-native-fbank/csrc)
+add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/kaldi)
+file(GLOB ASR_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/*.cpp")
+
+if (APPLE)
+    file(GLOB ITN_SOURCE "itn-*.cpp")
+    list(REMOVE_ITEM ASR_SOURCE ${ITN_SOURCE})
+endif (APPLE)
+list(REMOVE_ITEM ASR_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/paraformer-torch.cpp")
+
+if (WIN32)
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
+endif ()
+
+add_library(${TARGET_NAME} SHARED ${ASR_SOURCE})
+target_compile_options(${TARGET_NAME} PRIVATE /Od)
+
+if (WIN32)
+    set(EXTRA_LIBS yaml-cpp csrc kaldi-decoder fst glog gflags avutil avcodec avformat swresample onnxruntime)
+    include_directories(${FFMPEG_DIR}/include)
+    target_link_directories(${TARGET_NAME} PUBLIC ${ONNXRUNTIME_DIR}/lib)
+    target_link_directories(${TARGET_NAME} PUBLIC ${FFMPEG_DIR}/lib)
+    target_compile_definitions(${TARGET_NAME} PUBLIC -D_FUNASR_API_EXPORT -DNOMINMAX -DYAML_CPP_DLL)
+else ()
+    set(EXTRA_LIBS pthread yaml-cpp csrc kaldi-decoder fst glog gflags avutil avcodec avformat swresample)
+    include_directories(${FFMPEG_DIR}/include)
+    if (APPLE)
+        target_link_directories(${TARGET_NAME} PUBLIC ${ONNXRUNTIME_DIR}/lib)
+        target_link_directories(${TARGET_NAME} PUBLIC ${FFMPEG_DIR}/lib)
+    endif (APPLE)
+endif ()
+
+include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/third_party)
+target_link_libraries(funasr PUBLIC  ${EXTRA_LIBS})
+
+list(APPEND DEPENDS ${TARGET_NAME})
