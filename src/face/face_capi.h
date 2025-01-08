@@ -43,11 +43,13 @@ EXPORT_DECL MDStatusCode md_face_gender_predict(const MDModel *model, MDImage *i
 
 EXPORT_DECL MDStatusCode md_face_eye_state_predict(const MDModel *model, MDImage *image, MDEyeStateResult *eye_state);
 
+EXPORT_DECL void md_print_face_anti_spoofing_result(MDFaceAntiSpoofingResult result);
+
 EXPORT_DECL void md_free_face_landmark(MDLandMarkResult *result);
 
 EXPORT_DECL void md_free_face_feature(MDFaceFeature *feature);
 
-EXPORT_DECL void md_print_face_anti_spoofing_result(MDFaceAntiSpoofingResult result);
+EXPORT_DECL void md_free_face_model(MDModel *model);
 
 
 #ifdef __cplusplus

@@ -4,11 +4,7 @@
 #include "src/utils/utils_capi.h"
 #include <chrono>
 
-#ifdef BUILD_FACE
 
-#include "src/face/face_capi.h"
-
-#endif
 #ifdef _WIN32
 
 #include <Windows.h>
@@ -16,6 +12,8 @@
 #endif
 
 #ifdef BUILD_FACE
+
+#include "src/face/face_capi.h"
 
 int test_face() {
     MDStatusCode ret;
@@ -29,7 +27,7 @@ int test_face() {
     ret = md_face_detection(&model, &image, &r_face_detect);
     std::cout << "face detection " << (ret ? "failed" : "success") << std::endl;
     std::cout << "face size is: " << r_face_detect.size << std::endl;
-     md_draw_detection_result(&image, &r_face_detect, "../tests/msyh.ttc", 20, 0.5, 1);
+    md_draw_detection_result(&image, &r_face_detect, "../tests/msyh.ttc", 20, 0.5, 1);
     md_show_image(&image);
     md_free_detection_result(&r_face_detect);
 
@@ -99,7 +97,40 @@ int test_face() {
 
     md_free_image(&image);
 
+    md_free_face_model(&model);
+
     return 0;
+}
+
+#endif
+
+#ifdef BUILD_ASR
+
+#include "src/asr/asr_capi.h"
+
+int test_asr() {
+
+    MDModel model;
+    md_create_asr_model(&model,
+                        "D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx",
+                        "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
+                        "D:/funasr-runtime-resources/models/punc_ct-transformer_cn-en-common-vocab471067-large-onnx");
+
+    MDASRResult result;
+    md_asr_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
+
+//    std::cout << result.msg << std::endl;
+//    std::cout << result.stamp << std::endl;
+//    std::cout << result.stamp_sents << std::endl;
+//    std::cout << result.tpass_msg << std::endl;
+//    std::cout << result.snippet_time << std::endl;
+
+    md_free_asr_result(&result);
+
+    md_free_asr_model(&model);
+
+    return 0;
+
 }
 
 #endif
@@ -179,7 +210,7 @@ int test_ocr() {
     // 打印文本信息
     md_print_rect(&rect);
     // 先裁剪再绘制，不然image是指针传递，在绘制时会修改原始image
-    if (rect.width>0 && rect.height>0){
+    if (rect.width > 0 && rect.height > 0) {
         auto roi = md_crop_image(&image, &rect);
         // 在原始画面上绘制文本结果
         md_draw_text(&image, &rect, text, "../tests/msyh.ttc", 15, &color, 0.5);
@@ -203,9 +234,13 @@ int test_ocr() {
 int main() {
     SetConsoleOutputCP(CP_UTF8);
 
-    test_detection();
+//    test_detection();
 //    test_ocr();
 #ifdef BUILD_FACE
 //    test_face();
 #endif
+#ifdef BUILD_ASR
+    test_asr();
+#endif
+
 }

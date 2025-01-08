@@ -40,12 +40,10 @@ MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameter
     det_model->GetPostprocessor().SetUseDilation(parameters->use_dilation);
 
     auto ocr_model = new fastdeploy::pipeline::PPOCRv4(det_model, rec_model);
-    auto model_name = ocr_model->ModelName();
     model->type = MDModelType::OCR;
     model->format = parameters->format;
     model->model_content = ocr_model;
-    model->model_name = (char *) malloc((model_name.size() + 1) * sizeof(char));
-    memcpy(model->model_name, model_name.c_str(), model_name.size() + 1);
+    model->model_name = _strdup(ocr_model->ModelName().c_str());
     ocr_model->SetRecBatchSize(parameters->rec_batch_size);
     if (!(ocr_model->Initialized())) {
         std::cerr << "Failed to initialize OCR model." << std::endl;
@@ -54,7 +52,7 @@ MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameter
     return MDStatusCode::Success;
 }
 
-MDRect md_get_text_position(MDModel *model, MDImage* image, const char *text) {
+MDRect md_get_text_position(MDModel *model, MDImage *image, const char *text) {
     cv::Mat cv_image = md_image_to_mat(image);
     fastdeploy::vision::OCRResult res;
     auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
@@ -113,8 +111,8 @@ void md_print_ocr_result(MDOCRResults *result) {
     }
 }
 
-void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path, int font_size, MDColor* color,
-                     double alpha, int save_result) {
+void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path, int font_size, MDColor *color,
+                        double alpha, int save_result) {
     cv::Mat cv_image, overlay;
     cv_image = md_image_to_mat(image);
     cv_image.copyTo(overlay);
@@ -164,13 +162,19 @@ void md_free_ocr_result(MDOCRResults *result) {
         free(result->data[i].box.data);
     }
     free(result->data);
+    result->data = nullptr;
     result->size = 0;
 }
 
 void md_free_ocr_model(MDModel *model) {
-    if (!model) return;
-    free(model->model_name);
-    delete static_cast<PPOCRv4 *>(model->model_content);
+    if (model != nullptr) {
+        if (model->model_content != nullptr) {
+            delete static_cast<PPOCRv4 *>(model->model_content);
+            model->model_content = nullptr;
+        }
+        free(model->model_name);
+        model->model_name = nullptr;
+    }
 }
 
 

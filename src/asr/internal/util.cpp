@@ -180,8 +180,8 @@ void Glu(Tensor<float> *din, Tensor<float> *dout)
     }
 }
 
-bool is_target_file(const std::string& filename, const std::string target) {
-    std::size_t pos = filename.find_last_of(".");
+bool is_target_file(const std::string& filename, const std::string& target) {
+    std::size_t pos = filename.find_last_of('.');
     if (pos == std::string::npos) {
         return false;
     }
@@ -233,7 +233,7 @@ void SplitChiEngCharacters(const std::string &input_str,
       if(!eng_word.empty()){
         characters.push_back(eng_word);
         eng_word = "";
-      }      
+      }
     }else{
       U8CHAR_T u8buf[4];
       size_t n = EncodeConverter::Utf16ToUtf8(pu16 + i, u8buf);
@@ -351,7 +351,7 @@ void TimestampSplitChiEngCharacters(const std::string &input_str,
       if(!eng_word.empty()){
         characters.push_back(eng_word);
         eng_word = "";
-      }      
+      }
     }else{
       U8CHAR_T u8buf[4];
       size_t n = EncodeConverter::Utf16ToUtf8(pu16 + i, u8buf);
@@ -400,10 +400,10 @@ std::string TimestampSmooth(std::string &text, std::string &text_itn, std::strin
     // process string to vector<string>
     std::vector<std::string> characters;
     funasr::TimestampSplitChiEngCharacters(text, characters);
-    
+
     std::vector<std::string> characters_itn;
     funasr::TimestampSplitChiEngCharacters(text_itn, characters_itn);
-    
+
     //convert string to vector<vector<int>>
     vector<vector<int>> timestamps = funasr::ParseTimestamps(str_time);
 
@@ -411,7 +411,7 @@ std::string TimestampSmooth(std::string &text, std::string &text_itn, std::strin
         LOG(ERROR) << "Timestamp Smooth Failed: Length of timestamp is zero";
         return timestamps_str;
     }
-    
+
     // edit distance
     int m = characters.size();
     int n = characters_itn.size();
@@ -457,7 +457,7 @@ std::string TimestampSmooth(std::string &text, std::string &text_itn, std::strin
             funasr::TimestampAdd(alignment_str1, characters[i - 1]);
             funasr::TimestampAdd(alignment_str2, characters_itn[j - 1]);
             i -= 1;
-            j -= 1;            
+            j -= 1;
         }
     }
 
@@ -561,7 +561,7 @@ std::string TimestampSmooth(std::string &text, std::string &text_itn, std::strin
         LOG(ERROR) << "Timestamp Smooth Failed: Timestamp length does not matched.";
         return timestamps_str;
     }
-    
+
     timestamps_str = VectorToString(timestamps_out);
     return timestamps_str;
 }
@@ -570,7 +570,7 @@ std::string TimestampSentence(std::string &text, std::string &str_time){
     std::vector<std::string> characters;
     funasr::TimestampSplitChiEngCharacters(text, characters);
     vector<vector<int>> timestamps = funasr::ParseTimestamps(str_time);
-    
+
     int idx_str = 0, idx_ts = 0;
     int start = -1, end = -1;
     std::string text_seg = "";
@@ -593,7 +593,7 @@ std::string TimestampSentence(std::string &text, std::string &str_time){
             ts_sent += "\"start\":" + to_string(start) + ",";
             ts_sent += "\"end\":" + to_string(end) + ",";
             ts_sent += "\"ts_list\":" + VectorToString(ts_seg, false) + "}";
-            
+
             if (idx_str == characters.size()-1){
                 ts_sentences += ts_sent;
             } else{
@@ -673,11 +673,11 @@ void PrintMat(const std::vector<std::vector<T>> &mat, const std::string &name) {
 }
 
 size_t Utf8ToCharset(const std::string &input, std::vector<std::string> &output) {
-  std::string ch; 
+  std::string ch;
   for (size_t i = 0, len = 0; i != input.length(); i += len) {
     unsigned char byte = (unsigned)input[i];
     if (byte >= 0xFC) // lenght 6
-      len = 6;  
+      len = 6;
     else if (byte >= 0xF8)
       len = 5;
     else if (byte >= 0xF0)
@@ -690,7 +690,7 @@ size_t Utf8ToCharset(const std::string &input, std::vector<std::string> &output)
       len = 1;
     ch = input.substr(i, len);
     output.push_back(ch);
-  }   
+  }
   return output.size();
 }
 
@@ -766,7 +766,7 @@ string PostProcess(std::vector<string> &raw_char, std::vector<std::vector<float>
 
         // step3 process english word deal with space , turn abbreviation to upper case
         {
-            // input word is chinese, not need process 
+            // input word is chinese, not need process
             if (IsChinese(word)) {
                 words.push_back(word);
                 timestamp_merge.emplace_back(timestamp_list[i]);
@@ -836,11 +836,11 @@ string PostProcess(std::vector<string> &raw_char, std::vector<std::vector<float>
 }
 
 void TimestampOnnx( std::vector<float>& us_alphas,
-                    std::vector<float> us_cif_peak, 
-                    std::vector<string>& char_list, 
-                    std::string &res_str, 
-                    std::vector<std::vector<float>> &timestamp_vec, 
-                    float begin_time, 
+                    std::vector<float> us_cif_peak,
+                    std::vector<string>& char_list,
+                    std::string &res_str,
+                    std::vector<std::vector<float>> &timestamp_vec,
+                    float begin_time,
                     float total_offset){
     if (char_list.empty()) {
         return ;
@@ -883,7 +883,7 @@ void TimestampOnnx( std::vector<float>& us_alphas,
             cif_peak.emplace_back(sum);
             if(sum>=1.0 - 1e-4){
                 sum -=(1.0 - 1e-4);
-            }            
+            }
         }
         // fix case: sum > 1
         int cif_idx = cif_peak.size()-1;
@@ -902,7 +902,7 @@ void TimestampOnnx( std::vector<float>& us_alphas,
             }
         }
     }
-    
+
     num_peak = fire_place.size();
     if(fire_place.size() == 0){
         return;
@@ -962,8 +962,8 @@ void TimestampOnnx( std::vector<float>& us_alphas,
     }
 }
 
-bool IsTargetFile(const std::string& filename, const std::string target) {
-    std::size_t pos = filename.find_last_of(".");
+bool IsTargetFile(const std::string& filename, const std::string& target) {
+    std::size_t pos = filename.find_last_of('.');
     if (pos == std::string::npos) {
         return false;
     }
@@ -998,7 +998,7 @@ void SplitStringToVector(const std::string &full, const char *delim,
   }
 }
 
-void ExtractHws(string hws_file, unordered_map<string, int> &hws_map)
+void ExtractHws(const string& hws_file, unordered_map<string, int> &hws_map)
 {
     if(hws_file.empty()){
         return;
@@ -1006,7 +1006,7 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map)
     std::string line;
     std::ifstream ifs_hws(hws_file.c_str());
     if(!ifs_hws.is_open()){
-        LOG(ERROR) << "Unable to open hotwords file: " << hws_file 
+        LOG(ERROR) << "Unable to open hotwords file: " << hws_file
             << ". If you have not set hotwords, please ignore this message.";
         return;
     }
@@ -1019,7 +1019,7 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map)
         float score = 1.0f;
         std::vector<std::string> text;
         SplitStringToVector(line, " ", true, &text);
-        
+
         if (text.size() > 1) {
             try{
                 score = std::stof(text[text.size() - 1]);
@@ -1031,21 +1031,21 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map)
         } else {
             continue;
         }
-        std::string hotword = "";
+        std::string hotword;
         for (size_t i = 0; i < text.size()-1; ++i) {
-            hotword = hotword + text[i];
+            hotword +=  text[i];
             if(i != text.size()-2){
-                hotword = hotword + " ";
+                hotword +=  " ";
             }
         }
-        
+
         LOG(INFO) << hotword << " : " << score;
         hws_map.emplace(hotword, score);
     }
     ifs_hws.close();
 }
 
-void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string &nn_hotwords_)
+void ExtractHws(const string& hws_file, unordered_map<string, int> &hws_map, string &nn_hotwords_)
 {
     if(hws_file.empty()){
         return;
@@ -1053,7 +1053,7 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string &nn
     std::string line;
     std::ifstream ifs_hws(hws_file.c_str());
     if(!ifs_hws.is_open()){
-        LOG(ERROR) << "Unable to open hotwords file: " << hws_file 
+        LOG(ERROR) << "Unable to open hotwords file: " << hws_file
             << ". If you have not set hotwords, please ignore this message.";
         return;
     }
@@ -1066,7 +1066,7 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string &nn
         float score = 1.0f;
         std::vector<std::string> text;
         SplitStringToVector(line, " ", true, &text);
-        
+
         if (text.size() > 1) {
             try{
                 score = std::stof(text[text.size() - 1]);
@@ -1078,14 +1078,14 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string &nn
         } else {
             continue;
         }
-        std::string hotword = "";
+        std::string hotword;
         for (size_t i = 0; i < text.size()-1; ++i) {
-            hotword = hotword + text[i];
+            hotword += text[i];
             if(i != text.size()-2){
-                hotword = hotword + " ";
+                hotword += " ";
             }
         }
-        
+
         nn_hotwords_ += " " + hotword;
         LOG(INFO) << hotword << " : " << score;
         hws_map.emplace(hotword, score);
@@ -1094,7 +1094,6 @@ void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string &nn
 }
 
 void SmoothTimestamps(std::string &str_punc, std::string &str_itn, std::string &str_timetamp){
-    
     return;
 }
 
