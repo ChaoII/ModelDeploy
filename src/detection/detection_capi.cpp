@@ -34,8 +34,7 @@ md_create_detection_model(MDModel *model, const char *model_dir, int thread_num,
     }
     auto model_name = detection_model->ModelName();
     model->format = model_format;
-    model->model_name = (char *) malloc((detection_model->ModelName().size() + 1) * sizeof(char));
-    memcpy(model->model_name, model_name.c_str(), model_name.size() + 1);
+    model->model_name = _strdup(detection_model->ModelName().c_str());
     model->model_content = detection_model;
     model->type = MDModelType::Detection;
     return MDStatusCode::Success;
@@ -137,12 +136,14 @@ void md_free_detection_result(MDDetectionResults *result) {
 
 void md_free_detection_model(MDModel *model) {
     if (model == nullptr) return;
+    if (model->model_content != nullptr) {
+        delete static_cast<YOLOv8 *>(model->model_content);
+        model->model_content = nullptr;
+    }
     if (model->model_name != nullptr) {
         free(model->model_name);
         model->model_name = nullptr;
     }
-    delete static_cast<YOLOv8 *>(model->model_content);
-    model->model_content = nullptr;
 }
 
 

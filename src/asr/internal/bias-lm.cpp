@@ -2,6 +2,7 @@
 #ifdef _WIN32
 #include "fst-types.cc"
 #endif
+
 namespace funasr {
 void print(std::queue<StateId> &q) {
   std::queue<StateId> data = q;
@@ -28,11 +29,13 @@ void BiasLm::LoadCfgFromYaml(const char* filename, BiasLmOption &opt) {
   }
 }
 
+
+
 void BiasLm::BuildGraph(std::vector<std::vector<int>> &split_id_vec,
   std::vector<float> &custom_weight) {
   if (split_id_vec.empty()) {
     LOG(INFO) << "Skip building biaslm graph, hotword not exits.";
-    return ; 
+    return ;
   }
   assert(split_id_vec.size() == custom_weight.size());
   // Build prefix tree
@@ -76,7 +79,7 @@ void BiasLm::BuildGraph(std::vector<std::vector<int>> &split_id_vec,
       }
     }
   }
-  
+
   // Build Aho-Corasick Automata
   std::queue<StateId> q;
   Matcher matcher(*graph_, fst::MATCH_INPUT);
@@ -96,8 +99,8 @@ void BiasLm::BuildGraph(std::vector<std::vector<int>> &split_id_vec,
       const Arc& arc = aiter.Value();
       StateId next_state = arc.nextstate;
       StateId temp_state = node_list_[state_id].back_off_;
-      if (next_state == start_state || next_state == temp_state) { 
-        continue; 
+      if (next_state == start_state || next_state == temp_state) {
+        continue;
       }
       while (true) {
         matcher.SetState(temp_state);
@@ -113,7 +116,7 @@ void BiasLm::BuildGraph(std::vector<std::vector<int>> &split_id_vec,
       float back_off_score = (node_list_[next_state].is_final_ ? 0 :
         node_list_[node_list_[next_state].back_off_].score_ -
         node_list_[next_state].score_);
-      graph_->AddArc(next_state, Arc(0, 0, back_off_score, 
+      graph_->AddArc(next_state, Arc(0, 0, back_off_score,
         node_list_[next_state].back_off_));
       q.push(next_state);
     }

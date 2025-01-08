@@ -1,16 +1,7 @@
-message("===========================build asr===========================")
-
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 set(TARGET_NAME "funasr")
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 include(TestBigEndian)
 test_big_endian(BIG_ENDIAN)
-if (BIG_ENDIAN)
-    message("Big endian system")
-else ()
-    message("Little endian system")
-endif ()
 
 # for onnxruntime
 IF (WIN32)
@@ -20,7 +11,7 @@ IF (WIN32)
     add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
 endif ()
 
-include_directories(${CMAKE_SOURCE_DIR}/src/asr)
+include_directories(${CMAKE_SOURCE_DIR}/src/asr/internal)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party/json/include)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party/kaldi-native-fbank)
@@ -47,26 +38,25 @@ include_directories(${openfst_SOURCE_DIR}/src/include)
 if (WIN32)
     include_directories(${openfst_SOURCE_DIR}/src/lib)
     set(YAML_BUILD_SHARED_LIBS ON)
+    # 这俩文件开启O2 编译会报错
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/src/asr/internal/bias-lm.cpp" PROPERTIES COMPILE_OPTIONS "/Od")
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/src/asr/internal/itn-processor.cpp" PROPERTIES COMPILE_OPTIONS "/Od")
 endif ()
-
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/yaml-cpp)
 add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/kaldi-native-fbank/kaldi-native-fbank/csrc)
 add_subdirectory(${CMAKE_SOURCE_DIR}/3rd_party/kaldi)
-file(GLOB ASR_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/*.cpp")
 
+file(GLOB ASR_INTERNAL_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/internal/*.cpp")
 if (APPLE)
-    file(GLOB ITN_SOURCE "itn-*.cpp")
-    list(REMOVE_ITEM ASR_SOURCE ${ITN_SOURCE})
+    file(GLOB ITN_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/internal/itn-*.cpp")
+    list(REMOVE_ITEM ASR_INTERNAL_SOURCE ${ITN_SOURCE})
 endif (APPLE)
-list(REMOVE_ITEM ASR_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/paraformer-torch.cpp")
+list(REMOVE_ITEM ASR_INTERNAL_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/internal/paraformer-torch.cpp")
 
-if (WIN32)
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
-endif ()
 
-add_library(${TARGET_NAME} SHARED ${ASR_SOURCE})
-target_compile_options(${TARGET_NAME} PRIVATE /Od)
+add_library(${TARGET_NAME} SHARED ${ASR_INTERNAL_SOURCE})
+target_compile_options(${TARGET_NAME} PRIVATE /O2)
 
 if (WIN32)
     set(EXTRA_LIBS yaml-cpp csrc kaldi-decoder fst glog gflags avutil avcodec avformat swresample onnxruntime)
@@ -85,6 +75,6 @@ endif ()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
-target_link_libraries(funasr PUBLIC  ${EXTRA_LIBS})
+target_link_libraries(${TARGET_NAME} PUBLIC ${EXTRA_LIBS})
 
 list(APPEND DEPENDS ${TARGET_NAME})

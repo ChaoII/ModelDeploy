@@ -155,13 +155,13 @@ int main(int argc, char** argv)
         wav_list.emplace_back(wav_path_);
         wav_ids.emplace_back(default_id);
     }
-    
+
     float snippet_time = 0.0f;
     long taking_micros = 0;
 
     // load hotwords list and build graph
     FunWfstDecoderLoadHwsRes(decoder_handle, fst_inc_wts.getValue(), hws_map);
-	
+
     std::vector<std::vector<float>> hotwords_embedding = CompileHotwordEmbedding(asr_hanlde, nn_hotwords_);
     for (int i = 0; i < wav_list.size(); i++) {
         auto& wav_file = wav_list[i];
@@ -222,7 +222,7 @@ int main(int argc, char** argv)
     LOG(INFO) << "Audio length: " << (double)snippet_time << " s";
     LOG(INFO) << "Model inference takes: " << (double)taking_micros / 1000000 <<" s";
     LOG(INFO) << "Model inference RTF: " << (double)taking_micros/ (snippet_time*1000000);
-    
+
     FunASRWfstDecoderUninit(decoder_handle);
     FunOfflineUninit(asr_hanlde);
     return 0;

@@ -24,9 +24,8 @@ using fst::StringTokenType;
 namespace funasr {
 ITNProcessor::ITNProcessor(){};
 ITNProcessor::~ITNProcessor(){};
-
 void  ITNProcessor::InitITN(const std::string& tagger_path,
-                     const std::string& verbalizer_path, 
+                     const std::string& verbalizer_path,
                      int thread_num) {
   try{
     tagger_.reset(StdVectorFst::Read(tagger_path));

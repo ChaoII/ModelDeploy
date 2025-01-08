@@ -40,7 +40,7 @@ namespace funasr {
 
     string PathAppend(const string &p1, const string &p2);
 
-    bool is_target_file(const std::string &filename, const std::string target);
+    bool is_target_file(const std::string &filename, const std::string &target);
 
     void KeepChineseCharacterAndSplit(const std::string &input_str,
                                       std::vector<std::string> &chinese_characters);
@@ -95,10 +95,10 @@ namespace funasr {
                        float begin_time = 0.0,
                        float total_offset = -1.5);
 
-    bool IsTargetFile(const std::string &filename, const std::string target);
+    bool IsTargetFile(const std::string &filename, const std::string &target);
 
-    void ExtractHws(string hws_file, unordered_map<string, int> &hws_map);
+    void ExtractHws(const string &hws_file, unordered_map<string, int> &hws_map);
 
-    void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string &nn_hotwords_);
+    void ExtractHws(const string &hws_file, unordered_map<string, int> &hws_map, string &nn_hotwords_);
 } // namespace funasr
 #endif

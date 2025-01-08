@@ -20,8 +20,8 @@ demo.exe ^
 
 ```bash
 #funasr-onnx-offline
-demo.exe ^
---model-dir D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-onnx ^
+demo-asr.exe ^
+--model-dir D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx ^
 --punc-dir D:/funasr-runtime-resources/models/punc_ct-transformer_cn-en-common-vocab471067-large-onnx ^
 --vad-dir D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx ^
 --vad-quant true ^

@@ -131,3 +131,6 @@ _FUNASRAPI void			FunASRWfstDecoderUninit(FUNASR_DEC_HANDLE handle);
 _FUNASRAPI void			FunWfstDecoderLoadHwsRes(FUNASR_DEC_HANDLE handle, int inc_bias, std::unordered_map<std::string, int> &hws_map);
 _FUNASRAPI void			FunWfstDecoderUnloadHwsRes(FUNASR_DEC_HANDLE handle);
 
+
+_FUNASRAPI void         ExtractHotWords(const std::string& hws_file, std::unordered_map<std::string, int> &hws_map, std::string &nn_hotwords_);
+

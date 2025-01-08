@@ -27,20 +27,22 @@ enum MDModelType {
     OCR = 0,
     Detection = 1,
     FACE = 2,
+    ASR = 3,
 };
 
 enum MDStatusCode {
     Success = 0x00,
-    CallError = 0x01,
-    ModelInitializeFailed = 0x02,
-    ModelPredictFailed = 0x03,
-    MemoryAllocatedFailed = 0x04,
-    OCRDetModelInitializeFailed = 0x05,
-    OCRRecModelInitializeFailed = 0x06,
+    FileOpenFailed = 0x01,
+    CallError,
+    ModelInitializeFailed,
+    ModelPredictFailed,
+    MemoryAllocatedFailed,
+    OCRDetModelInitializeFailed,
+    OCRRecModelInitializeFailed,
 
-    ModelTypeError = 0x07,
-    NotFoundLandmark = 0x08,
-    NotFoundFace = 0x09,
+    ModelTypeError,
+    NotFoundLandmark,
+    NotFoundFace,
     FaceFeatureExtractError,
 
     FaceDetectionFlagNotSetError,
@@ -200,4 +202,12 @@ typedef struct {
     MDEyeState right_eye;
 } MDEyeStateResult;
 
+
+typedef struct {
+    char *msg;
+    char *stamp;
+    char *stamp_sents;
+    char *tpass_msg;
+    float snippet_time;
+} MDASRResult;
 

@@ -12,9 +12,7 @@ MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int fla
     model->type = MDModelType::FACE;
     model->format = MDModelFormat::Tennis;
     model->model_content = face_model;
-    std::string model_name = "FaceNet";
-    model->model_name = (char *) malloc((model_name.size() + 1) * sizeof(char));
-    memcpy(model->model_name, model_name.c_str(), model_name.size() + 1);
+    model->model_name = _strdup("FaceNet");
     return MDStatusCode::Success;
 }
 
@@ -251,6 +249,24 @@ MDStatusCode md_face_eye_state_predict(const MDModel *model, MDImage *image, MDE
     return Success;
 }
 
+void md_print_face_anti_spoofing_result(MDFaceAntiSpoofingResult result) {
+    switch (result) {
+        case MDFaceAntiSpoofingResult::REAL:
+            printf("real\n");
+            break;
+        case MDFaceAntiSpoofingResult::SPOOF:
+            printf("spoof\n");
+            break;
+        case MDFaceAntiSpoofingResult::FUZZY:
+            printf("fuzzy\n");
+        case MDFaceAntiSpoofingResult::DETECTING:
+            printf("detecting\n");
+            break;
+        default:
+            printf("unknown\n");
+    }
+}
+
 void md_free_face_landmark(MDLandMarkResult *result) {
     if (result != nullptr) {
         free(result->data);
@@ -267,21 +283,15 @@ void md_free_face_feature(MDFaceFeature *feature) {
     }
 }
 
-void md_print_face_anti_spoofing_result(MDFaceAntiSpoofingResult result) {
-    switch (result) {
-        case MDFaceAntiSpoofingResult::REAL:
-            printf("real\n");
-            break;
-        case MDFaceAntiSpoofingResult::SPOOF:
-            printf("spoof\n");
-            break;
-        case MDFaceAntiSpoofingResult::FUZZY:
-            printf("fuzzy\n");
-        case MDFaceAntiSpoofingResult::DETECTING:
-            printf("detecting\n");
-            break;
-        default:
-            printf("unknown\n");
+
+void md_free_face_model(MDModel *model) {
+    if (model != nullptr) {
+        if (model->model_content != nullptr) {
+            delete static_cast<FaceModel *>(model->model_content);
+            model->model_content = nullptr;
+        }
+        free(model->model_name);
+        model->model_name = nullptr;
     }
 }
 
