@@ -29,7 +29,7 @@ int test_face() {
     std::cout << "face detection " << (ret ? "failed" : "success") << std::endl;
     std::cout << "face size is: " << r_face_detect.size << std::endl;
     md_draw_detection_result(&image, &r_face_detect, "../tests/msyh.ttc", 20, 0.5, 1);
-    md_show_image(&image);
+//    md_show_image(&image);
     md_free_detection_result(&r_face_detect);
 
     std::cout << "====================feature extract==========================" << std::endl;
@@ -110,30 +110,30 @@ int test_face() {
 #include "src/asr/asr_capi.h"
 #include "src/asr/asr_2pass_capi.h"
 
-//int test_asr() {
-//
-//    MDModel model;
-//    md_create_asr_model(&model,
-//                        "D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx",
-//                        "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
-//                        "D:/funasr-runtime-resources/models/punc_ct-transformer_cn-en-common-vocab471067-large-onnx");
-//
-//    MDASRResult result;
-//    md_asr_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
-//
-////    std::cout << result.msg << std::endl;
-////    std::cout << result.stamp << std::endl;
-////    std::cout << result.stamp_sents << std::endl;
-////    std::cout << result.tpass_msg << std::endl;
-////    std::cout << result.snippet_time << std::endl;
-//
-//    md_free_asr_result(&result);
-//
-//    md_free_asr_model(&model);
-//
-//    return 0;
-//
-//}
+int test_asr() {
+
+    MDModel model;
+    md_create_asr_model(&model,
+                        "D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx",
+                        "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
+                        "D:/funasr-runtime-resources/models/punc_ct-transformer_cn-en-common-vocab471067-large-onnx");
+
+    MDASRResult result;
+    md_asr_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
+
+//    std::cout << result.msg << std::endl;
+//    std::cout << result.stamp << std::endl;
+//    std::cout << result.stamp_sents << std::endl;
+//    std::cout << result.tpass_msg << std::endl;
+//    std::cout << result.snippet_time << std::endl;
+
+    md_free_asr_result(&result);
+
+    md_free_asr_model(&model);
+
+    return 0;
+
+}
 
 int test_tpass() {
 
@@ -171,7 +171,7 @@ int test_tpass() {
 int test_detection() {
     MDStatusCode ret;
     MDModel model;
-    if ((ret = md_create_detection_model(&model, "../tests/models/best.onnx", 8)) != 0) {
+    if ((ret = md_create_detection_model(&model, "../tests/models/best.onnx", 4)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
@@ -192,7 +192,7 @@ int test_detection() {
     md_draw_detection_result(&im, &result, "../tests/msyh.ttc", 20, 0.5, 1);
     std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "cost: " << diff.count() << std::endl;
-    md_show_image(&im);
+//    md_show_image(&im);
     md_print_detection_result(&result);
     md_free_detection_result(&result);
 
@@ -220,7 +220,7 @@ int test_ocr() {
             1.5,
             "slow",
             0,
-            8
+            4
     };
     if ((ret = md_create_ocr_model(&model, &parameters)) != 0) {
         std::cout << ret << std::endl;
@@ -250,13 +250,13 @@ int test_ocr() {
         auto enable = md_get_button_enable_status(&roi, 50, 0.05);
         // 判断按钮是否可用
         std::cout << "enable: " << enable << std::endl;
-        md_show_image(&roi);
+//        md_show_image(&roi);
         // 释放资源
         md_free_image(&roi);
     }
 
     // 显示原始画面
-    md_show_image(&image);
+//    md_show_image(&image);
     // 显示目标文本所在画面
     md_free_image(&image);
     md_free_ocr_model(&model);
@@ -265,8 +265,9 @@ int test_ocr() {
 
 
 int main() {
+#ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
-
+#endif
 //    test_detection();
 //    test_ocr();
 #ifdef BUILD_FACE

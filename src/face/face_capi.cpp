@@ -12,7 +12,7 @@ MDStatusCode md_create_face_model(MDModel *model, const char *model_dir, int fla
     model->type = MDModelType::FACE;
     model->format = MDModelFormat::Tennis;
     model->model_content = face_model;
-    model->model_name = _strdup("FaceNet");
+    model->model_name = strdup("FaceNet");
     return MDStatusCode::Success;
 }
 

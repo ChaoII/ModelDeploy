@@ -75,7 +75,7 @@ MDStatusCode md_create_asr_model(MDModel *model,
     model->type = MDModelType::ASR;
     model->format = MDModelFormat::ONNX;
     model->model_content = model_content;
-    model->model_name = _strdup("FunASR");
+    model->model_name = strdup("FunASR");
     return MDStatusCode::Success;
 }
 
@@ -111,11 +111,11 @@ MDStatusCode md_asr_model_predict(MDModel *model, const char *wav_path, MDASRRes
     std::string stamp_sents = FunASRGetStampSents(result);
     std::string tpass_msg = FunASRGetTpassResult(result, 0);
     float snippet_time = FunASRGetRetSnippetTime(result);
-    asr_result->msg = _strdup(msg.c_str());
+    asr_result->msg = strdup(msg.c_str());
     asr_result->snippet_time = snippet_time;
-    asr_result->stamp = _strdup(stamp.c_str());
-    asr_result->stamp_sents = _strdup(stamp_sents.c_str());
-    asr_result->tpass_msg = _strdup(tpass_msg.c_str());
+    asr_result->stamp = strdup(stamp.c_str());
+    asr_result->stamp_sents = strdup(stamp_sents.c_str());
+    asr_result->tpass_msg = strdup(tpass_msg.c_str());
     FunASRFreeResult(result);
     return MDStatusCode::Success;
 }
