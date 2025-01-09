@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.26)
 project(demo)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 11)
 
 
 set(LIB_NAME "model_deploy_sdk")
 set(SDK_SOURCE "")
 set(DEPENDS "")
 
-set(FD_PATH "E:/Fastdeploy/build/install1/FastDeploy.cmake" CACHE FILEPATH "fd cmake file path")
 option(BUILD_FACE "build face recognition module" ON)
 option(BUILD_ASR "build fun asr module" ON)
 option(BUILD_TEST "build unittest" ON)
+set(FD_PATH "E:/Fastdeploy/build/install1/FastDeploy.cmake" CACHE FILEPATH "fd cmake file path")
 
 
 include(${FD_PATH})
@@ -42,7 +42,6 @@ if (BUILD_ASR)
     list(APPEND SDK_SOURCE ${ASR_SOURCE})
 endif ()
 
-set(CMAKE_CXX_STANDARD 20)
 add_library(${LIB_NAME} SHARED ${SDK_SOURCE})
 target_link_libraries(${LIB_NAME} PUBLIC ${DEPENDS})
 

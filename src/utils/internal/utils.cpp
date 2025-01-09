@@ -3,7 +3,9 @@
 //
 #include "utils.h"
 #include <random>
-
+#include <filesystem>
+#define QUANTIZE_MODEL "model_quant.onnx"
+namespace fs = std::filesystem;
 cv::Mat md_image_to_mat(MDImage *image) {
     if (!image) {
         return {};
@@ -19,8 +21,8 @@ cv::Mat md_image_to_mat(MDImage *image) {
 }
 
 
-MDImage* mat_to_md_image(const cv::Mat &mat) {
-    auto md_image = (MDImage*)malloc(sizeof(MDImage));
+MDImage *mat_to_md_image(const cv::Mat &mat) {
+    auto md_image = (MDImage *) malloc(sizeof(MDImage));
     // 设置宽度和高度
     md_image->width = mat.cols;
     md_image->height = mat.rows;
@@ -33,15 +35,17 @@ MDImage* mat_to_md_image(const cv::Mat &mat) {
 }
 
 #ifdef BUILD_FACE
+
 SeetaImageData md_image_to_seeta_image(MDImage *image) {
     SeetaImageData seeta_image{
-            .width = image->width,
-            .height = image->height,
-            .channels = image->channels,
-            .data = image->data
+            image->width,
+            image->height,
+            image->channels,
+            image->data
     };
     return seeta_image;
 }
+
 #endif
 
 void draw_rect_internal(cv::Mat &cv_image, const cv::Rect &rect, const cv::Scalar &cv_color, double alpha) {
@@ -110,4 +114,14 @@ cv::Scalar get_random_color() {
             static_cast<double>((int) dis(gen))};
 }
 
+bool is_quantize_model(const char *model_dir) {
+    auto model_path = fs::path(model_dir);
+    if (fs::exists(model_path)) {
+        if (fs::exists(model_path / QUANTIZE_MODEL))
+            return true;
+        else
+            return false;
+    }
+    return false;
+}
 

@@ -3,6 +3,7 @@
 #include "src/detection/detection_capi.h"
 #include "src/utils/utils_capi.h"
 #include <chrono>
+#include <string>
 
 
 #ifdef _WIN32
@@ -107,17 +108,48 @@ int test_face() {
 #ifdef BUILD_ASR
 
 #include "src/asr/asr_capi.h"
+#include "src/asr/asr_2pass_capi.h"
 
-int test_asr() {
+//int test_asr() {
+//
+//    MDModel model;
+//    md_create_asr_model(&model,
+//                        "D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx",
+//                        "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
+//                        "D:/funasr-runtime-resources/models/punc_ct-transformer_cn-en-common-vocab471067-large-onnx");
+//
+//    MDASRResult result;
+//    md_asr_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
+//
+////    std::cout << result.msg << std::endl;
+////    std::cout << result.stamp << std::endl;
+////    std::cout << result.stamp_sents << std::endl;
+////    std::cout << result.tpass_msg << std::endl;
+////    std::cout << result.snippet_time << std::endl;
+//
+//    md_free_asr_result(&result);
+//
+//    md_free_asr_model(&model);
+//
+//    return 0;
+//
+//}
+
+int test_tpass() {
 
     MDModel model;
-    md_create_asr_model(&model,
-                        "D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx",
-                        "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
-                        "D:/funasr-runtime-resources/models/punc_ct-transformer_cn-en-common-vocab471067-large-onnx");
+    md_create_two_pass_model(&model,
+                             "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-onnx",
+                             "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx",
+                             "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
+                             "D:/funasr-runtime-resources/models/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx",
+                             "D:/funasr-runtime-resources/models/fst_itn_zh",
+                             "D:/funasr-runtime-resources/models/speech_ngram_lm_zh-cn-ai-wesp-fst",
+                             "",
+                             ASRMode::TwoPass);
 
     MDASRResult result;
-    md_asr_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
+    md_two_pass_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
 
 //    std::cout << result.msg << std::endl;
 //    std::cout << result.stamp << std::endl;
@@ -125,13 +157,14 @@ int test_asr() {
 //    std::cout << result.tpass_msg << std::endl;
 //    std::cout << result.snippet_time << std::endl;
 
-    md_free_asr_result(&result);
+//    md_free_asr_result(&result);
 
-    md_free_asr_model(&model);
+    md_free_two_pass_model(&model);
 
     return 0;
 
 }
+
 
 #endif
 
@@ -240,7 +273,7 @@ int main() {
 //    test_face();
 #endif
 #ifdef BUILD_ASR
-    test_asr();
+    test_tpass();
 #endif
 
 }

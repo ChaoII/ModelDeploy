@@ -80,6 +80,9 @@ EXPORT_DECL void md_free_image(MDImage *img);
 /// \return MDImage指针
 EXPORT_DECL MDImage md_read_image(const char *path);
 
+
+
+
 #ifdef __cplusplus
 }
 #endif

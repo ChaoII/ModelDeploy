@@ -5,11 +5,12 @@
 #include <sstream>
 #include <filesystem>
 #include "asr_capi.h"
+#include "src/utils/internal/utils.h"
 #include "internal/funasrruntime.h"
 #include "internal/com-define.h"
 
 
-#define QUANTIZE_MODEL "model_quant.onnx"
+
 namespace fs = std::filesystem;
 
 
@@ -19,16 +20,7 @@ struct ASRModel {
     std::vector<std::vector<float>> hot_words_embedding;
 };
 
-bool is_quantize_model(const char *model_dir) {
-    auto model_path = fs::path(model_dir);
-    if (fs::exists(model_path)) {
-        if (fs::exists(model_path / QUANTIZE_MODEL))
-            return true;
-        else
-            return false;
-    }
-    return false;
-}
+
 
 
 MDStatusCode md_create_asr_model(MDModel *model,
