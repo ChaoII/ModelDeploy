@@ -4,6 +4,10 @@
 
 #pragma once
 
+#ifdef _WIN32
+#define strdup _strdup
+#endif
+
 #define MD_FACE_DETECT             (0b00000001)
 #define MD_FACE_LANDMARK           (0b00000001 << 1)
 #define MD_FACE_RECOGNITION        (0b00000001 << 2)
@@ -95,7 +99,7 @@ typedef struct {
 
 typedef struct {
     MDPoint *data;
-    size_t size;
+    int size;
 } MDPolygon;
 
 typedef struct {
@@ -131,7 +135,7 @@ typedef struct {
 
 typedef struct {
     MDOCRResult *data;
-    size_t size;
+    int size;
 } MDOCRResults;
 
 
@@ -155,17 +159,17 @@ typedef struct {
 
 typedef struct {
     MDDetectionResult *data;
-    size_t size;
+    int size;
 } MDDetectionResults;
 
 typedef struct {
     MDPointF *data;
-    size_t size;
+    int size;
 } MDLandMarkResult;
 
 typedef struct {
     float *data;
-    size_t size;
+    int size;
 } MDFaceFeature;
 
 

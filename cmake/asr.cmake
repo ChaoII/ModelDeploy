@@ -1,5 +1,4 @@
 set(TARGET_NAME "funasr")
-set(CMAKE_CXX_STANDARD 17)
 include(TestBigEndian)
 test_big_endian(BIG_ENDIAN)
 
@@ -37,6 +36,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/3rd_party/openfst)
 include_directories(${openfst_SOURCE_DIR}/src/include)
 if (WIN32)
     include_directories(${openfst_SOURCE_DIR}/src/lib)
+    cmake_policy(SET CMP0077 NEW)  # 使 option() 只影响缓存变量
     set(YAML_BUILD_SHARED_LIBS ON)
     # 这俩文件开启O2 编译会报错
     set_source_files_properties("${CMAKE_SOURCE_DIR}/src/asr/internal/bias-lm.cpp" PROPERTIES COMPILE_OPTIONS "/Od")

@@ -1,6 +1,6 @@
-include_directories(${SEETA_PATH}/include)
+include_directories(${SEETA_DIR}/include)
 if (WIN32)
-    link_directories(${SEETA_PATH}/lib/x64)
+    link_directories(${SEETA_DIR}/lib/x64)
     list(APPEND DEPENDS
             SeetaFaceLandmarker600
             SeetaFaceRecognizer610

@@ -34,7 +34,7 @@ md_create_detection_model(MDModel *model, const char *model_dir, int thread_num,
     }
     auto model_name = detection_model->ModelName();
     model->format = model_format;
-    model->model_name = _strdup(detection_model->ModelName().c_str());
+    model->model_name = strdup(detection_model->ModelName().c_str());
     model->model_content = detection_model;
     model->type = MDModelType::Detection;
     return MDStatusCode::Success;
@@ -59,7 +59,7 @@ MDStatusCode md_detection_predict(const MDModel *model, MDImage *image, MDDetect
         return MDStatusCode::ModelPredictFailed;
     }
     auto r_size = res.boxes.size();
-    results->size = r_size;
+    results->size = (int)r_size;
     if (r_size == 0) {
         results->data = nullptr;
         return MDStatusCode::Success;

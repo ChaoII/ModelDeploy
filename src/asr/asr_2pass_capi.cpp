@@ -84,7 +84,7 @@ MDStatusCode md_create_two_pass_model(MDModel *model,
     model->type = MDModelType::ASR;
     model->format = MDModelFormat::ONNX;
     model->model_content = model_content;
-    model->model_name = _strdup("FunASR");
+    model->model_name = strdup("FunASR");
     return MDStatusCode::Success;
 }
 
@@ -166,7 +166,7 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
     }
     if (asr_mode == ASRMode::Offline || asr_mode == ASRMode::TwoPass) {
         LOG(INFO) << " Final offline results " << " : " << tpass_res;
-        if (time_stamp_res != "") {
+        if (!time_stamp_res.empty()) {
             LOG(INFO) << " Final timestamp results " << " : " << time_stamp_res;
         }
     }

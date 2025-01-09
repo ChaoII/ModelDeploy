@@ -2,9 +2,12 @@
 #include "../utils/internal/utils.h"
 #include "fastdeploy/vision.h"
 
+
 using DBDetector = fastdeploy::vision::ocr::DBDetector;
 using Recognizer = fastdeploy::vision::ocr::Recognizer;
 using PPOCRv4 = fastdeploy::pipeline::PPOCRv4;
+
+
 
 
 MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameters) {
@@ -43,7 +46,7 @@ MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameter
     model->type = MDModelType::OCR;
     model->format = parameters->format;
     model->model_content = ocr_model;
-    model->model_name = _strdup(ocr_model->ModelName().c_str());
+    model->model_name = strdup(ocr_model->ModelName().c_str());
     ocr_model->SetRecBatchSize(parameters->rec_batch_size);
     if (!(ocr_model->Initialized())) {
         std::cerr << "Failed to initialize OCR model." << std::endl;
@@ -83,7 +86,7 @@ MDStatusCode md_ocr_model_predict(MDModel *model, MDImage *image, MDOCRResults *
         return MDStatusCode::ModelPredictFailed;
     }
     auto r_size = res.boxes.size();
-    results->size = r_size;
+    results->size = (int)r_size;
     if (r_size == 0) {
         results->data = nullptr;
         return MDStatusCode::Success;
