@@ -71,7 +71,7 @@ md_face_feature(const MDModel *model, MDImage *image, const MDLandMarkResult *po
     std::vector<SeetaPointF> seeta_points;
     seeta_points.reserve(points->size);
     for (int i = 0; i < points->size; ++i) {
-        seeta_points.emplace_back(points->data[i].x, points->data[i].y);
+        seeta_points.push_back({points->data[i].x, points->data[i].y});
     }
     auto features = face_model->extract_feature(seeta_image, seeta_points);
     if (features.empty()) {

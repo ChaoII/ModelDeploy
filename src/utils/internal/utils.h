@@ -49,3 +49,5 @@ std::string format_rect(MDRect rect);
 
 /// 生成随机色
 cv::Scalar get_random_color();
+
+bool is_quantize_model(const char *model_dir);
