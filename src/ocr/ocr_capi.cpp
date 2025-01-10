@@ -8,8 +8,6 @@ using Recognizer = fastdeploy::vision::ocr::Recognizer;
 using PPOCRv4 = fastdeploy::pipeline::PPOCRv4;
 
 
-
-
 MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameters) {
     if (!model) {
         return MDStatusCode::MemoryAllocatedFailed;
@@ -86,7 +84,7 @@ MDStatusCode md_ocr_model_predict(MDModel *model, MDImage *image, MDOCRResults *
         return MDStatusCode::ModelPredictFailed;
     }
     auto r_size = res.boxes.size();
-    results->size = (int)r_size;
+    results->size = (int) r_size;
     if (r_size == 0) {
         results->data = nullptr;
         return MDStatusCode::Success;
@@ -159,7 +157,6 @@ void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_
 }
 
 void md_free_ocr_result(MDOCRResults *result) {
-    if (!result) return;
     for (int i = 0; i < result->size; ++i) {
         free(result->data[i].text);
         free(result->data[i].box.data);
@@ -170,14 +167,13 @@ void md_free_ocr_result(MDOCRResults *result) {
 }
 
 void md_free_ocr_model(MDModel *model) {
-    if (model != nullptr) {
-        if (model->model_content != nullptr) {
-            delete static_cast<PPOCRv4 *>(model->model_content);
-            model->model_content = nullptr;
-        }
-        free(model->model_name);
-        model->model_name = nullptr;
+
+    if (model->model_content != nullptr) {
+        delete static_cast<PPOCRv4 *>(model->model_content);
+        model->model_content = nullptr;
     }
+    free(model->model_name);
+    model->model_name = nullptr;
 }
 
 

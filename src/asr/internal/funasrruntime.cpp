@@ -876,3 +876,6 @@ _FUNASRAPI void FunWfstDecoderUnloadHwsRes(FUNASR_DEC_HANDLE handle) {
 void ExtractHotWords(const string& hws_file, unordered_map<string, int> &hws_map, string &nn_hotwords_) {
     funasr::ExtractHws(hws_file, hws_map, nn_hotwords_);
 }
+void ExtractHotWords(const string &hws_file, unordered_map<string, int> &hws_map) {
+    funasr::ExtractHws(hws_file, hws_map);
+}

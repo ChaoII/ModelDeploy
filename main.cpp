@@ -137,7 +137,8 @@ int test_asr() {
 
 int test_tpass() {
 
-    MDModel model;
+//    MDModel model{strdup(""), {}, {}, nullptr};
+    MDModel model{};
     md_create_two_pass_model(&model,
                              "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-onnx",
                              "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx",
@@ -147,17 +148,11 @@ int test_tpass() {
                              "D:/funasr-runtime-resources/models/speech_ngram_lm_zh-cn-ai-wesp-fst",
                              "",
                              ASRMode::TwoPass);
-
-    MDASRResult result;
+//    MDASRResult result{strdup(""), strdup(""), strdup(""), strdup(""), 0.0f};
+    MDASRResult result{};
     md_two_pass_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
 
-//    std::cout << result.msg << std::endl;
-//    std::cout << result.stamp << std::endl;
-//    std::cout << result.stamp_sents << std::endl;
-//    std::cout << result.tpass_msg << std::endl;
-//    std::cout << result.snippet_time << std::endl;
-
-//    md_free_asr_result(&result);
+    md_free_asr_result(&result);
 
     md_free_two_pass_model(&model);
 
