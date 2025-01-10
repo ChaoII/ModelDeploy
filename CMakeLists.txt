@@ -47,6 +47,12 @@ if (BUILD_TEST)
     enable_testing()
     add_subdirectory(tests)
 endif ()
-add_executable(demo main.cpp)
-target_link_libraries(demo ${LIB_NAME})
+
+
+
+include("${CMAKE_SOURCE_DIR}/cmake/asr_wss_server.cmake")
+
+
+#add_executable(demo main.cpp)
+#target_link_libraries(demo ${LIB_NAME})
 

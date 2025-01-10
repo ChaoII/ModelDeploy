@@ -59,7 +59,7 @@ MDStatusCode md_detection_predict(const MDModel *model, MDImage *image, MDDetect
         return MDStatusCode::ModelPredictFailed;
     }
     auto r_size = res.boxes.size();
-    results->size = (int)r_size;
+    results->size = (int) r_size;
     if (r_size == 0) {
         results->data = nullptr;
         return MDStatusCode::Success;
@@ -124,18 +124,15 @@ void md_draw_detection_result(MDImage *image, const MDDetectionResults *result, 
 
 
 void md_free_detection_result(MDDetectionResults *result) {
-    if (result == nullptr) return;
     if (result->size > 0 && result->data != nullptr) {
         result->size = 0;
         free(result->data);
         result->data = nullptr;
     }
-
 }
 
 
 void md_free_detection_model(MDModel *model) {
-    if (model == nullptr) return;
     if (model->model_content != nullptr) {
         delete static_cast<YOLOv8 *>(model->model_content);
         model->model_content = nullptr;

@@ -10,7 +10,6 @@
 #include "internal/com-define.h"
 
 
-
 namespace fs = std::filesystem;
 
 
@@ -19,8 +18,6 @@ struct ASRModel {
     void *decoder_model;
     std::vector<std::vector<float>> hot_words_embedding;
 };
-
-
 
 
 MDStatusCode md_create_asr_model(MDModel *model,
@@ -121,24 +118,24 @@ MDStatusCode md_asr_model_predict(MDModel *model, const char *wav_path, MDASRRes
 }
 
 void md_free_asr_result(MDASRResult *asr_result) {
-    if (asr_result != nullptr) {
-        if (asr_result->msg != nullptr) {
-            free(asr_result->msg);
-            asr_result->msg = nullptr;
-        }
-        if (asr_result->stamp != nullptr) {
-            free(asr_result->stamp);
-            asr_result->stamp = nullptr;
-        }
-        if (asr_result->stamp_sents != nullptr) {
-            free(asr_result->stamp_sents);
-            asr_result->stamp_sents = nullptr;
-        }
-        if (asr_result->tpass_msg != nullptr) {
-            free(asr_result->tpass_msg);
-            asr_result->tpass_msg = nullptr;
-        }
+
+    if (asr_result->msg != nullptr) {
+        free(asr_result->msg);
+        asr_result->msg = nullptr;
     }
+    if (asr_result->stamp != nullptr) {
+        free(asr_result->stamp);
+        asr_result->stamp = nullptr;
+    }
+    if (asr_result->stamp_sents != nullptr) {
+        free(asr_result->stamp_sents);
+        asr_result->stamp_sents = nullptr;
+    }
+    if (asr_result->tpass_msg != nullptr) {
+        free(asr_result->tpass_msg);
+        asr_result->tpass_msg = nullptr;
+    }
+
 }
 
 

@@ -18,7 +18,6 @@ include_directories(${CMAKE_SOURCE_DIR}/3rd_party/yaml-cpp/include)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party/jieba/include)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party/jieba/include/limonp/include)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party/kaldi)
-include_directories(${CMAKE_SOURCE_DIR}/3rd_party/json/include)
 include_directories(${ORT_LIB_PATH}/../include)
 
 set(ONNXRUNTIME_DIR ${ORT_LIB_PATH}/..)

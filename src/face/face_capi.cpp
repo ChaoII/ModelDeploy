@@ -276,23 +276,19 @@ void md_free_face_landmark(MDLandMarkResult *result) {
 }
 
 void md_free_face_feature(MDFaceFeature *feature) {
-    if (feature != nullptr) {
-        free(feature->data);
-        feature->data = nullptr;
-        feature->size = 0;
-    }
+    free(feature->data);
+    feature->data = nullptr;
+    feature->size = 0;
 }
 
 
 void md_free_face_model(MDModel *model) {
-    if (model != nullptr) {
-        if (model->model_content != nullptr) {
-            delete static_cast<FaceModel *>(model->model_content);
-            model->model_content = nullptr;
-        }
-        free(model->model_name);
-        model->model_name = nullptr;
+    if (model->model_content != nullptr) {
+        delete static_cast<FaceModel *>(model->model_content);
+        model->model_content = nullptr;
     }
+    free(model->model_name);
+    model->model_name = nullptr;
 }
 
 
