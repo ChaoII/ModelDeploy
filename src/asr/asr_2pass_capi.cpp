@@ -127,7 +127,8 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
             is_final = false;
         }
 
-        FUNASR_RESULT result = FunTpassInferBuffer(model_content->two_pass_handle, model_content->two_pass_online_handle,
+        FUNASR_RESULT result = FunTpassInferBuffer(model_content->two_pass_handle,
+                                                   model_content->two_pass_online_handle,
                                                    speech_buff + sample_offset, step, punct_cache, is_final,
                                                    sampling_rate, "pcm", (ASR_TYPE) asr_mode,
                                                    model_content->hot_words_embedding, true,
@@ -136,7 +137,7 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
             string online_msg = FunASRGetResult(result, 0);
             online_res += online_msg;
             if (!online_msg.empty()) {
-                std::cout << online_msg << std::endl;
+                LOG(INFO) << online_msg;
             }
             string tpass_msg = FunASRGetTpassResult(result, 0);
             tpass_res += tpass_msg;

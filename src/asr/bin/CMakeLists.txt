@@ -15,11 +15,6 @@ include_directories("${CMAKE_SOURCE_DIR}/3rd_party/json/include")
 set(CMAKE_TOOLCHAIN_FILE "E:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE PATH "Vcpkg toolchain file")
 find_package(OpenSSL REQUIRED)
 
-if(MSVC)
-    # 设置 MSVC 编译器选项以嵌入 manifest
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST")
-endif()
-
 file(GLOB ASR_WSS_SERVER_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/bin/*.cpp")
 add_executable(${TARGET_NAME} ${ASR_WSS_SERVER_SOURCE})
 target_include_directories(${TARGET_NAME} PUBLIC ${OPENSSL_INCLUDE_DIR})
