@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.26)
-project(demo)
+project(model_deploy_sdk)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -7,9 +7,12 @@ set(LIB_NAME "model_deploy_sdk")
 set(SDK_SOURCE "")
 set(DEPENDS "")
 
+option(BUILD_DETECTION "build face detection module" ON)
+option(BUILD_OCR "build face ocr module" ON)
 option(BUILD_FACE "build face recognition module" ON)
 option(BUILD_ASR "build asr module" ON)
 option(BUILD_ASR_WSS_SERVER "build asr websocket server" ON)
+option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TEST "build unittest" OFF)
 set(FD_DIR "E:/Fastdeploy/build/install1" CACHE PATH "fd cmake file path")
 
@@ -23,11 +26,23 @@ include_directories(${CMAKE_SOURCE_DIR})
 
 list(APPEND DEPENDS ${FASTDEPLOY_LIBS})
 add_definitions(-DMODEL_DEPLOY_LIB)
+
 # 添加FastDeploy依赖头文件
-file(GLOB_RECURSE DETECTION_SOURCE ${CMAKE_SOURCE_DIR}/src/detection/*.cpp)
-file(GLOB_RECURSE OCR_SOURCE ${CMAKE_SOURCE_DIR}/src/ocr/*.cpp)
 file(GLOB_RECURSE UTILS_SOURCE ${CMAKE_SOURCE_DIR}/src/utils/*.cpp)
-list(APPEND SDK_SOURCE ${DETECTION_SOURCE} ${OCR_SOURCE} ${UTILS_SOURCE})
+list(APPEND SDK_SOURCE ${UTILS_SOURCE})
+
+if (BUILD_DETECTION)
+    add_definitions(-DBUILD_DETECTION)
+    file(GLOB_RECURSE DETECTION_SOURCE ${CMAKE_SOURCE_DIR}/src/detection/*.cpp)
+    list(APPEND SDK_SOURCE ${DETECTION_SOURCE})
+endif ()
+
+if (BUILD_OCR)
+    add_definitions(-DBUILD_OCR)
+    file(GLOB_RECURSE OCR_SOURCE ${CMAKE_SOURCE_DIR}/src/ocr/*.cpp)
+    list(APPEND SDK_SOURCE ${OCR_SOURCE})
+endif ()
+
 
 if (BUILD_FACE)
     set(SEETA_DIR "E:/develop/SeetaFace" CACHE PATH "seeta face directory")
@@ -57,12 +72,13 @@ endif ()
 add_library(${LIB_NAME} SHARED ${SDK_SOURCE})
 target_link_libraries(${LIB_NAME} PUBLIC ${DEPENDS})
 
+if (BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif ()
+
 if (BUILD_TEST)
     enable_testing()
     add_subdirectory(tests)
 endif ()
 
-
-#add_executable(demo main.cpp)
-#target_link_libraries(demo ${LIB_NAME})
 

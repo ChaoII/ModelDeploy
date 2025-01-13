@@ -1,0 +1,13 @@
+
+if (BUILD_ASR)
+    add_subdirectory(demo_asr_2pass)
+endif ()
+if (BUILD_DETECTION)
+    add_subdirectory(demo_detection)
+endif ()
+if (BUILD_FACE)
+    add_subdirectory(demo_face)
+endif ()
+if (BUILD_OCR)
+    add_subdirectory(demo_ocr)
+endif ()
