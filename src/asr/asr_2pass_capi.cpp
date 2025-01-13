@@ -15,8 +15,8 @@ namespace fs = std::filesystem;
 
 
 struct TwoPassModel {
-    void *tpass_handle;
-    void *tpass_online_handle;
+    void *two_pass_handle;
+    void *two_pass_online_handle;
     void *decoder_model;
     std::vector<std::vector<float>> hot_words_embedding;
     int asr_mode;
@@ -93,29 +93,28 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
     std::string wav_file_extension = fs::path(wav_path).extension().string();
     if (wav_file_extension == ".wav") {
         if (!audio.LoadWav2Char(wav_path, &sampling_rate)) {
-            std::cerr << "Failed to load " << wav_path << std::endl;
+            LOG(ERROR) << "Failed to load " << wav_path;
             return MDStatusCode::FileOpenFailed;
         }
     } else if (wav_file_extension == ".pcm") {
         if (!audio.LoadPcmwav2Char(wav_path, &sampling_rate)) {
-            std::cerr << "Failed to load " << wav_path << std::endl;
+            LOG(ERROR) << "Failed to load " << wav_path;
             return MDStatusCode::FileOpenFailed;
         }
     } else {
         if (!audio.FfmpegLoad(wav_path, true)) {
-            std::cerr << "Failed to load " << wav_path << std::endl;
+            LOG(ERROR) << "Failed to load " << wav_path;
             return MDStatusCode::FileOpenFailed;
         }
     }
-
     char *speech_buff = audio.GetSpeechChar();
     int buff_len = audio.GetSpeechLen() * 2;
     int step = 800 * 2;
-    bool is_final = false;
+    bool is_final;
     string online_res;
     string tpass_res;
     string time_stamp_res;
-    std::vector<std::vector<string>> punc_cache(2);
+    std::vector<std::vector<string>> punct_cache(2);
 
     auto model_content = (TwoPassModel *) model->model_content;
     auto asr_mode = (ASRMode) model_content->asr_mode;
@@ -128,8 +127,8 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
             is_final = false;
         }
 
-        FUNASR_RESULT result = FunTpassInferBuffer(model_content->tpass_handle, model_content->tpass_online_handle,
-                                                   speech_buff + sample_offset, step, punc_cache, is_final,
+        FUNASR_RESULT result = FunTpassInferBuffer(model_content->two_pass_handle, model_content->two_pass_online_handle,
+                                                   speech_buff + sample_offset, step, punct_cache, is_final,
                                                    sampling_rate, "pcm", (ASR_TYPE) asr_mode,
                                                    model_content->hot_words_embedding, true,
                                                    model_content->decoder_model);
@@ -142,11 +141,11 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
             string tpass_msg = FunASRGetTpassResult(result, 0);
             tpass_res += tpass_msg;
             if (!tpass_msg.empty()) {
-                std::cout << " offline results : " << tpass_msg << std::endl;
+                LOG(INFO) << " offline results : " << tpass_msg;
             }
             string stamp = FunASRGetStamp(result);
             if (!stamp.empty()) {
-                std::cout << " time stamp : " << stamp << std::endl;
+                LOG(INFO) << " time stamp : " << stamp;
                 if (time_stamp_res.empty()) {
                     time_stamp_res += stamp;
                 } else {
@@ -174,42 +173,38 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
 
 
 void md_free_two_pass_result(MDASRResult *asr_result) {
-    if (asr_result != nullptr) {
-        if (asr_result->msg != nullptr) {
-            free(asr_result->msg);
-            asr_result->msg = nullptr;
-        }
-        if (asr_result->stamp != nullptr) {
-            free(asr_result->stamp);
-            asr_result->stamp = nullptr;
-        }
-        if (asr_result->stamp_sents != nullptr) {
-            free(asr_result->stamp_sents);
-            asr_result->stamp_sents = nullptr;
-        }
-        if (asr_result->tpass_msg != nullptr) {
-            free(asr_result->tpass_msg);
-            asr_result->tpass_msg = nullptr;
-        }
+    if (asr_result->msg != nullptr) {
+        free(asr_result->msg);
+        asr_result->msg = nullptr;
+    }
+    if (asr_result->stamp != nullptr) {
+        free(asr_result->stamp);
+        asr_result->stamp = nullptr;
+    }
+    if (asr_result->stamp_sents != nullptr) {
+        free(asr_result->stamp_sents);
+        asr_result->stamp_sents = nullptr;
+    }
+    if (asr_result->tpass_msg != nullptr) {
+        free(asr_result->tpass_msg);
+        asr_result->tpass_msg = nullptr;
     }
 }
 
 
 void md_free_two_pass_model(MDModel *model) {
-    if (model != nullptr) {
-        if (model->model_content != nullptr) {
-            auto model_content = static_cast<TwoPassModel *> (model->model_content);
-            FunWfstDecoderUnloadHwsRes(model_content->decoder_model);
-            FunASRWfstDecoderUninit(model_content->decoder_model);
-            FunTpassOnlineUninit(model_content->tpass_online_handle);
-            FunTpassUninit(model_content->tpass_handle);
-            delete model_content;
-            model->model_content = nullptr;
-        }
-        if (model->model_name != nullptr) {
-            free(model->model_name);
-            model->model_name = nullptr;
-        }
+    if (model->model_content != nullptr) {
+        auto model_content = static_cast<TwoPassModel *> (model->model_content);
+        FunWfstDecoderUnloadHwsRes(model_content->decoder_model);
+        FunASRWfstDecoderUninit(model_content->decoder_model);
+        FunTpassOnlineUninit(model_content->two_pass_online_handle);
+        FunTpassUninit(model_content->two_pass_handle);
+        delete model_content;
+        model->model_content = nullptr;
+    }
+    if (model->model_name != nullptr) {
+        free(model->model_name);
+        model->model_name = nullptr;
     }
 }
 
