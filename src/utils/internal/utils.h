@@ -3,9 +3,12 @@
 //
 
 #include "opencv2/opencv.hpp"
+#include "../../decl.h"
 
 #ifdef BUILD_FACE
+
 #include "seeta/CStruct.h"
+
 #endif
 
 #include "../../types.h"
@@ -13,15 +16,17 @@
 /// 将MDImage转换为cv::Mat
 /// \param image
 /// \return
-cv::Mat md_image_to_mat(MDImage* image);
+cv::Mat md_image_to_mat(MDImage *image);
 
 /// 将cv::Mat转换为MDImage
 /// \param mat
 /// \return
-MDImage* mat_to_md_image(const cv::Mat &mat);
+MDImage *mat_to_md_image(const cv::Mat &mat);
 
 #ifdef BUILD_FACE
+
 SeetaImageData md_image_to_seeta_image(MDImage *image);
+
 #endif
 
 void draw_rect_internal(cv::Mat &cv_image, const cv::Rect &rect, const cv::Scalar &cv_color, double alpha);
@@ -50,4 +55,4 @@ std::string format_rect(MDRect rect);
 /// 生成随机色
 cv::Scalar get_random_color();
 
-bool is_quantize_model(const char *model_dir);
+EXPORT_DECL bool is_quantize_model(const std::string &model_dir);

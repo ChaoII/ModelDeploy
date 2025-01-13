@@ -54,7 +54,7 @@ endif (APPLE)
 list(REMOVE_ITEM ASR_INTERNAL_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/internal/paraformer-torch.cpp")
 
 
-add_library(${TARGET_NAME} SHARED ${ASR_INTERNAL_SOURCE})
+add_library(${TARGET_NAME} STATIC ${ASR_INTERNAL_SOURCE})
 target_compile_options(${TARGET_NAME} PRIVATE /O2)
 
 if (WIN32)

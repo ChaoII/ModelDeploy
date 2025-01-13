@@ -4,8 +4,10 @@
 #include "utils.h"
 #include <random>
 #include <filesystem>
+
 #define QUANTIZE_MODEL "model_quant.onnx"
 namespace fs = std::filesystem;
+
 cv::Mat md_image_to_mat(MDImage *image) {
     if (!image) {
         return {};
@@ -114,7 +116,7 @@ cv::Scalar get_random_color() {
             static_cast<double>((int) dis(gen))};
 }
 
-bool is_quantize_model(const char *model_dir) {
+bool is_quantize_model(const std::string &model_dir) {
     auto model_path = fs::path(model_dir);
     if (fs::exists(model_path)) {
         if (fs::exists(model_path / QUANTIZE_MODEL))
