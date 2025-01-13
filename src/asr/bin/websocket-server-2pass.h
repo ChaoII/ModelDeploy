@@ -136,10 +136,11 @@ public:
     void on_close(const websocketpp::connection_hdl &hdl);
 
     context_ptr on_tls_init(tls_mode mode, const websocketpp::connection_hdl &hdl,
-                            std::string &s_cert_file, std::string &s_keyfile);
+                            std::string &s_cert_file, std::string &s_key_file);
 
 private:
     void check_and_clean_connection();
+
     asio::io_context &io_decoder_;  // threads for asr decoder
     // std::ofstream fout;
     // FUNASR_HANDLE asr_handle;  // asr engine handle
@@ -151,7 +152,6 @@ private:
 
     // use map to keep the received samples data from one connection in offline
     // engine. if for online engline, a data struct is needed(TODO)
-
     WSS_Data_Map data_map;
     websocketpp::lib::mutex m_lock;  // mutex for sample_map
 };
