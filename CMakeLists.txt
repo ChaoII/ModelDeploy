@@ -8,9 +8,14 @@ set(SDK_SOURCE "")
 set(DEPENDS "")
 
 option(BUILD_FACE "build face recognition module" ON)
-option(BUILD_ASR "build fun asr module" ON)
+option(BUILD_ASR "build asr module" ON)
+option(BUILD_ASR_WSS_SERVER "build asr websocket server" ON)
 option(BUILD_TEST "build unittest" OFF)
 set(FD_DIR "E:/Fastdeploy/build/install1" CACHE PATH "fd cmake file path")
+
+if (MSVC)
+    add_link_options("/MANIFEST:NO")
+endif ()
 
 include(${FD_DIR}/FastDeploy.cmake)
 include_directories(${FASTDEPLOY_INCS})
@@ -32,6 +37,15 @@ if (BUILD_FACE)
     list(APPEND SDK_SOURCE ${FACE_SOURCE})
 endif ()
 
+if (BUILD_ASR_WSS_SERVER)
+    if (NOT BUILD_ASR)
+        message(WARNING "build asr websocket server must set BUILD_ASR ON, set BUILD_ASR ON")
+        set(BUILD_ASR ON)
+    endif ()
+    add_subdirectory(${CMAKE_SOURCE_DIR}/src/asr/bin)
+endif ()
+
+
 if (BUILD_ASR)
     add_definitions(-DBUILD_ASR)
     set(FFMPEG_DIR "E:/develop/ffmpeg-master-latest-win64-gpl-shared" CACHE PATH "ffmpeg directory")
@@ -47,10 +61,6 @@ if (BUILD_TEST)
     enable_testing()
     add_subdirectory(tests)
 endif ()
-
-
-
-include("${CMAKE_SOURCE_DIR}/cmake/asr_wss_server.cmake")
 
 
 #add_executable(demo main.cpp)
