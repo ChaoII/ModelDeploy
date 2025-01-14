@@ -3,12 +3,6 @@ include(TestBigEndian)
 test_big_endian(BIG_ENDIAN)
 
 # for onnxruntime
-IF (WIN32)
-    add_compile_options(/wd4291 /wd4305 /wd4244 /wd4828 /wd4251 /wd4275)
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8>")
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
-endif ()
 
 include_directories(${CMAKE_SOURCE_DIR}/src/asr/internal)
 include_directories(${CMAKE_SOURCE_DIR}/3rd_party)
