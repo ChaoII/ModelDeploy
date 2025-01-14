@@ -5,21 +5,56 @@
 #include <chrono>
 #include "src/utils/utils_capi.h"
 #include "src/ocr/ocr_capi.h"
+#include <fstream>
+#include <sstream>
+
 #ifdef WIN32
+
 #include <windows.h>
+#include <string>
+
 #endif
-int main() {
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+//å­—ç¬¦ä¸²åˆ†å‰²å‡½æ•°
+std::vector<std::string> split(std::string str, const std::string &pattern) {
+    std::string::size_type pos;
+    std::vector<std::string> result;
+    str += pattern;//æ‰©å±•å­—ç¬¦ä¸²ä»¥æ–¹ä¾¿æ“ä½œ
+    int size = str.size();
+    for (int i = 0; i < size; i++) {
+        pos = str.find(pattern, i);
+        if (pos < size) {
+            std::string s = str.substr(i, pos - i);
+            result.push_back(s);
+            i = pos + pattern.size() - 1;
+        }
+    }
+    return result;
+}
+
+
+int main(int argc, char **argv) {
 #ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
 #endif
     MDStatusCode ret;
-    //¶ÁÈ¡Í¼Æ¬
-    auto image = md_read_image("../tests/test_images/test_ocr1.png");
-    // ĞèÒª²éÕÒµÄÎÄ±¾
-    const char *text = "ÔİÍ£²âÊÔ";
-    // ´´½¨Ä£ĞÍ¾ä±ú
+
+    std::string parameter_file = argv[1];
+    std::fstream in(parameter_file);
+    if (!in) {
+        std::cout << "Error: parameter file not found" << std::endl;
+        return -1;
+    }
+
+
+    // åˆ›å»ºæ¨¡å‹å¥æŸ„
     MDModel model;
-    MDOCRModelParameters parameters = {
+    MDOCRModelParameters ocr_parameters = {
             "../tests/models/ocr",
             "../tests/key.txt",
             8,
@@ -32,44 +67,67 @@ int main() {
             0,
             4
     };
-    if ((ret = md_create_ocr_model(&model, &parameters)) != 0) {
+    if ((ret = md_create_ocr_model(&model, &ocr_parameters)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-    // »ñÈ¡ÎÄ±¾Ä¿±êÎ»ÖÃ
-    MDOCRResults results;
-    if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
+    // è·å–æ–‡æœ¬ç›®æ ‡ä½ç½®
+//    MDOCRResults results;
+//    if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
+//        std::cout << ret << std::endl;
+//        return ret;
+//    }
     MDColor color = {0, 0, 255};
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
-    std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
-    std::cout << "cost: " << diff.count() << std::endl;
-    md_print_ocr_result(&results);
-    md_free_ocr_result(&results);
-    auto rect = md_get_text_position(&model, &image, text);
-    // ´òÓ¡ÎÄ±¾ĞÅÏ¢
-    md_print_rect(&rect);
-    // ÏÈ²Ã¼ôÔÙ»æÖÆ£¬²»È»imageÊÇÖ¸Õë´«µİ£¬ÔÚ»æÖÆÊ±»áĞŞ¸ÄÔ­Ê¼image
-    if (rect.width > 0 && rect.height > 0) {
-        auto roi = md_crop_image(&image, &rect);
-        // ÔÚÔ­Ê¼»­ÃæÉÏ»æÖÆÎÄ±¾½á¹û
-        md_draw_text(&image, &rect, text, "../tests/msyh.ttc", 15, &color, 0.5);
-        auto enable = md_get_button_enable_status(&roi, 50, 0.05);
-        // ÅĞ¶Ï°´Å¥ÊÇ·ñ¿ÉÓÃ
-        std::cout << "enable: " << enable << std::endl;
+//    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+//    md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
+//    std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
+//    std::cout << "cost: " << diff.count() << std::endl;
+//    md_print_ocr_result(&results);
+//    md_free_ocr_result(&results);
+
+    std::string line;
+    while (std::getline(in, line)) {
+        auto parameters = split(line, " ");
+        if (parameters.size() != 2) {
+            std::cerr << "Error: parameter file format error" << std::endl;
+            return -1;
+        }
+        auto image_path = parameters[0];
+        auto button_name = parameters[1];
+        auto image = md_read_image(image_path.c_str());
+        auto text = button_name.c_str();
+        auto rect = md_get_text_position(&model, &image, text);
+        // æ‰“å°æ–‡æœ¬ä¿¡æ¯
+        md_print_rect(&rect);
+        // å…ˆè£å‰ªå†ç»˜åˆ¶ï¼Œä¸ç„¶imageæ˜¯æŒ‡é’ˆä¼ é€’ï¼Œåœ¨ç»˜åˆ¶æ—¶ä¼šä¿®æ”¹åŸå§‹image
+        if (rect.width > 0 && rect.height > 0) {
+            auto roi = md_crop_image(&image, &rect);
+            // åœ¨åŸå§‹ç”»é¢ä¸Šç»˜åˆ¶æ–‡æœ¬ç»“æœ
+            // åˆ¤æ–­æŒ‰é’®æ˜¯å¦å¯ç”¨
+            auto enable = md_get_button_enable_status(&roi, 50, 0.05);
+
+            std::stringstream ss;
+            ss << (std::string(text) + "-" + (enable ? "enable" : "disable"))
+               << "-[ " << "x: " << rect.x << " y: " << rect.y << " ]";
+
+            md_draw_text(&image, &rect,
+                         ss.str().c_str(),
+                         "../tests/msyh.ttc",
+                         15,
+                         &color, 0.5);
+
 //        md_show_image(&roi);
-        // ÊÍ·Å×ÊÔ´
-        md_free_image(&roi);
+            // é‡Šæ”¾èµ„æº
+            md_free_image(&roi);
+        }
+
+        // æ˜¾ç¤ºåŸå§‹ç”»é¢
+        md_show_image(&image);
+        // æ˜¾ç¤ºç›®æ ‡æ–‡æœ¬æ‰€åœ¨ç”»é¢
+        md_free_image(&image);
     }
 
-    // ÏÔÊ¾Ô­Ê¼»­Ãæ
-//    md_show_image(&image);
-    // ÏÔÊ¾Ä¿±êÎÄ±¾ËùÔÚ»­Ãæ
-    md_free_image(&image);
+
     md_free_ocr_model(&model);
     return ret;
-
 }

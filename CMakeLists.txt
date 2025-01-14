@@ -18,6 +18,10 @@ set(FD_DIR "E:/Fastdeploy/build/install1" CACHE PATH "fd cmake file path")
 
 if (MSVC)
     add_link_options("/MANIFEST:NO")
+    add_compile_options(/wd4291 /wd4305 /wd4244 /wd4828 /wd4251 /wd4275)
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
 endif ()
 
 include(${FD_DIR}/FastDeploy.cmake)

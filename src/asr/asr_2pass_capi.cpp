@@ -108,6 +108,7 @@ MDStatusCode md_two_pass_model_predict(MDModel *model, const char *wav_path, MDA
         }
     }
     char *speech_buff = audio.GetSpeechChar();
+    // PCM 数据的每个样本通常使用 16 位（2 字节）来表示
     int buff_len = audio.GetSpeechLen() * 2;
     int step = 800 * 2;
     bool is_final;
