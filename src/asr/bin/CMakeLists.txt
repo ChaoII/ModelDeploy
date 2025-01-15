@@ -13,7 +13,9 @@ include_directories("${CMAKE_SOURCE_DIR}/3rd_party/websocketpp")
 include_directories("${CMAKE_SOURCE_DIR}/3rd_party/json/include")
 
 set(CMAKE_TOOLCHAIN_FILE "E:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE PATH "Vcpkg toolchain file")
+message("${CMAKE_TOOLCHAIN_FILE}")
 find_package(OpenSSL REQUIRED)
+
 
 file(GLOB ASR_WSS_SERVER_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/bin/*.cpp")
 add_executable(${TARGET_NAME} ${ASR_WSS_SERVER_SOURCE})

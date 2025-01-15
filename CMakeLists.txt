@@ -67,7 +67,7 @@ endif ()
 
 if (BUILD_ASR)
     add_definitions(-DBUILD_ASR)
-    set(FFMPEG_DIR "E:/develop/ffmpeg-master-latest-win64-gpl-shared" CACHE PATH "ffmpeg directory")
+    set(FFMPEG_DIR "E:/develop/ffmpeg" CACHE PATH "ffmpeg directory")
     include(${CMAKE_SOURCE_DIR}/cmake/asr.cmake)
     file(GLOB ASR_SOURCE ${CMAKE_SOURCE_DIR}/src/asr/*.cpp)
     list(APPEND SDK_SOURCE ${ASR_SOURCE})
