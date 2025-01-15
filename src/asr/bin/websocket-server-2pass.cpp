@@ -126,7 +126,7 @@ void WebSocketServer::do_decoder(
                                                  sub_vector.data(),
                                                  static_cast<int>(sub_vector.size()),
                                                  punct_cache, false, audio_fs,
-                                                 wav_format, (ASR_TYPE) asr_mode_,
+                                                 wav_format, static_cast<ASR_TYPE>(asr_mode_),
                                                  hot_words_embedding, itn, decoder_handle,
                                                  svs_lang, sys_itn);
                 } else {

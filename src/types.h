@@ -20,7 +20,8 @@
 
 #define MD_MASK (MD_FACE_DETECT | MD_FACE_LANDMARK | MD_FACE_RECOGNITION|MD_FACE_ANTI_SPOOfING|MD_FACE_QUALITY_EVALUATE|MD_FACE_AGE_ATTRIBUTE|MD_FACE_GENDER_ATTRIBUTE|MD_FACE_EYE_STATE)
 
-enum ASRMode{
+
+enum ASRMode {
     Offline = 0,
     Online = 1,
     TwoPass = 2,
@@ -66,10 +67,10 @@ enum MDStatusCode {
 };
 
 typedef struct {
-    char *model_name;
+    char* model_name;
     MDModelType type;
     MDModelFormat format;
-    void *model_content;
+    void* model_content;
 } MDModel;
 
 typedef struct {
@@ -94,19 +95,19 @@ typedef struct {
     int width;
     int height;
     int channels;
-    unsigned char *data;
+    unsigned char* data;
 } MDImage;
 
 typedef struct {
-    MDPoint *data;
+    MDPoint* data;
     int size;
 } MDPolygon;
 
 typedef struct {
     /// ocr model directory;
-    const char *model_dir;
+    const char* model_dir;
     /// ocr dictionary path
-    const char *dict_path;
+    const char* dict_path;
     /// thread num default is 8
     int thread_num;
     /// model format default is PaddlePaddle
@@ -120,7 +121,7 @@ typedef struct {
     /// detect db unclip ratio default 1.5
     double det_db_unclip_ratio;
     /// detect db score mode default is "slow"
-    const char *det_db_score_mode;
+    const char* det_db_score_mode;
     /// is use dilation default is false(0)
     int use_dilation;
     /// recognition batch size default is 8, unusually set the same as thread_num
@@ -129,12 +130,12 @@ typedef struct {
 
 typedef struct {
     MDPolygon box;
-    char *text;
+    char* text;
     float score;
 } MDOCRResult;
 
 typedef struct {
-    MDOCRResult *data;
+    MDOCRResult* data;
     int size;
 } MDOCRResults;
 
@@ -158,17 +159,17 @@ typedef struct {
 
 
 typedef struct {
-    MDDetectionResult *data;
+    MDDetectionResult* data;
     int size;
 } MDDetectionResults;
 
 typedef struct {
-    MDPointF *data;
+    MDPointF* data;
     int size;
 } MDLandMarkResult;
 
 typedef struct {
-    float *data;
+    float* data;
     int size;
 } MDFaceFeature;
 
@@ -200,6 +201,7 @@ enum MDGenderResult {
     MALE = 0,
     FEMALE = 1
 };
+
 enum MDEyeState {
     EYE_CLOSE = 0,
     EYE_OPEN = 1,
@@ -214,10 +216,11 @@ typedef struct {
 
 
 typedef struct {
-    char *msg;
-    char *stamp;
-    char *stamp_sents;
-    char *tpass_msg;
+    char* msg;
+    char* stamp;
+    char* stamp_sents;
+    char* tpass_msg;
     float snippet_time;
 } MDASRResult;
 
+typedef void (*ASRCallBack)(MDASRResult* result);
