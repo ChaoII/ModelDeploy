@@ -1,6 +1,6 @@
 
 if (BUILD_ASR)
-    add_subdirectory(demo_asr_2pass)
+    add_subdirectory(demo_asr)
 endif ()
 if (BUILD_DETECTION)
     add_subdirectory(demo_detection)

@@ -27,11 +27,9 @@ EXPORT_DECL MDStatusCode md_create_two_pass_model(MDModel* model,
                                                   int fst_inc_wts = 20,
                                                   int thread_num = 1);
 
-EXPORT_DECL MDStatusCode md_two_pass_model_predict(MDModel* model, const char* wav_path,
-                                                   MDASRResult* asr_result, int audio_fs = 16000);
 
-
-EXPORT_DECL MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model, const char* speech_buff,
+EXPORT_DECL MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model,
+                                                          const char* speech_buff,
                                                           int step,
                                                           bool is_final,
                                                           const char* wav_format,

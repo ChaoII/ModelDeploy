@@ -86,100 +86,6 @@ MDStatusCode md_create_two_pass_model(MDModel* model,
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_two_pass_model_predict(MDModel* model, const char* wav_path, MDASRResult* asr_result, int audio_fs) {
-    funasr::Audio audio(1);
-    int32_t sampling_rate = audio_fs;
-    std::string wav_file_extension = fs::path(wav_path).extension().string();
-    if (wav_file_extension == ".wav") {
-        if (!audio.LoadWav2Char(wav_path, &sampling_rate)) {
-            LOG(ERROR) << "Failed to load " << wav_path;
-            return MDStatusCode::FileOpenFailed;
-        }
-    }
-    else if (wav_file_extension == ".pcm") {
-        if (!audio.LoadPcmwav2Char(wav_path, &sampling_rate)) {
-            LOG(ERROR) << "Failed to load " << wav_path;
-            return MDStatusCode::FileOpenFailed;
-        }
-    }
-    else {
-        if (!audio.FfmpegLoad(wav_path, true)) {
-            LOG(ERROR) << "Failed to load " << wav_path;
-            return MDStatusCode::FileOpenFailed;
-        }
-    }
-    char* speech_buff = audio.GetSpeechChar();
-    // PCM 数据的每个样本通常使用 16 位（2 字节）来表示
-    int buff_len = audio.GetSpeechLen() * 2;
-    int step = 800 * 2;
-    bool is_final;
-    string online_res;
-    string tpass_res;
-    string time_stamp_res;
-    std::vector<std::vector<string>> punct_cache(2);
-
-    auto model_content = static_cast<TwoPassModel*>(model->model_content);
-    auto asr_mode = static_cast<ASRMode>(model_content->asr_mode);
-
-    for (int sample_offset = 0; sample_offset < buff_len; sample_offset += std::min(step, buff_len - sample_offset)) {
-        if (sample_offset + step >= buff_len - 1) {
-            step = buff_len - sample_offset;
-            is_final = true;
-        }
-        else {
-            is_final = false;
-        }
-
-        FUNASR_RESULT result = FunTpassInferBuffer(model_content->two_pass_handle,
-                                                   model_content->two_pass_online_handle,
-                                                   speech_buff + sample_offset, step, punct_cache, is_final,
-                                                   sampling_rate, "pcm", static_cast<ASR_TYPE>(asr_mode),
-                                                   model_content->hot_words_embedding, true,
-                                                   model_content->decoder_model);
-        if (result) {
-            string online_msg = FunASRGetResult(result, 0);
-            online_res += online_msg;
-            if (!online_msg.empty()) {
-                LOG(INFO) << online_msg;
-            }
-            string tpass_msg = FunASRGetTpassResult(result, 0);
-            tpass_res += tpass_msg;
-            if (!tpass_msg.empty()) {
-                LOG(INFO) << " offline results : " << tpass_msg;
-            }
-            else {
-                LOG(INFO) << " tpass_msg  is empty";
-            }
-            string stamp = FunASRGetStamp(result);
-            if (!stamp.empty()) {
-                LOG(INFO) << " time stamp : " << stamp;
-                if (time_stamp_res.empty()) {
-                    time_stamp_res += stamp;
-                }
-                else {
-                    time_stamp_res = time_stamp_res.erase(time_stamp_res.length() - 1)
-                        + "," + stamp.substr(1);
-                }
-            }
-            FunASRFreeResult(result);
-        }
-    }
-    if (asr_mode == ASRMode::TwoPass) {
-        LOG(INFO) << " Final online  results " << " : " << online_res;
-    }
-    if (asr_mode == ASRMode::Online) {
-        LOG(INFO) << " Final online  results " << " : " << tpass_res;
-    }
-    if (asr_mode == ASRMode::Offline || asr_mode == ASRMode::TwoPass) {
-        LOG(INFO) << " Final offline results " << " : " << tpass_res;
-        if (!time_stamp_res.empty()) {
-            LOG(INFO) << " Final timestamp results " << " : " << time_stamp_res;
-        }
-    }
-    return MDStatusCode::Success;
-}
-
-
 MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model, const char* speech_buff, int step,
                                               bool is_final,
                                               const char* wav_format,
@@ -204,6 +110,9 @@ MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model, const char* 
             string online_msg = FunASRGetResult(result, 0);
             string tpass_msg = FunASRGetTpassResult(result, 0);
             string stamp = FunASRGetStamp(result);
+            string stamp_sentences = FunASRGetStampSents(result);
+            // 这个和step相关为固定值
+            // asr_result.snippet_time = FunASRGetRetSnippetTime(result);
             if (!online_msg.empty()) {
                 asr_result.msg = strdup(online_msg.c_str());
             }
@@ -212,6 +121,9 @@ MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model, const char* 
             }
             if (!stamp.empty()) {
                 asr_result.stamp = strdup(stamp.c_str());
+            }
+            if (!stamp_sentences.empty()) {
+                asr_result.stamp_sents = strdup(stamp_sentences.c_str());
             }
             asr_call_back(&asr_result);
         }
