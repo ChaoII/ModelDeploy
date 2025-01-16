@@ -1,4 +1,4 @@
-set(TARGET_NAME "demo_face")
-add_executable(${TARGET_NAME} main.cpp)
-target_link_libraries(${TARGET_NAME} PUBLIC ${LIB_NAME})
-set_target_properties(${TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+add_executable(demo_face demo_face.cpp)
+target_link_libraries(demo_face PUBLIC ${LIB_NAME})
+set_target_properties(demo_face PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")

@@ -5,12 +5,10 @@
 #include <Windows.h>
 #endif
 
-#include <src/asr/asr_capi.h>
+#include <src/asr/asr_offline_capi.h>
 
 #include "src/asr/asr_2pass_capi.h"
 #include "src/asr/internal/audio.h"
-
-
 
 
 void call_back(MDASRResult* result) {
@@ -20,17 +18,22 @@ void call_back(MDASRResult* result) {
     if (result->tpass_msg) {
         std::cout << "*****" << result->tpass_msg << std::endl;
     }
+    if (result->stamp) {
+        std::cout << "++++" << result->stamp << std::endl;
+    }
+    if (result->stamp_sents) {
+        std::cout << "#####" << result->stamp_sents << std::endl;
+    }
+    // 打印，存数据库，想干啥干啥
     md_free_asr_result(result);
 }
 
 int main() {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
-#define _CRTDBG_MAP_ALLOC
-    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     MDModel model{};
     md_create_two_pass_model(&model,
-                             "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-onnx",
+                             "D:/funasr-runtime-resources/models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx",
                              "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx",
                              "D:/funasr-runtime-resources/models/speech_fsmn_vad_zh-cn-16k-common-onnx",
                              "D:/funasr-runtime-resources/models/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx",
@@ -62,7 +65,9 @@ int main() {
         else {
             is_final = false;
         }
-        md_two_pass_model_predict_buffer(&model, speech_buff + sample_offset, step, is_final, "pcm", sampling_rate,
+        md_two_pass_model_predict_buffer(&model, speech_buff + sample_offset, step, is_final,
+                                         "pcm",
+                                         sampling_rate,
                                          call_back);
     }
 

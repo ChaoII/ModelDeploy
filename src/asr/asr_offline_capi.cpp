@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
-#include "asr_capi.h"
+#include "asr_offline_capi.h"
 #include "src/utils/internal/utils.h"
 #include "internal/funasrruntime.h"
 #include "internal/com-define.h"
@@ -14,29 +14,27 @@ namespace fs = std::filesystem;
 
 
 struct ASRModel {
-    void *asr_model;
-    void *decoder_model;
+    void* asr_model;
+    void* decoder_model;
     std::vector<std::vector<float>> hot_words_embedding;
 };
 
 
-MDStatusCode md_create_asr_model(MDModel *model,
-                                 const char *model_dir,
-                                 const char *vad_dir,
-                                 const char *punct_dir,
-                                 const char *itn_dir,
-                                 const char *lm_dir,
-                                 const char *hot_word_path,
-                                 bool blade_disc,
-                                 float global_beam,
-                                 float lattice_beam,
-                                 float am_scale,
-                                 int fst_inc_wts,
-                                 int thread_num,
-                                 int batch_size,
-                                 bool use_gpu) {
-
-
+MDStatusCode md_create_asr_offline_model(MDModel* model,
+                                         const char* model_dir,
+                                         const char* vad_dir,
+                                         const char* punct_dir,
+                                         const char* itn_dir,
+                                         const char* lm_dir,
+                                         const char* hot_word_path,
+                                         bool blade_disc,
+                                         float global_beam,
+                                         float lattice_beam,
+                                         float am_scale,
+                                         int fst_inc_wts,
+                                         int thread_num,
+                                         int batch_size,
+                                         bool use_gpu) {
     std::map<std::string, std::string> model_path;
     model_path.insert({MODEL_DIR, model_dir});
     model_path.insert({QUANTIZE, is_quantize_model(model_dir) ? "true" : "false"});
@@ -47,7 +45,7 @@ MDStatusCode md_create_asr_model(MDModel *model,
     model_path.insert({PUNC_QUANT, is_quantize_model(vad_dir) ? "true" : "false"});
     model_path.insert({ITN_DIR, itn_dir});
     model_path.insert({LM_DIR, lm_dir});
-    void *asr_model = FunOfflineInit(model_path, thread_num, use_gpu, batch_size);
+    void* asr_model = FunOfflineInit(model_path, thread_num, use_gpu, batch_size);
     if (!asr_model) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -60,7 +58,7 @@ MDStatusCode md_create_asr_model(MDModel *model,
         am_sc = am_scale;
     }
     // init wfst decoder
-    void *decoder_handle = FunASRWfstDecoderInit(asr_model, ASR_OFFLINE, glob_beam, lat_beam, am_sc);
+    void* decoder_handle = FunASRWfstDecoderInit(asr_model, ASR_OFFLINE, glob_beam, lat_beam, am_sc);
     // hotword file
     std::unordered_map<std::string, int> hws_map;
     std::string nn_hot_words;
@@ -76,7 +74,7 @@ MDStatusCode md_create_asr_model(MDModel *model,
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_asr_model_predict(MDModel *model, const char *wav_path, MDASRResult *asr_result, int audio_fs) {
+MDStatusCode md_asr_offline_model_predict(MDModel* model, const char* wav_path, MDASRResult* asr_result, int audio_fs) {
     std::string wav_data;
     if (fs::path(wav_path).extension().string() == ".scp") {
         std::ifstream in(wav_path);
@@ -91,11 +89,12 @@ MDStatusCode md_asr_model_predict(MDModel *model, const char *wav_path, MDASRRes
             wav_data = column2;
         }
         in.close();
-    } else {
+    }
+    else {
         wav_data = wav_path;
     }
 
-    auto model_content = (ASRModel *) model->model_content;
+    auto model_content = static_cast<ASRModel*>(model->model_content);
 
     FUNASR_RESULT result = FunOfflineInfer(model_content->asr_model, wav_data.c_str(), RASR_NONE, nullptr,
                                            model_content->hot_words_embedding, audio_fs, true,
@@ -117,8 +116,7 @@ MDStatusCode md_asr_model_predict(MDModel *model, const char *wav_path, MDASRRes
     return MDStatusCode::Success;
 }
 
-void md_free_asr_result(MDASRResult *asr_result) {
-
+void md_free_asr_result(MDASRResult* asr_result) {
     if (asr_result->msg != nullptr) {
         free(asr_result->msg);
         asr_result->msg = nullptr;
@@ -135,14 +133,13 @@ void md_free_asr_result(MDASRResult *asr_result) {
         free(asr_result->tpass_msg);
         asr_result->tpass_msg = nullptr;
     }
-
 }
 
 
-void md_free_asr_model(MDModel *model) {
+void md_free_asr_offline_model(MDModel* model) {
     if (model != nullptr) {
         if (model->model_content != nullptr) {
-            auto model_content = static_cast<ASRModel *> (model->model_content);
+            auto model_content = static_cast<ASRModel*>(model->model_content);
             FunWfstDecoderUnloadHwsRes(model_content->decoder_model);
             FunASRWfstDecoderUninit(model_content->decoder_model);
             FunOfflineUninit(model_content->asr_model);
@@ -155,6 +152,3 @@ void md_free_asr_model(MDModel *model) {
         }
     }
 }
-
-
-

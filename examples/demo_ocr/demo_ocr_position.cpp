@@ -11,19 +11,16 @@
 #ifdef WIN32
 
 #include <windows.h>
-#include <string>
 
 #endif
 
-#include <iostream>
-#include <string>
 #include <vector>
 
 //字符串分割函数
-std::vector<std::string> split(std::string str, const std::string &pattern) {
+std::vector<std::string> split(std::string str, const std::string& pattern) {
     std::string::size_type pos;
     std::vector<std::string> result;
-    str += pattern;//扩展字符串以方便操作
+    str += pattern; //扩展字符串以方便操作
     int size = str.size();
     for (int i = 0; i < size; i++) {
         pos = str.find(pattern, i);
@@ -37,7 +34,7 @@ std::vector<std::string> split(std::string str, const std::string &pattern) {
 }
 
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 #ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
@@ -55,35 +52,35 @@ int main(int argc, char **argv) {
     // 创建模型句柄
     MDModel model;
     MDOCRModelParameters ocr_parameters = {
-            "../tests/models/ocr",
-            "../tests/key.txt",
-            8,
-            PaddlePaddle,
-            960,
-            0.3,
-            0.6,
-            1.5,
-            "slow",
-            0,
-            4
+        "../tests/models/ocr",
+        "../tests/key.txt",
+        8,
+        PaddlePaddle,
+        960,
+        0.3,
+        0.6,
+        1.5,
+        "slow",
+        0,
+        4
     };
     if ((ret = md_create_ocr_model(&model, &ocr_parameters)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
     // 获取文本目标位置
-//    MDOCRResults results;
-//    if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
-//        std::cout << ret << std::endl;
-//        return ret;
-//    }
+    //    MDOCRResults results;
+    //    if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
+    //        std::cout << ret << std::endl;
+    //        return ret;
+    //    }
     MDColor color = {0, 0, 255};
-//    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-//    md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
-//    std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
-//    std::cout << "cost: " << diff.count() << std::endl;
-//    md_print_ocr_result(&results);
-//    md_free_ocr_result(&results);
+    //    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    //    md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
+    //    std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
+    //    std::cout << "cost: " << diff.count() << std::endl;
+    //    md_print_ocr_result(&results);
+    //    md_free_ocr_result(&results);
 
     std::string line;
     while (std::getline(in, line)) {
@@ -108,7 +105,7 @@ int main(int argc, char **argv) {
 
             std::stringstream ss;
             ss << (std::string(text) + "-" + (enable ? "enable" : "disable"))
-               << "-[ " << "x: " << rect.x << " y: " << rect.y << " ]";
+                << "-[ " << "x: " << rect.x << " y: " << rect.y << " ]";
 
             md_draw_text(&image, &rect,
                          ss.str().c_str(),
@@ -116,7 +113,7 @@ int main(int argc, char **argv) {
                          15,
                          &color, 0.5);
 
-//        md_show_image(&roi);
+            //        md_show_image(&roi);
             // 释放资源
             md_free_image(&roi);
         }
