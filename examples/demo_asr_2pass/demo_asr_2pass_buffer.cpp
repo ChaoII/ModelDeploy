@@ -1,11 +1,17 @@
 //
 // Created by aichao on 2025/1/15.
 //
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 #include <src/asr/asr_capi.h>
 
 #include "src/asr/asr_2pass_capi.h"
 #include "src/asr/internal/audio.h"
+
+
+
 
 void call_back(MDASRResult* result) {
     if (result->msg) {
@@ -14,11 +20,14 @@ void call_back(MDASRResult* result) {
     if (result->tpass_msg) {
         std::cout << "*****" << result->tpass_msg << std::endl;
     }
-
     md_free_asr_result(result);
 }
 
 int main() {
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#define _CRTDBG_MAP_ALLOC
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     MDModel model{};
     md_create_two_pass_model(&model,
                              "D:/funasr-runtime-resources/models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-onnx",
