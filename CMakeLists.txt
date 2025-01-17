@@ -13,16 +13,23 @@ option(BUILD_FACE "build face recognition module" ON)
 option(BUILD_ASR "build asr module" ON)
 option(BUILD_ASR_WSS_SERVER "build asr websocket server" ON)
 option(BUILD_EXAMPLES "build examples" ON)
+option(WITH_SAVE_LOG "save log to log file" ON)
 option(BUILD_TEST "build unittest" OFF)
 set(FD_DIR "E:/Fastdeploy/build/install1" CACHE PATH "fd cmake file path")
+
 
 if (MSVC)
     add_link_options("/MANIFEST:NO")
     add_compile_options(/wd4291 /wd4305 /wd4244 /wd4828 /wd4251 /wd4275)
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8>")
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
 endif ()
+
+
+if (WITH_SAVE_LOG)
+    add_definitions(-DSAVE_LOG)
+endif ()
+set(BUILD_SHARED_LIBS OFF)
+add_subdirectory("${CMAKE_SOURCE_DIR}/3rd_party/spdlog")
+list(APPEND DEPENDS spdlog::spdlog)
 
 include(${FD_DIR}/FastDeploy.cmake)
 include_directories(${FASTDEPLOY_INCS})
@@ -72,6 +79,7 @@ if (BUILD_ASR)
     file(GLOB ASR_SOURCE ${CMAKE_SOURCE_DIR}/src/asr/*.cpp)
     list(APPEND SDK_SOURCE ${ASR_SOURCE})
 endif ()
+
 
 add_library(${LIB_NAME} SHARED ${SDK_SOURCE})
 target_link_libraries(${LIB_NAME} PUBLIC ${DEPENDS})

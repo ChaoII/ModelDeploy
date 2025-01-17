@@ -29,9 +29,8 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/3rd_party/openfst)
 include_directories(${openfst_SOURCE_DIR}/src/include)
 if (WIN32)
     include_directories(${openfst_SOURCE_DIR}/src/lib)
-    cmake_policy(SET CMP0077 NEW)  # 使 option() 只影响缓存变量
+    cmake_policy(SET CMP0077 NEW)
     set(YAML_BUILD_SHARED_LIBS ON)
-    # 这俩文件开启O2 编译会报错
     set_source_files_properties("${CMAKE_SOURCE_DIR}/src/asr/internal/bias-lm.cpp" PROPERTIES COMPILE_OPTIONS "/Od")
     set_source_files_properties("${CMAKE_SOURCE_DIR}/src/asr/internal/itn-processor.cpp" PROPERTIES COMPILE_OPTIONS "/Od")
 endif ()
@@ -47,9 +46,11 @@ if (APPLE)
 endif (APPLE)
 list(REMOVE_ITEM ASR_INTERNAL_SOURCE "${CMAKE_SOURCE_DIR}/src/asr/internal/paraformer-torch.cpp")
 
-
 add_library(${TARGET_NAME} STATIC ${ASR_INTERNAL_SOURCE})
-target_compile_options(${TARGET_NAME} PRIVATE /O2)
+target_compile_options(${TARGET_NAME} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/O2>")
+target_compile_options(${TARGET_NAME} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:utf-8>")
+target_compile_options(${TARGET_NAME} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
+target_compile_options(${TARGET_NAME} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
 
 if (WIN32)
     set(EXTRA_LIBS yaml-cpp csrc kaldi-decoder fst glog gflags avutil avcodec avformat swresample onnxruntime)

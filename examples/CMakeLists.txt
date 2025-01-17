@@ -11,3 +11,5 @@ endif ()
 if (BUILD_OCR)
     add_subdirectory(demo_ocr)
 endif ()
+
+add_subdirectory(demo_utils)
