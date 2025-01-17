@@ -121,8 +121,7 @@ bool is_quantize_model(const std::string &model_dir) {
     if (fs::exists(model_path)) {
         if (fs::exists(model_path / QUANTIZE_MODEL))
             return true;
-        else
-            return false;
+        return false;
     }
     return false;
 }

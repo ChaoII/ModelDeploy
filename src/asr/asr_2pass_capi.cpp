@@ -111,7 +111,6 @@ MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model, const char* 
             string tpass_msg = FunASRGetTpassResult(result, 0);
             string stamp = FunASRGetStamp(result);
             string stamp_sentences = FunASRGetStampSents(result);
-            // 这个和step相关为固定值
             // asr_result.snippet_time = FunASRGetRetSnippetTime(result);
             if (!online_msg.empty()) {
                 asr_result.msg = strdup(online_msg.c_str());
