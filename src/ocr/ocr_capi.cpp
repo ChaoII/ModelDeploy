@@ -1,6 +1,7 @@
 #include "ocr_capi.h"
 #include "../utils/internal/utils.h"
 #include "fastdeploy/vision.h"
+#include "spdlog/spdlog.h"
 
 
 using DBDetector = fastdeploy::vision::ocr::DBDetector;
@@ -8,7 +9,7 @@ using Recognizer = fastdeploy::vision::ocr::Recognizer;
 using PPOCRv4 = fastdeploy::pipeline::PPOCRv4;
 
 
-MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameters) {
+MDStatusCode md_create_ocr_model(MDModel* model, MDOCRModelParameters* parameters) {
     if (!model) {
         return MDStatusCode::MemoryAllocatedFailed;
     }
@@ -53,10 +54,10 @@ MDStatusCode md_create_ocr_model(MDModel *model, MDOCRModelParameters *parameter
     return MDStatusCode::Success;
 }
 
-MDRect md_get_text_position(MDModel *model, MDImage *image, const char *text) {
+MDRect md_get_text_position(MDModel* model, MDImage* image, const char* text) {
     cv::Mat cv_image = md_image_to_mat(image);
     fastdeploy::vision::OCRResult res;
-    auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
+    auto ocr_model = static_cast<PPOCRv4*>(model->model_content);
     bool res_status = ocr_model->Predict(cv_image, &res);
     if (!res_status) {
         return MDRect{0, 0, 0, 0};
@@ -75,27 +76,27 @@ MDRect md_get_text_position(MDModel *model, MDImage *image, const char *text) {
 }
 
 
-MDStatusCode md_ocr_model_predict(MDModel *model, MDImage *image, MDOCRResults *results) {
+MDStatusCode md_ocr_model_predict(MDModel* model, MDImage* image, MDOCRResults* results) {
     auto cv_image = md_image_to_mat(image);
     fastdeploy::vision::OCRResult res;
-    auto ocr_model = static_cast<PPOCRv4 *> (model->model_content);
+    auto ocr_model = static_cast<PPOCRv4*>(model->model_content);
     bool res_status = ocr_model->Predict(cv_image, &res);
     if (!res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     auto r_size = res.boxes.size();
-    results->size = (int) r_size;
+    results->size = (int)r_size;
     if (r_size == 0) {
         results->data = nullptr;
         return MDStatusCode::Success;
     }
-    results->data = (MDOCRResult *) malloc(sizeof(MDOCRResult) * r_size);
+    results->data = (MDOCRResult*)malloc(sizeof(MDOCRResult) * r_size);
     for (int i = 0; i < r_size; ++i) {
         auto text = res.text[i];
-        results->data[i].text = (char *) malloc(text.size() + 1);
+        results->data[i].text = (char*)malloc(text.size() + 1);
         memcpy(results->data[i].text, text.c_str(), text.size() + 1);
         results->data[i].score = res.rec_scores[i];
-        MDPolygon polygon{(MDPoint *) malloc(sizeof(MDPoint) * 4), 4};
+        MDPolygon polygon{(MDPoint*)malloc(sizeof(MDPoint) * 4), 4};
         for (int j = 0; j < 4; ++j) {
             polygon.data[j] = {res.boxes[i][j * 2], res.boxes[i][j * 2 + 1]};
         }
@@ -104,15 +105,15 @@ MDStatusCode md_ocr_model_predict(MDModel *model, MDImage *image, MDOCRResults *
     return MDStatusCode::Success;
 }
 
-void md_print_ocr_result(MDOCRResults *result) {
+void md_print_ocr_result(MDOCRResults* result) {
     if (!result) return;
     for (int i = 0; i < result->size; ++i) {
         std::cout << "box: " << format_polygon(result->data[i].box) << " text: "
-                  << result->data[i].text << " score: " << result->data[i].score << std::endl;
+            << result->data[i].text << " score: " << result->data[i].score << std::endl;
     }
 }
 
-void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_path, int font_size, MDColor *color,
+void md_draw_ocr_result(MDImage* image, MDOCRResults* results, const char* font_path, int font_size, MDColor* color,
                         double alpha, int save_result) {
     cv::Mat cv_image, overlay;
     cv_image = md_image_to_mat(image);
@@ -131,7 +132,6 @@ void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_
         auto size = cv::getTextSize(cv::Size(0, 0), results->data[i].text,
                                     {points[0].x, points[0].y}, font, font_size);
         cv::rectangle(cv_image, size, cv_color, -1, cv::LINE_AA, 0);
-
     }
     cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
     // 绘制非半透明部分（矩形边框、文字等）
@@ -153,10 +153,9 @@ void md_draw_ocr_result(MDImage *image, MDOCRResults *results, const char *font_
     if (save_result) {
         cv::imwrite("vis_result.jpg", cv_image);
     }
-
 }
 
-void md_free_ocr_result(MDOCRResults *result) {
+void md_free_ocr_result(MDOCRResults* result) {
     for (int i = 0; i < result->size; ++i) {
         free(result->data[i].text);
         free(result->data[i].box.data);
@@ -166,18 +165,11 @@ void md_free_ocr_result(MDOCRResults *result) {
     result->size = 0;
 }
 
-void md_free_ocr_model(MDModel *model) {
-
+void md_free_ocr_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<PPOCRv4 *>(model->model_content);
+        delete static_cast<PPOCRv4*>(model->model_content);
         model->model_content = nullptr;
     }
     free(model->model_name);
     model->model_name = nullptr;
 }
-
-
-
-
-
-

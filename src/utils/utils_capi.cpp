@@ -94,7 +94,7 @@ MDImage md_read_image_from_device(int device_id, int frame_width, int frame_heig
     cap.set(cv::CAP_PROP_FRAME_WIDTH, frame_width);
     cap.set(cv::CAP_PROP_FRAME_HEIGHT, frame_height);
     if (!cap.isOpened()) {
-        MD_LOG_ERROR("opening video stream or file failed");
+        // MD_LOG_WARN << "opening video stream or file failed";
         return {};
     }
     cv::Mat image;
@@ -102,18 +102,18 @@ MDImage md_read_image_from_device(int device_id, int frame_width, int frame_heig
     while (true) {
         bool ret = cap.read(image);
         if (!ret) {
-            MD_LOG_ERROR("No frame");
+            // MD_LOG_ERROR("No frame");
             continue;
         }
         if (image.empty()) {
-            MD_LOG_ERROR("Empty frame");
+            // MD_LOG_ERROR("Empty frame");
             continue;
         }
 
         std::vector<cv::Mat> channels;
         cv::split(image, channels);
         if (cv::countNonZero(channels[0]) == 0) {
-            MD_LOG_WARN("All black frame: {}", ++black);
+            // MD_LOG_WARN("All black frame: {}", ++black);
             continue;
         }
         break;
@@ -121,7 +121,8 @@ MDImage md_read_image_from_device(int device_id, int frame_width, int frame_heig
     cap.release();
     if (is_save_file) {
         cv::imwrite("capture.jpg", image);
-        MD_LOG_INFO("Save file to capture.jpg");
+        // MD_LOG_INFO("Save file to capture.jpg");
+        MD_LOG_WARN("Save file to capture.jpg");
     }
     return *mat_to_md_image(image);
 }
