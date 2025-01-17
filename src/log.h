@@ -2,10 +2,20 @@
 // Created by aichao on 2025/1/17.
 //
 #pragma once
+#include <iostream>
+#include <sstream>
+
 #include "spdlog/spdlog.h"
-#include "spdlog/sinks/rotating_file_sink.h" // support for basic file logging
+#include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
+enum class MD_LOG_LEVEL {
+    LOG_DEBUG,
+    LOG_INFO,
+    LOG_WARN,
+    LOG_ERROR,
+    LOG_CRITICAL
+};
 
 class MDLog {
 public:
@@ -33,6 +43,7 @@ private:
         return logger; // 返回文件日志记录器
     }
 };
+
 
 #define MD_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(MDLog::getInstance(), __VA_ARGS__)
 #define MD_LOG_INFO(...) SPDLOG_LOGGER_INFO(MDLog::getInstance(), __VA_ARGS__)
