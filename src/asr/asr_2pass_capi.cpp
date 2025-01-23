@@ -86,7 +86,9 @@ MDStatusCode md_create_two_pass_model(MDModel* model,
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model, const char* speech_buff, int step,
+MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model,
+                                              const char* speech_buff,
+                                              int step,
                                               bool is_final,
                                               const char* wav_format,
                                               int sampling_rate, ASRCallBack asr_call_back) {

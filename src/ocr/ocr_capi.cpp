@@ -13,9 +13,10 @@ MDStatusCode md_create_ocr_model(MDModel* model, MDOCRModelParameters* parameter
     if (!model) {
         return MDStatusCode::MemoryAllocatedFailed;
     }
-    fastdeploy::SetLogger(false);
+    // fastdeploy::SetLogger(false);
     fastdeploy::RuntimeOption option;
     option.UseOrtBackend();
+    option.UseGpu();
     option.SetCpuThreadNum(parameters->thread_num);
 
     auto det_model_file = std::string(parameters->model_dir) + "/det/" + "inference.pdmodel";

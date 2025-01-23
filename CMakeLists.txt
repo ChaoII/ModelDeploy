@@ -9,13 +9,13 @@ set(DEPENDS "")
 
 option(BUILD_DETECTION "build face detection module" ON)
 option(BUILD_OCR "build face ocr module" ON)
-option(BUILD_FACE "build face recognition module" ON)
+option(BUILD_FACE "build face recognition module" OFF)
 option(BUILD_ASR "build asr module" ON)
-option(BUILD_ASR_WSS_SERVER "build asr websocket server" ON)
+option(BUILD_ASR_WSS_SERVER "build asr websocket server" OFF)
 option(BUILD_EXAMPLES "build examples" ON)
-option(WITH_SAVE_LOG "save log to log file" ON)
+option(WITH_SAVE_LOG "save log to log file" OFF)
 option(BUILD_TEST "build unittest" OFF)
-set(FD_DIR "E:/Fastdeploy/build/install1" CACHE PATH "fd cmake file path")
+set(FD_DIR "E:/Fastdeploy/build/install_gpu" CACHE PATH "fd cmake file path")
 
 
 if (MSVC)
