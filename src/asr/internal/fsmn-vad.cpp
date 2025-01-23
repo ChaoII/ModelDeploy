@@ -90,10 +90,10 @@ void FsmnVad::Forward(
     vad_inputs.emplace_back(std::move(vad_feats_ort));
     // 4 caches
     // cache node {batch,128,19,1}
-    const int64_t cache_feats_shape[4] = {1, 128, 19, 1};
-    for (int i = 0; i < in_cache->size(); i++) {
+    constexpr int64_t cache_feats_shape[4] = {1, 128, 19, 1};
+    for (auto & i : *in_cache) {
       vad_inputs.emplace_back(std::move(Ort::Value::CreateTensor<float>(
-              memory_info, (*in_cache)[i].data(), (*in_cache)[i].size(), cache_feats_shape, 4)));
+              memory_info, i.data(), i.size(), cache_feats_shape, 4)));
     }
   
     // 4. Onnx infer
@@ -108,7 +108,7 @@ void FsmnVad::Forward(
     }
 
     // 5. Change infer result to output shapes
-    float *logp_data = vad_ort_outputs[0].GetTensorMutableData<float>();
+    auto *logp_data = vad_ort_outputs[0].GetTensorMutableData<float>();
     auto type_info = vad_ort_outputs[0].GetTensorTypeAndShapeInfo();
 
     int num_outputs = type_info.GetShape()[1];
@@ -123,7 +123,7 @@ void FsmnVad::Forward(
     // get 4 caches outputs,each size is 128*19
     if(!is_final){
         for (int i = 1; i < 5; i++) {
-        float* data = vad_ort_outputs[i].GetTensorMutableData<float>();
+        auto* data = vad_ort_outputs[i].GetTensorMutableData<float>();
         memcpy((*in_cache)[i-1].data(), data, sizeof(float) * 128*19);
         }
     }

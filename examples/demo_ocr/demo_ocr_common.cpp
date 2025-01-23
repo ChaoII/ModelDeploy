@@ -21,9 +21,7 @@ int main(int argc, char** argv) {
     SetConsoleCP(CP_UTF8);
 #endif
     MDStatusCode ret;
-
-
-    // ´´½¨Ä£ĞÍ¾ä±ú
+    //ç®€å•ç™¾å®ç®±
     MDModel model;
     MDOCRModelParameters ocr_parameters = {
         "../tests/models/ocr",
@@ -43,8 +41,7 @@ int main(int argc, char** argv) {
         return ret;
     }
 
-    MDImage image = md_read_image("../tests/test_images/test_ocr1.png");
-    // »ñÈ¡ÎÄ±¾Ä¿±êÎ»ÖÃ
+    MDImage image = md_read_image("../tests/test_images/test_ocr.png");
     MDOCRResults results;
     if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
         std::cout << ret << std::endl;
@@ -57,11 +54,11 @@ int main(int argc, char** argv) {
     std::cout << "cost: " << diff.count() << std::endl;
     md_print_ocr_result(&results);
 
-    // ÊÍ·Å¼ì²â½á¹û
+    // ï¿½Í·Å¼ï¿½ï¿½ï¿½ï¿½
     md_free_ocr_result(&results);
-    // ÏÔÊ¾Ô­Ê¼»­Ãæ
+    // ï¿½ï¿½Ê¾Ô­Ê¼ï¿½ï¿½ï¿½ï¿½
     md_show_image(&image);
-    // ÏÔÊ¾Ä¿±êÎÄ±¾ËùÔÚ»­Ãæ
+    // ï¿½ï¿½Ê¾Ä¿ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½Ú»ï¿½ï¿½ï¿½
     md_free_image(&image);
     md_free_ocr_model(&model);
     return ret;
