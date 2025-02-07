@@ -9,7 +9,7 @@ set(DEPENDS "")
 
 option(BUILD_DETECTION "build face detection module" ON)
 option(BUILD_OCR "build face ocr module" ON)
-option(BUILD_FACE "build face recognition module" OFF)
+option(BUILD_FACE "build face recognition module" ON)
 option(BUILD_ASR "build asr module" ON)
 option(BUILD_ASR_WSS_SERVER "build asr websocket server" OFF)
 option(BUILD_EXAMPLES "build examples" ON)

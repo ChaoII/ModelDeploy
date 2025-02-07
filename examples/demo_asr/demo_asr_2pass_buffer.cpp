@@ -42,7 +42,7 @@ int main() {
                              "D:/funasr-runtime-resources/models/fst_itn_zh",
                              "D:/funasr-runtime-resources/models/speech_ngram_lm_zh-cn-ai-wesp-fst",
                              "",
-                             ASRMode::TwoPass);
+                             MDASRMode::TwoPass);
     auto end_time1 = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time1 - start_time1).count();
     MD_LOG_INFO("md_create_asr_offline_model time: {}", duration);

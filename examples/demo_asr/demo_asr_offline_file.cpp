@@ -29,14 +29,14 @@ int main() {
 
     auto end_time1 = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time1 - start_time1).count();
-    MD_LOG_INFO("md_create_asr_offline_model time: {}", duration);
+    MD_LOG_INFO("md_create_asr_offline_model time: {}ms", duration);
 
     MDASRResult result{};
     auto start_time2 = std::chrono::steady_clock::now();
     md_asr_offline_model_predict(&model, "D:/funasr-runtime-resources/vad_example.wav", &result);
     auto end_time2 = std::chrono::steady_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time2 - start_time2).count();
-    MD_LOG_INFO("md_asr_offline_model_predict time: {}", duration);
+    MD_LOG_INFO("md_asr_offline_model_predict time: {}ms", duration);
 
     MD_LOG_INFO("msg: {}", result.msg);
     MD_LOG_INFO("snippet_time: {}", result.snippet_time);

@@ -30,7 +30,7 @@ MDStatusCode md_create_two_pass_model(MDModel* model,
                                       const char* itn_dir,
                                       const char* lm_dir,
                                       const char* hot_word_path,
-                                      ASRMode asr_mode,
+                                      MDASRMode asr_mode,
                                       float global_beam,
                                       float lattice_beam,
                                       float am_scale,
@@ -94,7 +94,7 @@ MDStatusCode md_two_pass_model_predict_buffer(const MDModel* model,
                                               int sampling_rate, ASRCallBack asr_call_back) {
     std::vector<std::vector<string>> punct_cache(2);
     auto model_content = static_cast<TwoPassModel*>(model->model_content);
-    auto asr_mode = static_cast<ASRMode>(model_content->asr_mode);
+    auto asr_mode = static_cast<MDASRMode>(model_content->asr_mode);
     std::vector<char> buffer(speech_buff, speech_buff + step);
 
     while (buffer.size() >= step) {

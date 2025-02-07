@@ -37,8 +37,7 @@ EXPORT_DECL void md_draw_polygon(MDImage* image, const MDPolygon* polygon, const
 /// \param color 颜色
 /// \param alpha 不透明度
 EXPORT_DECL void md_draw_text(MDImage* image, const MDRect* rect, const char* text, const char* font_path,
-                              int font_size,
-                              const MDColor* color, double alpha);
+                              int font_size, const MDColor* color, double alpha);
 
 /// 弹窗显示image
 /// \param image
