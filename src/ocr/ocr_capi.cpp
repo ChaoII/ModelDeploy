@@ -150,7 +150,6 @@ void md_draw_ocr_result(MDImage* image, MDOCRResults* results, const char* font_
         cv::putText(cv_image, results->data[i].text, {points[0].x, points[0].y - 2},
                     cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
     }
-
     if (save_result) {
         cv::imwrite("vis_result.jpg", cv_image);
     }

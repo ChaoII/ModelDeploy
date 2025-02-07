@@ -22,6 +22,11 @@ models
 # Fortran module files
 *.mod
 *.smod
+csharp/.idea
+csharp/ModelDeploy/bin
+csharp/ModelDeploy/obj
+csharp/TestModelDeploy/bin
+csharp/TestModelDeploy/obj
 
 # Compiled Static libraries
 *.lai

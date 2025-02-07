@@ -34,31 +34,27 @@ int main(int argc, char** argv) {
         1.5,
         "slow",
         0,
-        4
+        8
     };
     if ((ret = md_create_ocr_model(&model, &ocr_parameters)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-
     MDImage image = md_read_image("../tests/test_images/test_ocr.png");
     MDOCRResults results;
     if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDColor color = {0, 0, 255};
+    MDColor color = {255, 0, 255};
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "cost: " << diff.count() << std::endl;
     md_print_ocr_result(&results);
-
-    // �ͷż����
     md_free_ocr_result(&results);
-    // ��ʾԭʼ����
     md_show_image(&image);
-    // ��ʾĿ���ı����ڻ���
+
     md_free_image(&image);
     md_free_ocr_model(&model);
     return ret;
