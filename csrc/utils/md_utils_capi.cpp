@@ -1,0 +1,43 @@
+//
+// Created by AC on 2024/12/16.
+//
+#include <filesystem>
+#include "csrc/utils/md_utils_capi.h"
+#include "csrc/utils/internal/utils.h"
+#define QUANTIZE_MODEL "model_quant.onnx"
+namespace fs = std::filesystem;
+
+void md_print_rect(const MDRect* rect) {
+    std::cout << format_rect(*rect) << std::endl;
+}
+
+
+
+bool md_get_button_enable_status(MDImage* image, int pix_threshold, double rate_threshold) {
+    auto cv_image = md_image_to_mat(image);
+    if (cv_image.channels() != 1) {
+        cv::cvtColor(cv_image, cv_image, cv::COLOR_BGR2GRAY);
+    }
+    cv::Mat binaryImage;
+    cv::threshold(cv_image, binaryImage, pix_threshold, 255, cv::THRESH_BINARY);
+    int countAboveThreshold = static_cast<int>(cv_image.total()) - cv::countNonZero(binaryImage);
+    // 计算像素所占百分比
+    double percentage = (static_cast<double>(countAboveThreshold) / static_cast<int>(cv_image.total()));
+    return percentage >= rate_threshold;
+}
+
+
+
+MDPoint md_get_center_point(const MDRect* rect) {
+    return MDPoint{rect->x + rect->width / 2, rect->y + rect->height / 2};
+}
+
+bool is_quantize_model(const char* model_dir) {
+    auto model_path = fs::path(model_dir);
+    if (fs::exists(model_path)) {
+        if (fs::exists(model_path / QUANTIZE_MODEL))
+            return true;
+        return false;
+    }
+    return false;
+}

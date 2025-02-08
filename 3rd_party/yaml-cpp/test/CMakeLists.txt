@@ -29,7 +29,7 @@ target_include_directories(yaml-cpp-tests
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/integration
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${PROJECT_SOURCE_DIR}/src)
+        ${PROJECT_SOURCE_DIR}/csrc)
 target_compile_options(yaml-cpp-tests
   PRIVATE
     $<$<CXX_COMPILER_ID:Clang>:-Wno-c99-extensions -Wno-variadic-macros -Wno-sign-compare>

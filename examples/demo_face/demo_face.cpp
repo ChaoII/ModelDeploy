@@ -3,9 +3,7 @@
 //
 #include <iostream>
 #include <string>
-#include "src/face/face_capi.h"
-#include "src/utils/utils_capi.h"
-#include "src/detection/detection_capi.h"
+#include "csrc/model_deploy.h"
 
 int main() {
 

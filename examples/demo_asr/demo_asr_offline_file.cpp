@@ -8,9 +8,9 @@
 
 #include <iostream>
 #include <chrono>
-#include <src/log.h>
+#include <csrc/common/md_log.h>
 
-#include "src/asr/asr_offline_capi.h"
+#include "csrc/model_deploy.h"
 
 int main() {
 #ifdef _WIN32
