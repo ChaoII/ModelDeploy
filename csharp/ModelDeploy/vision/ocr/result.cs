@@ -2,7 +2,7 @@
 using ModelDeploy.utils;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.ocr;
+namespace ModelDeploy.vision.ocr;
 
 public class OCRResult
 {

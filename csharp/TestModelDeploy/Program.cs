@@ -1,12 +1,12 @@
 ﻿using ModelDeploy;
-using ModelDeploy.asr;
-using ModelDeploy.detection;
-using ModelDeploy.face;
-using ModelDeploy.ocr;
+using ModelDeploy.audio.asr;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using ModelDeploy.vision.detection;
+using ModelDeploy.vision.face;
+using ModelDeploy.vision.ocr;
 
-namespace ConsoleApp1;
+namespace TestModelDeploy;
 
 class Program
 {
@@ -54,8 +54,8 @@ class Program
     {
         MDOCRModelParameters parameters = new MDOCRModelParameters
         {
-            model_dir = "E:/CLionProjects/wrzs_hys/tests/models/ocr",
-            dict_path = "E:/CLionProjects/wrzs_hys/tests/key.txt",
+            model_dir = "E:/CLionProjects/ModelDeploy/tests/models/ocr",
+            dict_path = "E:/CLionProjects/ModelDeploy/tests/key.txt",
             thread_num = 8,
             format = MDModelFormat.PaddlePaddle,
             max_side_len = 960,
@@ -66,12 +66,12 @@ class Program
             use_dilation = 0,
             rec_batch_size = 8,
         };
-        Image image = Image.Read("E:/CLionProjects/wrzs_hys/tests/test_images/test_ocr.png");
+        Image image = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_ocr.png");
 
         PPOCRv4 ppocrv4 = new PPOCRv4(parameters);
         List<OCRResult> results = ppocrv4.Predict(image);
 
-        ppocrv4.DrawOcrResult(image, results, "E:/CLionProjects/wrzs_hys/tests/msyh.ttc", new Color
+        ppocrv4.DrawOcrResult(image, results, "E:/CLionProjects/ModelDeploy/tests/msyh.ttc", new Color
         {
             R = 0,
             G = 255,
@@ -88,13 +88,13 @@ class Program
 
     static void TestFace()
     {
-        Image image0 = Image.Read("E:/CLionProjects/wrzs_hys/tests/test_images/test_face.jpg");
-        Image image1 = Image.Read("E:/CLionProjects/wrzs_hys/tests/test_images/test_face1.jpg");
-        Image image2 = Image.Read("E:/CLionProjects/wrzs_hys/tests/test_images/test_face2.jpg");
-        Image image3 = Image.Read("E:/CLionProjects/wrzs_hys/tests/test_images/test_face3.jpg");
+        Image image0 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face.jpg");
+        Image image1 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face1.jpg");
+        Image image2 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face2.jpg");
+        Image image3 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face3.jpg");
 
         SeetaFace seetaFace =
-            new SeetaFace("E:/CLionProjects/wrzs_hys/tests/models/seetaface", FaceConstants.MD_MASK, 8);
+            new SeetaFace("E:/CLionProjects/ModelDeploy/tests/models/seetaface", FaceConstants.MD_MASK, 8);
 
         var detectionResults = seetaFace.FaceDetect(image3);
         Console.WriteLine($"Detection {detectionResults.Count} faces in image3");
@@ -143,10 +143,10 @@ class Program
 
     static void Main(string[] args)
     {
-        // TestASR();
-        // TestDetection();
-        // TestImage();
-        // TestOCR();
+        TestASR();
+        TestDetection();
+        TestImage();
+        TestOCR();
         TestFace();
         int a = 30;
     }
