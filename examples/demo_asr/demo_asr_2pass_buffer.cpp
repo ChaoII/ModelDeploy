@@ -6,10 +6,10 @@
 #endif
 
 #include <chrono>
-#include <src/asr/asr_offline_capi.h>
-#include "src/asr/asr_2pass_capi.h"
-#include "src/asr/internal/audio.h"
-#include "src/log.h"
+#include "csrc/model_deploy.h"
+#include "csrc/audio/asr/asr_2pass_capi.h"
+#include "csrc/audio/asr/internal/audio.h"
+#include "csrc/common/md_log.h"
 
 void call_back(MDASRResult* result) {
     if (result->msg) {

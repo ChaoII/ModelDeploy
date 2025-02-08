@@ -1,21 +1,17 @@
 //
 // Created by AC on 2025-01-13.
 //
+
 #include <iostream>
 #include <chrono>
-#include "src/utils/utils_capi.h"
-#include "src/ocr/ocr_capi.h"
 #include <fstream>
 #include <sstream>
-#include<chrono>
-
-#ifdef WIN32
-
-#include <windows.h>
-
-#endif
-
 #include <vector>
+#ifdef WIN32
+#include <windows.h>
+#endif
+#include "csrc/model_deploy.h"
+
 
 
 int main() {

@@ -1,7 +1,7 @@
 //
 // Created by aichao on 2025/1/17.
 //
-#include "src/utils/utils_capi.h"
+#include "csrc/model_deploy.h"
 
 int main() {
     // MDImage md_image = md_read_image_from_device(0, 1920, 1080, true);

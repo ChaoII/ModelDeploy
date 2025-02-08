@@ -8,7 +8,7 @@
 *.pdb
 *.tds
 address
-address_v4*
+address_v4.cpp
 address_v6*
 basic_endpoint
 basic_resolver

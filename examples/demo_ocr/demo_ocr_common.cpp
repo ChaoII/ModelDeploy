@@ -4,16 +4,11 @@
 
 #include <iostream>
 #include <chrono>
-#include "src/utils/utils_capi.h"
-#include "src/ocr/ocr_capi.h"
 #include <fstream>
-
 #ifdef WIN32
-
 #include <windows.h>
-
 #endif
-
+#include "csrc/model_deploy.h"
 
 int main(int argc, char** argv) {
 #ifdef WIN32
