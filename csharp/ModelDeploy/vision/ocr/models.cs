@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.ocr;
+namespace ModelDeploy.vision.ocr;
 
 public class PPOCRv4
 {

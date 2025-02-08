@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.asr;
+namespace ModelDeploy.audio.asr;
 
 public class FunASROffLine
 {

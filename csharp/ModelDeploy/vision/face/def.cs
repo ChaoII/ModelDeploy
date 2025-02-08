@@ -1,4 +1,4 @@
-﻿namespace ModelDeploy.face;
+﻿namespace ModelDeploy.vision.face;
 
 public static class FaceConstants
 {

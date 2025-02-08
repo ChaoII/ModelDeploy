@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.detection;
+namespace ModelDeploy.vision.detection;
 
 public class YOLOv8
 {

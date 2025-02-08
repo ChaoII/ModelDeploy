@@ -1,8 +1,8 @@
 ﻿using System.Runtime.InteropServices;
-using ModelDeploy.detection;
+using ModelDeploy.vision.detection;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.face;
+namespace ModelDeploy.vision.face;
 
 public class SeetaFace
 {
