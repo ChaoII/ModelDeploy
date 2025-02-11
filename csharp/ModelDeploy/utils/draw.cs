@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace ModelDeploy.utils
 {
-    public class draw
+    public class Draw
     {
         public static void DrawText(Image image, MDRect rect, string text, string fontPath, int fontSize, MDColor color,
             double alpha)
