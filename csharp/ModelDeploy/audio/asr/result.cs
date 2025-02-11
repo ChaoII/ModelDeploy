@@ -1,26 +1,28 @@
 ﻿using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
+using ModelDeploy.utils;
 
-namespace ModelDeploy.audio.asr;
-
-public class ASRResult
+namespace ModelDeploy.audio.asr
 {
-    public required string Message { get; set; }
-    public required string Stamp { get; set; }
-    public required string StampSents { get; set; }
-    public required string TwoPassMessage { get; set; }
-    public float SnippetTime { get; set; }
-
-    public static ASRResult FromMDASRResult(MDASRResult cresult)
+    public class ASRResult
     {
-        ASRResult result = new ASRResult
+        public  string Message { get; set; }
+        public  string Stamp { get; set; }
+        public  string StampSents { get; set; }
+        public  string TwoPassMessage { get; set; }
+        public float SnippetTime { get; set; }
+
+        public static ASRResult FromMDASRResult(MDASRResult cresult)
         {
-            Message = Marshal.PtrToStringUTF8(cresult.msg) ?? "",
-            Stamp = Marshal.PtrToStringUTF8(cresult.stamp) ?? "",
-            StampSents = Marshal.PtrToStringUTF8(cresult.stamp_sents) ?? "",
-            TwoPassMessage = Marshal.PtrToStringUTF8(cresult.tpass_msg) ?? "",
-            SnippetTime = cresult.snippet_time
-        };
-        return result;
-    }
-};
+            ASRResult result = new ASRResult
+            {
+                Message = Utils.PtrToStringUTF8(cresult.msg) ?? "",
+                Stamp = Utils.PtrToStringUTF8(cresult.stamp) ?? "",
+                StampSents = Utils.PtrToStringUTF8(cresult.stamp_sents) ?? "",
+                TwoPassMessage = Utils.PtrToStringUTF8(cresult.tpass_msg) ?? "",
+                SnippetTime = cresult.snippet_time
+            };
+            return result;
+        }
+    };
+}
