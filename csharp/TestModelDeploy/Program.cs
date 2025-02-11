@@ -24,8 +24,8 @@ class Program
 
     static void TestDetection()
     {
-        Image image = Image.Read("D:/funasr-runtime-resources/test_detection.png");
-        YOLOv8 yolov8 = new YOLOv8("D:/funasr-runtime-resources/best.onnx");
+        Image image = Image.Read("F:/ultralytics_workspace/dataset/D000000/src/images/test_ocr.png");
+        YOLOv8 yolov8 = new YOLOv8("best.onnx");
         yolov8.SetInputSize(1440, 1440);
         List<DetectionResult> detectionResults = yolov8.Predict(image);
         yolov8.DrawDetectionResult(image, detectionResults, "D:/funasr-runtime-resources/msyh.ttc", 20, 0.5);
@@ -58,7 +58,7 @@ class Program
             dict_path = "E:/CLionProjects/ModelDeploy/tests/key.txt",
             thread_num = 8,
             format = MDModelFormat.PaddlePaddle,
-            max_side_len = 960,
+            max_side_len = 1920,
             det_db_thresh = 0.3,
             det_db_box_thresh = 0.6,
             det_db_unclip_ratio = 1.5,
@@ -76,7 +76,7 @@ class Program
             R = 0,
             G = 255,
             B = 255
-        }, 20, 0.3);
+        }, 20, 0.3,1);
 
         image.Show();
 
@@ -143,11 +143,11 @@ class Program
 
     static void Main(string[] args)
     {
-        TestASR();
+        // TestASR();
         TestDetection();
-        TestImage();
-        TestOCR();
-        TestFace();
+        // TestImage();
+        // TestOCR();
+        // TestFace();
         int a = 30;
     }
 }
