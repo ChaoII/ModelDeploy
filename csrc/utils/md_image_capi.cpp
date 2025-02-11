@@ -85,6 +85,10 @@ MDImage md_read_image_from_device(int device_id, int frame_width, int frame_heig
     return *mat_to_md_image(image);
 }
 
+void md_save_image(MDImage* image, const char* path) {
+    cv::imwrite(path, md_image_to_mat(image));
+}
+
 
 void md_free_image(MDImage* image) {
     if (image == nullptr) return;

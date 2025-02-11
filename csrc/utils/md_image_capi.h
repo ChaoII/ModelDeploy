@@ -43,6 +43,7 @@ EXPORT_DECL MDImage md_read_image(const char* path);
 EXPORT_DECL MDImage md_read_image_from_device(int device_id, int frame_width = 640, int frame_height = 480,
                                               bool is_save_file = false);
 
+EXPORT_DECL void md_save_image(MDImage* image, const char* path);
 
 /// 释放MDImage指针
 /// \param img

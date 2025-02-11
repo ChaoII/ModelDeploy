@@ -43,11 +43,12 @@ class Program
         MDRect rect1 = new MDRect { x = 200, y = 200, width = 100, height = 100 };
         MDRect rect2 = new MDRect { x = 100, y = 100, width = 500, height = 500 };
         MDColor color = new MDColor { r = 255, g = 0, b = 0 };
-        draw.DrawRect(image, rect, color, 0.5);
-        draw.DrawText(image, rect1, "Hello World", "D:/funasr-runtime-resources/msyh.ttc", 20, color, 0.5);
+        Draw.DrawRect(image, rect, color, 0.5);
+        Draw.DrawText(image, rect1, "Hello World", "D:/funasr-runtime-resources/msyh.ttc", 20, color, 0.5);
         var cloneImage = image.Clone();
         var cropImage = cloneImage.Crop(rect2);
         cropImage.Show();
+        cropImage.Save("2.jpg");
     }
 
     static void TestOCR()
@@ -76,7 +77,7 @@ class Program
             R = 0,
             G = 255,
             B = 255
-        }, 20, 0.3,1);
+        }, 20, 0.3, 1);
 
         image.Show();
 
@@ -144,8 +145,8 @@ class Program
     static void Main(string[] args)
     {
         // TestASR();
-        TestDetection();
-        // TestImage();
+        // TestDetection();
+        TestImage();
         // TestOCR();
         // TestFace();
         int a = 30;

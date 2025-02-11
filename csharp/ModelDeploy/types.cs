@@ -6,7 +6,6 @@ using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy
 {
-
     public class Point
     {
         public int X { get; set; }
@@ -65,7 +64,9 @@ namespace ModelDeploy
         {
             Points = points;
         }
+
         public List<Point> Points { get; set; }
+
         public static Polygon FromRaw(MDPolygon polygon)
         {
             List<Point> points = new List<Point>();
@@ -74,6 +75,7 @@ namespace ModelDeploy
                 var currentPtr = IntPtr.Add(polygon.data, i * Marshal.SizeOf<MDPoint>());
                 points.Add(Point.FromRaw(Marshal.PtrToStructure<MDPoint>(currentPtr)));
             }
+
             return new Polygon(points);
         }
 
@@ -90,6 +92,7 @@ namespace ModelDeploy
                 var currentPtr = IntPtr.Add(polygon.data, i * Marshal.SizeOf<MDPoint>());
                 Marshal.StructureToPtr(Points[i].ToRaw(), currentPtr, false);
             }
+
             return polygon;
         }
     }
@@ -188,6 +191,11 @@ namespace ModelDeploy
             return image;
         }
 
+        public void Save(string imagePath)
+        {
+            md_save_image(ref RawImage, imagePath);
+        }
+
         public void Show()
         {
             md_show_image(ref RawImage);
@@ -208,5 +216,9 @@ namespace ModelDeploy
 
         [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_show_image(ref MDImage image);
+
+
+        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_save_image(ref MDImage image, string imagePath);
     }
 }
