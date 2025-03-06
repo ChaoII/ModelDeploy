@@ -11,13 +11,12 @@
 namespace seeta {
     class QualityOfClarityEx : public QualityRule {
     public:
+        explicit QualityOfClarityEx(const std::string& model_dir);
 
-        explicit QualityOfClarityEx(const std::string &model_dir);
-
-        void set_blur_threshold(float blur_thresh);
+        void set_blur_threshold(float blur_thresh) const;
 
         QualityResult
-        check(const SeetaImageData &image, const SeetaRect &face, const SeetaPointF *points, int32_t N) override;
+        check(const SeetaImageData& image, const SeetaRect& face, const SeetaPointF* points, int32_t N) override;
 
     private:
         std::shared_ptr<QualityOfLBN> m_lbn;

@@ -28,8 +28,7 @@ using Status = seeta::FaceAntiSpoofing::Status;
 
 class FaceModel {
 public:
-
-    enum class QualityEvaluateType : int {
+    enum class QualityEvaluateType : uint {
         BRIGHTNESS = 0,
         CLARITY = 1,
         INTEGRITY = 2,
@@ -40,44 +39,44 @@ public:
     };
 
 
-public:
-    explicit FaceModel(const std::string &model_dir,
-                       int flag,
-                       int thread_num = 1);
+    explicit FaceModel(const std::string& model_dir, int flag, int thread_num = 1);
 
-    std::vector<float> extract_feature(const SeetaImageData &image, std::vector<SeetaPointF> points);
+    [[nodiscard]] std::vector<float>
+    extract_feature(const SeetaImageData& image, std::vector<SeetaPointF> points) const;
 
-    std::vector<SeetaFaceInfo> face_detection(const SeetaImageData &image);
+    [[nodiscard]] std::vector<SeetaFaceInfo> face_detection(const SeetaImageData& image) const;
 
-    std::vector<SeetaPointF> face_marker(const SeetaImageData &image, const SeetaRect &rect);
+    [[nodiscard]] std::vector<SeetaPointF> face_marker(const SeetaImageData& image, const SeetaRect& rect) const;
 
     /// 人脸活体检测
     /// \param clarity_threshold 默认0.3
     /// \param reality_threshold 默认0.8
-    void set_anti_spoofing_threshold(float clarity_threshold, float reality_threshold);
+    void set_anti_spoofing_threshold(float clarity_threshold, float reality_threshold) const;
 
-    Status face_anti_spoofing(const SeetaImageData &image, const SeetaRect &rect, std::vector<SeetaPointF> points);
+    [[nodiscard]] Status face_anti_spoofing(const SeetaImageData& image, const SeetaRect& rect,
+                                            const std::vector<SeetaPointF>& points) const;
 
-    float face_feature_compare(std::vector<float> feature1, std::vector<float> feature2);
+    [[nodiscard]] float face_feature_compare(const std::vector<float>& feature1,
+                                             const std::vector<float>& feature2) const;
 
-    seeta::QualityResult quality_evaluate(const SeetaImageData &image, const SeetaRect &face,
-                                          const std::vector<SeetaPointF> &points, QualityEvaluateType type);
+    [[nodiscard]] seeta::QualityResult quality_evaluate(const SeetaImageData& image, const SeetaRect& face,
+                                                        const std::vector<SeetaPointF>& points,
+                                                        QualityEvaluateType type) const;
 
 
     [[nodiscard]] int get_feature_size() const;
 
     [[nodiscard]] bool check_flag(int flag_check) const;
 
-    int age_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points);
+    [[nodiscard]] int age_predict(const SeetaImageData& image, const std::vector<SeetaPointF>& points) const;
 
-    seeta::GenderPredictor::GENDER gender_predict(const SeetaImageData &image, const std::vector<SeetaPointF> &points);
+    [[nodiscard]] seeta::GenderPredictor::GENDER gender_predict(const SeetaImageData& image,
+                                                                const std::vector<SeetaPointF>& points) const;
 
-    std::pair<seeta::EyeStateDetector::EYE_STATE, seeta::EyeStateDetector::EYE_STATE>
-    eye_state_predict(const SeetaImageData &img, const std::vector<SeetaPointF> &points);
-
+    [[nodiscard]] std::pair<seeta::EyeStateDetector::EYE_STATE, seeta::EyeStateDetector::EYE_STATE>
+    eye_state_predict(const SeetaImageData& img, const std::vector<SeetaPointF>& points) const;
 
 private:
-
     int flag_;
     std::shared_ptr<seeta::FaceDetector> detect_ = nullptr;
     std::shared_ptr<seeta::FaceLandmarker> landmark_ = nullptr;
@@ -96,5 +95,3 @@ private:
     std::shared_ptr<seeta::QualityOfClarityEx> qs_clarity_ex_ = nullptr;
     std::shared_ptr<seeta::QualityOfNoMask> qs_no_mask_ = nullptr;
 };
-
-

@@ -3,13 +3,10 @@
 //
 
 
-#include "recognizer.h"
-#include "./utils/ocr_utils.h"
+#include "csrc/vision/ocr/recognizer.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
-    Recognizer::Recognizer() {
-    }
-
     Recognizer::Recognizer(const std::string& model_file,
                            const std::string& label_path,
                            const RuntimeOption& custom_option)
