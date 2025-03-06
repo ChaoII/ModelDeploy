@@ -16,16 +16,16 @@ class Program
         MDSenseVoiceParameters parameters = new MDSenseVoiceParameters
         {
             model_path =
-                "E:/CLionProjects/onnxruntime_test/tests/test_models/sense-voice-zh-en-ja-ko-yue/model.onnx",
+                "../../../../../tests/test_models/sense-voice-zh-en-ja-ko-yue/model.onnx",
             use_itn = 1,
             language = "auto",
-            tokens_path = "E:/CLionProjects/onnxruntime_test/tests/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt",
+            tokens_path = "../../../../../tests/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt",
             num_threads = 1,
             debug = 0,
         };
 
         SenseVoice senseVoice = new SenseVoice(parameters);
-        ASRResult result = senseVoice.Predict("D:/funasr-runtime-resources/vad_example.wav");
+        ASRResult result = senseVoice.Predict("../../../../../tests/vad_example.wav");
         Console.WriteLine(result.Message);
     }
 
@@ -33,13 +33,13 @@ class Program
     {
         MDKokoroParameters parameters = new MDKokoroParameters
         {
-            model_path = "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/model.onnx",
-            voices_path = "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/voices.bin",
-            tokens_path = "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/tokens.txt",
-            data_dir = "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/espeak-ng-data",
-            dict_dir = "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/dict",
-            lexicon = "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/lexicon-us-en.txt," +
-                      "E:/CLionProjects/onnxruntime_test/tests/test_models/kokoro-multi-lang-v1_0/lexicon-zh.txt",
+            model_path = "../../../../../tests/test_models/kokoro-multi-lang-v1_0/model.onnx",
+            voices_path = "../../../../../tests/test_models/kokoro-multi-lang-v1_0/voices.bin",
+            tokens_path = "../../../../../tests/test_models/kokoro-multi-lang-v1_0/tokens.txt",
+            data_dir = "../../../../../tests/test_models/kokoro-multi-lang-v1_0/espeak-ng-data",
+            dict_dir = "../../../../../tests/test_models/kokoro-multi-lang-v1_0/dict",
+            lexicon = "../../../../../tests/test_models/kokoro-multi-lang-v1_0/lexicon-us-en.txt," +
+                      "../../../../../tests/test_models/kokoro-multi-lang-v1_0/lexicon-zh.txt",
             num_threads = 1,
             debug = 0
         };
@@ -55,11 +55,11 @@ class Program
 
     static void TestDetection()
     {
-        Image image = Image.Read("E:/CLionProjects/onnxruntime_test/tests/test_images/test_detection.png");
-        YOLOv8 yolov8 = new YOLOv8("E:/CLionProjects/onnxruntime_test/tests/test_models/best.onnx");
+        Image image = Image.Read("../../../../../tests/test_images/test_detection.png");
+        YOLOv8 yolov8 = new YOLOv8("../../../../../tests/test_models/best.onnx");
         yolov8.SetInputSize(1440, 1440);
         List<DetectionResult> detectionResults = yolov8.Predict(image);
-        yolov8.DrawDetectionResult(image, detectionResults, "E:/CLionProjects/onnxruntime_test/tests/msyh.ttc", 20,
+        yolov8.DrawDetectionResult(image, detectionResults, "../../../../../tests/msyh.ttc", 20,
             0.5);
         image.Show();
         foreach (var detectionResult in detectionResults)
@@ -70,13 +70,13 @@ class Program
 
     static void TestImage()
     {
-        Image image = Image.Read("E:/CLionProjects/onnxruntime_test/tests/test_images/test_detection.png");
+        Image image = Image.Read("../../../../../tests/test_images/test_detection.png");
         Rect rect = new Rect { X = 0, Y = 0, Width = 100, Height = 100 };
         Rect rect1 = new Rect { X = 200, Y = 200, Width = 100, Height = 100 };
         Rect rect2 = new Rect { X = 100, Y = 100, Width = 500, Height = 500 };
         Color color = new Color { R = 255, G = 0, B = 0 };
         Draw.DrawRect(image, rect, color, 0.5);
-        Draw.DrawText(image, rect1, "Hello World", "E:/CLionProjects/onnxruntime_test/tests/msyh.ttc", 20, color, 0.5);
+        Draw.DrawText(image, rect1, "Hello World", "../../../../../tests/msyh.ttc", 20, color, 0.5);
         var cloneImage = image.Clone();
         var cropImage = cloneImage.Crop(rect2);
         cropImage.Show();
@@ -88,8 +88,8 @@ class Program
         MDOCRModelParameters parameters = new MDOCRModelParameters
         {
             // 最后注意必须加斜杠
-            model_dir = "E:/CLionProjects/onnxruntime_test/tests/test_models/ocr/",
-            dict_path = "E:/CLionProjects/onnxruntime_test/tests/key.txt",
+            model_dir = "../../../../../tests/test_models/ocr/",
+            dict_path = "../../../../../tests/key.txt",
             thread_num = 8,
             format = MDModelFormat.ONNX,
             max_side_len = 1920,
@@ -100,10 +100,10 @@ class Program
             use_dilation = 0,
             rec_batch_size = 8,
         };
-        Image image = Image.Read("E:/CLionProjects/onnxruntime_test/tests/test_images/test_ocr1.png");
+        Image image = Image.Read("../../../../../tests/test_images/test_ocr1.png");
         PPOCRv4 ppocrv4 = new PPOCRv4(parameters);
         List<OCRResult> results = ppocrv4.Predict(image);
-        ppocrv4.DrawOcrResult(image, results, "E:/CLionProjects/onnxruntime_test/tests/msyh.ttc", new Color
+        ppocrv4.DrawOcrResult(image, results, "../../../../../tests/msyh.ttc", new Color
         {
             R = 0,
             G = 0,
@@ -118,13 +118,13 @@ class Program
 
     static void TestFace()
     {
-        Image image0 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face.jpg");
-        Image image1 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face1.jpg");
-        Image image2 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face2.jpg");
-        Image image3 = Image.Read("E:/CLionProjects/ModelDeploy/tests/test_images/test_face3.jpg");
+        Image image0 = Image.Read("../../../../../tests/test_images/test_face.jpg");
+        Image image1 = Image.Read("../../../../../tests/test_images/test_face1.jpg");
+        Image image2 = Image.Read("../../../../../tests/test_images/test_face2.jpg");
+        Image image3 = Image.Read("../../../../../tests/test_images/test_face3.jpg");
 
         SeetaFace seetaFace =
-            new SeetaFace("E:/CLionProjects/ModelDeploy/tests/models/seetaface", FaceConstants.MD_MASK, 8);
+            new SeetaFace("../../../../../tests/test_models/seetaface", FaceConstants.MD_MASK, 8);
         var detectionResults = seetaFace.FaceDetect(image3);
         Console.WriteLine($"Detection {detectionResults.Count} faces in image3");
 
@@ -173,9 +173,9 @@ class Program
     static void TestOcrRecognition()
     {
         OCRRecognition ocrRecognition =
-            new OCRRecognition("E:/CLionProjects/onnxruntime_test/tests/test_models/ocr/rec_infer.onnx",
-                "E:/CLionProjects/onnxruntime_test/tests/key.txt");
-        Image image = Image.Read("E:/CLionProjects/onnxruntime_test/tests/test_images/test_ocr_recognition.png");
+            new OCRRecognition("../../../../../tests/test_models/ocr/rec_infer.onnx",
+                "../../../../../tests/key.txt");
+        Image image = Image.Read("../../../../../tests/test_images/test_ocr_recognition.png");
         var result = ocrRecognition.Predict(image);
         Console.WriteLine(result);
     }
@@ -183,9 +183,9 @@ class Program
     static void TestOcrRecognitionBatch()
     {
         OCRRecognition ocrRecognition =
-            new OCRRecognition("E:/CLionProjects/onnxruntime_test/tests/test_models/ocr/rec_infer.onnx",
-                "E:/CLionProjects/onnxruntime_test/tests/key.txt");
-        Image image = Image.Read("E:/CLionProjects/onnxruntime_test/tests/test_images/ocr_check_report.png");
+            new OCRRecognition("../../../../../tests/test_models/ocr/rec_infer.onnx",
+                "../../../../../tests/key.txt");
+        Image image = Image.Read("../../../../../tests/test_images/ocr_check_report.png");
 
         // image
         // |------------------|-|- 
@@ -251,14 +251,14 @@ class Program
 
     static void Main(string[] args)
     {
-        // TestSenseVoice();
-        // TestKokoro();
-        // TestDetection();
-        // TestImage();
-        // TestOCR();
-        // TestOcrRecognition();
+        TestFace();
+        TestSenseVoice();
+        TestKokoro();
+        TestDetection();
+        TestImage();
+        TestOCR();
+        TestOcrRecognition();
         TestOcrRecognitionBatch();
-        // TestFace();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();
