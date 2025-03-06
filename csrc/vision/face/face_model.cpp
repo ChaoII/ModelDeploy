@@ -88,7 +88,7 @@ FaceModel::FaceModel(const std::string& model_dir, int flag, int thread_num) {
 }
 
 
-std::vector<float> FaceModel::extract_feature(const SeetaImageData& image, std::vector<SeetaPointF> points) {
+std::vector<float> FaceModel::extract_feature(const SeetaImageData& image, std::vector<SeetaPointF> points) const {
     if (!(flag_ & MD_FACE_RECOGNITION)) throw std::runtime_error("FACE_RECOGNITION flag is not enabled");
     assert(points.size() == 5);
     std::vector<float> feature(recognize_->GetExtractFeatureSize());
@@ -101,43 +101,43 @@ int FaceModel::get_feature_size() const {
     return recognize_->GetExtractFeatureSize();
 }
 
-float FaceModel::face_feature_compare(std::vector<float> feature1, std::vector<float> feature2) {
+float FaceModel::face_feature_compare(const std::vector<float>& feature1, const std::vector<float>& feature2) const {
     if (!(flag_ & MD_FACE_RECOGNITION)) throw std::runtime_error("MD_FACE_RECOGNITION flag is not enabled");
     return recognize_->CalculateSimilarity(feature1.data(), feature2.data());
 }
 
-std::vector<SeetaFaceInfo> FaceModel::face_detection(const SeetaImageData& image) {
+std::vector<SeetaFaceInfo> FaceModel::face_detection(const SeetaImageData& image) const {
     if (!(flag_ & MD_FACE_DETECT))throw std::runtime_error("FACE_DETECT flag is not enabled");
-    auto faces_ = detect_->detect(image);
+    const auto faces_ = detect_->detect(image);
     std::vector<SeetaFaceInfo> faces;
     faces.reserve(faces_.size);
     for (int i = 0; i < faces_.size; i++) {
         faces.emplace_back(faces_.data[i]);
     }
-    // ���򣬽������ɴ�С��������
+    // 重新排序
     std::partial_sort(faces.begin(), faces.begin() + 1, faces.end(),
-                      [](SeetaFaceInfo a, SeetaFaceInfo b) {
+                      [](const SeetaFaceInfo& a, const SeetaFaceInfo& b) {
                           return a.pos.width > b.pos.width;
                       });
     return faces;
 }
 
 
-std::vector<SeetaPointF> FaceModel::face_marker(const SeetaImageData& image, const SeetaRect& rect) {
+std::vector<SeetaPointF> FaceModel::face_marker(const SeetaImageData& image, const SeetaRect& rect) const {
     if (!(flag_ & MD_FACE_LANDMARK)) throw std::runtime_error("FACE_LANDMARK flag is not enabled");
-    int point_nums = landmark_->number();
+    const int point_nums = landmark_->number();
     std::vector<SeetaPointF> points(point_nums);
     landmark_->mark(image, rect, points.data());
     return points;
 }
 
-void FaceModel::set_anti_spoofing_threshold(float clarity_threshold, float reality_threshold) {
+void FaceModel::set_anti_spoofing_threshold(const float clarity_threshold, const float reality_threshold) const {
     if (!(flag_ & MD_FACE_ANTI_SPOOfING)) throw std::runtime_error("FACE_ANTI_SPOOfING flag is not enabled");
     anti_spoofing_->SetThreshold(clarity_threshold, reality_threshold);
 }
 
 Status FaceModel::face_anti_spoofing(const SeetaImageData& image, const SeetaRect& rect,
-                                     std::vector<SeetaPointF> points) {
+                                     const std::vector<SeetaPointF>& points) const {
     if (!(flag_ & MD_FACE_ANTI_SPOOfING)) throw std::runtime_error("FACE_ANTI_SPOOfING flag is not enabled");
     return anti_spoofing_->Predict(image, rect, points.data());
 }
@@ -145,25 +145,25 @@ Status FaceModel::face_anti_spoofing(const SeetaImageData& image, const SeetaRec
 
 seeta::QualityResult FaceModel::quality_evaluate(const SeetaImageData& image,
                                                  const SeetaRect& face, const std::vector<SeetaPointF>& points,
-                                                 QualityEvaluateType type) {
+                                                 const QualityEvaluateType type) const {
     if (!(flag_ & MD_FACE_QUALITY_EVALUATE)) {
         throw std::runtime_error("FACE_QUALITY_EVALUATE flag is not enabled");
     }
     switch (type) {
     case QualityEvaluateType::BRIGHTNESS:
-        return qs_bright_->check(image, face, points.data(), int(points.size()));
+        return qs_bright_->check(image, face, points.data(), static_cast<int>(points.size()));
     case QualityEvaluateType::CLARITY:
-        return qs_clarity_->check(image, face, points.data(), int(points.size()));
+        return qs_clarity_->check(image, face, points.data(), static_cast<int>(points.size()));
     case QualityEvaluateType::INTEGRITY:
-        return qs_integrity_->check(image, face, points.data(), int(points.size()));
+        return qs_integrity_->check(image, face, points.data(), static_cast<int>(points.size()));
     case QualityEvaluateType::POSE:
-        return qs_pose_->check(image, face, points.data(), int(points.size()));
+        return qs_pose_->check(image, face, points.data(), static_cast<int>(points.size()));
     case QualityEvaluateType::RESOLUTION:
-        return qs_resolution_->check(image, face, points.data(), int(points.size()));
+        return qs_resolution_->check(image, face, points.data(), static_cast<int>(points.size()));
     case QualityEvaluateType::CLARITY_EX:
-        return qs_clarity_ex_->check(image, face, points.data(), int(points.size()));
+        return qs_clarity_ex_->check(image, face, points.data(), static_cast<int>(points.size()));
     case QualityEvaluateType::NO_MASK:
-        return qs_no_mask_->check(image, face, points.data(), int(points.size()));
+        return qs_no_mask_->check(image, face, points.data(), static_cast<int>(points.size()));
     default:
         throw std::runtime_error("QualityEvaluateType is not supported");
     }
@@ -173,7 +173,7 @@ bool FaceModel::check_flag(int flag_check) const {
     return flag_ & flag_check;
 }
 
-int FaceModel::age_predict(const SeetaImageData& image, const std::vector<SeetaPointF>& points) {
+int FaceModel::age_predict(const SeetaImageData& image, const std::vector<SeetaPointF>& points) const {
     if (!(flag_ & MD_FACE_AGE_ATTRIBUTE)) throw std::runtime_error("FACE_AGE_ATTRIBUTE flag is not enabled");
     assert(points.size() == 5);
     int age = 0;
@@ -182,7 +182,7 @@ int FaceModel::age_predict(const SeetaImageData& image, const std::vector<SeetaP
 }
 
 seeta::GenderPredictor::GENDER FaceModel::gender_predict(const SeetaImageData& image,
-                                                         const std::vector<SeetaPointF>& points) {
+                                                         const std::vector<SeetaPointF>& points) const {
     if (!(flag_ & MD_FACE_GENDER_ATTRIBUTE)) throw std::runtime_error("FACE_GENDER_ATTRIBUTE flag is not enabled");
     assert(points.size() == 5);
     seeta::GenderPredictor::GENDER gender = seeta::GenderPredictor::GENDER::MALE;
@@ -192,7 +192,7 @@ seeta::GenderPredictor::GENDER FaceModel::gender_predict(const SeetaImageData& i
 
 std::pair<seeta::EyeStateDetector::EYE_STATE, seeta::EyeStateDetector::EYE_STATE>
 FaceModel::eye_state_predict(const SeetaImageData& img,
-                             const std::vector<SeetaPointF>& points) {
+                             const std::vector<SeetaPointF>& points) const {
     if (!(flag_ & MD_FACE_EYE_STATE)) throw std::runtime_error("FACE_EYE_STATE flag is not enabled");
     seeta::EyeStateDetector::EYE_STATE left_eye, right_eye;
     eye_state_->Detect(img, points.data(), left_eye, right_eye);

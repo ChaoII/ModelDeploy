@@ -15,15 +15,15 @@ namespace modeldeploy::vision::ocr {
      */
     class Recognizer : public BaseModel {
     public:
-        Recognizer();
+        Recognizer() = default;
         /** \brief Set path of model file, and the configuration of runtime
          *
          * \param[in] model_file Path of model file, e.g ./ch_PP-OCRv3_rec_infer/model.pdmodel.
          * \param[in] label_path Path of label file used by OCR recognition model. e.g ./ppocr_keys_v1.txt
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in `valid_cpu_backends`.
          */
-        Recognizer(const std::string& model_file, const std::string& label_path = "",
-                   const RuntimeOption& custom_option = RuntimeOption());
+        explicit Recognizer(const std::string& model_file, const std::string& label_path = "",
+                            const RuntimeOption& custom_option = RuntimeOption());
 
         /// Get model's name
         std::string name() const override { return "ppocr/ocr_rec"; }

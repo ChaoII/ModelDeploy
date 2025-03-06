@@ -5,16 +5,15 @@
 
 #pragma once
 #include "csrc/core/md_tensor.h"
-#include "../common/processors/normalize_and_permute.h"
-#include "../common/processors/normalize.h"
-#include "../common/processors/resize.h"
-#include "../common/processors/pad.h"
-#include "../common/processors/hwc2chw.h"
-#include "../common/processors/cast.h"
+#include "csrc/vision/common/processors/pad.h"
+#include "csrc/vision/common/processors/cast.h"
+#include "csrc/vision/common/processors/resize.h"
+#include "csrc/vision/common/processors/hwc2chw.h"
+#include "csrc/vision/common/processors/normalize.h"
+#include "csrc/vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::ocr {
-
-    class RecognizerPreprocessor {
+    class RecognizerPreprocessor final {
     public:
         virtual ~RecognizerPreprocessor() = default;
         RecognizerPreprocessor();
@@ -37,7 +36,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        virtual bool Apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
+        bool Apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
 
         /// Set static_shape_infer is true or not. When deploy PP-OCR
         /// on hardware which can not support dynamic input shape very well,
@@ -53,8 +52,8 @@ namespace modeldeploy::vision::ocr {
         /// the normalize parameters, otherwise it will use the default normalize
         /// parameters.
         void set_normalize(const std::vector<float>& mean,
-                          const std::vector<float>& std,
-                          bool is_scale) {
+                           const std::vector<float>& std,
+                           bool is_scale) {
             normalize_permute_op_ =
                 std::make_shared<NormalizeAndPermute>(mean, std, is_scale);
             normalize_op_ = std::make_shared<Normalize>(mean, std, is_scale);
@@ -75,8 +74,8 @@ namespace modeldeploy::vision::ocr {
 
     private:
         void ocr_recognizer_resize_image(cv::Mat* mat, float max_wh_ratio,
-                                      const std::vector<int>& rec_image_shape,
-                                      bool static_shape_infer);
+                                         const std::vector<int>& rec_image_shape,
+                                         bool static_shape_infer);
         // for recording the switch of hwc2chw
         bool disable_permute_ = false;
         // for recording the switch of normalize

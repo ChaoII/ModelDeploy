@@ -9,18 +9,16 @@ namespace seeta {
         m_marker = std::move(ld_);
     }
 
-    QualityResult QualityOfNoMask::check(const SeetaImageData &image, const SeetaRect &face,
-                                         const SeetaPointF *points, int32_t N) {
-        auto mask_points = m_marker->mark_v2(image, face);
+    QualityResult QualityOfNoMask::check(const SeetaImageData& image, const SeetaRect& face,
+                                         const SeetaPointF* points, int32_t N) {
+        const auto mask_points = m_marker->mark_v2(image, face);
         int mask_count = 0;
-        for (auto point: mask_points) {
+        for (auto& point : mask_points) {
             if (point.mask) mask_count++;
         }
         if (mask_count > 0) {
-            return {QualityLevel::LOW, 1 - float(mask_count) / (float) mask_points.size()};
-        } else {
-            return {QualityLevel::HIGH, 1};
+            return {QualityLevel::LOW, 1 - static_cast<float>(mask_count) / static_cast<float>(mask_points.size())};
         }
+        return {QualityLevel::HIGH, 1};
     }
-
 }
