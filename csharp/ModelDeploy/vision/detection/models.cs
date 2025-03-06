@@ -57,26 +57,26 @@ namespace ModelDeploy.vision.detection
             md_free_detection_result(ref cResults);
         }
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_detection_model(ref MDModel model, string modelDir, int threadNum = 8,
             MDModelFormat format = MDModelFormat.ONNX);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_detection_input_size(ref MDModel model, MDSize size);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_detection_predict(ref MDModel model, ref MDImage image, ref MDDetectionResults results);
 
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_detection_result(ref MDImage image, ref MDDetectionResults result,
             string fontPath, int fontSize, double alpha, int saveResult);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern void md_free_detection_result(ref MDDetectionResults results);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_detection_model(ref MDModel model);
     }
 }

@@ -9,6 +9,7 @@ models
 *.lo
 *.o
 *.obj
+tests/test_models
 
 # Precompiled Headers
 *.gch

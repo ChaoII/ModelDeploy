@@ -92,6 +92,30 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct MDSenseVoiceParameters
+        {
+            public string model_path;
+            public int use_itn;
+            public string language;
+            public string tokens_path;
+            public int num_threads;
+            public int debug;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDKokoroParameters
+        {
+            public string model_path;
+            public string voices_path;
+            public string tokens_path;
+            public string data_dir;
+            public string dict_dir;
+            public string lexicon;
+            public int num_threads;
+            public int debug;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct MDOCRResult
         {
             public MDPolygon box;
