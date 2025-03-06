@@ -12,6 +12,11 @@ namespace ModelDeploy
         public int Y { get; set; }
 
 
+        public override string ToString()
+        {
+            return $"{{x:{X}, y:{Y}}}";
+        }
+
         public static Point FromRaw(MDPoint point)
         {
             return new Point { X = point.x, Y = point.y };
@@ -60,41 +65,81 @@ namespace ModelDeploy
 
     public class Polygon
     {
-        Polygon(List<Point> points)
+        public override string ToString()
         {
-            Points = points;
+            return $"{{ {string.Join(",", Points)} }}";
         }
 
         public List<Point> Points { get; set; }
 
-        public static Polygon FromRaw(MDPolygon polygon)
+        public static Polygon FromPointList(List<Point> points)
         {
+            Polygon polygon = new Polygon { Points = points };
+            return polygon;
+        }
+
+        public static Polygon FromMDPolygon(MDPolygon cPolygon)
+        {
+            Polygon polygon = new Polygon();
             List<Point> points = new List<Point>();
-            for (int i = 0; i < polygon.size; i++)
+            for (int i = 0; i < cPolygon.size; i++)
             {
-                var currentPtr = IntPtr.Add(polygon.data, i * Marshal.SizeOf<MDPoint>());
+                var currentPtr = IntPtr.Add(cPolygon.data, i * Marshal.SizeOf<MDPoint>());
                 points.Add(Point.FromRaw(Marshal.PtrToStructure<MDPoint>(currentPtr)));
             }
 
-            return new Polygon(points);
+            polygon.Points = points;
+            return polygon;
         }
 
-        public MDPolygon ToRaw()
+        public static List<Polygon> FromMDPolygonArray(ref MDPolygon cPolygons, int size)
         {
-            MDPolygon polygon = new MDPolygon
+            List<Polygon> polygons = new List<Polygon>();
+            for (int i = 0; i < size; i++)
             {
-                size = Points.Count,
-                data = Marshal.AllocHGlobal(Marshal.SizeOf<MDPoint>() * Points.Count)
-            };
+                var currentPtr = IntPtr.Add(cPolygons.data, i * Marshal.SizeOf<MDPolygon>());
+                polygons.Add(Polygon.FromMDPolygon(Marshal.PtrToStructure<MDPolygon>(currentPtr)));
+            }
 
+            return polygons;
+        }
+
+        public MDPolygon CopyToMDPolygon()
+        {
+            MDPolygon cPolygon = new MDPolygon { size = Points.Count };
+            // 注意此处开辟的内存，因此需要在释放时进行释放（如果单独使用CopyToMDPolygon后需要释放，如果使用后地址赋值给其他结构体，
+            // 然后其他结构体调用了释放方法则需要在其他地方进行释）
+            cPolygon.data = Marshal.AllocHGlobal(Points.Count * Marshal.SizeOf<MDPoint>());
             for (int i = 0; i < Points.Count; i++)
             {
-                var currentPtr = IntPtr.Add(polygon.data, i * Marshal.SizeOf<MDPoint>());
+                var currentPtr = IntPtr.Add(cPolygon.data, i * Marshal.SizeOf<MDPoint>());
                 Marshal.StructureToPtr(Points[i].ToRaw(), currentPtr, false);
             }
 
-            return polygon;
+            return cPolygon;
         }
+
+
+        public static MDPolygon[] ToMDPolygonArray(List<Polygon> polygons)
+        {
+            MDPolygon[] cPolygons = new MDPolygon[polygons.Count];
+            for (int i = 0; i < polygons.Count; i++)
+            {
+                MDPolygon polygon = polygons[i].CopyToMDPolygon();
+                cPolygons[i] = polygon;
+            }
+
+            return cPolygons;
+        }
+
+
+        ~Polygon()
+        {
+            // md_free_polygon(ref RawPolygon); // 修改：添加析构函数来释放未托管资源
+        }
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_polygon(ref MDPolygon polygon);
     }
 
     public class Size
@@ -184,9 +229,9 @@ namespace ModelDeploy
             return image;
         }
 
-        public Image Crop(MDRect rect)
+        public Image Crop(Rect rect)
         {
-            MDImage cropImage = md_crop_image(ref RawImage, rect);
+            MDImage cropImage = md_crop_image(ref RawImage, rect.ToRaw());
             Image image = FromRaw(cropImage);
             return image;
         }
@@ -201,24 +246,22 @@ namespace ModelDeploy
             md_show_image(ref RawImage);
         }
 
-
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_read_image(string imagePath);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_image(ref MDImage img);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_clone_image(ref MDImage image);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_crop_image(ref MDImage image, MDRect rect);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_show_image(ref MDImage image);
 
-
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_save_image(ref MDImage image, string imagePath);
     }
 }

@@ -161,54 +161,54 @@ namespace ModelDeploy.vision.face
         }
 
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_create_face_model(ref MDModel model, string modelDir, int flags = FaceConstants.MD_MASK, int threadNum = 1);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_detection(ref MDModel model, ref MDImage image, ref MDDetectionResults result);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_face_marker(ref MDModel model, ref MDImage image, ref MDRect rect, ref MDLandMarkResult result);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_feature(ref MDModel model, ref MDImage image,
             ref MDLandMarkResult points, ref MDFaceFeature feature);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_feature_e2e(ref MDModel model, ref MDImage image, ref MDFaceFeature feature);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_feature_compare(ref MDModel model, ref MDFaceFeature feature1,
             ref MDFaceFeature feature2, ref float similarity);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_anti_spoofing(ref MDModel model, ref MDImage image,
             ref FaceAntiSpoofingResult result);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_quality_evaluate(ref MDModel model, ref MDImage image,
             FaceQualityEvaluateType type, ref FaceQualityEvaluateResult result);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_age_predict(ref MDModel model, ref MDImage image, ref int age);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_gender_predict(ref MDModel model, ref MDImage image, ref GenderResult gender);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_eye_state_predict(ref MDModel model, ref MDImage image,
             ref MDEyeStateResult eyeState);
 
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_landmark(ref MDLandMarkResult result);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_feature(ref MDFaceFeature feature);
 
-        [DllImport("model_deploy_sdk.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_model(ref MDModel model);
     }
 }

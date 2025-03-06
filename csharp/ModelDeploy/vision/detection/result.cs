@@ -5,10 +5,9 @@ using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.vision.detection
 {
-
     public class DetectionResult
     {
-        public  Rect Box { get; set; }
+        public Rect Box { get; set; }
 
         public int LabelId { get; set; }
 

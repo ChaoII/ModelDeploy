@@ -6,36 +6,41 @@ using System;
 
 namespace ModelDeploy.vision.ocr
 {
-
-
     public class OCRResult
     {
-        public  Polygon Box { get; set; }
-        public  string Text { get; set; }
+        public Polygon Box { get; set; }
+        public string Text { get; set; }
         public float Score { get; set; }
 
 
-        private static OCRResult FromMDOCRResult(MDOCRResult cresult)
+        public override string ToString()
+        {
+            return $"Box: {Box}, Text: {Text}, Score: {Score}";
+        }
+
+        public static OCRResult FromMDOCRResult(MDOCRResult cResult)
         {
             OCRResult result = new OCRResult
             {
-                Box = Polygon.FromRaw(cresult.box),
-                Text = Utils.PtrToStringUTF8(cresult.text) ?? "",
-                Score = cresult.score
+                Box = Polygon.FromMDPolygon(cResult.box),
+                Text = Utils.PtrToStringUTF8(cResult.text) ?? "",
+                Score = cResult.score
             };
             return result;
         }
 
         private static MDOCRResult ToMDOCRResult(OCRResult result)
         {
-            MDOCRResult cresult = new MDOCRResult
+            MDOCRResult cResult = new MDOCRResult
             {
-                box = result.Box.ToRaw(),
+                // notice
+                // 此处开辟了内存，并将内存地址赋值给cresult.box, 因此需要在释放时进行释放(但是该处释放内存在C中进行)
+                box = result.Box.CopyToMDPolygon(),
                 // 在C中进行释放 无需Marshal.FreeHGlobal(cresult.text);
                 text = Utils.ConvertStringToHGlobalUtf8(result.Text),
                 score = result.Score
             };
-            return cresult;
+            return cResult;
         }
 
         public static List<OCRResult> FromMDOCRResults(MDOCRResults cresults)
@@ -47,6 +52,7 @@ namespace ModelDeploy.vision.ocr
                 MDOCRResult res = Marshal.PtrToStructure<MDOCRResult>(currentPtr);
                 results.Add(FromMDOCRResult(res));
             }
+
             return results;
         }
 
@@ -64,6 +70,7 @@ namespace ModelDeploy.vision.ocr
                 MDOCRResult res = ToMDOCRResult(results[i]);
                 Marshal.StructureToPtr(res, currentPtr, false);
             }
+
             return cresults;
         }
     }
