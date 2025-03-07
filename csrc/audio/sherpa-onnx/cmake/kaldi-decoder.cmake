@@ -3,7 +3,7 @@ function(download_kaldi_decoder)
 
   set(kaldi_decoder_URL  "http://localhost:5545/v0.2.6.tar.gz")
   set(kaldi_decoder_URL2 "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/kaldi-decoder-0.2.6.tar.gz")
-  set(kaldi_decoder_HASH "SHA256=0cfbe64a85028196c700d39e80ff4d498dedb348fa77fb0f39337fa45c93d71b")
+  set(kaldi_decoder_HASH "SHA256=b13c78b37495cafc6ef3f8a7b661b349c55a51abbd7f7f42f389408dcf86a463")
 
   set(KALDI_DECODER_BUILD_PYTHON OFF CACHE BOOL "" FORCE)
   set(KALDI_DECODER_ENABLE_TESTS OFF CACHE BOOL "" FORCE)

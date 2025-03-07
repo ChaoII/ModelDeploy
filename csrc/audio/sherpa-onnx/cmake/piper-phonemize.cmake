@@ -1,8 +1,8 @@
 function(download_piper_phonemize)
   include(FetchContent)
 
-  set(piper_phonemize_URL  "http://localhost:5545/piper-phonemize-78a788e0b719013401572d70fef372e77bff8e43.zip")
-  set(piper_phonemize_URL2 "http://localhost:5545/piper-phonemize-78a788e0b719013401572d70fef372e77bff8e43.zip")
+  set(piper_phonemize_URL  "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/piper-phonemize-78a788e0b719013401572d70fef372e77bff8e43.zip")
+  set(piper_phonemize_URL2 "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/piper-phonemize-78a788e0b719013401572d70fef372e77bff8e43.zip")
   set(piper_phonemize_HASH "SHA256=89641a46489a4898754643ce57bda9c9b54b4ca46485fdc02bf0dc84b866645d")
 
   # If you don't have access to the Internet,
