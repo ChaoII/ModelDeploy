@@ -11,16 +11,21 @@ option(BUILD_VISION "build vision module" ON)
 option(BUILD_FACE "build face" ON)
 option(BUILD_CAPI "build with capi" ON)
 option(ENABLE_SAVE_LOG "save log to log file" OFF)
+option(WITH_STATIC_CRT "" ON)
 
+
+# 消除 FetchContent_Populate 的弃用警告
 
 if (MSVC)
-    add_compile_options(
-            $<$<CONFIG:>:/MT> #---------|
-            $<$<CONFIG:Debug>:/MTd> #---|-- Statically link the runtime libraries
-            $<$<CONFIG:Release>:/MT> #--|
-            $<$<CONFIG:RelWithDebInfo>:/MT>
-            $<$<CONFIG:MinSizeRel>:/MT>
-    )
+    if (WITH_STATIC_CRT)
+        add_compile_options(
+                $<$<CONFIG:>:/MT>
+                $<$<CONFIG:Debug>:/MTd>
+                $<$<CONFIG:Release>:/MT>
+                $<$<CONFIG:RelWithDebInfo>:/MT>
+                $<$<CONFIG:MinSizeRel>:/MT>
+        )
+    endif ()
     add_compile_options(/wd4819 /wd4244)
 endif ()
 include_directories(${CMAKE_SOURCE_DIR})
@@ -35,8 +40,7 @@ list(APPEND SOURCE csrc/base_model.cpp)
 
 if (BUILD_VISION)
     # opencv
-    set(OpenCV_DIR "D:/opencv-5.x/build/install_mt/x64/vc17/staticlib" CACHE PATH "Path to OpenCV build directory")
-    find_package(OpenCV CONFIG REQUIRED)
+    include("${CMAKE_SOURCE_DIR}/cmake/opencv.cmake")
     if (NOT OpenCV_FOUND)
         message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")
     endif ()

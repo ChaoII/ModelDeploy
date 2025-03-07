@@ -1,6 +1,6 @@
 #### 1.编译
 
-```bach
+```bash
 git clone https://github.com/ChaoII/ModelDeploy.git
 cmake -S . -B build -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_FACE=ON -DBUILD_CAPI=ON
 cmake --build build --config Release
