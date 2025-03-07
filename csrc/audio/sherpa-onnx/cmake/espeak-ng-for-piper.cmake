@@ -1,8 +1,8 @@
 function(download_espeak_ng_for_piper)
   include(FetchContent)
 
-  set(espeak_ng_URL  "http://github.com/csukuangfj/espeak-ng/archive/f6fed6c58b5e0998b8e68c6610125e2d07d595a7.zip")
-  set(espeak_ng_URL2 "http://localhost:5545/espeak-ng-f6fed6c58b5e0998b8e68c6610125e2d07d595a7.zip")
+  set(espeak_ng_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/espeak-ng-f6fed6c58b5e0998b8e68c6610125e2d07d595a7.zip")
+  set(espeak_ng_URL2  "http://github.com/csukuangfj/espeak-ng/archive/f6fed6c58b5e0998b8e68c6610125e2d07d595a7.zip")
   set(espeak_ng_HASH "SHA256=70cbf4050e7a014aae19140b05e57249da4720f56128459fbe3a93beaf971ae6")
 
   set(BUILD_ESPEAK_NG_TESTS OFF CACHE BOOL "" FORCE)
