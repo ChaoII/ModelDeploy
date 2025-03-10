@@ -3,6 +3,7 @@
 //
 #include "allocate.h"
 #include <memory>
+#include <cstdlib>
 
 namespace modeldeploy {
     bool MDHostAllocator::operator()(void** ptr, size_t size) const {
