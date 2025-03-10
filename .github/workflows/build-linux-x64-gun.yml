@@ -1,6 +1,6 @@
 # This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
 # See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
-name: CMake on multiple platforms
+name: build linux x64 gun
 
 on:
   push:
@@ -10,38 +10,14 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ubuntu-latest
+    build_type: [ Release ]
+    c_compiler: [ gcc ]
     strategy:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
       fail-fast: false
-
-      # Set up a matrix to run the following 3 configurations:
-      # 1. <Windows, Release, latest MSVC compiler toolchain on the default runner image, default generator>
-      # 2. <Linux, Release, latest GCC compiler toolchain on the default runner image, default generator>
-      # 3. <Linux, Release, latest Clang compiler toolchain on the default runner image, default generator>
-      #
-      # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
-      matrix:
-        os: [ ubuntu-latest, windows-latest,ubuntu-latest ]
-        build_type: [ Release ]
-        c_compiler: [ gcc, cl, gcc ]
-        include:
-          - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
-          - os: ubuntu-latest
-            architecture: x86_64
-            c_compiler: gcc
-            cpp_compiler: g++
-          - os: ubuntu-latest
-            architecture: arm64
-            c_compiler: gcc
-            cpp_compiler: g++
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set reusable strings
         # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
         id: strings
@@ -49,13 +25,11 @@ jobs:
         run: |
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        if: matrix.architecture == 'arm64'
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Buildx
-        if: matrix.architecture == 'arm64'
-        uses: docker/setup-buildx-action@v2
+      - name: install audio dependents
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y alsa-utils libasound2-dev
 
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
