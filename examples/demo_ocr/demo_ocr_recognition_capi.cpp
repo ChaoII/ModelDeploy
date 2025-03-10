@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDImage image = md_read_image("../tests/test_images/test_ocr_recognition.png");
+    MDImage image = md_read_image("../tests/test_images/test_ocr_recognition1.png");
     MDOCRResult result;
     if ((ret = md_ocr_recognition_model_predict(&model, &image, &result)) != 0) {
         std::cout << ret << std::endl;

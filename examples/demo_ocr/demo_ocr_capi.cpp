@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
         "../tests/key.txt",
         8,
         ONNX,
-        960,
+        1920,
         0.3,
         0.6,
         1.5,
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDImage image = md_read_image("../tests/test_images/test_ocr1.png");
+    MDImage image = md_read_image("../tests/test_images/test_ocr4.png");
     MDOCRResults results;
     if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
         std::cout << ret << std::endl;
