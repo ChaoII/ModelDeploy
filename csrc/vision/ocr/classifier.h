@@ -11,7 +11,7 @@
 
 
 namespace modeldeploy::vision::ocr {
-    class Classifier : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT Classifier : public BaseModel {
     public:
         Classifier();
         /** \brief Set path of model file, and the configuration of runtime

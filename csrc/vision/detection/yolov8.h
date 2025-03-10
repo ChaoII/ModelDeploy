@@ -8,7 +8,7 @@
 #include "../../base_model.h"
 
 namespace modeldeploy::vision::detection {
-    class YOLOv8 : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT YOLOv8 : public BaseModel {
     public:
         YOLOv8(const std::string& model_file,
                const RuntimeOption& custom_option = RuntimeOption());

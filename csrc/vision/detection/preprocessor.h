@@ -2,11 +2,12 @@
 // Created by aichao on 2025/2/20.
 //
 #pragma once
-#include "../utils.h"
+#include "csrc/core/md_decl.h"
+#include "csrc/vision/utils.h"
 #include <map>
 
 namespace modeldeploy::vision::detection {
-    class YOLOv8Preprocessor {
+    class MODELDEPLOY_CXX_EXPORT YOLOv8Preprocessor {
     public:
         YOLOv8Preprocessor();
 

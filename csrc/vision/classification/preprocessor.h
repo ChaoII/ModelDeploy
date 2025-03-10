@@ -6,7 +6,8 @@
 
 #include "csrc/vision/common/result.h"
 #include <map>
-#include "../utils.h"
+#include "csrc/vision/utils.h"
+#include "csrc/core/md_decl.h"
 #include "csrc/core/md_tensor.h"
 
 namespace modeldeploy {
@@ -15,7 +16,7 @@ namespace vision {
 namespace classification {
 /*! @brief Preprocessor object for YOLOv5Cls serials model.
  */
-class  YOLOv5ClsPreprocessor {
+class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
  public:
   /** \brief Create a preprocessor instance for YOLOv5Cls serials model
    */

@@ -3,12 +3,13 @@
 //
 
 #pragma once
-#include "../common/result.h"
-#include "../../core/md_tensor.h"
+#include "csrc/core/md_decl.h"
+#include "csrc/vision/common/result.h"
+#include "csrc/core/md_tensor.h"
 #include "./utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
-    class DBDetectorPostprocessor {
+    class MODELDEPLOY_CXX_EXPORT DBDetectorPostprocessor {
     public:
         /** \brief Process the result of runtime and fill to results structure
          *

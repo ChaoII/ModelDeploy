@@ -10,7 +10,7 @@
 #include "./det_preprocessor.h"
 
 namespace modeldeploy::vision::ocr {
-    class DBDetector : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT DBDetector : public BaseModel {
     public:
         DBDetector();
         /** \brief Set path of model file, and the configuration of runtime

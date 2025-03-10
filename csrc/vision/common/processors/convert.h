@@ -4,12 +4,13 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "csrc/core/md_decl.h"
 
 namespace modeldeploy {
 namespace vision {
 /*! @brief Processor for convert images with given paramters.
  */
-class  Convert {
+class MODELDEPLOY_CXX_EXPORT Convert {
  public:
   Convert(const std::vector<float>& alpha, const std::vector<float>& beta);
     bool operator()(cv::Mat* mat) ;

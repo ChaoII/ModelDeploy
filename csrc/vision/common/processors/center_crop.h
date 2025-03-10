@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "csrc/core/md_decl.h"
 
 
 namespace modeldeploy {
@@ -12,7 +13,7 @@ namespace vision {
 
 /*! @brief Processor for crop images in center with given type deafault is float.
  */
-class  CenterCrop {
+class MODELDEPLOY_CXX_EXPORT CenterCrop {
  public:
   CenterCrop(int width, int height) : height_(height), width_(width) {}
   bool ImplByOpenCV(cv::Mat* mat);

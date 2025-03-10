@@ -13,7 +13,7 @@
 #include "csrc/vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::ocr {
-    class RecognizerPreprocessor final {
+    class MODELDEPLOY_CXX_EXPORT RecognizerPreprocessor final {
     public:
         virtual ~RecognizerPreprocessor() = default;
         RecognizerPreprocessor();

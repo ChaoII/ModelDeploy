@@ -13,7 +13,7 @@
 namespace modeldeploy::vision::ocr {
     /*! @brief Recognizer object is used to load the recognition model provided by PaddleOCR.
      */
-    class Recognizer : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT Recognizer : public BaseModel {
     public:
         Recognizer() = default;
         /** \brief Set path of model file, and the configuration of runtime

@@ -10,7 +10,7 @@
 #include "../common/processors/hwc2chw.h"
 
 namespace modeldeploy::vision::ocr {
-    class ClassifierPreprocessor {
+    class MODELDEPLOY_CXX_EXPORT ClassifierPreprocessor {
     public:
         virtual ~ClassifierPreprocessor() = default;
         ClassifierPreprocessor();

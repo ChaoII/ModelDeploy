@@ -4,12 +4,13 @@
 
 #pragma once
 
+#include "csrc/core/md_decl.h"
 #include "seeta/FaceLandmarker.h"
 #include "seeta/QualityStructure.h"
 #include "seeta/QualityOfLBN.h"
 
 namespace seeta {
-    class QualityOfClarityEx : public QualityRule {
+    class MODELDEPLOY_CXX_EXPORT QualityOfClarityEx : public QualityRule {
     public:
         explicit QualityOfClarityEx(const std::string& model_dir);
 

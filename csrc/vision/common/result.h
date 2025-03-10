@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include "csrc/core/md_decl.h"
 #include <opencv2/opencv.hpp>
 
 namespace modeldeploy::vision {
@@ -30,7 +31,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Classify result structure for all the image classify models
      */
-    struct ClassifyResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT ClassifyResult : public BaseResult {
         ClassifyResult() = default;
         /// Classify result for an image
         std::vector<int32_t> label_ids;
@@ -60,7 +61,7 @@ namespace modeldeploy::vision {
 
     /*! Mask structure, used in DetectionResult for instance segmentation models
      */
-    struct Mask : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT Mask : public BaseResult {
         /// Mask data buffer
         std::vector<uint8_t> data;
         /// Shape of mask
@@ -92,7 +93,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Detection result structure for all the object detection models and instance segmentation models
      */
-    struct DetectionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT DetectionResult : public BaseResult {
         DetectionResult() = default;
         /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
          */
@@ -134,7 +135,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Detection result structure for all the object detection models and instance segmentation models
      */
-    struct PerceptionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT PerceptionResult : public BaseResult {
         PerceptionResult() = default;
 
         std::vector<float> scores;
@@ -183,7 +184,7 @@ namespace modeldeploy::vision {
 
     /*! @brief KeyPoint Detection result structure for all the keypoint detection models
      */
-    struct KeyPointDetectionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT KeyPointDetectionResult : public BaseResult {
         /** \brief All the coordinates of detected keypoints for an input image, the size of `keypoints` is num_detected_objects * num_joints, and the element of `keypoint` is a array of 2 float values, means [x, y]
          */
         std::vector<std::array<float, 2>> keypoints;
@@ -207,7 +208,7 @@ namespace modeldeploy::vision {
         std::string Str();
     };
 
-    struct OCRResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT OCRResult : public BaseResult {
         std::vector<std::array<int, 8>> boxes;
 
         std::vector<std::string> text;
@@ -229,7 +230,7 @@ namespace modeldeploy::vision {
 
     /*! @brief MOT(Multi-Object Tracking) result structure for all the MOT models
      */
-    struct MOTResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT MOTResult : public BaseResult {
         /** \brief All the tracking object boxes for an input image, the size of `boxes` is the number of tracking objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
          */
         std::vector<std::array<int, 4>> boxes;
@@ -253,7 +254,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Face detection result structure for all the face detection models
      */
-    struct FaceDetectionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT FaceDetectionResult : public BaseResult {
         /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
          */
         std::vector<std::array<float, 4>> boxes;
@@ -289,7 +290,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Face Alignment result structure for all the face alignment models
      */
-    struct FaceAlignmentResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT FaceAlignmentResult : public BaseResult {
         /** \brief All the coordinates of detected landmarks for an input image, and the element of `landmarks` is a array of 2 float values, means [x, y]
          */
         std::vector<std::array<float, 2>> landmarks;
@@ -311,7 +312,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Segmentation result structure for all the segmentation models
      */
-    struct SegmentationResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT SegmentationResult : public BaseResult {
         SegmentationResult() = default;
         /** \brief
          * `label_map` stores the pixel-level category labels for input image. the number of pixels is equal to label_map.size()
@@ -348,7 +349,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Face recognition result structure for all the Face recognition models
      */
-    struct FaceRecognitionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult : public BaseResult {
         /** \brief The feature embedding that represents the final extraction of the face recognition model can be used to calculate the feature similarity between faces.
          */
         std::vector<float> embedding;
@@ -374,7 +375,7 @@ namespace modeldeploy::vision {
 
     /*! @brief Matting result structure for all the Matting models
      */
-    struct MattingResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT MattingResult : public BaseResult {
         /** \brief
         `alpha` is a one-dimensional vector, which is the predicted alpha transparency value. The range of values is [0., 1.], and the length is hxw. h, w are the height and width of the input image
         */
@@ -413,7 +414,7 @@ namespace modeldeploy::vision {
 
     /*! @brief HeadPose result structure for all the headpose models
      */
-    struct HeadPoseResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT HeadPoseResult : public BaseResult {
         /** \brief EulerAngles for an input image, and the element of `euler_angles` is a vector, contains {yaw, pitch, roll}
          */
         std::vector<float> euler_angles;

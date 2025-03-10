@@ -3,9 +3,10 @@
 //
 #pragma once
 #include <cstddef>
+#include "csrc/core/md_decl.h"
 
 namespace modeldeploy {
-    class MDHostAllocator {
+    class MODELDEPLOY_CXX_EXPORT MDHostAllocator {
     public:
         bool operator()(void** ptr, size_t size) const;
     };

@@ -5,8 +5,10 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
+#include "csrc/core/md_decl.h"
+
 namespace modeldeploy::vision {
-    class  Pad  {
+    class MODELDEPLOY_CXX_EXPORT Pad  {
     public:
         Pad(int top, int bottom, int left, int right,
             const std::vector<float>& value) {
