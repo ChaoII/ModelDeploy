@@ -10,7 +10,7 @@
 namespace modeldeploy::vision {
     bool mat_to_tensor(cv::Mat& mat, MDTensor* tensor, bool is_copy = false);
     MDDataType cv_dtype_to_md_dtype(int type);
-    bool mats_to_tensor(std::vector<cv::Mat> mats, MDTensor* tensor);
+    bool mats_to_tensor(const std::vector<cv::Mat>& mats, MDTensor* tensor);
 
     void nms(DetectionResult* output, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 

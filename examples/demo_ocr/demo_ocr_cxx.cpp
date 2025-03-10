@@ -4,11 +4,11 @@
 #include "csrc/vision.h"
 
 int main() {
-    modeldeploy::vision::ocr::PPOCRv4 ocr("det_infer.onnx",
-                                          "cls_infer.onnx",
-                                          "rec_infer.onnx",
-                                          "E:/CLionProjects/ModelDeploy/tests/key.txt");
-    auto img = cv::imread("E:/CLionProjects/ModelDeploy/tests/test_images/test_ocr1.png");
+    modeldeploy::vision::ocr::PPOCRv4 ocr("../tests/test_models/ocr/det_infer.onnx",
+                                          "../tests/test_models/ocr/cls_infer.onnx",
+                                          "../tests/test_models/ocr/rec_infer.onnx",
+                                          "../tests/key.txt");
+    auto img = cv::imread("../tests/test_images/test_ocr1.png");
     modeldeploy::vision::OCRResult result;
     ocr.predict(img, &result);
     std::cout << result.Str() << std::endl;

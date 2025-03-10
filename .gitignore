@@ -10,6 +10,7 @@ models
 *.o
 *.obj
 tests/test_models
+build_linux
 
 # Precompiled Headers
 *.gch

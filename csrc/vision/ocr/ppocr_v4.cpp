@@ -81,8 +81,10 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool PPOCRv4::predict(const cv::Mat& image, OCRResult* result) {
+        std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>1<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
         std::vector<OCRResult> batch_result(1);
         const bool success = batch_predict({image}, &batch_result);
+        std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>2<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
         if (!success) {
             return success;
         }
@@ -119,6 +121,7 @@ namespace modeldeploy::vision::ocr {
                     image_list[i_box] = get_rotate_crop_image(img, boxes[i_box]);
                 }
             }
+            std::cout << "=====================1=======================" << std::endl;
             std::vector<int32_t>* cls_labels_ptr = &ocr_result.cls_labels;
             std::vector<float>* cls_scores_ptr = &ocr_result.cls_scores;
             std::vector<std::string>* text_ptr = &ocr_result.text;
@@ -146,7 +149,7 @@ namespace modeldeploy::vision::ocr {
 
             std::vector<float> width_list;
             width_list.reserve(image_list.size());
-            for (auto & image : image_list) {
+            for (const auto& image : image_list) {
                 width_list.push_back(static_cast<float>(image.cols) / image.rows);
             }
             std::vector<int> indices = arg_sort(width_list);

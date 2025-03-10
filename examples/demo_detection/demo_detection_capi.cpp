@@ -29,7 +29,7 @@ int main() {
     md_draw_detection_result(&im, &result, "../tests/msyh.ttc", 20, 0.5, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "duration cost: " << diff.count() << "s" << std::endl;
-    md_show_image(&im);
+    // md_show_image(&im);
     // md_print_detection_result(&result);
     md_free_detection_result(&result);
 
