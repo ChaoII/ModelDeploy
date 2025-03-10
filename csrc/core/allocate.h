@@ -2,6 +2,7 @@
 // Created by aichao on 2025/2/20.
 //
 #pragma once
+#include <cstddef>
 
 namespace modeldeploy {
     class MDHostAllocator {

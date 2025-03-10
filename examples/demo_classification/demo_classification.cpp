@@ -2,7 +2,7 @@
 // Created by aichao on 2025/2/24.
 //
 
-#include "vision.h"
+#include "csrc/vision.h"
 
 int main() {
     modeldeploy::vision::classification::YOLOv5Cls yol_ov5_cls("yolov5n-cls.onnx");
