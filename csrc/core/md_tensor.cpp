@@ -140,7 +140,8 @@ namespace modeldeploy {
                 if (new_shape[i] < 0) {
                     std::cerr << "Each dimension value of 'shape' in ReshapeOp must not "
                         "be negative except one unknown dimension. "
-                        "But received  shape = " << print_vector(new_shape) << ", shape[" << i << "] =" << new_shape[i] <<
+                        "But received  shape = " << print_vector(new_shape) << ", shape[" << i << "] =" << new_shape[i]
+                        <<
                         std::endl;
                     return false;
                 };
@@ -155,7 +156,8 @@ namespace modeldeploy {
                     "The input tensor X'size must be divisible by known "
                     "capacity of 'shape'. "
                     "But received X's shape = [" << print_vector(shape) << "], X's size = " << numel << ", "
-                    "'shape' is [" << print_vector(new_shape) << "], known capacity of 'shape' is " << capacity << "." <<
+                    "'shape' is [" << print_vector(new_shape) << "], known capacity of 'shape' is " << capacity << "."
+                    <<
                     std::endl;
                 return false;
             }
@@ -233,8 +235,8 @@ namespace modeldeploy {
     }
 
     MDTensor::MDTensor(const MDTensor& other)
-        : shape(other.shape),
-          name(other.name),
+        : name(other.name),
+          shape(other.shape),
           dtype(other.dtype) {
         // Copy buffer
         if (other.buffer_ == nullptr) {
@@ -243,7 +245,7 @@ namespace modeldeploy {
         else {
             size_t nbytes = total_bytes();
             if (!re_alloc_fn(nbytes)) {
-                std::cerr << "The FastDeploy MDTensor allocate memory error" << std::endl;
+                std::cerr << "The ModelDeploy MDTensor allocate memory error" << std::endl;
             }
             copy_buffer(buffer_, other.buffer_, nbytes);
         }
@@ -251,9 +253,9 @@ namespace modeldeploy {
     }
 
     MDTensor::MDTensor(MDTensor&& other)
-        : buffer_(other.buffer_),
+        : name(std::move(other.name)),
+          buffer_(other.buffer_),
           shape(std::move(other.shape)),
-          name(std::move(other.name)),
           dtype(other.dtype),
           external_data_ptr_(other.external_data_ptr_),
           total_bytes_allocated_(other.total_bytes_allocated_) {

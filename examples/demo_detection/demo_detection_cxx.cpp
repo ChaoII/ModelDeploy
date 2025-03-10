@@ -5,7 +5,7 @@
 #include "csrc/vision.h"
 
 int main() {
-     modeldeploy::vision::detection::YOLOv8 yolov8("../tests/models/best.onnx");
+     modeldeploy::vision::detection::YOLOv8 yolov8("../tests/test_models/best.onnx");
      bool is_inited = yolov8.initialized();
      auto img = cv::imread("../tests/test_images/test_detection.png");
      modeldeploy::vision::DetectionResult result;

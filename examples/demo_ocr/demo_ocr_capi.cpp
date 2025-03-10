@@ -42,8 +42,8 @@ int main(int argc, char** argv) {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDColor color = {255, 0, 255};
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    constexpr MDColor color = {255, 0, 255};
+    const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     md_draw_ocr_result(&image, &results, "../tests/msyh.ttc", 15, &color, 0.5, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "cost: " << diff.count() << std::endl;

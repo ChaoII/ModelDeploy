@@ -32,14 +32,14 @@ namespace modeldeploy::vision::ocr {
         }
         std::vector<std::vector<std::vector<int>>> boxes;
         boxes = util_post_processor_.boxes_from_bitmap(
-            pred_map, bit_map, det_db_box_thresh_,
-            det_db_unclip_ratio_, det_db_score_mode_);
+            pred_map, bit_map, static_cast<float>(det_db_box_thresh_),
+            static_cast<float>(det_db_unclip_ratio_), det_db_score_mode_);
         boxes = util_post_processor_.filter_tag_det_res(boxes, det_img_info);
         // boxes to boxes_result
-        for (int i = 0; i < boxes.size(); i++) {
-            std::array<int, 8> new_box;
+        for (auto& boxe : boxes) {
+            std::array<int, 8> new_box{};
             int k = 0;
-            for (auto& vec : boxes[i]) {
+            for (auto& vec : boxe) {
                 for (auto& e : vec) {
                     new_box[k++] = e;
                 }
@@ -54,17 +54,20 @@ namespace modeldeploy::vision::ocr {
         std::vector<std::vector<std::array<int, 8>>>* results,
         const std::vector<std::array<int, 4>>& batch_det_img_info) {
         // DBDetector have only 1 output tensor.
+
         const MDTensor& tensor = tensors[0];
         // For DBDetector, the output tensor shape = [batch, 1, ?, ?]
         const size_t batch = tensor.shape[0];
         const size_t length = accumulate(tensor.shape.begin() + 1, tensor.shape.end(), 1,
-                                         std::multiplies<int>());
-        const float* tensor_data = static_cast<const float*>(tensor.data());
+                                         std::multiplies());
+        auto tensor_data = static_cast<const float*>(tensor.data());
         results->resize(batch);
         for (int i_batch = 0; i_batch < batch; ++i_batch) {
-            single_batch_postprocessor(tensor_data, tensor.shape[2], tensor.shape[3],
+            single_batch_postprocessor(tensor_data, static_cast<int>(tensor.shape[2]),
+                                       static_cast<int>(tensor.shape[3]),
                                        batch_det_img_info[i_batch],
                                        &results->at(i_batch));
+
             tensor_data = tensor_data + length;
         }
         return true;
