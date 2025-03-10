@@ -5,13 +5,14 @@
 
 #pragma once
 
+#include "csrc/core/md_decl.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
-#include "../../core/md_tensor.h"
+#include "csrc/core/md_tensor.h"
 
 namespace modeldeploy::vision::ocr {
     /*! @brief Postprocessor object for Recognizer serials model.
      */
-    class RecognizerPostprocessor {
+    class MODELDEPLOY_CXX_EXPORT RecognizerPostprocessor {
     public:
         RecognizerPostprocessor();
         /** \brief Create a postprocessor instance for Recognizer serials model

@@ -3,11 +3,12 @@
 //
 
 #pragma once
+#include "csrc/core/md_decl.h"
 #include "./utils/ocr_postprocess_op.h"
-#include "../../core/md_tensor.h"
+#include "csrc/core/md_tensor.h"
 
 namespace modeldeploy::vision::ocr {
-    class ClassifierPostprocessor {
+    class MODELDEPLOY_CXX_EXPORT ClassifierPostprocessor {
     public:
         /** \brief Process the result of runtime and fill to ClassifyResult structure
          *

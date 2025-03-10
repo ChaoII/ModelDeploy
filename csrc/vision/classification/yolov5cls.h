@@ -11,7 +11,7 @@
 namespace modeldeploy::vision::classification {
     /*! @brief YOLOv5Cls model object used when to load a YOLOv5Cls model exported by YOLOv5Cls.
      */
-    class YOLOv5Cls : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT YOLOv5Cls : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
          *

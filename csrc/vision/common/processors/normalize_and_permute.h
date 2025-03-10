@@ -7,7 +7,7 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
-
+#include "csrc/core/md_decl.h"
 #include "csrc/core/md_tensor.h"
 
 
@@ -15,7 +15,7 @@ namespace modeldeploy::vision {
 
 /*! @brief Processor for Normalize and Permute images from HWC to CHW.
  */
-class  NormalizeAndPermute {
+class MODELDEPLOY_CXX_EXPORT NormalizeAndPermute {
  public:
   NormalizeAndPermute(const std::vector<float>& mean,
                       const std::vector<float>& std, bool is_scale = true,

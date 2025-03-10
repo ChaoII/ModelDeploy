@@ -4,6 +4,8 @@
 
 #pragma once
 #include <string>
+#include "csrc/core/md_decl.h"
+
 namespace modeldeploy {
     enum Device {
         CPU,
@@ -12,7 +14,7 @@ namespace modeldeploy {
 
     /*! @brief Option object to configure ONNX Runtime backend
      */
-    struct RuntimeOption {
+    struct MODELDEPLOY_CXX_EXPORT RuntimeOption {
         bool model_from_memory = false;
 
         /// Level of graph optimization,

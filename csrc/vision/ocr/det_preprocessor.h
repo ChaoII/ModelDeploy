@@ -9,7 +9,7 @@
 
 
 namespace modeldeploy::vision::ocr {
-    class DBDetectorPreprocessor {
+    class MODELDEPLOY_CXX_EXPORT DBDetectorPreprocessor {
     public:
         virtual ~DBDetectorPreprocessor() = default;
         DBDetectorPreprocessor();

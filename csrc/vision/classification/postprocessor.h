@@ -2,9 +2,9 @@
 // Created by aichao on 2025/2/24.
 //
 #pragma once
-
-#include "csrc/vision/common/result.h"
 #include <map>
+#include "csrc/core/md_decl.h"
+#include "csrc/vision/common/result.h"
 #include "csrc/core/md_tensor.h"
 namespace modeldeploy {
 namespace vision {
@@ -12,7 +12,7 @@ namespace vision {
 namespace classification {
 /*! @brief Postprocessor object for YOLOv5Cls serials model.
  */
-class  YOLOv5ClsPostprocessor {
+class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPostprocessor {
  public:
   /** \brief Create a postprocessor instance for YOLOv5Cls serials model
    */
@@ -21,7 +21,7 @@ class  YOLOv5ClsPostprocessor {
   /** \brief Process the result of runtime and fill to ClassifyResult structure
    *
    * \param[in] tensors The inference result from runtime
-   * \param[in] result The output result of classification
+   * \param[in] results The output result of classification
    * \param[in] ims_info The shape info list, record input_shape and output_shape
    * \return true if the postprocess successed, otherwise false
    */

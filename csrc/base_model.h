@@ -3,10 +3,11 @@
 //
 
 #pragma once
+#include "csrc/core/md_decl.h"
 #include "csrc/runtime/ort.h"
 
 namespace modeldeploy {
-    class BaseModel {
+    class MODELDEPLOY_CXX_EXPORT BaseModel {
     public:
         virtual ~BaseModel() = default;
 

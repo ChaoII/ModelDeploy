@@ -5,7 +5,7 @@
 #pragma once
 
 #include <vector>
-
+#include "csrc/core/md_decl.h"
 #include "csrc/base_model.h"
 #include "csrc/vision/common/result.h"
 #include "classifier.h"
@@ -14,7 +14,7 @@
 #include "./utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
-    class PPOCRv4 : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT PPOCRv4 : public BaseModel {
     public:
         PPOCRv4(const std::string& det_model_path,
                 const std::string& cls_model_path,

@@ -4,11 +4,12 @@
 
 #pragma once
 
+#include "csrc/core/md_decl.h"
 #include "seeta/FaceLandmarker.h"
 #include "seeta/QualityStructure.h"
 
 namespace seeta {
-    class QualityOfNoMask : public QualityRule {
+    class MODELDEPLOY_CXX_EXPORT QualityOfNoMask : public QualityRule {
     public:
         explicit QualityOfNoMask(std::shared_ptr<seeta::FaceLandmarker> ld_);
 

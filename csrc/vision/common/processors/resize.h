@@ -6,9 +6,10 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include <csrc/vision/detection/preprocessor.h>
+#include "csrc/core/md_decl.h"
 
 namespace modeldeploy::vision {
-    class Resize {
+    class MODELDEPLOY_CXX_EXPORT Resize {
     public:
         Resize(int width, int height, float scale_w = -1.0, float scale_h = -1.0,
                int interp = 1, bool use_scale = false) {

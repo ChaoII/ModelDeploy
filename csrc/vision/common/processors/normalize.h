@@ -7,13 +7,14 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "csrc/core/md_decl.h"
 #include "csrc/core/md_tensor.h"
 
 namespace modeldeploy {
 namespace vision {
 /*! @brief Processor for Normalize images with given paramters.
  */
-class  Normalize {
+class MODELDEPLOY_CXX_EXPORT Normalize {
  public:
   Normalize(const std::vector<float>& mean, const std::vector<float>& std,
             bool is_scale = true,

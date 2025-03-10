@@ -3,11 +3,12 @@
 //
 
 #pragma once
-#include "../common/result.h"
-#include "../utils.h"
+#include "csrc/core/md_decl.h"
+#include "csrc/vision/common/result.h"
+#include "csrc/vision/utils.h"
 
 namespace modeldeploy::vision::detection {
-    class YOLOv8Postprocessor {
+    class MODELDEPLOY_CXX_EXPORT YOLOv8Postprocessor {
     public:
         YOLOv8Postprocessor();
         bool run(const std::vector<MDTensor>& tensors,

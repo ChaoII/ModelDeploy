@@ -26,7 +26,7 @@
 
 using Status = seeta::FaceAntiSpoofing::Status;
 
-class FaceModel {
+class MODELDEPLOY_CXX_EXPORT FaceModel {
 public:
     enum class QualityEvaluateType : uint {
         BRIGHTNESS = 0,
