@@ -25,6 +25,17 @@ bool md_get_button_enable_status(MDImage* image, const int pix_threshold, const 
     return percentage >= rate_threshold;
 }
 
+MDPolygon* md_create_polygon_from_rect(const MDRect* rect) {
+    auto* polygon = static_cast<MDPolygon*>(malloc(sizeof(MDPolygon)));
+    polygon->data = static_cast<MDPoint*>(malloc(sizeof(MDPoint) * 4));
+    polygon->data[0] = MDPoint{rect->x, rect->y};
+    polygon->data[1] = MDPoint{rect->x + rect->width, rect->y};
+    polygon->data[2] = MDPoint{rect->x + rect->width, rect->y + rect->height};
+    polygon->data[3] = MDPoint{rect->x, rect->y + rect->height};
+    polygon->size = 4;
+    return polygon;
+}
+
 
 MDPoint md_get_center_point(const MDRect* rect) {
     return MDPoint{rect->x + rect->width / 2, rect->y + rect->height / 2};

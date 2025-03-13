@@ -55,8 +55,8 @@ class Program
 
     static void TestDetection()
     {
-        Image image = Image.Read("../../../../../tests/test_images/test_detection.png");
-        YOLOv8 yolov8 = new YOLOv8("../../../../../tests/test_models/best.onnx");
+        Image image = Image.Read("../../../../../tests/test_images/test_detection1.png");
+        YOLOv8 yolov8 = new YOLOv8("../../../../../tests/test_models/best1.onnx");
         yolov8.SetInputSize(1440, 1440);
         List<DetectionResult> detectionResults = yolov8.Predict(image);
         yolov8.DrawDetectionResult(image, detectionResults, "../../../../../tests/msyh.ttc", 20,
@@ -251,16 +251,16 @@ class Program
 
     static void Main(string[] args)
     {
-        TestFace();
-        TestSenseVoice();
-        TestKokoro();
-        TestDetection();
-        TestImage();
-        TestOCR();
-        TestOcrRecognition();
+        // TestFace();
+        // TestSenseVoice();
+        // TestKokoro();
+        // TestDetection();
+        // TestImage();
+        // TestOCR();
+        // TestOcrRecognition();
         TestOcrRecognitionBatch();
         // 测试GC
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
+        // GC.Collect();
+        // GC.WaitForPendingFinalizers();
     }
 }

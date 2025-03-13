@@ -7,7 +7,6 @@ set(SOURCE "")
 set(DEPENDS "")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-
 option(BUILD_AUDIO "build asr tts vad sr" OFF)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_FACE "build face" ON)
@@ -44,6 +43,7 @@ list(APPEND SOURCE csrc/base_model.cpp)
 if (BUILD_VISION)
     # opencv
     include("${CMAKE_SOURCE_DIR}/cmake/opencv.cmake")
+    find_package(OpenCV CONFIG REQUIRED)
     if (NOT OpenCV_FOUND)
         message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")
     endif ()
