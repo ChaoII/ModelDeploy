@@ -4,6 +4,13 @@ message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
 
 
+set(opencv_5_x_win_x64_static_mt_FILE_NAME "opencv_5_x_win_x64_static_mt.zip")
+set(opencv_5_x_win_x64_static_md_FILE_NAME "opencv_5_x_win_x64_static_md.zip")
+set(opencv_5_x_linux_x64_static_FILE_NAME "opencv_5_x_linux_x64_static.zip")
+set(opencv_5_x_linux_aarch64_static_FILE_NAME "opencv_5_x_linux_aarch64_static.zip")
+set(OPENCV_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
+
+
 set(opencv_5_x_win_x64_static_mt_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_win_x64_static_mt.zip")
 set(opencv_5_x_win_x64_static_md_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_win_x64_static_md.zip")
 set(opencv_5_x_linux_x64_static_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_linux_x64_static.zip")
@@ -17,45 +24,33 @@ include(FetchContent)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     if (WITH_STATIC_CRT)
-        set(possible_file_locations
-                $ENV{HOME}/Downloads/opencv_5_x_win_x64_static_mt_URL.zip
-                ${CMAKE_SOURCE_DIR}/opencv_5_x_win_x64_static_mt_URL.zip
-                ${CMAKE_BINARY_DIR}/opencv_5_x_win_x64_static_mt_URL.zip
-                /tmp/opencv_5_x_win_x64_static_mt_URL.zip
-        )
-        set(OPENCV_URL "${opencv_5_x_win_x64_static_mt_URL}")
-        set(OPENCV_HASH "${opencv_5_x_win_x64_static_mt_HASH}")
+        set(OPENCV_FILE_NAME ${opencv_5_x_win_x64_static_mt_FILE_NAME})
+        set(OPENCV_URL ${OPENCV_BASE_URL}/${OPENCV_FILE_NAME})
+        set(OPENCV_HASH "SHA256=86e5bdbce3d2955ef92f295feef1f40171dfdfeac37eaf1b5b141ed8aae3d112")
     elseif ()
-        set(possible_file_locations
-                $ENV{HOME}/Downloads/opencv_5_x_win_x64_static_md_URL.zip
-                ${CMAKE_SOURCE_DIR}/opencv_5_x_win_x64_static_md_URL.zip
-                ${CMAKE_BINARY_DIR}/opencv_5_x_win_x64_static_md_URL.zip
-                /tmp/opencv_5_x_win_x64_static_md_URL.zip
-        )
-        set(OPENCV_URL "${opencv_5_x_win_x64_static_md_URL}")
-        set(OPENCV_HASH "${opencv_5_x_win_x64_static_md_HASH}")
+        set(OPENCV_FILE_NAME ${opencv_5_x_win_x64_static_md_FILE_NAME})
+        set(OPENCV_URL ${OPENCV_BASE_URL}/${OPENCV_FILE_NAME})
+        set(OPENCV_HASH "SHA256=587dc46cdb8154cd29e342ff9ad83e5fcaee247aa312f918c5bf1b1372540c38")
     endif ()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-        set(possible_file_locations
-                $ENV{HOME}/Downloads/opencv_5_x_linux_x64_static_URL.zip
-                ${CMAKE_SOURCE_DIR}/opencv_5_x_linux_x64_static_URL.zip
-                ${CMAKE_BINARY_DIR}/opencv_5_x_linux_x64_static_URL.zip
-                /tmp/opencv_5_x_linux_x64_static_URL.zip)
-        set(OPENCV_URL "${opencv_5_x_linux_x64_static_URL}")
-        set(OPENCV_HASH "${opencv_5_x_linux_x64_static_HASH}")
+        set(OPENCV_FILE_NAME ${opencv_5_x_linux_x64_static_FILE_NAME})
+        set(OPENCV_URL ${OPENCV_BASE_URL}/${OPENCV_FILE_NAME})
+        set(OPENCV_HASH "SHA256=4a1ec2ec05b8e8a4d4503e2410543a48dc48beea4a4d3c4832375f6ab7edefb2")
     elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        set(possible_file_locations
-                $ENV{HOME}/Downloads/opencv_5_x_linux_aarch64_static_URL.zip
-                ${CMAKE_SOURCE_DIR}/opencv_5_x_linux_aarch64_static_URL.zip
-                ${CMAKE_BINARY_DIR}/opencv_5_x_linux_aarch64_static_URL.zip
-                /tmp/opencv_5_x_linux_aarch64_static_URL.zip)
-        set(OPENCV_URL "${opencv_5_x_linux_aarch64_static_URL}")
-        set(OPENCV_HASH "${opencv_5_x_linux_aarch64_static_HASH}")
+        set(OPENCV_FILE_NAME ${opencv_5_x_linux_aarch64_static_FILE_NAME})
+        set(OPENCV_URL ${OPENCV_BASE_URL}/${OPENCV_FILE_NAME})
+        set(OPENCV_HASH "SHA256=5e1cae594bc10fb3ba228478dfaaf975cb7476c2457174dabdc364a44d664fa9")
     endif ()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
+
+set(possible_file_locations
+        $ENV{HOME}/Downloads/${OPENCV_FILE_NAME}
+        ${CMAKE_SOURCE_DIR}/${OPENCV_FILE_NAME}
+        ${CMAKE_BINARY_DIR}/${OPENCV_FILE_NAME}
+        /tmp/${OPENCV_FILE_NAME})
 
 
 foreach (f IN LISTS possible_file_locations)
@@ -71,6 +66,7 @@ FetchContent_Declare(opencv
         URL
         ${OPENCV_URL}
         URL_HASH ${OPENCV_HASH}
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 FetchContent_GetProperties(opencv)
@@ -96,5 +92,3 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
-
-find_package(OpenCV CONFIG REQUIRED)

@@ -21,6 +21,10 @@ MODELDEPLOY_CAPI_EXPORT void md_print_rect(const MDRect* rect);
 /// \return 按钮是否可用
 MODELDEPLOY_CAPI_EXPORT bool md_get_button_enable_status(MDImage* image, int pix_threshold = 50,
                                                          double rate_threshold = 0.05);
+/// 将MDRect转化为MDPolygon多边形,注意使用完后调用md_free_polygon释放内存
+/// @param rect MDRect
+/// @return
+MODELDEPLOY_CAPI_EXPORT MDPolygon* md_create_polygon_from_rect(const MDRect* rect);
 
 /// 获取矩形的中心点
 /// \param rect

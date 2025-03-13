@@ -48,6 +48,7 @@ FetchContent_Declare(seetaface
         URL
         ${SEETA_FACE_URL}
         URL_HASH ${SEETA_FACE_HASH}
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 FetchContent_GetProperties(seetaface)
