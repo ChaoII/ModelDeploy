@@ -112,4 +112,26 @@ namespace modeldeploy {
             tensor->set_external_data(shape, dtype, const_cast<void*>(value_ptr));
         }
     }
+
+    std::string onnx_type_to_string(const ONNXTensorElementDataType type) {
+        static const std::map<ONNXTensorElementDataType, std::string> type_map = {
+            {ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, "FLOAT"},
+            {ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32, "INT32"},
+            {ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, "STRING"},
+            // 添加更多类型映射...
+        };
+        return type_map.count(type) ? type_map.at(type) : "UNKNOWN";
+    }
+
+    // 辅助函数：形状转字符串
+    std::string shape_to_string(const std::vector<int64_t>& shape) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < shape.size(); ++i) {
+            if (i > 0) ss << ", ";
+            ss << shape[i];
+        }
+        ss << "]";
+        return ss.str();
+    }
 }

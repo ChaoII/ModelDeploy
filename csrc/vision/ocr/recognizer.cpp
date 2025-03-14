@@ -4,6 +4,9 @@
 
 
 #include "csrc/vision/ocr/recognizer.h"
+
+#include <csrc/core/md_log.h>
+
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
@@ -19,10 +22,9 @@ namespace modeldeploy::vision::ocr {
     // Init
     bool Recognizer::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR("Failed to initialize modeldeploy backend.");
             return false;
         }
-
         return true;
     }
 
@@ -67,24 +69,23 @@ namespace modeldeploy::vision::ocr {
                                    const std::vector<int>& indices) {
         const size_t total_size = images.size();
         if (!indices.empty() && indices.size() != total_size) {
-            std::cerr << "indices.size() should be 0 or images.size()." << std::endl;
+            MD_LOG_ERROR("indices.size() should be 0 or images.size().");
             return false;
         }
         std::vector<cv::Mat> imgs = images;
         if (!preprocessor_.Run(&imgs, &reused_input_tensors_, start_index,
                                end_index, indices)) {
-            std::cerr << "Failed to preprocess the input image." << std::endl;
+            MD_LOG_ERROR("Failed to preprocess the input image.");
             return false;
         }
         reused_input_tensors_[0].name = get_input_info(0).name;
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            std::cerr << "Failed to inference by runtime." << std::endl;
+            MD_LOG_ERROR("Failed to inference by runtime.");
             return false;
         }
         if (!postprocessor_.run(reused_output_tensors_, texts, rec_scores,
                                 start_index, total_size, indices)) {
-            std::cerr << "Failed to postprocess the inference cls_results by runtime."
-                << std::endl;
+            MD_LOG_ERROR( "Failed to postprocess the inference cls_results by runtime.");
             return false;
         }
         return true;

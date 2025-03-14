@@ -18,14 +18,14 @@ extern "C" {
 /// @param thread_num 线程数，线程数越大，识别速度越快，但是资源占用越高，并且速度并不是线性增长的请酌情修改
 /// @return 创建成功返回MDStatusCode::Success，否则返回错误码
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_path,
-                                                                     const char* dict_path, int thread_num = 8);
+                                                                     const char* dict_path, int thread_num = 1);
 
 /// 单张图片识别，图片中仅包含单行文字的识别，直接给出识别结果
 /// @param model 由md_create_ocr_recognition_model生成的模型
 /// @param image 图像，仅包含单行文字的图像
 /// @param result 识别结果
 /// @return 识别成功返回MDStatusCode::Success，否则返回错误码
-MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, MDImage* image,
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImage* image,
                                                                       MDOCRResult* result);
 
 /// 图片中包含大量的单行文字，识别给定区域内的文字，可以批量识别
@@ -37,7 +37,7 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_recognition_model_predict(const MDMo
 /// @param results 模型识别结果
 /// @return 识别成功返回MDStatusCode::Success，否则返回错误码
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_recognition_model_predict_batch(
-    const MDModel* model, MDImage* image, int batch_size, MDPolygon* polygon, int size, MDOCRResults* results);
+    const MDModel* model, const MDImage* image, int batch_size, const MDPolygon* polygon, int size, MDOCRResults* results);
 
 /// 释放文本识别结果
 /// @param result 模型识别结果，由于在填充结构体时进行了手动内存分配，所以需要手动释放

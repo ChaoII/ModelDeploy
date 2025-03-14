@@ -4,11 +4,14 @@
 
 
 #include <map>
+#include <tabulate/tabulate.hpp>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/detection/detection_capi.h"
+
+using namespace tabulate;
 
 
 MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
@@ -70,10 +73,16 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
 
 
 void md_print_detection_result(const MDDetectionResults* result) {
+    Table detection_results_table;
+    detection_results_table.add_row({"box", "label_id", "score"});
     for (int i = 0; i < result->size; ++i) {
-        std::cout << "box: " << format_rect(result->data[i].box) << " label_id: "
-            << result->data[i].label_id << " score: " << result->data[i].score << std::endl;
+        detection_results_table.add_row({
+            format_rect(result->data[i].box),
+            std::to_string(result->data[i].label_id),
+            std::to_string(result->data[i].score)
+        });
     }
+    std::cout << detection_results_table << std::endl;
 }
 
 

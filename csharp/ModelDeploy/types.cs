@@ -107,7 +107,7 @@ namespace ModelDeploy
         public MDPolygon CopyToMDPolygon()
         {
             MDPolygon cPolygon = new MDPolygon { size = Points.Count };
-            // 注意此处开辟的内存，因此需要在释放时进行释放（如果单独使用CopyToMDPolygon后需要释放，如果使用后地址赋值给其他结构体，
+            // 注意此处开辟的内存，因此需要不用时进行释放（如果单独使用CopyToMDPolygon后需要释放，如果使用后地址赋值给其他结构体，
             // 然后其他结构体调用了释放方法则需要在其他地方进行释）
             cPolygon.data = Marshal.AllocHGlobal(Points.Count * Marshal.SizeOf<MDPoint>());
             for (int i = 0; i < Points.Count; i++)
@@ -130,6 +130,16 @@ namespace ModelDeploy
             }
 
             return cPolygons;
+        }
+
+
+        public static void FreeMDPolygon(MDPolygon polygon)
+        {
+            if (polygon.data != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(polygon.data);
+                polygon.data = IntPtr.Zero; // 确保释放后不再使用
+            }
         }
 
 

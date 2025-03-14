@@ -18,7 +18,6 @@ namespace ModelDeploy.vision.ocr
                 throw new Exception("md_create_ocr_model failed error code is: " + ret);
             }
         }
-
         ~PPOCRv4()
         {
             md_free_ocr_model(ref model);
@@ -32,7 +31,6 @@ namespace ModelDeploy.vision.ocr
             {
                 throw new Exception("md_ocr_model_predict failed error code is: " + ret);
             }
-
             List<OCRResult> ocrResult = OCRResult.FromMDOCRResults(cResults);
             md_free_ocr_result(ref cResults);
             return ocrResult;
@@ -76,27 +74,28 @@ namespace ModelDeploy.vision.ocr
 
     public class OCRRecognition
     {
-        private MDModel model;
-
-        public OCRRecognition(string modelPath, string dictPath)
+        private MDModel _model;
+        
+        public OCRRecognition(string modelPath, string dictPath, int threadNum = 1)
         {
-            model = new MDModel();
-            int ret = md_create_ocr_recognition_model(ref model, modelPath, dictPath);
+            _model = new MDModel();
+            int ret = md_create_ocr_recognition_model(ref _model, modelPath, dictPath, threadNum);
             if (ret != 0)
             {
+                md_free_ocr_recognition_model(ref _model);
                 throw new Exception("md_create_ocr_model failed error code is: " + ret);
             }
         }
 
         ~OCRRecognition()
         {
-            md_free_ocr_recognition_model(ref model);
+            md_free_ocr_recognition_model(ref _model);
         }
 
         public OCRResult Predict(Image image)
         {
             MDOCRResult cResult = new MDOCRResult();
-            int ret = md_ocr_recognition_model_predict(ref model, ref image.RawImage, ref cResult);
+            int ret = md_ocr_recognition_model_predict(ref _model, ref image.RawImage, ref cResult);
             if (ret != 0)
             {
                 throw new Exception("md_ocr_model_predict failed error code is: " + ret);
@@ -111,25 +110,35 @@ namespace ModelDeploy.vision.ocr
         public List<OCRResult> BatchPredict(Image image, List<Polygon> polygons, int batchSize)
         {
             MDOCRResults cResults = new MDOCRResults();
-            MDPolygon[] cPolygons = Polygon.ToMDPolygonArray(polygons);
-            int ret = md_ocr_recognition_model_predict_batch(ref model, ref image.RawImage, batchSize,
-                ref cPolygons[0], polygons.Count, ref cResults);
-            if (ret != 0)
+            MDPolygon[] cPolygons = null;
+            try
             {
-                throw new Exception("md_ocr_model_predict failed error code is: " + ret);
+                cPolygons = Polygon.ToMDPolygonArray(polygons);
+                int ret = md_ocr_recognition_model_predict_batch(ref _model, ref image.RawImage, batchSize,
+                    ref cPolygons[0], polygons.Count, ref cResults);
+                if (ret != 0)
+                {
+                    throw new Exception("md_ocr_model_predict failed error code is: " + ret);
+                }
+                return OCRResult.FromMDOCRResults(cResults);
             }
-            for (int i = 0; i < polygons.Count; i++)
+            finally
             {
-                Marshal.FreeHGlobal(cPolygons[i].data);
+                if (cPolygons != null)
+                {
+                    foreach (var polygon in cPolygons)
+                    {
+                        Polygon.FreeMDPolygon(polygon);
+                    }
+                }
+                md_free_ocr_result(ref cResults);
             }
-            List<OCRResult> ocrResult = OCRResult.FromMDOCRResults(cResults);
-            md_free_ocr_result(ref cResults);
-            return ocrResult;
         }
 
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_ocr_recognition_model(ref MDModel model, string modelPath, string dictPath);
+        private static extern int
+            md_create_ocr_recognition_model(ref MDModel model, string modelPath, string dictPath, int threadNum = 1);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_ocr_recognition_model_predict(ref MDModel model, ref MDImage image,
@@ -145,6 +154,7 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_ocr_recognition_model(ref MDModel model);
+
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_ocr_result(ref MDOCRResults results);
     }

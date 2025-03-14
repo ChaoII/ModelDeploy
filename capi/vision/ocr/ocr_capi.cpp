@@ -4,6 +4,8 @@
 
 #include <string>
 #include <filesystem>
+
+
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
 #include "capi/vision/ocr/ocr_capi.h"
@@ -20,7 +22,6 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
     const auto det_model_file_path = fs::path(parameters->model_dir) / "det_infer.onnx";
     const auto cls_model_file_path = fs::path(parameters->model_dir) / "cls_infer.onnx";
     const auto rec_model_file_path = fs::path(parameters->model_dir) / "rec_infer.onnx";
-
     const auto ocr_model = new modeldeploy::vision::ocr::PPOCRv4(det_model_file_path.string(),
                                                                  cls_model_file_path.string(),
                                                                  rec_model_file_path.string(),
@@ -97,14 +98,16 @@ MDStatusCode md_ocr_model_predict(const MDModel* model, MDImage* image, MDOCRRes
 }
 
 void md_print_ocr_result(const MDOCRResults* results) {
-    if (!results) return;
     for (int i = 0; i < results->size; ++i) {
-        std::cout << "box: " << format_polygon(results->data[i].box) << " text: "
-            << results->data[i].text << " score: " << results->data[i].score << std::endl;
+        std::cout
+            << "box: " << format_polygon(results->data[i].box)
+            << " text: " << results->data[i].text
+            << " score: " << results->data[i].score
+            << std::endl;
     }
 }
 
-void md_draw_ocr_result(MDImage* image, const MDOCRResults* results, const char* font_path, const int font_size,
+void md_draw_ocr_result(const MDImage* image, const MDOCRResults* results, const char* font_path, const int font_size,
                         const MDColor* color, const double alpha, const int save_result) {
     cv::Mat overlay;
     cv::Mat cv_image = md_image_to_mat(image);
@@ -161,6 +164,8 @@ void md_free_ocr_model(MDModel* model) {
         delete static_cast<modeldeploy::vision::ocr::PPOCRv4*>(model->model_content);
         model->model_content = nullptr;
     }
-    free(model->model_name);
-    model->model_name = nullptr;
+    if (model->model_name != nullptr) {
+        free(model->model_name);
+        model->model_name = nullptr;
+    }
 }

@@ -29,7 +29,7 @@ namespace modeldeploy::vision::ocr {
                 bool use_dilation = false,
                 int rec_batch_size = 8);
 
-        ~PPOCRv4();
+        ~PPOCRv4() override;
 
         /** \brief Predict the input image and get OCR result.
          *
@@ -48,11 +48,11 @@ namespace modeldeploy::vision::ocr {
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
                                    std::vector<OCRResult>* batch_result);
 
-        bool initialized() const override;
+        [[nodiscard]] bool initialized() const override;
         bool set_cls_batch_size(int cls_batch_size);
-        int get_cls_batch_size();
+        [[nodiscard]] int get_cls_batch_size() const;
         bool set_rec_batch_size(int rec_batch_size);
-        int get_rec_batch_size();
+        [[nodiscard]] int get_rec_batch_size() const;
 
     protected:
         std::unique_ptr<DBDetector> detector_ = nullptr;

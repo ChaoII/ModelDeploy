@@ -87,21 +87,20 @@ bool contains_substring(const std::string& str, const std::string& sub_str) {
 
 std::string format_polygon(const MDPolygon polygon) {
     std::ostringstream os;
-    os << "polygon: {";
+    os << "[";
     for (int i = 0; i < polygon.size; i++) {
         os << "[" << polygon.data[i].x << "," << polygon.data[i].y << "]";
         if (i != polygon.size - 1) {
             os << ",";
         }
     }
-    os << "}";
+    os << "]";
     return os.str();
 }
 
 std::string format_rect(const MDRect rect) {
     std::ostringstream os;
-    os << "MDRect {" << "x: " << rect.x << ", " << "y: " << rect.y << ", "
-        << "width: " << rect.width << ", " << "height: " << rect.height << "}";
+    os << "[" << rect.x << ", " << rect.y << ", " << rect.width << ", " << rect.height << "]";
     return os.str();
 }
 

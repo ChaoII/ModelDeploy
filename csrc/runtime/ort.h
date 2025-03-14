@@ -43,6 +43,7 @@ namespace modeldeploy {
     private:
         bool init_from_onnx(const std::string& model_buffer,
                             const RuntimeOption& option = RuntimeOption());
+
         Ort::Env env_{ORT_LOGGING_LEVEL_WARNING, "MD"};
         Ort::Session session_{nullptr};
         Ort::SessionOptions session_options_;
