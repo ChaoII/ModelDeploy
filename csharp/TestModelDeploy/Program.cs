@@ -59,9 +59,9 @@ class Program
         YOLOv8 yolov8 = new YOLOv8("../../../../../tests/test_models/best1.onnx");
         yolov8.SetInputSize(1440, 1440);
         List<DetectionResult> detectionResults = yolov8.Predict(image);
-        yolov8.DrawDetectionResult(image, detectionResults, "../../../../../tests/msyh.ttc", 20,
-            0.5);
-        image.Show();
+        // yolov8.DrawDetectionResult(image, detectionResults, "../../../../../tests/msyh.ttc", 20,
+        // 0.5);
+        // image.Show();
         foreach (var detectionResult in detectionResults)
         {
             Console.WriteLine(detectionResult.Box);
@@ -174,7 +174,7 @@ class Program
     {
         OCRRecognition ocrRecognition =
             new OCRRecognition("../../../../../tests/test_models/ocr/rec_infer.onnx",
-                "../../../../../tests/key.txt");
+                "../../../../../tests/key.txt", 8);
         Image image = Image.Read("../../../../../tests/test_images/test_ocr_recognition.png");
         var result = ocrRecognition.Predict(image);
         Console.WriteLine(result);
@@ -241,7 +241,7 @@ class Program
         List<OCRResult> results = ocrRecognition.BatchPredict(image, polygons, 2);
         Draw.DrawPolygon(image, polygons[0], new Color { R = 255, G = 255, B = 0 }, 0.5);
         Draw.DrawPolygon(image, polygons[1], new Color { R = 255, G = 0, B = 0 }, 0.5);
-        image.Show();
+        // image.Show();
 
         foreach (var result in results)
         {
@@ -254,13 +254,16 @@ class Program
         // TestFace();
         // TestSenseVoice();
         // TestKokoro();
+
         // TestDetection();
+
+
         // TestImage();
         // TestOCR();
         // TestOcrRecognition();
         TestOcrRecognitionBatch();
         // 测试GC
-        // GC.Collect();
-        // GC.WaitForPendingFinalizers();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
     }
 }

@@ -13,34 +13,33 @@
 
 MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_path,
                                              const char* dict_path, const int thread_num) {
-    if (!model) {
-        return MDStatusCode::MemoryAllocatedFailed;
-    }
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
     const auto ocr_rec_model = new modeldeploy::vision::ocr::Recognizer(model_path, dict_path, option);
-    model->type = MDModelType::OCR;
+    if (!ocr_rec_model->initialized()) {
+        MD_LOG_ERROR("Failed to initialize OCR Recognition model.");
+        return MDStatusCode::ModelInitializeFailed;
+    }
     model->format = MDModelFormat::ONNX;
     model->model_content = ocr_rec_model;
     model->model_name = strdup(ocr_rec_model->name().c_str());
-    if (!ocr_rec_model->initialized()) {
-        MD_LOG_ERROR("Failed to initialize OCR Recognition model.Please check your model parameters");
-        return MDStatusCode::ModelInitializeFailed;
-    }
+    model->type = MDModelType::OCR;
     return MDStatusCode::Success;
 }
 
 
-MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, MDImage* image, MDOCRResult* result) {
+MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImage* image, MDOCRResult* result) {
     if (model->type != MDModelType::OCR) {
         MD_LOG_ERROR("Model type is not OCR");
         return MDStatusCode::ModelTypeError;
     }
-    const auto ocr_rec_model = static_cast<modeldeploy::vision::ocr::Recognizer*>(model->model_content);
     const auto cv_image = md_image_to_mat(image);
+    const auto ocr_rec_model = static_cast<modeldeploy::vision::ocr::Recognizer*>(model->model_content);
     std::string text;
     float score;
-    ocr_rec_model->predict(cv_image, &text, &score);
+    if (const bool res_status = ocr_rec_model->predict(cv_image, &text, &score); !res_status) {
+        return MDStatusCode::ModelPredictFailed;
+    }
     result->box.size = 0;
     result->box.data = nullptr;
     result->text = strdup(text.c_str());
@@ -49,8 +48,8 @@ MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, MDImage* ima
 }
 
 MDStatusCode md_ocr_recognition_model_predict_batch(
-    const MDModel* model, MDImage* image, int batch_size,
-    MDPolygon* polygon, int size, MDOCRResults* results) {
+    const MDModel* model, const MDImage* image, const int batch_size,
+    const MDPolygon* polygon, const int size, MDOCRResults* results) {
     if (model->type != MDModelType::OCR) {
         MD_LOG_ERROR("Model type is not OCR");
         return MDStatusCode::ModelTypeError;
@@ -104,6 +103,8 @@ void md_free_ocr_recognition_model(MDModel* model) {
         delete static_cast<modeldeploy::vision::ocr::Recognizer*>(model->model_content);
         model->model_content = nullptr;
     }
-    free(model->model_name);
-    model->model_name = nullptr;
+    if (model->model_name != nullptr) {
+        free(model->model_name);
+        model->model_name = nullptr;
+    }
 }

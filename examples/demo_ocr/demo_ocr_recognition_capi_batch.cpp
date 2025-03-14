@@ -32,6 +32,7 @@ int main(int argc, char** argv) {
     if ((ret = md_create_ocr_recognition_model(&model,
                                                "../tests/test_models/ocr/rec_infer.onnx",
                                                "../tests/key.txt")) != 0) {
+        md_free_ocr_recognition_model(&model);
         std::cout << ret << std::endl;
         return ret;
     }

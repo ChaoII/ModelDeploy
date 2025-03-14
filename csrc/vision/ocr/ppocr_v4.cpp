@@ -2,8 +2,9 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "ppocr_v4.h"
-#include "./utils/ocr_utils.h"
+#include "csrc/vision/ocr/ppocr_v4.h"
+#include "csrc/core/md_log.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     PPOCRv4::PPOCRv4(const std::string& det_model_path,
@@ -37,8 +38,7 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    PPOCRv4::~PPOCRv4() {
-    }
+    PPOCRv4::~PPOCRv4() = default;
 
     bool PPOCRv4::set_cls_batch_size(int cls_batch_size) {
         if (cls_batch_size < -1 || cls_batch_size == 0) {
@@ -49,9 +49,9 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    int PPOCRv4::get_cls_batch_size() { return cls_batch_size_; }
+    int PPOCRv4::get_cls_batch_size() const { return cls_batch_size_; }
 
-    bool PPOCRv4::set_rec_batch_size(int rec_batch_size) {
+    bool PPOCRv4::set_rec_batch_size(const int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
             std::cerr << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;
@@ -60,7 +60,7 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    int PPOCRv4::get_rec_batch_size() { return rec_batch_size_; }
+    int PPOCRv4::get_rec_batch_size() const { return rec_batch_size_; }
 
     bool PPOCRv4::initialized() const {
         if (detector_ != nullptr && !detector_->initialized()) {
@@ -88,7 +88,7 @@ namespace modeldeploy::vision::ocr {
         }
         *result = std::move(batch_result[0]);
         return true;
-    };
+    }
 
     bool PPOCRv4::batch_predict(
         const std::vector<cv::Mat>& images,
@@ -97,7 +97,7 @@ namespace modeldeploy::vision::ocr {
         batch_result->resize(images.size());
         std::vector<std::vector<std::array<int, 8>>> batch_boxes(images.size());
         if (!detector_->batch_predict(images, &batch_boxes)) {
-            std::cerr << "There's error while detecting image in PPOCR." << std::endl;
+            MD_LOG_ERROR("There's error while detecting image in PPOCR.");
             return false;
         }
         for (int i_batch = 0; i_batch < batch_boxes.size(); ++i_batch) {
@@ -131,7 +131,7 @@ namespace modeldeploy::vision::ocr {
                     if (!classifier_->batch_predict(image_list, cls_labels_ptr,
                                                     cls_scores_ptr, start_index,
                                                     end_index)) {
-                        std::cerr << "There's error while recognizing image in PPOCR." << std::endl;
+                        MD_LOG_ERROR("There's error while recognizing image in PPOCR.");
                         return false;
                     }
                     for (size_t i_img = start_index; i_img < end_index; ++i_img) {
@@ -156,7 +156,7 @@ namespace modeldeploy::vision::ocr {
                     std::min(start_index + rec_batch_size_, image_list.size());
                 if (!recognizer_->batch_predict(image_list, text_ptr, rec_scores_ptr,
                                                 start_index, end_index, indices)) {
-                    std::cerr << "There's error while recognizing image in PPOCR." << std::endl;
+                    MD_LOG_ERROR("There's error while recognizing image in PPOCR.");
                     return false;
                 }
             }

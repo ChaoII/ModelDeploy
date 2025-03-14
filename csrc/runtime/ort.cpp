@@ -1,14 +1,19 @@
 //
 // Created by aichao on 2025/2/20.
 //
-
-#include "ort.h"
-#include "../utils/utils.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
+#include <tabulate/tabulate.hpp>
+#include "csrc/runtime/ort.h"
+#include "csrc/utils/utils.h"
+#include "csrc/core/md_log.h"
+
+
+namespace fs = std::filesystem;
+using namespace tabulate;
+
 namespace modeldeploy {
-
-
     void OrtBackend::build_option(const RuntimeOption& option) {
         option_ = option;
         if (option.graph_optimization_level >= 0) {
@@ -33,7 +38,7 @@ namespace modeldeploy {
         }
         // CUDA
         if (option.device == Device::GPU) {
-            auto all_providers = Ort::GetAvailableProviders();
+            const auto all_providers = Ort::GetAvailableProviders();
             bool support_cuda = false;
             std::string providers_msg;
             for (const auto& all_provider : all_providers) {
@@ -43,10 +48,8 @@ namespace modeldeploy {
                 }
             }
             if (!support_cuda) {
-                std::cerr << "Compiled fastdeploy with onnxruntime doesn't "
-                    "support GPU, the available providers are "
-                    << providers_msg << "will fallback to CPUExecutionProvider."
-                    << std::endl;
+                MD_LOG_ERROR("Compiled fastdeploy with onnxruntime doesn't support GPU, "
+                             "the available providers are {} will fallback to CPUExecutionProvider.", providers_msg);
                 option_.device = Device::CPU;
             }
             else {
@@ -63,72 +66,103 @@ namespace modeldeploy {
 
     bool OrtBackend::init(const RuntimeOption& option) {
         if (option.device != Device::CPU && option.device != Device::GPU) {
-            std::cerr
-                << "Backend::ORT only supports Device::CPU/Device::GPU, but now its "
-                << option.device << "." << std::endl;
+            MD_LOG_ERROR("Backend::ORT only supports Device::CPU/Device::GPU, but now its {}.",
+                         option.device==0?"cpu":"gpu");
             return false;
         }
         if (option.model_from_memory) {
             return init_from_onnx(option.model_buffer, option);
         }
+        if (!fs::exists(option.model_filepath)) {
+            MD_LOG_ERROR("Model file does not exist: {}", option.model_filepath);
+            return false;
+        }
         std::string model_buffer;
-        read_binary_from_file(option.model_filepath, &model_buffer);
+        if (!read_binary_from_file(option.model_filepath, &model_buffer)) {
+            MD_LOG_ERROR("Failed to read model file: {}", option.model_filepath);
+            return false;
+        }
         return init_from_onnx(model_buffer, option);
     }
 
 
-    bool OrtBackend::init_from_onnx(const std::string& model_file, const RuntimeOption& option) {
+    bool OrtBackend::init_from_onnx(const std::string& model_buffer, const RuntimeOption& option) {
         if (initialized_) {
-            std::cerr << "OrtBackend is already initlized, cannot initialize again." << std::endl;
+            MD_LOG_ERROR("OrtBackend is already initialized, cannot initialize again.");
             return false;
         }
-        build_option(option);
-        session_ = {env_, model_file.data(), model_file.size(), session_options_};
-        binding_ = std::make_unique<Ort::IoBinding>(session_);
-        auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-        Ort::Allocator allocator(session_, memory_info);
-        std::cout << "======================Input Info===========================" << std::endl;
-        size_t n_inputs = session_.GetInputCount();
-        for (size_t i = 0; i < n_inputs; ++i) {
-            auto input_name_ptr = session_.GetInputNameAllocated(i, allocator);
-            auto type_info = session_.GetInputTypeInfo(i);
-            std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
-            ONNXTensorElementDataType data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
+        try {
+            build_option(option);
+            session_ = {env_, model_buffer.data(), model_buffer.size(), session_options_};
+            binding_ = std::make_unique<Ort::IoBinding>(session_);
+            const auto input_memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+            const auto output_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+            const Ort::Allocator allocator(session_, input_memory_info);
 
-            std::cout << "Input" << i << ":" << " name=" << input_name_ptr.get() << std::endl;
-            std::cout << "Input" << i << ":" << " data type=" << data_type << std::endl;
-            std::cout << "Input" << i << " : num_dims = " << shape.size() << '\n';
-            for (size_t j = 0; j < shape.size(); j++) {
-                std::cout << "Input" << i << " : dim[" << j << "] =" << shape[j] << '\n';
+            const size_t n_inputs = session_.GetInputCount();
+            const size_t n_outputs = session_.GetOutputCount();
+
+
+            // 模型输入输出信息
+            Table input_table;
+            input_table.format().font_style({FontStyle::underline}).font_color(Color::yellow);
+
+            // input_table.add_row(Row_t{model_info_table});
+            input_table.add_row({"Type", "Index", "Name", "Data Type", "Shape"});
+
+            for (size_t i = 0; i < n_inputs; ++i) {
+                auto input_name_ptr = session_.GetInputNameAllocated(i, allocator);
+                auto type_info = session_.GetInputTypeInfo(i);
+                std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
+                const auto data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
+
+                input_table.add_row({
+                    "Input",
+                    std::to_string(i),
+                    input_name_ptr.get(),
+                    onnx_type_to_string(data_type),
+                    shape_to_string(shape)
+                });
+                inputs_desc_.emplace_back(TensorInfo{input_name_ptr.get(), shape, data_type});
             }
-            inputs_desc_.emplace_back(TensorInfo{input_name_ptr.get(), shape, data_type});
-        }
-        std::cout << "======================Output Info===========================" << std::endl;
-        size_t n_outputs = session_.GetOutputCount();
-        for (size_t i = 0; i < n_outputs; ++i) {
-            auto output_name_ptr = session_.GetOutputNameAllocated(i, allocator);
-            auto type_info = session_.GetOutputTypeInfo(i);
-            std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
-            ONNXTensorElementDataType data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
-            outputs_desc_.emplace_back(TensorInfo{output_name_ptr.get(), shape, data_type});
-            std::cout << "Output" << i << ":" << " name:" << output_name_ptr.get() << std::endl;
-            std::cout << "Output" << i << ":" << " data type: " << data_type << std::endl;
-            std::cout << "Output" << i << ": num_dims = " << shape.size() << '\n';
-            for (size_t j = 0; j < shape.size(); j++) {
-                std::cout << "Output" << i << " : " << " dim[" << j << "] =" << shape[j] << '\n';
+
+            // 输出表格
+            for (size_t i = 0; i < n_outputs; ++i) {
+                auto output_name_ptr = session_.GetOutputNameAllocated(i, allocator);
+                auto type_info = session_.GetOutputTypeInfo(i);
+                std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
+                const auto data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
+                input_table.add_row({
+                    "Output",
+                    std::to_string(i),
+                    output_name_ptr.get(),
+                    onnx_type_to_string(data_type),
+                    shape_to_string(shape)
+                });
+                outputs_desc_.emplace_back(TensorInfo{output_name_ptr.get(), shape, data_type});
+                binding_->BindOutput(output_name_ptr.get(), output_memory_info);
             }
-            Ort::MemoryInfo out_memory_info("Cpu", OrtDeviceAllocator, 0, OrtMemTypeDefault);
-            binding_->BindOutput(output_name_ptr.get(), out_memory_info);
+            // ====================== 组合最终输出 ======================
+            std::cout << termcolor::green << "[model file:"
+                << fs::absolute(option.model_filepath).filename().string()
+                << " model size: " << std::fixed << std::setprecision(3)
+                << static_cast<float>(model_buffer.size()) / 1024 / 1024.0f << "MB]"
+                << termcolor::reset << std::endl;
+            std::cout << input_table << std::endl;
+            initialized_ = true;
+            return true;
         }
-        initialized_ = true;
-        return true;
+        catch (const std::exception& e) {
+            MD_LOG_ERROR("Failed to initialize from ONNX: {}", e.what());
+            return false;
+        }
     }
 
     bool OrtBackend::infer(std::vector<MDTensor>& inputs, std::vector<MDTensor>* outputs, bool copy_to_fd) {
         if (inputs.size() != inputs_desc_.size()) {
-            std::cerr << "[OrtBackend] Size of the inputs(" << inputs.size()
-                << ") should keep same with the inputs of this model("
-                << inputs_desc_.size() << ")." << std::endl;
+            MD_LOG_ERROR(
+                "[OrtBackend] Size of the inputs({}) should keep same with the inputs of this model({})",
+                inputs.size(), inputs_desc_.size());
             return false;
         }
         for (size_t i = 0; i < inputs.size(); ++i) {
@@ -144,19 +178,18 @@ namespace modeldeploy {
             session_.Run({}, *binding_);
         }
         catch (const std::exception& e) {
-            std::cerr << "Failed to Infer: " << e.what() << std::endl;
+            MD_LOG_ERROR("Failed to Infer: {}", e.what());
             return false;
         }
-        std::vector<Ort::Value> ort_outputs = binding_->GetOutputValues();
+        const std::vector<Ort::Value> ort_outputs = binding_->GetOutputValues();
         outputs->resize(ort_outputs.size());
         for (size_t i = 0; i < ort_outputs.size(); ++i) {
-            ort_value_to_md_tensor(ort_outputs[i], &((*outputs)[i]), outputs_desc_[i].name,
-                               copy_to_fd);
+            ort_value_to_md_tensor(ort_outputs[i], &(*outputs)[i], outputs_desc_[i].name, copy_to_fd);
         }
         return true;
     }
 
-    TensorInfo OrtBackend::get_input_info(int index) {
+    TensorInfo OrtBackend::get_input_info(const int index) {
         return inputs_desc_[index];
     }
 

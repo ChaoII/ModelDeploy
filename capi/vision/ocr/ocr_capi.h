@@ -41,7 +41,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_ocr_result(const MDOCRResults* results);
 /// \param color 字体颜色
 /// \param alpha 不透明度
 /// \param save_result 是否保存结果
-MODELDEPLOY_CAPI_EXPORT void md_draw_ocr_result(MDImage* image, const MDOCRResults* results, const char* font_path,
+MODELDEPLOY_CAPI_EXPORT void md_draw_ocr_result(const MDImage* image, const MDOCRResults* results, const char* font_path,
                                                 int font_size, const MDColor* color, double alpha, int save_result);
 
 /// 释放文本识别结果

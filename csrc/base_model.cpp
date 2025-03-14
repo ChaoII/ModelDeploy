@@ -3,6 +3,8 @@
 //
 #include "base_model.h"
 
+#include "core/md_log.h"
+
 namespace modeldeploy {
     bool BaseModel::init_runtime() {
         if (runtime_initialized_) {
@@ -20,7 +22,7 @@ namespace modeldeploy {
 
     bool BaseModel::infer(std::vector<MDTensor>& input_tensors,
                           std::vector<MDTensor>* output_tensors) {
-        auto ret = runtime_->infer(input_tensors, output_tensors);
+        const auto ret = runtime_->infer(input_tensors, output_tensors);
         return ret;
     }
 
