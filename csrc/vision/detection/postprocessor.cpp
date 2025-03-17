@@ -83,7 +83,7 @@ namespace modeldeploy::vision::detection {
             if ((*results)[bs].boxes.size() == 0) {
                 continue;
             }
-            nms(&(*results)[bs], nms_threshold_);
+            utils::nms(&(*results)[bs], nms_threshold_);
             // scale the boxes to the origin image shape
             auto iter_out = ims_info[bs].find("output_shape");
             auto iter_ipt = ims_info[bs].find("input_shape");

@@ -29,17 +29,17 @@ namespace modeldeploy::vision::ocr {
          * \return true if the postprocess successed, otherwise false
          */
         bool run(const std::vector<MDTensor>& tensors,
-                 std::vector<std::string>* texts, std::vector<float>* rec_scores);
+                 std::vector<std::string>* texts, std::vector<float>* rec_scores) const;
 
         bool run(const std::vector<MDTensor>& tensors,
                  std::vector<std::string>* texts, std::vector<float>* rec_scores,
                  size_t start_index, size_t total_size,
-                 const std::vector<int>& indices);
+                 const std::vector<int>& indices) const;
 
     private:
         bool single_batch_postprocessor(const float* out_data,
                                       const std::vector<int64_t>& output_shape,
-                                      std::string* text, float* rec_score);
+                                      std::string* text, float* rec_score) const;
         bool initialized_ = false;
         std::vector<std::string> label_list_;
     };

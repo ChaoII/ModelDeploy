@@ -23,7 +23,7 @@ namespace modeldeploy {
     public:
         OrtBackend() = default;
 
-        virtual ~OrtBackend() = default;
+        ~OrtBackend() = default;
 
         void build_option(const RuntimeOption& option);
 

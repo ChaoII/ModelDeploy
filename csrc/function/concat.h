@@ -3,7 +3,7 @@
 //
 #pragma once
 
-#include "../core/md_tensor.h"
+#include "csrc/core/md_tensor.h"
 
 namespace modeldeploy::function  {
 

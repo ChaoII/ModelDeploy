@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "../common/processors/resize.h"
-#include "../common/processors/pad.h"
-#include "../common/processors/normalize_and_permute.h"
+#include "csrc/vision/common/processors/pad.h"
+#include "csrc/vision/common/processors/resize.h"
+#include "csrc/vision/common/processors/normalize_and_permute.h"
 
 
 namespace modeldeploy::vision::ocr {
@@ -50,8 +50,8 @@ namespace modeldeploy::vision::ocr {
 
     private:
         bool resize_image(cv::Mat* img, int resize_w, int resize_h,
-                          int max_resize_w, int max_resize_h);
-        std::array<int, 4> ocr_detector_get_info(cv::Mat* img, int max_size_len);
+                          int max_resize_w, int max_resize_h) const;
+        std::array<int, 4> ocr_detector_get_info(const cv::Mat* img, int max_size_len) const;
         // for recording the switch of hwc2chw
         bool disable_permute_ = false;
         // for recording the switch of normalize

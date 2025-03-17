@@ -54,17 +54,17 @@ namespace modeldeploy {
             device = Device::CPU;
         }
 
-        void use_gpu(int index) {
+        void use_gpu(const int index) {
             device = Device::GPU;
             device_id = index;
         }
 
-        void set_cpu_thread_num(int num) {
+        void set_cpu_thread_num(const int num) {
             intra_op_num_threads = num;
             inter_op_num_threads = num;
         }
 
-        void set_graph_optimization_level(int level) {
+        void set_graph_optimization_level(const int level) {
             graph_optimization_level = level;
         }
     };

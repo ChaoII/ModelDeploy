@@ -10,9 +10,6 @@
 #include "csrc/core/md_log.h"
 
 
-namespace fs = std::filesystem;
-using namespace tabulate;
-
 namespace modeldeploy {
     void OrtBackend::build_option(const RuntimeOption& option) {
         option_ = option;
@@ -42,7 +39,7 @@ namespace modeldeploy {
             bool support_cuda = false;
             std::string providers_msg;
             for (const auto& all_provider : all_providers) {
-                providers_msg += (all_provider + ", ");
+                providers_msg += all_provider + ", ";
                 if (all_provider == "CUDAExecutionProvider") {
                     support_cuda = true;
                 }
@@ -73,7 +70,7 @@ namespace modeldeploy {
         if (option.model_from_memory) {
             return init_from_onnx(option.model_buffer, option);
         }
-        if (!fs::exists(option.model_filepath)) {
+        if (!std::filesystem::exists(option.model_filepath)) {
             MD_LOG_ERROR("Model file does not exist: {}", option.model_filepath);
             return false;
         }
@@ -104,18 +101,19 @@ namespace modeldeploy {
 
 
             // 模型输入输出信息
-            Table input_table;
-            input_table.format().font_style({FontStyle::underline}).font_color(Color::yellow);
+            tabulate::Table input_table;
+            input_table.format().font_color(tabulate::Color::yellow)
+                       .border_color(tabulate::Color::blue)
+                       .corner_color(tabulate::Color::blue);
 
             // input_table.add_row(Row_t{model_info_table});
             input_table.add_row({"Type", "Index", "Name", "Data Type", "Shape"});
-
+            input_table[0].format().font_style({tabulate::FontStyle::bold});
             for (size_t i = 0; i < n_inputs; ++i) {
                 auto input_name_ptr = session_.GetInputNameAllocated(i, allocator);
                 auto type_info = session_.GetInputTypeInfo(i);
                 std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
                 const auto data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
-
                 input_table.add_row({
                     "Input",
                     std::to_string(i),
@@ -144,7 +142,7 @@ namespace modeldeploy {
             }
             // ====================== 组合最终输出 ======================
             std::cout << termcolor::green << "[model file:"
-                << fs::absolute(option.model_filepath).filename().string()
+                << std::filesystem::absolute(option.model_filepath).filename().string()
                 << " model size: " << std::fixed << std::setprecision(3)
                 << static_cast<float>(model_buffer.size()) / 1024 / 1024.0f << "MB]"
                 << termcolor::reset << std::endl;
@@ -158,7 +156,7 @@ namespace modeldeploy {
         }
     }
 
-    bool OrtBackend::infer(std::vector<MDTensor>& inputs, std::vector<MDTensor>* outputs, bool copy_to_fd) {
+    bool OrtBackend::infer(std::vector<MDTensor>& inputs, std::vector<MDTensor>* outputs, const bool copy_to_fd) {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR(
                 "[OrtBackend] Size of the inputs({}) should keep same with the inputs of this model({})",
@@ -197,7 +195,7 @@ namespace modeldeploy {
         return inputs_desc_;
     }
 
-    TensorInfo OrtBackend::get_output_info(int index) {
+    TensorInfo OrtBackend::get_output_info(const int index) {
         return outputs_desc_[index];
     }
 

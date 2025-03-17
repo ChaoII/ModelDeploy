@@ -15,18 +15,21 @@
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT RecognizerPreprocessor final {
     public:
-        virtual ~RecognizerPreprocessor() = default;
+        ~RecognizerPreprocessor() = default;
         RecognizerPreprocessor();
 
         /** \brief Process the input image and prepare input tensors for runtime
          *
          * \param[in] images The input data list, all the elements are FDMat
          * \param[in] outputs The output tensors which will be fed into runtime
+         * \param start_index
+         * \param end_index
+         * \param indices
          * \return true if the preprocess successes, otherwise false
          */
-        bool Run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(const std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
                  size_t start_index, size_t end_index,
-                 const std::vector<int>& indices);
+                 const std::vector<int>& indices) const;
 
         /** \brief Implement the virtual function of ProcessorManager, Apply() is the
          *  body of Run(). Apply() contains the main logic of preprocessing, Run() is
@@ -36,7 +39,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        bool Apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
+        bool apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs) const;
 
         /// Set static_shape_infer is true or not. When deploy PP-OCR
         /// on hardware which can not support dynamic input shape very well,
@@ -46,7 +49,7 @@ namespace modeldeploy::vision::ocr {
         }
 
         /// Get static_shape_infer of the recognition preprocess
-        bool get_static_shape_infer() const { return static_shape_infer_; }
+        [[nodiscard]] bool get_static_shape_infer() const { return static_shape_infer_; }
 
         /// Set preprocess normalize parameters, please call this API to customize
         /// the normalize parameters, otherwise it will use the default normalize
@@ -75,7 +78,7 @@ namespace modeldeploy::vision::ocr {
     private:
         void ocr_recognizer_resize_image(cv::Mat* mat, float max_wh_ratio,
                                          const std::vector<int>& rec_image_shape,
-                                         bool static_shape_infer);
+                                         bool static_shape_infer) const;
         // for recording the switch of hwc2chw
         bool disable_permute_ = false;
         // for recording the switch of normalize

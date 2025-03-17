@@ -2,9 +2,10 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "./det_postprocessor.h"
-#include "./utils/ocr_utils.h"
 #include <opencv2/opencv.hpp>
+#include "csrc/vision/ocr/det_postprocessor.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
+
 
 namespace modeldeploy::vision::ocr {
     bool DBDetectorPostprocessor::single_batch_postprocessor(

@@ -4,14 +4,12 @@
 
 #pragma once
 
+#include <numeric>
 #include <iomanip>
 #include <iostream>
 #include <vector>
-#include "opencv2/core.hpp"
+#include <opencv2/opencv.hpp>
 
-#include <numeric>
-
-#include "./clipper.h"
 
 namespace modeldeploy::vision::ocr {
     class PostProcessor {
@@ -21,9 +19,7 @@ namespace modeldeploy::vision::ocr {
 
         cv::RotatedRect un_clip(std::vector<std::vector<float>> box,
                                 const float& unclip_ratio);
-
         float** mat2_vec(cv::Mat mat);
-
         std::vector<std::vector<int>> order_points_clockwise(
             std::vector<std::vector<int>> pts);
 

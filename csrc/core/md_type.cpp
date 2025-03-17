@@ -4,41 +4,41 @@
 #include <cstdint>
 #include "csrc/core/md_type.h"
 
+#include "md_log.h"
+
 namespace modeldeploy {
-    int md_dtype_size(const MDDataType& data_type) {
-        if (data_type == MDDataType::BOOL) {
+    int32_t MDDataType::size(const Type& data_type) {
+        if (data_type == Type::BOOL) {
             return sizeof(bool);
         }
-        else if (data_type == MDDataType::INT16) {
+        if (data_type == MDDataType::INT16) {
             return sizeof(int16_t);
         }
-        else if (data_type == MDDataType::INT32) {
+        if (data_type == MDDataType::INT32) {
             return sizeof(int32_t);
         }
-        else if (data_type == MDDataType::INT64) {
+        if (data_type == MDDataType::INT64) {
             return sizeof(int64_t);
         }
-        else if (data_type == MDDataType::FP32) {
+        if (data_type == MDDataType::FP32) {
             return sizeof(float);
         }
-        else if (data_type == MDDataType::FP64) {
+        if (data_type == MDDataType::FP64) {
             return sizeof(double);
         }
-        else if (data_type == MDDataType::UINT8) {
+        if (data_type == MDDataType::UINT8) {
             return sizeof(uint8_t);
         }
-        else if (data_type == MDDataType::INT8) {
+        if (data_type == MDDataType::INT8) {
             return sizeof(int8_t);
         }
-        else {
-            std::cerr << "Unexpected data type: %s", str(data_type);
-        }
+        MD_LOG_ERROR("Unexpected data type: {}", str(data_type));
         return -1;
     }
 
-    std::string str(const MDDataType& fdt) {
+    std::string MDDataType::str(const Type& data_type) {
         std::string out;
-        switch (fdt) {
+        switch (data_type) {
         case MDDataType::BOOL:
             out = "MDDataType::BOOL";
             break;
@@ -69,7 +69,7 @@ namespace modeldeploy {
         return out;
     }
 
-    std::ostream& operator<<(std::ostream& out, const MDDataType& md_dtype) {
+    std::ostream& operator<<(std::ostream& out, const MDDataType::Type& md_dtype) {
         switch (md_dtype) {
         case MDDataType::BOOL:
             out << "MDDataType::BOOL";
@@ -102,29 +102,29 @@ namespace modeldeploy {
     }
 
     template <typename PlainType>
-    const MDDataType TypeToDataType<PlainType>::dtype = UNKNOWN1;
+    const MDDataType::Type TypeToDataType<PlainType>::dtype = MDDataType::Type::UNKNOWN1;
 
     template <>
-    const MDDataType TypeToDataType<bool>::dtype = BOOL;
+    const MDDataType::Type TypeToDataType<bool>::dtype = MDDataType::Type::BOOL;
 
     template <>
-    const MDDataType TypeToDataType<int16_t>::dtype = INT16;
+    const MDDataType::Type TypeToDataType<int16_t>::dtype = MDDataType::Type::INT16;
 
     template <>
-    const MDDataType TypeToDataType<int32_t>::dtype = INT32;
+    const MDDataType::Type TypeToDataType<int32_t>::dtype = MDDataType::Type::INT32;
 
     template <>
-    const MDDataType TypeToDataType<int64_t>::dtype = INT64;
+    const MDDataType::Type TypeToDataType<int64_t>::dtype = MDDataType::Type::INT64;
 
     template <>
-    const MDDataType TypeToDataType<float>::dtype = FP32;
+    const MDDataType::Type TypeToDataType<float>::dtype = MDDataType::Type::FP32;
 
     template <>
-    const MDDataType TypeToDataType<double>::dtype = FP64;
+    const MDDataType::Type TypeToDataType<double>::dtype = MDDataType::Type::FP64;
 
     template <>
-    const MDDataType TypeToDataType<uint8_t>::dtype = UINT8;
+    const MDDataType::Type TypeToDataType<uint8_t>::dtype = MDDataType::Type::UINT8;
 
     template <>
-    const MDDataType TypeToDataType<int8_t>::dtype = INT8;
+    const MDDataType::Type TypeToDataType<int8_t>::dtype = MDDataType::Type::INT8;
 }

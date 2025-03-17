@@ -3,11 +3,12 @@
 //
 
 #pragma once
-#include "../../base_model.h"
-#include "../common/result.h"
-#include "./utils/ocr_postprocess_op.h"
-#include "./det_postprocessor.h"
-#include "./det_preprocessor.h"
+#include "csrc/base_model.h"
+#include "csrc/vision/common/result.h"
+#include "csrc/vision/ocr/det_postprocessor.h"
+#include "csrc/vision/ocr/det_preprocessor.h"
+#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
+
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT DBDetector : public BaseModel {
@@ -22,7 +23,7 @@ namespace modeldeploy::vision::ocr {
 
 
         /// Get model's name
-        std::string name() const override { return "ppocr/ocr_det"; }
+        [[nodiscard]] std::string name() const override { return "ppocr/ocr_det"; }
 
         /** \brief Predict the input image and get OCR detection model result.
         *

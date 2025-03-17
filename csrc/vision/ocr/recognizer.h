@@ -6,7 +6,6 @@
 #pragma once
 #include "csrc/base_model.h"
 #include "csrc/vision/common/result.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 #include "csrc/vision/ocr/rec_preprocessor.h"
 #include "csrc/vision/ocr/rec_postprocessor.h"
 

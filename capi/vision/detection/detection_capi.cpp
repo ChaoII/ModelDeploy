@@ -11,8 +11,6 @@
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/detection/detection_capi.h"
 
-using namespace tabulate;
-
 
 MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
                                        const int thread_num) {
@@ -73,8 +71,12 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
 
 
 void md_print_detection_result(const MDDetectionResults* result) {
-    Table detection_results_table;
-    detection_results_table.add_row({"box", "label_id", "score"});
+    tabulate::Table detection_results_table;
+    detection_results_table.format()
+                           .border_color(tabulate::Color::magenta)
+                           .font_color(tabulate::Color::green)
+                           .corner_color(tabulate::Color::magenta);
+    detection_results_table.add_row({"box([x,y,w,h])", "label_id", "score"});
     for (int i = 0; i < result->size; ++i) {
         detection_results_table.add_row({
             format_rect(result->data[i].box),
@@ -82,11 +84,12 @@ void md_print_detection_result(const MDDetectionResults* result) {
             std::to_string(result->data[i].score)
         });
     }
+    detection_results_table.column(1).format().font_align(tabulate::FontAlign::center);
     std::cout << detection_results_table << std::endl;
 }
 
 
-void md_draw_detection_result(MDImage* image, const MDDetectionResults* result,
+void md_draw_detection_result(const MDImage* image, const MDDetectionResults* result,
                               const char* font_path, const int font_size,
                               const double alpha, const int save_result) {
     cv::Mat overlay;

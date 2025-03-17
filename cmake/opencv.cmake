@@ -9,17 +9,6 @@ set(opencv_5_x_win_x64_static_md_FILE_NAME "opencv_5_x_win_x64_static_md.zip")
 set(opencv_5_x_linux_x64_static_FILE_NAME "opencv_5_x_linux_x64_static.zip")
 set(opencv_5_x_linux_aarch64_static_FILE_NAME "opencv_5_x_linux_aarch64_static.zip")
 set(OPENCV_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
-
-
-set(opencv_5_x_win_x64_static_mt_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_win_x64_static_mt.zip")
-set(opencv_5_x_win_x64_static_md_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_win_x64_static_md.zip")
-set(opencv_5_x_linux_x64_static_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_linux_x64_static.zip")
-set(opencv_5_x_linux_aarch64_static_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/opencv_5_x_linux_aarch64_static.zip")
-set(opencv_5_x_win_x64_static_mt_HASH "SHA256=86e5bdbce3d2955ef92f295feef1f40171dfdfeac37eaf1b5b141ed8aae3d112")
-set(opencv_5_x_win_x64_static_md_HASH "SHA256=587dc46cdb8154cd29e342ff9ad83e5fcaee247aa312f918c5bf1b1372540c38")
-set(opencv_5_x_linux_x64_static_HASH "SHA256=4a1ec2ec05b8e8a4d4503e2410543a48dc48beea4a4d3c4832375f6ab7edefb2")
-set(opencv_5_x_linux_aarch64_static_HASH "SHA256=5e1cae594bc10fb3ba228478dfaaf975cb7476c2457174dabdc364a44d664fa9")
-
 include(FetchContent)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")

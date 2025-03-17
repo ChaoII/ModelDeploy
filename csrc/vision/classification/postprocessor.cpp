@@ -31,7 +31,7 @@ bool YOLOv5ClsPostprocessor::Run(
         reinterpret_cast<const float*>(infer_result_softmax.data()) + bs * infer_result_softmax.shape[1];
     topk_ = std::min(num_classes, topk_);
     (*results)[bs].label_ids =
-        top_k_indices(infer_result_buffer, num_classes, topk_);
+        utils::top_k_indices(infer_result_buffer, num_classes, topk_);
     (*results)[bs].scores.resize(topk_);
     for (int i = 0; i < topk_; ++i) {
       (*results)[bs].scores[i] = *(infer_result_buffer + (*results)[bs].label_ids[i]);

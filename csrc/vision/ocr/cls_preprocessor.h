@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include "../common/processors/normalize.h"
-#include "../common/processors/resize.h"
-#include "../common/processors/pad.h"
-#include "../common/processors/hwc2chw.h"
+#include "csrc/vision/common/processors/pad.h"
+#include "csrc/vision/common/processors/resize.h"
+#include "csrc/vision/common/processors/normalize.h"
+#include "csrc/vision/common/processors/hwc2chw.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT ClassifierPreprocessor {
@@ -23,7 +23,7 @@ namespace modeldeploy::vision::ocr {
          * \param end_index
          * \return true if the preprocess successed, otherwise false
          */
-        bool Run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(const std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
                  size_t start_index, size_t end_index);
 
         /** \brief Implement the virtual function of ProcessorManager, Apply() is the
@@ -34,14 +34,14 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        virtual bool Apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
+        virtual bool apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
 
         /// Set preprocess normalize parameters, please call this API to customize
         /// the normalize parameters, otherwise it will use the default normalize
         /// parameters.
         void set_normalize(const std::vector<float>& mean,
-                          const std::vector<float>& std,
-                          bool is_scale) {
+                           const std::vector<float>& std,
+                           bool is_scale) {
             normalize_op_ = std::make_shared<Normalize>(mean, std, is_scale);
         }
 
@@ -51,11 +51,11 @@ namespace modeldeploy::vision::ocr {
         }
 
         /// Get cls_image_shape for the classification preprocess
-        std::vector<int> get_cls_image_shape() const { return cls_image_shape_; }
+        [[nodiscard]] std::vector<int> get_cls_image_shape() const { return cls_image_shape_; }
 
     private:
         void ocr_classifier_resize_image(cv::Mat* mat,
-                                      const std::vector<int>& cls_image_shape);
+                                         const std::vector<int>& cls_image_shape) const;
 
         std::vector<int> cls_image_shape_ = {3, 48, 192};
         std::shared_ptr<Resize> resize_op_;

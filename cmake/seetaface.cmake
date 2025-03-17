@@ -6,8 +6,8 @@ message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 set(seetaface_win_x64_FILE_NAME "seetaface_win_x64.zip")
 set(seetaface_linux_x64_FILE_NAME "seetaface_linux_x64.zip")
 set(seetaface_linux_aarch64_FILE_NAME "seetaface_linux_aarch64.zip")
-
 set(SEETA_FACE_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
+
 set(SEETA_FACE_SHARED_LIBS "")
 include(FetchContent)
 

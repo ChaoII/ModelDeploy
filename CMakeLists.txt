@@ -7,7 +7,7 @@ set(SOURCE "")
 set(DEPENDS "")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(BUILD_AUDIO "build asr tts vad sr" OFF)
+option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_FACE "build face" ON)
 option(BUILD_CAPI "build with capi" ON)

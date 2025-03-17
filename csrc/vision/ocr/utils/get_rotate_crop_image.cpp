@@ -2,8 +2,9 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "ocr_utils.h"
 #include <opencv2/opencv.hpp>
+#include "csrc/vision/ocr/utils/ocr_utils.h"
+
 
 namespace modeldeploy::vision::ocr {
     cv::Mat get_rotate_crop_image(const cv::Mat& srcimage,

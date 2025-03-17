@@ -241,7 +241,7 @@ class Program
         List<OCRResult> results = ocrRecognition.BatchPredict(image, polygons, 2);
         Draw.DrawPolygon(image, polygons[0], new Color { R = 255, G = 255, B = 0 }, 0.5);
         Draw.DrawPolygon(image, polygons[1], new Color { R = 255, G = 0, B = 0 }, 0.5);
-        // image.Show();
+        image.Show();
 
         foreach (var result in results)
         {

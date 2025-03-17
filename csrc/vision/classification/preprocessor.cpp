@@ -49,7 +49,7 @@ bool YOLOv5ClsPreprocessor::Preprocess(
   (*im_info)["output_shape"] = {static_cast<float>(mat->rows),
                                 static_cast<float>(mat->cols)};
 
-  mat_to_tensor(*mat, output);
+  utils::mat_to_tensor(*mat, output);
   output->expand_dim(0); // reshape to n, c, h, w
   return true;
 }

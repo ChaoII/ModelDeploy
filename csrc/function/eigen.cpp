@@ -1,7 +1,7 @@
 //
 // Created by aichao on 2025/2/20.
 //
-#include "eigen.h"
+#include "csrc/function/eigen.h"
 
 namespace modeldeploy::function {
     std::shared_ptr<EigenDeviceWrapper> EigenDeviceWrapper::instance_ = nullptr;

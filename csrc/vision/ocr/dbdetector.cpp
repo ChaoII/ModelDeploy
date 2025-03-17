@@ -2,13 +2,12 @@
 // Created by aichao on 2025/2/21.
 //
 
-
-#include "dbdetector.h"
-#include "./utils/ocr_utils.h"
+#include "csrc/core/md_log.h"
+#include "csrc/vision/ocr/dbdetector.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
-    DBDetector::DBDetector() {
-    }
+    DBDetector::DBDetector() = default;
 
     DBDetector::DBDetector(const std::string& model_file,
                            const RuntimeOption& custom_option) {
@@ -20,7 +19,7 @@ namespace modeldeploy::vision::ocr {
     // Init
     bool DBDetector::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
             return false;
         }
         return true;
@@ -38,7 +37,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool DBDetector::predict(const cv::Mat& img, OCRResult* ocr_result) {
-        if (!predict(img, &(ocr_result->boxes))) {
+        if (!predict(img, &ocr_result->boxes)) {
             return false;
         }
         return true;
@@ -62,19 +61,19 @@ namespace modeldeploy::vision::ocr {
         std::vector<std::vector<std::array<int, 8>>>* det_results) {
         std::vector<cv::Mat> imgs = images;
         if (!preprocessor_.apply(&imgs, &reused_input_tensors_)) {
-            std::cerr << "Failed to preprocess input image." << std::endl;
+            MD_LOG_ERROR("Failed to preprocess input image.");
             return false;
         }
         const auto batch_det_img_info = preprocessor_.get_batch_img_info();
         reused_input_tensors_[0].name = get_input_info(0).name;
 
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            std::cerr << "Failed to inference by runtime." << std::endl;
+            MD_LOG_ERROR("Failed to inference by runtime.");
             return false;
         }
         if (!postprocessor_.apply(reused_output_tensors_,
                                   det_results, *batch_det_img_info)) {
-            std::cerr << "Failed to postprocess the inference cls_results by runtime." << std::endl;
+            MD_LOG_ERROR("Failed to postprocess the inference cls_results by runtime.");
             return false;
         }
         return true;

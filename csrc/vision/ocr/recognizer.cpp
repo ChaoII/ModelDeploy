@@ -2,11 +2,8 @@
 // Created by aichao on 2025/2/21.
 //
 
-
+#include "csrc/core/md_log.h"
 #include "csrc/vision/ocr/recognizer.h"
-
-#include <csrc/core/md_log.h>
-
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
@@ -33,8 +30,7 @@ namespace modeldeploy::vision::ocr {
                              float* rec_score) {
         std::vector<std::string> texts(1);
         std::vector<float> rec_scores(1);
-        const bool success = batch_predict({img}, &texts, &rec_scores);
-        if (!success) {
+        if (const bool success = batch_predict({img}, &texts, &rec_scores); !success) {
             return success;
         }
         *text = std::move(texts[0]);
@@ -65,15 +61,15 @@ namespace modeldeploy::vision::ocr {
     bool Recognizer::batch_predict(const std::vector<cv::Mat>& images,
                                    std::vector<std::string>* texts,
                                    std::vector<float>* rec_scores,
-                                   size_t start_index, size_t end_index,
+                                   const size_t start_index, const size_t end_index,
                                    const std::vector<int>& indices) {
         const size_t total_size = images.size();
         if (!indices.empty() && indices.size() != total_size) {
-            MD_LOG_ERROR("indices.size() should be 0 or images.size().");
+            MD_LOG_ERROR("indices.size() should be 0 or {}.", images.size());
             return false;
         }
-        std::vector<cv::Mat> imgs = images;
-        if (!preprocessor_.Run(&imgs, &reused_input_tensors_, start_index,
+        const std::vector<cv::Mat>& images_ = images;
+        if (!preprocessor_.run(&images_, &reused_input_tensors_, start_index,
                                end_index, indices)) {
             MD_LOG_ERROR("Failed to preprocess the input image.");
             return false;
@@ -85,7 +81,7 @@ namespace modeldeploy::vision::ocr {
         }
         if (!postprocessor_.run(reused_output_tensors_, texts, rec_scores,
                                 start_index, total_size, indices)) {
-            MD_LOG_ERROR( "Failed to postprocess the inference cls_results by runtime.");
+            MD_LOG_ERROR("Failed to postprocess the inference cls_results by runtime.");
             return false;
         }
         return true;

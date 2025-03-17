@@ -2,7 +2,7 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "ocr_utils.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     std::vector<int> xyxyxyxy2xyxy(const std::array<int, 8>& box) {
@@ -12,7 +12,7 @@ namespace modeldeploy::vision::ocr {
         const int right = *std::max_element(x_collect, x_collect + 4);
         const int top = *std::min_element(y_collect, y_collect + 4);
         const int bottom = *std::max_element(y_collect, y_collect + 4);
-        std::vector<int> box1(4, 0);
+        std::vector box1(4, 0);
         box1[0] = left;
         box1[1] = top;
         box1[2] = right;
@@ -21,15 +21,15 @@ namespace modeldeploy::vision::ocr {
     }
 
     float dis(const std::vector<int>& box1, const std::vector<int>& box2) {
-        const float x1_1 = static_cast<float>(box1[0]);
-        const float y1_1 = static_cast<float>(box1[1]);
-        const float x2_1 = static_cast<float>(box1[2]);
-        const float y2_1 = static_cast<float>(box1[3]);
+        const auto x1_1 = static_cast<float>(box1[0]);
+        const auto y1_1 = static_cast<float>(box1[1]);
+        const auto x2_1 = static_cast<float>(box1[2]);
+        const auto y2_1 = static_cast<float>(box1[3]);
 
-        const float x1_2 = static_cast<float>(box2[0]);
-        const float y1_2 = static_cast<float>(box2[1]);
-        const float x2_2 = static_cast<float>(box2[2]);
-        const float y2_2 = static_cast<float>(box2[3]);
+        const auto x1_2 = static_cast<float>(box2[0]);
+        const auto y1_2 = static_cast<float>(box2[1]);
+        const auto x2_2 = static_cast<float>(box2[2]);
+        const auto y2_2 = static_cast<float>(box2[3]);
 
         const float dis = std::abs(x1_2 - x1_1) + std::abs(y1_2 - y1_1) +
             std::abs(x2_2 - x2_1) + std::abs(y2_2 - y2_1);
@@ -56,7 +56,8 @@ namespace modeldeploy::vision::ocr {
             return 0.0;
         }
         const int intersect = (x2 - x1) * (y2 - y1);
-        return intersect / (sum_area - intersect + 0.00000001);
+        return static_cast<float>(intersect) / (static_cast<float>(sum_area)
+            - static_cast<float>(intersect) + 0.00000001f);
     }
 
     bool comparison_dis(const std::vector<float>& dis1,

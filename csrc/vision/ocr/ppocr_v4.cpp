@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "csrc/vision/ocr/ppocr_v4.h"
 #include "csrc/core/md_log.h"
+#include "csrc/vision/ocr/ppocr_v4.h"
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
@@ -40,9 +40,9 @@ namespace modeldeploy::vision::ocr {
 
     PPOCRv4::~PPOCRv4() = default;
 
-    bool PPOCRv4::set_cls_batch_size(int cls_batch_size) {
+    bool PPOCRv4::set_cls_batch_size(const int cls_batch_size) {
         if (cls_batch_size < -1 || cls_batch_size == 0) {
-            std::cerr << "batch_size > 0 or batch_size == -1." << std::endl;
+            MD_LOG_ERROR("batch_size > 0 or batch_size == -1.");
             return false;
         }
         cls_batch_size_ = cls_batch_size;
@@ -53,7 +53,7 @@ namespace modeldeploy::vision::ocr {
 
     bool PPOCRv4::set_rec_batch_size(const int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
-            std::cerr << "batch_size > 0 or batch_size == -1." << std::endl;
+            MD_LOG_ERROR("batch_size > 0 or batch_size == -1.");
             return false;
         }
         rec_batch_size_ = rec_batch_size;
@@ -82,8 +82,7 @@ namespace modeldeploy::vision::ocr {
 
     bool PPOCRv4::predict(const cv::Mat& image, OCRResult* result) {
         std::vector<OCRResult> batch_result(1);
-        const bool success = batch_predict({image}, &batch_result);
-        if (!success) {
+        if (const bool success = batch_predict({image}, &batch_result); !success) {
             return success;
         }
         *result = std::move(batch_result[0]);
@@ -131,7 +130,7 @@ namespace modeldeploy::vision::ocr {
                     if (!classifier_->batch_predict(image_list, cls_labels_ptr,
                                                     cls_scores_ptr, start_index,
                                                     end_index)) {
-                        MD_LOG_ERROR("There's error while recognizing image in PPOCR.");
+                        MD_LOG_ERROR("There's error while recognizing image in OCR.");
                         return false;
                     }
                     for (size_t i_img = start_index; i_img < end_index; ++i_img) {
@@ -147,7 +146,7 @@ namespace modeldeploy::vision::ocr {
             std::vector<float> width_list;
             width_list.reserve(image_list.size());
             for (const auto& image : image_list) {
-                width_list.push_back(static_cast<float>(image.cols) / image.rows);
+                width_list.push_back(static_cast<float>(image.cols) / static_cast<float>(image.rows));
             }
             std::vector<int> indices = arg_sort(width_list);
             for (size_t start_index = 0; start_index < image_list.size();

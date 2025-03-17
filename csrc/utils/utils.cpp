@@ -8,9 +8,9 @@
 
 namespace modeldeploy {
     std::vector<int64_t> get_stride(const std::vector<int64_t>& dims) {
-        auto dims_size = dims.size();
+        const auto dims_size = dims.size();
         std::vector<int64_t> result(dims_size, 1);
-        for (int i = dims_size - 2; i >= 0; --i) {
+        for (int i = static_cast<int>(dims_size) - 2; i >= 0; --i) {
             result[i] = result[i + 1] * dims[i + 1];
         }
         return result;
@@ -22,11 +22,13 @@ namespace modeldeploy {
 #else
     using os_string = std::string;
 #endif
-    os_string to_osstring(std::string_view utf8_str) {
+    os_string to_os_string(std::string_view utf8_str) {
 #ifdef _WIN32
-        int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(), static_cast<int>(utf8_str.size()), nullptr, 0);
+        const int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(),
+                                            static_cast<int>(utf8_str.size()), nullptr, 0);
         os_string result(len, 0);
-        MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(), static_cast<int>(utf8_str.size()), result.data(), len);
+        MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(),
+                            static_cast<int>(utf8_str.size()), result.data(), len);
         return result;
 #else
         return std::string(utf8_str);
@@ -40,22 +42,21 @@ namespace modeldeploy {
         auto& result = *contents;
         result.clear();
 
-        std::ifstream file(to_osstring(path), std::ios::binary | std::ios::ate);
+        std::ifstream file(to_os_string(path), std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             return false;
         }
-        auto file_size = file.tellg();
-        if (file_size != -1) {
+        if (const auto file_size = file.tellg(); file_size != -1) {
             result.resize(file_size);
             file.seekg(0, std::ios::beg);
-            file.read(const_cast<char*>(result.data()), file_size);
+            file.read(result.data(), file_size);
         }
         else {
             // no size available, read to EOF
             constexpr auto chunk_size = 4096;
             std::string chunk(chunk_size, 0);
             while (!file.fail()) {
-                file.read(const_cast<char*>(chunk.data()), chunk_size);
+                file.read(chunk.data(), chunk_size);
                 result.insert(result.end(), chunk.data(), chunk.data() + file.gcount());
             }
         }
@@ -63,13 +64,13 @@ namespace modeldeploy {
     }
 #ifdef _WIN32
     std::wstring to_wstring(const std::string& str) {
-        unsigned len = str.size() * 2;
+        const unsigned len = str.size() * 2;
         setlocale(LC_CTYPE, "");
         auto* p = new wchar_t[len];
         mbstowcs(p, str.c_str(), len);
-        std::wstring wstr(p);
+        std::wstring w_str(p);
         delete[] p;
-        return wstr;
+        return w_str;
     }
 #endif
 }

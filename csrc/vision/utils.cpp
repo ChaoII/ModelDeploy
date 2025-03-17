@@ -1,55 +1,50 @@
 //
 // Created by aichao on 2025/2/20.
 //
-#include "utils.h"
 
-#include <csrc/core/md_log.h>
+#include "csrc/vision/utils.h"
+#include "csrc/core/md_log.h"
 
-namespace modeldeploy::vision {
-    MDDataType cv_dtype_to_md_dtype(int type) {
+namespace modeldeploy::vision::utils {
+    MDDataType::Type cv_dtype_to_md_dtype(int type) {
         type = type % 8;
         if (type == 0) {
-            return MDDataType::UINT8;
+            return MDDataType::Type::UINT8;
         }
-        else if (type == 1) {
-            return MDDataType::INT8;
+        if (type == 1) {
+            return MDDataType::Type::INT8;
         }
-        else if (type == 2) {
-            std::cerr << "While calling OpenCVDataTypeToMD(), get UINT16 type which is not "
-                "supported now." << std::endl;
-            return MDDataType::UNKNOWN1;
+        if (type == 2) {
+            MD_LOG_ERROR("While calling OpenCVDataTypeToMD(), get UINT16 type which is not supported now.");
+            return MDDataType::Type::UNKNOWN1;
         }
-        else if (type == 3) {
-            return MDDataType::INT16;
+        if (type == 3) {
+            return MDDataType::Type::INT16;
         }
-        else if (type == 4) {
-            return MDDataType::INT32;
+        if (type == 4) {
+            return MDDataType::Type::INT32;
         }
-        else if (type == 5) {
-            return MDDataType::FP32;
+        if (type == 5) {
+            return MDDataType::Type::FP32;
         }
-        else if (type == 6) {
-            return MDDataType::FP64;
+        if (type == 6) {
+            return MDDataType::Type::FP64;
         }
-        else {
-            MD_LOG_ERROR("While calling OpenCVDataTypeToMD(), get type = {}, which is not expected.", type);
-            return MDDataType::UNKNOWN1;
-        }
+        MD_LOG_ERROR("While calling OpenCVDataTypeToMD(), get type = {}, which is not expected.", type);
+        return MDDataType::Type::UNKNOWN1;
     }
 
 
-    bool mat_to_tensor(cv::Mat& mat, MDTensor* tensor, bool is_copy) {
+    bool mat_to_tensor(cv::Mat& mat, MDTensor* tensor, const bool is_copy) {
         if (is_copy) {
-            const int total_bytes = mat.rows * mat.cols * mat.channels() * md_dtype_size(
+            const int num_bytes = mat.rows * mat.cols * mat.channels() * MDDataType::size(
                 cv_dtype_to_md_dtype(mat.type()));
-            if (total_bytes != tensor->total_bytes()) {
-                std::cerr << "While copy Mat to Tensor, requires the memory size be same, "
-                    "but now size of Tensor = "
-                    << tensor->total_bytes() << ", size of Mat = " << total_bytes << "."
-                    << std::endl << std::endl;
+            if (num_bytes != tensor->total_bytes()) {
+                MD_LOG_ERROR("While copy Mat to Tensor, requires the memory size be same, "
+                             "but now size of Tensor = {}, size of Mat = {}.", tensor->total_bytes(), num_bytes);
                 return false;
             }
-            memcpy(tensor->mutable_data(), mat.data, total_bytes);
+            memcpy(tensor->mutable_data(), mat.data, num_bytes);
         }
         else {
             tensor->set_external_data({mat.channels(), mat.rows, mat.cols}, cv_dtype_to_md_dtype(mat.type()), mat.data);
@@ -67,7 +62,7 @@ namespace modeldeploy::vision {
         tensor->resize(shape, cv_dtype_to_md_dtype(mats[0].type()), "batch_tensor");
         for (size_t i = 0; i < mats.size(); ++i) {
             auto* p = static_cast<uint8_t*>(tensor->data());
-            const int total_bytes = mats[i].rows * mats[i].cols * mats[i].channels() * md_dtype_size(
+            const int total_bytes = mats[i].rows * mats[i].cols * mats[i].channels() * MDDataType::size(
                 cv_dtype_to_md_dtype(mats[i].type()));
             MDTensor::copy_buffer(p + i * total_bytes, mats[i].data, total_bytes);
         }
@@ -75,7 +70,7 @@ namespace modeldeploy::vision {
     }
 
 
-    void nms(DetectionResult* output, float iou_threshold,
+    void nms(DetectionResult* output, const float iou_threshold,
              std::vector<int>* index) {
         // get sorted score indices
         std::vector<int> sorted_indices;
@@ -88,15 +83,13 @@ namespace modeldeploy::vision {
                 sorted_indices.push_back(iter.second);
             }
         }
-        //  utils::SortDetectionResult(result);
-
+        sort_detection_result(output);
         std::vector<float> area_of_boxes(output->boxes.size());
-        std::vector<int> suppressed(output->boxes.size(), 0);
+        std::vector suppressed(output->boxes.size(), 0);
         for (size_t i = 0; i < output->boxes.size(); ++i) {
             area_of_boxes[i] = (output->boxes[i][2] - output->boxes[i][0]) *
                 (output->boxes[i][3] - output->boxes[i][1]);
         }
-
         for (size_t i = 0; i < output->boxes.size(); ++i) {
             if (suppressed[i] == 1) {
                 continue;
@@ -121,7 +114,7 @@ namespace modeldeploy::vision {
         }
         DetectionResult backup(*output);
         output->Clear();
-        output->Reserve(suppressed.size());
+        output->Reserve(static_cast<int>(suppressed.size()));
         for (size_t i = 0; i < suppressed.size(); ++i) {
             if (suppressed[i] == 1) {
                 continue;
@@ -137,10 +130,10 @@ namespace modeldeploy::vision {
 
 
     void print_mat_type(const cv::Mat& mat) {
-        int type = mat.type();
+        const int type = mat.type();
         std::string r;
-        uchar depth = type & CV_MAT_DEPTH_MASK;
-        uchar chans = 1 + (type >> CV_CN_SHIFT);
+        const uchar depth = type & CV_MAT_DEPTH_MASK;
+        const uchar chans = 1 + (type >> CV_CN_SHIFT);
         switch (depth) {
         case CV_8U: r = "8U";
             break;
@@ -160,7 +153,7 @@ namespace modeldeploy::vision {
             break;
         }
         r += "C";
-        r += (chans + '0');
+        r += chans + '0';
         std::cout << "Mat type: " << r << std::endl;
     }
 }

@@ -4,9 +4,7 @@
 #pragma once
 
 #include <cstdint>
-#include <limits>
-#include <string>
-#include "md_type.h"
+#include "csrc/core/md_type.h"
 
 namespace modeldeploy {
     class Scalar {
@@ -15,50 +13,42 @@ namespace modeldeploy {
         Scalar() : Scalar(0) {
         }
 
-        Scalar(double val) : dtype_(MDDataType::FP64) {
-            // NOLINT
+        explicit Scalar(const double val) : dtype_(MDDataType::Type::FP64) {
             data_.f64 = val;
         }
 
-        Scalar(float val) : dtype_(MDDataType::FP32) {
-            // NOLINT
+        explicit Scalar(const float val) : dtype_(MDDataType::Type::FP32) {
             data_.f32 = val;
         }
 
 
-        Scalar(int64_t val) : dtype_(MDDataType::INT64) {
-            // NOLINT
+        explicit Scalar(const int64_t val) : dtype_(MDDataType::Type::INT64) {
             data_.i64 = val;
         }
 
-        Scalar(int32_t val) : dtype_(MDDataType::INT32) {
-            // NOLINT
+        explicit Scalar(const int32_t val) : dtype_(MDDataType::Type::INT32) {
             data_.i32 = val;
         }
 
-        Scalar(int16_t val) : dtype_(MDDataType::INT16) {
-            // NOLINT
+        explicit Scalar(const int16_t val) : dtype_(MDDataType::Type::INT16) {
             data_.i16 = val;
         }
 
-        Scalar(int8_t val) : dtype_(MDDataType::INT8) {
-            // NOLINT
+        explicit Scalar(const int8_t val) : dtype_(MDDataType::Type::INT8) {
             data_.i8 = val;
         }
 
-        Scalar(uint8_t val) : dtype_(MDDataType::UINT8) {
-            // NOLINT
+        explicit Scalar(const uint8_t val) : dtype_(MDDataType::Type::UINT8) {
             data_.ui8 = val;
         }
 
-        Scalar(bool val) : dtype_(MDDataType::BOOL) {
-            // NOLINT
+        explicit Scalar(const bool val) : dtype_(MDDataType::Type::BOOL) {
             data_.b = val;
         }
 
 
         template <typename RT>
-        inline RT to() const {
+        RT to() const {
             switch (dtype_) {
             case MDDataType::FP32:
                 return static_cast<RT>(data_.f32);
@@ -81,10 +71,10 @@ namespace modeldeploy {
             }
         }
 
-        MDDataType dtype() const { return dtype_; }
+        [[nodiscard]] MDDataType::Type dtype() const { return dtype_; }
 
     private:
-        MDDataType dtype_;
+        MDDataType::Type dtype_;
 
         union data {
             bool b;
@@ -95,6 +85,6 @@ namespace modeldeploy {
             uint8_t ui8;
             float f32;
             double f64;
-        } data_;
+        } data_{};
     };
 }

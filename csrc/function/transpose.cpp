@@ -1,21 +1,25 @@
 //
 // Created by aichao on 2025/2/20.
 //
-#include "transpose.h"
-#include "eigen.h"
-#include "../utils/utils.h"
+
+
+#include "csrc/utils/utils.h"
+#include "csrc/function/eigen.h"
+#include "csrc/function/transpose.h"
+
+#include <csrc/core/md_log.h>
 
 namespace modeldeploy::function {
     template <typename T>
     struct TransposeNormalKernel {
         void operator()(const MDTensor& in, MDTensor* out,
-                        const std::vector<int64_t>& axis) {
-            const int rank = axis.size();
-            auto in_stride = get_stride(in.shape);
-            auto out_stride = get_stride(out->shape);
-            auto transpose_helper = [&](int64_t beg, int64_t end) {
-                const T* in_ptr = reinterpret_cast<const T*>(in.data());
-                T* out_ptr = reinterpret_cast<T*>(out->data());
+                        const std::vector<int64_t>& axis) const {
+            const int rank = static_cast<int>(axis.size());
+            const auto in_stride = get_stride(in.shape);
+            const auto out_stride = get_stride(out->shape);
+            auto transpose_helper = [&](const int64_t beg, const int64_t end) {
+                const T* in_ptr = static_cast<const T*>(in.data());
+                T* out_ptr = static_cast<T*>(out->data());
                 for (int64_t out_idx = beg; out_idx < end; ++out_idx) {
                     int64_t in_idx = 0;
                     int64_t tmp_idx = out_idx;
@@ -49,10 +53,8 @@ namespace modeldeploy::function {
     };
 
     template <typename T>
-    void TransposeKernel(const MDTensor& x, MDTensor* out,
-                         const std::vector<int64_t>& axis) {
-        int rank = axis.size();
-        switch (rank) {
+    void TransposeKernel(const MDTensor& x, MDTensor* out, const std::vector<int64_t>& axis) {
+        switch (axis.size()) {
         case 1:
             TransposeKernelImpl<T, 1> trans1;
             trans1(x, out, axis);
@@ -76,23 +78,21 @@ namespace modeldeploy::function {
         }
     }
 
-    void Transpose(const MDTensor& x, MDTensor* out,
-                   const std::vector<int64_t>& dims) {
-        size_t dims_size = dims.size();
+    void Transpose(const MDTensor& x, MDTensor* out, const std::vector<int64_t>& dims) {
+        const size_t dims_size = dims.size();
         if (dims_size != x.shape.size()) {
-            std::cerr << "The input tensor's dimension should be equal to the dims's size. "
-                "Expect dims size is " << x.shape.size() << ", but receive " << dims_size << "." << std::endl;
+            MD_LOG_ERROR("The input tensor's dimension should be equal to the dims's size. "
+                         "Expect dims size is {}, but receive {}.", x.shape.size(), dims_size);
         }
-        std::vector<int> count(dims_size, 0);
+        std::vector count(dims_size, 0);
         for (size_t i = 0; i < dims_size; i++) {
             if (dims[i] < 0) {
-                std::cerr << "The dims should be greater than or equal to 0, but receive " << dims[i] << "." <<
-                    std::endl;
+                MD_LOG_ERROR("The dims should be greater than or equal to 0, but receive {}.", dims[i]);
             }
             if (dims[i] >= static_cast<int>(dims_size) && ++count[dims[i]] == 1) {
-                std::cerr << "Each element of Attribute axis should be a unique value range "
+                MD_LOG_ERROR("Each element of Attribute axis should be a unique value range "
                     "from 0 to (dims - 1), where the dims is the axis's size, unique "
-                    "value means this axis value can appear only once. ";
+                    "value means this axis value can appear only once.");
             }
         }
         std::vector<int64_t> out_dims(dims_size);
@@ -100,7 +100,7 @@ namespace modeldeploy::function {
             out_dims[i] = x.shape[dims[i]];
         }
 
-        // Note(zhoushunjie): The FDTensor out may equal to FDTensor x, so firstly we
+        // notice: The MDTensor out may equal to MDTensor x, so firstly we
         // use out_temp to get the transposed result, then we move the out_temp to
         // out.
         MDTensor out_temp;

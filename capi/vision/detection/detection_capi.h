@@ -45,7 +45,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_detection_result(const MDDetectionResults*
 /// \param font_size 字体大小
 /// \param alpha 不透明度
 /// \param save_result 保存结果, 如果>0将保存绘制后的图片vis_result.jpg
-MODELDEPLOY_CAPI_EXPORT void md_draw_detection_result(MDImage* image,
+MODELDEPLOY_CAPI_EXPORT void md_draw_detection_result(const MDImage* image,
                                                       const MDDetectionResults* result,
                                                       const char* font_path,
                                                       int font_size,

@@ -7,14 +7,18 @@
 #include "../core/md_tensor.h"
 #include "./common/result.h"
 
-namespace modeldeploy::vision {
+namespace modeldeploy::vision::utils {
     bool mat_to_tensor(cv::Mat& mat, MDTensor* tensor, bool is_copy = false);
-    MDDataType cv_dtype_to_md_dtype(int type);
+
+    MDDataType::Type cv_dtype_to_md_dtype(int type);
+
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, MDTensor* tensor);
 
     void nms(DetectionResult* output, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
     void print_mat_type(const cv::Mat& mat);
+
+    void sort_detection_result(DetectionResult* result);
 
     template <typename T>
     std::vector<int32_t> top_k_indices(const T* array, int array_size, int topk) {

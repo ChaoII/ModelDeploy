@@ -11,10 +11,10 @@
 #include "csrc/core/md_tensor.h"
 
 namespace modeldeploy {
-    ONNXTensorElementDataType get_ort_dtype(const MDDataType& fd_dtype);
+    ONNXTensorElementDataType get_ort_dtype(const MDDataType& md_dtype);
 
     // Convert OrtDataType to FDDataType
-    MDDataType get_md_dtype(const ONNXTensorElementDataType& ort_dtype);
+    MDDataType::Type get_md_dtype(const ONNXTensorElementDataType& ort_dtype);
 
     // Create Ort::Value
     // is_backend_cuda specify if the onnxruntime use CUDAExectionProvider

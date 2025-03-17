@@ -2,10 +2,10 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "ocr_postprocess_op.h"
 #include <map>
-#include <opencv2/opencv.hpp>
-#include "clipper.h"
+#include "csrc/vision/ocr/utils/clipper.h"
+#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
+
 
 namespace modeldeploy::vision::ocr {
     void PostProcessor::get_contour_area(const std::vector<std::vector<float>>& box,
@@ -270,6 +270,7 @@ namespace modeldeploy::vision::ocr {
         }
         return boxes;
     }
+
     std::vector<std::vector<std::vector<int>>> PostProcessor::filter_tag_det_res(
         std::vector<std::vector<std::vector<int>>> boxes,
         const std::array<int, 4>& det_img_info) {

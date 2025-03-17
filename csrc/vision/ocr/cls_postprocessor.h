@@ -4,7 +4,6 @@
 
 #pragma once
 #include "csrc/core/md_decl.h"
-#include "./utils/ocr_postprocess_op.h"
 #include "csrc/core/md_tensor.h"
 
 namespace modeldeploy::vision::ocr {
@@ -28,7 +27,7 @@ namespace modeldeploy::vision::ocr {
         void set_cls_thresh(float cls_thresh) { cls_thresh_ = cls_thresh; }
 
         /// Get threshold value of the classification postprocess.
-        float get_cls_thresh() const { return cls_thresh_; }
+        [[nodiscard]] float get_cls_thresh() const { return cls_thresh_; }
 
     private:
         float cls_thresh_ = 0.9;

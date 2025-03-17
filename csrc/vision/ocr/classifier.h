@@ -5,9 +5,9 @@
 #pragma once
 #include "csrc/base_model.h"
 #include "csrc/vision/common/result.h"
-#include "utils/ocr_postprocess_op.h"
-#include "cls_postprocessor.h"
-#include "cls_preprocessor.h"
+#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
+#include "csrc/vision/ocr/cls_postprocessor.h"
+#include "csrc/vision/ocr/cls_preprocessor.h"
 
 
 namespace modeldeploy::vision::ocr {
