@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <filesystem>
 #include <vector>
 #include "csrc/core/md_log.h"
 
@@ -64,7 +65,6 @@ namespace modeldeploy {
         }
         return res;
     }
-
 
     std::vector<unsigned char> base64_decode(const std::string& base64_str);
 

@@ -11,11 +11,11 @@ option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_FACE "build face" ON)
 option(BUILD_CAPI "build with capi" ON)
+option(BUILD_EXAMPLES "build examples" ON)
+option(BUILD_TESTS "build tests" ON)
 option(ENABLE_SAVE_LOG "save log to log file" OFF)
-option(WITH_STATIC_CRT "" ON)
+option(WITH_STATIC_CRT "build for mt" ON)
 
-
-# 消除 FetchContent_Populate 的弃用警告
 
 if (MSVC)
     if (WITH_STATIC_CRT)
@@ -87,5 +87,12 @@ else ()
     list(APPEND DEPENDS onnxruntime)
 endif ()
 target_link_libraries(${LIBRARY_NAME} ${DEPENDS})
-add_subdirectory(examples)
 
+if (BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif ()
+
+if (BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif ()

@@ -64,52 +64,47 @@ namespace modeldeploy {
     }
 #ifdef _WIN32
     std::wstring to_wstring(const std::string& str) {
-        const unsigned len = str.size() * 2;
-        setlocale(LC_CTYPE, "");
-        auto* p = new wchar_t[len];
-        mbstowcs(p, str.c_str(), len);
-        std::wstring w_str(p);
-        delete[] p;
+        const unsigned len = str.size() + 1; // +1 for the null terminator
+        std::wstring w_str(len, 0);
+        size_t converted_chars = 0;
+        if (const errno_t err = mbstowcs_s(&converted_chars, w_str.data(), len, str.c_str(), _TRUNCATE); err != 0) {
+            // Handle error
+            return L"";
+        }
+        w_str.resize(converted_chars - 1); // Remove the null terminator
         return w_str;
     }
 #endif
 
+
     std::vector<unsigned char> base64_decode(const std::string& base64_str) {
-        const std::string base64_chars =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "abcdefghijklmnopqrstuvwxyz"
-            "0123456789+/";
-
-        int in_len = base64_str.size();
-        int i = 0;
-        int j = 0;
-        int in_ = 0;
-        unsigned char char_array_4[4], char_array_3[3];
+        const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         std::vector<unsigned char> ret;
-
-        while (in_len-- && (base64_str[in_] != '=') && base64_chars.find(base64_str[in_]) != std::string::npos) {
-            char_array_4[i++] = base64_str[in_];
-            in_++;
+        const int in_len = static_cast<int>(base64_str.size());
+        unsigned char char_array_4[4], char_array_3[3];
+        int i = 0;
+        for (int in_ = 0; in_ < in_len; ++in_) {
+            if (base64_str[in_] == '=' || base64_chars.find(base64_str[in_]) == std::string::npos) {
+                break;
+            }
+            char_array_4[i++] = base64_chars.find(base64_str[in_]);
             if (i == 4) {
-                for (i = 0; i < 4; i++)
-                    char_array_4[i] = base64_chars.find(char_array_4[i]);
                 char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
                 char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
                 char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-                for (i = 0; (i < 3); i++)
-                    ret.push_back(char_array_3[i]);
+                ret.insert(ret.end(), char_array_3, char_array_3 + 3);
                 i = 0;
             }
         }
+
         if (i) {
-            for (j = i; j < 4; j++)
+            for (int j = i; j < 4; ++j) {
                 char_array_4[j] = 0;
-            for (j = 0; j < 4; j++)
-                char_array_4[j] = base64_chars.find(char_array_4[j]);
+            }
             char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
             char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
             char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-            for (j = 0; (j < i - 1); j++) ret.push_back(char_array_3[j]);
+            ret.insert(ret.end(), char_array_3, char_array_3 + i - 1);
         }
         return ret;
     }
