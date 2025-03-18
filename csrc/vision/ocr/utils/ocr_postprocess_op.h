@@ -14,35 +14,35 @@
 namespace modeldeploy::vision::ocr {
     class PostProcessor {
     public:
-        void get_contour_area(const std::vector<std::vector<float>>& box,
+        static void get_contour_area(const std::vector<std::vector<float>>& box,
                               float unclip_ratio, float& distance);
 
-        cv::RotatedRect un_clip(std::vector<std::vector<float>> box,
+        static cv::RotatedRect un_clip(const std::vector<std::vector<float>>& box,
                                 const float& unclip_ratio);
-        float** mat2_vec(cv::Mat mat);
-        std::vector<std::vector<int>> order_points_clockwise(
+        static float** mat2_vec(cv::Mat mat);
+        static std::vector<std::vector<int>> order_points_clockwise(
             std::vector<std::vector<int>> pts);
 
-        std::vector<std::vector<float>> get_mini_boxes(cv::RotatedRect box,
+        static std::vector<std::vector<float>> get_mini_boxes(const cv::RotatedRect& box,
                                                        float& ssid);
 
-        float box_score_fast(std::vector<std::vector<float>> box_array, cv::Mat pred);
-        float polygon_score_acc(std::vector<cv::Point> contour, cv::Mat pred);
+        static float box_score_fast(std::vector<std::vector<float>> box_array, const cv::Mat& pred);
+        static float polygon_score_acc(const std::vector<cv::Point>& contour, const cv::Mat& pred);
 
-        std::vector<std::vector<std::vector<int>>> boxes_from_bitmap(
-            cv::Mat pred, cv::Mat bitmap, const float& box_thresh,
+        static std::vector<std::vector<std::vector<int>>> boxes_from_bitmap(
+            const cv::Mat& pred, const cv::Mat& bitmap, const float& box_thresh,
             const float& det_db_unclip_ratio, const std::string& det_db_score_mode);
 
-        std::vector<std::vector<std::vector<int>>> filter_tag_det_res(
+        static std::vector<std::vector<std::vector<int>>> filter_tag_det_res(
             std::vector<std::vector<std::vector<int>>> boxes,
             const std::array<int, 4>& det_img_info);
 
     private:
-        static bool x_sort_int(std::vector<int> a, std::vector<int> b);
+        static bool x_sort_int(const std::vector<int>& a, const std::vector<int>& b);
 
-        static bool x_sort_fp32(std::vector<float> a, std::vector<float> b);
+        static bool x_sort_fp32(const std::vector<float>& a, const std::vector<float>& b);
 
-        std::vector<std::vector<float>> mat2_vector(cv::Mat mat);
+        static std::vector<std::vector<float>> mat2_vector(cv::Mat mat);
 
         static int _max(const int a, const int b) { return a >= b ? a : b; }
 

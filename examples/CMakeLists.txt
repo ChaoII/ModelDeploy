@@ -1,3 +1,4 @@
+add_subdirectory(demo_image)
 add_subdirectory(demo_ocr)
 add_subdirectory(demo_classification)
 add_subdirectory(demo_detection)

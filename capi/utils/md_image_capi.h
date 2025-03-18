@@ -35,10 +35,17 @@ MODELDEPLOY_CAPI_EXPORT MDImage md_clone_image(const MDImage* image);
 MODELDEPLOY_CAPI_EXPORT MDImage md_from_compressed_bytes(const unsigned char* bytes, int size);
 
 
+///  从base64编码的字符串生成一个MDImage对象（注意需要手动释放MDImage）。
+///
+///  @param base64_str base64编码的字符串，表示图像数据。
+///  @return 返回一个MDImage对象，表示解码后的图像。
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_base64_str(const char* base64_str);
+
 /// 从文件读取MDImage
 /// \param path 图像路径
 /// \return MDImage指针
 MODELDEPLOY_CAPI_EXPORT MDImage md_read_image(const char* path);
+
 /// 从指定设备id中获取图像
 /// @param device_id 设备id比如默认摄像头为0
 /// @param frame_width 帧宽

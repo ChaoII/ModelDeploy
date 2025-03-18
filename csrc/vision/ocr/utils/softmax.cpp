@@ -2,7 +2,7 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "ocr_utils.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     static float fast_exp(const float x) {
@@ -15,7 +15,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     std::vector<float> softmax(std::vector<float>& src) {
-        const int length = src.size();
+        const int length = static_cast<int>(src.size());
         std::vector<float> dst;
         dst.resize(length);
         const float alpha = *std::max_element(&src[0], &src[0 + length]);

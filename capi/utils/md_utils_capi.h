@@ -19,7 +19,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_rect(const MDRect* rect);
 /// \param pix_threshold 像素值的阈值
 /// \param rate_threshold 对应阈值内的像素所占百分比
 /// \return 按钮是否可用
-MODELDEPLOY_CAPI_EXPORT bool md_get_button_enable_status(MDImage* image, int pix_threshold = 50,
+MODELDEPLOY_CAPI_EXPORT bool md_get_button_enable_status(const MDImage* image, int pix_threshold = 50,
                                                          double rate_threshold = 0.05);
 /// 将MDRect转化为MDPolygon多边形,注意使用完后调用md_free_polygon释放内存
 /// @param rect MDRect

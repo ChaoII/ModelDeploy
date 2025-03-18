@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.utils
 {
@@ -22,14 +23,28 @@ namespace ModelDeploy.utils
             {
                 return null;
             }
+
             int length = 0;
             while (Marshal.ReadByte(ptr, length) != 0)
             {
                 length++;
             }
+
             byte[] buffer = new byte[length];
             Marshal.Copy(ptr, buffer, 0, length);
             return Encoding.UTF8.GetString(buffer);
         }
+
+        public bool GetButtonEnableStatus(Image image, int pixThreshold, double rateThreshold)
+        {
+            MDImage cImage = image.RawImage;
+            bool result = md_get_button_enable_status(ref cImage, pixThreshold, rateThreshold);
+            return result;
+        }
+
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern bool md_get_button_enable_status(ref MDImage image, int pixThreshold,
+            double rateThreshold);
     }
 }

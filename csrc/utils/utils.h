@@ -7,6 +7,13 @@
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy {
+    ///
+    /// 从文件中读取二进制内容
+    /// 用于将文件中的二进制数据读取到字符串中，通常用于数据加载
+    ///
+    /// @param path 文件路径，指定要读取的文件
+    /// @param contents 指向字符串的指针，用于存储读取的文件内容
+    /// @return bool 表示是否成功读取文件内容
     bool read_binary_from_file(const std::string& path, std::string* contents);
 
 #ifdef _WIN32
@@ -57,6 +64,10 @@ namespace modeldeploy {
         }
         return res;
     }
+
+
+    std::vector<unsigned char> base64_decode(const std::string& base64_str);
+
 
 #define MD_PRIVATE_CASE_TYPE_USING_HINT(NAME, enum_type, type, HINT, ...)                   \
     case enum_type: {                                                                       \

@@ -4,8 +4,7 @@
 #pragma once
 
 #include <vector>
-
-#include "opencv2/core.hpp"
+#include <opencv2/core.hpp>
 
 namespace modeldeploy::vision::ocr {
     cv::Mat get_rotate_crop_image(const cv::Mat& image,
@@ -23,6 +22,5 @@ namespace modeldeploy::vision::ocr {
 
     float iou(const std::vector<int>& box1, const std::vector<int>& box2);
 
-    bool comparison_dis(const std::vector<float>& dis1,
-                        const std::vector<float>& dis2);
+    bool comparison_dis(const std::vector<float>& dis1, const std::vector<float>& dis2);
 }

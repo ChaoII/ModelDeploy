@@ -220,6 +220,13 @@ namespace ModelDeploy
             return image;
         }
 
+        public static Image FromBase64String(string base64String)
+        {
+            var image = new Image { RawImage = md_from_base64_str(base64String) };
+            image.Update();
+            return image;
+        }
+
         public static Image FromRaw(MDImage mdImage)
         {
             Image image = new Image { RawImage = mdImage };
@@ -258,6 +265,10 @@ namespace ModelDeploy
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_read_image(string imagePath);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_base64_str(string base64String);
+
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_image(ref MDImage img);

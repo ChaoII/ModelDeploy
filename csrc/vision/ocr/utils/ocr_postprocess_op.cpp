@@ -3,13 +3,14 @@
 //
 
 #include <map>
+#include <utility>
 #include "csrc/vision/ocr/utils/clipper.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 
 
 namespace modeldeploy::vision::ocr {
     void PostProcessor::get_contour_area(const std::vector<std::vector<float>>& box,
-                                         float unclip_ratio, float& distance) {
+                                         const float unclip_ratio, float& distance) {
         constexpr int pts_num = 4;
         float area = 0.0f;
         float dist = 0.0f;
@@ -25,16 +26,16 @@ namespace modeldeploy::vision::ocr {
         distance = area * unclip_ratio / dist;
     }
 
-    cv::RotatedRect PostProcessor::un_clip(std::vector<std::vector<float>> box,
+    cv::RotatedRect PostProcessor::un_clip(const std::vector<std::vector<float>>& box,
                                            const float& unclip_ratio) {
         float distance = 1.0;
         get_contour_area(box, unclip_ratio, distance);
         ClipperLib::ClipperOffset offset;
         ClipperLib::Path p;
-        p << ClipperLib::IntPoint(int(box[0][0]), int(box[0][1]))
-            << ClipperLib::IntPoint(int(box[1][0]), int(box[1][1]))
-            << ClipperLib::IntPoint(int(box[2][0]), int(box[2][1]))
-            << ClipperLib::IntPoint(int(box[3][0]), int(box[3][1]));
+        p << ClipperLib::IntPoint(static_cast<int>(box[0][0]), static_cast<int>(box[0][1]))
+            << ClipperLib::IntPoint(static_cast<int>(box[1][0]), static_cast<int>(box[1][1]))
+            << ClipperLib::IntPoint(static_cast<int>(box[2][0]), static_cast<int>(box[2][1]))
+            << ClipperLib::IntPoint(static_cast<int>(box[3][0]), static_cast<int>(box[3][1]));
         offset.AddPath(p, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
         ClipperLib::Paths soln;
         offset.Execute(soln, distance);
@@ -45,7 +46,7 @@ namespace modeldeploy::vision::ocr {
             }
         }
         cv::RotatedRect res;
-        if (points.size() <= 0) {
+        if (points.empty()) {
             res = cv::RotatedRect(cv::Point2f(0, 0), cv::Size2f(1, 1), 0);
         }
         else {
@@ -68,16 +69,13 @@ namespace modeldeploy::vision::ocr {
 
     std::vector<std::vector<int>> PostProcessor::order_points_clockwise(
         std::vector<std::vector<int>> pts) {
-        std::vector<std::vector<int>> box = pts;
+        std::vector<std::vector<int>> box = std::move(pts);
         std::sort(box.begin(), box.end(), x_sort_int);
         std::vector leftmost = {box[0], box[1]};
         std::vector rightmost = {box[2], box[3]};
         if (leftmost[0][1] > leftmost[1][1]) std::swap(leftmost[0], leftmost[1]);
         if (rightmost[0][1] > rightmost[1][1]) std::swap(rightmost[0], rightmost[1]);
-        std::vector<std::vector<int>> rect = {
-            leftmost[0], rightmost[0], rightmost[1],
-            leftmost[1]
-        };
+        std::vector rect = {leftmost[0], rightmost[0], rightmost[1], leftmost[1]};
         return rect;
     }
 
@@ -94,17 +92,17 @@ namespace modeldeploy::vision::ocr {
         return img_vec;
     }
 
-    bool PostProcessor::x_sort_fp32(std::vector<float> a, std::vector<float> b) {
+    bool PostProcessor::x_sort_fp32(const std::vector<float>& a, const std::vector<float>& b) {
         if (a[0] != b[0]) return a[0] < b[0];
         return false;
     }
 
-    bool PostProcessor::x_sort_int(std::vector<int> a, std::vector<int> b) {
+    bool PostProcessor::x_sort_int(const std::vector<int>& a, const std::vector<int>& b) {
         if (a[0] != b[0]) return a[0] < b[0];
         return false;
     }
 
-    std::vector<std::vector<float>> PostProcessor::get_mini_boxes(cv::RotatedRect box,
+    std::vector<std::vector<float>> PostProcessor::get_mini_boxes(const cv::RotatedRect& box,
                                                                   float& ssid) {
         ssid = std::max(box.size.width, box.size.height);
         cv::Mat points;
@@ -137,15 +135,15 @@ namespace modeldeploy::vision::ocr {
         return array;
     }
 
-    float PostProcessor::polygon_score_acc(std::vector<cv::Point> contour,
-                                           cv::Mat pred) {
+    float PostProcessor::polygon_score_acc(const std::vector<cv::Point>& contour,
+                                           const cv::Mat& pred) {
         const int width = pred.cols;
         const int height = pred.rows;
         std::vector<float> box_x;
         std::vector<float> box_y;
-        for (int i = 0; i < contour.size(); ++i) {
-            box_x.push_back(contour[i].x);
-            box_y.push_back(contour[i].y);
+        for (const auto point : contour) {
+            box_x.push_back(static_cast<float>(point.x));
+            box_y.push_back(static_cast<float>(point.y));
         }
         int xmin =
             clamp(static_cast<int>(std::floor(*std::min_element(box_x.begin(), box_x.end()))), 0,
@@ -160,7 +158,7 @@ namespace modeldeploy::vision::ocr {
             clamp(static_cast<int>(std::ceil(*std::max_element(box_y.begin(), box_y.end()))), 0,
                   height - 1);
         cv::Mat mask = cv::Mat::zeros(ymax - ymin + 1, xmax - xmin + 1, CV_8UC1);
-        cv::Point* rook_point = new cv::Point[contour.size()];
+        auto* rook_point = new cv::Point[contour.size()];
         for (int i = 0; i < contour.size(); ++i) {
             rook_point[i] = cv::Point(static_cast<int>(box_x[i]) - xmin, static_cast<int>(box_y[i]) - ymin);
         }
@@ -170,14 +168,14 @@ namespace modeldeploy::vision::ocr {
         cv::Mat croppedImg;
         pred(cv::Rect(xmin, ymin, xmax - xmin + 1, ymax - ymin + 1))
             .copyTo(croppedImg);
-        const float score = cv::mean(croppedImg, mask)[0];
+        const float score = static_cast<float>(cv::mean(croppedImg, mask)[0]);
         delete[] rook_point;
         return score;
     }
 
     float PostProcessor::box_score_fast(std::vector<std::vector<float>> box_array,
-                                        cv::Mat pred) {
-        const auto array = box_array;
+                                        const cv::Mat& pred) {
+        const auto array = std::move(box_array);
         const int width = pred.cols;
         const int height = pred.rows;
 
@@ -204,22 +202,22 @@ namespace modeldeploy::vision::ocr {
         cv::Mat croppedImg;
         pred(cv::Rect(xmin, ymin, xmax - xmin + 1, ymax - ymin + 1))
             .copyTo(croppedImg);
-        const auto score = cv::mean(croppedImg, mask)[0];
+        const auto score = static_cast<float>(cv::mean(croppedImg, mask)[0]);
         return score;
     }
 
     std::vector<std::vector<std::vector<int>>> PostProcessor::boxes_from_bitmap(
-        const cv::Mat pred, const cv::Mat bitmap, const float& box_thresh,
+        const cv::Mat& pred, const cv::Mat& bitmap, const float& box_thresh,
         const float& det_db_unclip_ratio, const std::string& det_db_score_mode) {
         constexpr int max_candidates = 1000;
-        int width = bitmap.cols;
-        int height = bitmap.rows;
+        const int width = bitmap.cols;
+        const int height = bitmap.rows;
         std::vector<std::vector<cv::Point>> contours;
         std::vector<cv::Vec4i> hierarchy;
         cv::findContours(bitmap, contours, hierarchy, cv::RETR_LIST,
                          cv::CHAIN_APPROX_SIMPLE);
-        int num_contours =
-            contours.size() >= max_candidates ? max_candidates : contours.size();
+        const int num_contours =
+            contours.size() >= max_candidates ? max_candidates : static_cast<int>(contours.size());
         std::vector<std::vector<std::vector<int>>> boxes;
         for (int _i = 0; _i < num_contours; _i++) {
             constexpr int min_size = 3;
@@ -229,34 +227,33 @@ namespace modeldeploy::vision::ocr {
             float ssid;
             cv::RotatedRect box = cv::minAreaRect(contours[_i]);
             auto array = get_mini_boxes(box, ssid);
-            auto box_for_unclip = array;
+            const auto& box_for_unclip = array;
             // end get_mini_box
             if (ssid < min_size) {
                 continue;
             }
             float score;
-            if (det_db_score_mode == "slow") /* compute using polygon*/
+            if (det_db_score_mode == "slow") /* compute using polygon*/ {
                 score = polygon_score_acc(contours[_i], pred);
-            else
+            }
+            else {
                 score = box_score_fast(array, pred);
-
+            }
             if (score < box_thresh) continue;
             // start for unclip
-            cv::RotatedRect points = un_clip(box_for_unclip, det_db_unclip_ratio);
+            const cv::RotatedRect points = un_clip(box_for_unclip, det_db_unclip_ratio);
             if (points.size.height < 1.001 && points.size.width < 1.001) {
                 continue;
             }
             // end for unclip
             cv::RotatedRect clip_box = points;
             auto clip_array = get_mini_boxes(clip_box, ssid);
-
             if (ssid < min_size + 2) continue;
-
-            int dest_width = pred.cols;
-            int dest_height = pred.rows;
+            const int dest_width = pred.cols;
+            const int dest_height = pred.rows;
             std::vector<std::vector<int>> int_clip_array;
             for (int num_pt = 0; num_pt < 4; num_pt++) {
-                std::vector<int> a{
+                std::vector a{
                     static_cast<int>(clamp<float>(
                         roundf(clip_array[num_pt][0] / static_cast<float>(width) * static_cast<float>(dest_width)),
                         0, static_cast<float>(dest_width))),
@@ -282,19 +279,19 @@ namespace modeldeploy::vision::ocr {
         for (int n = 0; n < boxes.size(); n++) {
             boxes[n] = order_points_clockwise(boxes[n]);
             for (int m = 0; m < boxes[0].size(); m++) {
-                boxes[n][m][0] /= ratio_w;
-                boxes[n][m][1] /= ratio_h;
+                boxes[n][m][0] = static_cast<int>(static_cast<float>(boxes[n][m][0]) / ratio_w);
+                boxes[n][m][1] = static_cast<int>(static_cast<float>(boxes[n][m][1]) / ratio_h);
                 boxes[n][m][0] = _min(_max(boxes[n][m][0], 0), ori_img_w - 1);
                 boxes[n][m][1] = _min(_max(boxes[n][m][1], 0), ori_img_h - 1);
             }
         }
-        for (int n = 0; n < boxes.size(); n++) {
-            const int rect_width = static_cast<int>(sqrt(pow(boxes[n][0][0] - boxes[n][1][0], 2) +
-                pow(boxes[n][0][1] - boxes[n][1][1], 2)));
-            const int rect_height = static_cast<int>(sqrt(pow(boxes[n][0][0] - boxes[n][3][0], 2) +
-                pow(boxes[n][0][1] - boxes[n][3][1], 2)));
+        for (auto& boxe : boxes) {
+            const int rect_width = static_cast<int>(sqrt(pow(boxe[0][0] - boxe[1][0], 2) +
+                pow(boxe[0][1] - boxe[1][1], 2)));
+            const int rect_height = static_cast<int>(sqrt(pow(boxe[0][0] - boxe[3][0], 2) +
+                pow(boxe[0][1] - boxe[3][1], 2)));
             if (rect_width <= 4 || rect_height <= 4) continue;
-            root_points.push_back(boxes[n]);
+            root_points.push_back(boxe);
         }
         return root_points;
     }

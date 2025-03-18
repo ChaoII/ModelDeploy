@@ -148,11 +148,4 @@ cv::Scalar get_random_color();
 /// @return 旋转裁剪后的图像
 cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon);
 
-///
-/// 从文件中读取二进制内容
-/// 用于将文件中的二进制数据读取到字符串中，通常用于数据加载
-///
-/// @param path 文件路径，指定要读取的文件
-/// @param contents 指向字符串的指针，用于存储读取的文件内容
-/// @return bool 表示是否成功读取文件内容
-bool read_binary_from_file(const std::string& path, std::string* contents);
+

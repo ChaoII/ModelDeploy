@@ -12,7 +12,7 @@ void md_print_rect(const MDRect* rect) {
 }
 
 
-bool md_get_button_enable_status(MDImage* image, const int pix_threshold, const double rate_threshold) {
+bool md_get_button_enable_status(const MDImage* image, const int pix_threshold, const double rate_threshold) {
     auto cv_image = md_image_to_mat(image);
     if (cv_image.channels() != 1) {
         cv::cvtColor(cv_image, cv_image, cv::COLOR_BGR2GRAY);

@@ -4,6 +4,9 @@
 
 #include "csrc/core/md_log.h"
 #include "capi/utils/md_image_capi.h"
+#include "csrc/base_model.h"
+#include "csrc/vision.h"
+#include "csrc/utils/utils.h"
 #include "capi/utils/internal/utils.h"
 
 
@@ -37,6 +40,19 @@ MDImage md_from_compressed_bytes(const unsigned char* bytes, const int size) {
     const cv::Mat img_decompressed = cv::imdecode(buffer, cv::IMREAD_COLOR);
     return *mat_to_md_image(img_decompressed);
 }
+
+MDImage md_from_base64_str(const char* base64_str) {
+    const std::vector buffer = modeldeploy::base64_decode(base64_str);
+    const cv::Mat img_decode = cv::imdecode(buffer, cv::IMREAD_COLOR);
+    // 检查图像是否成功解码
+    if (img_decode.empty()) {
+        MD_LOG_ERROR("Failed to decode image from base64 string");
+        return {};
+    }
+    // 将 cv::Mat 转换为 MDImage
+    return *mat_to_md_image(img_decode);
+}
+
 
 MDImage md_read_image(const char* path) {
     const cv::Mat image = cv::imread(path);

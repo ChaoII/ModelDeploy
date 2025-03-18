@@ -2,7 +2,7 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "ocr_utils.h"
+#include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     bool compare_box(const std::array<int, 8>& result1,
@@ -18,7 +18,7 @@ namespace modeldeploy::vision::ocr {
 
     void sort_boxes(std::vector<std::array<int, 8>>* boxes) {
         std::sort(boxes->begin(), boxes->end(), compare_box);
-        if (boxes->size() == 0) {
+        if (boxes->empty()) {
             return;
         }
         for (int i = 0; i < boxes->size() - 1; i++) {
@@ -32,15 +32,13 @@ namespace modeldeploy::vision::ocr {
     }
 
     std::vector<int> arg_sort(const std::vector<float>& array) {
-        const int array_len(array.size());
-        std::vector<int> array_index(array_len, 0);
+        const int array_len = static_cast<int>(array.size());
+        std::vector array_index(array_len, 0);
         for (int i = 0; i < array_len; ++i)
             array_index[i] = i;
-
         std::sort(
             array_index.begin(), array_index.end(),
             [&array](const int pos1, const int pos2) { return array[pos1] < array[pos2]; });
-
         return array_index;
     }
 }
