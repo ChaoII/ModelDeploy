@@ -12,7 +12,7 @@ models
 tests/test_models
 build_linux
 test_data
-
+.Testing
 # Precompiled Headers
 *.gch
 *.pch

@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../test_data/test_models/ocr/rec_infer.onnx",
+                                               "../test_data/test_models/ocr/ch_PP-OCRv4_rec_server_infer.onnx",
                                                "../test_data/key.txt")) != 0) {
         md_free_ocr_recognition_model(&model);
         std::cout << ret << std::endl;
