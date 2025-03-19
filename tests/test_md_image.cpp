@@ -25,7 +25,7 @@ bool from_base64_str() {
     if (!file.is_open()) {
         return false;
     }
-    std::string base64_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    const std::string base64_str((std::istreambuf_iterator(file)), std::istreambuf_iterator<char>());
     file.close();
     const MDImage image = md_from_base64_str(base64_str.c_str());
     return image.data != nullptr && image.height == 184 && image.width == 192;
