@@ -3,9 +3,10 @@
 
 std::filesystem::path get_test_data_path(){
     const char* test_data_dir_env = std::getenv("TEST_DATA_DIR");
+    std::cout << "TEST_DATA_DIR: " << test_data_dir_env << std::endl;
     std::filesystem::path test_data_path;
     if (test_data_dir_env && *test_data_dir_env) {
-        test_data_path = std::filesystem::path(test_data_dir_env);
+        test_data_path = std::filesystem::path(std::string(test_data_dir_env) +"/test_data");
         if (std::filesystem::exists(test_data_path)) {
             return test_data_path;
         }
