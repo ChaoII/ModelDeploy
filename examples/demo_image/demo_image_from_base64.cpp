@@ -10,7 +10,7 @@
 int main(int argc, char** argv) {
     //读取base64_image.txt文件
 
-    auto file_path = "../tests/test_images/test_base64_image.txt";
+    auto file_path = "../test_data/test_images/test_base64_image.txt";
     std::ifstream file(file_path);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << file_path << std::endl;

@@ -17,10 +17,10 @@ int main() {
     MDStatusCode ret;
     MDModel model;
     MDSenseVoiceParameters parameters = {
-        "../tests/test_models/sense-voice-zh-en-ja-ko-yue/model.int8.onnx",
+        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/model.int8.onnx",
         1,
         "auto",
-        "../tests/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt",
+        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt",
         8,
         0,
     };
@@ -29,7 +29,7 @@ int main() {
         return ret;
     }
     MDASRResult result;
-    if ((ret = md_sense_voice_model_predict(&model, "../tests/vad_example.wav", &result)) != 0) {
+    if ((ret = md_sense_voice_model_predict(&model, "../test_data/vad_example.wav", &result)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }

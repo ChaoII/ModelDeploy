@@ -10,13 +10,13 @@ int32_t main() {
     MDStatusCode ret;
     MDModel model;
     MDKokoroParameters parameters = {
-        "../tests/test_models/kokoro-multi-lang-v1_1/model.onnx",
-        "../tests/test_models/kokoro-multi-lang-v1_1/voices.bin",
-        "../tests/test_models/kokoro-multi-lang-v1_1/tokens.txt",
-        "../tests/test_models/kokoro-multi-lang-v1_1/espeak-ng-data",
-        "../tests/test_models/kokoro-multi-lang-v1_1/dict",
-        "../tests/test_models/kokoro-multi-lang-v1_1/lexicon-us-en.txt,"
-        "../tests/test_models/kokoro-multi-lang-v1_1/lexicon-zh.txt",
+        "../test_data/test_models/kokoro-multi-lang-v1_1/model.onnx",
+        "../test_data/test_models/kokoro-multi-lang-v1_1/voices.bin",
+        "../test_data/test_models/kokoro-multi-lang-v1_1/tokens.txt",
+        "../test_data/test_models/kokoro-multi-lang-v1_1/espeak-ng-data",
+        "../test_data/test_models/kokoro-multi-lang-v1_1/dict",
+        "../test_data/test_models/kokoro-multi-lang-v1_1/lexicon-us-en.txt,"
+        "../test_data/test_models/kokoro-multi-lang-v1_1/lexicon-zh.txt",
         1,
         0
     };

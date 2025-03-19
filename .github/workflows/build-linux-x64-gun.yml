@@ -21,13 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download test data
+      - name: Download and decompressed test data
         shell: bash
         run: |
           mkdir -p ${{ github.workspace }}/test_data
           curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
-          unzip test_data.zip -d ${{ github.workspace }}/test_data"
-          rm -f test_data.zip
+          unzip test_data.zip -d ${{ github.workspace }}/test_data
 
       - name: Cache test data
         uses: actions/cache@v3
@@ -72,3 +71,5 @@ jobs:
         # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: ctest --build-config ${{ matrix.build_type }}
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}/test_data

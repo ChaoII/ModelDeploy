@@ -19,12 +19,12 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../tests/test_models/ocr/rec_infer.onnx",
-                                               "../tests/key.txt")) != 0) {
+                                               "../test_data/test_models/ocr/rec_infer.onnx",
+                                               "../test_data/key.txt")) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDImage image = md_read_image("../tests/test_images/test_ocr_recognition1.png");
+    MDImage image = md_read_image("../test_data/test_images/test_ocr_recognition1.png");
     MDOCRResult result;
     if ((ret = md_ocr_recognition_model_predict(&model, &image, &result)) != 0) {
         std::cout << ret << std::endl;

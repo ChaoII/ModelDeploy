@@ -12,11 +12,11 @@ int32_t main() {
     OfflineRecognizerConfig config;
 
     config.model_config.sense_voice.model =
-        "./sense-voice-zh-en-ja-ko-yue/model.int8.onnx";
+        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/model.int8.onnx";
     config.model_config.sense_voice.use_itn = true;
     config.model_config.sense_voice.language = "auto";
     config.model_config.tokens =
-        "./sense-voice-zh-en-ja-ko-yue/tokens.txt";
+        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt";
     config.model_config.num_threads = 1;
     std::cout << "Loading model\n";
     OfflineRecognizer recognizer = OfflineRecognizer::Create(config);
@@ -26,7 +26,7 @@ int32_t main() {
     }
     std::cout << "Loading model done\n";
     std::string wave_filename =
-        "./sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
+        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
     Wave wave = ReadWave(wave_filename);
     if (wave.samples.empty()) {
         std::cerr << "Failed to read: '" << wave_filename << "'\n";
