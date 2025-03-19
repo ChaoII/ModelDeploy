@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "capi/utils/md_image_capi.h"
 
+
 bool read_image() {
     const std::filesystem::path image_path = TEST_DATA_DIR / "test_images" / "test_person.jpg";
     const std::string image_path_str = image_path.string();
@@ -19,7 +20,7 @@ bool read_image() {
 }
 
 bool from_base64_str() {
-    const std::filesystem::path image_path = TEST_DATA_DIR / "test_images" / "test_base64_image.txt";
+    const std::filesystem::path image_path = TEST_DATA_DIR/ "test_images" / "test_base64_image.txt";;
     const std::string image_path_str = image_path.string();
     std::ifstream file(image_path_str);
     if (!file.is_open()) {

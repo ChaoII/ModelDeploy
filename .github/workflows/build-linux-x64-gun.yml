@@ -24,9 +24,8 @@ jobs:
       - name: Download and decompressed test data
         shell: bash
         run: |
-          mkdir -p ${{ github.workspace }}/test_data
           curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
-          unzip test_data.zip -d ${{ github.workspace }}/test_data
+          unzip test_data.zip -d ${{ github.workspace }}
 
       - name: Cache test data
         uses: actions/cache@v3

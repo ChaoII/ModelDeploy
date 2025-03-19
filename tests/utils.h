@@ -7,5 +7,4 @@
 
 std::filesystem::path get_test_data_path();
 
-
-const std::filesystem::path TEST_DATA_DIR = get_test_data_path();
+#define TEST_DATA_DIR [](){return get_test_data_path();}()
