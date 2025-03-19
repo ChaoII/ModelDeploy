@@ -15,7 +15,7 @@ int main() {
 
     modeldeploy::vision::ocr::PPOCRv4 ocr("../test_data/test_models/ocr/det_infer.onnx",
                                           "../test_data/test_models/ocr/cls_infer.onnx",
-                                          "../test_data/test_models/ocr/rec_infer.onnx",
+                                          "../test_data/test_models/ocr/rec_infer1.onnx",
                                           "../test_data/key.txt");
     auto img = cv::imread("../test_data/test_images/test_ocr1.png");
     modeldeploy::vision::OCRResult result;

@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../test_data/test_models/ocr/rec_infer.onnx",
+                                               "../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
                                                "../test_data/key.txt")) != 0) {
         std::cout << ret << std::endl;
         return ret;

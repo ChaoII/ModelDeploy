@@ -8,8 +8,9 @@
 #include <fstream>
 
 #include "tests/utils.h"
-#include <catch2/catch_test_macros.hpp>
 #include "capi/utils/md_image_capi.h"
+#include <catch2/catch_test_macros.hpp>
+
 
 
 bool read_image() {

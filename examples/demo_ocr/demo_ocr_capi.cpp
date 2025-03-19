@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     MDOCRModelParameters ocr_parameters = {
-        "../test_data/test_models/ocr/",
+        "../test_data/test_models/ocr/repsvtr_mobile/",
         "../test_data/key.txt",
         8,
         ONNX,

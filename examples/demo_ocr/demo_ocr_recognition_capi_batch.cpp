@@ -30,15 +30,15 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../test_data/test_models/ocr/ch_PP-OCRv4_rec_server_infer.onnx",
+                                               "../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
                                                "../test_data/key.txt")) != 0) {
         md_free_ocr_recognition_model(&model);
         std::cout << ret << std::endl;
         return ret;
     }
-    std::vector<std::vector<MDPoint>> points = {
-        {{17, 16}, {288, 18}, {288, 45}, {17, 43}},
-        {{20, 54}, {62, 56}, {61, 74}, {19, 72}}
+    const std::vector<std::vector<MDPoint>> points = {
+        {{1107, 2237}, {1333, 2237}, {1333, 2296}, {1107, 2296}},
+        {{1069, 2548}, {1420, 2548}, {1420, 2611}, {1069, 2611}}
     };
 
     auto polygons = std::vector<MDPolygon>(points.size());
@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
         points_to_polygon(points[i], &polygon);
     }
 
-    MDImage image = md_read_image("../test_data/test_images/test_ocr1.png");
+    MDImage image = md_read_image("../test_data/test_images/ocr_check_report1.png");
     MDOCRResults results;
     if ((ret = md_ocr_recognition_model_predict_batch(&model, &image, 8,
                                                       polygons.data(),

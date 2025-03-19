@@ -21,7 +21,7 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
     }
     const auto det_model_file_path = fs::path(parameters->model_dir) / "det_infer.onnx";
     const auto cls_model_file_path = fs::path(parameters->model_dir) / "cls_infer.onnx";
-    const auto rec_model_file_path = fs::path(parameters->model_dir) / "rec_infer.onnx";
+    const auto rec_model_file_path = fs::path(parameters->model_dir) / "rec_infer1.onnx";
     const auto ocr_model = new modeldeploy::vision::ocr::PPOCRv4(det_model_file_path.string(),
                                                                  cls_model_file_path.string(),
                                                                  rec_model_file_path.string(),
