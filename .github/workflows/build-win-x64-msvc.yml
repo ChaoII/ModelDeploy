@@ -24,7 +24,7 @@ jobs:
       - name: Download and decompressed test data
         shell: bash
         run: |
-          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_images.zip
+          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
           unzip test_data.zip
 
       - name: Cache test data
