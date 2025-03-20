@@ -20,6 +20,10 @@ jobs:
         cpp_compiler: [ cl ]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: choco install ninja
+
       - name: Download and decompressed test data
         shell: bash
         run: |
