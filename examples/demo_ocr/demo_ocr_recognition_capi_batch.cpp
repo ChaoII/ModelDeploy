@@ -30,8 +30,8 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
-                                               "../test_data/key.txt")) != 0) {
+                                               "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
+                                               "../../test_data/key.txt")) != 0) {
         md_free_ocr_recognition_model(&model);
         std::cout << ret << std::endl;
         return ret;
@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
         points_to_polygon(points[i], &polygon);
     }
 
-    MDImage image = md_read_image("../test_data/test_images/ocr_check_report1.png");
+    MDImage image = md_read_image("../../test_data/test_images/ocr_check_report1.png");
     MDOCRResults results;
     if ((ret = md_ocr_recognition_model_predict_batch(&model, &image, 8,
                                                       polygons.data(),

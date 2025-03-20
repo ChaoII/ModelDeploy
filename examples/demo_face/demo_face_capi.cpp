@@ -11,16 +11,16 @@ int main() {
 
     MDStatusCode ret;
     MDModel model;
-    ret = md_create_face_model(&model, "../test_data/test_models/seetaface", MD_MASK, 1);
+    ret = md_create_face_model(&model, "../../test_data/test_models/seetaface", MD_MASK, 1);
     std::cout << "create model result: " << ret << std::endl;
-    auto image = md_read_image("../test_data/test_images/test_face3.jpg");
+    auto image = md_read_image("../../test_data/test_images/test_face3.jpg");
 
     std::cout << "====================face detection==========================" << std::endl;
     MDDetectionResults r_face_detect;
     ret = md_face_detection(&model, &image, &r_face_detect);
     std::cout << "face detection " << (ret ? "failed" : "success") << std::endl;
     std::cout << "face size is: " << r_face_detect.size << std::endl;
-    md_draw_detection_result(&image, &r_face_detect, "../test_data/msyh.ttc", 20, 0.5, 1);
+    md_draw_detection_result(&image, &r_face_detect, "../../test_data/msyh.ttc", 20, 0.5, 1);
 //    md_show_image(&image);
     md_free_detection_result(&r_face_detect);
 

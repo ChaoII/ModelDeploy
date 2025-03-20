@@ -4,19 +4,24 @@
 #include <chrono>  // NOLINT
 #include <iostream>
 #include <string>
-
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "csrc/audio/sherpa-onnx/csrc/cxx-api.h"
 
 int32_t main() {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     using namespace sherpa_onnx::cxx; // NOLINT
     OfflineRecognizerConfig config;
 
     config.model_config.sense_voice.model =
-        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/model.int8.onnx";
+        "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/model.int8.onnx";
     config.model_config.sense_voice.use_itn = true;
     config.model_config.sense_voice.language = "auto";
     config.model_config.tokens =
-        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt";
+        "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt";
     config.model_config.num_threads = 1;
     std::cout << "Loading model\n";
     OfflineRecognizer recognizer = OfflineRecognizer::Create(config);
@@ -26,7 +31,7 @@ int32_t main() {
     }
     std::cout << "Loading model done\n";
     std::string wave_filename =
-        "../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
+        "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
     Wave wave = ReadWave(wave_filename);
     if (wave.samples.empty()) {
         std::cerr << "Failed to read: '" << wave_filename << "'\n";

@@ -84,16 +84,13 @@ else ()
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
 
+# 检查目录是否存在
+if (NOT EXISTS ${DIST_DIRECTORY})
+    # 如果目录不存在，则创建它
+    file(MAKE_DIRECTORY ${DIST_DIRECTORY})
+    message(STATUS "Directory ${DIST_DIRECTORY} created.")
+else ()
+    message(STATUS "Directory ${DIST_DIRECTORY} already exists.")
+endif ()
 
-add_custom_target(seetaface_copy_shared_libs ALL
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${SEETA_FACE_SHARED_LIBS}
-        "${DIST_DIRECTORY}"
-        COMMENT "Copying SEETA_FACE_SHARED_LIBS to ${DIST_DIRECTORY}"
-)
-
-
-
-
-
-
+file(COPY ${SEETA_FACE_SHARED_LIBS} DESTINATION ${DIST_DIRECTORY})

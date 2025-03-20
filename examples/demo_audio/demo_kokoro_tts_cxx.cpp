@@ -20,14 +20,14 @@ int32_t main() {
     using namespace sherpa_onnx::cxx; // NOLINT
     OfflineTtsConfig config;
 
-    config.model.kokoro.model = "../test_data/test_models/kokoro-int8-multi-lang-v1_1/model.int8.onnx";
-    config.model.kokoro.voices = "../test_data/test_models/kokoro-int8-multi-lang-v1_1/voices.bin";
-    config.model.kokoro.tokens = "../test_data/test_models/kokoro-int8-multi-lang-v1_1/tokens.txt";
-    config.model.kokoro.data_dir = "../test_data/test_models/kokoro-int8-multi-lang-v1_1/espeak-ng-data";
-    config.model.kokoro.dict_dir = "../test_data/test_models/kokoro-int8-multi-lang-v1_1/dict";
+    config.model.kokoro.model = "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/model.int8.onnx";
+    config.model.kokoro.voices = "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/voices.bin";
+    config.model.kokoro.tokens = "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/tokens.txt";
+    config.model.kokoro.data_dir = "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/espeak-ng-data";
+    config.model.kokoro.dict_dir = "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/dict";
     config.model.kokoro.lexicon =
-        "../test_data/test_models/kokoro-int8-multi-lang-v1_1/lexicon-us-en.txt,"
-        "../test_data/test_models/kokoro-int8-multi-lang-v1_1/lexicon-zh.txt";
+        "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/lexicon-us-en.txt,"
+        "../../test_data/test_models/kokoro-int8-multi-lang-v1_1/lexicon-zh.txt";
     config.model.num_threads = 2;
     // If you don't want to see debug messages, please set it to 0
     config.model.debug = false;
