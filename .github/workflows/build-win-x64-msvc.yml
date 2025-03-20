@@ -22,8 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          choco install icu4c
-          choco install zlib
+          choco install icu4c --pre
+          choco install zlib --pre
       - name: Download and decompressed test data
         shell: bash
         run: |
