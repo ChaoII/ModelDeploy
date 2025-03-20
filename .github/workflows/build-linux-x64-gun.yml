@@ -70,7 +70,7 @@ jobs:
         # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: |
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${{ steps.strings.outputs.build-output-dir }}
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${{ steps.strings.outputs.build-output-dir }}/bin
           ctest --build-config ${{ matrix.build_type }} --rerun-failed --output-on-failure -V
         env:
           TEST_DATA_DIR: ${{ github.workspace }}/test_data

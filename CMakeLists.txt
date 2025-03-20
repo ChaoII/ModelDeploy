@@ -17,6 +17,11 @@ option(ENABLE_SAVE_LOG "save log to log file" OFF)
 option(WITH_STATIC_CRT "build for mt" ON)
 
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 if (MSVC)
     if (WITH_STATIC_CRT)
         add_compile_options(
@@ -29,6 +34,9 @@ if (MSVC)
     endif ()
     add_compile_options(/wd4819 /wd4244)
     add_definitions(-DMD_CXX_EXPORT)
+    if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
+        set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
+    endif ()
 endif ()
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/third_party)

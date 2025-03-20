@@ -11,7 +11,7 @@
 int main() {
     MDStatusCode ret;
     MDModel model;
-    if (ret = md_create_detection_model(&model, "../test_data/test_models/best1.onnx", 8); ret) {
+    if (ret = md_create_detection_model(&model, "../../test_data/test_models/best1.onnx", 8); ret) {
         std::cout << ret << std::endl;
         return ret;
     }
@@ -20,13 +20,13 @@ int main() {
         return ret;
     }
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    auto im = md_read_image("../test_data/test_images/test_detection1.png");
+    auto im = md_read_image("../../test_data/test_images/test_detection1.png");
     MDDetectionResults result;
     if ((ret = md_detection_predict(&model, &im, &result)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-    md_draw_detection_result(&im, &result, "../test_data/msyh.ttc", 20, 0.5, 1);
+    md_draw_detection_result(&im, &result, "../../test_data/msyh.ttc", 20, 0.5, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "duration cost: " << diff.count() << "s" << std::endl;
     // md_show_image(&im);

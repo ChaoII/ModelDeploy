@@ -86,10 +86,10 @@ endif ()
 
 
 add_custom_target(seetaface_copy_shared_libs ALL
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        COMMAND ${CMAKE_COMMAND} -E copy
         ${SEETA_FACE_SHARED_LIBS}
-        ${CMAKE_BINARY_DIR}
-        COMMENT "Copying SEETA_FACE_SHARED_LIBS to ${CMAKE_BINARY_DIR}"
+        "${DIST_DIRECTORY}"
+        COMMENT "Copying SEETA_FACE_SHARED_LIBS to ${DIST_DIRECTORY}"
 )
 
 

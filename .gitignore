@@ -1,5 +1,8 @@
 
 build
+build_msvc
+build_linux
+
 .idea
 # Prerequisites
 *.d
@@ -10,7 +13,6 @@ models
 *.o
 *.obj
 tests/test_models
-build_linux
 test_data
 .Testing
 # Precompiled Headers
