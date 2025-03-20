@@ -22,10 +22,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download and decompressed test data
-        shell: bash
+        shell: powershell
         run: |
-          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_images.zip
-          powershell -command "Expand-Archive -Path test_data.zip -DestinationPath ${{ github.workspace }}"
+          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
+          Expand-Archive -Verbose -Path test_data.zip -DestinationPath ${{ github.workspace }}
 
       - name: Cache test data
         uses: actions/cache@v3
