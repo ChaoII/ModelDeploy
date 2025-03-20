@@ -6,6 +6,7 @@
 #include "csrc/audio/sherpa-onnx/csrc/c-api.h"
 #include "csrc/core/md_log.h"
 #include "capi/common/md_micro.h"
+#include "tabulate/tabulate.hpp"
 
 
 MDStatusCode md_create_sense_voice_model(MDModel* model, MDSenseVoiceParameters* parameters) {
@@ -25,14 +26,14 @@ MDStatusCode md_create_sense_voice_model(MDModel* model, MDSenseVoiceParameters*
     // 贪心搜索
     recognizer_config.decoding_method = "greedy_search";
     recognizer_config.model_config = offline_model_config;
-    MD_LOG_INFO("========Loading model ...========");
+    std::cout << termcolor::magenta << "========Loading model============" << termcolor::reset << std::endl;
     const SherpaOnnxOfflineRecognizer* recognizer =
         SherpaOnnxCreateOfflineRecognizer(&recognizer_config);
     if (!recognizer) {
         MD_LOG_ERROR(" Model initial failed, please check your parameters");
         return MDStatusCode::ModelInitializeFailed;
     }
-    MD_LOG_INFO("========Loading model done========");
+    std::cout << termcolor::magenta << "========Loading model done=======" << termcolor::reset << std::endl;
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup("sense_voice");
     model->model_content = const_cast<SherpaOnnxOfflineRecognizer*>(recognizer);
@@ -50,7 +51,7 @@ MDStatusCode md_sense_voice_model_predict(const MDModel* model, const char* wav_
         MD_LOG_ERROR("Failed to read: {}", wav_path);
         return MDStatusCode::FileOpenFailed;
     }
-    MD_LOG_INFO("========Start recognition========");
+    std::cout << termcolor::magenta << "========Start recognition========" << termcolor::reset << std::endl;
     const auto begin = std::chrono::steady_clock::now();
     const auto recognizer = static_cast<const SherpaOnnxOfflineRecognizer*>(model->model_content);
     const SherpaOnnxOfflineStream* stream = SherpaOnnxCreateOfflineStream(recognizer);
@@ -69,12 +70,13 @@ MDStatusCode md_sense_voice_model_predict(const MDModel* model, const char* wav_
     SherpaOnnxDestroyOfflineRecognizerResult(result);
     SherpaOnnxDestroyOfflineStream(stream);
     SherpaOnnxFreeWave(wave);
-    float rtf = elapsed_seconds / snippet_time;
-    MD_LOG_INFO("Text is: {}", asr_result->msg);
-    MD_LOG_INFO("Snippet time is: {:.2f}", snippet_time);
-    MD_LOG_INFO("Elapsed seconds: {:.2f}", elapsed_seconds);
-    MD_LOG_INFO("(Real time factor) RTF = {:.2f} / {:.2f} = {:.2f}", elapsed_seconds,
-                snippet_time, rtf);
+    const float rtf = elapsed_seconds / snippet_time;
+    std::cout << termcolor::cyan << "Text is: " << termcolor::reset << std::endl;
+    std::cout << termcolor::green << asr_result->msg << std::endl;
+    std::cout << termcolor::cyan << "Snippet time is: " << termcolor::green << snippet_time << std::endl;
+    std::cout << termcolor::cyan << "Elapsed seconds is: " << termcolor::green << elapsed_seconds << std::endl;
+    std::cout << termcolor::cyan << "(Real time factor) RTF = " << termcolor::green << elapsed_seconds << "/"
+        << snippet_time << " = " << rtf << termcolor::reset << std::endl;
     return MDStatusCode::Success;
 }
 

@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
-          unzip test_data.zip -d ${{ github.workspace }}
+          powershell -command "Expand-Archive -Path test_data.zip -DestinationPath $env:GITHUB_WORKSPACE"
 
       - name: Cache test data
         uses: actions/cache@v3
