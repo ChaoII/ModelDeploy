@@ -59,8 +59,8 @@ namespace modeldeploy::vision::ocr {
     bool DBDetector::batch_predict(
         const std::vector<cv::Mat>& images,
         std::vector<std::vector<std::array<int, 8>>>* det_results) {
-        std::vector<cv::Mat> imgs = images;
-        if (!preprocessor_.apply(&imgs, &reused_input_tensors_)) {
+        std::vector<cv::Mat> images_ = images;
+        if (!preprocessor_.apply(&images_, &reused_input_tensors_)) {
             MD_LOG_ERROR("Failed to preprocess input image.");
             return false;
         }

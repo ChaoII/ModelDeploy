@@ -70,7 +70,7 @@ namespace modeldeploy {
         std::string name;
 
         /// Whether the tensor is owned the data buffer or share the data buffer from outside
-        bool is_shared() { return external_data_ptr_ != nullptr; }
+        [[nodiscard]] bool is_shared() const { return external_data_ptr_ != nullptr; }
         /// If the tensor is share the data buffer from outside, `StopSharing` will copy to its own structure; Otherwise, do nothing
         void stop_sharing();
 
