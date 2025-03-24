@@ -20,6 +20,9 @@ namespace modeldeploy::vision::utils {
 
     void sort_detection_result(DetectionResult* result);
 
+
+    MODELDEPLOY_CXX_EXPORT std::vector<float> l2_normalize(const std::vector<float>& values);
+
     template <typename T>
     std::vector<int32_t> top_k_indices(const T* array, int array_size, int topk) {
         topk = std::min(array_size, topk);

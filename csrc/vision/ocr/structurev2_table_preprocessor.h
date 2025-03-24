@@ -21,6 +21,9 @@ namespace modeldeploy::vision::ocr {
          *
          * \param[in] images The input data list, all the elements are FDMat
          * \param[in] outputs The output tensors which will be fed into runtime
+         * \param start_index
+         * \param end_index
+         * \param indices
          * \return true if the preprocess successed, otherwise false
          */
         bool Run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
@@ -49,7 +52,7 @@ namespace modeldeploy::vision::ocr {
         bool disable_permute_ = false;
         // for recording the switch of normalize
         bool disable_normalize_ = false;
-        // for SLANet or SLANet_Plus max_len = 484,for SLANeXt_wired max_len=512
+        // for SLANet or SLANet_Plus max_len = 484,for SLANeXt_wired max_len = 512
         int max_len = 484;
         std::vector<int> rec_image_shape_ = {3, max_len, max_len};
         bool static_shape_infer_ = false;

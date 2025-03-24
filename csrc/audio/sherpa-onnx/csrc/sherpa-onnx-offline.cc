@@ -89,7 +89,7 @@ See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-ctc/yesno/ind
     --sample-rate=8000 \
     --feat-dim=23 \
     --tokens=./sherpa-onnx-tdnn-yesno/tokens.txt \
-    --tdnn-model=./sherpa-onnx-tdnn-yesno/model-epoch-14-avg-2.onnx \
+    --tdnn-model=./sherpa-onnx-tdnn-yesno/model-epoch-14-avg-face_recognition.onnx \
     ./sherpa-onnx-tdnn-yesno/test_wavs/0_0_0_1_0_0_0_1.wav \
     ./sherpa-onnx-tdnn-yesno/test_wavs/0_0_1_0_0_0_1_0.wav
 
