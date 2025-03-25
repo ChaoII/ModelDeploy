@@ -14,41 +14,36 @@
 
 #include "convert.h"
 
-namespace modeldeploy {
+namespace modeldeploy::vision {
+    Convert::Convert(const std::vector<float>& alpha,
+                     const std::vector<float>& beta) {
+        if (alpha.size() != beta.size()) {
+            std::cerr << "Convert: requires the size of alpha equal to the size of beta.";
+        }
+        if (alpha.size() == 0) {
+            std::cerr << "Convert: requires the size of alpha and beta > 0.";
+        }
+        alpha_.assign(alpha.begin(), alpha.end());
+        beta_.assign(beta.begin(), beta.end());
+    }
 
-namespace vision {
+    bool Convert::ImplByOpenCV(cv::Mat* im) {
+        std::vector<cv::Mat> split_im;
+        cv::split(*im, split_im);
+        for (int c = 0; c < im->channels(); c++) {
+            split_im[c].convertTo(split_im[c], CV_32FC1, alpha_[c], beta_[c]);
+        }
+        cv::merge(split_im, *im);
+        return true;
+    }
 
-Convert::Convert(const std::vector<float>& alpha,
-                 const std::vector<float>& beta) {
-  if(alpha.size() != beta.size()){
-           std::cerr<<"Convert: requires the size of alpha equal to the size of beta.";}
-  if(alpha.size() == 0){
-           std::cerr<<"Convert: requires the size of alpha and beta > 0.";}
-  alpha_.assign(alpha.begin(), alpha.end());
-  beta_.assign(beta.begin(), beta.end());
+    bool Convert::operator()(cv::Mat* mat) {
+        return ImplByOpenCV(mat);
+    }
+
+    bool Convert::Run(cv::Mat* mat, const std::vector<float>& alpha,
+                      const std::vector<float>& beta) {
+        auto c = Convert(alpha, beta);
+        return c(mat);
+    }
 }
-
-bool Convert::ImplByOpenCV(cv::Mat* im) {
-  std::vector<cv::Mat> split_im;
-  cv::split(*im, split_im);
-  for (int c = 0; c < im->channels(); c++) {
-    split_im[c].convertTo(split_im[c], CV_32FC1, alpha_[c], beta_[c]);
-  }
-  cv::merge(split_im, *im);
-  return true;
-}
-
-    bool Convert::operator()(cv::Mat* mat){
-
-    return ImplByOpenCV(mat);
-
-}
-
-bool Convert::Run(cv::Mat* mat, const std::vector<float>& alpha,
-                  const std::vector<float>& beta) {
-  auto c = Convert(alpha, beta);
-  return c(mat);
-}
-
-}  // namespace vision
-}  // namespace fastdeploy

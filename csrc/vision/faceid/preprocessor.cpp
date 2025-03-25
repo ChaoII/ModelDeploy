@@ -2,43 +2,38 @@
 // Created by aichao on 2025/3/24.
 //
 #include "csrc/vision/faceid/preprocessor.h"
+
+#include <csrc/core/md_log.h>
+
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/color_space_convert.h"
-#include "csrc/vision/common/processors/convert.h"
 #include "csrc/vision/common/processors/hwc2chw.h"
 #include "csrc/vision/common/processors/cast.h"
+#include "csrc/vision/common/processors/center_crop.h"
 
 
 namespace modeldeploy::vision::faceid {
-    AdaFacePreprocessor::AdaFacePreprocessor() {
-        // parameters for preprocess
-        size_ = {248, 248};
-        alpha_ = {1.f / 127.5f, 1.f / 127.5f, 1.f / 127.5f};
-        beta_ = {-1.f, -1.f, -1.f}; // RGB
-        permute_ = true;
-    }
 
     bool AdaFacePreprocessor::Preprocess(cv::Mat* mat, MDTensor* output) {
-        // face recognition model's preprocess steps in insightface
-        // reference: insightface/recognition/arcface_torch/inference.py
-        // 1. Resize
+        // 经过人脸对齐后[256, 256]的图像
+        // 1. CenterCrop [256,256]->[248,248]
         // 2. BGR2RGB
-        // 3. Convert(opencv style) or Normalize
-        // 4. HWC2CHW
-        int resize_w = size_[0];
-        int resize_h = size_[1];
-        if (resize_h != mat->rows || resize_w != mat->cols) {
-            Resize::Run(mat, resize_w, resize_h);
+        // 3. HWC2CHW
+        // 4. Cast
+        if (mat->rows != 256 || mat->cols != 256) {
+            MD_LOG_ERROR(
+                "the size of shape must be 256, ensure use face alignment? "
+                "now, resize to 256 and may loss precision");
+            Resize::Run(mat, 256, 256);
         }
-        if (permute_) {
-            BGR2RGB::Run(mat);
-        }
-
-        Convert::Run(mat, alpha_, beta_);
+        CenterCrop::Run(mat, size_[0], size_[1]);
+        BGR2RGB::Run(mat);
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
-
-        utils::mat_to_tensor(*mat, output);
+        if (!utils::mat_to_tensor(*mat, output)) {
+            MD_LOG_ERROR("Failed to binding mat to tensor.");
+            return false;
+        }
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
@@ -46,8 +41,7 @@ namespace modeldeploy::vision::faceid {
     bool AdaFacePreprocessor::Run(std::vector<cv::Mat>* images,
                                   std::vector<MDTensor>* outputs) {
         if (images->empty()) {
-            std::cerr << "The size of input images should be greater than 0."
-                << std::endl;
+            std::cerr << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
         if (images->size() != 1) {

@@ -3,6 +3,9 @@
 //
 
 #include "csrc/vision/utils.h"
+
+#include <execution>
+
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy::vision::utils {
@@ -129,6 +132,87 @@ namespace modeldeploy::vision::utils {
     }
 
 
+    void nms(FaceDetectionResult* result, float iou_threshold) {
+        utils::sort_detection_result(result);
+
+        std::vector<float> area_of_boxes(result->boxes.size());
+        std::vector<int> suppressed(result->boxes.size(), 0);
+        for (size_t i = 0; i < result->boxes.size(); ++i) {
+            area_of_boxes[i] = (result->boxes[i][2] - result->boxes[i][0]) *
+                (result->boxes[i][3] - result->boxes[i][1]);
+        }
+
+        for (size_t i = 0; i < result->boxes.size(); ++i) {
+            if (suppressed[i] == 1) {
+                continue;
+            }
+            for (size_t j = i + 1; j < result->boxes.size(); ++j) {
+                if (suppressed[j] == 1) {
+                    continue;
+                }
+                float xmin = std::max(result->boxes[i][0], result->boxes[j][0]);
+                float ymin = std::max(result->boxes[i][1], result->boxes[j][1]);
+                float xmax = std::min(result->boxes[i][2], result->boxes[j][2]);
+                float ymax = std::min(result->boxes[i][3], result->boxes[j][3]);
+                float overlap_w = std::max(0.0f, xmax - xmin);
+                float overlap_h = std::max(0.0f, ymax - ymin);
+                float overlap_area = overlap_w * overlap_h;
+                float overlap_ratio =
+                    overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
+                if (overlap_ratio > iou_threshold) {
+                    suppressed[j] = 1;
+                }
+            }
+        }
+        FaceDetectionResult backup(*result);
+        int landmarks_per_face = result->landmarks_per_face;
+
+        result->Clear();
+        // don't forget to reset the landmarks_per_face
+        // before apply Reserve method.
+        result->landmarks_per_face = landmarks_per_face;
+        result->Reserve(suppressed.size());
+        for (size_t i = 0; i < suppressed.size(); ++i) {
+            if (suppressed[i] == 1) {
+                continue;
+            }
+            result->boxes.emplace_back(backup.boxes[i]);
+            result->scores.push_back(backup.scores[i]);
+            // landmarks (if have)
+            if (result->landmarks_per_face > 0) {
+                for (size_t j = 0; j < result->landmarks_per_face; ++j) {
+                    result->landmarks.emplace_back(
+                        backup.landmarks[i * result->landmarks_per_face + j]);
+                }
+            }
+        }
+    }
+
+    cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size) {
+        // 获取输入图像的尺寸
+        int img_height = image.rows;
+        int img_width = image.cols;
+
+        // 获取裁剪尺寸
+        int crop_height = crop_size.height;
+        int crop_width = crop_size.width;
+
+        // 检查裁剪尺寸是否大于输入图像尺寸
+        if (crop_height > img_height || crop_width > img_width) {
+            std::cerr << "Crop size is larger than the input image size." << std::endl;
+            return image; // 或者抛出异常
+        }
+
+        // 计算裁剪区域的起始坐标
+        int top = (img_height - crop_height) / 2;
+        int left = (img_width - crop_width) / 2;
+
+        // 使用子矩阵操作进行裁剪
+        cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
+
+        return cropped_image;
+    }
+
     void print_mat_type(const cv::Mat& mat) {
         const int type = mat.type();
         std::string r;
@@ -155,6 +239,27 @@ namespace modeldeploy::vision::utils {
         r += "C";
         r += chans + '0';
         std::cout << "Mat type: " << r << std::endl;
+    }
+
+
+    std::vector<float> compute_sqrt(const std::vector<float>& vec) {
+        std::vector<float> result(vec.size());
+        std::transform(std::execution::par, vec.begin(), vec.end(), result.begin(), [](float x) {
+            return std::sqrt(x);
+        });
+        return result;
+    }
+
+    float compute_similarity(const std::vector<float>& feature1, const std::vector<float>& feature2) {
+        if (feature1.size() != feature2.size()) {
+            MD_LOG_ERROR("The size of feature1 and feature2 should be same.");
+            return 0.0f;
+        }
+        float sum = 0;
+        for (int i = 0; i < feature1.size(); ++i) {
+            sum += feature1[i] * feature2[i];
+        }
+        return std::max<float>(sum, 0.0f);
     }
 
     std::vector<float> l2_normalize(const std::vector<float>& values) {

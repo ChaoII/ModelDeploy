@@ -9,3 +9,4 @@
 #include "vision/ocr/recognizer.h"
 #include "vision/detection/yolov8.h"
 #include "vision/classification/yolov5cls.h"
+#include "vision/face_detection/scrfd.h"

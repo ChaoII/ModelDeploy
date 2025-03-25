@@ -18,15 +18,15 @@ namespace modeldeploy {
 
         virtual bool infer();
 
-        virtual int num_inputs() { return runtime_->num_inputs(); }
+        virtual size_t num_inputs() { return runtime_->num_inputs(); }
 
-        virtual int num_outputs() { return runtime_->num_outputs(); }
+        virtual size_t num_outputs() { return runtime_->num_outputs(); }
 
-        virtual TensorInfo get_input_info(int index) {
+        virtual TensorInfo get_input_info(const int index) {
             return runtime_->get_input_info(index);
         }
 
-        virtual TensorInfo get_output_info(int index) {
+        virtual TensorInfo get_output_info(const int index) {
             return runtime_->get_output_info(index);
         }
 

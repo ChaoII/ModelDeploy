@@ -12,14 +12,14 @@
 namespace modeldeploy::vision::faceid {
     /*! @brief AdaFace model object used when to load a AdaFace model exported by AdaFace.
      */
-    class MODELDEPLOY_CXX_EXPORT AdaFace : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT SeetaFace : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
          *
          * \param[in] model_file Path of model file, e.g ./adaface.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        AdaFace(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
+        explicit SeetaFace(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "seetaface recognitin"; }
 
@@ -29,7 +29,7 @@ namespace modeldeploy::vision::faceid {
          * \param[in] result The output FaceRecognitionResult will be writen to this structure
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool Predict(const cv::Mat& image, FaceRecognitionResult* result);
+        virtual bool predict(const cv::Mat& image, FaceRecognitionResult* result);
 
         /** \brief Predict the detection results for a batch of input images
          *
@@ -37,21 +37,21 @@ namespace modeldeploy::vision::faceid {
          * \param[in] results The output FaceRecognitionResult list
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool BatchPredict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<cv::Mat>& images,
                                   std::vector<FaceRecognitionResult>* results);
 
         /// Get preprocessor reference of AdaFace
-        virtual AdaFacePreprocessor& GetPreprocessor() {
+        virtual AdaFacePreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of AdaFace
-        virtual AdaFacePostprocessor& GetPostprocessor() {
+        virtual AdaFacePostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 
     protected:
-        bool Initialize();
+        bool initialize();
         AdaFacePreprocessor preprocessor_;
         AdaFacePostprocessor postprocessor_;
     };

@@ -18,8 +18,7 @@ namespace modeldeploy::vision {
             cv::extractChannel(
                 im_clone,
                 cv::Mat(rh, rw, im->type() % 8,
-                        im->ptr() + i * rh * rw * MDDataType::size(utils::cv_dtype_to_md_dtype(im->type()))),
-                i);
+                        im->ptr() + i * rh * rw * MDDataType::size(utils::cv_dtype_to_md_dtype(im->type()))), i);
         }
         return true;
     }
