@@ -16,7 +16,7 @@ int main() {
     auto im1 = cv::imread("../../test_data/test_images/test_face_id4.jpg");
     modeldeploy::vision::FaceRecognitionResult result0;
     modeldeploy::vision::FaceRecognitionResult result1;
-    if (!faceid_model.Predict(im0, &result0)) {
+    if (!faceid_model.predict(im0, &result0)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
