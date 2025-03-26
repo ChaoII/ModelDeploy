@@ -11,11 +11,11 @@
 namespace modeldeploy::vision::faceid {
     /*! @brief Preprocessor object for AdaFace serials model.
      */
-    class MODELDEPLOY_CXX_EXPORT SeetaFacePreprocessor {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceAgePreprocessor {
     public:
         /** \brief Create a preprocessor instance for AdaFace serials model
          */
-        SeetaFacePreprocessor() = default;
+        SeetaFaceAgePreprocessor() = default;
 
         /** \brief Process the input image and prepare input tensors for runtime
          *

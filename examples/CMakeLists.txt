@@ -3,6 +3,7 @@ add_subdirectory(demo_ocr)
 add_subdirectory(demo_classification)
 add_subdirectory(demo_detection)
 add_subdirectory(demo_face_detection)
+add_subdirectory(demo_face_age)
 add_subdirectory(demo_face_id)
 
 if (BUILD_FACE)

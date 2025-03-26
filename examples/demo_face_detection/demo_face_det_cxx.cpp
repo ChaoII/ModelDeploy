@@ -90,7 +90,7 @@ int main() {
     auto im = cv::imread(image_file);
     auto im_bak = im.clone();
     modeldeploy::vision::FaceDetectionResult res;
-    if (!model.Predict(&im, &res)) {
+    if (!model.predict(&im, &res)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }

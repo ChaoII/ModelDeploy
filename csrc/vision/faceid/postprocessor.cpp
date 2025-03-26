@@ -3,29 +3,32 @@
 //
 
 #include "csrc/vision/faceid/postprocessor.h"
+
+#include <csrc/core/md_log.h>
+
 #include "csrc/vision/utils.h"
 #include "csrc/core/md_type.h"
 
 namespace modeldeploy::vision::faceid {
-    bool AdaFacePostprocessor::Run(std::vector<MDTensor>& infer_result,
-                                   std::vector<FaceRecognitionResult>* results) {
+    bool SeetaFacePostprocessor::run(std::vector<MDTensor>& infer_result,
+                                     std::vector<FaceRecognitionResult>* results) {
         if (infer_result[0].dtype != MDDataType::Type::FP32) {
-            std::cerr << "Only support post process with float32 data." << std::endl;
+            MD_LOG_ERROR("Only support post process with float32 data.");
             return false;
         }
         if (infer_result.size() != 1) {
-            std::cerr << "The default number of output tensor "
-                "must be 1 according to insightface." << std::endl;
+            MD_LOG_ERROR("The default number of output tensor "
+                "must be 1 according to insightface.");
         }
         const size_t batch = infer_result[0].shape[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             MDTensor& embedding_tensor = infer_result.at(bs);
-            if ((embedding_tensor.shape[0] != 1)) {
-                std::cerr << "Only support batch = 1 now." << std::endl;
+            if (embedding_tensor.shape[0] != 1) {
+                MD_LOG_ERROR("Only support batch = 1 now.");
             }
             if (embedding_tensor.dtype != MDDataType::Type::FP32) {
-                std::cerr << "Only support post process with float32 data." << std::endl;
+                MD_LOG_ERROR("Only support post process with float32 data.");
                 return false;
             }
             (*results)[bs].Clear();

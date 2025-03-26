@@ -13,7 +13,7 @@ int main() {
     MDModel model;
     ret = md_create_face_model(&model, "../../test_data/test_models/seetaface", MD_MASK, 1);
     std::cout << "create model result: " << ret << std::endl;
-    auto image = md_read_image("../../test_data/test_images/test_face3.jpg");
+    auto image = md_read_image("../../test_data/test_images/test_face_recognition.png");
 
     std::cout << "====================face detection==========================" << std::endl;
     MDDetectionResults r_face_detect;

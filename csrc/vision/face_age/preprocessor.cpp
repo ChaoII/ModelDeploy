@@ -1,7 +1,7 @@
 //
 // Created by aichao on 2025/3/24.
 //
-#include "csrc/vision/faceid/preprocessor.h"
+#include "csrc/vision/face_age/preprocessor.h"
 
 #include <csrc/core/md_log.h>
 
@@ -13,20 +13,26 @@
 
 
 namespace modeldeploy::vision::faceid {
-    bool SeetaFacePreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
+    bool SeetaFaceAgePreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]
         // 2. BGR2RGB
         // 3. HWC2CHW
         // 4. Cast
-        if (mat->rows != 256 || mat->cols != 256) {
+        if (mat->rows == 256 && mat->cols == 256) {
+            CenterCrop::Run(mat, size_[0], size_[1]);
+        }
+        else if (mat->rows == size_[0] && mat->cols == size_[1]) {
+            MD_LOG_WARN("the width and height is already to {} and {} ", size_[0], size_[1]);
+        }
+        else {
             MD_LOG_WARN(
                 "the size of shape must be 256, ensure use face alignment? "
-                "now, resize to 256 and may loss precision");
+                "now, resize to 256 and may loss predict precision");
             Resize::Run(mat, 256, 256);
+            CenterCrop::Run(mat, size_[0], size_[1]);
         }
-        CenterCrop::Run(mat, size_[0], size_[1]);
-        BGR2RGB::Run(mat);
+        // BGR2RGB::Run(mat); 前处理不需要转换为RGB
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
@@ -37,8 +43,8 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFacePreprocessor::run(std::vector<cv::Mat>* images,
-                                    std::vector<MDTensor>* outputs) {
+    bool SeetaFaceAgePreprocessor::run(std::vector<cv::Mat>* images,
+                                       std::vector<MDTensor>* outputs) {
         if (images->empty()) {
             MD_LOG_ERROR("The size of input images should be greater than 0.");
             return false;

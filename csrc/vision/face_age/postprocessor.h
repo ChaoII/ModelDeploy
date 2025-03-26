@@ -10,11 +10,11 @@
 namespace modeldeploy::vision::faceid {
     /*! @brief Postprocessor object for AdaFace serials model.
      */
-    class MODELDEPLOY_CXX_EXPORT SeetaFacePostprocessor {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceAgePostprocessor {
     public:
         /** \brief Create a postprocessor instance for AdaFace serials model
          */
-        SeetaFacePostprocessor() = default;
+        SeetaFaceAgePostprocessor() = default;
 
         /** \brief Process the result of runtime and fill to FaceRecognitionResult structure
          *
@@ -22,6 +22,6 @@ namespace modeldeploy::vision::faceid {
          * \param[in] results The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(std::vector<MDTensor>& infer_result, std::vector<FaceRecognitionResult>* results);
+        bool run(std::vector<MDTensor>& infer_result, std::vector<int>* ages);
     };
 } // namespace modeldeploy::vision::faceid

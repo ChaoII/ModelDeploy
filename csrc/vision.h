@@ -10,3 +10,4 @@
 #include "vision/detection/yolov8.h"
 #include "vision/classification/yolov5cls.h"
 #include "vision/face_detection/scrfd.h"
+#include "vision/face_age/seetaface_age.h"
