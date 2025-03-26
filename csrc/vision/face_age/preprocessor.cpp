@@ -12,7 +12,7 @@
 #include "csrc/vision/common/processors/center_crop.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     bool SeetaFaceAgePreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]

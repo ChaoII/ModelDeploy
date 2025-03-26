@@ -27,9 +27,9 @@ namespace modeldeploy::pipeline {
          * \param[in] rec_model Path of recognition model, e.g ./ch_PP-OCRv2_rec_infer
          * \param[in] table_model Path of table recognition model, e.g ./en_ppstructure_mobile_v2.0_SLANet_infer
          */
-        PPStructureV2Table(modeldeploy::vision::ocr::DBDetector* det_model,
-                           modeldeploy::vision::ocr::Recognizer* rec_model,
-                           modeldeploy::vision::ocr::StructureV2Table* table_model);
+        PPStructureV2Table(modeldeploy::vision::ocr::DBDetector *det_model,
+                           modeldeploy::vision::ocr::Recognizer *rec_model,
+                           modeldeploy::vision::ocr::StructureV2Table *table_model);
 
 
         /** \brief Predict the input image and get OCR result.
@@ -38,26 +38,29 @@ namespace modeldeploy::pipeline {
          * \param[in] result The output OCR result will be writen to this structure.
          * \return true if the prediction successed, otherwise false.
          */
-        virtual bool Predict(cv::Mat* img, modeldeploy::vision::OCRResult* result);
-        virtual bool Predict(const cv::Mat& img,
-                             modeldeploy::vision::OCRResult* result);
+        virtual bool predict(cv::Mat *img, modeldeploy::vision::OCRResult *result);
+
+        virtual bool predict(const cv::Mat &img, modeldeploy::vision::OCRResult *result);
+
         /** \brief BatchPredict the input image and get OCR result.
          *
          * \param[in] images The list of input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] batch_result The output list of OCR result will be writen to this structure.
          * \return true if the prediction successed, otherwise false.
          */
-        virtual bool BatchPredict(const std::vector<cv::Mat>& images,
-                                  std::vector<modeldeploy::vision::OCRResult>* batch_result);
+        virtual bool batch_predict(const std::vector<cv::Mat> &images,
+                                   std::vector<modeldeploy::vision::OCRResult> *batch_result);
 
         [[nodiscard]] bool initialized() const override;
-        bool SetRecBatchSize(int rec_batch_size);
-        int GetRecBatchSize();
+
+        bool set_rec_batch_size(int rec_batch_size);
+
+        [[maybe_unused]] int get_rec_batch_size() const;
 
     protected:
-        modeldeploy::vision::ocr::DBDetector* detector_ = nullptr;
-        modeldeploy::vision::ocr::Recognizer* recognizer_ = nullptr;
-        modeldeploy::vision::ocr::StructureV2Table* table_ = nullptr;
+        modeldeploy::vision::ocr::DBDetector *detector_ = nullptr;
+        modeldeploy::vision::ocr::Recognizer *recognizer_ = nullptr;
+        modeldeploy::vision::ocr::StructureV2Table *table_ = nullptr;
 
     private:
         int rec_batch_size_ = 6;

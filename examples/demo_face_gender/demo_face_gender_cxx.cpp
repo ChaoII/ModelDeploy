@@ -8,7 +8,7 @@
 #include "csrc/vision.h"
 
 int main() {
-    auto faceid_model = modeldeploy::vision::faceid::SeetaFaceGender(
+    auto faceid_model = modeldeploy::vision::face::SeetaFaceGender(
         "../../test_data/test_models/face/gender_predictor.onnx");
     assert(table_model.Initialized());
     const auto im0 = cv::imread("../../test_data/test_images/test_face_gender.jpg");

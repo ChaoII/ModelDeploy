@@ -2,13 +2,13 @@
 // Created by aichao on 2025/3/24.
 //
 
+#include "csrc/core/md_log.h"
 #include "csrc/vision/face_age/seetaface_age.h"
-#include <csrc/core/md_log.h>
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     SeetaFaceAge::SeetaFaceAge(
-        const std::string& model_file,
-        const modeldeploy::RuntimeOption& custom_option) {
+            const std::string &model_file,
+            const modeldeploy::RuntimeOption &custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = initialize();
@@ -22,7 +22,7 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFaceAge::predict(const cv::Mat& image, int* age) {
+    bool SeetaFaceAge::predict(const cv::Mat &image, int *age) {
         std::vector<int> ages;
         if (!batch_predict({image}, &ages)) {
             return false;
@@ -33,8 +33,8 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFaceAge::batch_predict(const std::vector<cv::Mat>& images,
-                                  std::vector<int>* ages) {
+    bool SeetaFaceAge::batch_predict(const std::vector<cv::Mat> &images,
+                                     std::vector<int> *ages) {
         std::vector<cv::Mat> fd_images = images;
         if (images.size() != 1) {
             MD_LOG_ERROR("Only support batch = 1 now.");

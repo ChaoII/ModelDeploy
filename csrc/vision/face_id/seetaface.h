@@ -9,17 +9,17 @@
 #include "csrc/vision/face_id/preprocessor.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief AdaFace model object used when to load a AdaFace model exported by AdaFace.
      */
-    class MODELDEPLOY_CXX_EXPORT SeetaFace : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceID : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
          *
          * \param[in] model_file Path of model file, e.g ./adaface.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        explicit SeetaFace(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
+        explicit SeetaFaceID(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "seetaface recognitin"; }
 
@@ -41,18 +41,18 @@ namespace modeldeploy::vision::faceid {
                                   std::vector<FaceRecognitionResult>* results);
 
         /// Get preprocessor reference of AdaFace
-        virtual SeetaFacePreprocessor& get_preprocessor() {
+        virtual SeetaFaceIDPreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of AdaFace
-        virtual SeetaFacePostprocessor& get_postprocessor() {
+        virtual SeetaFaceIDPostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 
     protected:
         bool initialize();
-        SeetaFacePreprocessor preprocessor_;
-        SeetaFacePostprocessor postprocessor_;
+        SeetaFaceIDPreprocessor preprocessor_;
+        SeetaFaceIDPostprocessor postprocessor_;
     };
 } // namespace modeldeploy::vision::faceid

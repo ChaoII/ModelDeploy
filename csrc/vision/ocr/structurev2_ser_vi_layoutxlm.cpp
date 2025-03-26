@@ -6,14 +6,14 @@
 
 namespace modeldeploy::vision::ocr {
     StructureV2SERViLayoutXLMModel::StructureV2SERViLayoutXLMModel(
-        const std::string& model_file, const RuntimeOption& custom_option) {
+            const std::string &model_file, const RuntimeOption &custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
-        initialized_ = Initialize();
+        initialized_ = initialize();
     }
 
 
-    bool StructureV2SERViLayoutXLMModel::Initialize() {
+    bool StructureV2SERViLayoutXLMModel::initialize() {
         if (!init_runtime()) {
             std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
             return false;

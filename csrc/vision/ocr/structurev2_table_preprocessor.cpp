@@ -20,12 +20,10 @@ namespace modeldeploy::vision::ocr {
         hwc2chw_op_ = std::make_shared<HWC2CHW>();
     }
 
-    void StructureV2TablePreprocessor::StructureV2TableResizeImage(cv::Mat* mat,
-                                                                   int batch_idx) {
-        float img_h = float(rec_image_shape_[1]);
-        float img_w = float(rec_image_shape_[2]);
-        float width = float(mat->cols);
-        float height = float(mat->rows);
+    void StructureV2TablePreprocessor::structure_v2_table_resize_image(cv::Mat *mat,
+                                                                       int batch_idx) {
+        auto width = float(mat->cols);
+        auto height = float(mat->rows);
         float ratio = max_len / (std::max(height, width) * 1.0);
         int resize_h = int(height * ratio);
         int resize_w = int(width * ratio);
@@ -40,20 +38,20 @@ namespace modeldeploy::vision::ocr {
 
         (*hwc2chw_op_)(mat);
         batch_det_img_info_[batch_idx] = {
-            int(width), int(height), resize_w,
-            resize_h
+                int(width), int(height), resize_w,
+                resize_h
         };
     }
 
-    bool StructureV2TablePreprocessor::Run(std::vector<cv::Mat>* images,
-                                           std::vector<MDTensor>* outputs,
+    bool StructureV2TablePreprocessor::run(std::vector<cv::Mat> *images,
+                                           std::vector<MDTensor> *outputs,
                                            size_t start_index, size_t end_index,
-                                           const std::vector<int>& indices) {
+                                           const std::vector<int> &indices) {
         if (images->size() == 0 || end_index <= start_index ||
             end_index > images->size()) {
             std::cerr << "images->size() or index error. Correct is: 0 <= start_index < "
-                "end_index <= images->size()"
-                << std::endl;
+                         "end_index <= images->size()"
+                      << std::endl;
             return false;
         }
 
@@ -65,22 +63,21 @@ namespace modeldeploy::vision::ocr {
             }
             mats[i - start_index] = images->at(real_index);
         }
-        return Apply(&mats, outputs);
+        return run(&mats, outputs);
     }
 
-    bool StructureV2TablePreprocessor::Apply(std::vector<cv::Mat>* image_batch,
-                                             std::vector<MDTensor>* outputs) {
+    bool StructureV2TablePreprocessor::run(std::vector<cv::Mat> *image_batch,
+                                           std::vector<MDTensor> *outputs) {
         batch_det_img_info_.clear();
         batch_det_img_info_.resize(image_batch->size());
         for (size_t i = 0; i < image_batch->size(); ++i) {
-            cv::Mat* mat = &(image_batch->at(i));
-            StructureV2TableResizeImage(mat, i);
+            cv::Mat *mat = &(image_batch->at(i));
+            structure_v2_table_resize_image(mat, i);
         }
 
         // Only have 1 output Tensor.
         outputs->resize(1);
         // Get the NCHW tensor
-
         utils::mats_to_tensor(*image_batch, &(*outputs)[0]);
         return true;
     }

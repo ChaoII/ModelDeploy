@@ -5,7 +5,7 @@
 #include "csrc/vision/face_gender/seetaface_gender.h"
 #include <csrc/core/md_log.h>
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     SeetaFaceGender::SeetaFaceGender(
         const std::string& model_file,
         const modeldeploy::RuntimeOption& custom_option) {

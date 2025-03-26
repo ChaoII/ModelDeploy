@@ -6,7 +6,7 @@
 #include "csrc/vision.h"
 
 int main() {
-    auto faceid_model = modeldeploy::vision::faceid::SeetaFaceAge(
+    auto faceid_model = modeldeploy::vision::face::SeetaFaceAge(
         "../../test_data/test_models/face/age_predictor.onnx");
     assert(table_model.Initialized());
     auto im0 = cv::imread("../../test_data/test_images/test_face_id.jpg");

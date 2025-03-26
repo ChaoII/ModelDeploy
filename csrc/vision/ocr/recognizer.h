@@ -25,7 +25,7 @@ namespace modeldeploy::vision::ocr {
                             const RuntimeOption& custom_option = RuntimeOption());
 
         /// Get model's name
-        std::string name() const override { return "ppocr/ocr_rec"; }
+        [[nodiscard]] std::string name() const override { return "ppocr/ocr_rec"; }
 
 
         /** \brief Predict the input image and get OCR recognition model result.

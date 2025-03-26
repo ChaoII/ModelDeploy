@@ -3,11 +3,12 @@
 //
 
 #pragma once
+
 #include "csrc/core/md_tensor.h"
 #include "csrc/vision/common/result.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief Postprocessor object for AdaFace serials model.
      */
     class MODELDEPLOY_CXX_EXPORT SeetaFaceAgePostprocessor {
@@ -22,6 +23,6 @@ namespace modeldeploy::vision::faceid {
          * \param[in] results The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(std::vector<MDTensor>& infer_result, std::vector<int>* ages);
+        bool run(std::vector<MDTensor> &infer_result, std::vector<int> *ages);
     };
 } // namespace modeldeploy::vision::faceid

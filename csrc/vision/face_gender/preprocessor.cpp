@@ -8,7 +8,7 @@
 #include "csrc/vision/common/processors/cast.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     bool SeetaFaceGenderPreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
         // 1. Resize
         // 2. HWC2CHW

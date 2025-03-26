@@ -8,7 +8,7 @@
 #include "csrc/core/md_tensor.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief Preprocessor object for AdaFace serials model.
      */
     class MODELDEPLOY_CXX_EXPORT SeetaFaceAgePreprocessor {

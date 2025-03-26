@@ -13,7 +13,7 @@ int main() {
     auto im = cv::imread("../../test_data/test_images/test_table1.jpg");
     auto im_bak = im.clone();
     modeldeploy::vision::OCRResult result;
-    if (!table_model.Predict(im, &result)) {
+    if (!table_model.predict(im, &result)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }

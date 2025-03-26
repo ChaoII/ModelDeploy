@@ -4,7 +4,7 @@
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision::facedet {
+namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.
              */
     class MODELDEPLOY_CXX_EXPORT SCRFD : public BaseModel {

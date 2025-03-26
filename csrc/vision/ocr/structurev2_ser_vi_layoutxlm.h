@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "csrc/base_model.h"
 
 
@@ -22,16 +23,14 @@ namespace modeldeploy::vision::ocr {
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in `valid_cpu_backends`
          * \param[in] model_format Model format of the loaded model, default is Paddle format
          */
-        StructureV2SERViLayoutXLMModel(const std::string& model_file,
-                                       const RuntimeOption& custom_option = RuntimeOption());
+        explicit StructureV2SERViLayoutXLMModel(const std::string &model_file,
+                                                const RuntimeOption &custom_option = RuntimeOption());
 
 
         /// Get model's name
-        virtual std::string ModelName() const {
-            return "StructureV2SERViLayoutXLMModel";
-        }
+        [[nodiscard]] std::string name() const override { return "StructureV2SERViLayoutXLMModel"; }
 
     protected:
-        bool Initialize();
+        bool initialize();
     };
 } // namespace modeldeploy::vision::ocr

@@ -7,11 +7,9 @@
 
 
 namespace modeldeploy::vision::ocr {
-    StructureV2Layout::StructureV2Layout() {
-    }
 
-    StructureV2Layout::StructureV2Layout(const std::string& model_file,
-                                         const RuntimeOption& custom_option) {
+    StructureV2Layout::StructureV2Layout(const std::string &model_file,
+                                         const RuntimeOption &custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = Initialize();
@@ -26,27 +24,27 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool StructureV2Layout::Predict(cv::Mat* im, DetectionResult* result) {
-        return Predict(*im, result);
+    bool StructureV2Layout::predict(cv::Mat *im, DetectionResult *result) {
+        return predict(*im, result);
     }
 
-    bool StructureV2Layout::Predict(const cv::Mat& im, DetectionResult* result) {
+    bool StructureV2Layout::predict(const cv::Mat &im, DetectionResult *result) {
         std::vector<DetectionResult> results;
-        if (!BatchPredict({im}, &results)) {
+        if (!batch_predict({im}, &results)) {
             return false;
         }
         *result = std::move(results[0]);
         return true;
     }
 
-    bool StructureV2Layout::BatchPredict(const std::vector<cv::Mat>& images,
-                                         std::vector<DetectionResult>* results) {
+    bool StructureV2Layout::batch_predict(const std::vector<cv::Mat> &images,
+                                          std::vector<DetectionResult> *results) {
         std::vector<cv::Mat> images_ = images;
-        if (!preprocessor_.Apply(&images_, &reused_input_tensors_)) {
+        if (!preprocessor_.run(&images_, &reused_input_tensors_)) {
             std::cerr << "Failed to preprocess input image." << std::endl;
             return false;
         }
-        auto batch_layout_img_info = preprocessor_.GetBatchLayoutImgInfo();
+        auto batch_layout_img_info = preprocessor_.get_batch_layout_image_info();
 
         reused_input_tensors_[0].name = get_input_info(0).name;
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
@@ -54,7 +52,7 @@ namespace modeldeploy::vision::ocr {
             return false;
         }
 
-        if (!postprocessor_.Run(reused_output_tensors_, results,
+        if (!postprocessor_.run(reused_output_tensors_, results,
                                 *batch_layout_img_info)) {
             std::cerr << "Failed to postprocess the inference results." << std::endl;
             return false;

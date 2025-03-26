@@ -9,8 +9,8 @@
 #include "csrc/vision/utils.h"
 #include "csrc/core/md_type.h"
 
-namespace modeldeploy::vision::faceid {
-    bool SeetaFacePostprocessor::run(std::vector<MDTensor>& infer_result,
+namespace modeldeploy::vision::face {
+    bool SeetaFaceIDPostprocessor::run(std::vector<MDTensor>& infer_result,
                                      std::vector<FaceRecognitionResult>* results) {
         if (infer_result[0].dtype != MDDataType::Type::FP32) {
             MD_LOG_ERROR("Only support post process with float32 data.");

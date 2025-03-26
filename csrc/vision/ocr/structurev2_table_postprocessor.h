@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "csrc/core/md_tensor.h"
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
@@ -14,11 +15,12 @@ namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT StructureV2TablePostprocessor {
     public:
         StructureV2TablePostprocessor();
+
         /** \brief Create a postprocessor instance for Recognizer serials model
          *
          * \param[in] label_path The path of label_dict
          */
-        explicit StructureV2TablePostprocessor(const std::string& dict_path);
+        explicit StructureV2TablePostprocessor(const std::string &dict_path);
 
         /** \brief Process the result of runtime and fill to RecognizerResult
          *
@@ -27,22 +29,23 @@ namespace modeldeploy::vision::ocr {
          * \param[in] rec_scores The output score results of recognizer
          * \return true if the postprocess successed, otherwise false
          */
-        bool Run(const std::vector<MDTensor>& tensors,
-                 std::vector<std::vector<std::array<int, 8>>>* bbox_batch_list,
-                 std::vector<std::vector<std::string>>* structure_batch_list,
-                 const std::vector<std::array<int, 4>>& batch_det_img_info);
+        bool run(const std::vector<MDTensor> &tensors,
+                 std::vector<std::vector<std::array<int, 8>>> *bbox_batch_list,
+                 std::vector<std::vector<std::string>> *structure_batch_list,
+                 const std::vector<std::array<int, 4>> &batch_det_img_info);
 
     private:
         PostProcessor util_post_processor_;
-        bool SingleBatchPostprocessor(const float* structure_probs,
-                                      const float* bbox_preds,
-                                      size_t slice_dim,
-                                      size_t prob_dim,
-                                      size_t box_dim,
-                                      int img_width,
-                                      int img_height,
-                                      std::vector<std::array<int, 8>>* boxes_result,
-                                      std::vector<std::string>* structure_list_result);
+
+        bool single_batch_post_processor(const float *structure_probs,
+                                         const float *bbox_preds,
+                                         size_t slice_dim,
+                                         size_t prob_dim,
+                                         size_t box_dim,
+                                         int img_width,
+                                         int img_height,
+                                         std::vector<std::array<int, 8>> *boxes_result,
+                                         std::vector<std::string> *structure_list_result);
 
         bool merge_no_span_structure{true};
         std::vector<std::string> dict_character;

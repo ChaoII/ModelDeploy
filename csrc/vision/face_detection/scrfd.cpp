@@ -10,7 +10,7 @@
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/convert.h"
 
-namespace modeldeploy::vision::facedet {
+namespace modeldeploy::vision::face {
     void SCRFD::letter_box(cv::Mat* mat, const std::vector<int>& size,
                            const std::vector<float>& color, const bool _auto,
                            const bool scale_fill, const bool scale_up, const int stride) {

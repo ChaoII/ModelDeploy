@@ -12,8 +12,8 @@
 #include "csrc/vision/common/processors/center_crop.h"
 
 
-namespace modeldeploy::vision::faceid {
-    bool SeetaFacePreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
+namespace modeldeploy::vision::face {
+    bool SeetaFaceIDPreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]
         // 2. BGR2RGB
@@ -37,7 +37,7 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFacePreprocessor::run(std::vector<cv::Mat>* images,
+    bool SeetaFaceIDPreprocessor::run(std::vector<cv::Mat>* images,
                                     std::vector<MDTensor>* outputs) {
         if (images->empty()) {
             MD_LOG_ERROR("The size of input images should be greater than 0.");

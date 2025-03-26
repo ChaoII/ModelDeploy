@@ -85,7 +85,7 @@ int main() {
     // When inference batch size is set to -1, it means that the inference batch
     // size of the rec models will be the same as the number of boxes detected
     // by the det model.
-    ppstructurev2_table.SetRecBatchSize(rec_batch_size);
+    ppstructurev2_table.set_rec_batch_size(rec_batch_size);
 
     if (!ppstructurev2_table.initialized()) {
         std::cerr << "Failed to initialize PP-OCR-Table." << std::endl;
@@ -96,7 +96,7 @@ int main() {
     auto im_bak = im.clone();
 
     modeldeploy::vision::OCRResult result;
-    if (!ppstructurev2_table.Predict(&im, &result)) {
+    if (!ppstructurev2_table.predict(&im, &result)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }

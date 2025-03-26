@@ -8,14 +8,14 @@
 #include "csrc/core/md_tensor.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief Preprocessor object for AdaFace serials model.
      */
-    class MODELDEPLOY_CXX_EXPORT SeetaFacePreprocessor {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceIDPreprocessor {
     public:
         /** \brief Create a preprocessor instance for AdaFace serials model
          */
-        SeetaFacePreprocessor() = default;
+        SeetaFaceIDPreprocessor() = default;
 
         /** \brief Process the input image and prepare input tensors for runtime
          *

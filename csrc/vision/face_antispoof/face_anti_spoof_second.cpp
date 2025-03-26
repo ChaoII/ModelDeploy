@@ -1,3 +1,6 @@
+//
+// Created by aichao on 2025/3/26.
+//
 #include "csrc/vision/face_antispoof/face_anti_spoof_second.h"
 
 #include <csrc/core/md_log.h>
@@ -11,9 +14,9 @@
 #include <variant>
 #include <csrc/utils/utils.h>
 
-namespace modeldeploy::vision::facedet {
-    SeetaFaceAntiSpoofSecond::SeetaFaceAntiSpoofSecond(const std::string& model_file,
-                                                       const RuntimeOption& custom_option) {
+namespace modeldeploy::vision::face {
+    SeetaFaceAntiSpoofSecond::SeetaFaceAntiSpoofSecond(const std::string &model_file,
+                                                       const RuntimeOption &custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = Initialize();
@@ -27,21 +30,15 @@ namespace modeldeploy::vision::facedet {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofSecond::preprocess(cv::Mat* mat, MDTensor* output,
-                                              std::map<std::string, std::array<float, 2>>* im_info) {
+    bool SeetaFaceAntiSpoofSecond::preprocess(cv::Mat *mat, MDTensor *output) {
         std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         std::vector beta_ = {-1.0f, -1.0f, -1.0f};
 
-        Resize::Run(mat, size[0], size[1]);
+        Resize::Run(mat, size_[0], size_[1]);
         Convert::Run(mat, alpha_, beta_);
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
 
-        // Record output shape of preprocessed image
-        (*im_info)["output_shape"] = {
-            static_cast<float>(mat->rows),
-            static_cast<float>(mat->cols)
-        };
         if (!utils::mat_to_tensor(*mat, output)) {
             MD_LOG_ERROR("Failed to binding mat to tensor.");
             return false;
@@ -52,9 +49,9 @@ namespace modeldeploy::vision::facedet {
 
 
     bool SeetaFaceAntiSpoofSecond::postprocess(
-        const std::vector<MDTensor>& infer_result, std::vector<std::tuple<int, float>>* result) {
-        const auto& class_predictions = infer_result[0];
-        const auto& box_encodings = infer_result[1];
+            const std::vector<MDTensor> &infer_result, std::vector<std::tuple<int, float>> *result) {
+        const auto &class_predictions = infer_result[0];
+        const auto &box_encodings = infer_result[1];
         const size_t size = box_encodings.shape[1];
         result->resize(size);
         for (int i = 0; i < size; ++i) {
@@ -74,10 +71,10 @@ namespace modeldeploy::vision::facedet {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofSecond::predict(cv::Mat* im, std::vector<std::tuple<int, float>>* result) {
+    bool SeetaFaceAntiSpoofSecond::predict(cv::Mat *im, std::vector<std::tuple<int, float>> *result) {
         std::vector<MDTensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
-        if (!preprocess(im, &input_tensors[0], &im_info)) {
+        if (!preprocess(im, &input_tensors[0])) {
             MD_LOG_ERROR("Failed to preprocess input image.");
             return false;
         }

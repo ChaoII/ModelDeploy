@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "csrc/vision/common/result.h"
 #include "csrc/core/md_tensor.h"
 
@@ -12,8 +13,7 @@ namespace modeldeploy::vision::ocr {
      */
     class MODELDEPLOY_CXX_EXPORT StructureV2LayoutPostprocessor {
     public:
-        StructureV2LayoutPostprocessor() {
-        }
+        StructureV2LayoutPostprocessor() = default;
 
         /** \brief Process the result of runtime and fill to batch DetectionResult
          *
@@ -23,40 +23,50 @@ namespace modeldeploy::vision::ocr {
          *            {{image width, image height, resize width, resize height},...}
          * \return true if the postprocess successed, otherwise false
          */
-        bool Run(const std::vector<MDTensor>& tensors,
-                 std::vector<DetectionResult>* results,
-                 const std::vector<std::array<int, 4>>& batch_layout_img_info);
+        bool run(const std::vector<MDTensor> &tensors,
+                 std::vector<DetectionResult> *results,
+                 const std::vector<std::array<int, 4>> &batch_layout_img_info);
 
         /// Set score_threshold_ for layout detection postprocess, default is 0.4
-        void SetScoreThreshold(float score_threshold) { score_threshold_ = score_threshold; }
+        void set_score_threshold(float score_threshold) { score_threshold_ = score_threshold; }
+
         /// Set nms_threshold_ for layout detection postprocess, default is 0.5
-        void SetNMSThreshold(float nms_threshold) { nms_threshold_ = nms_threshold; }
+        void set_nms_threshold(float nms_threshold) { nms_threshold_ = nms_threshold; }
+
         /// Set num_class_ for layout detection postprocess, default is 5
-        void SetNumClass(int num_class) { num_class_ = num_class; }
+        void set_num_class(int num_class) { num_class_ = num_class; }
+
         /// Set fpn_stride_ for layout detection postprocess, default is {8, 16, 32, 64}
-        void SetFPNStride(const std::vector<int>& fpn_stride) { fpn_stride_ = fpn_stride; }
+        void set_fpn_stride(const std::vector<int> &fpn_stride) { fpn_stride_ = fpn_stride; }
+
         /// Set reg_max_ for layout detection postprocess, default is 8
-        void SetRegMax(int reg_max) { reg_max_ = reg_max; } // should private ?
+        void set_reg_max(int reg_max) { reg_max_ = reg_max; } // should private ?
         /// Get score_threshold_ of layout detection postprocess, default is 0.4
-        float GetScoreThreshold() const { return score_threshold_; }
+        [[nodiscard]] float get_score_threshold() const { return score_threshold_; }
+
         /// Get nms_threshold_ of layout detection postprocess, default is 0.5
-        float GetNMSThreshold() const { return nms_threshold_; }
+        [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
+
         /// Get num_class_ of layout detection postprocess, default is 5
-        int GetNumClass() const { return num_class_; }
+        [[nodiscard]] int get_num_class() const { return num_class_; }
+
         /// Get fpn_stride_ of layout detection postprocess, default is {8, 16, 32, 64}
-        std::vector<int> GetFPNStride() const { return fpn_stride_; }
+        [[nodiscard]] std::vector<int> get_fpn_stride() const { return fpn_stride_; }
+
         /// Get reg_max_ of layout detection postprocess, default is 8
-        int GetRegMax() const { return reg_max_; }
+        [[nodiscard]] int get_reg_max() const { return reg_max_; }
 
     private:
-        std::array<float, 4> DisPred2Bbox(const std::vector<float>& bbox_pred, int x, int y,
-                                          int stride, int resize_w, int resize_h, int reg_max);
-        bool SingleBatchPostprocessor(const std::vector<MDTensor>& single_batch_tensors,
-                                      const std::array<int, 4>& layout_img_info,
-                                      DetectionResult* result);
-        void SetSingleBatchExternalData(const std::vector<MDTensor>& tensors,
-                                        std::vector<MDTensor>& single_batch_tensors,
-                                        size_t batch_idx);
+        std::array<float, 4> dis_pred_to_bbox(const std::vector<float> &bbox_pred, int x, int y,
+                                              int stride, int resize_w, int resize_h, int reg_max);
+
+        bool single_batch_postprocessor(const std::vector<MDTensor> &single_batch_tensors,
+                                        const std::array<int, 4> &layout_img_info,
+                                        DetectionResult *result);
+
+        void set_single_batch_external_data(const std::vector<MDTensor> &tensors,
+                                            std::vector<MDTensor> &single_batch_tensors,
+                                            size_t batch_idx);
 
         std::vector<int> fpn_stride_ = {8, 16, 32, 64};
         float score_threshold_ = 0.4;

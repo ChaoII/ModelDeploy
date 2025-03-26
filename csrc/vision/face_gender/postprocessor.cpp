@@ -6,7 +6,7 @@
 #include "csrc/core/md_type.h"
 #include "csrc/vision/face_gender/postprocessor.h"
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     bool SeetaFaceGenderPostprocessor::run(std::vector<MDTensor>& infer_result, std::vector<int>* genders) {
         if (infer_result[0].dtype != MDDataType::Type::FP32) {
             MD_LOG_ERROR("Only support post process with float32 data.");

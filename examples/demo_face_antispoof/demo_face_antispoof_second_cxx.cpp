@@ -6,12 +6,12 @@
 #include "csrc/vision.h"
 
 int main() {
-    auto faceid_model = modeldeploy::vision::facedet::SeetaFaceAntiSpoofSecond(
+    auto face_antispoof_model = modeldeploy::vision::face::SeetaFaceAntiSpoofSecond(
         "../../test_data/test_models/face/fas_second.onnx");
     assert(table_model.Initialized());
     auto im0 = cv::imread("../../test_data/test_images/test_face_antispoof1.jpg");
-    std::vector<auto> results;
-    if (!faceid_model.predict(&im0, &results)) {
+    std::vector<std::tuple<int, float>> results;
+    if (!face_antispoof_model.predict(&im0, &results)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }

@@ -7,7 +7,7 @@
 #include "csrc/vision/common/result.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief Postprocessor object for AdaFace serials model.
      */
     class MODELDEPLOY_CXX_EXPORT SeetaFaceGenderPostprocessor {

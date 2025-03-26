@@ -7,14 +7,14 @@
 
 namespace modeldeploy::pipeline {
     PPStructureV2Table::PPStructureV2Table(
-        modeldeploy::vision::ocr::DBDetector* det_model,
-        modeldeploy::vision::ocr::Recognizer* rec_model,
-        modeldeploy::vision::ocr::StructureV2Table* table_model)
-        : detector_(det_model), recognizer_(rec_model), table_(table_model) {
-        initialized();
+            modeldeploy::vision::ocr::DBDetector *det_model,
+            modeldeploy::vision::ocr::Recognizer *rec_model,
+            modeldeploy::vision::ocr::StructureV2Table *table_model)
+            : detector_(det_model), recognizer_(rec_model), table_(table_model) {
+        initialized_ = initialized();
     }
 
-    bool PPStructureV2Table::SetRecBatchSize(int rec_batch_size) {
+    bool PPStructureV2Table::set_rec_batch_size(int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
             std::cerr << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;
@@ -23,7 +23,7 @@ namespace modeldeploy::pipeline {
         return true;
     }
 
-    int PPStructureV2Table::GetRecBatchSize() { return rec_batch_size_; }
+    [[maybe_unused]] int PPStructureV2Table::get_rec_batch_size() const { return rec_batch_size_; }
 
     bool PPStructureV2Table::initialized() const {
         if (detector_ != nullptr && !detector_->initialized()) {
@@ -41,26 +41,25 @@ namespace modeldeploy::pipeline {
     }
 
 
-
-    bool PPStructureV2Table::Predict(cv::Mat* img,
-                                     modeldeploy::vision::OCRResult* result) {
-        return Predict(*img, result);
+    bool PPStructureV2Table::predict(cv::Mat *img,
+                                     modeldeploy::vision::OCRResult *result) {
+        return predict(*img, result);
     }
 
-    bool PPStructureV2Table::Predict(const cv::Mat& img,
-                                     modeldeploy::vision::OCRResult* result) {
+    bool PPStructureV2Table::predict(const cv::Mat &img,
+                                     modeldeploy::vision::OCRResult *result) {
         std::vector<modeldeploy::vision::OCRResult> batch_result(1);
-        bool success = BatchPredict({img}, &batch_result);
+        bool success = batch_predict({img}, &batch_result);
         if (!success) {
             return success;
         }
         *result = std::move(batch_result[0]);
         return true;
-    };
+    }
 
-    bool PPStructureV2Table::BatchPredict(
-        const std::vector<cv::Mat>& images,
-        std::vector<modeldeploy::vision::OCRResult>* batch_result) {
+    bool PPStructureV2Table::batch_predict(
+            const std::vector<cv::Mat> &images,
+            std::vector<modeldeploy::vision::OCRResult> *batch_result) {
         batch_result->clear();
         batch_result->resize(images.size());
         std::vector<std::vector<std::array<int, 8>>> batch_boxes(images.size());
@@ -76,52 +75,50 @@ namespace modeldeploy::pipeline {
         }
 
         for (int i_batch = 0; i_batch < images.size(); ++i_batch) {
-            modeldeploy::vision::OCRResult& ocr_result = (*batch_result)[i_batch];
+            modeldeploy::vision::OCRResult &ocr_result = (*batch_result)[i_batch];
             // Get croped images by detection result
-            const std::vector<std::array<int, 8>>& boxes = ocr_result.boxes;
-            const cv::Mat& img = images[i_batch];
+            const std::vector<std::array<int, 8>> &boxes = ocr_result.boxes;
+            const cv::Mat &img = images[i_batch];
             std::vector<cv::Mat> image_list;
-            if (boxes.size() == 0) {
+            if (boxes.empty()) {
                 image_list.emplace_back(img);
-            }
-            else {
+            } else {
                 image_list.resize(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
                     image_list[i_box] = vision::ocr::get_rotate_crop_image(img, boxes[i_box]);
                 }
             }
-            std::vector<int32_t>* cls_labels_ptr = &ocr_result.cls_labels;
-            std::vector<float>* cls_scores_ptr = &ocr_result.cls_scores;
 
-            std::vector<std::string>* text_ptr = &ocr_result.text;
-            std::vector<float>* rec_scores_ptr = &ocr_result.rec_scores;
+            std::vector<std::string> *text_ptr = &ocr_result.text;
+            std::vector<float> *rec_scores_ptr = &ocr_result.rec_scores;
 
             std::vector<float> width_list;
-            for (int i = 0; i < image_list.size(); i++) {
-                width_list.push_back(float(image_list[i].cols) / image_list[i].rows);
+            width_list.reserve(image_list.size());
+            for (auto &image: image_list) {
+                width_list.push_back(float(image.cols) / image.rows);
             }
             std::vector<int> indices = vision::ocr::arg_sort(width_list);
 
             for (size_t start_index = 0; start_index < image_list.size();
                  start_index += rec_batch_size_) {
                 size_t end_index =
-                    std::min(start_index + rec_batch_size_, image_list.size());
+                        std::min(start_index + rec_batch_size_, image_list.size());
                 if (!recognizer_->batch_predict(image_list, text_ptr, rec_scores_ptr,
                                                 start_index, end_index, indices)) {
                     std::cerr << "There's error while recognizing image in PPOCR."
-                        << std::endl;
+                              << std::endl;
                     return false;
                 }
             }
         }
 
-        if (!table_->BatchPredict(images, batch_result)) {
+        if (!table_->batch_predict(images, batch_result)) {
             std::cerr << "There's error while recognizing tables in images." << std::endl;
             return false;
         }
 
         for (int i_batch = 0; i_batch < batch_boxes.size(); ++i_batch) {
-            modeldeploy::vision::OCRResult& ocr_result = (*batch_result)[i_batch];
+            modeldeploy::vision::OCRResult &ocr_result = (*batch_result)[i_batch];
             std::vector<std::vector<std::string>> matched(ocr_result.table_boxes.size(),
                                                           std::vector<std::string>());
 
@@ -150,15 +147,15 @@ namespace modeldeploy::pipeline {
             }
 
             // get pred html
-            std::string html_str = "";
+            std::string html_str;
             int td_tag_idx = 0;
             auto structure_html_tags = ocr_result.table_structure;
-            for (int i = 0; i < structure_html_tags.size(); i++) {
-                if (structure_html_tags[i].find("</td>") != std::string::npos) {
-                    if (structure_html_tags[i].find("<td></td>") != std::string::npos) {
+            for (const auto &structure_html_tag: structure_html_tags) {
+                if (structure_html_tag.find("</td>") != std::string::npos) {
+                    if (structure_html_tag.find("<td></td>") != std::string::npos) {
                         html_str += "<td>";
                     }
-                    if (matched[td_tag_idx].size() > 0) {
+                    if (!matched[td_tag_idx].empty()) {
                         bool b_with = false;
                         if (matched[td_tag_idx][0].find("<b>") != std::string::npos &&
                             matched[td_tag_idx].size() > 1) {
@@ -194,16 +191,14 @@ namespace modeldeploy::pipeline {
                             html_str += "</b>";
                         }
                     }
-                    if (structure_html_tags[i].find("<td></td>") != std::string::npos) {
+                    if (structure_html_tag.find("<td></td>") != std::string::npos) {
                         html_str += "</td>";
-                    }
-                    else {
-                        html_str += structure_html_tags[i];
+                    } else {
+                        html_str += structure_html_tag;
                     }
                     td_tag_idx += 1;
-                }
-                else {
-                    html_str += structure_html_tags[i];
+                } else {
+                    html_str += structure_html_tag;
                 }
             }
             (*batch_result)[i_batch].table_html = html_str;

@@ -9,7 +9,7 @@
 #include "csrc/vision/face_gender/preprocessor.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief AdaFace model object used when to load a AdaFace model exported by AdaFace.
      */
     class MODELDEPLOY_CXX_EXPORT SeetaFaceGender : public BaseModel {

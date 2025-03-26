@@ -26,7 +26,7 @@ namespace modeldeploy::vision::ocr {
          * \param indices
          * \return true if the preprocess successed, otherwise false
          */
-        bool Run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
                  size_t start_index, size_t end_index,
                  const std::vector<int>& indices);
 
@@ -38,7 +38,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        virtual bool Apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
+        bool run(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
 
         /// Get the image info of the last batch, return a list of array
         /// {image width, image height, resize width, resize height}
@@ -47,7 +47,7 @@ namespace modeldeploy::vision::ocr {
         }
 
     private:
-        void StructureV2TableResizeImage(cv::Mat* mat, int batch_idx);
+        void structure_v2_table_resize_image(cv::Mat* mat, int batch_idx);
         // for recording the switch of hwc2chw
         bool disable_permute_ = false;
         // for recording the switch of normalize

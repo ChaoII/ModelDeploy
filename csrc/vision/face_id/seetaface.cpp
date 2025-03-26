@@ -5,8 +5,8 @@
 #include "csrc/vision/face_id/seetaface.h"
 #include <csrc/core/md_log.h>
 
-namespace modeldeploy::vision::faceid {
-    SeetaFace::SeetaFace(
+namespace modeldeploy::vision::face {
+    SeetaFaceID::SeetaFaceID(
         const std::string& model_file,
         const modeldeploy::RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
@@ -14,7 +14,7 @@ namespace modeldeploy::vision::faceid {
         initialized_ = initialize();
     }
 
-    bool SeetaFace::initialize() {
+    bool SeetaFaceID::initialize() {
         if (!init_runtime()) {
             MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
             return false;
@@ -22,7 +22,7 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFace::predict(const cv::Mat& image, FaceRecognitionResult* result) {
+    bool SeetaFaceID::predict(const cv::Mat& image, FaceRecognitionResult* result) {
         std::vector<FaceRecognitionResult> results;
         if (!batch_predict({image}, &results)) {
             return false;
@@ -33,7 +33,7 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFace::batch_predict(const std::vector<cv::Mat>& images,
+    bool SeetaFaceID::batch_predict(const std::vector<cv::Mat>& images,
                                   std::vector<FaceRecognitionResult>* results) {
         std::vector<cv::Mat> fd_images = images;
         if (images.size() != 1) {

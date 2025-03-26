@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "csrc/base_model.h"
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
@@ -15,7 +16,8 @@ namespace modeldeploy::vision::ocr {
      */
     class MODELDEPLOY_CXX_EXPORT StructureV2Layout : public BaseModel {
     public:
-        StructureV2Layout();
+        StructureV2Layout() = default;
+
         /** \brief Set path of model file, and the configuration of runtime
          *
          * \param[in] model_file Path of model file, e.g ./picodet_lcnet_x1_0_fgd_layout_cdla_infer/model.pdmodel.
@@ -23,13 +25,12 @@ namespace modeldeploy::vision::ocr {
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in `valid_cpu_backends`.
          * \param[in] model_format Model format of the loaded model, default is Paddle format.
          */
-        StructureV2Layout(const std::string& model_file,
-                          const RuntimeOption& custom_option = RuntimeOption());
-
+        explicit StructureV2Layout(const std::string &model_file,
+                                   const RuntimeOption &custom_option = RuntimeOption());
 
 
         /// Get model's name
-        std::string ModelName() const { return "pp-structurev2-layout"; }
+        [[nodiscard]] std::string name() const override { return "pp-structurev2-layout"; }
 
         /** \brief DEPRECATED Predict the detection result for an input image
          *
@@ -37,35 +38,36 @@ namespace modeldeploy::vision::ocr {
          * \param[in] result The output detection result
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool Predict(cv::Mat* im, DetectionResult* result);
+        virtual bool predict(cv::Mat *im, DetectionResult *result);
 
         /** \brief Predict the detection result for an input image
          * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] result The output detection result
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool Predict(const cv::Mat& im, DetectionResult* result);
+        virtual bool predict(const cv::Mat &im, DetectionResult *result);
 
         /** \brief Predict the detection result for an input image list
          * \param[in] im The input image list, all the elements come from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] results The output detection result list
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool BatchPredict(const std::vector<cv::Mat>& imgs,
-                                  std::vector<DetectionResult>* results);
+        virtual bool batch_predict(const std::vector<cv::Mat> &imgs,
+                                   std::vector<DetectionResult> *results);
 
         /// Get preprocessor reference ofStructureV2LayoutPreprocessor
-        virtual StructureV2LayoutPreprocessor& GetPreprocessor() {
+        virtual StructureV2LayoutPreprocessor &get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference ofStructureV2LayoutPostprocessor
-        virtual StructureV2LayoutPostprocessor& GetPostprocessor() {
+        virtual StructureV2LayoutPostprocessor &get_postprocessor() {
             return postprocessor_;
         }
 
     private:
         bool Initialize();
+
         StructureV2LayoutPreprocessor preprocessor_;
         StructureV2LayoutPostprocessor postprocessor_;
     };

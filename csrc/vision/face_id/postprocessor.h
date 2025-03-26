@@ -7,14 +7,14 @@
 #include "csrc/vision/common/result.h"
 
 
-namespace modeldeploy::vision::faceid {
+namespace modeldeploy::vision::face {
     /*! @brief Postprocessor object for AdaFace serials model.
      */
-    class MODELDEPLOY_CXX_EXPORT SeetaFacePostprocessor {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceIDPostprocessor {
     public:
         /** \brief Create a postprocessor instance for AdaFace serials model
          */
-        SeetaFacePostprocessor() = default;
+        SeetaFaceIDPostprocessor() = default;
 
         /** \brief Process the result of runtime and fill to FaceRecognitionResult structure
          *
