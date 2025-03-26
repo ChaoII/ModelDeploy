@@ -15,5 +15,10 @@ int main() {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
+
+    for (auto& result : results) {
+        std::cout << "FaceAntiSpoofSecond: " << std::get<0>(result) << ", " << std::get<1>(result) << std::endl;
+    }
+
     return 0;
 }

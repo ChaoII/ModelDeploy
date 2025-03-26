@@ -31,7 +31,7 @@ namespace modeldeploy::vision::face {
         if (mat->rows == 256 && mat->cols == 256) {
             CenterCrop::Run(mat, size_[0], size_[1]);
         } else if (mat->rows == size_[0] && mat->cols == size_[1]) {
-            MD_LOG_WARN("the width and height is already to {} and {} ", size_[0], size_[1]);
+            MD_LOG_WARN("the width and height is already to [{},{}] ", size_[0], size_[1]);
         } else {
             MD_LOG_WARN("the size of shape must be 256, ensure use face alignment? "
                         "now, resize to 256 and may loss predict precision");
