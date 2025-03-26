@@ -68,6 +68,27 @@ namespace modeldeploy {
 
     std::vector<unsigned char> base64_decode(const std::string& base64_str);
 
+    int argmax(const std::vector<float>& vec);
+
+    template <typename T>
+    void calculate_statis_info(const void* src_ptr, int size, double* mean,
+                               double* max, double* min) {
+        const T* ptr = static_cast<const T*>(src_ptr);
+        *mean = static_cast<double>(0);
+        *max = static_cast<double>(-99999999);
+        *min = static_cast<double>(99999999);
+        for (int i = 0; i < size; ++i) {
+            if (*(ptr + i) > *max) {
+                *max = *(ptr + i);
+            }
+            if (*(ptr + i) < *min) {
+                *min = *(ptr + i);
+            }
+            *mean += *(ptr + i);
+        }
+        *mean = *mean / size;
+    }
+
 
 #define MD_PRIVATE_CASE_TYPE_USING_HINT(NAME, enum_type, type, HINT, ...)                   \
     case enum_type: {                                                                       \

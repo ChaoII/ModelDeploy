@@ -5,8 +5,8 @@
 #pragma once
 
 #include "csrc/base_model.h"
-#include "csrc/vision/faceid/postprocessor.h"
-#include "csrc/vision/faceid/preprocessor.h"
+#include "csrc/vision/face_id/postprocessor.h"
+#include "csrc/vision/face_id/preprocessor.h"
 
 
 namespace modeldeploy::vision::faceid {

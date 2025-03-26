@@ -28,9 +28,30 @@ namespace modeldeploy {
         }
 
         /// Get data pointer of tensor
-        const void* get_data() const {
+        [[nodiscard]] const void* get_data() const {
             return data();
         }
+
+        template <typename T>
+        [[nodiscard]] T at(const std::vector<int>& indices) const {
+            if (indices.size() != shape.size()) {
+                std::cerr << "Indices size does not match tensor shape." << std::endl;
+                return static_cast<T>(0.0); // 或者抛出异常
+            }
+            int offset = 0;
+            int stride = 1;
+            for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+                offset += indices[i] * stride;
+                stride *= static_cast<int>(shape[i]);
+            }
+            return static_cast<T*>(buffer_)[offset];
+        }
+
+
+        [[nodiscard]] float at(const std::vector<int>& indices) const {
+            return at<float>(indices);
+        }
+
 
         /// Expand the shape of tensor, it will not change the data memory, just modify its attribute `shape`
         void expand_dim(int64_t axis = 0);
@@ -42,16 +63,16 @@ namespace modeldeploy {
         bool reshape(const std::vector<int64_t>& new_shape);
 
         /// Total size of tensor memory buffer in bytes
-        int total_bytes() const;
+        [[nodiscard]] int total_bytes() const;
 
         /// Total number of elements in tensor
-        int total() const;
+        [[nodiscard]] int total() const;
 
         /// Get shape of tensor
-        std::vector<int64_t> get_shape() const { return shape; }
+        [[nodiscard]] std::vector<int64_t> get_shape() const { return shape; }
 
         /// Get dtype of tensor
-        MDDataType::Type get_dtype() const { return dtype; }
+        [[nodiscard]] MDDataType::Type get_dtype() const { return dtype; }
 
         /** \brief Allocate cpu data buffer for a MDTensor, e.g
          *  ```
@@ -103,7 +124,10 @@ namespace modeldeploy {
 
         void* data();
 
-        const void* data() const;
+        void print_info(const std::string& prefix = "Debug TensorInfo: ") const;
+
+
+        [[nodiscard]] const void* data() const;
 
         // void SetDataBuffer(const std::vector<int64_t>& new_shape, const FDDataType& data_type, void* data_buffer, bool copy = false, const Device& new_device = Device::CPU, int new_device_id = -1);
         // Set user memory buffer for Tensor, the memory is managed by
@@ -129,8 +153,7 @@ namespace modeldeploy {
 
         void free_fn();
 
-        MDTensor() {
-        }
+        MDTensor() = default;
 
         explicit MDTensor(const std::string& tensor_name);
         explicit MDTensor(const char* tensor_name);
@@ -138,12 +161,12 @@ namespace modeldeploy {
         // Deep copy
         MDTensor(const MDTensor& other);
         // Move constructor
-        MDTensor(MDTensor&& other) noexcept ;
+        MDTensor(MDTensor&& other) noexcept;
 
         // Deep copy assignment
         MDTensor& operator=(const MDTensor& other);
         // Move assignment
-        MDTensor& operator=(MDTensor&& other) noexcept ;
+        MDTensor& operator=(MDTensor&& other) noexcept;
 
         // Scalar to MDTensor
         explicit MDTensor(const Scalar& scalar);

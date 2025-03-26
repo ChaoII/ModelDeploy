@@ -11,3 +11,5 @@
 #include "vision/classification/yolov5cls.h"
 #include "vision/face_detection/scrfd.h"
 #include "vision/face_age/seetaface_age.h"
+#include "vision/face_antispoof/face_anti_spoof_first.h"
+#include "vision/face_antispoof/face_anti_spoof_second.h"

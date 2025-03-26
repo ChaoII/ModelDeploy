@@ -2,7 +2,7 @@
 // Created by aichao on 2025/3/24.
 //
 
-#include "csrc/vision/faceid/postprocessor.h"
+#include "csrc/vision/face_id/postprocessor.h"
 
 #include <csrc/core/md_log.h>
 

@@ -2,11 +2,11 @@
 // Created by aichao on 2025/3/24.
 //
 
-#include "csrc/vision/faceid/seetaface.h"
+#include "csrc/vision/face_gender/seetaface_gender.h"
 #include <csrc/core/md_log.h>
 
 namespace modeldeploy::vision::faceid {
-    SeetaFace::SeetaFace(
+    SeetaFaceGender::SeetaFaceGender(
         const std::string& model_file,
         const modeldeploy::RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
@@ -14,7 +14,7 @@ namespace modeldeploy::vision::faceid {
         initialized_ = initialize();
     }
 
-    bool SeetaFace::initialize() {
+    bool SeetaFaceGender::initialize() {
         if (!init_runtime()) {
             MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
             return false;
@@ -22,19 +22,19 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFace::predict(const cv::Mat& image, FaceRecognitionResult* result) {
-        std::vector<FaceRecognitionResult> results;
-        if (!batch_predict({image}, &results)) {
+    bool SeetaFaceGender::predict(const cv::Mat& image, int* age) {
+        std::vector<int> ages;
+        if (!batch_predict({image}, &ages)) {
             return false;
         }
-        if (!results.empty()) {
-            *result = results[0];
+        if (!ages.empty()) {
+            *age = ages[0];
         }
         return true;
     }
 
-    bool SeetaFace::batch_predict(const std::vector<cv::Mat>& images,
-                                  std::vector<FaceRecognitionResult>* results) {
+    bool SeetaFaceGender::batch_predict(const std::vector<cv::Mat>& images,
+                                        std::vector<int>* ages) {
         std::vector<cv::Mat> fd_images = images;
         if (images.size() != 1) {
             MD_LOG_ERROR("Only support batch = 1 now.");
@@ -48,7 +48,7 @@ namespace modeldeploy::vision::faceid {
             MD_LOG_ERROR("Failed to inference by runtime.");
             return false;
         }
-        if (!postprocessor_.run(reused_output_tensors_, results)) {
+        if (!postprocessor_.run(reused_output_tensors_, ages)) {
             MD_LOG_ERROR("Failed to postprocess the inference results by runtime.");
             return false;
         }

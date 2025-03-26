@@ -9,7 +9,7 @@ int main() {
     auto faceid_model = modeldeploy::vision::faceid::SeetaFaceAge(
         "../../test_data/test_models/face/age_predictor.onnx");
     assert(table_model.Initialized());
-    auto im0 = cv::imread("vis_result_crop.jpg");
+    auto im0 = cv::imread("../../test_data/test_images/test_face_id.jpg");
     int age = 0;
     if (!faceid_model.predict(im0, &age)) {
         std::cerr << "Failed to predict." << std::endl;

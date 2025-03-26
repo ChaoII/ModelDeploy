@@ -1,32 +1,20 @@
 //
 // Created by aichao on 2025/3/24.
 //
-#include "csrc/vision/faceid/preprocessor.h"
-
+#include "csrc/vision/face_gender/preprocessor.h"
 #include <csrc/core/md_log.h>
-
 #include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/color_space_convert.h"
 #include "csrc/vision/common/processors/hwc2chw.h"
 #include "csrc/vision/common/processors/cast.h"
-#include "csrc/vision/common/processors/center_crop.h"
 
 
 namespace modeldeploy::vision::faceid {
-    bool SeetaFacePreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
-        // 经过人脸对齐后[256, 256]的图像
-        // 1. CenterCrop [256,256]->[248,248]
-        // 2. BGR2RGB
-        // 3. HWC2CHW
-        // 4. Cast
-        if (mat->rows != 256 || mat->cols != 256) {
-            MD_LOG_WARN(
-                "the size of shape must be 256, ensure use face alignment? "
-                "now, resize to 256 and may loss precision");
-            Resize::Run(mat, 256, 256);
-        }
-        CenterCrop::Run(mat, size_[0], size_[1]);
-        BGR2RGB::Run(mat);
+    bool SeetaFaceGenderPreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
+        // 1. Resize
+        // 2. HWC2CHW
+        // 3. Cast
+        Resize::Run(mat, size_[0], size_[1]);
+        // BGR2RGB::Run(mat); 前处理不需要转换为RGB
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
@@ -37,8 +25,8 @@ namespace modeldeploy::vision::faceid {
         return true;
     }
 
-    bool SeetaFacePreprocessor::run(std::vector<cv::Mat>* images,
-                                    std::vector<MDTensor>* outputs) {
+    bool SeetaFaceGenderPreprocessor::run(std::vector<cv::Mat>* images,
+                                          std::vector<MDTensor>* outputs) {
         if (images->empty()) {
             MD_LOG_ERROR("The size of input images should be greater than 0.");
             return false;
@@ -58,4 +46,4 @@ namespace modeldeploy::vision::faceid {
         (*outputs)[0] = std::move(tensors[0]);
         return true;
     }
-} // namespace modeldeploy::vision::faceid
+} // namespace modeldeploy::vision::face_id

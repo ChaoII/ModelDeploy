@@ -108,4 +108,22 @@ namespace modeldeploy {
         }
         return ret;
     }
+
+    int argmax(const std::vector<float>& vec) {
+        if (vec.empty()) {
+            std::cerr << "Vector is empty." << std::endl;
+            return -1; // 或者抛出异常
+        }
+
+        int max_index = 0;
+        float max_value = std::numeric_limits<float>::lowest();
+
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (vec[i] > max_value) {
+                max_value = vec[i];
+                max_index = i;
+            }
+        }
+        return max_index;
+    }
 }

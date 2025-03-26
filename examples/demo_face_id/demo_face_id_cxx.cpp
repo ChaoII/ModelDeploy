@@ -3,7 +3,7 @@
 //
 #include <iostream>
 #include <string>
-#include "csrc/vision/faceid/seetaface.h"
+#include "csrc/vision/face_id/seetaface.h"
 #include "csrc/vision/utils.h"
 #include "capi/utils/md_image_capi.h"
 

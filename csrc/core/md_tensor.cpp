@@ -31,6 +31,44 @@ namespace modeldeploy {
         return buffer_;
     }
 
+
+    void MDTensor::print_info(const std::string& prefix) const {
+        std::cout << prefix << ": name=" << name << ", shape=";
+        for (int i = 0; i < shape.size(); ++i) {
+            std::cout << shape[i] << " ";
+        }
+        std::cout << ", buffer_=" << buffer_ << ", external_data_ptr=" << external_data_ptr_;
+        double mean = 0;
+        double max = -99999999;
+        double min = 99999999;
+        if (dtype == MDDataType::Type::FP32) {
+            calculate_statis_info<float>(data(), total(), &mean, &max, &min);
+        }
+        else if (dtype == MDDataType::Type::FP64) {
+            calculate_statis_info<double>(data(), total(), &mean, &max, &min);
+        }
+        else if (dtype == MDDataType::Type::INT8) {
+            calculate_statis_info<int8_t>(data(), total(), &mean, &max, &min);
+        }
+        else if (dtype == MDDataType::Type::UINT8) {
+            calculate_statis_info<uint8_t>(data(), total(), &mean, &max, &min);
+        }
+        else if (dtype == MDDataType::Type::INT32) {
+            calculate_statis_info<int32_t>(data(), total(), &mean, &max, &min);
+        }
+        else if (dtype == MDDataType::Type::INT64) {
+            calculate_statis_info<int64_t>(data(), total(), &mean, &max, &min);
+        }
+        else {
+            MD_LOG_ERROR(
+                "PrintInfo function doesn't support current situation, maybe you "
+                "need enhance this function now.");
+        }
+        std::cout << ", dtype=" << MDDataType::str(dtype) << ", mean=" << mean << ", max=" << max
+            << ", min=" << min << std::endl;
+    }
+
+
     void MDTensor::stop_sharing() {
         if (is_shared()) {
             re_alloc_fn(total_bytes());

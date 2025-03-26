@@ -80,7 +80,7 @@ namespace modeldeploy::vision::detection {
                 }
             }
 
-            if ((*results)[bs].boxes.size() == 0) {
+            if ((*results)[bs].boxes.empty()) {
                 continue;
             }
             utils::nms(&(*results)[bs], nms_threshold_);
