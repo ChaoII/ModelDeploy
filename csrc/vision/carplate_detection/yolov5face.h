@@ -38,7 +38,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5Face : public BaseModel {
   /*! @brief
   Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default size = {640, 640}
   */
-  std::vector<int> size;
+  std::vector<int> size{640,640};
   // padding value, size should be the same as channels
 
   std::vector<float> padding_value;

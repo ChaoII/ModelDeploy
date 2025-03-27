@@ -14,3 +14,4 @@
 #include "vision/face_antispoof/face_anti_spoof_first.h"
 #include "vision/face_antispoof/face_anti_spoof_second.h"
 #include "vision/carplate_detection/yolov5face.h"
+#include "vision/carplate_recognizer/carplate_recognizer.h"

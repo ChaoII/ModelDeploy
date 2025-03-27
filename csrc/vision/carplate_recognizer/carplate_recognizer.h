@@ -11,7 +11,7 @@ namespace vision {
 namespace facedet {
 /*! @brief YOLOv5Face model object used when to load a YOLOv5Face model exported by YOLOv5Face.
  */
-class MODELDEPLOY_CXX_EXPORT YOLOv5Face : public BaseModel {
+class MODELDEPLOY_CXX_EXPORT CarplateRecognizer : public BaseModel {
  public:
   /** \brief  Set path of model file and the configuration of runtime.
    *
@@ -20,7 +20,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5Face : public BaseModel {
    * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
    * \param[in] model_format Model format of the loaded model, default is ONNX format
    */
-  YOLOv5Face(const std::string& model_file,const RuntimeOption& custom_option = RuntimeOption());
+  CarplateRecognizer(const std::string& model_file,const RuntimeOption& custom_option = RuntimeOption());
 
   std::string ModelName() const { return "yolov5-face"; }
   /** \brief Predict the face detection result for an input image
@@ -38,28 +38,10 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5Face : public BaseModel {
   /*! @brief
   Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default size = {640, 640}
   */
-  std::vector<int> size;
-  // padding value, size should be the same as channels
-
-  std::vector<float> padding_value;
-  // only pad to the minimum rectange which height and width is times of stride
-  bool is_mini_pad;
-  // while is_mini_pad = false and is_no_pad = true,
-  // will resize the image to the set size
-
-  bool is_no_pad;
-  // if is_scale_up is false, the input image only can be zoom out,
-  // the maximum resize scale cannot exceed 1.0
-
-  bool is_scale_up;
-  // padding stride, for is_mini_pad
-  int stride;
-  /*! @brief
-    Argument for image postprocessing step, setup the number of landmarks for per face (if have), default 5 in
-    official yolov5face note that, the outupt tensor's shape must be:
-    (1,n,4+1+2*landmarks_per_face+1=box+obj+landmarks+cls), default 5
-  */
-  int landmarks_per_face;
+  std::vector<int> size{168,48};
+    std::vector<std::string>plate_color_list={"黑色","蓝色","绿色","白色","黄色"};
+    std::string plate_chr[78]={"#","京","沪","津","渝","冀","晋","蒙","辽","吉","黑","苏","浙","皖","闽","赣","鲁","豫","鄂","湘","粤","桂","琼","川","贵","云","藏","陕","甘","青","宁",
+    "新","学","警","港","澳","挂","使","领","民","航","危","0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","J","K","L","M","N","P","Q","R","S","T","U","V","W","X","Y","Z","险","品"};
 
  private:
   bool Initialize();
@@ -67,7 +49,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5Face : public BaseModel {
   bool Preprocess(cv::Mat* mat, MDTensor* outputs,
                   std::map<std::string, std::array<float, 2>>* im_info);
 
-  bool Postprocess(MDTensor& infer_result, FaceDetectionResult* result,
+  bool Postprocess(std::vector<MDTensor>& infer_result, FaceDetectionResult* result,
                    const std::map<std::string, std::array<float, 2>>& im_info,
                    float conf_threshold, float nms_iou_threshold);
 

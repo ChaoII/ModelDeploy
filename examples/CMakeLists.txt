@@ -8,6 +8,7 @@ add_subdirectory(demo_face_id)
 add_subdirectory(demo_face_gender)
 add_subdirectory(demo_face_antispoof)
 add_subdirectory(demo_carplate_detection)
+add_subdirectory(demo_carplate_recognizer)
 
 if (BUILD_FACE)
     add_subdirectory(demo_face)

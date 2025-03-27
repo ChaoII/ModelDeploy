@@ -10,7 +10,6 @@
 int main() {
 #ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
 #endif
 
     modeldeploy::vision::ocr::PPOCRv4 ocr("../../test_data/test_models/ocr/det_infer.onnx",
