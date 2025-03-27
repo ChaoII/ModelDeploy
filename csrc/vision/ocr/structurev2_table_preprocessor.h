@@ -53,7 +53,7 @@ namespace modeldeploy::vision::ocr {
         // for recording the switch of normalize
         bool disable_normalize_ = false;
         // for SLANet or SLANet_Plus max_len = 484,for SLANeXt_wired max_len = 512
-        int max_len = 484;
+        int max_len = 512;
         std::vector<int> rec_image_shape_ = {3, max_len, max_len};
         bool static_shape_infer_ = false;
         std::shared_ptr<Resize> resize_op_;

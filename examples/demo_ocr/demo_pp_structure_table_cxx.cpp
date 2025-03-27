@@ -2,8 +2,6 @@
 // Created by aichao on 2025/3/21.
 //
 
-#include <uni_algo.h>
-
 #include "csrc/vision.h"
 #include "csrc/vision/common/result.h"
 #ifdef _WIN32

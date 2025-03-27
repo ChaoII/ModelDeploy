@@ -80,7 +80,7 @@ namespace modeldeploy::vision::utils {
         if (index != nullptr) {
             std::map<float, int, std::greater<>> score_map;
             for (size_t i = 0; i < output->scores.size(); ++i) {
-                score_map.insert(std::pair<float, int>(output->scores[i], i));
+                score_map.insert({output->scores[i], i});
             }
             for (auto iter : score_map) {
                 sorted_indices.push_back(iter.second);
