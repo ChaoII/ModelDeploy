@@ -1,0 +1,3 @@
+
+add_executable(demo_carplate_detection_cxx demo_carplate_detection_cxx.cpp)
+target_link_libraries(demo_carplate_detection_cxx PUBLIC ${LIBRARY_NAME})
