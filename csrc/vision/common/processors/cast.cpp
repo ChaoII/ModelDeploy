@@ -14,7 +14,7 @@ bool Cast::ImplByOpenCV(cv::Mat* im) {
   int c = im->channels();
   if (dtype_ == "float") {
     if (im->type() != CV_32FC(c)) {
-      im->convertTo(*im, CV_32FC(c));
+      im->convertTo(*im, CV_16FC(c));
     }
   } else if (dtype_ == "double") {
     if (im->type() != CV_64FC(c)) {
