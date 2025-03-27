@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "csrc/core/md_decl.h"
 #include <opencv2/opencv.hpp>
 
@@ -29,10 +30,21 @@ namespace modeldeploy::vision {
         ResultType type = ResultType::UNKNOWN_RESULT;
     };
 
+
+    /*! @brief Classify result structure for all the image classify models
+ */
+    struct MODELDEPLOY_CXX_EXPORT CarPlateRecognizerResult : public BaseResult {
+        CarPlateRecognizerResult() = default;
+
+        std::string car_plate_str;
+        std::string car_plate_color;
+    };
+
     /*! @brief Classify result structure for all the image classify models
      */
     struct MODELDEPLOY_CXX_EXPORT ClassifyResult : public BaseResult {
         ClassifyResult() = default;
+
         /// Classify result for an image
         std::vector<int32_t> label_ids;
         /// The confidence for each classify result
@@ -51,9 +63,10 @@ namespace modeldeploy::vision {
         void Free();
 
         /// Copy constructor
-        ClassifyResult(const ClassifyResult& other) = default;
+        ClassifyResult(const ClassifyResult &other) = default;
+
         /// Move assignment
-        ClassifyResult& operator=(ClassifyResult&& other) ;
+        ClassifyResult &operator=(ClassifyResult &&other);
 
         /// Debug function, convert the result to string to print
         std::string Str();
@@ -75,10 +88,10 @@ namespace modeldeploy::vision {
         void Free();
 
         /// Return a mutable pointer of the mask data buffer
-        void* Data() { return data.data(); }
+        void *Data() { return data.data(); }
 
         /// Return a pointer of the mask data buffer for read only
-        const void* Data() const { return data.data(); }
+        const void *Data() const { return data.data(); }
 
         /// Reserve size for mask data buffer
         void Reserve(int size);
@@ -95,6 +108,7 @@ namespace modeldeploy::vision {
      */
     struct MODELDEPLOY_CXX_EXPORT DetectionResult : public BaseResult {
         DetectionResult() = default;
+
         /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
          */
         std::vector<std::array<float, 4>> boxes;
@@ -115,9 +129,10 @@ namespace modeldeploy::vision {
         ResultType type = ResultType::DETECTION;
 
         /// Copy constructor
-        DetectionResult(const DetectionResult& res);
+        DetectionResult(const DetectionResult &res);
+
         /// Move assignment
-        DetectionResult& operator=(DetectionResult&& other);
+        DetectionResult &operator=(DetectionResult &&other);
 
         /// Clear DetectionResult
         void Clear();
@@ -164,9 +179,10 @@ namespace modeldeploy::vision {
 
 
         /// Copy constructor
-        PerceptionResult(const PerceptionResult& res);
+        PerceptionResult(const PerceptionResult &res);
+
         /// Move assignment
-        PerceptionResult& operator=(PerceptionResult&& other);
+        PerceptionResult &operator=(PerceptionResult &&other);
 
         /// Clear PerceptionResult
         void Clear();
@@ -194,6 +210,7 @@ namespace modeldeploy::vision {
         int num_joints = -1;
 
         ResultType type = ResultType::KEYPOINT_DETECTION;
+
         /// Clear KeyPointDetectionResult
         void Clear();
 
@@ -245,8 +262,10 @@ namespace modeldeploy::vision {
         std::vector<int> class_ids;
 
         ResultType type = ResultType::MOT;
+
         /// Clear MOT result
         void Clear();
+
         /// Debug function, convert the result to string to print
         std::string Str();
     };
@@ -274,7 +293,9 @@ namespace modeldeploy::vision {
         int landmarks_per_face;
 
         FaceDetectionResult() { landmarks_per_face = 0; }
-        FaceDetectionResult(const FaceDetectionResult& res);
+
+        FaceDetectionResult(const FaceDetectionResult &res);
+
         /// Clear FaceDetectionResult
         void Clear();
 
@@ -284,6 +305,7 @@ namespace modeldeploy::vision {
         void Reserve(int size);
 
         void Resize(int size);
+
         /// Debug function, convert the result to string to print
         std::string Str();
     };
@@ -296,6 +318,7 @@ namespace modeldeploy::vision {
         std::vector<std::array<float, 2>> landmarks;
 
         ResultType type = ResultType::FACE_ALIGNMENT;
+
         /// Clear FaceAlignmentResult
         void Clear();
 
@@ -314,6 +337,7 @@ namespace modeldeploy::vision {
      */
     struct MODELDEPLOY_CXX_EXPORT SegmentationResult : public BaseResult {
         SegmentationResult() = default;
+
         /** \brief
          * `label_map` stores the pixel-level category labels for input image. the number of pixels is equal to label_map.size()
         */
@@ -328,11 +352,13 @@ namespace modeldeploy::vision {
         bool contain_score_map = false;
 
         /// Copy constructor
-        SegmentationResult(const SegmentationResult& other) = default;
+        SegmentationResult(const SegmentationResult &other) = default;
+
         /// Move assignment
-        SegmentationResult& operator=(SegmentationResult&& other);
+        SegmentationResult &operator=(SegmentationResult &&other);
 
         ResultType type = ResultType::SEGMENTATION;
+
         /// Clear Segmentation result
         void Clear();
 
@@ -359,7 +385,8 @@ namespace modeldeploy::vision {
         FaceRecognitionResult() {
         }
 
-        FaceRecognitionResult(const FaceRecognitionResult& res);
+        FaceRecognitionResult(const FaceRecognitionResult &res);
+
         /// Clear FaceRecognitionResult
         void Clear();
 
@@ -369,6 +396,7 @@ namespace modeldeploy::vision {
         void Reserve(int size);
 
         void Resize(int size);
+
         /// Debug function, convert the result to string to print
         std::string Str();
     };
@@ -398,7 +426,8 @@ namespace modeldeploy::vision {
         MattingResult() {
         }
 
-        MattingResult(const MattingResult& res);
+        MattingResult(const MattingResult &res);
+
         /// Clear matting result
         void Clear();
 
@@ -408,6 +437,7 @@ namespace modeldeploy::vision {
         void Reserve(int size);
 
         void Resize(int size);
+
         /// Debug function, convert the result to string to print
         std::string Str();
     };
@@ -420,6 +450,7 @@ namespace modeldeploy::vision {
         std::vector<float> euler_angles;
 
         ResultType type = ResultType::HEADPOSE;
+
         /// Clear HeadPoseResult
         void Clear();
 
