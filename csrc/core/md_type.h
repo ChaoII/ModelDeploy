@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <string>
+#include "csrc/core/float16.h"
 
 namespace modeldeploy {
     class MDDataType {
@@ -15,6 +16,7 @@ namespace modeldeploy {
             INT16,
             INT32,
             INT64,
+            FP16,
             FP32,
             FP64,
             UNKNOWN1,
@@ -34,13 +36,13 @@ namespace modeldeploy {
             INT8
         };
 
-        // std::ostream& operator<<(std::ostream& out, const MDDataType::Type& md_dtype);
 
         static std::string str(const Type& data_type);
 
         static int32_t size(const Type& data_type);
     };
 
+    std::ostream& operator<<(std::ostream& out, const MDDataType::Type& md_dtype);
 
     template <typename PlainType>
     struct TypeToDataType {

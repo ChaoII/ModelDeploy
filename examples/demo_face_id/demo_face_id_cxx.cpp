@@ -27,8 +27,8 @@ int main() {
 
     // const auto similarity = modeldeploy::vision::utils::compute_similarity(result0.embedding, result1.embedding);
 
-    std::cout << result0.Str() << std::endl;
-    // std::cout << result1.Str() << std::endl;
+    // std::cout << result0.Str() << std::endl;
+    std::cout << result1.Str() << std::endl;
     // std::cout << similarity << std::endl;
     return 0;
 }

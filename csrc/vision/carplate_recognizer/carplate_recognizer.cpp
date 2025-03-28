@@ -11,9 +11,8 @@
 
 
 namespace modeldeploy::vision::facedet {
-
-    CarPlateRecognizer::CarPlateRecognizer(const std::string &model_file,
-                                           const RuntimeOption &custom_option) {
+    CarPlateRecognizer::CarPlateRecognizer(const std::string& model_file,
+                                           const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = initialize();
@@ -28,8 +27,7 @@ namespace modeldeploy::vision::facedet {
     }
 
     bool CarPlateRecognizer::preprocess(
-            cv::Mat *mat, MDTensor *output) {
-
+        cv::Mat* mat, MDTensor* output) {
         // car_plate_recognizer's preprocess steps
         // 1. resize
         // 2. BGR->RGB
@@ -52,25 +50,24 @@ namespace modeldeploy::vision::facedet {
     }
 
     bool CarPlateRecognizer::postprocess(
-            std::vector<MDTensor> &infer_result, CarPlateRecognizerResult *result) {
-
-        auto *plate_color_ptr = static_cast<float *>(infer_result[1].data());
+        std::vector<MDTensor>& infer_result, CarPlateRecognizerResult* result) {
+        auto* plate_color_ptr = static_cast<float*>(infer_result[1].data());
         std::vector<float> plate_color_vec(plate_color_ptr, plate_color_ptr + 5);
         int max_Index = argmax(plate_color_vec);
         std::string plate_color = plate_color_list[max_Index];
         //车牌
         std::vector<int> plate_index;
         plate_index.reserve(21);
-        auto *prob1_temp = static_cast<float *> (infer_result[0].data());
-        std::vector<float> plate_tensor(prob1_temp, prob1_temp + 78);
+        auto* prob1_temp = static_cast<float*>(infer_result[0].data());
         for (size_t j = 0; j < 21; j++) {
+            std::vector<float> plate_tensor(prob1_temp, prob1_temp + 78);
             max_Index = argmax(plate_tensor);
             plate_index.push_back(max_Index);
             prob1_temp = prob1_temp + 78;
         }
         int pre = 0;
         std::string plate_str;
-        for (int j: plate_index) {
+        for (int j : plate_index) {
             if (j != 0 && j != pre) {
                 plate_str += plate_chr[j];
             }
@@ -82,7 +79,7 @@ namespace modeldeploy::vision::facedet {
         return true;
     }
 
-    bool CarPlateRecognizer::predict(cv::Mat *image, CarPlateRecognizerResult *result) {
+    bool CarPlateRecognizer::predict(cv::Mat* image, CarPlateRecognizerResult* result) {
         std::vector<MDTensor> input_tensors(1);
         if (!preprocess(image, &input_tensors[0])) {
             std::cerr << "Failed to preprocess input image." << std::endl;

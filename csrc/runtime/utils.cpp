@@ -6,6 +6,9 @@
 
 namespace modeldeploy {
     ONNXTensorElementDataType get_ort_dtype(const MDDataType::Type& md_dtype) {
+        if (md_dtype == MDDataType::Type::FP16) {
+            return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16;
+        }
         if (md_dtype == MDDataType::Type::FP32) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
         }
@@ -29,6 +32,9 @@ namespace modeldeploy {
     }
 
     MDDataType::Type get_md_dtype(const ONNXTensorElementDataType& ort_dtype) {
+        if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16) {
+            return MDDataType::Type::FP16;
+        }
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
             return MDDataType::Type::FP32;
         }
@@ -75,6 +81,11 @@ namespace modeldeploy {
         const auto shape = info.GetShape();
         MDDataType::Type dtype;
 
+        if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16) {
+            dtype = MDDataType::Type::FP32;
+            num_el *= sizeof(float16);
+        }
+
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
             dtype = MDDataType::Type::FP32;
             num_el *= sizeof(float);
@@ -116,6 +127,7 @@ namespace modeldeploy {
 
     std::string onnx_type_to_string(const ONNXTensorElementDataType type) {
         static const std::map<ONNXTensorElementDataType, std::string> type_map = {
+            {ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16, "FLOAT16"},
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, "FLOAT"},
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32, "INT32"},
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, "STRING"},

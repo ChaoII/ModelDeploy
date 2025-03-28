@@ -20,6 +20,9 @@ namespace modeldeploy {
         if (data_type == MDDataType::INT64) {
             return sizeof(int64_t);
         }
+        if (data_type == MDDataType::FP16) {
+            return sizeof(float16);
+        }
         if (data_type == MDDataType::FP32) {
             return sizeof(float);
         }
@@ -50,6 +53,9 @@ namespace modeldeploy {
             break;
         case MDDataType::INT64:
             out = "MDDataType::INT64";
+            break;
+        case MDDataType::FP16:
+            out = "MDDataType::FP16";
             break;
         case MDDataType::FP32:
             out = "MDDataType::FP32";
@@ -83,6 +89,9 @@ namespace modeldeploy {
         case MDDataType::INT64:
             out << "MDDataType::INT64";
             break;
+        case MDDataType::FP16:
+            out << "MDDataType::FP16";
+            break;
         case MDDataType::FP32:
             out << "MDDataType::FP32";
             break;
@@ -115,6 +124,9 @@ namespace modeldeploy {
 
     template <>
     const MDDataType::Type TypeToDataType<int64_t>::dtype = MDDataType::Type::INT64;
+
+    template <>
+    const MDDataType::Type TypeToDataType<float16>::dtype = MDDataType::Type::FP16;
 
     template <>
     const MDDataType::Type TypeToDataType<float>::dtype = MDDataType::Type::FP32;
