@@ -6,10 +6,19 @@
 #include "csrc/vision/face_id/seetaface.h"
 #include "csrc/vision/utils.h"
 #include "capi/utils/md_image_capi.h"
+#include "csrc/core/log.h"
 
 int main() {
+    MD_SET_LOG_LEVEL(modeldeploy::LogLevel::MD_LOG_D);
+
+    MD_LOG_DEBUG << "Hello World!" << std::endl;
+    MD_LOG_INFO << "Hello World!" << std::endl;
+    MD_LOG_WARN << "Hello World!" << std::endl;
+    MD_LOG_ERROR << "Hello World!" << std::endl;
+    MD_LOG_FATAL << "Hello World!" << std::endl;
+
     auto faceid_model = modeldeploy::vision::face::SeetaFaceID(
-            "../../test_data/test_models/face/face_recognition.onnx");
+            "../../test_data/test_models/face/face_recognizer.onnx");
     assert(table_model.Initialized());
     // auto im0 = cv::imread("../../test_data/test_images/test_face_id1.jpg");
 //    auto im0 = cv::imread("vis_result.jpg");

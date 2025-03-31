@@ -33,6 +33,9 @@ namespace modeldeploy::vision::utils {
         if (type == 6) {
             return MDDataType::Type::FP64;
         }
+        if (type == 7) {
+            return MDDataType::Type::FP16;
+        }
         MD_LOG_ERROR("While calling OpenCVDataTypeToMD(), get type = {}, which is not expected.", type);
         return MDDataType::Type::UNKNOWN1;
     }

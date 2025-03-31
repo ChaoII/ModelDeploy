@@ -528,8 +528,7 @@ namespace modeldeploy {
 
     template<typename T,
             typename std::enable_if<std::is_integral<T>::value ||
-                                    std::is_same<T, float>::value,
-                    bool>::type = true>
+                                    std::is_same<T, float>::value, bool>::type = true>
     inline T &operator+=(T &a, const float16 &b) {  // NOLINT
         auto c = static_cast<float>(a) + static_cast<float>(b);
         a = static_cast<T>(c);

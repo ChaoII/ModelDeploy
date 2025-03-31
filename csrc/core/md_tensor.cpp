@@ -41,7 +41,10 @@ namespace modeldeploy {
         double mean = 0;
         double max = -99999999;
         double min = 99999999;
-        if (dtype == MDDataType::Type::FP32) {
+        if (dtype == MDDataType::Type::FP16) {
+            calculate_statis_info<float16>(data(), total(), &mean, &max, &min);
+        }
+        else if (dtype == MDDataType::Type::FP32) {
             calculate_statis_info<float>(data(), total(), &mean, &max, &min);
         }
         else if (dtype == MDDataType::Type::FP64) {

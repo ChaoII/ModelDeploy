@@ -10,20 +10,21 @@
 #include "csrc/core/md_type.h"
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceIDPostprocessor::run(std::vector<MDTensor>& infer_result,
-                                     std::vector<FaceRecognitionResult>* results) {
+    bool SeetaFaceIDPostprocessor::run(std::vector<MDTensor> &infer_result,
+                                       std::vector<FaceRecognitionResult> *results) {
+
         if (infer_result[0].dtype != MDDataType::Type::FP32) {
             MD_LOG_ERROR("Only support post process with float32 data.");
             return false;
         }
         if (infer_result.size() != 1) {
             MD_LOG_ERROR("The default number of output tensor "
-                "must be 1 according to insightface.");
+                         "must be 1 according to insightface.");
         }
         const size_t batch = infer_result[0].shape[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
-            MDTensor& embedding_tensor = infer_result.at(bs);
+            MDTensor &embedding_tensor = infer_result.at(bs);
             if (embedding_tensor.shape[0] != 1) {
                 MD_LOG_ERROR("Only support batch = 1 now.");
             }
