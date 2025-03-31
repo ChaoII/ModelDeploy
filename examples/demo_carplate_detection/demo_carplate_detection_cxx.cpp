@@ -6,6 +6,7 @@
 #include <string>
 #include "csrc/vision.h"
 #include "csrc/vision/utils.h"
+#include "csrc/core/log.h"
 
 std::vector<int> GenerateColorMap(int num_classes) {
     if (num_classes < 10) {
@@ -26,7 +27,7 @@ std::vector<int> GenerateColorMap(int num_classes) {
     return color_map;
 }
 
-cv::Mat VisFaceDetection(const cv::Mat &im, const modeldeploy::vision::FaceDetectionResult &result,
+cv::Mat VisFaceDetection(const cv::Mat& im, const modeldeploy::vision::FaceDetectionResult& result,
                          int line_size, float font_size) {
     auto color_map = GenerateColorMap(10);
     int h = im.rows;
@@ -36,7 +37,7 @@ cv::Mat VisFaceDetection(const cv::Mat &im, const modeldeploy::vision::FaceDetec
     bool vis_landmarks = false;
     if ((result.landmarks_per_face > 0) &&
         (result.boxes.size() * result.landmarks_per_face ==
-         result.landmarks.size())) {
+            result.landmarks.size())) {
         vis_landmarks = true;
     }
     for (size_t i = 0; i < result.boxes.size(); ++i) {
@@ -58,8 +59,8 @@ cv::Mat VisFaceDetection(const cv::Mat &im, const modeldeploy::vision::FaceDetec
         origin.x = rect.x;
         origin.y = rect.y;
         cv::Rect text_background =
-                cv::Rect(result.boxes[i][0], result.boxes[i][1] - text_size.height,
-                         text_size.width, text_size.height);
+            cv::Rect(result.boxes[i][0], result.boxes[i][1] - text_size.height,
+                     text_size.width, text_size.height);
         cv::rectangle(vis_im, rect, rect_color, line_size);
         cv::putText(vis_im, text, origin, font, font_size,
                     cv::Scalar(255, 255, 255), 1);
@@ -69,9 +70,9 @@ cv::Mat VisFaceDetection(const cv::Mat &im, const modeldeploy::vision::FaceDetec
             for (size_t j = 0; j < result.landmarks_per_face; ++j) {
                 cv::Point landmark;
                 landmark.x = static_cast<int>(
-                        result.landmarks[i * result.landmarks_per_face + j][0]);
+                    result.landmarks[i * result.landmarks_per_face + j][0]);
                 landmark.y = static_cast<int>(
-                        result.landmarks[i * result.landmarks_per_face + j][1]);
+                    result.landmarks[i * result.landmarks_per_face + j][1]);
                 cv::circle(vis_im, landmark, line_size, landmark_color, -1);
             }
         }
@@ -81,6 +82,9 @@ cv::Mat VisFaceDetection(const cv::Mat &im, const modeldeploy::vision::FaceDetec
 
 
 int main() {
+    MD_LOG_INFO << "asda" << std::endl;
+
+
     auto model = modeldeploy::vision::facedet::CarPlateDetection("../../test_data/test_models/yolov5plate.onnx");
     if (!model.initialized()) {
         std::cerr << "Failed to initialize." << std::endl;
