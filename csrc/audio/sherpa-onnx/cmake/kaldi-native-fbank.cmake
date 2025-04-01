@@ -3,7 +3,7 @@ function(download_kaldi_native_fbank)
 
   set(kaldi_native_fbank_URL   "http://localhost:5545/v1.20.0.tar.gz")
   set(kaldi_native_fbank_URL2  "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/kaldi-native-fbank-1.20.0.tar.gz")
-  set(kaldi_native_fbank_HASH "SHA256=c6195b3cf374eef824644061d3c04f6b2a9267ae554169cbaa9865c89c1fe4f9")
+  set(kaldi_native_fbank_HASH "SHA256=45b521a56ac22bd8daec4691d6d76c87d40af9d5088739e44d76be5acb3b615b")
 
   set(KALDI_NATIVE_FBANK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF CACHE BOOL "" FORCE)
