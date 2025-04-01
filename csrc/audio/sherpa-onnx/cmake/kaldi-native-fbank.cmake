@@ -1,9 +1,9 @@
 function(download_kaldi_native_fbank)
   include(FetchContent)
 
-  set(kaldi_native_fbank_URL   "http://localhost:5545/v1.20.0.tar.gz")
+  set(kaldi_native_fbank_URL   "https://modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/kaldi-native-fbank-1.20.0.tar.gz")
   set(kaldi_native_fbank_URL2  "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/kaldi-native-fbank-1.20.0.tar.gz")
-  set(kaldi_native_fbank_HASH "SHA256=a028bd21700eb75a516efbcbfe6514c30eb57a36928c301b5cafbd0bd528db6e")
+  set(kaldi_native_fbank_HASH  "SHA256=a028bd21700eb75a516efbcbfe6514c30eb57a36928c301b5cafbd0bd528db6e")
 
   set(KALDI_NATIVE_FBANK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF CACHE BOOL "" FORCE)
