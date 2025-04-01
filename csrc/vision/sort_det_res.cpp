@@ -99,8 +99,8 @@ namespace modeldeploy::vision::utils {
         DetectionResult backup = *result;
         const bool contain_masks = backup.contain_masks;
         const int boxes_num = static_cast<int>(backup.boxes.size());
-        result->Clear();
-        result->Resize(boxes_num);
+        result->clear();
+        result->resize(boxes_num);
         // boxes, scores, labels_ids
         for (int i = 0; i < boxes_num; ++i) {
             result->boxes[i] = backup.boxes[indices[i]];
@@ -113,8 +113,8 @@ namespace modeldeploy::vision::utils {
                 const auto& shape = backup.masks[indices[i]].shape;
                 const int mask_num_el = static_cast<int>(shape[0] * shape[1]);
                 result->masks[i].shape = shape;
-                result->masks[i].Resize(mask_num_el);
-                std::memcpy(result->masks[i].Data(), backup.masks[indices[i]].Data(),
+                result->masks[i].resize(mask_num_el);
+                std::memcpy(result->masks[i].data(), backup.masks[indices[i]].data(),
                             mask_num_el * sizeof(uint8_t));
             }
         }

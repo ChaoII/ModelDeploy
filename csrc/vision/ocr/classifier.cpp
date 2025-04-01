@@ -18,7 +18,7 @@ namespace modeldeploy::vision::ocr {
 
     bool Classifier::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
 
@@ -67,17 +67,17 @@ namespace modeldeploy::vision::ocr {
         const size_t total_size = images.size();
         const std::vector<cv::Mat>& images_ = images;
         if (!preprocessor_.run(&images_, &reused_input_tensors_, start_index, end_index)) {
-            MD_LOG_ERROR("Failed to preprocess the input image.");
+            MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
         reused_input_tensors_[0].name = get_input_info(0).name;
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            MD_LOG_ERROR("Failed to inference by runtime.");
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
         if (!postprocessor_.run(reused_output_tensors_, cls_labels, cls_scores,
                                 start_index, total_size)) {
-            MD_LOG_ERROR("Failed to postprocess the inference cls_results by runtime.");
+            MD_LOG_ERROR << "Failed to postprocess the inference cls_results by runtime." << std::endl;
             return false;
         }
         return true;

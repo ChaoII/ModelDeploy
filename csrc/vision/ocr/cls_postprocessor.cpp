@@ -35,16 +35,16 @@ namespace modeldeploy::vision::ocr {
         const size_t length = accumulate(tensor.shape.begin() + 1, tensor.shape.end(), 1,
                                          std::multiplies());
         if (batch <= 0) {
-            MD_LOG_ERROR("The infer outputTensor.shape[0] <=0, wrong infer result.");
+            MD_LOG_ERROR << "The infer outputTensor.shape[0] <=0, wrong infer result." << std::endl;
             return false;
         }
         if (total_size <= 0) {
-            MD_LOG_ERROR("start_index or total_size error. Correct is: 0 <= start_index < total_size");
+            MD_LOG_ERROR << "start_index or total_size error. Correct is: 0 <= start_index < total_size" << std::endl;
             return false;
         }
         if (start_index + batch > total_size) {
-            MD_LOG_ERROR("start_index or total_size error. Correct is: start_index + "
-                "batch(outputTensor.shape[0]) <= total_size");
+            MD_LOG_ERROR << "start_index or total_size error. Correct is: start_index + "
+                "batch(outputTensor.shape[0]) <= total_size" << std::endl;
             return false;
         }
         cls_labels->resize(total_size);

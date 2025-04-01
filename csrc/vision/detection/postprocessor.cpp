@@ -23,12 +23,12 @@ namespace modeldeploy::vision::detection {
         function::Transpose(tensors[0], &tensor_transpose, dim);
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
-            (*results)[bs].Clear();
+            (*results)[bs].clear();
             if (multi_label_) {
-                (*results)[bs].Reserve(tensor_transpose.shape[1] * (tensor_transpose.shape[2] - 4));
+                (*results)[bs].reserve(tensor_transpose.shape[1] * (tensor_transpose.shape[2] - 4));
             }
             else {
-                (*results)[bs].Reserve(tensor_transpose.shape[1]);
+                (*results)[bs].reserve(tensor_transpose.shape[1]);
             }
             if (tensor_transpose.dtype != MDDataType::FP32) {
                 std::cerr << "Only support post process with float32 data." << std::endl;

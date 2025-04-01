@@ -9,104 +9,54 @@
 
 namespace modeldeploy::vision {
     enum ResultType {
-        UNKNOWN_RESULT,
         CLASSIFY,
         DETECTION,
-        SEGMENTATION,
         OCR,
-        MOT,
         FACE_DETECTION,
-        FACE_ALIGNMENT,
         FACE_RECOGNITION,
-        MATTING,
         MASK,
-        KEYPOINT_DETECTION,
-        HEADPOSE,
-        PERCEPTION,
     };
 
-
-    struct BaseResult {
-        ResultType type = ResultType::UNKNOWN_RESULT;
-    };
-
-
-    /*! @brief Classify result structure for all the image classify models
- */
-    struct MODELDEPLOY_CXX_EXPORT CarPlateRecognizerResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT CarPlateRecognizerResult {
         CarPlateRecognizerResult() = default;
-
         std::string car_plate_str;
         std::string car_plate_color;
     };
 
-    /*! @brief Classify result structure for all the image classify models
-     */
-    struct MODELDEPLOY_CXX_EXPORT ClassifyResult : public BaseResult {
+    /// Classify result structure for all the image classify models
+    struct MODELDEPLOY_CXX_EXPORT ClassifyResult {
         ClassifyResult() = default;
-
-        /// Classify result for an image
         std::vector<int32_t> label_ids;
-        /// The confidence for each classify result
         std::vector<float> scores;
-        /// The feature vector of recognizer, e.g, PP-ShiTuV2 Recognizer
         std::vector<float> feature;
         ResultType type = ResultType::CLASSIFY;
-
-        /// Resize ClassifyResult data buffer
-        void Resize(int size);
-
-        /// Clear ClassifyResult
-        void Clear();
-
-        /// Clear ClassifyResult and free the memory
-        void Free();
-
-        /// Copy constructor
-        ClassifyResult(const ClassifyResult &other) = default;
-
-        /// Move assignment
-        ClassifyResult &operator=(ClassifyResult &&other);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
+        void resize(int size);
+        void clear();
+        void free();
+        void display() const;
+        ClassifyResult(const ClassifyResult& other) = default;
+        ClassifyResult& operator=(ClassifyResult&& other) noexcept;
     };
 
     /*! Mask structure, used in DetectionResult for instance segmentation models
      */
-    struct MODELDEPLOY_CXX_EXPORT Mask : public BaseResult {
-        /// Mask data buffer
-        std::vector<uint8_t> data;
-        /// Shape of mask
+    struct MODELDEPLOY_CXX_EXPORT Mask {
+        std::vector<uint8_t> buffer;
         std::vector<int64_t> shape; // (H,W) ...
         ResultType type = ResultType::MASK;
-
-        /// clear Mask result
-        void Clear();
-
-        /// Clear Mask result and free the memory
-        void Free();
-
-        /// Return a mutable pointer of the mask data buffer
-        void *Data() { return data.data(); }
-
-        /// Return a pointer of the mask data buffer for read only
-        const void *Data() const { return data.data(); }
-
-        /// Reserve size for mask data buffer
-        void Reserve(int size);
-
-        /// Resize the mask data buffer
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
+        void clear();
+        void free();
+        void* data() { return buffer.data(); }
+        [[nodiscard]] const void* data() const { return buffer.data(); }
+        void reserve(int size);
+        void resize(int size);
+        [[nodiscard]] std::string str() const;
     };
 
 
     /*! @brief Detection result structure for all the object detection models and instance segmentation models
      */
-    struct MODELDEPLOY_CXX_EXPORT DetectionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT DetectionResult {
         DetectionResult() = default;
 
         /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
@@ -129,151 +79,44 @@ namespace modeldeploy::vision {
         ResultType type = ResultType::DETECTION;
 
         /// Copy constructor
-        DetectionResult(const DetectionResult &res);
+        DetectionResult(const DetectionResult& res);
 
         /// Move assignment
-        DetectionResult &operator=(DetectionResult &&other);
+        DetectionResult& operator=(DetectionResult&& other) noexcept;
 
         /// Clear DetectionResult
-        void Clear();
+        void clear();
 
         /// Clear DetectionResult and free the memory
-        void Free();
+        void free();
 
-        void Reserve(int size);
+        void reserve(int size);
 
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
-    };
-
-    /*! @brief Detection result structure for all the object detection models and instance segmentation models
-     */
-    struct MODELDEPLOY_CXX_EXPORT PerceptionResult : public BaseResult {
-        PerceptionResult() = default;
-
-        std::vector<float> scores;
-
-        std::vector<int32_t> label_ids;
-        // xmin, ymin, xmax, ymax, h, w, l
-        std::vector<std::array<float, 7>> boxes;
-        // cx, cy, cz
-        std::vector<std::array<float, 3>> center;
-
-        std::vector<float> observation_angle;
-
-        std::vector<float> yaw_angle;
-        // vx, vy, vz
-        std::vector<std::array<float, 3>> velocity;
-
-        // valid results for func Str(): True for printing
-        // 0 scores
-        // 1 label_ids
-        // 2 boxes
-        // 3 center
-        // 4 observation_angle
-        // 5 yaw_angle
-        // 6 velocity
-        std::vector<bool> valid;
-
-
-        /// Copy constructor
-        PerceptionResult(const PerceptionResult &res);
-
-        /// Move assignment
-        PerceptionResult &operator=(PerceptionResult &&other);
-
-        /// Clear PerceptionResult
-        void Clear();
-
-        /// Clear PerceptionResult and free the memory
-        void Free();
-
-        void Reserve(int size);
-
-        void Resize(int size);
+        void resize(int size);
 
         /// Debug function, convert the result to string to print
-        std::string Str();
+        void display() const;
     };
 
-    /*! @brief KeyPoint Detection result structure for all the keypoint detection models
-     */
-    struct MODELDEPLOY_CXX_EXPORT KeyPointDetectionResult : public BaseResult {
-        /** \brief All the coordinates of detected keypoints for an input image, the size of `keypoints` is num_detected_objects * num_joints, and the element of `keypoint` is a array of 2 float values, means [x, y]
-         */
-        std::vector<std::array<float, 2>> keypoints;
-        //// The confidence for all the detected points
-        std::vector<float> scores;
-        //// Number of joints for a detected object
-        int num_joints = -1;
 
-        ResultType type = ResultType::KEYPOINT_DETECTION;
-
-        /// Clear KeyPointDetectionResult
-        void Clear();
-
-        /// Clear KeyPointDetectionResult and free the memory
-        void Free();
-
-        void Reserve(int size);
-
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
-    };
-
-    struct MODELDEPLOY_CXX_EXPORT OCRResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT OCRResult {
         std::vector<std::array<int, 8>> boxes;
-
         std::vector<std::string> text;
         std::vector<float> rec_scores;
-
         std::vector<float> cls_scores;
         std::vector<int32_t> cls_labels;
-
         std::vector<std::array<int, 8>> table_boxes;
         std::vector<std::string> table_structure;
         std::string table_html;
-
         ResultType type = ResultType::OCR;
-
-        void Clear();
-
-        std::string Str();
-    };
-
-    /*! @brief MOT(Multi-Object Tracking) result structure for all the MOT models
-     */
-    struct MODELDEPLOY_CXX_EXPORT MOTResult : public BaseResult {
-        /** \brief All the tracking object boxes for an input image, the size of `boxes` is the number of tracking objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
-         */
-        std::vector<std::array<int, 4>> boxes;
-        /** \brief All the tracking object ids
-         */
-        std::vector<int> ids;
-        /** \brief The confidence for all the tracking objects
-         */
-        std::vector<float> scores;
-        /** \brief The classify label id for all the tracking object
-         */
-        std::vector<int> class_ids;
-
-        ResultType type = ResultType::MOT;
-
-        /// Clear MOT result
-        void Clear();
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
+        void clear();
+        [[nodiscard]] std::string str() const;
     };
 
 
     /*! @brief Face detection result structure for all the face detection models
      */
-    struct MODELDEPLOY_CXX_EXPORT FaceDetectionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
         /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
          */
         std::vector<std::array<float, 4>> boxes;
@@ -290,178 +133,51 @@ namespace modeldeploy::vision {
          * `landmarks_per_face` indicates the number of face landmarks for each detected face
          * if the model's output contains face landmarks (such as YOLOv5Face, SCRFD, ...)
         */
-        int landmarks_per_face;
+        int landmarks_per_instance;
 
-        FaceDetectionResult() { landmarks_per_face = 0; }
+        DetectionLandmarkResult() { landmarks_per_instance = 0; }
 
-        FaceDetectionResult(const FaceDetectionResult &res);
+        DetectionLandmarkResult(const DetectionLandmarkResult& res);
 
         /// Clear FaceDetectionResult
-        void Clear();
+        void clear();
 
         /// Clear FaceDetectionResult and free the memory
-        void Free();
+        void free();
 
-        void Reserve(int size);
+        void reserve(int size);
 
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
-    };
-
-    /*! @brief Face Alignment result structure for all the face alignment models
-     */
-    struct MODELDEPLOY_CXX_EXPORT FaceAlignmentResult : public BaseResult {
-        /** \brief All the coordinates of detected landmarks for an input image, and the element of `landmarks` is a array of 2 float values, means [x, y]
-         */
-        std::vector<std::array<float, 2>> landmarks;
-
-        ResultType type = ResultType::FACE_ALIGNMENT;
-
-        /// Clear FaceAlignmentResult
-        void Clear();
-
-        /// Clear FaceAlignmentResult and free the memory
-        void Free();
-
-        void Reserve(int size);
-
-        void Resize(int size);
+        void resize(int size);
 
         /// Debug function, convert the result to string to print
-        std::string Str();
+        void display() const;
     };
 
-    /*! @brief Segmentation result structure for all the segmentation models
-     */
-    struct MODELDEPLOY_CXX_EXPORT SegmentationResult : public BaseResult {
-        SegmentationResult() = default;
-
-        /** \brief
-         * `label_map` stores the pixel-level category labels for input image. the number of pixels is equal to label_map.size()
-        */
-        std::vector<uint8_t> label_map;
-        /** \brief
-         * `score_map` stores the probability of the predicted label for each pixel of input image.
-        */
-        std::vector<float> score_map;
-        /// The output shape, means [H, W]
-        std::vector<int64_t> shape;
-        /// SegmentationResult whether containing score_map
-        bool contain_score_map = false;
-
-        /// Copy constructor
-        SegmentationResult(const SegmentationResult &other) = default;
-
-        /// Move assignment
-        SegmentationResult &operator=(SegmentationResult &&other);
-
-        ResultType type = ResultType::SEGMENTATION;
-
-        /// Clear Segmentation result
-        void Clear();
-
-        /// Clear Segmentation result and free the memory
-        void Free();
-
-        void Reserve(int size);
-
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
-    };
 
     /*! @brief Face recognition result structure for all the Face recognition models
      */
-    struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult : public BaseResult {
+    struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult {
         /** \brief The feature embedding that represents the final extraction of the face recognition model can be used to calculate the feature similarity between faces.
          */
         std::vector<float> embedding;
 
         ResultType type = ResultType::FACE_RECOGNITION;
 
-        FaceRecognitionResult() {
-        }
+        FaceRecognitionResult() = default;
 
-        FaceRecognitionResult(const FaceRecognitionResult &res);
+        FaceRecognitionResult(const FaceRecognitionResult& res);
 
         /// Clear FaceRecognitionResult
-        void Clear();
+        void clear();
 
         /// Clear FaceRecognitionResult and free the memory
-        void Free();
+        void free();
 
-        void Reserve(int size);
+        void reserve(int size);
 
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
-    };
-
-    /*! @brief Matting result structure for all the Matting models
-     */
-    struct MODELDEPLOY_CXX_EXPORT MattingResult : public BaseResult {
-        /** \brief
-        `alpha` is a one-dimensional vector, which is the predicted alpha transparency value. The range of values is [0., 1.], and the length is hxw. h, w are the height and width of the input image
-        */
-        std::vector<float> alpha; // h x w
-        /** \brief
-        If the model can predict foreground, `foreground` save the predicted foreground image, the shape is [hight,width,channel] generally.
-        */
-        std::vector<float> foreground; // h x w x c (c=3 default)
-        /** \brief
-         * The shape of output result, when contain_foreground == false, shape only contains (h, w), when contain_foreground == true, shape contains (h, w, c), and c is generally 3
-         */
-        std::vector<int64_t> shape;
-        /** \brief
-        If the model can predict alpha matte and foreground, contain_foreground = true, default false
-        */
-        bool contain_foreground = false;
-
-        ResultType type = ResultType::MATTING;
-
-        MattingResult() {
-        }
-
-        MattingResult(const MattingResult &res);
-
-        /// Clear matting result
-        void Clear();
-
-        /// Free matting result
-        void Free();
-
-        void Reserve(int size);
-
-        void Resize(int size);
+        void resize(int size);
 
         /// Debug function, convert the result to string to print
-        std::string Str();
+        void display();
     };
-
-    /*! @brief HeadPose result structure for all the headpose models
-     */
-    struct MODELDEPLOY_CXX_EXPORT HeadPoseResult : public BaseResult {
-        /** \brief EulerAngles for an input image, and the element of `euler_angles` is a vector, contains {yaw, pitch, roll}
-         */
-        std::vector<float> euler_angles;
-
-        ResultType type = ResultType::HEADPOSE;
-
-        /// Clear HeadPoseResult
-        void Clear();
-
-        /// Clear HeadPoseResult and free the memory
-        void Free();
-
-        void Reserve(int size);
-
-        void Resize(int size);
-
-        /// Debug function, convert the result to string to print
-        std::string Str();
-    };
-};
+}

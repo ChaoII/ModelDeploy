@@ -46,7 +46,7 @@ MDImage md_from_base64_str(const char* base64_str) {
     const cv::Mat img_decode = cv::imdecode(buffer, cv::IMREAD_COLOR);
     // 检查图像是否成功解码
     if (img_decode.empty()) {
-        MD_LOG_ERROR("Failed to decode image from base64 string");
+        MD_LOG_ERROR << "Failed to decode image from base64 string" << std::endl;
         return {};
     }
     // 将 cv::Mat 转换为 MDImage
@@ -68,24 +68,24 @@ MDImage md_read_image_from_device(int device_id, int frame_width, int frame_heig
     cap.set(cv::CAP_PROP_FRAME_WIDTH, frame_width);
     cap.set(cv::CAP_PROP_FRAME_HEIGHT, frame_height);
     if (!cap.isOpened()) {
-        MD_LOG_WARN("Open video stream or file failed");
+        MD_LOG_WARN << "Open video stream or file failed" << std::endl;
         return {};
     }
     cv::Mat image;
     int black = 0;
     while (true) {
         if (const bool ret = cap.read(image); !ret) {
-            MD_LOG_ERROR("No frame");
+            MD_LOG_ERROR << "No frame" << std::endl;
             continue;
         }
         if (image.empty()) {
-            MD_LOG_ERROR("Empty frame");
+            MD_LOG_ERROR << "Empty frame" << std::endl;
             continue;
         }
         std::vector<cv::Mat> channels;
         cv::split(image, channels);
         if (cv::countNonZero(channels[0]) == 0) {
-            MD_LOG_WARN("All black frame: {}", ++black);
+            MD_LOG_WARN << "All black frame: " << ++black;
             continue;
         }
         break;
@@ -93,7 +93,7 @@ MDImage md_read_image_from_device(int device_id, int frame_width, int frame_heig
     cap.release();
     if (is_save_file) {
         cv::imwrite("capture.jpg", image);
-        MD_LOG_INFO("Save file to [capture.jpg]");
+        MD_LOG_INFO << "Save file to [capture.jpg]" << std::endl;
     }
     return *mat_to_md_image(image);
 }

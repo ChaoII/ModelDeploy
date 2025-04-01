@@ -11,20 +11,20 @@
 
 namespace modeldeploy::vision::ocr {
     bool StructureV2LayoutPostprocessor::run(
-            const std::vector<MDTensor> &tensors, std::vector<DetectionResult> *results,
-            const std::vector<std::array<int, 4>> &batch_layout_img_info) {
+        const std::vector<MDTensor>& tensors, std::vector<DetectionResult>* results,
+        const std::vector<std::array<int, 4>>& batch_layout_img_info) {
         // A StructureV2Layout has 8 output tensors on which it then runs
         // a GFL regression (namely, DisPred2Box), reference:
         // PaddleOCR/blob/release/2.6/deploy/cpp_infer/src/postprocess_op.cpp#L511
         int tensor_size = tensors.size();
         if (tensor_size != 8) {
-            MD_LOG_ERROR("StructureV2Layout should has 8 output tensors,"
-                         "but got {} now!", tensor_size);
+            MD_LOG_ERROR << "StructureV2Layout should has 8 output tensors,"
+                "but got " << tensor_size << " now!" << std::endl;
         }
         if ((tensor_size / 2) != fpn_stride_.size()) {
-            MD_LOG_ERROR("found (tensor_size / 2) != fpn_stride_.size() !");
+            MD_LOG_ERROR << "found (tensor_size / 2) != fpn_stride_.size() !" << std::endl;
         }
-        // TODO(qiuyanjun): may need to reorder the tensors according to
+        // TODO: may need to reorder the tensors according to
         // fpn_stride_ and the shape of output tensors.
         size_t batch = tensors[0].get_shape()[0]; // [batch, ...]
 
@@ -41,30 +41,30 @@ namespace modeldeploy::vision::ocr {
     }
 
     void StructureV2LayoutPostprocessor::set_single_batch_external_data(
-            const std::vector<MDTensor> &tensors,
-            std::vector<MDTensor> &single_batch_tensors, size_t batch_idx) {
+        const std::vector<MDTensor>& tensors,
+        std::vector<MDTensor>& single_batch_tensors, size_t batch_idx) {
         single_batch_tensors.resize(tensors.size());
         for (int j = 0; j < tensors.size(); ++j) {
             auto j_shape = tensors[j].get_shape();
             j_shape[0] = 1; // process b=1 per loop
             size_t j_step =
-                    std::accumulate(j_shape.begin(), j_shape.end(), 1, std::multiplies());
-            const float *j_data_ptr = reinterpret_cast<const float *>(tensors[j].data());
-            const float *j_start_ptr = j_data_ptr + j_step * batch_idx;
+                std::accumulate(j_shape.begin(), j_shape.end(), 1, std::multiplies());
+            const float* j_data_ptr = reinterpret_cast<const float*>(tensors[j].data());
+            const float* j_start_ptr = j_data_ptr + j_step * batch_idx;
 
 
             single_batch_tensors[j].set_external_data(
-                    j_shape, tensors[j].get_dtype(),
-                    const_cast<void *>(reinterpret_cast<const void *>(j_start_ptr)));
+                j_shape, tensors[j].get_dtype(),
+                const_cast<void*>(reinterpret_cast<const void*>(j_start_ptr)));
         }
     }
 
     bool StructureV2LayoutPostprocessor::single_batch_postprocessor(
-            const std::vector<MDTensor> &single_batch_tensors,
-            const std::array<int, 4> &layout_img_info, DetectionResult *result) {
+        const std::vector<MDTensor>& single_batch_tensors,
+        const std::array<int, 4>& layout_img_info, DetectionResult* result) {
         if (single_batch_tensors.size() != 8) {
-            MD_LOG_ERROR("StructureV2Layout should has 8 output tensors,"
-                         "but got %d now!", static_cast<int>(single_batch_tensors.size()));
+            MD_LOG_ERROR << "StructureV2Layout should has 8 output tensors,"
+                "but got " << static_cast<int>(single_batch_tensors.size()) << " now!" << std::endl;
         }
         // layout_img_info: {image width, image height, resize width, resize height}
         int img_w = layout_img_info[0];
@@ -81,10 +81,10 @@ namespace modeldeploy::vision::ocr {
         for (int i = 0; i < fpn_stride_.size(); ++i) {
             int feature_h = std::ceil(static_cast<float>(in_h) / fpn_stride_[i]);
             int feature_w = std::ceil(static_cast<float>(in_w) / fpn_stride_[i]);
-            const MDTensor &prob_tensor = single_batch_tensors[i];
-            const MDTensor &bbox_tensor = single_batch_tensors[i + fpn_stride_.size()];
-            const float *prob_data = reinterpret_cast<const float *>(prob_tensor.data());
-            const float *bbox_data = reinterpret_cast<const float *>(bbox_tensor.data());
+            const MDTensor& prob_tensor = single_batch_tensors[i];
+            const MDTensor& bbox_tensor = single_batch_tensors[i + fpn_stride_.size()];
+            const float* prob_data = reinterpret_cast<const float*>(prob_tensor.data());
+            const float* bbox_data = reinterpret_cast<const float*>(bbox_tensor.data());
             for (int idx = 0; idx < feature_h * feature_w; ++idx) {
                 // score and label
                 float score = 0.f;
@@ -102,17 +102,17 @@ namespace modeldeploy::vision::ocr {
                     std::vector<float> bbox_pred(bbox_data + idx * 4 * reg_max_,
                                                  bbox_data + (idx + 1) * 4 * reg_max_);
                     bbox_results[label].boxes.push_back(dis_pred_to_bbox(
-                            bbox_pred, col, row, fpn_stride_[i], in_w, in_h, reg_max_));
+                        bbox_pred, col, row, fpn_stride_[i], in_w, in_h, reg_max_));
                     bbox_results[label].scores.push_back(score);
                     bbox_results[label].label_ids.push_back(label);
                 }
             }
         }
 
-        result->Clear();
+        result->clear();
         // nms for per class, i in [0~num_class-1]
         for (int i = 0; i < bbox_results.size(); ++i) {
-            if (bbox_results[i].boxes.size() <= 0) {
+            if (bbox_results[i].boxes.empty()) {
                 continue;
             }
             vision::utils::nms(&bbox_results[i], nms_threshold_);
@@ -121,20 +121,20 @@ namespace modeldeploy::vision::ocr {
                 result->scores.push_back(bbox_results[i].scores[j]);
                 result->label_ids.push_back(bbox_results[i].label_ids[j]);
                 result->boxes.push_back(
-                        {
-                                bbox_results[i].boxes[j][0] / scale_factor_w,
-                                bbox_results[i].boxes[j][1] / scale_factor_h,
-                                bbox_results[i].boxes[j][2] / scale_factor_w,
-                                bbox_results[i].boxes[j][3] / scale_factor_h,
-                        });
+                    {
+                        bbox_results[i].boxes[j][0] / scale_factor_w,
+                        bbox_results[i].boxes[j][1] / scale_factor_h,
+                        bbox_results[i].boxes[j][2] / scale_factor_w,
+                        bbox_results[i].boxes[j][3] / scale_factor_h,
+                    });
             }
         }
         return true;
     }
 
     std::array<float, 4> StructureV2LayoutPostprocessor::dis_pred_to_bbox(
-            const std::vector<float> &bbox_pred, int x, int y, int stride, int resize_w,
-            int resize_h, int reg_max) {
+        const std::vector<float>& bbox_pred, int x, int y, int stride, int resize_w,
+        int resize_h, int reg_max) {
         float ct_x = (static_cast<float>(x) + 0.5f) * static_cast<float>(stride);
         float ct_y = (static_cast<float>(y) + 0.5f) * static_cast<float>(stride);
         std::vector<float> dis_pred;

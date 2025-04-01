@@ -42,7 +42,7 @@ namespace modeldeploy::vision::facedet {
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
-            MD_LOG_ERROR("Failed to binding mat to tensor.");
+            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
         output->expand_dim(0); // reshape to n, c, h, w

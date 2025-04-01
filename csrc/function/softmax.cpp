@@ -101,9 +101,9 @@ namespace modeldeploy::function {
     void softmax(const MDTensor& x, MDTensor* out, const int axis) {
         if (
             std::abs(axis) >= x.shape.size()) {
-            MD_LOG_ERROR("The absolute given axis should be smaller than the input's "
-                         "dimension. Expected absolute axis is smaller than {}, but receive {}.",
-                         x.shape.size(), std::abs(axis));
+            MD_LOG_ERROR << "The absolute given axis should be smaller than the input's "
+                "dimension. Expected absolute axis is smaller than " << x.shape.size() << ", but receive " <<
+                std::abs(axis) << "." << std::endl;
         }
         // Note: The MDTensor out may equal to MDTensor x, so firstly we
         // use out_temp to get the softmax result, then we move the out_temp to out.

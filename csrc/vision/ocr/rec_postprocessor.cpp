@@ -12,7 +12,7 @@ namespace modeldeploy::vision::ocr {
     std::vector<std::string> read_dict(const std::string& path) {
         std::ifstream in(path);
         if (!in) {
-            MD_LOG_ERROR("Cannot open file {} to read.", path);
+            MD_LOG_ERROR << "Cannot open file " << path << " to read." << std::endl;
         }
         std::string line;
         std::vector<std::string> m_vec;
@@ -57,8 +57,8 @@ namespace modeldeploy::vision::ocr {
                 score += max_value;
                 count += 1;
                 if (argmax_idx > label_list_.size()) {
-                    MD_LOG_ERROR("The output index: {} is larger than the size of label_list: {}. "
-                                 "Please check the label file!", argmax_idx, label_list_.size());
+                    MD_LOG_ERROR << "The output index: " << argmax_idx << " is larger than the size of label_list: " <<
+                        label_list_.size() << ". Please check the label file!" << std::endl;
                     return false;
                 }
                 str_res += label_list_[argmax_idx];
@@ -100,18 +100,18 @@ namespace modeldeploy::vision::ocr {
                                          std::multiplies());
 
         if (batch <= 0) {
-            MD_LOG_ERROR("The infer outputTensor.shape[0] <=0, wrong infer result.");
+            MD_LOG_ERROR << "The infer outputTensor.shape[0] <=0, wrong infer result." << std::endl;
             return false;
         }
         if (total_size <= 0) {
-            MD_LOG_ERROR("start_index or total_size error. Correct is: 0 "
-                "<= start_index < total_size");
+            MD_LOG_ERROR << "start_index or total_size error. Correct is: 0 "
+                "<= start_index < total_size" << std::endl;
             return false;
         }
         if (start_index + batch > total_size) {
-            MD_LOG_ERROR(
+            MD_LOG_ERROR <<
                 "start_index or total_size error. Correct is: start_index + "
-                "batch(outputTensor.shape[0]) <= total_size");
+                "batch(outputTensor.shape[0]) <= total_size" << std::endl;
             return false;
         }
         texts->resize(total_size);

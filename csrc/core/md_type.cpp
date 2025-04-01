@@ -35,7 +35,7 @@ namespace modeldeploy {
         if (data_type == MDDataType::INT8) {
             return sizeof(int8_t);
         }
-        MD_LOG_ERROR("Unexpected data type: {}", str(data_type));
+        MD_LOG_ERROR << "Unexpected data type: " << str(data_type) << std::endl;
         return -1;
     }
 

@@ -58,7 +58,7 @@ namespace modeldeploy::vision::face {
     bool SCRFD::Initialize() {
         // num_outputs = use_kps ? 9 : 6;
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         // Check if the input shape is dynamic after Runtime already initialized,
@@ -121,7 +121,7 @@ namespace modeldeploy::vision::face {
             static_cast<float>(mat->cols)
         };
         if (!utils::mat_to_tensor(*mat, output)) {
-            MD_LOG_ERROR("Failed to binding mat to tensor.");
+            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
         output->expand_dim(0); // reshape to n, c, h, w
@@ -155,7 +155,7 @@ namespace modeldeploy::vision::face {
     }
 
     bool SCRFD::postprocess(
-        std::vector<MDTensor>& infer_result, FaceDetectionResult* result,
+        std::vector<MDTensor>& infer_result, DetectionLandmarkResult* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
         const float conf_threshold, const float nms_iou_threshold) {
         // number of downsample_strides
@@ -163,16 +163,16 @@ namespace modeldeploy::vision::face {
         // scrfd has 6,9,10,15 output tensors
         if (!(infer_result.size() == 9 || infer_result.size() == 6 ||
             infer_result.size() == 10 || infer_result.size() == 15)) {
-            MD_LOG_ERROR("The default number of output tensor must be 6, 9, 10, or 15 "
-                "according to scrfd.");
+            MD_LOG_ERROR << "The default number of output tensor must be 6, 9, 10, or 15 "
+                "according to scrfd." << std::endl;
         }
         if (!(fmc == 3 || fmc == 5)) { std::cerr << "The fmc must be 3 or 5" << std::endl; }
         if (infer_result.at(0).shape[0] != 1) {
-            MD_LOG_ERROR("Only support batch =1 now.");
+            MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
         }
         for (int i = 0; i < fmc; ++i) {
             if (infer_result.at(i).dtype != MDDataType::Type::FP32) {
-                std::cerr << "Only support post process with float32 data." << std::endl;
+                MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
         }
@@ -182,13 +182,13 @@ namespace modeldeploy::vision::face {
             total_num_boxes += infer_result.at(f).shape[1];
         }
         generate_points();
-        result->Clear();
+        result->clear();
         // scale the boxes to the origin image shape
         const auto iter_out = im_info.find("output_shape");
         const auto iter_ipt = im_info.find("input_shape");
 
         if (!(iter_out != im_info.end() && iter_ipt != im_info.end())) {
-            MD_LOG_ERROR("Cannot find input_shape or output_shape from im_info.");
+            MD_LOG_ERROR << "Cannot find input_shape or output_shape from im_info." << std::endl;
         }
         const float out_h = iter_out->second[0];
         const float out_w = iter_out->second[1];
@@ -207,13 +207,13 @@ namespace modeldeploy::vision::face {
         }
         // must be setup landmarks_per_face before reserve
         if (use_kps) {
-            result->landmarks_per_face = landmarks_per_face;
+            result->landmarks_per_instance = landmarks_per_face;
         }
         else {
             // force landmarks_per_face = 0, if use_kps has been set as 'false'.
-            result->landmarks_per_face = 0;
+            result->landmarks_per_instance = 0;
         }
-        result->Reserve(static_cast<int>(total_num_boxes));
+        result->reserve(static_cast<int>(total_num_boxes));
         unsigned int count = 0;
         // loop each stride
         for (int f = 0; f < fmc; ++f) {
@@ -266,7 +266,7 @@ namespace modeldeploy::vision::face {
 
         // fetch original image shape
         if (iter_ipt == im_info.end()) {
-            MD_LOG_ERROR("Cannot find input_shape from im_info.");
+            MD_LOG_ERROR << "Cannot find input_shape from im_info." << std::endl;
         }
 
         if (result->boxes.empty()) {
@@ -298,7 +298,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SCRFD::predict(cv::Mat* im, FaceDetectionResult* result,
+    bool SCRFD::predict(cv::Mat* im, DetectionLandmarkResult* result,
                         const float conf_threshold, const float nms_iou_threshold) {
         std::vector<MDTensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
@@ -312,20 +312,20 @@ namespace modeldeploy::vision::face {
             static_cast<float>(im->cols)
         };
         if (!preprocess(im, &input_tensors[0], &im_info)) {
-            MD_LOG_ERROR("Failed to preprocess input image.");
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
 
         input_tensors[0].name = get_input_info(0).name;
         std::vector<MDTensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
-            MD_LOG_ERROR("Failed to inference.");
+            MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;
         }
 
         if (!postprocess(output_tensors, result, im_info, conf_threshold,
                          nms_iou_threshold)) {
-            MD_LOG_ERROR("Failed to post process.");
+            MD_LOG_ERROR << "Failed to post process." << std::endl;
             return false;
         }
         return true;

@@ -18,7 +18,8 @@ namespace modeldeploy::vision::utils {
             return MDDataType::Type::INT8;
         }
         if (type == 2) {
-            MD_LOG_ERROR("While calling OpenCVDataTypeToMD(), get UINT16 type which is not supported now.");
+            MD_LOG_ERROR << "While calling cv_dtype_to_md_dtype(), "
+                "get UINT16 type which is not supported now." << std::endl;
             return MDDataType::Type::UNKNOWN1;
         }
         if (type == 3) {
@@ -36,7 +37,8 @@ namespace modeldeploy::vision::utils {
         if (type == 7) {
             return MDDataType::Type::FP16;
         }
-        MD_LOG_ERROR("While calling OpenCVDataTypeToMD(), get type = {}, which is not expected.", type);
+        MD_LOG_ERROR << "While calling cv_dtype_to_md_dtype(), get type = "
+            << type << ", which is not expected." << std::endl;
         return MDDataType::Type::UNKNOWN1;
     }
 
@@ -46,8 +48,9 @@ namespace modeldeploy::vision::utils {
             const int num_bytes = mat.rows * mat.cols * mat.channels() * MDDataType::size(
                 cv_dtype_to_md_dtype(mat.type()));
             if (num_bytes != tensor->total_bytes()) {
-                MD_LOG_ERROR("While copy Mat to Tensor, requires the memory size be same, "
-                             "but now size of Tensor = {}, size of Mat = {}.", tensor->total_bytes(), num_bytes);
+                MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
+                    "but now size of Tensor = " << tensor->total_bytes()
+                    << ", size of Mat = " << num_bytes << "." << std::endl;
                 return false;
             }
             memcpy(tensor->mutable_data(), mat.data, num_bytes);
@@ -119,8 +122,8 @@ namespace modeldeploy::vision::utils {
             }
         }
         DetectionResult backup(*output);
-        output->Clear();
-        output->Reserve(static_cast<int>(suppressed.size()));
+        output->clear();
+        output->reserve(static_cast<int>(suppressed.size()));
         for (size_t i = 0; i < suppressed.size(); ++i) {
             if (suppressed[i] == 1) {
                 continue;
@@ -135,7 +138,7 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    void nms(FaceDetectionResult* result, float iou_threshold) {
+    void nms(DetectionLandmarkResult* result, float iou_threshold) {
         utils::sort_detection_result(result);
 
         std::vector<float> area_of_boxes(result->boxes.size());
@@ -167,14 +170,14 @@ namespace modeldeploy::vision::utils {
                 }
             }
         }
-        FaceDetectionResult backup(*result);
-        int landmarks_per_face = result->landmarks_per_face;
+        DetectionLandmarkResult backup(*result);
+        int landmarks_per_face = result->landmarks_per_instance;
 
-        result->Clear();
+        result->clear();
         // don't forget to reset the landmarks_per_face
         // before apply Reserve method.
-        result->landmarks_per_face = landmarks_per_face;
-        result->Reserve(suppressed.size());
+        result->landmarks_per_instance = landmarks_per_face;
+        result->reserve(suppressed.size());
         for (size_t i = 0; i < suppressed.size(); ++i) {
             if (suppressed[i] == 1) {
                 continue;
@@ -182,10 +185,10 @@ namespace modeldeploy::vision::utils {
             result->boxes.emplace_back(backup.boxes[i]);
             result->scores.push_back(backup.scores[i]);
             // landmarks (if have)
-            if (result->landmarks_per_face > 0) {
-                for (size_t j = 0; j < result->landmarks_per_face; ++j) {
+            if (result->landmarks_per_instance > 0) {
+                for (size_t j = 0; j < result->landmarks_per_instance; ++j) {
                     result->landmarks.emplace_back(
-                        backup.landmarks[i * result->landmarks_per_face + j]);
+                        backup.landmarks[i * result->landmarks_per_instance + j]);
                 }
             }
         }
@@ -193,23 +196,20 @@ namespace modeldeploy::vision::utils {
 
     cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size) {
         // 获取输入图像的尺寸
-        int img_height = image.rows;
-        int img_width = image.cols;
-
+        const int img_height = image.rows;
+        const int img_width = image.cols;
         // 获取裁剪尺寸
-        int crop_height = crop_size.height;
-        int crop_width = crop_size.width;
+        const int crop_height = crop_size.height;
+        const int crop_width = crop_size.width;
 
         // 检查裁剪尺寸是否大于输入图像尺寸
         if (crop_height > img_height || crop_width > img_width) {
             std::cerr << "Crop size is larger than the input image size." << std::endl;
             return image; // 或者抛出异常
         }
-
         // 计算裁剪区域的起始坐标
-        int top = (img_height - crop_height) / 2;
-        int left = (img_width - crop_width) / 2;
-
+        const int top = (img_height - crop_height) / 2;
+        const int left = (img_width - crop_width) / 2;
         // 使用子矩阵操作进行裁剪
         cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
 
@@ -255,7 +255,7 @@ namespace modeldeploy::vision::utils {
 
     float compute_similarity(const std::vector<float>& feature1, const std::vector<float>& feature2) {
         if (feature1.size() != feature2.size()) {
-            MD_LOG_ERROR("The size of feature1 and feature2 should be same.");
+            MD_LOG_ERROR << "The size of feature1 and feature2 should be same." << std::endl;
             return 0.0f;
         }
         float sum = 0;

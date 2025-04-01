@@ -19,7 +19,7 @@ namespace modeldeploy::vision::ocr {
     // Init
     bool Recognizer::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize modeldeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
         return true;
@@ -65,23 +65,23 @@ namespace modeldeploy::vision::ocr {
                                    const std::vector<int>& indices) {
         const size_t total_size = images.size();
         if (!indices.empty() && indices.size() != total_size) {
-            MD_LOG_ERROR("indices.size() should be 0 or {}.", images.size());
+            MD_LOG_ERROR << "indices.size() should be 0 or " << images.size() << "." << std::endl;
             return false;
         }
         const std::vector<cv::Mat>& images_ = images;
         if (!preprocessor_.run(&images_, &reused_input_tensors_, start_index,
                                end_index, indices)) {
-            MD_LOG_ERROR("Failed to preprocess the input image.");
+            MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
         reused_input_tensors_[0].name = get_input_info(0).name;
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            MD_LOG_ERROR("Failed to inference by runtime.");
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
         if (!postprocessor_.run(reused_output_tensors_, texts, rec_scores,
                                 start_index, total_size, indices)) {
-            MD_LOG_ERROR("Failed to postprocess the inference cls_results by runtime.");
+            MD_LOG_ERROR << "Failed to postprocess the inference cls_results by runtime." << std::endl;
             return false;
         }
         return true;

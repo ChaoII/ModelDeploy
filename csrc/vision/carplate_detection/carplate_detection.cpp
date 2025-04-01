@@ -10,7 +10,7 @@
 
 
 namespace modeldeploy::vision::facedet {
-    void LetterBox(cv::Mat *mat, std::vector<int> size, const std::vector<float> &color,
+    void LetterBox(cv::Mat* mat, std::vector<int> size, const std::vector<float>& color,
                    bool _auto, bool scale_fill = false, bool scale_up = true, int stride = 32) {
         float scale = std::min(size[1] * 1.0 / mat->rows, size[0] * 1.0 / mat->cols);
         if (!scale_up) {
@@ -25,7 +25,8 @@ namespace modeldeploy::vision::facedet {
         if (_auto) {
             pad_h = pad_h % stride;
             pad_w = pad_w % stride;
-        } else if (scale_fill) {
+        }
+        else if (scale_fill) {
             pad_h = 0;
             pad_w = 0;
             resize_h = size[1];
@@ -45,8 +46,8 @@ namespace modeldeploy::vision::facedet {
         }
     }
 
-    CarPlateDetection::CarPlateDetection(const std::string &model_file,
-                                         const RuntimeOption &custom_option) {
+    CarPlateDetection::CarPlateDetection(const std::string& model_file,
+                                         const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = initialize();
@@ -63,7 +64,7 @@ namespace modeldeploy::vision::facedet {
         landmarks_per_card = 4;
 
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize modeldeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
         // Check if the input shape is dynamic after Runtime already initialized,
@@ -85,8 +86,8 @@ namespace modeldeploy::vision::facedet {
     }
 
     bool CarPlateDetection::preprocess(
-            cv::Mat *mat, MDTensor *output,
-            std::map<std::string, std::array<float, 2>> *im_info) {
+        cv::Mat* mat, MDTensor* output,
+        std::map<std::string, std::array<float, 2>>* im_info) {
         // process after image load
         float ratio = std::min(size[1] * 1.0f / static_cast<float>(mat->rows),
                                size[0] * 1.0f / static_cast<float>(mat->cols));
@@ -117,15 +118,15 @@ namespace modeldeploy::vision::facedet {
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {
-                static_cast<float>(mat->rows),
-                static_cast<float>(mat->cols)
+            static_cast<float>(mat->rows),
+            static_cast<float>(mat->cols)
         };
 
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
 
         if (!utils::mat_to_tensor(*mat, output)) {
-            MD_LOG_ERROR("Failed to binding mat to tensor.");
+            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
         output->expand_dim(0); // reshape to n, c, h, w
@@ -133,26 +134,26 @@ namespace modeldeploy::vision::facedet {
     }
 
     bool CarPlateDetection::postprocess(
-            MDTensor &infer_result, FaceDetectionResult *result,
-            const std::map<std::string, std::array<float, 2>> &im_info,
-            float conf_threshold, float nms_iou_threshold) {
+        MDTensor& infer_result, DetectionLandmarkResult* result,
+        const std::map<std::string, std::array<float, 2>>& im_info,
+        float conf_threshold, float nms_iou_threshold) {
         // infer_result: (1,n,14) 15=4+1+8+1
         if (infer_result.shape[0] != 1) {
-            MD_LOG_ERROR("Only support batch =1 now.");
+            MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
         }
         if (infer_result.dtype != MDDataType::Type::FP32) {
-            MD_LOG_ERROR("Only support post process with float32 data.");
+            MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
             return false;
         }
-        result->Clear();
+        result->clear();
         // must be setup landmarks_per_face before reserve
-        result->landmarks_per_face = landmarks_per_card;
-        result->Reserve(infer_result.shape[1]);
+        result->landmarks_per_instance = landmarks_per_card;
+        result->reserve(infer_result.shape[1]);
 
-        auto *data = static_cast<float *>(infer_result.data());
+        auto* data = static_cast<float*>(infer_result.data());
         // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf
         for (size_t i = 0; i < infer_result.shape[1]; ++i) {
-            float *reg_cls_ptr = data + i * infer_result.shape[2];
+            float* reg_cls_ptr = data + i * infer_result.shape[2];
             float obj_conf = reg_cls_ptr[4];
             float cls_conf = reg_cls_ptr[13];
             float confidence = obj_conf * cls_conf;
@@ -167,15 +168,15 @@ namespace modeldeploy::vision::facedet {
 
             // convert from [x, y, w, h] to [x1, y1, x2, y2]
             result->boxes.emplace_back(std::array<float, 4>{
-                    (x - w / 2.f), (y - h / 2.f), (x + w / 2.f), (y + h / 2.f)
+                (x - w / 2.f), (y - h / 2.f), (x + w / 2.f), (y + h / 2.f)
             });
             result->scores.push_back(confidence);
             // decode landmarks (default 5 landmarks)
             if (landmarks_per_card > 0) {
-                float *landmarks_ptr = reg_cls_ptr + 5;
+                float* landmarks_ptr = reg_cls_ptr + 5;
                 for (size_t j = 0; j < landmarks_per_card * 2; j += 2) {
                     result->landmarks.emplace_back(
-                            std::array<float, 2>{landmarks_ptr[j], landmarks_ptr[j + 1]});
+                        std::array<float, 2>{landmarks_ptr[j], landmarks_ptr[j + 1]});
                 }
             }
         }
@@ -190,7 +191,7 @@ namespace modeldeploy::vision::facedet {
         auto iter_out = im_info.find("output_shape");
         auto iter_ipt = im_info.find("input_shape");
         if (!(iter_out != im_info.end() && iter_ipt != im_info.end())) {
-            MD_LOG_ERROR("Cannot find input_shape or output_shape from im_info.");
+            MD_LOG_ERROR << "Cannot find input_shape or output_shape from im_info." << std::endl;
         }
         float out_h = iter_out->second[0];
         float out_w = iter_out->second[1];
@@ -207,7 +208,7 @@ namespace modeldeploy::vision::facedet {
             pad_w = static_cast<float>(static_cast<int>(pad_w) % stride);
         }
         // scale and clip box
-        for (auto &boxe: result->boxes) {
+        for (auto& boxe : result->boxes) {
             boxe[0] = std::max((boxe[0] - pad_w) / scale, 0.0f);
             boxe[1] = std::max((boxe[1] - pad_h) / scale, 0.0f);
             boxe[2] = std::max((boxe[2] - pad_w) / scale, 0.0f);
@@ -218,7 +219,7 @@ namespace modeldeploy::vision::facedet {
             boxe[3] = std::min(boxe[3], ipt_h - 1.0f);
         }
         // scale and clip landmarks
-        for (auto &landmark: result->landmarks) {
+        for (auto& landmark : result->landmarks) {
             landmark[0] = std::max((landmark[0] - pad_w) / scale, 0.0f);
             landmark[1] = std::max((landmark[1] - pad_h) / scale, 0.0f);
             landmark[0] = std::min(landmark[0], ipt_w - 1.0f);
@@ -227,34 +228,34 @@ namespace modeldeploy::vision::facedet {
         return true;
     }
 
-    bool CarPlateDetection::predict(cv::Mat *image, FaceDetectionResult *result,
-                                    float conf_threshold, float nms_iou_threshold) {
+    bool CarPlateDetection::predict(cv::Mat* image, DetectionLandmarkResult* result,
+                                    const float conf_threshold, const float nms_iou_threshold) {
         std::vector<MDTensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
         // Record the shape of image and the shape of preprocessed image
         im_info["input_shape"] = {
-                static_cast<float>(image->rows),
-                static_cast<float>(image->cols)
+            static_cast<float>(image->rows),
+            static_cast<float>(image->cols)
         };
         im_info["output_shape"] = {
-                static_cast<float>(image->rows),
-                static_cast<float>(image->cols)
+            static_cast<float>(image->rows),
+            static_cast<float>(image->cols)
         };
 
         if (!preprocess(image, &input_tensors[0], &im_info)) {
-            MD_LOG_ERROR("Failed to preprocess input image.");
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
         input_tensors[0].name = get_input_info(0).name;
         std::vector<MDTensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
-            MD_LOG_ERROR("Failed to inference.");
+            MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;
         }
 
         if (!postprocess(output_tensors[0], result, im_info, conf_threshold,
                          nms_iou_threshold)) {
-            MD_LOG_ERROR("Failed to post process.");
+            MD_LOG_ERROR << "Failed to post process." << std::endl;
             return false;
         }
         return true;

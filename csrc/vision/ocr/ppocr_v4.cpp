@@ -42,7 +42,7 @@ namespace modeldeploy::vision::ocr {
 
     bool PPOCRv4::set_cls_batch_size(const int cls_batch_size) {
         if (cls_batch_size < -1 || cls_batch_size == 0) {
-            MD_LOG_ERROR("batch_size > 0 or batch_size == -1.");
+            MD_LOG_ERROR << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;
         }
         cls_batch_size_ = cls_batch_size;
@@ -53,7 +53,7 @@ namespace modeldeploy::vision::ocr {
 
     bool PPOCRv4::set_rec_batch_size(const int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
-            MD_LOG_ERROR("batch_size > 0 or batch_size == -1.");
+            MD_LOG_ERROR << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;
         }
         rec_batch_size_ = rec_batch_size;
@@ -96,7 +96,7 @@ namespace modeldeploy::vision::ocr {
         batch_result->resize(images.size());
         std::vector<std::vector<std::array<int, 8>>> batch_boxes(images.size());
         if (!detector_->batch_predict(images, &batch_boxes)) {
-            MD_LOG_ERROR("There's error while detecting image in PPOCR.");
+            MD_LOG_ERROR << "There's error while detecting image in PPOCR." << std::endl;
             return false;
         }
         for (int i_batch = 0; i_batch < batch_boxes.size(); ++i_batch) {
@@ -130,7 +130,7 @@ namespace modeldeploy::vision::ocr {
                     if (!classifier_->batch_predict(image_list, cls_labels_ptr,
                                                     cls_scores_ptr, start_index,
                                                     end_index)) {
-                        MD_LOG_ERROR("There's error while recognizing image in OCR.");
+                        MD_LOG_ERROR << "There's error while recognizing image in OCR." << std::endl;
                         return false;
                     }
                     for (size_t i_img = start_index; i_img < end_index; ++i_img) {
@@ -155,7 +155,7 @@ namespace modeldeploy::vision::ocr {
                     std::min(start_index + rec_batch_size_, image_list.size());
                 if (!recognizer_->batch_predict(image_list, text_ptr, rec_scores_ptr,
                                                 start_index, end_index, indices)) {
-                    MD_LOG_ERROR("There's error while recognizing image in PPOCR.");
+                    MD_LOG_ERROR << "There's error while recognizing image in PPOCR." << std::endl;
                     return false;
                 }
             }

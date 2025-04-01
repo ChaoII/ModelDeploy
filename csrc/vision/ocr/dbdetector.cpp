@@ -19,7 +19,7 @@ namespace modeldeploy::vision::ocr {
     // Init
     bool DBDetector::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         return true;
@@ -61,19 +61,19 @@ namespace modeldeploy::vision::ocr {
         std::vector<std::vector<std::array<int, 8>>>* det_results) {
         std::vector<cv::Mat> images_ = images;
         if (!preprocessor_.apply(&images_, &reused_input_tensors_)) {
-            MD_LOG_ERROR("Failed to preprocess input image.");
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
         const auto batch_det_img_info = preprocessor_.get_batch_img_info();
         reused_input_tensors_[0].name = get_input_info(0).name;
 
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            MD_LOG_ERROR("Failed to inference by runtime.");
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
         if (!postprocessor_.apply(reused_output_tensors_,
                                   det_results, *batch_det_img_info)) {
-            MD_LOG_ERROR("Failed to postprocess the inference cls_results by runtime.");
+            MD_LOG_ERROR << "Failed to postprocess the inference cls_results by runtime." << std::endl;
             return false;
         }
         return true;

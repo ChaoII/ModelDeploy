@@ -17,7 +17,7 @@ MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_p
     option.set_cpu_thread_num(thread_num);
     const auto ocr_rec_model = new modeldeploy::vision::ocr::Recognizer(model_path, dict_path, option);
     if (!ocr_rec_model->initialized()) {
-        MD_LOG_ERROR("Failed to initialize OCR Recognition model.");
+        MD_LOG_ERROR << "Failed to initialize OCR Recognition model." << std::endl;
         return MDStatusCode::ModelInitializeFailed;
     }
     model->format = MDModelFormat::ONNX;
@@ -30,7 +30,7 @@ MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_p
 
 MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImage* image, MDOCRResult* result) {
     if (model->type != MDModelType::OCR) {
-        MD_LOG_ERROR("Model type is not OCR");
+        MD_LOG_ERROR << "Model type is not OCR" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
     const auto cv_image = md_image_to_mat(image);
@@ -51,7 +51,7 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
     const MDModel* model, const MDImage* image, const int batch_size,
     const MDPolygon* polygon, const int size, MDOCRResults* results) {
     if (model->type != MDModelType::OCR) {
-        MD_LOG_ERROR("Model type is not OCR");
+        MD_LOG_ERROR << "Model type is not OCR" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
     const auto ocr_rec_model = static_cast<modeldeploy::vision::ocr::Recognizer*>(model->model_content);
@@ -73,7 +73,7 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
         const int end_index = std::min(start_index + batch_size, size);
         if (!ocr_rec_model->batch_predict(image_list, &text_ptr, &rec_scores_ptr,
                                           start_index, end_index, indices)) {
-            MD_LOG_ERROR("There's error while recognizing image in OCR recognition model.");
+            MD_LOG_ERROR << "There's error while recognizing image in OCR recognition model." << std::endl;
         }
         for (int i = 0; i < text_ptr.size(); i++) {
             // 注意在识别模型中不会返回box信息

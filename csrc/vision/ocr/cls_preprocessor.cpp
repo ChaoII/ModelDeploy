@@ -37,8 +37,8 @@ namespace modeldeploy::vision::ocr {
                                      const size_t start_index, const size_t end_index) {
         if (static_cast<int>(images->size()) == 0 || end_index <= start_index ||
             end_index > images->size()) {
-            MD_LOG_ERROR("images->size() or index error. Correct is: 0 <= start_index < "
-                "end_index <= images->size()");
+            MD_LOG_ERROR << "images->size() or index error. Correct is: 0 <= start_index < "
+                "end_index <= images->size()" << std::endl;
             return false;
         }
         std::vector<cv::Mat> mats(end_index - start_index);

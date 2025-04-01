@@ -18,7 +18,7 @@ namespace modeldeploy::vision::face {
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
-            MD_LOG_ERROR("Failed to binding mat to tensor.");
+            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
         output->expand_dim(0); // reshape to n, c, h, w
@@ -28,18 +28,18 @@ namespace modeldeploy::vision::face {
     bool SeetaFaceGenderPreprocessor::run(std::vector<cv::Mat>* images,
                                           std::vector<MDTensor>* outputs) {
         if (images->empty()) {
-            MD_LOG_ERROR("The size of input images should be greater than 0.");
+            MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
         if (images->size() != 1) {
-            MD_LOG_ERROR("Only support batch = 1 now.");
+            MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
         }
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
         std::vector<MDTensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
             if (!preprocess(&(*images)[i], &tensors[i])) {
-                MD_LOG_ERROR("Failed to preprocess input image.");
+                MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
                 return false;
             }
         }

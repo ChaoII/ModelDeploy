@@ -18,7 +18,7 @@ MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
     option.set_cpu_thread_num(thread_num);
     const auto detection_model = new modeldeploy::vision::detection::YOLOv8(model_path, option);
     if (!detection_model->initialized()) {
-        MD_LOG_ERROR("Detection model initial failed!");
+        MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
         return MDStatusCode::ModelInitializeFailed;
     }
     model->format = MDModelFormat::ONNX;
@@ -30,7 +30,7 @@ MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
 
 MDStatusCode md_set_detection_input_size(const MDModel* model, const MDSize size) {
     if (model->type != MDModelType::Detection) {
-        MD_LOG_ERROR("Model type is not detection!");
+        MD_LOG_ERROR << "Model type is not detection!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
     const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
@@ -40,7 +40,7 @@ MDStatusCode md_set_detection_input_size(const MDModel* model, const MDSize size
 
 MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetectionResults* results) {
     if (model->type != MDModelType::Detection) {
-        MD_LOG_ERROR("Model type is not detection!");
+        MD_LOG_ERROR << "Model type is not detection!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
     const auto cv_image = md_image_to_mat(image);
@@ -52,7 +52,7 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
     const auto r_size = res.boxes.size();
     results->size = static_cast<int>(r_size);
     if (r_size == 0) {
-        MD_LOG_WARN("Not found detect object!");
+        MD_LOG_WARN << "Not found detect object!" << std::endl;
         results->data = nullptr;
         return MDStatusCode::Success;
     }
@@ -126,7 +126,7 @@ void md_draw_detection_result(const MDImage* image, const MDDetectionResults* re
                     cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
     }
     if (save_result) {
-        MD_LOG_INFO("Save detection result to [vis_result.jpg]");
+        MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
         cv::imwrite("vis_result.jpg", cv_image);
     }
 }

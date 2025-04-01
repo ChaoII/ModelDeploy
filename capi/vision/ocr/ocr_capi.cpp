@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 
 MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* parameters) {
     if (!fs::exists(parameters->model_dir)) {
-        MD_LOG_ERROR("Model directory {} is not existed!", parameters->model_dir);
+        MD_LOG_ERROR << "Model directory " << parameters->model_dir << " is not existed!";
         return MDStatusCode::PathNotFound;
     }
     const auto det_model_file_path = fs::path(parameters->model_dir) / "det_infer.onnx";
@@ -40,7 +40,7 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
     model->model_content = ocr_model;
     model->model_name = strdup(ocr_model->name().c_str());
     if (!ocr_model->initialized()) {
-        MD_LOG_ERROR("Failed to initialize OCR model.Please check your model parameters");
+        MD_LOG_ERROR << "Failed to initialize OCR model.Please check your model parameters" << std::endl;
         return MDStatusCode::ModelInitializeFailed;
     }
     return MDStatusCode::Success;

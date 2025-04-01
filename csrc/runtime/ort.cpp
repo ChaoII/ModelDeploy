@@ -45,8 +45,9 @@ namespace modeldeploy {
                 }
             }
             if (!support_cuda) {
-                MD_LOG_ERROR("Compiled fastdeploy with onnxruntime doesn't support GPU, "
-                             "the available providers are {} will fallback to CPUExecutionProvider.", providers_msg);
+                MD_LOG_ERROR << "Compiled fastdeploy with onnxruntime doesn't support GPU, "
+                    "the available providers are " << providers_msg
+                    << " will fallback to CPUExecutionProvider." << std::endl;
                 option_.device = Device::CPU;
             }
             else {
@@ -63,20 +64,20 @@ namespace modeldeploy {
 
     bool OrtBackend::init(const RuntimeOption& option) {
         if (option.device != Device::CPU && option.device != Device::GPU) {
-            MD_LOG_ERROR("Backend::ORT only supports Device::CPU/Device::GPU, but now its {}.",
-                         option.device==0?"cpu":"gpu");
+            MD_LOG_ERROR << "Backend::ORT only supports Device::CPU/Device::GPU, but now its "
+                << (option.device == 0 ? "cpu" : "gpu") << "." << std::endl;
             return false;
         }
         if (option.model_from_memory) {
             return init_from_onnx(option.model_buffer, option);
         }
         if (!std::filesystem::exists(option.model_filepath)) {
-            MD_LOG_ERROR("Model file does not exist: {}", option.model_filepath);
+            MD_LOG_ERROR << "Model file does not exist: " << option.model_filepath << std::endl;
             return false;
         }
         std::string model_buffer;
         if (!read_binary_from_file(option.model_filepath, &model_buffer)) {
-            MD_LOG_ERROR("Failed to read model file: {}", option.model_filepath);
+            MD_LOG_ERROR << "Failed to read model file: " << option.model_filepath << std::endl;
             return false;
         }
         return init_from_onnx(model_buffer, option);
@@ -85,7 +86,7 @@ namespace modeldeploy {
 
     bool OrtBackend::init_from_onnx(const std::string& model_buffer, const RuntimeOption& option) {
         if (initialized_) {
-            MD_LOG_ERROR("OrtBackend is already initialized, cannot initialize again.");
+            MD_LOG_ERROR << "OrtBackend is already initialized, cannot initialize again." << std::endl;
             return false;
         }
         try {
@@ -151,16 +152,16 @@ namespace modeldeploy {
             return true;
         }
         catch (const std::exception& e) {
-            MD_LOG_ERROR("Failed to initialize from ONNX: {}", e.what());
+            MD_LOG_ERROR << "Failed to initialize from ONNX: " << e.what() << std::endl;
             return false;
         }
     }
 
     bool OrtBackend::infer(std::vector<MDTensor>& inputs, std::vector<MDTensor>* outputs, const bool copy_to_fd) {
         if (inputs.size() != inputs_desc_.size()) {
-            MD_LOG_ERROR(
-                "[OrtBackend] Size of the inputs({}) should keep same with the inputs of this model({})",
-                inputs.size(), inputs_desc_.size());
+            MD_LOG_ERROR <<
+                "[OrtBackend] Size of the inputs(" << inputs.size() <<
+                ") should keep same with the inputs of this model(" << inputs_desc_.size() << ")" << std::endl;
             return false;
         }
         for (size_t i = 0; i < inputs.size(); ++i) {
@@ -176,7 +177,7 @@ namespace modeldeploy {
             session_.Run({}, *binding_);
         }
         catch (const std::exception& e) {
-            MD_LOG_ERROR("Failed to Infer: {}", e.what());
+            MD_LOG_ERROR << "Failed to Infer: " << e.what() << std::endl;
             return false;
         }
         const std::vector<Ort::Value> ort_outputs = binding_->GetOutputValues();

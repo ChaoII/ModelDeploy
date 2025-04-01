@@ -6,29 +6,20 @@
 #include "csrc/vision/face_id/seetaface.h"
 #include "csrc/vision/utils.h"
 #include "capi/utils/md_image_capi.h"
-#include "csrc/core/log.h"
 
 int main() {
-    MD_SET_LOG_LEVEL(modeldeploy::LogLevel::MD_LOG_D);
-
-    MD_LOG_DEBUG << "Hello World!" << std::endl;
-    MD_LOG_INFO << "Hello World!" << std::endl;
-    MD_LOG_WARN << "Hello World!" << std::endl;
-    MD_LOG_ERROR << "Hello World!" << std::endl;
-    MD_LOG_FATAL << "Hello World!" << std::endl;
-
     auto faceid_model = modeldeploy::vision::face::SeetaFaceID(
-            "../../test_data/test_models/face/face_recognizer.onnx");
+        "../../test_data/test_models/face/face_recognizer.onnx");
     assert(table_model.Initialized());
     // auto im0 = cv::imread("../../test_data/test_images/test_face_id1.jpg");
-//    auto im0 = cv::imread("vis_result.jpg");
+    //    auto im0 = cv::imread("vis_result.jpg");
     auto im1 = cv::imread("../../test_data/test_images/test_face_id4.jpg");
     modeldeploy::vision::FaceRecognitionResult result0;
     modeldeploy::vision::FaceRecognitionResult result1;
-//    if (!faceid_model.predict(im0, &result0)) {
-//        std::cerr << "Failed to predict." << std::endl;
-//        return -1;
-//    }
+    //    if (!faceid_model.predict(im0, &result0)) {
+    //        std::cerr << "Failed to predict." << std::endl;
+    //        return -1;
+    //    }
     if (!faceid_model.predict(im1, &result1)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
@@ -37,7 +28,7 @@ int main() {
     // const auto similarity = modeldeploy::vision::utils::compute_similarity(result0.embedding, result1.embedding);
 
     // std::cout << result0.Str() << std::endl;
-    std::cout << result1.Str() << std::endl;
+    result1.display();
     // std::cout << similarity << std::endl;
     return 0;
 }

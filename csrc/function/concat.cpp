@@ -13,10 +13,10 @@ namespace modeldeploy::function {
         const size_t in_zero_dims_size = out_dims.size();
         for (size_t i = 1; i < n; ++i) {
             if (input[i].shape.size() != out_dims.size()) {
-                MD_LOG_ERROR(
-                    "The shape of input[0] and input[{}] is expected to be equal. But "
-                    "received input[0]'s shape = {}, input[{}]'s shape = {} .",
-                    i, print_vector(out_dims), i, print_vector(input[i].shape));
+                MD_LOG_ERROR <<
+                    "The shape of input[0] and input[" << i << "] is expected to be equal. But "
+                    "received input[0]'s shape = " << print_vector(out_dims) << ", input[" << i << "]'s shape = " <<
+                    print_vector(input[i].shape) << " ." << std::endl;
             }
             for (size_t j = 0; j < in_zero_dims_size; j++) {
                 if (j == axis) {
@@ -24,10 +24,10 @@ namespace modeldeploy::function {
                 }
                 else {
                     if (input[0].shape[j] != input[i].shape[j]) {
-                        MD_LOG_ERROR(
-                            "The {}-th dimension of input[0] and input[{}] is expected to be "
-                            "equal.But received input[0]'s shape = {}, input[{}]'s shape = { }",
-                            j, i, print_vector(input[0].shape), print_vector(input[1].shape));
+                        MD_LOG_ERROR <<
+                            "The " << j << "-th dimension of input[0] and input[" << i << "] is expected to be "
+                            "equal.But received input[0]'s shape = " << print_vector(input[0].shape) << ", input[" << i
+                            << "]'s shape = " << print_vector(input[1].shape) << std::endl;
                     }
                 }
             }
@@ -84,12 +84,14 @@ namespace modeldeploy::function {
 
     void Concat(const std::vector<MDTensor>& x, MDTensor* out, int axis) {
         if (x.size() < 0) {
-            MD_LOG_ERROR(
-                "The number of MDTensor array should be larger than 0, but the size of input is {}", x.size());
+            MD_LOG_ERROR <<
+                "The number of MDTensor array should be larger than 0, but the size of input is " << x.size() << "." <<
+                std::endl;
         }
         const auto rank = static_cast<int>(x[0].shape.size());
         if (!(axis >= -rank && axis < rank)) {
-            MD_LOG_ERROR("The axis is expected to be in range of [ {} , {} ], but got {}", rank, axis, -rank);
+            MD_LOG_ERROR << "The axis is expected to be in range of "
+                "[ " << rank << " , " << axis << " ], but got " << -rank << std::endl;
         }
         if (axis < 0) {
             axis += rank;

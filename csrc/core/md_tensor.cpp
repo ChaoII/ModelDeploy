@@ -33,11 +33,6 @@ namespace modeldeploy {
 
 
     void MDTensor::print_info(const std::string& prefix) const {
-        std::cout << prefix << ": name=" << name << ", shape=";
-        for (int i = 0; i < shape.size(); ++i) {
-            std::cout << shape[i] << " ";
-        }
-        std::cout << ", buffer_=" << buffer_ << ", external_data_ptr=" << external_data_ptr_;
         double mean = 0;
         double max = -99999999;
         double min = 99999999;
@@ -63,12 +58,19 @@ namespace modeldeploy {
             calculate_statis_info<int64_t>(data(), total(), &mean, &max, &min);
         }
         else {
-            MD_LOG_ERROR(
-                "PrintInfo function doesn't support current situation, maybe you "
-                "need enhance this function now.");
+            MD_LOG_ERROR << "PrintInfo function doesn't support current situation, maybe you "
+                "need enhance this function now." << std::endl;
         }
-        std::cout << ", dtype=" << MDDataType::str(dtype) << ", mean=" << mean << ", max=" << max
-            << ", min=" << min << std::endl;
+        std::cout << termcolor::green << prefix << std::endl;
+        std::cout << "name=" << name << "\n"
+            << "shape = " << print_vector(shape) << "\n"
+            << "buffer_=" << buffer_ << "\n"
+            << "external_data_ptr=" << external_data_ptr_ << "\n"
+            << "dtype=" << MDDataType::str(dtype)
+            << "mean=" << mean
+            << "max=" << max
+            << "min=" << min
+            << termcolor::reset << std::endl;
     }
 
 
@@ -91,7 +93,7 @@ namespace modeldeploy {
     void MDTensor::expand_dim(const int64_t axis) {
         const size_t ndim = shape.size();
         if (!(axis >= 0 && axis <= ndim)) {
-            MD_LOG_ERROR("The allowed 'axis' must be in range of {}.", ndim);
+            MD_LOG_ERROR << "The allowed 'axis' must be in range of " << ndim << "." << std::endl;
         }
         shape.insert(shape.begin() + axis, 1);
     }
@@ -99,10 +101,11 @@ namespace modeldeploy {
     void MDTensor::squeeze(const int64_t axis) {
         const size_t ndim = shape.size();
         if (!(axis >= 0 && axis < ndim)) {
-            MD_LOG_ERROR("The allowed 'axis' must be in range of {}.", ndim);
+            MD_LOG_ERROR << "The allowed 'axis' must be in range of " << ndim << "." << std::endl;
         }
         if (shape[axis] != 1) {
-            MD_LOG_ERROR("The No.{} dimension of shape should be 1, but it is {}!", axis, shape[axis]);
+            MD_LOG_ERROR << "The No." << axis << " dimension of shape should be 1, "
+                "but it is " << shape[axis] << "!" << std::endl;
         }
         shape.erase(shape.begin() + axis);
     }
@@ -115,7 +118,7 @@ namespace modeldeploy {
         shape.assign(new_shape.begin(), new_shape.end());
         const size_t num_bytes = total_bytes();
         if (!re_alloc_fn(num_bytes)) {
-            MD_LOG_ERROR("The FastDeploy MDTensor allocate cpu memory error");
+            MD_LOG_ERROR << "The FastDeploy MDTensor allocate cpu memory error!" << std::endl;
         }
     }
 
@@ -162,28 +165,29 @@ namespace modeldeploy {
         for (size_t i = 0; i < new_shape.size(); ++i) {
             if (new_shape[i] == unk_dim_val) {
                 if (unk_dim_idx != -1) {
-                    MD_LOG_ERROR("Only one dimension value of 'shape' in ReshapeOp can "
-                                 "be -1. But received shape shape {} is also -1.", i);
+                    MD_LOG_ERROR << "Only one dimension value of 'shape' in ReshapeOp can "
+                        "be -1. But received shape shape" << i << "is also -1.";
                 }
                 unk_dim_idx = static_cast<int>(i);
             }
             else if (new_shape[i] == copy_dim_val) {
                 if (i > shape.size()) {
-                    MD_LOG_ERROR(
+                    MD_LOG_ERROR <<
                         "The index of 0 in `shape` must be less than "
-                        "the input tensor X's dimensions. But received shape ={}, shape {}= 0, "
-                        "X's shape = {} X's dimensions = {}",
-                        print_vector(new_shape), i,
-                        print_vector(shape), shape.size());
+                        "the input tensor X's dimensions. But received shape ="
+                        << print_vector(new_shape) << ", shape " << i << "= 0, "
+                        "X's shape = " << print_vector(shape) << " X's dimensions = "
+                        << print_vector(shape) << "." << std::endl;
                     return false;
                 }
             }
             else {
                 if (new_shape[i] < 0) {
-                    MD_LOG_ERROR(
+                    MD_LOG_ERROR <<
                         "Each dimension value of 'shape' in ReshapeOp must not "
                         "be negative except one unknown dimension. "
-                        "But received  shape = {}, shape[{}] ={}", print_vector(new_shape), i, new_shape[i]);
+                        "But received  shape = " << print_vector(new_shape)
+                        << ", shape[" << i << "] = " << new_shape[i] << "." << std::endl;
                     return false;
                 }
             }
@@ -193,21 +197,22 @@ namespace modeldeploy {
         if (unk_dim_idx != -1) {
             output_shape[unk_dim_idx] = -num_el / capacity;
             if (output_shape[unk_dim_idx] * capacity != -num_el) {
-                MD_LOG_ERROR(
+                MD_LOG_ERROR <<
                     "The 'shape' attribute in ReshapeOp is invalid. "
                     "The input tensor X's size must be divisible by known "
-                    "capacity of 'shape'. But received X's shape = [{}], X's size = {}, "
-                    "'shape' is [{}], known capacity of 'shape' is {}.", print_vector(shape), num_el,
-                    print_vector(new_shape), capacity);
+                    "capacity of 'shape'. But received X's shape = ["
+                    << print_vector(shape) << "], X's size = " << num_el << ", "
+                    "'shape' is [" << print_vector(new_shape) << "], "
+                    "known capacity of 'shape' is " << capacity << "." << std::endl;
                 return false;
             }
             if (num_el != capacity) {
-                MD_LOG_ERROR(
-                    "The 'shape' in ReshapeOp is invalid. "
+                MD_LOG_ERROR
+                    << "The 'shape' in ReshapeOp is invalid. "
                     "The input tensor X's size must be equal to the capacity of "
-                    "'shape'. But received X's shape = [{}], X's size = {} 'shape' is "
-                    "[{}], the capacity of 'shape' is {}.", print_vector(shape), num_el,
-                    print_vector(shape), capacity);
+                    "'shape'. But received X's shape = [" << print_vector(shape) << "], "
+                    "X's size = " << num_el << "'shape' is [" << print_vector(shape)
+                    << "], the capacity of 'shape' is " << capacity << "." << std::endl;
                 return false;
             }
             shape = output_shape;
@@ -284,7 +289,7 @@ namespace modeldeploy {
         else {
             const size_t num_bytes = total_bytes();
             if (!re_alloc_fn(num_bytes)) {
-                MD_LOG_ERROR("The ModelDeploy MDTensor allocate memory error");
+                MD_LOG_ERROR << "The ModelDeploy MDTensor allocate memory error!" << std::endl;
             }
             copy_buffer(buffer_, other.buffer_, num_bytes);
         }

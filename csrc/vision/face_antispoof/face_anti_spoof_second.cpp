@@ -24,7 +24,7 @@ namespace modeldeploy::vision::face {
 
     bool SeetaFaceAntiSpoofSecond::Initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         return true;
@@ -40,7 +40,7 @@ namespace modeldeploy::vision::face {
         Cast::Run(mat, "float");
 
         if (!utils::mat_to_tensor(*mat, output)) {
-            MD_LOG_ERROR("Failed to binding mat to tensor.");
+            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
         output->expand_dim(0); // reshape to n, c, h, w
@@ -73,13 +73,13 @@ namespace modeldeploy::vision::face {
     bool SeetaFaceAntiSpoofSecond::predict(cv::Mat* im, std::vector<std::tuple<int, float>>* result) {
         std::vector<MDTensor> input_tensors(1);
         if (!preprocess(im, &input_tensors[0])) {
-            MD_LOG_ERROR("Failed to preprocess input image.");
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
         input_tensors[0].name = get_input_info(0).name;
         std::vector<MDTensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
-            MD_LOG_ERROR("Failed to inference.");
+            MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;
         }
         postprocess(output_tensors, result);

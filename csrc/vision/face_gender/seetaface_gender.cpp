@@ -16,7 +16,7 @@ namespace modeldeploy::vision::face {
 
     bool SeetaFaceGender::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR("Failed to initialize fastdeploy backend.");
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         return true;
@@ -37,19 +37,19 @@ namespace modeldeploy::vision::face {
                                         std::vector<int>* ages) {
         std::vector<cv::Mat> fd_images = images;
         if (images.size() != 1) {
-            MD_LOG_ERROR("Only support batch = 1 now.");
+            MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
         }
         if (!preprocessor_.run(&fd_images, &reused_input_tensors_)) {
-            MD_LOG_ERROR("Failed to preprocess the input image.");
+            MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
         reused_input_tensors_[0].name = get_input_info(0).name;
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            MD_LOG_ERROR("Failed to inference by runtime.");
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
         if (!postprocessor_.run(reused_output_tensors_, ages)) {
-            MD_LOG_ERROR("Failed to postprocess the inference results by runtime.");
+            MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }
         return true;

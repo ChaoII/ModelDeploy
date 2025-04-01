@@ -10,30 +10,29 @@
 #include "csrc/core/md_type.h"
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceIDPostprocessor::run(std::vector<MDTensor> &infer_result,
-                                       std::vector<FaceRecognitionResult> *results) {
-
+    bool SeetaFaceIDPostprocessor::run(std::vector<MDTensor>& infer_result,
+                                       std::vector<FaceRecognitionResult>* results) {
         if (infer_result[0].dtype != MDDataType::Type::FP32) {
-            MD_LOG_ERROR("Only support post process with float32 data.");
+            MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
             return false;
         }
         if (infer_result.size() != 1) {
-            MD_LOG_ERROR("The default number of output tensor "
-                         "must be 1 according to insightface.");
+            MD_LOG_ERROR << "The default number of output tensor "
+                "must be 1 according to insightface." << std::endl;
         }
         const size_t batch = infer_result[0].shape[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
-            MDTensor &embedding_tensor = infer_result.at(bs);
+            MDTensor& embedding_tensor = infer_result.at(bs);
             if (embedding_tensor.shape[0] != 1) {
-                MD_LOG_ERROR("Only support batch = 1 now.");
+                MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
             }
             if (embedding_tensor.dtype != MDDataType::Type::FP32) {
-                MD_LOG_ERROR("Only support post process with float32 data.");
+                MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
-            (*results)[bs].Clear();
-            (*results)[bs].Resize(embedding_tensor.total());
+            (*results)[bs].clear();
+            (*results)[bs].resize(embedding_tensor.total());
 
             std::memcpy((*results)[bs].embedding.data(),
                         embedding_tensor.data(),

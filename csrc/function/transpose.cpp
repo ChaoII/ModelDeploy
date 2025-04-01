@@ -81,18 +81,19 @@ namespace modeldeploy::function {
     void Transpose(const MDTensor& x, MDTensor* out, const std::vector<int64_t>& dims) {
         const size_t dims_size = dims.size();
         if (dims_size != x.shape.size()) {
-            MD_LOG_ERROR("The input tensor's dimension should be equal to the dims's size. "
-                         "Expect dims size is {}, but receive {}.", x.shape.size(), dims_size);
+            MD_LOG_ERROR << "The input tensor's dimension should be equal to the dims size. "
+                "Expect dims size is " << x.shape.size() << ", but receive " << dims_size << "." << std::endl;
         }
         std::vector count(dims_size, 0);
         for (size_t i = 0; i < dims_size; i++) {
             if (dims[i] < 0) {
-                MD_LOG_ERROR("The dims should be greater than or equal to 0, but receive {}.", dims[i]);
+                MD_LOG_ERROR << "The dims should be greater than or equal to 0, but receive "
+                    << dims[i] << "." << std::endl;
             }
             if (dims[i] >= static_cast<int>(dims_size) && ++count[dims[i]] == 1) {
-                MD_LOG_ERROR("Each element of Attribute axis should be a unique value range "
+                MD_LOG_ERROR << "Each element of Attribute axis should be a unique value range "
                     "from 0 to (dims - 1), where the dims is the axis's size, unique "
-                    "value means this axis value can appear only once.");
+                    "value means this axis value can appear only once." << std::endl;
             }
         }
         std::vector<int64_t> out_dims(dims_size);

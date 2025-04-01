@@ -9,5 +9,5 @@ int main() {
     auto img = cv::imread("../../test_data/test_images/test_face.jpg");
     modeldeploy::vision::ClassifyResult results;
     yol_ov5_cls.Predict(img, &results);
-    std::cout << results.Str() << std::endl;
+    results.display();
 }

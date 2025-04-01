@@ -102,7 +102,7 @@ namespace modeldeploy::vision::utils {
     }
 
     std::vector<cv::Mat> AlignFaceWithFivePoints(
-        cv::Mat& image, FaceDetectionResult& result,
+        cv::Mat& image, DetectionLandmarkResult& result,
         std::vector<std::array<float, 2>> std_landmarks,
         std::array<int, 2> output_size) {
         if (std_landmarks.size() != 5) { std::cerr << "The landmarks.size() must be 5."; }

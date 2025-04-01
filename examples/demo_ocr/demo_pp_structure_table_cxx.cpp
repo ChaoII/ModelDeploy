@@ -98,5 +98,5 @@ int main() {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
-    std::cout << result.Str() << std::endl;
+    std::cout << result.str() << std::endl;
 }
