@@ -4,8 +4,6 @@
 
 #include <numeric>
 #include <iostream>
-#include <algorithm>
-#include "csrc/utils/utils.h"
 #include "tabulate/tabulate.hpp"
 #include "csrc/vision/common/result.h"
 
