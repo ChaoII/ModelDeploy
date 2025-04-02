@@ -12,7 +12,7 @@
 #include "capi/vision/detection/detection_capi.h"
 
 
-MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
+MDStatusCode md_create_detection_model(MDModel *model, const char *model_path,
                                        const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
@@ -21,27 +21,31 @@ MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
     model->model_name = strdup(detection_model->name().c_str());
     model->model_content = detection_model;
     model->type = MDModelType::Detection;
+    if (!detection_model->is_initialized()) {
+        MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
+        return MDStatusCode::ModelInitializeFailed;
+    }
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_set_detection_input_size(const MDModel* model, const MDSize size) {
+MDStatusCode md_set_detection_input_size(const MDModel *model, const MDSize size) {
     if (model->type != MDModelType::Detection) {
         MD_LOG_ERROR << "Model type is not detection!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
+    const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8 *>(model->model_content);
     detection_model->get_preprocessor().set_size({size.height, size.height});
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetectionResults* results) {
+MDStatusCode md_detection_predict(const MDModel *model, MDImage *image, MDDetectionResults *results) {
     if (model->type != MDModelType::Detection) {
         MD_LOG_ERROR << "Model type is not detection!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
     const auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::DetectionResult res;
-    const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
+    const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8 *>(model->model_content);
     if (const bool res_status = detection_model->predict(cv_image, &res); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
@@ -52,12 +56,12 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
         results->data = nullptr;
         return MDStatusCode::Success;
     }
-    results->data = static_cast<MDDetectionResult*>(malloc(sizeof(MDDetectionResult) * r_size));
+    results->data = static_cast<MDDetectionResult *>(malloc(sizeof(MDDetectionResult) * r_size));
     for (int i = 0; i < r_size; ++i) {
         auto box = res.boxes[i];
         results->data[i].box = {
-            static_cast<int>(box[0]), static_cast<int>(box[1]),
-            static_cast<int>(box[2] - box[0]), static_cast<int>(box[3] - box[1])
+                static_cast<int>(box[0]), static_cast<int>(box[1]),
+                static_cast<int>(box[2] - box[0]), static_cast<int>(box[3] - box[1])
         };
         results->data[i].score = res.scores[i];
         results->data[i].label_id = res.label_ids[i];
@@ -66,27 +70,27 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
 }
 
 
-void md_print_detection_result(const MDDetectionResults* result) {
+void md_print_detection_result(const MDDetectionResults *result) {
     tabulate::Table detection_results_table;
     detection_results_table.format()
-                           .border_color(tabulate::Color::magenta)
-                           .font_color(tabulate::Color::green)
-                           .corner_color(tabulate::Color::magenta);
+            .border_color(tabulate::Color::magenta)
+            .font_color(tabulate::Color::green)
+            .corner_color(tabulate::Color::magenta);
     detection_results_table.add_row({"box([x,y,w,h])", "label_id", "score"});
     for (int i = 0; i < result->size; ++i) {
         detection_results_table.add_row({
-            format_rect(result->data[i].box),
-            std::to_string(result->data[i].label_id),
-            std::to_string(result->data[i].score)
-        });
+                                                format_rect(result->data[i].box),
+                                                std::to_string(result->data[i].label_id),
+                                                std::to_string(result->data[i].score)
+                                        });
     }
     detection_results_table.column(1).format().font_align(tabulate::FontAlign::center);
     std::cout << detection_results_table << std::endl;
 }
 
 
-void md_draw_detection_result(const MDImage* image, const MDDetectionResults* result,
-                              const char* font_path, const int font_size,
+void md_draw_detection_result(const MDImage *image, const MDDetectionResults *result,
+                              const char *font_path, const int font_size,
                               const double alpha, const int save_result) {
     cv::Mat overlay;
     cv::Mat cv_image = md_image_to_mat(image);
@@ -127,7 +131,7 @@ void md_draw_detection_result(const MDImage* image, const MDDetectionResults* re
     }
 }
 
-void md_free_detection_result(MDDetectionResults* result) {
+void md_free_detection_result(MDDetectionResults *result) {
     if (result->size > 0 && result->data != nullptr) {
         result->size = 0;
         free(result->data);
@@ -135,9 +139,9 @@ void md_free_detection_result(MDDetectionResults* result) {
     }
 }
 
-void md_free_detection_model(MDModel* model) {
+void md_free_detection_model(MDModel *model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
+        delete static_cast<modeldeploy::vision::detection::YOLOv8 *>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

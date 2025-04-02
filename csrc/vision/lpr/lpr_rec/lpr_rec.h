@@ -42,6 +42,7 @@ namespace modeldeploy::vision::lpr {
                                      "Y", "Z", "险", "品"};
 
     private:
+
         bool initialize();
 
         bool preprocess(cv::Mat *mat, MDTensor *outputs);

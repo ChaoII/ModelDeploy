@@ -39,21 +39,21 @@ namespace modeldeploy::vision::lpr {
         /// padding value, size should be the same as channels
         std::vector<float> padding_value;
         /// only pad to the minimum rectangle which height and width is times of stride
-        bool is_mini_pad;
+        bool is_mini_pad{};
         /// while is_mini_pad = false and is_no_pad = true,
         /// will resize the image to the set size
-        bool is_no_pad;
+        bool is_no_pad{};
         /// if is_scale_up is false, the input image only can be zoom out,
         /// the maximum resize scale cannot exceed 1.0
-        bool is_scale_up;
+        bool is_scale_up{};
         /// padding stride, for is_mini_pad
-        int stride;
+        int stride{};
         /*! @brief
           Argument for image postprocessing step, setup the number of landmarks for per car plate (if have), default 4.
           The output tensor's shape must be:
           (1,n,4+1+2*landmarks_per_card+1=box+obj+landmarks+cls), default 5
         */
-        int landmarks_per_card;
+        int landmarks_per_card{};
 
     private:
         bool initialize();
@@ -65,9 +65,9 @@ namespace modeldeploy::vision::lpr {
                          const std::map<std::string, std::array<float, 2>> &im_info,
                          float conf_threshold, float nms_iou_threshold);
 
-        bool is_dynamic_input() const { return is_dynamic_input_; }
+        [[nodiscard]] bool is_dynamic_input() const { return is_dynamic_input_; }
 
-        bool is_dynamic_input_;
+        bool is_dynamic_input_{};
     };
 
 } // namespace modeldeploy::vision::facedet

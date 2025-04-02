@@ -19,12 +19,11 @@ namespace modeldeploy::vision::lpr {
 
     bool LprRecognizer::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            std::cerr << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
         return true;
     }
-
     bool LprRecognizer::preprocess(
         cv::Mat* mat, MDTensor* output) {
         // car_plate_recognizer's preprocess steps

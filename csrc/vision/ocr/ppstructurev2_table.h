@@ -51,6 +51,8 @@ namespace modeldeploy::pipeline {
         virtual bool batch_predict(const std::vector<cv::Mat> &images,
                                    std::vector<modeldeploy::vision::OCRResult> *batch_result);
 
+        [[nodiscard]] bool is_initialized() const override;
+
         bool set_rec_batch_size(int rec_batch_size);
 
         [[nodiscard]] int get_rec_batch_size() const;

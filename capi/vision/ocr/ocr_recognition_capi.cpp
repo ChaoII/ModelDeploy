@@ -20,6 +20,10 @@ MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_p
     model->model_content = ocr_rec_model;
     model->model_name = strdup(ocr_rec_model->name().c_str());
     model->type = MDModelType::OCR;
+    if (!ocr_rec_model->is_initialized()) {
+        MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
+        return MDStatusCode::ModelInitializeFailed;
+    }
     return MDStatusCode::Success;
 }
 

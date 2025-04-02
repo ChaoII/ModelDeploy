@@ -13,6 +13,21 @@ namespace modeldeploy::pipeline {
             : detector_(det_model), recognizer_(rec_model), table_(table_model) {
     }
 
+    bool PPStructureV2Table::is_initialized() const {
+        if (detector_ != nullptr && !detector_->is_initialized()) {
+            return false;
+        }
+
+        if (recognizer_ != nullptr && !recognizer_->is_initialized()) {
+            return false;
+        }
+
+        if (table_ != nullptr && !table_->is_initialized()) {
+            return false;
+        }
+        return true;
+    }
+
     bool PPStructureV2Table::set_rec_batch_size(int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
             std::cerr << "batch_size > 0 or batch_size == -1." << std::endl;

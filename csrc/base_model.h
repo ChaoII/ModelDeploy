@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "csrc/core/md_decl.h"
 #include "csrc/runtime/ort.h"
 
@@ -13,8 +14,8 @@ namespace modeldeploy {
 
         [[nodiscard]] virtual std::string name() const { return "NameUndefined"; }
 
-        virtual bool infer(std::vector<MDTensor>& input_tensors,
-                           std::vector<MDTensor>* output_tensors);
+        virtual bool infer(std::vector<MDTensor> &input_tensors,
+                           std::vector<MDTensor> *output_tensors);
 
         virtual bool infer();
 
@@ -30,7 +31,7 @@ namespace modeldeploy {
             return runtime_->get_output_info(index);
         }
 
-        [[nodiscard]] virtual bool initialized() const {
+        [[nodiscard]] virtual bool is_initialized() const {
             return runtime_initialized_ && initialized_;
         }
 
@@ -39,13 +40,14 @@ namespace modeldeploy {
             reused_output_tensors_.shrink_to_fit();
         }
 
-        virtual bool set_runtime(OrtBackend* clone_runtime) {
+        virtual bool set_runtime(OrtBackend *clone_runtime) {
             runtime_ = std::unique_ptr<OrtBackend>(clone_runtime);
             return true;
         }
 
     protected:
         virtual bool init_runtime();
+
         bool initialized_ = false;
         RuntimeOption runtime_option_;
         std::vector<MDTensor> reused_input_tensors_;

@@ -39,6 +39,10 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
     model->format = parameters->format;
     model->model_content = ocr_model;
     model->model_name = strdup(ocr_model->name().c_str());
+    if (!ocr_model->is_initialized()) {
+        MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
+        return MDStatusCode::ModelInitializeFailed;
+    }
     return MDStatusCode::Success;
 }
 
