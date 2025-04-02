@@ -48,7 +48,6 @@ namespace modeldeploy::vision::ocr {
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
                                    std::vector<OCRResult>* batch_result);
 
-        [[nodiscard]] bool initialized() const override;
         bool set_cls_batch_size(int cls_batch_size);
         [[nodiscard]] int get_cls_batch_size() const;
         bool set_rec_batch_size(int rec_batch_size);

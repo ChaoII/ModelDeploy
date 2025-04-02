@@ -1,9 +1,9 @@
 function(download_cppjieba)
   include(FetchContent)
 
-  set(cppjieba_URL  "https://github.com/csukuangfj/cppjieba/archive/refs/tags/sherpa-onnx-2024-04-19.tar.gz")
+  set(cppjieba_URL  "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/cppjieba-sherpa-onnx-2024-04-19.tar.gz")
   set(cppjieba_URL2 "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/cppjieba-sherpa-onnx-2024-04-19.tar.gz")
-  set(cppjieba_HASH "SHA256=03e5264687f0efaef05487a07d49c3f4c0f743347bfbf825df4b30cc75ac5288")
+  set(cppjieba_HASH "SHA256=06b3ccd351f71bcbccf507ea6c6ad8c47691b3125f19906261e4d5c829f966eb")
 
   # If you don't have access to the Internet,
   # please pre-download cppjieba

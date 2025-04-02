@@ -13,5 +13,5 @@
 #include "vision/face_age/seetaface_age.h"
 #include "vision/face_antispoof/face_anti_spoof_first.h"
 #include "vision/face_antispoof/face_anti_spoof_second.h"
-#include "vision/carplate_detection/carplate_detection.h"
-#include "vision/carplate_recognizer/carplate_recognizer.h"
+#include "vision/lpr/lpr_det/lpr_det.h"
+#include "vision/lpr/lpr_rec/lpr_rec.h"

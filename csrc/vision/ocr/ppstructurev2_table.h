@@ -51,11 +51,9 @@ namespace modeldeploy::pipeline {
         virtual bool batch_predict(const std::vector<cv::Mat> &images,
                                    std::vector<modeldeploy::vision::OCRResult> *batch_result);
 
-        [[nodiscard]] bool initialized() const override;
-
         bool set_rec_batch_size(int rec_batch_size);
 
-        [[maybe_unused]] int get_rec_batch_size() const;
+        [[nodiscard]] int get_rec_batch_size() const;
 
     protected:
         modeldeploy::vision::ocr::DBDetector *detector_ = nullptr;

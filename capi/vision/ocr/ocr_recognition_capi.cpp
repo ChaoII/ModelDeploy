@@ -16,10 +16,6 @@ MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_p
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
     const auto ocr_rec_model = new modeldeploy::vision::ocr::Recognizer(model_path, dict_path, option);
-    if (!ocr_rec_model->initialized()) {
-        MD_LOG_ERROR << "Failed to initialize OCR Recognition model." << std::endl;
-        return MDStatusCode::ModelInitializeFailed;
-    }
     model->format = MDModelFormat::ONNX;
     model->model_content = ocr_rec_model;
     model->model_name = strdup(ocr_rec_model->name().c_str());

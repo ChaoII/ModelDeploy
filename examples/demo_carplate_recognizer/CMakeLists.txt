@@ -1,3 +1,0 @@
-
-add_executable(demo_carplate_recognizer_cxx demo_carplate_recognizer_cxx.cpp)
-target_link_libraries(demo_carplate_recognizer_cxx PUBLIC ${LIBRARY_NAME})

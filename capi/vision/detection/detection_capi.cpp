@@ -17,10 +17,6 @@ MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
     const auto detection_model = new modeldeploy::vision::detection::YOLOv8(model_path, option);
-    if (!detection_model->initialized()) {
-        MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
-        return MDStatusCode::ModelInitializeFailed;
-    }
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(detection_model->name().c_str());
     model->model_content = detection_model;

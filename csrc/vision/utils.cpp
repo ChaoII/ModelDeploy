@@ -266,7 +266,7 @@ namespace modeldeploy::vision::utils {
     }
 
     std::vector<float> l2_normalize(const std::vector<float>& values) {
-        size_t num_val = values.size();
+        const size_t num_val = values.size();
         if (num_val == 0) {
             return {};
         }
@@ -275,7 +275,7 @@ namespace modeldeploy::vision::utils {
         for (size_t i = 0; i < num_val; ++i) {
             l2_sum_val += (values[i] * values[i]);
         }
-        float l2_sum_sqrt = std::sqrt(l2_sum_val);
+        const float l2_sum_sqrt = std::sqrt(l2_sum_val);
         norm.resize(num_val);
         for (size_t i = 0; i < num_val; ++i) {
             norm[i] = values[i] / l2_sum_sqrt;

@@ -12,10 +12,6 @@ int main() {
     std::string image_file = "../../test_data/test_images/test_face_recognition.png";
     auto model =
         modeldeploy::vision::face::SCRFD("../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
-    if (!model.initialized()) {
-        std::cerr << "Failed to initialize." << std::endl;
-        return -1;
-    }
 
     auto im = cv::imread(image_file);
     auto im_bak = im.clone();

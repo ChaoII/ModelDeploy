@@ -62,19 +62,6 @@ namespace modeldeploy::vision::ocr {
 
     int PPOCRv4::get_rec_batch_size() const { return rec_batch_size_; }
 
-    bool PPOCRv4::initialized() const {
-        if (detector_ != nullptr && !detector_->initialized()) {
-            return false;
-        }
-        if (classifier_ != nullptr && !classifier_->initialized()) {
-            return false;
-        }
-        if (recognizer_ != nullptr && !recognizer_->initialized()) {
-            return false;
-        }
-        return true;
-    }
-
 
     bool PPOCRv4::predict(cv::Mat* image, OCRResult* result) {
         return predict(*image, result);

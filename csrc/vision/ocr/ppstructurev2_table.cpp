@@ -11,7 +11,6 @@ namespace modeldeploy::pipeline {
             modeldeploy::vision::ocr::Recognizer *rec_model,
             modeldeploy::vision::ocr::StructureV2Table *table_model)
             : detector_(det_model), recognizer_(rec_model), table_(table_model) {
-        initialized_ = initialized();
     }
 
     bool PPStructureV2Table::set_rec_batch_size(int rec_batch_size) {
@@ -24,21 +23,6 @@ namespace modeldeploy::pipeline {
     }
 
     [[maybe_unused]] int PPStructureV2Table::get_rec_batch_size() const { return rec_batch_size_; }
-
-    bool PPStructureV2Table::initialized() const {
-        if (detector_ != nullptr && !detector_->initialized()) {
-            return false;
-        }
-
-        if (recognizer_ != nullptr && !recognizer_->initialized()) {
-            return false;
-        }
-
-        if (table_ != nullptr && !table_->initialized()) {
-            return false;
-        }
-        return true;
-    }
 
 
     bool PPStructureV2Table::predict(cv::Mat *img,

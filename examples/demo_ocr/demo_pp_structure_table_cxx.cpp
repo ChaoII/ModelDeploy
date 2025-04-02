@@ -85,11 +85,6 @@ int main() {
     // by the det model.
     ppstructurev2_table.set_rec_batch_size(rec_batch_size);
 
-    if (!ppstructurev2_table.initialized()) {
-        std::cerr << "Failed to initialize PP-OCR-Table." << std::endl;
-        return -1;
-    }
-
     auto im = cv::imread(image_file);
     auto im_bak = im.clone();
 

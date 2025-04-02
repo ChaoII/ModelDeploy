@@ -39,10 +39,6 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
     model->format = parameters->format;
     model->model_content = ocr_model;
     model->model_name = strdup(ocr_model->name().c_str());
-    if (!ocr_model->initialized()) {
-        MD_LOG_ERROR << "Failed to initialize OCR model.Please check your model parameters" << std::endl;
-        return MDStatusCode::ModelInitializeFailed;
-    }
     return MDStatusCode::Success;
 }
 
