@@ -8,7 +8,7 @@
 #include "csrc/vision/common/processors/hwc2chw.h"
 #include "csrc/vision/common/processors/cast.h"
 #include "csrc/vision/common/processors/center_crop.h"
-#include "csrc/vision/face_antispoof/face_anti_spoof_first.h"
+#include "csrc/vision/face_as/face_as_first.h"
 
 
 namespace modeldeploy::vision::face {
@@ -58,9 +58,9 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofFirst::predict(cv::Mat* im, float* result) {
+    bool SeetaFaceAntiSpoofFirst::predict(cv::Mat& im, float* result) {
         std::vector<MDTensor> input_tensors(1);
-        if (!preprocess(im, &input_tensors[0])) {
+        if (!preprocess(&im, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

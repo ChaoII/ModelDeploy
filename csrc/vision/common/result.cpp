@@ -528,4 +528,28 @@ namespace modeldeploy::vision {
         std::cout << termcolor::cyan << "LprResult:" << termcolor::reset << std::endl;
         std::cout << output_table << std::endl;
     }
+
+    FaceAntiSpoofResult::FaceAntiSpoofResult(const FaceAntiSpoofResult& res) {
+        anti_spoofs.assign(res.anti_spoofs.begin(), res.anti_spoofs.end());
+    }
+
+    void FaceAntiSpoofResult::clear() {
+        anti_spoofs.clear();
+    }
+
+    void FaceAntiSpoofResult::free() {
+        anti_spoofs.shrink_to_fit();
+    }
+
+    void FaceAntiSpoofResult::reserve(const size_t size) {
+        anti_spoofs.reserve(size);
+    }
+
+    void FaceAntiSpoofResult::resize(const size_t size) {
+        anti_spoofs.resize(size);
+    }
+
+    void FaceAntiSpoofResult::display() {
+
+    }
 }

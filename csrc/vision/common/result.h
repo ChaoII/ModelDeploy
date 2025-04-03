@@ -17,6 +17,12 @@ namespace modeldeploy::vision {
         MASK,
     };
 
+    enum class FaceAntiSpoofType:std::uint8_t {
+        REAL,
+        FUZZY,
+        SPOOF,
+    };
+
 
     /// Classify result structure for all the image classify models
     struct MODELDEPLOY_CXX_EXPORT ClassifyResult {
@@ -201,6 +207,25 @@ namespace modeldeploy::vision {
         void resize(size_t size);
 
         /// Debug function, convert the result to string to print
+        void display();
+    };
+
+
+    struct MODELDEPLOY_CXX_EXPORT FaceAntiSpoofResult {
+        std::vector<FaceAntiSpoofType> anti_spoofs;
+
+        FaceAntiSpoofResult() = default;
+
+        FaceAntiSpoofResult(const FaceAntiSpoofResult& res);
+
+        void clear();
+
+        void free();
+
+        void reserve(size_t size);
+
+        void resize(size_t size);
+
         void display();
     };
 }

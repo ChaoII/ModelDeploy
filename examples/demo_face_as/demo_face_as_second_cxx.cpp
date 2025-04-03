@@ -9,16 +9,19 @@ int main() {
     auto face_antispoof_model = modeldeploy::vision::face::SeetaFaceAntiSpoofSecond(
         "../../test_data/test_models/face/fas_second.onnx");
     assert(table_model.Initialized());
-    auto im0 = cv::imread("../../test_data/test_images/test_face_antispoof1.jpg");
+    auto im0 = cv::imread("../../test_data/test_images/test_face_as_second2.jpg");
     std::vector<std::tuple<int, float>> results;
-    if (!face_antispoof_model.predict(&im0, &results)) {
+    if (!face_antispoof_model.predict(im0, &results)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
 
-    for (auto& result : results) {
-        std::cout << "FaceAntiSpoofSecond: " << std::get<0>(result) << ", " << std::get<1>(result) << std::endl;
+    // 如果检测到对象，那么可以初步认为是攻击人脸(全局性的)
+    if (!results.empty()) {
+        std::cout << "Spoof" << std::endl;
     }
-
+    else {
+        std::cout << "real" << std::endl;
+    }
     return 0;
 }

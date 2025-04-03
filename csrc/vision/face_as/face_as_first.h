@@ -20,7 +20,7 @@ namespace modeldeploy::vision::face {
         explicit SeetaFaceAntiSpoofFirst(const std::string &model_file,
                                          const RuntimeOption &custom_option = RuntimeOption());
 
-        [[nodiscard]] std::string name() const override { return "scrfd"; }
+        [[nodiscard]] std::string name() const override { return "face_as_first"; }
 
         /** \brief Predict the face detection result for an input image
          *
@@ -28,7 +28,7 @@ namespace modeldeploy::vision::face {
          * \param[in] result The output face FaceAntiSpoof result will be writen to this structure
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(cv::Mat *im, float *result);
+        bool predict(cv::Mat& im, float *result);
 
         /// Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default (640, 640)
         std::vector<int> size_{224, 224};

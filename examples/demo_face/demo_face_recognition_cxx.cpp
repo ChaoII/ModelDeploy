@@ -12,7 +12,7 @@
 #include <chrono>
 
 int main_image() {
-    seeta::cv::ImageData image = cv::imread("../../test_data/test_images/test_face_recognition.png");
+    seeta::cv::ImageData image = cv::imread("../../test_data/test_images/test_face_detection2.png");
     seeta::Rect face(97, 54, 127, 170);
     std::vector<SeetaPointF> points = {
         {134.929, 126.889},

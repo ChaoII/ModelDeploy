@@ -1,7 +1,7 @@
 //
 // Created by aichao on 2025/3/26.
 //
-#include "csrc/vision/face_antispoof/face_anti_spoof_second.h"
+#include "csrc/vision/face_as/face_as_second.h"
 
 #include <csrc/core/md_log.h>
 
@@ -70,9 +70,9 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofSecond::predict(cv::Mat* im, std::vector<std::tuple<int, float>>* result) {
+    bool SeetaFaceAntiSpoofSecond::predict(cv::Mat& im, std::vector<std::tuple<int, float>>* result) {
         std::vector<MDTensor> input_tensors(1);
-        if (!preprocess(im, &input_tensors[0])) {
+        if (!preprocess(&im, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

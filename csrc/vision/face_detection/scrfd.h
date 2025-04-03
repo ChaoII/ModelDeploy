@@ -25,7 +25,7 @@ namespace modeldeploy::vision::face {
          * \param[in] nms_iou_threshold iou threashold for NMS, default is 0.4
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(cv::Mat* im, DetectionLandmarkResult* result,
+        bool predict(cv::Mat& im, DetectionLandmarkResult* result,
                      float conf_threshold = 0.25f,
                      float nms_iou_threshold = 0.4f);
 

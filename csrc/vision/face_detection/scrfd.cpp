@@ -296,20 +296,20 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SCRFD::predict(cv::Mat* im, DetectionLandmarkResult* result,
+    bool SCRFD::predict(cv::Mat& im, DetectionLandmarkResult* result,
                         const float conf_threshold, const float nms_iou_threshold) {
         std::vector<MDTensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
         // Record the shape of image and the shape of preprocessed image
         im_info["input_shape"] = {
-            static_cast<float>(im->rows),
-            static_cast<float>(im->cols)
+            static_cast<float>(im.rows),
+            static_cast<float>(im.cols)
         };
         im_info["output_shape"] = {
-            static_cast<float>(im->rows),
-            static_cast<float>(im->cols)
+            static_cast<float>(im.rows),
+            static_cast<float>(im.cols)
         };
-        if (!preprocess(im, &input_tensors[0], &im_info)) {
+        if (!preprocess(&im, &input_tensors[0], &im_info)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
