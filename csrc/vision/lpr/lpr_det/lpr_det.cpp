@@ -87,46 +87,46 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetection::preprocess(
-        cv::Mat* mat, MDTensor* output,
+        cv::Mat& mat, MDTensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) {
         // process after image load
-        const float ratio = std::min(static_cast<float>(size[1]) * 1.0f / static_cast<float>(mat->rows),
-                                     static_cast<float>(size[0]) * 1.0f / static_cast<float>(mat->cols));
+        const float ratio = std::min(static_cast<float>(size[1]) * 1.0f / static_cast<float>(mat.rows),
+                                     static_cast<float>(size[0]) * 1.0f / static_cast<float>(mat.cols));
 
         if (std::fabs(ratio - 1.0f) > 1e-06) {
             int interp = cv::INTER_LINEAR;
             if (ratio > 1.0) {
                 interp = cv::INTER_LINEAR;
             }
-            const int resize_h = static_cast<int>(round(static_cast<float>(mat->rows) * ratio));
-            const int resize_w = static_cast<int>(round(static_cast<float>(mat->cols) * ratio));
-            Resize::Run(mat, resize_w, resize_h, -1, -1, interp);
+            const int resize_h = static_cast<int>(round(static_cast<float>(mat.rows) * ratio));
+            const int resize_w = static_cast<int>(round(static_cast<float>(mat.cols) * ratio));
+            Resize::Run(&mat, resize_w, resize_h, -1, -1, interp);
         }
 
         // yolov5face's preprocess steps
         // 1. letterbox
         // 2. BGR->RGB
         // 3. HWC->CHW
-        LetterBox(mat, size, padding_value, is_mini_pad, is_no_pad, is_scale_up,
+        LetterBox(&mat, size, padding_value, is_mini_pad, is_no_pad, is_scale_up,
                   stride);
-        BGR2RGB::Run(mat);
+        BGR2RGB::Run(&mat);
         // Normalize::Run(mat, std::vector<float>(mat->Channels(), 0.0),
         //                std::vector<float>(mat->Channels(), 1.0));
         // Compute `result = mat * alpha + beta` directly by channel
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        Convert::Run(mat, alpha, beta);
+        Convert::Run(&mat, alpha, beta);
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {
-            static_cast<float>(mat->rows),
-            static_cast<float>(mat->cols)
+            static_cast<float>(mat.rows),
+            static_cast<float>(mat.cols)
         };
 
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
+        HWC2CHW::Run(&mat);
+        Cast::Run(&mat, "float");
 
-        if (!utils::mat_to_tensor(*mat, output)) {
+        if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -166,8 +166,6 @@ namespace modeldeploy::vision::lpr {
             if (confidence <= conf_threshold) {
                 continue;
             }
-            std::cout << "class_id: " << class_id << " conf: " << confidence << std::endl;
-
 
             const float x = reg_cls_ptr[0];
             const float y = reg_cls_ptr[1];
@@ -193,12 +191,6 @@ namespace modeldeploy::vision::lpr {
             return true;
         }
         utils::nms(result, nms_iou_threshold);
-        std::cout << "========================================" << std::endl;
-        for (size_t i = 0; i < result->boxes.size(); ++i) {
-            std::cout << "class_id: " << result->label_ids[i] << " conf: " << result->scores[i] << std::endl;
-        }
-
-
         // scale the boxes to the origin image shape
         const auto iter_out = im_info.find("output_shape");
         const auto iter_ipt = im_info.find("input_shape");
@@ -240,7 +232,7 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprDetection::predict(const cv::Mat& image, DetectionLandmarkResult* result,
+    bool LprDetection::predict(cv::Mat& image, DetectionLandmarkResult* result,
                                const float conf_threshold, const float nms_iou_threshold) {
         std::vector<MDTensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
@@ -254,9 +246,8 @@ namespace modeldeploy::vision::lpr {
             static_cast<float>(image.cols)
         };
 
-        cv::Mat image_ = image;
 
-        if (!preprocess(&image_, &input_tensors[0], &im_info)) {
+        if (!preprocess(image, &input_tensors[0], &im_info)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

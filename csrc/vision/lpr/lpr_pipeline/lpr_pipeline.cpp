@@ -80,14 +80,19 @@ namespace modeldeploy::vision::lpr {
         return out;
     }
 
-    bool LprPipeline::predict(cv::Mat& image, std::vector<CarPlateRecognizerResult>* results) {
+    bool LprPipeline::predict(cv::Mat& image, LprResult* results) {
         DetectionLandmarkResult det_result;
+
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
         }
         const size_t lp_num = det_result.boxes.size();
         results->resize(lp_num);
+        results->landmarks = det_result.landmarks;
+        results->boxes = det_result.boxes;
+        results->scores = det_result.scores;
+        results->label_ids = det_result.label_ids;
         for (int i = 0; i < lp_num; ++i) {
             std::array<cv::Point2f, 4> points;
             points[0] = cv::Point2f(det_result.landmarks[i * 4 + 0][0], det_result.landmarks[i * 4 + 0][1]);
@@ -99,7 +104,10 @@ namespace modeldeploy::vision::lpr {
             if (det_result.label_ids[i]) {
                 transform_image = get_split_merge(transform_image);
             }
-            recognizer_->predict(&transform_image, &(*results)[i]);
+            LprResult tmp_result;
+            recognizer_->predict(transform_image, &tmp_result);
+            results->car_plate_colors[i] = tmp_result.car_plate_colors[0];
+            results->car_plate_strs[i] = tmp_result.car_plate_strs[0];
         }
         return true;
     }

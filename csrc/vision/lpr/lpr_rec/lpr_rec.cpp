@@ -24,22 +24,23 @@ namespace modeldeploy::vision::lpr {
         }
         return true;
     }
+
     bool LprRecognizer::preprocess(
-        cv::Mat* mat, MDTensor* output) {
+        cv::Mat& mat, MDTensor* output) {
         // car_plate_recognizer's preprocess steps
         // 1. resize
         // 2. BGR->RGB
         // 3. HWC->CHW
 
-        Resize::Run(mat, size[0], size[1]);
-        BGR2RGB::Run(mat);
+        Resize::Run(&mat, size[0], size[1]);
+        BGR2RGB::Run(&mat);
         // Compute `result = mat * alpha + beta` directly by channel
         std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         std::vector beta = {-0.588f, -0.588f, -0.588f};
-        Convert::Run(mat, alpha, beta);
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
-        if (!utils::mat_to_tensor(*mat, output)) {
+        Convert::Run(&mat, alpha, beta);
+        HWC2CHW::Run(&mat);
+        Cast::Run(&mat, "float");
+        if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -48,7 +49,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprRecognizer::postprocess(
-        std::vector<MDTensor>& infer_result, CarPlateRecognizerResult* result) {
+        std::vector<MDTensor>& infer_result, LprResult* result) {
         auto* plate_color_ptr = static_cast<float*>(infer_result[1].data());
         const std::vector plate_color_vec(plate_color_ptr, plate_color_ptr + 5);
         int max_Index = argmax(plate_color_vec);
@@ -65,19 +66,19 @@ namespace modeldeploy::vision::lpr {
         }
         int pre = 0;
         std::string plate_str;
-        for (int j : plate_index) {
+        for (const int j : plate_index) {
             if (j != 0 && j != pre) {
                 plate_str += plate_chr[j];
             }
             pre = j;
         }
 
-        result->car_plate_str = plate_str;
-        result->car_plate_color = plate_color;
+        result->car_plate_strs.emplace_back(plate_str);
+        result->car_plate_colors.emplace_back(plate_color);
         return true;
     }
 
-    bool LprRecognizer::predict(cv::Mat* image, CarPlateRecognizerResult* result) {
+    bool LprRecognizer::predict(cv::Mat& image, LprResult* result) {
         std::vector<MDTensor> input_tensors(1);
         if (!preprocess(image, &input_tensors[0])) {
             std::cerr << "Failed to preprocess input image." << std::endl;
@@ -92,4 +93,6 @@ namespace modeldeploy::vision::lpr {
         postprocess(output_tensors, result);
         return true;
     }
+
+
 } // namespace modeldeploy::vision::facedet

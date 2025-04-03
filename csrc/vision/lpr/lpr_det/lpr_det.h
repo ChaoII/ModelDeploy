@@ -27,7 +27,7 @@ namespace modeldeploy::vision::lpr {
          * \param[in] nms_iou_threshold iou threashold for NMS, default is 0.5
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(const cv::Mat& image, DetectionLandmarkResult* result,
+        bool predict(cv::Mat& image, DetectionLandmarkResult* result,
                      float conf_threshold = 0.25, float nms_iou_threshold = 0.5);
 
         /*! @brief
@@ -56,7 +56,7 @@ namespace modeldeploy::vision::lpr {
     private:
         bool initialize();
 
-        bool preprocess(cv::Mat* mat, MDTensor* outputs,
+        bool preprocess(cv::Mat& mat, MDTensor* outputs,
                         std::map<std::string, std::array<float, 2>>* im_info);
 
         bool postprocess(MDTensor& infer_result, DetectionLandmarkResult* result,

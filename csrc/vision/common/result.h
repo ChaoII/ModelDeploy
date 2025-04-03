@@ -17,11 +17,6 @@ namespace modeldeploy::vision {
         MASK,
     };
 
-    struct MODELDEPLOY_CXX_EXPORT CarPlateRecognizerResult {
-        CarPlateRecognizerResult() = default;
-        std::string car_plate_str;
-        std::string car_plate_color;
-    };
 
     /// Classify result structure for all the image classify models
     struct MODELDEPLOY_CXX_EXPORT ClassifyResult {
@@ -178,6 +173,32 @@ namespace modeldeploy::vision {
         void reserve(int size);
 
         void resize(int size);
+
+        /// Debug function, convert the result to string to print
+        void display();
+    };
+
+    struct MODELDEPLOY_CXX_EXPORT LprResult {
+        std::vector<std::array<float, 4>> boxes;
+        std::vector<std::array<float, 2>> landmarks;
+        std::vector<int> label_ids;
+        std::vector<float> scores;
+        std::vector<std::string> car_plate_strs;
+        std::vector<std::string> car_plate_colors;
+
+        LprResult() = default;
+
+        LprResult(const LprResult& res);
+
+        /// Clear FaceRecognitionResult
+        void clear();
+
+        /// Clear FaceRecognitionResult and free the memory
+        void free();
+
+        void reserve(size_t size);
+
+        void resize(size_t size);
 
         /// Debug function, convert the result to string to print
         void display();

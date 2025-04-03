@@ -17,18 +17,14 @@ int main() {
 #endif
     auto model = modeldeploy::vision::lpr::LprRecognizer(
         "../../test_data/test_models/plate_recognition_color.onnx");
-    auto im = cv::imread("../../test_data/test_images/test_carplate_recongnizer.jpg");
+    auto im = cv::imread("../../test_data/test_images/test_lpr_recognizer.jpg");
     auto im_bak = im.clone();
-
-    modeldeploy::vision::CarPlateRecognizerResult res;
-    if (!model.predict(&im, &res)) {
+    modeldeploy::vision::LprResult res;
+    if (!model.predict(im, &res)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
-
-
-    std::cout << "car plate color: " << res.car_plate_color << std::endl;
-    std::cout << "car_plate_str: " << res.car_plate_str << std::endl;
-
+    std::cout << "car plate color: " << res.car_plate_colors[0] << std::endl;
+    std::cout << "car_plate_str: " << res.car_plate_strs[0] << std::endl;
     return 0;
 }

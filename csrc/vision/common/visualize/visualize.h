@@ -28,5 +28,10 @@ namespace modeldeploy::vision {
 
     MODELDEPLOY_CXX_EXPORT cv::Mat VisFaceDetection(cv::Mat cv_image, const DetectionLandmarkResult& result,
                                                     const std::string& font_path, int font_size = 14,
-                                                    int landmark_radius = 4, double alpha = 0.5, bool save_result = false);
+                                                    int landmark_radius = 4, double alpha = 0.5,
+                                                    bool save_result = false);
+
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_lpr(cv::Mat& cv_image, const LprResult& result,
+                                           const std::string& font_path, int font_size = 14,
+                                           int landmark_radius = 4, double alpha = 0.5, bool save_result = false);
 }

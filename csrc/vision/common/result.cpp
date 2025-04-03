@@ -439,4 +439,93 @@ namespace modeldeploy::vision {
         std::cout << termcolor::cyan << "FaceRecognitionResult:" << termcolor::reset << std::endl;
         std::cout << output_table << std::endl;
     }
+
+    LprResult::LprResult(const LprResult& res) {
+        car_plate_strs.assign(res.car_plate_strs.begin(), res.car_plate_strs.end());
+        car_plate_colors.assign(res.car_plate_colors.begin(), res.car_plate_colors.end());
+        boxes.assign(res.boxes.begin(), res.boxes.end());
+        label_ids.assign(res.label_ids.begin(), res.label_ids.end());
+        scores.assign(res.scores.begin(), res.scores.end());
+        landmarks.assign(res.landmarks.begin(), res.landmarks.end());
+    }
+
+    void LprResult::clear() {
+        boxes.clear();
+        landmarks.clear();
+        label_ids.clear();
+        scores.clear();
+        car_plate_strs.clear();
+        car_plate_colors.clear();
+    }
+
+    void LprResult::free() {
+        boxes.shrink_to_fit();
+        landmarks.shrink_to_fit();
+        label_ids.shrink_to_fit();
+        scores.shrink_to_fit();
+        car_plate_strs.shrink_to_fit();
+        car_plate_colors.shrink_to_fit();
+    }
+
+    void LprResult::reserve(const size_t size) {
+        boxes.reserve(size);
+        landmarks.reserve(size * 4);
+        label_ids.reserve(size);
+        scores.reserve(size);
+        car_plate_strs.reserve(size);
+        car_plate_colors.reserve(size);
+    }
+
+    void LprResult::resize(const size_t size) {
+        boxes.resize(size);
+        landmarks.resize(size * 4);
+        label_ids.resize(size);
+        scores.resize(size);
+        car_plate_strs.resize(size);
+        car_plate_colors.resize(size);
+    }
+
+    void LprResult::display() {
+        tabulate::Table output_table;
+        output_table.format()
+                    .locale(std::locale::classic().name())
+                    .multi_byte_characters(true)
+                    .font_color(tabulate::Color::green)
+                    .border_color(tabulate::Color::magenta)
+                    .corner_color(tabulate::Color::magenta);
+
+        if (landmarks.size() != boxes.size() * 4) {
+            std::cerr << "The size of landmarks != boxes.size * landmarks_per_instance." << std::endl;
+        }
+        output_table.add_row({
+            "order",
+            "box([x1, y1, x2, y2])",
+            "label_id",
+            "score",
+            "color",
+            "plate_str"
+        });
+        for (size_t i = 0; i < boxes.size(); ++i) {
+            std::string row_str_box = "["
+                + std::to_string(static_cast<int>(boxes[i][0])) + ", "
+                + std::to_string(static_cast<int>(boxes[i][1])) + ", "
+                + std::to_string(static_cast<int>(boxes[i][2])) + ", "
+                + std::to_string(static_cast<int>(boxes[i][3])) + "]";
+            std::string row_str_score = std::to_string(scores[i]);
+            std::string row_str_label_id = std::to_string(label_ids[i]);
+            std::string row_str_color = car_plate_colors[i];
+            std::string row_str_plate = car_plate_strs[i];
+
+            output_table.add_row({
+                std::to_string(i),
+                row_str_box,
+                row_str_label_id,
+                row_str_score,
+                row_str_color,
+                row_str_plate
+            });
+        }
+        std::cout << termcolor::cyan << "LprResult:" << termcolor::reset << std::endl;
+        std::cout << output_table << std::endl;
+    }
 }

@@ -19,7 +19,7 @@ namespace modeldeploy::vision::lpr {
 
         ~LprPipeline() override;
 
-        virtual bool predict(cv::Mat& image, std::vector<CarPlateRecognizerResult>* results);
+        virtual bool predict(cv::Mat& image, LprResult* results);
 
         [[nodiscard]] bool is_initialized() const override;
 
