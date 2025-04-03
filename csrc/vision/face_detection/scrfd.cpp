@@ -242,6 +242,7 @@ namespace modeldeploy::vision::face {
                 const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
                 result->boxes.emplace_back(std::array<float, 4>{x1, y1, x2, y2});
                 result->scores.push_back(cls_conf);
+                result->label_ids.push_back(0);
                 if (use_kps) {
                     const auto* landmarks_ptr =
                         static_cast<float*>(infer_result.at(f + 2 * fmc).data());
@@ -268,13 +269,10 @@ namespace modeldeploy::vision::face {
         if (iter_ipt == im_info.end()) {
             MD_LOG_ERROR << "Cannot find input_shape from im_info." << std::endl;
         }
-
         if (result->boxes.empty()) {
             return true;
         }
-
         utils::nms(result, nms_iou_threshold);
-
         // scale and clip box
         for (auto& boxe : result->boxes) {
             boxe[0] = std::max(boxe[0], 0.0f);

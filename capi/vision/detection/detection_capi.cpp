@@ -76,7 +76,7 @@ void md_print_detection_result(const MDDetectionResults *result) {
             .border_color(tabulate::Color::magenta)
             .font_color(tabulate::Color::green)
             .corner_color(tabulate::Color::magenta);
-    detection_results_table.add_row({"box([x,y,w,h])", "label_id", "score"});
+    detection_results_table.add_row({"box([x,y,w,h])", "label_ids", "score"});
     for (int i = 0; i < result->size; ++i) {
         detection_results_table.add_row({
                                                 format_rect(result->data[i].box),

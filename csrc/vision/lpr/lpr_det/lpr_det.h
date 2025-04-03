@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 #include "csrc/base_model.h"
@@ -16,21 +14,21 @@ namespace modeldeploy::vision::lpr {
          * \param[in] model_file Path of model file, e.g ./yolov5face.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        explicit LprDetection(const std::string &model_file,
-                                   const RuntimeOption &custom_option = RuntimeOption());
+        explicit LprDetection(const std::string& model_file,
+                              const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "car-plate-detection"; }
 
         /** \brief Predict the face detection result for an input image
          *
-         * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] result The output face detection result will be writen to this structure
          * \param[in] conf_threshold confidence threashold for postprocessing, default is 0.25
          * \param[in] nms_iou_threshold iou threashold for NMS, default is 0.5
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(cv::Mat *im, DetectionLandmarkResult *result, float conf_threshold = 0.25,
-                             float nms_iou_threshold = 0.5);
+        bool predict(const cv::Mat& image, DetectionLandmarkResult* result,
+                     float conf_threshold = 0.25, float nms_iou_threshold = 0.5);
 
         /*! @brief
         Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default size = {640, 640}
@@ -58,16 +56,15 @@ namespace modeldeploy::vision::lpr {
     private:
         bool initialize();
 
-        bool preprocess(cv::Mat *mat, MDTensor *outputs,
-                        std::map<std::string, std::array<float, 2>> *im_info);
+        bool preprocess(cv::Mat* mat, MDTensor* outputs,
+                        std::map<std::string, std::array<float, 2>>* im_info);
 
-        bool postprocess(MDTensor &infer_result, DetectionLandmarkResult *result,
-                         const std::map<std::string, std::array<float, 2>> &im_info,
+        bool postprocess(MDTensor& infer_result, DetectionLandmarkResult* result,
+                         const std::map<std::string, std::array<float, 2>>& im_info,
                          float conf_threshold, float nms_iou_threshold);
 
         [[nodiscard]] bool is_dynamic_input() const { return is_dynamic_input_; }
 
         bool is_dynamic_input_{};
     };
-
 } // namespace modeldeploy::vision::facedet

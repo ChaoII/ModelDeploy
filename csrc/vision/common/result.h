@@ -124,6 +124,8 @@ namespace modeldeploy::vision {
          * If the model detect face with landmarks, every detected object box correspoing to a landmark, which is a array of 2 float values, means location [x,y]
         */
         std::vector<std::array<float, 2>> landmarks;
+
+        std::vector<int> label_ids;
         /** \brief
          * Indicates the confidence of all targets detected from a single image, and the number of elements is consistent with boxes.size()
          */

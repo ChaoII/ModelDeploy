@@ -34,8 +34,8 @@ namespace modeldeploy::vision::lpr {
         Resize::Run(mat, size[0], size[1]);
         BGR2RGB::Run(mat);
         // Compute `result = mat * alpha + beta` directly by channel
-        std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        std::vector<float> beta = {-0.588f, -0.588f, -0.588f};
+        std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+        std::vector beta = {-0.588f, -0.588f, -0.588f};
         Convert::Run(mat, alpha, beta);
         HWC2CHW::Run(mat);
         Cast::Run(mat, "float");
@@ -50,15 +50,15 @@ namespace modeldeploy::vision::lpr {
     bool LprRecognizer::postprocess(
         std::vector<MDTensor>& infer_result, CarPlateRecognizerResult* result) {
         auto* plate_color_ptr = static_cast<float*>(infer_result[1].data());
-        std::vector<float> plate_color_vec(plate_color_ptr, plate_color_ptr + 5);
+        const std::vector plate_color_vec(plate_color_ptr, plate_color_ptr + 5);
         int max_Index = argmax(plate_color_vec);
-        std::string plate_color = plate_color_list[max_Index];
+        const std::string plate_color = plate_color_list[max_Index];
         //车牌
         std::vector<int> plate_index;
         plate_index.reserve(21);
         auto* prob1_temp = static_cast<float*>(infer_result[0].data());
         for (size_t j = 0; j < 21; j++) {
-            std::vector<float> plate_tensor(prob1_temp, prob1_temp + 78);
+            std::vector plate_tensor(prob1_temp, prob1_temp + 78);
             max_Index = argmax(plate_tensor);
             plate_index.push_back(max_Index);
             prob1_temp = prob1_temp + 78;

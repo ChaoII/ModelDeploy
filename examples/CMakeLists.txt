@@ -9,6 +9,7 @@ add_subdirectory(demo_face_gender)
 add_subdirectory(demo_face_antispoof)
 add_subdirectory(demo_lpr_detection)
 add_subdirectory(demo_lpr_recognizer)
+add_subdirectory(demo_lpr_pipeline)
 
 if (BUILD_FACE)
     add_subdirectory(demo_face)

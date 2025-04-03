@@ -13,7 +13,7 @@ namespace modeldeploy::vision::utils {
         int landmarks_per_instance = result->landmarks_per_instance;
         if (landmarks_per_instance > 0) {
             if (
-                (result->landmarks.size() != result->boxes.size() * landmarks_per_instance)) {
+                result->landmarks.size() != result->boxes.size() * landmarks_per_instance) {
                 std::cerr << "The size of landmarks != boxes.size * landmarks_per_face." << std::endl;
             }
         }
@@ -39,6 +39,7 @@ namespace modeldeploy::vision::utils {
             for (const auto& indice : indices) {
                 result->boxes.emplace_back(backup.boxes[indice]);
                 result->scores.push_back(backup.scores[indice]);
+                result->label_ids.push_back(backup.label_ids[indice]);
                 for (size_t j = 0; j < landmarks_per_instance; ++j) {
                     result->landmarks.emplace_back(
                         backup.landmarks[indice * landmarks_per_instance + j]);
@@ -49,6 +50,7 @@ namespace modeldeploy::vision::utils {
             for (const auto& indice : indices) {
                 result->boxes.emplace_back(backup.boxes[indice]);
                 result->scores.push_back(backup.scores[indice]);
+                result->label_ids.push_back(backup.label_ids[indice]);
             }
         }
     }

@@ -140,9 +140,8 @@ namespace modeldeploy::vision::utils {
 
     void nms(DetectionLandmarkResult* result, float iou_threshold) {
         utils::sort_detection_result(result);
-
         std::vector<float> area_of_boxes(result->boxes.size());
-        std::vector<int> suppressed(result->boxes.size(), 0);
+        std::vector suppressed(result->boxes.size(), 0);
         for (size_t i = 0; i < result->boxes.size(); ++i) {
             area_of_boxes[i] = (result->boxes[i][2] - result->boxes[i][0]) *
                 (result->boxes[i][3] - result->boxes[i][1]);
@@ -172,7 +171,6 @@ namespace modeldeploy::vision::utils {
         }
         DetectionLandmarkResult backup(*result);
         int landmarks_per_face = result->landmarks_per_instance;
-
         result->clear();
         // don't forget to reset the landmarks_per_face
         // before apply Reserve method.
@@ -184,6 +182,7 @@ namespace modeldeploy::vision::utils {
             }
             result->boxes.emplace_back(backup.boxes[i]);
             result->scores.push_back(backup.scores[i]);
+            result->label_ids.push_back(backup.label_ids[i]);
             // landmarks (if have)
             if (result->landmarks_per_instance > 0) {
                 for (size_t j = 0; j < result->landmarks_per_instance; ++j) {

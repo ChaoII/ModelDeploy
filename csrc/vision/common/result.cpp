@@ -189,7 +189,7 @@ namespace modeldeploy::vision {
                     .corner_color(tabulate::Color::magenta);
 
         if (rotated_boxes.empty()) {
-            output_table.add_row({"order", " box([x1, y1, x2, y2])", "label_id", " score", "mask_size"});
+            output_table.add_row({"order", " box([x1, y1, x2, y2])", "label_ids", " score", "mask_size"});
             for (size_t i = 0; i < boxes.size(); ++i) {
                 std::string box_str = "["
                     + std::to_string(static_cast<int>(boxes[i][0])) + ", "
@@ -203,7 +203,7 @@ namespace modeldeploy::vision {
             }
         }
         else {
-            output_table.add_row({"order", " box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_id", " score"});
+            output_table.add_row({"order", " box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_ids", " score"});
             for (size_t i = 0; i < rotated_boxes.size(); ++i) {
                 std::string box_str = "["
                     + std::to_string(static_cast<int>(rotated_boxes[i][0])) + ", "
@@ -331,6 +331,7 @@ namespace modeldeploy::vision {
     DetectionLandmarkResult::DetectionLandmarkResult(const DetectionLandmarkResult& res) {
         boxes.assign(res.boxes.begin(), res.boxes.end());
         landmarks.assign(res.landmarks.begin(), res.landmarks.end());
+        label_ids.assign(res.label_ids.begin(), res.label_ids.end());
         scores.assign(res.scores.begin(), res.scores.end());
         landmarks_per_instance = res.landmarks_per_instance;
     }
@@ -345,6 +346,7 @@ namespace modeldeploy::vision {
     void DetectionLandmarkResult::clear() {
         boxes.clear();
         scores.clear();
+        label_ids.clear();
         landmarks.clear();
         landmarks_per_instance = 0;
     }
@@ -352,6 +354,7 @@ namespace modeldeploy::vision {
     void DetectionLandmarkResult::reserve(const int size) {
         boxes.reserve(size);
         scores.reserve(size);
+        label_ids.reserve(size);
         if (landmarks_per_instance > 0) {
             landmarks.reserve(size * landmarks_per_instance);
         }
@@ -360,6 +363,7 @@ namespace modeldeploy::vision {
     void DetectionLandmarkResult::resize(const int size) {
         boxes.resize(size);
         scores.resize(size);
+        label_ids.resize(size);
         if (landmarks_per_instance > 0) {
             landmarks.resize(size * landmarks_per_instance);
         }
@@ -377,6 +381,7 @@ namespace modeldeploy::vision {
         output_table.add_row({
             "order",
             "box([x1, y1, x2, y2])",
+            "label_id",
             "score",
             "landmarks(" + std::to_string(landmarks_per_instance) + " * point)"
         });
@@ -388,6 +393,7 @@ namespace modeldeploy::vision {
                 + std::to_string(static_cast<int>(boxes[i][3])) + "]";
 
             std::string row_str_score = std::to_string(scores[i]);
+            std::string row_str_label_id = std::to_string(label_ids[i]);
             std::string row_str_landmarks;
             for (size_t j = 0; j < landmarks_per_instance; ++j) {
                 row_str_landmarks += "[" +
@@ -395,7 +401,7 @@ namespace modeldeploy::vision {
                     std::to_string(static_cast<int>(landmarks[i * landmarks_per_instance + j][1]));
                 row_str_landmarks += j < landmarks_per_instance - 1 ? "], " : "]";
             }
-            output_table.add_row({std::to_string(i), row_str_box, row_str_score, row_str_landmarks});
+            output_table.add_row({std::to_string(i), row_str_box, row_str_label_id, row_str_score, row_str_landmarks});
         }
         std::cout << termcolor::cyan << "DetectionLandmarkResult:" << termcolor::reset << std::endl;
         std::cout << output_table << std::endl;
