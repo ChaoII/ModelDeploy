@@ -9,7 +9,7 @@
 #include "vision/ocr/recognizer.h"
 #include "vision/detection/yolov8.h"
 #include "vision/classification/yolov5cls.h"
-#include "vision/face_detection/scrfd.h"
+#include "vision/face_det/scrfd.h"
 #include "vision/face_age/seetaface_age.h"
 #include "vision/face_as/face_as_first.h"
 #include "vision/face_as/face_as_second.h"

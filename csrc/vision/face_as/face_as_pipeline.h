@@ -5,7 +5,7 @@
 
 #include "csrc/base_model.h"
 #include "csrc/core/md_decl.h"
-#include "csrc/vision/face_detection/scrfd.h"
+#include "csrc/vision/face_det/scrfd.h"
 #include "csrc/vision/face_as/face_as_first.h"
 #include "csrc/vision/face_as/face_as_second.h"
 
@@ -36,7 +36,7 @@ namespace modeldeploy::vision::face {
          * \param fuse_threshold
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(cv::Mat& im, FaceAntiSpoofResult* results, float fuse_threshold = 0.8f);
+        bool predict(cv::Mat& im, FaceAntiSpoofResult* results, float fuse_threshold = 0.8f, float clarity_threshold = 0.3);
 
 
         [[nodiscard]] bool is_initialized() const override;

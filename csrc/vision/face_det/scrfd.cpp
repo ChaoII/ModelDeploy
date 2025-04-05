@@ -1,4 +1,4 @@
-#include "csrc/vision/face_detection/scrfd.h"
+#include "csrc/vision/face_det/scrfd.h"
 
 #include <csrc/core/md_log.h>
 

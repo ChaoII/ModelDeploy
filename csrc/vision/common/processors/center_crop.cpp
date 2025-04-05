@@ -1,11 +1,12 @@
 #include "center_crop.h"
+#include "csrc/core/md_log.h"
 
 namespace modeldeploy::vision {
-    bool CenterCrop::ImplByOpenCV(cv::Mat* im) {
+    bool CenterCrop::ImplByOpenCV(cv::Mat *im) {
         int height = static_cast<int>(im->rows);
         int width = static_cast<int>(im->cols);
         if (height < height_ || width < width_) {
-            std::cerr << "[CenterCrop] Image size less than crop size" << std::endl;
+            MD_LOG_ERROR << "[CenterCrop] Image size less than crop size" << std::endl;
             return false;
         }
         int offset_x = static_cast<int>((width - width_) / 2);
@@ -16,11 +17,11 @@ namespace modeldeploy::vision {
         return true;
     }
 
-    bool CenterCrop::operator()(cv::Mat* mat) {
+    bool CenterCrop::operator()(cv::Mat *mat) {
         return ImplByOpenCV(mat);
     }
 
-    bool CenterCrop::Run(cv::Mat* mat, const int& width, const int& height) {
+    bool CenterCrop::Run(cv::Mat *mat, const int &width, const int &height) {
         auto c = CenterCrop(width, height);
         return c(mat);
     }
