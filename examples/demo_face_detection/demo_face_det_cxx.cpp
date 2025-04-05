@@ -25,7 +25,7 @@ int main() {
     cv::imshow("image", image);
     cv::waitKey(0);
     auto vis_im_list =
-        modeldeploy::vision::utils::AlignFaceWithFivePoints(im_bak, res);
+        modeldeploy::vision::utils::align_face_with_five_points(im_bak, res);
     if (!vis_im_list.empty()) {
         std::vector<cv::Mat> cropped_images;
         for (auto& align_image : vis_im_list) {
