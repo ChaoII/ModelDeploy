@@ -181,6 +181,9 @@ typedef struct {
 } MDFaceRecognizerResults;
 
 
+typedef int MDFaceAgeResult;
+
+
 enum MDFaceAntiSpoofingResult {
     REAL = 0,
     SPOOF = 1,
