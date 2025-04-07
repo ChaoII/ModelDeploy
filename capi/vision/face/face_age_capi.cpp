@@ -14,12 +14,12 @@ MDStatusCode md_create_face_age_model(MDModel* model, const char* model_path,
                                       const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto face_rec_model = new modeldeploy::vision::face::SeetaFaceAge(model_path, option);
+    const auto face_age_model = new modeldeploy::vision::face::SeetaFaceAge(model_path, option);
     model->format = MDModelFormat::ONNX;
-    model->model_name = strdup(face_rec_model->name().c_str());
-    model->model_content = face_rec_model;
-    model->type = MDModelType::Detection;
-    if (!face_rec_model->is_initialized()) {
+    model->model_name = strdup(face_age_model->name().c_str());
+    model->model_content = face_age_model;
+    model->type = MDModelType::FACE;
+    if (!face_age_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
     return MDStatusCode::Success;
@@ -31,8 +31,8 @@ MDStatusCode md_face_age_predict(const MDModel* model, MDImage* image, MDFaceAge
         return MDStatusCode::ModelTypeError;
     }
     auto cv_image = md_image_to_mat(image);
-    const auto detection_model = static_cast<modeldeploy::vision::face::SeetaFaceAge*>(model->model_content);
-    if (const bool res_status = detection_model->predict(cv_image, c_result); !res_status) {
+    const auto face_age_model = static_cast<modeldeploy::vision::face::SeetaFaceAge*>(model->model_content);
+    if (const bool res_status = face_age_model->predict(cv_image, c_result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     return MDStatusCode::Success;

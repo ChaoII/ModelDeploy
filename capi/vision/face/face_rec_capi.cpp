@@ -18,7 +18,7 @@ MDStatusCode md_create_face_rec_model(MDModel* model, const char* model_path,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_rec_model->name().c_str());
     model->model_content = face_rec_model;
-    model->type = MDModelType::Detection;
+    model->type = MDModelType::FACE;
     if (!face_rec_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -32,8 +32,8 @@ MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRec
     }
     auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::FaceRecognitionResult result;
-    const auto detection_model = static_cast<modeldeploy::vision::face::SeetaFaceID*>(model->model_content);
-    if (const bool res_status = detection_model->predict(cv_image, &result); !res_status) {
+    const auto face_rec_model = static_cast<modeldeploy::vision::face::SeetaFaceID*>(model->model_content);
+    if (const bool res_status = face_rec_model->predict(cv_image, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     face_recognizer_result_2_c_result(result, c_result);

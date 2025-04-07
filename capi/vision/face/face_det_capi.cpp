@@ -19,7 +19,7 @@ MDStatusCode md_create_face_det_model(MDModel* model, const char* model_path,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_det_model->name().c_str());
     model->model_content = face_det_model;
-    model->type = MDModelType::Detection;
+    model->type = MDModelType::FACE;
     if (!face_det_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -33,8 +33,8 @@ MDStatusCode md_face_det_predict(const MDModel* model, MDImage* image, MDDetecti
     }
     auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::DetectionLandmarkResult results;
-    const auto detection_model = static_cast<modeldeploy::vision::face::SCRFD*>(model->model_content);
-    if (const bool res_status = detection_model->predict(cv_image, &results); !res_status) {
+    const auto face_det_model = static_cast<modeldeploy::vision::face::SCRFD*>(model->model_content);
+    if (const bool res_status = face_det_model->predict(cv_image, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     detection_landmark_result_2_c_results(results, c_results);

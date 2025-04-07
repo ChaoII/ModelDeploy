@@ -15,6 +15,11 @@ target_link_libraries(demo_face_age_capi PUBLIC ${LIBRARY_NAME})
 add_executable(demo_face_gender_cxx demo_face_gender_cxx.cpp)
 target_link_libraries(demo_face_gender_cxx PUBLIC ${LIBRARY_NAME})
 
+
+add_executable(demo_face_gender_capi demo_face_gender_capi.cpp)
+target_link_libraries(demo_face_gender_capi PUBLIC ${LIBRARY_NAME})
+
+
 add_executable(demo_face_rec_cxx demo_face_rec_cxx.cpp)
 target_link_libraries(demo_face_rec_cxx PUBLIC ${LIBRARY_NAME})
 

@@ -183,6 +183,10 @@ typedef struct {
 
 typedef int MDFaceAgeResult;
 
+enum MDFaceGenderResult {
+    FEMALE = 0,
+    MALE = 1
+};
 
 enum MDFaceAntiSpoofingResult {
     REAL = 0,
@@ -207,10 +211,6 @@ enum MDFaceQualityEvaluateResult {
     HIGH = 2
 };
 
-enum MDGenderResult {
-    MALE = 0,
-    FEMALE = 1
-};
 
 enum MDEyeState {
     EYE_CLOSE = 0,
