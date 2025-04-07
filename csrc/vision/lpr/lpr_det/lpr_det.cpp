@@ -87,46 +87,47 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetection::preprocess(
-        cv::Mat& mat, MDTensor* output,
+        cv::Mat& image, MDTensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) {
         // process after image load
-        const float ratio = std::min(static_cast<float>(size[1]) * 1.0f / static_cast<float>(mat.rows),
-                                     static_cast<float>(size[0]) * 1.0f / static_cast<float>(mat.cols));
+
+        const float ratio = std::min(static_cast<float>(size[1]) * 1.0f / static_cast<float>(image.rows),
+                                     static_cast<float>(size[0]) * 1.0f / static_cast<float>(image.cols));
 
         if (std::fabs(ratio - 1.0f) > 1e-06) {
             int interp = cv::INTER_LINEAR;
             if (ratio > 1.0) {
                 interp = cv::INTER_LINEAR;
             }
-            const int resize_h = static_cast<int>(round(static_cast<float>(mat.rows) * ratio));
-            const int resize_w = static_cast<int>(round(static_cast<float>(mat.cols) * ratio));
-            Resize::Run(&mat, resize_w, resize_h, -1, -1, interp);
+            const int resize_h = static_cast<int>(round(static_cast<float>(image.rows) * ratio));
+            const int resize_w = static_cast<int>(round(static_cast<float>(image.cols) * ratio));
+            Resize::Run(&image, resize_w, resize_h, -1, -1, interp);
         }
 
         // yolov5face's preprocess steps
         // 1. letterbox
         // 2. BGR->RGB
         // 3. HWC->CHW
-        LetterBox(&mat, size, padding_value, is_mini_pad, is_no_pad, is_scale_up,
+        LetterBox(&image, size, padding_value, is_mini_pad, is_no_pad, is_scale_up,
                   stride);
-        BGR2RGB::Run(&mat);
+        BGR2RGB::Run(&image);
         // Normalize::Run(mat, std::vector<float>(mat->Channels(), 0.0),
         //                std::vector<float>(mat->Channels(), 1.0));
         // Compute `result = mat * alpha + beta` directly by channel
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        Convert::Run(&mat, alpha, beta);
+        Convert::Run(&image, alpha, beta);
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {
-            static_cast<float>(mat.rows),
-            static_cast<float>(mat.cols)
+            static_cast<float>(image.rows),
+            static_cast<float>(image.cols)
         };
 
-        HWC2CHW::Run(&mat);
-        Cast::Run(&mat, "float");
+        HWC2CHW::Run(&image);
+        Cast::Run(&image, "float");
 
-        if (!utils::mat_to_tensor(mat, output)) {
+        if (!utils::mat_to_tensor(image, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -135,10 +136,10 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetection::postprocess(
-        MDTensor& infer_result, DetectionLandmarkResult* result,
+        const MDTensor& infer_result, DetectionLandmarkResult* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
         const float conf_threshold, const float nms_iou_threshold) {
-        // infer_result: (1,n,14) 15=4+1+8+1
+        // infer_result: (1,n,15) 15=4+1+8+1+1
         if (infer_result.shape[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
         }
@@ -150,10 +151,10 @@ namespace modeldeploy::vision::lpr {
         // must be setup landmarks_per_face before reserve
         result->landmarks_per_instance = landmarks_per_card;
         result->reserve(static_cast<int>(infer_result.shape[1]));
-        auto* data = static_cast<float*>(infer_result.data());
+        auto* data = static_cast<const float*>(infer_result.data());
         // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf0(单层车牌),cls_conf1(双层车牌)
         for (size_t i = 0; i < infer_result.shape[1]; ++i) {
-            float* reg_cls_ptr = data + i * infer_result.shape[2];
+            const float* reg_cls_ptr = data + i * infer_result.shape[2];
             const float obj_conf = reg_cls_ptr[4];
             // const float cls_conf = reg_cls_ptr[13];
             // 0: 单层车牌
@@ -232,7 +233,7 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprDetection::predict(cv::Mat& image, DetectionLandmarkResult* result,
+    bool LprDetection::predict(const cv::Mat& image, DetectionLandmarkResult* result,
                                const float conf_threshold, const float nms_iou_threshold) {
         std::vector<MDTensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
@@ -246,8 +247,9 @@ namespace modeldeploy::vision::lpr {
             static_cast<float>(image.cols)
         };
 
-
-        if (!preprocess(image, &input_tensors[0], &im_info)) {
+        // 预处理会修改image的shape等等相关数据，为了保证原始图像不被修改，需要拷贝一份图像数据
+        cv::Mat image_bak = image;
+        if (!preprocess(image_bak, &input_tensors[0], &im_info)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

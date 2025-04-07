@@ -1,9 +1,0 @@
-
-add_executable(demo_face_as_second_cxx demo_face_as_second_cxx.cpp)
-target_link_libraries(demo_face_as_second_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_first_cxx demo_face_as_first_cxx.cpp)
-target_link_libraries(demo_face_as_first_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_pipeline_cxx demo_face_as_pipeline_cxx.cpp)
-target_link_libraries(demo_face_as_pipeline_cxx PUBLIC ${LIBRARY_NAME})

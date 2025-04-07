@@ -412,13 +412,21 @@ namespace modeldeploy::vision {
         embedding.assign(res.embedding.begin(), res.embedding.end());
     }
 
-    void FaceRecognitionResult::free() { std::vector<float>().swap(embedding); }
+    void FaceRecognitionResult::free() {
+        embedding.shrink_to_fit();
+    }
 
-    void FaceRecognitionResult::clear() { embedding.clear(); }
+    void FaceRecognitionResult::clear() {
+        embedding.clear();
+    }
 
-    void FaceRecognitionResult::reserve(const int size) { embedding.reserve(size); }
+    void FaceRecognitionResult::reserve(const size_t size) {
+        embedding.reserve(size);
+    }
 
-    void FaceRecognitionResult::resize(const int size) { embedding.resize(size); }
+    void FaceRecognitionResult::resize(const size_t size) {
+        embedding.resize(size);
+    }
 
     void FaceRecognitionResult::display() {
         tabulate::Table output_table;
@@ -426,8 +434,9 @@ namespace modeldeploy::vision {
                     .border_color(tabulate::Color::magenta)
                     .corner_color(tabulate::Color::magenta);
         output_table.add_row({"Dim", "Min", "Max", "Mean"});
+
         const auto max_it = std::max_element(embedding.begin(), embedding.end());
-        const auto min_it = std::max_element(embedding.begin(), embedding.end());
+        const auto min_it = std::min_element(embedding.begin(), embedding.end());
         const auto total_val = std::accumulate(embedding.begin(), embedding.end(), 0.0f);
         const float mean_val = total_val / static_cast<float>(embedding.size());
         output_table.add_row({
@@ -550,6 +559,5 @@ namespace modeldeploy::vision {
     }
 
     void FaceAntiSpoofResult::display() {
-
     }
 }

@@ -83,16 +83,16 @@ namespace modeldeploy {
 
         LogManager& operator=(const LogManager&) = delete;
 
-        inline static LogManager& getInstance() {
+        static LogManager& getInstance() {
             static LogManager instance;
             return instance;
         }
 
-        inline void set_log_level(LogLevel level) {
+        void set_log_level(LogLevel level) {
             current_level_ = level;
         }
 
-        inline LogStreamWrapper logStream(LogLevel level, const char* filename, const char* function, int line) const {
+        LogStreamWrapper logStream(LogLevel level, const char* filename, const char* function, int line) const {
             if (current_level_ == LogLevel::MD_LOG_NONE || level < current_level_) {
                 return LogStreamWrapper(nullptr);
             }

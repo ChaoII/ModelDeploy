@@ -30,7 +30,7 @@ namespace modeldeploy::vision::utils {
     std::vector<float> compute_sqrt(const std::vector<float> &vec);
 
     MODELDEPLOY_CXX_EXPORT std::vector<cv::Mat> align_face_with_five_points(
-            cv::Mat &image, DetectionLandmarkResult &result,
+            const cv::Mat &image, DetectionLandmarkResult &result,
             std::vector<std::array<float, 2>> std_landmarks =
                     {
                             {89.3095f,  72.9025f},
