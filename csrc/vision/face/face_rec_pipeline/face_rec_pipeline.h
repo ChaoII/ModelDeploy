@@ -8,7 +8,7 @@
 #include "csrc/base_model.h"
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/face/face_det/scrfd.h"
-#include "csrc/vision/face/face_id/seetaface.h"
+#include "csrc/vision/face/face_rec/seetaface.h"
 
 namespace modeldeploy::vision::face {
     class MODELDEPLOY_CXX_EXPORT FaceRecognizerPipeline : public BaseModel {

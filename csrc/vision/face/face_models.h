@@ -10,4 +10,4 @@
 #include "csrc/vision/face/face_as/face_as_second.h"
 #include "csrc/vision/face/face_as/face_as_pipeline.h"
 #include "csrc/vision/face/face_gender/seetaface_gender.h"
-#include "csrc/vision/face/face_id/seetaface.h"
+#include "csrc/vision/face/face_rec/seetaface.h"

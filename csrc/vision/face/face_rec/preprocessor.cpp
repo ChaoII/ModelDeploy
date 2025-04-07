@@ -8,7 +8,7 @@
 #include "csrc/vision/common/processors/hwc2chw.h"
 #include "csrc/vision/common/processors/cast.h"
 #include "csrc/vision/common/processors/center_crop.h"
-#include "csrc/vision/face/face_id/preprocessor.h"
+#include "csrc/vision/face/face_rec/preprocessor.h"
 
 
 namespace modeldeploy::vision::face {
@@ -57,4 +57,4 @@ namespace modeldeploy::vision::face {
         (*outputs)[0] = std::move(tensors[0]);
         return true;
     }
-} // namespace modeldeploy::vision::face_id
+} // namespace modeldeploy::vision::face_rec

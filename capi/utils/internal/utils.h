@@ -9,6 +9,8 @@
 #include "seeta/CStruct.h"
 #endif
 
+#include "csrc/vision/common/result.h"
+
 #include "capi/common/md_types.h"
 
 ///
@@ -149,3 +151,25 @@ cv::Scalar get_random_color();
 cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon);
 
 
+//---------------------------for result type--------------------------------
+
+using namespace modeldeploy::vision;
+
+void detection_landmark_result_2_c_results(
+    const DetectionLandmarkResult& result,
+    MDDetectionLandmarkResults* c_results);
+
+
+void c_results_2_detection_landmark_result(
+    const MDDetectionLandmarkResults* c_results,
+    DetectionLandmarkResult* result);
+
+
+void face_recognizer_result_2_c_result(
+    const FaceRecognitionResult& result,
+    MDFaceRecognizerResult* c_result);
+
+
+void c_result_2_face_recognizer_result(
+    const MDFaceRecognizerResult* c_result,
+    FaceRecognitionResult* result);

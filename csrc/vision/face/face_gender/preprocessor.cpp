@@ -46,4 +46,4 @@ namespace modeldeploy::vision::face {
         (*outputs)[0] = std::move(tensors[0]);
         return true;
     }
-} // namespace modeldeploy::vision::face_id
+} // namespace modeldeploy::vision::face_rec

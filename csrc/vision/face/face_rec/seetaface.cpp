@@ -4,7 +4,7 @@
 
 
 #include "csrc/core/md_log.h"
-#include "csrc/vision/face/face_id/seetaface.h"
+#include "csrc/vision/face/face_rec/seetaface.h"
 
 namespace modeldeploy::vision::face {
     SeetaFaceID::SeetaFaceID(

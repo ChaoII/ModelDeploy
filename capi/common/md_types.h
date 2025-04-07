@@ -35,20 +35,7 @@ enum MDStatusCode {
     MemoryAllocatedFailed,
     OCRDetModelInitializeFailed,
     OCRRecModelInitializeFailed,
-
     ModelTypeError,
-    NotFoundLandmark,
-    NotFoundFace,
-    FaceFeatureExtractError,
-
-    FaceDetectionFlagNotSetError,
-    FaceLandmarkFlagNotSetError,
-    FaceRecognitionFlagNotSetError,
-    FaceAntiSpoofingFlagNotSetError,
-    FaceQualityEvaluateFlagNotSetError,
-    FaceAgeAttributeFlagNotSetError,
-    FaceGenderAttributeFlagNotSetError,
-    FaceEyeStateFlagNotSetError,
 };
 
 typedef struct {
@@ -163,6 +150,14 @@ typedef struct {
     float score;
 } MDDetectionResult;
 
+typedef struct {
+    MDRect box;
+    MDPoint* landmarks;
+    int landmarks_size;
+    int label_id;
+    float score;
+} MDDetectionLandmarkResult;
+
 
 typedef struct {
     MDDetectionResult* data;
@@ -170,14 +165,20 @@ typedef struct {
 } MDDetectionResults;
 
 typedef struct {
-    MDPointF* data;
+    MDDetectionLandmarkResult* data;
     int size;
-} MDLandMarkResult;
+} MDDetectionLandmarkResults;
+
 
 typedef struct {
-    float* data;
+    float* embedding;
     int size;
-} MDFaceFeature;
+} MDFaceRecognizerResult;
+
+typedef struct {
+    MDFaceRecognizerResult* data;
+    int size;
+} MDFaceRecognizerResults;
 
 
 enum MDFaceAntiSpoofingResult {

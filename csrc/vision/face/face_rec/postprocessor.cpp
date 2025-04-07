@@ -6,7 +6,7 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/utils.h"
 #include "csrc/core/md_type.h"
-#include "csrc/vision/face/face_id/postprocessor.h"
+#include "csrc/vision/face/face_rec/postprocessor.h"
 
 
 namespace modeldeploy::vision::face {

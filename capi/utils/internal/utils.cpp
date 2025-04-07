@@ -150,3 +150,69 @@ cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon
     return dst_img;
 }
 
+void detection_landmark_result_2_c_results(
+    const DetectionLandmarkResult& result,
+    MDDetectionLandmarkResults* c_results) {
+    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->data = new MDDetectionLandmarkResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        auto [xmin, ymin, xmax, ymax] = result.boxes[i];
+        c_results->data[i].box = MDRect{
+            static_cast<int>(xmin),
+            static_cast<int>(ymin),
+            static_cast<int>(xmax - xmin),
+            static_cast<int>(ymax - ymin)
+        };
+        c_results->data[i].label_id = result.label_ids[i];
+        c_results->data[i].score = result.scores[i];
+        const int landmark_size = result.landmarks_per_instance;
+        c_results->data[i].landmarks_size = landmark_size;
+        c_results->data[i].landmarks = new MDPoint[landmark_size];
+        for (int j = 0; j < landmark_size; j++) {
+            c_results->data[i].landmarks[j] = MDPoint{
+                static_cast<int>(result.landmarks[i * landmark_size + j][0]),
+                static_cast<int>(result.landmarks[i * landmark_size + j][1])
+            };
+        }
+    }
+}
+
+void c_results_2_detection_landmark_result(const MDDetectionLandmarkResults* c_results,
+                                           DetectionLandmarkResult* result) {
+    result->reserve(c_results->size);
+    result->landmarks_per_instance = c_results->data[0].landmarks_size;
+    for (int i = 0; i < c_results->size; i++) {
+        result->boxes.emplace_back(std::array<float, 4>{
+                static_cast<float>(c_results->data[i].box.x),
+                static_cast<float>(c_results->data[i].box.y),
+                static_cast<float>(c_results->data[i].box.x) + c_results->data[i].box.width,
+                static_cast<float>(c_results->data[i].box.y) + c_results->data[i].box.height
+            }
+        );
+        result->label_ids.emplace_back(c_results->data[i].label_id);
+        result->scores.emplace_back(c_results->data[i].score);
+        for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
+            result->landmarks.emplace_back(
+                std::array<float, 2>{
+                    static_cast<float>(c_results->data[i].landmarks[j].x),
+                    static_cast<float>(c_results->data[i].landmarks[j].y)
+                }
+            );
+        }
+    }
+}
+
+void face_recognizer_result_2_c_result(
+    const FaceRecognitionResult& result, MDFaceRecognizerResult* c_result) {
+    c_result->size = static_cast<int>(result.embedding.size());
+    c_result->embedding = new float[c_result->size];
+    std::copy(result.embedding.begin(), result.embedding.end(), c_result->embedding);
+}
+
+
+void c_result_2_face_recognizer_result(
+    const MDFaceRecognizerResult* c_result,
+    FaceRecognitionResult* result) {
+    result->resize(c_result->size);
+    result->embedding.assign(c_result->embedding, c_result->embedding + c_result->size);
+}
