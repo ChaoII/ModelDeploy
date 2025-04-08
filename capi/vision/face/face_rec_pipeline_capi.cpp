@@ -12,7 +12,7 @@
 MDStatusCode md_create_face_rec_pipeline_model(MDModel* model,
                                                const char* face_det_model_file,
                                                const char* face_rec_model_file,
-                                               int thread_num) {
+                                               const int thread_num) {
     const auto face_rec_pipeline_model = new modeldeploy::vision::face::FaceRecognizerPipeline(
         face_det_model_file, face_rec_model_file, thread_num);
     model->format = MDModelFormat::ONNX;
@@ -30,7 +30,7 @@ MDStatusCode md_face_rec_pipeline_predict(const MDModel* model, MDImage* image, 
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    const auto cv_image = md_image_to_mat(image);
     const auto face_rec_pipeline_model = static_cast<
         modeldeploy::vision::face::FaceRecognizerPipeline*>(model->model_content);
 
@@ -40,16 +40,13 @@ MDStatusCode md_face_rec_pipeline_predict(const MDModel* model, MDImage* image, 
         return MDStatusCode::ModelPredictFailed;
     }
 
-    face_recognizer_result_2_c_results(results, c_results);
+    face_recognizer_results_2_c_results(results, c_results);
     return MDStatusCode::Success;
 }
 
 void md_print_face_rec_pipeline_result(const MDFaceRecognizerResults* c_results) {
     std::vector<FaceRecognitionResult> results;
-    std::cout << "===========1============" << std::endl;
-    c_results_2_face_recognizer_result(c_results, &results);
-    std::cout << "===========2============" << std::endl;
-
+    c_results_2_face_recognizer_results(c_results, &results);
     for (auto& result : results) {
         result.display();
     }

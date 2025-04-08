@@ -175,11 +175,11 @@ void c_result_2_face_recognizer_result(
     FaceRecognitionResult* result);
 
 
-void face_recognizer_result_2_c_results(
-    const std::vector<FaceRecognitionResult>& result,
+void face_recognizer_results_2_c_results(
+    const std::vector<FaceRecognitionResult>& results,
     MDFaceRecognizerResults* c_results);
 
 
-void c_results_2_face_recognizer_result(
+void c_results_2_face_recognizer_results(
     const MDFaceRecognizerResults* c_results,
     std::vector<FaceRecognitionResult>* results);

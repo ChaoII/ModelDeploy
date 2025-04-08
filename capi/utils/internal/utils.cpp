@@ -150,6 +150,7 @@ cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon
     return dst_img;
 }
 
+// 注意开辟内存需要成对的销毁
 void detection_landmark_result_2_c_results(
     const DetectionLandmarkResult& result,
     MDDetectionLandmarkResults* c_results) {
@@ -202,6 +203,7 @@ void c_results_2_detection_landmark_result(const MDDetectionLandmarkResults* c_r
     }
 }
 
+// 注意开辟内存需要成对的销毁
 void face_recognizer_result_2_c_result(
     const FaceRecognitionResult& result, MDFaceRecognizerResult* c_result) {
     c_result->size = static_cast<int>(result.embedding.size());
@@ -217,25 +219,26 @@ void c_result_2_face_recognizer_result(
     result->embedding.assign(c_result->embedding, c_result->embedding + c_result->size);
 }
 
-
-void face_recognizer_result_2_c_results(
-    const std::vector<FaceRecognitionResult>& result, MDFaceRecognizerResults* c_results) {
-    c_results->size = static_cast<int>(result.size());
-    c_results->data = new MDFaceRecognizerResult[result.size()];
-    for (int i = 0; i < result.size(); i++) {
-        c_results->data[i].embedding = new float[result[i].embedding.size()];
-        std::copy(result[i].embedding.begin(), result[i].embedding.end(), c_results->data[i].embedding);
-        c_results->data[i].size = static_cast<int>(result[i].embedding.size());
+// 注意开辟内存需要成对的销毁
+void face_recognizer_results_2_c_results(
+    const std::vector<FaceRecognitionResult>& results, MDFaceRecognizerResults* c_results) {
+    c_results->size = static_cast<int>(results.size());
+    c_results->data = new MDFaceRecognizerResult[results.size()];
+    for (int i = 0; i < results.size(); i++) {
+        c_results->data[i].embedding = new float[results[i].embedding.size()];
+        std::copy(results[i].embedding.begin(), results[i].embedding.end(), c_results->data[i].embedding);
+        c_results->data[i].size = static_cast<int>(results[i].embedding.size());
     }
 }
 
-void c_results_2_face_recognizer_result(
+void c_results_2_face_recognizer_results(
     const MDFaceRecognizerResults* c_results,
     std::vector<FaceRecognitionResult>* results) {
     results->resize(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        results->at(i).resize(c_results->data[i].size);
+        const size_t embedding_dim = c_results->data[i].size;
+        results->at(i).resize(embedding_dim);
         results->at(i).embedding.assign(c_results->data[i].embedding,
-                                        c_results->data[i].embedding + c_results->data[i].size);
+                                        c_results->data[i].embedding + embedding_dim);
     }
 }
