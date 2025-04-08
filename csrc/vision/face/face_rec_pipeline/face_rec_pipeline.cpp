@@ -42,10 +42,6 @@ namespace modeldeploy::vision::face {
         const size_t lp_num = aligned_images.size();
         results->reserve(lp_num);
         for (const auto & aligned_image : aligned_images) {
-
-            cv::imshow("123", aligned_image);
-            cv::waitKey(0);
-
             FaceRecognitionResult tmp_result;
             recognizer_->predict(aligned_image, &tmp_result);
             results->emplace_back(tmp_result);

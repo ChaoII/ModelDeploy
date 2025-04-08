@@ -17,7 +17,7 @@ namespace modeldeploy::vision::face {
 
     bool SeetaFaceID::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize modeldelpoy backend." << std::endl;
             return false;
         }
         return true;

@@ -1,5 +1,5 @@
 //
-// Created by AC on 2024-12-17.
+// Created by aichao on 2025-4-7.
 //
 
 
@@ -27,7 +27,7 @@ MDStatusCode md_create_face_gender_model(MDModel* model, const char* model_path,
 
 
 MDStatusCode md_face_gender_predict(const MDModel* model, MDImage* image, MDFaceGenderResult* c_result) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
     auto cv_image = md_image_to_mat(image);
@@ -36,6 +36,7 @@ MDStatusCode md_face_gender_predict(const MDModel* model, MDImage* image, MDFace
     if (const bool res_status = face_gender_model->predict(cv_image, &gender_id); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
+    std::cout << "gender_id: " << gender_id << std::endl;
     *c_result = static_cast<MDFaceGenderResult>(gender_id);
     return MDStatusCode::Success;
 }

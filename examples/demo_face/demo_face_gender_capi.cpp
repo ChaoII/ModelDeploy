@@ -8,7 +8,7 @@
 int main() {
     MDModel model;
     md_create_face_gender_model(&model, "../../test_data/test_models/face/gender_predictor.onnx");
-    MDImage image = md_read_image("../../test_data/test_images/test_face_id1.jpg");
+    MDImage image = md_read_image("../../test_data/test_images/test_face_gender.jpg");
     MDFaceGenderResult c_result;
     md_face_gender_predict(&model, &image, &c_result);
     std::cout << "gender is: " << c_result << std::endl;

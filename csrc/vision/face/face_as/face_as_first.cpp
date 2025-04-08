@@ -36,7 +36,7 @@ namespace modeldeploy::vision::face {
         }
         else {
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
-                "now, resize to 256 and may loss predict precision";
+                "now, resize to 256 and may loss predict precision" << std::endl;
             Resize::Run(mat, 256, 256);
             CenterCrop::Run(mat, size_[0], size_[1]);
         }

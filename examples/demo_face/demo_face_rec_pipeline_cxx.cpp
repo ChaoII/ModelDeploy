@@ -26,7 +26,6 @@ int main() {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
-    std::cout << ress.size() << std::endl;
     for (auto& res : ress) {
         res.display();
     }

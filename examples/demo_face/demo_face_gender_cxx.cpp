@@ -9,7 +9,7 @@ int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceGender(
         "../../test_data/test_models/face/gender_predictor.onnx");
     assert(table_model.Initialized());
-    const auto im0 = cv::imread("../../test_data/test_images/test_face_gender.jpg");
+    const auto im0 = cv::imread("../../test_data/test_images/test_face_id1.jpg");
     int gender_id = 0;
     if (!faceid_model.predict(im0, &gender_id)) {
         std::cerr << "Failed to predict." << std::endl;

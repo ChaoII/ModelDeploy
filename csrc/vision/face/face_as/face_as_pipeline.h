@@ -34,6 +34,7 @@ namespace modeldeploy::vision::face {
          * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] results The output face FaceAntiSpoof result will be writen to this structure
          * \param fuse_threshold
+         * \param clarity_threshold
          * \return true if the prediction successed, otherwise false
          */
         bool predict(cv::Mat& im, FaceAntiSpoofResult* results, float fuse_threshold = 0.8f, float clarity_threshold = 0.3);

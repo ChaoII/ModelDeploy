@@ -9,7 +9,7 @@ int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceAntiSpoofFirst(
         "../../test_data/test_models/face/fas_first.onnx");
     assert(table_model.Initialized());
-    auto im0 = cv::imread("../../test_data/test_images/test_face_id.jpg");
+    auto im0 = cv::imread("../../test_data/test_images/test_face_id4.jpg");
     float result;
     if (!faceid_model.predict(im0, &result)) {
         std::cerr << "Failed to predict." << std::endl;

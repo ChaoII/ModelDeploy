@@ -183,17 +183,32 @@ typedef struct {
 
 typedef int MDFaceAgeResult;
 
+typedef struct {
+    int label_id;
+    float score;
+} MDFaceAsSecondResult;
+
+typedef struct {
+    MDFaceAsSecondResult* data;
+    int size;
+} MDFaceAsSecondResults;
+
 enum MDFaceGenderResult {
     FEMALE = 0,
     MALE = 1
 };
 
-enum MDFaceAntiSpoofingResult {
+enum MDFaceAsResult {
     REAL = 0,
-    SPOOF = 1,
-    FUZZY = 2,
-    DETECTING = 3
+    FUZZY = 1,
+    SPOOF = 2
 };
+
+typedef struct {
+    MDFaceAsResult* data;
+    int size;
+} MDFaceAsResults;
+
 
 enum MDFaceQualityEvaluateType {
     BRIGHTNESS = 0,

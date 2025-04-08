@@ -1,5 +1,5 @@
 //
-// Created by AC on 2024-12-17.
+// Created by aichao on 2025-4-7.
 //
 
 
@@ -27,7 +27,7 @@ MDStatusCode md_create_face_age_model(MDModel* model, const char* model_path,
 
 
 MDStatusCode md_face_age_predict(const MDModel* model, MDImage* image, MDFaceAgeResult* c_result) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
     auto cv_image = md_image_to_mat(image);

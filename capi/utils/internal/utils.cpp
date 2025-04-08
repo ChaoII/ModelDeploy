@@ -216,3 +216,26 @@ void c_result_2_face_recognizer_result(
     result->resize(c_result->size);
     result->embedding.assign(c_result->embedding, c_result->embedding + c_result->size);
 }
+
+
+void face_recognizer_result_2_c_results(
+    const std::vector<FaceRecognitionResult>& result, MDFaceRecognizerResults* c_results) {
+    c_results->size = static_cast<int>(result.size());
+    c_results->data = new MDFaceRecognizerResult[result.size()];
+    for (int i = 0; i < result.size(); i++) {
+        c_results->data[i].embedding = new float[result[i].embedding.size()];
+        std::copy(result[i].embedding.begin(), result[i].embedding.end(), c_results->data[i].embedding);
+        c_results->data[i].size = static_cast<int>(result[i].embedding.size());
+    }
+}
+
+void c_results_2_face_recognizer_result(
+    const MDFaceRecognizerResults* c_results,
+    std::vector<FaceRecognitionResult>* results) {
+    results->resize(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        results->at(i).resize(c_results->data[i].size);
+        results->at(i).embedding.assign(c_results->data[i].embedding,
+                                        c_results->data[i].embedding + c_results->data[i].size);
+    }
+}

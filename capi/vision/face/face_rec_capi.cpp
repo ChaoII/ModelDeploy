@@ -1,9 +1,8 @@
 //
-// Created by AC on 2024-12-17.
+// Created by aichao on 2025-4-7.
 //
 
 
-#include <map>
 #include "csrc/vision.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
@@ -27,10 +26,10 @@ MDStatusCode md_create_face_rec_model(MDModel* model, const char* model_path,
 
 
 MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRecognizerResult* c_result) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    const auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::FaceRecognitionResult result;
     const auto face_rec_model = static_cast<modeldeploy::vision::face::SeetaFaceID*>(model->model_content);
     if (const bool res_status = face_rec_model->predict(cv_image, &result); !res_status) {
@@ -42,10 +41,9 @@ MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRec
 
 
 void md_print_face_rec_result(const MDFaceRecognizerResult* c_result) {
-    const auto result = new modeldeploy::vision::FaceRecognitionResult();
-    c_result_2_face_recognizer_result(c_result, result);
-    result->display();
-    delete result;
+    modeldeploy::vision::FaceRecognitionResult result;
+    c_result_2_face_recognizer_result(c_result, &result);
+    result.display();
 }
 
 
