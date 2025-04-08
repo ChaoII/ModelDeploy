@@ -3,7 +3,6 @@
 //
 
 
-#include <map>
 #include "csrc/vision.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
@@ -30,13 +29,12 @@ MDStatusCode md_face_gender_predict(const MDModel* model, MDImage* image, MDFace
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    const auto cv_image = md_image_to_mat(image);
     const auto face_gender_model = static_cast<modeldeploy::vision::face::SeetaFaceGender*>(model->model_content);
     int gender_id;
     if (const bool res_status = face_gender_model->predict(cv_image, &gender_id); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
-    std::cout << "gender_id: " << gender_id << std::endl;
     *c_result = static_cast<MDFaceGenderResult>(gender_id);
     return MDStatusCode::Success;
 }

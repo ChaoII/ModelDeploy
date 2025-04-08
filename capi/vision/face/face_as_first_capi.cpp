@@ -3,7 +3,6 @@
 //
 
 
-#include <map>
 #include "csrc/vision.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"

@@ -4,7 +4,6 @@
 
 
 #include <map>
-#include <tabulate/tabulate.hpp>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
 #include "capi/common/md_micro.h"
