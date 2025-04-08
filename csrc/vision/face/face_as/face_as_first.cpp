@@ -12,14 +12,14 @@
 
 
 namespace modeldeploy::vision::face {
-    SeetaFaceAntiSpoofFirst::SeetaFaceAntiSpoofFirst(const std::string& model_file,
+    SeetaFaceAsFirst::SeetaFaceAsFirst(const std::string& model_file,
                                                      const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = Initialize();
     }
 
-    bool SeetaFaceAntiSpoofFirst::Initialize() {
+    bool SeetaFaceAsFirst::Initialize() {
         if (!init_runtime()) {
             MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
@@ -27,7 +27,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofFirst::preprocess(cv::Mat* mat, MDTensor* output) {
+    bool SeetaFaceAsFirst::preprocess(cv::Mat* mat, MDTensor* output) {
         if (mat->rows == 256 && mat->cols == 256) {
             CenterCrop::Run(mat, size_[0], size_[1]);
         }
@@ -52,13 +52,13 @@ namespace modeldeploy::vision::face {
     }
 
 
-    bool SeetaFaceAntiSpoofFirst::postprocess(const std::vector<MDTensor>& infer_result, float* result) {
+    bool SeetaFaceAsFirst::postprocess(const std::vector<MDTensor>& infer_result, float* result) {
         const MDTensor& infer_result_ = infer_result[0];
         *result = static_cast<float*>(infer_result_.buffer_)[1];
         return true;
     }
 
-    bool SeetaFaceAntiSpoofFirst::predict(cv::Mat& im, float* result) {
+    bool SeetaFaceAsFirst::predict(cv::Mat& im, float* result) {
         std::vector<MDTensor> input_tensors(1);
         if (!preprocess(&im, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;

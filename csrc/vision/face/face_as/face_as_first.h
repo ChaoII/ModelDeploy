@@ -10,14 +10,14 @@
 namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.
              */
-    class MODELDEPLOY_CXX_EXPORT SeetaFaceAntiSpoofFirst : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceAsFirst : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
          *
          * \param[in] model_file Path of model file, e.g ./scrfd.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu
          */
-        explicit SeetaFaceAntiSpoofFirst(const std::string &model_file,
+        explicit SeetaFaceAsFirst(const std::string &model_file,
                                          const RuntimeOption &custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "face_as_first"; }

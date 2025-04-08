@@ -14,7 +14,7 @@ MDStatusCode md_create_face_as_first_model(MDModel* model, const char* model_pat
                                            const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto face_as_first_model = new modeldeploy::vision::face::SeetaFaceAntiSpoofFirst(model_path, option);
+    const auto face_as_first_model = new modeldeploy::vision::face::SeetaFaceAsFirst(model_path, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_as_first_model->name().c_str());
     model->model_content = face_as_first_model;
@@ -31,7 +31,7 @@ MDStatusCode md_face_as_first_predict(const MDModel* model, MDImage* image, floa
         return MDStatusCode::ModelTypeError;
     }
     auto cv_image = md_image_to_mat(image);
-    const auto face_as_first_model = static_cast<modeldeploy::vision::face::SeetaFaceAntiSpoofFirst*>(model->
+    const auto face_as_first_model = static_cast<modeldeploy::vision::face::SeetaFaceAsFirst*>(model->
         model_content);
     if (const bool res_status = face_as_first_model->predict(cv_image, c_result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
@@ -42,7 +42,7 @@ MDStatusCode md_face_as_first_predict(const MDModel* model, MDImage* image, floa
 
 void md_free_face_as_first_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::face::SeetaFaceAntiSpoofFirst*>(model->model_content);
+        delete static_cast<modeldeploy::vision::face::SeetaFaceAsFirst*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

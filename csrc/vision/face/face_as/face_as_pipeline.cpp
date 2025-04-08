@@ -20,8 +20,8 @@ namespace modeldeploy::vision::face {
         RuntimeOption option;
         option.set_cpu_thread_num(thread_num);
         face_det_ = std::make_unique<SCRFD>(face_det_model_file, option);
-        face_as_first_ = std::make_unique<SeetaFaceAntiSpoofFirst>(first_model_file, option);
-        face_as_second_ = std::make_unique<SeetaFaceAntiSpoofSecond>(second_model_file, option);
+        face_as_first_ = std::make_unique<SeetaFaceAsFirst>(first_model_file, option);
+        face_as_second_ = std::make_unique<SeetaFaceAsSecond>(second_model_file, option);
     }
 
 

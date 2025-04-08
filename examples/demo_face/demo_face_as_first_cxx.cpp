@@ -6,7 +6,7 @@
 #include "csrc/vision.h"
 
 int main() {
-    auto faceid_model = modeldeploy::vision::face::SeetaFaceAntiSpoofFirst(
+    auto faceid_model = modeldeploy::vision::face::SeetaFaceAsFirst(
         "../../test_data/test_models/face/fas_first.onnx");
     assert(table_model.Initialized());
     auto im0 = cv::imread("../../test_data/test_images/test_face_id4.jpg");

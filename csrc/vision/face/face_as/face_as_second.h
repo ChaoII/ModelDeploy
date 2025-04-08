@@ -10,14 +10,14 @@
 namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.
              */
-    class MODELDEPLOY_CXX_EXPORT SeetaFaceAntiSpoofSecond : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT SeetaFaceAsSecond : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
          *
          * \param[in] model_file Path of model file, e.g ./scrfd.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        explicit SeetaFaceAntiSpoofSecond(const std::string &model_file,
+        explicit SeetaFaceAsSecond(const std::string &model_file,
                                           const RuntimeOption &custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "face_as_second"; }

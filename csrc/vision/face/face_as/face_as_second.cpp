@@ -15,14 +15,14 @@
 
 
 namespace modeldeploy::vision::face {
-    SeetaFaceAntiSpoofSecond::SeetaFaceAntiSpoofSecond(const std::string& model_file,
+    SeetaFaceAsSecond::SeetaFaceAsSecond(const std::string& model_file,
                                                        const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = Initialize();
     }
 
-    bool SeetaFaceAntiSpoofSecond::Initialize() {
+    bool SeetaFaceAsSecond::Initialize() {
         if (!init_runtime()) {
             MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
@@ -30,7 +30,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofSecond::preprocess(cv::Mat* mat, MDTensor* output) {
+    bool SeetaFaceAsSecond::preprocess(cv::Mat* mat, MDTensor* output) {
         std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         std::vector beta_ = {-1.0f, -1.0f, -1.0f};
 
@@ -48,7 +48,7 @@ namespace modeldeploy::vision::face {
     }
 
 
-    bool SeetaFaceAntiSpoofSecond::postprocess(
+    bool SeetaFaceAsSecond::postprocess(
         const std::vector<MDTensor>& infer_result, std::vector<std::tuple<int, float>>* result) {
         const auto& class_predictions = infer_result[0];
         const auto& box_encodings = infer_result[1];
@@ -70,7 +70,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAntiSpoofSecond::predict(cv::Mat& im, std::vector<std::tuple<int, float>>* result) {
+    bool SeetaFaceAsSecond::predict(cv::Mat& im, std::vector<std::tuple<int, float>>* result) {
         std::vector<MDTensor> input_tensors(1);
         if (!preprocess(&im, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;

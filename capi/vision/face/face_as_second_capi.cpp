@@ -14,7 +14,7 @@ MDStatusCode md_create_face_as_second_model(MDModel* model, const char* model_pa
                                             const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto face_as_second_model = new modeldeploy::vision::face::SeetaFaceAntiSpoofSecond(model_path, option);
+    const auto face_as_second_model = new modeldeploy::vision::face::SeetaFaceAsSecond(model_path, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_as_second_model->name().c_str());
     model->model_content = face_as_second_model;
@@ -32,7 +32,7 @@ MDStatusCode md_face_as_second_predict(const MDModel* model, MDImage* image, MDF
     }
     auto cv_image = md_image_to_mat(image);
     const auto face_as_second_model = static_cast<
-        modeldeploy::vision::face::SeetaFaceAntiSpoofSecond*>(model->model_content);
+        modeldeploy::vision::face::SeetaFaceAsSecond*>(model->model_content);
 
     std::vector<std::tuple<int, float>> result;
     if (const bool res_status = face_as_second_model->predict(cv_image, &result); !res_status) {
@@ -57,7 +57,7 @@ void md_free_face_as_second_result(MDFaceAsSecondResults* c_results) {
 
 void md_free_face_as_second_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::face::SeetaFaceAntiSpoofSecond*>(model->model_content);
+        delete static_cast<modeldeploy::vision::face::SeetaFaceAsSecond*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {
