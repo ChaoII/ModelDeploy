@@ -12,7 +12,7 @@ int main() {
     auto model = modeldeploy::vision::lpr::LprDetection("../../test_data/test_models/yolov5plate.onnx");
 
     auto im = cv::imread("../../test_data/test_images/test_lpr_pipeline2.jpg");
-    const auto im_bak = im.clone();
+    auto im_bak = im.clone();
 
     modeldeploy::vision::DetectionLandmarkResult res;
     if (!model.predict(im, &res)) {
@@ -20,8 +20,8 @@ int main() {
         return -1;
     }
     res.display();
-    const auto image = VisFaceDetection(im_bak, res,
-                                        "../../test_data/msyh.ttc", 14, 2, 0.3, true);
+    const auto image = modeldeploy::vision::vis_face_det(im_bak, res,
+                                                    "../../test_data/msyh.ttc", 14, 2, 0.3, true);
 
     // cv::resize(image, image, cv::Size(0, 0), 0.5, 0.5);
 

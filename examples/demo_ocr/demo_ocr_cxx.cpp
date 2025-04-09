@@ -21,7 +21,7 @@ int main() {
     modeldeploy::vision::OCRResult result;
     ocr.predict(img, &result);
     std::cout << result.str() << std::endl;
-    auto vis_image = modeldeploy::vision::VisOcr(img, result, "../../test_data/msyh.ttc", 14, 0.5, 0);
+    auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc", 14, 0.5, 0);
     cv::imshow("test", vis_image);
     cv::waitKey(0);
 }
