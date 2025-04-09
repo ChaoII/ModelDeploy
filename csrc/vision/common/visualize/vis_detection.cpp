@@ -8,9 +8,9 @@
 
 
 namespace modeldeploy::vision {
-    cv::Mat VisDetection(cv::Mat cv_image, const DetectionResult& result,
-                         const std::string& font_path, const int font_size,
-                         const double alpha, const int save_result) {
+    cv::Mat vis_detection(cv::Mat& cv_image, const DetectionResult& result,
+                          const std::string& font_path, const int font_size,
+                          const double alpha, const int save_result) {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);

@@ -71,7 +71,7 @@ namespace modeldeploy::vision {
         std::vector<float> scores;
         /// The classify label for all the detected objects
         std::vector<int32_t> label_ids;
-        /** \brief For instance segmentation model, `masks` is the predict mask for all the deteced objects
+        /** \brief For instance segmentation model, `masks` is the predict mask for all the detected objects
          */
         std::vector<Mask> masks;
         /// Shows if the DetectionResult has mask

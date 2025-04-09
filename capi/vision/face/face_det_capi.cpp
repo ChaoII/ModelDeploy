@@ -55,7 +55,7 @@ void md_draw_face_det_result(const MDImage* image, const MDDetectionLandmarkResu
     auto cv_image = md_image_to_mat(image);
     const auto result = new modeldeploy::vision::DetectionLandmarkResult();
     c_results_2_detection_landmark_result(c_results, result);
-    modeldeploy::vision::VisFaceDetection(cv_image, *result, font_path, font_size, landmark_radius, alpha, save_result);
+    modeldeploy::vision::vis_face_det(cv_image, *result, font_path, font_size, landmark_radius, alpha, save_result);
 }
 
 

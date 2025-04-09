@@ -28,33 +28,33 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_set_detection_input_size(const MDModel* 
                                                                  MDSize size);
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_detection_model创建的模型
-/// \param results 检测结果结构体，请在调用该方法前申请内存，该方法会在内部申请内存，并释放
+/// \param c_results 检测结果结构体，请在调用该方法前申请内存，该方法会在内部申请内存，并释放
 /// \param image 原始图像
 /// \return MDStatusCode::Success 成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_detection_predict(const MDModel* model,
                                                           MDImage* image,
-                                                          MDDetectionResults* results);
+                                                          MDDetectionResults* c_results);
 
 /// 打印检测结果
-MODELDEPLOY_CAPI_EXPORT void md_print_detection_result(const MDDetectionResults* result);
+MODELDEPLOY_CAPI_EXPORT void md_print_detection_result(const MDDetectionResults* c_results);
 
 /// 绘制检测结果
 /// \param image 原始图像
-/// \param result 检测结果
+/// \param c_results 检测结果
 /// \param font_path 字体路径
 /// \param font_size 字体大小
 /// \param alpha 不透明度
 /// \param save_result 保存结果, 如果>0将保存绘制后的图片vis_result.jpg
 MODELDEPLOY_CAPI_EXPORT void md_draw_detection_result(const MDImage* image,
-                                                      const MDDetectionResults* result,
+                                                      const MDDetectionResults* c_results,
                                                       const char* font_path,
                                                       int font_size,
                                                       double alpha,
                                                       int save_result);
 
 /// 释放检测结果
-/// @param result 由md_detection_predict生成的检测结果
-MODELDEPLOY_CAPI_EXPORT void md_free_detection_result(MDDetectionResults* result);
+/// @param c_results 由md_detection_predict生成的检测结果
+MODELDEPLOY_CAPI_EXPORT void md_free_detection_result(MDDetectionResults* c_results);
 
 /// 释放检测模型
 /// @param model 由create_detection_model创建的模型

@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <random>
+#include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 
 
@@ -150,6 +151,91 @@ cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon
     return dst_img;
 }
 
+
+// 注意开辟内存需要成对的销毁
+void detection_result_2_c_results(
+    const DetectionResult& result,
+    MDDetectionResults* c_results) {
+    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->data = new MDDetectionResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        auto [xmin, ymin, xmax, ymax] = result.boxes[i];
+        c_results->data[i].box = MDRect{
+            static_cast<int>(xmin),
+            static_cast<int>(ymin),
+            static_cast<int>(xmax - xmin),
+            static_cast<int>(ymax - ymin)
+        };
+        c_results->data[i].score = result.scores[i];
+        c_results->data[i].label_id = result.label_ids[i];
+    }
+}
+
+
+void c_results_2_detection_result(
+    const MDDetectionResults* c_results,
+    DetectionResult* result) {
+    result->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        auto [x, y, width, height] = c_results->data[i].box;
+        auto box = std::array<float, 4>{
+            static_cast<float>(x),
+            static_cast<float>(y),
+            static_cast<float>(x + width),
+            static_cast<float>(y + height)
+        };
+        result->boxes.emplace_back(box);
+        result->scores.emplace_back(c_results->data[i].score);
+        result->label_ids.emplace_back(c_results->data[i].label_id);
+    }
+}
+
+void ocr_result_2_c_results(
+    const OCRResult& result,
+    MDOCRResults* c_results) {
+    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->data = new MDOCRResult[c_results->size];
+    for (int i = 0; i < c_results->size; ++i) {
+        auto text = result.text[i];
+        c_results->data[i].text = strdup(text.c_str());
+        c_results->data[i].score = result.rec_scores[i];
+        // const 保证 data和size成员本身不被修改，但是不会限制data指向的内容不被修改
+        MDPolygon polygon;
+        polygon.size = 4;
+        polygon.data = new MDPoint[polygon.size];
+        polygon.data[0] = {result.boxes[i][0 * 2], result.boxes[i][0 * 2 + 1]};
+        polygon.data[1] = {result.boxes[i][1 * 2], result.boxes[i][1 * 2 + 1]};
+        polygon.data[2] = {result.boxes[i][2 * 2], result.boxes[i][2 * 2 + 1]};
+        polygon.data[3] = {result.boxes[i][3 * 2], result.boxes[i][3 * 2 + 1]};
+        c_results->data[i].box = polygon;
+    }
+}
+
+
+void c_results_2_ocr_result(
+    const MDOCRResults* c_results, OCRResult* result) {
+    result->boxes.reserve(c_results->size);
+    result->text.reserve(c_results->size);
+    result->rec_scores.reserve(c_results->size);
+    for (int i = 0; i < c_results->size; ++i) {
+        result->boxes.emplace_back(
+            std::array<int, 8>{
+                c_results->data[i].box.data[0].x,
+                c_results->data[i].box.data[0].y,
+                c_results->data[i].box.data[1].x,
+                c_results->data[i].box.data[1].y,
+                c_results->data[i].box.data[2].x,
+                c_results->data[i].box.data[2].y,
+                c_results->data[i].box.data[3].x,
+                c_results->data[i].box.data[3].y
+            }
+        );
+        result->text.emplace_back(c_results->data[i].text);
+        result->rec_scores.emplace_back(c_results->data[i].score);
+    }
+}
+
+
 // 注意开辟内存需要成对的销毁
 void detection_landmark_result_2_c_results(
     const DetectionLandmarkResult& result,
@@ -178,16 +264,17 @@ void detection_landmark_result_2_c_results(
     }
 }
 
-void c_results_2_detection_landmark_result(const MDDetectionLandmarkResults* c_results,
-                                           DetectionLandmarkResult* result) {
+void c_results_2_detection_landmark_result(
+    const MDDetectionLandmarkResults* c_results,
+    DetectionLandmarkResult* result) {
     result->reserve(c_results->size);
     result->landmarks_per_instance = c_results->data[0].landmarks_size;
     for (int i = 0; i < c_results->size; i++) {
         result->boxes.emplace_back(std::array<float, 4>{
                 static_cast<float>(c_results->data[i].box.x),
                 static_cast<float>(c_results->data[i].box.y),
-                static_cast<float>(c_results->data[i].box.x) + c_results->data[i].box.width,
-                static_cast<float>(c_results->data[i].box.y) + c_results->data[i].box.height
+                static_cast<float>(c_results->data[i].box.x + c_results->data[i].box.width),
+                static_cast<float>(c_results->data[i].box.y + c_results->data[i].box.height)
             }
         );
         result->label_ids.emplace_back(c_results->data[i].label_id);
@@ -238,7 +325,8 @@ void c_results_2_face_recognizer_results(
     for (int i = 0; i < c_results->size; i++) {
         const size_t embedding_dim = c_results->data[i].size;
         results->at(i).resize(embedding_dim);
-        results->at(i).embedding.assign(c_results->data[i].embedding,
-                                        c_results->data[i].embedding + embedding_dim);
+        results->at(i).embedding.assign(
+            c_results->data[i].embedding,
+            c_results->data[i].embedding + embedding_dim);
     }
 }

@@ -14,7 +14,6 @@
 int main(int argc, char** argv) {
 #ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
 #endif
     MDStatusCode ret;
     //简单百宝箱
@@ -42,9 +41,8 @@ int main(int argc, char** argv) {
         std::cout << ret << std::endl;
         return ret;
     }
-    constexpr MDColor color = {255, 0, 255};
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    md_draw_ocr_result(&image, &results, "../../test_data/msyh.ttc", 15, &color, 0.5, 1);
+    md_draw_ocr_result(&image, &results, "../../test_data/msyh.ttc", 12, 0.3, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "cost: " << diff.count() << std::endl;
     md_print_ocr_result(&results);

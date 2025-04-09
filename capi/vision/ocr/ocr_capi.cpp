@@ -9,6 +9,9 @@
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
 #include "capi/vision/ocr/ocr_capi.h"
+
+#include <csrc/vision/common/visualize/visualize.h>
+
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 
@@ -68,32 +71,14 @@ MDRect md_get_text_position(const MDModel* model, MDImage* image, const char* te
 }
 
 
-MDStatusCode md_ocr_model_predict(const MDModel* model, MDImage* image, MDOCRResults* results) {
+MDStatusCode md_ocr_model_predict(const MDModel* model, MDImage* image, MDOCRResults* c_results) {
     const auto cv_image = md_image_to_mat(image);
-    modeldeploy::vision::OCRResult res;
+    modeldeploy::vision::OCRResult result;
     const auto ocr_model = static_cast<modeldeploy::vision::ocr::PPOCRv4*>(model->model_content);
-    if (const bool res_status = ocr_model->predict(cv_image, &res); !res_status) {
+    if (const bool res_status = ocr_model->predict(cv_image, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
-    const auto r_size = res.boxes.size();
-    results->size = static_cast<int>(r_size);
-    if (r_size == 0) {
-        results->data = nullptr;
-        return MDStatusCode::Success;
-    }
-    results->data = static_cast<MDOCRResult*>(malloc(sizeof(MDOCRResult) * r_size));
-    for (int i = 0; i < r_size; ++i) {
-        auto text = res.text[i];
-        results->data[i].text = static_cast<char*>(malloc(text.size() + 1));
-        memcpy(results->data[i].text, text.c_str(), text.size() + 1);
-        results->data[i].score = res.rec_scores[i];
-        // const 保证 data和size成员本身不被修改，但是不会限制data指向的内容不被修改
-        const MDPolygon polygon{static_cast<MDPoint*>(malloc(sizeof(MDPoint) * 4)), 4};
-        for (int j = 0; j < 4; ++j) {
-            polygon.data[j] = {res.boxes[i][j * 2], res.boxes[i][j * 2 + 1]};
-        }
-        results->data[i].box = polygon;
-    }
+    ocr_result_2_c_results(result, c_results);
     return MDStatusCode::Success;
 }
 
@@ -107,56 +92,22 @@ void md_print_ocr_result(const MDOCRResults* results) {
     }
 }
 
-void md_draw_ocr_result(const MDImage* image, const MDOCRResults* results, const char* font_path, const int font_size,
-                        const MDColor* color, const double alpha, const int save_result) {
-    cv::Mat overlay;
+void md_draw_ocr_result(const MDImage* image, const MDOCRResults* c_results, const char* font_path,
+                        const int font_size, const double alpha, const int save_result) {
     cv::Mat cv_image = md_image_to_mat(image);
-    cv_image.copyTo(overlay);
-    cv::FontFace font(font_path);
-    cv::Scalar cv_color(color->b, color->g, color->r);
-    // 绘制半透明部分（填充多边形）和文字背景色
-    for (int i = 0; i < results->size; ++i) {
-        const auto polygon = results->data[i].box;
-        std::vector<cv::Point> points;
-        points.reserve(polygon.size);
-        for (int j = 0; j < polygon.size; ++j) {
-            points.emplace_back(polygon.data[j].x, polygon.data[j].y);
-        }
-        cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
-        const auto size = cv::getTextSize(cv::Size(0, 0), results->data[i].text,
-                                          {points[0].x, points[0].y}, font, font_size);
-        cv::rectangle(cv_image, size, cv_color, -1, cv::LINE_AA, 0);
-    }
-    cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
-    // 绘制多边形边框，文字背景边框，文字
-    for (int i = 0; i < results->size; ++i) {
-        const auto polygon = results->data[i].box;
-        std::vector<cv::Point> points;
-        points.reserve(polygon.size);
-        for (int j = 0; j < polygon.size; ++j) {
-            points.emplace_back(polygon.data[j].x, polygon.data[j].y);
-        }
-        cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
-        const auto size = cv::getTextSize(cv::Size(0, 0), results->data[i].text,
-                                          {points[0].x, points[0].y}, font, font_size);
-        cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
-        const auto inv_color = cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]);
-        cv::putText(cv_image, results->data[i].text, {points[0].x, points[0].y - 2},
-                    inv_color, font, font_size);
-    }
-    if (save_result) {
-        cv::imwrite("vis_result.jpg", cv_image);
-    }
+    modeldeploy::vision::OCRResult result;
+    c_results_2_ocr_result(c_results, &result);
+    modeldeploy::vision::vis_ocr(cv_image, result, font_path, font_size, alpha, save_result);
 }
 
-void md_free_ocr_result(MDOCRResults* results) {
-    for (int i = 0; i < results->size; ++i) {
-        free(results->data[i].text);
-        free(results->data[i].box.data);
+void md_free_ocr_result(MDOCRResults* c_results) {
+    for (int i = 0; i < c_results->size; ++i) {
+        free(c_results->data[i].text);
+        delete[] c_results->data[i].box.data;
     }
-    free(results->data);
-    results->data = nullptr;
-    results->size = 0;
+    delete[] c_results->data;
+    c_results->data = nullptr;
+    c_results->size = 0;
 }
 
 void md_free_ocr_model(MDModel* model) {

@@ -155,6 +155,27 @@ cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon
 
 using namespace modeldeploy::vision;
 
+
+void detection_result_2_c_results(
+    const DetectionResult& result,
+    MDDetectionResults* c_results);
+
+
+void c_results_2_detection_result(
+    const MDDetectionResults* c_results,
+    DetectionResult* result);
+
+
+void ocr_result_2_c_results(
+    const OCRResult& result,
+    MDOCRResults* c_results);
+
+
+void c_results_2_ocr_result(
+    const MDOCRResults* c_results,
+    OCRResult* result);
+
+
 void detection_landmark_result_2_c_results(
     const DetectionLandmarkResult& result,
     MDDetectionLandmarkResults* c_results);

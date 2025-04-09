@@ -5,9 +5,9 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-namespace modeldeploy ::vision {
-    cv::Mat VisOcr(cv::Mat image, const OCRResult& results, const std::string& font_path,
-                   const int font_size, const double alpha, const int save_result) {
+namespace modeldeploy::vision {
+    cv::Mat vis_ocr(cv::Mat& image, const OCRResult& results, const std::string& font_path,
+                    const int font_size, const double alpha, const int save_result) {
         cv::Mat overlay;
         image.copyTo(overlay);
         cv::FontFace font(font_path);

@@ -21,7 +21,7 @@ int main() {
         return -1;
     }
     res.display();
-    auto image = VisFaceDetection(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
+    auto image = modeldeploy::vision::vis_face_det(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
     cv::imshow("image", image);
     cv::waitKey(0);
     auto vis_im_list =
@@ -32,9 +32,7 @@ int main() {
             auto img_crop = modeldeploy::vision::utils::center_crop(align_image, {248, 248});
             cropped_images.push_back(img_crop);
         }
-
         int size = static_cast<int>(std::sqrt(cropped_images.size())) + 1;
-
         // 如果图像数量不足，填充空白图像
         int total_images = size * size;
         while (cropped_images.size() < total_images) {
