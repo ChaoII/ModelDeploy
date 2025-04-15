@@ -6,8 +6,6 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/hwc2chw.h"
-#include "csrc/vision/common/processors/cast.h"
-#include "csrc/vision/common/processors/center_crop.h"
 #include "csrc/vision/face/face_as/face_as_pipeline.h"
 
 
@@ -76,6 +74,8 @@ namespace modeldeploy::vision::face {
                 }
             }
         }
+
+
         float D_Fver = 0.0;
         float D_FHor = 0.0;
         float D_BVer = 0.0;
@@ -86,14 +86,14 @@ namespace modeldeploy::vision::face {
         float s_VHor = 0.0;
         for (int i = 1; i < height; ++i) {
             for (int j = 1; j < width; ++j) {
-                D_Fver = std::abs((float)data[i * width + j] - (float)data[(i - 1) * width + j]);
+                D_Fver = std::abs(static_cast<float>(data[i * width + j]) - static_cast<float>(data[(i - 1) * width + j]));
                 s_FVer += D_Fver;
                 D_BVer = std::abs((float)BVer[i * width + j] - (float)BVer[(i - 1) * width + j]);
-                s_Vver += std::max((float)0.0, D_Fver - D_BVer);
-                D_FHor = std::abs((float)data[i * width + j] - (float)data[i * width + (j - 1)]);
+                s_Vver += std::max(static_cast<float>(0.0), D_Fver - D_BVer);
+                D_FHor = std::abs(static_cast<float>(data[i * width + j]) - static_cast<float>(data[i * width + (j - 1)]));
                 s_FHor += D_FHor;
                 D_BHor = std::abs((float)BHor[i * width + j] - (float)BHor[i * width + (j - 1)]);
-                s_VHor += std::max((float)0.0, D_FHor - D_BHor);
+                s_VHor += std::max(static_cast<float>(0.0), D_FHor - D_BHor);
             }
         }
         float b_FVer = (s_FVer - s_Vver) / s_FVer;
@@ -123,10 +123,10 @@ namespace modeldeploy::vision::face {
     }
 
 
-    bool SeetaFaceAsPipeline::predict(cv::Mat& im,
+    bool SeetaFaceAsPipeline::predict(const cv::Mat& im,
                                       FaceAntiSpoofResult* results,
                                       const float fuse_threshold,
-                                      const float clarity_threshold) {
+                                      const float clarity_threshold) const {
         cv::Mat im_bak0 = im.clone();
         cv::Mat im_bak1 = im.clone();
         std::vector<std::tuple<int, float>> face_as_second_result;

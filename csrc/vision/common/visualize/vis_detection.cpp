@@ -40,10 +40,10 @@ namespace modeldeploy::vision {
         // 绘制对象矩形矩形边框、文字背景边框、文字
         for (int c = 0; c < result.boxes.size(); ++c) {
             auto class_id = result.label_ids[c];
-            auto x1 = static_cast<int>(result.boxes[c][0]);
-            auto y1 = static_cast<int>(result.boxes[c][1]);
-            auto x2 = static_cast<int>(result.boxes[c][2]);
-            auto y2 = static_cast<int>(result.boxes[c][3]);
+            int x1 = static_cast<int>(round(result.boxes[c][0]));
+            int y1 = static_cast<int>(round(result.boxes[c][1]));
+            int x2 = static_cast<int>(round(result.boxes[c][2]));
+            int y2 = static_cast<int>(round(result.boxes[c][3]));
             auto cv_color = color_map[class_id];
             cv::rectangle(cv_image, cv::Point(x1, y1), cv::Point(x2, y2), cv_color, 1, cv::LINE_AA, 0);
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[c]).substr(0, 4);
@@ -59,22 +59,22 @@ namespace modeldeploy::vision {
                 int mask_h = static_cast<int>(result.masks[c].shape[0]);
                 int mask_w = static_cast<int>(result.masks[c].shape[1]);
                 // non-const pointer for cv:Mat constructor
-                auto* mask_raw_data = const_cast<int32_t*>(
-                    static_cast<const int32_t*>(result.masks[c].data()));
+                auto* mask_raw_data = const_cast<uint8_t*>(
+                    static_cast<const uint8_t*>(result.masks[c].data()));
                 // only reference to mask data (zero copy)
-                cv::Mat mask(mask_h, mask_w, CV_32SC1, mask_raw_data);
-                if (mask_h != box_h || mask_w != box_w) {
+                cv::Mat mask(mask_h, mask_w, CV_8UC1, mask_raw_data);
+                if (mask_h != box_h || (mask_w != box_w)) {
                     cv::resize(mask, mask, cv::Size(box_w, box_h));
                 }
                 // use a bright color for instance mask
                 int mc0 = 255 - cv_color[0] >= 127 ? 255 - cv_color[0] : 127;
                 int mc1 = 255 - cv_color[1] >= 127 ? 255 - cv_color[1] : 127;
                 int mc2 = 255 - cv_color[2] >= 127 ? 255 - cv_color[2] : 127;
-                auto* mask_data = reinterpret_cast<int32_t*>(mask.data);
+                auto* mask_data = mask.data;
                 // inplace blending (zero copy)
                 auto* vis_im_data = cv_image.data;
-                for (int i = y1; i < y2; ++i) {
-                    for (int j = x1; j < x2; ++j) {
+                for (size_t i = y1; i < y2; ++i) {
+                    for (size_t j = x1; j < x2; ++j) {
                         if (mask_data[(i - y1) * mask_w + (j - x1)] != 0) {
                             vis_im_data[i * im_w * 3 + j * 3 + 0] = cv::saturate_cast<uchar>(
                                 static_cast<float>(mc0) * 0.5f +

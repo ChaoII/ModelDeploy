@@ -1,0 +1,3 @@
+
+add_executable(demo_instance_seg_cxx demo_instance_seg_cxx.cpp)
+target_link_libraries(demo_instance_seg_cxx PUBLIC ${LIBRARY_NAME})

@@ -37,7 +37,7 @@ namespace modeldeploy::vision::face {
          * \param clarity_threshold
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(cv::Mat& im, FaceAntiSpoofResult* results, float fuse_threshold = 0.8f, float clarity_threshold = 0.3);
+        bool predict(const cv::Mat& im, FaceAntiSpoofResult* results, float fuse_threshold = 0.8f, float clarity_threshold = 0.3) const;
 
 
         [[nodiscard]] bool is_initialized() const override;
