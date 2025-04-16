@@ -1,5 +1,10 @@
 #### 1.编译
 
+1. `release/v1.0`的audio部分使用了funasr sdk源码，具有2pass功能，但是相对不灵活，缺失tts模型之后引用了sherpa-onnx源码
+2. 从`release/v1.1` 开始人脸识别部分全部转换为onnxruntime推理，放弃了seetaface的tennis推理引擎 
+3. 从`release/v1.2` 为老版本的`md_tensor.h`的方案，其优势是灵活可以与不同硬件设备直接集成，但是编译速度很慢很慢，之后重构了tensor类，编译速度大大提升，库体积大小与重构前相当 
+4. 如果主干分支bug多，速度慢，请切换至`release/v1.2`分支
+
 ```bash
 git clone https://github.com/ChaoII/ModelDeploy.git
 cmake -S . -B build -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_FACE=ON -DBUILD_CAPI=ON
