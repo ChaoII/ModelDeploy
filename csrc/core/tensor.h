@@ -70,7 +70,7 @@ namespace modeldeploy {
         [[nodiscard]] const std::string& name() const;
         void set_name(const std::string& name);
         static size_t get_element_size(DataType dtype);
-        [[nodiscard]] size_t Tensor::outer_dim(int axis) const;
+        [[nodiscard]] size_t outer_dim(int axis) const;
 
         // 数据操作接口 - 优化版本
         template <typename T>
@@ -87,7 +87,7 @@ namespace modeldeploy {
         T& at(const std::vector<int64_t>& indices);
 
         template <typename T>
-        [[nodiscard]] const T& Tensor::at(const std::vector<int64_t>& indices) const;
+        [[nodiscard]] const T& at(const std::vector<int64_t>& indices) const;
 
         [[nodiscard]] float at(const std::vector<int64_t>& indices) const;
 
