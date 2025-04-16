@@ -4,7 +4,6 @@
 
 #include "csrc/core/md_log.h"
 #include "csrc/vision/instance_seg/preprocessor.h"
-#include "csrc/function/concat.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/convert_and_permute.h"
@@ -54,7 +53,7 @@ namespace modeldeploy::vision::detection {
     }
 
     bool YOLOv5SegPreprocessor::preprocess(
-        cv::Mat* mat, MDTensor* output,
+        cv::Mat* mat, Tensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) {
         // Record the shape of image and the shape of preprocessed image
         (*im_info)["input_shape"] = {
@@ -81,7 +80,7 @@ namespace modeldeploy::vision::detection {
     }
 
     bool YOLOv5SegPreprocessor::run(
-        std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
         std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
@@ -90,7 +89,7 @@ namespace modeldeploy::vision::detection {
         ims_info->resize(images->size());
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
-        std::vector<MDTensor> tensors(images->size());
+        std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
             preprocess(&(*images)[i], &tensors[i], &(*ims_info)[i]);
         }
@@ -98,7 +97,7 @@ namespace modeldeploy::vision::detection {
             (*outputs)[0] = std::move(tensors[0]);
         }
         else {
-            function::Concat(tensors, &(*outputs)[0], 0);
+            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
         }
         return true;
     }

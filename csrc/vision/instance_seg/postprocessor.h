@@ -2,7 +2,7 @@
 // Created by aichao on 2025/4/14.
 //
 #pragma once
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
 namespace modeldeploy::vision::detection {
@@ -21,7 +21,7 @@ namespace modeldeploy::vision::detection {
        * \param[in] ims_info The shape info list, record input_shape and output_shape
        * \return true if the postprocess successed, otherwise false
        */
-        bool run(const std::vector<MDTensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<DetectionResult>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 

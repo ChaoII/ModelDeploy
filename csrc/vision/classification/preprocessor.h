@@ -8,7 +8,7 @@
 #include <map>
 #include "csrc/vision/utils.h"
 #include "csrc/core/md_decl.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 namespace modeldeploy {
 namespace vision {
@@ -29,7 +29,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
    * \param[in] ims_info The shape info list, record input_shape and output_shape
    * \return true if the preprocess successed, otherwise false
    */
-  bool Run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+  bool Run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
            std::vector<std::map<std::string, std::array<float, 2>>>* ims_info);
 
   /// Set target size, tuple of (width, height), default size = {224, 224}
@@ -39,7 +39,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
   std::vector<int> GetSize() const { return size_; }
 
  protected:
-  bool Preprocess(cv::Mat* mat, MDTensor* output,
+  bool Preprocess(cv::Mat* mat, Tensor* output,
                   std::map<std::string, std::array<float, 2>>* im_info);
 
   // target size, tuple of (width, height), default size = {224, 224}

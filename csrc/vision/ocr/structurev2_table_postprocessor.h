@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "csrc/core/md_tensor.h"
-#include "csrc/vision/common/result.h"
+#include "csrc/core/tensor.h"
+#include "csrc/core/md_decl.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 
 
@@ -29,7 +29,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] rec_scores The output score results of recognizer
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<MDTensor> &tensors,
+        bool run(const std::vector<Tensor> &tensors,
                  std::vector<std::vector<std::array<int, 8>>> *bbox_batch_list,
                  std::vector<std::vector<std::string>> *structure_batch_list,
                  const std::vector<std::array<int, 4>> &batch_det_img_info);

@@ -198,7 +198,10 @@ namespace modeldeploy::vision {
                     + std::to_string(static_cast<int>(boxes[i][3])) + "]";
                 std::string label_id_str = std::to_string(label_ids[i]);
                 std::string score_str = std::to_string(scores[i]);
-                std::string mask_size_str = std::to_string(masks[i].shape[0] * masks[i].shape[1]);
+                std::string mask_size_str;
+                if (!masks.empty()) {
+                    mask_size_str = std::to_string(masks[i].shape[0] * masks[i].shape[1]);
+                }
                 output_table.add_row({std::to_string(i), box_str, label_id_str, score_str, mask_size_str});
             }
         }

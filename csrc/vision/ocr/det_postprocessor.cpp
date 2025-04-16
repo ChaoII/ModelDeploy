@@ -51,21 +51,21 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool DBDetectorPostprocessor::apply(
-        const std::vector<MDTensor>& tensors,
+        const std::vector<Tensor>& tensors,
         std::vector<std::vector<std::array<int, 8>>>* results,
         const std::vector<std::array<int, 4>>& batch_det_img_info) {
         // DBDetector have only 1 output tensor.
 
-        const MDTensor& tensor = tensors[0];
+        const Tensor& tensor = tensors[0];
         // For DBDetector, the output tensor shape = [batch, 1, ?, ?]
-        const size_t batch = tensor.shape[0];
-        const size_t length = accumulate(tensor.shape.begin() + 1, tensor.shape.end(), 1,
+        const size_t batch = tensor.shape()[0];
+        const size_t length = accumulate(tensor.shape().begin() + 1, tensor.shape().end(), 1,
                                          std::multiplies());
         auto tensor_data = static_cast<const float*>(tensor.data());
         results->resize(batch);
         for (int i_batch = 0; i_batch < batch; ++i_batch) {
-            single_batch_postprocessor(tensor_data, static_cast<int>(tensor.shape[2]),
-                                       static_cast<int>(tensor.shape[3]),
+            single_batch_postprocessor(tensor_data, static_cast<int>(tensor.shape()[2]),
+                                       static_cast<int>(tensor.shape()[3]),
                                        batch_det_img_info[i_batch],
                                        &results->at(i_batch));
 

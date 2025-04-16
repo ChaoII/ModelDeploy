@@ -9,7 +9,7 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include "csrc/core/md_decl.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 namespace modeldeploy {
     namespace vision {

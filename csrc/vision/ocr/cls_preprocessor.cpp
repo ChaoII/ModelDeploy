@@ -33,7 +33,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool ClassifierPreprocessor::run(const std::vector<cv::Mat>* images,
-                                     std::vector<MDTensor>* outputs,
+                                     std::vector<Tensor>* outputs,
                                      const size_t start_index, const size_t end_index) {
         if (static_cast<int>(images->size()) == 0 || end_index <= start_index ||
             end_index > images->size()) {
@@ -49,7 +49,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool ClassifierPreprocessor::apply(std::vector<cv::Mat>* image_batch,
-                                       std::vector<MDTensor>* outputs) {
+                                       std::vector<Tensor>* outputs) {
         for (auto& image : *image_batch) {
             cv::Mat* mat = &image;
             ocr_classifier_resize_image(mat, cls_image_shape_);

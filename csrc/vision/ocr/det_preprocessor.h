@@ -15,7 +15,7 @@ namespace modeldeploy::vision::ocr {
         DBDetectorPreprocessor();
 
         virtual bool apply(std::vector<cv::Mat>* image_batch,
-                           std::vector<MDTensor>* outputs);
+                           std::vector<Tensor>* outputs);
 
         void set_max_side_len(int max_side_len) { max_side_len_ = max_side_len; }
 

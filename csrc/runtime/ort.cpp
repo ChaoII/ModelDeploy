@@ -157,7 +157,7 @@ namespace modeldeploy {
         }
     }
 
-    bool OrtBackend::infer(std::vector<MDTensor>& inputs, std::vector<MDTensor>* outputs, const bool copy_to_fd) {
+    bool OrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs, const bool copy_to_fd) {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR <<
                 "[OrtBackend] Size of the inputs(" << inputs.size() <<
@@ -183,7 +183,7 @@ namespace modeldeploy {
         const std::vector<Ort::Value> ort_outputs = binding_->GetOutputValues();
         outputs->resize(ort_outputs.size());
         for (size_t i = 0; i < ort_outputs.size(); ++i) {
-            ort_value_to_md_tensor(ort_outputs[i], &(*outputs)[i], outputs_desc_[i].name, copy_to_fd);
+            ort_value_to_md_tensor(ort_outputs[i], &(*outputs)[i], outputs_desc_[i].name);
         }
         return true;
     }

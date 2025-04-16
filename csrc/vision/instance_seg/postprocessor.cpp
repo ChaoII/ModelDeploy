@@ -18,38 +18,38 @@ namespace modeldeploy::vision::detection {
     }
 
     bool YOLOv5SegPostprocessor::run(
-        const std::vector<MDTensor>& tensors, std::vector<DetectionResult>* results,
+        const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
-        size_t batch = tensors[0].shape[0];
+        size_t batch = tensors[0].shape()[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             // store mask information
             std::vector<std::vector<float>> mask_embeddings;
             (*results)[bs].clear();
             if (multi_label_) {
-                (*results)[bs].reserve(tensors[0].shape[1] * (tensors[0].shape[2] - mask_nums_ - 5));
+                (*results)[bs].reserve(tensors[0].shape()[1] * (tensors[0].shape()[2] - mask_nums_ - 5));
             }
             else {
-                (*results)[bs].reserve(static_cast<int>(tensors[0].shape[1]));
+                (*results)[bs].reserve(static_cast<int>(tensors[0].shape()[1]));
             }
-            if (tensors[0].dtype != MDDataType::Type::FP32) {
+            if (tensors[0].dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
             const float* data = static_cast<const float*>(tensors[0].data()) +
-                bs * tensors[0].shape[1] * tensors[0].shape[2];
-            for (size_t i = 0; i < tensors[0].shape[1]; ++i) {
-                size_t s = i * tensors[0].shape[2];
+                bs * tensors[0].shape()[1] * tensors[0].shape()[2];
+            for (size_t i = 0; i < tensors[0].shape()[1]; ++i) {
+                size_t s = i * tensors[0].shape()[2];
                 float cls_conf = data[s + 4];
                 float confidence = data[s + 4];
                 std::vector mask_embedding(
-                    data + s + tensors[0].shape[2] - mask_nums_,
-                    data + s + tensors[0].shape[2]);
+                    data + s + tensors[0].shape()[2] - mask_nums_,
+                    data + s + tensors[0].shape()[2]);
                 for (float& mask_embedding_el : mask_embedding) {
                     mask_embedding_el *= cls_conf;
                 }
                 if (multi_label_) {
-                    for (size_t j = 5; j < tensors[0].shape[2] - mask_nums_; ++j) {
+                    for (size_t j = 5; j < tensors[0].shape()[2] - mask_nums_; ++j) {
                         confidence = data[s + 4];
                         const float* class_score = data + s + j;
                         confidence *= *class_score;
@@ -72,7 +72,7 @@ namespace modeldeploy::vision::detection {
                 }
                 else {
                     const float* max_class_score = std::max_element(
-                        data + s + 5, data + s + tensors[0].shape[2] - mask_nums_);
+                        data + s + 5, data + s + tensors[0].shape()[2] - mask_nums_);
                     confidence *= *max_class_score;
                     // filter boxes by conf_threshold
                     if (confidence <= conf_threshold_) {
@@ -108,10 +108,10 @@ namespace modeldeploy::vision::detection {
             (*results)[bs].masks.resize((*results)[bs].boxes.size());
             const float* data_mask =
                 static_cast<const float*>(tensors[1].data()) +
-                bs * tensors[1].shape[1] * tensors[1].shape[2] * tensors[1].shape[3];
+                bs * tensors[1].shape()[1] * tensors[1].shape()[2] * tensors[1].shape()[3];
 
-            auto mask_proto = cv::Mat(static_cast<int>(tensors[1].shape[1]),
-                                      static_cast<int>(tensors[1].shape[2] * tensors[1].shape[3]),
+            auto mask_proto = cv::Mat(static_cast<int>(tensors[1].shape()[1]),
+                                      static_cast<int>(tensors[1].shape()[2] * tensors[1].shape()[3]),
                                       CV_32FC(1), const_cast<float*>(data_mask));
             // vector to cv::Mat for MatMul
             // after push_back, Mat of m*n becomes (m + 1) * n
@@ -123,8 +123,8 @@ namespace modeldeploy::vision::detection {
             cv::Mat matmul_result = (mask_proposals * mask_proto).t();
             cv::Mat masks = matmul_result.reshape(
                 static_cast<int>((*results)[bs].boxes.size()), {
-                    static_cast<int>(tensors[1].shape[2]),
-                    static_cast<int>(tensors[1].shape[3])
+                    static_cast<int>(tensors[1].shape()[2]),
+                    static_cast<int>(tensors[1].shape()[3])
                 });
             // split for boxes nums
             std::vector<cv::Mat> mask_channels;
@@ -143,8 +143,8 @@ namespace modeldeploy::vision::detection {
             float pad_h = (out_h - ipt_h * scale) / 2;
             float pad_w = (out_w - ipt_w * scale) / 2;
             // for mask
-            float pad_h_mask = pad_h / out_h * static_cast<float>(tensors[1].shape[2]);
-            float pad_w_mask = pad_w / out_w * static_cast<float>(tensors[1].shape[3]);
+            float pad_h_mask = pad_h / out_h * static_cast<float>(tensors[1].shape()[2]);
+            float pad_w_mask = pad_w / out_w * static_cast<float>(tensors[1].shape()[3]);
             for (size_t i = 0; i < (*results)[bs].boxes.size(); ++i) {
                 int32_t label_id = (*results)[bs].label_ids[i];
                 // clip box
@@ -168,8 +168,8 @@ namespace modeldeploy::vision::detection {
                 // crop mask for feature map
                 int x1 = static_cast<int>(pad_w_mask);
                 int y1 = static_cast<int>(pad_h_mask);
-                int x2 = static_cast<int>(static_cast<float>(tensors[1].shape[3]) - pad_w_mask);
-                int y2 = static_cast<int>(static_cast<float>(tensors[1].shape[2]) - pad_h_mask);
+                int x2 = static_cast<int>(static_cast<float>(tensors[1].shape()[3]) - pad_w_mask);
+                int y2 = static_cast<int>(static_cast<float>(tensors[1].shape()[2]) - pad_h_mask);
                 cv::Rect roi(x1, y1, x2 - x1, y2 - y1);
                 dest = dest(roi);
                 cv::resize(dest, mask,

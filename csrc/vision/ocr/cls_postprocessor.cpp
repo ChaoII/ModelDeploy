@@ -17,22 +17,22 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool ClassifierPostprocessor::run(const std::vector<MDTensor>& tensors,
+    bool ClassifierPostprocessor::run(const std::vector<Tensor>& tensors,
                                       std::vector<int32_t>* cls_labels,
                                       std::vector<float>* cls_scores) {
-        const size_t total_size = tensors[0].shape[0];
+        const size_t total_size = tensors[0].shape()[0];
         return run(tensors, cls_labels, cls_scores, 0, total_size);
     }
 
-    bool ClassifierPostprocessor::run(const std::vector<MDTensor>& tensors,
+    bool ClassifierPostprocessor::run(const std::vector<Tensor>& tensors,
                                       std::vector<int32_t>* cls_labels,
                                       std::vector<float>* cls_scores,
                                       const size_t start_index, const size_t total_size) {
         // Classifier have only 1 output tensor.
-        const MDTensor& tensor = tensors[0];
+        const Tensor& tensor = tensors[0];
         // For Classifier, the output tensor shape = [batch,2]
-        const size_t batch = tensor.shape[0];
-        const size_t length = accumulate(tensor.shape.begin() + 1, tensor.shape.end(), 1,
+        const size_t batch = tensor.shape()[0];
+        const size_t length = accumulate(tensor.shape().begin() + 1, tensor.shape().end(), 1,
                                          std::multiplies());
         if (batch <= 0) {
             MD_LOG_ERROR << "The infer outputTensor.shape[0] <=0, wrong infer result." << std::endl;

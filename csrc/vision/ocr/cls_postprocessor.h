@@ -4,7 +4,7 @@
 
 #pragma once
 #include "csrc/core/md_decl.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT ClassifierPostprocessor {
@@ -16,10 +16,10 @@ namespace modeldeploy::vision::ocr {
          * \param[in] cls_scores The output score results of classification model
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<MDTensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<int32_t>* cls_labels, std::vector<float>* cls_scores);
 
-        bool run(const std::vector<MDTensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<int32_t>* cls_labels, std::vector<float>* cls_scores,
                  size_t start_index, size_t total_size);
 

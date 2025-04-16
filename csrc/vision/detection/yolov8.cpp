@@ -37,7 +37,7 @@ namespace modeldeploy::vision::detection {
             std::cerr << "Failed to preprocess the input image." << std::endl;
             return false;
         }
-        reused_input_tensors_[0].name = get_input_info(0).name;
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
             std::cerr << "Failed to inference by runtime." << std::endl;
             return false;

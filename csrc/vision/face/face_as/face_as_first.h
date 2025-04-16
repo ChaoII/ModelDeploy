@@ -37,8 +37,8 @@ namespace modeldeploy::vision::face {
     private:
         bool Initialize();
 
-        bool preprocess(cv::Mat *mat, MDTensor *output);
+        bool preprocess(cv::Mat *mat, Tensor *output);
 
-        static bool postprocess(const std::vector<MDTensor> &infer_result, float *result);
+        static bool postprocess(const std::vector<Tensor> &infer_result, float *result);
     };
 }

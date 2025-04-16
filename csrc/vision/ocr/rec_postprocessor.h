@@ -7,7 +7,7 @@
 
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 namespace modeldeploy::vision::ocr {
     /*! @brief Postprocessor object for Recognizer serials model.
@@ -28,10 +28,10 @@ namespace modeldeploy::vision::ocr {
          * \param[in] rec_scores The output score results of recognizer
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<MDTensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<std::string>* texts, std::vector<float>* rec_scores) const;
 
-        bool run(const std::vector<MDTensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<std::string>* texts, std::vector<float>* rec_scores,
                  size_t start_index, size_t total_size,
                  const std::vector<int>& indices) const;

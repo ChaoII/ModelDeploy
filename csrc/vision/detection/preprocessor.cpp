@@ -3,7 +3,6 @@
 //
 
 #include "preprocessor.h"
-#include "../../function/concat.h"
 #include "../common/processors/resize.h"
 #include "../common/processors/pad.h"
 #include "../common/processors/convert_and_permute.h"
@@ -54,7 +53,7 @@ namespace modeldeploy::vision::detection {
         }
     }
 
-    bool YOLOv8Preprocessor::preprocess(cv::Mat* mat, MDTensor* output,
+    bool YOLOv8Preprocessor::preprocess(cv::Mat* mat, Tensor* output,
                                         std::map<std::string, std::array<float, 2>>* im_info) {
         // Record the shape of image and the shape of preprocessed image
         (*im_info)["input_shape"] = {
@@ -80,7 +79,7 @@ namespace modeldeploy::vision::detection {
 
     bool YOLOv8Preprocessor::run(
         std::vector<cv::Mat>* images,
-        std::vector<MDTensor>* outputs,
+        std::vector<Tensor>* outputs,
         std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) {
         if (images->empty()) {
             std::cerr << "The size of input images should be greater than 0." << std::endl;
@@ -89,7 +88,7 @@ namespace modeldeploy::vision::detection {
         ims_info->resize(images->size());
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
-        std::vector<MDTensor> tensors(images->size());
+        std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
             // 修改了数据，并生成一个tensor
             preprocess(&(*images)[i], &tensors[i], &(*ims_info)[i]);
@@ -98,7 +97,7 @@ namespace modeldeploy::vision::detection {
             (*outputs)[0] = std::move(tensors[0]);
         }
         else {
-            function::Concat(tensors, &((*outputs)[0]), 0);
+            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
         }
         return true;
     }

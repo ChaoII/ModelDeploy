@@ -9,7 +9,7 @@
 
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceGenderPreprocessor::preprocess(cv::Mat* mat, MDTensor* output) {
+    bool SeetaFaceGenderPreprocessor::preprocess(cv::Mat* mat, Tensor* output) {
         // 1. Resize
         // 2. HWC2CHW
         // 3. Cast
@@ -26,7 +26,7 @@ namespace modeldeploy::vision::face {
     }
 
     bool SeetaFaceGenderPreprocessor::run(std::vector<cv::Mat>* images,
-                                          std::vector<MDTensor>* outputs) {
+                                          std::vector<Tensor>* outputs) {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
@@ -36,7 +36,7 @@ namespace modeldeploy::vision::face {
         }
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
-        std::vector<MDTensor> tensors(images->size());
+        std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
             if (!preprocess(&(*images)[i], &tensors[i])) {
                 MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;

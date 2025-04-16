@@ -62,7 +62,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool RecognizerPreprocessor::run(const std::vector<cv::Mat>* images,
-                                     std::vector<MDTensor>* outputs,
+                                     std::vector<Tensor>* outputs,
                                      const size_t start_index, const size_t end_index,
                                      const std::vector<int>& indices) const {
         if (images->empty() || end_index <= start_index ||
@@ -84,7 +84,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool RecognizerPreprocessor::apply(std::vector<cv::Mat>* image_batch,
-                                       std::vector<MDTensor>* outputs) const {
+                                       std::vector<Tensor>* outputs) const {
         const int img_h = rec_image_shape_[1];
         const int img_w = rec_image_shape_[2];
         float max_wh_ratio = static_cast<float>(img_w) * 1.0f / static_cast<float>(img_h);

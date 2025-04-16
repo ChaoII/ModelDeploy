@@ -72,16 +72,16 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool RecognizerPostprocessor::run(const std::vector<MDTensor>& tensors,
+    bool RecognizerPostprocessor::run(const std::vector<Tensor>& tensors,
                                       std::vector<std::string>* texts,
                                       std::vector<float>* rec_scores) const {
         // Recognizer have only 1 output tensor.
         // For Recognizer, the output tensor shape = [batch, ?, 6625]
-        const size_t total_size = tensors[0].shape[0];
+        const size_t total_size = tensors[0].shape()[0];
         return run(tensors, texts, rec_scores, 0, total_size, {});
     }
 
-    bool RecognizerPostprocessor::run(const std::vector<MDTensor>& tensors,
+    bool RecognizerPostprocessor::run(const std::vector<Tensor>& tensors,
                                       std::vector<std::string>* texts,
                                       std::vector<float>* rec_scores,
                                       const size_t start_index, const size_t total_size,
@@ -92,11 +92,11 @@ namespace modeldeploy::vision::ocr {
         }
 
         // Recognizer have only 1 output tensor.
-        const MDTensor& tensor = tensors[0];
+        const Tensor& tensor = tensors[0];
         // For Recognizer, the output tensor shape = [batch, ?, 6625]
-        const size_t batch = tensor.shape[0];
-        const size_t length = accumulate(tensor.shape.begin() + 1,
-                                         tensor.shape.end(), 1,
+        const size_t batch = tensor.shape()[0];
+        const size_t length = accumulate(tensor.shape().begin() + 1,
+                                         tensor.shape().end(), 1,
                                          std::multiplies());
 
         if (batch <= 0) {
@@ -124,7 +124,7 @@ namespace modeldeploy::vision::ocr {
                 real_index = indices[i_batch + start_index];
             }
             if (!single_batch_postprocessor(tensor_data + i_batch * length,
-                                            tensor.shape, &texts->at(real_index),
+                                            tensor.shape(), &texts->at(real_index),
                                             &rec_scores->at(real_index))) {
                 return false;
             }

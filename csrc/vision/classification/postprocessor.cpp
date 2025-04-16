@@ -2,7 +2,6 @@
 // Created by aichao on 2025/2/24.
 //
 #include "postprocessor.h"
-#include "csrc/function/softmax.h"
 #include "csrc/vision/utils.h"
 
 
@@ -12,21 +11,19 @@ namespace modeldeploy::vision::classification {
     }
 
     bool YOLOv5ClsPostprocessor::Run(
-        const std::vector<MDTensor>& tensors, std::vector<ClassifyResult>* results,
+        const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) {
-        int batch = tensors[0].shape[0];
-        MDTensor infer_result = tensors[0];
-        MDTensor infer_result_softmax;
-        function::softmax(infer_result, &infer_result_softmax, 1);
+        int batch = tensors[0].shape()[0];
+        Tensor infer_result = tensors[0];
+        Tensor infer_result_softmax = infer_result.softmax(1);
         results->resize(batch);
 
         for (size_t bs = 0; bs < batch; ++bs) {
             (*results)[bs].clear();
-            // output (1,1000) score classnum 1000
-            int num_classes = infer_result_softmax.shape[1];
+            // output (1,1000) score class_num 1000
+            int num_classes = infer_result_softmax.shape()[1];
             const float* infer_result_buffer =
-                reinterpret_cast<const float*>(infer_result_softmax.data()) + bs * infer_result_softmax.shape[
-                    1];
+                reinterpret_cast<const float*>(infer_result_softmax.data()) + bs * infer_result_softmax.shape()[1];
             topk_ = std::min(num_classes, topk_);
             (*results)[bs].label_ids =
                 utils::top_k_indices(infer_result_buffer, num_classes, topk_);

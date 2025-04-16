@@ -3,7 +3,6 @@
 //
 
 #include "csrc/vision/ocr/structurev2_table_preprocessor.h"
-#include "csrc/function/concat.h"
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 
@@ -44,7 +43,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2TablePreprocessor::run(std::vector<cv::Mat> *images,
-                                           std::vector<MDTensor> *outputs,
+                                           std::vector<Tensor> *outputs,
                                            size_t start_index, size_t end_index,
                                            const std::vector<int> &indices) {
         if (images->size() == 0 || end_index <= start_index ||
@@ -67,7 +66,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2TablePreprocessor::run(std::vector<cv::Mat> *image_batch,
-                                           std::vector<MDTensor> *outputs) {
+                                           std::vector<Tensor> *outputs) {
         batch_det_img_info_.clear();
         batch_det_img_info_.resize(image_batch->size());
         for (size_t i = 0; i < image_batch->size(); ++i) {

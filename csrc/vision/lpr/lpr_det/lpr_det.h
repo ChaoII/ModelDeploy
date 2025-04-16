@@ -56,10 +56,10 @@ namespace modeldeploy::vision::lpr {
     private:
         bool initialize();
 
-        bool preprocess(cv::Mat& mat, MDTensor* outputs,
+        bool preprocess(cv::Mat& mat, Tensor* outputs,
                         std::map<std::string, std::array<float, 2>>* im_info);
 
-        bool postprocess(const MDTensor& infer_result, DetectionLandmarkResult* result,
+        bool postprocess(const Tensor& infer_result, DetectionLandmarkResult* result,
                          const std::map<std::string, std::array<float, 2>>& im_info,
                          float conf_threshold, float nms_iou_threshold);
 

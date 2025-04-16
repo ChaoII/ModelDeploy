@@ -4,7 +4,7 @@
 
 #pragma once
 #include "csrc/core/md_decl.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 #include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
@@ -17,7 +17,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] batch_det_img_info The detector_preprocess result
          * \return true if the postprocess successes, otherwise false
          */
-        bool apply(const std::vector<MDTensor>& tensors,
+        bool apply(const std::vector<Tensor>& tensors,
                    std::vector<std::vector<std::array<int, 8>>>* results,
                    const std::vector<std::array<int, 4>>& batch_det_img_info);
 

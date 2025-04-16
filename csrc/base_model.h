@@ -14,8 +14,8 @@ namespace modeldeploy {
 
         [[nodiscard]] virtual std::string name() const { return "NameUndefined"; }
 
-        virtual bool infer(std::vector<MDTensor> &input_tensors,
-                           std::vector<MDTensor> *output_tensors);
+        virtual bool infer(std::vector<Tensor> &input_tensors,
+                           std::vector<Tensor> *output_tensors);
 
         virtual bool infer();
 
@@ -50,8 +50,8 @@ namespace modeldeploy {
 
         bool initialized_ = false;
         RuntimeOption runtime_option_;
-        std::vector<MDTensor> reused_input_tensors_;
-        std::vector<MDTensor> reused_output_tensors_;
+        std::vector<Tensor> reused_input_tensors_;
+        std::vector<Tensor> reused_output_tensors_;
 
     private:
         std::shared_ptr<OrtBackend> runtime_;

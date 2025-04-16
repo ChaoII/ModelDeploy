@@ -87,7 +87,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetection::preprocess(
-        cv::Mat& image, MDTensor* output,
+        cv::Mat& image, Tensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) {
         // process after image load
 
@@ -136,30 +136,30 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetection::postprocess(
-        const MDTensor& infer_result, DetectionLandmarkResult* result,
+        const Tensor& infer_result, DetectionLandmarkResult* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
         const float conf_threshold, const float nms_iou_threshold) {
         // infer_result: (1,n,15) 15=4+1+8+1+1
-        if (infer_result.shape[0] != 1) {
+        if (infer_result.shape()[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
         }
-        if (infer_result.dtype != MDDataType::Type::FP32) {
+        if (infer_result.dtype() != DataType::FP32) {
             MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
             return false;
         }
         result->clear();
         // must be setup landmarks_per_face before reserve
         result->landmarks_per_instance = landmarks_per_card;
-        result->reserve(static_cast<int>(infer_result.shape[1]));
+        result->reserve(static_cast<int>(infer_result.shape()[1]));
         auto* data = static_cast<const float*>(infer_result.data());
         // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf0(单层车牌),cls_conf1(双层车牌)
-        for (size_t i = 0; i < infer_result.shape[1]; ++i) {
-            const float* reg_cls_ptr = data + i * infer_result.shape[2];
+        for (size_t i = 0; i < infer_result.shape()[1]; ++i) {
+            const float* reg_cls_ptr = data + i * infer_result.shape()[2];
             const float obj_conf = reg_cls_ptr[4];
             // const float cls_conf = reg_cls_ptr[13];
             // 0: 单层车牌
             // 1: 双层车牌
-            std::vector<float> cls_confs = {reg_cls_ptr + 13, reg_cls_ptr + infer_result.shape[2]};
+            std::vector<float> cls_confs = {reg_cls_ptr + 13, reg_cls_ptr + infer_result.shape()[2]};
             const int class_id = argmax(cls_confs);
             const auto cls_conf = *std::max_element(cls_confs.begin(), cls_confs.end());
             float confidence = obj_conf * cls_conf;
@@ -235,7 +235,7 @@ namespace modeldeploy::vision::lpr {
 
     bool LprDetection::predict(const cv::Mat& image, DetectionLandmarkResult* result,
                                const float conf_threshold, const float nms_iou_threshold) {
-        std::vector<MDTensor> input_tensors(1);
+        std::vector<Tensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
         // Record the shape of image and the shape of preprocessed image
         im_info["input_shape"] = {
@@ -253,8 +253,8 @@ namespace modeldeploy::vision::lpr {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
-        input_tensors[0].name = get_input_info(0).name;
-        std::vector<MDTensor> output_tensors;
+        input_tensors[0].set_name(get_input_info(0).name);
+        std::vector<Tensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
             MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;

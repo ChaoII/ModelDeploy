@@ -21,8 +21,8 @@ namespace modeldeploy {
     }
 
 
-    bool BaseModel::infer(std::vector<MDTensor>& input_tensors,
-                          std::vector<MDTensor>* output_tensors) {
+    bool BaseModel::infer(std::vector<Tensor>& input_tensors,
+                          std::vector<Tensor>* output_tensors) {
         const auto ret = runtime_->infer(input_tensors, output_tensors);
         return ret;
     }
