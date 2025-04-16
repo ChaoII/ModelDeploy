@@ -7,7 +7,6 @@
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/normalize.h"
 #include "csrc/vision/common/processors/hwc2chw.h"
-#include "csrc/vision/common/result.h"
 #include "opencv2/opencv.hpp"
 
 

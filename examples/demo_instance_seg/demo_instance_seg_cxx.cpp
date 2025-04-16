@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
         return -1;
     }
     res.display();
-    auto vis_im = modeldeploy::vision::vis_detection(im, res, "../../test_data/test_models/font.ttf", 12, 0.3, 0);
+    auto vis_im = modeldeploy::vision::vis_detection(im, res, "../../test_data/test_models/font.ttf", 14, 0.3, 0);
     cv::resize(vis_im, vis_im, cv::Size(0, 0),0.75,0.75);
     cv::imshow("vis_im", vis_im);
     cv::waitKey(0);
