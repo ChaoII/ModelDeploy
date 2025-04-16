@@ -8,7 +8,7 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include "csrc/core/md_decl.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 namespace modeldeploy {
 namespace vision {
@@ -70,8 +70,6 @@ class MODELDEPLOY_CXX_EXPORT Normalize {
  private:
   std::vector<float> alpha_;
   std::vector<float> beta_;
-  MDTensor gpu_alpha_;
-  MDTensor gpu_beta_;
   bool swap_rb_;
 };
 }  // namespace vision

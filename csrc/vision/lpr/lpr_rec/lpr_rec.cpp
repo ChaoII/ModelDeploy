@@ -26,7 +26,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprRecognizer::preprocess(
-        cv::Mat& mat, MDTensor* output) {
+        cv::Mat& mat, Tensor* output) {
         // car_plate_recognizer's preprocess steps
         // 1. resize
         // 2. BGR->RGB
@@ -49,7 +49,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprRecognizer::postprocess(
-        std::vector<MDTensor>& infer_result, LprResult* result) {
+        std::vector<Tensor>& infer_result, LprResult* result) {
         auto* plate_color_ptr = static_cast<float*>(infer_result[1].data());
         const std::vector plate_color_vec(plate_color_ptr, plate_color_ptr + 5);
         int max_Index = argmax(plate_color_vec);
@@ -79,13 +79,13 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprRecognizer::predict(cv::Mat& image, LprResult* result) {
-        std::vector<MDTensor> input_tensors(1);
+        std::vector<Tensor> input_tensors(1);
         if (!preprocess(image, &input_tensors[0])) {
             std::cerr << "Failed to preprocess input image." << std::endl;
             return false;
         }
-        input_tensors[0].name = get_input_info(0).name;
-        std::vector<MDTensor> output_tensors;
+        input_tensors[0].set_name(get_input_info(0).name);
+        std::vector<Tensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
             std::cerr << "Failed to inference." << std::endl;
             return false;
@@ -93,6 +93,4 @@ namespace modeldeploy::vision::lpr {
         postprocess(output_tensors, result);
         return true;
     }
-
-
 } // namespace modeldeploy::vision::facedet

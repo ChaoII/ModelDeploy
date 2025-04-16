@@ -43,7 +43,7 @@ namespace modeldeploy::vision::face {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
-        reused_input_tensors_[0].name = get_input_info(0).name;
+        reused_input_tensors_[0].set_name( get_input_info(0).name);
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;

@@ -5,108 +5,98 @@
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy {
-    ONNXTensorElementDataType get_ort_dtype(const MDDataType::Type& md_dtype) {
-        if (md_dtype == MDDataType::Type::FP16) {
-            return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16;
-        }
-        if (md_dtype == MDDataType::Type::FP32) {
+    ONNXTensorElementDataType get_ort_dtype(const DataType& dtype) {
+        if (dtype == DataType::FP32) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
         }
-        if (md_dtype == MDDataType::Type::FP64) {
+        if (dtype == DataType::FP64) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE;
         }
-        if (md_dtype == MDDataType::Type::INT32) {
+        if (dtype == DataType::INT32) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32;
         }
-        if (md_dtype == MDDataType::Type::INT64) {
+        if (dtype == DataType::INT64) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64;
         }
-        if (md_dtype == MDDataType::Type::UINT8) {
+        if (dtype == DataType::UINT8) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8;
         }
-        if (md_dtype == MDDataType::Type::INT8) {
+        if (dtype == DataType::INT8) {
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8;
         }
-        MD_LOG_ERROR << "Unrecognized modeldeploy data type:" << MDDataType::str(md_dtype) << "." << std::endl;
+        MD_LOG_ERROR << "Unrecognized modeldeploy data type." << std::endl;
         return ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
     }
 
-    MDDataType::Type get_md_dtype(const ONNXTensorElementDataType& ort_dtype) {
-        if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16) {
-            return MDDataType::Type::FP16;
-        }
+    DataType get_md_dtype(const ONNXTensorElementDataType& ort_dtype) {
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
-            return MDDataType::Type::FP32;
+            return DataType::FP32;
         }
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE) {
-            return MDDataType::Type::FP64;
+            return DataType::FP64;
         }
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32) {
-            return MDDataType::Type::INT32;
+            return DataType::INT32;
         }
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
-            return MDDataType::Type::INT64;
+            return DataType::INT64;
         }
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8) {
-            return MDDataType::Type::UINT8;
+            return DataType::UINT8;
         }
         if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8) {
-            return MDDataType::Type::INT8;
+            return DataType::INT8;
         }
         MD_LOG_ERROR << "Unrecognized ort data type:" << ort_dtype << "." << std::endl;
-        return MDDataType::Type::FP32;
+        return DataType::FP32;
     }
 
-    Ort::Value create_ort_value(MDTensor& tensor, const bool is_backend_cuda) {
+    Ort::Value create_ort_value(Tensor& tensor, const bool is_backend_cuda) {
         if (is_backend_cuda) {
             const Ort::MemoryInfo memory_info("Cuda", OrtDeviceAllocator, 0,
                                               OrtMemTypeDefault);
             auto ort_value = Ort::Value::CreateTensor(
-                memory_info, tensor.mutable_data(), tensor.total_bytes(), tensor.shape.data(),
-                tensor.shape.size(), get_ort_dtype(tensor.dtype));
+                memory_info, tensor.data(), tensor.byte_size(), tensor.shape().data(),
+                tensor.shape().size(), get_ort_dtype(tensor.dtype()));
             return ort_value;
         }
         const auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         auto ort_value = Ort::Value::CreateTensor(
-            memory_info, tensor.data(), tensor.total_bytes(), tensor.shape.data(),
-            tensor.shape.size(), get_ort_dtype(tensor.dtype));
+            memory_info, tensor.data(), tensor.byte_size(), tensor.shape().data(),
+            tensor.shape().size(), get_ort_dtype(tensor.dtype()));
         return ort_value;
     }
 
-    void ort_value_to_md_tensor(const Ort::Value& value, MDTensor* tensor,
-                                const std::string& name, const bool copy_to_fd) {
+    void ort_value_to_md_tensor(const Ort::Value& value, Tensor* tensor,
+                                const std::string& name) {
         const auto info = value.GetTensorTypeAndShapeInfo();
         const auto ort_dtype = info.GetElementType();
         size_t num_el = info.GetElementCount();
         const auto shape = info.GetShape();
-        MDDataType::Type dtype;
+        DataType dtype;
 
-        if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16) {
-            dtype = MDDataType::Type::FP16;
-            num_el *= sizeof(float16);
-        }
-        else if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
-            dtype = MDDataType::Type::FP32;
+        if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+            dtype = DataType::FP32;
             num_el *= sizeof(float);
         }
         else if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32) {
-            dtype = MDDataType::Type::INT32;
+            dtype = DataType::INT32;
             num_el *= sizeof(int32_t);
         }
         else if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
-            dtype = MDDataType::Type::INT64;
+            dtype = DataType::INT64;
             num_el *= sizeof(int64_t);
         }
         else if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE) {
-            dtype = MDDataType::Type::FP64;
+            dtype = DataType::FP64;
             num_el *= sizeof(double);
         }
         else if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8) {
-            dtype = MDDataType::Type::UINT8;
+            dtype = DataType::UINT8;
             num_el *= sizeof(uint8_t);
         }
         else if (ort_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8) {
-            dtype = MDDataType::Type::INT8;
+            dtype = DataType::INT8;
             num_el *= sizeof(int8_t);
         }
         else {
@@ -114,14 +104,8 @@ namespace modeldeploy {
                 " while calling OrtBackend::CopyToCpu()." << std::endl;
         }
         const void* value_ptr = value.GetTensorData<void*>();
-        if (copy_to_fd) {
-            tensor->resize(shape, dtype, name);
-            memcpy(tensor->mutable_data(), value_ptr, num_el);
-        }
-        else {
-            tensor->name = name;
-            tensor->set_external_data(shape, dtype, const_cast<void*>(value_ptr));
-        }
+        tensor->allocate(shape, dtype, name);
+        memcpy(tensor->data(), value_ptr, num_el);
     }
 
     std::string onnx_type_to_string(const ONNXTensorElementDataType type) {

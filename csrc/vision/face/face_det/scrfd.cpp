@@ -82,7 +82,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SCRFD::preprocess(cv::Mat* mat, MDTensor* output,
+    bool SCRFD::preprocess(cv::Mat* mat, Tensor* output,
                            std::map<std::string, std::array<float, 2>>* im_info) {
         const float ratio = std::min(
             static_cast<float>(size[1]) * 1.0f / static_cast<float>(mat->rows),
@@ -157,7 +157,7 @@ namespace modeldeploy::vision::face {
     }
 
     bool SCRFD::postprocess(
-        std::vector<MDTensor>& infer_result, DetectionLandmarkResult* result,
+        std::vector<Tensor>& infer_result, DetectionLandmarkResult* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
         const float conf_threshold, const float nms_iou_threshold) {
         // number of downsample_strides
@@ -169,11 +169,11 @@ namespace modeldeploy::vision::face {
                 "according to scrfd." << std::endl;
         }
         if (!(fmc == 3 || fmc == 5)) { std::cerr << "The fmc must be 3 or 5" << std::endl; }
-        if (infer_result.at(0).shape[0] != 1) {
+        if (infer_result.at(0).shape()[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
         }
         for (int i = 0; i < fmc; ++i) {
-            if (infer_result.at(i).dtype != MDDataType::Type::FP32) {
+            if (infer_result.at(i).dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
@@ -181,7 +181,7 @@ namespace modeldeploy::vision::face {
         size_t total_num_boxes = 0;
         // compute the reserve space.
         for (int f = 0; f < fmc; ++f) {
-            total_num_boxes += infer_result.at(f).shape[1];
+            total_num_boxes += infer_result.at(f).shape()[1];
         }
         generate_points();
         result->clear();
@@ -221,7 +221,7 @@ namespace modeldeploy::vision::face {
         for (int f = 0; f < fmc; ++f) {
             const auto* score_ptr = static_cast<float*>(infer_result.at(f).data());
             const auto* bbox_ptr = static_cast<float*>(infer_result.at(f + fmc).data());
-            const unsigned int num_points = infer_result.at(f).shape[1];
+            const unsigned int num_points = infer_result.at(f).shape()[1];
             int current_stride = downsample_strides[f];
             auto& stride_points = center_points_[current_stride];
             // loop each anchor
@@ -300,7 +300,7 @@ namespace modeldeploy::vision::face {
 
     bool SCRFD::predict(cv::Mat& im, DetectionLandmarkResult* result,
                         const float conf_threshold, const float nms_iou_threshold) {
-        std::vector<MDTensor> input_tensors(1);
+        std::vector<Tensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
         // Record the shape of image and the shape of preprocessed image
         im_info["input_shape"] = {
@@ -316,8 +316,8 @@ namespace modeldeploy::vision::face {
             return false;
         }
 
-        input_tensors[0].name = get_input_info(0).name;
-        std::vector<MDTensor> output_tensors;
+        input_tensors[0].set_name(get_input_info(0).name);
+        std::vector<Tensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
             MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;

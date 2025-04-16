@@ -50,7 +50,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool DBDetectorPreprocessor::apply(std::vector<cv::Mat>* image_batch,
-                                       std::vector<MDTensor>* outputs) {
+                                       std::vector<Tensor>* outputs) {
         int max_resize_w = 0;
         int max_resize_h = 0;
         batch_det_img_info_.clear();

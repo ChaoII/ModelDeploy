@@ -23,7 +23,7 @@ namespace modeldeploy::vision::ocr {
          * \param end_index
          * \return true if the preprocess successed, otherwise false
          */
-        bool run(const std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(const std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
                  size_t start_index, size_t end_index);
 
         /** \brief Implement the virtual function of ProcessorManager, Apply() is the
@@ -34,7 +34,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        virtual bool apply(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
+        virtual bool apply(std::vector<cv::Mat>* image_batch, std::vector<Tensor>* outputs);
 
         /// Set preprocess normalize parameters, please call this API to customize
         /// the normalize parameters, otherwise it will use the default normalize

@@ -11,7 +11,7 @@
 
 namespace modeldeploy::vision::ocr {
     bool StructureV2LayoutPostprocessor::run(
-        const std::vector<MDTensor>& tensors, std::vector<DetectionResult>* results,
+        const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
         const std::vector<std::array<int, 4>>& batch_layout_img_info) {
         // A StructureV2Layout has 8 output tensors on which it then runs
         // a GFL regression (namely, DisPred2Box), reference:
@@ -26,12 +26,12 @@ namespace modeldeploy::vision::ocr {
         }
         // TODO: may need to reorder the tensors according to
         // fpn_stride_ and the shape of output tensors.
-        size_t batch = tensors[0].get_shape()[0]; // [batch, ...]
+        size_t batch = tensors[0].shape()[0]; // [batch, ...]
 
         results->resize(batch);
-        set_reg_max(tensors[fpn_stride_.size()].get_shape()[2] / 4);
+        set_reg_max(tensors[fpn_stride_.size()].shape()[2] / 4);
         for (int batch_idx = 0; batch_idx < batch; ++batch_idx) {
-            std::vector<MDTensor> single_batch_tensors(8);
+            std::vector<Tensor> single_batch_tensors(8);
             set_single_batch_external_data(tensors, single_batch_tensors, batch_idx);
             single_batch_postprocessor(single_batch_tensors,
                                        batch_layout_img_info[batch_idx],
@@ -41,26 +41,25 @@ namespace modeldeploy::vision::ocr {
     }
 
     void StructureV2LayoutPostprocessor::set_single_batch_external_data(
-        const std::vector<MDTensor>& tensors,
-        std::vector<MDTensor>& single_batch_tensors, size_t batch_idx) {
+        const std::vector<Tensor>& tensors,
+        std::vector<Tensor>& single_batch_tensors, size_t batch_idx) {
         single_batch_tensors.resize(tensors.size());
         for (int j = 0; j < tensors.size(); ++j) {
-            auto j_shape = tensors[j].get_shape();
+            auto j_shape = tensors[j].shape();
             j_shape[0] = 1; // process b=1 per loop
             size_t j_step =
                 std::accumulate(j_shape.begin(), j_shape.end(), 1, std::multiplies());
             const float* j_data_ptr = reinterpret_cast<const float*>(tensors[j].data());
             const float* j_start_ptr = j_data_ptr + j_step * batch_idx;
-
-
-            single_batch_tensors[j].set_external_data(
-                j_shape, tensors[j].get_dtype(),
-                const_cast<void*>(reinterpret_cast<const void*>(j_start_ptr)));
+            // todo error
+            // single_batch_tensors[j].set_external_data(
+            //     j_shape, tensors[j].dtype(),
+            //     const_cast<void*>(reinterpret_cast<const void*>(j_start_ptr)));
         }
     }
 
     bool StructureV2LayoutPostprocessor::single_batch_postprocessor(
-        const std::vector<MDTensor>& single_batch_tensors,
+        const std::vector<Tensor>& single_batch_tensors,
         const std::array<int, 4>& layout_img_info, DetectionResult* result) {
         if (single_batch_tensors.size() != 8) {
             MD_LOG_ERROR << "StructureV2Layout should has 8 output tensors,"
@@ -81,8 +80,8 @@ namespace modeldeploy::vision::ocr {
         for (int i = 0; i < fpn_stride_.size(); ++i) {
             int feature_h = std::ceil(static_cast<float>(in_h) / fpn_stride_[i]);
             int feature_w = std::ceil(static_cast<float>(in_w) / fpn_stride_[i]);
-            const MDTensor& prob_tensor = single_batch_tensors[i];
-            const MDTensor& bbox_tensor = single_batch_tensors[i + fpn_stride_.size()];
+            const Tensor& prob_tensor = single_batch_tensors[i];
+            const Tensor& bbox_tensor = single_batch_tensors[i + fpn_stride_.size()];
             const float* prob_data = reinterpret_cast<const float*>(prob_tensor.data());
             const float* bbox_data = reinterpret_cast<const float*>(bbox_tensor.data());
             for (int idx = 0; idx < feature_h * feature_w; ++idx) {

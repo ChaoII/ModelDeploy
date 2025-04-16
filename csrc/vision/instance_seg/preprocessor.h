@@ -4,7 +4,7 @@
 
 #pragma once
 #include "csrc/vision/common/result.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Preprocessor object for YOLOv5Seg serials model.
@@ -20,7 +20,7 @@ namespace modeldeploy::vision::detection {
         * \param[in] ims_info The shape info list, record input_shape and output_shape
         * \return true if the preprocess successed, otherwise false
         */
-        bool run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
                  std::vector<std::map<std::string, std::array<float, 2>>>* ims_info);
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
@@ -64,7 +64,7 @@ namespace modeldeploy::vision::detection {
         [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, MDTensor* output,
+        bool preprocess(cv::Mat* mat, Tensor* output,
                         std::map<std::string, std::array<float, 2>>* im_info);
 
         void letter_box(cv::Mat* mat) const;

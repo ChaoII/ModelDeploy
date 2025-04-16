@@ -29,7 +29,7 @@ namespace modeldeploy {
 
         bool init(const RuntimeOption& option);
 
-        bool infer(std::vector<MDTensor>& inputs, std::vector<MDTensor>* outputs, bool copy_to_fd = true);
+        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs, bool copy_to_fd = true);
 
         [[nodiscard]] size_t num_inputs() const { return inputs_desc_.size(); }
 

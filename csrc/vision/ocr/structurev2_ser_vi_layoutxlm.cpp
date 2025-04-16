@@ -3,6 +3,8 @@
 //
 #include "csrc/vision/ocr//structurev2_ser_vi_layoutxlm.h"
 
+#include <csrc/core/md_log.h>
+
 
 namespace modeldeploy::vision::ocr {
     StructureV2SERViLayoutXLMModel::StructureV2SERViLayoutXLMModel(
@@ -15,7 +17,7 @@ namespace modeldeploy::vision::ocr {
 
     bool StructureV2SERViLayoutXLMModel::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         return true;

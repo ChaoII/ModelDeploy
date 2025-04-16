@@ -68,10 +68,10 @@ namespace modeldeploy::vision::face {
     private:
         bool Initialize();
 
-        bool preprocess(cv::Mat* mat, MDTensor* output,
+        bool preprocess(cv::Mat* mat, Tensor* output,
                         std::map<std::string, std::array<float, 2>>* im_info);
 
-        bool postprocess(std::vector<MDTensor>& infer_result,
+        bool postprocess(std::vector<Tensor>& infer_result,
                          DetectionLandmarkResult* result,
                          const std::map<std::string, std::array<float, 2>>& im_info,
                          float conf_threshold, float nms_iou_threshold);

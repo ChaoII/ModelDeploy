@@ -11,7 +11,7 @@ namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT YOLOv8Postprocessor {
     public:
         YOLOv8Postprocessor();
-        bool run(const std::vector<MDTensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<DetectionResult>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info);
 

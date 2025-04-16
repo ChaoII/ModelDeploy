@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
 
@@ -20,9 +20,9 @@ namespace modeldeploy::vision::face {
         /** \brief Process the result of runtime and fill to FaceRecognitionResult structure
          *
          * \param[in] infer_result The inference result from runtime
-         * \param[in] results The output result of FaceRecognitionResult
+         * \param[in] ages The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(std::vector<MDTensor> &infer_result, std::vector<int> *ages);
+        bool run(std::vector<Tensor> &infer_result, std::vector<int> *ages);
     };
 } // namespace modeldeploy::vision::faceid

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "csrc/vision/common/result.h"
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 
 
 namespace modeldeploy::vision::ocr {
@@ -23,7 +23,7 @@ namespace modeldeploy::vision::ocr {
          *            {{image width, image height, resize width, resize height},...}
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<MDTensor> &tensors,
+        bool run(const std::vector<Tensor> &tensors,
                  std::vector<DetectionResult> *results,
                  const std::vector<std::array<int, 4>> &batch_layout_img_info);
 
@@ -60,12 +60,12 @@ namespace modeldeploy::vision::ocr {
         std::array<float, 4> dis_pred_to_bbox(const std::vector<float> &bbox_pred, int x, int y,
                                               int stride, int resize_w, int resize_h, int reg_max);
 
-        bool single_batch_postprocessor(const std::vector<MDTensor> &single_batch_tensors,
+        bool single_batch_postprocessor(const std::vector<Tensor> &single_batch_tensors,
                                         const std::array<int, 4> &layout_img_info,
                                         DetectionResult *result);
 
-        void set_single_batch_external_data(const std::vector<MDTensor> &tensors,
-                                            std::vector<MDTensor> &single_batch_tensors,
+        void set_single_batch_external_data(const std::vector<Tensor> &tensors,
+                                            std::vector<Tensor> &single_batch_tensors,
                                             size_t batch_idx);
 
         std::vector<int> fpn_stride_ = {8, 16, 32, 64};

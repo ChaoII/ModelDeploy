@@ -3,7 +3,7 @@
 //
 #pragma once
 
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/normalize_and_permute.h"
 
@@ -21,7 +21,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        virtual bool run(std::vector<cv::Mat> *image_batch, std::vector<MDTensor> *outputs);
+        virtual bool run(std::vector<cv::Mat> *image_batch, std::vector<Tensor> *outputs);
 
         /// Set preprocess normalize parameters, please call this API to customize
         /// the normalize parameters, otherwise it will use the default normalize

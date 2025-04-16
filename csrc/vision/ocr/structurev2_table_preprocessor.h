@@ -25,7 +25,7 @@ namespace modeldeploy::vision::ocr {
          * \param indices
          * \return true if the preprocess successed, otherwise false
          */
-        bool run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
                  size_t start_index, size_t end_index,
                  const std::vector<int>& indices);
 
@@ -37,7 +37,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        bool run(std::vector<cv::Mat>* image_batch, std::vector<MDTensor>* outputs);
+        bool run(std::vector<cv::Mat>* image_batch, std::vector<Tensor>* outputs);
 
         /// Get the image info of the last batch, return a list of array
         /// {image width, image height, resize width, resize height}

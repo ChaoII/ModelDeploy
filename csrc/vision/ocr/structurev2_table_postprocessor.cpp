@@ -111,29 +111,29 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2TablePostprocessor::run(
-            const std::vector<MDTensor> &tensors,
+            const std::vector<Tensor> &tensors,
             std::vector<std::vector<std::array<int, 8>>> *bbox_batch_list,
             std::vector<std::vector<std::string>> *structure_batch_list,
             const std::vector<std::array<int, 4>> &batch_det_img_info) {
         // Table have 2 output tensors.
-        const MDTensor &structure_probs = tensors[1];
-        const MDTensor &bbox_preds = tensors[0];
+        const Tensor &structure_probs = tensors[1];
+        const Tensor &bbox_preds = tensors[0];
 
         const auto *structure_probs_data =
                 reinterpret_cast<const float *>(structure_probs.data());
         size_t structure_probs_length =
-                accumulate(structure_probs.shape.begin() + 1, structure_probs.shape.end(),
+                accumulate(structure_probs.shape().begin() + 1, structure_probs.shape().end(),
                            1, std::multiplies());
 
         const auto *bbox_preds_data =
                 reinterpret_cast<const float *>(bbox_preds.data());
         size_t bbox_preds_length =
-                accumulate(bbox_preds.shape.begin() + 1, bbox_preds.shape.end(), 1,
+                accumulate(bbox_preds.shape().begin() + 1, bbox_preds.shape().end(), 1,
                            std::multiplies());
-        size_t batch = bbox_preds.shape[0];
-        size_t slice_dim = bbox_preds.shape[1];
-        size_t prob_dim = structure_probs.shape[2];
-        size_t box_dim = bbox_preds.shape[2];
+        size_t batch = bbox_preds.shape()[0];
+        size_t slice_dim = bbox_preds.shape()[1];
+        size_t prob_dim = structure_probs.shape()[2];
+        size_t box_dim = bbox_preds.shape()[2];
 
         bbox_batch_list->resize(batch);
         structure_batch_list->resize(batch);

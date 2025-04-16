@@ -11,9 +11,13 @@ int main() {
     modeldeploy::vision::DetectionResult result;
     yolov8.get_preprocessor().set_size({1440, 1440});
     yolov8.predict(img, &result);
+    std::cout<<"-------------"<<std::endl;
     result.display();
+    std::cout<<"-------------"<<std::endl;
+
     const auto vis_image =
         modeldeploy::vision::vis_detection(img, result, "../../test_data/test_models/font.ttf", 12, 0.3, 0);
+    std::cout<<"-------------"<<std::endl;
 
     cv::imshow("test", vis_image);
     cv::waitKey(0);

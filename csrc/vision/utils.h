@@ -5,17 +5,17 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
 namespace modeldeploy::vision::utils {
-    bool mat_to_tensor(cv::Mat &mat, MDTensor *tensor, bool is_copy = false);
+    bool mat_to_tensor(cv::Mat &mat, Tensor *tensor);
 
-    MDDataType::Type cv_dtype_to_md_dtype(int type);
+    DataType cv_dtype_to_md_dtype(int type);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat center_crop(const cv::Mat &image, const cv::Size &crop_size);
 
-    bool mats_to_tensor(const std::vector<cv::Mat> &mats, MDTensor *tensor);
+    bool mats_to_tensor(const std::vector<cv::Mat> &mats, Tensor *tensor);
 
     void nms(DetectionResult *output, float iou_threshold = 0.5, std::vector<int> *index = nullptr);
 

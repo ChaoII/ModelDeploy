@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include "csrc/core/md_tensor.h"
+#include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
 
@@ -22,6 +22,6 @@ namespace modeldeploy::vision::face {
          * \param[in] genders The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(std::vector<MDTensor>& infer_result, std::vector<int>* genders);
+        bool run(std::vector<Tensor>& infer_result, std::vector<int>* genders);
     };
 } // namespace modeldeploy::vision::faceid

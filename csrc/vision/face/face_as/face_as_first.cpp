@@ -13,7 +13,7 @@
 
 namespace modeldeploy::vision::face {
     SeetaFaceAsFirst::SeetaFaceAsFirst(const std::string& model_file,
-                                                     const RuntimeOption& custom_option) {
+                                       const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = Initialize();
@@ -27,7 +27,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAsFirst::preprocess(cv::Mat* mat, MDTensor* output) {
+    bool SeetaFaceAsFirst::preprocess(cv::Mat* mat, Tensor* output) {
         if (mat->rows == 256 && mat->cols == 256) {
             CenterCrop::Run(mat, size_[0], size_[1]);
         }
@@ -52,20 +52,20 @@ namespace modeldeploy::vision::face {
     }
 
 
-    bool SeetaFaceAsFirst::postprocess(const std::vector<MDTensor>& infer_result, float* result) {
-        const MDTensor& infer_result_ = infer_result[0];
-        *result = static_cast<float*>(infer_result_.buffer_)[1];
+    bool SeetaFaceAsFirst::postprocess(const std::vector<Tensor>& infer_result, float* result) {
+        const Tensor& infer_result_ = infer_result[0];
+        *result = static_cast<const float*>(infer_result_.data())[1];
         return true;
     }
 
     bool SeetaFaceAsFirst::predict(cv::Mat& im, float* result) {
-        std::vector<MDTensor> input_tensors(1);
+        std::vector<Tensor> input_tensors(1);
         if (!preprocess(&im, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
-        input_tensors[0].name = get_input_info(0).name;
-        std::vector<MDTensor> output_tensors;
+        input_tensors[0].set_name(get_input_info(0).name);
+        std::vector<Tensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
             MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;

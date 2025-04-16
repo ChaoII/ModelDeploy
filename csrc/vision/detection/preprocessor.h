@@ -11,7 +11,7 @@ namespace modeldeploy::vision::detection {
     public:
         YOLOv8Preprocessor();
 
-        bool run(std::vector<cv::Mat>* images, std::vector<MDTensor>* outputs,
+        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
                  std::vector<std::map<std::string, std::array<float, 2>>>* ims_info);
 
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -43,7 +43,7 @@ namespace modeldeploy::vision::detection {
         bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, MDTensor* output,
+        bool preprocess(cv::Mat* mat, Tensor* output,
                         std::map<std::string, std::array<float, 2>>* im_info);
 
         void letter_box(cv::Mat* mat);

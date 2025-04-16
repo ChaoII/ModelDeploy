@@ -44,9 +44,9 @@ namespace modeldeploy::vision::lpr {
     private:
         bool initialize();
 
-        bool preprocess(cv::Mat& mat, MDTensor* outputs);
+        bool preprocess(cv::Mat& mat, Tensor* outputs);
 
-        bool postprocess(std::vector<MDTensor>& infer_result, LprResult* result);
+        bool postprocess(std::vector<Tensor>& infer_result, LprResult* result);
 
         [[nodiscard]] bool is_dynamic_input() const { return is_dynamic_input_; }
 
