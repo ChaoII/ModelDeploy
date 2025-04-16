@@ -57,7 +57,7 @@ namespace modeldeploy::vision::face {
             // 获取类别预测
             std::vector<float> class_pred;
             for (int j = 1; j < class_predictions.shape[2]; ++j) {
-                class_pred.push_back(class_predictions.at({0, 0, i, j}));
+                class_pred.push_back(class_predictions.at({0, i, j, 0}));
             }
             int label = argmax(class_pred) + 1;
             float score = class_predictions.at({0, i, label, 0});
