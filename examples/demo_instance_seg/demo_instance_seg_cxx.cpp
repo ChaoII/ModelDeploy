@@ -4,6 +4,8 @@
 
 #include <iostream>
 #include <filesystem>
+#include <csrc/core/md_log.h>
+
 #include "csrc/vision.h"
 #include "csrc/vision/common/visualize/visualize.h"
 

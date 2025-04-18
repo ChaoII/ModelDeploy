@@ -23,7 +23,7 @@ namespace modeldeploy {
     public:
         static void* allocate(size_t size);
         static void deallocate(void* ptr, size_t size);
-        static void* reallocate(void* ptr, size_t old_size, size_t new_size);
+        static void* reallocate(void* ptr, size_t new_size);
     };
 
     // 内存块封装，支持引用计数
@@ -103,7 +103,10 @@ namespace modeldeploy {
         // 原地操作
         void resize(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
         void allocate(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
-
+        void from_external_memory(void* data,
+                                  const std::vector<int64_t>& shape, DataType dtype,
+                                  std::function<void(void*)> deleter = [](void*) {
+                                  }, std::string name = "");
         // 其他操作
         static Tensor concat(const std::vector<Tensor>& tensors, int axis);
         [[nodiscard]] Tensor softmax(int axis = -1) const;

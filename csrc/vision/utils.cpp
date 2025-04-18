@@ -38,17 +38,25 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    bool mat_to_tensor(cv::Mat& mat, Tensor* tensor) {
-        const int num_bytes = mat.rows * mat.cols * mat.channels() * Tensor::get_element_size(
-            cv_dtype_to_md_dtype(mat.type()));
-        tensor->allocate({mat.channels(), mat.rows, mat.cols}, cv_dtype_to_md_dtype(mat.type()));
-        if (num_bytes != tensor->byte_size()) {
-            MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
-                "but now size of Tensor = " << tensor->byte_size()
-                << ", size of Mat = " << num_bytes << "." << std::endl;
-            return false;
+    bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, const bool is_copy) {
+        const auto dtype = cv_dtype_to_md_dtype(mat.type());
+        if (is_copy) {
+            const size_t num_bytes = mat.rows * mat.cols * mat.channels() * Tensor::get_element_size(dtype);
+            tensor->allocate({mat.channels(), mat.rows, mat.cols}, dtype);
+            if (num_bytes != tensor->byte_size()) {
+                MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
+                    "but now size of Tensor = " << tensor->byte_size()
+                    << ", size of Mat = " << num_bytes << "." << std::endl;
+                return false;
+            }
+            memcpy(tensor->data(), mat.data, num_bytes);
         }
-        memcpy(tensor->data(), mat.data, num_bytes);
+        else {
+            // OpenCV Mat 的内存管理由 Mat 自己处理，这里不需要额外操作
+            // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
+            // 确保mat在tensor生命周期结束前有效
+            tensor->from_external_memory(mat.data, {mat.channels(), mat.rows, mat.cols}, dtype);
+        }
         return true;
     }
 
@@ -59,11 +67,11 @@ namespace modeldeploy::vision::utils {
         const std::vector<int64_t> shape = {
             static_cast<long long>(mats.size()), mats[0].channels(), mats[0].rows, mats[0].cols
         };
-        tensor->allocate(shape, cv_dtype_to_md_dtype(mats[0].type()));
+        const auto dtype = cv_dtype_to_md_dtype(mats[0].type());
+        const size_t total_bytes = mats[0].rows * mats[0].cols * mats[0].channels() * Tensor::get_element_size(dtype);
+        tensor->allocate(shape, dtype);
         for (size_t i = 0; i < mats.size(); ++i) {
             auto* p = static_cast<uint8_t*>(tensor->data());
-            const int total_bytes = mats[i].rows * mats[i].cols * mats[i].channels() * Tensor::get_element_size(
-                cv_dtype_to_md_dtype(mats[i].type()));
             std::memcpy(p + i * total_bytes, mats[i].data, total_bytes);
         }
         return true;
@@ -243,9 +251,10 @@ namespace modeldeploy::vision::utils {
 
     std::vector<float> compute_sqrt(const std::vector<float>& vec) {
         std::vector<float> result(vec.size());
-        std::transform(std::execution::par, vec.begin(), vec.end(), result.begin(), [](const float x) {
-            return std::sqrt(x);
-        });
+        std::transform(std::execution::par, vec.begin(), vec.end(), result.begin(),
+                       [](const float x) {
+                           return std::sqrt(x);
+                       });
         return result;
     }
 
@@ -269,7 +278,7 @@ namespace modeldeploy::vision::utils {
         std::vector<float> norm;
         float l2_sum_val = 0.f;
         for (size_t i = 0; i < num_val; ++i) {
-            l2_sum_val += (values[i] * values[i]);
+            l2_sum_val += values[i] * values[i];
         }
         const float l2_sum_sqrt = std::sqrt(l2_sum_val);
         norm.resize(num_val);

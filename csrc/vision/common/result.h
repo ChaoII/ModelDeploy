@@ -148,9 +148,9 @@ namespace modeldeploy::vision {
         /// Clear FaceDetectionResult and free the memory
         void free();
 
-        void reserve(int size);
+        void reserve(size_t size);
 
-        void resize(int size);
+        void resize(size_t size);
 
         /// Debug function, convert the result to string to print
         void display() const;

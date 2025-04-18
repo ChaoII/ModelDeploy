@@ -354,7 +354,7 @@ namespace modeldeploy::vision {
         landmarks_per_instance = 0;
     }
 
-    void DetectionLandmarkResult::reserve(const int size) {
+    void DetectionLandmarkResult::reserve(const size_t size) {
         boxes.reserve(size);
         scores.reserve(size);
         label_ids.reserve(size);
@@ -363,7 +363,7 @@ namespace modeldeploy::vision {
         }
     }
 
-    void DetectionLandmarkResult::resize(const int size) {
+    void DetectionLandmarkResult::resize(const size_t size) {
         boxes.resize(size);
         scores.resize(size);
         label_ids.resize(size);
