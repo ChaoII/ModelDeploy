@@ -22,3 +22,19 @@ cmake --build build --config Release
 ```CMakeLists.txt
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MT")
 ```
+
+#### 2.使用混合精度推理
+将fp32模型转换为fp16模型，在输入输出插入cast算子，将fp32转换为fp16，然后将输出参数从fp16转化为fp32
+```python
+import onnx
+from onnxconverter_common import float16
+# 加载原始 FP32 模型
+model = onnx.load("model_fp32.onnx")
+# 转为混合精度：内部节点为 float16，但输入/输出保持 float32
+model_mixed = float16.convert_float_to_float16(
+    model,
+    keep_io_types=True
+)
+# 保存新模型
+onnx.save(model_mixed, "model_mixed.onnx")
+```
