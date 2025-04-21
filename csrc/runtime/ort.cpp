@@ -13,6 +13,13 @@
 namespace modeldeploy {
     void OrtBackend::build_option(const RuntimeOption& option) {
         option_ = option;
+
+        session_options_.DisableMemPattern();
+        session_options_.
+
+        session_options_.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+
+
         if (option.graph_optimization_level >= 0) {
             session_options_.SetGraphOptimizationLevel(
                 static_cast<GraphOptimizationLevel>(option.graph_optimization_level));
@@ -96,10 +103,8 @@ namespace modeldeploy {
             const auto input_memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
             const auto output_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
             const Ort::Allocator allocator(session_, input_memory_info);
-
             const size_t n_inputs = session_.GetInputCount();
             const size_t n_outputs = session_.GetOutputCount();
-
 
             // 模型输入输出信息
             tabulate::Table input_table;
