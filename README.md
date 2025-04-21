@@ -38,3 +38,21 @@ model_mixed = float16.convert_float_to_float16(
 # 保存新模型
 onnx.save(model_mixed, "model_mixed.onnx")
 ```
+#### 3.模型量化
+此处仅为减小模型体积，使用uint8动态量化
+```python
+from onnxruntime.quantization import QuantType, quantize_dynamic
+# 模型路径
+model_fp32 = 'model_fp32.onnx'
+model_quant_dynamic = 'model_quant_dynamic.onnx'
+
+# 动态量化
+quantize_dynamic(
+    model_input=model_fp32,  # 输入模型
+    # op_types_to_quantize=["Conv"],
+    reduce_range=True,
+    model_output=model_quant_dynamic,  # 输出模型
+    per_channel=True,
+    weight_type=QuantType.QUInt8,  # 参数类型 Int8 / UInt8
+)
+```

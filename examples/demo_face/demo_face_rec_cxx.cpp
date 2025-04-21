@@ -8,7 +8,7 @@
 
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceID(
-        "../../test_data/test_models/face/face_recognizer_fp16.onnx");
+        "../../test_data/test_models/face/face_recognizer_quant_dynamic.onnx");
     assert(table_model.Initialized());
     // auto im0 = cv::imread("../../test_data/test_images/test_face_id1.jpg");
     //    auto im0 = cv::imread("vis_result.jpg");

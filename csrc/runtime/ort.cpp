@@ -13,13 +13,6 @@
 namespace modeldeploy {
     void OrtBackend::build_option(const RuntimeOption& option) {
         option_ = option;
-
-        session_options_.DisableMemPattern();
-        session_options_.
-
-        session_options_.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
-
-
         if (option.graph_optimization_level >= 0) {
             session_options_.SetGraphOptimizationLevel(
                 static_cast<GraphOptimizationLevel>(option.graph_optimization_level));
