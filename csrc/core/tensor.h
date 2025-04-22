@@ -5,6 +5,8 @@
 #include <string>
 #include <stdexcept>
 #include <functional>
+#include <iostream>
+
 #include "csrc/core/md_decl.h"
 
 namespace modeldeploy {
@@ -17,6 +19,20 @@ namespace modeldeploy {
         INT8,
         UNKNOW
     };
+
+    // 辅助函数实现
+    inline std::string to_string(const DataType dtype) {
+        switch (dtype) {
+        case DataType::FP32: return "FP32";
+        case DataType::FP64: return "FP64";
+        case DataType::INT32: return "INT32";
+        case DataType::INT64: return "INT64";
+        case DataType::UINT8: return "UINT8";
+        case DataType::INT8: return "INT8";
+        case DataType::UNKNOW: return "UNKNOWN";
+        default: return "";
+        }
+    }
 
     // 内存池管理器
     class MemoryPool {
@@ -109,7 +125,9 @@ namespace modeldeploy {
                                   std::function<void(void*)> deleter = [](void*) {
                                   }, std::string name = "");
         // 其他操作
-        void print() const;
+        void print(std::ostream& os = std::cout) const;
+        [[nodiscard]] std::string Tensor::to_string() const;
+        friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
         static Tensor concat(const std::vector<Tensor>& tensors, int axis);
         [[nodiscard]] Tensor softmax(int axis = -1) const;
         void expand_dim(int64_t axis);
@@ -119,7 +137,7 @@ namespace modeldeploy {
         [[nodiscard]] size_t get_dim_size(size_t dim) const;
         [[nodiscard]] size_t get_rank() const;
         [[nodiscard]] bool is_empty() const;
-        size_t compute_index(const std::vector<size_t>& indices) const ;
+        [[nodiscard]] size_t compute_index(const std::vector<size_t>& indices) const;
 
     private:
         std::string name_{};

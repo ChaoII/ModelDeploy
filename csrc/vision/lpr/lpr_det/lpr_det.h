@@ -61,7 +61,7 @@ namespace modeldeploy::vision::lpr {
 
         bool postprocess(const Tensor& infer_result, DetectionLandmarkResult* result,
                          const std::map<std::string, std::array<float, 2>>& im_info,
-                         float conf_threshold, float nms_iou_threshold);
+                         float conf_threshold, float nms_iou_threshold) const;
 
         [[nodiscard]] bool is_dynamic_input() const { return is_dynamic_input_; }
 

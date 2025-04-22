@@ -138,7 +138,7 @@ namespace modeldeploy::vision::lpr {
     bool LprDetection::postprocess(
         const Tensor& infer_result, DetectionLandmarkResult* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
-        const float conf_threshold, const float nms_iou_threshold) {
+        const float conf_threshold, const float nms_iou_threshold) const {
         // infer_result: (1,n,15) 15=4+1+8+1+1
         if (infer_result.shape()[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;

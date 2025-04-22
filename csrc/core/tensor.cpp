@@ -425,62 +425,75 @@ namespace modeldeploy {
         calculate_strides();
     }
 
+
+    // 友元函数，用于流输出
+    std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
+        tensor.print(os);
+        return os;
+    }
+
     // 显示张量内容
-    void Tensor::print() const {
+    void Tensor::print(std::ostream& os) const {
         if (is_empty()) {
             std::cout << "Empty tensor" << std::endl;
             return;
         }
         std::function<void(const void*, const std::vector<int64_t>&, std::vector<size_t>&, size_t)> print_helper;
         print_helper = [&](const void* data, const std::vector<int64_t>& shape,
-                           std::vector<size_t>& indices, size_t dim) {
+                           std::vector<size_t>& indices, const size_t dim) {
             if (dim == shape.size() - 1) {
-                std::cout << "[";
+                os << "[";
                 for (size_t i = 0; i < shape[dim]; ++i) {
                     indices[dim] = i;
                     switch (dtype_) {
                     case DataType::FP32:
-                        std::cout << static_cast<const float*>(data)[compute_index(indices)];
+                        os << static_cast<const float*>(data)[compute_index(indices)];
                         break;
                     case DataType::FP64:
-                        std::cout << static_cast<const double*>(data)[compute_index(indices)];
+                        os << static_cast<const double*>(data)[compute_index(indices)];
                         break;
                     case DataType::INT32:
-                        std::cout << static_cast<const int32_t*>(data)[compute_index(indices)];
+                        os << static_cast<const int32_t*>(data)[compute_index(indices)];
                         break;
                     case DataType::INT64:
-                        std::cout << static_cast<const int64_t*>(data)[compute_index(indices)];
+                        os << static_cast<const int64_t*>(data)[compute_index(indices)];
                         break;
                     case DataType::INT8:
-                        std::cout << static_cast<const int8_t*>(data)[compute_index(indices)];
+                        os << static_cast<const int8_t*>(data)[compute_index(indices)];
                         break;
                     case DataType::UINT8:
-                        std::cout << static_cast<const uint8_t*>(data)[compute_index(indices)];
+                        os << static_cast<const uint8_t*>(data)[compute_index(indices)];
                         break;
                     default:
                         break;
                     }
-                    if (i < shape[dim] - 1) std::cout << ", ";
+                    if (i < shape[dim] - 1) os << ", ";
                 }
-                std::cout << "]";
+                os << "]";
             }
             else {
-                std::cout << "[";
+                os << "[";
                 for (size_t i = 0; i < shape[dim]; ++i) {
                     indices[dim] = i;
                     print_helper(data, shape, indices, dim + 1);
                     if (i < shape[dim] - 1) {
-                        std::cout << "," << std::endl;
-                        for (size_t j = 0; j <= dim; ++j) std::cout << " ";
+                        os << "," << std::endl;
+                        for (size_t j = 0; j <= dim; ++j) os << " ";
                     }
                 }
-                std::cout << "]";
+                os << "]";
             }
         };
 
         std::vector<size_t> indices(shape_.size(), 0);
         print_helper(data_ptr_, shape_, indices, 0);
-        std::cout << std::endl;
+        os << std::endl;
+    }
+
+    std::string Tensor::to_string() const {
+        std::ostringstream oss;
+        print(oss);
+        return oss.str();
     }
 
 
