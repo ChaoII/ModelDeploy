@@ -432,6 +432,40 @@ namespace modeldeploy {
         return os;
     }
 
+    void Tensor::set_display_max_ele_width(int width) {
+        display_max_ele_width_ = width;
+    }
+
+
+    std::string data_ptr_to_string(const void* data, const size_t index, const DataType dtype, int max_ele_width) {
+        std::ostringstream oss;
+        switch (dtype) {
+        case DataType::FP32:
+            oss << std::fixed << std::setw(max_ele_width) << std::setprecision(4) << static_cast<const float*>(data)[
+                index];
+            break;
+        case DataType::FP64:
+            oss << static_cast<const double*>(data)[index];
+            break;
+        case DataType::INT32:
+            oss << static_cast<const int32_t*>(data)[index];
+            break;
+        case DataType::INT64:
+            oss << static_cast<const int64_t*>(data)[index];
+            break;
+        case DataType::INT8:
+            oss << static_cast<const int8_t*>(data)[index];
+            break;
+        case DataType::UINT8:
+            oss << static_cast<const uint8_t*>(data)[index];
+            break;
+        default:
+            oss << "";
+            break;
+        }
+        return oss.str();
+    }
+
     // 显示张量内容
     void Tensor::print(std::ostream& os) const {
         if (is_empty()) {
@@ -443,52 +477,69 @@ namespace modeldeploy {
                            std::vector<size_t>& indices, const size_t dim) {
             if (dim == shape.size() - 1) {
                 os << "[";
-                for (size_t i = 0; i < shape[dim]; ++i) {
-                    indices[dim] = i;
-                    switch (dtype_) {
-                    case DataType::FP32:
-                        os << static_cast<const float*>(data)[compute_index(indices)];
-                        break;
-                    case DataType::FP64:
-                        os << static_cast<const double*>(data)[compute_index(indices)];
-                        break;
-                    case DataType::INT32:
-                        os << static_cast<const int32_t*>(data)[compute_index(indices)];
-                        break;
-                    case DataType::INT64:
-                        os << static_cast<const int64_t*>(data)[compute_index(indices)];
-                        break;
-                    case DataType::INT8:
-                        os << static_cast<const int8_t*>(data)[compute_index(indices)];
-                        break;
-                    case DataType::UINT8:
-                        os << static_cast<const uint8_t*>(data)[compute_index(indices)];
-                        break;
-                    default:
-                        break;
+                if (const size_t size = shape[dim]; size > 10) {
+                    // 打印前18个元素
+                    for (size_t i = 0; i < 8; ++i) {
+                        indices[dim] = i;
+                        os << data_ptr_to_string(data, compute_index(indices), dtype_, display_max_ele_width_) << ",";
                     }
-                    if (i < shape[dim] - 1) os << ", ";
+                    os << std::setw(display_max_ele_width_) << "...";
+                    os << ",";
+                    // 打印最后一个元素
+                    indices[dim] = size - 1;
+                    os << data_ptr_to_string(data, compute_index(indices), dtype_, display_max_ele_width_);
+                }
+                else {
+                    // 打印所有元素
+                    for (size_t i = 0; i < size; ++i) {
+                        indices[dim] = i;
+                        os << data_ptr_to_string(data, compute_index(indices), dtype_, display_max_ele_width_);
+                        if (i < size - 1) os << ",";
+                    }
                 }
                 os << "]";
             }
             else {
                 os << "[";
-                for (size_t i = 0; i < shape[dim]; ++i) {
-                    indices[dim] = i;
-                    print_helper(data, shape, indices, dim + 1);
-                    if (i < shape[dim] - 1) {
+                const size_t size = shape[dim];
+                if (size > 10) {
+                    // 打印前8个元素
+                    for (size_t i = 0; i < 8; ++i) {
+                        indices[dim] = i;
+                        print_helper(data, shape, indices, dim + 1);
                         os << "," << std::endl;
                         for (size_t j = 0; j <= dim; ++j) os << " ";
+                    }
+                    os << "[";
+                    for (size_t i = 0; i < 10; i++) {
+                        os << std::setw(display_max_ele_width_) << "...";
+                        if (i < 9) os << ",";
+                    }
+                    os << "],\n";
+                    // 打印最后一个元素
+                    indices[dim] = size - 1;
+                    for (size_t j = 0; j <= dim; ++j) os << " ";
+                    print_helper(data, shape, indices, dim + 1);
+                }
+                else {
+                    // 打印所有元素
+                    for (size_t i = 0; i < size; ++i) {
+                        indices[dim] = i;
+                        print_helper(data, shape, indices, dim + 1);
+                        if (i < size - 1) {
+                            os << "," << std::endl;
+                            for (size_t j = 0; j <= dim; ++j) os << " ";
+                        }
                     }
                 }
                 os << "]";
             }
         };
-
         std::vector<size_t> indices(shape_.size(), 0);
         print_helper(data_ptr_, shape_, indices, 0);
         os << std::endl;
     }
+
 
     std::string Tensor::to_string() const {
         std::ostringstream oss;

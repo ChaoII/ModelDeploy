@@ -125,6 +125,7 @@ namespace modeldeploy {
                                   std::function<void(void*)> deleter = [](void*) {
                                   }, std::string name = "");
         // 其他操作
+        void set_display_max_ele_width(int width);
         void print(std::ostream& os = std::cout) const;
         [[nodiscard]] std::string to_string() const;
         friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
@@ -140,6 +141,7 @@ namespace modeldeploy {
         [[nodiscard]] size_t compute_index(const std::vector<size_t>& indices) const;
 
     private:
+        int display_max_ele_width_ = 8;
         std::string name_{};
         std::vector<int64_t> shape_{0};
         std::vector<int64_t> strides_{};
