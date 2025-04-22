@@ -126,7 +126,7 @@ namespace modeldeploy {
                                   }, std::string name = "");
         // 其他操作
         void print(std::ostream& os = std::cout) const;
-        [[nodiscard]] std::string Tensor::to_string() const;
+        [[nodiscard]] std::string to_string() const;
         friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
         static Tensor concat(const std::vector<Tensor>& tensors, int axis);
         [[nodiscard]] Tensor softmax(int axis = -1) const;
