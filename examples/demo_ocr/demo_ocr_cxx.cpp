@@ -17,11 +17,11 @@ int main() {
                                           "../../test_data/test_models/ocr/repsvtr_mobile/cls_infer.onnx",
                                           "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer1.onnx",
                                           "../../test_data/key.txt");
-    auto img = cv::imread("../../test_data/test_images/test_ocr1.png");
+    auto img = cv::imread("../../test_data/test_images/test_ocr5.jpg");
     modeldeploy::vision::OCRResult result;
     ocr.predict(img, &result);
     std::cout << result.str() << std::endl;
-    auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc", 14, 0.5, 0);
+    const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc", 14, 0.5, 0);
     cv::imshow("test", vis_image);
     cv::waitKey(0);
 }

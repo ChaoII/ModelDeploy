@@ -9,7 +9,7 @@
 
 
 int main() {
-    auto model = modeldeploy::vision::lpr::LprDetection("../../test_data/test_models/yolov5plate_quant_dynamic.onnx");
+    auto model = modeldeploy::vision::lpr::LprDetection("../../test_data/test_models/yolov5plate.onnx");
 
     auto im = cv::imread("../../test_data/test_images/test_lpr_pipeline2.jpg");
     auto im_bak = im.clone();

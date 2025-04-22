@@ -346,6 +346,12 @@ namespace modeldeploy {
         return *this;
     }
 
+    Tensor Tensor::clone() const {
+        Tensor result(shape_, dtype_);
+        std::memcpy(result.data_ptr_, data_ptr_, calculate_total_size());
+        return result;
+    }
+
     void Tensor::resize(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name) {
         // 验证新形状
         validate_shape(shape);
@@ -400,8 +406,8 @@ namespace modeldeploy {
                                       std::function<void(void*)> deleter, std::string name) {
         name_ = std::move(name);
         shape_ = shape,
-        dtype_ = dtype,
-        element_size_ = get_element_size(dtype);
+            dtype_ = dtype,
+            element_size_ = get_element_size(dtype);
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         if (deleter) {
@@ -417,6 +423,64 @@ namespace modeldeploy {
         }
         data_ptr_ = memory_->data();
         calculate_strides();
+    }
+
+    // 显示张量内容
+    void Tensor::print() const {
+        if (is_empty()) {
+            std::cout << "Empty tensor" << std::endl;
+            return;
+        }
+        std::function<void(const void*, const std::vector<int64_t>&, std::vector<size_t>&, size_t)> print_helper;
+        print_helper = [&](const void* data, const std::vector<int64_t>& shape,
+                           std::vector<size_t>& indices, size_t dim) {
+            if (dim == shape.size() - 1) {
+                std::cout << "[";
+                for (size_t i = 0; i < shape[dim]; ++i) {
+                    indices[dim] = i;
+                    switch (dtype_) {
+                    case DataType::FP32:
+                        std::cout << static_cast<const float*>(data)[compute_index(indices)];
+                        break;
+                    case DataType::FP64:
+                        std::cout << static_cast<const double*>(data)[compute_index(indices)];
+                        break;
+                    case DataType::INT32:
+                        std::cout << static_cast<const int32_t*>(data)[compute_index(indices)];
+                        break;
+                    case DataType::INT64:
+                        std::cout << static_cast<const int64_t*>(data)[compute_index(indices)];
+                        break;
+                    case DataType::INT8:
+                        std::cout << static_cast<const int8_t*>(data)[compute_index(indices)];
+                        break;
+                    case DataType::UINT8:
+                        std::cout << static_cast<const uint8_t*>(data)[compute_index(indices)];
+                        break;
+                    default:
+                        break;
+                    }
+                    if (i < shape[dim] - 1) std::cout << ", ";
+                }
+                std::cout << "]";
+            }
+            else {
+                std::cout << "[";
+                for (size_t i = 0; i < shape[dim]; ++i) {
+                    indices[dim] = i;
+                    print_helper(data, shape, indices, dim + 1);
+                    if (i < shape[dim] - 1) {
+                        std::cout << "," << std::endl;
+                        for (size_t j = 0; j <= dim; ++j) std::cout << " ";
+                    }
+                }
+                std::cout << "]";
+            }
+        };
+
+        std::vector<size_t> indices(shape_.size(), 0);
+        print_helper(data_ptr_, shape_, indices, 0);
+        std::cout << std::endl;
     }
 
 
@@ -561,6 +625,21 @@ namespace modeldeploy {
 
     bool Tensor::is_empty() const {
         return memory_ == nullptr || data_ptr_ == nullptr;
+    }
+
+    size_t Tensor::compute_index(const std::vector<size_t>& indices) const {
+        if (indices.size() != shape_.size()) {
+            throw std::invalid_argument("Index dimension mismatch");
+        }
+
+        size_t index = 0;
+        for (size_t i = 0; i < indices.size(); ++i) {
+            if (indices[i] >= shape_[i]) {
+                throw std::out_of_range("Index out of range");
+            }
+            index += indices[i] * strides_[i];
+        }
+        return index;
     }
 
     void Tensor::validate_shape(const std::vector<int64_t>& shape) {

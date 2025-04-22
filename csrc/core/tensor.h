@@ -101,6 +101,7 @@ namespace modeldeploy {
         [[nodiscard]] Tensor materialize() const;
 
         // 原地操作
+        [[nodiscard]] Tensor clone() const;
         void resize(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
         void allocate(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
         void from_external_memory(void* data,
@@ -108,6 +109,7 @@ namespace modeldeploy {
                                   std::function<void(void*)> deleter = [](void*) {
                                   }, std::string name = "");
         // 其他操作
+        void print() const;
         static Tensor concat(const std::vector<Tensor>& tensors, int axis);
         [[nodiscard]] Tensor softmax(int axis = -1) const;
         void expand_dim(int64_t axis);
@@ -117,6 +119,7 @@ namespace modeldeploy {
         [[nodiscard]] size_t get_dim_size(size_t dim) const;
         [[nodiscard]] size_t get_rank() const;
         [[nodiscard]] bool is_empty() const;
+        size_t compute_index(const std::vector<size_t>& indices) const ;
 
     private:
         std::string name_{};

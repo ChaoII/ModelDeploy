@@ -259,7 +259,6 @@ namespace modeldeploy::vision::lpr {
             MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;
         }
-
         if (!postprocess(output_tensors[0], result, im_info, conf_threshold,
                          nms_iou_threshold)) {
             MD_LOG_ERROR << "Failed to post process." << std::endl;
