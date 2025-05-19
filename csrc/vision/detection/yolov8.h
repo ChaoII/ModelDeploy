@@ -5,7 +5,7 @@
 
 #include "preprocessor.h"
 #include "postprocessor.h"
-#include "../../base_model.h"
+#include "csrc/base_model.h"
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT YOLOv8 : public BaseModel {

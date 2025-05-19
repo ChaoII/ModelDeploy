@@ -17,7 +17,7 @@ int main() {
     auto model = modeldeploy::vision::lpr::LprPipeline(
         "../../test_data/test_models/yolov5plate.onnx",
         "../../test_data/test_models/plate_recognition_color.onnx");
-    auto im = cv::imread("../../test_data/test_images/test_lpr_detection.jpg");
+    auto im = cv::imread("../../test_data/test_images/test_lpr_pipeline3.jpg");
     auto im_bak = im.clone();
     modeldeploy::vision::LprResult res;
     if (!model.predict(im, &res)) {

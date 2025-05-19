@@ -77,6 +77,19 @@ namespace modeldeploy {
 #endif
 
 
+    std::vector<std::string> string_split(const std::string &s, const std::string &delimiter) {
+        std::vector<std::string> tokens;
+        size_t start = 0, end = s.find(delimiter);
+        while (end != std::string::npos) {
+            tokens.push_back(s.substr(start, end - start));
+            start = end + delimiter.length();
+            end = s.find(delimiter, start);
+        }
+        tokens.push_back(s.substr(start)); // 添加最后一个子串
+        return tokens;
+    }
+
+
     std::vector<unsigned char> base64_decode(const std::string& base64_str) {
         const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         std::vector<unsigned char> ret;

@@ -3,7 +3,9 @@ project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 17)
 
 set(LIBRARY_NAME "ModelDeploySDK")
-set(SOURCE "")
+set(SOURCE ""
+        csrc/audio/asr/sense_voice.cpp
+        csrc/audio/asr/sense_voice.h)
 set(DEPENDS "")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -62,6 +64,10 @@ if (BUILD_VISION)
 endif ()
 
 
+
+
+
+
 if (BUILD_CAPI)
     include(${CMAKE_SOURCE_DIR}/capi/CMakeLists.txt)
     if (MSVC)
@@ -73,14 +79,27 @@ endif ()
 set(ONNXRUNTIME_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-src")
 include_directories(${ONNXRUNTIME_DIR}/include)
 link_directories(${ONNXRUNTIME_DIR}/lib)
+list(APPEND DEPENDS onnxruntime)
+
+
+file(GLOB_RECURSE ASR_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/asr/*.cpp)
+file(GLOB_RECURSE VAD_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/vad/*.cpp)
+file(GLOB_RECURSE ASR_PIPELINE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
+set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF)
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/samplerate)
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
+list(APPEND SOURCE ${ASR_SOURCE} ${VAD_SOURCE} ${ASR_PIPELINE_SOURCE})
+list(APPEND DEPENDS samplerate kaldi-native-fbank-core)
+
 
 add_library(${LIBRARY_NAME} SHARED ${SOURCE})
-if (BUILD_AUDIO)
-    include("${CMAKE_SOURCE_DIR}/cmake/audio.cmake")
-    list(APPEND DEPENDS sherpa-onnx-core)
-else ()
-    list(APPEND DEPENDS onnxruntime)
-endif ()
+#if (BUILD_AUDIO)
+#    include("${CMAKE_SOURCE_DIR}/cmake/audio.cmake")
+#    list(APPEND DEPENDS sherpa-onnx-core)
+#else ()
+#    list(APPEND DEPENDS onnxruntime)
+#endif ()
 target_link_libraries(${LIBRARY_NAME} ${DEPENDS})
 
 if (BUILD_EXAMPLES)

@@ -39,6 +39,7 @@ namespace modeldeploy {
         TensorInfo get_output_info(int index);
         std::vector<TensorInfo> get_input_infos();
         std::vector<TensorInfo> get_output_infos();
+        [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const;
 
     private:
         bool init_from_onnx(const std::string& model_buffer,

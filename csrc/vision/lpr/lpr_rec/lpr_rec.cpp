@@ -25,8 +25,7 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprRecognizer::preprocess(
-        cv::Mat& mat, Tensor* output) {
+    bool LprRecognizer::preprocess(cv::Mat& mat, Tensor* output) {
         // car_plate_recognizer's preprocess steps
         // 1. resize
         // 2. BGR->RGB
@@ -35,8 +34,8 @@ namespace modeldeploy::vision::lpr {
         Resize::Run(&mat, size[0], size[1]);
         BGR2RGB::Run(&mat);
         // Compute `result = mat * alpha + beta` directly by channel
-        std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        std::vector beta = {-0.588f, -0.588f, -0.588f};
+        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+        const std::vector beta = {-0.588f, -0.588f, -0.588f};
         Convert::Run(&mat, alpha, beta);
         HWC2CHW::Run(&mat);
         Cast::Run(&mat, "float");

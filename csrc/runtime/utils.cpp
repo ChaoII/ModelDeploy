@@ -117,6 +117,7 @@ namespace modeldeploy {
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE, "DOUBLE"},
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8, "UINT8"},
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8, "INT8"},
+            {ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, "INT64"},
             // 添加更多类型映射...
         };
         return type_map.count(type) ? type_map.at(type) : "UNKNOWN";

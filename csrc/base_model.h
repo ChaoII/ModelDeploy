@@ -14,8 +14,8 @@ namespace modeldeploy {
 
         [[nodiscard]] virtual std::string name() const { return "NameUndefined"; }
 
-        virtual bool infer(std::vector<Tensor> &input_tensors,
-                           std::vector<Tensor> *output_tensors);
+        virtual bool infer(std::vector<Tensor>& input_tensors,
+                           std::vector<Tensor>* output_tensors);
 
         virtual bool infer();
 
@@ -40,9 +40,13 @@ namespace modeldeploy {
             reused_output_tensors_.shrink_to_fit();
         }
 
-        virtual bool set_runtime(OrtBackend *clone_runtime) {
+        virtual bool set_runtime(OrtBackend* clone_runtime) {
             runtime_ = std::unique_ptr<OrtBackend>(clone_runtime);
             return true;
+        }
+
+        virtual std::map<std::string, std::string> get_custom_meta_data() {
+            return runtime_->get_custom_meta_data();
         }
 
     protected:

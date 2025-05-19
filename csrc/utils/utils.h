@@ -17,9 +17,27 @@ namespace modeldeploy {
     /// @return bool 表示是否成功读取文件内容
     bool read_binary_from_file(const std::string& path, std::string* contents);
 
+
+    std::vector<std::string> string_split(const std::string& s, const std::string& delimiter);
+
+
 #ifdef _WIN32
     std::wstring to_wstring(const std::string& str);
 #endif
+
+    template <typename T>
+    std::vector<T> remove_consecutive_duplicates(const std::vector<T>& input) {
+        std::vector<T> result;
+        if (input.empty()) return result;
+
+        result.push_back(input[0]);
+        for (size_t i = 1; i < input.size(); ++i) {
+            if (input[i] != result.back()) {
+                result.push_back(input[i]);
+            }
+        }
+        return result;
+    }
 
 
     std::vector<int64_t> get_stride(const std::vector<int64_t>& dims);

@@ -201,4 +201,19 @@ namespace modeldeploy {
     std::vector<TensorInfo> OrtBackend::get_output_infos() {
         return outputs_desc_;
     }
+
+    std::map<std::string, std::string> OrtBackend::get_custom_meta_data() const {
+        std::map<std::string, std::string> data;
+        const Ort::AllocatorWithDefaultOptions allocator;
+        const Ort::ModelMetadata model_metadata = session_.GetModelMetadata();
+        // 获取自定义元数据数量
+        const auto keys = model_metadata.GetCustomMetadataMapKeysAllocated(allocator);
+        // 遍历所有自定义元数据
+        for (const auto & key_ptr : keys) {
+            const char* key = key_ptr.get();
+            auto value = model_metadata.LookupCustomMetadataMapAllocated(key, allocator);
+            data[std::string(key)] = std::string(value.get());
+        }
+        return data;
+    }
 }
