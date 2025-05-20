@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(ModelDeploySDK)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(LIBRARY_NAME "ModelDeploySDK")
 set(SOURCE ""
-        csrc/audio/asr/sense_voice.cpp
-        csrc/audio/asr/sense_voice.h)
+        csrc/audio/tts/utils.h)
 set(DEPENDS "")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -42,6 +41,7 @@ endif ()
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
+include("${CMAKE_SOURCE_DIR}/cmake/onnxruntime.cmake")
 file(GLOB_RECURSE RUNTIME_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/*.cpp)
 file(GLOB_RECURSE CORE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/core/*.cpp)
 file(GLOB_RECURSE FUNCTION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/function/*.cpp)
@@ -63,9 +63,21 @@ if (BUILD_VISION)
     list(APPEND DEPENDS ${OpenCV_LIBS})
 endif ()
 
-
-
-
+if (BUILD_AUDIO)
+    file(GLOB_RECURSE ASR_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/asr/*.cpp)
+    file(GLOB_RECURSE VAD_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/vad/*.cpp)
+    file(GLOB_RECURSE TTS_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*.cpp ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*/*.cpp)
+    file(GLOB_RECURSE ASR_PIPELINE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/samplerate)
+    set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF CACHE BOOL "Disable Python binding for kaldi-native-fbank" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "With shared library for kaldi-native-fbank" FORCE)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cppjieba)
+    include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
+    include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
+    list(APPEND SOURCE ${ASR_SOURCE} ${VAD_SOURCE} ${TTS_SOURCE} ${ASR_PIPELINE_SOURCE})
+    list(APPEND DEPENDS samplerate kaldi-native-fbank-core cppjieba)
+endif ()
 
 
 if (BUILD_CAPI)
@@ -75,31 +87,7 @@ if (BUILD_CAPI)
     endif ()
 endif ()
 
-# onnxruntime
-set(ONNXRUNTIME_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-src")
-include_directories(${ONNXRUNTIME_DIR}/include)
-link_directories(${ONNXRUNTIME_DIR}/lib)
-list(APPEND DEPENDS onnxruntime)
-
-
-file(GLOB_RECURSE ASR_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/asr/*.cpp)
-file(GLOB_RECURSE VAD_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/vad/*.cpp)
-file(GLOB_RECURSE ASR_PIPELINE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
-set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF)
-add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/samplerate)
-add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
-list(APPEND SOURCE ${ASR_SOURCE} ${VAD_SOURCE} ${ASR_PIPELINE_SOURCE})
-list(APPEND DEPENDS samplerate kaldi-native-fbank-core)
-
-
 add_library(${LIBRARY_NAME} SHARED ${SOURCE})
-#if (BUILD_AUDIO)
-#    include("${CMAKE_SOURCE_DIR}/cmake/audio.cmake")
-#    list(APPEND DEPENDS sherpa-onnx-core)
-#else ()
-#    list(APPEND DEPENDS onnxruntime)
-#endif ()
 target_link_libraries(${LIBRARY_NAME} ${DEPENDS})
 
 if (BUILD_EXAMPLES)

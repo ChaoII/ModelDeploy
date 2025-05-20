@@ -10,7 +10,9 @@
 #include <kaldi-native-fbank/csrc/online-feature.h>
 
 namespace modeldeploy {
-    SenseVoice::SenseVoice(const std::string& model_file, const std::string& token_path_str, const RuntimeOption& custom_option) {
+    SenseVoice::SenseVoice(const std::string& model_file,
+                           const std::string& token_path_str,
+                           const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         token_path_str_ = token_path_str;
@@ -26,7 +28,6 @@ namespace modeldeploy {
         auto get_int32 = [&meta](const std::string& key) {
             return stoi(meta[key]);
         };
-
         window_size_ = get_int32("lfr_window_size");
         window_shift_ = get_int32("lfr_window_shift");
         const std::vector<std::string> keys{
@@ -40,10 +41,8 @@ namespace modeldeploy {
         for (auto& key : keys) {
             lang_id_[key] = get_int32(key);
         }
-
         with_itn_ = get_int32("with_itn");
         without_itn_ = get_int32("without_itn");
-
         auto tmp = string_split(meta["neg_mean"], ",");
         for (const auto& f : tmp) {
             neg_mean_.push_back(stof(f));
@@ -52,7 +51,6 @@ namespace modeldeploy {
         for (const auto& f : tmp) {
             inv_stddev_.push_back(stof(f));
         }
-
         std::ifstream fin(token_path_str_);
         std::string line;
         while (std::getline(fin, line)) {
@@ -86,20 +84,24 @@ namespace modeldeploy {
 
 
     bool SenseVoice::preprocess(const std::vector<float>& data, std::vector<Tensor>* outputs) {
+        if (data.empty()) {
+            MD_LOG_ERROR << "The input data is empty." << std::endl;
+            return false;
+        }
         knf::FbankOptions opts;
         opts.frame_opts.dither = 0;
         opts.frame_opts.snip_edges = false;
         opts.frame_opts.window_type = "hamming";
         opts.frame_opts.samp_freq = 16000;
         opts.mel_opts.num_bins = 80;
-        knf::OnlineFbank fbank(opts);
-        fbank.AcceptWaveform(16000, data.data(), data.size());
-        fbank.InputFinished();
-        const int32_t n = fbank.NumFramesReady();
+        knf::OnlineFbank kaldi_f_bank(opts);
+        kaldi_f_bank.AcceptWaveform(16000, data.data(), static_cast<int32_t>(data.size()));
+        kaldi_f_bank.InputFinished();
+        const int32_t n = kaldi_f_bank.NumFramesReady();
         std::vector<float> feats;
         for (int i = 0; i + window_size_ <= n; i += window_shift_) {
             for (int k = i * 80; k < (i + window_size_) * 80; k++) {
-                const double value = fbank.GetFrame(k / 80)[k % 80];
+                const double value = kaldi_f_bank.GetFrame(k / 80)[k % 80];
                 feats.push_back(static_cast<float>(value + neg_mean_[k % 560]) * inv_stddev_[k % 560]);
             }
         }
@@ -116,9 +118,14 @@ namespace modeldeploy {
         //text_norm
         int32_t text_norm = with_itn_;
         (*outputs)[3] = std::move(Tensor(&text_norm, std::vector<int64_t>{1}, DataType::INT32));
+        return true;
     }
 
     bool SenseVoice::postprocess(std::vector<Tensor>& infer_result, std::string* result) {
+        if (infer_result.empty()) {
+            MD_LOG_ERROR << "Failed to get the inference results." << std::endl;
+            return false;
+        }
         auto& tensor = infer_result[0];
         const auto shape = tensor.shape();
         const int64_t last_dim = shape.empty() ? 1 : shape.back();

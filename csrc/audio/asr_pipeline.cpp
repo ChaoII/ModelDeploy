@@ -44,52 +44,52 @@ namespace modeldeploy {
     AAsr::AAsr(const std::string& asr_onnx,
                const std::string& tokens,
                const std::string& vad_onnx) {
-        _running = true;
-        _sence_voice = std::make_unique<SenseVoice>(asr_onnx, tokens);
-        _vad = std::make_unique<SileroVAD>(vad_onnx);
-        _th = std::thread(&AAsr::run, this);
+        running_ = true;
+        sense_voice_ = std::make_unique<SenseVoice>(asr_onnx, tokens);
+        vad_ = std::make_unique<SileroVAD>(vad_onnx);
+        th_ = std::thread(&AAsr::run, this);
     }
 
     AAsr::~AAsr() {
-        _running = false;
-        _th.join();
+        running_ = false;
+        th_.join();
     }
 
     void AAsr::push_data(const std::vector<float>& data, int inputRate) {
-        std::lock_guard lk(_mx);
+        std::lock_guard lk(mutex_);
         const auto out = resample(data, inputRate);
         for (const auto& d : out) {
-            _deque.push_back(d);
+            deque_.push_back(d);
         }
     }
 
 
     void AAsr::wait_finish() {
-        std::unique_lock lk(_mx);
-        _cv.wait(lk, [this] { return _deque.size() <= 512; });
-        _running.store(true);
+        std::unique_lock lk(mutex_);
+        cv_.wait(lk, [this] { return deque_.size() <= 512; });
+        running_.store(true);
     }
 
     void AAsr::run() {
         int idx = 0;
-        while (_running.load()) {
+        while (running_.load()) {
             std::vector<float> data;
             {
-                std::lock_guard lk(_mx);
+                std::lock_guard lk(mutex_);
                 data.clear();
-                if (_deque.size() >= 512) {
+                if (deque_.size() >= 512) {
                     for (int i = 0; i < 512; ++i) {
-                        data.push_back(_deque.front());
-                        _deque.pop_front();
+                        data.push_back(deque_.front());
+                        deque_.pop_front();
                     }
                 }
                 else {
-                    _cv.notify_all();
+                    cv_.notify_all();
                 }
             }
             if (data.size() == 512) {
                 std::string trigger;
-                _vad->predict(data, &trigger);
+                vad_->predict(data, &trigger);
                 if (trigger != "none") {
                     std::cout << 512 * idx++ << " " << trigger << std::endl;
                 }
@@ -98,29 +98,29 @@ namespace modeldeploy {
                                [](const float x) { return x * 32768.0f; });
                 if (trigger == "start") {
                     // detect voice
-                    _curWav.insert(_curWav.end(), data.begin(), data.end());
+                    cur_wav_.insert(cur_wav_.end(), data.begin(), data.end());
                 }
                 else if (trigger == "end") {
                     // detect silence
-                    _curWav.insert(_curWav.end(), data.begin(), data.end());
+                    cur_wav_.insert(cur_wav_.end(), data.begin(), data.end());
                     std::string result;
-                    _sence_voice->predict(_curWav, &result);
-                    if (_onAsr) {
-                        _onAsr(result);
+                    sense_voice_->predict(cur_wav_, &result);
+                    if (on_asr_) {
+                        on_asr_(result);
                     }
-                    _curWav.clear();
+                    cur_wav_.clear();
                 }
-                else if (!_curWav.empty()) {
-                    _curWav.insert(_curWav.end(), data.begin(), data.end());
+                else if (!cur_wav_.empty()) {
+                    cur_wav_.insert(cur_wav_.end(), data.begin(), data.end());
                 }
             }
         }
 
-        if (!_curWav.empty()) {
+        if (!cur_wav_.empty()) {
             std::string result;
-            _sence_voice->predict(_curWav, &result);
-            if (_onAsr) {
-                _onAsr(result);
+            sense_voice_->predict(cur_wav_, &result);
+            if (on_asr_) {
+                on_asr_(result);
             }
         }
         std::cout << "Asr run exit" << std::endl;

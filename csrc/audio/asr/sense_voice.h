@@ -16,7 +16,7 @@ namespace modeldeploy {
 
         [[nodiscard]] std::string name() const override { return "SenseVoice"; }
 
-        virtual bool predict(const std::vector<float>& data, std::string* result);
+        bool predict(const std::vector<float>& data, std::string* result);
 
     protected:
         bool initialize();
@@ -24,7 +24,7 @@ namespace modeldeploy {
         bool preprocess(const std::vector<float>& data, std::vector<Tensor>* outputs);
 
         bool postprocess(std::vector<Tensor>& infer_result, std::string* result);
-
+    private:
         int32_t window_size_{};
         int32_t window_shift_{};
         int32_t with_itn_{};

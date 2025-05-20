@@ -165,7 +165,7 @@ int main() {
         std::string wav = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
 
         auto asr = std::make_unique<modeldeploy::AAsr>(asr_onnx, tokens, vad_onnx);
-        asr->_onAsr = onAsr;
+        asr->on_asr_ = onAsr;
         std::vector<float> data;
         int32_t sampling_rate = 16000;
         load_wav_file(wav.c_str(), &sampling_rate, data);
@@ -175,7 +175,7 @@ int main() {
             tmp.push_back(i * 37268);
         }
         std::string result_raw;
-        asr->_sence_voice->predict(tmp, &result_raw);
+        asr->sense_voice_->predict(tmp, &result_raw);
         std::cout << "AsrResult:" << result_raw << std::endl;
         for (int i = 0; i < data.size() / 512; ++i) {
             std::vector<float> tmp(data.begin() + i * 512, data.begin() + i * 512 + 512);

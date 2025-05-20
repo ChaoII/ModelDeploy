@@ -21,18 +21,17 @@ namespace modeldeploy {
         ~AAsr();
         void push_data(const std::vector<float>& data, int sampleRate);
         void run();
-        std::atomic<bool> _running;
-        std::thread _th;
-        std::unique_ptr<SenseVoice> _sence_voice;
-        std::function<void(const std::string& asr)> _onAsr;
+        std::atomic<bool> running_;
+        std::thread th_;
+        std::unique_ptr<SenseVoice> sense_voice_;
+        std::function<void(const std::string& asr)> on_asr_;
         void wait_finish();
 
     private:
-        std::unique_ptr<SileroVAD> _vad;
-
-        std::deque<float> _deque;
-        std::vector<float> _curWav;
-        std::mutex _mx;
-        std::condition_variable _cv;
+        std::unique_ptr<SileroVAD> vad_;
+        std::deque<float> deque_;
+        std::vector<float> cur_wav_;
+        std::mutex mutex_;
+        std::condition_variable cv_;
     };
 }
