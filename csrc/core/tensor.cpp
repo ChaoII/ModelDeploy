@@ -164,7 +164,7 @@ namespace modeldeploy {
 
     size_t Tensor::size() const {
         return std::accumulate(shape_.begin(), shape_.end(),
-                               1LL, std::multiplies<>());
+                               1LL, std::multiplies());
     }
 
     size_t Tensor::byte_size() const {
@@ -718,7 +718,7 @@ namespace modeldeploy {
 
     size_t Tensor::calculate_total_size() const {
         return std::accumulate(shape_.begin(), shape_.end(),
-                               1LL, std::multiplies<>()) * element_size_;
+                               1LL, std::multiplies()) * element_size_;
     }
 
     // 计算轴之前的维度乘积
@@ -751,7 +751,7 @@ namespace modeldeploy {
 
     size_t TensorView::size() const {
         return std::accumulate(shape_.begin(), shape_.end(),
-                               1LL, std::multiplies<>());
+                               1LL, std::multiplies());
     }
 
     size_t TensorView::byte_size() const {
@@ -808,7 +808,7 @@ namespace modeldeploy {
     TensorView TensorView::reshape(const std::vector<int64_t>& new_shape) const {
         // 验证元素数量是否匹配
         const size_t new_size = std::accumulate(new_shape.begin(), new_shape.end(),
-                                                1LL, std::multiplies<>());
+                                                1LL, std::multiplies());
         if (new_size != size()) {
             throw std::runtime_error("无法重塑：元素数量不匹配");
         }
