@@ -4,6 +4,7 @@
 
 #include "utils.h"
 
+#include <codecvt>
 #include <fstream>
 
 namespace modeldeploy {
@@ -77,7 +78,17 @@ namespace modeldeploy {
 #endif
 
 
-    std::vector<std::string> string_split(const std::string &s, const std::string &delimiter) {
+    std::wstring utf8_to_wstring(const std::string& str) {
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+        return conv.from_bytes(str);
+    }
+
+    std::string wstring_to_string(const std::wstring& ws) {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+        return conv.to_bytes(ws);
+    }
+
+    std::vector<std::string> string_split(const std::string& s, const std::string& delimiter) {
         std::vector<std::string> tokens;
         size_t start = 0, end = s.find(delimiter);
         while (end != std::string::npos) {

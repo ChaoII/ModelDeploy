@@ -7,7 +7,7 @@
 
 #include "csrc/base_model.h"
 
-namespace modeldeploy {
+namespace modeldeploy::audio::vad {
     class MODELDEPLOY_CXX_EXPORT SileroVAD : public BaseModel {
     public:
         enum class SampleRate: uint32_t {

@@ -25,6 +25,10 @@ namespace modeldeploy {
     std::wstring to_wstring(const std::string& str);
 #endif
 
+    std::wstring utf8_to_wstring(const std::string& str);
+
+    std::string wstring_to_string(const std::wstring& ws);
+
     template <typename T>
     std::vector<T> remove_consecutive_duplicates(const std::vector<T>& input) {
         std::vector<T> result;

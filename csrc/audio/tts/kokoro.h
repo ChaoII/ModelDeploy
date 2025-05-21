@@ -6,9 +6,10 @@
 
 #include "csrc/base_model.h"
 #include "cppjieba/Jieba.hpp"
+#include "csrc/audio/text_normalize/text_normalization.h"
 
 
-namespace modeldeploy {
+namespace modeldeploy::audio::tts {
     class MODELDEPLOY_CXX_EXPORT Kokoro : public BaseModel {
     public:
         Kokoro(const std::string& model_file_path, const std::string& token_path_str,
@@ -46,5 +47,6 @@ namespace modeldeploy {
         std::map<std::string, std::vector<std::string>> word2token_;
         std::map<std::string, std::vector<float>> voices_; // voice -> 510 x 1 x 256
         std::vector<int64_t> style_dims_;
+        std::unique_ptr<TextNormalizer> text_normalizer_;
     };
 } // namespace detection

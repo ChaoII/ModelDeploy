@@ -6,7 +6,7 @@
 #include "csrc/utils/utils.h"
 
 
-namespace modeldeploy {
+namespace modeldeploy::audio::tts {
     inline std::vector<float> load_vec(const std::string& fin) {
         std::vector<float> ret;
         std::ifstream stream(fin);

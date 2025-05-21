@@ -3,8 +3,7 @@ project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 20)
 
 set(LIBRARY_NAME "ModelDeploySDK")
-set(SOURCE ""
-        csrc/audio/tts/utils.h)
+set(SOURCE "")
 set(DEPENDS "")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

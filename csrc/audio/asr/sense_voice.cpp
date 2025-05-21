@@ -9,7 +9,7 @@
 #include <kaldi-native-fbank/csrc/feature-fbank.h>
 #include <kaldi-native-fbank/csrc/online-feature.h>
 
-namespace modeldeploy {
+namespace modeldeploy::audio::asr {
     SenseVoice::SenseVoice(const std::string& model_file,
                            const std::string& token_path_str,
                            const RuntimeOption& custom_option) {

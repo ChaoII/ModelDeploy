@@ -7,12 +7,12 @@
 
 #include "csrc/base_model.h"
 
-namespace modeldeploy {
+namespace modeldeploy::audio::asr {
     class MODELDEPLOY_CXX_EXPORT SenseVoice : public BaseModel {
     public:
         SenseVoice(const std::string& model_file,
-              const std::string& token_path_str,
-              const RuntimeOption& custom_option = RuntimeOption());
+                   const std::string& token_path_str,
+                   const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "SenseVoice"; }
 
@@ -24,6 +24,7 @@ namespace modeldeploy {
         bool preprocess(const std::vector<float>& data, std::vector<Tensor>* outputs);
 
         bool postprocess(std::vector<Tensor>& infer_result, std::string* result);
+
     private:
         int32_t window_size_{};
         int32_t window_shift_{};

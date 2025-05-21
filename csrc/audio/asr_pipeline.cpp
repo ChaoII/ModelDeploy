@@ -9,7 +9,7 @@
 #include "csrc/core/md_log.h"
 #include "csrc/audio//asr_pipeline.h"
 
-namespace modeldeploy {
+namespace modeldeploy::audio {
     static std::vector<float> resample(const std::vector<float>& input, const int inputRate) {
         constexpr int outputRate = 16000;
         if (inputRate == outputRate) {
@@ -45,8 +45,8 @@ namespace modeldeploy {
                const std::string& tokens,
                const std::string& vad_onnx) {
         running_ = true;
-        sense_voice_ = std::make_unique<SenseVoice>(asr_onnx, tokens);
-        vad_ = std::make_unique<SileroVAD>(vad_onnx);
+        sense_voice_ = std::make_unique<asr::SenseVoice>(asr_onnx, tokens);
+        vad_ = std::make_unique<vad::SileroVAD>(vad_onnx);
         th_ = std::thread(&AAsr::run, this);
     }
 

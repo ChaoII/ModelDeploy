@@ -2,17 +2,14 @@
 // Created by aichao on 2025/5/19.
 //
 
-#include "csrc/audio/tts/kokoro.h"
-
-#include <codecvt>
-
-#include "csrc/audio/tts/wave_writer.h"
 #include <fstream>
 #include <regex>
 #include <memory>
+#include "csrc/audio/tts/kokoro.h"
 #include "csrc/audio/tts/utils.h"
+#include "csrc/audio/tts/wave_writer.h"
 
-namespace modeldeploy {
+namespace modeldeploy::audio::tts {
     Kokoro::Kokoro(const std::string& model_file_path, const std::string& token_path_str,
                    const std::vector<std::string>& lexicons, const std::string& voices_bin,
                    const std::string& jieba_dir,
@@ -53,6 +50,7 @@ namespace modeldeploy {
         for (auto p : punctuations) {
             punc_set_.insert(p);
         }
+        text_normalizer_ = std::make_unique<TextNormalizer>("../../test_data");
         return true;
     }
 
@@ -84,15 +82,20 @@ namespace modeldeploy {
             MD_LOG_ERROR << "The input text is empty." << std::endl;
             return false;
         }
-        // 中文解决标点断句的问题
-        const std::vector<std::pair<std::string, std::string>> replace_str_pairs = {
-            {"，", ","}, {":", ","}, {"、", ","}, {"；", ";"}, {"：", ":"},
-            {"。", "."}, {"？", "?"}, {"！", "!"}, {"\\s+", " "},
-        };
-        for (const auto& p : replace_str_pairs) {
-            std::regex re(p.first, std::regex::ECMAScript);
-            text = std::regex_replace(text, re, p.second);
-        }
+        // 中文解决标点断句的问题text_normalizer_能解决这些问题
+        // const std::vector<std::pair<std::string, std::string>> replace_str_pairs = {
+        //     {"，", ","}, {":", ","}, {"、", ","}, {"；", ";"}, {"：", ":"},
+        //     {"。", "."}, {"？", "?"}, {"！", "!"}, {"\\s+", " "},
+        // };
+        // for (const auto& p : replace_str_pairs) {
+        //     std::regex re(p.first, std::regex::ECMAScript);
+        //     text = std::regex_replace(text, re, p.second);
+        // }
+        // 此处用到了模型deploy的text_normalizer
+        text = wstring_to_string(text_normalizer_->normalize_sentence(utf8_to_wstring(text)));
+
+        std::cout << termcolor::cyan << "normalize text is:\n" << text << termcolor::reset << std::endl;
+
         const std::vector<std::string> parts = split_ch_eng(text);
         std::vector<std::string> tokens;
         for (const auto& sent : parts) {

@@ -2,15 +2,13 @@
 // Created by aichao on 2025/5/20.
 //
 
-
-#include "csrc/audio/tts/wave_writer.h"
-
 #include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
+#include "csrc/audio/tts/wave_writer.h"
 
-namespace modeldeploy {
+namespace modeldeploy::audio::tts {
     // see http://soundfile.sapp.org/doc/WaveFormat/
     //
     // Note: We assume little endian here
