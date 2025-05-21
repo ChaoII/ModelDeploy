@@ -8,7 +8,7 @@
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceAge(
         "../../test_data/test_models/face/age_predictor.onnx");
-    assert(table_model.Initialized());
+    assert(faceid_model.is_initialized());
     auto im0 = cv::imread("../../test_data/test_images/test_face_id.jpg");
     int age = 0;
     if (!faceid_model.predict(im0, &age)) {

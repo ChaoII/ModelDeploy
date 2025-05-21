@@ -12,7 +12,7 @@ cv::Mat VisOcr(const cv::Mat& im, const modeldeploy::vision::OCRResult& ocr_resu
                const float score_threshold) {
     auto vis_im = im.clone();
     bool have_score =
-      (ocr_result.boxes.size() == ocr_result.rec_scores.size());
+      ocr_result.boxes.size() == ocr_result.rec_scores.size();
 
     for (int n = 0; n < ocr_result.boxes.size(); n++) {
         if (have_score) {
@@ -58,9 +58,9 @@ int main() {
     auto table_model = modeldeploy::vision::ocr::StructureV2Table(
         table_model_file, table_char_dict_path);
 
-    assert(det_model.Initialized());
-    assert(rec_model.Initialized());
-    assert(table_model.Initialized());
+    assert(det_model.is_initialized());
+    assert(rec_model.is_initialized());
+    assert(table_model.is_initialized());
 
     // Parameters settings for pre and post processing of Det/Cls/Rec Models.
     // All parameters are set to default values.
