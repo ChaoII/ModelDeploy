@@ -58,7 +58,6 @@ jobs:
           -S ${{ github.workspace }}
           -DBUILD_AUDIO=ON
           -DBUILD_VISION=ON 
-          -DBUILD_FACE=ON
           -DBUILD_CAPI=ON
 
       - name: Build
