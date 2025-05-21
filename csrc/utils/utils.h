@@ -135,7 +135,7 @@ namespace modeldeploy {
             MD_PRIVATE_CASE_TYPE(NAME, MDDataType::Type::FP64, double,                      \
                                     __VA_ARGS__)                                            \
             default:                                                                        \
-                std::cerr<<"Invalid enum data type. Expect to accept data "                 \
+                MD_LOG_ERROR<<"Invalid enum data type. Expect to accept data "                 \
                 "type BOOL, INT32, INT64, FP32, FP64,"                                      \
                 "but receive type "<<MDDataType::str(__dtype__)<<std::endl;                 \
         }                                                                                   \
@@ -148,7 +148,7 @@ namespace modeldeploy {
             MD_PRIVATE_CASE_TYPE(NAME, MDDataType::Type::FP32, float, __VA_ARGS__)          \
             MD_PRIVATE_CASE_TYPE(NAME, MDDataType::Type::FP64, double, __VA_ARGS__)         \
             default:                                                                        \
-                std::cerr<<"Invalid enum data type. Expect to accept data type FP32, "      \
+                MD_LOG_ERROR<<"Invalid enum data type. Expect to accept data type FP32, "      \
                 "FP64, but receive type "<<MDDataType::str(__dtype__)<<std::endl;           \
         }                                                                                   \
     }()

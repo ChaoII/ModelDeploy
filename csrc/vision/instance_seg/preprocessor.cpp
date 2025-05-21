@@ -39,7 +39,7 @@ namespace modeldeploy::vision::detection {
             resize_w = size_[0];
         }
         if (std::fabs(scale - 1.0f) > 1e-06) {
-            Resize::Run(mat, resize_w, resize_h);
+            Resize::apply(mat, resize_w, resize_h);
         }
         if (pad_h > 0 || pad_w > 0) {
             const float half_h = static_cast<float>(pad_h) * 1.0f / 2;
@@ -48,7 +48,7 @@ namespace modeldeploy::vision::detection {
             const float half_w = static_cast<float>(pad_w) * 1.0f / 2;
             const int left = static_cast<int>(round(half_w - 0.1));
             const int right = static_cast<int>(round(half_w + 0.1));
-            Pad::Run(mat, top, bottom, left, right, padding_value_);
+            Pad::apply(mat, top, bottom, left, right, padding_value_);
         }
     }
 
@@ -66,7 +66,7 @@ namespace modeldeploy::vision::detection {
         letter_box(mat);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        ConvertAndPermute::Run(mat, alpha, beta, true);
+        ConvertAndPermute::apply(mat, alpha, beta, true);
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {

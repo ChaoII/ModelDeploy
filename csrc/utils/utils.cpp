@@ -124,7 +124,7 @@ namespace modeldeploy {
 
     int argmax(const std::vector<float>& vec) {
         if (vec.empty()) {
-            std::cerr << "Vector is empty." << std::endl;
+            MD_LOG_ERROR << "Vector is empty." << std::endl;
             return -1; // 或者抛出异常
         }
 

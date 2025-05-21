@@ -28,7 +28,7 @@ namespace modeldeploy::vision::ocr {
         else
             resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
 
-        resize_op_->SetWidthAndHeight(resize_w, img_h);
+        resize_op_->set_width_and_height(resize_w, img_h);
         (*resize_op_)(mat);
     }
 
@@ -56,7 +56,7 @@ namespace modeldeploy::vision::ocr {
             (*normalize_op_)(mat);
             std::vector<float> value = {0, 0, 0};
             if (mat->cols < cls_image_shape_[2]) {
-                pad_op_->SetPaddingSize(0, 0, 0, cls_image_shape_[2] - mat->cols);
+                pad_op_->set_padding_size(0, 0, 0, cls_image_shape_[2] - mat->cols);
                 (*pad_op_)(mat);
             }
             (*hwc2chw_op_)(mat);

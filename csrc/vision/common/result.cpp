@@ -7,6 +7,8 @@
 #include "tabulate/tabulate.hpp"
 #include "csrc/vision/common/result.h"
 
+#include <csrc/core/md_log.h>
+
 
 namespace modeldeploy::vision {
     void ClassifyResult::free() {
@@ -379,7 +381,7 @@ namespace modeldeploy::vision {
                     .corner_color(tabulate::Color::magenta);
 
         if (landmarks.size() != boxes.size() * landmarks_per_instance) {
-            std::cerr << "The size of landmarks != boxes.size * landmarks_per_face." << std::endl;
+            MD_LOG_ERROR << "The size of landmarks != boxes.size * landmarks_per_face." << std::endl;
         }
         output_table.add_row({
             "order",
@@ -507,7 +509,7 @@ namespace modeldeploy::vision {
                     .corner_color(tabulate::Color::magenta);
 
         if (landmarks.size() != boxes.size() * 4) {
-            std::cerr << "The size of landmarks != boxes.size * landmarks_per_instance." << std::endl;
+            MD_LOG_ERROR << "The size of landmarks != boxes.size * landmarks_per_instance." << std::endl;
         }
         output_table.add_row({
             "order",

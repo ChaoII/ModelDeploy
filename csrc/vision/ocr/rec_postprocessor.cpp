@@ -87,7 +87,7 @@ namespace modeldeploy::vision::ocr {
                                       const size_t start_index, const size_t total_size,
                                       const std::vector<int>& indices) const {
         if (!initialized_) {
-            std::cerr << "Postprocessor is not initialized." << std::endl;
+            MD_LOG_ERROR << "Postprocessor is not initialized." << std::endl;
             return false;
         }
 

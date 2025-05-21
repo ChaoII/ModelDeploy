@@ -4,11 +4,12 @@
 
 
 #include "cast.h"
+#include "csrc/core/md_log.h"
 
 
 namespace modeldeploy::vision {
-    bool Cast::ImplByOpenCV(cv::Mat* mat) {
-        int c = mat->channels();
+    bool Cast::impl(cv::Mat* mat) const {
+        const int c = mat->channels();
         if (dtype_ == "float") {
             if (mat->type() != CV_32FC(c)) {
                 mat->convertTo(*mat, CV_32FC(c));
@@ -25,19 +26,19 @@ namespace modeldeploy::vision {
             }
         }
         else {
-            std::cerr << "Cast not support for " << dtype_
-                << " now! will skip this operation." << std::endl;
+            MD_LOG_ERROR << "Cast not support for " << dtype_ << " now! will skip this operation." << std::endl;
+            return false;
         }
         return true;
     }
 
-    bool Cast::operator()(cv::Mat* mat) {
-        return ImplByOpenCV(mat);
+    bool Cast::operator()(cv::Mat* mat) const {
+        return impl(mat);
     }
 
 
-    bool Cast::Run(cv::Mat* mat, const std::string& dtype) {
-        auto c = Cast(dtype);
-        return c(mat);
+    bool Cast::apply(cv::Mat* mat, const std::string& dtype) {
+        const auto op = Cast(dtype);
+        return op(mat);
     }
 } // namespace modeldeploy::vision

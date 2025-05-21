@@ -3,6 +3,9 @@
 //
 
 #include "preprocessor.h"
+
+#include <csrc/core/md_log.h>
+
 #include "../common/processors/center_crop.h"
 #include "../common/processors/resize.h"
 #include "../common/processors/convert.h"
@@ -16,7 +19,12 @@ namespace modeldeploy::vision::classification {
 
     bool YOLOv5ClsPreprocessor::Preprocess(
         cv::Mat* mat, Tensor* output,
-        std::map<std::string, std::array<float, 2>>* im_info) {
+        std::map<std::string, std::array<float, 2>>* im_info) const {
+        if (mat->empty()) {
+            MD_LOG_ERROR << "Input image is empty." << std::endl;
+            return false;
+        }
+
         // Record the shape of image and the shape of preprocessed image
         (*im_info)["input_shape"] = {
             static_cast<float>(mat->rows),
@@ -26,22 +34,21 @@ namespace modeldeploy::vision::classification {
         // process after image load
         double ratio = (size_[0] * 1.0) / std::max(static_cast<float>(mat->rows),
                                                    static_cast<float>(mat->cols));
-
         // yolov5cls's preprocess steps
         // 1. CenterCrop
         // 2. Normalize
         // CenterCrop
-        int crop_size = std::min(mat->rows, mat->cols);
-        CenterCrop::Run(mat, crop_size, crop_size);
-        Resize::Run(mat, size_[0], size_[1], -1, -1, cv::INTER_LINEAR);
+        const int crop_size = std::min(mat->rows, mat->cols);
+        CenterCrop::apply(mat, crop_size, crop_size);
+        Resize::apply(mat, size_[0], size_[1], -1, -1, cv::INTER_LINEAR);
         // Normalize
-        BGR2RGB::Run(mat);
-        std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        std::vector<float> beta = {0.0f, 0.0f, 0.0f};
-        Convert::Run(mat, alpha, beta);
-        std::vector<float> mean = {0.485f, 0.456f, 0.406f};
-        std::vector<float> std = {0.229f, 0.224f, 0.225f};
-        NormalizeAndPermute::Run(mat, mean, std, false);
+        BGR2RGB::apply(mat);
+        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+        const std::vector beta = {0.0f, 0.0f, 0.0f};
+        Convert::apply(mat, alpha, beta);
+        const std::vector mean = {0.485f, 0.456f, 0.406f};
+        const std::vector std = {0.229f, 0.224f, 0.225f};
+        NormalizeAndPermute::apply(mat, mean, std, false);
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {
@@ -56,9 +63,9 @@ namespace modeldeploy::vision::classification {
 
     bool YOLOv5ClsPreprocessor::Run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-        std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) {
+        std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const {
         if (images->size() == 0) {
-            std::cerr << "The size of input images should be greater than 0."
+            MD_LOG_ERROR << "The size of input images should be greater than 0."
                 << std::endl;
             return false;
         }
@@ -68,7 +75,7 @@ namespace modeldeploy::vision::classification {
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
             if (!Preprocess(&(*images)[i], &tensors[i], &(*ims_info)[i])) {
-                std::cerr << "Failed to preprocess input image." << std::endl;
+                MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
                 return false;
             }
         }

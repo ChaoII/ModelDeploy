@@ -30,7 +30,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
    * \return true if the preprocess successed, otherwise false
    */
   bool Run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-           std::vector<std::map<std::string, std::array<float, 2>>>* ims_info);
+           std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const;
 
   /// Set target size, tuple of (width, height), default size = {224, 224}
   void SetSize(const std::vector<int>& size) { size_ = size; }
@@ -40,7 +40,7 @@ class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
 
  protected:
   bool Preprocess(cv::Mat* mat, Tensor* output,
-                  std::map<std::string, std::array<float, 2>>* im_info);
+                  std::map<std::string, std::array<float, 2>>* im_info) const;
 
   // target size, tuple of (width, height), default size = {224, 224}
   std::vector<int> size_;

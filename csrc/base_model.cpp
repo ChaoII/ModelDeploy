@@ -5,11 +5,10 @@
 #include "base_model.h"
 #include "core/md_log.h"
 
-
 namespace modeldeploy {
     bool BaseModel::init_runtime() {
         if (runtime_initialized_) {
-            std::cerr << "The model is already initialized, cannot be initialized again." << std::endl;
+            MD_LOG_ERROR << "The model is already initialized, cannot be initialized again." << std::endl;
             return false;
         }
         runtime_ = std::make_shared<OrtBackend>();
@@ -19,7 +18,6 @@ namespace modeldeploy {
         runtime_initialized_ = true;
         return true;
     }
-
 
     bool BaseModel::infer(std::vector<Tensor>& input_tensors,
                           std::vector<Tensor>* output_tensors) {

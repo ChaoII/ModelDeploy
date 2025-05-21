@@ -31,7 +31,7 @@ namespace modeldeploy::vision::detection {
                 (*results)[bs].reserve(tensor_transpose.shape()[1]);
             }
             if (tensor_transpose.dtype() != DataType::FP32) {
-                std::cerr << "Only support post process with float32 data." << std::endl;
+                MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
             const float* data =

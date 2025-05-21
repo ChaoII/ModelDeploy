@@ -202,7 +202,7 @@ namespace modeldeploy::vision::utils {
 
         // 检查裁剪尺寸是否大于输入图像尺寸
         if (crop_height > img_height || crop_width > img_width) {
-            std::cerr << "Crop size is larger than the input image size." << std::endl;
+            MD_LOG_ERROR << "Crop size is larger than the input image size." << std::endl;
             return image; // 或者抛出异常
         }
         // 计算裁剪区域的起始坐标

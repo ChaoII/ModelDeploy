@@ -2,28 +2,28 @@
 
 
 namespace modeldeploy::vision {
-    bool BGR2RGB::ImplByOpenCV(cv::Mat* im) {
+    bool BGR2RGB::impl(cv::Mat* im) {
         cv::Mat new_im;
         cv::cvtColor(*im, new_im, cv::COLOR_BGR2RGB);
         *im = new_im;
         return true;
     }
 
-    bool RGB2BGR::ImplByOpenCV(cv::Mat* im) {
+    bool RGB2BGR::impl(cv::Mat* im) {
         cv::Mat new_im;
         cv::cvtColor(*im, new_im, cv::COLOR_RGB2BGR);
         *im = new_im;
         return true;
     }
 
-    bool BGR2GRAY::ImplByOpenCV(cv::Mat* im) {
+    bool BGR2GRAY::impl(cv::Mat* im) {
         cv::Mat new_im;
         cv::cvtColor(*im, new_im, cv::COLOR_BGR2GRAY);
         *im = new_im;
         return true;
     }
 
-    bool RGB2GRAY::ImplByOpenCV(cv::Mat* im) {
+    bool RGB2GRAY::impl(cv::Mat* im) {
         cv::Mat new_im;
         cv::cvtColor(*im, new_im, cv::COLOR_RGB2GRAY);
         *im = new_im;
@@ -31,39 +31,39 @@ namespace modeldeploy::vision {
     }
 
     bool BGR2RGB::operator()(cv::Mat* mat) {
-        return ImplByOpenCV(mat);
+        return impl(mat);
     }
 
     bool RGB2BGR::operator()(cv::Mat* mat) {
-        return ImplByOpenCV(mat);
+        return impl(mat);
     }
 
     bool BGR2GRAY::operator()(cv::Mat* mat) {
-        return ImplByOpenCV(mat);
+        return impl(mat);
     }
 
     bool RGB2GRAY::operator()(cv::Mat* mat) {
-        return ImplByOpenCV(mat);
+        return impl(mat);
     }
 
 
-    bool BGR2RGB::Run(cv::Mat* mat) {
-        auto b = BGR2RGB();
-        return b(mat);
+    bool BGR2RGB::apply(cv::Mat* mat) {
+        auto op = BGR2RGB();
+        return op(mat);
     }
 
-    bool RGB2BGR::Run(cv::Mat* mat) {
-        auto r = RGB2BGR();
-        return r(mat);
+    bool RGB2BGR::apply(cv::Mat* mat) {
+        auto op = RGB2BGR();
+        return op(mat);
     }
 
-    bool BGR2GRAY::Run(cv::Mat* mat) {
-        auto b = BGR2GRAY();
-        return b(mat);
+    bool BGR2GRAY::apply(cv::Mat* mat) {
+        auto op = BGR2GRAY();
+        return op(mat);
     }
 
-    bool RGB2GRAY::Run(cv::Mat* mat) {
-        auto r = RGB2GRAY();
-        return r(mat);
+    bool RGB2GRAY::apply(cv::Mat* mat) {
+        auto op = RGB2GRAY();
+        return op(mat);
     }
 } // namespace modeldeploy::vision

@@ -40,22 +40,22 @@ namespace modeldeploy::vision::ocr {
             else {
                 resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
             }
-            resize_op_->SetWidthAndHeight(resize_w, img_h);
+            resize_op_->set_width_and_height(resize_w, img_h);
             (*resize_op_)(mat);
-            pad_op_->SetPaddingSize(0, 0, 0, img_w - mat->cols);
+            pad_op_->set_padding_size(0, 0, 0, img_w - mat->cols);
             (*pad_op_)(mat);
         }
         else {
             if (mat->cols >= img_w) {
                 // Resize W to 320
-                resize_op_->SetWidthAndHeight(img_w, img_h);
+                resize_op_->set_width_and_height(img_w, img_h);
                 (*resize_op_)(mat);
             }
             else {
-                resize_op_->SetWidthAndHeight(mat->cols, img_h);
+                resize_op_->set_width_and_height(mat->cols, img_h);
                 (*resize_op_)(mat);
                 // Pad to 320
-                pad_op_->SetPaddingSize(0, 0, 0, img_w - mat->cols);
+                pad_op_->set_padding_size(0, 0, 0, img_w - mat->cols);
                 (*pad_op_)(mat);
             }
         }

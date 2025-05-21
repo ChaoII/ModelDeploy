@@ -1,4 +1,3 @@
-
 //
 // Created by aichao on 2025/2/21.
 //
@@ -12,82 +11,82 @@
 
 
 namespace modeldeploy::vision {
+    /*! @brief Processor for Normalize and Permute images from HWC to CHW.
+     */
+    class MODELDEPLOY_CXX_EXPORT NormalizeAndPermute {
+    public:
+        NormalizeAndPermute(const std::vector<float>& mean,
+                            const std::vector<float>& std, bool is_scale = true,
+                            const std::vector<float>& min = std::vector<float>(),
+                            const std::vector<float>& max = std::vector<float>(),
+                            bool swap_rb = false);
+        bool impl(cv::Mat* mat);
 
-/*! @brief Processor for Normalize and Permute images from HWC to CHW.
- */
-class MODELDEPLOY_CXX_EXPORT NormalizeAndPermute {
- public:
-  NormalizeAndPermute(const std::vector<float>& mean,
-                      const std::vector<float>& std, bool is_scale = true,
-                      const std::vector<float>& min = std::vector<float>(),
-                      const std::vector<float>& max = std::vector<float>(),
-                      bool swap_rb = false);
-  bool ImplByOpenCV(cv::Mat* mat);
-  bool operator()(cv::Mat* mat) ;
+        bool operator()(cv::Mat* mat);
 
-  std::string Name() { return "NormalizeAndPermute"; }
+        std::string name() { return "NormalizeAndPermute"; }
 
-  // While use normalize, it is more recommend not use this function
-  // this function will need to compute result = ((mat / 255) - mean) / std
-  // if we use the following method
-  // ```
-  // auto norm = Normalize(...)
-  // norm(mat)
-  // ```
-  // There will be some precomputation in contruct function
-  // and the `norm(mat)` only need to compute result = mat * alpha + beta
-  // which will reduce lots of time
-  /** \brief Process the input images
-   *
-   * \param[in] mat The input image data, `result = mat * alpha + beta`
-   * \param[in] mean target mean vector of output images
-   * \param[in] std target std vector of output images
-   * \param[in] max max value vector to be in target image
-   * \param[in] min min value vector to be in target image
-   * \param[in] swap_rb to define whether to swap r and b channel order
-   * \return true if the process successed, otherwise false
-   */
-  static bool Run(cv::Mat* mat, const std::vector<float>& mean,
-                  const std::vector<float>& std, bool is_scale = true,
-                  const std::vector<float>& min = std::vector<float>(),
-                  const std::vector<float>& max = std::vector<float>(), bool swap_rb = false);
+        // While use normalize, it is more recommend not use this function
+        // this function will need to compute result = ((mat / 255) - mean) / std
+        // if we use the following method
+        // ```
+        // auto norm = Normalize(...)
+        // norm(mat)
+        // ```
+        // There will be some precomputation in contruct function
+        // and the `norm(mat)` only need to compute result = mat * alpha + beta
+        // which will reduce lots of time
+        /** \brief Process the input images
+         *
+         * \param[in] mat The input image data, `result = mat * alpha + beta`
+         * \param[in] mean target mean vector of output images
+         * \param[in] std target std vector of output images
+         * \param[in] is_scale whether to scale the output images
+         * \param[in] max max value vector to be in target image
+         * \param[in] min min value vector to be in target image
+         * \param[in] swap_rb to define whether to swap r and b channel order
+         * \return true if the process successful, otherwise false
+         */
+        static bool apply(cv::Mat* mat, const std::vector<float>& mean,
+                          const std::vector<float>& std, bool is_scale = true,
+                          const std::vector<float>& min = std::vector<float>(),
+                          const std::vector<float>& max = std::vector<float>(), bool swap_rb = false);
 
-  /** \brief Process the input images
-   *
-   * \param[in] alpha set the value of the alpha parameter
-   */
-  void SetAlpha(const std::vector<float>& alpha) {
-    alpha_.clear();
-    std::vector<float>().swap(alpha_);
-    alpha_.assign(alpha.begin(), alpha.end());
-  }
+        /** \brief Process the input images
+         *
+         * \param[in] alpha set the value of the alpha parameter
+         */
+        void set_alpha(const std::vector<float>& alpha) {
+            alpha_.clear();
+            std::vector<float>().swap(alpha_);
+            alpha_.assign(alpha.begin(), alpha.end());
+        }
 
-  /** \brief Process the input images
-   *
-   * \param[in] beta set the value of the beta parameter
-   */
-  void SetBeta(const std::vector<float>& beta) {
-    beta_.clear();
-    std::vector<float>().swap(beta_);
-    beta_.assign(beta.begin(), beta.end());
-  }
+        /** \brief Process the input images
+         *
+         * \param[in] beta set the value of the beta parameter
+         */
+        void set_beta(const std::vector<float>& beta) {
+            beta_.clear();
+            std::vector<float>().swap(beta_);
+            beta_.assign(beta.begin(), beta.end());
+        }
 
-  bool GetSwapRB() {
-    return swap_rb_;
-  }
+        bool get_swap_rb() const {
+            return swap_rb_;
+        }
 
-  /** \brief Process the input images
-   *
-   * \param[in] swap_rb set the value of the swap_rb parameter
-   */
-  void SetSwapRB(bool swap_rb) {
-    swap_rb_ = swap_rb;
-  }
+        /** \brief Process the input images
+         *
+         * \param[in] swap_rb set the value of the swap_rb parameter
+         */
+        void set_swap_rb(bool swap_rb) {
+            swap_rb_ = swap_rb;
+        }
 
- private:
-  std::vector<float> alpha_;
-  std::vector<float> beta_;
-  bool swap_rb_;
-};
+    private:
+        std::vector<float> alpha_;
+        std::vector<float> beta_;
+        bool swap_rb_;
+    };
 }
-

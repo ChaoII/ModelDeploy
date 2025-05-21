@@ -34,10 +34,10 @@ namespace modeldeploy::vision::face {
         std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         std::vector beta_ = {-1.0f, -1.0f, -1.0f};
 
-        Resize::Run(mat, size_[0], size_[1]);
-        Convert::Run(mat, alpha_, beta_);
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
+        Resize::apply(mat, size_[0], size_[1]);
+        Convert::apply(mat, alpha_, beta_);
+        HWC2CHW::apply(mat);
+        Cast::apply(mat, "float");
 
         if (!utils::mat_to_tensor(*mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;

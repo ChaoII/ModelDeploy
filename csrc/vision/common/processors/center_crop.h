@@ -11,12 +11,14 @@ namespace modeldeploy::vision {
          */
     class MODELDEPLOY_CXX_EXPORT CenterCrop {
     public:
-        CenterCrop(int width, int height) : height_(height), width_(width) {
+        CenterCrop(const int width, const int height) : height_(height), width_(width) {
         }
 
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat) const;
+
         static std::string name() { return "CenterCrop"; }
-        bool operator()(cv::Mat* mat);
+
+        bool operator()(cv::Mat* mat) const;
 
         /** \brief Process the input images
              *
@@ -25,7 +27,7 @@ namespace modeldeploy::vision {
              * \param[in] height height of data will be croped to
              * \return true if the process successed, otherwise false
              */
-        static bool Run(cv::Mat* mat, const int& width, const int& height);
+        static bool apply(cv::Mat* mat, const int& width, const int& height);
 
     private:
         int height_;

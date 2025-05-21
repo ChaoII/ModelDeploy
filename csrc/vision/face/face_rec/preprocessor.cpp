@@ -22,12 +22,12 @@ namespace modeldeploy::vision::face {
             MD_LOG_WARN <<
                 "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss precision" << std::endl;
-            Resize::Run(mat, 256, 256);
+            Resize::apply(mat, 256, 256);
         }
-        CenterCrop::Run(mat, size_[0], size_[1]);
-        BGR2RGB::Run(mat);
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
+        CenterCrop::apply(mat, size_[0], size_[1]);
+        BGR2RGB::apply(mat);
+        HWC2CHW::apply(mat);
+        Cast::apply(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;

@@ -37,7 +37,7 @@ namespace modeldeploy::vision::face {
             resize_w = size[0];
         }
         if (resize_h != mat->rows || resize_w != mat->cols) {
-            Resize::Run(mat, resize_w, resize_h);
+            Resize::apply(mat, resize_w, resize_h);
         }
         if (pad_h > 0 || pad_w > 0) {
             const float half_h = static_cast<float>(pad_h) * 1.0f / 2;
@@ -46,7 +46,7 @@ namespace modeldeploy::vision::face {
             const float half_w = static_cast<float>(pad_w) * 1.0f / 2;
             const int left = static_cast<int>(round(half_w - 0.1));
             const int right = static_cast<int>(round(half_w + 0.1));
-            Pad::Run(mat, top, bottom, left, right, color);
+            Pad::apply(mat, top, bottom, left, right, color);
         }
     }
 
@@ -95,7 +95,7 @@ namespace modeldeploy::vision::face {
             }
             const int resize_h = static_cast<int>(static_cast<float>(mat->rows) * ratio);
             const int resize_w = static_cast<int>(static_cast<float>(mat->cols) * ratio);
-            Resize::Run(mat, resize_w, resize_h, -1, -1, interp);
+            Resize::apply(mat, resize_w, resize_h, -1, -1, interp);
         }
         // scrfd's preprocess steps
         // 1. letterbox
@@ -103,7 +103,7 @@ namespace modeldeploy::vision::face {
         // 3. HWC->CHW
         SCRFD::letter_box(mat, size, padding_value, is_mini_pad, is_no_pad, is_scale_up, stride);
 
-        BGR2RGB::Run(mat);
+        BGR2RGB::apply(mat);
 
         // Normalize::Run(mat, std::vector<float>(mat->Channels(), 0.0),
         //                std::vector<float>(mat->Channels(), 1.0));
@@ -112,10 +112,9 @@ namespace modeldeploy::vision::face {
         // input_size, (127.5, 127.5, 127.5), swapRB=True)
         const std::vector alpha = {1.f / 128.f, 1.f / 128.f, 1.f / 128.f};
         const std::vector beta = {-127.5f / 128.f, -127.5f / 128.f, -127.5f / 128.f};
-        Convert::Run(mat, alpha, beta);
-
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
+        Convert::apply(mat, alpha, beta);
+        HWC2CHW::apply(mat);
+        Cast::apply(mat, "float");
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {
@@ -242,7 +241,7 @@ namespace modeldeploy::vision::face {
                 const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
                 const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
                 const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
-                result->boxes.emplace_back(std::array<float, 4>{x1, y1, x2, y2});
+                result->boxes.emplace_back(std::array{x1, y1, x2, y2});
                 result->scores.push_back(cls_conf);
                 result->label_ids.push_back(0);
                 if (use_kps) {
@@ -257,7 +256,7 @@ namespace modeldeploy::vision::face {
                         // cx + l x
                         const float kps_y = ((cy + kps_t) * static_cast<float>(current_stride) - pad_h) / scale;
                         // cy + t y
-                        result->landmarks.emplace_back(std::array<float, 2>{kps_x, kps_y});
+                        result->landmarks.emplace_back(std::array{kps_x, kps_y});
                     }
                 }
                 count += 1; // limit boxes for nms.

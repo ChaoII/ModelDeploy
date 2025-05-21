@@ -34,7 +34,7 @@ namespace modeldeploy::vision::lpr {
             resize_w = size[0];
         }
         if (resize_h != mat->rows || resize_w != mat->cols) {
-            Resize::Run(mat, resize_w, resize_h);
+            Resize::apply(mat, resize_w, resize_h);
         }
         if (pad_h > 0 || pad_w > 0) {
             const float half_h = static_cast<float>(pad_h) * 1.0f / 2;
@@ -43,7 +43,7 @@ namespace modeldeploy::vision::lpr {
             const float half_w = static_cast<float>(pad_w) * 1.0f / 2;
             const int left = static_cast<int>(round(half_w - 0.1));
             const int right = static_cast<int>(round(half_w + 0.1));
-            Pad::Run(mat, top, bottom, left, right, color);
+            Pad::apply(mat, top, bottom, left, right, color);
         }
     }
 
@@ -101,7 +101,7 @@ namespace modeldeploy::vision::lpr {
             }
             const int resize_h = static_cast<int>(round(static_cast<float>(image.rows) * ratio));
             const int resize_w = static_cast<int>(round(static_cast<float>(image.cols) * ratio));
-            Resize::Run(&image, resize_w, resize_h, -1, -1, interp);
+            Resize::apply(&image, resize_w, resize_h, -1, -1, interp);
         }
 
         // yolov5face's preprocess steps
@@ -110,13 +110,13 @@ namespace modeldeploy::vision::lpr {
         // 3. HWC->CHW
         LetterBox(&image, size, padding_value, is_mini_pad, is_no_pad, is_scale_up,
                   stride);
-        BGR2RGB::Run(&image);
+        BGR2RGB::apply(&image);
         // Normalize::Run(mat, std::vector<float>(mat->Channels(), 0.0),
         //                std::vector<float>(mat->Channels(), 1.0));
         // Compute `result = mat * alpha + beta` directly by channel
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        Convert::Run(&image, alpha, beta);
+        Convert::apply(&image, alpha, beta);
 
         // Record output shape of preprocessed image
         (*im_info)["output_shape"] = {
@@ -124,8 +124,8 @@ namespace modeldeploy::vision::lpr {
             static_cast<float>(image.cols)
         };
 
-        HWC2CHW::Run(&image);
-        Cast::Run(&image, "float");
+        HWC2CHW::apply(&image);
+        Cast::apply(&image, "float");
 
         if (!utils::mat_to_tensor(image, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;

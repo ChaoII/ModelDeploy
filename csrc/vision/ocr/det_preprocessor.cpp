@@ -41,10 +41,10 @@ namespace modeldeploy::vision::ocr {
 
     bool DBDetectorPreprocessor::resize_image(cv::Mat* img, const int resize_w, const int resize_h,
                                               const int max_resize_w, const int max_resize_h) const {
-        resize_op_->SetWidthAndHeight(resize_w, resize_h);
+        resize_op_->set_width_and_height(resize_w, resize_h);
         (*resize_op_)(img);
-        pad_op_->SetPaddingSize(0, max_resize_h - resize_h, 0,
-                                max_resize_w - resize_w);
+        pad_op_->set_padding_size(0, max_resize_h - resize_h, 0,
+                                  max_resize_w - resize_w);
         (*pad_op_)(img);
         return true;
     }

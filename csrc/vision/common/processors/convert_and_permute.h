@@ -13,38 +13,38 @@ namespace modeldeploy::vision {
         ConvertAndPermute(const std::vector<float>& alpha = std::vector<float>(),
                           const std::vector<float>& beta = std::vector<float>(),
                           bool swap_rb = false);
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat) const;
 
-        std::string Name() { return "ConvertAndPermute"; }
+        std::string name() { return "ConvertAndPermute"; }
 
-        static bool Run(cv::Mat* mat, const std::vector<float>& alpha,
-                        const std::vector<float>& beta, bool swap_rb = false);
+        static bool apply(cv::Mat* mat, const std::vector<float>& alpha,
+                          const std::vector<float>& beta, bool swap_rb = false);
 
-        std::vector<float> GetAlpha() const { return alpha_; }
+        std::vector<float> get_alpha() const { return alpha_; }
 
-        bool operator()(cv::Mat* mat);
+        bool operator()(cv::Mat* mat) const;
 
-        void SetAlpha(const std::vector<float>& alpha) {
+        void set_alpha(const std::vector<float>& alpha) {
             alpha_.clear();
             std::vector<float>().swap(alpha_);
             alpha_.assign(alpha.begin(), alpha.end());
         }
 
-        std::vector<float> GetBeta() const { return beta_; }
+        std::vector<float> get_beta() const { return beta_; }
 
 
-        void SetBeta(const std::vector<float>& beta) {
+        void set_beta(const std::vector<float>& beta) {
             beta_.clear();
             std::vector<float>().swap(beta_);
             beta_.assign(beta.begin(), beta.end());
         }
 
-        bool GetSwapRB() {
+        bool get_swap_rb() {
             return swap_rb_;
         }
 
 
-        void SetSwapRB(bool swap_rb) {
+        void set_swap_rb(bool swap_rb) {
             swap_rb_ = swap_rb;
         }
 

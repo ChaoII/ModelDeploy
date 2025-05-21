@@ -11,8 +11,8 @@
 namespace modeldeploy::vision {
     class MODELDEPLOY_CXX_EXPORT Resize {
     public:
-        Resize(int width, int height, float scale_w = -1.0, float scale_h = -1.0,
-               int interp = 1, bool use_scale = false) {
+        Resize(const int width, const int height, const float scale_w = -1.0, const float scale_h = -1.0,
+               const int interp = 1, bool const use_scale = false) {
             width_ = width;
             height_ = height;
             scale_w_ = scale_w;
@@ -21,22 +21,22 @@ namespace modeldeploy::vision {
             use_scale_ = use_scale;
         }
 
-        bool operator()(cv::Mat* mat);
+        bool operator()(cv::Mat* mat) const;
 
+        bool impl(cv::Mat* mat) const;
 
-        bool ImplByOpenCV(cv::Mat* mat);
-        std::string Name() { return "Resize"; }
+        std::string name() { return "Resize"; }
 
-        static bool Run(cv::Mat* mat, int width, int height, float scale_w = -1.0,
-                        float scale_h = -1.0, int interp = 1, bool use_scale = false);
+        static bool apply(cv::Mat* mat, int width, int height, float scale_w = -1.0,
+                          float scale_h = -1.0, int interp = 1, bool use_scale = false);
 
-        bool SetWidthAndHeight(int width, int height) {
+        bool set_width_and_height(int width, int height) {
             width_ = width;
             height_ = height;
             return true;
         }
 
-        std::tuple<int, int> GetWidthAndHeight() {
+        std::tuple<int, int> get_width_and_height() {
             return std::make_tuple(width_, height_);
         }
 

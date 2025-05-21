@@ -7,49 +7,47 @@
 
 
 namespace modeldeploy::vision {
-    /*! @brief Processor for tansform images from BGR to RGB.
+    /*! @brief Processor for transform images from BGR to RGB.
      */
     class MODELDEPLOY_CXX_EXPORT BGR2RGB {
     public:
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat);
 
-        virtual std::string Name() { return "BGR2RGB"; }
+        virtual std::string name() { return "BGR2RGB"; }
         bool operator()(cv::Mat* mat);
 
         /** \brief Process the input images
          *
          * \param[in] mat The input image data
-         * \param[in] lib to define OpenCV or FlyCV or CVCUDA will be used.
-         * \return true if the process successed, otherwise false
+         * \return true if the process successes, otherwise false
          */
-        static bool Run(cv::Mat* mat);
+        static bool apply(cv::Mat* mat);
     };
 
     /*! @brief Processor for tansform images from RGB to BGR.
      */
-    class RGB2BGR {
+    class MODELDEPLOY_CXX_EXPORT RGB2BGR {
     public:
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat);
 
-        std::string Name() { return "RGB2BGR"; }
+        std::string name() { return "RGB2BGR"; }
         bool operator()(cv::Mat* mat);
 
         /** \brief Process the input images
          *
          * \param[in] mat The input image data
-         * \param[in] lib to define OpenCV or FlyCV or CVCUDA will be used.
          * \return true if the process successed, otherwise false
          */
-        static bool Run(cv::Mat* mat);
+        static bool apply(cv::Mat* mat);
     };
 
     /*! @brief Processor for tansform images from BGR to GRAY.
      */
-    class BGR2GRAY {
+    class MODELDEPLOY_CXX_EXPORT BGR2GRAY {
     public:
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat);
 
-        virtual std::string Name() { return "BGR2GRAY"; }
+        virtual std::string name() { return "BGR2GRAY"; }
         bool operator()(cv::Mat* mat);
 
         /** \brief Process the input images
@@ -57,25 +55,23 @@ namespace modeldeploy::vision {
          * \param[in] mat The input image data
          * \return true if the process successed, otherwise false
          */
-        static bool Run(cv::Mat* mat);
+        static bool apply(cv::Mat* mat);
     };
 
     /*! @brief Processor for tansform images from RGB to GRAY.
      */
-    class RGB2GRAY {
+    class MODELDEPLOY_CXX_EXPORT RGB2GRAY {
     public:
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat);
 
-        std::string Name() { return "RGB2GRAY"; }
+        std::string name() { return "RGB2GRAY"; }
         bool operator()(cv::Mat* mat);
 
         /** \brief Process the input images
          *
          * \param[in] mat The input image data
-         * \param[in] lib to define OpenCV or FlyCV or CVCUDA will be used.
          * \return true if the process successed, otherwise false
          */
-        static bool Run(cv::Mat* mat);
+        static bool apply(cv::Mat* mat);
     };
 } // namespace modeldeploy::vision
-// namespace fastdeploy

@@ -12,31 +12,29 @@
 
 
 namespace modeldeploy::vision {
-    /*! @brief Processor for cast images with given type deafault is float.
+    /*! @brief Processor for cast images with given type default is float.
      */
-    class Cast {
+    class MODELDEPLOY_CXX_EXPORT Cast {
     public:
         explicit Cast(const std::string& dtype = "float") : dtype_(dtype) {
         }
 
-        bool ImplByOpenCV(cv::Mat* mat);
+        bool impl(cv::Mat* mat) const;
 
-
-        bool operator()(cv::Mat* mat);
+        bool operator()(cv::Mat* mat) const;
 
         std::string name() { return "Cast"; }
         /** \brief Process the input images
          *
          * \param[in] mat The input image data
          * \param[in] dtype type of data will be casted to
-         * \return true if the process successed, otherwise false
+         * \return true if the process successfully, otherwise false
          */
-        static bool Run(cv::Mat* mat, const std::string& dtype);
+        static bool apply(cv::Mat* mat, const std::string& dtype);
 
-        std::string GetDtype() const { return dtype_; }
+        std::string get_dtype() const { return dtype_; }
 
     private:
         std::string dtype_;
     };
 } // namespace modeldeploy::vision
-// namespace fastdeploy

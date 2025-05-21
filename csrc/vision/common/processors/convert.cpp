@@ -14,20 +14,22 @@
 
 #include "convert.h"
 
+#include <csrc/core/md_log.h>
+
 namespace modeldeploy::vision {
     Convert::Convert(const std::vector<float>& alpha,
                      const std::vector<float>& beta) {
         if (alpha.size() != beta.size()) {
-            std::cerr << "Convert: requires the size of alpha equal to the size of beta.";
+            MD_LOG_ERROR << "Convert: requires the size of alpha equal to the size of beta." << std::endl;
         }
         if (alpha.size() == 0) {
-            std::cerr << "Convert: requires the size of alpha and beta > 0.";
+            MD_LOG_ERROR << "Convert: requires the size of alpha and beta > 0." << std::endl;
         }
         alpha_.assign(alpha.begin(), alpha.end());
         beta_.assign(beta.begin(), beta.end());
     }
 
-    bool Convert::ImplByOpenCV(cv::Mat* im) {
+    bool Convert::impl(cv::Mat* im) const {
         std::vector<cv::Mat> split_im;
         cv::split(*im, split_im);
         for (int c = 0; c < im->channels(); c++) {
@@ -38,12 +40,12 @@ namespace modeldeploy::vision {
     }
 
     bool Convert::operator()(cv::Mat* mat) {
-        return ImplByOpenCV(mat);
+        return impl(mat);
     }
 
-    bool Convert::Run(cv::Mat* mat, const std::vector<float>& alpha,
-                      const std::vector<float>& beta) {
-        auto c = Convert(alpha, beta);
-        return c(mat);
+    bool Convert::apply(cv::Mat* mat, const std::vector<float>& alpha,
+                        const std::vector<float>& beta) {
+        auto op = Convert(alpha, beta);
+        return op(mat);
     }
 }

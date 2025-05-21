@@ -2,27 +2,27 @@
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy::vision {
-    bool CenterCrop::ImplByOpenCV(cv::Mat *im) {
-        int height = static_cast<int>(im->rows);
-        int width = static_cast<int>(im->cols);
+    bool CenterCrop::impl(cv::Mat* im) const {
+        const int height = im->rows;
+        const int width = im->cols;
         if (height < height_ || width < width_) {
             MD_LOG_ERROR << "[CenterCrop] Image size less than crop size" << std::endl;
             return false;
         }
-        int offset_x = static_cast<int>((width - width_) / 2);
-        int offset_y = static_cast<int>((height - height_) / 2);
-        cv::Rect crop_roi(offset_x, offset_y, width_, height_);
-        cv::Mat new_im = (*im)(crop_roi).clone();
+        const int offset_x = (width - width_) / 2;
+        const int offset_y = (height - height_) / 2;
+        const cv::Rect crop_roi(offset_x, offset_y, width_, height_);
+        const cv::Mat new_im = (*im)(crop_roi).clone();
         *im = new_im;
         return true;
     }
 
-    bool CenterCrop::operator()(cv::Mat *mat) {
-        return ImplByOpenCV(mat);
+    bool CenterCrop::operator()(cv::Mat* mat) const {
+        return impl(mat);
     }
 
-    bool CenterCrop::Run(cv::Mat *mat, const int &width, const int &height) {
-        auto c = CenterCrop(width, height);
-        return c(mat);
+    bool CenterCrop::apply(cv::Mat* mat, const int& width, const int& height) {
+        const auto op = CenterCrop(width, height);
+        return op(mat);
     }
 }

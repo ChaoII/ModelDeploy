@@ -29,7 +29,7 @@ namespace modeldeploy::vision::face {
 
     bool SeetaFaceAsFirst::preprocess(cv::Mat* mat, Tensor* output) {
         if (mat->rows == 256 && mat->cols == 256) {
-            CenterCrop::Run(mat, size_[0], size_[1]);
+            CenterCrop::apply(mat, size_[0], size_[1]);
         }
         else if (mat->rows == size_[0] && mat->cols == size_[1]) {
             MD_LOG_WARN << "the width and height is already to [" << size_[0] << "," << size_[1] << "] " << std::endl;
@@ -37,12 +37,12 @@ namespace modeldeploy::vision::face {
         else {
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss predict precision" << std::endl;
-            Resize::Run(mat, 256, 256);
-            CenterCrop::Run(mat, size_[0], size_[1]);
+            Resize::apply(mat, 256, 256);
+            CenterCrop::apply(mat, size_[0], size_[1]);
         }
         cv::cvtColor(*mat, *mat, cv::COLOR_BGR2YCrCb);
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
+        HWC2CHW::apply(mat);
+        Cast::apply(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;

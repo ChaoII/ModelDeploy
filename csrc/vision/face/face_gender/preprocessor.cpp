@@ -13,10 +13,10 @@ namespace modeldeploy::vision::face {
         // 1. Resize
         // 2. HWC2CHW
         // 3. Cast
-        Resize::Run(mat, size_[0], size_[1]);
+        Resize::apply(mat, size_[0], size_[1]);
         // BGR2RGB::Run(mat); 前处理不需要转换为RGB
-        HWC2CHW::Run(mat);
-        Cast::Run(mat, "float");
+        HWC2CHW::apply(mat);
+        Cast::apply(mat, "float");
         if (!utils::mat_to_tensor(*mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;

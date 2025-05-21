@@ -31,14 +31,14 @@ namespace modeldeploy::vision::lpr {
         // 2. BGR->RGB
         // 3. HWC->CHW
 
-        Resize::Run(&mat, size[0], size[1]);
-        BGR2RGB::Run(&mat);
+        Resize::apply(&mat, size[0], size[1]);
+        BGR2RGB::apply(&mat);
         // Compute `result = mat * alpha + beta` directly by channel
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {-0.588f, -0.588f, -0.588f};
-        Convert::Run(&mat, alpha, beta);
-        HWC2CHW::Run(&mat);
-        Cast::Run(&mat, "float");
+        Convert::apply(&mat, alpha, beta);
+        HWC2CHW::apply(&mat);
+        Cast::apply(&mat, "float");
         if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;

@@ -66,7 +66,7 @@ namespace modeldeploy::vision::ocr {
         bool get_static_shape_infer() const { return static_shape_infer_; }
 
     private:
-        bool resize_layout_image(cv::Mat *img, int resize_w, int resize_h);
+        bool resize_layout_image(cv::Mat *img, int resize_w, int resize_h) const;
 
         std::array<int, 4> get_layout_image_info(cv::Mat *img);
 
