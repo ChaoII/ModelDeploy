@@ -164,7 +164,7 @@ int main() {
         std::string vad_onnx = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/silero_vad.onnx";
         std::string wav = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
 
-        auto asr = std::make_unique<modeldeploy::AAsr>(asr_onnx, tokens, vad_onnx);
+        auto asr = std::make_unique<modeldeploy::audio::AAsr>(asr_onnx, tokens, vad_onnx);
         asr->on_asr_ = onAsr;
         std::vector<float> data;
         int32_t sampling_rate = 16000;
