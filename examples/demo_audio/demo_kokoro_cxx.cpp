@@ -6,7 +6,7 @@
 #include <chrono>  // NOLINT
 #include <iostream>
 #include <string>
-
+#include "csrc/audio/tts/utils.h"
 #include "csrc/audio/tts/kokoro.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -28,7 +28,12 @@ int32_t main() {
     };
     const std::string voice_bin = "../../test_data/test_models/kokoro-multi-lang-v1_1/voices.bin";
     const std::string jieba_dir = "../../test_data/test_models/kokoro-multi-lang-v1_1/dict/";
-    auto kokoro = modeldeploy::audio::tts::Kokoro(kokoro_onnx, tokens, lexicons, voice_bin, jieba_dir);
+    const std::string text_normalization_dir = "../../test_data/";
+    auto kokoro = modeldeploy::audio::tts::Kokoro(kokoro_onnx,
+                                                  tokens,
+                                                  lexicons, voice_bin,
+                                                  jieba_dir,
+                                                  text_normalization_dir);
 
     const std::string test_str = "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。";
     std::string test_str1 =
@@ -37,7 +42,7 @@ int32_t main() {
         "该模型是经过短期训练的结果，从专业数据集中添加了100名中文使用者。";
     const std::string test_str3 =
         "北京时间5月19日多哈世乒赛，王楚钦势如破竹4-0剃光头，零封巴西小将速胜晋级；男单10号种子邱党鏖战七局爆冷被淘汰，从0-3追到3-3，只是最终还是无功而返，下面看看各场对决的简述。王楚钦延续火热的竞技状态，比赛上来连赢七分势不可挡，强力进攻打得对手无可奈何，毫无疑问是做好战术准备，首局几乎没给任何机会11-3速胜。";
-    std::string wav_file = "out.wav";
+    std::vector<float> out_data;
     // voice
     // af_maple,af_sol,bf_vale,zf_001,zf_002,zf_003,zf_004,zf_005,
     // zf_006,zf_007,zf_008,zf_017,zf_018,zf_019,zf_021,zf_022,zf_023,
@@ -51,5 +56,6 @@ int32_t main() {
     // zm_054,zm_055,zm_056,zm_057,zm_058,zm_061,zm_062,zm_063,zm_064,
     // zm_065,zm_066,zm_068,zm_069,zm_080,zm_081,zm_082,zm_089,zm_091,
     // zm_095,zm_096,zm_097,zm_098,zm_100
-    kokoro.predict(test_str2, "zf_060", 0.9, &wav_file);
+    kokoro.predict(test_str2, "zf_001", 0.9, &out_data);
+    modeldeploy::audio::tts::write_wave("out.wav", kokoro.get_sample_rate(), out_data.data(), out_data.size());
 }

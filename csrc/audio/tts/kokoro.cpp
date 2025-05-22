@@ -7,12 +7,12 @@
 #include <memory>
 #include "csrc/audio/tts/kokoro.h"
 #include "csrc/audio/tts/utils.h"
-#include "csrc/audio/tts/wave_writer.h"
 
 namespace modeldeploy::audio::tts {
     Kokoro::Kokoro(const std::string& model_file_path, const std::string& token_path_str,
                    const std::vector<std::string>& lexicons, const std::string& voices_bin,
                    const std::string& jieba_dir,
+                   const std::string& text_normalization_dir,
                    const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file_path;
@@ -20,12 +20,13 @@ namespace modeldeploy::audio::tts {
         lexicons_ = lexicons;
         voices_bin_ = voices_bin;
         jieba_dir_ = jieba_dir;
+        text_normalization_dir_ = text_normalization_dir;
         initialized_ = initialize();
     }
 
     bool Kokoro::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         load_tokens(token_path_str_);
@@ -50,12 +51,13 @@ namespace modeldeploy::audio::tts {
         for (auto p : punctuations) {
             punc_set_.insert(p);
         }
-        text_normalizer_ = std::make_unique<TextNormalizer>("../../test_data");
+        text_normalizer_ = std::make_unique<TextNormalizer>(text_normalization_dir_);
         return true;
     }
 
 
-    bool Kokoro::predict(const std::string& text, const std::string& voice, float speed, std::string* result) {
+    bool Kokoro::predict(const std::string& text, const std::string& voice, float speed,
+                         std::vector<float>* out_audio) {
         if (!preprocess(text, voice, speed, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input data." << std::endl;
             return false;
@@ -67,7 +69,7 @@ namespace modeldeploy::audio::tts {
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
-        if (!postprocess(reused_output_tensors_, result)) {
+        if (!postprocess(reused_output_tensors_, out_audio)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }
@@ -93,15 +95,12 @@ namespace modeldeploy::audio::tts {
         // }
         // 此处用到了模型deploy的text_normalizer
         text = wstring_to_string(text_normalizer_->normalize_sentence(utf8_to_wstring(text)));
-
         std::cout << termcolor::cyan << "normalize text is:\n" << text << termcolor::reset << std::endl;
-
         const std::vector<std::string> parts = split_ch_eng(text);
         std::vector<std::string> tokens;
         for (const auto& sent : parts) {
             const unsigned char byte = static_cast<unsigned>(sent[0]);
             if (punc_set_.contains(sent[0])) {
-                std::cout << "add punc token:" << sent << std::endl;
                 for (const auto s : sent) {
                     std::string tmp(1, s);
                     tokens.push_back(tmp);
@@ -111,11 +110,10 @@ namespace modeldeploy::audio::tts {
             else if (byte < 0xC0) {
                 // eng
                 if (word2token_.contains(sent)) {
-                    std::cout << "add eng token:" << sent << std::endl;
                     tokens.insert(tokens.end(), word2token_[sent].begin(), word2token_[sent].end());
                 }
                 else {
-                    std::cout << "skip eng:" << sent << std::endl;
+                    MD_LOG_WARN << "skip eng:" << sent << std::endl;
                 }
             }
             else {
@@ -123,30 +121,26 @@ namespace modeldeploy::audio::tts {
                 jieba_->Cut(sent, out);
                 for (auto& o : out) {
                     if (word2token_.contains(o)) {
-                        std::cout << "add token1:" << o << std::endl;
                         tokens.insert(tokens.end(), word2token_[o].begin(), word2token_[o].end());
                     }
                     else {
                         // split into single hanzi
                         for (const auto& hanzi : utf8_to_charset(o)) {
-                            std::cout << "add token2:" << hanzi << std::endl;
-                            if (word2token_.count(hanzi) > 0) {
+                            if (word2token_.contains(hanzi)) {
                                 tokens.insert(tokens.end(), word2token_[hanzi].begin(), word2token_[hanzi].end());
                             }
                             else {
-                                std::cout << "skip ch:" << sent << std::endl;
+                                MD_LOG_WARN << "skip ch:" << sent << std::endl;
                             }
                         }
                     }
                 }
             }
         }
-
         std::vector<int64_t> token_ids;
         token_ids.push_back(0);
         for (auto& str : tokens) {
             token_ids.push_back(token2id_[str]);
-            std::cout << "token_ids:" << str << " " << token2id_[str] << std::endl;
         }
         if (token_ids.size() > max_len_) {
             token_ids.resize(max_len_);
@@ -161,73 +155,53 @@ namespace modeldeploy::audio::tts {
 
         outputs->resize(3); // tokens,style,speed
         //tokens
-        const std::vector<int64_t> shape_0 = {1, static_cast<int64_t>(token_ids.size())};
+        const std::vector shape_0 = {1, static_cast<int64_t>(token_ids.size())};
         (*outputs)[0] = std::move(Tensor(token_ids.data(), shape_0, DataType::INT64));
         // style
-        const std::vector<int64_t> shape_1 = {style_dims_[1], style_dims_[2]};
+        const std::vector shape_1 = {style_dims_[1], style_dims_[2]};
         (*outputs)[1] = std::move(Tensor(style.data(), shape_1, DataType::FP32));
         //speed
         (*outputs)[2] = std::move(Tensor(&speed, std::vector<int64_t>{1}, DataType::FP32));
         return true;
     }
 
-    bool Kokoro::postprocess(std::vector<Tensor>& infer_result, std::string* result) {
+    bool Kokoro::postprocess(std::vector<Tensor>& infer_result, std::vector<float>* out_audio) {
         if (infer_result.empty()) {
             MD_LOG_ERROR << "Invalid output tensors" << std::endl;
             return false;
         }
         const auto& audio_tensor = infer_result[0];
         const std::vector<int64_t> shape = audio_tensor.shape();
-        std::cout << "shape: ";
-        for (const auto s : shape) {
-            std::cout << s << " ";
-        }
-        std::cout << std::endl;
         auto* logits_data = static_cast<float*>(infer_result[0].data());
         const size_t element_count = audio_tensor.size();
-        std::string wave_data = "out.wav";
-        if (result) {
-            if (const auto ret = string_split(wave_data, "."); ret.size() > 0) {
-                if (const auto& suffix = ret[ret.size() - 1]; suffix == "wav") {
-                    wave_data = *result;
-                }
-            }
-        }
-        if (bool ret = write_wave(std::string(wave_data), sample_rate_, logits_data, element_count)) {
-            MD_LOG_INFO << "save wave file:" << wave_data << std::endl;
-        }
-        else {
-            MD_LOG_ERROR << "save wave file error, filename:" << wave_data << std::endl;
-            return false;
-        }
+        out_audio->insert(out_audio->end(), logits_data, logits_data + element_count);
         return true;
     }
 
-    int Kokoro::load_voices(const std::vector<std::string>& speaker_names,
-                            std::vector<int64_t>& dims,
-                            const std::string& voices_bin) {
+    bool Kokoro::load_voices(const std::vector<std::string>& speaker_names,
+                             std::vector<int64_t>& dims,
+                             const std::string& voices_bin) {
         const size_t n_speaker = speaker_names.size();
         const int64_t max_len = style_dims_[0]; // 510
         const int64_t emb_dim = style_dims_[2]; // 256
 
         std::ifstream file(voices_bin, std::ios::binary);
         if (!file) {
-            std::cout << "fail to open " << voices_bin << std::endl;
-            return -1;
+            MD_LOG_ERROR << "fail to open " << voices_bin << std::endl;
+            return false;
         }
 
         file.seekg(0, std::ios::end);
         const size_t file_size = file.tellg();
         file.seekg(0, std::ios::beg);
-        std::cout << voices_bin << " file_size:" << file_size << std::endl;
         if (n_speaker * max_len * emb_dim * sizeof(float) != file_size) {
-            std::cout << voices_bin << " file_size error, please check" << std::endl;
-            return -2;
+            MD_LOG_ERROR << voices_bin << " file_size error, file size: " << file_size << " please check" << std::endl;
+            return false;
         }
 
         // 2. 读取数据到 uint8 缓冲区
         std::vector<uint8_t> buffer(file_size);
-        file.read(reinterpret_cast<char*>(buffer.data()), file_size);
+        file.read(reinterpret_cast<char*>(buffer.data()), static_cast<int64_t>(file_size));
         file.close();
 
         // // 3. 重新解释为 float32 数组
@@ -237,13 +211,12 @@ namespace modeldeploy::audio::tts {
             voices_[speaker_names[n]].assign(float_data + n * chunk_size,
                                              float_data + n * chunk_size + chunk_size);
         }
-        return 0;
+        return true;
     }
 
     void Kokoro::load_lexicons(const std::vector<std::string>& lexicon_files) {
         for (auto& fin : lexicon_files) {
             std::ifstream input(fin);
-
             std::string line;
             while (std::getline(input, line)) {
                 auto arr = string_split(line, " ");
@@ -251,7 +224,6 @@ namespace modeldeploy::audio::tts {
                 word2token_[arr[0]] = tokens;
             }
         }
-        std::cout << "token2id size: " << word2token_.size();
     }
 
     void Kokoro::load_tokens(const std::string& token_file) {
@@ -266,7 +238,6 @@ namespace modeldeploy::audio::tts {
                 token2id_[" "] = stoi(arr[2]);
             }
         }
-        std::cout << "token2id size: " << token2id_.size();
     }
 
 
@@ -289,12 +260,14 @@ namespace modeldeploy::audio::tts {
             else
                 len = 1;
             const auto sub = text.substr(i, len);
-            const bool is_punc = punc_set_.count(text[i]);
+            const bool is_punc = punc_set_.contains(text[i]);
             const size_t tmp_len = is_punc ? 0 : len;
             if (cur_len != -1 && tmp_len != cur_len) {
                 if (cur_len == 1) {
-                    std::transform(cur.begin(), cur.end(), cur.begin(),
-                                   [](const unsigned char c) { return std::tolower(c); });
+                    std::ranges::transform(cur, cur.begin(),
+                                           [](const unsigned char c) {
+                                               return std::tolower(c);
+                                           });
                 }
                 if (cur != " ") {
                     ret.push_back(cur);
@@ -308,9 +281,6 @@ namespace modeldeploy::audio::tts {
             if (cur != " ") {
                 ret.push_back(cur);
             }
-        }
-        for (const auto& p : ret) {
-            std::cout << "convert:" << p << std::endl;
         }
         return ret;
     }

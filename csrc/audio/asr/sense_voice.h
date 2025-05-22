@@ -32,9 +32,9 @@ namespace modeldeploy::audio::asr {
         int32_t without_itn_{};
 
         std::string token_path_str_;
-        std::map<std::string, int32_t> lang_id_;
         std::vector<float> neg_mean_;
         std::vector<float> inv_stddev_;
+        std::map<std::string, int32_t> lang_id_;
         std::map<std::string, std::string> tokens_;
     };
 } // namespace detection

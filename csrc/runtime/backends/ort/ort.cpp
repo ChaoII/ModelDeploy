@@ -5,13 +5,13 @@
 #include <fstream>
 #include <filesystem>
 #include <tabulate/tabulate.hpp>
-#include "csrc/runtime/ort.h"
+#include "csrc/runtime/backends/ort/ort.h"
 #include "csrc/utils/utils.h"
 #include "csrc/core/md_log.h"
 
 
 namespace modeldeploy {
-    void OrtBackend::build_option(const RuntimeOption& option) {
+    void OrtBackend::build_option(const OrtBackendOption& option) {
         option_ = option;
         if (option.graph_optimization_level >= 0) {
             session_options_.SetGraphOptimizationLevel(
@@ -68,8 +68,12 @@ namespace modeldeploy {
                 << (option.device == 0 ? "cpu" : "gpu") << "." << std::endl;
             return false;
         }
-        if (option.model_from_memory) {
-            return init_from_onnx(option.model_buffer, option);
+        option_.model_filepath = option.model_filepath;
+        option_.device_id = option.device_id;
+        option_.device = option.device;
+
+        if (option_.model_from_memory) {
+            return init_from_onnx(option.model_buffer, option_);
         }
         if (!std::filesystem::exists(option.model_filepath)) {
             MD_LOG_ERROR << "Model file does not exist: " << option.model_filepath << std::endl;
@@ -80,11 +84,11 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to read model file: " << option.model_filepath << std::endl;
             return false;
         }
-        return init_from_onnx(model_buffer, option);
+        return init_from_onnx(model_buffer, option_);
     }
 
 
-    bool OrtBackend::init_from_onnx(const std::string& model_buffer, const RuntimeOption& option) {
+    bool OrtBackend::init_from_onnx(const std::string& model_buffer, const OrtBackendOption& option) {
         if (initialized_) {
             MD_LOG_ERROR << "OrtBackend is already initialized, cannot initialize again." << std::endl;
             return false;
@@ -98,7 +102,6 @@ namespace modeldeploy {
             const Ort::Allocator allocator(session_, input_memory_info);
             const size_t n_inputs = session_.GetInputCount();
             const size_t n_outputs = session_.GetOutputCount();
-
             // 模型输入输出信息
             tabulate::Table input_table;
             input_table.format().font_color(tabulate::Color::yellow)
@@ -120,7 +123,7 @@ namespace modeldeploy {
                     onnx_type_to_string(data_type),
                     shape_to_string(shape)
                 });
-                inputs_desc_.emplace_back(TensorInfo{input_name_ptr.get(), shape, data_type});
+                inputs_desc_.emplace_back(OrtValueInfo{input_name_ptr.get(), shape, data_type});
             }
 
             // 输出表格
@@ -136,7 +139,7 @@ namespace modeldeploy {
                     onnx_type_to_string(data_type),
                     shape_to_string(shape)
                 });
-                outputs_desc_.emplace_back(TensorInfo{output_name_ptr.get(), shape, data_type});
+                outputs_desc_.emplace_back(OrtValueInfo{output_name_ptr.get(), shape, data_type});
                 binding_->BindOutput(output_name_ptr.get(), output_memory_info);
             }
             // ====================== 组合最终输出 ======================
@@ -155,7 +158,7 @@ namespace modeldeploy {
         }
     }
 
-    bool OrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs, const bool copy_to_fd) {
+    bool OrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR <<
                 "[OrtBackend] Size of the inputs(" << inputs.size() <<
@@ -187,19 +190,41 @@ namespace modeldeploy {
     }
 
     TensorInfo OrtBackend::get_input_info(const int index) {
-        return inputs_desc_[index];
+        TensorInfo info;
+        info.name = inputs_desc_[index].name;
+        info.shape.assign(inputs_desc_[index].shape.begin(),
+                          inputs_desc_[index].shape.end());
+        info.dtype = get_md_dtype(inputs_desc_[index].dtype);
+        return info;
     }
 
     std::vector<TensorInfo> OrtBackend::get_input_infos() {
-        return inputs_desc_;
+        auto size = inputs_desc_.size();
+        std::vector<TensorInfo> infos;
+        infos.reserve(size);
+        for (auto i = 0; i < size; i++) {
+            infos.emplace_back(get_input_info(i));
+        }
+        return infos;
     }
 
     TensorInfo OrtBackend::get_output_info(const int index) {
-        return outputs_desc_[index];
+        TensorInfo info;
+        info.name = outputs_desc_[index].name;
+        info.shape.assign(outputs_desc_[index].shape.begin(),
+                          outputs_desc_[index].shape.end());
+        info.dtype = get_md_dtype(outputs_desc_[index].dtype);
+        return info;
     }
 
     std::vector<TensorInfo> OrtBackend::get_output_infos() {
-        return outputs_desc_;
+        auto size = outputs_desc_.size();
+        std::vector<TensorInfo> infos;
+        infos.reserve(size);
+        for (auto i = 0; i < outputs_desc_.size(); i++) {
+            infos.emplace_back(get_output_info(i));
+        }
+        return infos;
     }
 
     std::map<std::string, std::string> OrtBackend::get_custom_meta_data() const {
@@ -209,7 +234,7 @@ namespace modeldeploy {
         // 获取自定义元数据数量
         const auto keys = model_metadata.GetCustomMetadataMapKeysAllocated(allocator);
         // 遍历所有自定义元数据
-        for (const auto & key_ptr : keys) {
+        for (const auto& key_ptr : keys) {
             const char* key = key_ptr.get();
             auto value = model_metadata.LookupCustomMetadataMapAllocated(key, allocator);
             data[std::string(key)] = std::string(value.get());

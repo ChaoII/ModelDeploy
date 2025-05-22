@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "base_model.h"
-#include "core/md_log.h"
+#include "csrc/base_model.h"
+#include "csrc/core/md_log.h"
 
 namespace modeldeploy {
     bool BaseModel::init_runtime() {
@@ -11,7 +11,7 @@ namespace modeldeploy {
             MD_LOG_ERROR << "The model is already initialized, cannot be initialized again." << std::endl;
             return false;
         }
-        runtime_ = std::make_shared<OrtBackend>();
+        runtime_ = std::make_shared<Runtime>();
         if (!runtime_->init(runtime_option_)) {
             return false;
         }
@@ -27,5 +27,26 @@ namespace modeldeploy {
 
     bool BaseModel::infer() {
         return infer(reused_input_tensors_, &reused_output_tensors_);
+    }
+
+
+    size_t BaseModel::num_inputs() { return runtime_->num_inputs(); }
+
+    size_t BaseModel::num_outputs() { return runtime_->num_outputs(); }
+
+    TensorInfo BaseModel::get_input_info(const int index) const {
+        return runtime_->get_input_info(index);
+    }
+
+    TensorInfo BaseModel::get_output_info(const int index) const {
+        return runtime_->get_output_info(index);
+    }
+
+    bool BaseModel::is_initialized() const {
+        return runtime_initialized_ && initialized_;
+    }
+
+    std::map<std::string, std::string> BaseModel::get_custom_meta_data() {
+        return runtime_->get_custom_meta_data();
     }
 }

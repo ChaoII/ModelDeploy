@@ -7,38 +7,44 @@
 
 
 namespace modeldeploy::audio::tts {
-    inline std::vector<float> load_vec(const std::string& fin) {
-        std::vector<float> ret;
-        std::ifstream stream(fin);
-        std::string line;
-        while (std::getline(stream, line)) {
-            auto vec = string_split(line, " ");
-            for (const auto& s : vec) {
-                ret.push_back(stof(s));
-            }
-        }
-        return ret;
-    }
+    std::vector<float> load_vec(const std::string& fin);
 
-    inline std::vector<std::string> utf8_to_charset(const std::string& input) {
-        std::vector<std::string> output;
-        for (size_t i = 0, len = 0; i != input.length(); i += len) {
-            const unsigned char byte = static_cast<unsigned>(input[i]);
-            if (byte >= 0xFC) // length 6
-                len = 6;
-            else if (byte >= 0xF8)
-                len = 5;
-            else if (byte >= 0xF0)
-                len = 4;
-            else if (byte >= 0xE0)
-                len = 3;
-            else if (byte >= 0xC0)
-                len = 2;
-            else
-                len = 1;
-            std::string ch = input.substr(i, len);
-            output.push_back(ch);
-        }
-        return output;
-    }
+    std::vector<std::string> utf8_to_charset(const std::string& input);
+
+    // see http://soundfile.sapp.org/doc/WaveFormat/
+    //
+    // Note: We assume little endian here
+    // TODO: Support big endian
+    struct WaveHeader {
+        int32_t chunk_id;
+        int32_t chunk_size;
+        int32_t format;
+        int32_t sub_chunk1_id;
+        int32_t sub_chunk1_size;
+        int16_t audio_format;
+        int16_t num_channels;
+        int32_t sample_rate;
+        int32_t byte_rate;
+        int16_t block_align;
+        int16_t bits_per_sample;
+        int32_t sub_chunk2_id; // a tag of this chunk
+        int32_t sub_chunk2_size; // size of subchunk2
+    };
+
+    // Write a single channel wave file.
+    // Note that the input samples are in the range [-1, 1]. It will be multiplied
+    // by 32767 and saved in int16_t format in the wave file.
+    //
+    // @param filename Path to save the samples.
+    // @param sampling_rate Sample rate of the samples.
+    // @param samples Pointer to the samples
+    // @param n Number of samples
+    // @return Return true if the write succeeds; return false otherwise.
+    MODELDEPLOY_CXX_EXPORT bool write_wave(const std::string& filename, int32_t sampling_rate,
+                                           const float* samples, size_t n);
+
+    MODELDEPLOY_CXX_EXPORT void write_wave(char* buffer, int32_t sampling_rate, const float* samples,
+                                           size_t n);
+
+    MODELDEPLOY_CXX_EXPORT size_t wave_file_size(int32_t n_samples);
 }

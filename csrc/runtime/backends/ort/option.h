@@ -5,16 +5,14 @@
 #pragma once
 #include <string>
 #include "csrc/core/md_decl.h"
+#include "csrc/runtime/enum_variables.h"
 
 namespace modeldeploy {
-    enum Device {
-        CPU,
-        GPU
-    };
+
 
     /*! @brief Option object to configure ONNX Runtime backend
      */
-    struct MODELDEPLOY_CXX_EXPORT RuntimeOption {
+    struct MODELDEPLOY_CXX_EXPORT OrtBackendOption {
         bool model_from_memory = false;
 
         /// Level of graph optimization,
@@ -46,26 +44,9 @@ namespace modeldeploy {
 
         std::string model_filepath;
 
-        void set_model_path(const std::string& model_path) {
-            model_filepath = model_path;
-        }
-
-        void use_cpu() {
-            device = Device::CPU;
-        }
-
-        void use_gpu(const int index) {
-            device = Device::GPU;
-            device_id = index;
-        }
-
         void set_cpu_thread_num(const int num) {
             intra_op_num_threads = num;
             inter_op_num_threads = num;
-        }
-
-        void set_graph_optimization_level(const int level) {
-            graph_optimization_level = level;
         }
     };
 }

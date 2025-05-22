@@ -19,9 +19,11 @@ namespace modeldeploy::vision::lpr {
 
     bool LprPipeline::is_initialized() const {
         if (detector_ != nullptr && !detector_->is_initialized()) {
+            MD_LOG_ERROR << "detector is not initialized" << std::endl;
             return false;
         }
         if (recognizer_ != nullptr && !recognizer_->is_initialized()) {
+            MD_LOG_ERROR << "recognizer is not initialized" << std::endl;
             return false;
         }
         return true;
@@ -81,6 +83,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprPipeline::predict(const cv::Mat& image, LprResult* results) {
+        std::cout << "-----------------2-------------" << std::endl;
         DetectionLandmarkResult det_result;
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;

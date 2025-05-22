@@ -6,7 +6,6 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
-#include <iomanip>
 #include <chrono>
 
 #ifdef _WIN32
@@ -15,138 +14,9 @@
 #endif
 #include <windows.h>
 #endif
-
+#include "csrc/utils/wave_helper.h"
 #include "csrc/audio/asr_pipeline.h"
 
-struct WaveHeader {
-    bool Validate() const {
-        //                 F F I R
-        if (chunk_id != 0x46464952) {
-            printf("Expected chunk_id RIFF. Given: 0x%08x\n", chunk_id);
-            return false;
-        }
-        //               E V A W
-        if (format != 0x45564157) {
-            printf("Expected format WAVE. Given: 0x%08x\n", format);
-            return false;
-        }
-
-        if (subchunk1_id != 0x20746d66) {
-            printf("Expected subchunk1_id 0x20746d66. Given: 0x%08x\n", subchunk1_id);
-            return false;
-        }
-
-        if (subchunk1_size != 16) {
-            // 16 for PCM
-            printf("Expected subchunk1_size 16. Given: %d\n", subchunk1_size);
-            return false;
-        }
-
-        if (audio_format != 1) {
-            // 1 for PCM
-            printf("Expected audio_format 1. Given: %d\n", audio_format);
-            return false;
-        }
-
-        if (num_channels != 1) {
-            // we support only single channel for now
-            printf("Expected single channel. Given: %d\n", num_channels);
-            return false;
-        }
-        if (byte_rate != (sample_rate * num_channels * bits_per_sample / 8)) {
-            return false;
-        }
-
-        if (block_align != (num_channels * bits_per_sample / 8)) {
-            return false;
-        }
-
-        if (bits_per_sample != 16) {
-            // we support only 16 bits per sample
-            printf("Expected bits_per_sample 16. Given: %d\n", bits_per_sample);
-            return false;
-        }
-        return true;
-    }
-
-    // See https://en.wikipedia.org/wiki/WAV#Metadata and
-    // https://www.robotplanet.dk/audio/wav_meta_data/riff_mci.pdf
-    void SeekToDataChunk(std::istream& is) {
-        //                              a t a d
-        while (is && subchunk2_id != 0x61746164) {
-            // const char *p = reinterpret_cast<const char *>(&subchunk2_id);
-            // printf("Skip chunk (%x): %c%c%c%c of size: %d\n", subchunk2_id, p[0],
-            //        p[1], p[2], p[3], subchunk2_size);
-            is.seekg(subchunk2_size, std::istream::cur);
-            is.read(reinterpret_cast<char*>(&subchunk2_id), sizeof(int32_t));
-            is.read(reinterpret_cast<char*>(&subchunk2_size), sizeof(int32_t));
-        }
-    }
-
-    int32_t chunk_id;
-    int32_t chunk_size;
-    int32_t format;
-    int32_t subchunk1_id;
-    int32_t subchunk1_size;
-    int16_t audio_format;
-    int16_t num_channels;
-    int32_t sample_rate;
-    int32_t byte_rate;
-    int16_t block_align;
-    int16_t bits_per_sample;
-    int32_t subchunk2_id; // a tag of this chunk
-    int32_t subchunk2_size; // size of subchunk2
-};
-
-bool load_wav_file(const char* filename, int32_t* sampling_rate,
-                   std::vector<float>& data) {
-    struct WaveHeader header{};
-
-    std::ifstream is(filename, std::ifstream::binary);
-    is.read(reinterpret_cast<char*>(&header), sizeof(header));
-    if (!is) {
-        std::cout << "Failed to read " << filename;
-        return false;
-    }
-
-    if (!header.Validate()) {
-        return false;
-    }
-
-    header.SeekToDataChunk(is);
-    if (!is) {
-        return false;
-    }
-
-    *sampling_rate = header.sample_rate;
-    // header.subchunk2_size contains the number of bytes in the data.
-    // As we assume each sample contains two bytes, so it is divided by 2 here
-    auto speech_len = header.subchunk2_size / 2;
-    data.resize(speech_len);
-
-    auto speech_buff = (int16_t*)malloc(sizeof(int16_t) * speech_len);
-
-    if (speech_buff) {
-        memset(speech_buff, 0, sizeof(int16_t) * speech_len);
-        is.read(reinterpret_cast<char*>(speech_buff), header.subchunk2_size);
-        if (!is) {
-            std::cout << "Failed to read " << filename;
-            return false;
-        }
-
-        float scale = 32768;
-        //float scale = 1.0;
-        for (int32_t i = 0; i != speech_len; ++i) {
-            data[i] = (float)speech_buff[i] / scale;
-        }
-        free(speech_buff);
-        return true;
-    }
-    else {
-        free(speech_buff);
-        return false;
-    }
-}
 
 void onAsr(const std::string& asr) {
     std::cout << "asr:" << asr << "\n------------" << std::endl;
@@ -162,9 +32,9 @@ int main() {
         std::string asr_onnx = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/model.int8.onnx";
         std::string tokens = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/tokens.txt";
         std::string vad_onnx = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/silero_vad.onnx";
-        std::string wav = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
+        const std::string wav = "../../test_data/test_models/sense-voice-zh-en-ja-ko-yue/test_wavs/vad.wav";
 
-        auto asr = std::make_unique<modeldeploy::audio::AAsr>(asr_onnx, tokens, vad_onnx);
+        const auto asr = std::make_unique<modeldeploy::audio::AAsr>(asr_onnx, tokens, vad_onnx);
         asr->on_asr_ = onAsr;
         std::vector<float> data;
         int32_t sampling_rate = 16000;
@@ -178,7 +48,7 @@ int main() {
         asr->sense_voice_->predict(tmp, &result_raw);
         std::cout << "AsrResult:" << result_raw << std::endl;
         for (int i = 0; i < data.size() / 512; ++i) {
-            std::vector<float> tmp(data.begin() + i * 512, data.begin() + i * 512 + 512);
+            std::vector tmp(data.begin() + i * 512, data.begin() + i * 512 + 512);
             asr->push_data(tmp, sampling_rate);
         }
         asr->wait_finish();

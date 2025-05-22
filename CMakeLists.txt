@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 20)
 
+
 set(LIBRARY_NAME "ModelDeploySDK")
 set(SOURCE "")
 set(DEPENDS "")
@@ -11,8 +12,8 @@ option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_CAPI "build with capi" ON)
 option(BUILD_EXAMPLES "build examples" ON)
-option(BUILD_TESTS "build tests" ON)
-option(WITH_STATIC_CRT "build for mt" ON)
+option(BUILD_TESTS "build tests" OFF)
+option(WITH_STATIC_CRT "build for mt" OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -98,3 +99,35 @@ if (BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif ()
+
+##########################################install###########################################
+
+if (WIN32)
+    install(
+            TARGETS ${LIBRARY_NAME}
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            RUNTIME DESTINATION lib
+    )
+else ()
+    install(
+            TARGETS ${LIBRARY_NAME}
+            LIBRARY DESTINATION lib)
+endif ()
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/csrc
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/include
+        FILES_MATCHING
+        PATTERN "*.h"
+)
+
+if (WITH_CAPI)
+    install(
+            DIRECTORY ${CMAKE_SOURCE_DIR}/c_api
+            DESTINATION ${CMAKE_INSTALL_PREFIX}/include
+            FILES_MATCHING
+            PATTERN "*.h"
+    )
+endif ()
+
+

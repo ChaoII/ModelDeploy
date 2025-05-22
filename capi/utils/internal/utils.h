@@ -134,12 +134,6 @@ std::string format_polygon(MDPolygon polygon);
 /// @return 描述矩形的字符串
 std::string format_rect(MDRect rect);
 
-///
-/// 获取随机颜色
-/// 用于生成一个随机的cv::Scalar对象，通常用于图形绘制时的颜色选择
-///
-/// @return 随机生成的cv::Scalar颜色对象
-cv::Scalar get_random_color();
 
 ///
 /// 从源图像中获取旋转裁剪后的图像

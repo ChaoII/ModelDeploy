@@ -4,8 +4,12 @@
 
 #pragma once
 
+#include <string>
+#include <map>
+#include "csrc/core/tensor.h"
 #include "csrc/core/md_decl.h"
-#include "csrc/runtime/ort.h"
+#include "csrc/runtime/runtime.h"
+
 
 namespace modeldeploy {
     class MODELDEPLOY_CXX_EXPORT BaseModel {
@@ -19,46 +23,38 @@ namespace modeldeploy {
 
         virtual bool infer();
 
-        virtual size_t num_inputs() { return runtime_->num_inputs(); }
+        virtual size_t num_inputs();
 
-        virtual size_t num_outputs() { return runtime_->num_outputs(); }
+        virtual size_t num_outputs();
 
-        virtual TensorInfo get_input_info(const int index) {
-            return runtime_->get_input_info(index);
-        }
+        [[nodiscard]] TensorInfo get_input_info(int index) const;
 
-        virtual TensorInfo get_output_info(const int index) {
-            return runtime_->get_output_info(index);
-        }
+        [[nodiscard]] TensorInfo get_output_info(int index) const;
 
-        [[nodiscard]] virtual bool is_initialized() const {
-            return runtime_initialized_ && initialized_;
-        }
+        [[nodiscard]] virtual bool is_initialized() const;
 
         virtual void release_reused_buffer() {
             reused_input_tensors_.shrink_to_fit();
             reused_output_tensors_.shrink_to_fit();
         }
 
-        virtual bool set_runtime(OrtBackend* clone_runtime) {
-            runtime_ = std::unique_ptr<OrtBackend>(clone_runtime);
+        virtual bool set_runtime(Runtime* clone_runtime) {
+            runtime_ = std::unique_ptr<Runtime>(clone_runtime);
             return true;
         }
 
-        virtual std::map<std::string, std::string> get_custom_meta_data() {
-            return runtime_->get_custom_meta_data();
-        }
+        virtual std::map<std::string, std::string> get_custom_meta_data();
 
     protected:
         virtual bool init_runtime();
 
         bool initialized_ = false;
-        RuntimeOption runtime_option_;
+        RuntimeOption runtime_option_{};
         std::vector<Tensor> reused_input_tensors_;
         std::vector<Tensor> reused_output_tensors_;
 
     private:
-        std::shared_ptr<OrtBackend> runtime_;
+        std::shared_ptr<Runtime> runtime_;
         bool runtime_initialized_ = false;
     };
 }

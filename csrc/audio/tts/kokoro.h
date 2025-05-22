@@ -15,24 +15,28 @@ namespace modeldeploy::audio::tts {
         Kokoro(const std::string& model_file_path, const std::string& token_path_str,
                const std::vector<std::string>& lexicons, const std::string& voices_bin,
                const std::string& jieba_dir,
+               const std::string& text_normalization_dir,
                const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "Kokoro"; }
 
-        virtual bool predict(const std::string& text, const std::string& voice, float speed, std::string* result);
+        virtual bool predict(const std::string& text, const std::string& voice, float speed,
+                             std::vector<float>* out_audio);
+
+        [[nodiscard]] int32_t get_sample_rate() const { return sample_rate_; }
 
     protected:
         bool initialize();
 
         bool preprocess(const std::string& text, const std::string& voice, float speed, std::vector<Tensor>* outputs);
 
-        bool postprocess(std::vector<Tensor>& infer_result, std::string* result);
+        bool postprocess(std::vector<Tensor>& infer_result, std::vector<float>* out_audio);
 
     private:
         void load_tokens(const std::string&);
         void load_lexicons(const std::vector<std::string>&);
-        int load_voices(const std::vector<std::string>& speaker_names,
-                        std::vector<int64_t>& dims, const std::string& voices_bin);
+        bool load_voices(const std::vector<std::string>& speaker_names,
+                         std::vector<int64_t>& dims, const std::string& voices_bin);
         [[nodiscard]] std::vector<std::string> split_ch_eng(const std::string& text) const;
 
         std::unique_ptr<cppjieba::Jieba> jieba_;
@@ -43,6 +47,7 @@ namespace modeldeploy::audio::tts {
         std::vector<std::string> lexicons_;
         std::string voices_bin_;
         std::string jieba_dir_;
+        std::string text_normalization_dir_;
         std::map<std::string, int32_t> token2id_;
         std::map<std::string, std::vector<std::string>> word2token_;
         std::map<std::string, std::vector<float>> voices_; // voice -> 510 x 1 x 256

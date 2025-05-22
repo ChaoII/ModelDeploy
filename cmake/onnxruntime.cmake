@@ -15,7 +15,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
         set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1.20.1_mt_FILE_NAME})
         set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
         set(ONNXRUNTIME_HASH "SHA256=06c19e1c9214f9f7b7c780d14424696f1eee3c39724f738607caa33760fa4cb1")
-    elseif ()
+    else ()
         set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1.20.1_md_FILE_NAME})
         set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
         set(ONNXRUNTIME_HASH "SHA256=8f1df4b53222ed4b92cd809157b219441ea52a9d74442a1254a9ff2e22852f78")
@@ -33,6 +33,9 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
+
+
+message(STATUS "${ONNXRUNTIME_FILE_NAME}")
 
 set(possible_file_locations
         $ENV{HOME}/Downloads/${ONNXRUNTIME_FILE_NAME}
