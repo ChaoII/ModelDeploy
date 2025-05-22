@@ -19,7 +19,7 @@ namespace modeldeploy::vision::ocr {
 
         void set_max_side_len(int max_side_len) { max_side_len_ = max_side_len; }
 
-        int get_max_side_len() const { return max_side_len_; }
+        [[nodiscard]] int get_max_side_len() const { return max_side_len_; }
 
         void set_normalize(const std::vector<float>& mean,
                            const std::vector<float>& std,

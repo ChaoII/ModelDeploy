@@ -31,8 +31,8 @@ namespace modeldeploy::vision::face {
     }
 
     bool SeetaFaceAsSecond::preprocess(cv::Mat* mat, Tensor* output) {
-        std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
-        std::vector beta_ = {-1.0f, -1.0f, -1.0f};
+        const std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
+        const std::vector beta_ = {-1.0f, -1.0f, -1.0f};
 
         Resize::apply(mat, size_[0], size_[1]);
         Convert::apply(mat, alpha_, beta_);

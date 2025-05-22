@@ -19,7 +19,7 @@ namespace modeldeploy::vision::lpr {
 
     bool LprRecognizer::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize modeldeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
         return true;
@@ -80,13 +80,13 @@ namespace modeldeploy::vision::lpr {
     bool LprRecognizer::predict(cv::Mat& image, LprResult* result) {
         std::vector<Tensor> input_tensors(1);
         if (!preprocess(image, &input_tensors[0])) {
-            std::cerr << "Failed to preprocess input image." << std::endl;
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
         input_tensors[0].set_name(get_input_info(0).name);
         std::vector<Tensor> output_tensors;
         if (!infer(input_tensors, &output_tensors)) {
-            std::cerr << "Failed to inference." << std::endl;
+            MD_LOG_ERROR << "Failed to inference." << std::endl;
             return false;
         }
         postprocess(output_tensors, result);

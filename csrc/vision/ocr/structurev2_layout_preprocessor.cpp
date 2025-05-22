@@ -2,6 +2,9 @@
 // Created by aichao on 2025/3/21.
 //
 #include "csrc/vision/ocr/structurev2_layout_preprocessor.h"
+
+#include <csrc/core/md_log.h>
+
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 
@@ -22,7 +25,7 @@ namespace modeldeploy::vision::ocr {
                 layout_image_shape_[1]
             };
         }
-        std::cerr << "not support dynamic shape inference now!" << std::endl;
+        MD_LOG_ERROR << "not support dynamic shape inference now!" << std::endl;
         return {
             img->cols, img->rows, layout_image_shape_[2], layout_image_shape_[1]
         };

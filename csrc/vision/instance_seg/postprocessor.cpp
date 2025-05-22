@@ -59,7 +59,7 @@ namespace modeldeploy::vision::detection {
                         }
                         auto label_id = static_cast<int32_t>(std::distance(data + s + 5, class_score));
                         // convert from [x, y, w, h] to [x1, y1, x2, y2]
-                        (*results)[bs].boxes.emplace_back(std::array<float, 4>{
+                        (*results)[bs].boxes.emplace_back(std::array{
                             data[s + 0] - data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
                             data[s + 1] - data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_,
                             data[s + 0] + data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
@@ -80,13 +80,13 @@ namespace modeldeploy::vision::detection {
                     }
                     auto label_id = static_cast<int32_t>(std::distance(data + s + 5, max_class_score));
                     // convert from [x, y, w, h] to [x1, y1, x2, y2]
-                    (*results)[bs].boxes.emplace_back(std::array<float, 4>
-                    {
-                        data[s + 0] - data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                        data[s + 1] - data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                        data[s + 0] + data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                        data[s + 1] + data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_
-                    });
+                    (*results)[bs].boxes.emplace_back(
+                        std::array{
+                            data[s + 0] - data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
+                            data[s + 1] - data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_,
+                            data[s + 0] + data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
+                            data[s + 1] + data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_
+                        });
                     (*results)[bs].label_ids.push_back(label_id);
                     (*results)[bs].scores.push_back(confidence);
                     mask_embeddings.emplace_back(std::move(mask_embedding));

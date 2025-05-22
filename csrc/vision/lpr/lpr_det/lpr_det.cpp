@@ -174,7 +174,7 @@ namespace modeldeploy::vision::lpr {
             const float h = reg_cls_ptr[3];
 
             // convert from [x, y, w, h] to [x1, y1, x2, y2]
-            result->boxes.emplace_back(std::array<float, 4>{
+            result->boxes.emplace_back(std::array{
                 (x - w / 2.f), (y - h / 2.f), (x + w / 2.f), (y + h / 2.f)
             });
             result->label_ids.push_back(class_id);
@@ -184,7 +184,7 @@ namespace modeldeploy::vision::lpr {
                 const float* landmarks_ptr = reg_cls_ptr + 5;
                 for (size_t j = 0; j < landmarks_per_card * 2; j += 2) {
                     result->landmarks.emplace_back(
-                        std::array<float, 2>{landmarks_ptr[j], landmarks_ptr[j + 1]});
+                        std::array{landmarks_ptr[j], landmarks_ptr[j + 1]});
                 }
             }
         }

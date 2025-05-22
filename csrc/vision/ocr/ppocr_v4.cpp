@@ -18,7 +18,7 @@ namespace modeldeploy::vision::ocr {
                      const double det_db_unclip_ratio,
                      const std::string &det_db_score_mode,
                      const bool use_dilation,
-                     const int batch_size) {
+                     const int rec_batch_size) {
         RuntimeOption option;
         option.set_cpu_thread_num(thread_num);
         detector_ = std::make_unique<DBDetector>(det_model_path, option);
@@ -33,8 +33,8 @@ namespace modeldeploy::vision::ocr {
             classifier_ = std::make_unique<Classifier>(cls_model_path, option);
         }
         recognizer_ = std::make_unique<Recognizer>(rec_model_path, dict_path, option);
-        set_cls_batch_size(batch_size);
-        set_rec_batch_size(batch_size);
+        set_cls_batch_size(rec_batch_size);
+        set_rec_batch_size(rec_batch_size);
     }
 
     PPOCRv4::~PPOCRv4() = default;

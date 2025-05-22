@@ -167,7 +167,7 @@ namespace modeldeploy::vision::face {
             MD_LOG_ERROR << "The default number of output tensor must be 6, 9, 10, or 15 "
                 "according to scrfd." << std::endl;
         }
-        if (!(fmc == 3 || fmc == 5)) { std::cerr << "The fmc must be 3 or 5" << std::endl; }
+        if (!(fmc == 3 || fmc == 5)) { MD_LOG_ERROR << "The fmc must be 3 or 5" << std::endl; }
         if (infer_result.at(0).shape()[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
         }

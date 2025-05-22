@@ -32,10 +32,10 @@ namespace modeldeploy::vision::ocr {
             cv::dilate(bit_map, bit_map, dila_ele);
         }
         std::vector<std::vector<std::vector<int>>> boxes;
-        boxes = util_post_processor_.boxes_from_bitmap(
+        boxes = PostProcessor::boxes_from_bitmap(
             pred_map, bit_map, static_cast<float>(det_db_box_thresh_),
             static_cast<float>(det_db_unclip_ratio_), det_db_score_mode_);
-        boxes = util_post_processor_.filter_tag_det_res(boxes, det_img_info);
+        boxes = PostProcessor::filter_tag_det_res(boxes, det_img_info);
         // boxes to boxes_result
         for (auto& boxe : boxes) {
             std::array<int, 8> new_box{};

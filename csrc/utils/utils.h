@@ -33,7 +33,6 @@ namespace modeldeploy {
     std::vector<T> remove_consecutive_duplicates(const std::vector<T>& input) {
         std::vector<T> result;
         if (input.empty()) return result;
-
         result.push_back(input[0]);
         for (size_t i = 1; i < input.size(); ++i) {
             if (input[i] != result.back()) {

@@ -18,15 +18,16 @@ namespace modeldeploy::vision::ocr {
 
         /** \brief Create a postprocessor instance for Recognizer serials model
          *
-         * \param[in] label_path The path of label_dict
+         * \param[in] dict_path The path of label_dict
          */
         explicit StructureV2TablePostprocessor(const std::string &dict_path);
 
         /** \brief Process the result of runtime and fill to RecognizerResult
          *
          * \param[in] tensors The inference result from runtime
-         * \param[in] texts The output text results of recognizer
-         * \param[in] rec_scores The output score results of recognizer
+         * \param[in] bbox_batch_list The output text results of recognizer
+         * \param[in] structure_batch_list The output score results of recognizer
+         * \param[in] batch_det_img_info The output score results of recognizer
          * \return true if the postprocess successed, otherwise false
          */
         bool run(const std::vector<Tensor> &tensors,

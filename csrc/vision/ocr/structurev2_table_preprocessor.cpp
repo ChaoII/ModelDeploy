@@ -45,7 +45,7 @@ namespace modeldeploy::vision::ocr {
 
     bool StructureV2TablePreprocessor::run(std::vector<cv::Mat>* images,
                                            std::vector<Tensor>* outputs,
-                                           size_t start_index, size_t end_index,
+                                           const size_t start_index, size_t end_index,
                                            const std::vector<int>& indices) {
         if (images->size() == 0 || end_index <= start_index ||
             end_index > images->size()) {

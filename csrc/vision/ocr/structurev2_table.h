@@ -25,13 +25,11 @@ namespace modeldeploy::vision::ocr {
          *
          * \param[in] model_file Path of model file, e.g ./en_ppstructure_mobile_v2.0_SLANet_infer/model.pdmodel.
          * \param table_char_dict_path
-         * \param[in] params_file Path of parameter file, e.g ./en_ppstructure_mobile_v2.0_SLANet_infer/model.pdiparams, if the model format is ONNX, this parameter will be ignored.
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in `valid_cpu_backends`.
-         * \param[in] model_format Model format of the loaded model, default is Paddle format.
          */
-        StructureV2Table(const std::string &model_file,
-                         const std::string &table_char_dict_path = "",
-                         const RuntimeOption &custom_option = RuntimeOption());
+        StructureV2Table(const std::string& model_file,
+                         const std::string& table_char_dict_path = "",
+                         const RuntimeOption& custom_option = RuntimeOption());
 
 
         /// Get model's name
@@ -44,9 +42,9 @@ namespace modeldeploy::vision::ocr {
         * \param structure_result
         * \return true if the prediction is successed, otherwise false.
         */
-        virtual bool predict(const cv::Mat &img,
-                             std::vector<std::array<int, 8>> *boxes_result,
-                             std::vector<std::string> *structure_result);
+        virtual bool predict(const cv::Mat& img,
+                             std::vector<std::array<int, 8>>* boxes_result,
+                             std::vector<std::string>* structure_result);
 
         /** \brief Predict the input image and get OCR detection model result.
          *
@@ -54,7 +52,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] ocr_result The output of OCR detection model result will be writen to this structure.
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool predict(const cv::Mat &img, vision::OCRResult *ocr_result);
+        virtual bool predict(const cv::Mat& img, vision::OCRResult* ocr_result);
 
         /** \brief BatchPredict the input image and get OCR detection model result.
         *
@@ -62,9 +60,9 @@ namespace modeldeploy::vision::ocr {
         * \param[in] det_results The output of OCR detection model result will be writen to this structure.
         * \return true if the prediction is successed, otherwise false.
         */
-        virtual bool batch_predict(const std::vector<cv::Mat> &images,
-                                  std::vector<std::vector<std::array<int, 8>>> *det_results,
-                                  std::vector<std::vector<std::string>> *structure_results);
+        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+                                   std::vector<std::vector<std::array<int, 8>>>* det_results,
+                                   std::vector<std::vector<std::string>>* structure_results);
 
         /** \brief BatchPredict the input image and get OCR detection model result.
          *
@@ -72,16 +70,16 @@ namespace modeldeploy::vision::ocr {
          * \param[in] ocr_results The output of OCR detection model result will be writen to this structure.
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool batch_predict(const std::vector<cv::Mat> &images,
-                                  std::vector<vision::OCRResult> *ocr_results);
+        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+                                   std::vector<vision::OCRResult>* ocr_results);
 
         /// Get preprocessor reference of StructureV2TablePreprocessor
-        virtual StructureV2TablePreprocessor &get_preprocessor() {
+        virtual StructureV2TablePreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of StructureV2TablePostprocessor
-        virtual StructureV2TablePostprocessor &get_postprocessor() {
+        virtual StructureV2TablePostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 

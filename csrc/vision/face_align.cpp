@@ -6,9 +6,9 @@
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy::vision::utils {
-    cv::Mat mean_axis0(const cv::Mat &src) {
-        int num = src.rows;
-        int dim = src.cols;
+    cv::Mat mean_axis0(const cv::Mat& src) {
+        const int num = src.rows;
+        const int dim = src.cols;
         cv::Mat output(1, dim, CV_32F);
         for (int i = 0; i < dim; i++) {
             float sum = 0;
@@ -20,7 +20,7 @@ namespace modeldeploy::vision::utils {
         return output;
     }
 
-    cv::Mat elementwise_minus(const cv::Mat &A, const cv::Mat &B) {
+    cv::Mat elementwise_minus(const cv::Mat& A, const cv::Mat& B) {
         cv::Mat output(A.rows, A.cols, A.type());
         assert(B.cols == A.cols);
         if (B.cols == A.cols) {
@@ -33,7 +33,7 @@ namespace modeldeploy::vision::utils {
         return output;
     }
 
-    cv::Mat VarAxis0(const cv::Mat &src) {
+    cv::Mat VarAxis0(const cv::Mat& src) {
         cv::Mat temp_ = elementwise_minus(src, mean_axis0(src));
         cv::multiply(temp_, temp_, temp_);
         return mean_axis0(temp_);
@@ -42,19 +42,19 @@ namespace modeldeploy::vision::utils {
     int MatrixRank(cv::Mat M) {
         cv::Mat w, u, vt;
         cv::SVD::compute(M, w, u, vt);
-        cv::Mat1b non_zero_singular_values = w > 0.0001;
-        int rank = countNonZero(non_zero_singular_values);
+        const cv::Mat1b non_zero_singular_values = w > 0.0001;
+        const int rank = countNonZero(non_zero_singular_values);
         return rank;
     }
 
-    cv::Mat similar_transform(cv::Mat &dst, cv::Mat &src) {
+    cv::Mat similar_transform(cv::Mat& dst, cv::Mat& src) {
         int num = dst.rows;
         int dim = dst.cols;
         cv::Mat src_mean = mean_axis0(dst);
         cv::Mat dst_mean = mean_axis0(src);
         cv::Mat src_demean = elementwise_minus(dst, src_mean);
         cv::Mat dst_demean = elementwise_minus(src, dst_mean);
-        cv::Mat A = (dst_demean.t() * src_demean) / static_cast<float>(num);
+        cv::Mat A = dst_demean.t() * src_demean / static_cast<float>(num);
         cv::Mat d(dim, 1, CV_32F);
         d.setTo(1.0f);
         if (cv::determinant(A) < 0) {
@@ -66,10 +66,12 @@ namespace modeldeploy::vision::utils {
         int rank = MatrixRank(A);
         if (rank == 0) {
             assert(rank == 0);
-        } else if (rank == dim - 1) {
+        }
+        else if (rank == dim - 1) {
             if (cv::determinant(U) * cv::determinant(V) > 0) {
                 T.rowRange(0, dim).colRange(0, dim) = U * V;
-            } else {
+            }
+            else {
                 int s = d.at<float>(dim - 1, 0) = -1;
                 d.at<float>(dim - 1, 0) = -1;
 
@@ -81,7 +83,8 @@ namespace modeldeploy::vision::utils {
                 T.rowRange(0, dim).colRange(0, dim) = U * twp;
                 d.at<float>(dim - 1, 0) = s;
             }
-        } else {
+        }
+        else {
             cv::Mat diag_ = cv::Mat::diag(d);
             cv::Mat twp = diag_ * V.t(); // np.dot(np.diag(d), V.T)
             cv::Mat res = U * twp; // U
@@ -93,7 +96,7 @@ namespace modeldeploy::vision::utils {
         cv::multiply(d, S, res);
         double scale = 1.0 / val * cv::sum(res).val[0];
         T.rowRange(0, dim).colRange(0, dim) =
-                -T.rowRange(0, dim).colRange(0, dim).t();
+            -T.rowRange(0, dim).colRange(0, dim).t();
         cv::Mat temp1 = T.rowRange(0, dim).colRange(0, dim); // T[:dim, :dim]
         cv::Mat temp2 = src_mean.t(); // src_mean.T
         cv::Mat temp3 = temp1 * temp2; // np.dot(T[:dim, :dim], src_mean.T)
@@ -104,9 +107,9 @@ namespace modeldeploy::vision::utils {
     }
 
     std::vector<cv::Mat> align_face_with_five_points(
-            const cv::Mat &image, DetectionLandmarkResult &result,
-            std::vector<std::array<float, 2>> std_landmarks,
-            std::array<int, 2> output_size) {
+        const cv::Mat& image, DetectionLandmarkResult& result,
+        std::vector<std::array<float, 2>> std_landmarks,
+        std::array<int, 2> output_size) {
         if (std_landmarks.size() != 5) {
             MD_LOG_ERROR << "The landmarks.size() must be 5." << std::endl;
         }

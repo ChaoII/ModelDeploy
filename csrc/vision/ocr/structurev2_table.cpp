@@ -4,6 +4,9 @@
 
 #include "opencv2/opencv.hpp"
 #include "csrc/vision/ocr/structurev2_table.h"
+
+#include <csrc/core/md_log.h>
+
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 
@@ -11,10 +14,10 @@ namespace modeldeploy::vision::ocr {
     StructureV2Table::StructureV2Table() {
     }
 
-    StructureV2Table::StructureV2Table(const std::string &model_file,
-                                       const std::string &table_char_dict_path,
-                                       const RuntimeOption &custom_option)
-            : postprocessor_(table_char_dict_path) {
+    StructureV2Table::StructureV2Table(const std::string& model_file,
+                                       const std::string& table_char_dict_path,
+                                       const RuntimeOption& custom_option)
+        : postprocessor_(table_char_dict_path) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
         initialized_ = initialize();
@@ -23,16 +26,16 @@ namespace modeldeploy::vision::ocr {
     // Init
     bool StructureV2Table::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         return true;
     }
 
 
-    bool StructureV2Table::predict(const cv::Mat &img,
-                                   std::vector<std::array<int, 8>> *boxes_result,
-                                   std::vector<std::string> *structure_result) {
+    bool StructureV2Table::predict(const cv::Mat& img,
+                                   std::vector<std::array<int, 8>>* boxes_result,
+                                   std::vector<std::string>* structure_result) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
         std::vector<std::vector<std::string>> structure_results;
         if (!batch_predict({img}, &det_results, &structure_results)) {
@@ -43,18 +46,17 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool StructureV2Table::predict(const cv::Mat &img,
-                                   vision::OCRResult *ocr_result) {
-        if (!predict(img, &(ocr_result->table_boxes),
-                     &(ocr_result->table_structure))) {
+    bool StructureV2Table::predict(const cv::Mat& img,
+                                   vision::OCRResult* ocr_result) {
+        if (!predict(img, &ocr_result->table_boxes, &ocr_result->table_structure)) {
             return false;
         }
         return true;
     }
 
     bool StructureV2Table::batch_predict(
-            const std::vector<cv::Mat> &images,
-            std::vector<vision::OCRResult> *ocr_results) {
+        const std::vector<cv::Mat>& images,
+        std::vector<vision::OCRResult>* ocr_results) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
         std::vector<std::vector<std::string>> structure_results;
         if (!batch_predict(images, &det_results, &structure_results)) {
@@ -69,25 +71,25 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2Table::batch_predict(
-            const std::vector<cv::Mat> &images,
-            std::vector<std::vector<std::array<int, 8>>> *det_results,
-            std::vector<std::vector<std::string>> *structure_results) {
+        const std::vector<cv::Mat>& images,
+        std::vector<std::vector<std::array<int, 8>>>* det_results,
+        std::vector<std::vector<std::string>>* structure_results) {
         std::vector<cv::Mat> images_ = images;
         if (!preprocessor_.run(&images_, &reused_input_tensors_)) {
-            std::cerr << "Failed to preprocess input image." << std::endl;
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
-        auto batch_det_img_info = preprocessor_.GetBatchImgInfo();
+        const auto batch_det_img_info = preprocessor_.GetBatchImgInfo();
 
         reused_input_tensors_[0].set_name(get_input_info(0).name);
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
-            std::cerr << "Failed to inference by runtime." << std::endl;
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
 
         if (!postprocessor_.run(reused_output_tensors_, det_results,
                                 structure_results, *batch_det_img_info)) {
-            std::cerr << "Failed to postprocess the inference cls_results by runtime." << std::endl;
+            MD_LOG_ERROR << "Failed to postprocess the inference cls_results by runtime." << std::endl;
             return false;
         }
         return true;

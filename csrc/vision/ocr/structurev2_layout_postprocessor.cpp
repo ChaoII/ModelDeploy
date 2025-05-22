@@ -16,17 +16,17 @@ namespace modeldeploy::vision::ocr {
         // A StructureV2Layout has 8 output tensors on which it then runs
         // a GFL regression (namely, DisPred2Box), reference:
         // PaddleOCR/blob/release/2.6/deploy/cpp_infer/src/postprocess_op.cpp#L511
-        int tensor_size = tensors.size();
+        const size_t tensor_size = tensors.size();
         if (tensor_size != 8) {
             MD_LOG_ERROR << "StructureV2Layout should has 8 output tensors,"
                 "but got " << tensor_size << " now!" << std::endl;
         }
-        if ((tensor_size / 2) != fpn_stride_.size()) {
+        if (tensor_size / 2 != fpn_stride_.size()) {
             MD_LOG_ERROR << "found (tensor_size / 2) != fpn_stride_.size() !" << std::endl;
         }
         // TODO: may need to reorder the tensors according to
         // fpn_stride_ and the shape of output tensors.
-        size_t batch = tensors[0].shape()[0]; // [batch, ...]
+        const size_t batch = tensors[0].shape()[0]; // [batch, ...]
 
         results->resize(batch);
         set_reg_max(tensors[fpn_stride_.size()].shape()[2] / 4);
@@ -44,12 +44,12 @@ namespace modeldeploy::vision::ocr {
         const std::vector<Tensor>& tensors,
         std::vector<Tensor>& single_batch_tensors, size_t batch_idx) {
         single_batch_tensors.resize(tensors.size());
-        for (int j = 0; j < tensors.size(); ++j) {
-            auto j_shape = tensors[j].shape();
+        for (const auto& tensor : tensors) {
+            auto j_shape = tensor.shape();
             j_shape[0] = 1; // process b=1 per loop
-            size_t j_step =
+            const size_t j_step =
                 std::accumulate(j_shape.begin(), j_shape.end(), 1, std::multiplies());
-            const float* j_data_ptr = reinterpret_cast<const float*>(tensors[j].data());
+            const auto* j_data_ptr = static_cast<const float*>(tensor.data());
             const float* j_start_ptr = j_data_ptr + j_step * batch_idx;
             // todo error
             // single_batch_tensors[j].set_external_data(
@@ -66,24 +66,24 @@ namespace modeldeploy::vision::ocr {
                 "but got " << static_cast<int>(single_batch_tensors.size()) << " now!" << std::endl;
         }
         // layout_img_info: {image width, image height, resize width, resize height}
-        int img_w = layout_img_info[0];
-        int img_h = layout_img_info[1];
-        int in_w = layout_img_info[2];
-        int in_h = layout_img_info[3];
-        float scale_factor_w = static_cast<float>(in_w) / static_cast<float>(img_w);
-        float scale_factor_h = static_cast<float>(in_h) / static_cast<float>(img_h);
+        const int img_w = layout_img_info[0];
+        const int img_h = layout_img_info[1];
+        const int in_w = layout_img_info[2];
+        const int in_h = layout_img_info[3];
+        const float scale_factor_w = static_cast<float>(in_w) / static_cast<float>(img_w);
+        const float scale_factor_h = static_cast<float>(in_h) / static_cast<float>(img_h);
 
         std::vector<DetectionResult> bbox_results;
         bbox_results.resize(num_class_); // tmp result for each class
 
         // decode score, label, box
         for (int i = 0; i < fpn_stride_.size(); ++i) {
-            int feature_h = std::ceil(static_cast<float>(in_h) / fpn_stride_[i]);
-            int feature_w = std::ceil(static_cast<float>(in_w) / fpn_stride_[i]);
+            const int feature_h = std::ceil(static_cast<float>(in_h) / fpn_stride_[i]);
+            const int feature_w = std::ceil(static_cast<float>(in_w) / fpn_stride_[i]);
             const Tensor& prob_tensor = single_batch_tensors[i];
             const Tensor& bbox_tensor = single_batch_tensors[i + fpn_stride_.size()];
-            const float* prob_data = reinterpret_cast<const float*>(prob_tensor.data());
-            const float* bbox_data = reinterpret_cast<const float*>(bbox_tensor.data());
+            const auto prob_data = static_cast<const float*>(prob_tensor.data());
+            const auto bbox_data = static_cast<const float*>(bbox_tensor.data());
             for (int idx = 0; idx < feature_h * feature_w; ++idx) {
                 // score and label
                 float score = 0.f;
@@ -96,10 +96,10 @@ namespace modeldeploy::vision::ocr {
                 }
                 // bbox
                 if (score > score_threshold_) {
-                    int row = idx / feature_w;
-                    int col = idx % feature_w;
-                    std::vector<float> bbox_pred(bbox_data + idx * 4 * reg_max_,
-                                                 bbox_data + (idx + 1) * 4 * reg_max_);
+                    const int row = idx / feature_w;
+                    const int col = idx % feature_w;
+                    std::vector bbox_pred(bbox_data + idx * 4 * reg_max_,
+                                          bbox_data + (idx + 1) * 4 * reg_max_);
                     bbox_results[label].boxes.push_back(dis_pred_to_bbox(
                         bbox_pred, col, row, fpn_stride_[i], in_w, in_h, reg_max_));
                     bbox_results[label].scores.push_back(score);
@@ -110,21 +110,21 @@ namespace modeldeploy::vision::ocr {
 
         result->clear();
         // nms for per class, i in [0~num_class-1]
-        for (int i = 0; i < bbox_results.size(); ++i) {
-            if (bbox_results[i].boxes.empty()) {
+        for (auto& bbox_result : bbox_results) {
+            if (bbox_result.boxes.empty()) {
                 continue;
             }
-            vision::utils::nms(&bbox_results[i], nms_threshold_);
+            vision::utils::nms(&bbox_result, nms_threshold_);
             // fill output results
-            for (int j = 0; j < bbox_results[i].boxes.size(); ++j) {
-                result->scores.push_back(bbox_results[i].scores[j]);
-                result->label_ids.push_back(bbox_results[i].label_ids[j]);
+            for (int j = 0; j < bbox_result.boxes.size(); ++j) {
+                result->scores.push_back(bbox_result.scores[j]);
+                result->label_ids.push_back(bbox_result.label_ids[j]);
                 result->boxes.push_back(
                     {
-                        bbox_results[i].boxes[j][0] / scale_factor_w,
-                        bbox_results[i].boxes[j][1] / scale_factor_h,
-                        bbox_results[i].boxes[j][2] / scale_factor_w,
-                        bbox_results[i].boxes[j][3] / scale_factor_h,
+                        bbox_result.boxes[j][0] / scale_factor_w,
+                        bbox_result.boxes[j][1] / scale_factor_h,
+                        bbox_result.boxes[j][2] / scale_factor_w,
+                        bbox_result.boxes[j][3] / scale_factor_h,
                     });
             }
         }
@@ -132,10 +132,10 @@ namespace modeldeploy::vision::ocr {
     }
 
     std::array<float, 4> StructureV2LayoutPostprocessor::dis_pred_to_bbox(
-        const std::vector<float>& bbox_pred, int x, int y, int stride, int resize_w,
-        int resize_h, int reg_max) {
-        float ct_x = (static_cast<float>(x) + 0.5f) * static_cast<float>(stride);
-        float ct_y = (static_cast<float>(y) + 0.5f) * static_cast<float>(stride);
+        const std::vector<float>& bbox_pred, const int x, const int y, const int stride, const int resize_w,
+        const int resize_h, const int reg_max) {
+        const float ct_x = (static_cast<float>(x) + 0.5f) * static_cast<float>(stride);
+        const float ct_y = (static_cast<float>(y) + 0.5f) * static_cast<float>(stride);
         std::vector<float> dis_pred;
         dis_pred.resize(4);
         for (int i = 0; i < 4; i++) {
@@ -149,12 +149,10 @@ namespace modeldeploy::vision::ocr {
             dis *= static_cast<float>(stride);
             dis_pred[i] = dis;
         }
-
         float xmin = std::max(ct_x - dis_pred[0], 0.0f);
         float ymin = std::max(ct_y - dis_pred[1], 0.0f);
         float xmax = std::min(ct_x + dis_pred[2], static_cast<float>(resize_w));
         float ymax = std::min(ct_y + dis_pred[3], static_cast<float>(resize_h));
-
         return {xmin, ymin, xmax, ymax};
     }
 } // namespace modeldeploy::vision::ocr

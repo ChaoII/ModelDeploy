@@ -5,6 +5,7 @@
 #include "csrc/vision/utils.h"
 
 #include <execution>
+#include <ranges>
 
 #include "csrc/core/md_log.h"
 
@@ -87,8 +88,8 @@ namespace modeldeploy::vision::utils {
             for (size_t i = 0; i < output->scores.size(); ++i) {
                 score_map.insert({output->scores[i], static_cast<int>(i)});
             }
-            for (auto iter : score_map) {
-                sorted_indices.push_back(iter.second);
+            for (auto val : score_map | std::views::values) {
+                sorted_indices.push_back(val);
             }
         }
         sort_detection_result(output);
@@ -106,14 +107,14 @@ namespace modeldeploy::vision::utils {
                 if (suppressed[j] == 1) {
                     continue;
                 }
-                float xmin = std::max(output->boxes[i][0], output->boxes[j][0]);
-                float ymin = std::max(output->boxes[i][1], output->boxes[j][1]);
-                float xmax = std::min(output->boxes[i][2], output->boxes[j][2]);
-                float ymax = std::min(output->boxes[i][3], output->boxes[j][3]);
-                float overlap_w = std::max(0.0f, xmax - xmin);
-                float overlap_h = std::max(0.0f, ymax - ymin);
-                float overlap_area = overlap_w * overlap_h;
-                float overlap_ratio =
+                const float xmin = std::max(output->boxes[i][0], output->boxes[j][0]);
+                const float ymin = std::max(output->boxes[i][1], output->boxes[j][1]);
+                const float xmax = std::min(output->boxes[i][2], output->boxes[j][2]);
+                const float ymax = std::min(output->boxes[i][3], output->boxes[j][3]);
+                const float overlap_w = std::max(0.0f, xmax - xmin);
+                const float overlap_h = std::max(0.0f, ymax - ymin);
+                const float overlap_area = overlap_w * overlap_h;
+                const float overlap_ratio =
                     overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
                 if (overlap_ratio > iou_threshold) {
                     suppressed[j] = 1;
@@ -154,14 +155,14 @@ namespace modeldeploy::vision::utils {
                 if (suppressed[j] == 1) {
                     continue;
                 }
-                float xmin = std::max(result->boxes[i][0], result->boxes[j][0]);
-                float ymin = std::max(result->boxes[i][1], result->boxes[j][1]);
-                float xmax = std::min(result->boxes[i][2], result->boxes[j][2]);
-                float ymax = std::min(result->boxes[i][3], result->boxes[j][3]);
-                float overlap_w = std::max(0.0f, xmax - xmin);
-                float overlap_h = std::max(0.0f, ymax - ymin);
-                float overlap_area = overlap_w * overlap_h;
-                float overlap_ratio =
+                const float xmin = std::max(result->boxes[i][0], result->boxes[j][0]);
+                const float ymin = std::max(result->boxes[i][1], result->boxes[j][1]);
+                const float xmax = std::min(result->boxes[i][2], result->boxes[j][2]);
+                const float ymax = std::min(result->boxes[i][3], result->boxes[j][3]);
+                const float overlap_w = std::max(0.0f, xmax - xmin);
+                const float overlap_h = std::max(0.0f, ymax - ymin);
+                const float overlap_area = overlap_w * overlap_h;
+                const float overlap_ratio =
                     overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
                 if (overlap_ratio > iou_threshold) {
                     suppressed[j] = 1;
@@ -169,7 +170,7 @@ namespace modeldeploy::vision::utils {
             }
         }
         DetectionLandmarkResult backup(*result);
-        int landmarks_per_face = result->landmarks_per_instance;
+        const int landmarks_per_face = result->landmarks_per_instance;
         result->clear();
         // don't forget to reset the landmarks_per_face
         // before apply Reserve method.
@@ -209,7 +210,7 @@ namespace modeldeploy::vision::utils {
         const int top = (img_height - crop_height) / 2;
         const int left = (img_width - crop_width) / 2;
         // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clion()操作
-        cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
+        const cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
         return cropped_image.clone();
     }
 
