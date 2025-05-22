@@ -33,25 +33,21 @@ namespace modeldeploy {
             return false;
         }
 
-        // Get number of inputs of the model
         [[nodiscard]] virtual size_t num_inputs() const = 0;
-        // Get number of outputs of the model
+
         [[nodiscard]] virtual size_t num_outputs() const = 0;
-        // Get information of input tensor
+
         virtual TensorInfo get_input_info(int index) = 0;
-        // Get information of output tensor
+
         virtual TensorInfo get_output_info(int index) = 0;
-        // Get information of all the input tensors
+
         virtual std::vector<TensorInfo> get_input_infos() = 0;
-        // Get information of all the output tensors
+
         virtual std::vector<TensorInfo> get_output_infos() = 0;
 
         [[nodiscard]] virtual std::map<std::string, std::string> get_custom_meta_data() const = 0;
 
-
-        // if copy_to_fd is true, copy memory data to FDTensor
-        // else share memory to FDTensor(only Paddle、ORT、TRT、OpenVINO support it)
         virtual bool infer(std::vector<Tensor>& inputs,
                            std::vector<Tensor>* outputs) = 0;
     };
-} // namespace fastdeploy
+}

@@ -34,9 +34,6 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
 
-
-message(STATUS "${ONNXRUNTIME_FILE_NAME}")
-
 set(possible_file_locations
         $ENV{HOME}/Downloads/${ONNXRUNTIME_FILE_NAME}
         ${CMAKE_SOURCE_DIR}/${ONNXRUNTIME_FILE_NAME}

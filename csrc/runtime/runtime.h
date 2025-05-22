@@ -47,4 +47,4 @@ namespace modeldeploy {
         std::vector<Tensor> input_tensors_;
         std::vector<Tensor> output_tensors_;
     };
-} // namespace fastdeploy
+}

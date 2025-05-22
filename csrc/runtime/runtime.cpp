@@ -101,4 +101,4 @@ namespace modeldeploy {
         }
         MD_LOG_INFO << "Runtime initialized with Backend::ORT in " << option.device << "." << std::endl;
     }
-} // namespace fastdeploy
+}

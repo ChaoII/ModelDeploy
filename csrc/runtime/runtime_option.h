@@ -9,8 +9,7 @@
 
 
 namespace modeldeploy {
-    /*! @brief Option object used when create a new Runtime object
-     */
+
     struct RuntimeOption {
 
         void set_model_path(const std::string& model_path);
