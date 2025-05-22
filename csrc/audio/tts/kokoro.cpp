@@ -93,6 +93,7 @@ namespace modeldeploy::audio::tts {
         //     std::regex re(p.first, std::regex::ECMAScript);
         //     text = std::regex_replace(text, re, p.second);
         // }
+        std::cout << termcolor::magenta << "source text is:\n" << text << termcolor::reset << std::endl;
         // 此处用到了模型deploy的text_normalizer
         text = wstring_to_string(text_normalizer_->normalize_sentence(utf8_to_wstring(text)));
         std::cout << termcolor::cyan << "normalize text is:\n" << text << termcolor::reset << std::endl;

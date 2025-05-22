@@ -9,8 +9,6 @@
 #include "csrc/runtime/runtime_option.h"
 
 namespace modeldeploy {
-    /*! @brief Information of Tensor
-     */
     struct TensorInfo {
         std::string name;
         std::vector<int> shape;

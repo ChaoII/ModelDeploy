@@ -64,10 +64,11 @@ namespace modeldeploy {
 
     bool OrtBackend::init(const RuntimeOption& option) {
         if (option.device != Device::CPU && option.device != Device::GPU) {
-            MD_LOG_ERROR << "Backend::ORT only supports Device::CPU/Device::GPU, but now its "
-                << (option.device == 0 ? "cpu" : "gpu") << "." << std::endl;
+            MD_LOG_ERROR << "Backend::ORT only supports Device::CPU/Device::GPU, but now its " << std::endl;
             return false;
         }
+        option_.device_id = option.device_id;
+        option_.device = option.device;
         option_.model_filepath = option.model_filepath;
         option_.device_id = option.device_id;
         option_.device = option.device;

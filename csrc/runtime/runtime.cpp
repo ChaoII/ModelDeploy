@@ -25,24 +25,24 @@ namespace modeldeploy {
         return true;
     }
 
-    TensorInfo Runtime::get_input_info(int index) {
+    TensorInfo Runtime::get_input_info(const int index) const {
         return backend_->get_input_info(index);
     }
 
-    TensorInfo Runtime::get_output_info(int index) {
+    TensorInfo Runtime::get_output_info(const int index) const {
         return backend_->get_output_info(index);
     }
 
-    std::vector<TensorInfo> Runtime::get_input_infos() {
+    std::vector<TensorInfo> Runtime::get_input_infos() const {
         return backend_->get_input_infos();
     }
 
-    std::vector<TensorInfo> Runtime::get_output_infos() {
+    std::vector<TensorInfo> Runtime::get_output_infos() const {
         return backend_->get_output_infos();
     }
 
     bool Runtime::infer(std::vector<Tensor>& input_tensors,
-                        std::vector<Tensor>* output_tensors) {
+                        std::vector<Tensor>* output_tensors) const {
         return backend_->infer(input_tensors, output_tensors);
     }
 

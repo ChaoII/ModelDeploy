@@ -3,13 +3,10 @@
 //
 
 #pragma once
-#include <ostream>
-#include <map>
 
 namespace modeldeploy {
-    /*! Inference backend supported in FastDeploy */
     enum Backend {
-        ORT, //< ONNX Runtime, support Paddle/ONNX format model,
+        ORT,
         NONE
     };
 
