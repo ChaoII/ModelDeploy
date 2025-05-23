@@ -6,40 +6,35 @@ using System;
 
 namespace ModelDeploy.audio.tts
 {
-    public class TTSResult
+    public class TtsResult
     {
-        public List<float> Data;
-        public int SampleRate;
+        private List<float> Data { get; }
+        private int SampleRate { get; }
 
-        public static TTSResult FromMDTTSResult(MDTTSResult cResult)
+        private TtsResult(List<float> data, int sampleRate)
         {
-            TTSResult result = new TTSResult();
-            result.Data = new List<float>();
-            for (int i = 0; i < cResult.size; i++)
-            {
-                IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<float>());
-                float res = Marshal.PtrToStructure<float>(currentPtr);
-                result.Data.Add(res);
-            }
-            result.SampleRate = cResult.sample_rate;
-            return result;
+            Data = data ?? throw new ArgumentNullException(nameof(data));
+            SampleRate = sampleRate;
         }
 
-        public static MDTTSResult ToMDTTSResult(TTSResult result)
+        public static TtsResult FromNative(MDTTSResult cResult)
         {
-            MDTTSResult cResult = new MDTTSResult();
-            // notice that the data will destroy in C
-            cResult.data = Marshal.AllocHGlobal(result.Data.Count * Marshal.SizeOf<float>());
-            cResult.size = result.Data.Count;
-            cResult.sample_rate = result.SampleRate;
+            float[] buffer = new float[cResult.size];
+            Marshal.Copy(cResult.data, buffer, 0, cResult.size);
+            return new TtsResult(new List<float>(buffer), cResult.sample_rate);
+        }
 
-            for (int i = 0; i < result.Data.Count; i++)
+        public MDTTSResult ToNative()
+        {
+            var cResult = new MDTTSResult
             {
-                IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<float>());
-                float res = result.Data[i];
-                Marshal.StructureToPtr(res, currentPtr, false);
-            }
+                size = Data.Count,
+                sample_rate = SampleRate,
+                data = Marshal.AllocHGlobal(Data.Count * sizeof(float))
+            };
 
+            float[] buffer = Data.ToArray();
+            Marshal.Copy(buffer, 0, cResult.data, buffer.Length);
             return cResult;
         }
     }

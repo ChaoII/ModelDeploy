@@ -24,7 +24,7 @@ int main() {
     params.text_normalization_dir = "../../test_data/";
     params.num_threads = -1;
     auto kokoro = md_create_kokoro_model(&model, &params);
-    const char* test_str0 = "来听一听, 这个是什么口音? How are you doing? Are you ok? Thank you! 你觉得中英文说得如何呢?";
+    const char* test_str0 = "来听一听, 这个是什么口音? How are you doing your kaldi? Are you ok? Thank you! 你觉得中英文说得如何呢?";
     const char* test_str = "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。";
     const char* test_str1 =
         "来听一听, 这个是什么口音? 现在是北京时间12:24:35，我的电话是18571498072. How are you doing? Are you ok? Thank you! 你觉得中英文说得如何呢?";
@@ -46,7 +46,7 @@ int main() {
     // zm_054,zm_055,zm_056,zm_057,zm_058,zm_061,zm_062,zm_063,zm_064,
     // zm_065,zm_066,zm_068,zm_069,zm_080,zm_081,zm_082,zm_089,zm_091,
     // zm_095,zm_096,zm_097,zm_098,zm_100
-    md_kokoro_model_predict(&model, test_str0, "zm_091", 0.9, &result);
+    md_kokoro_model_predict(&model, test_str3, "zf_001", 0.9, &result);
     md_write_wav(&result, "test.wav");
     md_free_kokoro_result(&result);
     md_free_kokoro_model(&model);
