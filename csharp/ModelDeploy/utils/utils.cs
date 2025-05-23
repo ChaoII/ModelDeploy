@@ -15,7 +15,7 @@ namespace ModelDeploy.utils
             Marshal.WriteByte(unmanagedString + utf8Bytes.Length, 0);
             return unmanagedString;
         }
-
+        
 
         public static string PtrToStringUTF8(IntPtr ptr)
         {
