@@ -6,6 +6,3 @@ add_subdirectory(demo_instance_seg)
 add_subdirectory(demo_face)
 add_subdirectory(demo_lpr)
 add_subdirectory(demo_audio)
-
-#if (BUILD_AUDIO)
-#endif ()

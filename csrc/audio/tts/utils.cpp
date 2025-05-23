@@ -88,6 +88,7 @@ namespace modeldeploy::audio::tts {
         if (!os) {
             return false;
         }
+        MD_LOG_INFO << "write wave file to [" << filename.c_str() << "] success";
         return true;
     }
 }

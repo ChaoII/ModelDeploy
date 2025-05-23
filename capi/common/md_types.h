@@ -33,9 +33,8 @@ enum MDStatusCode {
     ModelInitializeFailed,
     ModelPredictFailed,
     MemoryAllocatedFailed,
-    OCRDetModelInitializeFailed,
-    OCRRecModelInitializeFailed,
     ModelTypeError,
+    WriteWaveFailed
 };
 
 typedef struct {
@@ -111,13 +110,13 @@ typedef struct {
 
 typedef struct {
     const char* model_path;
-    const char* voices_path;
     const char* tokens_path;
-    const char* data_dir;
-    const char* dict_dir;
-    const char* lexicon;
+    const char* lexicons_en_path;
+    const char* lexicons_zh_path;
+    const char* voice_bin_path;
+    const char* jieba_dir;
+    const char* text_normalization_dir;
     int num_threads;
-    int debug;
 } MDKokoroParameters;
 
 
@@ -247,5 +246,12 @@ typedef struct {
     char* tpass_msg;
     float snippet_time;
 } MDASRResult;
+
+typedef struct {
+    float* data;
+    int size;
+    int sample_rate;
+} MDTTSResult;
+
 
 typedef void (*ASRCallBack)(MDASRResult* result);

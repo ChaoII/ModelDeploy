@@ -102,17 +102,18 @@ namespace ModelDeploy
             public int debug;
         }
 
+
         [StructLayout(LayoutKind.Sequential)]
         public struct MDKokoroParameters
         {
             public string model_path;
-            public string voices_path;
             public string tokens_path;
-            public string data_dir;
-            public string dict_dir;
-            public string lexicon;
+            public string lexicons_en_path;
+            public string lexicons_zh_path;
+            public string voice_bin_path;
+            public string jieba_dir;
+            public string text_normalization_dir;
             public int num_threads;
-            public int debug;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -180,6 +181,7 @@ namespace ModelDeploy
             public MDEyeState right_eye;
         }
 
+
         [StructLayout(LayoutKind.Sequential)]
         public struct MDASRResult
         {
@@ -188,6 +190,14 @@ namespace ModelDeploy
             public IntPtr stamp_sents;
             public IntPtr tpass_msg;
             public float snippet_time;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDTTSResult
+        {
+            public IntPtr data;
+            public int size;
+            public int sample_rate;
         }
     }
 }

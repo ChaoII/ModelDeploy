@@ -8,6 +8,8 @@
 #include "csrc/audio/tts/kokoro.h"
 #include "csrc/audio/tts/utils.h"
 
+namespace fs = std::filesystem;
+
 namespace modeldeploy::audio::tts {
     Kokoro::Kokoro(const std::string& model_file_path, const std::string& token_path_str,
                    const std::vector<std::string>& lexicons, const std::string& voices_bin,
@@ -39,11 +41,12 @@ namespace modeldeploy::audio::tts {
         load_voices(speaker_names, style_dims_, voices_bin_);
         sample_rate_ = 24000;
         max_len_ = static_cast<int32_t>(style_dims_[0]) - 1;
-        const std::string kDictPath = jieba_dir_ + "/jieba.dict.utf8";
-        const std::string kHmmPath = jieba_dir_ + "/hmm_model.utf8";
-        const std::string kUserDictPath = jieba_dir_ + "/user.dict.utf8";
-        const std::string kIdfPath = jieba_dir_ + "/idf.utf8";
-        const std::string kStopWordPath = jieba_dir_ + "/stop_words.utf8";
+        auto jieba_dir_path = fs::path(jieba_dir_);
+        const std::string kDictPath = (jieba_dir_path / "jieba.dict.utf8").string();
+        const std::string kHmmPath = (jieba_dir_path / "hmm_model.utf8").string();
+        const std::string kUserDictPath = (jieba_dir_path / "user.dict.utf8").string();
+        const std::string kIdfPath = (jieba_dir_path / "idf.utf8").string();
+        const std::string kStopWordPath = (jieba_dir_path / "stop_words.utf8").string();
         jieba_ = std::make_unique<cppjieba::Jieba>(
             kDictPath.c_str(), kHmmPath.c_str(), kUserDictPath.c_str(),
             kIdfPath.c_str(), kStopWordPath.c_str());
@@ -56,7 +59,7 @@ namespace modeldeploy::audio::tts {
     }
 
 
-    bool Kokoro::predict(const std::string& text, const std::string& voice, float speed,
+    bool Kokoro::predict(const std::string& text, const std::string& voice, const float speed,
                          std::vector<float>* out_audio) {
         if (!preprocess(text, voice, speed, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input data." << std::endl;
@@ -93,10 +96,21 @@ namespace modeldeploy::audio::tts {
         //     std::regex re(p.first, std::regex::ECMAScript);
         //     text = std::regex_replace(text, re, p.second);
         // }
+        std::cout << termcolor::blue << "source char bytes is:" << std::endl;
+        for (unsigned char c : text) {
+            std::cout << std::uppercase // 大写 A-F
+                << std::hex // 十六进制格式
+                << std::setw(2) // 宽度 2
+                << std::setfill('0') // 不足补0
+                << static_cast<int>(c) << " "; // 注意强转为 int
+        }
+        std::cout << std::dec << std::endl; // 恢复为十进制
         std::cout << termcolor::magenta << "source text is:\n" << text << termcolor::reset << std::endl;
         // 此处用到了模型deploy的text_normalizer
-        text = wstring_to_string(text_normalizer_->normalize_sentence(utf8_to_wstring(text)));
-        std::cout << termcolor::cyan << "normalize text is:\n" << text << termcolor::reset << std::endl;
+        const std::wstring ws_text = utf8_to_wstring(text);
+        const std::wstring ws_normalized_text = text_normalizer_->normalize_sentence(ws_text);
+        text = wstring_to_string(ws_normalized_text);
+        std::cout << termcolor::cyan << "normalization text is:\n" << text << termcolor::reset << std::endl;
         const std::vector<std::string> parts = split_ch_eng(text);
         std::vector<std::string> tokens;
         for (const auto& sent : parts) {

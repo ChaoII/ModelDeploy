@@ -10,7 +10,6 @@
 namespace modeldeploy {
     bool Runtime::init(const RuntimeOption& _option) {
         option = _option;
-        // decrypt encrypted model
 
         if (option.backend == Backend::NONE) {
             return false;
@@ -21,7 +20,6 @@ namespace modeldeploy {
         else {
             return false;
         }
-
         return true;
     }
 

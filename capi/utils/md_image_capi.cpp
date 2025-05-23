@@ -4,8 +4,6 @@
 
 #include "csrc/core/md_log.h"
 #include "capi/utils/md_image_capi.h"
-#include "csrc/base_model.h"
-#include "csrc/vision.h"
 #include "csrc/utils/utils.h"
 #include "capi/utils/internal/utils.h"
 
