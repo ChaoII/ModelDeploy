@@ -1,57 +1,55 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using System.Text;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
 
 namespace ModelDeploy.audio.tts
 {
-    public class Kokoro
+    public class Kokoro : IDisposable
     {
         private MDModel _model;
+        private bool _disposed;
 
         public Kokoro(MDKokoroParameters parameters)
         {
             _model = new MDModel();
-            md_create_kokoro_model(ref _model, ref parameters);
+            Utils.Check(md_create_kokoro_model(ref _model, ref parameters), "Create model");
         }
 
-        ~Kokoro()
+        public TtsResult Predict(string text, string voice, float speed)
         {
-            md_free_kokoro_model(ref _model);
-        }
-
-        public TTSResult Predict(string text, string voice, float speed)
-        {
-            // 注意一定要转化为原始的utf8字符串（char）指针
             MDTTSResult cResult = new MDTTSResult();
-            var ptr = Utils.ConvertStringToHGlobalUtf8(text);
-            int ret = md_kokoro_model_predict(ref _model, ptr, voice, speed, ref cResult);
-            // 注意使用完后需要手动释放开辟的地址
-            Marshal.FreeHGlobal(ptr);
-            if (ret != 0)
+
+            using (var utf8Text = new Utf8String(text)) // 自动释放的封装
             {
-                throw new Exception("kokoro model predict failed error code is: " + ret);
+                Utils.Check(md_kokoro_model_predict(ref _model, utf8Text.Ptr, voice, speed, ref cResult), "Predict");
             }
 
-            TTSResult ocrResult = TTSResult.FromMDTTSResult(cResult);
+            TtsResult result = TtsResult.FromNative(cResult);
             md_free_kokoro_result(ref cResult);
-            return ocrResult;
+            return result;
         }
 
-        public static void WriteWav(TTSResult result, string outputPath)
+        public static void WriteWav(TtsResult result, string outputPath)
         {
-            MDTTSResult cResult = TTSResult.ToMDTTSResult(result);
-            int ret = md_write_wav(ref cResult, outputPath);
-            if (ret != 0)
+            MDTTSResult cResult = result.ToNative();
+            Utils.Check(md_write_wav(ref cResult, outputPath), "WriteWav");
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
             {
-                throw new Exception("md_write_wav failed error code is: " + ret);
+                md_free_kokoro_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
             }
         }
+
+        ~Kokoro() => Dispose();
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_kokoro_model(ref MDModel model, ref MDKokoroParameters parameters);
-
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_kokoro_model_predict(ref MDModel model, IntPtr text, string voice, float speed,

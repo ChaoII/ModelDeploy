@@ -5,7 +5,7 @@ using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.utils
 {
-    public class Utils
+    public static class Utils
     {
         public static IntPtr ConvertStringToHGlobalUtf8(string str)
         {
@@ -15,7 +15,7 @@ namespace ModelDeploy.utils
             Marshal.WriteByte(unmanagedString + utf8Bytes.Length, 0);
             return unmanagedString;
         }
-        
+
 
         public static string PtrToStringUTF8(IntPtr ptr)
         {
@@ -35,7 +35,13 @@ namespace ModelDeploy.utils
             return Encoding.UTF8.GetString(buffer);
         }
 
-        public bool GetButtonEnableStatus(Image image, int pixThreshold, double rateThreshold)
+        public static void Check(int ret, string context)
+        {
+            if (ret != 0)
+                throw new InvalidOperationException($"{context} failed, error code: {ret}");
+        }
+
+        public static bool GetButtonEnableStatus(Image image, int pixThreshold, double rateThreshold)
         {
             MDImage cImage = image.RawImage;
             bool result = md_get_button_enable_status(ref cImage, pixThreshold, rateThreshold);
@@ -46,5 +52,22 @@ namespace ModelDeploy.utils
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern bool md_get_button_enable_status(ref MDImage image, int pixThreshold,
             double rateThreshold);
+    }
+
+    // 自动释放的 UTF8 字符串封装
+    internal class Utf8String : IDisposable
+    {
+        public IntPtr Ptr { get; }
+
+        public Utf8String(string str)
+        {
+            Ptr = Utils.ConvertStringToHGlobalUtf8(str);
+        }
+
+        public void Dispose()
+        {
+            if (Ptr != IntPtr.Zero)
+                Marshal.FreeHGlobal(Ptr);
+        }
     }
 }

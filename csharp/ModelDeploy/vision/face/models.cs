@@ -6,13 +6,11 @@ using System;
 
 namespace ModelDeploy.vision.face
 {
-
-
     public class SeetaFace
     {
         private MDModel _model;
 
-        public SeetaFace(string modelDir, int moduleFlags = FaceConstants.MD_MASK, int threadNum = 8)
+        public SeetaFace(string modelDir, int moduleFlags, int threadNum = 8)
         {
             _model = new MDModel();
             int ret = md_create_face_model(ref _model, modelDir, moduleFlags, threadNum);
@@ -163,10 +161,11 @@ namespace ModelDeploy.vision.face
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
-            md_create_face_model(ref MDModel model, string modelDir, int flags = FaceConstants.MD_MASK, int threadNum = 1);
+            md_create_face_model(ref MDModel model, string modelDir, int flags, int threadNum = 1);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_detection(ref MDModel model, ref MDImage image, ref MDDetectionResults result);
+        private static extern int
+            md_face_detection(ref MDModel model, ref MDImage image, ref MDDetectionResults result);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
