@@ -1,19 +1,10 @@
 ﻿namespace ModelDeploy
 {
-
-    public enum MDASRMode
-    {
-        Offline = 0,
-        Online = 1,
-        TwoPass = 2,
-    };
-
     public enum MDModelFormat
     {
         ONNX = 0,
-        PaddlePaddle = 1,
-        Tennis = 2,
-    };
+        MNN
+    }
 
     public enum MDModelType
     {
@@ -21,33 +12,20 @@
         Detection = 1,
         FACE = 2,
         ASR = 3,
-    };
+    }
 
     public enum MDStatusCode
     {
         Success = 0x00,
-        FileOpenFailed = 0x01,
+        PathNotFound,
+        FileOpenFailed,
         CallError,
         ModelInitializeFailed,
         ModelPredictFailed,
         MemoryAllocatedFailed,
-        OCRDetModelInitializeFailed,
-        OCRRecModelInitializeFailed,
-
         ModelTypeError,
-        NotFoundLandmark,
-        NotFoundFace,
-        FaceFeatureExtractError,
-
-        FaceDetectionFlagNotSetError,
-        FaceLandmarkFlagNotSetError,
-        FaceRecognitionFlagNotSetError,
-        FaceAntiSpoofingFlagNotSetError,
-        FaceQualityEvaluateFlagNotSetError,
-        FaceAgeAttributeFlagNotSetError,
-        FaceGenderAttributeFlagNotSetError,
-        FaceEyeStateFlagNotSetError,
-    };
+        WriteWaveFailed
+    }
 
     public enum FaceQualityEvaluateType
     {
@@ -67,5 +45,4 @@
         EYE_RANDOM = 2,
         EYE_UNKNOWN = 3
     }
-
 }

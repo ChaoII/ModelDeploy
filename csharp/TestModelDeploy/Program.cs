@@ -27,7 +27,7 @@ class Program
             num_threads = -1
         };
 
-        string text = "来听一听, 这个是什么口音? How are you doing? Are you ok? Thank you! 你觉得中英文说得如何呢?";
+        const string text = "来听一听, 这个是什么口音? How are you doing? Are you ok? Thank you! 你觉得中英文说得如何呢?";
 
         try
         {
@@ -45,15 +45,15 @@ class Program
 
     static void TestDetection()
     {
+        using var yolov8 = new YoloV8("../../../../../test_data/test_models/best1.onnx");
         Image image = Image.Read("../../../../../test_data/test_images/test_detection1.png");
-        YOLOv8 yolov8 = new YOLOv8("../../../../../test_data/test_models/best1.onnx");
         yolov8.SetInputSize(1440, 1440);
-        List<DetectionResult> detectionResults = yolov8.Predict(image);
-        // yolov8.DrawDetectionResult(image, detectionResults, "../../../../../test_data/msyh.ttc", 20,0.5);
-        // image.Show();
-        foreach (var detectionResult in detectionResults)
+        var results = yolov8.Predict(image);
+        yolov8.DrawDetectionResult(image, results, "font.ttf");
+        image.Show();
+        foreach (var rsult in results)
         {
-            Console.WriteLine(detectionResult.Box);
+            Console.WriteLine(rsult.Box);
         }
     }
 
@@ -97,8 +97,8 @@ class Program
             rec_batch_size = 8,
         };
         Image image = Image.Read("../../../../../test_data/test_images/test_ocr1.png");
-        PPOCRv4 ppocrv4 = new PPOCRv4(parameters);
-        List<OCRResult> results = ppocrv4.Predict(image);
+        PaddleOcrV4 ppocrv4 = new PaddleOcrV4(parameters);
+        List<OcrResult> results = ppocrv4.Predict(image);
         ppocrv4.DrawOcrResult(image, results, "../../../../../test_data/msyh.ttc", new Color
         {
             R = 0,
@@ -167,8 +167,8 @@ class Program
 
     static void TestOcrRecognition()
     {
-        OCRRecognition ocrRecognition =
-            new OCRRecognition("../../../../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
+        OcrRecognition ocrRecognition =
+            new OcrRecognition("../../../../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
                 "../../../../../test_data/key.txt", 8);
         Image image = Image.Read("../../../../../test_data/test_images/test_ocr_recognition.png");
         var result = ocrRecognition.Predict(image);
@@ -177,8 +177,8 @@ class Program
 
     static void TestOcrRecognitionBatch()
     {
-        OCRRecognition ocrRecognition =
-            new OCRRecognition("../../../../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
+        OcrRecognition ocrRecognition =
+            new OcrRecognition("../../../../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
                 "../../../../../test_data/key.txt");
         Image image = Image.Read("../../../../../test_data/test_images/ocr_check_report.png");
 
@@ -233,7 +233,7 @@ class Program
         List<Point> points2 = [p5, p6, p7, p8];
         List<Polygon> polygons = [Polygon.FromPointList(points1), Polygon.FromPointList(points2)];
 
-        List<OCRResult> results = ocrRecognition.BatchPredict(image, polygons, 2);
+        List<OcrResult> results = ocrRecognition.BatchPredict(image, polygons, 2);
         Draw.DrawPolygon(image, polygons[0], new Color { R = 255, G = 255, B = 0 }, 0.5);
         Draw.DrawPolygon(image, polygons[1], new Color { R = 255, G = 0, B = 0 }, 0.5);
         image.Show();
@@ -246,7 +246,7 @@ class Program
 
     static void Main(string[] args)
     {
-        // TestFace();
+        TestFace();
         // TestSenseVoice();
         TestKokoro();
         TestDetection();

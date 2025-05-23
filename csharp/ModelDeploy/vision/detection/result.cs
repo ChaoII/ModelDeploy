@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
@@ -7,73 +7,66 @@ namespace ModelDeploy.vision.detection
 {
     public class DetectionResult
     {
-        public Rect Box { get; set; }
+        public Rect Box { get; private set; }
+        private int LabelId { get; set; }
+        private float Score { get; set; }
 
-        public int LabelId { get; set; }
+        private static readonly int NativeSize = Marshal.SizeOf<MDDetectionResult>();
 
-        public float Score { get; set; }
-
-
-        private static DetectionResult FromMDDetectionResult(MDDetectionResult cresult)
+        private static DetectionResult FromNative(MDDetectionResult cResult) => new DetectionResult
         {
-            DetectionResult result = new DetectionResult
-            {
-                Box = Rect.FromRaw(cresult.box),
-                LabelId = cresult.label_id,
-                Score = cresult.score
-            };
-            return result;
-        }
+            Box = Rect.FromNative(cResult.box),
+            LabelId = cResult.label_id,
+            Score = cResult.score
+        };
 
-        private static MDDetectionResult ToMDDetectionResult(DetectionResult result)
+        private static MDDetectionResult ToNative(DetectionResult result) => new MDDetectionResult
         {
-            MDDetectionResult cresult = new MDDetectionResult
-            {
-                box = result.Box.ToRaw(),
-                label_id = result.LabelId,
-                score = result.Score
-            };
-            return cresult;
-        }
+            box = result.Box.ToNative(),
+            label_id = result.LabelId,
+            score = result.Score
+        };
 
-        public static List<DetectionResult> FromMDDetectionResults(MDDetectionResults cresults)
+        public static List<DetectionResult> FromNativeArray(MDDetectionResults cResults)
         {
-            List<DetectionResult> results = new List<DetectionResult>();
-            for (int i = 0; i < cresults.size; i++)
+            var results = new List<DetectionResult>(cResults.size);
+            for (int i = 0; i < cResults.size; i++)
             {
-                IntPtr currentPtr = IntPtr.Add(cresults.data, i * Marshal.SizeOf<MDDetectionResult>());
-                MDDetectionResult res = Marshal.PtrToStructure<MDDetectionResult>(currentPtr);
-                results.Add(FromMDDetectionResult(res));
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = Marshal.PtrToStructure<MDDetectionResult>(ptr);
+                results.Add(FromNative(native));
             }
 
             return results;
         }
 
-        public static MDDetectionResults ToMDDetectionResults(List<DetectionResult> results)
+        public static MDDetectionResults ToNativeArray(IReadOnlyList<DetectionResult> results)
         {
-            MDDetectionResults cresults = new MDDetectionResults
+            var cResults = new MDDetectionResults
             {
-                size = results.Count
+                size = results.Count,
+                data = results.Count > 0
+                    ? Marshal.AllocHGlobal(results.Count * NativeSize)
+                    : IntPtr.Zero
             };
-            if (results.Count > 0)
+
+            for (int i = 0; i < results.Count; i++)
             {
-                cresults.data = Marshal.AllocHGlobal(results.Count * Marshal.SizeOf<MDDetectionResult>());
-                for (int i = 0; i < results.Count; i++)
-                {
-                    IntPtr currentPtr = IntPtr.Add(cresults.data, i * Marshal.SizeOf<MDDetectionResult>());
-                    MDDetectionResult res = ToMDDetectionResult(results[i]);
-                    Marshal.StructureToPtr(res, currentPtr, false);
-                }
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = ToNative(results[i]);
+                Marshal.StructureToPtr(native, ptr, false);
             }
 
-            return cresults;
+            return cResults;
         }
 
-        public static void FreeMDDetectionResults(MDDetectionResults cresults)
+        public static void FreeNativeArray(ref MDDetectionResults cResults)
         {
-            if (cresults.data != IntPtr.Zero)
+            if (cResults.data != IntPtr.Zero)
             {
-                Marshal.FreeHGlobal(cresults.data);
+                Marshal.FreeHGlobal(cResults.data);
+                cResults.data = IntPtr.Zero;
+                cResults.size = 0;
             }
         }
     }

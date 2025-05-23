@@ -42,7 +42,7 @@ namespace modeldeploy::audio::tts {
         return output;
     }
 
-    size_t wave_file_size(const int32_t n_samples) {
+    size_t wave_file_size(const size_t n_samples) {
         return sizeof(WaveHeader) + n_samples * sizeof(int16_t);
     }
 
@@ -63,7 +63,7 @@ namespace modeldeploy::audio::tts {
         header.block_align = num_channels * bits_per_sample / 8;
         header.bits_per_sample = bits_per_sample;
         header.sub_chunk2_id = 0x61746164; // atad
-        header.sub_chunk2_size = n * num_channels * bits_per_sample / 8;
+        header.sub_chunk2_size = static_cast<int32_t>(n) * num_channels * bits_per_sample / 8;
         header.chunk_size = 36 + header.sub_chunk2_size;
 
         std::vector<int16_t> samples_int16(n);
