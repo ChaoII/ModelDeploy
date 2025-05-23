@@ -1,77 +1,73 @@
-﻿using System.Runtime.InteropServices;
-using ModelDeploy.utils;
-using ModelDeploy.types_internal_c;
+﻿using System;
 using System.Collections.Generic;
-using System;
+using System.Runtime.InteropServices;
+using ModelDeploy.types_internal_c;
+using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.ocr
 {
-    public class OCRResult
+    public class OcrResult
     {
-        public Polygon Box { get; set; }
-        public string Text { get; set; }
-        public float Score { get; set; }
+        private Polygon Box { get; set; }
+        public string Text { get; private set; }
+        private float Score { get; set; }
 
+        public override string ToString() => $"Box: {Box}, Text: {Text}, Score: {Score}";
 
-        public override string ToString()
+        public static OcrResult FromNative(MDOCRResult cResult)
         {
-            return $"Box: {Box}, Text: {Text}, Score: {Score}";
-        }
-
-        public static OCRResult FromMDOCRResult(MDOCRResult cResult)
-        {
-            OCRResult result = new OCRResult
+            return new OcrResult
             {
-                Box = Polygon.FromMDPolygon(cResult.box),
-                Text = Utils.PtrToStringUTF8(cResult.text) ?? "",
+                Box = Polygon.FromNative(cResult.box),
+                Text = Utils.PtrToStringUTF8(cResult.text) ?? string.Empty,
                 Score = cResult.score
             };
-            return result;
         }
 
-        private static MDOCRResult ToMDOCRResult(OCRResult result)
+        private static MDOCRResult ToNative(OcrResult result)
         {
-            MDOCRResult cResult = new MDOCRResult
+            return new MDOCRResult
             {
-                // notice
-                // 此处开辟了内存，并将内存地址赋值给cresult.box, 因此需要在释放时进行释放(但是该处释放内存在C中进行)
-                box = result.Box.CopyToMDPolygon(),
-                // 在C中进行释放 无需Marshal.FreeHGlobal(cresult.text);
-                text = Utils.ConvertStringToHGlobalUtf8(result.Text),
+                box = result.Box.CopyToMDPolygon(), // native内存交由C释放
+                text = Utils.ConvertStringToHGlobalUtf8(result.Text), // native内存交由C释放
                 score = result.Score
             };
-            return cResult;
         }
 
-        public static List<OCRResult> FromMDOCRResults(MDOCRResults cresults)
+        public static List<OcrResult> FromNativeArray(MDOCRResults cResults)
         {
-            List<OCRResult> results = new List<OCRResult>();
-            for (int i = 0; i < cresults.size; i++)
+            int size = cResults.size;
+            var results = new List<OcrResult>(size);
+            int structSize = Marshal.SizeOf<MDOCRResult>();
+
+            for (int i = 0; i < size; i++)
             {
-                IntPtr currentPtr = IntPtr.Add(cresults.data, i * Marshal.SizeOf<MDOCRResult>());
-                MDOCRResult res = Marshal.PtrToStructure<MDOCRResult>(currentPtr);
-                results.Add(FromMDOCRResult(res));
+                IntPtr currentPtr = IntPtr.Add(cResults.data, i * structSize);
+                var nativeResult = Marshal.PtrToStructure<MDOCRResult>(currentPtr);
+                results.Add(FromNative(nativeResult));
             }
 
             return results;
         }
 
-        public static MDOCRResults ToMDOCRResults(List<OCRResult> results)
+        public static MDOCRResults ToNativeArray(List<OcrResult> results)
         {
-            MDOCRResults cresults = new MDOCRResults
+            int count = results.Count;
+            int structSize = Marshal.SizeOf<MDOCRResult>();
+            IntPtr nativeArray = Marshal.AllocHGlobal(count * structSize);
+
+            for (int i = 0; i < count; i++)
             {
-                size = results.Count,
-                // 在C中进行释放
-                data = Marshal.AllocHGlobal(results.Count * Marshal.SizeOf<MDOCRResult>())
-            };
-            for (int i = 0; i < results.Count; i++)
-            {
-                IntPtr currentPtr = IntPtr.Add(cresults.data, i * Marshal.SizeOf<MDOCRResult>());
-                MDOCRResult res = ToMDOCRResult(results[i]);
-                Marshal.StructureToPtr(res, currentPtr, false);
+                IntPtr currentPtr = IntPtr.Add(nativeArray, i * structSize);
+                MDOCRResult nativeResult = ToNative(results[i]);
+                Marshal.StructureToPtr(nativeResult, currentPtr, false);
             }
 
-            return cresults;
+            return new MDOCRResults
+            {
+                size = count,
+                data = nativeArray
+            };
         }
     }
 }

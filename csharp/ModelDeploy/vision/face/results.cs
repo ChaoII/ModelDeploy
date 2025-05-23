@@ -68,7 +68,7 @@ namespace ModelDeploy.vision.face
             {
                 IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<MDPointF>());
                 MDPointF point = Marshal.PtrToStructure<MDPointF>(currentPtr);
-                landMarkPoints.Add(PointF.FromRaw(point));
+                landMarkPoints.Add(PointF.FromNative(point));
             }
 
             return new LandMarkResult(landMarkPoints);
@@ -85,7 +85,7 @@ namespace ModelDeploy.vision.face
             for (int i = 0; i < result.Points.Count; i++)
             {
                 IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<MDPointF>());
-                MDPointF res = PointF.ToRaw(result.Points[i]);
+                MDPointF res = PointF.ToNative(result.Points[i]);
                 Marshal.StructureToPtr(res, currentPtr, false);
             }
 

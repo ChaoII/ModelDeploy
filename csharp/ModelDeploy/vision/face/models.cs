@@ -27,23 +27,23 @@ namespace ModelDeploy.vision.face
 
         public List<DetectionResult> FaceDetect(Image image)
         {
-            var result = new MDDetectionResults();
-            int ret = md_face_detection(ref _model, ref image.RawImage, ref result);
+            var cResult = new MDDetectionResults();
+            int ret = md_face_detection(ref _model, ref image.RawImage, ref cResult);
             if (ret != 0)
             {
                 throw new Exception("md_face_detection failed error code is: " + ret);
             }
 
-            var results = DetectionResult.FromMDDetectionResults(result);
+            var results = DetectionResult.FromNativeArray(cResult);
             // todo optimize structure
-            YOLOv8.md_free_detection_result(ref result);
+            YoloV8.md_free_detection_result(ref cResult);
             return results;
         }
 
         public LandMarkResult FaceLandmark(Image image, Rect rect)
         {
             var cResult = new MDLandMarkResult();
-            var cRect = rect.ToRaw();
+            var cRect = rect.ToNative();
             int ret = md_face_marker(ref _model, ref image.RawImage, ref cRect, ref cResult);
             if (ret != 0)
             {
