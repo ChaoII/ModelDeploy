@@ -11,7 +11,9 @@
         OCR = 0,
         Detection = 1,
         FACE = 2,
-        ASR = 3,
+        LPR,
+        ASR,
+        TTS
     }
 
     public enum MDStatusCode
