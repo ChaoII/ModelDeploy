@@ -13,16 +13,16 @@ enum MDASRMode {
 
 enum MDModelFormat {
     ONNX = 0,
-    PaddlePaddle = 1,
-    Tennis = 2,
+    MNN
 };
 
 enum MDModelType {
     OCR = 0,
-    Detection = 1,
-    FACE = 2,
-    ASR = 3,
-    TTS = 4
+    Detection,
+    FACE,
+    LPR,
+    ASR,
+    TTS
 };
 
 enum MDStatusCode {

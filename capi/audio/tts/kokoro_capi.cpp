@@ -28,7 +28,7 @@ MDStatusCode md_create_kokoro_model(MDModel* model, const MDKokoroParameters* ko
         fs::path(kokoro_parameters->jieba_dir).string(),
         fs::path(kokoro_parameters->text_normalization_dir).string(),
         runtime_option);
-    model->type = MDModelType::OCR;
+    model->type = MDModelType::TTS;
     model->format = MDModelFormat::ONNX;
     model->model_content = kokoro_model;
     model->model_name = strdup(kokoro_model->name().c_str());
