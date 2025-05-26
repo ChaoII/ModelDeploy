@@ -1,0 +1,103 @@
+//
+// Created by AC on 2024/12/16.
+//
+
+#include <string>
+#include <filesystem>
+
+
+#include "csrc/vision.h"
+#include "csrc/core/md_log.h"
+#include "capi/vision/ocr/structure_pipeline_capi.h"
+#include <csrc/vision/common/visualize/visualize.h>
+#include "capi/common/md_micro.h"
+#include "capi/utils/internal/utils.h"
+
+namespace fs = std::filesystem;
+
+MDStatusCode md_create_structure_table_model(MDModel* model, const MDStructureTableModelParameters* parameters) {
+    const auto det_model_file_path = fs::path(parameters->det_model_file);
+    const auto rec_model_file_path = fs::path(parameters->rec_model_file);
+    const auto tab_model_file_path = fs::path(parameters->table_model_file);
+    const auto rec_label_file_path = fs::path(parameters->rec_label_file);
+    const auto tab_label_file_path = fs::path(parameters->table_char_dict_path);
+    const auto structure_table_model = new modeldeploy::vision::ocr::PPStructureV2Table(
+        det_model_file_path.string(),
+        rec_model_file_path.string(),
+        tab_model_file_path.string(),
+        rec_label_file_path.string(),
+        tab_label_file_path.string(),
+        parameters->thread_num,
+        parameters->max_side_len,
+        parameters->det_db_thresh,
+        parameters->det_db_box_thresh,
+        parameters->det_db_unclip_ratio,
+        parameters->det_db_score_mode,
+        parameters->use_dilation,
+        parameters->rec_batch_size);
+
+    model->type = MDModelType::OCR;
+    model->format = MDModelFormat::ONNX;
+    model->model_content = structure_table_model;
+    model->model_name = strdup(structure_table_model->name().c_str());
+    if (!structure_table_model->is_initialized()) {
+        MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
+        return MDStatusCode::ModelInitializeFailed;
+    }
+    return MDStatusCode::Success;
+}
+
+
+MDStatusCode md_structure_table_model_predict(const MDModel* model, MDImage* image, MDOCRResults* c_results) {
+    const auto cv_image = md_image_to_mat(image);
+    modeldeploy::vision::OCRResult result;
+    const auto structure_table_model = static_cast<modeldeploy::vision::ocr::PPStructureV2Table*>(model->
+        model_content);
+    if (const bool res_status = structure_table_model->predict(cv_image, &result); !res_status) {
+        return MDStatusCode::ModelPredictFailed;
+    }
+    ocr_result_2_c_results(result, c_results);
+    return MDStatusCode::Success;
+}
+
+void md_print_structure_table_result(const MDOCRResults* results) {
+    for (int i = 0; i < results->size; ++i) {
+        std::cout
+            << "box: " << format_polygon(results->data[i].box)
+            << " text: " << results->data[i].text
+            << " score: " << results->data[i].score
+            << " table_boxes: " << format_polygon(results->data[i].table_boxes)
+            << " table_structure: " << results->data[i].table_structure
+            << std::endl;
+    }
+    std::cout << results->table_html << std::endl;
+}
+
+void md_draw_structure_table_result(const MDImage* image, const MDOCRResults* c_results, const char* font_path,
+                                    const int font_size, const double alpha, const int save_result) {
+    cv::Mat cv_image = md_image_to_mat(image);
+    modeldeploy::vision::OCRResult result;
+    c_results_2_ocr_result(c_results, &result);
+    modeldeploy::vision::vis_ocr(cv_image, result, font_path, font_size, alpha, save_result);
+}
+
+void md_free_structure_table_result(MDOCRResults* c_results) {
+    for (int i = 0; i < c_results->size; ++i) {
+        free(c_results->data[i].text);
+        delete[] c_results->data[i].box.data;
+    }
+    delete[] c_results->data;
+    c_results->data = nullptr;
+    c_results->size = 0;
+}
+
+void md_free_structure_table_model(MDModel* model) {
+    if (model->model_content != nullptr) {
+        delete static_cast<modeldeploy::vision::ocr::PPOCRv4*>(model->model_content);
+        model->model_content = nullptr;
+    }
+    if (model->model_name != nullptr) {
+        free(model->model_name);
+        model->model_name = nullptr;
+    }
+}

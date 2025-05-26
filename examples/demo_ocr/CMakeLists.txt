@@ -16,3 +16,6 @@ target_link_libraries(demo_structure_table_cxx PUBLIC ${LIBRARY_NAME})
 
 add_executable(demo_pp_structure_table_cxx demo_pp_structure_table_cxx.cpp)
 target_link_libraries(demo_pp_structure_table_cxx PUBLIC ${LIBRARY_NAME})
+
+add_executable(demo_pp_structure_table_capi demo_pp_structure_table_capi.cpp)
+target_link_libraries(demo_pp_structure_table_capi PUBLIC ${LIBRARY_NAME})

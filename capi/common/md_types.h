@@ -100,6 +100,23 @@ typedef struct {
     int rec_batch_size;
 } MDOCRModelParameters;
 
+
+typedef struct {
+    const char* det_model_file;
+    const char* rec_model_file;
+    const char* table_model_file;
+    const char* rec_label_file;
+    const char* table_char_dict_path;
+    int thread_num;
+    int max_side_len;
+    double det_db_thresh;
+    double det_db_box_thresh;
+    double det_db_unclip_ratio;
+    const char* det_db_score_mode;
+    int use_dilation;
+    int rec_batch_size;
+} MDStructureTableModelParameters;
+
 typedef struct {
     const char* model_path;
     int use_itn;
@@ -168,10 +185,13 @@ typedef struct {
     MDPolygon box;
     char* text;
     float score;
+    MDPolygon table_boxes;
+    char* table_structure;
 } MDOCRResult;
 
 typedef struct {
     MDOCRResult* data;
+    char* table_html;
     int size;
 } MDOCRResults;
 
