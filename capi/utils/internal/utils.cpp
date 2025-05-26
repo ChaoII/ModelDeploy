@@ -182,6 +182,22 @@ void detection_result_2_c_results(
         };
         c_results->data[i].score = result.scores[i];
         c_results->data[i].label_id = result.label_ids[i];
+        c_results->data[i].mask.buffer = nullptr;
+        c_results->data[i].mask.shape = nullptr;
+        c_results->data[i].mask.num_dims = 0;
+        c_results->data[i].mask.buffer_size = 0;
+        if (result.contain_masks) {
+            // 拷贝buffer
+            c_results->data[i].mask.buffer = new char[result.masks[i].buffer.size()];
+            std::ranges::copy(result.masks[i].buffer, c_results->data[i].mask.buffer);
+            c_results->data[i].mask.buffer_size = static_cast<int>(result.masks[i].buffer.size());
+            // 拷贝shape
+            const auto& mask_shape = result.masks[i].shape;
+            c_results->data[i].mask.shape = new int[mask_shape.size()];
+            std::ranges::copy(result.masks[i].shape.begin(), result.masks[i].shape.end(),
+                              c_results->data[i].mask.shape);
+            c_results->data[i].mask.num_dims = static_cast<int>(mask_shape.size());
+        }
     }
 }
 
@@ -201,6 +217,18 @@ void c_results_2_detection_result(
         result->boxes.emplace_back(box);
         result->scores.emplace_back(c_results->data[i].score);
         result->label_ids.emplace_back(c_results->data[i].label_id);
+        if (c_results->data[i].mask.buffer != nullptr) {
+            result->contain_masks = true;
+            Mask mask;
+            mask.buffer = std::vector<uint8_t>(
+                c_results->data[i].mask.buffer,
+                c_results->data[i].mask.buffer + c_results->data[i].mask.buffer_size);
+            mask.shape = std::vector<int64_t>(
+                c_results->data[i].mask.shape,
+                c_results->data[i].mask.shape + c_results->data[i].mask.num_dims
+            );
+            result->masks.emplace_back(mask);
+        }
     }
 }
 

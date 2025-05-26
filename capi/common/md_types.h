@@ -143,9 +143,17 @@ typedef struct {
     int size;
 } MDClassificationResults;
 
+typedef struct {
+    char* buffer;
+    int buffer_size;
+    int* shape;
+    int num_dims;
+} MDMask;
+
 
 typedef struct {
     MDRect box;
+    MDMask mask;
     int label_id;
     float score;
 } MDDetectionResult;
