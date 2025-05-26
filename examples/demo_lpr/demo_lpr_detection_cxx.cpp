@@ -4,8 +4,8 @@
 
 #include <iostream>
 #include <string>
-#include "../../csrc/vision.h"
-#include "../../csrc/vision/common/visualize/visualize.h"
+#include "csrc/vision.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 
 int main() {
@@ -20,7 +20,7 @@ int main() {
         return -1;
     }
     res.display();
-    const auto image = modeldeploy::vision::vis_face_det(im_bak, res,
+    const auto image = modeldeploy::vision::vis_det_landmarks(im_bak, res,
                                                     "../../test_data/msyh.ttc", 14, 2, 0.3, true);
 
     // cv::resize(image, image, cv::Size(0, 0), 0.5, 0.5);

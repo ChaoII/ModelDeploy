@@ -83,7 +83,6 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprPipeline::predict(const cv::Mat& image, LprResult* results) {
-        std::cout << "-----------------2-------------" << std::endl;
         DetectionLandmarkResult det_result;
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;

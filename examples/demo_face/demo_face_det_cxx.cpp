@@ -21,7 +21,7 @@ int main() {
         return -1;
     }
     res.display();
-    auto image = modeldeploy::vision::vis_face_det(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
+    auto image = modeldeploy::vision::vis_det_landmarks(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
     cv::imshow("image", image);
     cv::waitKey(0);
     auto vis_im_list =

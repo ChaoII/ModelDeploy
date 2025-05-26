@@ -19,7 +19,7 @@ enum MDModelFormat {
 enum MDModelType {
     Classification = 0,
     Detection,
-    OCR = 0,
+    OCR,
     FACE,
     LPR,
     ASR,
@@ -122,18 +122,6 @@ typedef struct {
 
 
 typedef struct {
-    MDPolygon box;
-    char* text;
-    float score;
-} MDOCRResult;
-
-typedef struct {
-    MDOCRResult* data;
-    int size;
-} MDOCRResults;
-
-
-typedef struct {
     unsigned char r;
     unsigned char g;
     unsigned char b;
@@ -162,6 +150,24 @@ typedef struct {
     float score;
 } MDDetectionResult;
 
+
+typedef struct {
+    MDDetectionResult* data;
+    int size;
+} MDDetectionResults;
+
+typedef struct {
+    MDPolygon box;
+    char* text;
+    float score;
+} MDOCRResult;
+
+typedef struct {
+    MDOCRResult* data;
+    int size;
+} MDOCRResults;
+
+
 typedef struct {
     MDRect box;
     MDPoint* landmarks;
@@ -172,14 +178,26 @@ typedef struct {
 
 
 typedef struct {
-    MDDetectionResult* data;
-    int size;
-} MDDetectionResults;
-
-typedef struct {
     MDDetectionLandmarkResult* data;
     int size;
 } MDDetectionLandmarkResults;
+
+
+typedef struct {
+    MDRect box;
+    MDPoint* landmarks;
+    int landmarks_size;
+    int label_id;
+    float score;
+    char* car_plate_str;
+    char* car_plate_color;
+} MDLPRResult;
+
+
+typedef struct {
+    MDLPRResult* data;
+    int size;
+} MDLPRResults;
 
 
 typedef struct {

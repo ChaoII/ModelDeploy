@@ -30,7 +30,7 @@ namespace modeldeploy::vision {
         cv::Mat& image, const OCRResult& results, const std::string& font_path,
         int font_size, double alpha, int save_result);
 
-    MODELDEPLOY_CXX_EXPORT cv::Mat vis_face_det(
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_det_landmarks(
         cv::Mat cv_image, const DetectionLandmarkResult& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.5,
