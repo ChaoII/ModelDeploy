@@ -140,6 +140,29 @@ cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon
     return dst_img;
 }
 
+// 注意开辟内存需要成对的销毁
+void classification_result_2_c_results(
+    const ClassifyResult& result,
+    MDClassificationResults* c_results) {
+    c_results->size = static_cast<int>(result.label_ids.size());
+    c_results->data = new MDClassificationResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        c_results->data[i].label_id = result.label_ids[i];
+        c_results->data[i].score = result.scores[i];
+    }
+}
+
+
+void c_results_2_classification_result(
+    const MDClassificationResults* c_results,
+    ClassifyResult* result) {
+    result->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        result->label_ids.emplace_back(c_results->data[i].label_id);
+        result->scores.emplace_back(c_results->data[i].score);
+    }
+}
+
 
 // 注意开辟内存需要成对的销毁
 void detection_result_2_c_results(

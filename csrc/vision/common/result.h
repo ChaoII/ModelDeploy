@@ -31,6 +31,7 @@ namespace modeldeploy::vision {
         std::vector<float> scores;
         std::vector<float> feature;
         ResultType type = ResultType::CLASSIFY;
+        void reserve(int size);
         void resize(int size);
         void clear();
         void free();

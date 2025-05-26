@@ -21,19 +21,19 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool YOLOv5Cls::Predict(const cv::Mat& im, ClassifyResult* result) {
+    bool YOLOv5Cls::predict(const cv::Mat& im, ClassifyResult* result) {
         std::vector<ClassifyResult> results;
-        if (!BatchPredict({im}, &results)) {
+        if (!batch_predict({im}, &results)) {
             return false;
         }
         *result = std::move(results[0]);
         return true;
     }
 
-    bool YOLOv5Cls::BatchPredict(const std::vector<cv::Mat>& images, std::vector<ClassifyResult>* results) {
+    bool YOLOv5Cls::batch_predict(const std::vector<cv::Mat>& images, std::vector<ClassifyResult>* results) {
         std::vector<std::map<std::string, std::array<float, 2>>> ims_info;
-        std::vector<cv::Mat> imgs = images;
-        if (!preprocessor_.Run(&imgs, &reused_input_tensors_, &ims_info)) {
+        std::vector<cv::Mat> _images = images;
+        if (!preprocessor_.run(&_images, &reused_input_tensors_, &ims_info)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
@@ -44,7 +44,7 @@ namespace modeldeploy::vision::classification {
             return false;
         }
 
-        if (!postprocessor_.Run(reused_output_tensors_, results, ims_info)) {
+        if (!postprocessor_.run(reused_output_tensors_, results, ims_info)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }

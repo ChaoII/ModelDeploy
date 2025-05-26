@@ -10,6 +10,17 @@
 namespace modeldeploy::vision {
     cv::Scalar get_random_color();
 
+
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_classification(
+        cv::Mat& cv_image,
+        const ClassifyResult& result,
+        int top_k,
+        float score_threshold,
+        const std::string& font_path,
+        int font_size,
+        double alpha, int save_result);
+
+
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_detection(
         cv::Mat& cv_image, const DetectionResult& result,
         const std::string& font_path, int font_size,

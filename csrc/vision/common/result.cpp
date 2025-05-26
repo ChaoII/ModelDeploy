@@ -22,6 +22,11 @@ namespace modeldeploy::vision {
         scores.clear();
         feature.clear();
     }
+    void ClassifyResult::reserve(const int size) {
+        scores.reserve(size);
+        label_ids.reserve(size);
+    }
+
 
     void ClassifyResult::resize(const int size) {
         label_ids.resize(size);

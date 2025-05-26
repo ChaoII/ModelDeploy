@@ -22,17 +22,17 @@ namespace modeldeploy::vision::classification {
    * \param[in] ims_info The shape info list, record input_shape and output_shape
    * \return true if the postprocess successed, otherwise false
    */
-        bool Run(const std::vector<Tensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                  std::vector<ClassifyResult>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info);
 
         /// Set topk, default 1
-        void SetTopK(const int& topk) {
+        void set_top_k(const int& topk) {
             topk_ = topk;
         }
 
         /// Get topk, default 1
-        float GetTopK() const { return topk_; }
+        [[nodiscard]] float get_top_k() const { return topk_; }
 
     protected:
         int topk_;
