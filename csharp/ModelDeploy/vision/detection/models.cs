@@ -11,10 +11,10 @@ namespace ModelDeploy.vision.detection
         private MDModel _model;
         private bool _disposed;
 
-        public YoloV8(string modelDir, int threadNum = 8, MDModelFormat format = MDModelFormat.ONNX)
+        public YoloV8(string modelDir, int threadNum = 8)
         {
             _model = new MDModel();
-            Utils.Check(md_create_detection_model(ref _model, modelDir, threadNum, format), "Create detection model");
+            Utils.Check(md_create_detection_model(ref _model, modelDir, threadNum), "Create detection model");
         }
 
         public void SetInputSize(int width, int height)
@@ -66,8 +66,7 @@ namespace ModelDeploy.vision.detection
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_detection_model(ref MDModel model, string modelDir, int threadNum,
-            MDModelFormat format);
+        private static extern int md_create_detection_model(ref MDModel model, string modelDir, int threadNum);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_detection_input_size(ref MDModel model, MDSize size);

@@ -3,46 +3,45 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.vision.detection
+namespace ModelDeploy.vision.classification
 {
-    public class DetectionResult
+    public class ClassificationResult
     {
-        public Rect Box { get; private set; }
         private int LabelId { get; set; }
         private float Score { get; set; }
 
+        public override string ToString() => $"LabelId: {LabelId}, Score: {Score}";
+
         private static readonly int NativeSize = Marshal.SizeOf<MDDetectionResult>();
 
-        private static DetectionResult FromNative(MDDetectionResult cResult) => new DetectionResult
+        private static ClassificationResult FromNative(MDClassificationResult cResult) => new ClassificationResult
         {
-            Box = Rect.FromNative(cResult.box),
             LabelId = cResult.label_id,
             Score = cResult.score
         };
 
-        private static MDDetectionResult ToNative(DetectionResult result) => new MDDetectionResult
+        private static MDClassificationResult ToNative(ClassificationResult result) => new MDClassificationResult
         {
-            box = result.Box.ToNative(),
             label_id = result.LabelId,
             score = result.Score
         };
 
-        public static List<DetectionResult> FromNativeArray(MDDetectionResults cResults)
+        public static List<ClassificationResult> FromNativeArray(MDClassificationResults cResults)
         {
-            var results = new List<DetectionResult>(cResults.size);
+            var results = new List<ClassificationResult>(cResults.size);
             for (int i = 0; i < cResults.size; i++)
             {
                 IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
-                var native = Marshal.PtrToStructure<MDDetectionResult>(ptr);
+                var native = Marshal.PtrToStructure<MDClassificationResult>(ptr);
                 results.Add(FromNative(native));
             }
 
             return results;
         }
 
-        public static MDDetectionResults ToNativeArray(IReadOnlyList<DetectionResult> results)
+        public static MDClassificationResults ToNativeArray(List<ClassificationResult> results)
         {
-            var cResults = new MDDetectionResults
+            var cResults = new MDClassificationResults
             {
                 size = results.Count,
                 data = results.Count > 0

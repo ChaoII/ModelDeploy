@@ -8,9 +8,10 @@
 
     public enum MDModelType
     {
-        OCR = 0,
+        Classification,
         Detection = 1,
-        FACE = 2,
+        OCR,
+        FACE,
         LPR,
         ASR,
         TTS

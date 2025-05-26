@@ -146,6 +146,21 @@ namespace ModelDeploy
             public int height;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDClassificationResult
+        {
+            public int label_id;
+            public float score;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDClassificationResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct MDDetectionResult
         {
             public MDRect box;
