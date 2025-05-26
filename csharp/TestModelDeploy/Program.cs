@@ -5,14 +5,29 @@ using ModelDeploy.audio.asr;
 using ModelDeploy.audio.tts;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using ModelDeploy.vision.classification;
 using ModelDeploy.vision.detection;
 using ModelDeploy.vision.face;
 using ModelDeploy.vision.ocr;
 
 namespace TestModelDeploy;
 
-class Program
+static class Program
 {
+    static void TestClassification()
+    {
+        using var yolov5 = new YoloV5Cls("../../../../../test_data/test_models/yolov5n-cls.onnx");
+        yolov5.SetInputSize(224, 224);
+        Image image = Image.Read("../../../../../test_data/test_images/test_face.jpg");
+        var results = yolov5.Predict(image);
+        yolov5.DrawClassificationResult(image, results, "../../../../../test_data/msyh.ttc", 5, 0.5f);
+        image.Show();
+        foreach (var result in results)
+        {
+            Console.WriteLine(result);
+        }
+    }
+
     static void TestKokoro()
     {
         var parameters = new MDKokoroParameters
@@ -49,7 +64,7 @@ class Program
         Image image = Image.Read("../../../../../test_data/test_images/test_detection1.png");
         yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
-        yolov8.DrawDetectionResult(image, results, "font.ttf");
+        yolov8.DrawDetectionResult(image, results, "../../../../../test_data/msyh.ttc");
         image.Show();
         foreach (var rsult in results)
         {
@@ -246,14 +261,15 @@ class Program
 
     static void Main(string[] args)
     {
-        TestFace();
+        TestClassification();
+        // TestFace();
         // TestSenseVoice();
-        TestKokoro();
-        TestDetection();
-        TestImage();
-        TestOCR();
-        TestOcrRecognition();
-        TestOcrRecognitionBatch();
+        // TestKokoro();
+        // TestDetection();
+        // TestImage();
+        // TestOCR();
+        // TestOcrRecognition();
+        // TestOcrRecognitionBatch();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();
