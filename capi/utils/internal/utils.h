@@ -189,6 +189,14 @@ void c_results_2_detection_landmark_result(
     const MDDetectionLandmarkResults* c_results,
     DetectionLandmarkResult* result);
 
+void lpr_result_2_c_results(
+    const LprResult& result,
+    MDLPRResults* c_results);
+
+void c_results_2_lpr_result(
+    const MDLPRResults* c_results,
+    LprResult* result);
+
 
 void face_recognizer_result_2_c_result(
     const FaceRecognitionResult& result,

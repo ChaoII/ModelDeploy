@@ -3,8 +3,8 @@
 //
 
 #include <iostream>
-#include "../../csrc/vision.h"
-#include "../../csrc/vision/common/visualize/visualize.h"
+#include "csrc/vision.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 #ifdef WIN32
 #include <windows.h>

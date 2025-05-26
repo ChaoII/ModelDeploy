@@ -196,17 +196,14 @@ namespace modeldeploy::vision {
         LprResult() = default;
 
         LprResult(const LprResult& res);
-
         /// Clear FaceRecognitionResult
         void clear();
-
         /// Clear FaceRecognitionResult and free the memory
         void free();
 
         void reserve(size_t size);
 
         void resize(size_t size);
-
         /// Debug function, convert the result to string to print
         void display();
     };

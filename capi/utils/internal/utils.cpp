@@ -7,6 +7,8 @@
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 
+#include <csrc/core/md_log.h>
+
 
 cv::Mat md_image_to_mat(const MDImage* image) {
     if (!image) {
@@ -190,7 +192,7 @@ void c_results_2_detection_result(
     result->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
         auto [x, y, width, height] = c_results->data[i].box;
-        auto box = std::array<float, 4>{
+        auto box = std::array{
             static_cast<float>(x),
             static_cast<float>(y),
             static_cast<float>(x + width),
@@ -231,7 +233,7 @@ void c_results_2_ocr_result(
     result->rec_scores.reserve(c_results->size);
     for (int i = 0; i < c_results->size; ++i) {
         result->boxes.emplace_back(
-            std::array<int, 8>{
+            std::array{
                 c_results->data[i].box.data[0].x,
                 c_results->data[i].box.data[0].y,
                 c_results->data[i].box.data[1].x,
@@ -282,7 +284,7 @@ void c_results_2_detection_landmark_result(
     result->reserve(c_results->size);
     result->landmarks_per_instance = c_results->data[0].landmarks_size;
     for (int i = 0; i < c_results->size; i++) {
-        result->boxes.emplace_back(std::array<float, 4>{
+        result->boxes.emplace_back(std::array{
                 static_cast<float>(c_results->data[i].box.x),
                 static_cast<float>(c_results->data[i].box.y),
                 static_cast<float>(c_results->data[i].box.x + c_results->data[i].box.width),
@@ -293,7 +295,7 @@ void c_results_2_detection_landmark_result(
         result->scores.emplace_back(c_results->data[i].score);
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             result->landmarks.emplace_back(
-                std::array<float, 2>{
+                std::array{
                     static_cast<float>(c_results->data[i].landmarks[j].x),
                     static_cast<float>(c_results->data[i].landmarks[j].y)
                 }
@@ -303,11 +305,82 @@ void c_results_2_detection_landmark_result(
 }
 
 // 注意开辟内存需要成对的销毁
+void lpr_result_2_c_results(
+    const LprResult& result, MDLPRResults* c_results) {
+    // 针对单纯的车牌识别模型
+    if (result.boxes.empty()) {
+        c_results->size = 1;
+        c_results->data = new MDLPRResult[c_results->size];
+        c_results->data[0].box = MDRect{0, 0, 0, 0};
+        c_results->data[0].car_plate_color = strdup(result.car_plate_colors[0].c_str());
+        c_results->data[0].car_plate_str = strdup(result.car_plate_strs[0].c_str());
+        c_results->data[0].label_id = -1;
+        c_results->data[0].score = -1.0f;
+        c_results->data[0].landmarks_size = 0;
+        c_results->data[0].landmarks = nullptr;
+        return;
+    }
+
+    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->data = new MDLPRResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        auto [xmin, ymin, xmax, ymax] = result.boxes[i];
+        c_results->data[i].box = MDRect{
+            static_cast<int>(xmin),
+            static_cast<int>(ymin),
+            static_cast<int>(xmax - xmin),
+            static_cast<int>(ymax - ymin)
+        };
+        c_results->data[i].label_id = result.label_ids[i];
+        c_results->data[i].score = result.scores[i];
+        // 车牌关键点为4个
+        constexpr int landmark_size = 4;
+        c_results->data[i].landmarks_size = landmark_size;
+        c_results->data[i].landmarks = new MDPoint[landmark_size];
+        for (int j = 0; j < landmark_size; j++) {
+            c_results->data[i].landmarks[j] = MDPoint{
+                static_cast<int>(result.landmarks[i * landmark_size + j][0]),
+                static_cast<int>(result.landmarks[i * landmark_size + j][1])
+            };
+        }
+        c_results->data[i].car_plate_str = strdup(result.car_plate_strs[i].c_str());
+        c_results->data[i].car_plate_color = strdup(result.car_plate_colors[i].c_str());
+    }
+}
+
+void c_results_2_lpr_result(
+    const MDLPRResults* c_results, LprResult* result) {
+    result->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        result->boxes.emplace_back(std::array{
+                static_cast<float>(c_results->data[i].box.x),
+                static_cast<float>(c_results->data[i].box.y),
+                static_cast<float>(c_results->data[i].box.x + c_results->data[i].box.width),
+                static_cast<float>(c_results->data[i].box.y + c_results->data[i].box.height)
+            }
+        );
+        result->label_ids.emplace_back(c_results->data[i].label_id);
+        result->scores.emplace_back(c_results->data[i].score);
+        for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
+            result->landmarks.emplace_back(
+                std::array{
+                    static_cast<float>(c_results->data[i].landmarks[j].x),
+                    static_cast<float>(c_results->data[i].landmarks[j].y)
+                }
+            );
+        }
+        result->car_plate_strs.emplace_back(c_results->data[i].car_plate_str);
+        result->car_plate_colors.emplace_back(c_results->data[i].car_plate_color);
+    }
+}
+
+
+// 注意开辟内存需要成对的销毁
 void face_recognizer_result_2_c_result(
     const FaceRecognitionResult& result, MDFaceRecognizerResult* c_result) {
     c_result->size = static_cast<int>(result.embedding.size());
     c_result->embedding = new float[c_result->size];
-    std::copy(result.embedding.begin(), result.embedding.end(), c_result->embedding);
+    std::ranges::copy(result.embedding, c_result->embedding);
 }
 
 
@@ -325,7 +398,7 @@ void face_recognizer_results_2_c_results(
     c_results->data = new MDFaceRecognizerResult[results.size()];
     for (int i = 0; i < results.size(); i++) {
         c_results->data[i].embedding = new float[results[i].embedding.size()];
-        std::copy(results[i].embedding.begin(), results[i].embedding.end(), c_results->data[i].embedding);
+        std::ranges::copy(results[i].embedding, c_results->data[i].embedding);
         c_results->data[i].size = static_cast<int>(results[i].embedding.size());
     }
 }

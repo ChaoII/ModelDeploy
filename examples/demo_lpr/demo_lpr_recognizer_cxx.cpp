@@ -3,7 +3,7 @@
 //
 
 #include <iostream>
-#include "../../csrc/vision.h"
+#include "csrc/vision.h"
 
 #ifdef WIN32
 

@@ -68,16 +68,16 @@ namespace modeldeploy::vision {
             draw_landmarks(cv_image, result.landmarks, i, 4, landmark_radius);
         }
         if (save_result) {
-            MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
+            MD_LOG_INFO << "Save lpr result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
         return cv_image;
     }
 
 
-    cv::Mat vis_face_det(cv::Mat cv_image, const DetectionLandmarkResult& result,
-                                const std::string& font_path, const int font_size,
-                                const int landmark_radius, const double alpha, const bool save_result) {
+    cv::Mat vis_det_landmarks(cv::Mat cv_image, const DetectionLandmarkResult& result,
+                              const std::string& font_path, const int font_size,
+                              const int landmark_radius, const double alpha, const bool save_result) {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         const cv::FontFace font(font_path);
