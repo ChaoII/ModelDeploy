@@ -34,7 +34,7 @@ MDStatusCode md_set_detection_input_size(const MDModel* model, const MDSize size
         return MDStatusCode::ModelTypeError;
     }
     const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
-    detection_model->get_preprocessor().set_size({size.height, size.height});
+    detection_model->get_preprocessor().set_size({size.width, size.height});
     return MDStatusCode::Success;
 }
 

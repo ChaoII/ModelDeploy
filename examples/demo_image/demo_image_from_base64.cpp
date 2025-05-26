@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << file_path << std::endl;
     }
-    std::string base64_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    const std::string base64_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
     MDImage image = md_from_base64_str(base64_str.c_str());
     md_save_image(&image, "s.jpg");
