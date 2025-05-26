@@ -7,12 +7,36 @@
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 #include "csrc/vision/ocr/ppstructurev2_table.h"
 
-namespace modeldeploy::pipeline {
-    PPStructureV2Table::PPStructureV2Table(
-        modeldeploy::vision::ocr::DBDetector* det_model,
-        modeldeploy::vision::ocr::Recognizer* rec_model,
-        modeldeploy::vision::ocr::StructureV2Table* table_model)
-        : detector_(det_model), recognizer_(rec_model), table_(table_model) {
+namespace modeldeploy::vision::ocr {
+    PPStructureV2Table::PPStructureV2Table(const std::string& det_model_file,
+                                           const std::string& rec_model_file,
+                                           const std::string& table_model_file,
+                                           const std::string& rec_label_file,
+                                           const std::string& table_char_dict_path,
+                                           int thread_num,
+                                           int max_side_len,
+                                           double det_db_thresh,
+                                           double det_db_box_thresh,
+                                           double det_db_unclip_ratio,
+                                           const std::string& det_db_score_mode,
+                                           bool use_dilation,
+                                           int rec_batch_size) {
+        RuntimeOption option;
+        option.set_cpu_thread_num(thread_num);
+        // detection
+        detector_ = std::make_unique<DBDetector>(det_model_file, option);
+        detector_->get_preprocessor().set_max_side_len(max_side_len);
+        detector_->get_postprocessor().set_det_db_thresh(det_db_thresh);
+        detector_->get_postprocessor().set_det_db_box_thresh(det_db_box_thresh);
+        detector_->get_postprocessor().set_det_db_score_mode(det_db_score_mode);
+        detector_->get_postprocessor().set_det_db_score_mode(det_db_score_mode);
+        detector_->get_postprocessor().set_use_dilation(use_dilation);
+        detector_->get_postprocessor().set_det_db_unclip_ratio(det_db_unclip_ratio);
+        // recognizer
+        recognizer_ = std::make_unique<Recognizer>(rec_model_file, rec_label_file, option);
+        set_rec_batch_size(rec_batch_size);
+        // table recognizer
+        table_ = std::make_unique<StructureV2Table>(table_model_file, table_char_dict_path, option);
     }
 
     bool PPStructureV2Table::is_initialized() const {
@@ -42,15 +66,15 @@ namespace modeldeploy::pipeline {
     [[maybe_unused]] int PPStructureV2Table::get_rec_batch_size() const { return rec_batch_size_; }
 
 
-    bool PPStructureV2Table::predict(cv::Mat* img,
+    bool PPStructureV2Table::predict(cv::Mat* image,
                                      modeldeploy::vision::OCRResult* result) {
-        return predict(*img, result);
+        return predict(*image, result);
     }
 
-    bool PPStructureV2Table::predict(const cv::Mat& img,
+    bool PPStructureV2Table::predict(const cv::Mat& image,
                                      modeldeploy::vision::OCRResult* result) {
         std::vector<modeldeploy::vision::OCRResult> batch_result(1);
-        const bool success = batch_predict({img}, &batch_result);
+        const bool success = batch_predict({image}, &batch_result);
         if (!success) {
             return success;
         }
