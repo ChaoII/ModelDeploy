@@ -1,3 +1,7 @@
 
-add_executable(demo_classification demo_classification.cpp)
-target_link_libraries(demo_classification PUBLIC ${LIBRARY_NAME})
+add_executable(demo_classification_cxx demo_classification_cxx.cpp)
+target_link_libraries(demo_classification_cxx PUBLIC ${LIBRARY_NAME})
+
+
+add_executable(demo_classification_capi demo_classification_capi.cpp)
+target_link_libraries(demo_classification_capi PUBLIC ${LIBRARY_NAME})

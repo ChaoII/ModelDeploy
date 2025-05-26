@@ -3,7 +3,6 @@
 //
 
 #include "csrc/core/md_log.h"
-#include "opencv2/opencv.hpp"
 #include "csrc/vision/common/visualize/visualize.h"
 
 
@@ -19,7 +18,7 @@ namespace modeldeploy::vision {
         // 绘制半透明部分（填充矩形）
         for (int i = 0; i < result.boxes.size(); ++i) {
             auto class_id = result.label_ids[i];
-            if (color_map.find(class_id) == color_map.end()) {
+            if (!color_map.contains(class_id)) {
                 color_map[class_id] = get_random_color();
             }
             auto x1 = static_cast<int>(result.boxes[i][0]);
@@ -30,7 +29,6 @@ namespace modeldeploy::vision {
             // 绘制对象矩形框
             cv::rectangle(overlay, cv::Point(x1, y1), cv::Point(x2, y2), cv_color, -1);
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[i]).substr(0, 4);
-
             const auto size = cv::getTextSize(cv::Size(0, 0),
                                               text, cv::Point(x1, y1), font, font_size);
             // 绘制标签背景
@@ -63,7 +61,7 @@ namespace modeldeploy::vision {
                     static_cast<const uint8_t*>(result.masks[c].data()));
                 // only reference to mask data (zero copy)
                 cv::Mat mask(mask_h, mask_w, CV_8UC1, mask_raw_data);
-                if (mask_h != box_h || (mask_w != box_w)) {
+                if (mask_h != box_h || mask_w != box_w) {
                     cv::resize(mask, mask, cv::Size(box_w, box_h));
                 }
                 // use a bright color for instance mask

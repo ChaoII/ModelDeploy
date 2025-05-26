@@ -10,42 +10,36 @@
 #include "csrc/core/md_decl.h"
 #include "csrc/core/tensor.h"
 
-namespace modeldeploy {
-namespace vision {
-
-namespace classification {
-/*! @brief Preprocessor object for YOLOv5Cls serials model.
+namespace modeldeploy::vision::classification {
+    /*! @brief Preprocessor object for YOLOv5Cls serials model.
  */
-class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
- public:
-  /** \brief Create a preprocessor instance for YOLOv5Cls serials model
+    class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
+    public:
+        /** \brief Create a preprocessor instance for YOLOv5Cls serials model
    */
-  YOLOv5ClsPreprocessor();
+        YOLOv5ClsPreprocessor();
 
-  /** \brief Process the input image and prepare input tensors for runtime
+        /** \brief Process the input image and prepare input tensors for runtime
    *
    * \param[in] images The input image data list, all the elements are returned by cv::imread()
    * \param[in] outputs The output tensors which will feed in runtime
    * \param[in] ims_info The shape info list, record input_shape and output_shape
    * \return true if the preprocess successed, otherwise false
    */
-  bool Run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-           std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const;
+        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+                 std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const;
 
-  /// Set target size, tuple of (width, height), default size = {224, 224}
-  void SetSize(const std::vector<int>& size) { size_ = size; }
+        /// Set target size, tuple of (width, height), default size = {224, 224}
+        void set_size(const std::vector<int>& size) { size_ = size; }
 
-  /// Get target size, tuple of (width, height), default size = {224, 224}
-  std::vector<int> GetSize() const { return size_; }
+        /// Get target size, tuple of (width, height), default size = {224, 224}
+        [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
- protected:
-  bool Preprocess(cv::Mat* mat, Tensor* output,
-                  std::map<std::string, std::array<float, 2>>* im_info) const;
+    protected:
+        bool preprocess(cv::Mat* mat, Tensor* output,
+                        std::map<std::string, std::array<float, 2>>* im_info) const;
 
-  // target size, tuple of (width, height), default size = {224, 224}
-  std::vector<int> size_;
-};
-
-}  // namespace classification
-}  // namespace vision
-}  // namespace fastdeploy
+        // target size, tuple of (width, height), default size = {224, 224}
+        std::vector<int> size_;
+    };
+}

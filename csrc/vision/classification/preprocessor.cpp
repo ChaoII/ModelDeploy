@@ -17,7 +17,7 @@ namespace modeldeploy::vision::classification {
         size_ = {224, 224}; //{h,w}
     }
 
-    bool YOLOv5ClsPreprocessor::Preprocess(
+    bool YOLOv5ClsPreprocessor::preprocess(
         cv::Mat* mat, Tensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) const {
         if (mat->empty()) {
@@ -61,10 +61,10 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool YOLOv5ClsPreprocessor::Run(
+    bool YOLOv5ClsPreprocessor::run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
         std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const {
-        if (images->size() == 0) {
+        if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0."
                 << std::endl;
             return false;
@@ -74,7 +74,7 @@ namespace modeldeploy::vision::classification {
         // Concat all the preprocessed data to a batch tensor
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
-            if (!Preprocess(&(*images)[i], &tensors[i], &(*ims_info)[i])) {
+            if (!preprocess(&(*images)[i], &tensors[i], &(*ims_info)[i])) {
                 MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
                 return false;
             }

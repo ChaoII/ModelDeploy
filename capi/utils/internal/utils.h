@@ -150,6 +150,16 @@ cv::Mat get_rotate_crop_image(const cv::Mat& src_image, const MDPolygon* polygon
 using namespace modeldeploy::vision;
 
 
+void classification_result_2_c_results(
+    const ClassifyResult& result,
+    MDClassificationResults* c_results);
+
+
+void c_results_2_classification_result(
+    const MDClassificationResults* c_results,
+    ClassifyResult* result);
+
+
 void detection_result_2_c_results(
     const DetectionResult& result,
     MDDetectionResults* c_results);

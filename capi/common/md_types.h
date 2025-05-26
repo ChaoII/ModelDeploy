@@ -17,8 +17,9 @@ enum MDModelFormat {
 };
 
 enum MDModelType {
-    OCR = 0,
+    Classification = 0,
     Detection,
+    OCR = 0,
     FACE,
     LPR,
     ASR,
@@ -143,6 +144,18 @@ typedef struct {
     int height;
 } MDSize;
 
+
+typedef struct {
+    int label_id;
+    float score;
+} MDClassificationResult;
+
+typedef struct {
+    MDClassificationResult* data;
+    int size;
+} MDClassificationResults;
+
+
 typedef struct {
     MDRect box;
     int label_id;
@@ -182,6 +195,7 @@ typedef struct {
 
 typedef int MDFaceAgeResult;
 
+// same to MDClassificationResult
 typedef struct {
     int label_id;
     float score;
