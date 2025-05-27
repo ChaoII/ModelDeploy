@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     MDStatusCode ret;
     //简单百宝箱
     MDModel model;
-    MDStructureTableModelParameters ocr_parameters = {
+    const MDStructureTableModelParameters ocr_parameters = {
         "../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx",
         "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
         "../../test_data/test_models/ocr/SLANeXt_wired.onnx",

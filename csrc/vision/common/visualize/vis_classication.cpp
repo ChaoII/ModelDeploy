@@ -8,7 +8,7 @@
 namespace modeldeploy::vision {
     cv::Mat vis_classification(cv::Mat& cv_image,
                                const ClassifyResult& result,
-                               int top_k,
+                               const int top_k,
                                const float score_threshold,
                                const std::string& font_path,
                                const int font_size,
@@ -16,7 +16,7 @@ namespace modeldeploy::vision {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
-        size_t margin = 5;
+        constexpr int margin = 5;
         // 根据label_id获取颜色
         std::map<int, cv::Scalar_<int>> color_map;
         // 绘制半透明部分（填充矩形）
@@ -29,7 +29,7 @@ namespace modeldeploy::vision {
                 color_map[class_id] = get_random_color();
             }
             auto cv_color = color_map[class_id];
-            cv::Point origin(margin, margin + font_size * (i + 1));
+            const cv::Point origin(margin, margin + font_size * (i + 1));
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[i]).substr(0, 4);
             const auto size = cv::getTextSize(cv::Size(0, 0),
                                               text, origin, font, font_size);
@@ -45,7 +45,7 @@ namespace modeldeploy::vision {
             auto class_id = result.label_ids[c];
             auto cv_color = color_map[class_id];
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[c]).substr(0, 4);
-            cv::Point origin(margin, margin + font_size * (c + 1));
+            const cv::Point origin(margin, margin + font_size * (c + 1));
             const auto size = cv::getTextSize(cv::Size(0, 0), text,
                                               origin, font, font_size);
             cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);

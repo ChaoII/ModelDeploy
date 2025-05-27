@@ -12,7 +12,7 @@ namespace ModelDeploy.vision.classification
 
         public override string ToString() => $"LabelId: {LabelId}, Score: {Score}";
 
-        private static readonly int NativeSize = Marshal.SizeOf<MDDetectionResult>();
+        private static readonly int NativeSize = Marshal.SizeOf<MDClassificationResult>();
 
         private static ClassificationResult FromNative(MDClassificationResult cResult) => new ClassificationResult
         {
@@ -55,7 +55,6 @@ namespace ModelDeploy.vision.classification
                 var native = ToNative(results[i]);
                 Marshal.StructureToPtr(native, ptr, false);
             }
-
             return cResults;
         }
     }

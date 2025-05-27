@@ -91,6 +91,25 @@ namespace ModelDeploy
             public int rec_batch_size;
         }
 
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDStructureTableModelParameters
+        {
+            public string det_model_file;
+            public string rec_model_file;
+            public string table_model_file;
+            public string rec_label_file;
+            public string table_char_dict_path;
+            public int thread_num;
+            public int max_side_len;
+            public double det_db_thresh;
+            public double det_db_box_thresh;
+            public double det_db_unclip_ratio;
+            public string det_db_score_mode;
+            public int use_dilation;
+            public int rec_batch_size;
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         public struct MDSenseVoiceParameters
         {
@@ -122,12 +141,15 @@ namespace ModelDeploy
             public MDPolygon box;
             public IntPtr text;
             public float score;
+            public MDPolygon table_boxes;
+            public IntPtr table_structure;
         }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDOCRResults
         {
             public IntPtr data;
+            public IntPtr table_html;
             public int size;
         }
 
