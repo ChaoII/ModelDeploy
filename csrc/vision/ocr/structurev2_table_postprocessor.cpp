@@ -52,8 +52,8 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2TablePostprocessor::single_batch_post_processor(
-        const float* structure_probs, const float* bbox_preds, size_t slice_dim,
-        size_t prob_dim, size_t box_dim, int img_width, int img_height,
+        const float* structure_probs, const float* bbox_preds, const size_t slice_dim,
+        const size_t prob_dim, const size_t box_dim, const int img_width, const int img_height,
         std::vector<std::array<int, 8>>* boxes_result,
         std::vector<std::string>* structure_list_result) {
         structure_list_result->emplace_back("<html>");
@@ -77,12 +77,11 @@ namespace modeldeploy::vision::ocr {
                 continue;
 
             std::string text = dict_character[structure_idx];
-            if (std::find(td_tokens.begin(), td_tokens.end(), text) !=
-                td_tokens.end()) {
+            if (std::ranges::find(td_tokens, text) != td_tokens.end()) {
                 std::array<int, 8> bbox{};
                 // box dim: en->4, ch->8
                 if (box_dim == 4) {
-                    bbox[0] = bbox_preds[i * box_dim] * img_width;
+                    bbox[0] = bbox_preds[i * box_dim + 0] * img_width;
                     bbox[1] = bbox_preds[i * box_dim + 1] * img_height;
 
                     bbox[2] = bbox_preds[i * box_dim + 2] * img_width;
@@ -91,7 +90,7 @@ namespace modeldeploy::vision::ocr {
                     bbox[4] = bbox_preds[i * box_dim + 2] * img_width;
                     bbox[5] = bbox_preds[i * box_dim + 3] * img_height;
 
-                    bbox[6] = bbox_preds[i * box_dim] * img_width;
+                    bbox[6] = bbox_preds[i * box_dim + 0] * img_width;
                     bbox[7] = bbox_preds[i * box_dim + 3] * img_height;
                 }
                 else {
@@ -105,6 +104,8 @@ namespace modeldeploy::vision::ocr {
             }
             structure_list_result->push_back(text);
         }
+
+
         structure_list_result->emplace_back("</table>");
         structure_list_result->emplace_back("</body>");
         structure_list_result->emplace_back("</html>");
@@ -123,18 +124,18 @@ namespace modeldeploy::vision::ocr {
 
         const auto* structure_probs_data =
             static_cast<const float*>(structure_probs.data());
-        size_t structure_probs_length =
+        const size_t structure_probs_length =
             accumulate(structure_probs.shape().begin() + 1, structure_probs.shape().end(),
                        1, std::multiplies());
         const auto* bbox_preds_data =
             static_cast<const float*>(bbox_preds.data());
-        size_t bbox_preds_length =
+        const size_t bbox_preds_length =
             accumulate(bbox_preds.shape().begin() + 1, bbox_preds.shape().end(), 1,
                        std::multiplies());
-        size_t batch = bbox_preds.shape()[0];
-        size_t slice_dim = bbox_preds.shape()[1];
-        size_t prob_dim = structure_probs.shape()[2];
-        size_t box_dim = bbox_preds.shape()[2];
+        const size_t batch = bbox_preds.shape()[0];
+        const size_t slice_dim = bbox_preds.shape()[1];
+        const size_t prob_dim = structure_probs.shape()[2];
+        const size_t box_dim = bbox_preds.shape()[2];
 
         bbox_batch_list->resize(batch);
         structure_batch_list->resize(batch);

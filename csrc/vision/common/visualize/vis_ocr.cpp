@@ -25,6 +25,20 @@ namespace modeldeploy::vision {
                                               {points[0].x, points[0].y}, font, font_size);
             cv::rectangle(image, size, cv_color, -1, cv::LINE_AA, 0);
         }
+        // 绘制表格单元格
+        // for (int j = 0; j < results.table_boxes.size(); j++) {
+        //     const auto polygon = results.table_boxes[j];
+        //     std::vector<cv::Point> points;
+        //     points.reserve(polygon.size() / 2);
+        //     for (int k = 0; k < polygon.size(); k += 2) {
+        //         points.emplace_back(polygon[k], polygon[k + 1]);
+        //     }
+        //     cv::fillPoly(image, points, cv_color, cv::LINE_AA, 0);
+        //     const auto size = cv::getTextSize(cv::Size(0, 0), results.table_structure[j],
+        //                                       {points[0].x, points[0].y}, font, font_size);
+        //     cv::rectangle(image, size, cv_color, 1, cv::LINE_AA, 0);
+        // }
+
         cv::addWeighted(overlay, alpha, image, 1 - alpha, 0, image);
         // 绘制多边形边框，文字背景边框，文字
         for (int i = 0; i < results.boxes.size(); ++i) {
@@ -42,6 +56,22 @@ namespace modeldeploy::vision {
             cv::putText(image, results.text[i], {points[0].x, points[0].y - 2},
                         inv_color, font, font_size);
         }
+        // 绘制表格单元格
+        // for (int j = 0; j < results.table_boxes.size(); j++) {
+        //     const auto polygon = results.table_boxes[j];
+        //     std::vector<cv::Point> points;
+        //     points.reserve(polygon.size());
+        //     for (int k = 0; k < polygon.size(); k += 2) {
+        //         points.emplace_back(polygon[k], polygon[k + 1]);
+        //     }
+        //     cv::polylines(image, points, true, cv_color, 1, cv::LINE_AA, 0);
+        //     const auto size = cv::getTextSize(cv::Size(0, 0), results.table_structure[j],
+        //                                       {points[0].x, points[0].y}, font, font_size);
+        //     cv::rectangle(image, size, cv_color, 1, cv::LINE_AA, 0);
+        //     const auto inv_color = cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]);
+        //     cv::putText(image, results.table_structure[j], {points[0].x, points[0].y - 2},
+        //                 inv_color, font, font_size);
+        // }
         if (save_result) {
             cv::imwrite("vis_result.jpg", image);
         }

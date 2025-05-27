@@ -2,6 +2,8 @@
 // Created by aichao on 2025/3/21.
 //
 
+#include <csrc/vision/common/visualize/visualize.h>
+
 #include "csrc/vision.h"
 #include "csrc/vision/common/result.h"
 #ifdef _WIN32
@@ -49,7 +51,7 @@ int main() {
     const std::string& table_char_dict_path = "../../test_data/table_structure_dict_ch.txt";
     const std::string& image_file = "../../test_data/test_images/test_table.jpg";
 
-    int rec_batch_size = 8;
+    constexpr int rec_batch_size = 8;
 
 
     // The classification model is optional, so the PP-OCR can also be connected
@@ -70,5 +72,10 @@ int main() {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
+    auto vis_image = modeldeploy::vision::vis_ocr(im_bak, result, "../../test_data/msyh.ttc", 20, 0.5, 0);
+
+    cv::imshow("result", vis_image);
+    cv::waitKey(0);
+
     std::cout << result.str() << std::endl;
 }

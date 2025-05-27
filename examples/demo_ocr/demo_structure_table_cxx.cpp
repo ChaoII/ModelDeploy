@@ -2,12 +2,14 @@
 // Created by aichao on 2025/3/21.
 //
 
+#include <csrc/vision/common/visualize/visualize.h>
+
 #include "csrc/vision.h"
 #include "csrc/vision/common/result.h"
 
 int main() {
     auto table_model = modeldeploy::vision::ocr::StructureV2Table(
-        "../../test_data/test_models/ocr/SLANeXt_wired.onnx",
+        "../../test_data/test_models/ocr/SLANet_plus.onnx",
         "../../test_data/table_structure_dict_ch.txt");
     assert(table_model.is_initialized());
     auto im = cv::imread("../../test_data/test_images/test_table1.jpg");
@@ -17,6 +19,10 @@ int main() {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
+    auto vis_image = modeldeploy::vision::vis_ocr(im_bak, result, "../../test_data/msyh.ttc", 20, 0.5, 0);
+
+    cv::imshow("result", vis_image);
+    cv::waitKey(0);
     std::cout << result.str() << std::endl;
     return 0;
 }

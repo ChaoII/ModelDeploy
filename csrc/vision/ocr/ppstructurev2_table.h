@@ -23,9 +23,19 @@ namespace modeldeploy::vision::ocr {
     public:
         /** \brief Set up the detection model path, recognition model path and table model path respectively.
          *
-         * \param[in] det_model Path of detection model, e.g ./ch_PP-OCRv2_det_infer
-         * \param[in] rec_model Path of recognition model, e.g ./ch_PP-OCRv2_rec_infer
-         * \param[in] table_model Path of table recognition model, e.g ./en_ppstructure_mobile_v2.0_SLANet_infer
+         * \param det_model_file The detection model path.
+         * \param rec_model_file The recognition model path.
+         * \param table_model_file The table model path.
+         * \param rec_label_file The recognition label path.
+         * \param table_char_dict_path The table model path.
+         * \param thread_num The number of threads to use.
+         * \param max_side_len The maximum side length of input image.
+         * \param det_db_thresh
+         * \param det_db_box_thresh
+         * \param det_db_unclip_ratio
+         * \param det_db_score_mode
+         * \param use_dilation
+         * \param rec_batch_size
          */
         PPStructureV2Table(const std::string& det_model_file,
                            const std::string& rec_model_file,
@@ -56,7 +66,7 @@ namespace modeldeploy::vision::ocr {
          *
          * \param[in] images The list of input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] batch_result The output list of OCR result will be writen to this structure.
-         * \return true if the prediction successed, otherwise false.
+         * \return true if the prediction successfully otherwise false.
          */
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
                                    std::vector<modeldeploy::vision::OCRResult>* batch_result);
