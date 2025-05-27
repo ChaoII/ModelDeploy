@@ -70,7 +70,7 @@ namespace modeldeploy::vision::ocr {
         batch_det_img_info_.clear();
         batch_det_img_info_.resize(image_batch->size());
         for (size_t i = 0; i < image_batch->size(); ++i) {
-            cv::Mat* mat = &(image_batch->at(i));
+            cv::Mat* mat = &image_batch->at(i);
             structure_v2_table_resize_image(mat, i);
         }
 

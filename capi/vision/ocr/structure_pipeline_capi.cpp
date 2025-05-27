@@ -85,9 +85,17 @@ void md_free_structure_table_result(MDOCRResults* c_results) {
     for (int i = 0; i < c_results->size; ++i) {
         free(c_results->data[i].text);
         delete[] c_results->data[i].box.data;
+        c_results->data[i].box.data = nullptr;
+        c_results->data[i].box.size = 0;
+        free(c_results->data[i].table_structure);
+        delete[] c_results->data[i].table_boxes.data;
+        c_results->data[i].table_boxes.data = nullptr;
+        c_results->data[i].table_boxes.size = 0;
     }
     delete[] c_results->data;
+    free(c_results->table_html);
     c_results->data = nullptr;
+    c_results->table_html = nullptr;
     c_results->size = 0;
 }
 
