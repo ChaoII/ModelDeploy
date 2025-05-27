@@ -18,8 +18,8 @@ extern "C" {
 /// \param thread_num 线程数
 /// \return MDStatusCode::Success成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_gender_model(MDModel* model,
-                                                              const char* model_path,
-                                                              int thread_num = 8);
+                                                                 const char* model_path,
+                                                                 int thread_num = 8);
 
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_detection_model创建的模型
@@ -27,7 +27,7 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_gender_model(MDModel* model,
 /// \param image 原始图像
 /// \return MDStatusCode::Success 成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_face_gender_predict(const MDModel* model, MDImage* image,
-                                                         MDFaceGenderResult* c_result);
+                                                            MDFaceGenderResult* c_result);
 
 
 /// 释放检测结果

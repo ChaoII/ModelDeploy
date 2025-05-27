@@ -57,7 +57,6 @@ static class Program
         }
     }
 
-
     static void TestDetection()
     {
         using var yolov8 = new YoloV8("../../../../../test_data/test_models/best1.onnx");
@@ -131,55 +130,64 @@ static class Program
 
     static void TestFace()
     {
-        // Image image0 = Image.Read("../../../../../test_data/test_images/test_face.jpg");
-        // Image image1 = Image.Read("../../../../../test_data/test_images/test_face1.jpg");
-        // Image image2 = Image.Read("../../../../../test_data/test_images/test_face2.jpg");
-        // Image image3 = Image.Read("../../../../../test_data/test_images/test_face3.jpg");
-        //
-        // SeetaFace seetaFace =
-        //     new SeetaFace("../../../../../test_data/test_models/seetaface", FaceConstants.MD_MASK, 8);
-        // var detectionResults = seetaFace.FaceDetect(image3);
-        // Console.WriteLine($"Detection {detectionResults.Count} faces in image3");
-        //
-        // var points = seetaFace.FaceLandmark(image3, detectionResults[0].Box);
-        //
-        // var feature0 = seetaFace.FaceFeatureExtract(image0);
-        // var feature1 = seetaFace.FaceFeatureExtract(image1);
-        // var feature2 = seetaFace.FaceFeatureExtract(image2);
-        // var feature3 = seetaFace.FaceFeatureExtract(image3, points);
-        //
-        // var similarity0 = seetaFace.FaceFeatureCompare(feature0, feature1);
-        // Console.WriteLine($"similarity between image0 and image1 is: {similarity0}");
-        // var similarity1 = seetaFace.FaceFeatureCompare(feature0, feature2);
-        // Console.WriteLine($"similarity between image0 and image2 is: {similarity1}");
-        //
-        // var ret = seetaFace.FaceAntiSpoofing(image0);
-        // Console.WriteLine($"AntiSpoofing result: {ret}");
-        //
-        // var age = seetaFace.FaceAgePredict(image0);
-        // Console.WriteLine($"Age predict result: {age}");
-        // var gender = seetaFace.FaceGenderPredict(image0);
-        // Console.WriteLine($"Gender predict result: {gender}");
-        //
-        // var quality0 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.Brightness);
-        // Console.WriteLine($"Brightness quality: {quality0}");
-        // var quality1 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.Clarity);
-        // Console.WriteLine($"Clarity quality: {quality1}");
-        // var quality2 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.Integrity);
-        // Console.WriteLine($"Integrity quality: {quality2}");
-        // var quality3 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.Pose);
-        // Console.WriteLine($"Pose quality: {quality3}");
-        // var quality4 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.ClarityEx);
-        // Console.WriteLine($"ClarityEx quality: {quality4}");
-        // var quality5 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.Resolution);
-        // Console.WriteLine($"Resolution quality: {quality5}");
-        // var quality6 = seetaFace.FaceQualityEvaluate(image0, FaceQualityEvaluateType.NoMask);
-        // Console.WriteLine($"NoMask quality: {quality6}");
-        //
-        // var eyeState0 = seetaFace.FaceEyeStatePredict(image0);
-        // Console.WriteLine($"image0: {eyeState0}");
-        // var eyeState1 = seetaFace.FaceEyeStatePredict(image2);
-        // Console.WriteLine($"image2: {eyeState1}");
+        // 人脸检测
+        var image0 = Image.Read("../../../../../test_data/test_images/test_face.jpg");
+        var scrfd = new Scrfd("../../../../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx", 8);
+        var result = scrfd.Predict(image0);
+        scrfd.DrawDetectionResult(image0, result, "../../../../../test_data/msyh.ttc", 15, 10, 0.3, 1);
+        image0.Show();
+
+        // 人脸识别
+        var image1 = Image.Read("../../../../../test_data/test_images/test_face_id4.jpg");
+        var seetaFaceId = new SeetaFaceId("../../../../../test_data/test_models/face/face_recognizer.onnx", 8);
+        var recResult = seetaFaceId.Predict(image1);
+        seetaFaceId.Display(recResult);
+
+        // 年龄预测
+        var image2 = Image.Read("../../../../../test_data/test_images/test_face_id1.jpg");
+        var agePredict = new SeetaFaceAge("../../../../../test_data/test_models/face/age_predictor.onnx", 8);
+        var age = agePredict.Predict(image2);
+        Console.WriteLine($"Age is: {age}");
+
+        //  性别预测
+        var image3 = Image.Read("../../../../../test_data/test_images/test_face_gender.jpg");
+        var genderPredict = new SeetaFaceGender("../../../../../test_data/test_models/face/gender_predictor.onnx", 8);
+        var gender = genderPredict.Predict(image3);
+        Console.WriteLine($"gender is: {gender}");
+
+        // 人脸活体检测1
+        var image4 = Image.Read("../../../../../test_data/test_images/test_face_id3.jpg");
+        var asFirst = new SeetaFaceAsFirst("../../../../../test_data/test_models/face/fas_first.onnx", 8);
+        var score = asFirst.Predict(image4);
+        Console.WriteLine(score > 0.8 ? "REAL" : "SPOOF");
+
+
+        // 人脸活体检测2
+        var image5 = Image.Read("../../../../../test_data/test_images/test_face_as_second2.jpg");
+        var asSecond = new SeetaFaceAsSecond("../../../../../test_data/test_models/face/fas_second.onnx", 8);
+        var asSecondResults = asSecond.Predict(image5);
+        Console.WriteLine(asSecondResults.Count > 0 ? "SPOOF" : "REAL");
+
+        // 人脸活体检测pipeline
+        var image6 = Image.Read("../../../../../test_data/test_images/test_face_detection4.jpg");
+        var antiSpoof = new SeetaFaceAntiSpoof(
+            "../../../../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx",
+            "../../../../../test_data/test_models/face/fas_first.onnx",
+            "../../../../../test_data/test_models/face/fas_second.onnx", 8);
+        var asResults = antiSpoof.Predict(image6);
+        // REAL = 0, FUZZY = 1, SPOOF = 2
+        foreach (var asResult in asResults)
+        {
+            Console.WriteLine($"{asResult}");
+        }
+
+        // 人脸识别pipeline （人脸检测+人脸裁剪+人脸矫正+人脸特征提取）
+        var image7 = Image.Read("../../../../../test_data/test_images/test_face_detection4.jpg");
+        var faceRecognizerPipeline = new FaceRecognizerPipeline(
+            "../../../../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx",
+            "../../../../../test_data/test_models/face/face_recognizer.onnx", 8);
+        var results = faceRecognizerPipeline.Predict(image7);
+        faceRecognizerPipeline.Display(results);
     }
 
     static void TestOcrRecognition()
@@ -312,7 +320,7 @@ static class Program
         // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
-        TestStructureTable();
+        // TestStructureTable();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();
