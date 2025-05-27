@@ -18,11 +18,11 @@ namespace ModelDeploy.vision.ocr
                 throw new Exception("md_create_ocr_model failed.");
         }
 
-        public List<OcrResult> Predict(Image image)
+        public OcrResults Predict(Image image)
         {
             MDOCRResults cResults = new MDOCRResults();
             Utils.Check(md_ocr_model_predict(ref _model, ref image.RawImage, ref cResults), "md_ocr_model_predict");
-            var results = OcrResult.FromNativeArray(cResults);
+            var results = OcrResults.FromNativeArray(cResults);
             md_free_ocr_result(ref cResults);
             return results;
         }
@@ -33,12 +33,13 @@ namespace ModelDeploy.vision.ocr
             return Rect.FromNative(nativeRect);
         }
 
-        public void DrawOcrResult(Image image, List<OcrResult> results, string fontPath, Color color,
+        public void DrawOcrResult(Image image, OcrResults results, string fontPath, Color color,
             int fontSize = 12, double alpha = 0.5, int saveResult = 1)
         {
-            var nativeResults = OcrResult.ToNativeArray(results);
+            var nativeResults = OcrResults.ToNativeArray(results);
             var nativeColor = color.ToNative();
-            md_draw_ocr_result(ref image.RawImage, ref nativeResults, fontPath, fontSize, ref nativeColor, alpha, saveResult);
+            md_draw_ocr_result(ref image.RawImage, ref nativeResults, fontPath, fontSize, ref nativeColor, alpha,
+                saveResult);
             md_free_ocr_result(ref nativeResults);
         }
 
@@ -92,13 +93,14 @@ namespace ModelDeploy.vision.ocr
         public OcrResult Predict(Image image)
         {
             MDOCRResult native = new MDOCRResult();
-            Utils.Check(md_ocr_recognition_model_predict(ref _model, ref image.RawImage, ref native), "md_ocr_recognition_model_predict");
+            Utils.Check(md_ocr_recognition_model_predict(ref _model, ref image.RawImage, ref native),
+                "md_ocr_recognition_model_predict");
             var result = OcrResult.FromNative(native);
             md_free_ocr_recognition_result(ref native);
             return result;
         }
 
-        public List<OcrResult> BatchPredict(Image image, List<Polygon> polygons, int batchSize)
+        public OcrResults BatchPredict(Image image, List<Polygon> polygons, int batchSize)
         {
             MDOCRResults nativeResults = new MDOCRResults();
             MDPolygon[] nativePolygons = null;
@@ -115,7 +117,7 @@ namespace ModelDeploy.vision.ocr
                     ref nativeResults
                 ), "md_ocr_recognition_model_predict_batch");
 
-                return OcrResult.FromNativeArray(nativeResults);
+                return OcrResults.FromNativeArray(nativeResults);
             }
             finally
             {
@@ -142,10 +144,12 @@ namespace ModelDeploy.vision.ocr
         ~OcrRecognition() => Dispose();
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_ocr_recognition_model(ref MDModel model, string modelPath, string dictPath, int threadNum);
+        private static extern int md_create_ocr_recognition_model(ref MDModel model, string modelPath, string dictPath,
+            int threadNum);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_ocr_recognition_model_predict(ref MDModel model, ref MDImage image, ref MDOCRResult result);
+        private static extern int md_ocr_recognition_model_predict(ref MDModel model, ref MDImage image,
+            ref MDOCRResult result);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_ocr_recognition_model_predict_batch(ref MDModel model, ref MDImage image,
@@ -159,5 +163,73 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_ocr_result(ref MDOCRResults results);
+    }
+
+    public class PaddleStructureTable : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        public PaddleStructureTable(MDStructureTableModelParameters parameters)
+        {
+            _model = new MDModel();
+            if (md_create_structure_table_model(ref _model, ref parameters) != 0)
+                throw new Exception("md_create_ocr_model failed.");
+        }
+
+        public OcrResults Predict(Image image)
+        {
+            MDOCRResults cResults = new MDOCRResults();
+            Utils.Check(md_structure_table_model_predict(ref _model, ref image.RawImage, ref cResults),
+                "md_ocr_model_predict");
+            var results = OcrResults.FromNativeArray(cResults);
+            md_free_structure_table_result(ref cResults);
+            return results;
+        }
+
+        public void DrawOcrResult(Image image, OcrResults results, string fontPath, Color color,
+            int fontSize = 12, double alpha = 0.5, int saveResult = 1)
+        {
+            var nativeResults = OcrResults.ToNativeArray(results);
+            var nativeColor = color.ToNative();
+            md_draw_structure_table_result(ref image.RawImage, ref nativeResults, fontPath, fontSize, alpha,
+                saveResult);
+            md_free_structure_table_result(ref nativeResults);
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_structure_table_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~PaddleStructureTable() => Dispose();
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_create_structure_table_model(ref MDModel model,
+            ref MDStructureTableModelParameters parameters);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_structure_table_model_predict(ref MDModel model, ref MDImage image,
+            ref MDOCRResults cResults);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_draw_structure_table_result(ref MDImage image, ref MDOCRResults cResults,
+            string fontPath, int fontSize, double alpha, int saveResult);
+
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_print_structure_table_result(ref MDOCRResults cResults);
+
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_structure_table_result(ref MDOCRResults cResults);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_structure_table_model(ref MDModel model);
     }
 }

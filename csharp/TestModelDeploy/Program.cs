@@ -20,7 +20,7 @@ static class Program
         yolov5.SetInputSize(224, 224);
         Image image = Image.Read("../../../../../test_data/test_images/test_face.jpg");
         var results = yolov5.Predict(image);
-        yolov5.DrawClassificationResult(image, results, "../../../../../test_data/msyh.ttc", 5, 0.5f);
+        yolov5.DrawClassificationResult(image, results, "../../../../../test_data/msyh.ttc", 1, 0.5f);
         image.Show();
         foreach (var result in results)
         {
@@ -113,7 +113,7 @@ static class Program
         };
         Image image = Image.Read("../../../../../test_data/test_images/test_ocr1.png");
         PaddleOcrV4 ppocrv4 = new PaddleOcrV4(parameters);
-        List<OcrResult> results = ppocrv4.Predict(image);
+        OcrResults results = ppocrv4.Predict(image);
         ppocrv4.DrawOcrResult(image, results, "../../../../../test_data/msyh.ttc", new Color
         {
             R = 0,
@@ -121,10 +121,12 @@ static class Program
             B = 255
         }, 15, 0.3, 1);
         image.Show();
-        foreach (var result in results)
+        foreach (var result in results.Data)
         {
             Console.WriteLine(result.Text);
         }
+
+        Console.WriteLine(results.TableHtml);
     }
 
     static void TestFace()
@@ -248,20 +250,60 @@ static class Program
         List<Point> points2 = [p5, p6, p7, p8];
         List<Polygon> polygons = [Polygon.FromPointList(points1), Polygon.FromPointList(points2)];
 
-        List<OcrResult> results = ocrRecognition.BatchPredict(image, polygons, 2);
+        OcrResults results = ocrRecognition.BatchPredict(image, polygons, 2);
         Draw.DrawPolygon(image, polygons[0], new Color { R = 255, G = 255, B = 0 }, 0.5);
         Draw.DrawPolygon(image, polygons[1], new Color { R = 255, G = 0, B = 0 }, 0.5);
         image.Show();
 
-        foreach (var result in results)
+        foreach (var result in results.Data)
         {
             Console.WriteLine(result);
         }
+
+        Console.WriteLine(results.TableHtml);
     }
+
+    static void TestStructureTable()
+    {
+        MDStructureTableModelParameters parameters = new MDStructureTableModelParameters
+        {
+            // 最后注意必须加斜杠
+            det_model_file = "../../../../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx",
+            rec_model_file = "../../../../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
+            table_model_file = "../../../../../test_data/test_models/ocr/SLANeXt_wired.onnx",
+            rec_label_file = "../../../../../test_data/key.txt",
+            table_char_dict_path = "../../../../../test_data/table_structure_dict_ch.txt",
+            thread_num = 8,
+            max_side_len = 1920,
+            det_db_thresh = 0.3,
+            det_db_box_thresh = 0.6,
+            det_db_unclip_ratio = 1.5,
+            det_db_score_mode = "slow",
+            use_dilation = 0,
+            rec_batch_size = 8,
+        };
+        Image image = Image.Read("../../../../../test_data/test_images/test_table.jpg");
+        PaddleStructureTable structureTable = new PaddleStructureTable(parameters);
+        OcrResults results = structureTable.Predict(image);
+        structureTable.DrawOcrResult(image, results, "../../../../../test_data/msyh.ttc", new Color
+        {
+            R = 0,
+            G = 0,
+            B = 255
+        }, 15, 0.3, 1);
+        image.Show();
+        foreach (var result in results.Data)
+        {
+            Console.WriteLine(result.Text);
+        }
+
+        Console.WriteLine(results.TableHtml);
+    }
+
 
     static void Main(string[] args)
     {
-        TestClassification();
+        // TestClassification();
         // TestFace();
         // TestSenseVoice();
         // TestKokoro();
@@ -270,6 +312,7 @@ static class Program
         // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
+        TestStructureTable();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();

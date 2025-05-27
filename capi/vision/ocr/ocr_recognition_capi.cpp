@@ -42,8 +42,11 @@ MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImag
     }
     result->box.size = 0;
     result->box.data = nullptr;
+    result->table_boxes.size = 0;
+    result->table_boxes.data = nullptr;
     result->text = strdup(text.c_str());
     result->score = score;
+    result->table_structure = nullptr;
     return MDStatusCode::Success;
 }
 
@@ -69,6 +72,7 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
     int result_index = 0;
     results->size = size;
     results->data = static_cast<MDOCRResult*>(malloc(sizeof(MDOCRResult) * size));
+    results->table_html = nullptr;
     for (int start_index = 0; start_index < size; start_index += batch_size) {
         const int end_index = std::min(start_index + batch_size, size);
         if (!ocr_rec_model->batch_predict(image_list, &text_ptr, &rec_scores_ptr,
@@ -79,8 +83,11 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
             // 注意在识别模型中不会返回box信息
             results->data[result_index].box.size = 0;
             results->data[result_index].box.data = nullptr;
+            results->data[result_index].table_boxes.size = 0;
+            results->data[result_index].table_boxes.data = nullptr;
             results->data[result_index].text = strdup(text_ptr[i].c_str());
             results->data[result_index].score = rec_scores_ptr[i];
+            results->data[result_index].table_structure = nullptr;
             result_index++;
         }
     }
