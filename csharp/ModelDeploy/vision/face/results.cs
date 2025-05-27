@@ -1,137 +1,212 @@
-﻿using System.Collections.Generic;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.vision.face
 {
-
-
-    //MDFaceAntiSpoofingResult
-    public enum FaceAntiSpoofingResult
+    public class DetectionLandmarkResult
     {
-        Real = 0,
-        Spoof = 1,
-        Fuzzy = 2,
-        Detecting = 3
-    }
+        public Rect Box { get; set; }
+        public List<Point> Landmarks { get; set; }
+        public int LabelId { get; set; }
+        public float Score { get; set; }
 
-    //MDFaceQualityEvaluateResult
-    public enum FaceQualityEvaluateResult
-    {
-        Low = 0,
-        Medium = 1,
-        High = 2
-    }
+        private static readonly int NativeSize = Marshal.SizeOf<MDDetectionLandmarkResult>();
 
-    //MDGenderResult
-    public enum GenderResult
-    {
-        Male = 0,
-        Female = 1
-    }
-
-    public class EyeStateResult
-    {
-        public MDEyeState LeftEye { get; set; }
-        public MDEyeState RightEye { get; set; }
-
-        public override string ToString()
+        private static DetectionLandmarkResult FromNative(MDDetectionLandmarkResult cResult)
         {
-            return $"LeftEye: {LeftEye}, RightEye: {RightEye}";
-        }
-
-        public static EyeStateResult FromRow(MDEyeStateResult cResult)
-        {
-            return new EyeStateResult
+            var detResult = new DetectionLandmarkResult
             {
-                LeftEye = cResult.left_eye,
-                RightEye = cResult.right_eye
+                Box = Rect.FromNative(cResult.box),
+                LabelId = cResult.label_id,
+                Score = cResult.score,
+                Landmarks = new List<Point>(cResult.landmarks_size)
             };
-        }
-    }
-
-    public class LandMarkResult
-    {
-
-        public LandMarkResult(List<PointF> points)
-        {
-            Points = points;
-        }
-
-        private List<PointF> Points { get; set; } = null;
-
-        public static LandMarkResult FromRow(MDLandMarkResult cResult)
-        {
-            List<PointF> landMarkPoints = new List<PointF>();
-            for (int i = 0; i < cResult.size; i++)
+            for (var i = 0; i < cResult.landmarks_size; i++)
             {
-                IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<MDPointF>());
-                MDPointF point = Marshal.PtrToStructure<MDPointF>(currentPtr);
-                landMarkPoints.Add(PointF.FromNative(point));
+                var currentPtr = IntPtr.Add(cResult.landmarks_data, i * Marshal.SizeOf<MDPoint>());
+                var cPoint = Marshal.PtrToStructure<MDPoint>(currentPtr);
+                detResult.Landmarks.Add(Point.FromNative(cPoint));
             }
 
-            return new LandMarkResult(landMarkPoints);
+            return detResult;
         }
 
-        public static MDLandMarkResult ToRow(LandMarkResult result)
+        private static MDDetectionLandmarkResult ToNative(DetectionLandmarkResult result)
         {
-            MDLandMarkResult cResult = new MDLandMarkResult
+            var cResult = new MDDetectionLandmarkResult
             {
-                // notice that the data will destroy in C
-                data = Marshal.AllocHGlobal(result.Points.Count * Marshal.SizeOf<MDPointF>()),
-                size = result.Points.Count
+                box = result.Box.ToNative(),
+                label_id = result.LabelId,
+                score = result.Score,
+                landmarks_size = result.Landmarks.Count,
+                landmarks_data = result.Landmarks.Count > 0
+                    ? Marshal.AllocHGlobal(result.Landmarks.Count * Marshal.SizeOf<MDPoint>())
+                    : IntPtr.Zero
             };
-            for (int i = 0; i < result.Points.Count; i++)
+            for (var i = 0; i < result.Landmarks.Count; i++)
             {
-                IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<MDPointF>());
-                MDPointF res = PointF.ToNative(result.Points[i]);
-                Marshal.StructureToPtr(res, currentPtr, false);
+                var currentPtr = IntPtr.Add(cResult.landmarks_data, i * Marshal.SizeOf<MDPoint>());
+                Marshal.StructureToPtr(result.Landmarks[i].ToNative(), currentPtr, false);
             }
 
             return cResult;
         }
+
+        public static List<DetectionLandmarkResult> FromNativeArray(MDDetectionLandmarkResults cResults)
+        {
+            var results = new List<DetectionLandmarkResult>(cResults.size);
+            for (int i = 0; i < cResults.size; i++)
+            {
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = Marshal.PtrToStructure<MDDetectionLandmarkResult>(ptr);
+                results.Add(FromNative(native));
+            }
+
+            return results;
+        }
+
+        public static MDDetectionLandmarkResults ToNativeArray(List<DetectionLandmarkResult> results)
+        {
+            var cResults = new MDDetectionLandmarkResults
+            {
+                size = results.Count,
+                data = results.Count > 0
+                    ? Marshal.AllocHGlobal(results.Count * NativeSize)
+                    : IntPtr.Zero
+            };
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = ToNative(results[i]);
+                Marshal.StructureToPtr(native, ptr, false);
+            }
+
+            return cResults;
+        }
     }
 
-    public class FaceFeature
+    public class FaceRecognizerResult
     {
-        FaceFeature(List<float> feature)
+        public List<float> Embedding { get; set; }
+
+        private static readonly int NativeSize = Marshal.SizeOf<MDFaceRecognizerResult>();
+
+        public static FaceRecognizerResult FromNative(MDFaceRecognizerResult cResult)
         {
-            Feature  = feature;
-        }
-
-        private List<float> Feature { get; set; }
-
-
-        public static FaceFeature FromRow(MDFaceFeature cResult)
-        {
-            List<float> result = new List<float>();
-            for (int i = 0; i < cResult.size; i++)
+            var detResult = new FaceRecognizerResult
             {
-                IntPtr currentPtr = IntPtr.Add(cResult.data, i * Marshal.SizeOf<float>());
-                float res = Marshal.PtrToStructure<float>(currentPtr);
-                result.Add(res);
-            }
-
-            return new FaceFeature(result);
-        }
-
-        public static MDFaceFeature ToRow(FaceFeature result)
-        {
-            MDFaceFeature cFeature = new MDFaceFeature
-            {
-                // notice that the data will destroy in C
-                data = Marshal.AllocHGlobal(result.Feature.Count * Marshal.SizeOf<float>()),
-                size = result.Feature.Count
+                Embedding = new List<float>(cResult.size)
             };
-            for (int i = 0; i < result.Feature.Count; i++)
+
+            float[] buffer = new float[cResult.size];
+            Marshal.Copy(cResult.embedding, buffer, 0, cResult.size);
+            detResult.Embedding = new List<float>(buffer);
+            return detResult;
+        }
+
+        public static MDFaceRecognizerResult ToNative(FaceRecognizerResult result)
+        {
+            var cResult = new MDFaceRecognizerResult
             {
-                IntPtr currentPtr = IntPtr.Add(cFeature.data, i * Marshal.SizeOf<float>());
-                float res = result.Feature[i];
-                Marshal.StructureToPtr(res, currentPtr, false);
+                size = result.Embedding.Count,
+                embedding = Marshal.AllocHGlobal(result.Embedding.Count * sizeof(float))
+            };
+
+            float[] buffer = result.Embedding.ToArray();
+            Marshal.Copy(buffer, 0, cResult.embedding, buffer.Length);
+            return cResult;
+        }
+
+
+        public static List<FaceRecognizerResult> FromNativeArray(MDFaceRecognizerResults cResults)
+        {
+            var results = new List<FaceRecognizerResult>(cResults.size);
+            for (int i = 0; i < cResults.size; i++)
+            {
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = Marshal.PtrToStructure<MDFaceRecognizerResult>(ptr);
+                results.Add(FromNative(native));
             }
 
-            return cFeature;
+            return results;
+        }
+
+        public static MDFaceRecognizerResults ToNativeArray(List<FaceRecognizerResult> results)
+        {
+            var cResults = new MDFaceRecognizerResults
+            {
+                size = results.Count,
+                data = results.Count > 0
+                    ? Marshal.AllocHGlobal(results.Count * NativeSize)
+                    : IntPtr.Zero
+            };
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = ToNative(results[i]);
+                Marshal.StructureToPtr(native, ptr, false);
+            }
+
+            return cResults;
+        }
+    }
+
+    public class FaceAsSecondResult
+    {
+        private int LabelId { get; set; }
+        private float Score { get; set; }
+
+        public override string ToString() => $"LabelId: {LabelId}, Score: {Score}";
+
+        private static readonly int NativeSize = Marshal.SizeOf<MDFaceAsSecondResult>();
+
+        private static FaceAsSecondResult FromNative(MDFaceAsSecondResult cResult) => new FaceAsSecondResult
+        {
+            LabelId = cResult.label_id,
+            Score = cResult.score
+        };
+
+        private static MDFaceAsSecondResult ToNative(FaceAsSecondResult result) => new MDFaceAsSecondResult
+        {
+            label_id = result.LabelId,
+            score = result.Score
+        };
+
+        public static List<FaceAsSecondResult> FromNativeArray(MDFaceAsSecondResults cResults)
+        {
+            var results = new List<FaceAsSecondResult>(cResults.size);
+            for (int i = 0; i < cResults.size; i++)
+            {
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = Marshal.PtrToStructure<MDFaceAsSecondResult>(ptr);
+                results.Add(FromNative(native));
+            }
+
+            return results;
+        }
+
+        public static MDFaceAsSecondResults ToNativeArray(List<FaceAsSecondResult> results)
+        {
+            var cResults = new MDFaceAsSecondResults
+            {
+                size = results.Count,
+                data = results.Count > 0
+                    ? Marshal.AllocHGlobal(results.Count * NativeSize)
+                    : IntPtr.Zero
+            };
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
+                var native = ToNative(results[i]);
+                Marshal.StructureToPtr(native, ptr, false);
+            }
+
+            return cResults;
         }
     }
 }

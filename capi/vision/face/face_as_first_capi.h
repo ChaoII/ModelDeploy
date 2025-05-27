@@ -17,18 +17,19 @@ extern "C" {
 /// \param model_path 模型路径
 /// \param thread_num 线程数
 /// \return MDStatusCode::Success成功，其他失败
-MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_as_first_model(MDModel* model,
-                                                              const char* model_path,
-                                                              int thread_num = 8);
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_as_first_model(
+    MDModel* model,
+    const char* model_path,
+    int thread_num = 8);
 
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_detection_model创建的模型
 /// \param c_result 检测结果结构体，请在调用该方法前申请内存，该方法会在内部申请内存，并释放
 /// \param image 原始图像
 /// \return MDStatusCode::Success 成功，其他失败
-MODELDEPLOY_CAPI_EXPORT MDStatusCode md_face_as_first_predict(const MDModel* model, MDImage* image,
-                                                         float* c_result);
-
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_face_as_first_predict(
+    const MDModel* model, MDImage* image,
+    float* c_result);
 
 
 /// 释放检测模型

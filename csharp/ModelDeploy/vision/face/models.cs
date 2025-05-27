@@ -1,213 +1,504 @@
-﻿using System.Runtime.InteropServices;
-using ModelDeploy.vision.detection;
-using ModelDeploy.types_internal_c;
+﻿using System;
 using System.Collections.Generic;
-using System;
+using System.Runtime.InteropServices;
+using ModelDeploy.types_internal_c;
+using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.face
 {
-    public class SeetaFace
+    public sealed class Scrfd : IDisposable
     {
         private MDModel _model;
+        private bool _disposed;
 
-        public SeetaFace(string modelDir, int moduleFlags, int threadNum = 8)
+        public Scrfd(string modelDir, int threadNum = 8)
         {
             _model = new MDModel();
-            int ret = md_create_face_model(ref _model, modelDir, moduleFlags, threadNum);
-            if (ret != 0)
+            Utils.Check(md_create_face_det_model(ref _model, modelDir, threadNum), "Create detection model");
+        }
+
+
+        public List<DetectionLandmarkResult> Predict(Image image)
+        {
+            var cResults = new MDDetectionLandmarkResults();
+            Utils.Check(md_face_det_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
+            try
             {
-                throw new Exception("Failed to create face model,error code: " + ret);
+                return new List<DetectionLandmarkResult>(DetectionLandmarkResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                md_free_face_det_result(ref cResults);
             }
         }
 
-        ~SeetaFace()
+        public void DrawDetectionResult(Image image, List<DetectionLandmarkResult> results, string fontPath,
+            int fontSize = 12, int landmarkRadius = 2,
+            double alpha = 0.5, int saveResult = 1)
         {
-            md_free_face_model(ref _model);
+            var cResults = DetectionLandmarkResult.ToNativeArray(results);
+            try
+            {
+                md_draw_face_det_result(ref image.RawImage, ref cResults, fontPath, fontSize, landmarkRadius, alpha,
+                    saveResult);
+            }
+            finally
+            {
+                md_free_face_det_result(ref cResults);
+            }
         }
 
-        public List<DetectionResult> FaceDetect(Image image)
+        public void Dispose()
         {
-            var cResult = new MDDetectionResults();
-            int ret = md_face_detection(ref _model, ref image.RawImage, ref cResult);
-            if (ret != 0)
+            if (!_disposed)
             {
-                throw new Exception("md_face_detection failed error code is: " + ret);
+                md_free_face_det_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
             }
-
-            var results = DetectionResult.FromNativeArray(cResult);
-            // todo optimize structure
-            YoloV8.md_free_detection_result(ref cResult);
-            return results;
         }
 
-        public LandMarkResult FaceLandmark(Image image, Rect rect)
-        {
-            var cResult = new MDLandMarkResult();
-            var cRect = rect.ToNative();
-            int ret = md_face_marker(ref _model, ref image.RawImage, ref cRect, ref cResult);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_marker failed error code is: " + ret);
-            }
+        ~Scrfd() => Dispose();
 
-            var result = LandMarkResult.FromRow(cResult);
-            md_free_face_landmark(ref cResult);
-            return result;
+        #region Native bindings
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_create_face_det_model(ref MDModel model, string modelPath, int threadNum = 8);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_face_det_predict(ref MDModel model, ref MDImage image,
+            ref MDDetectionLandmarkResults cResults);
+
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_draw_face_det_result(ref MDImage image,
+            ref MDDetectionLandmarkResults cResults, string fontPath, int fontSize, int landmarkRadius, double alpha,
+            int saveResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_det_result(ref MDDetectionLandmarkResults cResults);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_det_model(ref MDModel model);
+
+        #endregion
+    }
+
+    public sealed class SeetaFaceId : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        public SeetaFaceId(string modelDir, int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_rec_model(ref _model, modelDir, threadNum), "Create detection model");
         }
 
-        public FaceFeature FaceFeatureExtract(Image image, LandMarkResult points)
-        {
-            var cFeature = new MDFaceFeature();
-            MDLandMarkResult cPoints = LandMarkResult.ToRow(points);
-            int ret = md_face_feature(ref _model, ref image.RawImage, ref cPoints, ref cFeature);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_feature failed error code is: " + ret);
-            }
 
-            var feature = FaceFeature.FromRow(cFeature);
-            md_free_face_feature(ref cFeature);
-            return feature;
+        public FaceRecognizerResult Predict(Image image)
+        {
+            var cResult = new MDFaceRecognizerResult();
+            Utils.Check(md_face_rec_predict(ref _model, ref image.RawImage, ref cResult), "Detection predict");
+            try
+            {
+                return FaceRecognizerResult.FromNative(cResult);
+            }
+            finally
+            {
+                md_free_face_rec_result(ref cResult);
+            }
         }
 
-        public FaceFeature FaceFeatureExtract(Image image)
+        public void Display(FaceRecognizerResult result)
         {
-            var cFeature = new MDFaceFeature();
-            int ret = md_face_feature_e2e(ref _model, ref image.RawImage, ref cFeature);
-            if (ret != 0)
+            var cResult = FaceRecognizerResult.ToNative(result);
+            try
             {
-                throw new Exception("md_face_feature_e2e failed error code is: " + ret);
+                md_print_face_rec_result(ref cResult);
             }
-
-            var feature = FaceFeature.FromRow(cFeature);
-            md_free_face_feature(ref cFeature);
-            return feature;
+            finally
+            {
+                md_free_face_rec_result(ref cResult);
+            }
         }
 
-        public float FaceFeatureCompare(FaceFeature feature1, FaceFeature feature2)
+        public void Dispose()
         {
-            var similarity = 0.0f;
-            var cFeature1 = FaceFeature.ToRow(feature1);
-            var cFeature2 = FaceFeature.ToRow(feature2);
-            int ret = md_face_feature_compare(ref _model, ref cFeature1, ref cFeature2, ref similarity);
-            if (ret != 0)
+            if (!_disposed)
             {
-                throw new Exception("md_face_feature_compare failed error code is: " + ret);
+                md_free_face_rec_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
             }
-
-            return similarity;
         }
 
-        public FaceAntiSpoofingResult FaceAntiSpoofing(Image image)
-        {
-            var result = new FaceAntiSpoofingResult();
-            int ret = md_face_anti_spoofing(ref _model, ref image.RawImage, ref result);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_anti_spoofing failed error code is: " + ret);
-            }
+        ~SeetaFaceId() => Dispose();
 
-            return result;
+        #region Native bindings
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_create_face_rec_model(ref MDModel model, string modelPath, int threadNum = 8);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_face_rec_predict(ref MDModel model, ref MDImage image,
+            ref MDFaceRecognizerResult cResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_print_face_rec_result(ref MDFaceRecognizerResult cResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_rec_result(ref MDFaceRecognizerResult cResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_rec_model(ref MDModel model);
+
+        #endregion
+    }
+
+
+    public sealed class SeetaFaceAge : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        public SeetaFaceAge(string modelDir, int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_age_model(ref _model, modelDir, threadNum), "Create detection model");
         }
 
-        public FaceQualityEvaluateResult FaceQualityEvaluate(Image image, FaceQualityEvaluateType type)
+
+        public int Predict(Image image)
         {
-            var result = new FaceQualityEvaluateResult();
-            int ret = md_face_quality_evaluate(ref _model, ref image.RawImage, type, ref result);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_quality_evaluate failed error code is: " + ret);
-            }
-
-            return result;
-        }
-
-        public int FaceAgePredict(Image image)
-        {
-            var age = 0;
-            int ret = md_face_age_predict(ref _model, ref image.RawImage, ref age);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_age_predict failed error code is: " + ret);
-            }
-
+            int age = 0;
+            Utils.Check(md_face_age_predict(ref _model, ref image.RawImage, ref age), "Detection predict");
             return age;
         }
 
-        public GenderResult FaceGenderPredict(Image image)
-        {
-            var gender = new GenderResult();
-            int ret = md_face_gender_predict(ref _model, ref image.RawImage, ref gender);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_gender_predict failed error code is: " + ret);
-            }
 
-            return gender;
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_face_age_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
         }
 
-        public EyeStateResult FaceEyeStatePredict(Image image)
-        {
-            var eyeState = new MDEyeStateResult();
-            int ret = md_face_eye_state_predict(ref _model, ref image.RawImage, ref eyeState);
-            if (ret != 0)
-            {
-                throw new Exception("md_face_eye_state_predict failed error code is: " + ret);
-            }
+        ~SeetaFaceAge() => Dispose();
 
-            return EyeStateResult.FromRow(eyeState);
+        #region Native bindings
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_create_face_age_model(ref MDModel model, string modelPath, int threadNum = 8);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_face_age_predict(ref MDModel model, ref MDImage image,
+            ref int cResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_age_model(ref MDModel model);
+
+        #endregion
+    }
+
+    public sealed class SeetaFaceGender : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        public enum Gender
+        {
+            Female,
+            Male
+        }
+
+        public SeetaFaceGender(string modelDir, int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_gender_model(ref _model, modelDir, threadNum), "Create detection model");
         }
 
 
+        public Gender Predict(Image image)
+        {
+            int gender = 0;
+            Utils.Check(md_face_gender_predict(ref _model, ref image.RawImage, ref gender), "Detection predict");
+            return (Gender)gender;
+        }
+
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_face_gender_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~SeetaFaceGender() => Dispose();
+
+        #region Native bindings
+
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int
-            md_create_face_model(ref MDModel model, string modelDir, int flags, int threadNum = 1);
+        private static extern int md_create_face_gender_model(ref MDModel model, string modelPath, int threadNum = 8);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_face_gender_predict(ref MDModel model, ref MDImage image,
+            ref int cResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_gender_model(ref MDModel model);
+
+        #endregion
+    }
+
+    public sealed class SeetaFaceAsFirst : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        public SeetaFaceAsFirst(string modelDir, int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_as_first_model(ref _model, modelDir, threadNum), "Create detection model");
+        }
+
+
+        public float Predict(Image image)
+        {
+            float score = 0;
+            Utils.Check(md_face_as_first_predict(ref _model, ref image.RawImage, ref score), "Detection predict");
+            return score;
+        }
+
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_face_as_first_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~SeetaFaceAsFirst() => Dispose();
+
+        #region Native bindings
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_create_face_as_first_model(ref MDModel model, string modelPath, int threadNum = 8);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_face_as_first_predict(ref MDModel model, ref MDImage image, ref float cResult);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_as_first_model(ref MDModel model);
+
+        #endregion
+    }
+
+    public sealed class SeetaFaceAsSecond : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        public SeetaFaceAsSecond(string modelDir, int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_as_second_model(ref _model, modelDir, threadNum), "Create detection model");
+        }
+
+
+        public List<FaceAsSecondResult> Predict(Image image)
+        {
+            var cResults = new MDFaceAsSecondResults();
+            Utils.Check(md_face_as_second_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
+            try
+            {
+                return new List<FaceAsSecondResult>(FaceAsSecondResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                md_free_face_as_second_result(ref cResults);
+            }
+        }
+
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_face_as_second_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~SeetaFaceAsSecond() => Dispose();
+
+        #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
-            md_face_detection(ref MDModel model, ref MDImage image, ref MDDetectionResults result);
+            md_create_face_as_second_model(ref MDModel model, string modelPath, int threadNum = 8);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_face_as_second_predict(ref MDModel model, ref MDImage image,
+            ref MDFaceAsSecondResults cResults);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_as_second_result(ref MDFaceAsSecondResults cResults);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_free_face_as_second_model(ref MDModel model);
+
+        #endregion
+    }
+
+    public sealed class SeetaFaceAntiSpoof : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+
+        public SeetaFaceAntiSpoof(string faceDetModelFile, string firstModelFile, string secondModelFile,
+            int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_as_pipeline_model(ref _model, faceDetModelFile, firstModelFile, secondModelFile,
+                threadNum), "Create detection model");
+        }
+
+
+        public List<MDFaceAsResult> Predict(Image image)
+        {
+            var cResults = new MDFaceAsResults();
+            Utils.Check(md_face_as_pipeline_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
+            try
+            {
+                var results = new List<MDFaceAsResult>();
+                for (var i = 0; i < cResults.size; i++)
+                {
+                    var currentPtr = IntPtr.Add(cResults.data, i * sizeof(int));
+                    results.Add((MDFaceAsResult)Marshal.ReadInt32(currentPtr));
+                }
+
+                return results;
+            }
+            finally
+            {
+                md_free_face_as_pipeline_result(ref cResults);
+            }
+        }
+
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_face_as_pipeline_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~SeetaFaceAntiSpoof() => Dispose();
+
+        #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
-            md_face_marker(ref MDModel model, ref MDImage image, ref MDRect rect, ref MDLandMarkResult result);
+            md_create_face_as_pipeline_model(ref MDModel model, string faceDetModelFile, string firstModelFile,
+                string secondModelFile, int threadNum = 8);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_feature(ref MDModel model, ref MDImage image,
-            ref MDLandMarkResult points, ref MDFaceFeature feature);
+        private static extern int md_face_as_pipeline_predict(ref MDModel model, ref MDImage image,
+            ref MDFaceAsResults cResults, float fuseThreshold = 0.8f, float clarityThreshold = 0.3f);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_feature_e2e(ref MDModel model, ref MDImage image, ref MDFaceFeature feature);
+        private static extern void md_free_face_as_pipeline_result(ref MDFaceAsResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_feature_compare(ref MDModel model, ref MDFaceFeature feature1,
-            ref MDFaceFeature feature2, ref float similarity);
+        private static extern void md_free_face_as_pipeline_model(ref MDModel model);
+
+        #endregion
+    }
+
+    public sealed class FaceRecognizerPipeline : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+
+        public FaceRecognizerPipeline(string faceDetModelFile, string faceRecModelFile, int threadNum = 8)
+        {
+            _model = new MDModel();
+            Utils.Check(md_create_face_rec_pipeline_model(ref _model, faceDetModelFile, faceRecModelFile, threadNum),
+                "Create detection model");
+        }
+
+
+        public List<FaceRecognizerResult> Predict(Image image)
+        {
+            var cResults = new MDFaceRecognizerResults();
+            Utils.Check(md_face_rec_pipeline_predict(ref _model, ref image.RawImage, ref cResults),
+                "Detection predict");
+            try
+            {
+                return new List<FaceRecognizerResult>(FaceRecognizerResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                md_free_face_rec_pipeline_result(ref cResults);
+            }
+        }
+
+        public void Display(List<FaceRecognizerResult> results)
+        {
+            var cResult = FaceRecognizerResult.ToNativeArray(results);
+            md_print_face_rec_pipeline_result(ref cResult);
+        }
+
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                md_free_face_rec_pipeline_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~FaceRecognizerPipeline() => Dispose();
+
+        #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_anti_spoofing(ref MDModel model, ref MDImage image,
-            ref FaceAntiSpoofingResult result);
+        private static extern int
+            md_create_face_rec_pipeline_model(ref MDModel model, string faceDetModelFile, string faceRecModelFile,
+                int threadNum = 8);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_quality_evaluate(ref MDModel model, ref MDImage image,
-            FaceQualityEvaluateType type, ref FaceQualityEvaluateResult result);
+        private static extern int md_face_rec_pipeline_predict(ref MDModel model, ref MDImage image,
+            ref MDFaceRecognizerResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_age_predict(ref MDModel model, ref MDImage image, ref int age);
-
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_gender_predict(ref MDModel model, ref MDImage image, ref GenderResult gender);
-
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_eye_state_predict(ref MDModel model, ref MDImage image,
-            ref MDEyeStateResult eyeState);
+        private static extern void md_print_face_rec_pipeline_result(ref MDFaceRecognizerResults cResults);
 
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_landmark(ref MDLandMarkResult result);
+        private static extern void md_free_face_rec_pipeline_result(ref MDFaceRecognizerResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_feature(ref MDFaceFeature feature);
+        private static extern void md_free_face_rec_pipeline_model(ref MDModel model);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_model(ref MDModel model);
+        #endregion
     }
 }

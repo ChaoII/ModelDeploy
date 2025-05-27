@@ -18,18 +18,21 @@ extern "C" {
 /// \param face_rec_model_file
 /// \param thread_num 线程数
 /// \return MDStatusCode::Success成功，其他失败
-MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_rec_pipeline_model(MDModel* model,
-                                                                       const char* face_det_model_file,
-                                                                       const char* face_rec_model_file,
-                                                                       int thread_num = 8);
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_rec_pipeline_model(
+    MDModel* model,
+    const char* face_det_model_file,
+    const char* face_rec_model_file,
+    int thread_num = 8);
 
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_detection_model创建的模型
 /// \param image 原始图像
 /// \param c_results
 /// \return MDStatusCode::Success 成功，其他失败
-MODELDEPLOY_CAPI_EXPORT MDStatusCode md_face_rec_pipeline_predict(const MDModel* model, MDImage* image,
-                                                                  MDFaceRecognizerResults* c_results);
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_face_rec_pipeline_predict(
+    const MDModel* model,
+    MDImage* image,
+    MDFaceRecognizerResults* c_results);
 
 MODELDEPLOY_CAPI_EXPORT void md_print_face_rec_pipeline_result(const MDFaceRecognizerResults* c_results);
 

@@ -198,18 +198,64 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDLandMarkResult
+        public struct MDDetectionLandmarkResult
+        {
+            public MDRect box;
+            public IntPtr landmarks_data;
+            public int landmarks_size;
+            public int label_id;
+            public float score;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDDetectionLandmarkResults
         {
             public IntPtr data;
             public int size;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDFaceFeature
+        public struct MDFaceRecognizerResult
+        {
+            public IntPtr embedding;
+            public int size;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDFaceRecognizerResults
         {
             public IntPtr data;
             public int size;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDFaceAsSecondResult
+        {
+            public int label_id;
+            public float score;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDFaceAsSecondResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
+        public enum MDFaceAsResult
+        {
+            REAL = 0,
+            FUZZY = 1,
+            SPOOF = 2
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDFaceAsResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDEyeStateResult
