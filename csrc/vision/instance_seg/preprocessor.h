@@ -3,16 +3,16 @@
 //
 
 #pragma once
-#include "csrc/vision/common/result.h"
 #include "csrc/core/tensor.h"
+#include "csrc/vision/common/result.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Preprocessor object for YOLOv5Seg serials model.
-   */
-    class MODELDEPLOY_CXX_EXPORT YOLOv5SegPreprocessor {
+    */
+    class MODELDEPLOY_CXX_EXPORT UltralyticsSegPreprocessor {
     public:
         /// Create a preprocessor instance for YOLOv5Seg serials model
-        YOLOv5SegPreprocessor();
+        UltralyticsSegPreprocessor();
         /** \brief Process the input image and prepare input tensors for runtime
         *
         * \param[in] images The input image data list, all the elements are returned by cv::imread()

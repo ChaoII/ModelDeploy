@@ -16,7 +16,7 @@ MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
                                        const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto detection_model = new modeldeploy::vision::detection::YOLOv8(model_path, option);
+    const auto detection_model = new modeldeploy::vision::detection::UltralyticsDet(model_path, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(detection_model->name().c_str());
     model->model_content = detection_model;
@@ -33,7 +33,7 @@ MDStatusCode md_set_detection_input_size(const MDModel* model, const MDSize size
         MD_LOG_ERROR << "Model type is not detection!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
+    const auto detection_model = static_cast<modeldeploy::vision::detection::UltralyticsDet*>(model->model_content);
     detection_model->get_preprocessor().set_size({size.width, size.height});
     return MDStatusCode::Success;
 }
@@ -45,7 +45,7 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
     }
     const auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::DetectionResult result;
-    const auto detection_model = static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
+    const auto detection_model = static_cast<modeldeploy::vision::detection::UltralyticsDet*>(model->model_content);
     if (const bool res_status = detection_model->predict(cv_image, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
@@ -80,7 +80,7 @@ void md_free_detection_result(MDDetectionResults* c_results) {
 
 void md_free_detection_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::detection::YOLOv8*>(model->model_content);
+        delete static_cast<modeldeploy::vision::detection::UltralyticsDet*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

@@ -12,7 +12,7 @@
 
 int main(int argc, char** argv) {
     std::string model_file = "../../test_data/test_models/yolov5l-seg.onnx";
-    auto model = modeldeploy::vision::detection::YOLOv5Seg(model_file);
+    auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file);
     if (!model.is_initialized()) {
         std::cerr << "Failed to initialize." << std::endl;
         return -1;
@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     }
     res.display();
     auto vis_im = modeldeploy::vision::vis_detection(im, res, "../../test_data/test_models/font.ttf", 14, 0.3, 0);
-    cv::resize(vis_im, vis_im, cv::Size(0, 0),0.75,0.75);
+    cv::resize(vis_im, vis_im, cv::Size(0, 0), 0.75, 0.75);
     cv::imshow("vis_im", vis_im);
     cv::waitKey(0);
 }

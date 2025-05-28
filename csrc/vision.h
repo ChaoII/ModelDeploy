@@ -3,12 +3,12 @@
 //
 #pragma once
 
+#include "vision/ocr/ppocr.h"
+#include "vision/ocr/recognizer.h"
 #include "vision/ocr/structurev2_table.h"
 #include "vision/ocr/ppstructurev2_table.h"
-#include "vision/ocr/ppocr_v4.h"
-#include "vision/ocr/recognizer.h"
-#include "vision/detection/yolov8.h"
-#include "vision/instance_seg/yolov5seg.h"
-#include "vision/classification/yolov5cls.h"
+#include "vision/detection/ultralytics_det.h"
+#include "vision/instance_seg/ultralytics_seg.h"
+#include "vision/classification/ultralytics_cls.h"
 #include "csrc/vision/face/face_models.h"
 #include "csrc/vision/lpr/lpr_models.h"

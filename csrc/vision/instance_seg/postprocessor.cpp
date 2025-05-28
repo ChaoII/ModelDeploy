@@ -6,9 +6,8 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/instance_seg/postprocessor.h"
 
-
 namespace modeldeploy::vision::detection {
-    YOLOv5SegPostprocessor::YOLOv5SegPostprocessor() {
+    UltralyticsSegPostprocessor::UltralyticsSegPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
         mask_threshold_ = 0.35;
@@ -17,7 +16,7 @@ namespace modeldeploy::vision::detection {
         mask_nums_ = 32;
     }
 
-    bool YOLOv5SegPostprocessor::run(
+    bool UltralyticsSegPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
         size_t batch = tensors[0].shape()[0];

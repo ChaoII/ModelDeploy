@@ -8,11 +8,11 @@
 namespace modeldeploy::vision::detection {
     /*! @brief Postprocessor object for YOLOv5Seg serials model.
    */
-    class MODELDEPLOY_CXX_EXPORT YOLOv5SegPostprocessor {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsSegPostprocessor {
     public:
         /** \brief Create a postprocessor instance for YOLOv5Seg serials model
        */
-        YOLOv5SegPostprocessor();
+        UltralyticsSegPostprocessor();
 
         /** \brief Process the result of runtime and fill to DetectionResult structure
        *

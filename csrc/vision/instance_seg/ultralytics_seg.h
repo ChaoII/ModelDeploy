@@ -10,18 +10,18 @@
 
 namespace modeldeploy::vision::detection {
     /*! @brief YOLOv5Seg model object used when to load a YOLOv5Seg model exported by YOLOv5.
- */
-    class MODELDEPLOY_CXX_EXPORT YOLOv5Seg : public BaseModel {
+    */
+    class MODELDEPLOY_CXX_EXPORT UltralyticsSeg : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
         *
         * \param[in] model_file Path of model file, e.g ./yolov5seg.onnx
         * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
         */
-        explicit YOLOv5Seg(const std::string& model_file,
-                           const RuntimeOption& custom_option = RuntimeOption());
+        explicit UltralyticsSeg(const std::string& model_file,
+                                const RuntimeOption& custom_option = RuntimeOption());
 
-        [[nodiscard]] std::string name() const override { return "yolov5seg"; }
+        [[nodiscard]] std::string name() const override { return "UltralyticsSeg"; }
 
         /** \brief Predict the detection result for an input image
         *
@@ -41,18 +41,18 @@ namespace modeldeploy::vision::detection {
                                    std::vector<DetectionResult>* results);
 
         /// Get preprocessor reference of YOLOv5Seg
-        virtual YOLOv5SegPreprocessor& get_preprocessor() {
+        virtual UltralyticsSegPreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of YOLOv5Seg
-        virtual YOLOv5SegPostprocessor& get_postprocessor() {
+        virtual UltralyticsSegPostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 
     protected:
         bool initialize();
-        YOLOv5SegPreprocessor preprocessor_;
-        YOLOv5SegPostprocessor postprocessor_;
+        UltralyticsSegPreprocessor preprocessor_;
+        UltralyticsSegPostprocessor postprocessor_;
     };
 }

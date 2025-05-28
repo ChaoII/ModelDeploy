@@ -4,16 +4,16 @@
 
 #pragma once
 #include "csrc/core/md_decl.h"
-#include "csrc/vision/common/result.h"
 #include "csrc/vision/utils.h"
+#include "csrc/vision/common/result.h"
 
 namespace modeldeploy::vision::detection {
-    class MODELDEPLOY_CXX_EXPORT YOLOv8Postprocessor {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsPostprocessor {
     public:
-        YOLOv8Postprocessor();
+        UltralyticsPostprocessor();
         bool run(const std::vector<Tensor>& tensors,
                  std::vector<DetectionResult>* results,
-                 const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info);
+                 const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 
         /// Set conf_threshold, default 0.25
         void set_conf_threshold(const float& conf_threshold) {
@@ -21,7 +21,7 @@ namespace modeldeploy::vision::detection {
         }
 
         /// Get conf_threshold, default 0.25
-        float get_conf_threshold() const { return conf_threshold_; }
+        [[nodiscard]] float get_conf_threshold() const { return conf_threshold_; }
 
         /// Set nms_threshold, default 0.5
         void set_nms_threshold(const float& nms_threshold) {
@@ -29,7 +29,7 @@ namespace modeldeploy::vision::detection {
         }
 
         /// Get nms_threshold, default 0.5
-        float get_nms_threshold() const { return nms_threshold_; }
+        [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
 
         /// Set multi_label, set true for eval, default true
         void set_multi_label(bool multi_label) {
@@ -37,7 +37,7 @@ namespace modeldeploy::vision::detection {
         }
 
         /// Get multi_label, default true
-        bool get_multi_label() const { return multi_label_; }
+        [[nodiscard]] bool get_multi_label() const { return multi_label_; }
 
     protected:
         float conf_threshold_;

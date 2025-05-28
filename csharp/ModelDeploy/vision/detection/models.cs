@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.detection
 {
-    public sealed class YoloV8 : IDisposable
+    public sealed class UltralyticsDet : IDisposable
     {
         private MDModel _model;
         private bool _disposed;
 
-        public YoloV8(string modelDir, int threadNum = 8)
+        public UltralyticsDet(string modelDir, int threadNum = 8)
         {
             _model = new MDModel();
             Utils.Check(md_create_detection_model(ref _model, modelDir, threadNum), "Create detection model");
@@ -77,7 +76,7 @@ namespace ModelDeploy.vision.detection
             }
         }
 
-        ~YoloV8() => Dispose();
+        ~UltralyticsDet() => Dispose();
 
         #region Native bindings
 

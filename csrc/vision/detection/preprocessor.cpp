@@ -2,17 +2,14 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "preprocessor.h"
-
-#include <csrc/core/md_log.h>
-
-#include "../common/processors/resize.h"
-#include "../common/processors/pad.h"
-#include "../common/processors/convert_and_permute.h"
-
+#include "csrc/core/md_log.h"
+#include "csrc/vision/detection/preprocessor.h"
+#include "csrc/vision/common/processors/resize.h"
+#include "csrc/vision/common/processors/pad.h"
+#include "csrc/vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::detection {
-    YOLOv8Preprocessor::YOLOv8Preprocessor() {
+    UltralyticsPreprocessor::UltralyticsPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
         is_mini_pad_ = false;
@@ -22,7 +19,7 @@ namespace modeldeploy::vision::detection {
         max_wh_ = 7680.0;
     }
 
-    void YOLOv8Preprocessor::letter_box(cv::Mat* mat) {
+    void UltralyticsPreprocessor::letter_box(cv::Mat* mat) const {
         float scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
         if (!is_scale_up_) {
             scale = std::min(scale, 1.0f);
@@ -56,8 +53,8 @@ namespace modeldeploy::vision::detection {
         }
     }
 
-    bool YOLOv8Preprocessor::preprocess(cv::Mat* mat, Tensor* output,
-                                        std::map<std::string, std::array<float, 2>>* im_info) {
+    bool UltralyticsPreprocessor::preprocess(cv::Mat* mat, Tensor* output,
+                                             std::map<std::string, std::array<float, 2>>* im_info) const {
         // Record the shape of image and the shape of preprocessed image
         (*im_info)["input_shape"] = {
             static_cast<float>(mat->rows),
@@ -80,10 +77,10 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool YOLOv8Preprocessor::run(
+    bool UltralyticsPreprocessor::run(
         std::vector<cv::Mat>* images,
         std::vector<Tensor>* outputs,
-        std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) {
+        std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
