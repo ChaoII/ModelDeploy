@@ -16,6 +16,21 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct MDColor
+        {
+            public byte r;
+            public byte g;
+            public byte b;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDSize
+        {
+            public int width;
+            public int height;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct MDPoint
         {
             public int x;
@@ -153,20 +168,6 @@ namespace ModelDeploy
             public int size;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MDColor
-        {
-            public byte r;
-            public byte g;
-            public byte b;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MDSize
-        {
-            public int width;
-            public int height;
-        }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDClassificationResult
@@ -183,9 +184,20 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct MDMask
+        {
+            public IntPtr buffer;
+            public int buffer_size;
+            public IntPtr shape;
+            public int num_dims;
+        }
+
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct MDDetectionResult
         {
             public MDRect box;
+            public MDMask mask;
             public int label_id;
             public float score;
         }
@@ -213,6 +225,26 @@ namespace ModelDeploy
             public IntPtr data;
             public int size;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDLPRResult
+        {
+            public MDRect box;
+            public IntPtr landmarks;
+            public int landmarks_size;
+            public int label_id;
+            public float score;
+            public IntPtr car_plate_str;
+            public IntPtr car_plate_color;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDLPRResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDFaceRecognizerResult
@@ -244,9 +276,9 @@ namespace ModelDeploy
 
         public enum MDFaceAsResult
         {
-            REAL = 0,
-            FUZZY = 1,
-            SPOOF = 2
+            Real = 0,
+            Fuzzy = 1,
+            Spoof = 2
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -254,14 +286,6 @@ namespace ModelDeploy
         {
             public IntPtr data;
             public int size;
-        }
-
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MDEyeStateResult
-        {
-            public MDEyeState left_eye;
-            public MDEyeState right_eye;
         }
 
 

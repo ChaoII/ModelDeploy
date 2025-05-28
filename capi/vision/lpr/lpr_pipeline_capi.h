@@ -36,13 +36,6 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_lpr_pipeline_predict(
 MODELDEPLOY_CAPI_EXPORT void md_print_lpr_pipeline_result(
     const MDLPRResults* c_results);
 
-// const MDImage* image,
-// const MDDetectionLandmarkResults* c_results,
-// const char* font_path,
-// int font_size,
-// int landmark_radius,
-// double alpha,
-// int save_result);
 
 /// 绘制检测结果
 /// \param image 原始图像

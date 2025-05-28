@@ -42,10 +42,9 @@ MDStatusCode md_lpr_det_predict(const MDModel* model, MDImage* image, MDDetectio
 
 
 void md_print_lpr_det_result(const MDDetectionLandmarkResults* c_results) {
-    const auto result = new modeldeploy::vision::DetectionLandmarkResult();
-    c_results_2_detection_landmark_result(c_results, result);
-    result->display();
-    delete result;
+    modeldeploy::vision::DetectionLandmarkResult results;
+    c_results_2_detection_landmark_result(c_results, &results);
+    results.display();
 }
 
 
