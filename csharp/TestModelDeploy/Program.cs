@@ -109,8 +109,8 @@ static class Program
         MDOCRModelParameters parameters = new MDOCRModelParameters
         {
             // 最后注意必须加斜杠
-            model_dir = Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile"),
-            dict_path = Path.Combine(TestDataPath, "key.txt"),
+            model_dir = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile"),
+            dict_path = Path.Combine(TestDataPath, "ppocrv5_dict.txt"),
             thread_num = 8,
             format = MDModelFormat.ONNX,
             max_side_len = 1920,
@@ -122,14 +122,9 @@ static class Program
             rec_batch_size = 8,
         };
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.png"));
-        PaddleOcr ppocrv4 = new PaddleOcr(parameters);
-        OcrResults results = ppocrv4.Predict(image);
-        ppocrv4.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), new Color
-        {
-            R = 0,
-            G = 0,
-            B = 255
-        }, 15, 0.3, 1);
+        PaddleOcr ppocr = new PaddleOcr(parameters);
+        OcrResults results = ppocr.Predict(image);
+        ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.5, 1);
         image.Show();
         foreach (var result in results.Data)
         {
@@ -353,18 +348,18 @@ static class Program
 
     static void Main(string[] args)
     {
-        TestClassification();
-        TestFace();
-        TestLpr();
+        // TestClassification();
+        // TestFace();
+        // TestLpr();
         // TestSenseVoice();
-        TestKokoro();
-        TestDetection();
-        TestInstanceSeg();
-        TestImage();
+        // TestKokoro();
+        // TestDetection();
+        // TestInstanceSeg();
+        // TestImage();
         TestOCR();
-        TestOcrRecognition();
-        TestOcrRecognitionBatch();
-        TestStructureTable();
+        // TestOcrRecognition();
+        // TestOcrRecognitionBatch();
+        // TestStructureTable();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();
