@@ -13,10 +13,10 @@ int main() {
     SetConsoleOutputCP(CP_UTF8);
 #endif
 
-    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx",
-                                            "../../test_data/test_models/ocr/repsvtr_mobile/cls_infer.onnx",
-                                            "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer1.onnx",
-                                            "../../test_data/key.txt");
+    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
+                                            "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
+                                            "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
+                                            "../../test_data/ppocrv5_dict.txt");
     auto img = cv::imread("../../test_data/test_images/test_ocr5.jpg");
     modeldeploy::vision::OCRResult result;
     ocr.predict(img, &result);
