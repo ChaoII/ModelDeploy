@@ -7,8 +7,7 @@
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/lpr/lpr_pipeline_capi.h"
-
-#include <csrc/vision/common/visualize/visualize.h>
+#include "csrc/vision/common/visualize/visualize.h"
 
 
 MDStatusCode md_create_lpr_pipeline_model(MDModel* model,

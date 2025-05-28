@@ -59,8 +59,7 @@ MODELDEPLOY_CAPI_EXPORT void md_free_lpr_det_result(
 
 /// 释放检测模型
 /// @param model 由create_detection_model创建的模型
-MODELDEPLOY_CAPI_EXPORT void md_free_lpr_det_model
-(MDModel* model);
+MODELDEPLOY_CAPI_EXPORT void md_free_lpr_det_model(MDModel* model);
 
 #ifdef __cplusplus
 }

@@ -22,23 +22,7 @@ namespace ModelDeploy
             return new MDPoint { x = X, y = Y };
         }
     }
-
-    public class PointF
-    {
-        public double X { get; set; }
-        public double Y { get; set; }
-
-        public static PointF FromNative(MDPointF point)
-        {
-            return new PointF { X = point.x, Y = point.y };
-        }
-
-        public static MDPointF ToNative(PointF point)
-        {
-            return new MDPointF { x = point.X, y = point.Y };
-        }
-    }
-
+    
     public class Color
     {
         public byte R { get; set; }

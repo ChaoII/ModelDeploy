@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
@@ -37,8 +38,23 @@ namespace ModelDeploy.vision.detection
             }
         }
 
+
+        public void Display(List<DetectionResult> results)
+        {
+            var cResults = DetectionResult.ToNativeArray(results);
+            try
+            {
+                md_print_detection_result(ref cResults);
+            }
+            finally
+            {
+                md_free_detection_result(ref cResults);
+            }
+        }
+
+
         public void DrawDetectionResult(Image image, List<DetectionResult> results, string fontPath, int fontSize = 12,
-            double alpha = 0.5, int saveResult = 1)
+            double alpha = 0.5, int saveResult = 0)
         {
             var cResults = DetectionResult.ToNativeArray(results);
             try
@@ -76,11 +92,14 @@ namespace ModelDeploy.vision.detection
             ref MDDetectionResults results);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void md_print_detection_result(ref MDDetectionResults cResults);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_detection_result(ref MDImage image, ref MDDetectionResults result,
             string fontPath, int fontSize, double alpha, int saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        public static extern void md_free_detection_result(ref MDDetectionResults results);
+        private static extern void md_free_detection_result(ref MDDetectionResults results);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_detection_model(ref MDModel model);

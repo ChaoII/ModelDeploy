@@ -210,7 +210,6 @@ typedef struct {
     int size;
 } MDDetectionLandmarkResults;
 
-
 typedef struct {
     MDRect box;
     MDPoint* landmarks;
@@ -220,7 +219,6 @@ typedef struct {
     char* car_plate_str;
     char* car_plate_color;
 } MDLPRResult;
-
 
 typedef struct {
     MDLPRResult* data;

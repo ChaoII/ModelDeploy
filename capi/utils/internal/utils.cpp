@@ -188,7 +188,7 @@ void detection_result_2_c_results(
         c_results->data[i].mask.buffer_size = 0;
         if (result.contain_masks) {
             // 拷贝buffer
-            const auto& mask_buffer = result.masks[i].shape;
+            const auto& mask_buffer = result.masks[i].buffer;
             c_results->data[i].mask.buffer = new char[mask_buffer.size()];
             std::ranges::copy(mask_buffer, c_results->data[i].mask.buffer);
             c_results->data[i].mask.buffer_size = static_cast<int>(mask_buffer.size());

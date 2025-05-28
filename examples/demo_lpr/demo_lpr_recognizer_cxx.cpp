@@ -24,6 +24,7 @@ int main() {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
+    res.display();
     std::cout << "car plate color: " << res.car_plate_colors[0] << std::endl;
     std::cout << "car_plate_str: " << res.car_plate_strs[0] << std::endl;
     return 0;
