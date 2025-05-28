@@ -16,7 +16,7 @@ MDStatusCode md_create_instance_seg_model(MDModel* model, const char* model_path
                                           const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto instance_seg_model = new modeldeploy::vision::detection::YOLOv5Seg(model_path, option);
+    const auto instance_seg_model = new modeldeploy::vision::detection::UltralyticsSeg(model_path, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(instance_seg_model->name().c_str());
     model->model_content = instance_seg_model;
@@ -33,7 +33,7 @@ MDStatusCode md_set_instance_seg_input_size(const MDModel* model, const MDSize s
         MD_LOG_ERROR << "Model type is not instance_seg!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto instance_seg_model = static_cast<modeldeploy::vision::detection::YOLOv5Seg*>(model->model_content);
+    const auto instance_seg_model = static_cast<modeldeploy::vision::detection::UltralyticsSeg*>(model->model_content);
     instance_seg_model->get_preprocessor().set_size({size.width, size.height});
     return MDStatusCode::Success;
 }
@@ -45,7 +45,7 @@ MDStatusCode md_instance_seg_predict(const MDModel* model, MDImage* image, MDDet
     }
     const auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::DetectionResult result;
-    const auto instance_seg_model = static_cast<modeldeploy::vision::detection::YOLOv5Seg*>(model->model_content);
+    const auto instance_seg_model = static_cast<modeldeploy::vision::detection::UltralyticsSeg*>(model->model_content);
     if (const bool res_status = instance_seg_model->predict(cv_image, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
@@ -80,7 +80,7 @@ void md_free_instance_seg_result(MDDetectionResults* c_results) {
 
 void md_free_instance_seg_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::detection::YOLOv5Seg*>(model->model_content);
+        delete static_cast<modeldeploy::vision::detection::UltralyticsSeg*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

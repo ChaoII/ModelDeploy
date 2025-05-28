@@ -1,6 +1,4 @@
-﻿using System.Runtime.InteropServices;
-using System.Text;
-using ModelDeploy;
+﻿using ModelDeploy;
 using ModelDeploy.audio.asr;
 using ModelDeploy.audio.tts;
 using ModelDeploy.types_internal_c;
@@ -21,7 +19,7 @@ static class Program
 
     static void TestClassification()
     {
-        using var yolov5 = new YoloV5Cls(Path.Combine(TestDataPath, "test_models/yolov5n-cls.onnx"));
+        using var yolov5 = new UltralyticsCls(Path.Combine(TestDataPath, "test_models/yolov5n-cls.onnx"));
         yolov5.SetInputSize(224, 224);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_face.jpg"));
         var results = yolov5.Predict(image);
@@ -64,7 +62,7 @@ static class Program
 
     static void TestDetection()
     {
-        using var yolov8 = new YoloV8(Path.Combine(TestDataPath, "test_models/best1.onnx"));
+        using var yolov8 = new UltralyticsDet(Path.Combine(TestDataPath, "test_models/best1.onnx"));
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection1.png"));
         yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
@@ -75,7 +73,7 @@ static class Program
 
     static void TestInstanceSeg()
     {
-        using var yoloV5Seg = new YoloV5Seg(Path.Combine(TestDataPath, "test_models/yolov5l-seg.onnx"));
+        using var yoloV5Seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/yolov5l-seg.onnx"));
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_detection.jpg"));
         var results = yoloV5Seg.Predict(image);
         yoloV5Seg.DrawDetectionResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"));
@@ -124,7 +122,7 @@ static class Program
             rec_batch_size = 8,
         };
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.png"));
-        PaddleOcrV4 ppocrv4 = new PaddleOcrV4(parameters);
+        PaddleOcr ppocrv4 = new PaddleOcr(parameters);
         OcrResults results = ppocrv4.Predict(image);
         ppocrv4.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), new Color
         {
@@ -355,18 +353,18 @@ static class Program
 
     static void Main(string[] args)
     {
-        // TestClassification();
-        // TestFace();
-        // TestLpr();
+        TestClassification();
+        TestFace();
+        TestLpr();
         // TestSenseVoice();
-        // TestKokoro();
+        TestKokoro();
         TestDetection();
         TestInstanceSeg();
-        // TestImage();
-        // TestOCR();
-        // TestOcrRecognition();
-        // TestOcrRecognitionBatch();
-        // TestStructureTable();
+        TestImage();
+        TestOCR();
+        TestOcrRecognition();
+        TestOcrRecognitionBatch();
+        TestStructureTable();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();

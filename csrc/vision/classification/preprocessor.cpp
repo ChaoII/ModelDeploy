@@ -2,22 +2,20 @@
 // Created by aichao on 2025/2/24.
 //
 
-#include "preprocessor.h"
-
-#include <csrc/core/md_log.h>
-
-#include "../common/processors/center_crop.h"
-#include "../common/processors/resize.h"
-#include "../common/processors/convert.h"
-#include "../common/processors/color_space_convert.h"
-#include "../common/processors/normalize_and_permute.h"
+#include "csrc/core/md_log.h"
+#include "csrc/vision/classification/preprocessor.h"
+#include "csrc/vision/common/processors/center_crop.h"
+#include "csrc/vision/common/processors/resize.h"
+#include "csrc/vision/common/processors/convert.h"
+#include "csrc/vision/common/processors/color_space_convert.h"
+#include "csrc/vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::classification {
-    YOLOv5ClsPreprocessor::YOLOv5ClsPreprocessor() {
+    UltralyticsClsPreprocessor::UltralyticsClsPreprocessor() {
         size_ = {224, 224}; //{h,w}
     }
 
-    bool YOLOv5ClsPreprocessor::preprocess(
+    bool UltralyticsClsPreprocessor::preprocess(
         cv::Mat* mat, Tensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) const {
         if (mat->empty()) {
@@ -61,7 +59,7 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool YOLOv5ClsPreprocessor::run(
+    bool UltralyticsClsPreprocessor::run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
         std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const {
         if (images->empty()) {

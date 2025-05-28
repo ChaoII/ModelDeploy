@@ -6,12 +6,12 @@ using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.instance_seg
 {
-    public sealed class YoloV5Seg : IDisposable
+    public sealed class UltralyticsSeg : IDisposable
     {
         private MDModel _model;
         private bool _disposed;
 
-        public YoloV5Seg(string modelDir, int threadNum = 8)
+        public UltralyticsSeg(string modelDir, int threadNum = 8)
         {
             _model = new MDModel();
             Utils.Check(md_create_instance_seg_model(ref _model, modelDir, threadNum), "Create detection model");
@@ -74,7 +74,7 @@ namespace ModelDeploy.vision.instance_seg
             }
         }
 
-        ~YoloV5Seg() => Dispose();
+        ~UltralyticsSeg() => Dispose();
 
         #region Native bindings
 

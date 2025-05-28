@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "csrc/vision/common/result.h"
 #include <map>
 #include "csrc/vision/utils.h"
 #include "csrc/core/md_decl.h"
@@ -13,11 +12,11 @@
 namespace modeldeploy::vision::classification {
     /*! @brief Preprocessor object for YOLOv5Cls serials model.
  */
-    class MODELDEPLOY_CXX_EXPORT YOLOv5ClsPreprocessor {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsClsPreprocessor {
     public:
         /** \brief Create a preprocessor instance for YOLOv5Cls serials model
    */
-        YOLOv5ClsPreprocessor();
+        UltralyticsClsPreprocessor();
 
         /** \brief Process the input image and prepare input tensors for runtime
    *

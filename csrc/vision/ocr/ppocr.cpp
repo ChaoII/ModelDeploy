@@ -3,22 +3,22 @@
 //
 
 #include "csrc/core/md_log.h"
-#include "csrc/vision/ocr/ppocr_v4.h"
+#include "csrc/vision/ocr/ppocr.h"
 #include "csrc/vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
-    PPOCRv4::PPOCRv4(const std::string &det_model_path,
-                     const std::string &cls_model_path,
-                     const std::string &rec_model_path,
-                     const std::string &dict_path,
-                     const int thread_num,
-                     const int max_side_len,
-                     const double det_db_thresh,
-                     const double det_db_box_thresh,
-                     const double det_db_unclip_ratio,
-                     const std::string &det_db_score_mode,
-                     const bool use_dilation,
-                     const int rec_batch_size) {
+    PaddleOCR::PaddleOCR(const std::string& det_model_path,
+                         const std::string& cls_model_path,
+                         const std::string& rec_model_path,
+                         const std::string& dict_path,
+                         const int thread_num,
+                         const int max_side_len,
+                         const double det_db_thresh,
+                         const double det_db_box_thresh,
+                         const double det_db_unclip_ratio,
+                         const std::string& det_db_score_mode,
+                         const bool use_dilation,
+                         const int rec_batch_size) {
         RuntimeOption option;
         option.set_cpu_thread_num(thread_num);
         detector_ = std::make_unique<DBDetector>(det_model_path, option);
@@ -37,9 +37,9 @@ namespace modeldeploy::vision::ocr {
         set_rec_batch_size(rec_batch_size);
     }
 
-    PPOCRv4::~PPOCRv4() = default;
+    PaddleOCR::~PaddleOCR() = default;
 
-    bool PPOCRv4::is_initialized() const {
+    bool PaddleOCR::is_initialized() const {
         if (detector_ != nullptr && !detector_->is_initialized()) {
             return false;
         }
@@ -52,7 +52,7 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool PPOCRv4::set_cls_batch_size(const int cls_batch_size) {
+    bool PaddleOCR::set_cls_batch_size(const int cls_batch_size) {
         if (cls_batch_size < -1 || cls_batch_size == 0) {
             MD_LOG_ERROR << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;
@@ -61,9 +61,9 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    int PPOCRv4::get_cls_batch_size() const { return cls_batch_size_; }
+    int PaddleOCR::get_cls_batch_size() const { return cls_batch_size_; }
 
-    bool PPOCRv4::set_rec_batch_size(const int rec_batch_size) {
+    bool PaddleOCR::set_rec_batch_size(const int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
             MD_LOG_ERROR << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;
@@ -72,14 +72,14 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    int PPOCRv4::get_rec_batch_size() const { return rec_batch_size_; }
+    int PaddleOCR::get_rec_batch_size() const { return rec_batch_size_; }
 
 
-    bool PPOCRv4::predict(cv::Mat *image, OCRResult *result) {
+    bool PaddleOCR::predict(cv::Mat* image, OCRResult* result) {
         return predict(*image, result);
     }
 
-    bool PPOCRv4::predict(const cv::Mat &image, OCRResult *result) {
+    bool PaddleOCR::predict(const cv::Mat& image, OCRResult* result) {
         std::vector<OCRResult> batch_result(1);
         if (const bool success = batch_predict({image}, &batch_result); !success) {
             return success;
@@ -88,14 +88,14 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool PPOCRv4::batch_predict(
-            const std::vector<cv::Mat> &images,
-            std::vector<OCRResult> *batch_result) {
+    bool PaddleOCR::batch_predict(
+        const std::vector<cv::Mat>& images,
+        std::vector<OCRResult>* batch_result) {
         batch_result->clear();
         batch_result->resize(images.size());
         std::vector<std::vector<std::array<int, 8>>> batch_boxes(images.size());
         if (!detector_->batch_predict(images, &batch_boxes)) {
-            MD_LOG_ERROR << "There's error while detecting image in PPOCR." << std::endl;
+            MD_LOG_ERROR << "There's error while detecting image in PaddleOCR." << std::endl;
             return false;
         }
         for (int i_batch = 0; i_batch < batch_boxes.size(); ++i_batch) {
@@ -103,28 +103,29 @@ namespace modeldeploy::vision::ocr {
             (*batch_result)[i_batch].boxes = batch_boxes[i_batch];
         }
         for (int i_batch = 0; i_batch < images.size(); ++i_batch) {
-            OCRResult &ocr_result = (*batch_result)[i_batch];
+            OCRResult& ocr_result = (*batch_result)[i_batch];
             // Get cropped images by detection result
-            const std::vector<std::array<int, 8>> &boxes = ocr_result.boxes;
-            const cv::Mat &img = images[i_batch];
+            const std::vector<std::array<int, 8>>& boxes = ocr_result.boxes;
+            const cv::Mat& img = images[i_batch];
             std::vector<cv::Mat> image_list;
             if (boxes.empty()) {
                 image_list.emplace_back(img);
-            } else {
+            }
+            else {
                 image_list.resize(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
                     image_list[i_box] = get_rotate_crop_image(img, boxes[i_box]);
                 }
             }
-            std::vector<int32_t> *cls_labels_ptr = &ocr_result.cls_labels;
-            std::vector<float> *cls_scores_ptr = &ocr_result.cls_scores;
-            std::vector<std::string> *text_ptr = &ocr_result.text;
-            std::vector<float> *rec_scores_ptr = &ocr_result.rec_scores;
+            std::vector<int32_t>* cls_labels_ptr = &ocr_result.cls_labels;
+            std::vector<float>* cls_scores_ptr = &ocr_result.cls_scores;
+            std::vector<std::string>* text_ptr = &ocr_result.text;
+            std::vector<float>* rec_scores_ptr = &ocr_result.rec_scores;
             if (nullptr != classifier_) {
                 for (size_t start_index = 0; start_index < image_list.size();
                      start_index += cls_batch_size_) {
                     const size_t end_index =
-                            std::min(start_index + cls_batch_size_, image_list.size());
+                        std::min(start_index + cls_batch_size_, image_list.size());
                     if (!classifier_->batch_predict(image_list, cls_labels_ptr,
                                                     cls_scores_ptr, start_index,
                                                     end_index)) {
@@ -143,14 +144,14 @@ namespace modeldeploy::vision::ocr {
 
             std::vector<float> width_list;
             width_list.reserve(image_list.size());
-            for (const auto &image: image_list) {
+            for (const auto& image : image_list) {
                 width_list.push_back(static_cast<float>(image.cols) / static_cast<float>(image.rows));
             }
             std::vector<int> indices = arg_sort(width_list);
             for (size_t start_index = 0; start_index < image_list.size();
                  start_index += rec_batch_size_) {
                 const size_t end_index =
-                        std::min(start_index + rec_batch_size_, image_list.size());
+                    std::min(start_index + rec_batch_size_, image_list.size());
                 if (!recognizer_->batch_predict(image_list, text_ptr, rec_scores_ptr,
                                                 start_index, end_index, indices)) {
                     MD_LOG_ERROR << "There's error while recognizing image in PPOCR." << std::endl;

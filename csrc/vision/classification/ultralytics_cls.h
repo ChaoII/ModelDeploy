@@ -5,22 +5,22 @@
 #pragma once
 
 #include "csrc/base_model.h"
-#include "preprocessor.h"
-#include "postprocessor.h"
+#include "csrc/vision/classification/preprocessor.h"
+#include "csrc/vision/classification/postprocessor.h"
 
 namespace modeldeploy::vision::classification {
     /*! @brief YOLOv5Cls model object used when to load a YOLOv5Cls model exported by YOLOv5Cls.
      */
-    class MODELDEPLOY_CXX_EXPORT YOLOv5Cls : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsCls : public BaseModel {
     public:
         /** \brief  Set path of model file and the configuration of runtime.
          *
          * \param[in] model_file Path of model file, e.g ./yolov5cls.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        YOLOv5Cls(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
+        explicit UltralyticsCls(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
 
-        [[nodiscard]] std::string name() const override { return "yolov5cls"; }
+        [[nodiscard]] std::string name() const override { return "UltralyticsCls"; }
 
         /** \brief Predict the classification result for an input image
          *
@@ -37,21 +37,21 @@ namespace modeldeploy::vision::classification {
          * \return true if the prediction successed, otherwise false
          */
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                  std::vector<ClassifyResult>* results);
+                                   std::vector<ClassifyResult>* results);
 
         /// Get preprocessor reference of YOLOv5Cls
-        virtual YOLOv5ClsPreprocessor& get_preprocessor() {
+        virtual UltralyticsClsPreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of YOLOv5Cls
-        virtual YOLOv5ClsPostprocessor& get_postprocessor() {
+        virtual UltralyticsClsPostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 
     protected:
         bool initialize();
-        YOLOv5ClsPreprocessor preprocessor_;
-        YOLOv5ClsPostprocessor postprocessor_;
+        UltralyticsClsPreprocessor preprocessor_;
+        UltralyticsClsPostprocessor postprocessor_;
     };
 } // namespace classification

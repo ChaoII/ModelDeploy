@@ -2,21 +2,20 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "postprocessor.h"
-
-#include <csrc/core/md_log.h>
+#include "csrc/core/md_log.h"
+#include "csrc/vision/detection/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
-    YOLOv8Postprocessor::YOLOv8Postprocessor() {
+    UltralyticsPostprocessor::UltralyticsPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
         multi_label_ = true;
         max_wh_ = 7680.0;
     }
 
-    bool YOLOv8Postprocessor::run(
+    bool UltralyticsPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
-        const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) {
+        const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
         int batch = tensors[0].shape()[0];
         // transpose
         std::vector<int64_t> dim{0, 2, 1};

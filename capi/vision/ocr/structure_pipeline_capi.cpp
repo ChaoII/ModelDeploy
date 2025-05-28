@@ -101,7 +101,7 @@ void md_free_structure_table_result(MDOCRResults* c_results) {
 
 void md_free_structure_table_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::ocr::PPOCRv4*>(model->model_content);
+        delete static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

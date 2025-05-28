@@ -9,7 +9,7 @@
 #include "csrc/vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::detection {
-    YOLOv5SegPreprocessor::YOLOv5SegPreprocessor() {
+    UltralyticsSegPreprocessor::UltralyticsSegPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
         is_mini_pad_ = false;
@@ -19,7 +19,7 @@ namespace modeldeploy::vision::detection {
         max_wh_ = 7680.0;
     }
 
-    void YOLOv5SegPreprocessor::letter_box(cv::Mat* mat) const {
+    void UltralyticsSegPreprocessor::letter_box(cv::Mat* mat) const {
         auto scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
         if (!is_scale_up_) {
             scale = std::min(scale, 1.0);
@@ -52,7 +52,7 @@ namespace modeldeploy::vision::detection {
         }
     }
 
-    bool YOLOv5SegPreprocessor::preprocess(
+    bool UltralyticsSegPreprocessor::preprocess(
         cv::Mat* mat, Tensor* output,
         std::map<std::string, std::array<float, 2>>* im_info) {
         // Record the shape of image and the shape of preprocessed image
@@ -79,7 +79,7 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool YOLOv5SegPreprocessor::run(
+    bool UltralyticsSegPreprocessor::run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
         std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) {
         if (images->empty()) {

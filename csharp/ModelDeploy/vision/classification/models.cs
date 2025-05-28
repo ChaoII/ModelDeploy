@@ -6,12 +6,12 @@ using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.classification
 {
-    public sealed class YoloV5Cls : IDisposable
+    public sealed class UltralyticsCls : IDisposable
     {
         private MDModel _model;
         private bool _disposed;
 
-        public YoloV5Cls(string modelDir, int threadNum = 8)
+        public UltralyticsCls(string modelDir, int threadNum = 8)
         {
             _model = new MDModel();
             Utils.Check(md_create_classification_model(ref _model, modelDir, threadNum), "Create detection model");
@@ -67,7 +67,7 @@ namespace ModelDeploy.vision.classification
             }
         }
 
-        ~YoloV5Cls() => Dispose();
+        ~UltralyticsCls() => Dispose();
 
         #region Native bindings
 

@@ -16,7 +16,7 @@ MDStatusCode md_create_classification_model(MDModel* model, const char* model_pa
                                             const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto classification_model = new modeldeploy::vision::classification::YOLOv5Cls(model_path, option);
+    const auto classification_model = new modeldeploy::vision::classification::UltralyticsCls(model_path, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(classification_model->name().c_str());
     model->model_content = classification_model;
@@ -33,7 +33,7 @@ MDStatusCode md_set_classification_input_size(const MDModel* model, const MDSize
         MD_LOG_ERROR << "Model type is not classification!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto classification_model = static_cast<modeldeploy::vision::classification::YOLOv5Cls*>(model->
+    const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
         model_content);
     classification_model->get_preprocessor().set_size({size.height, size.height});
     return MDStatusCode::Success;
@@ -46,7 +46,7 @@ MDStatusCode md_classification_predict(const MDModel* model, MDImage* image, MDC
     }
     const auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::ClassifyResult result;
-    const auto detection_model = static_cast<modeldeploy::vision::classification::YOLOv5Cls*>(model->model_content);
+    const auto detection_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->model_content);
     if (const bool res_status = detection_model->predict(cv_image, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
@@ -84,7 +84,7 @@ void md_free_classification_result(MDClassificationResults* c_results) {
 
 void md_free_classification_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::classification::YOLOv5Cls*>(model->model_content);
+        delete static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

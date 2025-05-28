@@ -6,12 +6,12 @@ using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.ocr
 {
-    public class PaddleOcrV4 : IDisposable
+    public class PaddleOcr : IDisposable
     {
         private MDModel _model;
         private bool _disposed;
 
-        public PaddleOcrV4(MDOCRModelParameters parameters)
+        public PaddleOcr(MDOCRModelParameters parameters)
         {
             _model = new MDModel();
             if (md_create_ocr_model(ref _model, ref parameters) != 0)
@@ -53,7 +53,7 @@ namespace ModelDeploy.vision.ocr
             }
         }
 
-        ~PaddleOcrV4() => Dispose();
+        ~PaddleOcr() => Dispose();
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_ocr_model(ref MDModel model, ref MDOCRModelParameters parameters);

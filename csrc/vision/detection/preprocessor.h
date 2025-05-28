@@ -7,24 +7,24 @@
 #include <map>
 
 namespace modeldeploy::vision::detection {
-    class MODELDEPLOY_CXX_EXPORT YOLOv8Preprocessor {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor {
     public:
-        YOLOv8Preprocessor();
+        UltralyticsPreprocessor();
 
         bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-                 std::vector<std::map<std::string, std::array<float, 2>>>* ims_info);
+                 std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const;
 
         void set_size(const std::vector<int>& size) { size_ = size; }
 
-        std::vector<int> get_size() const { return size_; }
+        [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
         void set_padding_value(const std::vector<float>& padding_value) {
             padding_value_ = padding_value;
         }
 
-        std::vector<float> get_padding_value() const { return padding_value_; }
+        [[nodiscard]] std::vector<float> get_padding_value() const { return padding_value_; }
 
-        void set_scale_up(bool is_scale_up) {
+        void set_scale_up(const bool is_scale_up) {
             is_scale_up_ = is_scale_up;
         }
 
@@ -44,9 +44,9 @@ namespace modeldeploy::vision::detection {
 
     protected:
         bool preprocess(cv::Mat* mat, Tensor* output,
-                        std::map<std::string, std::array<float, 2>>* im_info);
+                        std::map<std::string, std::array<float, 2>>* im_info) const;
 
-        void letter_box(cv::Mat* mat);
+        void letter_box(cv::Mat* mat) const;
 
         std::vector<int> size_;
         std::vector<float> padding_value_;
