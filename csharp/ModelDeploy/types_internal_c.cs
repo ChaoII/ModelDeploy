@@ -69,11 +69,14 @@ namespace ModelDeploy
             public int size;
         }
 
+        
         [StructLayout(LayoutKind.Sequential)]
         public struct MDOCRModelParameters
         {
             /// ocr model directory;
-            public string model_dir;
+            public string det_model_file;
+            public string cls_model_file;
+            public string rec_model_file;
 
             /// ocr dictionary path
             public string dict_path;

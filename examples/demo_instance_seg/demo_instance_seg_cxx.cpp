@@ -11,8 +11,10 @@
 
 
 int main(int argc, char** argv) {
-    std::string model_file = "../../test_data/test_models/yolov5l-seg.onnx";
-    auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file);
+    modeldeploy::RuntimeOption option;
+    option.use_gpu();
+    std::string model_file = "../../test_data/test_models/yolo11n-seg.onnx";
+    auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file, option);
     if (!model.is_initialized()) {
         std::cerr << "Failed to initialize." << std::endl;
         return -1;
@@ -25,7 +27,7 @@ int main(int argc, char** argv) {
         return -1;
     }
     res.display();
-    auto vis_im = modeldeploy::vision::vis_detection(im, res, "../../test_data/test_models/font.ttf", 14, 0.3, 0);
+    auto vis_im = modeldeploy::vision::vis_detection(im, res, 0.5, "../../test_data/test_models/font.ttf", 14, 0.3, 0);
     cv::resize(vis_im, vis_im, cv::Size(0, 0), 0.75, 0.75);
     cv::imshow("vis_im", vis_im);
     cv::waitKey(0);

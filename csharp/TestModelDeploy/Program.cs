@@ -62,21 +62,21 @@ static class Program
 
     static void TestDetection()
     {
-        using var yolov8 = new UltralyticsDet(Path.Combine(TestDataPath, "test_models/best1.onnx"));
-        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection1.png"));
+        using var yolov8 = new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolov8n.onnx"));
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection.jpg"));
         yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
-        yolov8.DrawDetectionResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"));
+        yolov8.DrawDetectionResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
         image.Show();
         yolov8.Display(results);
     }
 
     static void TestInstanceSeg()
     {
-        using var yoloV5Seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/yolov5l-seg.onnx"));
+        using var yoloV5Seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/yolov5l_seg_fp16.onnx"));
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_detection.jpg"));
         var results = yoloV5Seg.Predict(image);
-        yoloV5Seg.DrawDetectionResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"));
+        yoloV5Seg.DrawDetectionResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
         image.Show();
         yoloV5Seg.Display(results);
     }
@@ -109,7 +109,9 @@ static class Program
         MDOCRModelParameters parameters = new MDOCRModelParameters
         {
             // 最后注意必须加斜杠
-            model_dir = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile"),
+            det_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/det_infer.onnx"),
+            cls_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/cls_infer.onnx"),
+            rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/rec_infer.onnx"),
             dict_path = Path.Combine(TestDataPath, "ppocrv5_dict.txt"),
             thread_num = 8,
             format = MDModelFormat.ONNX,
@@ -230,9 +232,9 @@ static class Program
     static void TestOcrRecognition()
     {
         OcrRecognition ocrRecognition =
-            new OcrRecognition(Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/rec_infer.onnx"),
-                Path.Combine(TestDataPath, "key.txt"), 8);
-        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr_recognition.png"));
+            new OcrRecognition(Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/rec_infer.onnx"),
+                Path.Combine(TestDataPath, "ppocrv5_dict.txt"), 8);
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_lpr_recognizer.jpg"));
         var result = ocrRecognition.Predict(image);
         Console.WriteLine(result);
     }
@@ -241,7 +243,7 @@ static class Program
     {
         OcrRecognition ocrRecognition =
             new OcrRecognition(Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/rec_infer.onnx"),
-                Path.Combine(TestDataPath, "key.txt"));
+                Path.Combine(TestDataPath, "ppocrv4_dict.txt"));
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/ocr_check_report.png"));
 
         // image
@@ -354,9 +356,9 @@ static class Program
         // TestSenseVoice();
         // TestKokoro();
         // TestDetection();
-        // TestInstanceSeg();
+        TestInstanceSeg();
         // TestImage();
-        TestOCR();
+        // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();

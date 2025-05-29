@@ -18,13 +18,9 @@
 namespace fs = std::filesystem;
 
 MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* parameters) {
-    if (!fs::exists(parameters->model_dir)) {
-        MD_LOG_ERROR << "Model directory " << parameters->model_dir << " is not existed!";
-        return MDStatusCode::PathNotFound;
-    }
-    const auto det_model_file_path = fs::path(parameters->model_dir) / "det_infer.onnx";
-    const auto cls_model_file_path = fs::path(parameters->model_dir) / "cls_infer.onnx";
-    const auto rec_model_file_path = fs::path(parameters->model_dir) / "rec_infer.onnx";
+    const auto det_model_file_path = fs::path(parameters->det_model_file);
+    const auto cls_model_file_path = fs::path(parameters->cls_model_file);
+    const auto rec_model_file_path = fs::path(parameters->rec_model_file);
     const auto ocr_model = new modeldeploy::vision::ocr::PaddleOCR(det_model_file_path.string(),
                                                                    cls_model_file_path.string(),
                                                                    rec_model_file_path.string(),

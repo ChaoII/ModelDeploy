@@ -31,18 +31,9 @@ namespace modeldeploy::vision::detection {
         /// Get nms_threshold, default 0.5
         [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
 
-        /// Set multi_label, set true for eval, default true
-        void set_multi_label(bool multi_label) {
-            multi_label_ = multi_label;
-        }
-
-        /// Get multi_label, default true
-        [[nodiscard]] bool get_multi_label() const { return multi_label_; }
 
     protected:
         float conf_threshold_;
         float nms_threshold_;
-        bool multi_label_;
-        float max_wh_;
     };
 } // namespace fastdeploy

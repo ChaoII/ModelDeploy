@@ -21,7 +21,7 @@ namespace modeldeploy::vision::detection {
        * \param[in] ims_info The shape info list, record input_shape and output_shape
        * \return true if the postprocess successed, otherwise false
        */
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<DetectionResult>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 
@@ -41,21 +41,9 @@ namespace modeldeploy::vision::detection {
         /// Get nms_threshold, default 0.5
         [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
 
-        /// Set multi_label, set true for eval, default true
-        void set_multi_label(const bool multi_label) {
-            multi_label_ = multi_label;
-        }
-
-        /// Get multi_label, default true
-        [[nodiscard]] bool get_multi_label() const { return multi_label_; }
-
     protected:
         float conf_threshold_;
         float nms_threshold_;
-        bool multi_label_;
-        float max_wh_;
-        // channel nums of masks
-        int mask_nums_;
         // mask threshold
         float mask_threshold_;
     };

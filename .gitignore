@@ -2,6 +2,7 @@
 build
 build_msvc
 build_linux
+build_debug
 
 .idea
 # Prerequisites

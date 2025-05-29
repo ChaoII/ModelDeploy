@@ -20,14 +20,14 @@ int32_t main() {
     SetConsoleOutputCP(CP_UTF8);
     std::wcout.imbue(std::locale(""));
 #endif
-    const std::string kokoro_onnx = "../../test_data/test_models/kokoro-multi-lang-v1_1/model.onnx";
-    const std::string tokens = "../../test_data/test_models/kokoro-multi-lang-v1_1/tokens.txt";
+    const std::string kokoro_onnx = "../../test_data/test_models/kokoro_v1_1/model.onnx";
+    const std::string tokens = "../../test_data/test_models/kokoro_v1_1/tokens.txt";
     const std::vector<std::string> lexicons = {
-        "../../test_data/test_models/kokoro-multi-lang-v1_1/lexicon-us-en.txt",
-        "../../test_data/test_models/kokoro-multi-lang-v1_1/lexicon-zh.txt"
+        "../../test_data/test_models/kokoro_v1_1/lexicon-us-en.txt",
+        "../../test_data/test_models/kokoro_v1_1/lexicon-zh.txt"
     };
-    const std::string voice_bin = "../../test_data/test_models/kokoro-multi-lang-v1_1/voices.bin";
-    const std::string jieba_dir = "../../test_data/test_models/kokoro-multi-lang-v1_1/dict/";
+    const std::string voice_bin = "../../test_data/test_models/kokoro_v1_1/voices.bin";
+    const std::string jieba_dir = "../../test_data/test_models/kokoro_v1_1/dict/";
     const std::string text_normalization_dir = "../../test_data/";
     auto kokoro = modeldeploy::audio::tts::Kokoro(kokoro_onnx,
                                                   tokens,

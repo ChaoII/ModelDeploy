@@ -18,17 +18,17 @@ namespace modeldeploy::vision {
         float score_threshold,
         const std::string& font_path,
         int font_size,
-        double alpha, int save_result);
+        double alpha, bool save_result);
 
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_detection(
-        cv::Mat& cv_image, const DetectionResult& result,
-        const std::string& font_path, int font_size,
-        double alpha, int save_result);
+        cv::Mat& cv_image, const DetectionResult& result, double threshold = 0.5,
+        const std::string& font_path = "", int font_size = 14,
+        double alpha = 0.5, bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_ocr(
         cv::Mat& image, const OCRResult& results, const std::string& font_path,
-        int font_size, double alpha, int save_result);
+        int font_size, double alpha, bool save_result);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_det_landmarks(
         cv::Mat cv_image, const DetectionLandmarkResult& result,

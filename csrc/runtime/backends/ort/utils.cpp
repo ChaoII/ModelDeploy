@@ -5,6 +5,8 @@
 #include "csrc/core/md_log.h"
 #include "csrc/runtime/backends/ort/utils.h"
 
+#include <map>
+
 
 namespace modeldeploy {
     ONNXTensorElementDataType get_ort_dtype(const DataType& dtype) {
@@ -53,16 +55,8 @@ namespace modeldeploy {
         return DataType::FP32;
     }
 
-    Ort::Value create_ort_value(Tensor& tensor, const bool is_backend_cuda) {
-        if (is_backend_cuda) {
-            const Ort::MemoryInfo memory_info("Cuda", OrtDeviceAllocator, 0,
-                                              OrtMemTypeDefault);
-            auto ort_value = Ort::Value::CreateTensor(
-                memory_info, tensor.data(), tensor.byte_size(), tensor.shape().data(),
-                tensor.shape().size(), get_ort_dtype(tensor.dtype()));
-            return ort_value;
-        }
-        const auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+    Ort::Value create_ort_value(Tensor& tensor, const Ort::MemoryInfo& memory_info) {
+
         auto ort_value = Ort::Value::CreateTensor(
             memory_info, tensor.data(), tensor.byte_size(), tensor.shape().data(),
             tensor.shape().size(), get_ort_dtype(tensor.dtype()));
@@ -122,7 +116,7 @@ namespace modeldeploy {
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, "INT64"},
             // 添加更多类型映射...
         };
-        return type_map.count(type) ? type_map.at(type) : "UNKNOWN";
+        return type_map.contains(type) ? type_map.at(type) : "UNKNOWN";
     }
 
     std::string shape_to_string(const std::vector<int64_t>& shape) {

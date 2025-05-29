@@ -8,8 +8,9 @@
 
 namespace modeldeploy::vision {
     cv::Mat vis_detection(cv::Mat& cv_image, const DetectionResult& result,
+                          const double threshold,
                           const std::string& font_path, const int font_size,
-                          const double alpha, const int save_result) {
+                          const double alpha, const bool save_result) {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
@@ -17,6 +18,9 @@ namespace modeldeploy::vision {
         std::map<int, cv::Scalar_<int>> color_map;
         // 绘制半透明部分（填充矩形）
         for (int i = 0; i < result.boxes.size(); ++i) {
+            if (result.scores[i] < threshold) {
+                continue;
+            }
             auto class_id = result.label_ids[i];
             if (!color_map.contains(class_id)) {
                 color_map[class_id] = get_random_color();
@@ -37,6 +41,9 @@ namespace modeldeploy::vision {
         cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
         // 绘制对象矩形矩形边框、文字背景边框、文字
         for (int c = 0; c < result.boxes.size(); ++c) {
+            if (result.scores[c] < threshold) {
+                continue;
+            }
             auto class_id = result.label_ids[c];
             int x1 = static_cast<int>(round(result.boxes[c][0]));
             int y1 = static_cast<int>(round(result.boxes[c][1]));
@@ -52,43 +59,29 @@ namespace modeldeploy::vision {
                         cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
             int box_h = y2 - y1;
             int box_w = x2 - x1;
-            int im_w = cv_image.cols;
             if (result.contain_masks) {
                 int mask_h = static_cast<int>(result.masks[c].shape[0]);
                 int mask_w = static_cast<int>(result.masks[c].shape[1]);
-                // non-const pointer for cv:Mat constructor
-                auto* mask_raw_data = const_cast<uint8_t*>(
-                    static_cast<const uint8_t*>(result.masks[c].data()));
-                // only reference to mask data (zero copy)
-                cv::Mat mask(mask_h, mask_w, CV_8UC1, mask_raw_data);
+                cv::Mat mask(mask_h, mask_w, CV_8UC1,
+                             const_cast<uint8_t*>(static_cast<const uint8_t*>(result.masks[c].data())));
                 if (mask_h != box_h || mask_w != box_w) {
                     cv::resize(mask, mask, cv::Size(box_w, box_h));
                 }
-                // use a bright color for instance mask
+                // 创建一个彩色 mask 图层
+                cv::Mat color_mask(cv::Size(box_w, box_h), CV_8UC3);
                 int mc0 = 255 - cv_color[0] >= 127 ? 255 - cv_color[0] : 127;
                 int mc1 = 255 - cv_color[1] >= 127 ? 255 - cv_color[1] : 127;
                 int mc2 = 255 - cv_color[2] >= 127 ? 255 - cv_color[2] : 127;
-                auto* mask_data = mask.data;
-                // inplace blending (zero copy)
-                auto* vis_im_data = cv_image.data;
-                for (size_t i = y1; i < y2; ++i) {
-                    for (size_t j = x1; j < x2; ++j) {
-                        if (mask_data[(i - y1) * mask_w + (j - x1)] != 0) {
-                            vis_im_data[i * im_w * 3 + j * 3 + 0] = cv::saturate_cast<uchar>(
-                                static_cast<float>(mc0) * 0.5f +
-                                static_cast<float>(vis_im_data[i * im_w * 3 + j * 3 + 0]) * 0.5f);
-                            vis_im_data[i * im_w * 3 + j * 3 + 1] = cv::saturate_cast<uchar>(
-                                static_cast<float>(mc1) * 0.5f +
-                                static_cast<float>(vis_im_data[i * im_w * 3 + j * 3 + 1]) * 0.5f);
-                            vis_im_data[i * im_w * 3 + j * 3 + 2] = cv::saturate_cast<uchar>(
-                                static_cast<float>(mc2) * 0.5f +
-                                static_cast<float>(vis_im_data[i * im_w * 3 + j * 3 + 2]) * 0.5f);
-                        }
-                    }
-                }
+                color_mask.setTo(cv::Scalar(mc0, mc1, mc2));
+                // 将 mask 应用到 color_mask 上
+                cv::Mat colored_mask;
+                cv::bitwise_and(color_mask, color_mask, colored_mask, mask);
+                // 定义 ROI 区域
+                cv::Mat roi(cv_image, cv::Rect(x1, y1, box_w, box_h));
+                // 使用 addWeighted 混合原始图像和 mask
+                cv::addWeighted(roi, 0.5, colored_mask, 0.5, 0, roi);
             }
         }
-
         if (save_result) {
             MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);

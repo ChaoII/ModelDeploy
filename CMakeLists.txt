@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(LIBRARY_NAME "ModelDeploySDK")
 set(SOURCE "")
 set(DEPENDS "")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+message("==================${CMAKE_BUILD_TYPE}===================")
 
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
@@ -19,6 +20,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 
 if (MSVC)
     if (WITH_STATIC_CRT)
@@ -52,6 +55,10 @@ list(APPEND SOURCE csrc/base_model.cpp)
 if (BUILD_VISION)
     # opencv
     include("${CMAKE_SOURCE_DIR}/cmake/opencv.cmake")
+    # for debug
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(OpenCV_DIR "E:/develop/opencv/build/x64/vc16/lib")
+    endif ()
     find_package(OpenCV CONFIG REQUIRED)
     if (NOT OpenCV_FOUND)
         message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")

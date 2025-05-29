@@ -12,7 +12,7 @@ namespace modeldeploy::vision {
                                const float score_threshold,
                                const std::string& font_path,
                                const int font_size,
-                               const double alpha, const int save_result) {
+                               const double alpha, const bool save_result) {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);

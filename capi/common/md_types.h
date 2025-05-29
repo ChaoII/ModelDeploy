@@ -77,7 +77,9 @@ typedef struct {
 
 typedef struct {
     /// ocr model directory;
-    const char* model_dir;
+    const char* det_model_file;
+    const char* cls_model_file;
+    const char* rec_model_file;
     /// ocr dictionary path
     const char* dict_path;
     /// thread num default is 8

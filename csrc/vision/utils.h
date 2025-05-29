@@ -48,6 +48,11 @@ namespace modeldeploy::vision::utils {
 
     MODELDEPLOY_CXX_EXPORT std::vector<float> l2_normalize(const std::vector<float>& values);
 
+    template <typename T>
+    T clamp(T val, T min_val, T max_val) {
+        return std::min(std::max(val, min_val), max_val);
+    }
+
 
     template <typename T>
     std::vector<int32_t> top_k_indices(const T* array, int array_size, int topk) {

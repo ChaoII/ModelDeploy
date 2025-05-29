@@ -13,6 +13,12 @@
 namespace modeldeploy {
     void OrtBackend::build_option(const OrtBackendOption& option) {
         option_ = option;
+        // session_options_.SetLogSeverityLevel(1); // verbose
+        //
+        // session_options_.EnableProfiling(to_wstring("onnxruntime_perf_test.json").c_str());
+        // std::wstring model_filepath = to_wstring("optimized_graph.onnx");
+        // session_options_.SetOptimizedModelFilePath(model_filepath.c_str());
+
         if (option.graph_optimization_level >= 0) {
             session_options_.SetGraphOptimizationLevel(
                 static_cast<GraphOptimizationLevel>(option.graph_optimization_level));
@@ -33,31 +39,83 @@ namespace modeldeploy {
             session_options_.SetOptimizedModelFilePath(option.optimized_model_filepath.c_str());
 #endif
         }
+        const auto all_providers = Ort::GetAvailableProviders();
+        std::string providers_msg;
+        for (const auto& p : all_providers) {
+            providers_msg += p + ", ";
+        }
         // CUDA
         if (option.device == Device::GPU) {
-            const auto all_providers = Ort::GetAvailableProviders();
-            bool support_cuda = false;
-            std::string providers_msg;
-            for (const auto& all_provider : all_providers) {
-                providers_msg += all_provider + ", ";
-                if (all_provider == "CUDAExecutionProvider") {
-                    support_cuda = true;
+            bool has_cuda = std::ranges::find(all_providers, "CUDAExecutionProvider") != all_providers.end();
+            if (option_.enable_cuda && has_cuda) {
+                OrtCUDAProviderOptionsV2* cuda_options = nullptr;
+                Ort::ThrowOnError(Ort::GetApi().CreateCUDAProviderOptions(&cuda_options));
+
+                std::vector<const char*> keys_cuda;
+                std::vector<const char*> values_cuda;
+
+                std::string device_id_str = std::to_string(option.device_id);
+                keys_cuda.push_back("device_id");
+                values_cuda.push_back(device_id_str.c_str());
+
+                if (option.external_stream_) {
+                    keys_cuda.push_back("user_compute_stream");
+                    std::string stream_str = std::to_string(reinterpret_cast<uintptr_t>(option.external_stream_));
+                    values_cuda.push_back(stream_str.c_str());
                 }
-            }
-            if (!support_cuda) {
-                MD_LOG_ERROR << "Compiled fastdeploy with onnxruntime doesn't support GPU, "
-                    "the available providers are " << providers_msg
-                    << " will fallback to CPUExecutionProvider." << std::endl;
-                option_.device = Device::CPU;
+
+                Ort::ThrowOnError(
+                    Ort::GetApi().UpdateCUDAProviderOptions(cuda_options, keys_cuda.data(),
+                                                            values_cuda.data(), static_cast<int>(keys_cuda.size())));
+                Ort::ThrowOnError(
+                    Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA_V2(session_options_, cuda_options));
+                Ort::GetApi().ReleaseCUDAProviderOptions(cuda_options);
+                MD_LOG_INFO << "ONNX Runtime CUDA Provider enabled." << std::endl;
+                bool has_trt = std::ranges::find(all_providers, "TensorrtExecutionProvider") != all_providers.end();
+
+                if (option.enable_trt && has_trt) {
+                    OrtTensorRTProviderOptionsV2* trt_options = nullptr;
+                    Ort::ThrowOnError(Ort::GetApi().CreateTensorRTProviderOptions(&trt_options));
+
+                    std::vector<const char*> keys_trt;
+                    std::vector<const char*> values_trt;
+
+                    // Example options:
+                    std::string trt_max_workspace = "2147483648"; // 2GB
+                    keys_trt.push_back("trt_max_workspace_size");
+                    values_trt.push_back(trt_max_workspace.c_str());
+
+                    std::string trt_fp16_enable = option.enable_fp16 ? "1" : "0";
+                    keys_trt.push_back("trt_fp16_enable");
+                    values_trt.push_back(trt_fp16_enable.c_str());
+
+                    keys_trt.push_back("device_id");
+                    values_trt.push_back(device_id_str.c_str());
+
+                    keys_trt.push_back("trt_engine_cache_enable");
+                    values_trt.push_back("1");
+
+                    keys_trt.push_back("trt_engine_cache_path");
+                    values_trt.push_back("./");
+
+                    Ort::ThrowOnError(
+                        Ort::GetApi().UpdateTensorRTProviderOptions(trt_options,
+                                                                    keys_trt.data(), values_trt.data(),
+                                                                    static_cast<int>(keys_trt.size())));
+                    Ort::ThrowOnError(
+                        Ort::GetApi().SessionOptionsAppendExecutionProvider_TensorRT_V2(session_options_, trt_options));
+                    Ort::GetApi().ReleaseTensorRTProviderOptions(trt_options);
+                    MD_LOG_INFO << "ONNX Runtime TensorRT Provider enabled." << std::endl;
+                }
+                else {
+                    MD_LOG_WARN << "ONNX Runtime compiled without TensorRT support. fallback to CUDA. Providers: " <<
+                        providers_msg << std::endl;
+                }
             }
             else {
-                OrtCUDAProviderOptions cuda_options;
-                cuda_options.device_id = option.device_id;
-                if (option.external_stream_) {
-                    cuda_options.has_user_compute_stream = 1;
-                    cuda_options.user_compute_stream = option.external_stream_;
-                }
-                session_options_.AppendExecutionProvider_CUDA(cuda_options);
+                MD_LOG_ERROR << "ONNX Runtime compiled without CUDA support, fallback to CPU. Providers: " <<
+                    providers_msg << std::endl;
+                option_.device = Device::CPU;
             }
         }
     }
@@ -98,9 +156,9 @@ namespace modeldeploy {
             build_option(option);
             session_ = {env_, model_buffer.data(), model_buffer.size(), session_options_};
             binding_ = std::make_unique<Ort::IoBinding>(session_);
-            const auto input_memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-            const auto output_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
-            const Ort::Allocator allocator(session_, input_memory_info);
+            const Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+
+            const Ort::Allocator allocator(session_, memory_info);
             const size_t n_inputs = session_.GetInputCount();
             const size_t n_outputs = session_.GetOutputCount();
             // 模型输入输出信息
@@ -141,7 +199,6 @@ namespace modeldeploy {
                     shape_to_string(shape)
                 });
                 outputs_desc_.emplace_back(OrtValueInfo{output_name_ptr.get(), shape, data_type});
-                binding_->BindOutput(output_name_ptr.get(), output_memory_info);
             }
             // ====================== 组合最终输出 ======================
             std::cout << termcolor::green << "[model file:"
@@ -166,14 +223,14 @@ namespace modeldeploy {
                 ") should keep same with the inputs of this model(" << inputs_desc_.size() << ")" << std::endl;
             return false;
         }
+        const Ort::MemoryInfo input_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         for (size_t i = 0; i < inputs.size(); ++i) {
-            auto ort_value = create_ort_value(inputs[i], false);
+            auto ort_value = create_ort_value(inputs[i], input_memory_info);
             binding_->BindInput(inputs_desc_[i].name.c_str(), ort_value);
         }
-
+        const Ort::MemoryInfo output_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         for (auto& output_info : outputs_desc_) {
-            auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-            binding_->BindOutput(output_info.name.c_str(), memory_info);
+            binding_->BindOutput(output_info.name.c_str(), output_memory_info);
         }
         try {
             session_.Run({}, *binding_);

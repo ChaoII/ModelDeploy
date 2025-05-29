@@ -2,6 +2,7 @@
 // Created by aichao on 2025/4/14.
 //
 
+#include <numeric> // 需要包含此头文件
 #include "csrc/core/md_log.h"
 #include "csrc/vision/utils.h"
 #include "csrc/vision/instance_seg/postprocessor.h"
@@ -11,26 +12,21 @@ namespace modeldeploy::vision::detection {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
         mask_threshold_ = 0.35;
-        multi_label_ = true;
-        max_wh_ = 7680.0;
-        mask_nums_ = 32;
     }
 
     bool UltralyticsSegPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
+        std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
+        //(1,116,8400)->(1,8400,116)  116=4(xc,yc,w,h)+80(coco 80 classes)+32(mask coefficient)
+        tensors[0] = tensors[0].transpose({0, 2, 1}).to_tensor();
+        auto mask_nums = tensors[1].shape()[1];
         size_t batch = tensors[0].shape()[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             // store mask information
             std::vector<std::vector<float>> mask_embeddings;
             (*results)[bs].clear();
-            if (multi_label_) {
-                (*results)[bs].reserve(tensors[0].shape()[1] * (tensors[0].shape()[2] - mask_nums_ - 5));
-            }
-            else {
-                (*results)[bs].reserve(static_cast<int>(tensors[0].shape()[1]));
-            }
+            (*results)[bs].reserve(static_cast<int>(tensors[0].shape()[1]));
             if (tensors[0].dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
@@ -40,56 +36,31 @@ namespace modeldeploy::vision::detection {
             for (size_t i = 0; i < tensors[0].shape()[1]; ++i) {
                 size_t s = i * tensors[0].shape()[2];
                 float cls_conf = data[s + 4];
-                float confidence = data[s + 4];
                 std::vector mask_embedding(
-                    data + s + tensors[0].shape()[2] - mask_nums_,
+                    data + s + tensors[0].shape()[2] - mask_nums,
                     data + s + tensors[0].shape()[2]);
                 for (float& mask_embedding_el : mask_embedding) {
                     mask_embedding_el *= cls_conf;
                 }
-                if (multi_label_) {
-                    for (size_t j = 5; j < tensors[0].shape()[2] - mask_nums_; ++j) {
-                        confidence = data[s + 4];
-                        const float* class_score = data + s + j;
-                        confidence *= *class_score;
-                        // filter boxes by conf_threshold
-                        if (confidence <= conf_threshold_) {
-                            continue;
-                        }
-                        auto label_id = static_cast<int32_t>(std::distance(data + s + 5, class_score));
-                        // convert from [x, y, w, h] to [x1, y1, x2, y2]
-                        (*results)[bs].boxes.emplace_back(std::array{
-                            data[s + 0] - data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                            data[s + 1] - data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                            data[s + 0] + data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                            data[s + 1] + data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_
-                        });
-                        (*results)[bs].label_ids.push_back(label_id);
-                        (*results)[bs].scores.push_back(confidence);
-                        mask_embeddings.emplace_back(std::move(mask_embedding));
-                    }
+                const float* max_class_score = std::max_element(
+                    data + s + 4, data + s + tensors[0].shape()[2] - mask_nums);
+                float confidence = *max_class_score;
+                // filter boxes by conf_threshold
+                if (confidence <= conf_threshold_) {
+                    continue;
                 }
-                else {
-                    const float* max_class_score = std::max_element(
-                        data + s + 5, data + s + tensors[0].shape()[2] - mask_nums_);
-                    confidence *= *max_class_score;
-                    // filter boxes by conf_threshold
-                    if (confidence <= conf_threshold_) {
-                        continue;
-                    }
-                    auto label_id = static_cast<int32_t>(std::distance(data + s + 5, max_class_score));
-                    // convert from [x, y, w, h] to [x1, y1, x2, y2]
-                    (*results)[bs].boxes.emplace_back(
-                        std::array{
-                            data[s + 0] - data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                            data[s + 1] - data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                            data[s + 0] + data[s + 2] / 2.0f + static_cast<float>(label_id) * max_wh_,
-                            data[s + 1] + data[s + 3] / 2.0f + static_cast<float>(label_id) * max_wh_
-                        });
-                    (*results)[bs].label_ids.push_back(label_id);
-                    (*results)[bs].scores.push_back(confidence);
-                    mask_embeddings.emplace_back(std::move(mask_embedding));
-                }
+                auto label_id = static_cast<int32_t>(std::distance(data + s + 4, max_class_score));
+                // convert from [x, y, w, h] to [x1, y1, x2, y2]
+                (*results)[bs].boxes.emplace_back(
+                    std::array{
+                        data[s + 0] - data[s + 2] / 2.0f,
+                        data[s + 1] - data[s + 3] / 2.0f,
+                        data[s + 0] + data[s + 2] / 2.0f,
+                        data[s + 1] + data[s + 3] / 2.0f
+                    });
+                (*results)[bs].label_ids.push_back(label_id);
+                (*results)[bs].scores.push_back(confidence);
+                mask_embeddings.emplace_back(std::move(mask_embedding));
             }
 
             if ((*results)[bs].boxes.empty()) {
@@ -108,7 +79,6 @@ namespace modeldeploy::vision::detection {
             const float* data_mask =
                 static_cast<const float*>(tensors[1].data()) +
                 bs * tensors[1].shape()[1] * tensors[1].shape()[2] * tensors[1].shape()[3];
-
             auto mask_proto = cv::Mat(static_cast<int>(tensors[1].shape()[1]),
                                       static_cast<int>(tensors[1].shape()[2] * tensors[1].shape()[3]),
                                       CV_32FC(1), const_cast<float*>(data_mask));
@@ -116,7 +86,7 @@ namespace modeldeploy::vision::detection {
             // after push_back, Mat of m*n becomes (m + 1) * n
             cv::Mat mask_proposals;
             for (auto index : indexs) {
-                auto tmp = cv::Mat(1, mask_nums_, CV_32FC(1), mask_embeddings[index].data());
+                auto tmp = cv::Mat(1, mask_nums, CV_32FC(1), mask_embeddings[index].data());
                 mask_proposals.push_back(tmp);
             }
             cv::Mat matmul_result = (mask_proposals * mask_proto).t();
@@ -145,20 +115,20 @@ namespace modeldeploy::vision::detection {
             float pad_h_mask = pad_h / out_h * static_cast<float>(tensors[1].shape()[2]);
             float pad_w_mask = pad_w / out_w * static_cast<float>(tensors[1].shape()[3]);
             for (size_t i = 0; i < (*results)[bs].boxes.size(); ++i) {
-                int32_t label_id = (*results)[bs].label_ids[i];
-                // clip box
-                (*results)[bs].boxes[i][0] = (*results)[bs].boxes[i][0] - max_wh_ * static_cast<float>(label_id);
-                (*results)[bs].boxes[i][1] = (*results)[bs].boxes[i][1] - max_wh_ * static_cast<float>(label_id);
-                (*results)[bs].boxes[i][2] = (*results)[bs].boxes[i][2] - max_wh_ * static_cast<float>(label_id);
-                (*results)[bs].boxes[i][3] = (*results)[bs].boxes[i][3] - max_wh_ * static_cast<float>(label_id);
-                (*results)[bs].boxes[i][0] = std::max(((*results)[bs].boxes[i][0] - pad_w) / scale, 0.0f);
-                (*results)[bs].boxes[i][1] = std::max(((*results)[bs].boxes[i][1] - pad_h) / scale, 0.0f);
-                (*results)[bs].boxes[i][2] = std::max(((*results)[bs].boxes[i][2] - pad_w) / scale, 0.0f);
-                (*results)[bs].boxes[i][3] = std::max(((*results)[bs].boxes[i][3] - pad_h) / scale, 0.0f);
-                (*results)[bs].boxes[i][0] = std::min((*results)[bs].boxes[i][0], ipt_w);
-                (*results)[bs].boxes[i][1] = std::min((*results)[bs].boxes[i][1], ipt_h);
-                (*results)[bs].boxes[i][2] = std::min((*results)[bs].boxes[i][2], ipt_w);
-                (*results)[bs].boxes[i][3] = std::min((*results)[bs].boxes[i][3], ipt_h);
+                auto& box = (*results)[bs].boxes[i];
+
+                // Remove padding and apply scale
+                box[0] = (box[0] - pad_w) / scale;
+                box[1] = (box[1] - pad_h) / scale;
+                box[2] = (box[2] - pad_w) / scale;
+                box[3] = (box[3] - pad_h) / scale;
+
+                // Clip to image boundaries
+                box[0] = utils::clamp(box[0], 0.0f, ipt_w);
+                box[1] = utils::clamp(box[1], 0.0f, ipt_h);
+                box[2] = utils::clamp(box[2], 0.0f, ipt_w);
+                box[3] = utils::clamp(box[3], 0.0f, ipt_h);
+
                 // deal with mask
                 cv::Mat dest, mask;
                 // sigmoid
@@ -189,7 +159,7 @@ namespace modeldeploy::vision::detection {
                 (*results)[bs].masks[i].resize(keep_mask_num_el);
                 (*results)[bs].masks[i].shape = {keep_mask_h, keep_mask_w};
                 auto* keep_mask_ptr = static_cast<uint8_t*>((*results)[bs].masks[i].data());
-                std::memcpy(keep_mask_ptr, mask.ptr(), keep_mask_num_el * sizeof(uint8_t));
+                std::copy_n(mask.ptr(), keep_mask_num_el, keep_mask_ptr);
             }
         }
         return true;

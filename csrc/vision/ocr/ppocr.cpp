@@ -31,9 +31,9 @@ namespace modeldeploy::vision::ocr {
         detector_->get_postprocessor().set_det_db_unclip_ratio(det_db_unclip_ratio);
         if (!cls_model_path.empty()) {
             classifier_ = std::make_unique<Classifier>(cls_model_path, option);
+            set_cls_batch_size(rec_batch_size);
         }
         recognizer_ = std::make_unique<Recognizer>(rec_model_path, dict_path, option);
-        set_cls_batch_size(rec_batch_size);
         set_rec_batch_size(rec_batch_size);
     }
 
