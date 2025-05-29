@@ -8,8 +8,6 @@
 #include "csrc/runtime/enum_variables.h"
 
 namespace modeldeploy {
-
-
     /*! @brief Option object to configure ONNX Runtime backend
      */
     struct MODELDEPLOY_CXX_EXPORT OrtBackendOption {
@@ -43,6 +41,10 @@ namespace modeldeploy {
         std::string model_buffer;
 
         std::string model_filepath;
+
+        bool enable_trt = true;
+
+        bool enable_cuda = true;
 
         void set_cpu_thread_num(const int num) {
             intra_op_num_threads = num;

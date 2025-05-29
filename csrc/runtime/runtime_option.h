@@ -10,7 +10,7 @@
 
 namespace modeldeploy {
 
-    struct RuntimeOption {
+    struct MODELDEPLOY_CXX_EXPORT RuntimeOption {
 
         void set_model_path(const std::string& model_path);
 

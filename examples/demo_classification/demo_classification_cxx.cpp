@@ -6,7 +6,9 @@
 #include "csrc/vision/common/visualize/visualize.h"
 
 int main() {
-    modeldeploy::vision::classification::UltralyticsCls yol_ov5_cls("../../test_data/test_models/yolov5n-cls.onnx");
+    modeldeploy::RuntimeOption option;
+    // option.use_gpu();
+    modeldeploy::vision::classification::UltralyticsCls yol_ov5_cls("../../test_data/test_models/yolov5n-cls.onnx",option);
     auto img = cv::imread("../../test_data/test_images/test_face.jpg");
     modeldeploy::vision::ClassifyResult results;
     yol_ov5_cls.predict(img, &results);

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
+#include <map>
 #include "csrc/core/tensor.h"
 #include "csrc/core/md_log.h"
 #include "csrc/runtime/runtime_option.h"

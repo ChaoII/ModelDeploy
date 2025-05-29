@@ -50,13 +50,14 @@ namespace ModelDeploy.vision.instance_seg
             }
         }
 
-        public void DrawDetectionResult(Image image, List<detection.DetectionResult> results, string fontPath,
-            int fontSize = 12, double alpha = 0.5, int saveResult = 0)
+        public void DrawDetectionResult(Image image, List<detection.DetectionResult> results, double threshold,
+            string fontPath, int fontSize = 12, double alpha = 0.5, int saveResult = 0)
         {
             var cResults = detection.DetectionResult.ToNativeArray(results);
             try
             {
-                md_draw_instance_seg_result(ref image.RawImage, ref cResults, fontPath, fontSize, alpha, saveResult);
+                md_draw_instance_seg_result(ref image.RawImage, ref cResults, threshold, fontPath, fontSize, alpha,
+                    saveResult);
             }
             finally
             {
@@ -93,7 +94,7 @@ namespace ModelDeploy.vision.instance_seg
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_instance_seg_result(ref MDImage image, ref MDDetectionResults result,
-            string fontPath, int fontSize, double alpha, int saveResult);
+            double threshold, string fontPath, int fontSize, double alpha, int saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_instance_seg_result(ref MDDetectionResults results);

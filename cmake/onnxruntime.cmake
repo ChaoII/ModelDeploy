@@ -69,6 +69,11 @@ if (NOT onnxruntime_SOURCE_DIR)
     message(FATAL_ERROR "onnxruntime_SOURCE_DIR is not set after population")
 endif ()
 
+# for debug
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+#    set(onnxruntime_SOURCE_DIR "E:/develop/onnxruntime-win-x64-1.22.0")
+    set(onnxruntime_SOURCE_DIR "C:/Users/aichao/Downloads/onnxruntime-win-x64-gpu-1.20.1")
+endif ()
 include_directories(${onnxruntime_SOURCE_DIR}/include)
 link_directories(${onnxruntime_SOURCE_DIR}/lib)
 list(APPEND DEPENDS onnxruntime)

@@ -7,7 +7,7 @@
 
 namespace modeldeploy::vision {
     cv::Mat vis_ocr(cv::Mat& image, const OCRResult& results, const std::string& font_path,
-                    const int font_size, const double alpha, const int save_result) {
+                    const int font_size, const double alpha, const bool save_result) {
         cv::Mat overlay;
         image.copyTo(overlay);
         cv::FontFace font(font_path);
@@ -23,7 +23,7 @@ namespace modeldeploy::vision {
             cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
             const auto size = cv::getTextSize(cv::Size(0, 0), results.text[i],
                                               {points[0].x, points[0].y}, font, font_size);
-            cv::rectangle(image, size, cv_color, -1, cv::LINE_AA, 0);
+            cv::rectangle(overlay, size, cv_color, -1, cv::LINE_AA, 0);
         }
         // 绘制表格单元格
         // for (int j = 0; j < results.table_boxes.size(); j++) {
@@ -33,10 +33,10 @@ namespace modeldeploy::vision {
         //     for (int k = 0; k < polygon.size(); k += 2) {
         //         points.emplace_back(polygon[k], polygon[k + 1]);
         //     }
-        //     cv::fillPoly(image, points, cv_color, cv::LINE_AA, 0);
+        //     cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
         //     const auto size = cv::getTextSize(cv::Size(0, 0), results.table_structure[j],
         //                                       {points[0].x, points[0].y}, font, font_size);
-        //     cv::rectangle(image, size, cv_color, 1, cv::LINE_AA, 0);
+        //     cv::rectangle(overlay, size, cv_color, 1, cv::LINE_AA, 0);
         // }
 
         cv::addWeighted(overlay, alpha, image, 1 - alpha, 0, image);
