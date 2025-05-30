@@ -32,9 +32,8 @@ namespace modeldeploy::vision::classification {
     }
 
     bool UltralyticsCls::batch_predict(const std::vector<cv::Mat>& images, std::vector<ClassifyResult>* results) {
-        std::vector<std::map<std::string, std::array<float, 2>>> ims_info;
         std::vector<cv::Mat> _images = images;
-        if (!preprocessor_.run(&_images, &reused_input_tensors_, &ims_info)) {
+        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
@@ -45,7 +44,7 @@ namespace modeldeploy::vision::classification {
             return false;
         }
 
-        if (!postprocessor_.run(reused_output_tensors_, results, ims_info)) {
+        if (!postprocessor_.run(reused_output_tensors_, results)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }

@@ -14,7 +14,7 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
-        int batch = tensors[0].shape()[0];
+        const size_t batch = tensors[0].shape()[0];
         // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
         results->resize(batch);

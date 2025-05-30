@@ -11,8 +11,7 @@ namespace modeldeploy::vision::classification {
     }
 
     bool UltralyticsClsPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results,
-        const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) {
+        const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) {
         const int64_t batch = tensors[0].shape()[0];
         const Tensor& infer_result = tensors[0];
         // 注意yolov8-cls在模型中已经做过softmax了。

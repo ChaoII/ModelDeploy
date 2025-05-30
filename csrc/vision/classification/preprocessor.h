@@ -22,11 +22,9 @@ namespace modeldeploy::vision::classification {
    *
    * \param[in] images The input image data list, all the elements are returned by cv::imread()
    * \param[in] outputs The output tensors which will feed in runtime
-   * \param[in] ims_info The shape info list, record input_shape and output_shape
-   * \return true if the preprocess successed, otherwise false
+   * \return true if the preprocess successfully, otherwise false
    */
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-                 std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const;
+        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const;
 
         /// Set target size, tuple of (width, height), default size = {224, 224}
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -35,8 +33,7 @@ namespace modeldeploy::vision::classification {
         [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output,
-                        std::map<std::string, std::array<float, 2>>* im_info) const;
+        bool preprocess(cv::Mat* mat, Tensor* output) const;
 
         // target size, tuple of (width, height), default size = {224, 224}
         std::vector<int> size_;

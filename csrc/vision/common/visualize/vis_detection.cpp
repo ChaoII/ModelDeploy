@@ -38,6 +38,32 @@ namespace modeldeploy::vision {
             // 绘制标签背景
             cv::rectangle(overlay, size, cv_color, -1);
         }
+
+        // for roted_box
+        for (int i = 0; i < result.rotated_boxes.size(); ++i) {
+            if (result.scores[i] < threshold) {
+                continue;
+            }
+            auto class_id = result.label_ids[i];
+            if (!color_map.contains(class_id)) {
+                color_map[class_id] = get_random_color();
+            }
+            auto roted_boxes = result.rotated_boxes[i];
+            std::vector<cv::Point> points;
+            points.reserve(roted_boxes.size() / 2);
+            for (int j = 0; j < roted_boxes.size(); j += 2) {
+                points.emplace_back(roted_boxes[j], roted_boxes[j + 1]);
+            }
+            auto cv_color = color_map[class_id];
+            // 绘制对象矩形框
+            cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
+            std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[i]).substr(0, 4);
+            const auto size = cv::getTextSize(cv::Size(0, 0), text, points[0], font, font_size);
+            // 绘制标签背景
+            cv::rectangle(overlay, size, cv_color, -1);
+        }
+
+
         cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
         // 绘制对象矩形矩形边框、文字背景边框、文字
         for (int c = 0; c < result.boxes.size(); ++c) {
@@ -82,6 +108,28 @@ namespace modeldeploy::vision {
                 cv::addWeighted(roi, 0.5, colored_mask, 0.5, 0, roi);
             }
         }
+
+        for (int c = 0; c < result.rotated_boxes.size(); ++c) {
+            if (result.scores[c] < threshold) {
+                continue;
+            }
+            auto class_id = result.label_ids[c];
+            auto roted_boxes = result.rotated_boxes[c];
+            std::vector<cv::Point> points;
+            points.reserve(roted_boxes.size() / 2);
+            for (int j = 0; j < roted_boxes.size(); j += 2) {
+                points.emplace_back(roted_boxes[j], roted_boxes[j + 1]);
+            }
+            auto cv_color = color_map[class_id];
+            cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
+            std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[c]).substr(0, 4);
+            const auto size = cv::getTextSize(cv::Size(0, 0), text, points[0], font, font_size);
+            cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
+            cv::putText(cv_image, text, points[0],
+                        cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
+        }
+
+
         if (save_result) {
             MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);

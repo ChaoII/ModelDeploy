@@ -22,6 +22,7 @@ namespace modeldeploy::vision {
         scores.clear();
         feature.clear();
     }
+
     void ClassifyResult::reserve(const int size) {
         scores.reserve(size);
         label_ids.reserve(size);
@@ -213,7 +214,7 @@ namespace modeldeploy::vision {
             }
         }
         else {
-            output_table.add_row({"order", " box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_ids", " score"});
+            output_table.add_row({"order", " roted_box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_ids", " score"});
             for (size_t i = 0; i < rotated_boxes.size(); ++i) {
                 std::string box_str = "["
                     + std::to_string(static_cast<int>(rotated_boxes[i][0])) + ", "
@@ -241,8 +242,6 @@ namespace modeldeploy::vision {
         cls_scores.clear();
         cls_labels.clear();
     }
-
-#include <sstream>
 
     std::string OCRResult::str() const {
         std::ostringstream out;
@@ -504,7 +503,7 @@ namespace modeldeploy::vision {
         car_plate_colors.resize(size);
     }
 
-    void LprResult::display() {
+    void LprResult::display() const {
         tabulate::Table output_table;
         output_table.format()
                     .locale(std::locale::classic().name())
