@@ -205,7 +205,7 @@ namespace modeldeploy::vision {
 
         void resize(size_t size);
         /// Debug function, convert the result to string to print
-        void display();
+        void display() const;
     };
 
 

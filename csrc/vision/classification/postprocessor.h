@@ -20,12 +20,10 @@ namespace modeldeploy::vision::classification {
         *
         * \param[in] tensors The inference result from runtime
         * \param[in] results The output result of classification
-        * \param[in] ims_info The shape info list, record input_shape and output_shape
-        * \return true if the postprocess successed, otherwise false
+        * \return true if the postprocess successful, otherwise false
         */
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<ClassifyResult>* results,
-                 const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info);
+                 std::vector<ClassifyResult>* results);
 
         /// Set topk, default 1
         void set_top_k(const int& top_k) {

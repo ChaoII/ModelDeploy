@@ -96,8 +96,8 @@ namespace modeldeploy::vision::utils {
         return x0_a > x0_b;
     }
 
-    void reorder_detectionResult_by_indices(DetectionResult* result,
-                                            const std::vector<size_t>& indices) {
+    void reorder_detection_result_by_indices(DetectionResult* result,
+                                             const std::vector<size_t>& indices) {
         // reorder boxes, scores, label_ids, masks
         DetectionResult backup = *result;
         const bool contain_masks = backup.contain_masks;
@@ -134,10 +134,10 @@ namespace modeldeploy::vision::utils {
         }
         // lex sort by x(w) then y(h)
         auto& boxes = result->boxes;
-        std::sort(indices.begin(), indices.end(), [&boxes](const size_t a, const size_t b) {
+        std::ranges::sort(indices, [&boxes](const size_t a, const size_t b) {
             return lex_sort_by_xy_compare(boxes[a], boxes[b]);
         });
-        reorder_detectionResult_by_indices(result, indices);
+        reorder_detection_result_by_indices(result, indices);
     }
 
     void LexSortOCRDetResultByXY(std::vector<std::array<int, 8>>* result) {
@@ -157,7 +157,7 @@ namespace modeldeploy::vision::utils {
             };
         }
         // lex sort by x(w) then y(h)
-        std::sort(indices.begin(), indices.end(), [&boxes](const size_t a, const size_t b) {
+        std::ranges::sort(indices, [&boxes](const size_t a, const size_t b) {
             return lex_sort_by_xy_compare(boxes[a], boxes[b]);
         });
         // reorder boxes

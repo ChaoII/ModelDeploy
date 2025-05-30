@@ -79,8 +79,7 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    void nms(DetectionResult* output, const float iou_threshold,
-             std::vector<int>* index) {
+    void nms(DetectionResult* output, const float iou_threshold, std::vector<int>* index) {
         // get sorted score indices
         std::vector<int> sorted_indices;
         if (index != nullptr) {
@@ -287,5 +286,29 @@ namespace modeldeploy::vision::utils {
             norm[i] = values[i] / l2_sum_sqrt;
         }
         return norm;
+    }
+
+    std::array<float, 8> xcycwha_to_x1y1x2y2x3y3x4y4(const float xc, const float yc, const float w, const float h,
+                                                     const float angle_rad) {
+        // 半宽高
+        const float cos_a = std::cos(angle_rad);
+        const float sin_a = std::sin(angle_rad);
+        const float dx = w / 2.0f;
+        const float dy = h / 2.0f;
+
+        // 四个顶点相对于中心点的偏移（顺时针）
+        const float x0 = -dx, y0 = -dy;
+        const float x1 = dx, y1 = -dy;
+        const float x2 = dx, y2 = dy;
+        const float x3 = -dx, y3 = dy;
+
+        // 旋转 + 平移到中心点
+        const std::array points = {
+            xc + cos_a * x0 - sin_a * y0, yc + sin_a * x0 + cos_a * y0, // x1, y1
+            xc + cos_a * x1 - sin_a * y1, yc + sin_a * x1 + cos_a * y1, // x2, y2
+            xc + cos_a * x2 - sin_a * y2, yc + sin_a * x2 + cos_a * y2, // x3, y3
+            xc + cos_a * x3 - sin_a * y3, yc + sin_a * x3 + cos_a * y3 // x4, y4
+        };
+        return points;
     }
 }

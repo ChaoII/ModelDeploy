@@ -17,6 +17,8 @@ namespace modeldeploy::vision::utils {
 
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 
+    void obb_nms(DetectionResult* output, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
+
     void nms(DetectionResult* output, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
     void nms(DetectionLandmarkResult* result, float iou_threshold);
@@ -53,6 +55,7 @@ namespace modeldeploy::vision::utils {
         return std::min(std::max(val, min_val), max_val);
     }
 
+    std::array<float, 8> xcycwha_to_x1y1x2y2x3y3x4y4(float xc, float yc, float w, float h, float angle_deg);
 
     template <typename T>
     std::vector<int32_t> top_k_indices(const T* array, int array_size, int topk) {

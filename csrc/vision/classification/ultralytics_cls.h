@@ -32,7 +32,7 @@ namespace modeldeploy::vision::classification {
 
         /** \brief Predict the classification results for a batch of input images
          *
-         * \param[in] images, The input image list, each element comes from cv::imread()
+         * \param[in] images input image list, each element comes from cv::imread()
          * \param[in] results The output classification result list
          * \return true if the prediction successed, otherwise false
          */
