@@ -11,7 +11,7 @@ namespace modeldeploy::vision::detection {
     UltralyticsSegPostprocessor::UltralyticsSegPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
-        mask_threshold_ = 0.35;
+        mask_threshold_ = 0.5;
     }
 
     bool UltralyticsSegPostprocessor::run(

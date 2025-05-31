@@ -14,7 +14,7 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "ConvertAndPermute: requires the size of alpha equal to the size of beta." << std::endl;
         }
 
-        if (!(alpha.size() > 0 && beta.size() > 0)) {
+        if (!(!alpha.empty() && !beta.empty())) {
             MD_LOG_ERROR << "ConvertAndPermute: requires the size of alpha and beta > 0.";
         }
         alpha_.assign(alpha.begin(), alpha.end());

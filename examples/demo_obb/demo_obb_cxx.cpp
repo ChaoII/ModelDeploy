@@ -5,9 +5,13 @@
 #include "csrc/vision.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-int main() {
-    modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/yolov8l-obb.onnx");
-    auto img = cv::imread("../../test_data/test_images/test_obb2.jpg");
+int main()
+{
+    modeldeploy::RuntimeOption option;
+    option.use_gpu();
+
+    modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/yolo11n-obb.onnx", option);
+    auto img = cv::imread("../../test_data/test_images/test_obb1.jpg");
     modeldeploy::vision::DetectionResult result;
     yolov8.get_preprocessor().set_size({1024, 1024});
     yolov8.predict(img, &result);

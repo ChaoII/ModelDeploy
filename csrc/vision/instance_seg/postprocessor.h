@@ -5,10 +5,12 @@
 #include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision::detection {
+namespace modeldeploy::vision::detection
+{
     /*! @brief Postprocessor object for YOLOv5Seg serials model.
    */
-    class MODELDEPLOY_CXX_EXPORT UltralyticsSegPostprocessor {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsSegPostprocessor
+    {
     public:
         /** \brief Create a postprocessor instance for YOLOv5Seg serials model
        */
@@ -36,6 +38,10 @@ namespace modeldeploy::vision::detection {
         /// Set nms_threshold, default 0.5
         void set_nms_threshold(const float& nms_threshold) {
             nms_threshold_ = nms_threshold;
+        }
+
+        void set_mask_threshold(const float& mask_threshold) {
+            mask_threshold_ = mask_threshold;
         }
 
         /// Get nms_threshold, default 0.5

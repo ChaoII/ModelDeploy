@@ -105,10 +105,10 @@ namespace modeldeploy::vision {
                 // 定义 ROI 区域
                 cv::Mat roi(cv_image, cv::Rect(x1, y1, box_w, box_h));
                 // 使用 addWeighted 混合原始图像和 mask
-                cv::addWeighted(roi, 0.5, colored_mask, 0.5, 0, roi);
+                cv::addWeighted(roi, 0.2, colored_mask, 0.8, 0, roi);
             }
         }
-
+        // for roted_box
         for (int c = 0; c < result.rotated_boxes.size(); ++c) {
             if (result.scores[c] < threshold) {
                 continue;

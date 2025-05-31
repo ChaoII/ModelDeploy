@@ -4,10 +4,11 @@
 #pragma once
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/utils.h"
-#include <map>
 
-namespace modeldeploy::vision::detection {
-    class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor {
+namespace modeldeploy::vision::detection
+{
+    class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor
+    {
     public:
         UltralyticsPreprocessor();
 
@@ -28,19 +29,19 @@ namespace modeldeploy::vision::detection {
             is_scale_up_ = is_scale_up;
         }
 
-        bool get_scale_up() const { return is_scale_up_; }
+        [[nodiscard]] bool get_scale_up() const { return is_scale_up_; }
 
-        void set_mini_pad(bool is_mini_pad) {
+        void set_mini_pad(const bool is_mini_pad) {
             is_mini_pad_ = is_mini_pad;
         }
 
-        bool get_mini_pad() const { return is_mini_pad_; }
+        [[nodiscard]] bool get_mini_pad() const { return is_mini_pad_; }
 
-        void set_stride(int stride) {
+        void set_stride(const int stride) {
             stride_ = stride;
         }
 
-        bool get_stride() const { return stride_; }
+        [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
         bool preprocess(cv::Mat* mat, Tensor* output,
@@ -61,8 +62,5 @@ namespace modeldeploy::vision::detection {
 
         // padding stride, for is_mini_pad
         int stride_;
-
-        // for offseting the boxes by classes when using NMS
-        float max_wh_;
     };
 } // namespace detection
