@@ -8,7 +8,8 @@
 #include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision::utils {
+namespace modeldeploy::vision::utils
+{
     bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = false);
 
     DataType cv_dtype_to_md_dtype(int type);
@@ -55,7 +56,8 @@ namespace modeldeploy::vision::utils {
         return std::min(std::max(val, min_val), max_val);
     }
 
-    std::array<float, 8> xcycwha_to_x1y1x2y2x3y3x4y4(float xc, float yc, float w, float h, float angle_deg);
+    std::array<float, 8> xcycwha_to_x1y1x2y2x3y3x4y4(float xc, float yc, float w, float h, float angle_rad);
+    std::array<float, 5> x1y1x2y2x3y3x4y4_to_xcycwha(const std::array<float, 8>& pts);
 
     template <typename T>
     std::vector<int32_t> top_k_indices(const T* array, int array_size, int topk) {

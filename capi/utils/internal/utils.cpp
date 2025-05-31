@@ -6,6 +6,7 @@
 #include <random>
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
+#include "csrc/vision/utils.h"
 
 #include <csrc/core/md_log.h>
 
@@ -170,16 +171,26 @@ void c_results_2_classification_result(
 void detection_result_2_c_results(
     const DetectionResult& result,
     MDDetectionResults* c_results) {
-    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->size = static_cast<int>(result.scores.size());
     c_results->data = new MDDetectionResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
-        auto [xmin, ymin, xmax, ymax] = result.boxes[i];
-        c_results->data[i].box = MDRect{
-            static_cast<int>(xmin),
-            static_cast<int>(ymin),
-            static_cast<int>(xmax - xmin),
-            static_cast<int>(ymax - ymin)
-        };
+        if (!result.boxes.empty()) {
+            auto [xmin, ymin, xmax, ymax] = result.boxes[i];
+            c_results->data[i].box = MDRect{
+                static_cast<int>(xmin),
+                static_cast<int>(ymin),
+                static_cast<int>(xmax - xmin),
+                static_cast<int>(ymax - ymin)
+            };
+        }
+        if (!result.rotated_boxes.empty()) {
+            auto roted_box = utils::x1y1x2y2x3y3x4y4_to_xcycwha(result.rotated_boxes[i]);
+            c_results->data[i].roted_box.x = static_cast<int>(roted_box[0]);
+            c_results->data[i].roted_box.y = static_cast<int>(roted_box[1]);
+            c_results->data[i].roted_box.width = static_cast<int>(roted_box[2]);
+            c_results->data[i].roted_box.height = static_cast<int>(roted_box[3]);
+            c_results->data[i].roted_box.angle = roted_box[4];
+        }
         c_results->data[i].score = result.scores[i];
         c_results->data[i].label_id = result.label_ids[i];
         c_results->data[i].mask.buffer = nullptr;
@@ -208,13 +219,24 @@ void c_results_2_detection_result(
     result->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
         auto [x, y, width, height] = c_results->data[i].box;
-        auto box = std::array{
-            static_cast<float>(x),
-            static_cast<float>(y),
-            static_cast<float>(x + width),
-            static_cast<float>(y + height)
-        };
-        result->boxes.emplace_back(box);
+        if (width > 0 && height > 0) {
+            auto box = std::array{
+                static_cast<float>(x),
+                static_cast<float>(y),
+                static_cast<float>(x + width),
+                static_cast<float>(y + height)
+            };
+            result->boxes.emplace_back(box);
+        }
+        const auto rotated_box = c_results->data[i].roted_box;
+        if (rotated_box.width > 0 && rotated_box.height > 0) {
+            result->rotated_boxes.emplace_back(
+                utils::xcycwha_to_x1y1x2y2x3y3x4y4(static_cast<float>(rotated_box.x),
+                                                   static_cast<float>(rotated_box.y),
+                                                   static_cast<float>(rotated_box.width),
+                                                   static_cast<float>(rotated_box.height),
+                                                   rotated_box.angle));
+        }
         result->scores.emplace_back(c_results->data[i].score);
         result->label_ids.emplace_back(c_results->data[i].label_id);
         if (c_results->data[i].mask.buffer != nullptr) {
