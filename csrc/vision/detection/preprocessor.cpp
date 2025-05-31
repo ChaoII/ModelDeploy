@@ -4,25 +4,27 @@
 
 #include "csrc/core/md_log.h"
 #include "csrc/vision/detection/preprocessor.h"
+
+#include "csrc/vision/common/processors/color_space_convert.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/convert_and_permute.h"
 
-namespace modeldeploy::vision::detection {
+namespace modeldeploy::vision::detection
+{
     UltralyticsPreprocessor::UltralyticsPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
-        is_mini_pad_ = false;
+        is_mini_pad_ = true;
         is_no_pad_ = false;
         is_scale_up_ = true;
         stride_ = 32;
-        max_wh_ = 7680.0;
     }
 
     void UltralyticsPreprocessor::letter_box(cv::Mat* mat) const {
-        float scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
+        auto scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
         if (!is_scale_up_) {
-            scale = std::min(scale, 1.0f);
+            scale = std::min(scale, 1.0);
         }
 
         int resize_h = static_cast<int>(round(mat->rows * scale));

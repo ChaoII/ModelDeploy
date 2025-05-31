@@ -5,7 +5,8 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/detection/postprocessor.h"
 
-namespace modeldeploy::vision::detection {
+namespace modeldeploy::vision::detection
+{
     UltralyticsPostprocessor::UltralyticsPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
@@ -66,13 +67,11 @@ namespace modeldeploy::vision::detection {
             const float scale = std::min(out_h / ipt_h, out_w / ipt_w);
             const float pad_h = (out_h - ipt_h * scale) / 2;
             const float pad_w = (out_w - ipt_w * scale) / 2;
-            for (size_t i = 0; i < (*results)[bs].boxes.size(); ++i) {
+            for (auto& box : (*results)[bs].boxes) {
                 // clip box()
                 //先减去 padding;
                 //再除以缩放因子 scale;
                 //最后限制在原始图像范围内 [0, width], [0, height]。
-                auto& box = (*results)[bs].boxes[i];
-
                 // Remove padding and apply scale
                 box[0] = (box[0] - pad_w) / scale;
                 box[1] = (box[1] - pad_h) / scale;

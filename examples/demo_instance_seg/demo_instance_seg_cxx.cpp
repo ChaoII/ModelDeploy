@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to initialize." << std::endl;
         return -1;
     }
-    std::string image_file = "../../test_data/test_images/test_face_detection.jpg";
+    std::string image_file = "../../test_data/test_images/test_detection0.jpg";
     auto im = cv::imread(image_file);
     modeldeploy::vision::DetectionResult res;
     if (!model.predict(im, &res)) {
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         return -1;
     }
     res.display();
-    auto vis_im = modeldeploy::vision::vis_detection(im, res, 0.5, "../../test_data/test_models/font.ttf", 14, 0.3, 0);
+    auto vis_im = modeldeploy::vision::vis_detection(im, res, 0.2, "../../test_data/test_models/font.ttf", 14, 0.5, 0);
     cv::resize(vis_im, vis_im, cv::Size(0, 0), 0.75, 0.75);
     cv::imshow("vis_im", vis_im);
     cv::waitKey(0);
