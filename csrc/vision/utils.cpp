@@ -9,7 +9,8 @@
 #include "csrc/vision/utils.h"
 #include "csrc/core/md_log.h"
 
-namespace modeldeploy::vision::utils {
+namespace modeldeploy::vision::utils
+{
     DataType cv_dtype_to_md_dtype(int type) {
         type = type % 8;
         if (type == 0) {
@@ -310,5 +311,27 @@ namespace modeldeploy::vision::utils {
             xc + cos_a * x3 - sin_a * y3, yc + sin_a * x3 + cos_a * y3 // x4, y4
         };
         return points;
+    }
+
+    std::array<float, 5> x1y1x2y2x3y3x4y4_to_xcycwha(const std::array<float, 8>& pts) {
+        // 提取四个点
+        const float x1 = pts[0], y1 = pts[1];
+        const float x2 = pts[2], y2 = pts[3];
+        const float x3 = pts[4], y3 = pts[5];
+        const float x4 = pts[6], y4 = pts[7];
+        // 中心点 (平均四点)
+        const float xc = (x1 + x2 + x3 + x4) / 4.0f;
+        const float yc = (y1 + y2 + y3 + y4) / 4.0f;
+        // 宽 w = p1 -> p2 的距离
+        const float dx_w = x2 - x1;
+        const float dy_w = y2 - y1;
+        const float w = std::sqrt(dx_w * dx_w + dy_w * dy_w);
+        // 高 h = p2 -> p3 的距离
+        const float dx_h = x3 - x2;
+        const float dy_h = y3 - y2;
+        const float h = std::sqrt(dx_h * dx_h + dy_h * dy_h);
+        // 角度（p1 -> p2）方向，atan2(y, x)
+        const float angle = std::atan2(dy_w, dx_w); // 弧度制，逆时针为正
+        return {xc, yc, w, h, angle};
     }
 }

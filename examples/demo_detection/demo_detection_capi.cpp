@@ -20,7 +20,7 @@ int main() {
         return ret;
     }
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    auto im = md_read_image("../../test_data/test_images/test_detection.jpg");
+    auto im = md_read_image("../../test_data/test_images/test_detection0.jpg");
     MDDetectionResults result;
     if ((ret = md_detection_predict(&model, &im, &result)) != 0) {
         std::cout << ret << std::endl;

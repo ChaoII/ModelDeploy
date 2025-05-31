@@ -4,13 +4,6 @@
 
 #pragma once
 
-enum MDASRMode {
-    Offline = 0,
-    Online = 1,
-    TwoPass = 2,
-};
-
-
 enum MDModelFormat {
     ONNX = 0,
     MNN
@@ -62,6 +55,25 @@ typedef struct {
     int height;
 } MDRect;
 
+typedef struct {
+    int x;
+    int y;
+    int width;
+    int height;
+    float angle;
+} MDRotedRect;
+
+
+typedef struct {
+    unsigned char r;
+    unsigned char g;
+    unsigned char b;
+} MDColor;
+
+typedef struct {
+    int width;
+    int height;
+} MDSize;
 
 typedef struct {
     int width;
@@ -141,18 +153,6 @@ typedef struct {
 
 
 typedef struct {
-    unsigned char r;
-    unsigned char g;
-    unsigned char b;
-} MDColor;
-
-typedef struct {
-    int width;
-    int height;
-} MDSize;
-
-
-typedef struct {
     int label_id;
     float score;
 } MDClassificationResult;
@@ -172,6 +172,7 @@ typedef struct {
 
 typedef struct {
     MDRect box;
+    MDRotedRect roted_box;
     MDMask mask;
     int label_id;
     float score;
