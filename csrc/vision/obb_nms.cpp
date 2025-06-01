@@ -26,7 +26,7 @@ namespace modeldeploy::vision::utils
 
         // 使用排序后的索引，重排所有字段
         auto reorder = [&](auto& vec) {
-            using T = typename std::decay<decltype(vec[0])>::type;
+            using T = std::decay_t<decltype(vec[0])>;
             std::vector<T> reordered;
             reordered.reserve(vec.size());
             for (size_t idx : indices) {
@@ -45,8 +45,8 @@ namespace modeldeploy::vision::utils
     // Shoelace 算法求多边形面积（顶点顺时针/逆时针都可以）
     float polygon_area(const std::vector<cv::Point2f>& poly) {
         float area = 0.0f;
-        int n = poly.size();
-        for (int i = 0; i < n; ++i) {
+        const size_t n = poly.size();
+        for (size_t i = 0; i < n; ++i) {
             const cv::Point2f& p1 = poly[i];
             const cv::Point2f& p2 = poly[(i + 1) % n];
             area += p1.x * p2.y - p2.x * p1.y;
@@ -62,17 +62,16 @@ namespace modeldeploy::vision::utils
     // 计算两个边的交点
     cv::Point2f compute_intersection(const cv::Point2f& p1, const cv::Point2f& p2, const cv::Point2f& q1,
                                      const cv::Point2f& q2) {
-        float A1 = p2.y - p1.y;
-        float B1 = p1.x - p2.x;
-        float C1 = A1 * p1.x + B1 * p1.y;
+        const float A1 = p2.y - p1.y;
+        const float B1 = p1.x - p2.x;
+        const float C1 = A1 * p1.x + B1 * p1.y;
 
-        float A2 = q2.y - q1.y;
-        float B2 = q1.x - q2.x;
-        float C2 = A2 * q1.x + B2 * q1.y;
+        const float A2 = q2.y - q1.y;
+        const float B2 = q1.x - q2.x;
+        const float C2 = A2 * q1.x + B2 * q1.y;
 
-        float det = A1 * B2 - A2 * B1;
+        const float det = A1 * B2 - A2 * B1;
         if (std::abs(det) < 1e-6f) return {0, 0}; // 平行，实际使用中需处理
-
         return {
             (B2 * C1 - B1 * C2) / det,
             (A1 * C2 - A2 * C1) / det
@@ -107,7 +106,7 @@ namespace modeldeploy::vision::utils
     }
 
     // 转换 array<float, 8> 为 Point vector
-    std::vector<Point> array_to_polygon(const std::array<float, 8>& box) {
+    std::vector<cv::Point2f> array_to_polygon(const std::array<float, 8>& box) {
         return {
             {box[0], box[1]},
             {box[2], box[3]},
@@ -116,68 +115,78 @@ namespace modeldeploy::vision::utils
         };
     }
 
-    // 主函数：计算两个旋转框的 IoU
+    // 使用OpenCV中的多边形相交方法
     float rotated_iou(const cv::RotatedRect& box1, const cv::RotatedRect& box2) {
-        cv::Point2f poly1_[4];
-        cv::Point2f poly2_[4];
-        box1.points(poly1_);
-        box2.points(poly2_);
-        auto poly1 = std::vector(poly1_, poly1_ + 4);
-        auto poly2 = std::vector(poly2_, poly2_ + 4);
+        std::vector<cv::Point2f> intersection;
+        float iou = 0.0f;
+        if (cv::rotatedRectangleIntersection(box1, box2, intersection) > 0) {
+            const auto intersection_area = cv::contourArea(intersection);
+            const auto box1_area = box1.size.area();
+            const auto box2_area = box2.size.area();
+            iou = static_cast<float>(intersection_area / (box1_area + box2_area - intersection_area));
+        }
+        return iou;
+    }
 
 
-        float area1 = polygon_area(poly1);
-        float area2 = polygon_area(poly2);
+    // 计算两个旋转框的 IoU，自己造轮子
+    float rotated_iou(const std::array<float, 8>& box1, const std::array<float, 8>& box2) {
+        const auto poly1 = array_to_polygon(box1);
+        const auto poly2 = array_to_polygon(box2);
 
-        std::vector<cv::Point2f> inter_poly = polygon_intersection(poly1, poly2);
+        const float area1 = polygon_area(poly1);
+        const float area2 = polygon_area(poly2);
+
+        const std::vector<cv::Point2f> inter_poly = polygon_intersection(poly1, poly2);
         if (inter_poly.empty()) return 0.0f;
 
-        float inter_area = polygon_area(inter_poly);
-        float union_area = area1 + area2 - inter_area;
+        const float inter_area = polygon_area(inter_poly);
+        const float union_area = area1 + area2 - inter_area;
         return inter_area / union_area;
     }
 
-    void obb_nms(DetectionResult* output, const float iou_threshold,
-                 std::vector<int>* index) {
-        // get sorted score indices
-        std::vector<int> sorted_indices;
-        if (index != nullptr) {
-            std::map<float, int, std::greater<>> score_map;
-            for (size_t i = 0; i < output->scores.size(); ++i) {
-                score_map.insert({output->scores[i], static_cast<int>(i)});
-            }
-            for (auto val : score_map | std::views::values) {
-                sorted_indices.push_back(val);
-            }
-        }
-        sort_detection_result_by_score(*output);
-        std::vector suppressed(output->rotated_boxes.size(), 0);
-        for (size_t i = 0; i < output->rotated_boxes.size(); ++i) {
-            if (suppressed[i] == 1) {
-                continue;
-            }
-            for (size_t j = i + 1; j < output->rotated_boxes.size(); ++j) {
-                if (suppressed[j] == 1) {
-                    continue;
-                }
-                auto iou = rotated_iou(output->rotated_boxes[i], output->rotated_boxes[j]);
+    void obb_nms(DetectionResult* output, const float iou_threshold, std::vector<int>* index) {
+        const size_t N = output->rotated_boxes.size();
+
+        // Step 1: 根据分数排序得到索引
+        std::vector<int> sorted_indices(N);
+        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
+        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+            return output->scores[a] > output->scores[b]; // 分数高的排前面
+        });
+
+        // Step 2: NMS 主逻辑
+        std::vector suppressed(N, false);
+        std::vector<int> keep_indices;
+
+        for (size_t m = 0; m < N; ++m) {
+            int i = sorted_indices[m];
+            if (suppressed[i]) continue;
+            keep_indices.push_back(i); // 保留当前框
+            const auto& box_i = output->rotated_boxes[i];
+            for (size_t n = m + 1; n < N; ++n) {
+                const int j = sorted_indices[n];
+                if (suppressed[j]) continue;
+
+                const auto& box_j = output->rotated_boxes[j];
+                const float iou = rotated_iou(box_i, box_j);
                 if (iou > iou_threshold) {
-                    suppressed[j] = 1;
+                    suppressed[j] = true;
                 }
             }
         }
-        DetectionResult backup(*output);
+
+        // Step 3: 根据 keep_indices 重建结果
+        const DetectionResult backup(*output);
         output->clear();
-        output->reserve(static_cast<int>(suppressed.size()));
-        for (size_t i = 0; i < suppressed.size(); ++i) {
-            if (suppressed[i] == 1) {
-                continue;
-            }
-            output->rotated_boxes.emplace_back(backup.rotated_boxes[i]);
-            output->scores.push_back(backup.scores[i]);
-            output->label_ids.push_back(backup.label_ids[i]);
-            if (index != nullptr) {
-                index->push_back(sorted_indices[i]);
+        output->reserve(static_cast<int>(keep_indices.size()));
+
+        for (int idx : keep_indices) {
+            output->rotated_boxes.push_back(backup.rotated_boxes[idx]);
+            output->scores.push_back(backup.scores[idx]);
+            output->label_ids.push_back(backup.label_ids[idx]);
+            if (index) {
+                index->push_back(idx); // 保留原始下标
             }
         }
     }
