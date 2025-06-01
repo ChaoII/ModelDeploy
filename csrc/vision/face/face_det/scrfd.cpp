@@ -12,7 +12,8 @@
 #include "csrc/vision/face/face_det/scrfd.h"
 
 
-namespace modeldeploy::vision::face {
+namespace modeldeploy::vision::face
+{
     void SCRFD::letter_box(cv::Mat* mat, const std::vector<int>& size,
                            const std::vector<float>& color, const bool _auto,
                            const bool scale_fill, const bool scale_up, const int stride) {
@@ -241,7 +242,7 @@ namespace modeldeploy::vision::face {
                 const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
                 const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
                 const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
-                result->boxes.emplace_back(std::array{x1, y1, x2, y2});
+                result->boxes.emplace_back(x1, y1, x2 - x1, y2 - y1);
                 result->scores.push_back(cls_conf);
                 result->label_ids.push_back(0);
                 if (use_kps) {
@@ -256,7 +257,7 @@ namespace modeldeploy::vision::face {
                         // cx + l x
                         const float kps_y = ((cy + kps_t) * static_cast<float>(current_stride) - pad_h) / scale;
                         // cy + t y
-                        result->landmarks.emplace_back(std::array{kps_x, kps_y});
+                        result->landmarks.emplace_back(kps_x, kps_y);
                     }
                 }
                 count += 1; // limit boxes for nms.
@@ -276,22 +277,25 @@ namespace modeldeploy::vision::face {
         utils::nms(result, nms_iou_threshold);
         // scale and clip box
         for (auto& boxe : result->boxes) {
-            boxe[0] = std::max(boxe[0], 0.0f);
-            boxe[1] = std::max(boxe[1], 0.0f);
-            boxe[2] = std::max(boxe[2], 0.0f);
-            boxe[3] = std::max(boxe[3], 0.0f);
-            boxe[0] = std::min(boxe[0], ipt_w - 1.0f);
-            boxe[1] = std::min(boxe[1], ipt_h - 1.0f);
-            boxe[2] = std::min(boxe[2], ipt_w - 1.0f);
-            boxe[3] = std::min(boxe[3], ipt_h - 1.0f);
+            // 左上角不能越界
+            boxe.x = std::max(boxe.x, 0.0f);
+            boxe.y = std::max(boxe.y, 0.0f);
+
+            // 右下角也不能越界
+            const float x2 = std::min(boxe.x + boxe.width, ipt_w - 1.0f);
+            const float y2 = std::min(boxe.y + boxe.height, ipt_h - 1.0f);
+
+            // 防止裁剪后右下角比左上角还小
+            boxe.width = std::max(x2 - boxe.x, 0.0f);
+            boxe.height = std::max(y2 - boxe.y, 0.0f);
         }
         // scale and clip landmarks
         if (use_kps) {
             for (auto& landmark : result->landmarks) {
-                landmark[0] = std::max(landmark[0], 0.0f);
-                landmark[1] = std::max(landmark[1], 0.0f);
-                landmark[0] = std::min(landmark[0], ipt_w - 1.0f);
-                landmark[1] = std::min(landmark[1], ipt_h - 1.0f);
+                landmark.x = std::max(landmark.x, 0.0f);
+                landmark.y = std::max(landmark.y, 0.0f);
+                landmark.x = std::min(landmark.x, ipt_w - 1.0f);
+                landmark.y = std::min(landmark.y, ipt_h - 1.0f);
             }
         }
         return true;

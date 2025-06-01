@@ -5,40 +5,33 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-namespace modeldeploy::vision {
-    void draw_rectangle_and_text(cv::Mat& image, const std::array<float, 4> box, const std::string& text,
+namespace modeldeploy::vision
+{
+    void draw_rectangle_and_text(cv::Mat& image, const cv::Rect2f box, const std::string& text,
                                  const cv::Scalar& color, cv::FontFace font, const int font_size,
                                  const int thickness, const bool draw_text = false) {
-        const auto x1 = static_cast<int>(box[0]);
-        const auto y1 = static_cast<int>(box[1]);
-        const auto x2 = static_cast<int>(box[2]);
-        const auto y2 = static_cast<int>(box[3]);
         // 绘制对象矩形框
-        cv::rectangle(image, cv::Point(x1, y1), cv::Point(x2, y2), color, thickness);
+        cv::rectangle(image, box, color, thickness);
         const auto size = cv::getTextSize(cv::Size(0, 0),
-                                          text, cv::Point(x1, y1), font, font_size);
+                                          text, cv::Point2f(box.x, box.y), font, font_size);
         // 绘制标签背景
         cv::rectangle(image, size, color, thickness);
         if (draw_text) {
-            cv::putText(image, text, cv::Point(x1, y1 - 2),
+            cv::putText(image, text, cv::Point2f(box.x, box.y - 2),
                         cv::Scalar(255 - color[0], 255 - color[1], 255 - color[2]),
                         font, font_size);
         }
     }
 
     void draw_landmarks(cv::Mat& cv_image,
-                        const std::vector<std::array<float, 2>>& landmarks,
+                        const std::vector<cv::Point2f>& landmarks,
                         const size_t
                         current_obj_index,
                         const size_t landmark_num,
                         const int landmark_radius) {
         for (size_t j = 0; j < landmark_num; ++j) {
-            cv::Point landmark;
+            const cv::Point landmark = landmarks[current_obj_index * landmark_num + j];
             auto landmark_color = get_random_color();
-            landmark.x = static_cast<int>(
-                landmarks[current_obj_index * landmark_num + j][0]);
-            landmark.y = static_cast<int>(
-                landmarks[current_obj_index * landmark_num + j][1]);
             cv::circle(cv_image, landmark, landmark_radius, landmark_color, -1);
         }
     }

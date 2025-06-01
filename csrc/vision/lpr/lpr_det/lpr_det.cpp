@@ -10,7 +10,8 @@
 #include "csrc/vision/common/processors/convert.h"
 
 
-namespace modeldeploy::vision::lpr {
+namespace modeldeploy::vision::lpr
+{
     void LetterBox(cv::Mat* mat, const std::vector<int>& size, const std::vector<float>& color,
                    const bool _auto, const bool scale_fill = false, const bool scale_up = true, const int stride = 32) {
         float scale = std::min(size[1] * 1.0f / mat->rows, size[0] * 1.0f / mat->cols);
@@ -173,10 +174,10 @@ namespace modeldeploy::vision::lpr {
             const float w = reg_cls_ptr[2];
             const float h = reg_cls_ptr[3];
 
-            // convert from [x, y, w, h] to [x1, y1, x2, y2]
-            result->boxes.emplace_back(std::array{
-                (x - w / 2.f), (y - h / 2.f), (x + w / 2.f), (y + h / 2.f)
-            });
+            // convert from [xc, yc, w, h] to [x, y, w, h]
+            result->boxes.emplace_back(
+                x - w / 2.f, y - h / 2.f, w, h
+            );
             result->label_ids.push_back(class_id);
             result->scores.push_back(confidence);
             // decode landmarks (default 5 landmarks)
@@ -184,7 +185,7 @@ namespace modeldeploy::vision::lpr {
                 const float* landmarks_ptr = reg_cls_ptr + 5;
                 for (size_t j = 0; j < landmarks_per_card * 2; j += 2) {
                     result->landmarks.emplace_back(
-                        std::array{landmarks_ptr[j], landmarks_ptr[j + 1]});
+                        landmarks_ptr[j], landmarks_ptr[j + 1]);
                 }
             }
         }
@@ -214,21 +215,24 @@ namespace modeldeploy::vision::lpr {
         }
         // scale and clip box
         for (auto& boxe : result->boxes) {
-            boxe[0] = std::max((boxe[0] - pad_w) / scale, 0.0f);
-            boxe[1] = std::max((boxe[1] - pad_h) / scale, 0.0f);
-            boxe[2] = std::max((boxe[2] - pad_w) / scale, 0.0f);
-            boxe[3] = std::max((boxe[3] - pad_h) / scale, 0.0f);
-            boxe[0] = std::min(boxe[0], ipt_w - 1.0f);
-            boxe[1] = std::min(boxe[1], ipt_h - 1.0f);
-            boxe[2] = std::min(boxe[2], ipt_w - 1.0f);
-            boxe[3] = std::min(boxe[3], ipt_h - 1.0f);
+            boxe.x = std::max(boxe.x, 0.0f);
+            boxe.y = std::max(boxe.y, 0.0f);
+
+            // 右下角也不能越界
+            const float x2 = std::min(boxe.x + boxe.width, ipt_w - 1.0f);
+            const float y2 = std::min(boxe.y + boxe.height, ipt_h - 1.0f);
+
+            // 防止裁剪后右下角比左上角还小
+            boxe.width = std::max(x2 - boxe.x, 0.0f);
+            boxe.height = std::max(y2 - boxe.y, 0.0f);
         }
         // scale and clip landmarks
         for (auto& landmark : result->landmarks) {
-            landmark[0] = std::max((landmark[0] - pad_w) / scale, 0.0f);
-            landmark[1] = std::max((landmark[1] - pad_h) / scale, 0.0f);
-            landmark[0] = std::min(landmark[0], ipt_w - 1.0f);
-            landmark[1] = std::min(landmark[1], ipt_h - 1.0f);
+            landmark.x = std::max((landmark.x - pad_w) / scale, 0.0f);
+            landmark.y = std::max((landmark.y - pad_h) / scale, 0.0f);
+
+            landmark.x = std::min(landmark.x, ipt_w - 1.0f);
+            landmark.y = std::min(landmark.y, ipt_h - 1.0f);
         }
         return true;
     }
