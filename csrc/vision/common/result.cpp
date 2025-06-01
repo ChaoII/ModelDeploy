@@ -10,7 +10,8 @@
 #include <csrc/core/md_log.h>
 
 
-namespace modeldeploy::vision {
+namespace modeldeploy::vision
+{
     void ClassifyResult::free() {
         label_ids.shrink_to_fit();
         scores.shrink_to_fit();
@@ -197,13 +198,13 @@ namespace modeldeploy::vision {
                     .corner_color(tabulate::Color::magenta);
 
         if (rotated_boxes.empty()) {
-            output_table.add_row({"order", " box([x1, y1, x2, y2])", "label_ids", " score", "mask_size"});
+            output_table.add_row({"order", " box([x, y, width, height])", "label_ids", " score", "mask_size"});
             for (size_t i = 0; i < boxes.size(); ++i) {
                 std::string box_str = "["
-                    + std::to_string(static_cast<int>(boxes[i][0])) + ", "
-                    + std::to_string(static_cast<int>(boxes[i][1])) + ", "
-                    + std::to_string(static_cast<int>(boxes[i][2])) + ", "
-                    + std::to_string(static_cast<int>(boxes[i][3])) + "]";
+                    + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
+                    + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
+                    + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
+                    + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
                 std::string label_id_str = std::to_string(label_ids[i]);
                 std::string score_str = std::to_string(scores[i]);
                 std::string mask_size_str;
@@ -217,14 +218,11 @@ namespace modeldeploy::vision {
             output_table.add_row({"order", " roted_box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_ids", " score"});
             for (size_t i = 0; i < rotated_boxes.size(); ++i) {
                 std::string box_str = "["
-                    + std::to_string(static_cast<int>(rotated_boxes[i][0])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][1])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][2])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][3])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][4])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][5])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][6])) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i][7])) + "]";
+                    + std::to_string(static_cast<int>(rotated_boxes[i].center.x)) + ", "
+                    + std::to_string(static_cast<int>(rotated_boxes[i].center.y)) + ", "
+                    + std::to_string(static_cast<int>(rotated_boxes[i].size.width)) + ", "
+                    + std::to_string(static_cast<int>(rotated_boxes[i].size.height)) + ", "
+                    + std::to_string(static_cast<int>(rotated_boxes[i].angle)) + "]";
                 std::string label_id_str = std::to_string(label_ids[i]);
                 std::string score_str = std::to_string(scores[i]);
                 output_table.add_row({std::to_string(i), box_str, label_id_str, score_str});

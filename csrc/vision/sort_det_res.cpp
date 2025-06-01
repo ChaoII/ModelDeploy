@@ -4,9 +4,10 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision::utils {
+namespace modeldeploy::vision::utils
+{
     void merge(DetectionResult* result, const size_t low, const size_t mid, const size_t high) {
-        std::vector<std::array<float, 4>>& boxes = result->boxes;
+        std::vector<cv::Rect2f>& boxes = result->boxes;
         std::vector<float>& scores = result->scores;
         std::vector<int32_t>& label_ids = result->label_ids;
         const std::vector temp_boxes(boxes);
@@ -65,17 +66,17 @@ namespace modeldeploy::vision::utils {
     }
 
     template <typename T>
-    bool lex_sort_by_xy_compare(const std::array<T, 4>& box_a,
-                                const std::array<T, 4>& box_b) {
+    bool lex_sort_by_xy_compare(const cv::Rect2f& box_a,
+                                const cv::Rect2f& box_b) {
         // WARN: The status shoule be false if (a==b).
         // https://blog.csdn.net/xxxwrq/article/details/83080640
         auto is_equal = [](const T& a, const T& b) -> bool {
             return std::abs(a - b) < 1e-6f;
         };
-        const T& x0_a = box_a[0];
-        const T& y0_a = box_a[1];
-        const T& x0_b = box_b[0];
-        const T& y0_b = box_b[1];
+        const T& x0_a = box_a.x;
+        const T& y0_a = box_a.y;
+        const T& x0_b = box_b.x;
+        const T& y0_b = box_b.y;
         if (is_equal(x0_a, x0_b)) {
             return !is_equal(y0_a, y0_b) && y0_a > y0_b;
         }
@@ -83,18 +84,18 @@ namespace modeldeploy::vision::utils {
     }
 
     // Only for int dtype
-    template <>
-    bool lex_sort_by_xy_compare(const std::array<int, 4>& box_a,
-                                const std::array<int, 4>& box_b) {
-        const int& x0_a = box_a[0];
-        const int& y0_a = box_a[1];
-        const int& x0_b = box_b[0];
-        const int& y0_b = box_b[1];
-        if (x0_a == x0_b) {
-            return y0_a == y0_b ? false : y0_a > y0_b;
-        }
-        return x0_a > x0_b;
-    }
+    // template <>
+    // bool lex_sort_by_xy_compare(const Rect& box_a,
+    //                             const Rect& box_b) {
+    //     const int& x0_a = box_a.x;
+    //     const int& y0_a = box_a.y;
+    //     const int& x0_b = box_b.x;
+    //     const int& y0_b = box_b.y;
+    //     if (x0_a == x0_b) {
+    //         return y0_a == y0_b ? false : y0_a > y0_b;
+    //     }
+    //     return x0_a > x0_b;
+    // }
 
     void reorder_detection_result_by_indices(DetectionResult* result,
                                              const std::vector<size_t>& indices) {
@@ -135,7 +136,7 @@ namespace modeldeploy::vision::utils {
         // lex sort by x(w) then y(h)
         auto& boxes = result->boxes;
         std::ranges::sort(indices, [&boxes](const size_t a, const size_t b) {
-            return lex_sort_by_xy_compare(boxes[a], boxes[b]);
+            return lex_sort_by_xy_compare<int>(boxes[a], boxes[b]);
         });
         reorder_detection_result_by_indices(result, indices);
     }
@@ -146,19 +147,20 @@ namespace modeldeploy::vision::utils {
         }
         std::vector<size_t> indices;
         indices.resize(result->size());
-        std::vector<std::array<int, 4>> boxes;
+        std::vector<cv::Rect2f> boxes;
         boxes.resize(result->size());
         for (size_t i = 0; i < result->size(); ++i) {
             indices[i] = i;
             // 4 points to 2 points for LexSort
             boxes[i] = {
-                (*result)[i][0], (*result)[i][1], (*result)[i][6],
-                (*result)[i][7]
+                (float)(*result)[i][0], (float)(*result)[i][1],
+                (float)((*result)[i][6] - (*result)[i][0]),
+                (float)((*result)[i][7] - (*result)[i][1])
             };
         }
         // lex sort by x(w) then y(h)
         std::ranges::sort(indices, [&boxes](const size_t a, const size_t b) {
-            return lex_sort_by_xy_compare(boxes[a], boxes[b]);
+            return lex_sort_by_xy_compare<int>(boxes[a], boxes[b]);
         });
         // reorder boxes
         const std::vector<std::array<int, 8>> backup = *result;

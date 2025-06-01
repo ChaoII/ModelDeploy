@@ -40,12 +40,12 @@ namespace modeldeploy::vision::detection
                 }
                 int32_t label_id = std::distance(data + s + 4, max_class_score);
                 // convert from [x, y, w, h] to [x1, y1, x2, y2]
-                (*results)[bs].boxes.emplace_back(std::array<float, 4>{
+                (*results)[bs].boxes.emplace_back(
                     data[s + 0] - data[s + 2] / 2.0f,
                     data[s + 1] - data[s + 3] / 2.0f,
-                    data[s + 0] + data[s + 2] / 2.0f,
-                    data[s + 1] + data[s + 3] / 2.0f
-                });
+                    data[s + 2],
+                    data[s + 3]
+                );
                 (*results)[bs].label_ids.push_back(label_id);
                 (*results)[bs].scores.push_back(confidence);
             }
@@ -72,17 +72,23 @@ namespace modeldeploy::vision::detection
                 //先减去 padding;
                 //再除以缩放因子 scale;
                 //最后限制在原始图像范围内 [0, width], [0, height]。
-                // Remove padding and apply scale
-                box[0] = (box[0] - pad_w) / scale;
-                box[1] = (box[1] - pad_h) / scale;
-                box[2] = (box[2] - pad_w) / scale;
-                box[3] = (box[3] - pad_h) / scale;
+                // 去掉 padding 并缩放
+                float x1 = (box.x - pad_w) / scale;
+                float y1 = (box.y - pad_h) / scale;
+                float x2 = (box.x + box.width - pad_w) / scale;
+                float y2 = (box.y + box.height - pad_h) / scale;
 
-                // Clip to image boundaries
-                box[0] = utils::clamp(box[0], 0.0f, ipt_w);
-                box[1] = utils::clamp(box[1], 0.0f, ipt_h);
-                box[2] = utils::clamp(box[2], 0.0f, ipt_w);
-                box[3] = utils::clamp(box[3], 0.0f, ipt_h);
+                // 限制在图像边界内
+                x1 = utils::clamp(x1, 0.0f, ipt_w);
+                y1 = utils::clamp(y1, 0.0f, ipt_h);
+                x2 = utils::clamp(x2, 0.0f, ipt_w);
+                y2 = utils::clamp(y2, 0.0f, ipt_h);
+
+                // 重新赋值到 box
+                box.x = std::round(x1);
+                box.y = std::round(y1);
+                box.width = std::round(x2 - x1);
+                box.height = std::round(y2 - y1);
             }
         }
         return true;

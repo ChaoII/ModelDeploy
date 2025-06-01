@@ -8,7 +8,8 @@
 #include "csrc/core/tensor.h"
 
 
-namespace modeldeploy::vision::ocr {
+namespace modeldeploy::vision::ocr
+{
     /*! @brief Postprocessor object for PaddleDet serials model.
      */
     class MODELDEPLOY_CXX_EXPORT StructureV2LayoutPostprocessor {
@@ -23,9 +24,9 @@ namespace modeldeploy::vision::ocr {
          *            {{image width, image height, resize width, resize height},...}
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<Tensor> &tensors,
-                 std::vector<DetectionResult> *results,
-                 const std::vector<std::array<int, 4>> &batch_layout_img_info);
+        bool run(const std::vector<Tensor>& tensors,
+                 std::vector<DetectionResult>* results,
+                 const std::vector<std::array<int, 4>>& batch_layout_img_info);
 
         /// Set score_threshold_ for layout detection postprocess, default is 0.4
         void set_score_threshold(float score_threshold) { score_threshold_ = score_threshold; }
@@ -37,7 +38,7 @@ namespace modeldeploy::vision::ocr {
         void set_num_class(int num_class) { num_class_ = num_class; }
 
         /// Set fpn_stride_ for layout detection postprocess, default is {8, 16, 32, 64}
-        void set_fpn_stride(const std::vector<int> &fpn_stride) { fpn_stride_ = fpn_stride; }
+        void set_fpn_stride(const std::vector<int>& fpn_stride) { fpn_stride_ = fpn_stride; }
 
         /// Set reg_max_ for layout detection postprocess, default is 8
         void set_reg_max(int reg_max) { reg_max_ = reg_max; } // should private ?
@@ -57,15 +58,15 @@ namespace modeldeploy::vision::ocr {
         [[nodiscard]] int get_reg_max() const { return reg_max_; }
 
     private:
-        std::array<float, 4> dis_pred_to_bbox(const std::vector<float> &bbox_pred, int x, int y,
-                                              int stride, int resize_w, int resize_h, int reg_max);
+        cv::Rect2f dis_pred_to_bbox(const std::vector<float>& bbox_pred, int x, int y,
+                              int stride, int resize_w, int resize_h, int reg_max);
 
-        bool single_batch_postprocessor(const std::vector<Tensor> &single_batch_tensors,
-                                        const std::array<int, 4> &layout_img_info,
-                                        DetectionResult *result);
+        bool single_batch_postprocessor(const std::vector<Tensor>& single_batch_tensors,
+                                        const std::array<int, 4>& layout_img_info,
+                                        DetectionResult* result);
 
-        void set_single_batch_external_data(const std::vector<Tensor> &tensors,
-                                            std::vector<Tensor> &single_batch_tensors,
+        void set_single_batch_external_data(const std::vector<Tensor>& tensors,
+                                            std::vector<Tensor>& single_batch_tensors,
                                             size_t batch_idx);
 
         std::vector<int> fpn_stride_ = {8, 16, 32, 64};

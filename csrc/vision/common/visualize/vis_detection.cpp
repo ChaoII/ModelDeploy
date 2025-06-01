@@ -6,7 +6,8 @@
 #include "csrc/vision/common/visualize/visualize.h"
 
 
-namespace modeldeploy::vision {
+namespace modeldeploy::vision
+{
     cv::Mat vis_detection(cv::Mat& cv_image, const DetectionResult& result,
                           const double threshold,
                           const std::string& font_path, const int font_size,
@@ -25,16 +26,13 @@ namespace modeldeploy::vision {
             if (!color_map.contains(class_id)) {
                 color_map[class_id] = get_random_color();
             }
-            auto x1 = static_cast<int>(result.boxes[i][0]);
-            auto y1 = static_cast<int>(result.boxes[i][1]);
-            auto x2 = static_cast<int>(result.boxes[i][2]);
-            auto y2 = static_cast<int>(result.boxes[i][3]);
+            cv::Rect2f rect = {result.boxes[i].x, result.boxes[i].y, result.boxes[i].width, result.boxes[i].height};
             auto cv_color = color_map[class_id];
             // 绘制对象矩形框
-            cv::rectangle(overlay, cv::Point(x1, y1), cv::Point(x2, y2), cv_color, -1);
+            cv::rectangle(overlay, rect, cv_color, -1);
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[i]).substr(0, 4);
             const auto size = cv::getTextSize(cv::Size(0, 0),
-                                              text, cv::Point(x1, y1), font, font_size);
+                                              text, cv::Point(rect.x, rect.y), font, font_size);
             // 绘制标签背景
             cv::rectangle(overlay, size, cv_color, -1);
         }
@@ -48,17 +46,19 @@ namespace modeldeploy::vision {
             if (!color_map.contains(class_id)) {
                 color_map[class_id] = get_random_color();
             }
-            auto roted_boxes = result.rotated_boxes[i];
+            cv::Point2f _points[4];
+            result.rotated_boxes[i].points(_points);
+
             std::vector<cv::Point> points;
-            points.reserve(roted_boxes.size() / 2);
-            for (int j = 0; j < roted_boxes.size(); j += 2) {
-                points.emplace_back(roted_boxes[j], roted_boxes[j + 1]);
+            points.reserve(4);
+            for (auto& _point : _points) {
+                points.emplace_back(cvRound(_point.x), cvRound(_point.y));
             }
             auto cv_color = color_map[class_id];
             // 绘制对象矩形框
             cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[i]).substr(0, 4);
-            const auto size = cv::getTextSize(cv::Size(0, 0), text, points[0], font, font_size);
+            const auto size = cv::getTextSize(cv::Size(0, 0), text, points[1], font, font_size);
             // 绘制标签背景
             cv::rectangle(overlay, size, cv_color, -1);
         }
@@ -71,30 +71,25 @@ namespace modeldeploy::vision {
                 continue;
             }
             auto class_id = result.label_ids[c];
-            int x1 = static_cast<int>(round(result.boxes[c][0]));
-            int y1 = static_cast<int>(round(result.boxes[c][1]));
-            int x2 = static_cast<int>(round(result.boxes[c][2]));
-            int y2 = static_cast<int>(round(result.boxes[c][3]));
+            cv::Rect2f rect = {result.boxes[c].x, result.boxes[c].y, result.boxes[c].width, result.boxes[c].height};
             auto cv_color = color_map[class_id];
-            cv::rectangle(cv_image, cv::Point(x1, y1), cv::Point(x2, y2), cv_color, 1, cv::LINE_AA, 0);
+            cv::rectangle(cv_image, rect, cv_color, 1, cv::LINE_AA, 0);
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[c]).substr(0, 4);
             const auto size = cv::getTextSize(cv::Size(0, 0), text,
-                                              cv::Point(x1, y1), font, font_size);
+                                              cv::Point2f(rect.x, rect.y), font, font_size);
             cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
-            cv::putText(cv_image, text, cv::Point(x1, y1 - 2),
+            cv::putText(cv_image, text, cv::Point2f(rect.x, rect.y - 2),
                         cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
-            int box_h = y2 - y1;
-            int box_w = x2 - x1;
             if (result.contain_masks) {
                 int mask_h = static_cast<int>(result.masks[c].shape[0]);
                 int mask_w = static_cast<int>(result.masks[c].shape[1]);
                 cv::Mat mask(mask_h, mask_w, CV_8UC1,
                              const_cast<uint8_t*>(static_cast<const uint8_t*>(result.masks[c].data())));
-                if (mask_h != box_h || mask_w != box_w) {
-                    cv::resize(mask, mask, cv::Size(box_w, box_h));
+                if (mask_h != rect.height || mask_w != rect.width) {
+                    cv::resize(mask, mask, rect.size());
                 }
                 // 创建一个彩色 mask 图层
-                cv::Mat color_mask(cv::Size(box_w, box_h), CV_8UC3);
+                cv::Mat color_mask(rect.size(), CV_8UC3);
                 int mc0 = 255 - cv_color[0] >= 127 ? 255 - cv_color[0] : 127;
                 int mc1 = 255 - cv_color[1] >= 127 ? 255 - cv_color[1] : 127;
                 int mc2 = 255 - cv_color[2] >= 127 ? 255 - cv_color[2] : 127;
@@ -103,7 +98,7 @@ namespace modeldeploy::vision {
                 cv::Mat colored_mask;
                 cv::bitwise_and(color_mask, color_mask, colored_mask, mask);
                 // 定义 ROI 区域
-                cv::Mat roi(cv_image, cv::Rect(x1, y1, box_w, box_h));
+                cv::Mat roi(cv_image, rect);
                 // 使用 addWeighted 混合原始图像和 mask
                 cv::addWeighted(roi, 0.2, colored_mask, 0.8, 0, roi);
             }
@@ -115,17 +110,19 @@ namespace modeldeploy::vision {
             }
             auto class_id = result.label_ids[c];
             auto roted_boxes = result.rotated_boxes[c];
-            std::vector<cv::Point> points;
-            points.reserve(roted_boxes.size() / 2);
-            for (int j = 0; j < roted_boxes.size(); j += 2) {
-                points.emplace_back(roted_boxes[j], roted_boxes[j + 1]);
-            }
+            cv::Point2f _points[4];
+            roted_boxes.points(_points);
             auto cv_color = color_map[class_id];
+            std::vector<cv::Point> points;
+            points.reserve(4);
+            for (auto& _point : _points) {
+                points.emplace_back(cvRound(_point.x), cvRound(_point.y));
+            }
             cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
             std::string text = std::to_string(class_id) + ": " + std::to_string(result.scores[c]).substr(0, 4);
-            const auto size = cv::getTextSize(cv::Size(0, 0), text, points[0], font, font_size);
+            const auto size = cv::getTextSize(cv::Size(0, 0), text, points[1], font, font_size);
             cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
-            cv::putText(cv_image, text, points[0],
+            cv::putText(cv_image, text, points[1],
                         cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
         }
 

@@ -4,8 +4,6 @@
 
 #include "csrc/core/md_log.h"
 #include "csrc/vision/detection/preprocessor.h"
-
-#include "csrc/vision/common/processors/color_space_convert.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/convert_and_permute.h"

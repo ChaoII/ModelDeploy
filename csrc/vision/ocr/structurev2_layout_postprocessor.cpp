@@ -9,7 +9,8 @@
 #include <numeric>
 
 
-namespace modeldeploy::vision::ocr {
+namespace modeldeploy::vision::ocr
+{
     bool StructureV2LayoutPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
         const std::vector<std::array<int, 4>>& batch_layout_img_info) {
@@ -121,17 +122,17 @@ namespace modeldeploy::vision::ocr {
                 result->label_ids.push_back(bbox_result.label_ids[j]);
                 result->boxes.push_back(
                     {
-                        bbox_result.boxes[j][0] / scale_factor_w,
-                        bbox_result.boxes[j][1] / scale_factor_h,
-                        bbox_result.boxes[j][2] / scale_factor_w,
-                        bbox_result.boxes[j][3] / scale_factor_h,
+                        bbox_result.boxes[j].x / scale_factor_w,
+                        bbox_result.boxes[j].y / scale_factor_h,
+                        bbox_result.boxes[j].width / scale_factor_w,
+                        bbox_result.boxes[j].height / scale_factor_h,
                     });
             }
         }
         return true;
     }
 
-    std::array<float, 4> StructureV2LayoutPostprocessor::dis_pred_to_bbox(
+    cv::Rect2f StructureV2LayoutPostprocessor::dis_pred_to_bbox(
         const std::vector<float>& bbox_pred, const int x, const int y, const int stride, const int resize_w,
         const int resize_h, const int reg_max) {
         const float ct_x = (static_cast<float>(x) + 0.5f) * static_cast<float>(stride);
@@ -153,6 +154,6 @@ namespace modeldeploy::vision::ocr {
         float ymin = std::max(ct_y - dis_pred[1], 0.0f);
         float xmax = std::min(ct_x + dis_pred[2], static_cast<float>(resize_w));
         float ymax = std::min(ct_y + dis_pred[3], static_cast<float>(resize_h));
-        return {xmin, ymin, xmax, ymax};
+        return cv::Rect2f{xmin, ymin, xmax - xmin, ymax - ymin};
     }
 } // namespace modeldeploy::vision::ocr
