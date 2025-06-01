@@ -56,12 +56,12 @@ typedef struct {
 } MDRect;
 
 typedef struct {
-    int x;
-    int y;
+    int xc;
+    int yc;
     int width;
     int height;
     float angle;
-} MDRotedRect;
+} MDRotatedRect;
 
 
 typedef struct {
@@ -172,7 +172,7 @@ typedef struct {
 
 typedef struct {
     MDRect box;
-    MDRotedRect roted_box;
+    MDRotatedRect roted_box;
     MDMask mask;
     int label_id;
     float score;

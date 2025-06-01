@@ -7,7 +7,8 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/instance_seg/postprocessor.h"
 
-namespace modeldeploy::vision::detection {
+namespace modeldeploy::vision::detection
+{
     UltralyticsSegPostprocessor::UltralyticsSegPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
@@ -52,12 +53,11 @@ namespace modeldeploy::vision::detection {
                 auto label_id = static_cast<int32_t>(std::distance(data + s + 4, max_class_score));
                 // convert from [x, y, w, h] to [x1, y1, x2, y2]
                 (*results)[bs].boxes.emplace_back(
-                    std::array{
-                        data[s + 0] - data[s + 2] / 2.0f,
-                        data[s + 1] - data[s + 3] / 2.0f,
-                        data[s + 0] + data[s + 2] / 2.0f,
-                        data[s + 1] + data[s + 3] / 2.0f
-                    });
+                    data[s + 0] - data[s + 2] / 2.0f,
+                    data[s + 1] - data[s + 3] / 2.0f,
+                    data[s + 2],
+                    data[s + 3]
+                );
                 (*results)[bs].label_ids.push_back(label_id);
                 (*results)[bs].scores.push_back(confidence);
                 mask_embeddings.emplace_back(std::move(mask_embedding));
@@ -117,44 +117,56 @@ namespace modeldeploy::vision::detection {
             for (size_t i = 0; i < (*results)[bs].boxes.size(); ++i) {
                 auto& box = (*results)[bs].boxes[i];
 
-                // Remove padding and apply scale
-                box[0] = (box[0] - pad_w) / scale;
-                box[1] = (box[1] - pad_h) / scale;
-                box[2] = (box[2] - pad_w) / scale;
-                box[3] = (box[3] - pad_h) / scale;
+                float x1 = (box.x - pad_w) / scale;
+                float y1 = (box.y - pad_h) / scale;
+                float x2 = (box.x + box.width - pad_w) / scale;
+                float y2 = (box.y + box.height - pad_h) / scale;
 
-                // Clip to image boundaries
-                box[0] = utils::clamp(box[0], 0.0f, ipt_w);
-                box[1] = utils::clamp(box[1], 0.0f, ipt_h);
-                box[2] = utils::clamp(box[2], 0.0f, ipt_w);
-                box[3] = utils::clamp(box[3], 0.0f, ipt_h);
+                // 限制在图像边界内
+                x1 = utils::clamp(x1, 0.0f, static_cast<float>(ipt_w));
+                y1 = utils::clamp(y1, 0.0f, static_cast<float>(ipt_h));
+                x2 = utils::clamp(x2, 0.0f, static_cast<float>(ipt_w));
+                y2 = utils::clamp(y2, 0.0f, static_cast<float>(ipt_h));
 
+                // 重新赋值到 box
+                box.x = static_cast<int>(std::round(x1));
+                box.y = static_cast<int>(std::round(y1));
+                box.width = static_cast<int>(std::round(x2 - x1));
+                box.height = static_cast<int>(std::round(y2 - y1));
                 // deal with mask
                 cv::Mat dest, mask;
                 // sigmoid
                 cv::exp(-mask_channels[i], dest);
                 dest = 1.0 / (1.0 + dest);
                 // crop mask for feature map
-                int x1 = static_cast<int>(pad_w_mask);
-                int y1 = static_cast<int>(pad_h_mask);
-                int x2 = static_cast<int>(static_cast<float>(tensors[1].shape()[3]) - pad_w_mask);
-                int y2 = static_cast<int>(static_cast<float>(tensors[1].shape()[2]) - pad_h_mask);
-                cv::Rect roi(x1, y1, x2 - x1, y2 - y1);
+                int x1_ = static_cast<int>(pad_w_mask);
+                int y1_ = static_cast<int>(pad_h_mask);
+                int x2_ = static_cast<int>(static_cast<float>(tensors[1].shape()[3]) - pad_w_mask);
+                int y2_ = static_cast<int>(static_cast<float>(tensors[1].shape()[2]) - pad_h_mask);
+                cv::Rect roi(x1_, y1_, x2_ - x1_, y2_ - y1_);
                 dest = dest(roi);
                 cv::resize(dest, mask,
                            {static_cast<int>(ipt_w), static_cast<int>(ipt_h)}, 0, 0,
                            cv::INTER_LINEAR);
                 // crop mask for source img
-                int x1_src = static_cast<int>(round((*results)[bs].boxes[i][0]));
-                int y1_src = static_cast<int>(round((*results)[bs].boxes[i][1]));
-                int x2_src = static_cast<int>(round((*results)[bs].boxes[i][2]));
-                int y2_src = static_cast<int>(round((*results)[bs].boxes[i][3]));
-                cv::Rect roi_src(x1_src, y1_src, x2_src - x1_src, y2_src - y1_src);
-                mask = mask(roi_src);
+                // int x1_src = static_cast<int>(round((*results)[bs].boxes[i][0]));
+                // int y1_src = static_cast<int>(round((*results)[bs].boxes[i][1]));
+                // int x2_src = static_cast<int>(round((*results)[bs].boxes[i][2]));
+                // int y2_src = static_cast<int>(round((*results)[bs].boxes[i][3]));
+
+                cv::Rect2f roi_rect = {
+                    (*results)[bs].boxes[i].x,
+                    (*results)[bs].boxes[i].y,
+                    (*results)[bs].boxes[i].width,
+                    (*results)[bs].boxes[i].height
+                };
+
+                // cv::Rect roi_src(x1_src, y1_src, x2_src - x1_src, y2_src - y1_src);
+                mask = mask(roi_rect);
                 mask = mask > mask_threshold_;
                 // save mask in DetectionResult
-                int keep_mask_h = y2_src - y1_src;
-                int keep_mask_w = x2_src - x1_src;
+                int keep_mask_h = roi_rect.height;
+                int keep_mask_w = roi_rect.width;
                 int keep_mask_num_el = keep_mask_h * keep_mask_w;
                 (*results)[bs].masks[i].resize(keep_mask_num_el);
                 (*results)[bs].masks[i].shape = {keep_mask_h, keep_mask_w};

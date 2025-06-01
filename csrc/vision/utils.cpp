@@ -96,8 +96,7 @@ namespace modeldeploy::vision::utils
         std::vector<float> area_of_boxes(output->boxes.size());
         std::vector suppressed(output->boxes.size(), 0);
         for (size_t i = 0; i < output->boxes.size(); ++i) {
-            area_of_boxes[i] = (output->boxes[i][2] - output->boxes[i][0]) *
-                (output->boxes[i][3] - output->boxes[i][1]);
+            area_of_boxes[i] = output->boxes[i].width * output->boxes[i].height;
         }
         for (size_t i = 0; i < output->boxes.size(); ++i) {
             if (suppressed[i] == 1) {
@@ -107,10 +106,13 @@ namespace modeldeploy::vision::utils
                 if (suppressed[j] == 1) {
                     continue;
                 }
-                const float xmin = std::max(output->boxes[i][0], output->boxes[j][0]);
-                const float ymin = std::max(output->boxes[i][1], output->boxes[j][1]);
-                const float xmax = std::min(output->boxes[i][2], output->boxes[j][2]);
-                const float ymax = std::min(output->boxes[i][3], output->boxes[j][3]);
+                const float xmin = std::max(output->boxes[i].x, output->boxes[j].x);
+                const float ymin = std::max(output->boxes[i].y, output->boxes[j].y);
+                const float xmax = std::min(output->boxes[i].x + output->boxes[i].width,
+                                            output->boxes[j].x + output->boxes[j].width);
+                const float ymax = std::min(output->boxes[i].y + output->boxes[i].height,
+                                            output->boxes[j].y + output->boxes[j].height);
+
                 const float overlap_w = std::max(0.0f, xmax - xmin);
                 const float overlap_h = std::max(0.0f, ymax - ymin);
                 const float overlap_area = overlap_w * overlap_h;

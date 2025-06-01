@@ -8,7 +8,8 @@
 #include <ranges>
 #include "csrc/vision/utils.h"
 
-namespace modeldeploy::vision::utils {
+namespace modeldeploy::vision::utils
+{
     struct Point {
         float x, y;
     };
@@ -42,24 +43,25 @@ namespace modeldeploy::vision::utils {
     }
 
     // Shoelace 算法求多边形面积（顶点顺时针/逆时针都可以）
-    float polygon_area(const std::vector<Point>& poly) {
+    float polygon_area(const std::vector<cv::Point2f>& poly) {
         float area = 0.0f;
         int n = poly.size();
         for (int i = 0; i < n; ++i) {
-            const Point& p1 = poly[i];
-            const Point& p2 = poly[(i + 1) % n];
+            const cv::Point2f& p1 = poly[i];
+            const cv::Point2f& p2 = poly[(i + 1) % n];
             area += p1.x * p2.y - p2.x * p1.y;
         }
         return std::abs(area) * 0.5f;
     }
 
     // 判断点 p 是否在边 (a,b) 的左侧
-    bool is_inside(const Point& p, const Point& a, const Point& b) {
+    bool is_inside(const cv::Point2f& p, const cv::Point2f& a, const cv::Point2f& b) {
         return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) >= 0;
     }
 
     // 计算两个边的交点
-    Point compute_intersection(const Point& p1, const Point& p2, const Point& q1, const Point& q2) {
+    cv::Point2f compute_intersection(const cv::Point2f& p1, const cv::Point2f& p2, const cv::Point2f& q1,
+                                     const cv::Point2f& q2) {
         float A1 = p2.y - p1.y;
         float B1 = p1.x - p2.x;
         float C1 = A1 * p1.x + B1 * p1.y;
@@ -78,17 +80,18 @@ namespace modeldeploy::vision::utils {
     }
 
     // Sutherland–Hodgman 多边形裁剪
-    std::vector<Point> polygon_intersection(const std::vector<Point>& subject, const std::vector<Point>& clip) {
-        std::vector<Point> output = subject;
+    std::vector<cv::Point2f> polygon_intersection(const std::vector<cv::Point2f>& subject,
+                                                  const std::vector<cv::Point2f>& clip) {
+        std::vector<cv::Point2f> output = subject;
         for (size_t i = 0; i < clip.size(); ++i) {
-            const Point& A = clip[i];
-            const Point& B = clip[(i + 1) % clip.size()];
-            std::vector<Point> input = output;
+            const cv::Point2f& A = clip[i];
+            const cv::Point2f& B = clip[(i + 1) % clip.size()];
+            std::vector<cv::Point2f> input = output;
             output.clear();
 
             for (size_t j = 0; j < input.size(); ++j) {
-                const Point& P = input[j];
-                const Point& Q = input[(j + 1) % input.size()];
+                const cv::Point2f& P = input[j];
+                const cv::Point2f& Q = input[(j + 1) % input.size()];
                 if (is_inside(Q, A, B)) {
                     if (!is_inside(P, A, B)) {
                         output.push_back(compute_intersection(P, Q, A, B));
@@ -114,14 +117,19 @@ namespace modeldeploy::vision::utils {
     }
 
     // 主函数：计算两个旋转框的 IoU
-    float rotated_iou(const std::array<float, 8>& box1, const std::array<float, 8>& box2) {
-        std::vector<Point> poly1 = array_to_polygon(box1);
-        std::vector<Point> poly2 = array_to_polygon(box2);
+    float rotated_iou(const cv::RotatedRect& box1, const cv::RotatedRect& box2) {
+        cv::Point2f poly1_[4];
+        cv::Point2f poly2_[4];
+        box1.points(poly1_);
+        box2.points(poly2_);
+        auto poly1 = std::vector(poly1_, poly1_ + 4);
+        auto poly2 = std::vector(poly2_, poly2_ + 4);
+
 
         float area1 = polygon_area(poly1);
         float area2 = polygon_area(poly2);
 
-        std::vector<Point> inter_poly = polygon_intersection(poly1, poly2);
+        std::vector<cv::Point2f> inter_poly = polygon_intersection(poly1, poly2);
         if (inter_poly.empty()) return 0.0f;
 
         float inter_area = polygon_area(inter_poly);

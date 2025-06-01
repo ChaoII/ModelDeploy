@@ -7,7 +7,8 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/obb/postprocessor.h"
 
-namespace modeldeploy::vision::detection {
+namespace modeldeploy::vision::detection
+{
     UltralyticsObbPostprocessor::UltralyticsObbPostprocessor() {
         conf_threshold_ = 0.25;
         mask_threshold_ = 0.35;
@@ -45,15 +46,12 @@ namespace modeldeploy::vision::detection {
                 }
                 auto label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
                 // convert from [x, y, w, h, a] to [x1, y1, x2, y2,x3, y3, x4, y4]
-                // 其中a为angle矩形框的旋转角度, 默认为弧度制
-                (*results)[bs].rotated_boxes.emplace_back(std::array{
-                    utils::xcycwha_to_x1y1x2y2x3y3x4y4(
-                        attr_ptr[0],
-                        attr_ptr[1],
-                        attr_ptr[2],
-                        attr_ptr[3],
-                        attr_ptr[obj_attr_num - 1])
-                });
+                // 其中a为angle矩形框的旋转角度, 默认为弧度制(但是OpenCV的RotatedRect的旋转角度，默认为角度制)
+                (*results)[bs].rotated_boxes.emplace_back(
+                    cv::Point2f(attr_ptr[0], attr_ptr[1]),
+                    cv::Size2f(attr_ptr[2], attr_ptr[3]),
+                    attr_ptr[obj_attr_num - 1] * 180 / 3.141592653f
+                );
                 (*results)[bs].label_ids.push_back(label_id);
                 (*results)[bs].scores.push_back(confidence);
             }
