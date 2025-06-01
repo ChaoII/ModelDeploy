@@ -103,23 +103,35 @@ namespace modeldeploy::vision::utils
                 continue;
             }
             for (size_t j = i + 1; j < output->boxes.size(); ++j) {
-                if (suppressed[j] == 1) {
-                    continue;
-                }
-                const float xmin = std::max(output->boxes[i].x, output->boxes[j].x);
-                const float ymin = std::max(output->boxes[i].y, output->boxes[j].y);
-                const float xmax = std::min(output->boxes[i].x + output->boxes[i].width,
-                                            output->boxes[j].x + output->boxes[j].width);
-                const float ymax = std::min(output->boxes[i].y + output->boxes[i].height,
-                                            output->boxes[j].y + output->boxes[j].height);
+                if (suppressed[j] == 1) continue;
+                // 手动计算
+                // const float xmin = std::max(output->boxes[i].x, output->boxes[j].x);
+                // const float ymin = std::max(output->boxes[i].y, output->boxes[j].y);
+                // const float xmax = std::min(output->boxes[i].x + output->boxes[i].width,
+                //                             output->boxes[j].x + output->boxes[j].width);
+                // const float ymax = std::min(output->boxes[i].y + output->boxes[i].height,
+                //                             output->boxes[j].y + output->boxes[j].height);
+                //
+                // const float overlap_w = std::max(0.0f, xmax - xmin);
+                // const float overlap_h = std::max(0.0f, ymax - ymin);
+                // const float overlap_area = overlap_w * overlap_h;
+                // const float overlap_ratio =
+                //     overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
+                // if (overlap_ratio > iou_threshold) {
+                //     suppressed[j] = 1;
+                // }
 
-                const float overlap_w = std::max(0.0f, xmax - xmin);
-                const float overlap_h = std::max(0.0f, ymax - ymin);
-                const float overlap_area = overlap_w * overlap_h;
-                const float overlap_ratio =
-                    overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
-                if (overlap_ratio > iou_threshold) {
-                    suppressed[j] = 1;
+                // 使用opencv的api
+                const cv::Rect2f& box_i = output->boxes[i];
+                const cv::Rect2f& box_j = output->boxes[j];
+
+                cv::Rect2f intersection = box_i & box_j; // 取交集
+                const float inter_area = intersection.area();
+                const float union_area = area_of_boxes[i] + area_of_boxes[j] - inter_area;
+
+                const float iou = inter_area / union_area;
+                if (iou > iou_threshold) {
+                    suppressed[j] = true;
                 }
             }
         }
@@ -143,31 +155,43 @@ namespace modeldeploy::vision::utils
     void nms(DetectionLandmarkResult* result, float iou_threshold) {
         utils::sort_detection_result(result);
         std::vector<float> area_of_boxes(result->boxes.size());
-        std::vector suppressed(result->boxes.size(), 0);
+        std::vector suppressed(result->boxes.size(), false);
         for (size_t i = 0; i < result->boxes.size(); ++i) {
-            area_of_boxes[i] = (result->boxes[i][2] - result->boxes[i][0]) *
-                (result->boxes[i][3] - result->boxes[i][1]);
+            area_of_boxes[i] = result->boxes[i].width * result->boxes[i].height;
         }
-
         for (size_t i = 0; i < result->boxes.size(); ++i) {
             if (suppressed[i] == 1) {
                 continue;
             }
             for (size_t j = i + 1; j < result->boxes.size(); ++j) {
-                if (suppressed[j] == 1) {
-                    continue;
-                }
-                const float xmin = std::max(result->boxes[i][0], result->boxes[j][0]);
-                const float ymin = std::max(result->boxes[i][1], result->boxes[j][1]);
-                const float xmax = std::min(result->boxes[i][2], result->boxes[j][2]);
-                const float ymax = std::min(result->boxes[i][3], result->boxes[j][3]);
-                const float overlap_w = std::max(0.0f, xmax - xmin);
-                const float overlap_h = std::max(0.0f, ymax - ymin);
-                const float overlap_area = overlap_w * overlap_h;
-                const float overlap_ratio =
-                    overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
-                if (overlap_ratio > iou_threshold) {
-                    suppressed[j] = 1;
+                if (suppressed[j]) continue;
+                // 手动计算iou
+                // const float xmin = std::max(result->boxes[i].x, result->boxes[j].x);
+                // const float ymin = std::max(result->boxes[i].y, result->boxes[j].y);
+                // const float xmax = std::min(result->boxes[i].x + result->boxes[i].width,
+                //                             result->boxes[j].x + result->boxes[j].width);
+                // const float ymax = std::min(result->boxes[i].y + result->boxes[i].height,
+                //                             result->boxes[j].y + result->boxes[j].height);
+                // const float overlap_w = std::max(0.0f, xmax - xmin);
+                // const float overlap_h = std::max(0.0f, ymax - ymin);
+                // const float overlap_area = overlap_w * overlap_h;
+                // const float overlap_ratio =
+                //     overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
+                // if (overlap_ratio > iou_threshold) {
+                //     suppressed[j] = 1;
+                // }
+
+                // 使用opencv的api
+                const cv::Rect2f& box_i = result->boxes[i];
+                const cv::Rect2f& box_j = result->boxes[j];
+
+                cv::Rect2f intersection = box_i & box_j; // 取交集
+                const float inter_area = intersection.area();
+                const float union_area = area_of_boxes[i] + area_of_boxes[j] - inter_area;
+
+                const float iou = inter_area / union_area;
+                if (iou > iou_threshold) {
+                    suppressed[j] = true;
                 }
             }
         }
@@ -211,7 +235,7 @@ namespace modeldeploy::vision::utils
         // 计算裁剪区域的起始坐标
         const int top = (img_height - crop_height) / 2;
         const int left = (img_width - crop_width) / 2;
-        // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clion()操作
+        // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clone()操作
         const cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
         return cropped_image.clone();
     }

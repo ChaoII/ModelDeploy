@@ -354,8 +354,8 @@ void detection_landmark_result_2_c_results(
         c_results->data[i].landmarks = new MDPoint[landmark_size];
         for (int j = 0; j < landmark_size; j++) {
             c_results->data[i].landmarks[j] = MDPoint{
-                static_cast<int>(result.landmarks[i * landmark_size + j][0]),
-                static_cast<int>(result.landmarks[i * landmark_size + j][1])
+                static_cast<int>(result.landmarks[i * landmark_size + j].x),
+                static_cast<int>(result.landmarks[i * landmark_size + j].y)
             };
         }
     }
@@ -367,21 +367,18 @@ void c_results_2_detection_landmark_result(
     result->reserve(c_results->size);
     result->landmarks_per_instance = c_results->data[0].landmarks_size;
     for (int i = 0; i < c_results->size; i++) {
-        result->boxes.emplace_back(std::array{
-                static_cast<float>(c_results->data[i].box.x),
-                static_cast<float>(c_results->data[i].box.y),
-                static_cast<float>(c_results->data[i].box.x + c_results->data[i].box.width),
-                static_cast<float>(c_results->data[i].box.y + c_results->data[i].box.height)
-            }
+        result->boxes.emplace_back(
+            static_cast<float>(c_results->data[i].box.x),
+            static_cast<float>(c_results->data[i].box.y),
+            static_cast<float>(c_results->data[i].box.width),
+            static_cast<float>(c_results->data[i].box.height)
         );
         result->label_ids.emplace_back(c_results->data[i].label_id);
         result->scores.emplace_back(c_results->data[i].score);
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             result->landmarks.emplace_back(
-                std::array{
-                    static_cast<float>(c_results->data[i].landmarks[j].x),
-                    static_cast<float>(c_results->data[i].landmarks[j].y)
-                }
+                c_results->data[i].landmarks[j].x,
+                c_results->data[i].landmarks[j].y
             );
         }
     }
@@ -422,8 +419,8 @@ void lpr_result_2_c_results(
         c_results->data[i].landmarks = new MDPoint[landmark_size];
         for (int j = 0; j < landmark_size; j++) {
             c_results->data[i].landmarks[j] = MDPoint{
-                static_cast<int>(result.landmarks[i * landmark_size + j][0]),
-                static_cast<int>(result.landmarks[i * landmark_size + j][1])
+                static_cast<int>(result.landmarks[i * landmark_size + j].x),
+                static_cast<int>(result.landmarks[i * landmark_size + j].y)
             };
         }
         c_results->data[i].car_plate_str = strdup(result.car_plate_strs[i].c_str());
@@ -435,21 +432,19 @@ void c_results_2_lpr_result(
     const MDLPRResults* c_results, LprResult* result) {
     result->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        result->boxes.emplace_back(std::array{
-                static_cast<float>(c_results->data[i].box.x),
-                static_cast<float>(c_results->data[i].box.y),
-                static_cast<float>(c_results->data[i].box.x + c_results->data[i].box.width),
-                static_cast<float>(c_results->data[i].box.y + c_results->data[i].box.height)
-            }
+        result->boxes.emplace_back(
+            static_cast<float>(c_results->data[i].box.x),
+            static_cast<float>(c_results->data[i].box.y),
+            static_cast<float>(c_results->data[i].box.width),
+            static_cast<float>(c_results->data[i].box.height)
+
         );
         result->label_ids.emplace_back(c_results->data[i].label_id);
         result->scores.emplace_back(c_results->data[i].score);
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             result->landmarks.emplace_back(
-                std::array{
-                    static_cast<float>(c_results->data[i].landmarks[j].x),
-                    static_cast<float>(c_results->data[i].landmarks[j].y)
-                }
+                c_results->data[i].landmarks[j].x,
+                c_results->data[i].landmarks[j].y
             );
         }
         result->car_plate_strs.emplace_back(c_results->data[i].car_plate_str);

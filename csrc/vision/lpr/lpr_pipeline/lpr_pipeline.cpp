@@ -5,7 +5,8 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
-namespace modeldeploy::vision::lpr {
+namespace modeldeploy::vision::lpr
+{
     LprPipeline::LprPipeline(const std::string& det_model_path,
                              const std::string& rec_model_path,
                              int thread_num) {
@@ -96,10 +97,10 @@ namespace modeldeploy::vision::lpr {
         results->label_ids = det_result.label_ids;
         for (int i = 0; i < lp_num; ++i) {
             std::array<cv::Point2f, 4> points;
-            points[0] = cv::Point2f(det_result.landmarks[i * 4 + 0][0], det_result.landmarks[i * 4 + 0][1]);
-            points[1] = cv::Point2f(det_result.landmarks[i * 4 + 1][0], det_result.landmarks[i * 4 + 1][1]);
-            points[2] = cv::Point2f(det_result.landmarks[i * 4 + 2][0], det_result.landmarks[i * 4 + 2][1]);
-            points[3] = cv::Point2f(det_result.landmarks[i * 4 + 3][0], det_result.landmarks[i * 4 + 3][1]);
+            points[0] = det_result.landmarks[i * 4 + 0];
+            points[1] = det_result.landmarks[i * 4 + 1];
+            points[2] = det_result.landmarks[i * 4 + 2];
+            points[3] = det_result.landmarks[i * 4 + 3];
             cv::Mat transform_image = transform_from_4points(image, points);
             // 如果是双层车牌
             if (det_result.label_ids[i]) {

@@ -60,42 +60,27 @@ namespace modeldeploy::vision
      */
     struct MODELDEPLOY_CXX_EXPORT DetectionResult {
         DetectionResult() = default;
-
-        /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
-         */
+        // for detection
         std::vector<cv::Rect2f> boxes;
-        /** \brief All the detected rotated object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `rotated_boxes` is an array of 8 float values, means [x1, y1, x2, y2, x3, y3, x4, y4]
-         */
+        // for obb
         std::vector<cv::RotatedRect> rotated_boxes;
-        /** \brief The confidence for all the detected objects
-         */
         std::vector<float> scores;
-        /// The classify label for all the detected objects
         std::vector<int32_t> label_ids;
-        /** \brief For instance segmentation model, `masks` is the predict mask for all the detected objects
-         */
+        // For instance segmentation model, `masks` is the predict mask for all the detected objects
         std::vector<Mask> masks;
         /// Shows if the DetectionResult has mask
         bool contain_masks = false;
-
         ResultType type = ResultType::DETECTION;
-
         /// Copy constructor
         DetectionResult(const DetectionResult& res);
-
         /// Move assignment
         DetectionResult& operator=(DetectionResult&& other) noexcept;
-
         /// Clear DetectionResult
         void clear();
-
         /// Clear DetectionResult and free the memory
         void free();
-
         void reserve(int size);
-
         void resize(int size);
-
         /// Debug function, convert the result to string to print
         void display() const;
     };
@@ -121,11 +106,11 @@ namespace modeldeploy::vision
     struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
         /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
          */
-        std::vector<std::array<float, 4>> boxes;
+        std::vector<cv::Rect2f> boxes;
         /** \brief
          * If the model detect face with landmarks, every detected object box correspoing to a landmark, which is a array of 2 float values, means location [x,y]
         */
-        std::vector<std::array<float, 2>> landmarks;
+        std::vector<cv::Point2f> landmarks;
 
         std::vector<int> label_ids;
         /** \brief
@@ -186,8 +171,8 @@ namespace modeldeploy::vision
     };
 
     struct MODELDEPLOY_CXX_EXPORT LprResult {
-        std::vector<std::array<float, 4>> boxes;
-        std::vector<std::array<float, 2>> landmarks;
+        std::vector<cv::Rect2f> boxes;
+        std::vector<cv::Point2f> landmarks;
         std::vector<int> label_ids;
         std::vector<float> scores;
         std::vector<std::string> car_plate_strs;

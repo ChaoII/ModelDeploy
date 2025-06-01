@@ -387,25 +387,24 @@ namespace modeldeploy::vision
         }
         output_table.add_row({
             "order",
-            "box([x1, y1, x2, y2])",
+            "box([x, y, width, height])",
             "label_id",
             "score",
             "landmarks(" + std::to_string(landmarks_per_instance) + " * point)"
         });
         for (size_t i = 0; i < boxes.size(); ++i) {
             std::string row_str_box = "["
-                + std::to_string(static_cast<int>(boxes[i][0])) + ", "
-                + std::to_string(static_cast<int>(boxes[i][1])) + ", "
-                + std::to_string(static_cast<int>(boxes[i][2])) + ", "
-                + std::to_string(static_cast<int>(boxes[i][3])) + "]";
-
+                + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
+                + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
+                + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
+                + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
             std::string row_str_score = std::to_string(scores[i]);
             std::string row_str_label_id = std::to_string(label_ids[i]);
             std::string row_str_landmarks;
             for (size_t j = 0; j < landmarks_per_instance; ++j) {
                 row_str_landmarks += "[" +
-                    std::to_string(static_cast<int>(landmarks[i * landmarks_per_instance + j][0])) + "," +
-                    std::to_string(static_cast<int>(landmarks[i * landmarks_per_instance + j][1]));
+                    std::to_string(static_cast<int>(landmarks[i * landmarks_per_instance + j].x)) + "," +
+                    std::to_string(static_cast<int>(landmarks[i * landmarks_per_instance + j].y));
                 row_str_landmarks += j < landmarks_per_instance - 1 ? "], " : "]";
             }
             output_table.add_row({std::to_string(i), row_str_box, row_str_label_id, row_str_score, row_str_landmarks});
@@ -515,7 +514,7 @@ namespace modeldeploy::vision
         }
         output_table.add_row({
             "order",
-            "box([x1, y1, x2, y2])",
+            "box([x, y, width, height])",
             "label_id",
             "score",
             "color",
@@ -523,10 +522,10 @@ namespace modeldeploy::vision
         });
         for (size_t i = 0; i < boxes.size(); ++i) {
             std::string row_str_box = "["
-                + std::to_string(static_cast<int>(boxes[i][0])) + ", "
-                + std::to_string(static_cast<int>(boxes[i][1])) + ", "
-                + std::to_string(static_cast<int>(boxes[i][2])) + ", "
-                + std::to_string(static_cast<int>(boxes[i][3])) + "]";
+                + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
+                + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
+                + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
+                + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
             std::string row_str_score = std::to_string(scores[i]);
             std::string row_str_label_id = std::to_string(label_ids[i]);
             std::string row_str_color = car_plate_colors[i];
