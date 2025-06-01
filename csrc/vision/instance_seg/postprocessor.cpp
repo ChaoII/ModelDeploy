@@ -129,44 +129,28 @@ namespace modeldeploy::vision::detection
                 y2 = utils::clamp(y2, 0.0f, static_cast<float>(ipt_h));
 
                 // 重新赋值到 box
-                box.x = static_cast<int>(std::round(x1));
-                box.y = static_cast<int>(std::round(y1));
-                box.width = static_cast<int>(std::round(x2 - x1));
-                box.height = static_cast<int>(std::round(y2 - y1));
+                box.x = std::round(x1);
+                box.y = std::round(y1);
+                box.width = std::round(x2 - x1);
+                box.height = std::round(y2 - y1);
                 // deal with mask
                 cv::Mat dest, mask;
                 // sigmoid
                 cv::exp(-mask_channels[i], dest);
                 dest = 1.0 / (1.0 + dest);
                 // crop mask for feature map
-                int x1_ = static_cast<int>(pad_w_mask);
-                int y1_ = static_cast<int>(pad_h_mask);
-                int x2_ = static_cast<int>(static_cast<float>(tensors[1].shape()[3]) - pad_w_mask);
-                int y2_ = static_cast<int>(static_cast<float>(tensors[1].shape()[2]) - pad_h_mask);
-                cv::Rect roi(x1_, y1_, x2_ - x1_, y2_ - y1_);
+                int _x1 = static_cast<int>(pad_w_mask);
+                int _y1 = static_cast<int>(pad_h_mask);
+                int _x2 = static_cast<int>(static_cast<float>(tensors[1].shape()[3]) - pad_w_mask);
+                int _y2 = static_cast<int>(static_cast<float>(tensors[1].shape()[2]) - pad_h_mask);
+                cv::Rect roi(_x1, _y1, _x2 - _x1, _y2 - _y1);
                 dest = dest(roi);
-                cv::resize(dest, mask,
-                           {static_cast<int>(ipt_w), static_cast<int>(ipt_h)}, 0, 0,
-                           cv::INTER_LINEAR);
-                // crop mask for source img
-                // int x1_src = static_cast<int>(round((*results)[bs].boxes[i][0]));
-                // int y1_src = static_cast<int>(round((*results)[bs].boxes[i][1]));
-                // int x2_src = static_cast<int>(round((*results)[bs].boxes[i][2]));
-                // int y2_src = static_cast<int>(round((*results)[bs].boxes[i][3]));
-
-                cv::Rect2f roi_rect = {
-                    (*results)[bs].boxes[i].x,
-                    (*results)[bs].boxes[i].y,
-                    (*results)[bs].boxes[i].width,
-                    (*results)[bs].boxes[i].height
-                };
-
-                // cv::Rect roi_src(x1_src, y1_src, x2_src - x1_src, y2_src - y1_src);
-                mask = mask(roi_rect);
+                cv::resize(dest, mask, cv::Size2f{ipt_w, ipt_h}, 0, 0, cv::INTER_LINEAR);
+                mask = mask(box);
                 mask = mask > mask_threshold_;
                 // save mask in DetectionResult
-                int keep_mask_h = roi_rect.height;
-                int keep_mask_w = roi_rect.width;
+                int keep_mask_h = static_cast<int>(box.height);
+                int keep_mask_w = static_cast<int>(box.width);
                 int keep_mask_num_el = keep_mask_h * keep_mask_w;
                 (*results)[bs].masks[i].resize(keep_mask_num_el);
                 (*results)[bs].masks[i].shape = {keep_mask_h, keep_mask_w};
