@@ -4,7 +4,9 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 set(LIBRARY_NAME "ModelDeploySDK")
-set(SOURCE "")
+set(SOURCE ""
+        csrc/vision/common/visualize/vis_pose.cpp
+        csrc/vision/common/visualize/vis_lpr.cpp)
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")

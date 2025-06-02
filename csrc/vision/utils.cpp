@@ -202,22 +202,27 @@ namespace modeldeploy::vision::utils
 
 
     void nms(DetectionLandmarkResult* result, float iou_threshold) {
-        utils::sort_detection_result(result);
-        std::vector<float> area_of_boxes(result->boxes.size());
-        std::vector suppressed(result->boxes.size(), false);
-        for (size_t i = 0; i < result->boxes.size(); ++i) {
-            area_of_boxes[i] = result->boxes[i].width * result->boxes[i].height;
-        }
-        for (size_t i = 0; i < result->boxes.size(); ++i) {
-            if (suppressed[i] == 1) {
-                continue;
-            }
-            for (size_t j = i + 1; j < result->boxes.size(); ++j) {
-                if (suppressed[j]) continue;
-                // 使用opencv的api
-                const cv::Rect2f& box_i = result->boxes[i];
-                const cv::Rect2f& box_j = result->boxes[j];
+        const size_t N = result->boxes.size();
+        // Step 1: 根据分数排序得到索引
+        std::vector<int> sorted_indices(N);
+        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
+        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+            return result->scores[a] > result->scores[b]; // 分数高的排前面
+        });
 
+        // Step 2: NMS 主逻辑
+        std::vector suppressed(N, false);
+        std::vector<int> keep_indices;
+
+        for (size_t m = 0; m < N; ++m) {
+            int i = sorted_indices[m];
+            if (suppressed[i]) continue;
+            keep_indices.push_back(i); // 保留当前框
+            const auto& box_i = result->boxes[i];
+            for (size_t n = m + 1; n < N; ++n) {
+                const int j = sorted_indices[n];
+                if (suppressed[j]) continue;
+                const auto& box_j = result->boxes[j];
                 const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
