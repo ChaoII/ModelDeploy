@@ -28,10 +28,6 @@ namespace modeldeploy::vision::utils
 
     void print_mat_type(const cv::Mat& mat);
 
-    void sort_detection_result(DetectionResult* result);
-
-    void sort_detection_result(DetectionLandmarkResult* result);
-
     std::vector<float> compute_sqrt(const std::vector<float>& vec);
 
     MODELDEPLOY_CXX_EXPORT std::vector<cv::Mat> align_face_with_five_points(

@@ -7,7 +7,7 @@
 
 int main() {
     modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/yolo11n-pose.onnx");
-    auto img = cv::imread("../../test_data/test_images/test_pose0.jpg");
+    auto img = cv::imread("../../test_data/test_images/test_pose2.jpg");
     modeldeploy::vision::PoseResult result;
     yolov8.get_preprocessor().set_size({640, 640});
     yolov8.get_preprocessor().set_mini_pad(false);
