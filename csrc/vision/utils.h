@@ -18,9 +18,11 @@ namespace modeldeploy::vision::utils
 
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 
-    void obb_nms(DetectionResult* output, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
+    void obb_nms(DetectionResult* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
-    void nms(DetectionResult* output, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
+    void nms(DetectionResult* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
+
+    void nms(PoseResult* result, float iou_threshold, std::vector<int>* index = nullptr);
 
     void nms(DetectionLandmarkResult* result, float iou_threshold);
 

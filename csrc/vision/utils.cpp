@@ -80,73 +80,122 @@ namespace modeldeploy::vision::utils
     }
 
 
-    void nms(DetectionResult* output, const float iou_threshold, std::vector<int>* index) {
+    float rect_iou(const cv::Rect2f& rect1, const cv::Rect2f& rect2) {
+        // 手动计算
+        // const float xmin = std::max(rect1.x, rect2.x);
+        // const float ymin = std::max(rect1.y, rect2.y);
+        // const float xmax = std::min(rect1.x + rect1.width,
+        //                             rect2.x + rect2.width);
+        // const float ymax = std::min(rect1.y + rect1.height,
+        //                             rect2.y + rect2.height);
+        //
+        // const float overlap_w = std::max(0.0f, xmax - xmin);
+        // const float overlap_h = std::max(0.0f, ymax - ymin);
+        // const float overlap_area = overlap_w * overlap_h;
+        // const float area1 = rect1.width * rect1.height;
+        // const float area2 = rect2.width * rect2.height;
+        // const float iou = overlap_area / (area1 + area2 - overlap_area);
+
+
+        // 使用opencv的api
+        cv::Rect2f intersection = rect1 & rect2; // 取交集
+        const float inter_area = intersection.area();
+        const float union_area = rect1.area() + rect2.area() - inter_area;
+        const float iou = inter_area / union_area;
+        return iou;
+    }
+
+
+    void nms(DetectionResult* result, const float iou_threshold, std::vector<int>* index) {
         // get sorted score indices
-        std::vector<int> sorted_indices;
-        if (index != nullptr) {
-            std::map<float, int, std::greater<>> score_map;
-            for (size_t i = 0; i < output->scores.size(); ++i) {
-                score_map.insert({output->scores[i], static_cast<int>(i)});
-            }
-            for (auto val : score_map | std::views::values) {
-                sorted_indices.push_back(val);
-            }
-        }
-        sort_detection_result(output);
-        std::vector<float> area_of_boxes(output->boxes.size());
-        std::vector suppressed(output->boxes.size(), 0);
-        for (size_t i = 0; i < output->boxes.size(); ++i) {
-            area_of_boxes[i] = output->boxes[i].width * output->boxes[i].height;
-        }
-        for (size_t i = 0; i < output->boxes.size(); ++i) {
-            if (suppressed[i] == 1) {
-                continue;
-            }
-            for (size_t j = i + 1; j < output->boxes.size(); ++j) {
-                if (suppressed[j] == 1) continue;
-                // 手动计算
-                // const float xmin = std::max(output->boxes[i].x, output->boxes[j].x);
-                // const float ymin = std::max(output->boxes[i].y, output->boxes[j].y);
-                // const float xmax = std::min(output->boxes[i].x + output->boxes[i].width,
-                //                             output->boxes[j].x + output->boxes[j].width);
-                // const float ymax = std::min(output->boxes[i].y + output->boxes[i].height,
-                //                             output->boxes[j].y + output->boxes[j].height);
-                //
-                // const float overlap_w = std::max(0.0f, xmax - xmin);
-                // const float overlap_h = std::max(0.0f, ymax - ymin);
-                // const float overlap_area = overlap_w * overlap_h;
-                // const float overlap_ratio =
-                //     overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
-                // if (overlap_ratio > iou_threshold) {
-                //     suppressed[j] = 1;
-                // }
+        const size_t N = result->boxes.size();
+        // Step 1: 根据分数排序得到索引
+        std::vector<int> sorted_indices(N);
+        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
+        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+            return result->scores[a] > result->scores[b]; // 分数高的排前面
+        });
 
-                // 使用opencv的api
-                const cv::Rect2f& box_i = output->boxes[i];
-                const cv::Rect2f& box_j = output->boxes[j];
-
-                cv::Rect2f intersection = box_i & box_j; // 取交集
-                const float inter_area = intersection.area();
-                const float union_area = area_of_boxes[i] + area_of_boxes[j] - inter_area;
-
-                const float iou = inter_area / union_area;
+        // Step 2: NMS 主逻辑
+        std::vector suppressed(N, false);
+        std::vector<int> keep_indices;
+        for (size_t m = 0; m < N; ++m) {
+            int i = sorted_indices[m];
+            if (suppressed[i]) continue;
+            keep_indices.push_back(i); // 保留当前框
+            const auto& box_i = result->boxes[i];
+            for (size_t n = m + 1; n < N; ++n) {
+                const int j = sorted_indices[n];
+                if (suppressed[j]) continue;
+                const auto& box_j = result->boxes[j];
+                const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
             }
         }
-        DetectionResult backup(*output);
-        output->clear();
-        output->reserve(static_cast<int>(suppressed.size()));
-        for (size_t i = 0; i < suppressed.size(); ++i) {
-            if (suppressed[i] == 1) {
-                continue;
+        // Step 3: 根据 keep_indices 重建结果
+        const DetectionResult backup(*result);
+        result->clear();
+        result->reserve(static_cast<int>(keep_indices.size()));
+        for (int idx : keep_indices) {
+            result->boxes.push_back(backup.boxes[idx]);
+            result->scores.push_back(backup.scores[idx]);
+            result->label_ids.push_back(backup.label_ids[idx]);
+            if (index) {
+                index->push_back(idx); // 保留原始下标
             }
-            output->boxes.emplace_back(backup.boxes[i]);
-            output->scores.push_back(backup.scores[i]);
-            output->label_ids.push_back(backup.label_ids[i]);
-            if (index != nullptr) {
-                index->push_back(sorted_indices[i]);
+        }
+    }
+
+
+    void nms(PoseResult* result, float iou_threshold, std::vector<int>* index) {
+        const size_t N = result->boxes.size();
+        // Step 1: 根据分数排序得到索引
+        std::vector<int> sorted_indices(N);
+        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
+        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+            return result->scores[a] > result->scores[b]; // 分数高的排前面
+        });
+
+        // Step 2: NMS 主逻辑
+        std::vector suppressed(N, false);
+        std::vector<int> keep_indices;
+
+        for (size_t m = 0; m < N; ++m) {
+            int i = sorted_indices[m];
+            if (suppressed[i]) continue;
+            keep_indices.push_back(i); // 保留当前框
+            const auto& box_i = result->boxes[i];
+            for (size_t n = m + 1; n < N; ++n) {
+                const int j = sorted_indices[n];
+                if (suppressed[j]) continue;
+                const auto& box_j = result->boxes[j];
+                const float iou = rect_iou(box_i, box_j);
+                if (iou > iou_threshold) {
+                    suppressed[j] = true;
+                }
+            }
+        }
+
+        // Step 3: 根据 keep_indices 重建结果
+        const PoseResult backup(*result);
+        result->clear();
+        result->keypoints_per_instance = backup.keypoints_per_instance;
+        result->reserve(static_cast<int>(keep_indices.size()));
+
+        for (int idx : keep_indices) {
+            result->boxes.push_back(backup.boxes[idx]);
+            result->scores.push_back(backup.scores[idx]);
+            result->label_ids.push_back(backup.label_ids[idx]);
+            if (result->keypoints_per_instance > 0) {
+                for (size_t j = 0; j < result->keypoints_per_instance; ++j) {
+                    result->keypoints.emplace_back(
+                        backup.keypoints[idx * result->keypoints_per_instance + j]);
+                }
+            }
+            if (index) {
+                index->push_back(idx); // 保留原始下标
             }
         }
     }
@@ -165,42 +214,21 @@ namespace modeldeploy::vision::utils
             }
             for (size_t j = i + 1; j < result->boxes.size(); ++j) {
                 if (suppressed[j]) continue;
-                // 手动计算iou
-                // const float xmin = std::max(result->boxes[i].x, result->boxes[j].x);
-                // const float ymin = std::max(result->boxes[i].y, result->boxes[j].y);
-                // const float xmax = std::min(result->boxes[i].x + result->boxes[i].width,
-                //                             result->boxes[j].x + result->boxes[j].width);
-                // const float ymax = std::min(result->boxes[i].y + result->boxes[i].height,
-                //                             result->boxes[j].y + result->boxes[j].height);
-                // const float overlap_w = std::max(0.0f, xmax - xmin);
-                // const float overlap_h = std::max(0.0f, ymax - ymin);
-                // const float overlap_area = overlap_w * overlap_h;
-                // const float overlap_ratio =
-                //     overlap_area / (area_of_boxes[i] + area_of_boxes[j] - overlap_area);
-                // if (overlap_ratio > iou_threshold) {
-                //     suppressed[j] = 1;
-                // }
-
                 // 使用opencv的api
                 const cv::Rect2f& box_i = result->boxes[i];
                 const cv::Rect2f& box_j = result->boxes[j];
 
-                cv::Rect2f intersection = box_i & box_j; // 取交集
-                const float inter_area = intersection.area();
-                const float union_area = area_of_boxes[i] + area_of_boxes[j] - inter_area;
-
-                const float iou = inter_area / union_area;
+                const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
             }
         }
         DetectionLandmarkResult backup(*result);
-        const int landmarks_per_face = result->landmarks_per_instance;
         result->clear();
         // don't forget to reset the landmarks_per_face
         // before apply Reserve method.
-        result->landmarks_per_instance = landmarks_per_face;
+        result->landmarks_per_instance = result->landmarks_per_instance;
         result->reserve(suppressed.size());
         for (size_t i = 0; i < suppressed.size(); ++i) {
             if (suppressed[i] == 1) {

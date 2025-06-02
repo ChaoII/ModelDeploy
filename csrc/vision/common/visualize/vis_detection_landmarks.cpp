@@ -36,6 +36,20 @@ namespace modeldeploy::vision
         }
     }
 
+    void draw_keypoints(cv::Mat& cv_image,
+                        const std::vector<cv::Point3f>& keypoints,
+                        const size_t
+                        current_obj_index,
+                        const size_t keypoints_num,
+                        const int landmark_radius) {
+        for (size_t j = 0; j < keypoints_num; ++j) {
+            const cv::Point3f keypoint = keypoints[current_obj_index * keypoints_num + j];
+
+            auto landmark_color = get_random_color();
+            cv::circle(cv_image, cv::Point2f{keypoint.x, keypoint.y}, landmark_radius, landmark_color, -1);
+        }
+    }
+
 
     cv::Mat vis_lpr(cv::Mat& cv_image, const LprResult& result,
                     const std::string& font_path, const int font_size,
@@ -88,7 +102,35 @@ namespace modeldeploy::vision
             draw_landmarks(cv_image, result.landmarks, i, result.landmarks_per_instance, landmark_radius);
         }
         if (save_result) {
-            MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
+            MD_LOG_INFO << "Save landmark result to [vis_result.jpg]" << std::endl;
+            cv::imwrite("vis_result.jpg", cv_image);
+        }
+        return cv_image;
+    }
+
+
+    cv::Mat vis_pose(cv::Mat& cv_image, const PoseResult& result,
+                     const std::string& font_path, const int font_size,
+                     const int landmark_radius, const double alpha,
+                     const bool save_result) {
+        cv::Mat overlay;
+        cv_image.copyTo(overlay);
+        const cv::FontFace font(font_path);
+        const cv::Scalar cv_color = get_random_color();
+        // 绘制半透明部分（填充矩形）
+        for (int i = 0; i < result.boxes.size(); ++i) {
+            const std::string text = "score: " + std::to_string(result.scores[i]).substr(0, 4);
+            draw_rectangle_and_text(overlay, result.boxes[i], text, cv_color, font, font_size, -1, false);
+        }
+        cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
+        // 绘制对象矩形矩形边框、文字背景边框、文字、关键点
+        for (int i = 0; i < result.boxes.size(); ++i) {
+            const std::string text = "score: " + std::to_string(result.scores[i]).substr(0, 4);
+            draw_rectangle_and_text(cv_image, result.boxes[i], text, cv_color, font, font_size, 1, true);
+            draw_keypoints(cv_image, result.keypoints, i, result.keypoints_per_instance, landmark_radius);
+        }
+        if (save_result) {
+            MD_LOG_INFO << "Save pose result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
         return cv_image;

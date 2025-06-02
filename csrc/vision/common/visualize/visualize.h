@@ -7,7 +7,8 @@
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision {
+namespace modeldeploy::vision
+{
     cv::Scalar get_random_color();
 
 
@@ -38,6 +39,12 @@ namespace modeldeploy::vision {
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_lpr(
         cv::Mat& cv_image, const LprResult& result,
+        const std::string& font_path, int font_size = 14,
+        int landmark_radius = 4, double alpha = 0.5,
+        bool save_result = false);
+
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_pose(
+        cv::Mat& cv_image, const PoseResult& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.5,
         bool save_result = false);
