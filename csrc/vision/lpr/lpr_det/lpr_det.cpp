@@ -155,24 +155,24 @@ namespace modeldeploy::vision::lpr
         auto* data = static_cast<const float*>(infer_result.data());
         // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf0(单层车牌),cls_conf1(双层车牌)
         for (size_t i = 0; i < infer_result.shape()[1]; ++i) {
-            const float* reg_cls_ptr = data + i * infer_result.shape()[2];
-            const float obj_conf = reg_cls_ptr[4];
+            const float* attr_ptr = data + i * infer_result.shape()[2];
+            const float obj_conf = attr_ptr[4];
             // const float cls_conf = reg_cls_ptr[13];
             // 0: 单层车牌
             // 1: 双层车牌
-            std::vector<float> cls_confs = {reg_cls_ptr + 13, reg_cls_ptr + infer_result.shape()[2]};
+            std::vector<float> cls_confs = {attr_ptr + 13, attr_ptr + infer_result.shape()[2]};
             const int class_id = argmax(cls_confs);
-            const auto cls_conf = *std::max_element(cls_confs.begin(), cls_confs.end());
+            const auto cls_conf = *std::ranges::max_element(cls_confs);
             float confidence = obj_conf * cls_conf;
             // filter boxes by conf_threshold
             if (confidence <= conf_threshold) {
                 continue;
             }
 
-            const float x = reg_cls_ptr[0];
-            const float y = reg_cls_ptr[1];
-            const float w = reg_cls_ptr[2];
-            const float h = reg_cls_ptr[3];
+            const float x = attr_ptr[0];
+            const float y = attr_ptr[1];
+            const float w = attr_ptr[2];
+            const float h = attr_ptr[3];
 
             // convert from [xc, yc, w, h] to [x, y, w, h]
             result->boxes.emplace_back(
@@ -182,7 +182,7 @@ namespace modeldeploy::vision::lpr
             result->scores.push_back(confidence);
             // decode landmarks (default 5 landmarks)
             if (landmarks_per_card > 0) {
-                const float* landmarks_ptr = reg_cls_ptr + 5;
+                const float* landmarks_ptr = attr_ptr + 5;
                 for (size_t j = 0; j < landmarks_per_card * 2; j += 2) {
                     result->landmarks.emplace_back(
                         landmarks_ptr[j], landmarks_ptr[j + 1]);
