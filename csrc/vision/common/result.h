@@ -7,8 +7,7 @@
 #include "csrc/core/md_decl.h"
 #include <opencv2/opencv.hpp>
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     enum ResultType {
         CLASSIFY,
         DETECTION,
@@ -88,32 +87,41 @@ namespace modeldeploy::vision
 
     /*! @brief Face detection result structure for all the face detection models
     */
+    // struct MODELDEPLOY_CXX_EXPORT PoseResult {
+    //     std::vector<cv::Rect2f> boxes;
+    //     std::vector<cv::Point3f> keypoints;
+    //     std::vector<int> label_ids;
+    //     std::vector<float> scores;
+    //     int keypoints_per_instance;
+    //     ResultType type = ResultType::FACE_DETECTION;
+    //
+    //     PoseResult() {
+    //         keypoints_per_instance = 0;
+    //     };
+    //
+    //     PoseResult(const PoseResult& res);
+    //
+    //     /// Clear FaceDetectionResult
+    //     void clear();
+    //
+    //     /// Clear FaceDetectionResult and free the memory
+    //     void free();
+    //
+    //     void reserve(size_t size);
+    //
+    //     void resize(size_t size);
+    //
+    //     /// Debug function, convert the result to string to print
+    //     void display() const;
+    // };
+
+
     struct MODELDEPLOY_CXX_EXPORT PoseResult {
-        std::vector<cv::Rect2f> boxes;
+        cv::Rect2f box;
         std::vector<cv::Point3f> keypoints;
-        std::vector<int> label_ids;
-        std::vector<float> scores;
-        int keypoints_per_instance;
+        int32_t label_id;
+        float score;
         ResultType type = ResultType::FACE_DETECTION;
-
-        PoseResult() {
-            keypoints_per_instance = 0;
-        };
-
-        PoseResult(const PoseResult& res);
-
-        /// Clear FaceDetectionResult
-        void clear();
-
-        /// Clear FaceDetectionResult and free the memory
-        void free();
-
-        void reserve(size_t size);
-
-        void resize(size_t size);
-
-        /// Debug function, convert the result to string to print
-        void display() const;
     };
 
 

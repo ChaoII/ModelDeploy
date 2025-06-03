@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to initialize." << std::endl;
         return -1;
     }
-    std::string image_file = "../../test_data/test_images/test_detection0.jpg";
+    std::string image_file = "../../test_data/test_images/test_person.jpg";
     auto im = cv::imread(image_file);
     modeldeploy::vision::DetectionResult res;
     if (!model.predict(im, &res)) {

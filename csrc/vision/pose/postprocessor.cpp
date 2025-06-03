@@ -5,25 +5,21 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/pose/postprocessor.h"
 
-namespace modeldeploy::vision::detection
-{
+namespace modeldeploy::vision::detection {
     UltralyticsPosePostprocessor::UltralyticsPosePostprocessor() {
-        conf_threshold_ = 0.25;
+        conf_threshold_ = 0.3;
         nms_threshold_ = 0.5;
         keypoints_num_ = 17;
     }
 
     bool UltralyticsPosePostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<PoseResult>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<PoseResult>>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
         const size_t batch = tensors[0].shape()[0];
         // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
-        results->resize(batch);
+        results->reserve(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
-            (*results)[bs].clear();
-            (*results)[bs].reserve(tensor_transpose.shape()[1]);
-            (*results)[bs].keypoints_per_instance = keypoints_num_;
             int64_t keypoints_num_by_output = (tensor_transpose.shape()[2] - 5) / 3;
             if (keypoints_num_by_output != keypoints_num_) {
                 MD_LOG_ERROR << "Keypoints num set error, set" << keypoints_num_ << "but is: " <<
@@ -36,6 +32,9 @@ namespace modeldeploy::vision::detection
             const float* data =
                 static_cast<const float*>(tensor_transpose.data()) +
                 bs * tensor_transpose.shape()[1] * tensor_transpose.shape()[2];
+
+            std::vector<PoseResult> _results;
+            _results.reserve(tensor_transpose.shape()[1]);
             for (size_t i = 0; i < tensor_transpose.shape()[1]; ++i) {
                 // 4(xc,yc,w,h)+1(conf)+17(keypoints)*3(x,y,conf)=56
                 const float* attr_ptr = data + i * tensor_transpose.shape()[2];
@@ -46,29 +45,28 @@ namespace modeldeploy::vision::detection
                 }
                 int32_t label_id = 0;
                 // convert from [xc, yc, w, h] to [x, y, width, height]
-                (*results)[bs].boxes.emplace_back(
+                cv::Rect2f box = {
                     attr_ptr[0] - attr_ptr[2] / 2.0f,
                     attr_ptr[1] - attr_ptr[3] / 2.0f,
                     attr_ptr[2],
                     attr_ptr[3]
-                );
-
-                (*results)[bs].label_ids.push_back(label_id);
-                (*results)[bs].scores.push_back(confidence);
-
+                };
+                std::vector<cv::Point3f> keypoints;
+                keypoints.reserve(keypoints_num_);
                 if (keypoints_num_ > 0) {
                     const float* keypoints_ptr = attr_ptr + 5;
                     for (size_t j = 0; j < keypoints_num_ * 3; j += 3) {
-                        (*results)[bs].keypoints.emplace_back(
+                        keypoints.emplace_back(
                             keypoints_ptr[j], keypoints_ptr[j + 1], keypoints_ptr[j + 2]);
                     }
                 }
+                _results.emplace_back(box, keypoints, label_id, confidence);
             }
 
-            if ((*results)[bs].boxes.empty()) {
+            if (_results.empty()) {
                 continue;
             }
-            utils::nms(&(*results)[bs], nms_threshold_);
+            utils::nms(&_results, nms_threshold_);
             // scale the boxes to the origin image shape
             auto iter_out = ims_info[bs].find("output_shape");
             auto iter_ipt = ims_info[bs].find("input_shape");
@@ -83,12 +81,13 @@ namespace modeldeploy::vision::detection
             const float pad_h = (out_h - ipt_h * scale) / 2;
             const float pad_w = (out_w - ipt_w * scale) / 2;
 
-            for (auto& keypoint : (*results)[bs].keypoints) {
-                keypoint.x = (keypoint.x - pad_w) / scale;
-                keypoint.y = (keypoint.y - pad_h) / scale;
-            }
+            for (auto& result : _results) {
+                for (auto& keypoint : result.keypoints) {
+                    keypoint.x = (keypoint.x - pad_w) / scale;
+                    keypoint.y = (keypoint.y - pad_h) / scale;
+                }
 
-            for (auto& box : (*results)[bs].boxes) {
+                auto& box = result.box;
                 // clip box()
                 //先减去 padding;
                 //再除以缩放因子 scale;
@@ -111,6 +110,7 @@ namespace modeldeploy::vision::detection
                 box.width = std::round(x2 - x1);
                 box.height = std::round(y2 - y1);
             }
+            results->push_back(_results);
         }
         return true;
     }

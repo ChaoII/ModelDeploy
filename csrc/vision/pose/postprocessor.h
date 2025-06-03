@@ -7,13 +7,12 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision::detection
-{
+namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPosePostprocessor {
     public:
         UltralyticsPosePostprocessor();
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<PoseResult>* results,
+                 std::vector<std::vector<PoseResult>>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 
         /// Set conf_threshold, default 0.25

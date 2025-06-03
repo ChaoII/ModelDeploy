@@ -7,8 +7,7 @@
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     cv::Scalar get_random_color();
 
     void draw_rectangle_and_text(cv::Mat& image, cv::Rect2f box, const std::string& text,
@@ -52,7 +51,7 @@ namespace modeldeploy::vision
         bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_pose(
-        cv::Mat& cv_image, const PoseResult& result,
+        cv::Mat& cv_image, const std::vector<PoseResult>& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.5,
         bool save_result = false);
