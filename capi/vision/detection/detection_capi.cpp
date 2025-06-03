@@ -44,20 +44,20 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
         return MDStatusCode::ModelTypeError;
     }
     const auto cv_image = md_image_to_mat(image);
-    modeldeploy::vision::DetectionResult result;
+    std::vector<modeldeploy::vision::DetectionResult> results;
     const auto detection_model = static_cast<modeldeploy::vision::detection::UltralyticsDet*>(model->model_content);
-    if (const bool res_status = detection_model->predict(cv_image, &result); !res_status) {
+    if (const bool res_status = detection_model->predict(cv_image, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
-    detection_result_2_c_results(result, c_results);
+    detection_results_2_c_results(results, c_results);
     return MDStatusCode::Success;
 }
 
 
 void md_print_detection_result(const MDDetectionResults* c_results) {
-    modeldeploy::vision::DetectionResult result;
-    c_results_2_detection_result(c_results, &result);
-    result.display();
+    std::vector<modeldeploy::vision::DetectionResult> results;
+    c_results_2_detection_results(c_results, &results);
+    // results.display();
 }
 
 
@@ -65,9 +65,9 @@ void md_draw_detection_result(const MDImage* image, const MDDetectionResults* c_
                               const double threshold, const char* font_path, const int font_size,
                               const double alpha, const int save_result) {
     auto cv_image = md_image_to_mat(image);
-    modeldeploy::vision::DetectionResult result;
-    c_results_2_detection_result(c_results, &result);
-    modeldeploy::vision::vis_detection(cv_image, result, threshold, font_path, font_size, alpha, save_result);
+    std::vector<modeldeploy::vision::DetectionResult> results;
+    c_results_2_detection_results(c_results, &results);
+    modeldeploy::vision::vis_detection(cv_image, results, threshold, font_path, font_size, alpha, save_result);
 }
 
 void md_free_detection_result(MDDetectionResults* c_results) {

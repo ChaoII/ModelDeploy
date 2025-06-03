@@ -35,11 +35,11 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_set_obb_input_size(
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_obb_predict(
     const MDModel* model,
     MDImage* image,
-    MDDetectionResults* c_results);
+    MDObbResults* c_results);
 
 /// 打印检测结果
 MODELDEPLOY_CAPI_EXPORT void md_print_obb_result(
-    const MDDetectionResults* c_results);
+    const MDObbResults* c_results);
 
 /// 绘制检测结果
 /// \param image 原始图像
@@ -51,7 +51,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_obb_result(
 /// \param save_result 保存结果, 如果>0将保存绘制后的图片vis_result.jpg
 MODELDEPLOY_CAPI_EXPORT void md_draw_obb_result(
     const MDImage* image,
-    const MDDetectionResults* c_results,
+    const MDObbResults* c_results,
     double threshold,
     const char* font_path,
     int font_size,
@@ -61,7 +61,7 @@ MODELDEPLOY_CAPI_EXPORT void md_draw_obb_result(
 /// 释放检测结果
 /// @param c_results 由md_obb_predict生成的检测结果
 MODELDEPLOY_CAPI_EXPORT void md_free_obb_result(
-    MDDetectionResults* c_results);
+    MDObbResults* c_results);
 
 /// 释放检测模型
 /// @param model 由create_obb_model创建的模型

@@ -36,16 +36,16 @@ MDStatusCode md_face_as_pipeline_predict(const MDModel* model, MDImage* image, M
     const auto face_as_pipeline_model = static_cast<
         modeldeploy::vision::face::SeetaFaceAsPipeline*>(model->model_content);
 
-    FaceAntiSpoofResult result;
+    std::vector<FaceAntiSpoofResult> results;
     if (const bool res_status = face_as_pipeline_model->predict(
-        cv_image, &result, fuse_threshold, clarity_threshold); !res_status) {
+        cv_image, &results, fuse_threshold, clarity_threshold); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
-    const size_t face_size = result.anti_spoofs.size();
+    const size_t face_size = results.size();
     c_results->size = static_cast<int>(face_size);
     c_results->data = new MDFaceAsResult[face_size];
     for (int i = 0; i < face_size; ++i) {
-        c_results->data[i] = static_cast<MDFaceAsResult>(result.anti_spoofs[i]);
+        c_results->data[i] = static_cast<MDFaceAsResult>(results[i]);
     }
     return MDStatusCode::Success;
 }

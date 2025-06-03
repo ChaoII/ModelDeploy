@@ -5,8 +5,8 @@
 #pragma once
 
 #include "csrc/base_model.h"
-#include "csrc/vision/instance_seg/preprocessor.h"
-#include "csrc/vision/instance_seg/postprocessor.h"
+#include "csrc/vision/iseg/preprocessor.h"
+#include "csrc/vision/iseg/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief YOLOv5Seg model object used when to load a YOLOv5Seg model exported by YOLOv5.

@@ -10,7 +10,7 @@
 #include "vision/detection/ultralytics_det.h"
 #include "vision/obb/ultralytics_obb.h"
 #include "vision/pose/ultralytics_pose.h"
-#include "vision/instance_seg/ultralytics_seg.h"
+#include "vision/iseg/ultralytics_seg.h"
 #include "vision/classification/ultralytics_cls.h"
 #include "csrc/vision/face/face_models.h"
 #include "csrc/vision/lpr/lpr_models.h"

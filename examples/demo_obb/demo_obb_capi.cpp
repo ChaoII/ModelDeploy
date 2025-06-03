@@ -21,17 +21,17 @@ int main() {
     }
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     auto im = md_read_image("../../test_data/test_images/test_obb1.jpg");
-    MDDetectionResults result;
-    if ((ret = md_obb_predict(&model, &im, &result)) != 0) {
+    MDObbResults results;
+    if ((ret = md_obb_predict(&model, &im, &results)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-    md_draw_obb_result(&im, &result, 0.5, "../../test_data/msyh.ttc", 14, 0.5, 1);
+    md_draw_obb_result(&im, &results, 0.5, "../../test_data/msyh.ttc", 14, 0.5, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "duration cost: " << diff.count() << "s" << std::endl;
     md_show_image(&im);
-    md_print_obb_result(&result);
-    md_free_obb_result(&result);
+    md_print_obb_result(&results);
+    md_free_obb_result(&results);
     md_free_image(&im);
     md_free_obb_model(&model);
     return ret;

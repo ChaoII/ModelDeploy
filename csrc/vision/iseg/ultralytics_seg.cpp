@@ -3,7 +3,7 @@
 //
 
 #include "csrc/core/md_log.h"
-#include "csrc/vision/instance_seg/ultralytics_seg.h"
+#include "csrc/vision/iseg/ultralytics_seg.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsSeg::UltralyticsSeg(const std::string& model_file,

@@ -36,20 +36,20 @@ MDStatusCode md_lpr_pipeline_predict(const MDModel* model, MDImage* image,
     const auto lpr_pipeline_model = static_cast<
         modeldeploy::vision::lpr::LprPipeline*>(model->model_content);
 
-    LprResult results;
+    std::vector<LprResult> results;
     if (const bool res_status = lpr_pipeline_model->predict(
         cv_image, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
 
-    lpr_result_2_c_results(results, c_results);
+    lpr_results_2_c_results(results, c_results);
     return MDStatusCode::Success;
 }
 
 void md_print_lpr_pipeline_result(const MDLPRResults* c_results) {
-    LprResult results;
-    c_results_2_lpr_result(c_results, &results);
-    results.display();
+    std::vector<LprResult> results;
+    c_results_2_lpr_results(c_results, &results);
+    // results.display();
 }
 
 void md_draw_lpr_pipeline_result(
@@ -58,9 +58,9 @@ void md_draw_lpr_pipeline_result(
     const int landmark_radius, const double alpha,
     const int save_result) {
     auto cv_image = md_image_to_mat(image);
-    modeldeploy::vision::LprResult result;
-    c_results_2_lpr_result(c_results, &result);
-    modeldeploy::vision::vis_lpr(cv_image, result, font_path, font_size,
+    std::vector<LprResult> results;
+    c_results_2_lpr_results(c_results, &results);
+    modeldeploy::vision::vis_lpr(cv_image, results, font_path, font_size,
                                  landmark_radius, alpha, save_result);
 }
 

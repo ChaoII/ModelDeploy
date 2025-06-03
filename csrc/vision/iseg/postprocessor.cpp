@@ -5,7 +5,7 @@
 #include <numeric> // 需要包含此头文件
 #include "csrc/core/md_log.h"
 #include "csrc/vision/utils.h"
-#include "csrc/vision/instance_seg/postprocessor.h"
+#include "csrc/vision/iseg/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsSegPostprocessor::UltralyticsSegPostprocessor() {
