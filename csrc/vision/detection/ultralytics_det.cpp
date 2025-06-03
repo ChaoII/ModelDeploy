@@ -21,8 +21,8 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsDet::predict(const cv::Mat& im, DetectionResult* result) {
-        std::vector<DetectionResult> results;
+    bool UltralyticsDet::predict(const cv::Mat& im, std::vector<DetectionResult>* result) {
+        std::vector<std::vector<DetectionResult>> results;
         if (!batch_predict({im}, &results)) {
             return false;
         }
@@ -31,7 +31,7 @@ namespace modeldeploy::vision::detection {
     }
 
     bool UltralyticsDet::batch_predict(const std::vector<cv::Mat>& images,
-                                       std::vector<DetectionResult>* results) {
+                                       std::vector<std::vector<DetectionResult>>* results) {
         std::vector<std::map<std::string, std::array<float, 2>>> ims_info;
         std::vector<cv::Mat> imgs = images;
         if (!preprocessor_.run(&imgs, &reused_input_tensors_, &ims_info)) {

@@ -8,8 +8,7 @@
 #include "csrc/core/tensor.h"
 
 
-namespace modeldeploy::vision::ocr
-{
+namespace modeldeploy::vision::ocr {
     /*! @brief Postprocessor object for PaddleDet serials model.
      */
     class MODELDEPLOY_CXX_EXPORT StructureV2LayoutPostprocessor {
@@ -25,7 +24,7 @@ namespace modeldeploy::vision::ocr
          * \return true if the postprocess successed, otherwise false
          */
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<DetectionResult>* results,
+                 std::vector<std::vector<DetectionResult>>* results,
                  const std::vector<std::array<int, 4>>& batch_layout_img_info);
 
         /// Set score_threshold_ for layout detection postprocess, default is 0.4
@@ -59,11 +58,11 @@ namespace modeldeploy::vision::ocr
 
     private:
         cv::Rect2f dis_pred_to_bbox(const std::vector<float>& bbox_pred, int x, int y,
-                              int stride, int resize_w, int resize_h, int reg_max);
+                                    int stride, int resize_w, int resize_h, int reg_max);
 
         bool single_batch_postprocessor(const std::vector<Tensor>& single_batch_tensors,
                                         const std::array<int, 4>& layout_img_info,
-                                        DetectionResult* result);
+                                        std::vector<DetectionResult>* result);
 
         void set_single_batch_external_data(const std::vector<Tensor>& tensors,
                                             std::vector<Tensor>& single_batch_tensors,

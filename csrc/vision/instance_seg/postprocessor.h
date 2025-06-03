@@ -5,12 +5,10 @@
 #include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
 
-namespace modeldeploy::vision::detection
-{
+namespace modeldeploy::vision::detection {
     /*! @brief Postprocessor object for YOLOv5Seg serials model.
    */
-    class MODELDEPLOY_CXX_EXPORT UltralyticsSegPostprocessor
-    {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsSegPostprocessor {
     public:
         /** \brief Create a postprocessor instance for YOLOv5Seg serials model
        */
@@ -24,7 +22,7 @@ namespace modeldeploy::vision::detection
        * \return true if the postprocess successed, otherwise false
        */
         bool run(std::vector<Tensor>& tensors,
-                 std::vector<DetectionResult>* results,
+                 std::vector<std::vector<InstanceSegResult>>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 
         /// Set conf_threshold, default 0.25

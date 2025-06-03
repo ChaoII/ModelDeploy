@@ -123,114 +123,114 @@ namespace modeldeploy::vision
         return out;
     }
 
-    DetectionResult::DetectionResult(const DetectionResult& res) {
-        boxes.assign(res.boxes.begin(), res.boxes.end());
-        rotated_boxes.assign(res.rotated_boxes.begin(), res.rotated_boxes.end());
-        scores.assign(res.scores.begin(), res.scores.end());
-        label_ids.assign(res.label_ids.begin(), res.label_ids.end());
-        contain_masks = res.contain_masks;
-        if (contain_masks) {
-            masks.clear();
-            const size_t mask_size = res.masks.size();
-            for (size_t i = 0; i < mask_size; ++i) {
-                masks.emplace_back(res.masks[i]);
-            }
-        }
-    }
-
-    DetectionResult& DetectionResult::operator=(DetectionResult&& other) noexcept {
-        if (&other != this) {
-            boxes = std::move(other.boxes);
-            rotated_boxes = std::move(other.rotated_boxes);
-            scores = std::move(other.scores);
-            label_ids = std::move(other.label_ids);
-            contain_masks = other.contain_masks;
-            if (contain_masks) {
-                masks.clear();
-                masks = std::move(other.masks);
-            }
-        }
-        return *this;
-    }
-
-    void DetectionResult::free() {
-        boxes.shrink_to_fit();
-        rotated_boxes.shrink_to_fit();
-        scores.shrink_to_fit();
-        label_ids.shrink_to_fit();
-        masks.shrink_to_fit();
-        contain_masks = false;
-    }
-
-    void DetectionResult::clear() {
-        boxes.clear();
-        rotated_boxes.clear();
-        scores.clear();
-        label_ids.clear();
-        masks.clear();
-        contain_masks = false;
-    }
-
-    void DetectionResult::reserve(const int size) {
-        boxes.reserve(size);
-        rotated_boxes.reserve(size);
-        scores.reserve(size);
-        label_ids.reserve(size);
-        if (contain_masks) {
-            masks.reserve(size);
-        }
-    }
-
-    void DetectionResult::resize(const int size) {
-        boxes.resize(size);
-        rotated_boxes.resize(size);
-        scores.resize(size);
-        label_ids.resize(size);
-        if (contain_masks) {
-            masks.resize(size);
-        }
-    }
-
-    void DetectionResult::display() const {
-        tabulate::Table output_table;
-        output_table.format().font_color(tabulate::Color::green)
-                    .border_color(tabulate::Color::magenta)
-                    .corner_color(tabulate::Color::magenta);
-
-        if (rotated_boxes.empty()) {
-            output_table.add_row({"order", " box([x, y, width, height])", "label_ids", " score", "mask_size"});
-            for (size_t i = 0; i < boxes.size(); ++i) {
-                std::string box_str = "["
-                    + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
-                    + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
-                    + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
-                    + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
-                std::string label_id_str = std::to_string(label_ids[i]);
-                std::string score_str = std::to_string(scores[i]);
-                std::string mask_size_str;
-                if (!masks.empty()) {
-                    mask_size_str = std::to_string(masks[i].shape[0] * masks[i].shape[1]);
-                }
-                output_table.add_row({std::to_string(i), box_str, label_id_str, score_str, mask_size_str});
-            }
-        }
-        else {
-            output_table.add_row({"order", " roted_box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_ids", " score"});
-            for (size_t i = 0; i < rotated_boxes.size(); ++i) {
-                std::string box_str = "["
-                    + std::to_string(static_cast<int>(rotated_boxes[i].center.x)) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i].center.y)) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i].size.width)) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i].size.height)) + ", "
-                    + std::to_string(static_cast<int>(rotated_boxes[i].angle)) + "]";
-                std::string label_id_str = std::to_string(label_ids[i]);
-                std::string score_str = std::to_string(scores[i]);
-                output_table.add_row({std::to_string(i), box_str, label_id_str, score_str});
-            }
-        }
-        std::cout << termcolor::cyan << "DetectionResult:" << termcolor::reset << std::endl;
-        std::cout << output_table << std::endl;
-    }
+    // DetectionResult::DetectionResult(const DetectionResult& res) {
+    //     boxes.assign(res.boxes.begin(), res.boxes.end());
+    //     rotated_boxes.assign(res.rotated_boxes.begin(), res.rotated_boxes.end());
+    //     scores.assign(res.scores.begin(), res.scores.end());
+    //     label_ids.assign(res.label_ids.begin(), res.label_ids.end());
+    //     contain_masks = res.contain_masks;
+    //     if (contain_masks) {
+    //         masks.clear();
+    //         const size_t mask_size = res.masks.size();
+    //         for (size_t i = 0; i < mask_size; ++i) {
+    //             masks.emplace_back(res.masks[i]);
+    //         }
+    //     }
+    // }
+    //
+    // DetectionResult& DetectionResult::operator=(DetectionResult&& other) noexcept {
+    //     if (&other != this) {
+    //         boxes = std::move(other.boxes);
+    //         rotated_boxes = std::move(other.rotated_boxes);
+    //         scores = std::move(other.scores);
+    //         label_ids = std::move(other.label_ids);
+    //         contain_masks = other.contain_masks;
+    //         if (contain_masks) {
+    //             masks.clear();
+    //             masks = std::move(other.masks);
+    //         }
+    //     }
+    //     return *this;
+    // }
+    //
+    // void DetectionResult::free() {
+    //     boxes.shrink_to_fit();
+    //     rotated_boxes.shrink_to_fit();
+    //     scores.shrink_to_fit();
+    //     label_ids.shrink_to_fit();
+    //     masks.shrink_to_fit();
+    //     contain_masks = false;
+    // }
+    //
+    // void DetectionResult::clear() {
+    //     boxes.clear();
+    //     rotated_boxes.clear();
+    //     scores.clear();
+    //     label_ids.clear();
+    //     masks.clear();
+    //     contain_masks = false;
+    // }
+    //
+    // void DetectionResult::reserve(const int size) {
+    //     boxes.reserve(size);
+    //     rotated_boxes.reserve(size);
+    //     scores.reserve(size);
+    //     label_ids.reserve(size);
+    //     if (contain_masks) {
+    //         masks.reserve(size);
+    //     }
+    // }
+    //
+    // void DetectionResult::resize(const int size) {
+    //     boxes.resize(size);
+    //     rotated_boxes.resize(size);
+    //     scores.resize(size);
+    //     label_ids.resize(size);
+    //     if (contain_masks) {
+    //         masks.resize(size);
+    //     }
+    // }
+    //
+    // void DetectionResult::display() const {
+    //     tabulate::Table output_table;
+    //     output_table.format().font_color(tabulate::Color::green)
+    //                 .border_color(tabulate::Color::magenta)
+    //                 .corner_color(tabulate::Color::magenta);
+    //
+    //     if (rotated_boxes.empty()) {
+    //         output_table.add_row({"order", " box([x, y, width, height])", "label_ids", " score", "mask_size"});
+    //         for (size_t i = 0; i < boxes.size(); ++i) {
+    //             std::string box_str = "["
+    //                 + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
+    //                 + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
+    //                 + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
+    //                 + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
+    //             std::string label_id_str = std::to_string(label_ids[i]);
+    //             std::string score_str = std::to_string(scores[i]);
+    //             std::string mask_size_str;
+    //             if (!masks.empty()) {
+    //                 mask_size_str = std::to_string(masks[i].shape[0] * masks[i].shape[1]);
+    //             }
+    //             output_table.add_row({std::to_string(i), box_str, label_id_str, score_str, mask_size_str});
+    //         }
+    //     }
+    //     else {
+    //         output_table.add_row({"order", " roted_box([x1, y1, x2, y2, x3, y3, x4, y4])", "label_ids", " score"});
+    //         for (size_t i = 0; i < rotated_boxes.size(); ++i) {
+    //             std::string box_str = "["
+    //                 + std::to_string(static_cast<int>(rotated_boxes[i].center.x)) + ", "
+    //                 + std::to_string(static_cast<int>(rotated_boxes[i].center.y)) + ", "
+    //                 + std::to_string(static_cast<int>(rotated_boxes[i].size.width)) + ", "
+    //                 + std::to_string(static_cast<int>(rotated_boxes[i].size.height)) + ", "
+    //                 + std::to_string(static_cast<int>(rotated_boxes[i].angle)) + "]";
+    //             std::string label_id_str = std::to_string(label_ids[i]);
+    //             std::string score_str = std::to_string(scores[i]);
+    //             output_table.add_row({std::to_string(i), box_str, label_id_str, score_str});
+    //         }
+    //     }
+    //     std::cout << termcolor::cyan << "DetectionResult:" << termcolor::reset << std::endl;
+    //     std::cout << output_table << std::endl;
+    // }
 
 
     // PoseResult::PoseResult(const PoseResult& res) {

@@ -58,59 +58,52 @@ namespace modeldeploy::vision {
     /*! @brief Detection result structure for all the object detection models and instance segmentation models
      */
     struct MODELDEPLOY_CXX_EXPORT DetectionResult {
-        DetectionResult() = default;
-        // for detection
-        std::vector<cv::Rect2f> boxes;
-        // for obb
-        std::vector<cv::RotatedRect> rotated_boxes;
-        std::vector<float> scores;
-        std::vector<int32_t> label_ids;
-        // For instance segmentation model, `masks` is the predict mask for all the detected objects
-        std::vector<Mask> masks;
-        /// Shows if the DetectionResult has mask
-        bool contain_masks = false;
+        cv::Rect2f box;
+        int32_t label_id{};
+        float score{};
         ResultType type = ResultType::DETECTION;
-        /// Copy constructor
-        DetectionResult(const DetectionResult& res);
-        /// Move assignment
-        DetectionResult& operator=(DetectionResult&& other) noexcept;
-        /// Clear DetectionResult
-        void clear();
-        /// Clear DetectionResult and free the memory
-        void free();
-        void reserve(int size);
-        void resize(int size);
-        /// Debug function, convert the result to string to print
-        void display() const;
     };
 
 
-    /*! @brief Face detection result structure for all the face detection models
-    */
-    // struct MODELDEPLOY_CXX_EXPORT PoseResult {
+    struct MODELDEPLOY_CXX_EXPORT InstanceSegResult {
+        cv::Rect2f box;
+        Mask mask;
+        int32_t label_id{};
+        float score{};
+        ResultType type = ResultType::DETECTION;
+    };
+
+    struct MODELDEPLOY_CXX_EXPORT ObbResult {
+        cv::RotatedRect rotated_box;
+        int32_t label_id{};
+        float score{};
+        ResultType type = ResultType::DETECTION;
+    };
+
+
+    // struct MODELDEPLOY_CXX_EXPORT DetectionResult {
+    //     DetectionResult() = default;
+    //     // for detection
     //     std::vector<cv::Rect2f> boxes;
-    //     std::vector<cv::Point3f> keypoints;
-    //     std::vector<int> label_ids;
+    //     // for obb
+    //     std::vector<cv::RotatedRect> rotated_boxes;
     //     std::vector<float> scores;
-    //     int keypoints_per_instance;
-    //     ResultType type = ResultType::FACE_DETECTION;
-    //
-    //     PoseResult() {
-    //         keypoints_per_instance = 0;
-    //     };
-    //
-    //     PoseResult(const PoseResult& res);
-    //
-    //     /// Clear FaceDetectionResult
+    //     std::vector<int32_t> label_ids;
+    //     // For instance segmentation model, `masks` is the predict mask for all the detected objects
+    //     std::vector<Mask> masks;
+    //     /// Shows if the DetectionResult has mask
+    //     bool contain_masks = false;
+    //     ResultType type = ResultType::DETECTION;
+    //     /// Copy constructor
+    //     DetectionResult(const DetectionResult& res);
+    //     /// Move assignment
+    //     DetectionResult& operator=(DetectionResult&& other) noexcept;
+    //     /// Clear DetectionResult
     //     void clear();
-    //
-    //     /// Clear FaceDetectionResult and free the memory
+    //     /// Clear DetectionResult and free the memory
     //     void free();
-    //
-    //     void reserve(size_t size);
-    //
-    //     void resize(size_t size);
-    //
+    //     void reserve(int size);
+    //     void resize(int size);
     //     /// Debug function, convert the result to string to print
     //     void display() const;
     // };
@@ -119,8 +112,8 @@ namespace modeldeploy::vision {
     struct MODELDEPLOY_CXX_EXPORT PoseResult {
         cv::Rect2f box;
         std::vector<cv::Point3f> keypoints;
-        int32_t label_id;
-        float score;
+        int32_t label_id = -1;
+        float score = 0.0f;
         ResultType type = ResultType::FACE_DETECTION;
     };
 

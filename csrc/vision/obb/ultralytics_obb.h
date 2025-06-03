@@ -29,7 +29,7 @@ namespace modeldeploy::vision::detection {
         * \param[in] result The output detection result will be writen to this structure
         * \return true if the prediction successed, otherwise false
         */
-        virtual bool predict(const cv::Mat& image, DetectionResult* result);
+        virtual bool predict(const cv::Mat& image, std::vector<ObbResult>* result);
 
         /** \brief Predict the detection results for a batch of input images
         *
@@ -38,7 +38,7 @@ namespace modeldeploy::vision::detection {
         * \return true if the prediction successed, otherwise false
         */
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<DetectionResult>* results);
+                                   std::vector<std::vector<ObbResult>>* results);
 
         /// Get preprocessor reference of YOLOv5Seg
         virtual UltralyticsObbPreprocessor& get_preprocessor() {
