@@ -36,14 +36,14 @@ namespace modeldeploy::vision::ocr {
          * \param[in] result The output detection result
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool predict(cv::Mat* im, DetectionResult* result);
+        virtual bool predict(cv::Mat* im, std::vector<DetectionResult>* result);
 
         /** \brief Predict the detection result for an input image
          * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] result The output detection result
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool predict(const cv::Mat& im, DetectionResult* result);
+        virtual bool predict(const cv::Mat& im, std::vector<DetectionResult>* result);
 
         /** \brief Predict the detection result for an input image list
          * \param[in] images The input image list, all the elements come from cv::imread(), is a 3-D array with layout HWC, BGR format
@@ -51,7 +51,7 @@ namespace modeldeploy::vision::ocr {
          * \return true if the prediction successfully, otherwise false
          */
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<DetectionResult>* results);
+                                   std::vector<std::vector<DetectionResult>>* results);
 
         /// Get preprocessor reference ofStructureV2LayoutPreprocessor
         virtual StructureV2LayoutPreprocessor& get_preprocessor() {

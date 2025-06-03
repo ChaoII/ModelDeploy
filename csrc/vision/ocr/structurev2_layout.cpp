@@ -25,12 +25,12 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool StructureV2Layout::predict(cv::Mat* im, DetectionResult* result) {
+    bool StructureV2Layout::predict(cv::Mat* im, std::vector<DetectionResult>* result) {
         return predict(*im, result);
     }
 
-    bool StructureV2Layout::predict(const cv::Mat& im, DetectionResult* result) {
-        std::vector<DetectionResult> results;
+    bool StructureV2Layout::predict(const cv::Mat& im, std::vector<DetectionResult>* result) {
+        std::vector<std::vector<DetectionResult>> results;
         if (!batch_predict({im}, &results)) {
             return false;
         }
@@ -39,7 +39,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2Layout::batch_predict(const std::vector<cv::Mat>& images,
-                                          std::vector<DetectionResult>* results) {
+                                          std::vector<std::vector<DetectionResult>>* results) {
         std::vector<cv::Mat> images_ = images;
         if (!preprocessor_.run(&images_, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;

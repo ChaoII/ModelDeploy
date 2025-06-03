@@ -30,7 +30,19 @@ namespace modeldeploy::vision {
 
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_detection(
-        cv::Mat& cv_image, const DetectionResult& result, double threshold = 0.5,
+        cv::Mat& cv_image, const std::vector<DetectionResult>& result, double threshold = 0.5,
+        const std::string& font_path = "", int font_size = 14,
+        double alpha = 0.5, bool save_result = false);
+
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_iseg(
+        cv::Mat& cv_image, const std::vector<InstanceSegResult>& result,
+        double threshold = 0.5,
+        const std::string& font_path = "", int font_size = 14,
+        double alpha = 0.5, bool save_result = false);
+
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_obb(
+        cv::Mat& cv_image, const std::vector<ObbResult>& result,
+        double threshold = 0.5,
         const std::string& font_path = "", int font_size = 14,
         double alpha = 0.5, bool save_result = false);
 

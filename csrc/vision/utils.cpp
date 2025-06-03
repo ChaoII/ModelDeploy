@@ -105,28 +105,63 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    void nms(DetectionResult* result, const float iou_threshold, std::vector<int>* index) {
+    void nms(std::vector<DetectionResult>* result, const float iou_threshold) {
         // get sorted score indices
-        const size_t N = result->boxes.size();
-        // Step 1: 根据分数排序得到索引
-        std::vector<int> sorted_indices(N);
-        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
-        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
-            return result->scores[a] > result->scores[b]; // 分数高的排前面
+        const size_t N = result->size();
+        std::ranges::sort(*result, [&](const DetectionResult& a, const DetectionResult& b) {
+            return a.score > b.score; // 分数高的排前面
         });
 
         // Step 2: NMS 主逻辑
+        std::vector<size_t> index_;
         std::vector suppressed(N, false);
+        for (size_t m = 0; m < N; ++m) {
+            if (suppressed[m]) continue;
+            index_.push_back(m);
+            const auto& box_i = result->at(m).box;
+            for (size_t n = m + 1; n < N; ++n) {
+                if (suppressed[n]) continue;
+                const auto& box_j = result->at(n).box;
+                if (box_i.area() == 0 || box_j.area() == 0) continue;
+                const float iou = rect_iou(box_i, box_j);
+                if (iou > iou_threshold) {
+                    suppressed[n] = true;
+                }
+            }
+        }
+        // Step 3: 根据 keep_indices 重建结果
+        std::vector<DetectionResult> new_result;
+        new_result.reserve(index_.size());
+        for (const auto idx : index_) {
+            new_result.push_back(std::move((*result)[idx])); // 移动语义
+        }
+        result->swap(new_result);
+    }
+
+
+    void nms(std::vector<InstanceSegResult>* result, const float iou_threshold, std::vector<int>* index) {
+        // get sorted score indices
+        const size_t N = result->size();
+        // Step 1: 根据分数排序得到索引
+        std::vector<int> sorted_indices(N);
+        std::iota(sorted_indices.begin(), sorted_indices.end(), 0); // 初始化索引 [0, 1, ..., N-1]
+        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+            return (*result)[a].score > (*result)[b].score; // 分数高的排前面
+        });
+
+        // Step 2: NMS 主逻辑
+        std::vector<bool> suppressed(N, false);
         std::vector<int> keep_indices;
+
         for (size_t m = 0; m < N; ++m) {
             int i = sorted_indices[m];
             if (suppressed[i]) continue;
             keep_indices.push_back(i); // 保留当前框
-            const auto& box_i = result->boxes[i];
+            const auto& box_i = (*result)[i].box;
             for (size_t n = m + 1; n < N; ++n) {
-                const int j = sorted_indices[n];
+                int j = sorted_indices[n];
                 if (suppressed[j]) continue;
-                const auto& box_j = result->boxes[j];
+                const auto& box_j = (*result)[j].box;
                 const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
@@ -134,17 +169,15 @@ namespace modeldeploy::vision::utils {
             }
         }
         // Step 3: 根据 keep_indices 重建结果
-        const DetectionResult backup(*result);
-        result->clear();
-        result->reserve(static_cast<int>(keep_indices.size()));
-        for (int idx : keep_indices) {
-            result->boxes.push_back(backup.boxes[idx]);
-            result->scores.push_back(backup.scores[idx]);
-            result->label_ids.push_back(backup.label_ids[idx]);
+        std::vector<InstanceSegResult> new_result;
+        new_result.reserve(keep_indices.size());
+        for (const auto idx : keep_indices) {
+            new_result.push_back(std::move((*result)[idx])); // 移动语义
             if (index) {
-                index->push_back(idx); // 保留原始下标
+                index->push_back(idx);
             }
         }
+        result->swap(new_result);
     }
 
 
@@ -165,6 +198,7 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
+                if (box_i.area() == 0 || box_j.area() == 0) continue;
                 const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
@@ -173,11 +207,12 @@ namespace modeldeploy::vision::utils {
         }
 
         // Step 3: 根据 keep_indices 重建结果
-        const std::vector<PoseResult> backup = *result;
-        result->clear();
+        std::vector<PoseResult> new_result;
+        new_result.reserve(index_.size());
         for (const auto idx : index_) {
-            result->push_back(backup[idx]);
+            new_result.push_back(std::move((*result)[idx])); // 移动语义
         }
+        result->swap(new_result);
     }
 
 

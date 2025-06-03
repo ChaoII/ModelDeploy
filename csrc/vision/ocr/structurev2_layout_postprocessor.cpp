@@ -9,10 +9,9 @@
 #include <numeric>
 
 
-namespace modeldeploy::vision::ocr
-{
+namespace modeldeploy::vision::ocr {
     bool StructureV2LayoutPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
         const std::vector<std::array<int, 4>>& batch_layout_img_info) {
         // A StructureV2Layout has 8 output tensors on which it then runs
         // a GFL regression (namely, DisPred2Box), reference:
@@ -61,10 +60,11 @@ namespace modeldeploy::vision::ocr
 
     bool StructureV2LayoutPostprocessor::single_batch_postprocessor(
         const std::vector<Tensor>& single_batch_tensors,
-        const std::array<int, 4>& layout_img_info, DetectionResult* result) {
+        const std::array<int, 4>& layout_img_info, std::vector<DetectionResult>* result) {
         if (single_batch_tensors.size() != 8) {
             MD_LOG_ERROR << "StructureV2Layout should has 8 output tensors,"
                 "but got " << static_cast<int>(single_batch_tensors.size()) << " now!" << std::endl;
+            return false;
         }
         // layout_img_info: {image width, image height, resize width, resize height}
         const int img_w = layout_img_info[0];
@@ -74,7 +74,7 @@ namespace modeldeploy::vision::ocr
         const float scale_factor_w = static_cast<float>(in_w) / static_cast<float>(img_w);
         const float scale_factor_h = static_cast<float>(in_h) / static_cast<float>(img_h);
 
-        std::vector<DetectionResult> bbox_results;
+        std::vector<std::vector<DetectionResult>> bbox_results;
         bbox_results.resize(num_class_); // tmp result for each class
 
         // decode score, label, box
@@ -85,48 +85,51 @@ namespace modeldeploy::vision::ocr
             const Tensor& bbox_tensor = single_batch_tensors[i + fpn_stride_.size()];
             const auto prob_data = static_cast<const float*>(prob_tensor.data());
             const auto bbox_data = static_cast<const float*>(bbox_tensor.data());
-            for (int idx = 0; idx < feature_h * feature_w; ++idx) {
-                // score and label
+            for (size_t idx = 0; idx < feature_h * feature_w; ++idx) {
                 float score = 0.f;
                 int label = 0;
-                for (int j = 0; j < num_class_; ++j) {
-                    if (prob_data[idx * num_class_ + j] > score) {
-                        score = prob_data[idx * num_class_ + j];
+                for (size_t j = 0; j < num_class_; ++j) {
+                    float cls_score = prob_data[idx * num_class_ + j];
+                    if (cls_score > score) {
+                        score = cls_score;
                         label = j;
                     }
                 }
-                // bbox
                 if (score > score_threshold_) {
-                    const int row = idx / feature_w;
-                    const int col = idx % feature_w;
-                    std::vector bbox_pred(bbox_data + idx * 4 * reg_max_,
-                                          bbox_data + (idx + 1) * 4 * reg_max_);
-                    bbox_results[label].boxes.push_back(dis_pred_to_bbox(
-                        bbox_pred, col, row, fpn_stride_[i], in_w, in_h, reg_max_));
-                    bbox_results[label].scores.push_back(score);
-                    bbox_results[label].label_ids.push_back(label);
+                    int row = idx / feature_w;
+                    int col = idx % feature_w;
+                    std::vector<float> bbox_pred(
+                        bbox_data + idx * 4 * reg_max_,
+                        bbox_data + (idx + 1) * 4 * reg_max_);
+                    auto box = dis_pred_to_bbox(bbox_pred, col, row, fpn_stride_[i], in_w, in_h, reg_max_);
+                    bbox_results[label].emplace_back(box, label, score);
                 }
             }
         }
-
         result->clear();
+        const int total = std::accumulate(bbox_results.begin(), bbox_results.end(), 0ul,
+                                          [](const size_t sum, const std::vector<DetectionResult>& v) {
+                                              return sum + v.size();
+                                          });
+        result->reserve(total);
         // nms for per class, i in [0~num_class-1]
         for (auto& bbox_result : bbox_results) {
-            if (bbox_result.boxes.empty()) {
+            if (bbox_result.empty()) {
                 continue;
             }
             vision::utils::nms(&bbox_result, nms_threshold_);
             // fill output results
-            for (int j = 0; j < bbox_result.boxes.size(); ++j) {
-                result->scores.push_back(bbox_result.scores[j]);
-                result->label_ids.push_back(bbox_result.label_ids[j]);
-                result->boxes.push_back(
-                    {
-                        bbox_result.boxes[j].x / scale_factor_w,
-                        bbox_result.boxes[j].y / scale_factor_h,
-                        bbox_result.boxes[j].width / scale_factor_w,
-                        bbox_result.boxes[j].height / scale_factor_h,
-                    });
+            for (size_t j = 0; j < bbox_result.size(); ++j) {
+                result->emplace_back(
+                    cv::Rect2f{
+                        bbox_result[j].box.x / scale_factor_w,
+                        bbox_result[j].box.y / scale_factor_h,
+                        bbox_result[j].box.width / scale_factor_w,
+                        bbox_result[j].box.height / scale_factor_h,
+                    },
+                    bbox_result[j].score,
+                    bbox_result[j].label_id
+                );
             }
         }
         return true;

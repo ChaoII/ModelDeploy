@@ -22,7 +22,7 @@ namespace modeldeploy::vision::detection {
        * \return true if the postprocess successed, otherwise false
        */
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<DetectionResult>* results,
+                 std::vector<std::vector<ObbResult>>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 
         /// Set conf_threshold, default 0.25

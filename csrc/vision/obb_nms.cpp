@@ -8,39 +8,10 @@
 #include <ranges>
 #include "csrc/vision/utils.h"
 
-namespace modeldeploy::vision::utils
-{
+namespace modeldeploy::vision::utils {
     struct Point {
         float x, y;
     };
-
-    void sort_detection_result_by_score(DetectionResult& result) {
-        const size_t num = result.scores.size();
-        std::vector<size_t> indices(num);
-        std::iota(indices.begin(), indices.end(), 0); // 初始化索引 0,1,...,N-1
-
-        // 按照 scores 降序排序索引
-        std::ranges::sort(indices, [&](size_t i1, size_t i2) {
-            return result.scores[i1] > result.scores[i2];
-        });
-
-        // 使用排序后的索引，重排所有字段
-        auto reorder = [&](auto& vec) {
-            using T = std::decay_t<decltype(vec[0])>;
-            std::vector<T> reordered;
-            reordered.reserve(vec.size());
-            for (size_t idx : indices) {
-                reordered.push_back(vec[idx]);
-            }
-            vec = std::move(reordered);
-        };
-
-        reorder(result.scores);
-        reorder(result.label_ids);
-        if (!result.boxes.empty()) reorder(result.boxes);
-        if (!result.rotated_boxes.empty()) reorder(result.rotated_boxes);
-        if (result.contain_masks && !result.masks.empty()) reorder(result.masks);
-    }
 
     // Shoelace 算法求多边形面积（顶点顺时针/逆时针都可以）
     float polygon_area(const std::vector<cv::Point2f>& poly) {
@@ -145,14 +116,14 @@ namespace modeldeploy::vision::utils
         return inter_area / union_area;
     }
 
-    void obb_nms(DetectionResult* output, const float iou_threshold, std::vector<int>* index) {
-        const size_t N = output->rotated_boxes.size();
+    void obb_nms(std::vector<ObbResult>* result, const float iou_threshold, std::vector<int>* index) {
+        const size_t N = result->size();
 
         // Step 1: 根据分数排序得到索引
         std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
         std::ranges::sort(sorted_indices, [&](const int a, const int b) {
-            return output->scores[a] > output->scores[b]; // 分数高的排前面
+            return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 
         // Step 2: NMS 主逻辑
@@ -163,12 +134,12 @@ namespace modeldeploy::vision::utils
             int i = sorted_indices[m];
             if (suppressed[i]) continue;
             keep_indices.push_back(i); // 保留当前框
-            const auto& box_i = output->rotated_boxes[i];
+            const auto& box_i = (*result)[i].rotated_box;
             for (size_t n = m + 1; n < N; ++n) {
                 const int j = sorted_indices[n];
                 if (suppressed[j]) continue;
 
-                const auto& box_j = output->rotated_boxes[j];
+                const auto& box_j = (*result)[j].rotated_box;
                 const float iou = rotated_iou(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
@@ -177,17 +148,14 @@ namespace modeldeploy::vision::utils
         }
 
         // Step 3: 根据 keep_indices 重建结果
-        const DetectionResult backup(*output);
-        output->clear();
-        output->reserve(static_cast<int>(keep_indices.size()));
-
-        for (int idx : keep_indices) {
-            output->rotated_boxes.push_back(backup.rotated_boxes[idx]);
-            output->scores.push_back(backup.scores[idx]);
-            output->label_ids.push_back(backup.label_ids[idx]);
+        std::vector<ObbResult> new_result;
+        new_result.reserve(keep_indices.size());
+        for (const auto idx : keep_indices) {
+            new_result.push_back(std::move((*result)[idx])); // 移动语义
             if (index) {
-                index->push_back(idx); // 保留原始下标
+                index->push_back(idx);
             }
         }
+        result->swap(new_result);
     }
 }

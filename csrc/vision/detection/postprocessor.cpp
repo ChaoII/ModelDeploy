@@ -5,23 +5,20 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/detection/postprocessor.h"
 
-namespace modeldeploy::vision::detection
-{
+namespace modeldeploy::vision::detection {
     UltralyticsPostprocessor::UltralyticsPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
     }
 
     bool UltralyticsPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<DetectionResult>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
         const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
         const size_t batch = tensors[0].shape()[0];
         // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
-        results->resize(batch);
+        results->reserve(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
-            (*results)[bs].clear();
-            (*results)[bs].reserve(tensor_transpose.shape()[1]);
             if (tensor_transpose.dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
@@ -29,6 +26,10 @@ namespace modeldeploy::vision::detection
             const float* data =
                 static_cast<const float*>(tensor_transpose.data()) +
                 bs * tensor_transpose.shape()[1] * tensor_transpose.shape()[2];
+
+            std::vector<DetectionResult> _results;
+            _results.reserve(tensor_transpose.shape()[1]);
+
             for (size_t i = 0; i < tensor_transpose.shape()[1]; ++i) {
                 const float* attr_ptr = data + i * tensor_transpose.shape()[2];
                 const float* max_class_score = std::max_element(
@@ -40,20 +41,19 @@ namespace modeldeploy::vision::detection
                 }
                 int32_t label_id = std::distance(attr_ptr + 4, max_class_score);
                 // convert from [xc, yc, w, h] to [x, y, width, height]
-                (*results)[bs].boxes.emplace_back(
+                cv::Rect2f box = {
                     attr_ptr[0] - attr_ptr[2] / 2.0f,
                     attr_ptr[1] - attr_ptr[3] / 2.0f,
                     attr_ptr[2],
                     attr_ptr[3]
-                );
-                (*results)[bs].label_ids.push_back(label_id);
-                (*results)[bs].scores.push_back(confidence);
+                };
+                _results.emplace_back(box, label_id, confidence);
             }
 
-            if ((*results)[bs].boxes.empty()) {
+            if (_results.empty()) {
                 continue;
             }
-            utils::nms(&(*results)[bs], nms_threshold_);
+            utils::nms(&_results, nms_threshold_);
             // scale the boxes to the origin image shape
             auto iter_out = ims_info[bs].find("output_shape");
             auto iter_ipt = ims_info[bs].find("input_shape");
@@ -67,7 +67,8 @@ namespace modeldeploy::vision::detection
             const float scale = std::min(out_h / ipt_h, out_w / ipt_w);
             const float pad_h = (out_h - ipt_h * scale) / 2;
             const float pad_w = (out_w - ipt_w * scale) / 2;
-            for (auto& box : (*results)[bs].boxes) {
+            for (auto& result : _results) {
+                auto& box = result.box;
                 // clip box()
                 //先减去 padding;
                 //再除以缩放因子 scale;
@@ -90,6 +91,7 @@ namespace modeldeploy::vision::detection
                 box.width = std::round(x2 - x1);
                 box.height = std::round(y2 - y1);
             }
+            results->push_back(std::move(_results));
         }
         return true;
     }

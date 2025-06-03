@@ -12,7 +12,7 @@ namespace modeldeploy::vision::detection {
     public:
         UltralyticsPostprocessor();
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<DetectionResult>* results,
+                 std::vector<std::vector<DetectionResult>>* results,
                  const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
 
         /// Set conf_threshold, default 0.25
@@ -30,7 +30,6 @@ namespace modeldeploy::vision::detection {
 
         /// Get nms_threshold, default 0.5
         [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
-
 
     protected:
         float conf_threshold_;
