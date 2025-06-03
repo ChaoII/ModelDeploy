@@ -10,8 +10,7 @@
 #include <csrc/core/md_log.h>
 
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     void ClassifyResult::free() {
         label_ids.shrink_to_fit();
         scores.shrink_to_fit();
@@ -60,28 +59,9 @@ namespace modeldeploy::vision
             }
         }
 
-        if (feature.empty()) {
-            output_table.add_row({"label_ids", "scores"});
-            output_table.add_row({label_ids_str, scores_str});
-        }
-        else {
-            output_table.add_row({"label_ids", "scores", "dim", "min", "max", "mean"});
-            std::string feature_size_str = std::to_string(feature.size());
-            const auto max_it = std::max_element(feature.begin(), feature.end());
-            const auto min_it = std::max_element(feature.begin(), feature.end());
-            const auto total_val = std::accumulate(feature.begin(), feature.end(), 0.0f);
-            const float mean_val = total_val / static_cast<float>(feature.size());
-            output_table.add_row({
-                label_ids_str,
-                scores_str,
-                feature_size_str,
-                std::to_string(*min_it),
-                std::to_string(*max_it),
-                std::to_string(mean_val)
-            });
-        }
-        std::cout << termcolor::cyan << "ClassifyResult:" << termcolor::reset << std::endl;
-        std::cout << output_table << std::endl;
+        output_table.add_row({"label_ids", "scores"});
+        output_table.add_row({label_ids_str, scores_str});
+
     }
 
 
@@ -453,26 +433,6 @@ namespace modeldeploy::vision
     // }
 
 
-    FaceRecognitionResult::FaceRecognitionResult(const FaceRecognitionResult& res) {
-        embedding.assign(res.embedding.begin(), res.embedding.end());
-    }
-
-    void FaceRecognitionResult::free() {
-        embedding.shrink_to_fit();
-    }
-
-    void FaceRecognitionResult::clear() {
-        embedding.clear();
-    }
-
-    void FaceRecognitionResult::reserve(const size_t size) {
-        embedding.reserve(size);
-    }
-
-    void FaceRecognitionResult::resize(const size_t size) {
-        embedding.resize(size);
-    }
-
     void FaceRecognitionResult::display() {
         tabulate::Table output_table;
         output_table.format().font_color(tabulate::Color::green)
@@ -480,8 +440,8 @@ namespace modeldeploy::vision
                     .corner_color(tabulate::Color::magenta);
         output_table.add_row({"Dim", "Min", "Max", "Mean"});
 
-        const auto max_it = std::max_element(embedding.begin(), embedding.end());
-        const auto min_it = std::min_element(embedding.begin(), embedding.end());
+        const auto max_it = std::ranges::max_element(embedding);
+        const auto min_it = std::ranges::min_element(embedding);
         const auto total_val = std::accumulate(embedding.begin(), embedding.end(), 0.0f);
         const float mean_val = total_val / static_cast<float>(embedding.size());
         output_table.add_row({
@@ -538,27 +498,4 @@ namespace modeldeploy::vision
     //     std::cout << termcolor::cyan << "LprResult:" << termcolor::reset << std::endl;
     //     std::cout << output_table << std::endl;
     // }
-
-    FaceAntiSpoofResult::FaceAntiSpoofResult(const FaceAntiSpoofResult& res) {
-        anti_spoofs.assign(res.anti_spoofs.begin(), res.anti_spoofs.end());
-    }
-
-    void FaceAntiSpoofResult::clear() {
-        anti_spoofs.clear();
-    }
-
-    void FaceAntiSpoofResult::free() {
-        anti_spoofs.shrink_to_fit();
-    }
-
-    void FaceAntiSpoofResult::reserve(const size_t size) {
-        anti_spoofs.reserve(size);
-    }
-
-    void FaceAntiSpoofResult::resize(const size_t size) {
-        anti_spoofs.resize(size);
-    }
-
-    void FaceAntiSpoofResult::display() {
-    }
 }

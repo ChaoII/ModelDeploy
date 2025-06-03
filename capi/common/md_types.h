@@ -44,9 +44,10 @@ typedef struct {
 } MDPoint;
 
 typedef struct {
-    double x;
-    double y;
-} MDPointF;
+    float x;
+    float y;
+    float z;
+} MDPoint3f;
 
 typedef struct {
     int x;
@@ -172,8 +173,6 @@ typedef struct {
 
 typedef struct {
     MDRect box;
-    MDRotatedRect roted_box;
-    MDMask mask;
     int label_id;
     float score;
 } MDDetectionResult;
@@ -183,6 +182,48 @@ typedef struct {
     MDDetectionResult* data;
     int size;
 } MDDetectionResults;
+
+
+typedef struct {
+    MDRotatedRect rotated_box;
+    int label_id;
+    float score;
+} MDObbResult;
+
+
+typedef struct {
+    MDObbResult* data;
+    int size;
+} MDObbResults;
+
+
+typedef struct {
+    MDRect box;
+    MDMask mask;
+    int label_id;
+    float score;
+} MDIsegResult;
+
+
+typedef struct {
+    MDIsegResult* data;
+    int size;
+} MDIsegResults;
+
+
+typedef struct {
+    MDRect box;
+    MDPoint3f* keypoints;
+    int keypoints_size;
+    int label_id;
+    float score;
+} MDPoseResult;
+
+typedef struct {
+    MDPoseResult* data;
+    int size;
+} MDPoseResults;
+
 
 typedef struct {
     MDPolygon box;

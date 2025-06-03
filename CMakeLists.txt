@@ -13,7 +13,7 @@ message("==================${CMAKE_BUILD_TYPE}===================")
 
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
-option(BUILD_CAPI "build with capi" OFF)
+option(BUILD_CAPI "build with capi" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(WITH_STATIC_CRT "build for mt" OFF)

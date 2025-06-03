@@ -160,14 +160,44 @@ void c_results_2_classification_result(
     ClassifyResult* result);
 
 
-void detection_result_2_c_results(
-    const DetectionResult& result,
+void detection_results_2_c_results(
+    const std::vector<DetectionResult>& results,
     MDDetectionResults* c_results);
 
 
-void c_results_2_detection_result(
+void c_results_2_detection_results(
     const MDDetectionResults* c_results,
-    DetectionResult* result);
+    std::vector<DetectionResult>* results);
+
+
+void obb_results_2_c_results(
+    const std::vector<ObbResult>& results,
+    MDObbResults* c_results);
+
+
+void c_results_2_obb_results(
+    const MDObbResults* c_results,
+    std::vector<ObbResult>* results);
+
+
+void iseg_results_2_c_results(
+    const std::vector<InstanceSegResult>& results,
+    MDIsegResults* c_results);
+
+
+void c_results_2_iseg_results(
+    const MDIsegResults* c_results,
+    std::vector<InstanceSegResult>* results);
+
+
+void pose_results_2_c_results(
+    const std::vector<PoseResult>& results,
+    MDPoseResults* c_results);
+
+
+void c_results_2_pose_results(
+    const MDPoseResults* c_results,
+    std::vector<PoseResult>* results);
 
 
 void ocr_result_2_c_results(
@@ -181,21 +211,21 @@ void c_results_2_ocr_result(
 
 
 void detection_landmark_result_2_c_results(
-    const DetectionLandmarkResult& result,
+    const std::vector<DetectionLandmarkResult>& results,
     MDDetectionLandmarkResults* c_results);
 
 
 void c_results_2_detection_landmark_result(
     const MDDetectionLandmarkResults* c_results,
-    DetectionLandmarkResult* result);
+    std::vector<DetectionLandmarkResult>* results);
 
-void lpr_result_2_c_results(
-    const LprResult& result,
+void lpr_results_2_c_results(
+    const std::vector<LprResult>& results,
     MDLPRResults* c_results);
 
-void c_results_2_lpr_result(
+void c_results_2_lpr_results(
     const MDLPRResults* c_results,
-    LprResult* result);
+    std::vector<LprResult>* results);
 
 
 void face_recognizer_result_2_c_result(

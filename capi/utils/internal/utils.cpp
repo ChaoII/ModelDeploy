@@ -168,81 +168,191 @@ void c_results_2_classification_result(
 
 
 // 注意开辟内存需要成对的销毁
-void detection_result_2_c_results(
-    const DetectionResult& result,
+void detection_results_2_c_results(
+    const std::vector<DetectionResult>& results,
     MDDetectionResults* c_results) {
-    c_results->size = static_cast<int>(result.scores.size());
+    c_results->size = results.size();
     c_results->data = new MDDetectionResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
-        if (!result.boxes.empty()) {
-            auto [x, y, width, height] = result.boxes[i];
-            c_results->data[i].box = {
-                static_cast<int>(x),
-                static_cast<int>(y),
-                static_cast<int>(width),
-                static_cast<int>(height)
-            };
-        }
-        if (!result.rotated_boxes.empty()) {
-            auto roted_box = result.rotated_boxes[i];
-            c_results->data[i].roted_box.xc = static_cast<int>(roted_box.center.x);
-            c_results->data[i].roted_box.yc = static_cast<int>(roted_box.center.y);
-            c_results->data[i].roted_box.width = static_cast<int>(roted_box.size.width);
-            c_results->data[i].roted_box.height = static_cast<int>(roted_box.size.height);
-            c_results->data[i].roted_box.angle = roted_box.angle;
-        }
-        c_results->data[i].score = result.scores[i];
-        c_results->data[i].label_id = result.label_ids[i];
-        c_results->data[i].mask.buffer = nullptr;
-        c_results->data[i].mask.shape = nullptr;
-        c_results->data[i].mask.num_dims = 0;
-        c_results->data[i].mask.buffer_size = 0;
-        if (result.contain_masks) {
-            // 拷贝buffer
-            const auto& mask_buffer = result.masks[i].buffer;
-            c_results->data[i].mask.buffer = new char[mask_buffer.size()];
-            std::ranges::copy(mask_buffer, c_results->data[i].mask.buffer);
-            c_results->data[i].mask.buffer_size = static_cast<int>(mask_buffer.size());
-            // 拷贝shape
-            const auto& mask_shape = result.masks[i].shape;
-            c_results->data[i].mask.shape = new int[mask_shape.size()];
-            std::ranges::copy(mask_shape, c_results->data[i].mask.shape);
-            c_results->data[i].mask.num_dims = static_cast<int>(mask_shape.size());
-        }
+        auto [x, y, width, height] = results[i].box;
+        c_results->data[i].box = {
+            static_cast<int>(x),
+            static_cast<int>(y),
+            static_cast<int>(width),
+            static_cast<int>(height)
+        };
+        c_results->data[i].score = results[i].score;
+        c_results->data[i].label_id = results[i].label_id;
+    }
+}
+
+void c_results_2_detection_results(
+    const MDDetectionResults* c_results,
+    std::vector<DetectionResult>* results) {
+    results->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        cv::Rect2f box = {
+            static_cast<float>(c_results->data[i].box.x),
+            static_cast<float>(c_results->data[i].box.y),
+            static_cast<float>(c_results->data[i].box.width),
+            static_cast<float>(c_results->data[i].box.height),
+        };
+        results->emplace_back(box, c_results->data[i].label_id, c_results->data[i].score);
+    }
+}
+
+void obb_results_2_c_results(
+    const std::vector<ObbResult>& results,
+    MDObbResults* c_results) {
+    c_results->size = results.size();
+    c_results->data = new MDObbResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        auto rotated_box = results[i].rotated_box;
+        c_results->data[i].rotated_box = {
+            static_cast<int>(rotated_box.center.x),
+            static_cast<int>(rotated_box.center.y),
+            static_cast<int>(rotated_box.size.width),
+            static_cast<int>(rotated_box.size.height),
+            rotated_box.angle
+        };
+        c_results->data[i].score = results[i].score;
+        c_results->data[i].label_id = results[i].label_id;
     }
 }
 
 
-void c_results_2_detection_result(
-    const MDDetectionResults* c_results,
-    DetectionResult* result) {
-    result->reserve(c_results->size);
+void c_results_2_obb_results(
+    const MDObbResults* c_results,
+    std::vector<ObbResult>* results) {
+    results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        auto [x, y, width, height] = c_results->data[i].box;
-        if (width > 0 && height > 0) {
-            result->boxes.emplace_back(x, y, width, height);
+        cv::RotatedRect rotated_box = {
+            cv::Point2f{
+                static_cast<float>(c_results->data[i].rotated_box.xc),
+                static_cast<float>(c_results->data[i].rotated_box.yc)
+            },
+            cv::Size2f{
+                static_cast<float>(c_results->data[i].rotated_box.width),
+                static_cast<float>(c_results->data[i].rotated_box.height)
+            },
+            c_results->data[i].rotated_box.angle,
+        };
+        results->emplace_back(rotated_box, c_results->data[i].label_id, c_results->data[i].score);
+    }
+}
+
+
+void iseg_results_2_c_results(
+    const std::vector<InstanceSegResult>& results,
+    MDIsegResults* c_results) {
+    c_results->size = results.size();
+    c_results->data = new MDIsegResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        auto [x, y, width, height] = results[i].box;
+        c_results->data[i].box = {
+            static_cast<int>(x),
+            static_cast<int>(y),
+            static_cast<int>(width),
+            static_cast<int>(height)
+        };
+        c_results->data[i].score = results[i].score;
+        c_results->data[i].label_id = results[i].label_id;
+
+        if (results[i].mask.buffer.empty()) {
+            c_results->data[i].mask.buffer = nullptr;
+            c_results->data[i].mask.shape = nullptr;
+            c_results->data[i].mask.num_dims = 0;
+            c_results->data[i].mask.buffer_size = 0;
+            return;
         }
-        const auto rotated_box = c_results->data[i].roted_box;
-        if (rotated_box.width > 0 && rotated_box.height > 0) {
-            result->rotated_boxes.emplace_back(cv::Point2f(rotated_box.xc, rotated_box.yc),
-                                               cv::Size2f(rotated_box.width, rotated_box.height),
-                                               rotated_box.angle);
-        }
-        result->scores.emplace_back(c_results->data[i].score);
-        result->label_ids.emplace_back(c_results->data[i].label_id);
+
+        // 拷贝buffer
+        const auto& mask_buffer = results[i].mask.buffer;
+        c_results->data[i].mask.buffer = new char[mask_buffer.size()];
+        std::ranges::copy(mask_buffer, c_results->data[i].mask.buffer);
+        c_results->data[i].mask.buffer_size = static_cast<int>(mask_buffer.size());
+        // 拷贝shape
+        const auto& mask_shape = results[i].mask.shape;
+        c_results->data[i].mask.shape = new int[mask_shape.size()];
+        std::ranges::copy(mask_shape, c_results->data[i].mask.shape);
+        c_results->data[i].mask.num_dims = static_cast<int>(mask_shape.size());
+    }
+}
+
+
+void c_results_2_iseg_results(
+    const MDIsegResults* c_results,
+    std::vector<InstanceSegResult>* results) {
+    results->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        cv::Rect2f box = {
+            static_cast<float>(c_results->data[i].box.x),
+            static_cast<float>(c_results->data[i].box.y),
+            static_cast<float>(c_results->data[i].box.width),
+            static_cast<float>(c_results->data[i].box.height),
+        };
+        Mask mask;
         if (c_results->data[i].mask.buffer != nullptr) {
-            result->contain_masks = true;
-            Mask mask;
             mask.buffer = std::vector<uint8_t>(
                 c_results->data[i].mask.buffer,
                 c_results->data[i].mask.buffer + c_results->data[i].mask.buffer_size);
             mask.shape = std::vector<int64_t>(
                 c_results->data[i].mask.shape,
                 c_results->data[i].mask.shape + c_results->data[i].mask.num_dims);
-            result->masks.emplace_back(mask);
         }
+        results->emplace_back(box, mask, c_results->data[i].label_id, c_results->data[i].score);
     }
 }
+
+
+void pose_results_2_c_results(
+    const std::vector<PoseResult>& results,
+    MDPoseResults* c_results) {
+    c_results->size = results.size();
+    c_results->data = new MDPoseResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        c_results->data[i].box = {
+            static_cast<int>(results[i].box.x),
+            static_cast<int>(results[i].box.y),
+            static_cast<int>(results[i].box.width),
+            static_cast<int>(results[i].box.height)
+        };
+        c_results->data[i].keypoints_size = static_cast<int>(results[i].keypoints.size());
+        c_results->data[i].keypoints = new MDPoint3f[results[i].keypoints.size()];
+        for (int j = 0; j < results[i].keypoints.size(); j++) {
+            c_results->data[i].keypoints[j] = {
+                results[i].keypoints[j].x,
+                results[i].keypoints[j].y,
+                results[i].keypoints[j].z
+            };
+        }
+        c_results->data[i].label_id = results[i].label_id;
+        c_results->data[i].score = results[i].score;
+    }
+}
+
+
+void c_results_2_pose_results(
+    const MDPoseResults* c_results,
+    std::vector<PoseResult>* results) {
+    results->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        auto box = cv::Rect2f{
+            static_cast<float>(c_results->data[i].box.x),
+            static_cast<float>(c_results->data[i].box.y),
+            static_cast<float>(c_results->data[i].box.width),
+            static_cast<float>(c_results->data[i].box.height)
+        };
+        std::vector<cv::Point3f> keypoints;
+        for (int j = 0; j < c_results->data[i].keypoints_size; j++) {
+            keypoints.emplace_back(c_results->data[i].keypoints[j].x,
+                                   c_results->data[i].keypoints[j].y,
+                                   c_results->data[i].keypoints[j].z);
+        }
+        results->emplace_back(box, keypoints, c_results->data[i].label_id, c_results->data[i].score);
+    }
+}
+
 
 void ocr_result_2_c_results(
     const OCRResult& result,
@@ -335,120 +445,108 @@ void c_results_2_ocr_result(
 
 // 注意开辟内存需要成对的销毁
 void detection_landmark_result_2_c_results(
-    const DetectionLandmarkResult& result,
+    const std::vector<DetectionLandmarkResult>& results,
     MDDetectionLandmarkResults* c_results) {
-    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->size = results.size();
     c_results->data = new MDDetectionLandmarkResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
-        auto [xmin, ymin, xmax, ymax] = result.boxes[i];
-        c_results->data[i].box = MDRect{
-            static_cast<int>(xmin),
-            static_cast<int>(ymin),
-            static_cast<int>(xmax - xmin),
-            static_cast<int>(ymax - ymin)
+        c_results->data[i].box = {
+            static_cast<int>(results[i].box.x),
+            static_cast<int>(results[i].box.y),
+            static_cast<int>(results[i].box.width),
+            static_cast<int>(results[i].box.height)
         };
-        c_results->data[i].label_id = result.label_ids[i];
-        c_results->data[i].score = result.scores[i];
-        const int landmark_size = result.landmarks_per_instance;
-        c_results->data[i].landmarks_size = landmark_size;
-        c_results->data[i].landmarks = new MDPoint[landmark_size];
-        for (int j = 0; j < landmark_size; j++) {
-            c_results->data[i].landmarks[j] = MDPoint{
-                static_cast<int>(result.landmarks[i * landmark_size + j].x),
-                static_cast<int>(result.landmarks[i * landmark_size + j].y)
+        c_results->data[i].landmarks_size = static_cast<int>(results[i].landmarks.size());
+        c_results->data[i].landmarks = new MDPoint[results[i].landmarks.size()];
+        for (int j = 0; j < results[i].landmarks.size(); j++) {
+            c_results->data[i].landmarks[j] = {
+                static_cast<int>(results[i].landmarks[j].x),
+                static_cast<int>(results[i].landmarks[j].y),
             };
         }
+        c_results->data[i].label_id = results[i].label_id;
+        c_results->data[i].score = results[i].score;
     }
 }
 
 void c_results_2_detection_landmark_result(
     const MDDetectionLandmarkResults* c_results,
-    DetectionLandmarkResult* result) {
-    result->reserve(c_results->size);
-    result->landmarks_per_instance = c_results->data[0].landmarks_size;
+    std::vector<DetectionLandmarkResult>* results) {
+    results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        result->boxes.emplace_back(
+        auto box = cv::Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height)
-        );
-        result->label_ids.emplace_back(c_results->data[i].label_id);
-        result->scores.emplace_back(c_results->data[i].score);
+        };
+        std::vector<cv::Point2f> landmarks;
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
-            result->landmarks.emplace_back(
-                c_results->data[i].landmarks[j].x,
-                c_results->data[i].landmarks[j].y
-            );
+            landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
+                                   static_cast<float>(c_results->data[i].landmarks[j].y));
         }
+        results->emplace_back(box, landmarks, c_results->data[i].label_id, c_results->data[i].score);
     }
 }
 
 // 注意开辟内存需要成对的销毁
-void lpr_result_2_c_results(
-    const LprResult& result, MDLPRResults* c_results) {
+void lpr_results_2_c_results(
+    const std::vector<LprResult>& results, MDLPRResults* c_results) {
     // 针对单纯的车牌识别模型
-    if (result.boxes.empty()) {
+    if (results.empty()) {
         c_results->size = 1;
         c_results->data = new MDLPRResult[c_results->size];
         c_results->data[0].box = MDRect{0, 0, 0, 0};
-        c_results->data[0].car_plate_color = strdup(result.car_plate_colors[0].c_str());
-        c_results->data[0].car_plate_str = strdup(result.car_plate_strs[0].c_str());
+        c_results->data[0].car_plate_color = strdup(results[0].car_plate_color.c_str());
+        c_results->data[0].car_plate_str = strdup(results[0].car_plate_str.c_str());
         c_results->data[0].label_id = -1;
-        c_results->data[0].score = -1.0f;
+        c_results->data[0].score = 0.0f;
         c_results->data[0].landmarks_size = 0;
         c_results->data[0].landmarks = nullptr;
         return;
     }
 
-    c_results->size = static_cast<int>(result.boxes.size());
+    c_results->size = results.size();
     c_results->data = new MDLPRResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
-        auto [xmin, ymin, xmax, ymax] = result.boxes[i];
-        c_results->data[i].box = MDRect{
-            static_cast<int>(xmin),
-            static_cast<int>(ymin),
-            static_cast<int>(xmax - xmin),
-            static_cast<int>(ymax - ymin)
+        c_results->data[i].box = {
+            static_cast<int>(results[i].box.x),
+            static_cast<int>(results[i].box.y),
+            static_cast<int>(results[i].box.width),
+            static_cast<int>(results[i].box.height)
         };
-        c_results->data[i].label_id = result.label_ids[i];
-        c_results->data[i].score = result.scores[i];
-        // 车牌关键点为4个
-        constexpr int landmark_size = 4;
-        c_results->data[i].landmarks_size = landmark_size;
-        c_results->data[i].landmarks = new MDPoint[landmark_size];
-        for (int j = 0; j < landmark_size; j++) {
-            c_results->data[i].landmarks[j] = MDPoint{
-                static_cast<int>(result.landmarks[i * landmark_size + j].x),
-                static_cast<int>(result.landmarks[i * landmark_size + j].y)
+        c_results->data[i].landmarks_size = static_cast<int>(results[i].landmarks.size());
+        c_results->data[i].landmarks = new MDPoint[results[i].landmarks.size()];
+        for (int j = 0; j < results[i].landmarks.size(); j++) {
+            c_results->data[i].landmarks[j] = {
+                static_cast<int>(results[i].landmarks[j].x),
+                static_cast<int>(results[i].landmarks[j].y),
             };
         }
-        c_results->data[i].car_plate_str = strdup(result.car_plate_strs[i].c_str());
-        c_results->data[i].car_plate_color = strdup(result.car_plate_colors[i].c_str());
+        c_results->data[i].label_id = results[i].label_id;
+        c_results->data[i].score = results[i].score;
+        c_results->data[i].car_plate_str = strdup(results[i].car_plate_str.c_str());
+        c_results->data[i].car_plate_color = strdup(results[i].car_plate_color.c_str());
     }
 }
 
-void c_results_2_lpr_result(
-    const MDLPRResults* c_results, LprResult* result) {
-    result->reserve(c_results->size);
+void c_results_2_lpr_results(
+    const MDLPRResults* c_results, std::vector<LprResult>* results) {
+    results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        result->boxes.emplace_back(
+        auto box = cv::Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height)
-
-        );
-        result->label_ids.emplace_back(c_results->data[i].label_id);
-        result->scores.emplace_back(c_results->data[i].score);
+        };
+        std::vector<cv::Point2f> landmarks;
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
-            result->landmarks.emplace_back(
-                c_results->data[i].landmarks[j].x,
-                c_results->data[i].landmarks[j].y
-            );
+            landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
+                                   static_cast<float>(c_results->data[i].landmarks[j].y));
         }
-        result->car_plate_strs.emplace_back(c_results->data[i].car_plate_str);
-        result->car_plate_colors.emplace_back(c_results->data[i].car_plate_color);
+        results->emplace_back(box, landmarks, c_results->data[i].label_id, c_results->data[i].score,
+                              c_results->data[i].car_plate_str, c_results->data[i].car_plate_color);
     }
 }
 
@@ -465,7 +563,7 @@ void face_recognizer_result_2_c_result(
 void c_result_2_face_recognizer_result(
     const MDFaceRecognizerResult* c_result,
     FaceRecognitionResult* result) {
-    result->resize(c_result->size);
+    result->embedding.resize(c_result->size);
     result->embedding.assign(c_result->embedding, c_result->embedding + c_result->size);
 }
 
@@ -487,7 +585,7 @@ void c_results_2_face_recognizer_results(
     results->resize(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
         const size_t embedding_dim = c_results->data[i].size;
-        results->at(i).resize(embedding_dim);
+        results->at(i).embedding.resize(embedding_dim);
         results->at(i).embedding.assign(
             c_results->data[i].embedding,
             c_results->data[i].embedding + embedding_dim);

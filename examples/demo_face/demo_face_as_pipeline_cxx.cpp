@@ -11,20 +11,20 @@ int main() {
         "../../test_data/test_models/face/fas_first.onnx",
         "../../test_data/test_models/face/fas_second.onnx", 8);
     auto im0 = cv::imread("../../test_data/test_images/test_face_detection4.jpg");
-    modeldeploy::vision::FaceAntiSpoofResult results;
+    std::vector<modeldeploy::vision::FaceAntiSpoofResult> results;
     if (!face_as_pipeline_model.predict(im0, &results, 0.3)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
-    for (auto& anti_spoof : results.anti_spoofs) {
-        switch (anti_spoof) {
-        case modeldeploy::vision::FaceAntiSpoofType::FUZZY:
+    for (auto& result : results) {
+        switch (result) {
+        case modeldeploy::vision::FaceAntiSpoofResult::FUZZY:
             std::cout << "FUZZY" << std::endl;
             break;
-        case modeldeploy::vision::FaceAntiSpoofType::REAL:
+        case modeldeploy::vision::FaceAntiSpoofResult::REAL:
             std::cout << "REAL" << std::endl;
             break;
-        case modeldeploy::vision::FaceAntiSpoofType::SPOOF:
+        case modeldeploy::vision::FaceAntiSpoofResult::SPOOF:
             std::cout << "SPOOF" << std::endl;
             break;
         }
