@@ -54,6 +54,7 @@ void md_free_lpr_rec_result(MDLPRResults* c_results) {
             if (c_results->data[i].landmarks) {
                 delete[] c_results->data[i].landmarks;
                 c_results->data[i].landmarks = nullptr;
+                c_results->data[i].landmarks_size = 0;
             }
             free(c_results->data[i].car_plate_str);
             free(c_results->data[i].car_plate_color);

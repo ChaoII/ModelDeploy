@@ -65,6 +65,7 @@ void md_free_lpr_det_result(MDDetectionLandmarkResults* c_results) {
             if (c_results->data[i].landmarks) {
                 delete[] c_results->data[i].landmarks;
                 c_results->data[i].landmarks = nullptr;
+                c_results->data[i].landmarks_size = 0;
             }
         }
         delete[] c_results->data;
