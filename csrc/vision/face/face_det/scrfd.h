@@ -29,7 +29,7 @@ namespace modeldeploy::vision::face {
          * \param[in] nms_iou_threshold iou threshold for NMS, default is 0.4
          * \return true if the prediction successfully, otherwise false
          */
-        bool predict(cv::Mat& im, DetectionLandmarkResult* result,
+        bool predict(cv::Mat& im, std::vector<DetectionLandmarkResult>* result,
                      float conf_threshold = 0.25f,
                      float nms_iou_threshold = 0.4f);
 
@@ -70,7 +70,7 @@ namespace modeldeploy::vision::face {
                         std::map<std::string, std::array<float, 2>>* im_info);
 
         bool postprocess(std::vector<Tensor>& infer_result,
-                         DetectionLandmarkResult* result,
+                         std::vector<DetectionLandmarkResult>* result,
                          const std::map<std::string, std::array<float, 2>>& im_info,
                          float conf_threshold, float nms_iou_threshold);
 

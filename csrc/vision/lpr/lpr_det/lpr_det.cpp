@@ -10,8 +10,7 @@
 #include "csrc/vision/common/processors/convert.h"
 
 
-namespace modeldeploy::vision::lpr
-{
+namespace modeldeploy::vision::lpr {
     void LetterBox(cv::Mat* mat, const std::vector<int>& size, const std::vector<float>& color,
                    const bool _auto, const bool scale_fill = false, const bool scale_up = true, const int stride = 32) {
         float scale = std::min(size[1] * 1.0f / mat->rows, size[0] * 1.0f / mat->cols);
@@ -137,7 +136,7 @@ namespace modeldeploy::vision::lpr
     }
 
     bool LprDetection::postprocess(
-        const Tensor& infer_result, DetectionLandmarkResult* result,
+        const Tensor& infer_result, std::vector<DetectionLandmarkResult>* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
         const float conf_threshold, const float nms_iou_threshold) const {
         // infer_result: (1,n,15) 15=4+1+8+1+1
@@ -149,8 +148,6 @@ namespace modeldeploy::vision::lpr
             return false;
         }
         result->clear();
-        // must be setup landmarks_per_face before reserve
-        result->landmarks_per_instance = landmarks_per_card;
         result->reserve(static_cast<int>(infer_result.shape()[1]));
         auto* data = static_cast<const float*>(infer_result.data());
         // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf0(单层车牌),cls_conf1(双层车牌)
@@ -174,22 +171,22 @@ namespace modeldeploy::vision::lpr
             const float w = attr_ptr[2];
             const float h = attr_ptr[3];
 
-            // convert from [xc, yc, w, h] to [x, y, w, h]
-            result->boxes.emplace_back(
-                x - w / 2.f, y - h / 2.f, w, h
-            );
-            result->label_ids.push_back(class_id);
-            result->scores.push_back(confidence);
+
+            std::vector<cv::Point2f> landmarks;
+            landmarks.reserve(landmarks_per_card);
             // decode landmarks (default 5 landmarks)
             if (landmarks_per_card > 0) {
                 const float* landmarks_ptr = attr_ptr + 5;
                 for (size_t j = 0; j < landmarks_per_card * 2; j += 2) {
-                    result->landmarks.emplace_back(
+                    landmarks.emplace_back(
                         landmarks_ptr[j], landmarks_ptr[j + 1]);
                 }
             }
+            result->emplace_back(
+                cv::Rect2f{x - w / 2.f, y - h / 2.f, w, h},
+                landmarks, class_id, confidence);
         }
-        if (result->boxes.empty()) {
+        if (result->empty()) {
             return true;
         }
         utils::nms(result, nms_iou_threshold);
@@ -203,41 +200,49 @@ namespace modeldeploy::vision::lpr
         const float out_w = iter_out->second[1];
         const float ipt_h = iter_ipt->second[0];
         const float ipt_w = iter_ipt->second[1];
-        float scale = std::min(out_h / ipt_h, out_w / ipt_w);
-        if (!is_scale_up) {
-            scale = std::min(scale, 1.0f);
-        }
-        float pad_h = (out_h - ipt_h * scale) / 2.f;
-        float pad_w = (out_w - ipt_w * scale) / 2.f;
-        if (is_mini_pad) {
-            pad_h = static_cast<float>(static_cast<int>(pad_h) % stride);
-            pad_w = static_cast<float>(static_cast<int>(pad_w) % stride);
-        }
+        const float scale = std::min(out_h / ipt_h, out_w / ipt_w);
+        const float pad_h = (out_h - ipt_h * scale) / 2;
+        const float pad_w = (out_w - ipt_w * scale) / 2;
         // scale and clip box
-        for (auto& boxe : result->boxes) {
-            boxe.x = std::max(boxe.x, 0.0f);
-            boxe.y = std::max(boxe.y, 0.0f);
+        for (auto& _result : *result) {
+            auto& box = _result.box;
+            auto& landmarks = _result.landmarks;
+            // clip box()
+            //先减去 padding;
+            //再除以缩放因子 scale;
+            //最后限制在原始图像范围内 [0, width], [0, height]。
+            // 去掉 padding 并缩放
+            float x1 = (box.x - pad_w) / scale;
+            float y1 = (box.y - pad_h) / scale;
+            float x2 = (box.x + box.width - pad_w) / scale;
+            float y2 = (box.y + box.height - pad_h) / scale;
 
-            // 右下角也不能越界
-            const float x2 = std::min(boxe.x + boxe.width, ipt_w - 1.0f);
-            const float y2 = std::min(boxe.y + boxe.height, ipt_h - 1.0f);
+            // 限制在图像边界内
+            x1 = utils::clamp(x1, 0.0f, ipt_w);
+            y1 = utils::clamp(y1, 0.0f, ipt_h);
+            x2 = utils::clamp(x2, 0.0f, ipt_w);
+            y2 = utils::clamp(y2, 0.0f, ipt_h);
 
-            // 防止裁剪后右下角比左上角还小
-            boxe.width = std::max(x2 - boxe.x, 0.0f);
-            boxe.height = std::max(y2 - boxe.y, 0.0f);
+            // 重新赋值到 box
+            box.x = std::round(x1);
+            box.y = std::round(y1);
+            box.width = std::round(x2 - x1);
+            box.height = std::round(y2 - y1);
+
+            // scale and clip landmarks
+            for (auto& landmark : landmarks) {
+                landmark.x = std::max((landmark.x - pad_w) / scale, 0.0f);
+                landmark.y = std::max((landmark.y - pad_h) / scale, 0.0f);
+
+                landmark.x = std::min(landmark.x, ipt_w - 1.0f);
+                landmark.y = std::min(landmark.y, ipt_h - 1.0f);
+            }
         }
-        // scale and clip landmarks
-        for (auto& landmark : result->landmarks) {
-            landmark.x = std::max((landmark.x - pad_w) / scale, 0.0f);
-            landmark.y = std::max((landmark.y - pad_h) / scale, 0.0f);
 
-            landmark.x = std::min(landmark.x, ipt_w - 1.0f);
-            landmark.y = std::min(landmark.y, ipt_h - 1.0f);
-        }
         return true;
     }
 
-    bool LprDetection::predict(const cv::Mat& image, DetectionLandmarkResult* result,
+    bool LprDetection::predict(const cv::Mat& image, std::vector<DetectionLandmarkResult>* result,
                                const float conf_threshold, const float nms_iou_threshold) {
         std::vector<Tensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;

@@ -71,9 +71,8 @@ namespace modeldeploy::vision::lpr {
             }
             pre = j;
         }
-
-        result->car_plate_strs.emplace_back(plate_str);
-        result->car_plate_colors.emplace_back(plate_color);
+        result->car_plate_str = plate_str;
+        result->car_plate_color = plate_color;
         return true;
     }
 

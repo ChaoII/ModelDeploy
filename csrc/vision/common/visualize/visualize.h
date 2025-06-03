@@ -51,13 +51,13 @@ namespace modeldeploy::vision {
         int font_size, double alpha, bool save_result);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_det_landmarks(
-        cv::Mat cv_image, const DetectionLandmarkResult& result,
+        cv::Mat cv_image, const std::vector<DetectionLandmarkResult>& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.5,
         bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_lpr(
-        cv::Mat& cv_image, const LprResult& result,
+        cv::Mat& cv_image, const std::vector<LprResult>& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.5,
         bool save_result = false);

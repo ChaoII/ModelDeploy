@@ -216,55 +216,38 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    void nms(DetectionLandmarkResult* result, float iou_threshold) {
-        const size_t N = result->boxes.size();
+    void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold) {
+        const size_t N = result->size();
         // Step 1: 根据分数排序得到索引
-        std::vector<int> sorted_indices(N);
-        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
-        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
-            return result->scores[a] > result->scores[b]; // 分数高的排前面
+        std::ranges::sort(*result, [&](const DetectionLandmarkResult& a, const DetectionLandmarkResult& b) {
+            return a.score > b.score; // 分数高的排前面
         });
 
+        std::vector<size_t> index_;
         // Step 2: NMS 主逻辑
-        std::vector suppressed(N, false);
-        std::vector<int> keep_indices;
-
+        std::vector<bool> suppressed(N);
         for (size_t m = 0; m < N; ++m) {
-            int i = sorted_indices[m];
-            if (suppressed[i]) continue;
-            keep_indices.push_back(i); // 保留当前框
-            const auto& box_i = result->boxes[i];
+            if (suppressed[m]) continue;
+            index_.push_back(m);
+            const auto& box_i = result->at(m).box;
             for (size_t n = m + 1; n < N; ++n) {
-                const int j = sorted_indices[n];
-                if (suppressed[j]) continue;
-                const auto& box_j = result->boxes[j];
+                if (suppressed[n]) continue;
+                const auto& box_j = result->at(n).box;
+                if (box_i.area() == 0 || box_j.area() == 0) continue;
                 const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
-                    suppressed[j] = true;
+                    suppressed[n] = true;
                 }
             }
         }
-        DetectionLandmarkResult backup(*result);
-        result->clear();
-        // don't forget to reset the landmarks_per_face
-        // before apply Reserve method.
-        result->landmarks_per_instance = result->landmarks_per_instance;
-        result->reserve(suppressed.size());
-        for (size_t i = 0; i < suppressed.size(); ++i) {
-            if (suppressed[i] == 1) {
-                continue;
-            }
-            result->boxes.emplace_back(backup.boxes[i]);
-            result->scores.push_back(backup.scores[i]);
-            result->label_ids.push_back(backup.label_ids[i]);
-            // landmarks (if have)
-            if (result->landmarks_per_instance > 0) {
-                for (size_t j = 0; j < result->landmarks_per_instance; ++j) {
-                    result->landmarks.emplace_back(
-                        backup.landmarks[i * result->landmarks_per_instance + j]);
-                }
-            }
+
+        // Step 3: 根据 keep_indices 重建结果
+        std::vector<DetectionLandmarkResult> new_result;
+        new_result.reserve(index_.size());
+        for (const auto idx : index_) {
+            new_result.push_back(std::move((*result)[idx])); // 移动语义
         }
+        result->swap(new_result);
     }
 
     cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size) {

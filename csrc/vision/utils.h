@@ -25,14 +25,14 @@ namespace modeldeploy::vision::utils {
 
     void nms(std::vector<PoseResult>* result, float iou_threshold);
 
-    void nms(DetectionLandmarkResult* result, float iou_threshold);
+    void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold);
 
     void print_mat_type(const cv::Mat& mat);
 
     std::vector<float> compute_sqrt(const std::vector<float>& vec);
 
     MODELDEPLOY_CXX_EXPORT std::vector<cv::Mat> align_face_with_five_points(
-        const cv::Mat& image, DetectionLandmarkResult& result,
+        const cv::Mat& image, std::vector<DetectionLandmarkResult>& result,
         std::vector<std::array<float, 2>> std_landmarks =
         {
             {89.3095f, 72.9025f},
