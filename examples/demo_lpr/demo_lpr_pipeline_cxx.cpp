@@ -19,13 +19,12 @@ int main() {
         "../../test_data/test_models/plate_recognition_color.onnx");
     auto im = cv::imread("../../test_data/test_images/test_lpr_pipeline3.jpg");
     auto im_bak = im.clone();
-    modeldeploy::vision::LprResult res;
+    std::vector<modeldeploy::vision::LprResult> res;
     if (!model.predict(im, &res)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
 
-    res.display();
     auto vis_image = modeldeploy::vision::vis_lpr(im_bak, res, "../../test_data/msyh.ttc");
     cv::imshow("result", vis_image);
     cv::waitKey(0);

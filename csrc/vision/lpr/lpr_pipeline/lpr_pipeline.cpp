@@ -5,8 +5,7 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
-namespace modeldeploy::vision::lpr
-{
+namespace modeldeploy::vision::lpr {
     LprPipeline::LprPipeline(const std::string& det_model_path,
                              const std::string& rec_model_path,
                              int thread_num) {
@@ -83,33 +82,38 @@ namespace modeldeploy::vision::lpr
         return out;
     }
 
-    bool LprPipeline::predict(const cv::Mat& image, LprResult* results) {
-        DetectionLandmarkResult det_result;
+    bool LprPipeline::predict(const cv::Mat& image, std::vector<LprResult>* results) {
+        std::vector<DetectionLandmarkResult> det_result;
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
         }
-        const size_t lp_num = det_result.boxes.size();
+        const size_t lp_num = det_result.size();
         results->resize(lp_num);
-        results->landmarks = det_result.landmarks;
-        results->boxes = det_result.boxes;
-        results->scores = det_result.scores;
-        results->label_ids = det_result.label_ids;
+
         for (int i = 0; i < lp_num; ++i) {
+            (*results)[i].box = det_result[i].box;
+            (*results)[i].score = det_result[i].score;
+            (*results)[i].label_id = det_result[i].label_id;
+            (*results)[i].landmarks = det_result[i].landmarks;
+
             std::array<cv::Point2f, 4> points;
-            points[0] = det_result.landmarks[i * 4 + 0];
-            points[1] = det_result.landmarks[i * 4 + 1];
-            points[2] = det_result.landmarks[i * 4 + 2];
-            points[3] = det_result.landmarks[i * 4 + 3];
+            if (det_result[i].landmarks.size() != 4) {
+                MD_LOG_ERROR << "detector predict failed" << std::endl;
+                return false;
+            }
+            for (int j = 0; j < 4; ++j) {
+                points[j] = det_result[i].landmarks[j];
+            }
             cv::Mat transform_image = transform_from_4points(image, points);
-            // 如果是双层车牌
-            if (det_result.label_ids[i]) {
+            // 如果是双层车牌 0 单层车牌 1 双层车牌
+            if (det_result[i].label_id) {
                 transform_image = get_split_merge(transform_image);
             }
             LprResult tmp_result;
             recognizer_->predict(transform_image, &tmp_result);
-            results->car_plate_colors[i] = tmp_result.car_plate_colors[0];
-            results->car_plate_strs[i] = tmp_result.car_plate_strs[0];
+            (*results)[i].car_plate_color = tmp_result.car_plate_color;
+            (*results)[i].car_plate_str = tmp_result.car_plate_str;
         }
         return true;
     }

@@ -107,7 +107,7 @@ namespace modeldeploy::vision::utils {
     }
 
     std::vector<cv::Mat> align_face_with_five_points(
-        const cv::Mat& image, DetectionLandmarkResult& result,
+        const cv::Mat& image, std::vector<DetectionLandmarkResult>& result,
         std::vector<std::array<float, 2>> std_landmarks,
         std::array<int, 2> output_size) {
         if (std_landmarks.size() != 5) {
@@ -117,15 +117,15 @@ namespace modeldeploy::vision::utils {
             MD_LOG_ERROR << "The input_image can't be empty.";
         }
         std::vector<cv::Mat> output_images;
-        output_images.reserve(result.scores.size());
-        if (result.boxes.empty()) {
+        output_images.reserve(result.size());
+        if (result.empty()) {
             MD_LOG_ERROR << "The result is empty." << std::endl;
             return output_images;
         }
 
         cv::Mat src(5, 2, CV_32FC1, std_landmarks.data());
-        for (int i = 0; i < result.landmarks.size(); i += 5) {
-            cv::Mat dst(5, 2, CV_32FC1, result.landmarks.data() + i);
+        for (int i = 0; i < result.size(); i++) {
+            cv::Mat dst(5, 2, CV_32FC1, result[i].landmarks.data());
             cv::Mat m = similar_transform(dst, src);
             cv::Mat map_matrix;
             cv::Rect map_matrix_r = cv::Rect(0, 0, 3, 2);

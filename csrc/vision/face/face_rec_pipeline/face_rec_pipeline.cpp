@@ -32,7 +32,7 @@ namespace modeldeploy::vision::face {
 
     bool FaceRecognizerPipeline::predict(const cv::Mat& image, std::vector<FaceRecognitionResult>* results) {
         cv::Mat image_bak = image;
-        DetectionLandmarkResult det_result;
+        std::vector<DetectionLandmarkResult> det_result;
         if (!detector_->predict(image_bak, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
@@ -41,7 +41,7 @@ namespace modeldeploy::vision::face {
             modeldeploy::vision::utils::align_face_with_five_points(image, det_result);
         const size_t lp_num = aligned_images.size();
         results->reserve(lp_num);
-        for (const auto & aligned_image : aligned_images) {
+        for (const auto& aligned_image : aligned_images) {
             FaceRecognitionResult tmp_result;
             recognizer_->predict(aligned_image, &tmp_result);
             results->emplace_back(tmp_result);

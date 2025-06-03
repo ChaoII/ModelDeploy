@@ -81,39 +81,11 @@ namespace modeldeploy::vision {
     };
 
 
-    // struct MODELDEPLOY_CXX_EXPORT DetectionResult {
-    //     DetectionResult() = default;
-    //     // for detection
-    //     std::vector<cv::Rect2f> boxes;
-    //     // for obb
-    //     std::vector<cv::RotatedRect> rotated_boxes;
-    //     std::vector<float> scores;
-    //     std::vector<int32_t> label_ids;
-    //     // For instance segmentation model, `masks` is the predict mask for all the detected objects
-    //     std::vector<Mask> masks;
-    //     /// Shows if the DetectionResult has mask
-    //     bool contain_masks = false;
-    //     ResultType type = ResultType::DETECTION;
-    //     /// Copy constructor
-    //     DetectionResult(const DetectionResult& res);
-    //     /// Move assignment
-    //     DetectionResult& operator=(DetectionResult&& other) noexcept;
-    //     /// Clear DetectionResult
-    //     void clear();
-    //     /// Clear DetectionResult and free the memory
-    //     void free();
-    //     void reserve(int size);
-    //     void resize(int size);
-    //     /// Debug function, convert the result to string to print
-    //     void display() const;
-    // };
-
-
     struct MODELDEPLOY_CXX_EXPORT PoseResult {
         cv::Rect2f box;
         std::vector<cv::Point3f> keypoints;
-        int32_t label_id = -1;
-        float score = 0.0f;
+        int32_t label_id;
+        float score;
         ResultType type = ResultType::FACE_DETECTION;
     };
 
@@ -135,43 +107,51 @@ namespace modeldeploy::vision {
 
     /*! @brief Face detection result structure for all the face detection models
      */
+    // struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
+    //     /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
+    //      */
+    //     std::vector<cv::Rect2f> boxes;
+    //     /** \brief
+    //      * If the model detect face with landmarks, every detected object box correspoing to a landmark, which is a array of 2 float values, means location [x,y]
+    //     */
+    //     std::vector<cv::Point2f> landmarks;
+    //
+    //     std::vector<int> label_ids;
+    //     /** \brief
+    //      * Indicates the confidence of all targets detected from a single image, and the number of elements is consistent with boxes.size()
+    //      */
+    //     std::vector<float> scores;
+    //     ResultType type = ResultType::FACE_DETECTION;
+    //     /** \brief
+    //      * `landmarks_per_face` indicates the number of face landmarks for each detected face
+    //      * if the model's output contains face landmarks (such as YOLOv5Face, SCRFD, ...)
+    //     */
+    //     int landmarks_per_instance;
+    //
+    //     DetectionLandmarkResult() { landmarks_per_instance = 0; }
+    //
+    //     DetectionLandmarkResult(const DetectionLandmarkResult& res);
+    //
+    //     /// Clear FaceDetectionResult
+    //     void clear();
+    //
+    //     /// Clear FaceDetectionResult and free the memory
+    //     void free();
+    //
+    //     void reserve(size_t size);
+    //
+    //     void resize(size_t size);
+    //
+    //     /// Debug function, convert the result to string to print
+    //     void display() const;
+    // };
+
     struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
-        /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
-         */
-        std::vector<cv::Rect2f> boxes;
-        /** \brief
-         * If the model detect face with landmarks, every detected object box correspoing to a landmark, which is a array of 2 float values, means location [x,y]
-        */
+        cv::Rect2f box;
         std::vector<cv::Point2f> landmarks;
-
-        std::vector<int> label_ids;
-        /** \brief
-         * Indicates the confidence of all targets detected from a single image, and the number of elements is consistent with boxes.size()
-         */
-        std::vector<float> scores;
+        int label_id;
+        float score;
         ResultType type = ResultType::FACE_DETECTION;
-        /** \brief
-         * `landmarks_per_face` indicates the number of face landmarks for each detected face
-         * if the model's output contains face landmarks (such as YOLOv5Face, SCRFD, ...)
-        */
-        int landmarks_per_instance;
-
-        DetectionLandmarkResult() { landmarks_per_instance = 0; }
-
-        DetectionLandmarkResult(const DetectionLandmarkResult& res);
-
-        /// Clear FaceDetectionResult
-        void clear();
-
-        /// Clear FaceDetectionResult and free the memory
-        void free();
-
-        void reserve(size_t size);
-
-        void resize(size_t size);
-
-        /// Debug function, convert the result to string to print
-        void display() const;
     };
 
 
@@ -203,26 +183,12 @@ namespace modeldeploy::vision {
     };
 
     struct MODELDEPLOY_CXX_EXPORT LprResult {
-        std::vector<cv::Rect2f> boxes;
+        cv::Rect2f box;
         std::vector<cv::Point2f> landmarks;
-        std::vector<int> label_ids;
-        std::vector<float> scores;
-        std::vector<std::string> car_plate_strs;
-        std::vector<std::string> car_plate_colors;
-
-        LprResult() = default;
-
-        LprResult(const LprResult& res);
-        /// Clear FaceRecognitionResult
-        void clear();
-        /// Clear FaceRecognitionResult and free the memory
-        void free();
-
-        void reserve(size_t size);
-
-        void resize(size_t size);
-        /// Debug function, convert the result to string to print
-        void display() const;
+        int label_id;
+        float score;
+        std::string car_plate_str;
+        std::string car_plate_color;
     };
 
 

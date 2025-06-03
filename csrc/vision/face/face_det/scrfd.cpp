@@ -12,8 +12,7 @@
 #include "csrc/vision/face/face_det/scrfd.h"
 
 
-namespace modeldeploy::vision::face
-{
+namespace modeldeploy::vision::face {
     void SCRFD::letter_box(cv::Mat* mat, const std::vector<int>& size,
                            const std::vector<float>& color, const bool _auto,
                            const bool scale_fill, const bool scale_up, const int stride) {
@@ -157,7 +156,7 @@ namespace modeldeploy::vision::face
     }
 
     bool SCRFD::postprocess(
-        std::vector<Tensor>& infer_result, DetectionLandmarkResult* result,
+        std::vector<Tensor>& infer_result, std::vector<DetectionLandmarkResult>* result,
         const std::map<std::string, std::array<float, 2>>& im_info,
         const float conf_threshold, const float nms_iou_threshold) {
         // number of downsample_strides
@@ -167,10 +166,12 @@ namespace modeldeploy::vision::face
             infer_result.size() == 10 || infer_result.size() == 15)) {
             MD_LOG_ERROR << "The default number of output tensor must be 6, 9, 10, or 15 "
                 "according to scrfd." << std::endl;
+            return false;
         }
         if (!(fmc == 3 || fmc == 5)) { MD_LOG_ERROR << "The fmc must be 3 or 5" << std::endl; }
         if (infer_result.at(0).shape()[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
+            return false;
         }
         for (int i = 0; i < fmc; ++i) {
             if (infer_result.at(i).dtype() != DataType::FP32) {
@@ -207,14 +208,6 @@ namespace modeldeploy::vision::face
             pad_h = static_cast<float>(static_cast<int>(pad_h) % stride);
             pad_w = static_cast<float>(static_cast<int>(pad_w) % stride);
         }
-        // must be setup landmarks_per_face before reserve
-        if (use_kps) {
-            result->landmarks_per_instance = landmarks_per_face;
-        }
-        else {
-            // force landmarks_per_face = 0, if use_kps has been set as 'false'.
-            result->landmarks_per_instance = 0;
-        }
         result->reserve(static_cast<int>(total_num_boxes));
         unsigned int count = 0;
         // loop each stride
@@ -242,9 +235,8 @@ namespace modeldeploy::vision::face
                 const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
                 const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
                 const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
-                result->boxes.emplace_back(x1, y1, x2 - x1, y2 - y1);
-                result->scores.push_back(cls_conf);
-                result->label_ids.push_back(0);
+                std::vector<cv::Point2f> landmarks;
+                landmarks.reserve(landmarks_per_face);
                 if (use_kps) {
                     const auto* landmarks_ptr =
                         static_cast<float*>(infer_result.at(f + 2 * fmc).data());
@@ -257,9 +249,10 @@ namespace modeldeploy::vision::face
                         // cx + l x
                         const float kps_y = ((cy + kps_t) * static_cast<float>(current_stride) - pad_h) / scale;
                         // cy + t y
-                        result->landmarks.emplace_back(kps_x, kps_y);
+                        landmarks.emplace_back(kps_x, kps_y);
                     }
                 }
+                result->emplace_back(cv::Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, cls_conf, 0);
                 count += 1; // limit boxes for nms.
                 if (count > max_nms) {
                     break;
@@ -271,37 +264,40 @@ namespace modeldeploy::vision::face
         if (iter_ipt == im_info.end()) {
             MD_LOG_ERROR << "Cannot find input_shape from im_info." << std::endl;
         }
-        if (result->boxes.empty()) {
+        if (result->empty()) {
             return true;
         }
         utils::nms(result, nms_iou_threshold);
         // scale and clip box
-        for (auto& boxe : result->boxes) {
+        for (auto& _result : *result) {
+            auto& box = _result.box;
+            auto& landmarks = _result.landmarks;
+
             // 左上角不能越界
-            boxe.x = std::max(boxe.x, 0.0f);
-            boxe.y = std::max(boxe.y, 0.0f);
+            box.x = std::max(box.x, 0.0f);
+            box.y = std::max(box.y, 0.0f);
 
             // 右下角也不能越界
-            const float x2 = std::min(boxe.x + boxe.width, ipt_w - 1.0f);
-            const float y2 = std::min(boxe.y + boxe.height, ipt_h - 1.0f);
+            const float x2 = std::min(box.x + box.width, ipt_w - 1.0f);
+            const float y2 = std::min(box.y + box.height, ipt_h - 1.0f);
 
             // 防止裁剪后右下角比左上角还小
-            boxe.width = std::max(x2 - boxe.x, 0.0f);
-            boxe.height = std::max(y2 - boxe.y, 0.0f);
-        }
-        // scale and clip landmarks
-        if (use_kps) {
-            for (auto& landmark : result->landmarks) {
-                landmark.x = std::max(landmark.x, 0.0f);
-                landmark.y = std::max(landmark.y, 0.0f);
-                landmark.x = std::min(landmark.x, ipt_w - 1.0f);
-                landmark.y = std::min(landmark.y, ipt_h - 1.0f);
+            box.width = std::max(x2 - box.x, 0.0f);
+            box.height = std::max(y2 - box.y, 0.0f);
+            if (use_kps) {
+                for (auto& landmark : landmarks) {
+                    landmark.x = std::max(landmark.x, 0.0f);
+                    landmark.y = std::max(landmark.y, 0.0f);
+                    landmark.x = std::min(landmark.x, ipt_w - 1.0f);
+                    landmark.y = std::min(landmark.y, ipt_h - 1.0f);
+                }
             }
         }
+        // scale and clip landmarks
         return true;
     }
 
-    bool SCRFD::predict(cv::Mat& im, DetectionLandmarkResult* result,
+    bool SCRFD::predict(cv::Mat& im, std::vector<DetectionLandmarkResult>* result,
                         const float conf_threshold, const float nms_iou_threshold) {
         std::vector<Tensor> input_tensors(1);
         std::map<std::string, std::array<float, 2>> im_info;
