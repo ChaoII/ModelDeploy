@@ -57,9 +57,11 @@ void md_free_face_rec_pipeline_result(MDFaceRecognizerResults* c_results) {
         for (int i = 0; i < c_results->size; i++) {
             delete[] c_results->data[i].embedding;
             c_results->data[i].embedding = nullptr;
+            c_results->data[i].size = 0;
         }
         delete[] c_results->data;
         c_results->data = nullptr;
+        c_results->size = 0;
     }
 }
 
