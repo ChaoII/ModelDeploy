@@ -30,8 +30,8 @@ namespace modeldeploy::vision::face {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
-            (*results)[bs].clear();
-            (*results)[bs].resize(embedding_tensor.size());
+            (*results)[bs].embedding.clear();
+            (*results)[bs].embedding.resize(embedding_tensor.size());
 
             std::memcpy((*results)[bs].embedding.data(),
                         embedding_tensor.data(),

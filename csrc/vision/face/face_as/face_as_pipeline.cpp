@@ -126,7 +126,7 @@ namespace modeldeploy::vision::face {
 
 
     bool SeetaFaceAsPipeline::predict(const cv::Mat& im,
-                                      FaceAntiSpoofResult* results,
+                                      std::vector<FaceAntiSpoofResult>* results,
                                       const float fuse_threshold,
                                       const float clarity_threshold) const {
         cv::Mat im_bak0 = im.clone();
@@ -148,14 +148,14 @@ namespace modeldeploy::vision::face {
             const float result = has_box ? 0.0f : passive_result;
             if (result > fuse_threshold) {
                 if (clarity >= clarity_threshold) {
-                    results->anti_spoofs.push_back(FaceAntiSpoofType::REAL);
+                    results->push_back(FaceAntiSpoofResult::REAL);
                 }
                 else {
-                    results->anti_spoofs.push_back(FaceAntiSpoofType::FUZZY);
+                    results->push_back(FaceAntiSpoofResult::FUZZY);
                 }
             }
             else {
-                results->anti_spoofs.push_back(FaceAntiSpoofType::SPOOF);
+                results->push_back(FaceAntiSpoofResult::SPOOF);
             }
         }
         return true;

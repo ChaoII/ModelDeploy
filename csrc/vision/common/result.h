@@ -17,7 +17,7 @@ namespace modeldeploy::vision {
         MASK,
     };
 
-    enum class FaceAntiSpoofType:std::uint8_t {
+    enum class FaceAntiSpoofResult:std::uint8_t {
         REAL,
         FUZZY,
         SPOOF,
@@ -105,47 +105,6 @@ namespace modeldeploy::vision {
     };
 
 
-    /*! @brief Face detection result structure for all the face detection models
-     */
-    // struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
-    //     /** \brief All the detected object boxes for an input image, the size of `boxes` is the number of detected objects, and the element of `boxes` is a array of 4 float values, means [xmin, ymin, xmax, ymax]
-    //      */
-    //     std::vector<cv::Rect2f> boxes;
-    //     /** \brief
-    //      * If the model detect face with landmarks, every detected object box correspoing to a landmark, which is a array of 2 float values, means location [x,y]
-    //     */
-    //     std::vector<cv::Point2f> landmarks;
-    //
-    //     std::vector<int> label_ids;
-    //     /** \brief
-    //      * Indicates the confidence of all targets detected from a single image, and the number of elements is consistent with boxes.size()
-    //      */
-    //     std::vector<float> scores;
-    //     ResultType type = ResultType::FACE_DETECTION;
-    //     /** \brief
-    //      * `landmarks_per_face` indicates the number of face landmarks for each detected face
-    //      * if the model's output contains face landmarks (such as YOLOv5Face, SCRFD, ...)
-    //     */
-    //     int landmarks_per_instance;
-    //
-    //     DetectionLandmarkResult() { landmarks_per_instance = 0; }
-    //
-    //     DetectionLandmarkResult(const DetectionLandmarkResult& res);
-    //
-    //     /// Clear FaceDetectionResult
-    //     void clear();
-    //
-    //     /// Clear FaceDetectionResult and free the memory
-    //     void free();
-    //
-    //     void reserve(size_t size);
-    //
-    //     void resize(size_t size);
-    //
-    //     /// Debug function, convert the result to string to print
-    //     void display() const;
-    // };
-
     struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
         cv::Rect2f box;
         std::vector<cv::Point2f> landmarks;
@@ -155,58 +114,19 @@ namespace modeldeploy::vision {
     };
 
 
-    /*! @brief Face recognition result structure for all the Face recognition models
-     */
     struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult {
-        /** \brief The feature embedding that represents the final extraction of the face recognition model can be used to calculate the feature similarity between faces.
-         */
         std::vector<float> embedding;
-
         ResultType type = ResultType::FACE_RECOGNITION;
-
-        FaceRecognitionResult() = default;
-
-        FaceRecognitionResult(const FaceRecognitionResult& res);
-
-        /// Clear FaceRecognitionResult
-        void clear();
-
-        /// Clear FaceRecognitionResult and free the memory
-        void free();
-
-        void reserve(size_t size);
-
-        void resize(size_t size);
-
-        /// Debug function, convert the result to string to print
         void display();
     };
 
     struct MODELDEPLOY_CXX_EXPORT LprResult {
         cv::Rect2f box;
+        // 4 points
         std::vector<cv::Point2f> landmarks;
         int label_id;
         float score;
         std::string car_plate_str;
         std::string car_plate_color;
-    };
-
-
-    struct MODELDEPLOY_CXX_EXPORT FaceAntiSpoofResult {
-        std::vector<FaceAntiSpoofType> anti_spoofs;
-
-        FaceAntiSpoofResult() = default;
-
-        FaceAntiSpoofResult(const FaceAntiSpoofResult& res);
-
-        void clear();
-
-        void free();
-
-        void reserve(size_t size);
-
-        void resize(size_t size);
-
-        void display();
     };
 }
