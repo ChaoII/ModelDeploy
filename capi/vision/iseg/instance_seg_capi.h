@@ -36,11 +36,11 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_set_instance_seg_input_size(
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_instance_seg_predict(
     const MDModel* model,
     MDImage* image,
-    MDDetectionResults* c_results);
+    MDIsegResults* c_results);
 
 /// 打印检测结果
 MODELDEPLOY_CAPI_EXPORT void md_print_instance_seg_result(
-    const MDDetectionResults* c_results);
+    const MDIsegResults* c_results);
 
 /// 绘制检测结果
 /// \param image 原始图像
@@ -52,7 +52,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_instance_seg_result(
 /// \param save_result 保存结果, 如果>0将保存绘制后的图片vis_result.jpg
 MODELDEPLOY_CAPI_EXPORT void md_draw_instance_seg_result(
     const MDImage* image,
-    const MDDetectionResults* c_results,
+    const MDIsegResults* c_results,
     double threshold,
     const char* font_path,
     int font_size,
@@ -62,7 +62,7 @@ MODELDEPLOY_CAPI_EXPORT void md_draw_instance_seg_result(
 /// 释放检测结果
 /// @param c_results 由md_instance_seg_predict生成的检测结果
 MODELDEPLOY_CAPI_EXPORT void md_free_instance_seg_result(
-    MDDetectionResults* c_results);
+    MDIsegResults* c_results);
 
 /// 释放检测模型
 /// @param model 由create_instance_seg_model创建的模型

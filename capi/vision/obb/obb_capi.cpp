@@ -38,39 +38,39 @@ MDStatusCode md_set_obb_input_size(const MDModel* model, const MDSize size) {
     return MDStatusCode::Success;
 }
 
-MDStatusCode md_obb_predict(const MDModel* model, MDImage* image, MDDetectionResults* c_results) {
+MDStatusCode md_obb_predict(const MDModel* model, MDImage* image, MDObbResults* c_results) {
     if (model->type != MDModelType::Detection) {
         MD_LOG_ERROR << "Model type is not obb!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
     const auto cv_image = md_image_to_mat(image);
-    modeldeploy::vision::DetectionResult result;
+    std::vector<modeldeploy::vision::ObbResult> results;
     const auto obb_model = static_cast<modeldeploy::vision::detection::UltralyticsObb*>(model->model_content);
-    if (const bool res_status = obb_model->predict(cv_image, &result); !res_status) {
+    if (const bool res_status = obb_model->predict(cv_image, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
-    detection_result_2_c_results(result, c_results);
+    obb_results_2_c_results(results, c_results);
     return MDStatusCode::Success;
 }
 
 
-void md_print_obb_result(const MDDetectionResults* c_results) {
-    modeldeploy::vision::DetectionResult result;
-    c_results_2_detection_result(c_results, &result);
-    result.display();
+void md_print_obb_result(const MDObbResults* c_results) {
+    std::vector<modeldeploy::vision::ObbResult> results;
+    c_results_2_obb_results(c_results, &results);
+    // result.display();
 }
 
 
-void md_draw_obb_result(const MDImage* image, const MDDetectionResults* c_results,
+void md_draw_obb_result(const MDImage* image, const MDObbResults* c_results,
                         const double threshold, const char* font_path, const int font_size,
                         const double alpha, const int save_result) {
     auto cv_image = md_image_to_mat(image);
-    modeldeploy::vision::DetectionResult result;
-    c_results_2_detection_result(c_results, &result);
-    modeldeploy::vision::vis_detection(cv_image, result, threshold, font_path, font_size, alpha, save_result);
+    std::vector<modeldeploy::vision::ObbResult> results;
+    c_results_2_obb_results(c_results, &results);
+    modeldeploy::vision::vis_obb(cv_image, results, threshold, font_path, font_size, alpha, save_result);
 }
 
-void md_free_obb_result(MDDetectionResults* c_results) {
+void md_free_obb_result(MDObbResults* c_results) {
     if (c_results->size > 0 && c_results->data != nullptr) {
         c_results->size = 0;
         delete [] c_results->data;
