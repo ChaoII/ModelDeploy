@@ -9,7 +9,7 @@
 #include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
-#include "capi/vision/detection/pose_capi.h"
+#include "capi/vision/detection/detection_capi.h"
 
 
 MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
