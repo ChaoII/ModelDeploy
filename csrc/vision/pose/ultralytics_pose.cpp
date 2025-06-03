@@ -6,8 +6,7 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/pose/ultralytics_pose.h"
 
-namespace modeldeploy::vision::detection
-{
+namespace modeldeploy::vision::detection {
     UltralyticsPose::UltralyticsPose(const std::string& model_file, const RuntimeOption& custom_option) {
         runtime_option_ = custom_option;
         runtime_option_.model_filepath = model_file;
@@ -22,8 +21,8 @@ namespace modeldeploy::vision::detection
         return true;
     }
 
-    bool UltralyticsPose::predict(const cv::Mat& image, PoseResult* result) {
-        std::vector<PoseResult> results;
+    bool UltralyticsPose::predict(const cv::Mat& image, std::vector<PoseResult>* result) {
+        std::vector<std::vector<PoseResult>> results;
         if (!batch_predict({image}, &results)) {
             return false;
         }
@@ -32,7 +31,7 @@ namespace modeldeploy::vision::detection
     }
 
     bool UltralyticsPose::batch_predict(const std::vector<cv::Mat>& images,
-                                        std::vector<PoseResult>* results) {
+                                        std::vector<std::vector<PoseResult>>* results) {
         std::vector<std::map<std::string, std::array<float, 2>>> ims_info;
         std::vector<cv::Mat> _images = images;
         if (!preprocessor_.run(&_images, &reused_input_tensors_, &ims_info)) {
@@ -44,9 +43,6 @@ namespace modeldeploy::vision::detection
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
-        std::cout << "reused_output_tensors_[0].shape[0]= " << reused_output_tensors_[0].shape()[0] << std::endl;
-        std::cout << "reused_output_tensors_[0].shape[1]= " << reused_output_tensors_[0].shape()[1] << std::endl;
-        std::cout << "reused_output_tensors_[0].shape[2]= " << reused_output_tensors_[0].shape()[2] << std::endl;
         if (!postprocessor_.run(reused_output_tensors_, results, ims_info)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;

@@ -8,7 +8,7 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.use_gpu();
-    modeldeploy::vision::classification::UltralyticsCls yol_ov5_cls("../../test_data/test_models/yolov8n-cls.onnx",
+    modeldeploy::vision::classification::UltralyticsCls yol_ov5_cls("../../test_data/test_models/yolo11n-cls.onnx",
                                                                     option);
     auto img = cv::imread("../../test_data/test_images/test_face.jpg");
     modeldeploy::vision::ClassifyResult results;

@@ -233,84 +233,84 @@ namespace modeldeploy::vision
     }
 
 
-    PoseResult::PoseResult(const PoseResult& res) {
-        boxes.assign(res.boxes.begin(), res.boxes.end());
-        keypoints.assign(res.keypoints.begin(), res.keypoints.end());
-        label_ids.assign(res.label_ids.begin(), res.label_ids.end());
-        scores.assign(res.scores.begin(), res.scores.end());
-        keypoints_per_instance = res.keypoints_per_instance;
-    }
-
-    void PoseResult::free() {
-        boxes.shrink_to_fit();
-        scores.shrink_to_fit();
-        keypoints.shrink_to_fit();
-        keypoints_per_instance = 0;
-    }
-
-    void PoseResult::clear() {
-        boxes.clear();
-        scores.clear();
-        label_ids.clear();
-        keypoints.clear();
-        keypoints_per_instance = 0;
-    }
-
-    void PoseResult::reserve(const size_t size) {
-        boxes.reserve(size);
-        scores.reserve(size);
-        label_ids.reserve(size);
-        if (keypoints_per_instance > 0) {
-            keypoints.reserve(size * keypoints_per_instance);
-        }
-    }
-
-    void PoseResult::resize(const size_t size) {
-        boxes.resize(size);
-        scores.resize(size);
-        label_ids.resize(size);
-        if (keypoints_per_instance > 0) {
-            keypoints.resize(size * keypoints_per_instance);
-        }
-    }
-
-    void PoseResult::display() const {
-        tabulate::Table output_table;
-        output_table.format().font_color(tabulate::Color::green)
-                    .border_color(tabulate::Color::magenta)
-                    .corner_color(tabulate::Color::magenta);
-
-        if (keypoints.size() != boxes.size() * keypoints_per_instance) {
-            MD_LOG_ERROR << "The size of keypoints != boxes.size * keypoints_per_instance." << std::endl;
-        }
-        output_table.add_row({
-            "order",
-            "box([x, y, width, height])",
-            "label_id",
-            "score",
-            "landmarks(" + std::to_string(keypoints_per_instance) + " * point)"
-        });
-        for (size_t i = 0; i < boxes.size(); ++i) {
-            std::string row_str_box = "["
-                + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
-                + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
-                + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
-                + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
-            std::string row_str_score = std::to_string(scores[i]);
-            std::string row_str_label_id = std::to_string(label_ids[i]);
-            std::string row_str_keypoints;
-            for (size_t j = 0; j < keypoints_per_instance; ++j) {
-                row_str_keypoints += "[" +
-                    std::to_string(static_cast<int>(keypoints[i * keypoints_per_instance + j].x)) + "," +
-                    std::to_string(static_cast<int>(keypoints[i * keypoints_per_instance + j].y)) + "," +
-                    std::to_string(static_cast<int>(keypoints[i * keypoints_per_instance + j].z));
-                row_str_keypoints += j < keypoints_per_instance - 1 ? "], " : "]";
-            }
-            output_table.add_row({std::to_string(i), row_str_box, row_str_label_id, row_str_score, row_str_keypoints});
-        }
-        std::cout << termcolor::cyan << "PoseResult:" << termcolor::reset << std::endl;
-        std::cout << output_table << std::endl;
-    }
+    // PoseResult::PoseResult(const PoseResult& res) {
+    //     boxes.assign(res.boxes.begin(), res.boxes.end());
+    //     keypoints.assign(res.keypoints.begin(), res.keypoints.end());
+    //     label_ids.assign(res.label_ids.begin(), res.label_ids.end());
+    //     scores.assign(res.scores.begin(), res.scores.end());
+    //     keypoints_per_instance = res.keypoints_per_instance;
+    // }
+    //
+    // void PoseResult::free() {
+    //     boxes.shrink_to_fit();
+    //     scores.shrink_to_fit();
+    //     keypoints.shrink_to_fit();
+    //     keypoints_per_instance = 0;
+    // }
+    //
+    // void PoseResult::clear() {
+    //     boxes.clear();
+    //     scores.clear();
+    //     label_ids.clear();
+    //     keypoints.clear();
+    //     keypoints_per_instance = 0;
+    // }
+    //
+    // void PoseResult::reserve(const size_t size) {
+    //     boxes.reserve(size);
+    //     scores.reserve(size);
+    //     label_ids.reserve(size);
+    //     if (keypoints_per_instance > 0) {
+    //         keypoints.reserve(size * keypoints_per_instance);
+    //     }
+    // }
+    //
+    // void PoseResult::resize(const size_t size) {
+    //     boxes.resize(size);
+    //     scores.resize(size);
+    //     label_ids.resize(size);
+    //     if (keypoints_per_instance > 0) {
+    //         keypoints.resize(size * keypoints_per_instance);
+    //     }
+    // }
+    //
+    // void PoseResult::display() const {
+    //     tabulate::Table output_table;
+    //     output_table.format().font_color(tabulate::Color::green)
+    //                 .border_color(tabulate::Color::magenta)
+    //                 .corner_color(tabulate::Color::magenta);
+    //
+    //     if (keypoints.size() != boxes.size() * keypoints_per_instance) {
+    //         MD_LOG_ERROR << "The size of keypoints != boxes.size * keypoints_per_instance." << std::endl;
+    //     }
+    //     output_table.add_row({
+    //         "order",
+    //         "box([x, y, width, height])",
+    //         "label_id",
+    //         "score",
+    //         "landmarks(" + std::to_string(keypoints_per_instance) + " * point)"
+    //     });
+    //     for (size_t i = 0; i < boxes.size(); ++i) {
+    //         std::string row_str_box = "["
+    //             + std::to_string(static_cast<int>(std::round(boxes[i].x))) + ", "
+    //             + std::to_string(static_cast<int>(std::round(boxes[i].y))) + ", "
+    //             + std::to_string(static_cast<int>(std::round(boxes[i].width))) + ", "
+    //             + std::to_string(static_cast<int>(std::round(boxes[i].height))) + "]";
+    //         std::string row_str_score = std::to_string(scores[i]);
+    //         std::string row_str_label_id = std::to_string(label_ids[i]);
+    //         std::string row_str_keypoints;
+    //         for (size_t j = 0; j < keypoints_per_instance; ++j) {
+    //             row_str_keypoints += "[" +
+    //                 std::to_string(static_cast<int>(keypoints[i * keypoints_per_instance + j].x)) + "," +
+    //                 std::to_string(static_cast<int>(keypoints[i * keypoints_per_instance + j].y)) + "," +
+    //                 std::to_string(static_cast<int>(keypoints[i * keypoints_per_instance + j].z));
+    //             row_str_keypoints += j < keypoints_per_instance - 1 ? "], " : "]";
+    //         }
+    //         output_table.add_row({std::to_string(i), row_str_box, row_str_label_id, row_str_score, row_str_keypoints});
+    //     }
+    //     std::cout << termcolor::cyan << "PoseResult:" << termcolor::reset << std::endl;
+    //     std::cout << output_table << std::endl;
+    // }
 
 
     void OCRResult::clear() {

@@ -2,18 +2,14 @@
 // Created by aichao on 2025/2/24.
 //
 
-#include <chrono>
 #include "csrc/vision.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
 int main() {
-    modeldeploy::RuntimeOption option;
-    option.use_gpu();
-    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/yolo11n-pose.onnx", option);
+    modeldeploy::vision::detection::UltralyticsDet yolov8("../../test_data/test_models/yolo11n.onnx");
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
-    std::vector<modeldeploy::vision::PoseResult> result;
-
-
+    modeldeploy::vision::DetectionResult result;
+    // yolov8.get_preprocessor().set_size({1440, 1440});
     int warm_up_count = 20;
     for (int i = 0; i < warm_up_count; ++i) {
         yolov8.predict(img, &result);
@@ -27,9 +23,9 @@ int main() {
     auto end_time = std::chrono::steady_clock::now();
     std::cout << "infer time: " << std::chrono::duration<double, std::milli>(end_time - start_time).count() / loop_count
         << " ms" << std::endl;
-    // result.display();
+    result.display();
     const auto vis_image =
-        modeldeploy::vision::vis_pose(img, result, "../../test_data/test_models/msyh.ttc", 12, 4, 0.3, false);
+        modeldeploy::vision::vis_detection(img, result, 0.5, "../../test_data/test_models/msyh.ttc", 12, 0.3, false);
     cv::imshow("test", vis_image);
     cv::waitKey(0);
 }

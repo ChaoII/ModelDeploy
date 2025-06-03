@@ -7,8 +7,7 @@
 #include "csrc/vision/pose/preprocessor.h"
 #include "csrc/vision/pose/postprocessor.h"
 
-namespace modeldeploy::vision::detection
-{
+namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPose : public BaseModel {
     public:
         explicit UltralyticsPose(const std::string& model_file,
@@ -16,10 +15,10 @@ namespace modeldeploy::vision::detection
 
         [[nodiscard]] std::string name() const override { return "UltralyticsPose"; }
 
-        virtual bool predict(const cv::Mat& image, PoseResult* result);
+        virtual bool predict(const cv::Mat& image, std::vector<PoseResult>* result);
 
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<PoseResult>* results);
+                                   std::vector<std::vector<PoseResult>>* results);
 
         virtual UltralyticsPosePreprocessor& get_preprocessor() {
             return preprocessor_;
