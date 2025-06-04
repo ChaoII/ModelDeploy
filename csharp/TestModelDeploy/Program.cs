@@ -103,7 +103,7 @@ static class Program
         image.Show();
         yolo11n_pose.Display(results);
     }
-    
+
     static void TestImage()
     {
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection.png"));
@@ -148,7 +148,7 @@ static class Program
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.png"));
         PaddleOcr ppocr = new PaddleOcr(parameters);
         OcrResults results = ppocr.Predict(image);
-        ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.5, 1);
+        ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.5, true);
         image.Show();
         foreach (var result in results.Data)
         {
@@ -164,7 +164,7 @@ static class Program
         var image0 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face.jpg"));
         var scrfd = new Scrfd(Path.Combine(TestDataPath, "test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx"), 8);
         var result = scrfd.Predict(image0);
-        scrfd.DrawDetectionResult(image0, result, Path.Combine(TestDataPath, "msyh.ttc"), 15, 10, 0.3, 1);
+        scrfd.DrawFaceResult(image0, result, Path.Combine(TestDataPath, "msyh.ttc"), 15, 10, 0.3, true);
         image0.Show();
 
         // 人脸识别
@@ -247,7 +247,7 @@ static class Program
         );
         var lprResults = lprPipeline.Predict(image2);
         lprPipeline.Display(lprResults);
-        lprPipeline.DrawLprResult(image2, lprResults, Path.Combine(TestDataPath, "msyh.ttc"), 15, 4, 0.3, 1);
+        lprPipeline.DrawLprResult(image2, lprResults, Path.Combine(TestDataPath, "msyh.ttc"), 15, 4, 0.3, true);
         image2.Show();
     }
 
@@ -374,7 +374,7 @@ static class Program
     {
         // TestClassification();
         // TestFace();
-        // TestLpr();
+        TestLpr();
         // TestSenseVoice();
         // TestKokoro();
         // TestDetection();
@@ -385,7 +385,7 @@ static class Program
         // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
-        TestStructureTable();
+        // TestStructureTable();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();

@@ -213,7 +213,7 @@ namespace ModelDeploy.vision.lpr
         }
 
         public void DrawLprResult(Image image, List<LprResult> results, string fontPath,
-            int fontSize = 12, int landmarkRadius = 2, double alpha = 0.5, int saveResult = 1)
+            int fontSize = 12, int landmarkRadius = 2, double alpha = 0.5, bool saveResult = false)
         {
             var cResults = LprResult.ToNativeArray(results);
             try
@@ -256,7 +256,7 @@ namespace ModelDeploy.vision.lpr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_lpr_pipeline_result(ref MDImage image, ref MDLPRResults cResults,
-            string fontPath, int fontSize, int landmarkRadius, double alpha, int saveResult);
+            string fontPath, int fontSize, int landmarkRadius, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_lpr_pipeline_result(ref MDLPRResults cResults);

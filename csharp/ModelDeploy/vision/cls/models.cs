@@ -39,11 +39,8 @@ namespace ModelDeploy.vision.classification
 
         public void DrawClassificationResult(
             Image image, List<ClassificationResult> results,
-            string fontPath, int topK,
-            float scoreThreshold,
-            int fontSize = 12,
-            double alpha = 0.5,
-            int saveResult = 1)
+            string fontPath, int topK, float scoreThreshold, int fontSize = 12,
+            double alpha = 0.5, bool saveResult = false)
         {
             var cResults = ClassificationResult.ToNativeArray(results);
             try
@@ -83,7 +80,7 @@ namespace ModelDeploy.vision.classification
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_classification_result(ref MDImage image, ref MDClassificationResults result,
-            int topK, float scoreThreshold, string fontPath, int fontSize, double alpha, int saveResult);
+            int topK, float scoreThreshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_classification_result(ref MDClassificationResults results);
