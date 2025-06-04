@@ -7,6 +7,8 @@
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/lpr/lpr_pipeline_capi.h"
+
+#include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
 
@@ -49,7 +51,7 @@ MDStatusCode md_lpr_pipeline_predict(const MDModel* model, MDImage* image,
 void md_print_lpr_pipeline_result(const MDLPRResults* c_results) {
     std::vector<LprResult> results;
     c_results_2_lpr_results(c_results, &results);
-    // results.display();
+    dis_lpr(results);
 }
 
 void md_draw_lpr_pipeline_result(

@@ -3,6 +3,7 @@
 //
 
 #include "csrc/vision.h"
+#include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
 int main() {
@@ -18,5 +19,5 @@ int main() {
                                                                  12, 0.3, false);
     cv::imshow("test", vis_img);
     cv::waitKey(0);
-    results.display();
+    modeldeploy::vision::dis_cls(results);
 }

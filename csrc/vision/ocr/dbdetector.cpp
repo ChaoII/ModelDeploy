@@ -65,7 +65,7 @@ namespace modeldeploy::vision::ocr {
             return false;
         }
         const auto batch_det_img_info = preprocessor_.get_batch_img_info();
-        reused_input_tensors_[0].set_name(  get_input_info(0).name);
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
 
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;

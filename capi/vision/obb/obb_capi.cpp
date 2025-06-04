@@ -3,13 +3,14 @@
 //
 
 
-#include <map>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
-#include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/obb/obb_capi.h"
+
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 
 MDStatusCode md_create_obb_model(MDModel* model, const char* model_path,
@@ -57,7 +58,7 @@ MDStatusCode md_obb_predict(const MDModel* model, MDImage* image, MDObbResults* 
 void md_print_obb_result(const MDObbResults* c_results) {
     std::vector<modeldeploy::vision::ObbResult> results;
     c_results_2_obb_results(c_results, &results);
-    // result.display();
+    dis_obb(results);
 }
 
 

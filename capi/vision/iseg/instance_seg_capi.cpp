@@ -2,15 +2,14 @@
 // Created by AC on 2024-12-17.
 //
 
-
-#include <map>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
-#include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/iseg/instance_seg_capi.h"
 
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 MDStatusCode md_create_instance_seg_model(MDModel* model, const char* model_path,
                                           const int thread_num) {
@@ -57,7 +56,7 @@ MDStatusCode md_instance_seg_predict(const MDModel* model, MDImage* image, MDIse
 void md_print_instance_seg_result(const MDIsegResults* c_results) {
     std::vector<modeldeploy::vision::InstanceSegResult> results;
     c_results_2_iseg_results(c_results, &results);
-    // result.display();
+    dis_iseg(results);
 }
 
 

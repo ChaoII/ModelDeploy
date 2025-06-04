@@ -379,16 +379,18 @@ void ocr_result_2_c_results(
         c_results->data[i].table_boxes.data = nullptr;
         c_results->data[i].table_structure = nullptr;
 
+        std::cout << "===============" << i << "================" << std::endl;
+
         if (!result.table_html.empty()) {
             // table_box
-            MDPolygon table_polygon;
-            table_polygon.size = 4;
-            table_polygon.data = new MDPoint[table_polygon.size];
-            table_polygon.data[0] = {result.table_boxes[i][0 * 2], result.table_boxes[i][0 * 2 + 1]};
-            table_polygon.data[1] = {result.table_boxes[i][1 * 2], result.table_boxes[i][1 * 2 + 1]};
-            table_polygon.data[2] = {result.table_boxes[i][2 * 2], result.table_boxes[i][2 * 2 + 1]};
-            table_polygon.data[3] = {result.table_boxes[i][3 * 2], result.table_boxes[i][3 * 2 + 1]};
-            c_results->data[i].table_boxes = table_polygon;
+            // MDPolygon table_polygon;
+            // table_polygon.size = 4;
+            // table_polygon.data = new MDPoint[table_polygon.size];
+            // table_polygon.data[0] = {result.table_boxes[i][0 * 2], result.table_boxes[i][0 * 2 + 1]};
+            // table_polygon.data[1] = {result.table_boxes[i][1 * 2], result.table_boxes[i][1 * 2 + 1]};
+            // table_polygon.data[2] = {result.table_boxes[i][2 * 2], result.table_boxes[i][2 * 2 + 1]};
+            // table_polygon.data[3] = {result.table_boxes[i][3 * 2], result.table_boxes[i][3 * 2 + 1]};
+            // c_results->data[i].table_boxes = table_polygon;
             // table_structure
             c_results->data[i].table_structure = strdup(result.table_structure[i].c_str());
         }
@@ -421,19 +423,19 @@ void c_results_2_ocr_result(
         );
         result->text.emplace_back(c_results->data[i].text);
         result->rec_scores.emplace_back(c_results->data[i].score);
-        if (c_results->data[i].table_boxes.size > 0) {
-            result->table_boxes.emplace_back(
-                std::array{
-                    c_results->data[i].table_boxes.data[0].x,
-                    c_results->data[i].table_boxes.data[0].y,
-                    c_results->data[i].table_boxes.data[1].x,
-                    c_results->data[i].table_boxes.data[1].y,
-                    c_results->data[i].table_boxes.data[2].x,
-                    c_results->data[i].table_boxes.data[2].y,
-                    c_results->data[i].table_boxes.data[3].x,
-                    c_results->data[i].table_boxes.data[3].y
-                }
-            );
+        if (c_results->data[i].table_structure != nullptr) {
+            // result->table_boxes.emplace_back(
+            //     std::array{
+            //         c_results->data[i].table_boxes.data[0].x,
+            //         c_results->data[i].table_boxes.data[0].y,
+            //         c_results->data[i].table_boxes.data[1].x,
+            //         c_results->data[i].table_boxes.data[1].y,
+            //         c_results->data[i].table_boxes.data[2].x,
+            //         c_results->data[i].table_boxes.data[2].y,
+            //         c_results->data[i].table_boxes.data[3].x,
+            //         c_results->data[i].table_boxes.data[3].y
+            //     }
+            // );
             result->table_structure.emplace_back(c_results->data[i].table_structure);
         }
     }

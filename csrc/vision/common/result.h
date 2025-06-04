@@ -35,7 +35,6 @@ namespace modeldeploy::vision {
         void resize(int size);
         void clear();
         void free();
-        void display() const;
         ClassifyResult(const ClassifyResult& other) = default;
         ClassifyResult& operator=(ClassifyResult&& other) noexcept;
     };
@@ -101,7 +100,6 @@ namespace modeldeploy::vision {
         std::string table_html;
         ResultType type = ResultType::OCR;
         void clear();
-        [[nodiscard]] std::string str() const;
     };
 
 

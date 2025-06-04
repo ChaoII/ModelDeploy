@@ -2,10 +2,10 @@
 // Created by aichao on 2025/3/21.
 //
 
-#include <csrc/vision/common/visualize/visualize.h>
-
 #include "csrc/vision.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 int main() {
     auto table_model = modeldeploy::vision::ocr::StructureV2Table(
@@ -23,6 +23,6 @@ int main() {
 
     cv::imshow("result", vis_image);
     cv::waitKey(0);
-    std::cout << result.str() << std::endl;
+    modeldeploy::vision::dis_ocr(result);
     return 0;
 }
