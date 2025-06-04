@@ -4,16 +4,15 @@
 #pragma once
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/utils.h"
+#include "csrc/vision/common/struct.h"
 
-namespace modeldeploy::vision::detection
-{
-    class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor
-    {
+namespace modeldeploy::vision::detection {
+    class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor {
     public:
         UltralyticsPreprocessor();
 
         bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-                 std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) const;
+                 std::vector<LetterBoxRecord>* letter_box_records) const;
 
         void set_size(const std::vector<int>& size) { size_ = size; }
 
@@ -44,22 +43,18 @@ namespace modeldeploy::vision::detection
         [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output,
-                        std::map<std::string, std::array<float, 2>>* im_info) const;
+        bool preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
         void letter_box(cv::Mat* mat) const;
-
         std::vector<int> size_;
         std::vector<float> padding_value_;
         bool is_mini_pad_;
         // while is_mini_pad = false and is_no_pad = true,
         // will resize the image to the set size
         bool is_no_pad_;
-
         // if is_scale_up is false, the input image only can be zoom out,
         // the maximum resize scale cannot exceed 1.0
         bool is_scale_up_;
-
         // padding stride, for is_mini_pad
         int stride_;
     };

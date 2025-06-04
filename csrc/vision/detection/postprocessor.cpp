@@ -13,7 +13,7 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
-        const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
+        const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
         // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
@@ -26,10 +26,8 @@ namespace modeldeploy::vision::detection {
             const float* data =
                 static_cast<const float*>(tensor_transpose.data()) +
                 bs * tensor_transpose.shape()[1] * tensor_transpose.shape()[2];
-
             std::vector<DetectionResult> _results;
             _results.reserve(tensor_transpose.shape()[1]);
-
             for (size_t i = 0; i < tensor_transpose.shape()[1]; ++i) {
                 const float* attr_ptr = data + i * tensor_transpose.shape()[2];
                 const float* max_class_score = std::max_element(
@@ -55,18 +53,21 @@ namespace modeldeploy::vision::detection {
             }
             utils::nms(&_results, nms_threshold_);
             // scale the boxes to the origin image shape
-            auto iter_out = ims_info[bs].find("output_shape");
-            auto iter_ipt = ims_info[bs].find("input_shape");
-            if (!(iter_out != ims_info[bs].end() && iter_ipt != ims_info[bs].end())) {
-                MD_LOG_ERROR << "Cannot find input_shape or output_shape from im_info." << std::endl;
-            }
-            const float out_h = iter_out->second[0];
-            const float out_w = iter_out->second[1];
-            const float ipt_h = iter_ipt->second[0];
-            const float ipt_w = iter_ipt->second[1];
+
+            const float out_h = letter_box_records[bs].out_h;
+            const float out_w = letter_box_records[bs].out_w;
+            const float ipt_h = letter_box_records[bs].ipt_h;
+            const float ipt_w = letter_box_records[bs].ipt_w;
             const float scale = std::min(out_h / ipt_h, out_w / ipt_w);
             const float pad_h = (out_h - ipt_h * scale) / 2;
             const float pad_w = (out_w - ipt_w * scale) / 2;
+
+            std::cout << "=====================================postprocess:====================================" <<
+                std::endl;
+
+            std::cout << "out_h: " << out_h << " out_w: " << out_w << " ipt_h: " << ipt_h << " ipt_w: " << ipt_w <<
+                " scale: " << scale << " pad_h: " << pad_h << " pad_w: " << pad_w << std::endl;
+
             for (auto& result : _results) {
                 auto& box = result.box;
                 // clip box()
