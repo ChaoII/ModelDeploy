@@ -379,8 +379,7 @@ void ocr_result_2_c_results(
         c_results->data[i].table_boxes.data = nullptr;
         c_results->data[i].table_structure = nullptr;
 
-        std::cout << "===============" << i << "================" << std::endl;
-
+        // 注意table_boxes和box数量不一致，导致赋值会出问题，所以这里先不赋值table_boxes和table_structure
         if (!result.table_html.empty()) {
             // table_box
             // MDPolygon table_polygon;
@@ -424,6 +423,7 @@ void c_results_2_ocr_result(
         result->text.emplace_back(c_results->data[i].text);
         result->rec_scores.emplace_back(c_results->data[i].score);
         if (c_results->data[i].table_structure != nullptr) {
+            // 注意table_boxes和box数量不一致，导致赋值会出问题，所以这里先不赋值table_boxes和table_structure
             // result->table_boxes.emplace_back(
             //     std::array{
             //         c_results->data[i].table_boxes.data[0].x,
