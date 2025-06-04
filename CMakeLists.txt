@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(LIBRARY_NAME "ModelDeploySDK")
 set(SOURCE ""
-        csrc/vision/common/visualize/vis_pose.cpp
-        csrc/vision/common/visualize/vis_lpr.cpp)
+        csrc/vision/common/struct.h)
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
@@ -24,6 +23,13 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+
+find_package(OpenMP)
+if (OpenMP_CXX_FOUND)
+    list(APPEND OpenMP::OpenMP_CXX)
+else ()
+    message(WARNING "OpenMP not found. Compilation will be without OpenMP support.")
+endif ()
 
 if (MSVC)
     if (WITH_STATIC_CRT)
@@ -99,6 +105,7 @@ endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${SOURCE})
 target_link_libraries(${LIBRARY_NAME} ${DEPENDS})
+
 
 if (BUILD_EXAMPLES)
     add_subdirectory(examples)

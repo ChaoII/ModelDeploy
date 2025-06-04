@@ -6,6 +6,8 @@
 #include "csrc/core/md_decl.h"
 #include "csrc/vision/utils.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/struct.h"
+
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPostprocessor {
@@ -13,7 +15,7 @@ namespace modeldeploy::vision::detection {
         UltralyticsPostprocessor();
         bool run(const std::vector<Tensor>& tensors,
                  std::vector<std::vector<DetectionResult>>* results,
-                 const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
+                 const std::vector<LetterBoxRecord>& letter_box_records) const;
 
         /// Set conf_threshold, default 0.25
         void set_conf_threshold(const float& conf_threshold) {
