@@ -22,7 +22,27 @@ namespace ModelDeploy
             return new MDPoint { x = X, y = Y };
         }
     }
-    
+
+    public class Point3f
+    {
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Z { get; set; }
+
+        public override string ToString() => $"{{x:{X}, y:{Y},  z:{Z}}}";
+
+        public static Point3f FromNative(MDPoint3f point)
+        {
+            return new Point3f { X = point.x, Y = point.y, Z = point.z };
+        }
+
+        public MDPoint3f ToNative()
+        {
+            return new MDPoint3f { x = X, y = Y, z = Z };
+        }
+    }
+
+
     public class Color
     {
         public byte R { get; set; }
@@ -106,6 +126,7 @@ namespace ModelDeploy
             {
                 cPolygons[i] = polygons[i].CopyToMDPolygon();
             }
+
             return cPolygons;
         }
 
@@ -156,6 +177,31 @@ namespace ModelDeploy
             return new MDRect { x = X, y = Y, width = Width, height = Height };
         }
     }
+
+
+    public class RotatedRect
+    {
+        public float Xc { get; set; }
+        public float Yc { get; set; }
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public float Angle { get; set; }
+
+        public override string ToString() =>
+            $"Rect {{ x: {Xc}, y: {Yc}, width: {Width}, height: {Height},  angle: {Angle} }}";
+
+        public static RotatedRect FromNative(MDRotatedRect rect)
+        {
+            return new RotatedRect
+                { Xc = rect.xc, Yc = rect.yc, Width = rect.width, Height = rect.height, Angle = rect.angle };
+        }
+
+        public MDRotatedRect ToNative()
+        {
+            return new MDRotatedRect { xc = Xc, yc = Yc, width = Width, height = Height, angle = Angle };
+        }
+    }
+
 
     public class Image
     {

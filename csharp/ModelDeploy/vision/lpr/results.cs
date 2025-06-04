@@ -32,7 +32,7 @@ namespace ModelDeploy.vision.lpr
             };
             for (var i = 0; i < cResult.landmarks_size; i++)
             {
-                var currentPtr = IntPtr.Add(cResult.landmarks, i * Marshal.SizeOf<MDPoint>());
+                var currentPtr = IntPtr.Add(cResult.landmarks_data, i * Marshal.SizeOf<MDPoint>());
                 var cPoint = Marshal.PtrToStructure<MDPoint>(currentPtr);
                 lprResult.Landmarks.Add(Point.FromNative(cPoint));
             }
@@ -48,7 +48,7 @@ namespace ModelDeploy.vision.lpr
                 label_id = result.LabelId,
                 score = result.Score,
                 landmarks_size = result.Landmarks.Count,
-                landmarks = result.Landmarks.Count > 0
+                landmarks_data = result.Landmarks.Count > 0
                     ? Marshal.AllocHGlobal(result.Landmarks.Count * Marshal.SizeOf<MDPoint>())
                     : IntPtr.Zero,
                 car_plate_str = Utils.ConvertStringToHGlobalUtf8(result.CarPlateStr),
@@ -56,7 +56,7 @@ namespace ModelDeploy.vision.lpr
             };
             for (var i = 0; i < result.Landmarks.Count; i++)
             {
-                var currentPtr = IntPtr.Add(cResult.landmarks, i * Marshal.SizeOf<MDPoint>());
+                var currentPtr = IntPtr.Add(cResult.landmarks_data, i * Marshal.SizeOf<MDPoint>());
                 Marshal.StructureToPtr(result.Landmarks[i].ToNative(), currentPtr, false);
             }
 

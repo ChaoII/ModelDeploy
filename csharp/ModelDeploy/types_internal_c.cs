@@ -38,10 +38,11 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDPointF
+        public struct MDPoint3f
         {
-            public double x;
-            public double y;
+            public float x;
+            public float y;
+            public float z;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -51,6 +52,16 @@ namespace ModelDeploy
             public int y;
             public int width;
             public int height;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDRotatedRect
+        {
+            public float xc;
+            public float yc;
+            public float width;
+            public float height;
+            public float angle; //deg
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -69,12 +80,13 @@ namespace ModelDeploy
             public int size;
         }
 
-        
+
         [StructLayout(LayoutKind.Sequential)]
         public struct MDOCRModelParameters
         {
             /// ocr model directory;
             public string det_model_file;
+
             public string cls_model_file;
             public string rec_model_file;
 
@@ -186,21 +198,11 @@ namespace ModelDeploy
             public int size;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MDMask
-        {
-            public IntPtr buffer;
-            public int buffer_size;
-            public IntPtr shape;
-            public int num_dims;
-        }
-
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDDetectionResult
         {
             public MDRect box;
-            public MDMask mask;
             public int label_id;
             public float score;
         }
@@ -211,6 +213,65 @@ namespace ModelDeploy
             public IntPtr data;
             public int size;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDMask
+        {
+            public IntPtr buffer;
+            public int buffer_size;
+            public IntPtr shape;
+            public int num_dims;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDISegResult
+        {
+            public MDRect box;
+            public MDMask mask;
+            public int label_id;
+            public float score;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDISegResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDObbResult
+        {
+            public MDRotatedRect box;
+            public int label_id;
+            public float score;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDObbResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDPoseResult
+        {
+            public MDRect box;
+            public IntPtr keypoints_data;
+            public int keypoints_size;
+            public int label_id;
+            public float score;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDPoseResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDDetectionLandmarkResult
@@ -233,7 +294,7 @@ namespace ModelDeploy
         public struct MDLPRResult
         {
             public MDRect box;
-            public IntPtr landmarks;
+            public IntPtr landmarks_data;
             public int landmarks_size;
             public int label_id;
             public float score;

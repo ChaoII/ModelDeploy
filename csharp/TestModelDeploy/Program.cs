@@ -6,9 +6,11 @@ using ModelDeploy.utils;
 using ModelDeploy.vision.classification;
 using ModelDeploy.vision.detection;
 using ModelDeploy.vision.face;
-using ModelDeploy.vision.instance_seg;
+using ModelDeploy.vision.iseg;
 using ModelDeploy.vision.lpr;
+using ModelDeploy.vision.obb;
 using ModelDeploy.vision.ocr;
+using ModelDeploy.vision.pose;
 
 namespace TestModelDeploy;
 
@@ -19,7 +21,7 @@ static class Program
 
     static void TestClassification()
     {
-        using var yolov5 = new UltralyticsCls(Path.Combine(TestDataPath, "test_models/yolov5n-cls.onnx"));
+        using var yolov5 = new UltralyticsCls(Path.Combine(TestDataPath, "test_models/yolo11n-cls.onnx"));
         yolov5.SetInputSize(224, 224);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_face.jpg"));
         var results = yolov5.Predict(image);
@@ -35,12 +37,12 @@ static class Program
     {
         var parameters = new MDKokoroParameters
         {
-            model_path = Path.Combine(TestDataPath, "test_models/kokoro-multi-lang-v1_1/model.onnx"),
-            tokens_path = Path.Combine(TestDataPath, "test_models/kokoro-multi-lang-v1_1/tokens.txt"),
-            lexicons_en_path = Path.Combine(TestDataPath, "test_models/kokoro-multi-lang-v1_1/lexicon-us-en.txt"),
-            lexicons_zh_path = Path.Combine(TestDataPath, "test_models/kokoro-multi-lang-v1_1/lexicon-zh.txt"),
-            voice_bin_path = Path.Combine(TestDataPath, "test_models/kokoro-multi-lang-v1_1/voices.bin"),
-            jieba_dir = Path.Combine(TestDataPath, "test_models/kokoro-multi-lang-v1_1/dict/"),
+            model_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/model.onnx"),
+            tokens_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/tokens.txt"),
+            lexicons_en_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/lexicon-us-en.txt"),
+            lexicons_zh_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/lexicon-zh.txt"),
+            voice_bin_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/voices.bin"),
+            jieba_dir = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/dict/"),
             text_normalization_dir = Path.Combine(TestDataPath, ""),
             num_threads = -1
         };
@@ -62,26 +64,46 @@ static class Program
 
     static void TestDetection()
     {
-        using var yolov8 = new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolov8n.onnx"));
+        using var yolov8 = new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolo11n.onnx"));
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection.jpg"));
-        yolov8.SetInputSize(1440, 1440);
+        // yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
-        yolov8.DrawDetectionResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
+        yolov8.DrawDetectionResult(image, results, 0.3, Path.Combine(TestDataPath, "msyh.ttc"));
         image.Show();
         yolov8.Display(results);
     }
 
     static void TestInstanceSeg()
     {
-        using var yoloV5Seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/yolov5l_seg_fp16.onnx"));
-        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_detection.jpg"));
-        var results = yoloV5Seg.Predict(image);
-        yoloV5Seg.DrawDetectionResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
+        using var yolo11n_seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/yolo11n-seg.onnx"));
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_person.jpg"));
+        var results = yolo11n_seg.Predict(image);
+        yolo11n_seg.DrawIsegResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
         image.Show();
-        yoloV5Seg.Display(results);
+        yolo11n_seg.Display(results);
     }
 
+    static void TestObb()
+    {
+        using var yolo11n_obb = new UltralyticsObb(Path.Combine(TestDataPath, "test_models/yolo11n-obb.onnx"));
+        yolo11n_obb.SetInputSize(1024, 1024);
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_obb1.jpg"));
+        var results = yolo11n_obb.Predict(image);
+        yolo11n_obb.DrawObbResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
+        image.Show();
+        yolo11n_obb.Display(results);
+    }
 
+    static void TestPose()
+    {
+        using var yolo11n_pose = new UltralyticsPose(Path.Combine(TestDataPath, "test_models/yolo11n-pose.onnx"));
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_person.jpg"));
+        var results = yolo11n_pose.Predict(image);
+        yolo11n_pose.DrawPoseResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 12, 4, 0.5, true);
+        image.Show();
+        yolo11n_pose.Display(results);
+    }
+    
     static void TestImage()
     {
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection.png"));
@@ -318,7 +340,7 @@ static class Program
             det_model_file = Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/det_infer.onnx"),
             rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/rec_infer.onnx"),
             table_model_file = Path.Combine(TestDataPath, "test_models/ocr/SLANeXt_wired.onnx"),
-            rec_label_file = Path.Combine(TestDataPath, "key.txt"),
+            rec_label_file = Path.Combine(TestDataPath, "ppocrv4_dict.txt"),
             table_char_dict_path = Path.Combine(TestDataPath, "table_structure_dict_ch.txt"),
             thread_num = 8,
             max_side_len = 1920,
@@ -356,12 +378,14 @@ static class Program
         // TestSenseVoice();
         // TestKokoro();
         // TestDetection();
-        TestInstanceSeg();
+        // TestInstanceSeg();
+        // TestObb();
+        // TestPose();
         // TestImage();
         // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
-        // TestStructureTable();
+        TestStructureTable();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();
