@@ -34,7 +34,7 @@ namespace ModelDeploy.vision.ocr
         }
 
         public void DrawOcrResult(Image image, OcrResults results, string fontPath, int fontSize = 12,
-            double alpha = 0.5, int saveResult = 1)
+            double alpha = 0.5, bool saveResult = false)
         {
             var nativeResults = OcrResults.ToNativeArray(results);
             md_draw_ocr_result(ref image.RawImage, ref nativeResults, fontPath, fontSize, alpha, saveResult);
@@ -64,7 +64,7 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_ocr_result(ref MDImage image, ref MDOCRResults results, string fontPath,
-            int fontSize, double alpha, int saveResult);
+            int fontSize, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_ocr_result(ref MDOCRResults results);

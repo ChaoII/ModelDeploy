@@ -32,9 +32,8 @@ namespace ModelDeploy.vision.face
             }
         }
 
-        public void DrawDetectionResult(Image image, List<DetectionLandmarkResult> results, string fontPath,
-            int fontSize = 12, int landmarkRadius = 2,
-            double alpha = 0.5, int saveResult = 1)
+        public void DrawFaceResult(Image image, List<DetectionLandmarkResult> results, string fontPath,
+            int fontSize = 12, int landmarkRadius = 2, double alpha = 0.5, bool saveResult = false)
         {
             var cResults = DetectionLandmarkResult.ToNativeArray(results);
             try
@@ -72,8 +71,8 @@ namespace ModelDeploy.vision.face
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_face_det_result(ref MDImage image,
-            ref MDDetectionLandmarkResults cResults, string fontPath, int fontSize, int landmarkRadius, double alpha,
-            int saveResult);
+            ref MDDetectionLandmarkResults cResults, string fontPath, int fontSize,
+            int landmarkRadius, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_det_result(ref MDDetectionLandmarkResults cResults);

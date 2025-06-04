@@ -51,7 +51,7 @@ namespace ModelDeploy.vision.iseg
         }
 
         public void DrawIsegResult(Image image, List<ISegResult> results, double threshold,
-            string fontPath, int fontSize = 12, double alpha = 0.5, int saveResult = 0)
+            string fontPath, int fontSize = 12, double alpha = 0.5, bool saveResult = false)
         {
             var cResults = ISegResult.ToNativeArray(results);
             try
@@ -94,7 +94,7 @@ namespace ModelDeploy.vision.iseg
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_instance_seg_result(ref MDImage image, ref MDISegResults result,
-            double threshold, string fontPath, int fontSize, double alpha, int saveResult);
+            double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_instance_seg_result(ref MDISegResults results);

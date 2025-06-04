@@ -53,7 +53,7 @@ namespace ModelDeploy.vision.obb
 
 
         public void DrawObbResult(Image image, List<ObbResult> results,
-            double threshold, string fontPath, int fontSize = 12, double alpha = 0.5, int saveResult = 0)
+            double threshold, string fontPath, int fontSize = 12, double alpha = 0.5, bool saveResult = false)
         {
             var cResults = ObbResult.ToNativeArray(results);
             try
@@ -95,7 +95,7 @@ namespace ModelDeploy.vision.obb
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_obb_result(ref MDImage image, ref MDObbResults result,
-            double threshold, string fontPath, int fontSize, double alpha, int saveResult);
+            double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_obb_result(ref MDObbResults results);
