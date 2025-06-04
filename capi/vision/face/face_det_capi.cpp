@@ -4,10 +4,12 @@
 
 
 #include "csrc/vision.h"
-#include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/face/face_det_capi.h"
+
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 
 MDStatusCode md_create_face_det_model(MDModel* model, const char* model_path,
@@ -44,7 +46,7 @@ MDStatusCode md_face_det_predict(const MDModel* model, MDImage* image, MDDetecti
 void md_print_face_det_result(const MDDetectionLandmarkResults* c_results) {
     std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
     c_results_2_detection_landmark_result(c_results, &results);
-    // result->display();
+    dis_lmk(results);
 }
 
 

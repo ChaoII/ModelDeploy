@@ -2,40 +2,13 @@
 // Created by aichao on 2025/3/21.
 //
 
-#include <csrc/vision/common/visualize/visualize.h>
-
 #include "csrc/vision.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 #ifdef _WIN32
 #include "windows.h"
 #endif
-
-cv::Mat VisOcr(const cv::Mat& im, const modeldeploy::vision::OCRResult& ocr_result,
-               const float score_threshold) {
-    auto vis_im = im.clone();
-    bool have_score =
-        ocr_result.boxes.size() == ocr_result.rec_scores.size();
-
-    for (int n = 0; n < ocr_result.boxes.size(); n++) {
-        if (have_score) {
-            if (ocr_result.rec_scores[n] < score_threshold) {
-                continue;
-            }
-        }
-        cv::Point rook_points[4];
-
-        for (int m = 0; m < 4; m++) {
-            rook_points[m] = cv::Point(int(ocr_result.boxes[n][m * 2]),
-                                       int(ocr_result.boxes[n][m * 2 + 1]));
-        }
-
-        const cv::Point* ppt[1] = {rook_points};
-        int npt[] = {4};
-        cv::polylines(vis_im, ppt, npt, 1, 1, CV_RGB(0, 255, 0), 2, 8, 0);
-    }
-
-    return vis_im;
-}
 
 int main() {
 #ifdef WIN32
@@ -77,5 +50,5 @@ int main() {
     cv::imshow("result", vis_image);
     cv::waitKey(0);
 
-    std::cout << result.str() << std::endl;
+    modeldeploy::vision::dis_ocr(result);
 }

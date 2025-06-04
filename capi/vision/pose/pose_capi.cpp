@@ -6,10 +6,11 @@
 #include <map>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
-#include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/pose/pose_capi.h"
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 
 MDStatusCode md_create_pose_model(MDModel* model, const char* model_path,
@@ -57,7 +58,7 @@ MDStatusCode md_pose_predict(const MDModel* model, MDImage* image, MDPoseResults
 void md_print_pose_result(const MDPoseResults* c_results) {
     std::vector<modeldeploy::vision::PoseResult> results;
     c_results_2_pose_results(c_results, &results);
-    // results.display();
+    dis_pose(results);
 }
 
 

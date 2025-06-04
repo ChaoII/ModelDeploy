@@ -1,7 +1,9 @@
 //
 // Created by aichao on 2025/2/24.
 //
+
 #include "csrc/vision.h"
+#include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 #ifdef WIN32
 
@@ -20,7 +22,7 @@ int main() {
     auto img = cv::imread("../../test_data/test_images/test_ocr5.jpg");
     modeldeploy::vision::OCRResult result;
     ocr.predict(img, &result);
-    std::cout << result.str() << std::endl;
+    modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc", 14, 0.5, 0);
     cv::imshow("test", vis_image);
     cv::waitKey(0);

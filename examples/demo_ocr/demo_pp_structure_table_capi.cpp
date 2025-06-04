@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "cost: " << diff.count() << std::endl;
     md_print_structure_table_result(&results);
+    std::cout << results.table_html << std::endl;
     md_free_structure_table_result(&results);
     md_show_image(&image);
     // 释放内存

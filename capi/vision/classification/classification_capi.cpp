@@ -11,6 +11,8 @@
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/classification/classification_capi.h"
 
+#include <csrc/vision/common/display/display.h>
+
 
 MDStatusCode md_create_classification_model(MDModel* model, const char* model_path,
                                             const int thread_num) {
@@ -46,7 +48,8 @@ MDStatusCode md_classification_predict(const MDModel* model, MDImage* image, MDC
     }
     const auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::ClassifyResult result;
-    const auto detection_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->model_content);
+    const auto detection_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+        model_content);
     if (const bool res_status = detection_model->predict(cv_image, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
@@ -58,7 +61,7 @@ MDStatusCode md_classification_predict(const MDModel* model, MDImage* image, MDC
 void md_print_classification_result(const MDClassificationResults* c_results) {
     modeldeploy::vision::ClassifyResult result;
     c_results_2_classification_result(c_results, &result);
-    result.display();
+    dis_cls(result);
 }
 
 

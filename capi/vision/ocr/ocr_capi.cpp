@@ -8,12 +8,11 @@
 
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
-#include "capi/vision/ocr/ocr_capi.h"
-
-#include <csrc/vision/common/visualize/visualize.h>
-
 #include "capi/common/md_micro.h"
+#include "capi/vision/ocr/ocr_capi.h"
 #include "capi/utils/internal/utils.h"
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 namespace fs = std::filesystem;
 
@@ -79,13 +78,9 @@ MDStatusCode md_ocr_model_predict(const MDModel* model, MDImage* image, MDOCRRes
 }
 
 void md_print_ocr_result(const MDOCRResults* results) {
-    for (int i = 0; i < results->size; ++i) {
-        std::cout
-            << "box: " << format_polygon(results->data[i].box)
-            << " text: " << results->data[i].text
-            << " score: " << results->data[i].score
-            << std::endl;
-    }
+    OCRResult result;
+    c_results_2_ocr_result(results, &result);
+    dis_ocr(result);
 }
 
 void md_draw_ocr_result(const MDImage* image, const MDOCRResults* c_results, const char* font_path,

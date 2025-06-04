@@ -3,13 +3,14 @@
 //
 
 
-#include <map>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
-#include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/detection/detection_capi.h"
+
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 
 MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
@@ -57,7 +58,7 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
 void md_print_detection_result(const MDDetectionResults* c_results) {
     std::vector<modeldeploy::vision::DetectionResult> results;
     c_results_2_detection_results(c_results, &results);
-    // results.display();
+    dis_det(results);
 }
 
 
