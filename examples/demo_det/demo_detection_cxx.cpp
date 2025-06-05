@@ -24,7 +24,7 @@ int main() {
     for (int i = 0; i < loop_count; ++i) {
         yolo11_det.predict(img, &result, &timers);
     }
-    print_benchmark(timers);
+    timers.print_benchmark();
 
     const auto vis_image =
         modeldeploy::vision::vis_detection(img, result, 0.3, "../../test_data/test_models/msyh.ttc", 12, 0.3,

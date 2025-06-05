@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < loop; i++) {
         model.predict(im, &res, &times);
     }
-    print_benchmark(times);
+    times.print_benchmark();
     // res.display();
     auto vis_im = modeldeploy::vision::vis_iseg(im, res, 0.2, "../../test_data/test_models/font.ttf", 14, 0.5, 0);
     cv::imshow("vis_im", vis_im);

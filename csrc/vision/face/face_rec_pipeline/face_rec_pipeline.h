@@ -11,7 +11,8 @@
 #include "csrc/vision/face/face_det/scrfd.h"
 #include "csrc/vision/face/face_rec/seetaface.h"
 
-namespace modeldeploy::vision::face {
+namespace modeldeploy::vision::face
+{
     class MODELDEPLOY_CXX_EXPORT FaceRecognizerPipeline : public BaseModel {
     public:
         FaceRecognizerPipeline(const std::string& det_model_path,
@@ -20,7 +21,8 @@ namespace modeldeploy::vision::face {
 
         ~FaceRecognizerPipeline() override;
 
-        virtual bool predict(const cv::Mat& image, std::vector<FaceRecognitionResult>* results);
+        virtual bool predict(const cv::Mat& image, std::vector<FaceRecognitionResult>* results,
+                             TimerArray* timers = nullptr);
 
         [[nodiscard]] bool is_initialized() const override;
 
