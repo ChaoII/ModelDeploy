@@ -15,10 +15,16 @@ int main() {
     auto im = cv::imread(image_file);
     auto im_bak = im.clone();
     std::vector<modeldeploy::vision::DetectionLandmarkResult> res;
-    if (!model.predict(im, &res)) {
-        std::cerr << "Failed to predict." << std::endl;
-        return -1;
+
+    int loop = 100;
+    TimerArray timers;
+    for (int i = 0; i < loop; i++) {
+        if (!model.predict(im, &res, &timers)) {
+            std::cerr << "Failed to predict." << std::endl;
+            return -1;
+        }
     }
+    timers.print_benchmark();
     // res.display();
     auto image = modeldeploy::vision::vis_det_landmarks(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
     cv::imshow("image", image);

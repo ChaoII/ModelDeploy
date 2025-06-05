@@ -64,7 +64,6 @@ namespace modeldeploy::vision::face {
         for (int f = 0; f < fmc; ++f) {
             total_num_boxes += tensors.at(f).shape()[1];
         }
-
         const float ipt_h = letter_box_record.ipt_h;
         const float ipt_w = letter_box_record.ipt_w;
         const float out_h = letter_box_record.out_h;
@@ -118,7 +117,7 @@ namespace modeldeploy::vision::face {
                         landmarks.emplace_back(kps_x, kps_y);
                     }
                 }
-                results->emplace_back(cv::Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, cls_conf, 0);
+                results->emplace_back(cv::Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf);
                 count += 1; // limit boxes for nms.
                 if (count > max_nms_) {
                     break;
