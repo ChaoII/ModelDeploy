@@ -27,18 +27,20 @@ namespace modeldeploy::vision::detection {
         *
         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
         * \param[in] result The output detection result will be writen to this structure
+        * \param timers
         * \return true if the prediction successed, otherwise false
         */
-        virtual bool predict(const cv::Mat& image, std::vector<ObbResult>* result);
+        virtual bool predict(const cv::Mat& image, std::vector<ObbResult>* result, TimerArray* timers = nullptr);
 
         /** \brief Predict the detection results for a batch of input images
         *
         * \param[in] images The input image list, each element comes from cv::imread()
         * \param[in] results The output detection result list
+        * \param timers
         * \return true if the prediction successed, otherwise false
         */
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<std::vector<ObbResult>>* results);
+                                   std::vector<std::vector<ObbResult>>* results, TimerArray* timers = nullptr);
 
         /// Get preprocessor reference of YOLOv5Seg
         virtual UltralyticsObbPreprocessor& get_preprocessor() {

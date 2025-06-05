@@ -6,6 +6,7 @@
 
 #include <string>
 #include <map>
+#include "csrc/utils/benchmark.h"
 #include "csrc/core/tensor.h"
 #include "csrc/core/md_decl.h"
 #include "csrc/runtime/runtime.h"

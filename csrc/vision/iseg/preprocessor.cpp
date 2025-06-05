@@ -19,7 +19,9 @@ namespace modeldeploy::vision::detection {
         max_wh_ = 7680.0;
     }
 
-    void UltralyticsSegPreprocessor::letter_box(cv::Mat* mat) const {
+    void UltralyticsSegPreprocessor::letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const {
+        letter_box_record->ipt_h = static_cast<float>(mat->rows);
+        letter_box_record->ipt_w = static_cast<float>(mat->cols);
         auto scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
         if (!is_scale_up_) {
             scale = std::min(scale, 1.0);
@@ -50,30 +52,25 @@ namespace modeldeploy::vision::detection {
             const int right = static_cast<int>(round(half_w + 0.1));
             Pad::apply(mat, top, bottom, left, right, padding_value_);
         }
+        letter_box_record->out_h = static_cast<float>(mat->rows);
+        letter_box_record->out_w = static_cast<float>(mat->cols);
+        letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
+        letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
+        letter_box_record->scale = scale;
     }
 
     bool UltralyticsSegPreprocessor::preprocess(
         cv::Mat* mat, Tensor* output,
-        std::map<std::string, std::array<float, 2>>* im_info) {
+        LetterBoxRecord* letter_box_record) {
         // Record the shape of image and the shape of preprocessed image
-        (*im_info)["input_shape"] = {
-            static_cast<float>(mat->rows),
-            static_cast<float>(mat->cols)
-        };
+
         // yolov5seg's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        letter_box(mat);
+        letter_box(mat, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
         ConvertAndPermute::apply(mat, alpha, beta, true);
-
-        // Record output shape of preprocessed image
-        (*im_info)["output_shape"] = {
-            static_cast<float>(mat->rows),
-            static_cast<float>(mat->cols)
-        };
-
         utils::mat_to_tensor(*mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
@@ -81,17 +78,17 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsSegPreprocessor::run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-        std::vector<std::map<std::string, std::array<float, 2>>>* ims_info) {
+        std::vector<LetterBoxRecord>* letter_box_records) {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
-        ims_info->resize(images->size());
+        letter_box_records->resize(images->size());
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
-            preprocess(&(*images)[i], &tensors[i], &(*ims_info)[i]);
+            preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
         }
         if (tensors.size() == 1) {
             (*outputs)[0] = std::move(tensors[0]);

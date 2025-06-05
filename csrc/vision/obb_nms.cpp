@@ -118,7 +118,6 @@ namespace modeldeploy::vision::utils {
 
     void obb_nms(std::vector<ObbResult>* result, const float iou_threshold, std::vector<int>* index) {
         const size_t N = result->size();
-
         // Step 1: 根据分数排序得到索引
         std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0);

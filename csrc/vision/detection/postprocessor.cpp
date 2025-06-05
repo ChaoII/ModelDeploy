@@ -23,18 +23,17 @@ namespace modeldeploy::vision::detection {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
-            const float* data =
-                static_cast<const float*>(tensor_transpose.data()) +
-                bs * tensor_transpose.shape()[1] * tensor_transpose.shape()[2];
+            const size_t dim1 = tensor_transpose.shape()[1]; //8400
+            const size_t dim2 = tensor_transpose.shape()[2]; //84
+            const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * dim1 * dim2;
             std::vector<DetectionResult> _results;
-            _results.reserve(tensor_transpose.shape()[1]);
-            for (size_t i = 0; i < tensor_transpose.shape()[1]; ++i) {
-                const float* attr_ptr = data + i * tensor_transpose.shape()[2];
-                const float* max_class_score = std::max_element(
-                    attr_ptr + 4, attr_ptr + tensor_transpose.shape()[2]);
+            _results.reserve(dim1);
+            for (size_t i = 0; i < dim1; ++i) {
+                const float* attr_ptr = data + i * dim2;
+                const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
                 float confidence = *max_class_score;
                 // filter boxes by conf_threshold
-                if (confidence <= conf_threshold_) {
+                if (confidence <= conf_threshold_) [[likely]] {
                     continue;
                 }
                 int32_t label_id = std::distance(attr_ptr + 4, max_class_score);
@@ -47,13 +46,11 @@ namespace modeldeploy::vision::detection {
                 };
                 _results.emplace_back(box, label_id, confidence);
             }
-
             if (_results.empty()) {
                 continue;
             }
             utils::nms(&_results, nms_threshold_);
             // scale the boxes to the origin image shape
-
 
             const float ipt_h = letter_box_records[bs].ipt_h;
             const float ipt_w = letter_box_records[bs].ipt_w;
@@ -61,14 +58,10 @@ namespace modeldeploy::vision::detection {
             const float pad_h = letter_box_records[bs].pad_h;
             const float pad_w = letter_box_records[bs].pad_w;
 
-
             for (auto& result : _results) {
                 auto& box = result.box;
                 // clip box()
-                //先减去 padding;
-                //再除以缩放因子 scale;
-                //最后限制在原始图像范围内 [0, width], [0, height]。
-                // 去掉 padding 并缩放
+                //1 先减去 padding;2除以缩放因子scale 3最后限制在原始图像范围内 [0, width], [0, height]。
                 float x1 = (box.x - pad_w) / scale;
                 float y1 = (box.y - pad_h) / scale;
                 float x2 = (box.x + box.width - pad_w) / scale;
@@ -81,10 +74,10 @@ namespace modeldeploy::vision::detection {
                 y2 = utils::clamp(y2, 0.0f, ipt_h);
 
                 // 重新赋值到 box
-                box.x = std::round(x1);
-                box.y = std::round(y1);
-                box.width = std::round(x2 - x1);
-                box.height = std::round(y2 - y1);
+                box.x = std::roundf(x1);
+                box.y = std::roundf(y1);
+                box.width = std::roundf(x2 - x1);
+                box.height = std::roundf(y2 - y1);
             }
             results->push_back(std::move(_results));
         }

@@ -23,9 +23,10 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsDet::predict(const cv::Mat& im, std::vector<DetectionResult>* result) {
+    bool UltralyticsDet::predict(const cv::Mat& im, std::vector<DetectionResult>* result,
+                                 TimerArray* timers) {
         std::vector<std::vector<DetectionResult>> results;
-        if (!batch_predict({im}, &results)) {
+        if (!batch_predict({im}, &results, timers)) {
             return false;
         }
         *result = std::move(results[0]);
@@ -33,34 +34,29 @@ namespace modeldeploy::vision::detection {
     }
 
     bool UltralyticsDet::batch_predict(const std::vector<cv::Mat>& images,
-                                       std::vector<std::vector<DetectionResult>>* results) {
+                                       std::vector<std::vector<DetectionResult>>* results,
+                                       TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
-        std::vector<cv::Mat> imgs = images;
-        auto _pre_time = std::chrono::high_resolution_clock::now();
-        if (!preprocessor_.run(&imgs, &reused_input_tensors_, &letter_box_records)) {
+        std::vector<cv::Mat> _images = images;
+        if (timers) timers->pre_timer.start();
+        if (!preprocessor_.run(&_images, &reused_input_tensors_, &letter_box_records)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
-        std::cout << "preprocess time: "
-            << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - _pre_time).count()
-            << " ms" << std::endl;
+        if (timers) timers->pre_timer.stop();
         reused_input_tensors_[0].set_name(get_input_info(0).name);
-        auto _infer_time = std::chrono::high_resolution_clock::now();
+        if (timers) timers->infer_timer.start();
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
-        std::cout << "infer time: "
-            << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - _infer_time).count()
-            << " ms" << std::endl;
-        auto _post_time = std::chrono::high_resolution_clock::now();
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
         if (!postprocessor_.run(reused_output_tensors_, results, letter_box_records)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }
-        std::cout << "post time: "
-            << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - _post_time).count()
-            << " ms" << std::endl;
+        if (timers) timers->post_timer.stop();
         return true;
     }
 }

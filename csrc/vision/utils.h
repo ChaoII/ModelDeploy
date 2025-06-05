@@ -5,8 +5,11 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+
 #include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/struct.h"
+
 
 namespace modeldeploy::vision::utils {
     bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = false);
@@ -19,13 +22,16 @@ namespace modeldeploy::vision::utils {
 
     void obb_nms(std::vector<ObbResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
-    void nms(std::vector<DetectionResult>* result, float iou_threshold = 0.5);
+    void nms(std::vector<DetectionResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
     void nms(std::vector<InstanceSegResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
     void nms(std::vector<PoseResult>* result, float iou_threshold);
 
     void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold);
+
+    void letter_box(cv::Mat* mat, const std::vector<int>& size, bool is_scale_up, bool is_mini_pad, bool is_no_pad,
+                    const std::vector<float>& padding_value, int stride, LetterBoxRecord* letter_box_record);
 
     void print_mat_type(const cv::Mat& mat);
 

@@ -5,6 +5,7 @@
 #pragma once
 #include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/struct.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Preprocessor object for YOLOv5Seg serials model.
@@ -17,11 +18,11 @@ namespace modeldeploy::vision::detection {
         *
         * \param[in] images The input image data list, all the elements are returned by cv::imread()
         * \param[in] outputs The output tensors which will feed in runtime
-        * \param[in] ims_info The shape info list, record input_shape and output_shape
+        * \param[in] letter_box_records The shape info list, record input_shape and output_shape
         * \return true if the preprocess successed, otherwise false
         */
         bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-                 std::vector<std::map<std::string, std::array<float, 2>>>* ims_info);
+                 std::vector<LetterBoxRecord>* letter_box_records);
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -65,9 +66,7 @@ namespace modeldeploy::vision::detection {
 
     protected:
         bool preprocess(cv::Mat* mat, Tensor* output,
-                        std::map<std::string, std::array<float, 2>>* im_info);
-
-        void letter_box(cv::Mat* mat) const;
+                        LetterBoxRecord* letter_box_record);
 
         // target size, tuple of (width, height), default size = {640, 640}
         std::vector<int> size_;

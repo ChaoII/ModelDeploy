@@ -7,6 +7,8 @@
 #include <ranges>
 
 #include "csrc/vision/utils.h"
+#include "csrc//vision/common/processors/pad.h"
+#include "csrc//vision/common/processors/resize.h"
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy::vision::utils {
@@ -95,49 +97,67 @@ namespace modeldeploy::vision::utils {
         // const float area2 = rect2.width * rect2.height;
         // const float iou = overlap_area / (area1 + area2 - overlap_area);
 
+        // std::vector<cv::Point2f> intersection;
+        // float iou = 0.0f;
+        // if (cv::rotatedRectangleIntersection(box1, box2, intersection) > 0) {
+        //     const auto intersection_area = cv::contourArea(intersection);
+        //     const auto box1_area = box1.size.area();
+        //     const auto box2_area = box2.size.area();
+        //     iou = static_cast<float>(intersection_area / (box1_area + box2_area - intersection_area));
+        // }
+        // return iou;
+
 
         // 使用opencv的api
-        cv::Rect2f intersection = rect1 & rect2; // 取交集
+        float iou = 0.0f;
+        const cv::Rect2f intersection = rect1 & rect2; // 取交集
         const float inter_area = intersection.area();
+        // std::cout << "----inter area: " << inter_area << std::endl;
         const float union_area = rect1.area() + rect2.area() - inter_area;
-        const float iou = inter_area / union_area;
+        iou = inter_area / union_area;
         return iou;
     }
 
 
-    void nms(std::vector<DetectionResult>* result, const float iou_threshold) {
-        // get sorted score indices
+    void nms(std::vector<DetectionResult>* result, const float iou_threshold, std::vector<int>* index) {
         const size_t N = result->size();
-        std::ranges::sort(*result, [&](const DetectionResult& a, const DetectionResult& b) {
-            return a.score > b.score; // 分数高的排前面
+        // Step 1: 根据分数排序得到索引
+        std::vector<int> sorted_indices(N);
+        std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
+        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+            return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 
         // Step 2: NMS 主逻辑
-        std::vector<size_t> index_;
         std::vector suppressed(N, false);
+        std::vector<int> keep_indices;
+
         for (size_t m = 0; m < N; ++m) {
-            if (suppressed[m]) continue;
-            index_.push_back(m);
-            const auto& box_i = result->at(m).box;
+            int i = sorted_indices[m];
+            if (suppressed[i]) continue;
+            keep_indices.push_back(i); // 保留当前框
+            const auto& box_i = (*result)[i].box;
             for (size_t n = m + 1; n < N; ++n) {
-                if (suppressed[n]) continue;
-                const auto& box_j = result->at(n).box;
-                if (box_i.area() == 0 || box_j.area() == 0) continue;
+                const int j = sorted_indices[n];
+                if (suppressed[j]) continue;
+                const auto& box_j = (*result)[j].box;
                 const float iou = rect_iou(box_i, box_j);
                 if (iou > iou_threshold) {
-                    suppressed[n] = true;
+                    suppressed[j] = true;
                 }
             }
         }
         // Step 3: 根据 keep_indices 重建结果
         std::vector<DetectionResult> new_result;
-        new_result.reserve(index_.size());
-        for (const auto idx : index_) {
+        new_result.reserve(keep_indices.size());
+        for (const auto idx : keep_indices) {
             new_result.push_back(std::move((*result)[idx])); // 移动语义
+            if (index) {
+                index->push_back(idx);
+            }
         }
         result->swap(new_result);
     }
-
 
     void nms(std::vector<InstanceSegResult>* result, const float iou_threshold, std::vector<int>* index) {
         // get sorted score indices
@@ -150,7 +170,7 @@ namespace modeldeploy::vision::utils {
         });
 
         // Step 2: NMS 主逻辑
-        std::vector<bool> suppressed(N, false);
+        std::vector suppressed(N, false);
         std::vector<int> keep_indices;
 
         for (size_t m = 0; m < N; ++m) {
@@ -216,7 +236,7 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold) {
+    void nms(std::vector<DetectionLandmarkResult>* result, const float iou_threshold) {
         const size_t N = result->size();
         // Step 1: 根据分数排序得到索引
         std::ranges::sort(*result, [&](const DetectionLandmarkResult& a, const DetectionLandmarkResult& b) {
@@ -248,6 +268,48 @@ namespace modeldeploy::vision::utils {
             new_result.push_back(std::move((*result)[idx])); // 移动语义
         }
         result->swap(new_result);
+    }
+
+    void letter_box(cv::Mat* mat, const std::vector<int>& size, const bool is_scale_up, const bool is_mini_pad,
+                    const bool is_no_pad, const std::vector<float>& padding_value, const int stride,
+                    LetterBoxRecord* letter_box_record) {
+        letter_box_record->ipt_h = static_cast<float>(mat->rows);
+        letter_box_record->ipt_w = static_cast<float>(mat->cols);
+        auto scale = std::min(size[1] * 1.0 / mat->rows, size[0] * 1.0 / mat->cols);
+        if (!is_scale_up) {
+            scale = std::min(scale, 1.0);
+        }
+        int resize_h = static_cast<int>(round(mat->rows * scale));
+        int resize_w = static_cast<int>(round(mat->cols * scale));
+        int pad_w = size[0] - resize_w;
+        int pad_h = size[1] - resize_h;
+        if (is_mini_pad) {
+            pad_h = pad_h % stride;
+            pad_w = pad_w % stride;
+        }
+        else if (is_no_pad) {
+            pad_h = 0;
+            pad_w = 0;
+            resize_h = size[1];
+            resize_w = size[0];
+        }
+        if (std::fabs(scale - 1.0f) > 1e-06) {
+            Resize::apply(mat, resize_w, resize_h);
+        }
+        if (pad_h > 0 || pad_w > 0) {
+            const float half_h = static_cast<float>(pad_h) * 1.0f / 2;
+            const int top = static_cast<int>(round(half_h - 0.1));
+            const int bottom = static_cast<int>(round(half_h + 0.1));
+            const float half_w = static_cast<float>(pad_w) * 1.0f / 2;
+            const int left = static_cast<int>(round(half_w - 0.1));
+            const int right = static_cast<int>(round(half_w + 0.1));
+            Pad::apply(mat, top, bottom, left, right, padding_value);
+        }
+        letter_box_record->out_h = static_cast<float>(mat->rows);
+        letter_box_record->out_w = static_cast<float>(mat->cols);
+        letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
+        letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
+        letter_box_record->scale = scale;
     }
 
     cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size) {

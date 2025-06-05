@@ -4,6 +4,7 @@
 
 #pragma once
 
+
 #include "csrc/core/md_decl.h"
 #include "csrc/base_model.h"
 #include "csrc/vision/common/result.h"
@@ -14,8 +15,8 @@ namespace modeldeploy::vision::face {
     class MODELDEPLOY_CXX_EXPORT FaceRecognizerPipeline : public BaseModel {
     public:
         FaceRecognizerPipeline(const std::string& det_model_path,
-                    const std::string& rec_model_path,
-                    int thread_num = 8);
+                               const std::string& rec_model_path,
+                               int thread_num = 8);
 
         ~FaceRecognizerPipeline() override;
 
@@ -24,7 +25,7 @@ namespace modeldeploy::vision::face {
         [[nodiscard]] bool is_initialized() const override;
 
     protected:
-        std::unique_ptr<SCRFD> detector_ = nullptr;
+        std::unique_ptr<Scrfd> detector_ = nullptr;
         std::unique_ptr<SeetaFaceID> recognizer_ = nullptr;
     };
 }

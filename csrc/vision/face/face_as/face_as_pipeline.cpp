@@ -17,7 +17,7 @@ namespace modeldeploy::vision::face {
         const int thread_num) {
         RuntimeOption option;
         option.set_cpu_thread_num(thread_num);
-        face_det_ = std::make_unique<SCRFD>(face_det_model_file, option);
+        face_det_ = std::make_unique<Scrfd>(face_det_model_file, option);
         face_as_first_ = std::make_unique<SeetaFaceAsFirst>(first_model_file, option);
         face_as_second_ = std::make_unique<SeetaFaceAsSecond>(second_model_file, option);
     }
