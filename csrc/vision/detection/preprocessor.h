@@ -45,7 +45,7 @@ namespace modeldeploy::vision::detection {
     protected:
         bool preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
-        void letter_box(cv::Mat* mat) const;
+        void letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const;
         std::vector<int> size_;
         std::vector<float> padding_value_;
         bool is_mini_pad_;

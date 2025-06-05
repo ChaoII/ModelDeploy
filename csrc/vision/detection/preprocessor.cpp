@@ -12,16 +12,15 @@ namespace modeldeploy::vision::detection {
     UltralyticsPreprocessor::UltralyticsPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
-        is_mini_pad_ = false;
+        is_mini_pad_ = true;
         is_no_pad_ = false;
         is_scale_up_ = true;
         stride_ = 32;
     }
 
-    void UltralyticsPreprocessor::letter_box(cv::Mat* mat) const {
-        const float ipt_h = static_cast<float>(mat->rows);
-        const float ipt_w = static_cast<float>(mat->cols);
-
+    void UltralyticsPreprocessor::letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const {
+        letter_box_record->ipt_h = static_cast<float>(mat->rows);
+        letter_box_record->ipt_w = static_cast<float>(mat->cols);
         auto scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
         if (!is_scale_up_) {
             scale = std::min(scale, 1.0);
@@ -52,29 +51,21 @@ namespace modeldeploy::vision::detection {
             const int right = static_cast<int>(round(half_w + 0.1));
             Pad::apply(mat, top, bottom, left, right, padding_value_);
         }
-
-        const float out_h = static_cast<float>(mat->rows);
-        const float out_w = static_cast<float>(mat->cols);
-
-        std::cout << "=====================================preprocess:====================================" <<
-            std::endl;
-        std::cout << "out_h: " << out_h << " out_w: " << out_w << " ipt_h: " << ipt_h << " ipt_w: " << ipt_w <<
-            " scale: " << scale << " pad_h: " << pad_h << " pad_w: " << pad_w << std::endl;
+        letter_box_record->out_h = static_cast<float>(mat->rows);
+        letter_box_record->out_w = static_cast<float>(mat->cols);
+        letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
+        letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
+        letter_box_record->scale = scale;
     }
 
     bool UltralyticsPreprocessor::preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        letter_box_record->ipt_h = static_cast<float>(mat->rows);
-        letter_box_record->ipt_w = static_cast<float>(mat->cols);
-        letter_box(mat);
+        letter_box(mat, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
         ConvertAndPermute::apply(mat, alpha, beta, true);
-        // Record output shape of preprocessed image
-        letter_box_record->out_h = static_cast<float>(mat->rows);
-        letter_box_record->out_w = static_cast<float>(mat->cols);
         utils::mat_to_tensor(*mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;

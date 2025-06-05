@@ -12,12 +12,12 @@ int main() {
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     // yolov8.get_preprocessor().set_size({1440, 1440});
-    int warm_up_count = 0;
+    int warm_up_count = 10;
     for (int i = 0; i < warm_up_count; ++i) {
         yolov8.predict(img, &result);
     }
 
-    int loop_count = 1;
+    int loop_count = 20;
     auto start_time = std::chrono::steady_clock::now();
     for (int i = 0; i < loop_count; ++i) {
         yolov8.predict(img, &result);
