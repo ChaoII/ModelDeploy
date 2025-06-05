@@ -16,7 +16,7 @@ int main() {
     for (int i = 0; i < 100; i++) {
         yolov8.predict(img, &result, &timers);
     }
-    print_benchmark(timers);
+    timers.print_benchmark();
     const auto vis_image =
         modeldeploy::vision::vis_obb(img, result, 0.2, "../../test_data/test_models/msyh.ttc", 12, 0.3, 0);
     cv::imshow("test", vis_image);
