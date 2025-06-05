@@ -23,11 +23,11 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool Scrfd::predict(const cv::Mat& im, std::vector<DetectionLandmarkResult>* result,
-                                 TimerArray* timers) {
+    bool Scrfd::predict(const cv::Mat& image, std::vector<DetectionLandmarkResult>* result,
+                        TimerArray* timers) {
         std::vector<std::vector<DetectionLandmarkResult>> results;
         results.resize(1);
-        if (!batch_predict({im}, &results[0], timers)) {
+        if (!batch_predict({image}, &results[0], timers)) {
             return false;
         }
         *result = std::move(results[0]);
@@ -35,8 +35,8 @@ namespace modeldeploy::vision::face {
     }
 
     bool Scrfd::batch_predict(const std::vector<cv::Mat>& images,
-                                       std::vector<DetectionLandmarkResult>* results,
-                                       TimerArray* timers) {
+                              std::vector<DetectionLandmarkResult>* results,
+                              TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
         std::vector<cv::Mat> _images = images;
         if (timers) timers->pre_timer.start();
