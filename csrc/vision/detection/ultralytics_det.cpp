@@ -42,7 +42,7 @@ namespace modeldeploy::vision::detection {
             return false;
         }
         std::cout << "preprocess time: "
-            << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _pre_time).count()
+            << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - _pre_time).count()
             << " ms" << std::endl;
         reused_input_tensors_[0].set_name(get_input_info(0).name);
         auto _infer_time = std::chrono::high_resolution_clock::now();
@@ -51,7 +51,7 @@ namespace modeldeploy::vision::detection {
             return false;
         }
         std::cout << "infer time: "
-            << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _infer_time).count()
+            << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - _infer_time).count()
             << " ms" << std::endl;
         auto _post_time = std::chrono::high_resolution_clock::now();
         if (!postprocessor_.run(reused_output_tensors_, results, letter_box_records)) {
@@ -59,7 +59,7 @@ namespace modeldeploy::vision::detection {
             return false;
         }
         std::cout << "post time: "
-            << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _post_time).count()
+            << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - _post_time).count()
             << " ms" << std::endl;
         return true;
     }

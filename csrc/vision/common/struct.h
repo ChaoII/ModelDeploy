@@ -10,5 +10,8 @@ namespace modeldeploy::vision {
         float ipt_h;
         float out_w;
         float out_h;
+        float pad_w;
+        float pad_h;
+        float scale;
     };
 }

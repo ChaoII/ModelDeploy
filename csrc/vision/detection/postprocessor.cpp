@@ -54,19 +54,13 @@ namespace modeldeploy::vision::detection {
             utils::nms(&_results, nms_threshold_);
             // scale the boxes to the origin image shape
 
-            const float out_h = letter_box_records[bs].out_h;
-            const float out_w = letter_box_records[bs].out_w;
+
             const float ipt_h = letter_box_records[bs].ipt_h;
             const float ipt_w = letter_box_records[bs].ipt_w;
-            const float scale = std::min(out_h / ipt_h, out_w / ipt_w);
-            const float pad_h = (out_h - ipt_h * scale) / 2;
-            const float pad_w = (out_w - ipt_w * scale) / 2;
+            const float scale = letter_box_records[bs].scale;
+            const float pad_h = letter_box_records[bs].pad_h;
+            const float pad_w = letter_box_records[bs].pad_w;
 
-            std::cout << "=====================================postprocess:====================================" <<
-                std::endl;
-
-            std::cout << "out_h: " << out_h << " out_w: " << out_w << " ipt_h: " << ipt_h << " ipt_w: " << ipt_w <<
-                " scale: " << scale << " pad_h: " << pad_h << " pad_w: " << pad_w << std::endl;
 
             for (auto& result : _results) {
                 auto& box = result.box;
