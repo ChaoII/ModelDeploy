@@ -21,9 +21,10 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsSeg::predict(const cv::Mat& image, std::vector<InstanceSegResult>* result) {
+    bool UltralyticsSeg::predict(const cv::Mat& image, std::vector<InstanceSegResult>* result,
+                                 TimerArray* timers) {
         std::vector<std::vector<InstanceSegResult>> results;
-        if (!batch_predict({image}, &results)) {
+        if (!batch_predict({image}, &results, timers)) {
             return false;
         }
         *result = std::move(results[0]);
@@ -31,22 +32,29 @@ namespace modeldeploy::vision::detection {
     }
 
     bool UltralyticsSeg::batch_predict(const std::vector<cv::Mat>& images,
-                                       std::vector<std::vector<InstanceSegResult>>* results) {
-        std::vector<std::map<std::string, std::array<float, 2>>> ims_info;
+                                       std::vector<std::vector<InstanceSegResult>>* results,
+                                       TimerArray* timers) {
+        std::vector<LetterBoxRecord> ims_info;
         std::vector<cv::Mat> images_ = images;
+        if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(&images_, &reused_input_tensors_, &ims_info)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
+        if (timers) timers->pre_timer.stop();
         reused_input_tensors_[0].set_name(get_input_info(0).name);
+        if (timers) timers->infer_timer.start();
         if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
         if (!postprocessor_.run(reused_output_tensors_, results, ims_info)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }
+        if (timers) timers->post_timer.stop();
         return true;
     }
 } // namespace modeldeploy::vision::detection

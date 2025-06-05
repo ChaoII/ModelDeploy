@@ -16,7 +16,7 @@ MDStatusCode md_create_face_det_model(MDModel* model, const char* model_path,
                                       const int thread_num) {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(thread_num);
-    const auto face_det_model = new modeldeploy::vision::face::SCRFD(model_path, option);
+    const auto face_det_model = new modeldeploy::vision::face::Scrfd(model_path, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_det_model->name().c_str());
     model->model_content = face_det_model;
@@ -34,7 +34,7 @@ MDStatusCode md_face_det_predict(const MDModel* model, MDImage* image, MDDetecti
     }
     auto cv_image = md_image_to_mat(image);
     std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
-    const auto face_det_model = static_cast<modeldeploy::vision::face::SCRFD*>(model->model_content);
+    const auto face_det_model = static_cast<modeldeploy::vision::face::Scrfd*>(model->model_content);
     if (const bool res_status = face_det_model->predict(cv_image, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
@@ -78,7 +78,7 @@ void md_free_face_det_result(MDDetectionLandmarkResults* c_results) {
 
 void md_free_face_det_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::face::SCRFD*>(model->model_content);
+        delete static_cast<modeldeploy::vision::face::Scrfd*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

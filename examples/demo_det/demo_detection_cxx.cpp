@@ -8,26 +8,27 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(1);
-    modeldeploy::vision::detection::UltralyticsDet yolov8("../../test_data/test_models/yolo11n.onnx", option);
+    // option.use_gpu();
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.onnx", option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     // yolov8.get_preprocessor().set_size({1440, 1440});
-    int warm_up_count = 10;
+    yolo11_det.get_preprocessor().set_mini_pad(true);
+    int warm_up_count = 1;
     for (int i = 0; i < warm_up_count; ++i) {
-        yolov8.predict(img, &result);
+        yolo11_det.predict(img, &result);
     }
 
-    int loop_count = 20;
-    auto start_time = std::chrono::steady_clock::now();
+    TimerArray timers;
+    int loop_count = 100;
     for (int i = 0; i < loop_count; ++i) {
-        yolov8.predict(img, &result);
+        yolo11_det.predict(img, &result, &timers);
     }
-    auto end_time = std::chrono::steady_clock::now();
-    std::cout << "infer time: " << std::chrono::duration<double, std::milli>(end_time - start_time).count() / loop_count
-        << " ms" << std::endl;
-    // result.display();
+    print_benchmark(timers);
+
     const auto vis_image =
-        modeldeploy::vision::vis_detection(img, result, 0.3, "../../test_data/test_models/msyh.ttc", 12, 0.3, false);
+        modeldeploy::vision::vis_detection(img, result, 0.3, "../../test_data/test_models/msyh.ttc", 12, 0.3,
+                                           false);
     cv::imshow("test", vis_image);
     cv::waitKey(0);
 }

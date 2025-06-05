@@ -10,15 +10,14 @@
 namespace modeldeploy::vision::detection {
     UltralyticsObbPostprocessor::UltralyticsObbPostprocessor() {
         conf_threshold_ = 0.25;
-        mask_threshold_ = 0.35;
         nms_threshold_ = 0.5;
     }
 
     bool UltralyticsObbPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<std::vector<ObbResult>>* results,
-        const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
+        const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
-        // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
+        // transpose(1,20,21504)->(1,21504,20) 20 = 4(xc,yc,w,h)+classes_num(15)+1(angle)
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
         results->reserve(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
@@ -27,40 +26,45 @@ namespace modeldeploy::vision::detection {
                 return false;
             }
             // 官方模型为21504
-            const auto ooj_num = tensor_transpose.shape()[1];
+            const auto dim1 = tensor_transpose.shape()[1];
             // 官方模型为4(xc, yc, w, h)+classes_num(15)+1(angle) = 20
-            const auto obj_attr_num = tensor_transpose.shape()[2];
-            const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * ooj_num * obj_attr_num;
+            const auto dim2 = tensor_transpose.shape()[2];
+            const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * dim1 * dim2;
             std::vector<ObbResult> _results;
-            _results.reserve(ooj_num);
-            for (size_t i = 0; i < ooj_num; ++i) {
-                const auto attr_ptr = data + i * obj_attr_num;
+            _results.reserve(dim1);
+            for (size_t i = 0; i < dim1; ++i) {
+                const auto attr_ptr = data + i * dim2;
                 // 4(xc, yc, w, h)+classes_num(15)+1(angle)
-                const float* max_class_score = std::max_element(attr_ptr + 4,
-                                                                attr_ptr + obj_attr_num - 1);
+                const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2 - 1);
                 float confidence = *max_class_score;
                 // filter boxes by conf_threshold
                 if (confidence <= conf_threshold_) {
                     continue;
                 }
                 auto label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
-                // convert from [x, y, w, h, a] to [x1, y1, x2, y2,x3, y3, x4, y4]
+                // convert from [xc, yc, w, h, a]
                 // 其中a为angle矩形框的旋转角度, 默认为弧度制(但是OpenCV的RotatedRect的旋转角度，默认为角度制)
                 cv::RotatedRect rotated_boxes = {
                     cv::Point2f(attr_ptr[0], attr_ptr[1]),
                     cv::Size2f(attr_ptr[2], attr_ptr[3]),
-                    attr_ptr[obj_attr_num - 1] * 180 / 3.141592653f
+                    attr_ptr[dim2 - 1] * 180 / 3.141592653f
                 };
-                _results.emplace_back(
-                    rotated_boxes,
-                    label_id,
-                    confidence
-                );
+                _results.emplace_back(rotated_boxes, label_id, confidence);
             }
             if (_results.empty()) {
                 continue;
             }
             utils::obb_nms(&_results, nms_threshold_);
+            const float scale = letter_box_records[bs].scale;
+            const float pad_h = letter_box_records[bs].pad_h;
+            const float pad_w = letter_box_records[bs].pad_w;
+            for (auto& result : _results) {
+                auto& box = result.rotated_box;
+                // clip box()
+                //先减去 padding,再除以缩放因子scale;
+                box.center = (box.center - cv::Point2f(pad_w, pad_h)) / scale;
+                box.size = box.size / scale;
+            }
             results->emplace_back(std::move(_results));
         }
         return true;

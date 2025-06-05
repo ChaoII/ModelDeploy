@@ -48,7 +48,7 @@ namespace modeldeploy::vision {
         swap_rb_ = swap_rb;
     }
 
-    bool NormalizeAndPermute::impl(cv::Mat* im) {
+    bool NormalizeAndPermute::impl(cv::Mat* im) const {
         const int origin_w = im->cols;
         const int origin_h = im->rows;
         std::vector<cv::Mat> split_im;
@@ -73,10 +73,10 @@ namespace modeldeploy::vision {
     }
 
     bool NormalizeAndPermute::apply(cv::Mat* mat, const std::vector<float>& mean,
-                                  const std::vector<float>& std, bool is_scale,
-                                  const std::vector<float>& min,
-                                  const std::vector<float>& max,
-                                  bool swap_rb) {
+                                    const std::vector<float>& std, bool is_scale,
+                                    const std::vector<float>& min,
+                                    const std::vector<float>& max,
+                                    const bool swap_rb) {
         auto op = NormalizeAndPermute(mean, std, is_scale, min, max, swap_rb);
         return op(mat);
     }

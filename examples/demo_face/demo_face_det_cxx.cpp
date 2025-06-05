@@ -7,16 +7,15 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-
 int main() {
     std::string image_file = "../../test_data/test_images/test_face_detection4.jpg";
     auto model =
-        modeldeploy::vision::face::SCRFD("../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
-
+        modeldeploy::vision::face::Scrfd(
+            "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
     auto im = cv::imread(image_file);
     auto im_bak = im.clone();
     std::vector<modeldeploy::vision::DetectionLandmarkResult> res;
-    if (!model.predict(im, &res, 0.5)) {
+    if (!model.predict(im, &res)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }

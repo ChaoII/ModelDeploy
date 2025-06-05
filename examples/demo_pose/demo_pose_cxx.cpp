@@ -12,21 +12,17 @@ int main() {
     modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/yolo11n-pose.onnx", option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::PoseResult> result;
-
-
     int warm_up_count = 20;
     for (int i = 0; i < warm_up_count; ++i) {
         yolov8.predict(img, &result);
     }
 
+    TimerArray timers;
     int loop_count = 80;
-    auto start_time = std::chrono::steady_clock::now();
     for (int i = 0; i < loop_count; ++i) {
-        yolov8.predict(img, &result);
+        yolov8.predict(img, &result, &timers);
     }
-    auto end_time = std::chrono::steady_clock::now();
-    std::cout << "infer time: " << std::chrono::duration<double, std::milli>(end_time - start_time).count() / loop_count
-        << " ms" << std::endl;
+    timers.print_benchmark();
     // result.display();
     const auto vis_image =
         modeldeploy::vision::vis_pose(img, result, "../../test_data/test_models/msyh.ttc", 12, 4, 0.3, false);

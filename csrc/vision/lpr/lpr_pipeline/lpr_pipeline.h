@@ -19,7 +19,7 @@ namespace modeldeploy::vision::lpr {
 
         ~LprPipeline() override;
 
-        virtual bool predict(const cv::Mat& image, std::vector<LprResult>* results);
+        virtual bool predict(const cv::Mat& image, std::vector<LprResult>* results, TimerArray* times = nullptr);
 
         [[nodiscard]] bool is_initialized() const override;
 

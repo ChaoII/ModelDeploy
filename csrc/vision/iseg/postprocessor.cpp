@@ -16,7 +16,7 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsSegPostprocessor::run(
         std::vector<Tensor>& tensors, std::vector<std::vector<InstanceSegResult>>* results,
-        const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const {
+        const std::vector<LetterBoxRecord>& letter_box_records) const {
         //(1,116,8400)->(1,8400,116)  116=4(xc,yc,w,h)+80(coco 80 classes)+32(mask coefficient)
         tensors[0] = tensors[0].transpose({0, 2, 1}).to_tensor();
         auto mask_nums = tensors[1].shape()[1];
@@ -96,18 +96,13 @@ namespace modeldeploy::vision::detection {
             std::vector<cv::Mat> mask_channels;
             cv::split(masks, mask_channels);
             // scale the boxes to the origin image shape
-            auto iter_out = ims_info[bs].find("output_shape");
-            auto iter_ipt = ims_info[bs].find("input_shape");
-            if (!(iter_out != ims_info[bs].end() && iter_ipt != ims_info[bs].end())) {
-                MD_LOG_ERROR << "Cannot find input_shape or output_shape from im_info.";
-            }
-            float out_h = iter_out->second[0];
-            float out_w = iter_out->second[1];
-            float ipt_h = iter_ipt->second[0];
-            float ipt_w = iter_ipt->second[1];
-            float scale = std::min(out_h / ipt_h, out_w / ipt_w);
-            float pad_h = (out_h - ipt_h * scale) / 2;
-            float pad_w = (out_w - ipt_w * scale) / 2;
+            const float ipt_h = letter_box_records[bs].ipt_h;
+            const float ipt_w = letter_box_records[bs].ipt_w;
+            const float out_h = letter_box_records[bs].out_h;
+            const float out_w = letter_box_records[bs].out_w;
+            const float scale = letter_box_records[bs].scale;
+            const float pad_h = letter_box_records[bs].pad_h;
+            const float pad_w = letter_box_records[bs].pad_w;
             // for mask
             float pad_h_mask = pad_h / out_h * static_cast<float>(tensors[1].shape()[2]);
             float pad_w_mask = pad_w / out_w * static_cast<float>(tensors[1].shape()[3]);

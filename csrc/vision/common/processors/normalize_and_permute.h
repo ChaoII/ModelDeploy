@@ -20,7 +20,7 @@ namespace modeldeploy::vision {
                             const std::vector<float>& min = std::vector<float>(),
                             const std::vector<float>& max = std::vector<float>(),
                             bool swap_rb = false);
-        bool impl(cv::Mat* mat);
+        bool impl(cv::Mat* mat) const;
 
         bool operator()(cv::Mat* mat);
 

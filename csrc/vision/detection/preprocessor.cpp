@@ -18,51 +18,13 @@ namespace modeldeploy::vision::detection {
         stride_ = 32;
     }
 
-    void UltralyticsPreprocessor::letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const {
-        letter_box_record->ipt_h = static_cast<float>(mat->rows);
-        letter_box_record->ipt_w = static_cast<float>(mat->cols);
-        auto scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
-        if (!is_scale_up_) {
-            scale = std::min(scale, 1.0);
-        }
-        int resize_h = static_cast<int>(round(mat->rows * scale));
-        int resize_w = static_cast<int>(round(mat->cols * scale));
-        int pad_w = size_[0] - resize_w;
-        int pad_h = size_[1] - resize_h;
-        if (is_mini_pad_) {
-            pad_h = pad_h % stride_;
-            pad_w = pad_w % stride_;
-        }
-        else if (is_no_pad_) {
-            pad_h = 0;
-            pad_w = 0;
-            resize_h = size_[1];
-            resize_w = size_[0];
-        }
-        if (std::fabs(scale - 1.0f) > 1e-06) {
-            Resize::apply(mat, resize_w, resize_h);
-        }
-        if (pad_h > 0 || pad_w > 0) {
-            const float half_h = static_cast<float>(pad_h) * 1.0f / 2;
-            const int top = static_cast<int>(round(half_h - 0.1));
-            const int bottom = static_cast<int>(round(half_h + 0.1));
-            const float half_w = static_cast<float>(pad_w) * 1.0f / 2;
-            const int left = static_cast<int>(round(half_w - 0.1));
-            const int right = static_cast<int>(round(half_w + 0.1));
-            Pad::apply(mat, top, bottom, left, right, padding_value_);
-        }
-        letter_box_record->out_h = static_cast<float>(mat->rows);
-        letter_box_record->out_w = static_cast<float>(mat->cols);
-        letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
-        letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
-        letter_box_record->scale = scale;
-    }
 
     bool UltralyticsPreprocessor::preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        letter_box(mat, letter_box_record);
+        utils::letter_box(mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_,
+                          padding_value_, stride_, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
         ConvertAndPermute::apply(mat, alpha, beta, true);

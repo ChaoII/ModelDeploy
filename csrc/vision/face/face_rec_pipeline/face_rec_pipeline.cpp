@@ -6,14 +6,13 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/face/face_rec_pipeline/face_rec_pipeline.h"
 
-
 namespace modeldeploy::vision::face {
     FaceRecognizerPipeline::FaceRecognizerPipeline(const std::string& det_model_path,
                                                    const std::string& rec_model_path,
                                                    int thread_num) {
         RuntimeOption option;
         option.set_cpu_thread_num(thread_num);
-        detector_ = std::make_unique<SCRFD>(det_model_path, option);
+        detector_ = std::make_unique<Scrfd>(det_model_path, option);
         recognizer_ = std::make_unique<SeetaFaceID>(rec_model_path, option);
     }
 

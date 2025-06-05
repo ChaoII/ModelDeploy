@@ -44,7 +44,7 @@ namespace modeldeploy::vision::face {
         [[nodiscard]] bool is_initialized() const override;
 
     private:
-        std::unique_ptr<SCRFD> face_det_ = nullptr;
+        std::unique_ptr<Scrfd> face_det_ = nullptr;
         std::unique_ptr<SeetaFaceAsFirst> face_as_first_ = nullptr;
         std::unique_ptr<SeetaFaceAsSecond> face_as_second_ = nullptr;
     };

@@ -4,6 +4,7 @@
 #pragma once
 #include "csrc/core/tensor.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/struct.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Postprocessor object for YOLOv5Seg serials model.
@@ -18,12 +19,12 @@ namespace modeldeploy::vision::detection {
        *
        * \param[in] tensors The inference result from runtime
        * \param[in] results The output result of detection
-       * \param[in] ims_info The shape info list, record input_shape and output_shape
+       * \param[in] letter_box_records The shape info list, record input_shape and output_shape
        * \return true if the postprocess successed, otherwise false
        */
         bool run(std::vector<Tensor>& tensors,
                  std::vector<std::vector<InstanceSegResult>>* results,
-                 const std::vector<std::map<std::string, std::array<float, 2>>>& ims_info) const;
+                 const std::vector<LetterBoxRecord>& letter_box_records) const;
 
         /// Set conf_threshold, default 0.25
         void set_conf_threshold(const float& conf_threshold) {
