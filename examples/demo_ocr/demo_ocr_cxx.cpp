@@ -18,11 +18,12 @@ int main() {
     modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
-                                            "../../test_data/ppocrv5_dict.txt");
+                                            "../../test_data/ppocrv5_dict.txt",
+                                            true, 8);
     auto img = cv::imread("../../test_data/test_images/test_ocr1.jpg");
     modeldeploy::vision::OCRResult result;
     TimerArray timers;
-    int loop_count = 10;
+    int loop_count = 1;
     for (int i = 0; i < loop_count; i++) {
         ocr.predict(img, &result, &timers);
     }

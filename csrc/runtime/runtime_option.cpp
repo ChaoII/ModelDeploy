@@ -33,8 +33,27 @@ namespace modeldeploy {
         backend = Backend::ORT;
     }
 
-    void RuntimeOption::set_ort_graph_opt_level(int level) {
-        std::vector<int> supported_level{-1, 0, 1, 2};
+    void RuntimeOption::set_ort_graph_opt_level(const int level) {
+        const std::vector supported_level{-1, 0, 1, 2};
+        if (std::ranges::find(supported_level, level) == supported_level.end()) {
+            MD_LOG_ERROR << "Invalid graph optimization level: " << level << ", supported levels are: "
+                << print_vector(supported_level) << std::endl;
+        }
         ort_option.graph_optimization_level = level;
+    }
+
+    //input:8x3x224x224
+    void RuntimeOption::set_trt_min_shape(const std::string& trt_min_shape) {
+        ort_option.trt_min_shape = trt_min_shape;
+    }
+
+    //input:8x3x224x224
+    void RuntimeOption::set_trt_opt_shape(const std::string& trt_opt_shape) {
+        ort_option.trt_opt_shape = trt_opt_shape;
+    }
+
+    //input:8x3x224x224
+    void RuntimeOption::set_trt_max_shape(const std::string& trt_max_shape) {
+        ort_option.trt_max_shape = trt_max_shape;
     }
 }

@@ -20,6 +20,7 @@ namespace modeldeploy::vision::ocr {
                   const std::string& cls_model_path,
                   const std::string& rec_model_path,
                   const std::string& dict_path,
+                  bool use_gpu = false,
                   int thread_num = 8,
                   int max_side_len = 960,
                   double det_db_thresh = 0.3,
@@ -27,7 +28,7 @@ namespace modeldeploy::vision::ocr {
                   double det_db_unclip_ratio = 1.5,
                   const std::string& det_db_score_mode = "slow",
                   bool use_dilation = false,
-                  int rec_batch_size = 8);
+                  int rec_batch_size = 6);
 
         ~PaddleOCR() override;
 

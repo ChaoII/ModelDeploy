@@ -95,6 +95,7 @@ typedef struct {
     const char* rec_model_file;
     /// ocr dictionary path
     const char* dict_path;
+    int use_gpu;
     /// thread num default is 8
     int thread_num;
     /// model format default is PaddlePaddle
