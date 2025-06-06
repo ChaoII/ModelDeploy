@@ -42,19 +42,19 @@ namespace modeldeploy::vision::face {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
-        if (images->size() != 1) {
-            MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
-        }
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
-            if (!preprocess(&(*images)[i], &tensors[i])) {
-                MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
-                return false;
-            }
+            // 修改了数据，并生成一个tensor,并记录预处理的一些参数，便于在后处理中还原
+            preprocess(&(*images)[i], &tensors[i]);
         }
-        (*outputs)[0] = std::move(tensors[0]);
+        if (tensors.size() == 1) {
+            (*outputs)[0] = std::move(tensors[0]);
+        }
+        else {
+            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        }
         return true;
     }
 } // namespace modeldeploy::vision::face_rec

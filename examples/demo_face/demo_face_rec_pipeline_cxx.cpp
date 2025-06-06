@@ -3,10 +3,8 @@
 //
 
 #include <iostream>
-#include <csrc/vision/face/face_rec_pipeline/face_rec_pipeline.h>
-
-#include "../../csrc/vision.h"
-#include "../../csrc/vision/common/visualize/visualize.h"
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision.h"
 
 #ifdef WIN32
 #include <windows.h>
@@ -21,13 +19,16 @@ int main() {
         "../../test_data/test_models/face/face_recognizer.onnx");
     const auto im = cv::imread("../../test_data/test_images/test_face_detection4.jpg");
     auto im_bak = im.clone();
-    std::vector<modeldeploy::vision::FaceRecognitionResult> ress;
-    if (!model.predict(im, &ress)) {
-        std::cerr << "Failed to predict." << std::endl;
-        return -1;
+    TimerArray timers;
+    constexpr int loop_count = 50;
+    std::vector<modeldeploy::vision::FaceRecognitionResult> results;
+    for (int i = 0; i < loop_count; i++) {
+        if (!model.predict(im, &results, &timers)) {
+            std::cerr << "Failed to predict." << std::endl;
+            return -1;
+        }
     }
-    for (auto& res : ress) {
-        res.display();
-    }
+    timers.print_benchmark();
+    dis_face_rec(results);
     return 0;
 }

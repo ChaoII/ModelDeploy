@@ -3,6 +3,8 @@
 //
 #include <iostream>
 #include <string>
+#include <csrc/vision/common/display/display.h>
+
 #include "csrc/vision/utils.h"
 #include "csrc/vision.h"
 
@@ -12,13 +14,13 @@ int main() {
     assert(faceid_model.is_initialized());
     auto im0 = cv::imread("../../test_data/test_images/test_face_id1.jpg");
     auto im1 = cv::imread("../../test_data/test_images/test_face_id4.jpg");
-    modeldeploy::vision::FaceRecognitionResult result0;
-    modeldeploy::vision::FaceRecognitionResult result1;
-    faceid_model.predict(im0, &result0);
-    faceid_model.predict(im1, &result1);
-    const auto similarity = modeldeploy::vision::utils::compute_similarity(result0.embedding, result1.embedding);
-    result0.display();
-    result1.display();
+    std::vector<modeldeploy::vision::FaceRecognitionResult> result0;
+    std::vector<modeldeploy::vision::FaceRecognitionResult> result1;
+    faceid_model.predict(im0, &result0[0]);
+    faceid_model.predict(im1, &result1[0]);
+    const auto similarity = modeldeploy::vision::utils::compute_similarity(result0[0].embedding, result1[0].embedding);
+    modeldeploy::vision::dis_face_rec(result0);
+    modeldeploy::vision::dis_face_rec(result1);
     std::cout << "similarity: " << similarity << std::endl;
     return 0;
 }

@@ -6,8 +6,7 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/face/face_rec/seetaface.h"
 
-namespace modeldeploy::vision::face
-{
+namespace modeldeploy::vision::face {
     SeetaFaceID::SeetaFaceID(
         const std::string& model_file,
         const modeldeploy::RuntimeOption& custom_option) {
@@ -38,9 +37,6 @@ namespace modeldeploy::vision::face
     bool SeetaFaceID::batch_predict(const std::vector<cv::Mat>& images,
                                     std::vector<FaceRecognitionResult>* results, TimerArray* timers) {
         std::vector<cv::Mat> fd_images = images;
-        if (images.size() != 1) {
-            MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
-        }
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(&fd_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
