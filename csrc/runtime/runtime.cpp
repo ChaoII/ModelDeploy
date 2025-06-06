@@ -71,7 +71,6 @@ namespace modeldeploy {
             if (t.name() == name) {
                 is_exist = true;
                 t.from_external_memory(output.data(), output.shape(), output.dtype());
-
                 break;
             }
         }

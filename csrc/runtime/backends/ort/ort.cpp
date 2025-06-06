@@ -13,7 +13,7 @@
 namespace modeldeploy {
     void OrtBackend::build_option(const OrtBackendOption& option) {
         option_ = option;
-        // session_options_.SetLogSeverityLevel(1); // verbose
+        session_options_.SetLogSeverityLevel(1); // verbose
         //
         // session_options_.EnableProfiling(to_wstring("onnxruntime_perf_test.json").c_str());
         // std::wstring model_filepath = to_wstring("optimized_graph.onnx");
@@ -46,57 +46,47 @@ namespace modeldeploy {
         }
         // CUDA
         if (option.device == Device::GPU) {
-            bool has_cuda = std::ranges::find(all_providers, "CUDAExecutionProvider") != all_providers.end();
-            if (option_.enable_cuda && has_cuda) {
-                OrtCUDAProviderOptionsV2* cuda_options = nullptr;
-                Ort::ThrowOnError(Ort::GetApi().CreateCUDAProviderOptions(&cuda_options));
-
-                std::vector<const char*> keys_cuda;
-                std::vector<const char*> values_cuda;
-
-                std::string device_id_str = std::to_string(option.device_id);
-                keys_cuda.push_back("device_id");
-                values_cuda.push_back(device_id_str.c_str());
-
-                if (option.external_stream_) {
-                    keys_cuda.push_back("user_compute_stream");
-                    std::string stream_str = std::to_string(reinterpret_cast<uintptr_t>(option.external_stream_));
-                    values_cuda.push_back(stream_str.c_str());
-                }
-
-                Ort::ThrowOnError(
-                    Ort::GetApi().UpdateCUDAProviderOptions(cuda_options, keys_cuda.data(),
-                                                            values_cuda.data(), static_cast<int>(keys_cuda.size())));
-                Ort::ThrowOnError(
-                    Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA_V2(session_options_, cuda_options));
-                Ort::GetApi().ReleaseCUDAProviderOptions(cuda_options);
-                MD_LOG_INFO << "ONNX Runtime CUDA Provider enabled." << std::endl;
-                bool has_trt = std::ranges::find(all_providers, "TensorrtExecutionProvider") != all_providers.end();
-
-                if (option.enable_trt && has_trt) {
+            // 获取所有可用 Provider
+            const bool has_trt = std::ranges::find(all_providers, "TensorrtExecutionProvider") != all_providers.end();
+            const std::string device_id_str = std::to_string(option.device_id);
+            // ==== 1. 尝试启用 TensorRT（优先） ====
+            if (option.enable_trt) {
+                if (has_trt) {
                     OrtTensorRTProviderOptionsV2* trt_options = nullptr;
                     Ort::ThrowOnError(Ort::GetApi().CreateTensorRTProviderOptions(&trt_options));
 
                     std::vector<const char*> keys_trt;
                     std::vector<const char*> values_trt;
 
-                    // Example options:
-                    std::string trt_max_workspace = "2147483648"; // 2GB
-                    keys_trt.push_back("trt_max_workspace_size");
-                    values_trt.push_back(trt_max_workspace.c_str());
+                    keys_trt.push_back("device_id");
+                    values_trt.push_back(device_id_str.c_str());
 
-                    std::string trt_fp16_enable = option.enable_fp16 ? "1" : "0";
+                    const std::string trt_fp16_enable = option.enable_fp16 ? "1" : "0";
                     keys_trt.push_back("trt_fp16_enable");
                     values_trt.push_back(trt_fp16_enable.c_str());
 
-                    keys_trt.push_back("device_id");
-                    values_trt.push_back(device_id_str.c_str());
+                    keys_trt.push_back("trt_max_workspace_size");
+                    values_trt.push_back("2147483648"); // 2GB
 
                     keys_trt.push_back("trt_engine_cache_enable");
                     values_trt.push_back("1");
 
                     keys_trt.push_back("trt_engine_cache_path");
                     values_trt.push_back("./");
+
+                    // （可选）动态 shape profile 设置
+                    if (!option.trt_min_shape.empty()) {
+                        keys_trt.push_back("trt_profile_min_shape");
+                        values_trt.push_back(option.trt_min_shape.c_str());
+                    }
+                    if (!option.trt_opt_shape.empty()) {
+                        keys_trt.push_back("trt_profile_opt_shape");
+                        values_trt.push_back(option.trt_opt_shape.c_str());
+                    }
+                    if (!option.trt_max_shape.empty()) {
+                        keys_trt.push_back("trt_profile_max_shape");
+                        values_trt.push_back(option.trt_max_shape.c_str());
+                    }
 
                     Ort::ThrowOnError(
                         Ort::GetApi().UpdateTensorRTProviderOptions(trt_options,
@@ -105,17 +95,45 @@ namespace modeldeploy {
                     Ort::ThrowOnError(
                         Ort::GetApi().SessionOptionsAppendExecutionProvider_TensorRT_V2(session_options_, trt_options));
                     Ort::GetApi().ReleaseTensorRTProviderOptions(trt_options);
+
                     MD_LOG_INFO << "ONNX Runtime TensorRT Provider enabled." << std::endl;
                 }
                 else {
-                    MD_LOG_WARN << "ONNX Runtime compiled without TensorRT support. fallback to CUDA. Providers: " <<
+                    MD_LOG_WARN << "TensorRT provider not available. Disable TRT. Available providers: " <<
                         providers_msg << std::endl;
                 }
             }
+
+            // ==== 2. 启用 CUDA（作为 fallback 或主力） ====
+            if (std::ranges::find(all_providers, "CUDAExecutionProvider") != all_providers.end()) {
+                OrtCUDAProviderOptionsV2* cuda_options = nullptr;
+                Ort::ThrowOnError(Ort::GetApi().CreateCUDAProviderOptions(&cuda_options));
+
+                std::vector<const char*> keys_cuda;
+                std::vector<const char*> values_cuda;
+
+                keys_cuda.push_back("device_id");
+                values_cuda.push_back(device_id_str.c_str());
+
+                if (option.external_stream_) {
+                    const std::string stream_str = std::to_string(
+                        reinterpret_cast<uintptr_t>(option.external_stream_));
+                    keys_cuda.push_back("user_compute_stream");
+                    values_cuda.push_back(stream_str.c_str());
+                }
+
+                Ort::ThrowOnError(
+                    Ort::GetApi().UpdateCUDAProviderOptions(cuda_options, keys_cuda.data(),
+                                                            values_cuda.data(),
+                                                            static_cast<int>(keys_cuda.size())));
+                Ort::ThrowOnError(
+                    Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA_V2(session_options_, cuda_options));
+                Ort::GetApi().ReleaseCUDAProviderOptions(cuda_options);
+                MD_LOG_INFO << "ONNX Runtime CUDA Provider enabled." << std::endl;
+            }
             else {
-                MD_LOG_ERROR << "ONNX Runtime compiled without CUDA support, fallback to CPU. Providers: " <<
-                    providers_msg << std::endl;
-                option_.device = Device::CPU;
+                MD_LOG_ERROR << "CUDA provider not available. Fallback to CPU. Available providers: " << providers_msg
+                    << std::endl;
             }
         }
     }
@@ -125,11 +143,11 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Backend::ORT only supports Device::CPU/Device::GPU, but now its " << std::endl;
             return false;
         }
+        option_ = option.ort_option;
         option_.device_id = option.device_id;
         option_.device = option.device;
-        option_.model_filepath = option.model_filepath;
-        option_.device_id = option.device_id;
-        option_.device = option.device;
+        option_.enable_trt = option.enable_trt;
+        option_.enable_fp16 = option.enable_fp16;
 
         if (option_.model_from_memory) {
             return init_from_onnx(option.model_buffer, option_);

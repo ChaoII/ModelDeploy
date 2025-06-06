@@ -26,7 +26,7 @@ namespace modeldeploy {
         int inter_op_num_threads = -1;
         /// Execution mode for the graph, -1: default(Sequential mode)
         ///         /0: Sequential mode, execute the operators in graph one by one.
-        ///         /1: Parallel mode, execute the operators in graph parallelly.
+        ///         /1: Parallel mode, execute the operators in graph parallely.
         int execution_mode = -1;
         /// Inference device, OrtBackend supports CPU/GPU
         Device device = Device::CPU;
@@ -44,7 +44,12 @@ namespace modeldeploy {
 
         bool enable_trt = true;
 
-        bool enable_cuda = true;
+        // 动态 shape 支持（如不需要可以留空）
+        std::string trt_min_shape;
+
+        std::string trt_opt_shape;
+
+        std::string trt_max_shape;
 
         void set_cpu_thread_num(const int num) {
             intra_op_num_threads = num;

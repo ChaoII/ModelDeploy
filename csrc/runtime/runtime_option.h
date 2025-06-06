@@ -9,9 +9,7 @@
 
 
 namespace modeldeploy {
-
     struct MODELDEPLOY_CXX_EXPORT RuntimeOption {
-
         void set_model_path(const std::string& model_path);
 
         void use_cpu();
@@ -24,10 +22,18 @@ namespace modeldeploy {
 
         void use_ort_backend();
 
+        void set_trt_min_shape(const std::string& trt_min_shape);
+
+        void set_trt_opt_shape(const std::string& trt_opt_shape);
+
+        void set_trt_max_shape(const std::string& trt_max_shape);
+
         OrtBackendOption ort_option;
 
+        bool enable_fp16 = false;
         int cpu_thread_num = -1;
         int device_id = 0;
+        bool enable_trt = false;
         bool model_from_memory = false;
         std::string model_buffer;
         Device device = Device::CPU;

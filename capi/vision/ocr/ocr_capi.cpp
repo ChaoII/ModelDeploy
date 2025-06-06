@@ -24,6 +24,7 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
                                                                    cls_model_file_path.string(),
                                                                    rec_model_file_path.string(),
                                                                    parameters->dict_path,
+                                                                   parameters->use_gpu,
                                                                    parameters->thread_num,
                                                                    parameters->max_side_len,
                                                                    parameters->det_db_thresh,

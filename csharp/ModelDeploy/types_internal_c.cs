@@ -93,6 +93,8 @@ namespace ModelDeploy
             /// ocr dictionary path
             public string dict_path;
 
+            public int use_gpu;
+
             /// thread num default is 8
             public int thread_num;
 
