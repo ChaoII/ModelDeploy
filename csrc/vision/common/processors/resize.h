@@ -30,7 +30,7 @@ namespace modeldeploy::vision {
         static bool apply(cv::Mat* mat, int width, int height, float scale_w = -1.0,
                           float scale_h = -1.0, int interp = 1, bool use_scale = false);
 
-        bool set_width_and_height(int width, int height) {
+        bool set_width_and_height(const int width, const int height) {
             width_ = width;
             height_ = height;
             return true;

@@ -75,13 +75,13 @@ namespace modeldeploy::vision::ocr {
     int PaddleOCR::get_rec_batch_size() const { return rec_batch_size_; }
 
 
-    bool PaddleOCR::predict(cv::Mat* image, OCRResult* result) {
+    bool PaddleOCR::predict(cv::Mat* image, OCRResult* result, TimerArray* timers) {
         return predict(*image, result);
     }
 
-    bool PaddleOCR::predict(const cv::Mat& image, OCRResult* result) {
+    bool PaddleOCR::predict(const cv::Mat& image, OCRResult* result, TimerArray* timers) {
         std::vector<OCRResult> batch_result(1);
-        if (const bool success = batch_predict({image}, &batch_result); !success) {
+        if (const bool success = batch_predict({image}, &batch_result, timers); !success) {
             return success;
         }
         *result = std::move(batch_result[0]);
@@ -90,10 +90,15 @@ namespace modeldeploy::vision::ocr {
 
     bool PaddleOCR::batch_predict(
         const std::vector<cv::Mat>& images,
-        std::vector<OCRResult>* batch_result) {
+        std::vector<OCRResult>* batch_result, TimerArray* timers) {
         batch_result->clear();
         batch_result->resize(images.size());
         std::vector<std::vector<std::array<int, 8>>> batch_boxes(images.size());
+        if (timers) {
+            timers->pre_timer.push_back(0);
+            timers->post_timer.push_back(0);
+            timers->infer_timer.start();
+        }
         if (!detector_->batch_predict(images, &batch_boxes)) {
             MD_LOG_ERROR << "There's error while detecting image in PaddleOCR." << std::endl;
             return false;
@@ -124,8 +129,7 @@ namespace modeldeploy::vision::ocr {
             if (nullptr != classifier_) {
                 for (size_t start_index = 0; start_index < image_list.size();
                      start_index += cls_batch_size_) {
-                    const size_t end_index =
-                        std::min(start_index + cls_batch_size_, image_list.size());
+                    const size_t end_index = std::min(start_index + cls_batch_size_, image_list.size());
                     if (!classifier_->batch_predict(image_list, cls_labels_ptr,
                                                     cls_scores_ptr, start_index,
                                                     end_index)) {
@@ -159,6 +163,7 @@ namespace modeldeploy::vision::ocr {
                 }
             }
         }
+        if (timers) timers->infer_timer.stop();
         return true;
     }
 }

@@ -51,8 +51,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] ocr_result The output of OCR recognition model result will be writen to this structure.
          * \return true if the prediction is successes, otherwise false.
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   OCRResult* ocr_result);
+        virtual bool batch_predict(const std::vector<cv::Mat>& images, OCRResult* ocr_result);
 
         /** \brief BatchPredict the input image and get OCR recognition model result.
          *

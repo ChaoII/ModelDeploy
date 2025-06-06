@@ -95,8 +95,7 @@ namespace modeldeploy::vision::ocr {
 
         for (auto& image : *image_batch) {
             cv::Mat* mat = &image;
-            ocr_recognizer_resize_image(mat, max_wh_ratio,
-                                        rec_image_shape_, static_shape_infer_);
+            ocr_recognizer_resize_image(mat, max_wh_ratio, rec_image_shape_, static_shape_infer_);
             (*normalize_permute_op_)(mat);
         }
         // Only have 1 output Tensor.
