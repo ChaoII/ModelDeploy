@@ -19,9 +19,14 @@ int main() {
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
                                             "../../test_data/ppocrv5_dict.txt");
-    auto img = cv::imread("../../test_data/test_images/test_ocr5.jpg");
+    auto img = cv::imread("../../test_data/test_images/test_ocr1.jpg");
     modeldeploy::vision::OCRResult result;
-    ocr.predict(img, &result);
+    TimerArray timers;
+    int loop_count = 10;
+    for (int i = 0; i < loop_count; i++) {
+        ocr.predict(img, &result, &timers);
+    }
+    timers.print_benchmark();
     modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc", 14, 0.5, 0);
     cv::imshow("test", vis_image);

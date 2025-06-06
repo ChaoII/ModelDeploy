@@ -38,20 +38,22 @@ namespace modeldeploy::vision::ocr {
          *
          * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] result The output OCR result will be writen to this structure.
+         * \param timers
          * \return true if the prediction successed, otherwise false.
          */
-        virtual bool predict(cv::Mat* image, OCRResult* result);
+        virtual bool predict(cv::Mat* image, OCRResult* result, TimerArray* timers = nullptr);
 
-        virtual bool predict(const cv::Mat& image, OCRResult* result);
+        virtual bool predict(const cv::Mat& image, OCRResult* result, TimerArray* timers = nullptr);
 
         /** \brief BatchPredict the input image and get OCR result.
          *
          * \param[in] images The list of input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] batch_result The output list of OCR result will be writen to this structure.
+         * \param timers
          * \return true if the prediction successed, otherwise false.
          */
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<OCRResult>* batch_result);
+                                   std::vector<OCRResult>* batch_result, TimerArray* timers = nullptr);
 
         [[nodiscard]] bool is_initialized() const override;
 
