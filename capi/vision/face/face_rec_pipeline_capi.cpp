@@ -7,6 +7,7 @@
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/face/face_rec_pipeline_capi.h"
+#include "csrc/vision/common/display/display.h"
 
 
 MDStatusCode md_create_face_rec_pipeline_model(MDModel* model,
@@ -47,9 +48,7 @@ MDStatusCode md_face_rec_pipeline_predict(const MDModel* model, MDImage* image, 
 void md_print_face_rec_pipeline_result(const MDFaceRecognizerResults* c_results) {
     std::vector<FaceRecognitionResult> results;
     c_results_2_face_recognizer_results(c_results, &results);
-    for (auto& result : results) {
-        result.display();
-    }
+    dis_face_rec(results);
 }
 
 void md_free_face_rec_pipeline_result(MDFaceRecognizerResults* c_results) {

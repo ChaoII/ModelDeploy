@@ -6,8 +6,7 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/face/face_rec_pipeline/face_rec_pipeline.h"
 
-namespace modeldeploy::vision::face
-{
+namespace modeldeploy::vision::face {
     FaceRecognizerPipeline::FaceRecognizerPipeline(const std::string& det_model_path,
                                                    const std::string& rec_model_path,
                                                    int thread_num) {
@@ -32,25 +31,20 @@ namespace modeldeploy::vision::face
 
     bool FaceRecognizerPipeline::predict(const cv::Mat& image, std::vector<FaceRecognitionResult>* results,
                                          TimerArray* timers) {
+        if (timers) {
+            timers->pre_timer.push_back(0);
+            timers->post_timer.push_back(0);
+            timers->infer_timer.start();
+        }
         std::vector<DetectionLandmarkResult> det_result;
-        TimerArray timer_det;
-        if (!detector_->predict(image, &det_result, &timer_det)) {
+        if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
         }
         const auto aligned_images =
             modeldeploy::vision::utils::align_face_with_five_points(image, det_result);
-        TimerArray timer_recs;
-        const size_t lp_num = aligned_images.size();
-        results->reserve(lp_num);
-        for (const auto& aligned_image : aligned_images) {
-            TimerArray timer_rec;
-            FaceRecognitionResult tmp_result;
-            recognizer_->predict(aligned_image, &tmp_result, &timer_rec);
-            results->emplace_back(tmp_result);
-            timer_recs += timer_rec;
-        }
-        *timers = timer_det + timer_recs;
+        recognizer_->batch_predict(aligned_images, results);
+        if (timers)timers->infer_timer.stop();
         return true;
     }
 }

@@ -115,7 +115,6 @@ namespace modeldeploy::vision {
     struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult {
         std::vector<float> embedding;
         ResultType type = ResultType::FACE_RECOGNITION;
-        void display();
     };
 
     struct MODELDEPLOY_CXX_EXPORT LprResult {

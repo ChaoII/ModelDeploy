@@ -18,10 +18,10 @@ namespace modeldeploy::vision::face {
 
         /** \brief Process the result of runtime and fill to FaceRecognitionResult structure
          *
-         * \param[in] infer_result The inference result from runtime
+         * \param[in] tensors The inference result from runtime
          * \param[in] results The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(std::vector<Tensor>& infer_result, std::vector<FaceRecognitionResult>* results);
+        bool run(const std::vector<Tensor>& tensors, std::vector<FaceRecognitionResult>* results);
     };
 } // namespace modeldeploy::vision::faceid

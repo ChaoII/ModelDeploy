@@ -8,6 +8,8 @@
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/face/face_rec_capi.h"
 
+#include <csrc/vision/common/display/display.h>
+
 
 MDStatusCode md_create_face_rec_model(MDModel* model, const char* model_path,
                                       const int thread_num) {
@@ -41,9 +43,9 @@ MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRec
 
 
 void md_print_face_rec_result(const MDFaceRecognizerResult* c_result) {
-    modeldeploy::vision::FaceRecognitionResult result;
-    c_result_2_face_recognizer_result(c_result, &result);
-    result.display();
+    std::vector<modeldeploy::vision::FaceRecognitionResult> result;
+    c_result_2_face_recognizer_result(c_result, &result[0]);
+    dis_face_rec(result);
 }
 
 

@@ -29,6 +29,10 @@ public:
         return sum / durations_.size();
     }
 
+    void push_back(const double duration) {
+        durations_.push_back(duration);
+    }
+
     void reset() {
         durations_.clear();
     }
