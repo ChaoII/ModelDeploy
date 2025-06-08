@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
         "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
         "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
         "../../test_data/ppocrv5_dict.txt",
+        1,
         8,
         ONNX,
         1920,
