@@ -172,7 +172,7 @@ namespace modeldeploy::vision::lpr {
             const float h = attr_ptr[3];
 
 
-            std::vector<cv::Point2f> landmarks;
+            std::vector<Point2f> landmarks;
             landmarks.reserve(landmarks_per_card);
             // decode landmarks (default 5 landmarks)
             if (landmarks_per_card > 0) {
@@ -183,7 +183,7 @@ namespace modeldeploy::vision::lpr {
                 }
             }
             result->emplace_back(
-                cv::Rect2f{x - w / 2.f, y - h / 2.f, w, h},
+                Rect2f{x - w / 2.f, y - h / 2.f, w, h},
                 landmarks, class_id, confidence);
         }
         if (result->empty()) {

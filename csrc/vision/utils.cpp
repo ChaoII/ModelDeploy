@@ -11,7 +11,8 @@
 #include "csrc//vision/common/processors/resize.h"
 #include "csrc/core/md_log.h"
 
-namespace modeldeploy::vision::utils {
+namespace modeldeploy::vision::utils
+{
     DataType cv_dtype_to_md_dtype(int type) {
         type = type % 8;
         if (type == 0) {
@@ -141,7 +142,7 @@ namespace modeldeploy::vision::utils {
                 const int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(box_i, box_j);
+                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -182,7 +183,7 @@ namespace modeldeploy::vision::utils {
                 int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(box_i, box_j);
+                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -218,8 +219,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (box_i.area() == 0 || box_j.area() == 0) continue;
-                const float iou = rect_iou(box_i, box_j);
+                if (box_i.to_cv_Rect2f().area() == 0 || box_j.to_cv_Rect2f().area() == 0) continue;
+                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }
@@ -253,8 +254,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (box_i.area() == 0 || box_j.area() == 0) continue;
-                const float iou = rect_iou(box_i, box_j);
+                if (box_i.to_cv_Rect2f().area() == 0 || box_j.to_cv_Rect2f().area() == 0) continue;
+                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }

@@ -5,7 +5,8 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
-namespace modeldeploy::vision::lpr {
+namespace modeldeploy::vision::lpr
+{
     LprPipeline::LprPipeline(const std::string& det_model_path,
                              const std::string& rec_model_path,
                              int thread_num) {
@@ -103,7 +104,7 @@ namespace modeldeploy::vision::lpr {
                 return false;
             }
             for (int j = 0; j < 4; ++j) {
-                points[j] = det_result[i].landmarks[j];
+                points[j] = det_result[i].landmarks[j].to_cv_point2f();
             }
             cv::Mat transform_image = transform_from_4points(image, points);
             // 如果是双层车牌 0 单层车牌 1 双层车牌

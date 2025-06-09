@@ -7,7 +7,8 @@
 #include "csrc/vision/utils.h"
 #include "csrc/vision/iseg/postprocessor.h"
 
-namespace modeldeploy::vision::detection {
+namespace modeldeploy::vision::detection
+{
     UltralyticsSegPostprocessor::UltralyticsSegPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
@@ -50,7 +51,7 @@ namespace modeldeploy::vision::detection {
                 }
                 auto label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
                 // convert from [xc, yc, w, h] to [w, y, w, h]
-                cv::Rect2f box{
+                Rect2f box{
                     attr_ptr[0] - attr_ptr[2] / 2.0f,
                     attr_ptr[1] - attr_ptr[3] / 2.0f,
                     attr_ptr[2],
@@ -83,7 +84,7 @@ namespace modeldeploy::vision::detection {
             const int num_instances = static_cast<int>(indexs.size()); //n
             cv::Mat mask_proposals(num_instances, mask_nums, CV_32FC1);
             for (int i = 0; i < num_instances; ++i) {
-                float* dst_ptr = mask_proposals.ptr<float>(i);
+                auto* dst_ptr = mask_proposals.ptr<float>(i);
                 const auto& embedding = mask_embeddings[indexs[i]];
                 std::memcpy(dst_ptr, embedding.data(), mask_nums * sizeof(float));
             }
@@ -138,7 +139,7 @@ namespace modeldeploy::vision::detection {
                 cv::Rect roi(_x1, _y1, _x2 - _x1, _y2 - _y1);
                 dest = dest(roi);
                 cv::resize(dest, mask, cv::Size2f{ipt_w, ipt_h}, 0, 0, cv::INTER_LINEAR);
-                mask = mask(box);
+                mask = mask(box.to_cv_Rect2f());
                 mask = mask > mask_threshold_;
                 // save mask in DetectionResult
                 int keep_mask_h = static_cast<int>(box.height);

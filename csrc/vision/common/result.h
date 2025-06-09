@@ -5,9 +5,11 @@
 #pragma once
 
 #include "csrc/core/md_decl.h"
+#include "csrc/vision/common/struct.h"
 #include <opencv2/opencv.hpp>
 
-namespace modeldeploy::vision {
+namespace modeldeploy::vision
+{
     enum ResultType {
         CLASSIFY,
         DETECTION,
@@ -51,13 +53,12 @@ namespace modeldeploy::vision {
         [[nodiscard]] const void* data() const { return buffer.data(); }
         void reserve(int size);
         void resize(int size);
-        [[nodiscard]] std::string str() const;
     };
 
     /*! @brief Detection result structure for all the object detection models and instance segmentation models
      */
     struct MODELDEPLOY_CXX_EXPORT DetectionResult {
-        cv::Rect2f box;
+        Rect2f box;
         int32_t label_id{};
         float score{};
         ResultType type = ResultType::DETECTION;
@@ -65,7 +66,7 @@ namespace modeldeploy::vision {
 
 
     struct MODELDEPLOY_CXX_EXPORT InstanceSegResult {
-        cv::Rect2f box;
+        Rect2f box;
         Mask mask;
         int32_t label_id{};
         float score{};
@@ -81,10 +82,10 @@ namespace modeldeploy::vision {
 
 
     struct MODELDEPLOY_CXX_EXPORT PoseResult {
-        cv::Rect2f box;
-        std::vector<cv::Point3f> keypoints;
-        int32_t label_id;
-        float score;
+        Rect2f box;
+        std::vector<Point3f> keypoints;
+        int32_t label_id{};
+        float score{};
         ResultType type = ResultType::FACE_DETECTION;
     };
 
@@ -104,10 +105,10 @@ namespace modeldeploy::vision {
 
 
     struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
-        cv::Rect2f box;
-        std::vector<cv::Point2f> landmarks;
-        int label_id;
-        float score;
+        Rect2f box;
+        std::vector<Point2f> landmarks;
+        int label_id{};
+        float score{};
         ResultType type = ResultType::FACE_DETECTION;
     };
 
@@ -118,11 +119,11 @@ namespace modeldeploy::vision {
     };
 
     struct MODELDEPLOY_CXX_EXPORT LprResult {
-        cv::Rect2f box;
+        Rect2f box;
         // 4 points
-        std::vector<cv::Point2f> landmarks;
-        int label_id;
-        float score;
+        std::vector<Point2f> landmarks;
+        int label_id{};
+        float score{};
         std::string car_plate_str;
         std::string car_plate_color;
     };
