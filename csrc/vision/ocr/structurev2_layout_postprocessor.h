@@ -8,7 +8,8 @@
 #include "csrc/core/tensor.h"
 
 
-namespace modeldeploy::vision::ocr {
+namespace modeldeploy::vision::ocr
+{
     /*! @brief Postprocessor object for PaddleDet serials model.
      */
     class MODELDEPLOY_CXX_EXPORT StructureV2LayoutPostprocessor {
@@ -57,8 +58,8 @@ namespace modeldeploy::vision::ocr {
         [[nodiscard]] int get_reg_max() const { return reg_max_; }
 
     private:
-        cv::Rect2f dis_pred_to_bbox(const std::vector<float>& bbox_pred, int x, int y,
-                                    int stride, int resize_w, int resize_h, int reg_max);
+        Rect2f dis_pred_to_bbox(const std::vector<float>& bbox_pred, int x, int y,
+                                int stride, int resize_w, int resize_h, int reg_max);
 
         bool single_batch_postprocessor(const std::vector<Tensor>& single_batch_tensors,
                                         const std::array<int, 4>& layout_img_info,

@@ -38,7 +38,7 @@ namespace modeldeploy::vision::detection {
                 }
                 int32_t label_id = std::distance(attr_ptr + 4, max_class_score);
                 // convert from [xc, yc, w, h] to [x, y, width, height]
-                cv::Rect2f box = {
+                Rect2f box = {
                     attr_ptr[0] - attr_ptr[2] / 2.0f,
                     attr_ptr[1] - attr_ptr[3] / 2.0f,
                     attr_ptr[2],

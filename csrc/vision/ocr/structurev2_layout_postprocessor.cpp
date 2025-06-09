@@ -9,7 +9,8 @@
 #include <numeric>
 
 
-namespace modeldeploy::vision::ocr {
+namespace modeldeploy::vision::ocr
+{
     bool StructureV2LayoutPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
         const std::vector<std::array<int, 4>>& batch_layout_img_info) {
@@ -119,23 +120,23 @@ namespace modeldeploy::vision::ocr {
             }
             vision::utils::nms(&bbox_result, nms_threshold_);
             // fill output results
-            for (size_t j = 0; j < bbox_result.size(); ++j) {
+            for (auto& _bbox_result : bbox_result) {
                 result->emplace_back(
-                    cv::Rect2f{
-                        bbox_result[j].box.x / scale_factor_w,
-                        bbox_result[j].box.y / scale_factor_h,
-                        bbox_result[j].box.width / scale_factor_w,
-                        bbox_result[j].box.height / scale_factor_h,
+                    Rect2f{
+                        _bbox_result.box.x / scale_factor_w,
+                        _bbox_result.box.y / scale_factor_h,
+                        _bbox_result.box.width / scale_factor_w,
+                        _bbox_result.box.height / scale_factor_h,
                     },
-                    bbox_result[j].score,
-                    bbox_result[j].label_id
+                    _bbox_result.score,
+                    _bbox_result.label_id
                 );
             }
         }
         return true;
     }
 
-    cv::Rect2f StructureV2LayoutPostprocessor::dis_pred_to_bbox(
+    Rect2f StructureV2LayoutPostprocessor::dis_pred_to_bbox(
         const std::vector<float>& bbox_pred, const int x, const int y, const int stride, const int resize_w,
         const int resize_h, const int reg_max) {
         const float ct_x = (static_cast<float>(x) + 0.5f) * static_cast<float>(stride);
@@ -157,6 +158,6 @@ namespace modeldeploy::vision::ocr {
         float ymin = std::max(ct_y - dis_pred[1], 0.0f);
         float xmax = std::min(ct_x + dis_pred[2], static_cast<float>(resize_w));
         float ymax = std::min(ct_y + dis_pred[3], static_cast<float>(resize_h));
-        return cv::Rect2f{xmin, ymin, xmax - xmin, ymax - ymin};
+        return Rect2f{xmin, ymin, xmax - xmin, ymax - ymin};
     }
 } // namespace modeldeploy::vision::ocr

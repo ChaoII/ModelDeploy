@@ -45,13 +45,13 @@ namespace modeldeploy::vision::detection {
                 }
                 int32_t label_id = 0;
                 // convert from [xc, yc, w, h] to [x, y, width, height]
-                cv::Rect2f box = {
+                Rect2f box = {
                     attr_ptr[0] - attr_ptr[2] / 2.0f,
                     attr_ptr[1] - attr_ptr[3] / 2.0f,
                     attr_ptr[2],
                     attr_ptr[3]
                 };
-                std::vector<cv::Point3f> keypoints;
+                std::vector<Point3f> keypoints;
                 keypoints.reserve(keypoints_num_);
                 if (keypoints_num_ > 0) {
                     const float* keypoints_ptr = attr_ptr + 5;

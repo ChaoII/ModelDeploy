@@ -4,7 +4,8 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-namespace modeldeploy::vision {
+namespace modeldeploy::vision
+{
     struct PoseParams {
         static constexpr float kpt_threshold = 0.5;
         static constexpr bool is_draw_kpt_line = true;
@@ -103,16 +104,21 @@ namespace modeldeploy::vision {
         const cv::FontFace font(font_path);
         const cv::Scalar cv_color = get_random_color();
         // 绘制半透明部分（填充矩形）
-        for (int i = 0; i < result.size(); ++i) {
-            const std::string text = "score: " + std::to_string(result[i].score).substr(0, 4);
-            draw_rectangle_and_text(overlay, result[i].box, text, cv_color, font, font_size, -1, false);
+        for (const auto& _result : result) {
+            const std::string text = "score: " + std::to_string(_result.score).substr(0, 4);
+            draw_rectangle_and_text(overlay, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, -1, false);
         }
         cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
         // 绘制对象矩形矩形边框、文字背景边框、文字、关键点
-        for (int i = 0; i < result.size(); ++i) {
-            const std::string text = "score: " + std::to_string(result[i].score).substr(0, 4);
-            draw_rectangle_and_text(cv_image, result[i].box, text, cv_color, font, font_size, 1, true);
-            draw_keypoints(cv_image, result[i].keypoints, landmark_radius);
+        for (const auto& _result : result) {
+            const std::string text = "score: " + std::to_string(_result.score).substr(0, 4);
+            draw_rectangle_and_text(cv_image, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, 1, true);
+            std::vector<cv::Point3f> cv_keypoints;
+            std::ranges::transform(_result.keypoints, std::back_inserter(cv_keypoints),
+                                   [](const Point3f& point) {
+                                       return point.to_cv_point3f();
+                                   });
+            draw_keypoints(cv_image, cv_keypoints, landmark_radius);
         }
 
 

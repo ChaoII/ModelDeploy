@@ -13,8 +13,11 @@
 #include <type_traits>
 #include <csrc/core/md_log.h>
 
+#include "csrc/vision/common/struct.h"
 
-namespace modeldeploy {
+
+namespace modeldeploy
+{
     pybind11::dtype md_data_type_to_numpy_data_type(const DataType& md_dtype);
 
     DataType numpy_data_type_to_md_data_type(const pybind11::dtype& np_dtype);
@@ -30,6 +33,16 @@ namespace modeldeploy {
 
 #ifdef BUILD_VISION
     cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray);
+
+    vision::Point2f pyarray_to_point2f(pybind11::array& pyarray);
+
+    vision::Point3f pyarray_to_point3f(pybind11::array& pyarray);
+
+    vision::Rect2f pyarray_to_rect2f(const pybind11::array& pyarray);
+
+    vision::RotatedRect pyarray_to_rotated_rect(pybind11::array& pyarray);
+
+
 #endif
 
     template <typename T>

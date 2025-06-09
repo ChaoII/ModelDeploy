@@ -4,29 +4,30 @@
 
 #include "csrc/pybind/utils/utils.h"
 
-namespace modeldeploy {
-    pybind11::dtype md_data_type_to_numpy_data_type(const DataType& fd_dtype) {
+namespace modeldeploy
+{
+    pybind11::dtype md_data_type_to_numpy_data_type(const DataType& md_dtype) {
         pybind11::dtype dt;
-        if (fd_dtype == DataType::INT32) {
+        if (md_dtype == DataType::INT32) {
             dt = pybind11::dtype::of<int32_t>();
         }
-        else if (fd_dtype == DataType::INT64) {
+        else if (md_dtype == DataType::INT64) {
             dt = pybind11::dtype::of<int64_t>();
         }
-        else if (fd_dtype == DataType::FP32) {
+        else if (md_dtype == DataType::FP32) {
             dt = pybind11::dtype::of<float>();
         }
-        else if (fd_dtype == DataType::FP64) {
+        else if (md_dtype == DataType::FP64) {
             dt = pybind11::dtype::of<double>();
         }
-        else if (fd_dtype == DataType::UINT8) {
+        else if (md_dtype == DataType::UINT8) {
             dt = pybind11::dtype::of<uint8_t>();
         }
-        else if (fd_dtype == DataType::INT8) {
+        else if (md_dtype == DataType::INT8) {
             dt = pybind11::dtype::of<int8_t>();
         }
         else {
-            MD_LOG_FATAL << "The function doesn't support data type of %s." << to_string(fd_dtype) << std::endl;
+            MD_LOG_FATAL << "The function doesn't support data type of %s." << to_string(md_dtype) << std::endl;
         }
         return dt;
     }
@@ -55,11 +56,10 @@ namespace modeldeploy {
         return DataType::FP32;
     }
 
-    void py_array_to_tensor(pybind11::array& pyarray, Tensor* tensor, bool share_buffer) {
+    void py_array_to_tensor(pybind11::array& pyarray, Tensor* tensor, const bool share_buffer) {
         const auto dtype = numpy_data_type_to_md_data_type(pyarray.dtype());
         std::vector<int64_t> data_shape;
-        data_shape.insert(data_shape.begin(), pyarray.shape(),
-                          pyarray.shape() + pyarray.ndim());
+        data_shape.insert(data_shape.begin(), pyarray.shape(), pyarray.shape() + pyarray.ndim());
         if (share_buffer) {
             tensor->from_external_memory(pyarray.mutable_data(), data_shape, dtype);
         }
@@ -69,12 +69,12 @@ namespace modeldeploy {
         }
     }
 
-    void pyarray_to_tensor_list(std::vector<pybind11::array>& pyarrays,
-                                std::vector<Tensor>* tensors,
+    void pyarray_to_tensor_list(std::vector<pybind11::array>& pyarray,
+                                std::vector<Tensor>* tensor,
                                 const bool share_buffer) {
-        tensors->resize(pyarrays.size());
-        for (auto i = 0; i < pyarrays.size(); ++i) {
-            py_array_to_tensor(pyarrays[i], &(*tensors)[i], share_buffer);
+        tensor->resize(pyarray.size());
+        for (auto i = 0; i < pyarray.size(); ++i) {
+            py_array_to_tensor(pyarray[i], &(*tensor)[i], share_buffer);
         }
     }
 
@@ -86,6 +86,41 @@ namespace modeldeploy {
     }
 
 #ifdef BUILD_VISION
+
+    vision::Point2f pyarray_to_point2f(const pybind11::array& pyarray) {
+        if (pyarray.ndim() != 1 || pyarray.shape(0) != 2)
+            throw std::runtime_error("Expected a 1D numpy array of size 2 for Point2f");
+
+        const auto ptr = pyarray.unchecked<float>(); // No bounds checking
+
+        return vision::Point2f{ptr(0), ptr(1)};
+    }
+
+    vision::Point3f pyarray_to_point3f(const pybind11::array& pyarray) {
+        if (pyarray.ndim() != 1 || pyarray.shape(0) != 3)
+            throw std::runtime_error("Expected a 1D numpy array of size 3 for Point3f");
+
+        const auto ptr = pyarray.unchecked<float>();
+        return vision::Point3f{ptr(0), ptr(1), ptr(2)};
+    }
+
+    vision::Rect2f pyarray_to_rect2f(const pybind11::array& pyarray) {
+        if (pyarray.ndim() != 1 || pyarray.shape(0) != 4)
+            throw std::runtime_error("Expected a 1D numpy array of size 4 for Rect2f");
+
+        const auto ptr = pyarray.unchecked<float>();
+        return vision::Rect2f{ptr(0), ptr(1), ptr(2), ptr(3)};
+    }
+
+    vision::RotatedRect pyarray_to_rotated_rect(const pybind11::array& pyarray) {
+        if (pyarray.ndim() != 1 || pyarray.shape(0) != 5)
+            throw std::runtime_error("Expected a 1D numpy array of size 5 for RotatedRect");
+
+        auto ptr = pyarray.unchecked<float>();
+        return vision::RotatedRect{ptr(0), ptr(1), ptr(2), ptr(3), ptr(4)};
+    }
+
+
     int numpy_data_type_to_open_cv_type(const pybind11::dtype& np_dtype) {
         if (np_dtype.is(pybind11::dtype::of<int32_t>())) {
             return CV_32S;

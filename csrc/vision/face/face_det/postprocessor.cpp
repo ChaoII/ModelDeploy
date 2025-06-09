@@ -100,7 +100,7 @@ namespace modeldeploy::vision::face {
                 const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
                 const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
                 const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
-                std::vector<cv::Point2f> landmarks;
+                std::vector<Point2f> landmarks;
                 landmarks.reserve(landmarks_per_face_);
                 if (use_kps_) {
                     const auto* landmarks_ptr =
@@ -117,7 +117,7 @@ namespace modeldeploy::vision::face {
                         landmarks.emplace_back(kps_x, kps_y);
                     }
                 }
-                results->emplace_back(cv::Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf);
+                results->emplace_back(Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf);
                 count += 1; // limit boxes for nms.
                 if (count > max_nms_) {
                     break;

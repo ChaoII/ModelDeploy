@@ -191,7 +191,7 @@ void c_results_2_detection_results(
     std::vector<DetectionResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        cv::Rect2f box = {
+        Rect2f box = {
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
@@ -285,7 +285,7 @@ void c_results_2_iseg_results(
     std::vector<InstanceSegResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        cv::Rect2f box = {
+        Rect2f box = {
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
@@ -337,13 +337,13 @@ void c_results_2_pose_results(
     std::vector<PoseResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        auto box = cv::Rect2f{
+        auto box = Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height)
         };
-        std::vector<cv::Point3f> keypoints;
+        std::vector<Point3f> keypoints;
         for (int j = 0; j < c_results->data[i].keypoints_size; j++) {
             keypoints.emplace_back(c_results->data[i].keypoints[j].x,
                                    c_results->data[i].keypoints[j].y,
@@ -476,13 +476,13 @@ void c_results_2_detection_landmark_result(
     std::vector<DetectionLandmarkResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        auto box = cv::Rect2f{
+        auto box = Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height)
         };
-        std::vector<cv::Point2f> landmarks;
+        std::vector<Point2f> landmarks;
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
                                    static_cast<float>(c_results->data[i].landmarks[j].y));
@@ -536,13 +536,13 @@ void c_results_2_lpr_results(
     const MDLPRResults* c_results, std::vector<LprResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        auto box = cv::Rect2f{
+        auto box = Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height)
         };
-        std::vector<cv::Point2f> landmarks;
+        std::vector<Point2f> landmarks;
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
                                    static_cast<float>(c_results->data[i].landmarks[j].y));
