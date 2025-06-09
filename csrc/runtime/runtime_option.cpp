@@ -8,7 +8,7 @@
 
 namespace modeldeploy {
     void RuntimeOption::set_model_path(const std::string& model_path) {
-        model_filepath = model_path;
+        model_file = model_path;
     }
 
 

@@ -18,8 +18,8 @@ namespace modeldeploy::vision::ocr {
                                        const std::string& table_char_dict_path,
                                        const RuntimeOption& custom_option)
         : postprocessor_(table_char_dict_path) {
-        runtime_option_ = custom_option;
-        runtime_option_.model_filepath = model_file;
+        runtime_option = custom_option;
+        runtime_option.model_file = model_file;
         initialized_ = initialize();
     }
 

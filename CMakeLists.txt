@@ -12,6 +12,7 @@ message("==================${CMAKE_BUILD_TYPE}===================")
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_CAPI "build with capi" ON)
+option(BUILD_PYTHON "build with python" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(WITH_STATIC_CRT "build for mt" OFF)
@@ -60,6 +61,7 @@ list(APPEND SOURCE ${RUNTIME_SOURCE} ${VISION_SOURCE} ${CORE_SOURCE} ${FUNCTION_
 list(APPEND SOURCE csrc/base_model.cpp)
 
 if (BUILD_VISION)
+    add_definitions(-DBUILD_VISION)
     # opencv
     include("${CMAKE_SOURCE_DIR}/cmake/opencv.cmake")
     # for debug
@@ -78,6 +80,7 @@ if (BUILD_VISION)
 endif ()
 
 if (BUILD_AUDIO)
+    add_definitions(-DBUILD_AUDIO)
     file(GLOB_RECURSE ASR_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/asr/*.cpp)
     file(GLOB_RECURSE VAD_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/vad/*.cpp)
     file(GLOB_RECURSE TTS_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*.cpp ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*/*.cpp)
@@ -103,7 +106,15 @@ if (BUILD_CAPI)
 endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${SOURCE})
-target_link_libraries(${LIBRARY_NAME} ${DEPENDS})
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
+
+
+if (BUILD_PYTHON)
+    file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
+    add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
+    pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
+    target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
+endif ()
 
 
 if (BUILD_EXAMPLES)

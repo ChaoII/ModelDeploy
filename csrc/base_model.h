@@ -46,11 +46,14 @@ namespace modeldeploy {
 
         virtual std::map<std::string, std::string> get_custom_meta_data();
 
+
+        RuntimeOption runtime_option{};
+
     protected:
         virtual bool init_runtime();
 
         bool initialized_ = false;
-        RuntimeOption runtime_option_{};
+
         std::vector<Tensor> reused_input_tensors_;
         std::vector<Tensor> reused_output_tensors_;
 

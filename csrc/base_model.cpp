@@ -12,7 +12,7 @@ namespace modeldeploy {
             return false;
         }
         runtime_ = std::make_shared<Runtime>();
-        if (!runtime_->init(runtime_option_)) {
+        if (!runtime_->init(runtime_option)) {
             return false;
         }
         runtime_initialized_ = true;

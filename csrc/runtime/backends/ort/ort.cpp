@@ -16,8 +16,8 @@ namespace modeldeploy {
         session_options_.SetLogSeverityLevel(1); // verbose
         //
         // session_options_.EnableProfiling(to_wstring("onnxruntime_perf_test.json").c_str());
-        // std::wstring model_filepath = to_wstring("optimized_graph.onnx");
-        // session_options_.SetOptimizedModelFilePath(model_filepath.c_str());
+        // std::wstring model_file = to_wstring("optimized_graph.onnx");
+        // session_options_.SetOptimizedModelFilePath(model_file.c_str());
 
         if (option.graph_optimization_level >= 0) {
             session_options_.SetGraphOptimizationLevel(
@@ -152,13 +152,13 @@ namespace modeldeploy {
         if (option_.model_from_memory) {
             return init_from_onnx(option.model_buffer, option_);
         }
-        if (!std::filesystem::exists(option.model_filepath)) {
-            MD_LOG_ERROR << "Model file does not exist: " << option.model_filepath << std::endl;
+        if (!std::filesystem::exists(option.model_file)) {
+            MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;
             return false;
         }
         std::string model_buffer;
-        if (!read_binary_from_file(option.model_filepath, &model_buffer)) {
-            MD_LOG_ERROR << "Failed to read model file: " << option.model_filepath << std::endl;
+        if (!read_binary_from_file(option.model_file, &model_buffer)) {
+            MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
             return false;
         }
         return init_from_onnx(model_buffer, option_);
