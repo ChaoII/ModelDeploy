@@ -11,8 +11,8 @@ namespace modeldeploy::vision::ocr {
                            const std::string& label_path,
                            const RuntimeOption& custom_option)
         : postprocessor_(label_path) {
-        runtime_option_ = custom_option;
-        runtime_option_.model_filepath = model_file;
+        runtime_option = custom_option;
+        runtime_option.model_file = model_file;
         initialized_ = initialize();
     }
 

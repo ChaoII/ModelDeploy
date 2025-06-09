@@ -16,8 +16,8 @@ namespace modeldeploy::audio::tts {
                    const std::string& jieba_dir,
                    const std::string& text_normalization_dir,
                    const RuntimeOption& custom_option) {
-        runtime_option_ = custom_option;
-        runtime_option_.model_filepath = model_file_path;
+        runtime_option = custom_option;
+        runtime_option.model_file = model_file_path;
         token_path_str_ = token_path_str;
         lexicons_ = lexicons;
         voices_bin_ = voices_bin;

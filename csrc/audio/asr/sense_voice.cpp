@@ -13,8 +13,8 @@ namespace modeldeploy::audio::asr {
     SenseVoice::SenseVoice(const std::string& model_file,
                            const std::string& token_path_str,
                            const RuntimeOption& custom_option) {
-        runtime_option_ = custom_option;
-        runtime_option_.model_filepath = model_file;
+        runtime_option = custom_option;
+        runtime_option.model_file = model_file;
         token_path_str_ = token_path_str;
         initialized_ = initialize();
     }

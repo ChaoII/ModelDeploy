@@ -37,7 +37,7 @@ namespace modeldeploy {
         bool model_from_memory = false;
         std::string model_buffer;
         Device device = Device::CPU;
-        std::string model_filepath;
+        std::string model_file;
         Backend backend = Backend::ORT;
         void set_ort_graph_opt_level(int level = -1);
     };

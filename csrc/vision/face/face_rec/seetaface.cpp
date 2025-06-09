@@ -10,8 +10,8 @@ namespace modeldeploy::vision::face {
     SeetaFaceID::SeetaFaceID(
         const std::string& model_file,
         const modeldeploy::RuntimeOption& custom_option) {
-        runtime_option_ = custom_option;
-        runtime_option_.model_filepath = model_file;
+        runtime_option = custom_option;
+        runtime_option.model_file = model_file;
         initialized_ = initialize();
     }
 
