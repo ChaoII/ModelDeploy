@@ -2,7 +2,6 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/vision/utils.h"
 #include "csrc/pybind/utils/utils.h"
 #include "csrc/vision/common/visualize/visualize.h"
 

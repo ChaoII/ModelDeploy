@@ -6,12 +6,9 @@
 #include "csrc/runtime/runtime_option.h"
 #include <pybind11/pybind11.h>
 
-namespace modeldeploy {
-    // void bind_ort_option(pybind11::module& m);
-
+namespace modeldeploy
+{
     void bind_runtime_option(pybind11::module& m) {
-        // bind_ort_option(m);
-
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")
             .def(pybind11::init())
             .def("set_model_path", &RuntimeOption::set_model_path)
