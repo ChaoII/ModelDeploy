@@ -1,53 +1,42 @@
 //
-// Created by aichao on 2025/5/30.
+// Created by aichao on 2025/6/10.
 //
 
 #include "csrc/core/md_log.h"
-#include "csrc/vision/obb/preprocessor.h"
+#include "csrc/vision/lpr/lpr_rec/preprocessor.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/convert_and_permute.h"
 
-namespace modeldeploy::vision::detection {
-    UltralyticsObbPreprocessor::UltralyticsObbPreprocessor() {
-        size_ = {640, 640};
-        padding_value_ = {114.0, 114.0, 114.0};
-        is_mini_pad_ = false;
-        is_no_pad_ = false;
-        is_scale_up_ = true;
-        stride_ = 32;
+namespace modeldeploy::vision::lpr {
+    LprRecPreprocessor::LprRecPreprocessor() {
+        size_ = {168, 48};
     }
 
-
-    bool UltralyticsObbPreprocessor::preprocess(
-        cv::Mat* mat, Tensor* output,
-        LetterBoxRecord* letter_box_record) const {
-        // yolov5seg's preprocess steps
-        // 1. letterbox
+    bool LprRecPreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
+        // preprocess steps
+        // 1. Resize
         // 2. convert_and_permute(swap_rb=true)
-        utils::letter_box(mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_, padding_value_, stride_,
-                          letter_box_record);
+        Resize::apply(mat, size_[0], size_[1]);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        const std::vector beta = {0.0f, 0.0f, 0.0f};
+        const std::vector beta = {-0.588f, -0.588f, -0.588f};
         ConvertAndPermute::apply(mat, alpha, beta, true);
         utils::mat_to_tensor(*mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
-    bool UltralyticsObbPreprocessor::run(
-        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-        std::vector<LetterBoxRecord>* letter_box_records) const {
+    bool LprRecPreprocessor::run(
+        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
-        letter_box_records->resize(images->size());
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
-            preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
+            preprocess(&(*images)[i], &tensors[i]);
         }
         if (tensors.size() == 1) {
             (*outputs)[0] = std::move(tensors[0]);

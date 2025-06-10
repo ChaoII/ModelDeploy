@@ -15,10 +15,10 @@ namespace modeldeploy::vision {
         output_table.add_row({"order", " roted_box([xc, yc, width, height, angle(deg)])", "label_id", " score"});
         for (size_t i = 0; i < result.size(); ++i) {
             std::string box_str = "["
-                + std::to_string(static_cast<int>(result[i].rotated_box.center.x)) + ", "
-                + std::to_string(static_cast<int>(result[i].rotated_box.center.y)) + ", "
-                + std::to_string(static_cast<int>(result[i].rotated_box.size.width)) + ", "
-                + std::to_string(static_cast<int>(result[i].rotated_box.size.height)) + ", "
+                + std::to_string(static_cast<int>(result[i].rotated_box.xc)) + ", "
+                + std::to_string(static_cast<int>(result[i].rotated_box.yc)) + ", "
+                + std::to_string(static_cast<int>(result[i].rotated_box.width)) + ", "
+                + std::to_string(static_cast<int>(result[i].rotated_box.height)) + ", "
                 + std::to_string(static_cast<int>(result[i].rotated_box.angle)) + "]";
             std::string label_id_str = std::to_string(result[i].label_id);
             std::string score_str = std::to_string(result[i].score);

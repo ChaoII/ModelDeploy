@@ -13,7 +13,7 @@
 namespace modeldeploy {
     void OrtBackend::build_option(const OrtBackendOption& option) {
         option_ = option;
-        session_options_.SetLogSeverityLevel(1); // verbose
+        // session_options_.SetLogSeverityLevel(1); // verbose
         //
         // session_options_.EnableProfiling(to_wstring("onnxruntime_perf_test.json").c_str());
         // std::wstring model_file = to_wstring("optimized_graph.onnx");

@@ -33,6 +33,14 @@ namespace modeldeploy::vision::detection {
         /// Get conf_threshold, default 0.25
         [[nodiscard]] float get_conf_threshold() const { return conf_threshold_; }
 
+        /// Set nms_threshold, default 0.25
+        void set_nms_threshold(const float& nms_threshold) {
+            nms_threshold_ = nms_threshold;
+        }
+
+        /// Get nms_threshold, default 0.25
+        [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
+
     protected:
         float conf_threshold_;
         float nms_threshold_;

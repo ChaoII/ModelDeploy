@@ -22,13 +22,13 @@ namespace modeldeploy::vision::detection {
         * \return true if the preprocess successed, otherwise false
         */
         bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-                 std::vector<LetterBoxRecord>* letter_box_records);
+                 std::vector<LetterBoxRecord>* letter_box_records) const;
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
         void set_size(const std::vector<int>& size) { size_ = size; }
 
         /// Get target size, tuple of (width, height), default size = {640, 640}
-        [[nodiscard]] std::vector<int> GetSize() const { return size_; }
+        [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
         /// Set padding value, size should be the same as channels
         void set_padding_value(const std::vector<float>& padding_value) {
@@ -66,7 +66,7 @@ namespace modeldeploy::vision::detection {
 
     protected:
         bool preprocess(cv::Mat* mat, Tensor* output,
-                        LetterBoxRecord* letter_box_record);
+                        LetterBoxRecord* letter_box_record) const;
 
         void letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const;
 
@@ -89,8 +89,5 @@ namespace modeldeploy::vision::detection {
 
         // padding stride, for is_mini_pad
         int stride_;
-
-        // for offset the boxes by classes when using NMS
-        float max_wh_;
     };
 }

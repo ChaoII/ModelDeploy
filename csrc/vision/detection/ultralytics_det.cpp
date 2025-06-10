@@ -6,8 +6,6 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/detection/ultralytics_det.h"
 
-#include <chrono>
-
 namespace modeldeploy::vision::detection {
     UltralyticsDet::UltralyticsDet(const std::string& model_file, const RuntimeOption& custom_option) {
         runtime_option = custom_option;
