@@ -1,15 +1,15 @@
 //
-// Created by aichao on 2025/5/30.
+// Created by aichao on 2025/6/10.
 //
 
 #include "csrc/core/md_log.h"
-#include "csrc/vision/obb/preprocessor.h"
+#include "csrc/vision/lpr/lpr_det/preprocessor.h"
 #include "csrc/vision/common/processors/resize.h"
 #include "csrc/vision/common/processors/pad.h"
 #include "csrc/vision/common/processors/convert_and_permute.h"
 
-namespace modeldeploy::vision::detection {
-    UltralyticsObbPreprocessor::UltralyticsObbPreprocessor() {
+namespace modeldeploy::vision::lpr {
+    LprDetPreprocessor::LprDetPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
         is_mini_pad_ = false;
@@ -19,14 +19,12 @@ namespace modeldeploy::vision::detection {
     }
 
 
-    bool UltralyticsObbPreprocessor::preprocess(
-        cv::Mat* mat, Tensor* output,
-        LetterBoxRecord* letter_box_record) const {
-        // yolov5seg's preprocess steps
+    bool LprDetPreprocessor::preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const {
+        // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        utils::letter_box(mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_, padding_value_, stride_,
-                          letter_box_record);
+        utils::letter_box(mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_,
+                          padding_value_, stride_, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
         ConvertAndPermute::apply(mat, alpha, beta, true);
@@ -35,7 +33,7 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsObbPreprocessor::run(
+    bool LprDetPreprocessor::run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
         std::vector<LetterBoxRecord>* letter_box_records) const {
         if (images->empty()) {
@@ -47,6 +45,7 @@ namespace modeldeploy::vision::detection {
         // Concat all the preprocessed data to a batch tensor
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
+            // 修改了数据，并生成一个tensor,并记录预处理的一些参数，便于在后处理中还原
             preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
         }
         if (tensors.size() == 1) {

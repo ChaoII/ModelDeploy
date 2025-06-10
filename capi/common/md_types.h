@@ -57,10 +57,10 @@ typedef struct {
 } MDRect;
 
 typedef struct {
-    int xc;
-    int yc;
-    int width;
-    int height;
+    float xc;
+    float yc;
+    float width;
+    float height;
     float angle;
 } MDRotatedRect;
 

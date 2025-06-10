@@ -1,17 +1,14 @@
+//
+// Created by aichao on 2025/6/10.
+//
+
+
 #include "csrc/core/md_log.h"
 #include "csrc/vision/lpr/lpr_rec/lpr_rec.h"
-#include "csrc/vision/utils.h"
-#include "csrc/utils/utils.h"
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/color_space_convert.h"
-#include "csrc/vision/common/processors/hwc2chw.h"
-#include "csrc/vision/common/processors/cast.h"
-#include "csrc/vision/common/processors/convert.h"
 
 
 namespace modeldeploy::vision::lpr {
-    LprRecognizer::LprRecognizer(const std::string& model_file,
-                                 const RuntimeOption& custom_option) {
+    LprRecognizer::LprRecognizer(const std::string& model_file, const RuntimeOption& custom_option) {
         runtime_option = custom_option;
         runtime_option.model_file = model_file;
         initialized_ = initialize();
@@ -19,76 +16,44 @@ namespace modeldeploy::vision::lpr {
 
     bool LprRecognizer::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
             return false;
         }
         return true;
     }
 
-    bool LprRecognizer::preprocess(cv::Mat& mat, Tensor* output) {
-        // car_plate_recognizer's preprocess steps
-        // 1. resize
-        // 2. BGR->RGB
-        // 3. HWC->CHW
-
-        Resize::apply(&mat, size[0], size[1]);
-        BGR2RGB::apply(&mat);
-        // Compute `result = mat * alpha + beta` directly by channel
-        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        const std::vector beta = {-0.588f, -0.588f, -0.588f};
-        Convert::apply(&mat, alpha, beta);
-        HWC2CHW::apply(&mat);
-        Cast::apply(&mat, "float");
-        if (!utils::mat_to_tensor(mat, output)) {
-            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
+    bool LprRecognizer::predict(const cv::Mat& image, LprResult* result, TimerArray* timers) {
+        std::vector<LprResult> results;
+        if (!batch_predict({image}, &results, timers)) {
             return false;
         }
-        output->expand_dim(0); // reshape to n, c, h, w
+        *result = std::move(results[0]);
         return true;
     }
 
-    bool LprRecognizer::postprocess(
-        std::vector<Tensor>& infer_result, LprResult* result) {
-        auto* plate_color_ptr = static_cast<float*>(infer_result[1].data());
-        const std::vector plate_color_vec(plate_color_ptr, plate_color_ptr + 5);
-        int max_Index = argmax(plate_color_vec);
-        const std::string plate_color = plate_color_list[max_Index];
-        //车牌
-        std::vector<int> plate_index;
-        plate_index.reserve(21);
-        auto* prob1_temp = static_cast<float*>(infer_result[0].data());
-        for (size_t j = 0; j < 21; j++) {
-            std::vector plate_tensor(prob1_temp, prob1_temp + 78);
-            max_Index = argmax(plate_tensor);
-            plate_index.push_back(max_Index);
-            prob1_temp = prob1_temp + 78;
-        }
-        int pre = 0;
-        std::string plate_str;
-        for (const int j : plate_index) {
-            if (j != 0 && j != pre) {
-                plate_str += plate_chr[j];
-            }
-            pre = j;
-        }
-        result->car_plate_str = plate_str;
-        result->car_plate_color = plate_color;
-        return true;
-    }
-
-    bool LprRecognizer::predict(cv::Mat& image, LprResult* result) {
-        std::vector<Tensor> input_tensors(1);
-        if (!preprocess(image, &input_tensors[0])) {
-            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
+    bool LprRecognizer::batch_predict(const std::vector<cv::Mat>& images,
+                                      std::vector<LprResult>* results,
+                                      TimerArray* timers) {
+        std::vector<cv::Mat> _images = images;
+        if (timers) timers->pre_timer.start();
+        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
+            MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
-        input_tensors[0].set_name(get_input_info(0).name);
-        std::vector<Tensor> output_tensors;
-        if (!infer(input_tensors, &output_tensors)) {
-            MD_LOG_ERROR << "Failed to inference." << std::endl;
+        if (timers) timers->pre_timer.stop();
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
+        if (timers) timers->infer_timer.start();
+        if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
-        postprocess(output_tensors, result);
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
+        if (!postprocessor_.run(reused_output_tensors_, results)) {
+            MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->post_timer.stop();
         return true;
     }
-} // namespace modeldeploy::vision::facedet
+}

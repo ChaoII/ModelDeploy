@@ -1,19 +1,19 @@
 //
-// Created by aichao on 2025/6/9.
+// Created by aichao on 2025/6/10.
 //
 
 #include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/detection/preprocessor.h"
-#include "csrc/vision/detection/postprocessor.h"
-#include "csrc/vision/detection/ultralytics_det.h"
+#include "csrc/vision/iseg/preprocessor.h"
+#include "csrc/vision/iseg/postprocessor.h"
+#include "csrc/vision/iseg/ultralytics_seg.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_det(pybind11::module& m) {
-        pybind11::class_<detection::UltralyticsPreprocessor>(m, "UltralyticsPreprocessor")
+    void bind_ultralytics_iseg(pybind11::module& m) {
+        pybind11::class_<detection::UltralyticsSegPreprocessor>(m, "UltralyticsSegPreprocessor")
             .def(pybind11::init<>())
             .def(
                 "run",
-                [](const detection::UltralyticsPreprocessor& self,
+                [](const detection::UltralyticsSegPreprocessor& self,
                    std::vector<pybind11::array>& im_list) {
                     std::vector<cv::Mat> images;
                     images.reserve(im_list.size());
@@ -28,80 +28,80 @@ namespace modeldeploy::vision {
                     }
                     return make_pair(outputs, records);
                 })
-            .def_property("size", &detection::UltralyticsPreprocessor::get_size,
-                          &detection::UltralyticsPreprocessor::set_size)
+            .def_property("size", &detection::UltralyticsSegPreprocessor::get_size,
+                          &detection::UltralyticsSegPreprocessor::set_size)
             .def_property("padding_value",
-                          &detection::UltralyticsPreprocessor::get_padding_value,
-                          &detection::UltralyticsPreprocessor::set_padding_value)
+                          &detection::UltralyticsSegPreprocessor::get_padding_value,
+                          &detection::UltralyticsSegPreprocessor::set_padding_value)
             .def_property("is_scale_up",
-                          &detection::UltralyticsPreprocessor::get_scale_up,
-                          &detection::UltralyticsPreprocessor::set_scale_up)
+                          &detection::UltralyticsSegPreprocessor::get_scale_up,
+                          &detection::UltralyticsSegPreprocessor::set_scale_up)
             .def_property("is_mini_pad",
-                          &detection::UltralyticsPreprocessor::get_mini_pad,
-                          &detection::UltralyticsPreprocessor::set_mini_pad)
-            .def_property("stride", &detection::UltralyticsPreprocessor::get_stride,
-                          &detection::UltralyticsPreprocessor::set_stride);
+                          &detection::UltralyticsSegPreprocessor::get_mini_pad,
+                          &detection::UltralyticsSegPreprocessor::set_mini_pad)
+            .def_property("stride", &detection::UltralyticsSegPreprocessor::get_stride,
+                          &detection::UltralyticsSegPreprocessor::set_stride);
 
-        pybind11::class_<detection::UltralyticsPostprocessor>(
-                m, "UltralyticsPostprocessor")
+        pybind11::class_<detection::UltralyticsSegPostprocessor>(
+                m, "UltralyticsSegPostprocessor")
             .def(pybind11::init<>())
             .def("run",
-                 [](const detection::UltralyticsPostprocessor& self,
-                    const std::vector<Tensor>& inputs,
+                 [](const detection::UltralyticsSegPostprocessor& self,
+                    std::vector<Tensor>& inputs,
                     const std::vector<LetterBoxRecord>& records) {
-                     std::vector<std::vector<DetectionResult>> results;
+                     std::vector<std::vector<InstanceSegResult>> results;
                      if (!self.run(inputs, &results, records)) {
                          throw std::runtime_error(
                              "Failed to postprocess the runtime result in "
-                             "UltralyticsPostprocessor.");
+                             "UltralyticsSegPostprocessor.");
                      }
                      return results;
                  })
             .def("run",
-                 [](detection::UltralyticsPostprocessor& self,
+                 [](detection::UltralyticsSegPostprocessor& self,
                     std::vector<pybind11::array>& input_array,
                     const std::vector<LetterBoxRecord>& records) {
-                     std::vector<std::vector<DetectionResult>> results;
+                     std::vector<std::vector<InstanceSegResult>> results;
                      std::vector<Tensor> inputs;
                      pyarray_to_tensor_list(input_array, &inputs, /*share_buffer=*/true);
                      if (!self.run(inputs, &results, records)) {
                          throw std::runtime_error(
                              "Failed to postprocess the runtime result in "
-                             "UltralyticsPostprocessor.");
+                             "UltralyticsSegPostprocessor.");
                      }
                      return results;
                  })
             .def_property("conf_threshold",
-                          &detection::UltralyticsPostprocessor::get_conf_threshold,
-                          &detection::UltralyticsPostprocessor::set_conf_threshold)
+                          &detection::UltralyticsSegPostprocessor::get_conf_threshold,
+                          &detection::UltralyticsSegPostprocessor::set_conf_threshold)
             .def_property("nms_threshold",
-                          &detection::UltralyticsPostprocessor::get_nms_threshold,
-                          &detection::UltralyticsPostprocessor::set_nms_threshold);
+                          &detection::UltralyticsSegPostprocessor::get_nms_threshold,
+                          &detection::UltralyticsSegPostprocessor::set_nms_threshold);
 
-        pybind11::class_<detection::UltralyticsDet, BaseModel>(m, "UltralyticsDet")
+        pybind11::class_<detection::UltralyticsSeg, BaseModel>(m, "UltralyticsSeg")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](detection::UltralyticsDet& self, pybind11::array& data) {
+                 [](detection::UltralyticsSeg& self, pybind11::array& data) {
                      const auto mat = pyarray_to_cv_mat(data);
-                     std::vector<DetectionResult> res;
+                     std::vector<InstanceSegResult> res;
                      self.predict(mat, &res);
                      return res;
                  })
             .def("batch_predict",
-                 [](detection::UltralyticsDet& self,
+                 [](detection::UltralyticsSeg& self,
                     std::vector<pybind11::array>& data) {
                      std::vector<cv::Mat> images;
                      images.reserve(data.size());
                      for (auto& image : data) {
                          images.push_back(pyarray_to_cv_mat(image));
                      }
-                     std::vector<std::vector<DetectionResult>> results;
+                     std::vector<std::vector<InstanceSegResult>> results;
                      self.batch_predict(images, &results);
                      return results;
                  })
             .def_property_readonly("preprocessor",
-                                   &detection::UltralyticsDet::get_preprocessor)
+                                   &detection::UltralyticsSeg::get_preprocessor)
             .def_property_readonly("postprocessor",
-                                   &detection::UltralyticsDet::get_postprocessor);
+                                   &detection::UltralyticsSeg::get_postprocessor);
     }
 } // namespace fastdeploy

@@ -44,9 +44,9 @@ namespace modeldeploy::vision::detection {
                 auto label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
                 // convert from [xc, yc, w, h, a]
                 // 其中a为angle矩形框的旋转角度, 默认为弧度制(但是OpenCV的RotatedRect的旋转角度，默认为角度制)
-                cv::RotatedRect rotated_boxes = {
-                    cv::Point2f(attr_ptr[0], attr_ptr[1]),
-                    cv::Size2f(attr_ptr[2], attr_ptr[3]),
+                RotatedRect rotated_boxes = {
+                    attr_ptr[0], attr_ptr[1],
+                    attr_ptr[2], attr_ptr[3],
                     attr_ptr[dim2 - 1] * 180 / 3.141592653f
                 };
                 _results.emplace_back(rotated_boxes, label_id, confidence);
@@ -62,8 +62,10 @@ namespace modeldeploy::vision::detection {
                 auto& box = result.rotated_box;
                 // clip box()
                 //先减去 padding,再除以缩放因子scale;
-                box.center = (box.center - cv::Point2f(pad_w, pad_h)) / scale;
-                box.size = box.size / scale;
+                box.xc = (box.xc - pad_w) / scale;
+                box.yc = (box.yc - pad_h) / scale;
+                box.width = box.width / scale;
+                box.height = box.height / scale;
             }
             results->emplace_back(std::move(_results));
         }

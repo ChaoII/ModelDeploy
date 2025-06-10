@@ -16,7 +16,6 @@ namespace modeldeploy::vision::detection {
         is_no_pad_ = false;
         is_scale_up_ = true;
         stride_ = 32;
-        max_wh_ = 7680.0;
     }
 
     void UltralyticsSegPreprocessor::letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const {
@@ -56,12 +55,12 @@ namespace modeldeploy::vision::detection {
         letter_box_record->out_w = static_cast<float>(mat->cols);
         letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
         letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
-        letter_box_record->scale = scale;
+        letter_box_record->scale = static_cast<float>(scale);
     }
 
     bool UltralyticsSegPreprocessor::preprocess(
         cv::Mat* mat, Tensor* output,
-        LetterBoxRecord* letter_box_record) {
+        LetterBoxRecord* letter_box_record) const {
         // Record the shape of image and the shape of preprocessed image
 
         // yolov5seg's preprocess steps
@@ -78,7 +77,7 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsSegPreprocessor::run(
         std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
-        std::vector<LetterBoxRecord>* letter_box_records) {
+        std::vector<LetterBoxRecord>* letter_box_records) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;

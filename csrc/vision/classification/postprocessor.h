@@ -23,7 +23,7 @@ namespace modeldeploy::vision::classification {
         * \return true if the postprocess successful, otherwise false
         */
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<ClassifyResult>* results);
+                 std::vector<ClassifyResult>* results) const;
 
         /// Set topk, default 1
         void set_top_k(const int& top_k) {

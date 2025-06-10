@@ -128,7 +128,7 @@ namespace modeldeploy::vision
             this->angle = angle;
         }
 
-        [[nodiscard]] cv::RotatedRect to_cv_Rect2f() const {
+        [[nodiscard]] cv::RotatedRect to_cv_rotated_rect() const {
             return {cv::Point2f(this->xc, this->yc), cv::Point2f(this->width, this->height), this->angle};
         }
 

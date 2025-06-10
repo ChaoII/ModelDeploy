@@ -8,8 +8,7 @@
 #include "csrc/vision/common/struct.h"
 #include <opencv2/opencv.hpp>
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     enum ResultType {
         CLASSIFY,
         DETECTION,
@@ -74,7 +73,7 @@ namespace modeldeploy::vision
     };
 
     struct MODELDEPLOY_CXX_EXPORT ObbResult {
-        cv::RotatedRect rotated_box;
+        RotatedRect rotated_box;
         int32_t label_id{};
         float score{};
         ResultType type = ResultType::DETECTION;

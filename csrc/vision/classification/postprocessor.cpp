@@ -11,7 +11,7 @@ namespace modeldeploy::vision::classification {
     }
 
     bool UltralyticsClsPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) {
+        const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) const {
         const int64_t batch = tensors[0].shape()[0];
         const Tensor& infer_result = tensors[0];
         // 注意yolov8-cls在模型中已经做过softmax了。
@@ -24,11 +24,11 @@ namespace modeldeploy::vision::classification {
             const int64_t num_classes = infer_result.shape()[1];
             const float* infer_result_buffer =
                 static_cast<const float*>(infer_result.data()) + bs * infer_result.shape()[1];
-            top_k_ = std::min(static_cast<int>(num_classes), top_k_);
+            const auto top_k = std::min(static_cast<int>(num_classes), top_k_);
             (*results)[bs].label_ids =
-                utils::top_k_indices(infer_result_buffer, num_classes, top_k_);
-            (*results)[bs].scores.resize(top_k_);
-            for (int i = 0; i < top_k_; ++i) {
+                utils::top_k_indices(infer_result_buffer, num_classes, top_k);
+            (*results)[bs].scores.resize(top_k);
+            for (int i = 0; i < top_k; ++i) {
                 (*results)[bs].scores[i] = *(infer_result_buffer + (*results)[bs].label_ids[i]);
             }
 

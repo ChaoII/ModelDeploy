@@ -209,10 +209,10 @@ void obb_results_2_c_results(
     for (int i = 0; i < c_results->size; i++) {
         auto rotated_box = results[i].rotated_box;
         c_results->data[i].rotated_box = {
-            static_cast<int>(rotated_box.center.x),
-            static_cast<int>(rotated_box.center.y),
-            static_cast<int>(rotated_box.size.width),
-            static_cast<int>(rotated_box.size.height),
+            rotated_box.xc,
+            rotated_box.yc,
+            rotated_box.width,
+            rotated_box.height,
             rotated_box.angle
         };
         c_results->data[i].score = results[i].score;
@@ -226,15 +226,11 @@ void c_results_2_obb_results(
     std::vector<ObbResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        cv::RotatedRect rotated_box = {
-            cv::Point2f{
-                static_cast<float>(c_results->data[i].rotated_box.xc),
-                static_cast<float>(c_results->data[i].rotated_box.yc)
-            },
-            cv::Size2f{
-                static_cast<float>(c_results->data[i].rotated_box.width),
-                static_cast<float>(c_results->data[i].rotated_box.height)
-            },
+        RotatedRect rotated_box = {
+            c_results->data[i].rotated_box.xc,
+            c_results->data[i].rotated_box.yc,
+            c_results->data[i].rotated_box.width,
+            c_results->data[i].rotated_box.height,
             c_results->data[i].rotated_box.angle,
         };
         results->emplace_back(rotated_box, c_results->data[i].label_id, c_results->data[i].score);

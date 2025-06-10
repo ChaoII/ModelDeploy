@@ -16,7 +16,7 @@ namespace modeldeploy::vision::detection {
         const std::vector<Tensor>& tensors, std::vector<std::vector<PoseResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
-        // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
+        //  4(xc,yc,w,h)+1(conf)+17(keypoints)*3(x,y,conf)=56
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
         results->reserve(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
