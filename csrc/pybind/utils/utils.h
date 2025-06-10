@@ -16,8 +16,7 @@
 #include "csrc/vision/common/struct.h"
 
 
-namespace modeldeploy
-{
+namespace modeldeploy {
     pybind11::dtype md_data_type_to_numpy_data_type(const DataType& md_dtype);
 
     DataType numpy_data_type_to_md_data_type(const pybind11::dtype& np_dtype);
@@ -33,6 +32,8 @@ namespace modeldeploy
 
 #ifdef BUILD_VISION
     cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray);
+
+    pybind11::array cv_mat_to_pyarray(const cv::Mat& mat);
 
     vision::Point2f pyarray_to_point2f(pybind11::array& pyarray);
 

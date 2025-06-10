@@ -6,7 +6,7 @@
 #include "csrc/vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
-    cv::Mat vis_classification(cv::Mat& cv_image,
+    cv::Mat vis_cls(cv::Mat& cv_image,
                                const ClassifyResult& result,
                                const int top_k,
                                const float score_threshold,

@@ -1,0 +1,21 @@
+//
+// Created by aichao on 2025/6/10.
+//
+
+
+#include "csrc/pybind/utils/utils.h"
+#include "csrc/vision/face/face_rec_pipeline/face_rec_pipeline.h"
+
+namespace modeldeploy::vision {
+    void bind_face_rec_pipeline(const pybind11::module& m) {
+        pybind11::class_<face::FaceRecognizerPipeline, BaseModel>(m, "FaceRecognizerPipeline")
+            .def(pybind11::init<std::string, std::string, RuntimeOption>())
+            .def("predict",
+                 [](face::FaceRecognizerPipeline& self, pybind11::array& data) {
+                     const auto mat = pyarray_to_cv_mat(data);
+                     std::vector<FaceRecognitionResult> res;
+                     self.predict(mat, &res);
+                     return res;
+                 });
+    }
+} // namespace modeldeploy

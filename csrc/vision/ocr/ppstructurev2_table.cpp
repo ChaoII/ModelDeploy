@@ -13,16 +13,14 @@ namespace modeldeploy::vision::ocr {
                                            const std::string& table_model_file,
                                            const std::string& rec_label_file,
                                            const std::string& table_char_dict_path,
-                                           int thread_num,
-                                           int max_side_len,
-                                           double det_db_thresh,
-                                           double det_db_box_thresh,
-                                           double det_db_unclip_ratio,
+                                           const int max_side_len,
+                                           const double det_db_thresh,
+                                           const double det_db_box_thresh,
+                                           const double det_db_unclip_ratio,
                                            const std::string& det_db_score_mode,
-                                           bool use_dilation,
-                                           int rec_batch_size) {
-        RuntimeOption option;
-        option.set_cpu_thread_num(thread_num);
+                                           const bool use_dilation,
+                                           const int rec_batch_size,
+                                           const RuntimeOption& option) {
         // detection
         detector_ = std::make_unique<DBDetector>(det_model_file, option);
         detector_->get_preprocessor().set_max_side_len(max_side_len);

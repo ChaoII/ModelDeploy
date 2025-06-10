@@ -19,7 +19,7 @@ namespace modeldeploy::vision::face {
                              TimerArray* timers = nullptr);
 
         virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<DetectionLandmarkResult>* results,
+                                   std::vector<std::vector<DetectionLandmarkResult>>* results,
                                    TimerArray* timers = nullptr);
 
         virtual ScrfdPreprocessor& get_preprocessor() {

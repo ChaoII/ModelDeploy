@@ -68,7 +68,7 @@ void md_draw_detection_result(const MDImage* image, const MDDetectionResults* c_
     auto cv_image = md_image_to_mat(image);
     std::vector<modeldeploy::vision::DetectionResult> results;
     c_results_2_detection_results(c_results, &results);
-    modeldeploy::vision::vis_detection(cv_image, results, threshold, font_path, font_size, alpha, save_result);
+    modeldeploy::vision::vis_det(cv_image, results, threshold, font_path, font_size, alpha, save_result);
 }
 
 void md_free_detection_result(MDDetectionResults* c_results) {

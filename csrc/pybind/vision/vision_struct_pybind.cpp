@@ -1,22 +1,13 @@
 //
-// Created by aichao on 2025/6/9.
+// Created by aichao on 2025/6/10.
 //
 
-#include <csrc/vision/common/display/display.h>
-
-#include "csrc/vision/common/result.h"
-#include <pybind11/pybind11.h>
+#include "csrc/vision/utils.h"
+#include "csrc/pybind/utils/utils.h"
+#include "csrc/vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_cls(pybind11::module&);
-    void bind_ultralytics_det(pybind11::module&);
-    void bind_ultralytics_iseg(pybind11::module&);
-    void bind_ultralytics_obb(pybind11::module&);
-    void bind_ultralytics_pose(pybind11::module&);
-    void bind_lpr_det(pybind11::module&);
-    void bind_lpr_rec(pybind11::module&);
-
-    void bind_vision(pybind11::module& m) {
+    void bind_vision_struct(const pybind11::module& m) {
         pybind11::class_<Point2f>(m, "Point2f")
             .def(pybind11::init())
             .def_readwrite("x", &Point2f::x)
@@ -329,13 +320,5 @@ namespace modeldeploy::vision {
                     d.car_plate_color = t[5].cast<std::string>();
                     return d;
                 }));
-
-        bind_ultralytics_cls(m);
-        bind_ultralytics_det(m);
-        bind_ultralytics_iseg(m);
-        bind_ultralytics_obb(m);
-        bind_ultralytics_pose(m);
-        bind_lpr_det(m);
-        bind_lpr_rec(m);
     }
-}
+} // namespace fastdeploy

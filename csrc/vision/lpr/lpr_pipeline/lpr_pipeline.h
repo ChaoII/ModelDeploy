@@ -15,7 +15,7 @@ namespace modeldeploy::vision::lpr {
     public:
         LprPipeline(const std::string& det_model_path,
                     const std::string& rec_model_path,
-                    int thread_num = 8);
+                    RuntimeOption option = RuntimeOption());
 
         ~LprPipeline() override;
 

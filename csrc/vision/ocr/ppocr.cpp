@@ -11,22 +11,14 @@ namespace modeldeploy::vision::ocr {
                          const std::string& cls_model_path,
                          const std::string& rec_model_path,
                          const std::string& dict_path,
-                         const bool use_gpu,
-                         const int thread_num,
                          const int max_side_len,
                          const double det_db_thresh,
                          const double det_db_box_thresh,
                          const double det_db_unclip_ratio,
                          const std::string& det_db_score_mode,
                          const bool use_dilation,
-                         const int rec_batch_size) {
-        RuntimeOption option;
-        option.set_cpu_thread_num(thread_num);
-        if (use_gpu) {
-            option.use_gpu();
-        }
-        option.enable_fp16 = true;
-        option.enable_trt = true;
+                         const int rec_batch_size,
+                         const RuntimeOption& option) {
         detector_ = std::make_unique<DBDetector>(det_model_path, option);
         detector_->get_preprocessor().set_max_side_len(max_side_len);
         detector_->get_postprocessor().set_det_db_thresh(det_db_thresh);

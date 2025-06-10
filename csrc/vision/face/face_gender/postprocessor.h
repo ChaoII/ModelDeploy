@@ -20,8 +20,8 @@ namespace modeldeploy::vision::face {
          *
          * \param[in] infer_result The inference result from runtime
          * \param[in] genders The output result of FaceRecognitionResult
-         * \return true if the postprocess successed, otherwise false
+         * \return true if the postprocess successful, otherwise false
          */
-        bool run(std::vector<Tensor>& infer_result, std::vector<int>* genders);
+        bool run(const std::vector<Tensor>& infer_result, std::vector<int>* genders) const;
     };
 } // namespace modeldeploy::vision::faceid

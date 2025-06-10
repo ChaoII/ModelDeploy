@@ -11,13 +11,12 @@
 #include "csrc/vision/face/face_det/scrfd.h"
 #include "csrc/vision/face/face_rec/seetaface.h"
 
-namespace modeldeploy::vision::face
-{
+namespace modeldeploy::vision::face {
     class MODELDEPLOY_CXX_EXPORT FaceRecognizerPipeline : public BaseModel {
     public:
         FaceRecognizerPipeline(const std::string& det_model_path,
                                const std::string& rec_model_path,
-                               int thread_num = 8);
+                               const RuntimeOption& option = RuntimeOption());
 
         ~FaceRecognizerPipeline() override;
 

@@ -19,13 +19,13 @@ namespace modeldeploy::vision::face {
          * \param[in] face_det_model_file Path of model file, e.g ./scrfd.onnx, loacal
          * \param[in] first_model_file Path of model file, e.g ./scrfd.onnx, loacal
          * \param[in] second_model_file Path of model file, e.g ./scrfd.onnx, global
-         * \param[in] thread_num RuntimeOption for inference, the default will use cpu
+         * \param option
          */
         explicit SeetaFaceAsPipeline(
             const std::string& face_det_model_file,
             const std::string& first_model_file,
             const std::string& second_model_file,
-            int thread_num = 8);
+            const RuntimeOption& option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "face_pipeline"; }
 

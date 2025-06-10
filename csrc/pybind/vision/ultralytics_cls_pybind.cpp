@@ -8,7 +8,7 @@
 #include "csrc/vision/classification/ultralytics_cls.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_cls(pybind11::module& m) {
+    void bind_ultralytics_cls(const pybind11::module& m) {
         pybind11::class_<classification::UltralyticsClsPreprocessor>(m, "UltralyticsClsPreprocessor")
             .def(pybind11::init<>())
             .def(

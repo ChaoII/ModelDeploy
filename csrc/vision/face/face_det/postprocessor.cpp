@@ -38,8 +38,8 @@ namespace modeldeploy::vision::face {
 
 
     bool ScrfdPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<DetectionLandmarkResult>* results,
-        const LetterBoxRecord& letter_box_record) {
+        const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionLandmarkResult>>* results,
+        const std::vector<LetterBoxRecord>& letter_box_records) {
         const size_t fmc = downsample_strides_.size();
         // scrfd has 6,9,10,15 output tensors
         if (!(tensors.size() == 9 || tensors.size() == 6 ||
@@ -64,96 +64,99 @@ namespace modeldeploy::vision::face {
         for (int f = 0; f < fmc; ++f) {
             total_num_boxes += tensors.at(f).shape()[1];
         }
-        const float ipt_h = letter_box_record.ipt_h;
-        const float ipt_w = letter_box_record.ipt_w;
-        const float out_h = letter_box_record.out_h;
-        const float out_w = letter_box_record.out_w;
-        const float scale = letter_box_record.scale;
-        const float pad_h = letter_box_record.pad_h;
-        const float pad_w = letter_box_record.pad_w;
-        generate_points(out_w, out_h);
-        results->clear();
-        results->reserve(static_cast<int>(total_num_boxes));
-        unsigned int count = 0;
-        // loop each stride
-        for (int f = 0; f < fmc; ++f) {
-            const auto* score_ptr = static_cast<const float*>(tensors.at(f).data());
-            const auto* bbox_ptr = static_cast<const float*>(tensors.at(f + fmc).data());
-            const unsigned int num_points = tensors.at(f).shape()[1];
-            int current_stride = downsample_strides_[f];
-            auto& stride_points = center_points_[current_stride];
-            // loop each anchor
-            for (unsigned int i = 0; i < num_points; ++i) {
-                const float cls_conf = score_ptr[i];
-                if (cls_conf < conf_threshold_) continue; // filter
-                const auto& point = stride_points.at(i);
-                const float cx = point.cx; // cx
-                const float cy = point.cy; // cy
-                // bbox
-                const float* offsets = bbox_ptr + i * 4;
-                const float l = offsets[0]; // left
-                const float t = offsets[1]; // top
-                const float r = offsets[2]; // right
-                const float b = offsets[3]; // bottom
+        const size_t batch = tensors[0].shape()[0];
+        for (size_t bs = 0; bs < batch; ++bs) {
+            const float ipt_h = letter_box_records[bs].ipt_h;
+            const float ipt_w = letter_box_records[bs].ipt_w;
+            const float out_h = letter_box_records[bs].out_h;
+            const float out_w = letter_box_records[bs].out_w;
+            const float scale = letter_box_records[bs].scale;
+            const float pad_h = letter_box_records[bs].pad_h;
+            const float pad_w = letter_box_records[bs].pad_w;
+            generate_points(out_w, out_h);
+            std::vector<DetectionLandmarkResult> _results;
+            _results.reserve(static_cast<int>(total_num_boxes));
+            unsigned int count = 0;
+            // loop each stride
+            for (int f = 0; f < fmc; ++f) {
+                const auto* score_ptr = static_cast<const float*>(tensors.at(f).data());
+                const auto* bbox_ptr = static_cast<const float*>(tensors.at(f + fmc).data());
+                const unsigned int num_points = tensors.at(f).shape()[1];
+                int current_stride = downsample_strides_[f];
+                auto& stride_points = center_points_[current_stride];
+                // loop each anchor
+                for (unsigned int i = 0; i < num_points; ++i) {
+                    const float cls_conf = score_ptr[i];
+                    if (cls_conf < conf_threshold_) continue; // filter
+                    const auto& point = stride_points.at(i);
+                    const float cx = point.cx; // cx
+                    const float cy = point.cy; // cy
+                    // bbox
+                    const float* offsets = bbox_ptr + i * 4;
+                    const float l = offsets[0]; // left
+                    const float t = offsets[1]; // top
+                    const float r = offsets[2]; // right
+                    const float b = offsets[3]; // bottom
 
-                const float x1 = ((cx - l) * static_cast<float>(current_stride) - pad_w) / scale; // cx - l x1
-                const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
-                const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
-                const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
-                std::vector<Point2f> landmarks;
-                landmarks.reserve(landmarks_per_face_);
-                if (use_kps_) {
-                    const auto* landmarks_ptr =
-                        static_cast<const float*>(tensors.at(f + 2 * fmc).data());
-                    // landmarks
-                    const float* kps_offsets = landmarks_ptr + i * (landmarks_per_face_ * 2);
-                    for (unsigned int j = 0; j < landmarks_per_face_ * 2; j += 2) {
-                        const float kps_l = kps_offsets[j];
-                        const float kps_t = kps_offsets[j + 1];
-                        const float kps_x = ((cx + kps_l) * static_cast<float>(current_stride) - pad_w) / scale;
-                        // cx + l x
-                        const float kps_y = ((cy + kps_t) * static_cast<float>(current_stride) - pad_h) / scale;
-                        // cy + t y
-                        landmarks.emplace_back(kps_x, kps_y);
+                    const float x1 = ((cx - l) * static_cast<float>(current_stride) - pad_w) / scale; // cx - l x1
+                    const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
+                    const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
+                    const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
+                    std::vector<Point2f> landmarks;
+                    landmarks.reserve(landmarks_per_face_);
+                    if (use_kps_) {
+                        const auto* landmarks_ptr =
+                            static_cast<const float*>(tensors.at(f + 2 * fmc).data());
+                        // landmarks
+                        const float* kps_offsets = landmarks_ptr + i * (landmarks_per_face_ * 2);
+                        for (unsigned int j = 0; j < landmarks_per_face_ * 2; j += 2) {
+                            const float kps_l = kps_offsets[j];
+                            const float kps_t = kps_offsets[j + 1];
+                            const float kps_x = ((cx + kps_l) * static_cast<float>(current_stride) - pad_w) / scale;
+                            // cx + l x
+                            const float kps_y = ((cy + kps_t) * static_cast<float>(current_stride) - pad_h) / scale;
+                            // cy + t y
+                            landmarks.emplace_back(kps_x, kps_y);
+                        }
+                    }
+                    _results.emplace_back(Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf);
+                    count += 1; // limit boxes for nms.
+                    if (count > max_nms_) {
+                        break;
                     }
                 }
-                results->emplace_back(Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf);
-                count += 1; // limit boxes for nms.
-                if (count > max_nms_) {
-                    break;
+            }
+
+            if (_results.empty()) {
+                return true;
+            }
+            utils::nms(&_results, nms_threshold_);
+            // scale and clip box
+            for (auto& _result : _results) {
+                auto& box = _result.box;
+                auto& landmarks = _result.landmarks;
+                // 左上角不能越界
+                box.x = std::max(box.x, 0.0f);
+                box.y = std::max(box.y, 0.0f);
+
+                // 右下角也不能越界
+                const float x2 = std::min(box.x + box.width, ipt_w - 1.0f);
+                const float y2 = std::min(box.y + box.height, ipt_h - 1.0f);
+
+                // 防止裁剪后右下角比左上角还小
+                box.width = std::max(x2 - box.x, 0.0f);
+                box.height = std::max(y2 - box.y, 0.0f);
+                if (use_kps_) {
+                    for (auto& landmark : landmarks) {
+                        landmark.x = std::max(landmark.x, 0.0f);
+                        landmark.y = std::max(landmark.y, 0.0f);
+                        landmark.x = std::min(landmark.x, ipt_w - 1.0f);
+                        landmark.y = std::min(landmark.y, ipt_h - 1.0f);
+                    }
                 }
             }
+            results->push_back(std::move(_results));
         }
-
-        if (results->empty()) {
-            return true;
-        }
-        utils::nms(results, nms_threshold_);
-        // scale and clip box
-        for (auto& _result : *results) {
-            auto& box = _result.box;
-            auto& landmarks = _result.landmarks;
-            // 左上角不能越界
-            box.x = std::max(box.x, 0.0f);
-            box.y = std::max(box.y, 0.0f);
-
-            // 右下角也不能越界
-            const float x2 = std::min(box.x + box.width, ipt_w - 1.0f);
-            const float y2 = std::min(box.y + box.height, ipt_h - 1.0f);
-
-            // 防止裁剪后右下角比左上角还小
-            box.width = std::max(x2 - box.x, 0.0f);
-            box.height = std::max(y2 - box.y, 0.0f);
-            if (use_kps_) {
-                for (auto& landmark : landmarks) {
-                    landmark.x = std::max(landmark.x, 0.0f);
-                    landmark.y = std::max(landmark.y, 0.0f);
-                    landmark.x = std::min(landmark.x, ipt_w - 1.0f);
-                    landmark.y = std::min(landmark.y, ipt_h - 1.0f);
-                }
-            }
-        }
-        // scale and clip landmarks
         return true;
     }
 }

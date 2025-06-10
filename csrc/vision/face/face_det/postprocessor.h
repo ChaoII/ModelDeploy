@@ -14,8 +14,8 @@ namespace modeldeploy::vision::face {
     public:
         ScrfdPostprocessor();
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<DetectionLandmarkResult>* results,
-                 const LetterBoxRecord& letter_box_record);
+                 std::vector<std::vector<DetectionLandmarkResult>>* results,
+                 const std::vector<LetterBoxRecord>& letter_box_records);
 
         /// Set conf_threshold, default 0.25
         void set_conf_threshold(const float& conf_threshold) {
@@ -32,6 +32,15 @@ namespace modeldeploy::vision::face {
 
         /// Get nms_threshold, default 0.5
         [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
+
+
+        /// Set landmarks_per_face, default 5
+        void set_landmarks_per_face(const float& landmarks_per_face) {
+            landmarks_per_face_ = landmarks_per_face;
+        }
+
+        /// Get landmarks_per_face, default 5
+        [[nodiscard]] float get_landmarks_per_face() const { return landmarks_per_face_; }
 
     protected:
         void generate_points(int width, int height);

@@ -8,7 +8,7 @@
 #include "csrc/vision/obb/ultralytics_obb.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_obb(pybind11::module& m) {
+    void bind_ultralytics_obb(const pybind11::module& m) {
         pybind11::class_<detection::UltralyticsObbPreprocessor>(m, "UltralyticsObbPreprocessor")
             .def(pybind11::init<>())
             .def(
@@ -43,7 +43,7 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsObbPreprocessor::set_stride);
 
         pybind11::class_<detection::UltralyticsObbPostprocessor>(
-                m, "UltralyticsPostprocessor")
+                m, "UltralyticsObbPostprocessor")
             .def(pybind11::init<>())
             .def("run",
                  [](const detection::UltralyticsObbPostprocessor& self,

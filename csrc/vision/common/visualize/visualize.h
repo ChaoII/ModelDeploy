@@ -19,7 +19,7 @@ namespace modeldeploy::vision {
                         int landmark_radius);
 
 
-    MODELDEPLOY_CXX_EXPORT cv::Mat vis_classification(
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_cls(
         cv::Mat& cv_image,
         const ClassifyResult& result,
         int top_k,
@@ -29,7 +29,7 @@ namespace modeldeploy::vision {
         double alpha, bool save_result);
 
 
-    MODELDEPLOY_CXX_EXPORT cv::Mat vis_detection(
+    MODELDEPLOY_CXX_EXPORT cv::Mat vis_det(
         cv::Mat& cv_image, const std::vector<DetectionResult>& result, double threshold = 0.5,
         const std::string& font_path = "", int font_size = 14,
         double alpha = 0.5, bool save_result = false);
@@ -47,7 +47,7 @@ namespace modeldeploy::vision {
         double alpha = 0.5, bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_ocr(
-        cv::Mat& image, const OCRResult& results, const std::string& font_path,
+        cv::Mat& image, const OCRResult& result, const std::string& font_path,
         int font_size, double alpha, bool save_result);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_det_landmarks(
