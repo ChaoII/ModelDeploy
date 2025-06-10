@@ -27,7 +27,7 @@ int main() {
     timers.print_benchmark();
 
     const auto vis_image =
-        modeldeploy::vision::vis_detection(img, result, 0.3, "../../test_data/test_models/msyh.ttc", 12, 0.3,
+        modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,
                                            false);
     cv::imshow("test", vis_image);
     cv::waitKey(0);

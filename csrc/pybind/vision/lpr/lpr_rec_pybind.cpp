@@ -6,7 +6,7 @@
 #include "csrc/vision/lpr/lpr_rec/lpr_rec.h"
 
 namespace modeldeploy::vision {
-    void bind_lpr_rec(pybind11::module& m) {
+    void bind_lpr_rec(const pybind11::module& m) {
         pybind11::class_<lpr::LprRecPreprocessor>(m, "LprRecPreprocessor")
             .def(pybind11::init<>())
             .def(

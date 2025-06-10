@@ -13,7 +13,7 @@
 
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceAgePreprocessor::preprocess(cv::Mat* mat, Tensor* output) {
+    bool SeetaFaceAgePreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]
         // 2. HWC2CHW
@@ -42,13 +42,10 @@ namespace modeldeploy::vision::face {
     }
 
     bool SeetaFaceAgePreprocessor::run(std::vector<cv::Mat>* images,
-                                       std::vector<Tensor>* outputs) {
+                                       std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
-        }
-        if (images->size() != 1) {
-            MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
         }
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
@@ -59,7 +56,12 @@ namespace modeldeploy::vision::face {
                 return false;
             }
         }
-        (*outputs)[0] = std::move(tensors[0]);
+        if (tensors.size() == 1) {
+            (*outputs)[0] = std::move(tensors[0]);
+        }
+        else {
+            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        }
         return true;
     }
 } // namespace modeldeploy::vision::face_rec

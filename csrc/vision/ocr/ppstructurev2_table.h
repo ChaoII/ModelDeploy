@@ -10,7 +10,6 @@
 #include "csrc/vision/ocr/structurev2_table.h"
 #include "csrc/vision/ocr/dbdetector.h"
 #include "csrc/vision/ocr/recognizer.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 
 
 /** \brief This pipeline can launch detection model, classification model and recognition model sequentially. All OCR pipeline APIs are defined inside this namespace.
@@ -28,7 +27,6 @@ namespace modeldeploy::vision::ocr {
          * \param table_model_file The table model path.
          * \param rec_label_file The recognition label path.
          * \param table_char_dict_path The table model path.
-         * \param thread_num The number of threads to use.
          * \param max_side_len The maximum side length of input image.
          * \param det_db_thresh
          * \param det_db_box_thresh
@@ -36,20 +34,20 @@ namespace modeldeploy::vision::ocr {
          * \param det_db_score_mode
          * \param use_dilation
          * \param rec_batch_size
+         * \param option
          */
         PPStructureV2Table(const std::string& det_model_file,
                            const std::string& rec_model_file,
                            const std::string& table_model_file,
                            const std::string& rec_label_file,
                            const std::string& table_char_dict_path,
-                           int thread_num = 8,
                            int max_side_len = 960,
                            double det_db_thresh = 0.3,
                            double det_db_box_thresh = 0.6,
                            double det_db_unclip_ratio = 1.5,
                            const std::string& det_db_score_mode = "slow",
                            bool use_dilation = false,
-                           int rec_batch_size = 8);
+                           int rec_batch_size = 8, const RuntimeOption& option = RuntimeOption());
 
 
         /** \brief Predict the input image and get OCR result.

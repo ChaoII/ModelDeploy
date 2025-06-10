@@ -26,8 +26,7 @@ namespace modeldeploy::vision::face {
     bool Scrfd::predict(const cv::Mat& image, std::vector<DetectionLandmarkResult>* result,
                         TimerArray* timers) {
         std::vector<std::vector<DetectionLandmarkResult>> results;
-        results.resize(1);
-        if (!batch_predict({image}, &results[0], timers)) {
+        if (!batch_predict({image}, &results, timers)) {
             return false;
         }
         *result = std::move(results[0]);
@@ -35,7 +34,7 @@ namespace modeldeploy::vision::face {
     }
 
     bool Scrfd::batch_predict(const std::vector<cv::Mat>& images,
-                              std::vector<DetectionLandmarkResult>* results,
+                              std::vector<std::vector<DetectionLandmarkResult>>* results,
                               TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
         std::vector<cv::Mat> _images = images;
@@ -53,7 +52,7 @@ namespace modeldeploy::vision::face {
         }
         if (timers) timers->infer_timer.stop();
         if (timers) timers->post_timer.start();
-        if (!postprocessor_.run(reused_output_tensors_, results, letter_box_records[0])) {
+        if (!postprocessor_.run(reused_output_tensors_, results, letter_box_records)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }

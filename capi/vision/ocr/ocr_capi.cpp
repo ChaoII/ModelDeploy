@@ -20,19 +20,24 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
     const auto det_model_file_path = fs::path(parameters->det_model_file);
     const auto cls_model_file_path = fs::path(parameters->cls_model_file);
     const auto rec_model_file_path = fs::path(parameters->rec_model_file);
+
+    modeldeploy::RuntimeOption option;
+    option.set_cpu_thread_num(parameters->thread_num);
+    if (parameters->use_gpu) {
+        option.use_gpu();
+    }
+
     const auto ocr_model = new modeldeploy::vision::ocr::PaddleOCR(det_model_file_path.string(),
                                                                    cls_model_file_path.string(),
                                                                    rec_model_file_path.string(),
                                                                    parameters->dict_path,
-                                                                   parameters->use_gpu,
-                                                                   parameters->thread_num,
                                                                    parameters->max_side_len,
                                                                    parameters->det_db_thresh,
                                                                    parameters->det_db_box_thresh,
                                                                    parameters->det_db_unclip_ratio,
                                                                    parameters->det_db_score_mode,
                                                                    parameters->use_dilation,
-                                                                   parameters->rec_batch_size);
+                                                                   parameters->rec_batch_size, option);
 
     model->type = MDModelType::OCR;
     model->format = parameters->format;

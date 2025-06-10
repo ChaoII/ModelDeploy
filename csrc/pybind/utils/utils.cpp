@@ -4,8 +4,7 @@
 
 #include "csrc/pybind/utils/utils.h"
 
-namespace modeldeploy
-{
+namespace modeldeploy {
     pybind11::dtype md_data_type_to_numpy_data_type(const DataType& md_dtype) {
         pybind11::dtype dt;
         if (md_dtype == DataType::INT32) {
@@ -157,17 +156,56 @@ namespace modeldeploy
         return CV_8U;
     }
 
-    cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray) {
-        // auto cv_type = numpy_data_type_to_open_cv_type(pyarray.dtype());
-        const auto cv_type = numpy_data_type_to_open_cv_type_v2(pyarray);
-        if (pyarray.ndim() != 3) {
-            MD_LOG_FATAL << "Require rank of array to be 3 with HWC format while converting it to cv::Mat." <<
-                std::endl;
+    pybind11::dtype cv_data_type_to_numpy_dtype(const int cv_depth) {
+        switch (cv_depth) {
+        case CV_8U:
+            return pybind11::dtype::of<std::uint8_t>();
+        case CV_8S:
+            return pybind11::dtype::of<std::int8_t>();
+        case CV_16U:
+            return pybind11::dtype::of<std::uint16_t>();
+        case CV_16S:
+            return pybind11::dtype::of<std::int16_t>();
+        case CV_32S:
+            return pybind11::dtype::of<std::int32_t>();
+        case CV_32F:
+            return pybind11::dtype::of<float>();
+        case CV_64F:
+            return pybind11::dtype::of<double>();
+        default:
+            throw std::runtime_error("Unsupported OpenCV data type in cv_data_type_to_numpy_dtype()");
         }
-        const int channel = pyarray.shape()[2];
+    }
+
+    cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray) {
+        if (pyarray.ndim() != 3) {
+            throw std::runtime_error("Expected 3D array (HWC) for image input");
+        }
+        const auto _cv_type = numpy_data_type_to_open_cv_type_v2(pyarray);
         const int height = pyarray.shape()[0];
         const int width = pyarray.shape()[1];
-        return cv::Mat{height, width, CV_MAKETYPE(cv_type, channel), pyarray.mutable_data()};
+        const int channels = pyarray.shape()[2];
+        const auto cv_type = CV_MAKETYPE(_cv_type, channels);
+        // 注意：py::array::data() 返回的是 const void*
+        const auto data_ptr = const_cast<void*>(pyarray.data());
+        cv::Mat mat(height, width, cv_type, data_ptr);
+        return mat;
     }
+
+    pybind11::array cv_mat_to_pyarray(const cv::Mat& mat) {
+        // 获取 numpy 类型（如 np.uint8）
+        auto np_dtype = cv_data_type_to_numpy_dtype(mat.depth());
+
+        // 构造 shape 和 strides（以 HWC 格式）
+        const std::vector<int64_t> shape = {mat.rows, mat.cols, mat.channels()};
+        std::vector strides = {
+            static_cast<size_t>(mat.step[0]),
+            static_cast<size_t>(mat.step[1]), (mat.elemSize1())
+        };
+
+        // 构造共享内存 numpy array，不复制数据
+        return pybind11::array(pybind11::dtype(np_dtype), shape, strides, mat.data);
+    }
+
 #endif
 }

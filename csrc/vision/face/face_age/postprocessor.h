@@ -23,6 +23,6 @@ namespace modeldeploy::vision::face {
          * \param[in] ages The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(std::vector<Tensor> &infer_result, std::vector<int> *ages);
+        bool run(const std::vector<Tensor>& infer_result, std::vector<int>* ages) const;
     };
 } // namespace modeldeploy::vision::faceid

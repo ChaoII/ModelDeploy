@@ -16,8 +16,10 @@ MDStatusCode md_create_lpr_pipeline_model(MDModel* model,
                                           const char* lpr_det_model_file,
                                           const char* lpr_rec_model_file,
                                           const int thread_num) {
+    modeldeploy::RuntimeOption option;
+    option.set_cpu_thread_num(thread_num);
     const auto lpr_pipeline_model = new modeldeploy::vision::lpr::LprPipeline(
-        lpr_det_model_file, lpr_rec_model_file, thread_num);
+        lpr_det_model_file, lpr_rec_model_file, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(lpr_pipeline_model->name().c_str());
     model->model_content = lpr_pipeline_model;

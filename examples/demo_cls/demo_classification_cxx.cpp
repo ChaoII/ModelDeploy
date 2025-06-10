@@ -14,7 +14,7 @@ int main() {
     auto img = cv::imread("../../test_data/test_images/test_face.jpg");
     modeldeploy::vision::ClassifyResult results;
     yol_ov5_cls.predict(img, &results);
-    const auto vis_img = modeldeploy::vision::vis_classification(img, results, 1, 0.5,
+    const auto vis_img = modeldeploy::vision::vis_cls(img, results, 1, 0.5,
                                                                  "../../test_data/test_models/msyh.ttf",
                                                                  12, 0.3, false);
     cv::imshow("test", vis_img);

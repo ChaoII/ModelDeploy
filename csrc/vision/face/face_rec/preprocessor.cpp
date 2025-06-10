@@ -12,7 +12,7 @@
 
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceIDPreprocessor::preprocess(cv::Mat* mat, Tensor* output) {
+    bool SeetaFaceIDPreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]
         // 2. BGR2RGB
@@ -37,7 +37,7 @@ namespace modeldeploy::vision::face {
     }
 
     bool SeetaFaceIDPreprocessor::run(std::vector<cv::Mat>* images,
-                                      std::vector<Tensor>* outputs) {
+                                      std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;

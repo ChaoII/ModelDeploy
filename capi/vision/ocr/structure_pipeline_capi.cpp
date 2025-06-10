@@ -20,20 +20,21 @@ MDStatusCode md_create_structure_table_model(MDModel* model, const MDStructureTa
     const auto tab_model_file_path = fs::path(parameters->table_model_file);
     const auto rec_label_file_path = fs::path(parameters->rec_label_file);
     const auto tab_label_file_path = fs::path(parameters->table_char_dict_path);
+    modeldeploy::RuntimeOption option;
+    option.set_cpu_thread_num(parameters->thread_num);
     const auto structure_table_model = new modeldeploy::vision::ocr::PPStructureV2Table(
         det_model_file_path.string(),
         rec_model_file_path.string(),
         tab_model_file_path.string(),
         rec_label_file_path.string(),
         tab_label_file_path.string(),
-        parameters->thread_num,
         parameters->max_side_len,
         parameters->det_db_thresh,
         parameters->det_db_box_thresh,
         parameters->det_db_unclip_ratio,
         parameters->det_db_score_mode,
         parameters->use_dilation,
-        parameters->rec_batch_size);
+        parameters->rec_batch_size, option);
 
     model->type = MDModelType::OCR;
     model->format = MDModelFormat::ONNX;

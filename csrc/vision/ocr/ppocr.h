@@ -11,7 +11,6 @@
 #include "csrc/vision/ocr/classifier.h"
 #include "csrc/vision/ocr/dbdetector.h"
 #include "csrc/vision/ocr/recognizer.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT PaddleOCR : public BaseModel {
@@ -20,15 +19,13 @@ namespace modeldeploy::vision::ocr {
                   const std::string& cls_model_path,
                   const std::string& rec_model_path,
                   const std::string& dict_path,
-                  bool use_gpu = false,
-                  int thread_num = 8,
                   int max_side_len = 960,
                   double det_db_thresh = 0.3,
                   double det_db_box_thresh = 0.6,
                   double det_db_unclip_ratio = 1.5,
                   const std::string& det_db_score_mode = "slow",
                   bool use_dilation = false,
-                  int rec_batch_size = 6);
+                  int rec_batch_size = 6, const RuntimeOption& option = RuntimeOption());
 
         ~PaddleOCR() override;
 

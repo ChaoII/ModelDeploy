@@ -7,7 +7,7 @@
 #include "csrc/vision/lpr/lpr_det/lpr_det.h"
 
 namespace modeldeploy::vision {
-    void bind_lpr_det(pybind11::module& m) {
+    void bind_lpr_det(const pybind11::module& m) {
         pybind11::class_<lpr::LprDetPreprocessor>(m, "LprDetPreprocessor")
             .def(pybind11::init<>())
             .def(
@@ -23,7 +23,7 @@ namespace modeldeploy::vision {
                     std::vector<Tensor> outputs;
                     if (!self.run(&images, &outputs, &records)) {
                         throw std::runtime_error(
-                            "Failed to preprocess the input data in UltralyticsPosePreprocessor.");
+                            "Failed to preprocess the input data in LprDetPreprocessor.");
                     }
                     return make_pair(outputs, records);
                 })

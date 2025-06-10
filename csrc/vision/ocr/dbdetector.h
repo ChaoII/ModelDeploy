@@ -7,7 +7,6 @@
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/ocr/det_postprocessor.h"
 #include "csrc/vision/ocr/det_preprocessor.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
 
 
 namespace modeldeploy::vision::ocr {

@@ -21,9 +21,9 @@ namespace modeldeploy::vision::face {
          *
          * \param[in] images The input image data list, all the elements are returned by cv::imread()
          * \param[in] outputs The output tensors which will feed in runtime
-         * \return true if the preprocess successed, otherwise false
+         * \return true if the preprocess successful, otherwise false
          */
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs);
+        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const;
 
         /// Get Size
         std::vector<int> get_size() { return size_; }
@@ -32,7 +32,7 @@ namespace modeldeploy::vision::face {
         void set_size(const std::vector<int>& size) { size_ = size; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output);
+        bool preprocess(cv::Mat* mat, Tensor* output) const;
         // Argument for image preprocessing step, tuple of (width, height),
         // decide the target size after resize, default (248, 248)
         std::vector<int> size_{248, 248};

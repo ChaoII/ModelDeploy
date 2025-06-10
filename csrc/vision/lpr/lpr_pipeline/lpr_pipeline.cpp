@@ -5,13 +5,9 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
-namespace modeldeploy::vision::lpr
-{
+namespace modeldeploy::vision::lpr {
     LprPipeline::LprPipeline(const std::string& det_model_path,
-                             const std::string& rec_model_path,
-                             int thread_num) {
-        RuntimeOption option;
-        option.set_cpu_thread_num(thread_num);
+                             const std::string& rec_model_path, RuntimeOption option) {
         detector_ = std::make_unique<LprDetection>(det_model_path, option);
         recognizer_ = std::make_unique<LprRecognizer>(rec_model_path, option);
     }

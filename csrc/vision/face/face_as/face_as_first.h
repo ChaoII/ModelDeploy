@@ -20,7 +20,7 @@ namespace modeldeploy::vision::face {
         explicit SeetaFaceAsFirst(const std::string &model_file,
                                          const RuntimeOption &custom_option = RuntimeOption());
 
-        [[nodiscard]] std::string name() const override { return "face_as_first"; }
+        [[nodiscard]] std::string name() const override { return "SeetaFaceAsFirst"; }
 
         /** \brief Predict the face detection result for an input image
          *

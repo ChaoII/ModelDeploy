@@ -73,7 +73,7 @@ void md_draw_classification_result(const MDImage* image, const MDClassificationR
     auto cv_image = md_image_to_mat(image);
     modeldeploy::vision::ClassifyResult result;
     c_results_2_classification_result(c_results, &result);
-    modeldeploy::vision::vis_classification(cv_image, result, top_k, score_threshold,
+    modeldeploy::vision::vis_cls(cv_image, result, top_k, score_threshold,
                                             font_path, font_size, alpha, save_result);
 }
 

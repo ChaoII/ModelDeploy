@@ -24,7 +24,7 @@ namespace modeldeploy {
 
 #ifdef BUILD_VISION
         auto vision_module =
-            m.def_submodule("vision", "Vision module of FastDeploy.");
+            m.def_submodule("vision", "Vision module of Modeldeploy.");
         vision::bind_vision(vision_module);
 #endif
     }

@@ -8,7 +8,7 @@
 #include "csrc/vision/detection/ultralytics_det.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_det(pybind11::module& m) {
+    void bind_ultralytics_det(const pybind11::module& m) {
         pybind11::class_<detection::UltralyticsPreprocessor>(m, "UltralyticsPreprocessor")
             .def(pybind11::init<>())
             .def(

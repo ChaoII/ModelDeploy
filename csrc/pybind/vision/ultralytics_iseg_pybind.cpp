@@ -8,7 +8,7 @@
 #include "csrc/vision/iseg/ultralytics_seg.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_iseg(pybind11::module& m) {
+    void bind_ultralytics_iseg(const pybind11::module& m) {
         pybind11::class_<detection::UltralyticsSegPreprocessor>(m, "UltralyticsSegPreprocessor")
             .def(pybind11::init<>())
             .def(

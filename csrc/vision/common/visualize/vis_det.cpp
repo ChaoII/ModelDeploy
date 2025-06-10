@@ -7,7 +7,7 @@
 
 
 namespace modeldeploy::vision {
-    // cv::Mat vis_detection(cv::Mat& cv_image, const DetectionResult& result,
+    // cv::Mat vis_det(cv::Mat& cv_image, const DetectionResult& result,
     //                       const double threshold,
     //                       const std::string& font_path, const int font_size,
     //                       const double alpha, const bool save_result) {
@@ -133,7 +133,7 @@ namespace modeldeploy::vision {
     //     return cv_image;
     // }
 
-    cv::Mat vis_detection(cv::Mat& cv_image, const std::vector<DetectionResult>& result,
+    cv::Mat vis_det(cv::Mat& cv_image, const std::vector<DetectionResult>& result,
                           const double threshold,
                           const std::string& font_path, const int font_size,
                           const double alpha, const bool save_result) {

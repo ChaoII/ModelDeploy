@@ -8,7 +8,7 @@
 #include "csrc/vision/pose/ultralytics_pose.h"
 
 namespace modeldeploy::vision {
-    void bind_ultralytics_pose(pybind11::module& m) {
+    void bind_ultralytics_pose(const pybind11::module& m) {
         pybind11::class_<detection::UltralyticsPosePreprocessor>(m, "UltralyticsPosePreprocessor")
             .def(pybind11::init<>())
             .def(

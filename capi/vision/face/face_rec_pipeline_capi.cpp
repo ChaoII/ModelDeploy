@@ -14,8 +14,10 @@ MDStatusCode md_create_face_rec_pipeline_model(MDModel* model,
                                                const char* face_det_model_file,
                                                const char* face_rec_model_file,
                                                const int thread_num) {
+    modeldeploy::RuntimeOption option;
+    option.set_cpu_thread_num(thread_num);
     const auto face_rec_pipeline_model = new modeldeploy::vision::face::FaceRecognizerPipeline(
-        face_det_model_file, face_rec_model_file, thread_num);
+        face_det_model_file, face_rec_model_file, option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_rec_pipeline_model->name().c_str());
     model->model_content = face_rec_pipeline_model;
