@@ -2,9 +2,6 @@
 // Created by aichao on 2025/6/9.
 //
 
-#include <csrc/vision/common/display/display.h>
-
-#include "csrc/vision/common/result.h"
 #include <pybind11/pybind11.h>
 
 namespace modeldeploy::vision {

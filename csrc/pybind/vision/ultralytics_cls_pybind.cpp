@@ -3,8 +3,6 @@
 //
 
 #include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/classification/preprocessor.h"
-#include "csrc/vision/classification/postprocessor.h"
 #include "csrc/vision/classification/ultralytics_cls.h"
 
 namespace modeldeploy::vision {

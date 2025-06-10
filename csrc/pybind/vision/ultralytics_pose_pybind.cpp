@@ -3,8 +3,6 @@
 //
 
 #include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/pose/preprocessor.h"
-#include "csrc/vision/pose/postprocessor.h"
 #include "csrc/vision/pose/ultralytics_pose.h"
 
 namespace modeldeploy::vision {

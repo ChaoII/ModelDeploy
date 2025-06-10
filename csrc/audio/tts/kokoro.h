@@ -9,7 +9,8 @@
 #include "csrc/audio/text_normalize/text_normalization.h"
 
 
-namespace modeldeploy::audio::tts {
+namespace modeldeploy::audio::tts
+{
     class MODELDEPLOY_CXX_EXPORT Kokoro : public BaseModel {
     public:
         Kokoro(const std::string& model_file_path, const std::string& token_path_str,
@@ -24,6 +25,8 @@ namespace modeldeploy::audio::tts {
                              std::vector<float>* out_audio);
 
         [[nodiscard]] int32_t get_sample_rate() const { return sample_rate_; }
+
+        void set_sample_rate(const int32_t sample_rate) { sample_rate_ = sample_rate; }
 
     protected:
         bool initialize();
