@@ -59,6 +59,7 @@ jobs:
         env:
           CIBW_ENABLE: cpython-prerelease
           CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_ENVIRONMENT_WINDOWS: CC=cl CXX=cl
 
       - name: Verify clean directory
         run: git diff --exit-code
