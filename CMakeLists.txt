@@ -8,7 +8,6 @@ set(SOURCE "")
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
-
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_CAPI "build with capi" ON)
@@ -118,7 +117,7 @@ if (BUILD_PYTHON)
     target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
     install(TARGETS modeldeploy DESTINATION modeldeploy)
     install(TARGETS ${LIBRARY_NAME}
-            RUNTIME DESTINATION modeldeploy  # .dll
+            RUNTIME DESTINATION modeldeploy
             LIBRARY DESTINATION modeldeploy)
 
     # 安装依赖的第三方动态库
