@@ -4,6 +4,7 @@
 
 #include "csrc/base_model.h"
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace modeldeploy {
     void bind_base_model(pybind11::module& m) {
@@ -14,7 +15,15 @@ namespace modeldeploy {
             .def("num_outputs", &BaseModel::num_outputs)
             .def("get_input_info", &BaseModel::get_input_info)
             .def("get_output_info", &BaseModel::get_output_info)
-            .def("get_custom_meta_data", &BaseModel::get_custom_meta_data)
+            .def("get_custom_meta_data",
+                 [](BaseModel& self) {
+                     std::map<std::string, std::string> meta = self.get_custom_meta_data();
+                     pybind11::dict py_meta;
+                     for (const auto& kv : meta) {
+                         py_meta[pybind11::str(kv.first)] = pybind11::str(kv.second);
+                     }
+                     return py_meta;
+                 })
             .def("initialized", &BaseModel::is_initialized)
             .def_readwrite("runtime_option", &BaseModel::runtime_option);
     }

@@ -7,7 +7,6 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <pybind11/eval.h>
 #include "opencv2/opencv.hpp"
 #include "csrc/core/tensor.h"
 #include <type_traits>

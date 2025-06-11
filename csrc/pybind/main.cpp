@@ -34,7 +34,7 @@ namespace modeldeploy {
 #ifdef BUILD_AUDIO
         auto audio_module =
             m.def_submodule("audio", "Audio module of Modeldeploy.");
-        audio::bind_kokoro(vision_module);
+        audio::bind_kokoro(audio_module);
 #endif
     }
 }
