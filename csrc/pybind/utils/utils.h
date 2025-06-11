@@ -27,7 +27,10 @@ namespace modeldeploy {
     void pyarray_to_tensor_list(std::vector<pybind11::array>& pyarray,
                                 std::vector<Tensor>* tensor,
                                 bool share_buffer = false);
-    pybind11::array tensor_to_py_array(const Tensor& tensor);
+    pybind11::array tensor_to_pyarray(const Tensor& tensor);
+
+    void tensor_list_to_pyarray_list(std::vector<Tensor> tensors, std::vector<pybind11::array>& pyarrays);
+
 
 #ifdef BUILD_VISION
     cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray);
