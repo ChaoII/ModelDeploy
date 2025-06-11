@@ -3,7 +3,6 @@ Make programmer easier to deploy deeplearning model, save time to save the world
 """
 from __future__ import annotations
 import typing
-from _modeldeploy import *
 from . import audio
 from . import vision
 

@@ -77,12 +77,20 @@ namespace modeldeploy {
         }
     }
 
-    pybind11::array tensor_to_py_array(const Tensor& tensor) {
+    pybind11::array tensor_to_pyarray(const Tensor& tensor) {
         const auto numpy_dtype = md_data_type_to_numpy_data_type(tensor.dtype());
         auto out = pybind11::array(numpy_dtype, tensor.shape());
         memcpy(out.mutable_data(), tensor.data(), tensor.byte_size());
         return out;
     }
+
+    void tensor_list_to_pyarray_list(std::vector<Tensor> tensors, std::vector<pybind11::array>& pyarrays) {
+        pyarrays.resize(tensors.size());
+        for (auto i = 0; i < tensors.size(); ++i) {
+            pyarrays[i] = tensor_to_pyarray(tensors[i]);
+        }
+    }
+
 
 #ifdef BUILD_VISION
 
