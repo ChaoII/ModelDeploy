@@ -246,6 +246,11 @@ namespace modeldeploy::vision {
                     return d;
                 }));
 
+        pybind11::enum_<FaceAntiSpoofResult>(m, "FaceAntiSpoofResult")
+            .value("REAL", FaceAntiSpoofResult::REAL)
+            .value("FUZZY", FaceAntiSpoofResult::FUZZY)
+            .value("SPOOF", FaceAntiSpoofResult::SPOOF)
+            .export_values();
 
         pybind11::class_<OCRResult>(m, "OCRResult")
             .def(pybind11::init())
@@ -319,5 +324,15 @@ namespace modeldeploy::vision {
                     d.car_plate_color = t[5].cast<std::string>();
                     return d;
                 }));
+
+        pybind11::class_<LetterBoxRecord>(m, "LetterBoxRecord")
+            .def(pybind11::init())
+            .def_readwrite("ipt_h", &LetterBoxRecord::ipt_h)
+            .def_readwrite("ipt_w", &LetterBoxRecord::ipt_w)
+            .def_readwrite("out_h", &LetterBoxRecord::out_h)
+            .def_readwrite("out_w", &LetterBoxRecord::out_w)
+            .def_readwrite("pad_h", &LetterBoxRecord::pad_h)
+            .def_readwrite("pad_w", &LetterBoxRecord::pad_w)
+            .def_readwrite("scale", &LetterBoxRecord::scale);
     }
 } // namespace fastdeploy
