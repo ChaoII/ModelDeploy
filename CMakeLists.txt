@@ -85,11 +85,12 @@ if (BUILD_AUDIO)
     file(GLOB_RECURSE VAD_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/vad/*.cpp)
     file(GLOB_RECURSE TTS_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*.cpp ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*/*.cpp)
     file(GLOB_RECURSE ASR_PIPELINE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
+    set(BUILD_TESTING OFF CACHE BOOL "Disable testing for samplerate" FORCE)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/samplerate)
     set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF CACHE BOOL "Disable Python binding for kaldi-native-fbank" FORCE)
     set(KALDI_NATIVE_FBANK_BUILD_TESTS OFF CACHE BOOL "Disable testing for kaldi-native-fbank" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "With shared library for kaldi-native-fbank" FORCE)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank EXCLUDE_FROM_ALL)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cppjieba)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
@@ -112,8 +113,28 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 if (BUILD_PYTHON)
     file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
-    pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
-    target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
+    pybind11_add_module(_modeldeploy ${PYBIND_SOURCE})
+    target_link_libraries(_modeldeploy PUBLIC ${LIBRARY_NAME})
+    install(TARGETS _modeldeploy DESTINATION modeldeploy)
+    install(TARGETS ${LIBRARY_NAME}
+            RUNTIME DESTINATION modeldeploy  # .dll
+            LIBRARY DESTINATION modeldeploy)
+
+    # 安装依赖的第三方动态库
+    file(GLOB EXTRA_DLLS
+            "${CMAKE_BINARY_DIR}/bin/*.dll"
+            "${CMAKE_BINARY_DIR}/bin/*.so"
+            "${CMAKE_BINARY_DIR}/bin/*.dylib"
+    )
+
+    foreach (dll_file ${EXTRA_DLLS})
+        add_custom_command(TARGET _modeldeploy POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${dll_file}"
+                "${CMAKE_SOURCE_DIR}/python/modeldeploy/"
+                COMMENT "Copying ${dll_file} to python/modeldeploy/"
+        )
+    endforeach ()
 endif ()
 
 
@@ -124,36 +145,6 @@ endif ()
 if (BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
-endif ()
-
-##########################################install###########################################
-
-if (WIN32)
-    install(
-            TARGETS ${LIBRARY_NAME}
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
-            RUNTIME DESTINATION lib
-    )
-else ()
-    install(
-            TARGETS ${LIBRARY_NAME}
-            LIBRARY DESTINATION lib)
-endif ()
-
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/csrc
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/include
-        FILES_MATCHING
-        PATTERN "*.h"
-)
-
-if (WITH_CAPI)
-    install(
-            DIRECTORY ${CMAKE_SOURCE_DIR}/c_api
-            DESTINATION ${CMAKE_INSTALL_PREFIX}/include
-            FILES_MATCHING
-            PATTERN "*.h"
-    )
 endif ()
 
 

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "modeldeploy"
+version = "0.1.0"
+description = "ModelDeploy with C++ inference and pybind11 bindings"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { text = "MIT" }
+authors = [{ name = "Aichao", email = "849453582@qq.com" }]
+
+[tool.scikit-build]
+cmake.version = ">=3.15"
+# scikit-build-core 用的是多配置生成器里面如果使用了CMAKE_BUILD_TYPE变量会接收不到
+# cmake.build-type = "Release"
+cmake.define.CMAKE_BUILD_TYPE = "Release"
+cmake.define.BUILD_PYTHON = "ON"
+cmake.define.BUILD_CAPI = "OFF"
+cmake.define.BUILD_EXAMPLES = "OFF"
+cmake.define.BUILD_TESTS = "OFF"
+cmake.define.CMAKE_POLICY_VERSION_MINIMUM = "3.5"
+cmake.args = ["-G", "Ninja"]
