@@ -1,6 +1,6 @@
 # This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
 # See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
-name: Build
+name: Build WHEEL
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build_wheel:
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
