@@ -21,7 +21,7 @@ if(POLICY CMP0057)
   cmake_policy(SET CMP0057 NEW)
 endif()
 
-cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
 project(kaldi-native-fbank CXX C)
 

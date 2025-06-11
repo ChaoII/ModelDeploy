@@ -32,6 +32,7 @@ namespace modeldeploy {
         Device device = Device::CPU;
         /// Inference device id
         int device_id = 0;
+
         void* external_stream_ = nullptr;
         /// Use fp16 to infer
         bool enable_fp16 = false;

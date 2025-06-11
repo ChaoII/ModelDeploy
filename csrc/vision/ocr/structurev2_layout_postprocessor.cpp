@@ -9,8 +9,7 @@
 #include <numeric>
 
 
-namespace modeldeploy::vision::ocr
-{
+namespace modeldeploy::vision::ocr {
     bool StructureV2LayoutPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
         const std::vector<std::array<int, 4>>& batch_layout_img_info) {
@@ -108,10 +107,10 @@ namespace modeldeploy::vision::ocr
             }
         }
         result->clear();
-        const int total = std::accumulate(bbox_results.begin(), bbox_results.end(), 0ul,
-                                          [](const size_t sum, const std::vector<DetectionResult>& v) {
-                                              return sum + v.size();
-                                          });
+        const size_t total = std::accumulate(bbox_results.begin(), bbox_results.end(), 0ul,
+                                             [](const size_t sum, const std::vector<DetectionResult>& v) {
+                                                 return sum + v.size();
+                                             });
         result->reserve(total);
         // nms for per class, i in [0~num_class-1]
         for (auto& bbox_result : bbox_results) {

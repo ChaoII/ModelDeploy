@@ -15,5 +15,3 @@ if (NOT BUILD_AUDIO)
     list(REMOVE_ITEM CAPI_SRCS ${AUDIO_CAPI_SRCS})
 endif ()
 list(APPEND SOURCE ${CAPI_SRCS})
-
-message(${CAPI_SRCS})
