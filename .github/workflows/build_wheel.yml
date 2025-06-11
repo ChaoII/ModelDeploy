@@ -55,11 +55,14 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
+      - name: Set up MSVC Developer Command Prompt
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - uses: pypa/cibuildwheel@v2.23
         env:
           CIBW_ENABLE: cpython-prerelease
           CIBW_ARCHS_WINDOWS: AMD64
-          CIBW_ENVIRONMENT_WINDOWS: CC=cl CXX=cl
 
       - name: Verify clean directory
         run: git diff --exit-code
