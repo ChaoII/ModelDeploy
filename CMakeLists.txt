@@ -112,6 +112,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 
 if (BUILD_PYTHON)
     file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
     pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
     target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
