@@ -24,12 +24,12 @@ set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 
-find_package(OpenMP)
-if (OpenMP_CXX_FOUND)
-    list(APPEND OpenMP::OpenMP_CXX)
-else ()
-    message(WARNING "OpenMP not found. Compilation will be without OpenMP support.")
-endif ()
+#find_package(OpenMP)
+#if (OpenMP_CXX_FOUND)
+#    list(APPEND OpenMP::OpenMP_CXX)
+#else ()
+#    message(WARNING "OpenMP not found. Compilation will be without OpenMP support.")
+#endif ()
 
 if (MSVC)
     if (WITH_STATIC_CRT)
