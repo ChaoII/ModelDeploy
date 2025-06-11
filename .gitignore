@@ -4,6 +4,7 @@ build_msvc
 build_linux
 build_debug
 
+dist
 .idea
 # Prerequisites
 *.d
