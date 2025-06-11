@@ -51,6 +51,11 @@ jobs:
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v6
 
+
+      - name: Set up MSVC Developer Command Prompt
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Set reusable strings
         # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
         id: strings
