@@ -113,9 +113,9 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 if (BUILD_PYTHON)
     file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
-    pybind11_add_module(_modeldeploy ${PYBIND_SOURCE})
-    target_link_libraries(_modeldeploy PUBLIC ${LIBRARY_NAME})
-    install(TARGETS _modeldeploy DESTINATION modeldeploy)
+    pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
+    target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
+    install(TARGETS modeldeploy DESTINATION modeldeploy)
     install(TARGETS ${LIBRARY_NAME}
             RUNTIME DESTINATION modeldeploy  # .dll
             LIBRARY DESTINATION modeldeploy)
@@ -128,7 +128,7 @@ if (BUILD_PYTHON)
     )
 
     foreach (dll_file ${EXTRA_DLLS})
-        add_custom_command(TARGET _modeldeploy POST_BUILD
+        add_custom_command(TARGET modeldeploy POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${dll_file}"
                 "${CMAKE_SOURCE_DIR}/python/modeldeploy/"
