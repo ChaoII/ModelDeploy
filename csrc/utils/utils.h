@@ -5,6 +5,7 @@
 #pragma once
 #include <filesystem>
 #include <vector>
+#include <iterator>
 #include "csrc/core/md_log.h"
 
 namespace modeldeploy {
