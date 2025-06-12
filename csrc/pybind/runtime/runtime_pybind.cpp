@@ -116,14 +116,8 @@ namespace modeldeploy {
             .def_readwrite("name", &TensorInfo::name)
             .def_readwrite("shape", &TensorInfo::shape)
             .def_readwrite("dtype", &TensorInfo::dtype)
-            .def("__str__", [](const TensorInfo& self) {
-                return format("TensorInfo(name={}, shape={}, dtype={})",
-                              self.name, vector_to_string(self.shape), datatype_to_string(self.dtype));
-            })
-            .def("__repr__", [](const TensorInfo& self) {
-                return format("TensorInfo(name={}, shape={}, dtype={})",
-                              self.name, vector_to_string(self.shape), datatype_to_string(self.dtype));
-            });
+            .def("__str__", &TensorInfo::str)
+            .def("__repr__", &TensorInfo::str);
 
         pybind11::class_<Runtime>(m, "Runtime")
             .def(pybind11::init())

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "csrc/utils/utils.h"
 #include "csrc/core/tensor.h"
 #include "csrc/core/md_log.h"
 #include "csrc/runtime/runtime_option.h"
@@ -13,6 +14,15 @@ namespace modeldeploy {
         std::string name;
         std::vector<int> shape;
         DataType dtype;
+
+        [[nodiscard]] std::string str() const {
+            std::ostringstream oss;
+            oss << "TensorInfo(name=" << name
+                << ", shape=" << vector_to_string(shape)
+                << ", dtype=" << datatype_to_string(dtype)
+                << ")";
+            return oss.str();
+        }
     };
 
     class BaseBackend {

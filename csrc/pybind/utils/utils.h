@@ -11,7 +11,6 @@
 #include "csrc/core/tensor.h"
 #include <type_traits>
 #include <csrc/core/md_log.h>
-
 #include "csrc/vision/common/struct.h"
 
 
