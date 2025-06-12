@@ -37,7 +37,7 @@ namespace modeldeploy {
         const std::vector supported_level{-1, 0, 1, 2};
         if (std::ranges::find(supported_level, level) == supported_level.end()) {
             MD_LOG_ERROR << "Invalid graph optimization level: " << level << ", supported levels are: "
-                << print_vector(supported_level) << std::endl;
+                << vector_to_string(supported_level) << std::endl;
         }
         ort_option.graph_optimization_level = level;
     }

@@ -6,7 +6,7 @@ import modeldeploy
 import numpy
 import pybind11_stubgen.typing_ext
 import typing
-__all__ = ['Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionLandmarkResult', 'DetectionResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'Kokoro', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'Point2f', 'Point3f', 'PoseResult', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsCls', 'UltralyticsClsPostprocessor', 'UltralyticsClsPreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_cls', 'vis_det', 'vis_det_landmarks', 'vis_iseg', 'vis_lpr', 'vis_obb', 'vis_ocr', 'vis_pose']
+__all__ = ['Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionLandmarkResult', 'DetectionResult', 'FUZZY', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'Point2f', 'Point3f', 'PoseResult', 'REAL', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SPOOF', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsCls', 'UltralyticsClsPostprocessor', 'UltralyticsClsPreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_cls', 'vis_det', 'vis_det_landmarks', 'vis_iseg', 'vis_lpr', 'vis_obb', 'vis_ocr', 'vis_pose']
 class Classifier(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -38,7 +38,7 @@ class ClassifierPreprocessor:
     cls_image_shape: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
         ...
@@ -88,7 +88,7 @@ class DBDetectorPreprocessor:
     static_shape_infer: bool
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
         ...
@@ -112,6 +112,46 @@ class DetectionResult:
     def __init__(self) -> None:
         ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+class FaceAntiSpoofResult:
+    """
+    Members:
+    
+      REAL
+    
+      FUZZY
+    
+      SPOOF
+    """
+    FUZZY: typing.ClassVar[FaceAntiSpoofResult]  # value = <FaceAntiSpoofResult.FUZZY: 1>
+    REAL: typing.ClassVar[FaceAntiSpoofResult]  # value = <FaceAntiSpoofResult.REAL: 0>
+    SPOOF: typing.ClassVar[FaceAntiSpoofResult]  # value = <FaceAntiSpoofResult.SPOOF: 2>
+    __members__: typing.ClassVar[dict[str, FaceAntiSpoofResult]]  # value = {'REAL': <FaceAntiSpoofResult.REAL: 0>, 'FUZZY': <FaceAntiSpoofResult.FUZZY: 1>, 'SPOOF': <FaceAntiSpoofResult.SPOOF: 2>}
+    def __eq__(self, other: typing.Any) -> bool:
+        ...
+    def __getstate__(self) -> int:
+        ...
+    def __hash__(self) -> int:
+        ...
+    def __index__(self) -> int:
+        ...
+    def __init__(self, value: int) -> None:
+        ...
+    def __int__(self) -> int:
+        ...
+    def __ne__(self, other: typing.Any) -> bool:
+        ...
+    def __repr__(self) -> str:
+        ...
+    def __setstate__(self, state: int) -> None:
+        ...
+    def __str__(self) -> str:
+        ...
+    @property
+    def name(self) -> str:
+        ...
+    @property
+    def value(self) -> int:
         ...
 class FaceRecognitionResult:
     embedding: list[float]
@@ -137,11 +177,15 @@ class InstanceSegResult:
         ...
     def __setstate__(self, arg0: tuple) -> None:
         ...
-class Kokoro(modeldeploy.BaseModel):
-    sample_rate: int
-    def __init__(self, arg0: str, arg1: str, arg2: list[str], arg3: str, arg4: str, arg5: str, arg6: modeldeploy.RuntimeOption) -> None:
-        ...
-    def predict(self, arg0: str, arg1: str, arg2: float) -> list[float]:
+class LetterBoxRecord:
+    ipt_h: float
+    ipt_w: float
+    out_h: float
+    out_w: float
+    pad_h: float
+    pad_w: float
+    scale: float
+    def __init__(self) -> None:
         ...
 class LprDetPostprocessor:
     conf_threshold: float
@@ -149,10 +193,10 @@ class LprDetPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[...]) -> list[list[DetectionLandmarkResult]]:
+    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[...]) -> list[list[DetectionLandmarkResult]]:
+    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
         ...
     @property
     def landmarks_per_card_(self) -> int:
@@ -167,7 +211,7 @@ class LprDetPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[...]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -206,7 +250,7 @@ class LprRecPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
 class LprRecognizer(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -265,6 +309,7 @@ class ObbResult:
     def __setstate__(self, arg0: tuple) -> None:
         ...
 class PPStructureV2Table(modeldeploy.BaseModel):
+    rec_batch_size: int
     def __init__(self, arg0: str, arg1: str, arg2: str, arg3: str, arg4: str, arg5: int, arg6: float, arg7: float, arg8: float, arg9: str, arg10: bool, arg11: int, arg12: modeldeploy.RuntimeOption) -> None:
         ...
     def batch_predict(self, arg0: list[numpy.ndarray]) -> list[OCRResult]:
@@ -272,6 +317,8 @@ class PPStructureV2Table(modeldeploy.BaseModel):
     def predict(self, arg0: numpy.ndarray) -> OCRResult:
         ...
 class PaddleOCR(modeldeploy.BaseModel):
+    cls_batch_size: int
+    rec_batch_size: int
     def __init__(self, arg0: str, arg1: str, arg2: str, arg3: str, arg4: int, arg5: float, arg6: float, arg7: float, arg8: str, arg9: bool, arg10: int, arg11: modeldeploy.RuntimeOption) -> None:
         ...
     def batch_predict(self, arg0: list[numpy.ndarray]) -> list[OCRResult]:
@@ -347,7 +394,7 @@ class RecognizerPreprocessor:
     static_shape_infer: bool
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
         ...
@@ -408,7 +455,7 @@ class SeetaFaceAgePreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
 class SeetaFaceAsFirst(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -418,7 +465,7 @@ class SeetaFaceAsFirst(modeldeploy.BaseModel):
 class SeetaFaceAsPipeline(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: str, arg2: str, arg3: modeldeploy.RuntimeOption) -> None:
         ...
-    def predict(self, arg0: numpy.ndarray, arg1: float, arg2: float) -> list[...]:
+    def predict(self, arg0: numpy.ndarray, arg1: float, arg2: float) -> list[FaceAntiSpoofResult]:
         ...
 class SeetaFaceAsSecond(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -451,7 +498,7 @@ class SeetaFaceGenderPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
 class SeetaFaceID(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -479,7 +526,7 @@ class SeetaFaceIDPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
 class StructureV2Layout(modeldeploy.BaseModel):
     @typing.overload
@@ -513,7 +560,7 @@ class StructureV2LayoutPreprocessor:
     static_shape_infer: bool
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
         ...
@@ -522,7 +569,7 @@ class StructureV2SERViLayoutXLMModel(modeldeploy.BaseModel):
         ...
     def batch_predict(self, arg0: list[numpy.ndarray]) -> None:
         ...
-    def get_input_info(self, arg0: int) -> ...:
+    def get_input_info(self, arg0: int) -> modeldeploy.TensorInfo:
         ...
     def infer(self, arg0: dict[str, numpy.ndarray]) -> list[numpy.ndarray]:
         ...
@@ -557,7 +604,7 @@ class StructureV2TablePostprocessor:
 class StructureV2TablePreprocessor:
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
 class UltralyticsCls(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -585,7 +632,7 @@ class UltralyticsClsPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[...]:
+    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
         ...
 class UltralyticsDet(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -619,10 +666,10 @@ class UltralyticsObbPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[...]) -> list[list[ObbResult]]:
+    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[ObbResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[...]) -> list[list[ObbResult]]:
+    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[ObbResult]]:
         ...
 class UltralyticsObbPreprocessor:
     is_mini_pad: bool
@@ -631,7 +678,7 @@ class UltralyticsObbPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[...]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -658,10 +705,10 @@ class UltralyticsPosePostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[...]) -> list[list[PoseResult]]:
+    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[PoseResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[...]) -> list[list[PoseResult]]:
+    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[PoseResult]]:
         ...
 class UltralyticsPosePreprocessor:
     is_mini_pad: bool
@@ -670,7 +717,7 @@ class UltralyticsPosePreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[...]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -684,10 +731,10 @@ class UltralyticsPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[...]) -> list[list[DetectionResult]]:
+    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[...]) -> list[list[DetectionResult]]:
+    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
         ...
 class UltralyticsPreprocessor:
     is_mini_pad: bool
@@ -696,7 +743,7 @@ class UltralyticsPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[...]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -723,10 +770,10 @@ class UltralyticsSegPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[...]) -> list[list[InstanceSegResult]]:
+    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[...]) -> list[list[InstanceSegResult]]:
+    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
         ...
 class UltralyticsSegPreprocessor:
     is_mini_pad: bool
@@ -735,7 +782,7 @@ class UltralyticsSegPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[...], list[...]]:
+    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -759,3 +806,6 @@ def vis_ocr(arg0: numpy.ndarray, arg1: OCRResult, arg2: str, arg3: int, arg4: fl
     ...
 def vis_pose(arg0: numpy.ndarray, arg1: list[PoseResult], arg2: str, arg3: int, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
     ...
+FUZZY: FaceAntiSpoofResult  # value = <FaceAntiSpoofResult.FUZZY: 1>
+REAL: FaceAntiSpoofResult  # value = <FaceAntiSpoofResult.REAL: 0>
+SPOOF: FaceAntiSpoofResult  # value = <FaceAntiSpoofResult.SPOOF: 2>

@@ -25,7 +25,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in ScrfdPreprocessor.");
                     }
-                    return make_pair(outputs, records);
+                    std::vector<pybind11::array> arrays;
+                    tensor_list_to_pyarray_list(outputs, arrays);
+                    return make_pair(arrays, records);
                 })
             .def_property("size", &face::ScrfdPreprocessor::get_size,
                           &face::ScrfdPreprocessor::set_size)
@@ -83,9 +85,9 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](face::Scrfd& self, pybind11::array& data) {
                      const auto mat = pyarray_to_cv_mat(data);
-                     std::vector<DetectionLandmarkResult> res;
-                     self.predict(mat, &res);
-                     return res;
+                     std::vector<DetectionLandmarkResult> result;
+                     self.predict(mat, &result);
+                     return result;
                  })
             .def("batch_predict",
                  [](face::Scrfd& self,

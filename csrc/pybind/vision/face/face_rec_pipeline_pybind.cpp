@@ -13,9 +13,9 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](face::FaceRecognizerPipeline& self, pybind11::array& data) {
                      const auto mat = pyarray_to_cv_mat(data);
-                     std::vector<FaceRecognitionResult> res;
-                     self.predict(mat, &res);
-                     return res;
+                     std::vector<FaceRecognitionResult> result;
+                     self.predict(mat, &result);
+                     return result;
                  });
     }
 } // namespace modeldeploy

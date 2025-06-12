@@ -24,7 +24,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in UltralyticsObbPreprocessor.");
                     }
-                    return make_pair(outputs, records);
+                    std::vector<pybind11::array> arrays;
+                    tensor_list_to_pyarray_list(outputs, arrays);
+                    return make_pair(arrays, records);
                 })
             .def_property("size", &detection::UltralyticsObbPreprocessor::get_size,
                           &detection::UltralyticsObbPreprocessor::set_size)
