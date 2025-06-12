@@ -24,7 +24,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in SeetaFaceGenderPreprocessor.");
                     }
-                    return outputs;
+                    std::vector<pybind11::array> arrays;
+                    tensor_list_to_pyarray_list(outputs, arrays);
+                    return arrays;
                 })
             .def_property("size", &face::SeetaFaceGenderPreprocessor::get_size,
                           &face::SeetaFaceGenderPreprocessor::set_size);

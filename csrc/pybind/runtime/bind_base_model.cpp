@@ -3,11 +3,12 @@
 //
 
 
-#include <csrc/runtime/backends/backend.h>
-
+#include "csrc/runtime/backends/backend.h"
 #include "csrc/runtime/runtime_option.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <format>
+#include <csrc/utils/utils.h>
 
 namespace modeldeploy {
     void bind_runtime_option(pybind11::module& m) {
@@ -28,10 +29,10 @@ namespace modeldeploy {
             .def("use_cpu", &RuntimeOption::use_cpu)
             .def("set_ort_graph_opt_level", &RuntimeOption::set_ort_graph_opt_level)
             .def_readwrite("model_buffer", &RuntimeOption::model_buffer)
-            .def_readwrite("ort_option", &RuntimeOption::ort_option)
+            // .def_readwrite("ort_option", &RuntimeOption::ort_option)
             .def("set_external_stream", &RuntimeOption::set_external_stream,
                  pybind11::arg("stream"),
-                 pybind11::doc("A pointer to an external stream (e.g., CUDA stream), type: capsule")
+                 pybind11::doc("A pointer to an external stream")
             )
             .def("set_external_raw_stream",
                  [](RuntimeOption& self, size_t external_stream) {
@@ -63,7 +64,15 @@ namespace modeldeploy {
             .def(pybind11::init())
             .def_readwrite("name", &TensorInfo::name)
             .def_readwrite("shape", &TensorInfo::shape)
-            .def_readwrite("dtype", &TensorInfo::dtype);
+            .def_readwrite("dtype", &TensorInfo::dtype)
+            .def("__str__", [](const TensorInfo& self) {
+                return format("TensorInfo(name={}, shape={}, dtype={})",
+                              self.name, vector_to_string(self.shape), datatype_to_string(self.dtype));
+            })
+            .def("__repr__", [](const TensorInfo& self) {
+                return format("TensorInfo(name={}, shape={}, dtype={})",
+                              self.name, vector_to_string(self.shape), datatype_to_string(self.dtype));
+            });
 
         pybind11::class_<OrtBackendOption>(m, "OrtBackendOption")
             .def(pybind11::init())

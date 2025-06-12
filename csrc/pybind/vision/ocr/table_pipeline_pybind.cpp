@@ -13,9 +13,9 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](ocr::PPStructureV2Table& self, pybind11::array& data) {
                      const auto mat = pyarray_to_cv_mat(data);
-                     OCRResult res;
-                     self.predict(mat, &res);
-                     return res;
+                     OCRResult result;
+                     self.predict(mat, &result);
+                     return result;
                  })
 
             .def("batch_predict",
@@ -28,7 +28,7 @@ namespace modeldeploy::vision {
                      self.batch_predict(images, &results);
                      return results;
                  })
-            .def_property(" rec_batch_size",
+            .def_property("rec_batch_size",
                           &ocr::PPStructureV2Table::get_rec_batch_size,
                           &ocr::PPStructureV2Table::set_rec_batch_size);
     }

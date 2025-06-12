@@ -52,7 +52,7 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool PPStructureV2Table::set_rec_batch_size(int rec_batch_size) {
+    bool PPStructureV2Table::set_rec_batch_size(const int rec_batch_size) {
         if (rec_batch_size < -1 || rec_batch_size == 0) {
             MD_LOG_ERROR << "batch_size > 0 or batch_size == -1." << std::endl;
             return false;

@@ -23,7 +23,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in UltralyticsPosePreprocessor.");
                     }
-                    return outputs;
+                    std::vector<pybind11::array> arrays;
+                    tensor_list_to_pyarray_list(outputs, arrays);
+                    return arrays;
                 })
             .def_property("size", &lpr::LprRecPreprocessor::get_size,
                           &lpr::LprRecPreprocessor::set_size);

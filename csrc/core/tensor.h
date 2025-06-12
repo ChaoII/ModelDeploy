@@ -21,7 +21,7 @@ namespace modeldeploy {
     };
 
     // 辅助函数实现
-    inline std::string to_string(const DataType dtype) {
+    inline std::string datatype_to_string(const DataType dtype) {
         switch (dtype) {
         case DataType::FP32: return "FP32";
         case DataType::FP64: return "FP64";

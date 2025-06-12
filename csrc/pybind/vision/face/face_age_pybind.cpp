@@ -24,7 +24,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in SeetaFaceAgePreprocessor.");
                     }
-                    return outputs;
+                    std::vector<pybind11::array> arrays;
+                    tensor_list_to_pyarray_list(outputs, arrays);
+                    return arrays;
                 })
             .def_property("size", &face::SeetaFaceAgePreprocessor::get_size,
                           &face::SeetaFaceAgePreprocessor::set_size);
@@ -61,9 +63,9 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](face::SeetaFaceAge& self, pybind11::array& data) {
                      const auto mat = pyarray_to_cv_mat(data);
-                     int res;
-                     self.predict(mat, &res);
-                     return res;
+                     int result;
+                     self.predict(mat, &result);
+                     return result;
                  })
             .def("batch_predict",
                  [](face::SeetaFaceAge& self,

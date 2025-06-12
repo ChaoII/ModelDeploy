@@ -13,8 +13,8 @@ namespace modeldeploy {
             .def("model_name", &BaseModel::name)
             .def("num_inputs", &BaseModel::num_inputs)
             .def("num_outputs", &BaseModel::num_outputs)
-            .def("get_input_info", &BaseModel::get_input_info)
-            .def("get_output_info", &BaseModel::get_output_info)
+            .def("get_input_info", &BaseModel::get_input_info, pybind11::return_value_policy::copy)
+            .def("get_output_info", &BaseModel::get_output_info, pybind11::return_value_policy::copy)
             .def("get_custom_meta_data",
                  [](BaseModel& self) {
                      std::map<std::string, std::string> meta = self.get_custom_meta_data();
@@ -24,7 +24,7 @@ namespace modeldeploy {
                      }
                      return py_meta;
                  })
-            .def("initialized", &BaseModel::is_initialized)
-            .def_readwrite("runtime_option", &BaseModel::runtime_option);
+            .def("initialized", &BaseModel::is_initialized);
+        // .def_readwrite("runtime_option", &BaseModel::runtime_option);
     }
 } // namespace fastdeploy

@@ -13,9 +13,9 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](face::SeetaFaceAsSecond& self, pybind11::array& data) {
                      auto mat = pyarray_to_cv_mat(data);
-                     std::vector<std::tuple<int, float>> res;
-                     self.predict(mat, &res);
-                     return res;
+                     std::vector<std::tuple<int, float>> result;
+                     self.predict(mat, &result);
+                     return result;
                  });
     }
 } // namespace modeldeploy

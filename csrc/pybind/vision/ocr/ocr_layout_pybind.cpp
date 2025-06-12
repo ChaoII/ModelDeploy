@@ -32,8 +32,8 @@ namespace modeldeploy::vision {
                  [](ocr::StructureV2LayoutPreprocessor& self,
                     std::vector<pybind11::array>& im_list) {
                      std::vector<cv::Mat> images;
-                     for (size_t i = 0; i < im_list.size(); ++i) {
-                         images.push_back(pyarray_to_cv_mat(im_list[i]));
+                     for (auto& image : im_list) {
+                         images.push_back(pyarray_to_cv_mat(image));
                      }
                      std::vector<Tensor> outputs;
                      if (!self.run(&images, &outputs)) {
@@ -42,7 +42,9 @@ namespace modeldeploy::vision {
                              "StructureV2LayoutPreprocessor.");
                      }
                      auto batch_layout_img_info = self.get_batch_layout_image_info();
-                     return std::make_pair(outputs, *batch_layout_img_info);
+                     std::vector<pybind11::array> arrays;
+                     tensor_list_to_pyarray_list(outputs, arrays);
+                     return std::make_pair(arrays, *batch_layout_img_info);
                  });
 
 
@@ -98,8 +100,8 @@ namespace modeldeploy::vision {
             .def("batch_predict", [](ocr::StructureV2Layout& self,
                                      std::vector<pybind11::array>& data) {
                 std::vector<cv::Mat> images;
-                for (size_t i = 0; i < data.size(); ++i) {
-                    images.push_back(pyarray_to_cv_mat(data[i]));
+                for (auto& image : data) {
+                    images.push_back(pyarray_to_cv_mat(image));
                 }
                 std::vector<std::vector<DetectionResult>> results;
                 self.batch_predict(images, &results);

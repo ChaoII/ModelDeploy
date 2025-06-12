@@ -25,7 +25,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in LprDetPreprocessor.");
                     }
-                    return make_pair(outputs, records);
+                    std::vector<pybind11::array> arrays;
+                    tensor_list_to_pyarray_list(outputs, arrays);
+                    return make_pair(arrays, records);
                 })
             .def_property("size", &lpr::LprDetPreprocessor::get_size,
                           &lpr::LprDetPreprocessor::set_size)

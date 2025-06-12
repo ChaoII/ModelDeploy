@@ -79,12 +79,15 @@ namespace modeldeploy {
     }
 
     template <typename T>
-    static std::string print_vector(std::vector<T> v) {
-        std::string res;
-        for (auto i : v) {
-            res += std::to_string(i) + " ";
+    static std::string vector_to_string(const std::vector<T>& v) {
+        std::ostringstream oss;
+        if (v.empty()) {
+            return "[]";
         }
-        return res;
+        oss << "[";
+        std::copy(v.begin(), v.end() - 1, std::ostream_iterator<T>(oss, ", "));
+        oss << v.back() << "]";
+        return oss.str();
     }
 
     std::vector<unsigned char> base64_decode(const std::string& base64_str);

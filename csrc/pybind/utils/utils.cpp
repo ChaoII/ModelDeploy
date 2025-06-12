@@ -26,7 +26,7 @@ namespace modeldeploy {
             dt = pybind11::dtype::of<int8_t>();
         }
         else {
-            MD_LOG_FATAL << "The function doesn't support data type of %s." << to_string(md_dtype) << std::endl;
+            MD_LOG_FATAL << "The function doesn't support data type of %s." << datatype_to_string(md_dtype) << std::endl;
         }
         return dt;
     }
