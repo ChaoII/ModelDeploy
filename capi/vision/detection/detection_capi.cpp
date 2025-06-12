@@ -2,22 +2,20 @@
 // Created by AC on 2024-12-17.
 //
 
-
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/detection/detection_capi.h"
-
 #include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
 
 MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
-                                       const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto detection_model = new modeldeploy::vision::detection::UltralyticsDet(model_path, option);
+                                       const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption option_;
+    c_runtime_option_2_runtime_option(option, &option_);
+    const auto detection_model = new modeldeploy::vision::detection::UltralyticsDet(model_path, option_);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(detection_model->name().c_str());
     model->model_content = detection_model;

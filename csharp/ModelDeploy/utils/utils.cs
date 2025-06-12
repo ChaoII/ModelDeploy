@@ -84,4 +84,35 @@ namespace ModelDeploy.utils
             }
         }
     }
+
+    public class RuntimeOption
+    {
+        public string TrtMinShape { get; set; } = "";
+        public string TrtOptShape { get; set; } = "";
+        public string TrtMaxShape { get; set; } = "";
+        public bool EnableFp16 { get; set; } = false;
+        public int CpuThreadNum { get; set; } = 0;
+        public int DeviceId { get; set; } = 0;
+        public bool EnableTrt { get; set; } = false;
+        public Device Device { get; set; } = Device.CPU;
+        public Backend Backend { get; set; } = Backend.ORT;
+        public int GraphOptLevel { get; set; } = -1;
+
+        public MDRuntimeOption ToNative()
+        {
+            return new MDRuntimeOption
+            {
+                trt_min_shape = TrtMinShape,
+                trt_opt_shape = TrtOptShape,
+                trt_max_shape = TrtMaxShape,
+                enable_fp16 = EnableFp16 ? 1 : 0,
+                cpu_thread_num = CpuThreadNum,
+                device_id = DeviceId,
+                enable_trt = EnableTrt ? 1 : 0,
+                device = Device,
+                backend = Backend,
+                graph_opt_level = GraphOptLevel
+            };
+        }
+    }
 }

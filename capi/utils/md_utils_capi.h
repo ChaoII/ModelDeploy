@@ -37,6 +37,8 @@ MODELDEPLOY_CAPI_EXPORT void print_polygon(const MDPolygon* polygon);
 /// @param polygon 
 MODELDEPLOY_CAPI_EXPORT void md_free_polygon(MDPolygon* polygon);
 
+MODELDEPLOY_CAPI_EXPORT MDRuntimeOption md_create_default_runtime_option();
+
 
 #ifdef __cplusplus
 }

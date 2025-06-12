@@ -328,20 +328,6 @@ enum MDFaceQualityEvaluateResult {
     HIGH = 2
 };
 
-
-enum MDEyeState {
-    EYE_CLOSE = 0,
-    EYE_OPEN = 1,
-    EYE_RANDOM = 2,
-    EYE_UNKNOWN = 3
-};
-
-typedef struct {
-    MDEyeState left_eye;
-    MDEyeState right_eye;
-} MDEyeStateResult;
-
-
 typedef struct {
     char* msg;
     char* stamp;
@@ -355,6 +341,29 @@ typedef struct {
     int size;
     int sample_rate;
 } MDTTSResult;
+
+enum MDDevice {
+    MD_DEVICE_CPU = 0,
+    MD_DEVICE_GPU = 1
+};
+
+enum MDBackend {
+    MD_BACKEND_ORT = 0,
+    MD_BACKEND_NONE = 1
+};
+
+typedef struct {
+    const char* trt_min_shape;
+    const char* trt_opt_shape;
+    const char* trt_max_shape;
+    int enable_fp16;
+    int cpu_thread_num;
+    int device_id;
+    int enable_trt;
+    MDDevice device;
+    MDBackend backend;
+    int graph_opt_level;
+} MDRuntimeOption;
 
 
 typedef void (*ASRCallBack)(MDASRResult* result);

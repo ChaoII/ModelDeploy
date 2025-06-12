@@ -11,10 +11,10 @@ namespace ModelDeploy.vision.detection
         private MDModel _model;
         private bool _disposed;
 
-        public UltralyticsDet(string modelDir, int threadNum = 8)
+        public UltralyticsDet(string modelDir, MDRuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_detection_model(ref _model, modelDir, threadNum), "Create detection model");
+            Utils.Check(md_create_detection_model(ref _model, modelDir, ref option), "Create detection model");
         }
 
         public void SetInputSize(int width, int height)
@@ -82,7 +82,8 @@ namespace ModelDeploy.vision.detection
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_detection_model(ref MDModel model, string modelDir, int threadNum);
+        private static extern int md_create_detection_model(ref MDModel model, string modelDir,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_detection_input_size(ref MDModel model, MDSize size);

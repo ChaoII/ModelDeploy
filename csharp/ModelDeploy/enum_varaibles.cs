@@ -41,11 +41,15 @@
         NoMask = 6
     }
 
-    public enum MDEyeState
+    public enum Device
     {
-        EYE_CLOSE = 0,
-        EYE_OPEN = 1,
-        EYE_RANDOM = 2,
-        EYE_UNKNOWN = 3
+        CPU = 0,
+        GPU = 1,
+    }
+
+    public enum Backend
+    {
+        ORT = 0,
+        NONE = 1,
     }
 }

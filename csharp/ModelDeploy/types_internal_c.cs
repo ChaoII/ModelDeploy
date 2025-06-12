@@ -372,5 +372,20 @@ namespace ModelDeploy
             public int size;
             public int sample_rate;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDRuntimeOption
+        {
+            public string trt_min_shape;
+            public string trt_opt_shape;
+            public string trt_max_shape;
+            public int enable_fp16;
+            public int cpu_thread_num;
+            public int device_id;
+            public int enable_trt;
+            public Device device;
+            public Backend backend;
+            public int graph_opt_level;
+        }
     }
 }
