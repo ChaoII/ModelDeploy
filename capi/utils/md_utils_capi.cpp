@@ -58,3 +58,18 @@ void md_free_polygon(MDPolygon* polygon) {
     polygon->size = 0;
     free(polygon->data);
 }
+
+MDRuntimeOption md_create_default_runtime_option() {
+    return MDRuntimeOption{
+        "",
+        "",
+        "",
+        0,
+        -1,
+        0,
+        0,
+        MD_DEVICE_CPU,
+        MD_BACKEND_ORT,
+        -1
+    };
+}

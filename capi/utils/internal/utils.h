@@ -9,8 +9,8 @@
 #include "seeta/CStruct.h"
 #endif
 
+#include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
-
 #include "capi/common/md_types.h"
 
 ///
@@ -246,3 +246,7 @@ void face_recognizer_results_2_c_results(
 void c_results_2_face_recognizer_results(
     const MDFaceRecognizerResults* c_results,
     std::vector<FaceRecognitionResult>* results);
+
+void c_runtime_option_2_runtime_option(
+    const MDRuntimeOption* c_option,
+    modeldeploy::RuntimeOption* option);

@@ -64,7 +64,12 @@ static class Program
 
     static void TestDetection()
     {
-        using var yolov8 = new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolo11n.onnx"));
+        RuntimeOption option = new RuntimeOption
+        {
+            CpuThreadNum = 1
+        };
+        using var yolov8 =
+            new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolo11n.onnx"), option.ToNative());
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection.jpg"));
         // yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
@@ -374,10 +379,10 @@ static class Program
     {
         // TestClassification();
         // TestFace();
-        TestLpr();
+        // TestLpr();
         // TestSenseVoice();
         // TestKokoro();
-        // TestDetection();
+        TestDetection();
         // TestInstanceSeg();
         // TestObb();
         // TestPose();
