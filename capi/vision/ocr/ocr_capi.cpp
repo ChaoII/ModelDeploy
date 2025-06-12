@@ -16,17 +16,15 @@
 
 namespace fs = std::filesystem;
 
-MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* parameters) {
+MDStatusCode md_create_ocr_model(MDModel* model,
+                                 const MDOCRModelParameters* parameters,
+                                 const MDRuntimeOption* option) {
     const auto det_model_file_path = fs::path(parameters->det_model_file);
     const auto cls_model_file_path = fs::path(parameters->cls_model_file);
     const auto rec_model_file_path = fs::path(parameters->rec_model_file);
 
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(parameters->thread_num);
-    if (parameters->use_gpu) {
-        option.use_gpu();
-    }
-
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
     const auto ocr_model = new modeldeploy::vision::ocr::PaddleOCR(det_model_file_path.string(),
                                                                    cls_model_file_path.string(),
                                                                    rec_model_file_path.string(),
@@ -37,10 +35,10 @@ MDStatusCode md_create_ocr_model(MDModel* model, const MDOCRModelParameters* par
                                                                    parameters->det_db_unclip_ratio,
                                                                    parameters->det_db_score_mode,
                                                                    parameters->use_dilation,
-                                                                   parameters->rec_batch_size, option);
+                                                                   parameters->rec_batch_size, _option);
 
     model->type = MDModelType::OCR;
-    model->format = parameters->format;
+    model->format = MDModelFormat::ONNX;
     model->model_content = ocr_model;
     model->model_name = strdup(ocr_model->name().c_str());
     if (!ocr_model->is_initialized()) {

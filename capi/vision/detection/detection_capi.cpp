@@ -13,9 +13,9 @@
 
 MDStatusCode md_create_detection_model(MDModel* model, const char* model_path,
                                        const MDRuntimeOption* option) {
-    modeldeploy::RuntimeOption option_;
-    c_runtime_option_2_runtime_option(option, &option_);
-    const auto detection_model = new modeldeploy::vision::detection::UltralyticsDet(model_path, option_);
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto detection_model = new modeldeploy::vision::detection::UltralyticsDet(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(detection_model->name().c_str());
     model->model_content = detection_model;

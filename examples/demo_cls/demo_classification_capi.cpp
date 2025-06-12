@@ -6,12 +6,14 @@
 #include <chrono>
 
 #include "capi/utils/md_image_capi.h"
+#include "capi/utils/md_utils_capi.h"
 #include "capi/vision/classification/classification_capi.h"
 
 int main() {
     MDStatusCode ret;
     MDModel model;
-    if (ret = md_create_classification_model(&model, "../../test_data/test_models/yolov5n-cls.onnx", 8); ret) {
+    const MDRuntimeOption option = md_create_default_runtime_option();
+    if (ret = md_create_classification_model(&model, "../../test_data/test_models/yolov5n-cls.onnx", &option); ret) {
         std::cout << ret << std::endl;
         return ret;
     }

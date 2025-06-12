@@ -10,10 +10,10 @@
 
 
 MDStatusCode md_create_lpr_rec_model(MDModel* model, const char* model_path,
-                                     const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto lpr_rec_model = new modeldeploy::vision::lpr::LprRecognizer(model_path, option);
+                                     const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto lpr_rec_model = new modeldeploy::vision::lpr::LprRecognizer(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(lpr_rec_model->name().c_str());
     model->model_content = lpr_rec_model;

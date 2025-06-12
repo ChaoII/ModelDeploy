@@ -13,11 +13,11 @@ MDStatusCode md_create_face_as_pipeline_model(MDModel* model,
                                               const char* face_det_model_file,
                                               const char* first_model_file,
                                               const char* second_model_file,
-                                              const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
+                                              const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
     const auto face_as_pipeline_model = new modeldeploy::vision::face::SeetaFaceAsPipeline(
-        face_det_model_file, first_model_file, second_model_file, option);
+        face_det_model_file, first_model_file, second_model_file, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_as_pipeline_model->name().c_str());
     model->model_content = face_as_pipeline_model;

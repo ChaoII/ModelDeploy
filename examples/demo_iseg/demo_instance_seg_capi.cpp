@@ -6,12 +6,14 @@
 #include <chrono>
 
 #include "capi/utils/md_image_capi.h"
+#include "capi/utils/md_utils_capi.h"
 #include "capi/vision/iseg/instance_seg_capi.h"
 
 int main() {
     MDStatusCode ret;
     MDModel model;
-    if (ret = md_create_instance_seg_model(&model, "../../test_data/test_models/yolo11n-seg.onnx", 8); ret) {
+    const MDRuntimeOption option = md_create_default_runtime_option();
+    if (ret = md_create_instance_seg_model(&model, "../../test_data/test_models/yolo11n-seg.onnx", &option); ret) {
         std::cout << ret << std::endl;
         return ret;
     }
@@ -23,7 +25,7 @@ int main() {
         std::cout << ret << std::endl;
         return ret;
     }
-    md_draw_instance_seg_result(&im, &results,0.5, "../../test_data/msyh.ttc", 14, 0.1, 1);
+    md_draw_instance_seg_result(&im, &results, 0.5, "../../test_data/msyh.ttc", 14, 0.1, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
     std::cout << "duration cost: " << diff.count() << "s" << std::endl;
     md_show_image(&im);

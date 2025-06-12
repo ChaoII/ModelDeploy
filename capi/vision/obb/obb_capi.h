@@ -14,12 +14,10 @@ extern "C" {
 /// 创建检测模型
 /// \param model 模型，请在外部申请内存比如 malloc，new等等，该方法会在内部开辟模型内存，并赋值
 /// \param model_path 模型路径
-/// \param thread_num 线程数
+/// \param option
 /// \return MDStatusCode::Success成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_obb_model(
-    MDModel* model,
-    const char* model_path,
-    int thread_num = 8);
+    MDModel* model, const char* model_path, const MDRuntimeOption* option);
 ///
 /// \param model 由create_obb_model创建的模型
 /// \param size 模型输入的大小，在onnx模型中，检测模型默认输入大小为640*640，如果模型输入大小不一致，需要调用该方法设置

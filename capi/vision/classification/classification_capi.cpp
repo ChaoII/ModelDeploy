@@ -15,10 +15,10 @@
 
 
 MDStatusCode md_create_classification_model(MDModel* model, const char* model_path,
-                                            const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto classification_model = new modeldeploy::vision::classification::UltralyticsCls(model_path, option);
+                                            const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto classification_model = new modeldeploy::vision::classification::UltralyticsCls(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(classification_model->name().c_str());
     model->model_content = classification_model;
@@ -74,7 +74,7 @@ void md_draw_classification_result(const MDImage* image, const MDClassificationR
     modeldeploy::vision::ClassifyResult result;
     c_results_2_classification_result(c_results, &result);
     modeldeploy::vision::vis_cls(cv_image, result, top_k, score_threshold,
-                                            font_path, font_size, alpha, save_result);
+                                 font_path, font_size, alpha, save_result);
 }
 
 void md_free_classification_result(MDClassificationResults* c_results) {

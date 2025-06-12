@@ -14,10 +14,10 @@
 
 
 MDStatusCode md_create_pose_model(MDModel* model, const char* model_path,
-                                  const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto pose_model = new modeldeploy::vision::detection::UltralyticsPose(model_path, option);
+                                  const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto pose_model = new modeldeploy::vision::detection::UltralyticsPose(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(pose_model->name().c_str());
     model->model_content = pose_model;

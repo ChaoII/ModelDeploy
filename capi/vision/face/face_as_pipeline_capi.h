@@ -17,14 +17,14 @@ extern "C" {
 /// \param face_det_model_file
 /// \param first_model_file
 /// \param second_model_file
-/// \param thread_num 线程数
+/// \param option
 /// \return MDStatusCode::Success成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_as_pipeline_model(
     MDModel* model,
     const char* face_det_model_file,
     const char* first_model_file,
     const char* second_model_file,
-    int thread_num = 8);
+    const MDRuntimeOption* option);
 
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_detection_model创建的模型

@@ -14,14 +14,15 @@
 
 namespace fs = std::filesystem;
 
-MDStatusCode md_create_structure_table_model(MDModel* model, const MDStructureTableModelParameters* parameters) {
+MDStatusCode md_create_structure_table_model(MDModel* model, const MDStructureTableModelParameters* parameters,
+                                             const MDRuntimeOption* option) {
     const auto det_model_file_path = fs::path(parameters->det_model_file);
     const auto rec_model_file_path = fs::path(parameters->rec_model_file);
     const auto tab_model_file_path = fs::path(parameters->table_model_file);
     const auto rec_label_file_path = fs::path(parameters->rec_label_file);
     const auto tab_label_file_path = fs::path(parameters->table_char_dict_path);
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(parameters->thread_num);
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
     const auto structure_table_model = new modeldeploy::vision::ocr::PPStructureV2Table(
         det_model_file_path.string(),
         rec_model_file_path.string(),
@@ -34,7 +35,7 @@ MDStatusCode md_create_structure_table_model(MDModel* model, const MDStructureTa
         parameters->det_db_unclip_ratio,
         parameters->det_db_score_mode,
         parameters->use_dilation,
-        parameters->rec_batch_size, option);
+        parameters->rec_batch_size, _option);
 
     model->type = MDModelType::OCR;
     model->format = MDModelFormat::ONNX;

@@ -84,24 +84,10 @@ namespace ModelDeploy
         [StructLayout(LayoutKind.Sequential)]
         public struct MDOCRModelParameters
         {
-            /// ocr model directory;
             public string det_model_file;
-
             public string cls_model_file;
             public string rec_model_file;
-
-            /// ocr dictionary path
             public string dict_path;
-
-            public int use_gpu;
-
-            /// thread num default is 8
-            public int thread_num;
-
-            /// model format default is PaddlePaddle
-            public MDModelFormat format;
-
-            /// maximum side length default 960
             public int max_side_len;
 
             /// db threshold default 0.3
@@ -132,7 +118,6 @@ namespace ModelDeploy
             public string table_model_file;
             public string rec_label_file;
             public string table_char_dict_path;
-            public int thread_num;
             public int max_side_len;
             public double det_db_thresh;
             public double det_db_box_thresh;

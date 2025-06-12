@@ -10,10 +10,10 @@
 
 
 MDStatusCode md_create_face_age_model(MDModel* model, const char* model_path,
-                                      const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto face_age_model = new modeldeploy::vision::face::SeetaFaceAge(model_path, option);
+                                      const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto face_age_model = new modeldeploy::vision::face::SeetaFaceAge(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_age_model->name().c_str());
     model->model_content = face_age_model;
@@ -39,7 +39,6 @@ MDStatusCode md_face_age_predict(const MDModel* model, MDImage* image, MDFaceAge
 
 
 void md_free_face_age_result(MDFaceAgeResult* c_result) {
-
 }
 
 void md_free_face_age_model(MDModel* model) {

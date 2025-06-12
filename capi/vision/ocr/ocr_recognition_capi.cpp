@@ -12,10 +12,10 @@
 
 
 MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_path,
-                                             const char* dict_path, const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto ocr_rec_model = new modeldeploy::vision::ocr::Recognizer(model_path, dict_path, option);
+                                             const char* dict_path, const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto ocr_rec_model = new modeldeploy::vision::ocr::Recognizer(model_path, dict_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_content = ocr_rec_model;
     model->model_name = strdup(ocr_rec_model->name().c_str());
