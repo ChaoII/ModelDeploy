@@ -16,16 +16,16 @@ namespace modeldeploy::audio {
 
 namespace modeldeploy {
     void bind_tensor(pybind11::module&);
-    void bind_base_model(pybind11::module&);
     void bind_runtime(pybind11::module&);
+    void bind_base_model(pybind11::module&);
 
     PYBIND11_MODULE(modeldeploy, m) {
         m.doc() =
             "Make programmer easier to deploy deeplearning model, save time to save "
             "the world!";
-        bind_base_model(m);
-        bind_runtime(m);
         bind_tensor(m);
+        bind_runtime(m);
+        bind_base_model(m);
 
 #ifdef BUILD_VISION
         auto vision_module =

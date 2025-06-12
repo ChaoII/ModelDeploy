@@ -7,8 +7,9 @@
 
 int main() {
     modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(1);
-    // option.use_gpu();
+    option.set_cpu_thread_num(8);
+    option.use_gpu();
+    option.enable_trt = true;
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.onnx", option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
@@ -28,7 +29,7 @@ int main() {
 
     const auto vis_image =
         modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,
-                                           false);
+                                     false);
     cv::imshow("test", vis_image);
     cv::waitKey(0);
 }

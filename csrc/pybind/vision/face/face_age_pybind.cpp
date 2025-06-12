@@ -10,25 +10,21 @@ namespace modeldeploy::vision {
     void bind_face_age(const pybind11::module& m) {
         pybind11::class_<face::SeetaFaceAgePreprocessor>(m, "SeetaFaceAgePreprocessor")
             .def(pybind11::init<>())
-            .def(
-                "run",
-                [](const face::SeetaFaceAgePreprocessor& self,
-                   std::vector<pybind11::array>& im_list) {
-                    std::vector<cv::Mat> images;
-                    images.reserve(im_list.size());
-                    for (auto& image : im_list) {
-                        images.push_back(pyarray_to_cv_mat(image));
-                    }
-                    std::vector<Tensor> outputs;
-                    if (!self.run(&images, &outputs)) {
-                        throw std::runtime_error(
-                            "Failed to preprocess the input data in SeetaFaceAgePreprocessor.");
-                    }
-
-                    pybind11::array array;
-                    tensor_list_to_pyarray(outputs, array);
-                    return array;
-                })
+            .def("run",
+                 [](const face::SeetaFaceAgePreprocessor& self,
+                    std::vector<pybind11::array>& im_list) {
+                     std::vector<cv::Mat> images;
+                     images.reserve(im_list.size());
+                     for (auto& image : im_list) {
+                         images.push_back(pyarray_to_cv_mat(image));
+                     }
+                     std::vector<Tensor> outputs;
+                     if (!self.run(&images, &outputs)) {
+                         throw std::runtime_error(
+                             "Failed to preprocess the input data in SeetaFaceAgePreprocessor.");
+                     }
+                     return outputs;
+                 }, pybind11::arg("im_list"))
             .def_property("size", &face::SeetaFaceAgePreprocessor::get_size,
                           &face::SeetaFaceAgePreprocessor::set_size);
 
@@ -44,7 +40,7 @@ namespace modeldeploy::vision {
                              "SeetaFaceAgePostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"))
             .def("run",
                  [](face::SeetaFaceAgePostprocessor& self,
                     std::vector<pybind11::array>& input_arrays) {
@@ -56,30 +52,30 @@ namespace modeldeploy::vision {
                              "Failed to postprocess the runtime SeetaFaceAgePostprocessor in LprDetPostprocessor.");
                      }
                      return results;
-                 });
+                 }, pybind11::arg("inputs"));
 
 
         pybind11::class_<face::SeetaFaceAge, BaseModel>(m, "SeetaFaceAge")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](face::SeetaFaceAge& self, pybind11::array& data) {
-                     const auto mat = pyarray_to_cv_mat(data);
+                 [](face::SeetaFaceAge& self, pybind11::array& image) {
+                     const auto mat = pyarray_to_cv_mat(image);
                      int result;
                      self.predict(mat, &result);
                      return result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict",
                  [](face::SeetaFaceAge& self,
-                    std::vector<pybind11::array>& data) {
-                     std::vector<cv::Mat> images;
-                     images.reserve(data.size());
-                     for (auto& image : data) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                    std::vector<pybind11::array>& images) {
+                     std::vector<cv::Mat> _images;
+                     _images.reserve(images.size());
+                     for (auto& image : images) {
+                         _images.push_back(pyarray_to_cv_mat(image));
                      }
                      std::vector<int> results;
-                     self.batch_predict(images, &results);
+                     self.batch_predict(_images, &results);
                      return results;
-                 })
+                 }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",
                                    &face::SeetaFaceAge::get_preprocessor)
             .def_property_readonly("postprocessor",

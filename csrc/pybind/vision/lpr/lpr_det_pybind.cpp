@@ -10,25 +10,22 @@ namespace modeldeploy::vision {
     void bind_lpr_det(const pybind11::module& m) {
         pybind11::class_<lpr::LprDetPreprocessor>(m, "LprDetPreprocessor")
             .def(pybind11::init<>())
-            .def(
-                "run",
-                [](const lpr::LprDetPreprocessor& self,
-                   std::vector<pybind11::array>& im_list) {
-                    std::vector<cv::Mat> images;
-                    images.reserve(im_list.size());
-                    for (auto& image : im_list) {
-                        images.push_back(pyarray_to_cv_mat(image));
-                    }
-                    std::vector<LetterBoxRecord> records;
-                    std::vector<Tensor> outputs;
-                    if (!self.run(&images, &outputs, &records)) {
-                        throw std::runtime_error(
-                            "Failed to preprocess the input data in LprDetPreprocessor.");
-                    }
-                    pybind11::array array;
-                    tensor_list_to_pyarray(outputs, array);
-                    return make_pair(array, records);
-                })
+            .def("run",
+                 [](const lpr::LprDetPreprocessor& self,
+                    std::vector<pybind11::array>& im_list) {
+                     std::vector<cv::Mat> images;
+                     images.reserve(im_list.size());
+                     for (auto& image : im_list) {
+                         images.push_back(pyarray_to_cv_mat(image));
+                     }
+                     std::vector<LetterBoxRecord> records;
+                     std::vector<Tensor> outputs;
+                     if (!self.run(&images, &outputs, &records)) {
+                         throw std::runtime_error(
+                             "Failed to preprocess the input data in LprDetPreprocessor.");
+                     }
+                     return make_pair(outputs, records);
+                 }, pybind11::arg("im_list"))
             .def_property("size", &lpr::LprDetPreprocessor::get_size,
                           &lpr::LprDetPreprocessor::set_size)
             .def_property("padding_value",
@@ -56,7 +53,7 @@ namespace modeldeploy::vision {
                              "LprDetPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"), pybind11::arg("records"))
             .def("run",
                  [](const lpr::LprDetPostprocessor& self,
                     std::vector<pybind11::array>& input_array,
@@ -70,7 +67,7 @@ namespace modeldeploy::vision {
                              "LprDetPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"), pybind11::arg("records"))
             .def_property("conf_threshold",
                           &lpr::LprDetPostprocessor::get_conf_threshold,
                           &lpr::LprDetPostprocessor::set_conf_threshold)
@@ -84,12 +81,12 @@ namespace modeldeploy::vision {
         pybind11::class_<lpr::LprDetection, BaseModel>(m, "LprDetection")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](lpr::LprDetection& self, pybind11::array& data) {
-                     const auto mat = pyarray_to_cv_mat(data);
-                     std::vector<DetectionLandmarkResult> res;
-                     self.predict(mat, &res);
-                     return res;
-                 })
+                 [](lpr::LprDetection& self, pybind11::array& image) {
+                     const auto mat = pyarray_to_cv_mat(image);
+                     std::vector<DetectionLandmarkResult> result;
+                     self.predict(mat, &result);
+                     return result;
+                 }, pybind11::arg("image"))
             .def("batch_predict",
                  [](lpr::LprDetection& self,
                     std::vector<pybind11::array>& data) {
@@ -101,7 +98,7 @@ namespace modeldeploy::vision {
                      std::vector<std::vector<DetectionLandmarkResult>> results;
                      self.batch_predict(images, &results);
                      return results;
-                 })
+                 }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",
                                    &lpr::LprDetection::get_preprocessor)
             .def_property_readonly("postprocessor",

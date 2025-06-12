@@ -13,6 +13,6 @@ namespace modeldeploy::vision {
                 std::vector<LprResult> results;
                 self.predict(pyarray_to_cv_mat(image), &results);
                 return results;
-            });
+            }, pybind11::arg("image"));
     }
 }

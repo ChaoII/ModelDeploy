@@ -41,8 +41,11 @@ namespace modeldeploy {
         }
         const auto all_providers = Ort::GetAvailableProviders();
         std::string providers_msg;
-        for (const auto& p : all_providers) {
-            providers_msg += p + ", ";
+        for (size_t i = 0; i < all_providers.size(); i++) {
+            providers_msg += all_providers[i];
+            if (1 != all_providers.size() - i) {
+                providers_msg += ", ";
+            }
         }
         // CUDA
         if (option.device == Device::GPU) {
@@ -96,11 +99,12 @@ namespace modeldeploy {
                         Ort::GetApi().SessionOptionsAppendExecutionProvider_TensorRT_V2(session_options_, trt_options));
                     Ort::GetApi().ReleaseTensorRTProviderOptions(trt_options);
 
-                    MD_LOG_INFO << "ONNX Runtime TensorRT Provider enabled." << std::endl;
+                    MD_LOG_INFO << "OnnxRuntime TensorrtExecutionProvider enabled." << std::endl;
                 }
                 else {
-                    MD_LOG_WARN << "TensorRT provider not available. Disable TRT. Available providers: " <<
-                        providers_msg << std::endl;
+                    MD_LOG_WARN <<
+                        "OnnxRuntime TensorrtExecutionProvider not available. "
+                        "Disable TRT. Available providers: " << providers_msg << std::endl;
                 }
             }
 
@@ -129,13 +133,14 @@ namespace modeldeploy {
                 Ort::ThrowOnError(
                     Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA_V2(session_options_, cuda_options));
                 Ort::GetApi().ReleaseCUDAProviderOptions(cuda_options);
-                MD_LOG_INFO << "ONNX Runtime CUDA Provider enabled." << std::endl;
+                MD_LOG_INFO << "OnnxRuntime CUDAExecutionProvider enabled." << std::endl;
             }
             else {
-                MD_LOG_ERROR << "CUDA provider not available. Fallback to CPU. Available providers: " << providers_msg
-                    << std::endl;
+                MD_LOG_WARN << "OnnxRuntime CUDAExecutionProvider not available. Fallback to CPU. Available providers: "
+                    << providers_msg << std::endl;
             }
         }
+        MD_LOG_INFO << "OnnxRuntime CPUExecutionProvider enabled." << std::endl;
     }
 
     bool OrtBackend::init(const RuntimeOption& option) {

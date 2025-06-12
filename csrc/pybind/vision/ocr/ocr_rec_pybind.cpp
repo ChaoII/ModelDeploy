@@ -36,10 +36,8 @@ namespace modeldeploy::vision {
                              "Failed to preprocess the input data in "
                              "RecognizerPreprocessor.");
                      }
-                     pybind11::array array;
-                     tensor_list_to_pyarray(outputs, array);
-                     return array;
-                 });
+                     return outputs;
+                 }, pybind11::arg("im_list"));
 
 
         pybind11::class_<ocr::RecognizerPostprocessor>(
@@ -56,7 +54,7 @@ namespace modeldeploy::vision {
                              "RecognizerPostprocessor.");
                      }
                      return std::make_pair(texts, rec_scores);
-                 })
+                 }, pybind11::arg("inputs"))
             .def("run", [](ocr::RecognizerPostprocessor& self,
                            std::vector<pybind11::array>& input_array) {
                 std::vector<Tensor> inputs;
@@ -69,7 +67,7 @@ namespace modeldeploy::vision {
                         "RecognizerPostprocessor.");
                 }
                 return std::make_pair(texts, rec_scores);
-            });
+            }, pybind11::arg("inputs"));
 
         pybind11::class_<ocr::Recognizer, BaseModel>(m, "Recognizer")
             .def(pybind11::init<std::string, std::string, RuntimeOption>())
@@ -79,21 +77,21 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &ocr::Recognizer::get_postprocessor)
             .def("predict",
-                 [](ocr::Recognizer& self, pybind11::array& data) {
-                     auto mat = pyarray_to_cv_mat(data);
+                 [](ocr::Recognizer& self, pybind11::array& image) {
+                     auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
                      self.predict(mat, &ocr_result);
                      return ocr_result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::Recognizer& self,
-                                     std::vector<pybind11::array>& data) {
-                std::vector<cv::Mat> images;
-                for (auto& image : data) {
-                    images.push_back(pyarray_to_cv_mat(image));
+                                     std::vector<pybind11::array>& images) {
+                std::vector<cv::Mat> _images;
+                for (auto& image : images) {
+                    _images.push_back(pyarray_to_cv_mat(image));
                 }
                 OCRResult ocr_result;
-                self.batch_predict(images, &ocr_result);
+                self.batch_predict(_images, &ocr_result);
                 return ocr_result;
-            });
+            }, pybind11::arg("images"));
     }
 } // namespace modeldeploy

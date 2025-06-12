@@ -20,7 +20,7 @@ namespace modeldeploy::vision {
                     const std::vector<float>& mean, const std::vector<float>& std,
                     const bool is_scale) {
                      self.set_normalize(mean, std, is_scale);
-                 })
+                 }, pybind11::arg("mean"), pybind11::arg("std"), pybind11::arg("is_scale"))
             .def("run",
                  [](ocr::ClassifierPreprocessor& self,
                     std::vector<pybind11::array>& im_list) {
@@ -31,13 +31,10 @@ namespace modeldeploy::vision {
                      std::vector<Tensor> outputs;
                      if (!self.apply(&images, &outputs)) {
                          throw std::runtime_error(
-                             "Failed to preprocess the input data in "
-                             "ClassifierPreprocessor.");
+                             "Failed to preprocess the input data in ClassifierPreprocessor.");
                      }
-                     pybind11::array array;
-                     tensor_list_to_pyarray(outputs, array);
-                     return array;
-                 });
+                     return outputs;
+                 }, pybind11::arg("im_list"));
 
         pybind11::class_<ocr::ClassifierPostprocessor>(
                 m, "ClassifierPostprocessor")
@@ -56,7 +53,7 @@ namespace modeldeploy::vision {
                              "ClassifierPostprocessor.");
                      }
                      return std::make_pair(cls_labels, cls_scores);
-                 })
+                 }, pybind11::arg("inputs"))
             .def("run", [](ocr::ClassifierPostprocessor& self,
                            std::vector<pybind11::array>& input_array) {
                 std::vector<Tensor> inputs;
@@ -69,7 +66,7 @@ namespace modeldeploy::vision {
                         "ClassifierPostprocessor.");
                 }
                 return std::make_pair(cls_labels, cls_scores);
-            });
+            }, pybind11::arg("inputs"));
 
         pybind11::class_<ocr::Classifier, BaseModel>(m, "Classifier")
             .def(pybind11::init<std::string, RuntimeOption>())
@@ -79,21 +76,21 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &ocr::Classifier::get_postprocessor)
             .def("predict",
-                 [](ocr::Classifier& self, pybind11::array& data) {
-                     auto mat = pyarray_to_cv_mat(data);
+                 [](ocr::Classifier& self, pybind11::array& image) {
+                     auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
                      self.predict(mat, &ocr_result);
                      return ocr_result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::Classifier& self,
-                                     std::vector<pybind11::array>& data) {
-                std::vector<cv::Mat> images;
-                for (auto& image : data) {
-                    images.push_back(pyarray_to_cv_mat(image));
+                                     std::vector<pybind11::array>& images) {
+                std::vector<cv::Mat> _images;
+                for (auto& image : images) {
+                    _images.push_back(pyarray_to_cv_mat(image));
                 }
                 OCRResult ocr_result;
-                self.batch_predict(images, &ocr_result);
+                self.batch_predict(_images, &ocr_result);
                 return ocr_result;
-            });
+            }, pybind11::arg("images"));
     }
 } // namespace modeldeploy

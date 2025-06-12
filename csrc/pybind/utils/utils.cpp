@@ -85,11 +85,6 @@ namespace modeldeploy {
         return out;
     }
 
-    void tensor_list_to_pyarray(const std::vector<Tensor>& tensors, pybind11::array& pyarray) {
-        const auto tensor = Tensor::concat(tensors, 0);
-        pyarray = tensor_to_pyarray(tensor);
-    }
-
 
 #ifdef BUILD_VISION
 

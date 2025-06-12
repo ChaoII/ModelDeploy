@@ -23,12 +23,9 @@ namespace modeldeploy::vision {
                         "Failed to preprocess the input data in "
                         "StructureV2TablePreprocessor.");
                 }
-
                 auto batch_det_img_info = self.GetBatchImgInfo();
-                pybind11::array array;
-                tensor_list_to_pyarray(outputs, array);
-                return std::make_pair(array, *batch_det_img_info);
-            });
+                return std::make_pair(outputs, *batch_det_img_info);
+            }, pybind11::arg("im_list"));
 
         pybind11::class_<ocr::StructureV2TablePostprocessor>(
                 m, "StructureV2TablePostprocessor")
@@ -47,7 +44,7 @@ namespace modeldeploy::vision {
                              "StructureV2TablePostprocessor.");
                      }
                      return std::make_pair(boxes, structure_list);
-                 })
+                 }, pybind11::arg("inputs"), pybind11::arg("batch_det_img_info"))
             .def("run",
                  [](ocr::StructureV2TablePostprocessor& self,
                     std::vector<pybind11::array>& input_array,
@@ -64,7 +61,7 @@ namespace modeldeploy::vision {
                              "StructureV2TablePostprocessor.");
                      }
                      return std::make_pair(boxes, structure_list);
-                 });
+                 }, pybind11::arg("inputs"), pybind11::arg("batch_det_img_info"));
 
         pybind11::class_<ocr::StructureV2Table, BaseModel>(
                 m, "StructureV2Table")
@@ -75,21 +72,21 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &ocr::StructureV2Table::get_postprocessor)
             .def("predict",
-                 [](ocr::StructureV2Table& self, pybind11::array& data) {
-                     auto mat = pyarray_to_cv_mat(data);
+                 [](ocr::StructureV2Table& self, pybind11::array& image) {
+                     auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
                      self.predict(mat, &ocr_result);
                      return ocr_result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::StructureV2Table& self,
-                                     std::vector<pybind11::array>& data) {
-                std::vector<cv::Mat> images;
-                for (auto& image : data) {
-                    images.push_back(pyarray_to_cv_mat(image));
+                                     std::vector<pybind11::array>& images) {
+                std::vector<cv::Mat> _images;
+                for (auto& image : images) {
+                    _images.push_back(pyarray_to_cv_mat(image));
                 }
                 std::vector<OCRResult> ocr_results;
-                self.batch_predict(images, &ocr_results);
+                self.batch_predict(_images, &ocr_results);
                 return ocr_results;
-            });
+            }, pybind11::arg("images"));
     }
 } // namespace modeldeploy

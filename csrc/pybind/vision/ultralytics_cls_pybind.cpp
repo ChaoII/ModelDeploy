@@ -9,24 +9,21 @@ namespace modeldeploy::vision {
     void bind_ultralytics_cls(const pybind11::module& m) {
         pybind11::class_<classification::UltralyticsClsPreprocessor>(m, "UltralyticsClsPreprocessor")
             .def(pybind11::init<>())
-            .def(
-                "run",
-                [](const classification::UltralyticsClsPreprocessor& self,
-                   std::vector<pybind11::array>& im_list) {
-                    std::vector<cv::Mat> images;
-                    images.reserve(im_list.size());
-                    for (auto& image : im_list) {
-                        images.push_back(pyarray_to_cv_mat(image));
-                    }
-                    std::vector<Tensor> outputs;
-                    if (!self.run(&images, &outputs)) {
-                        throw std::runtime_error(
-                            "Failed to preprocess the input data in UltralyticsPosePreprocessor.");
-                    }
-                    pybind11::array array;
-                    tensor_list_to_pyarray(outputs, array);
-                    return array;
-                })
+            .def("run",
+                 [](const classification::UltralyticsClsPreprocessor& self,
+                    std::vector<pybind11::array>& im_list) {
+                     std::vector<cv::Mat> images;
+                     images.reserve(im_list.size());
+                     for (auto& image : im_list) {
+                         images.push_back(pyarray_to_cv_mat(image));
+                     }
+                     std::vector<Tensor> outputs;
+                     if (!self.run(&images, &outputs)) {
+                         throw std::runtime_error(
+                             "Failed to preprocess the input data in UltralyticsPosePreprocessor.");
+                     }
+                     return outputs;
+                 }, pybind11::arg("im_list"))
             .def_property("size", &classification::UltralyticsClsPreprocessor::get_size,
                           &classification::UltralyticsClsPreprocessor::set_size);
 
@@ -43,7 +40,7 @@ namespace modeldeploy::vision {
                              "UltralyticsClsPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"))
             .def("run",
                  [](const classification::UltralyticsClsPostprocessor& self,
                     std::vector<pybind11::array>& input_array) {
@@ -56,30 +53,30 @@ namespace modeldeploy::vision {
                              "UltralyticsObbPostprocessor.");
                      }
                      return results;
-                 });
+                 }, pybind11::arg("input_array"));
 
 
         pybind11::class_<classification::UltralyticsCls, BaseModel>(m, "UltralyticsCls")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](classification::UltralyticsCls& self, pybind11::array& data) {
-                     const auto mat = pyarray_to_cv_mat(data);
+                 [](classification::UltralyticsCls& self, pybind11::array& image) {
+                     const auto mat = pyarray_to_cv_mat(image);
                      ClassifyResult result;
                      self.predict(mat, &result);
                      return result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict",
                  [](classification::UltralyticsCls& self,
-                    std::vector<pybind11::array>& data) {
-                     std::vector<cv::Mat> images;
-                     images.reserve(data.size());
-                     for (auto& image : data) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                    std::vector<pybind11::array>& images) {
+                     std::vector<cv::Mat> _images;
+                     _images.reserve(images.size());
+                     for (auto& image : images) {
+                         _images.push_back(pyarray_to_cv_mat(image));
                      }
                      std::vector<ClassifyResult> results;
-                     self.batch_predict(images, &results);
+                     self.batch_predict(_images, &results);
                      return results;
-                 })
+                 }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",
                                    &classification::UltralyticsCls::get_preprocessor)
             .def_property_readonly("postprocessor",
