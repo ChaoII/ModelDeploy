@@ -60,6 +60,7 @@ void md_free_polygon(MDPolygon* polygon) {
 }
 
 MDRuntimeOption md_create_default_runtime_option() {
+    // 这里是允许返回栈上构造的结构体
     return MDRuntimeOption{
         "",
         "",
