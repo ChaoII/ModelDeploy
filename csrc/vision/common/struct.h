@@ -6,8 +6,7 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     struct LetterBoxRecord {
         float ipt_w;
         float ipt_h;
@@ -16,6 +15,19 @@ namespace modeldeploy::vision
         float pad_w;
         float pad_h;
         float scale;
+
+        [[nodiscard]] std::string str() const {
+            std::ostringstream oss;
+            oss << "LetterBoxRecord(ipt_h=" << ipt_h
+                << ", ipt_w=" << ipt_w
+                << ", out_h=" << out_h
+                << ", out_w=" << out_w
+                << ", pad_h=" << pad_h
+                << ", pad_w=" << pad_w
+                << ", scale=" << scale
+                << ")";
+            return oss.str();
+        }
     };
 
 
