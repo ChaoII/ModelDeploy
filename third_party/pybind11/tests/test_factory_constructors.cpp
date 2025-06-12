@@ -204,7 +204,7 @@ public:
 
 TEST_SUBMODULE(factory_constructors, m) {
 
-    // Define various trivial types to allow simpler overload resolution:
+    // Define various trivial core to allow simpler overload resolution:
     py::module_ m_tag = m.def_submodule("tag");
 #define MAKE_TAG_TYPE(Name)                                                                       \
     struct Name##_tag {};                                                                         \

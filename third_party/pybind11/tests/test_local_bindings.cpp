@@ -53,10 +53,10 @@ TEST_SUBMODULE(local_bindings, m) {
     });
 
     // test_stl_bind_local
-    // stl_bind.h binders defaults to py::module_local if the types are local or converting:
+    // stl_bind.h binders defaults to py::module_local if the core are local or converting:
     py::bind_vector<LocalVec>(m, "LocalVec");
     py::bind_map<LocalMap>(m, "LocalMap");
-    // and global if the type (or one of the types, for the map) is global:
+    // and global if the type (or one of the core, for the map) is global:
     py::bind_vector<NonLocalVec>(m, "NonLocalVec");
     py::bind_map<NonLocalMap>(m, "NonLocalMap");
 

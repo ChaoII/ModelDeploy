@@ -37,12 +37,13 @@ namespace modeldeploy {
             return backend_->get_custom_meta_data();
         }
 
-
         [[nodiscard]] bool is_initialized() const { return backend_->is_initialized(); }
+
+        RuntimeOption option;
 
     private:
         void CreateOrtBackend();
-        RuntimeOption option;
+
         std::unique_ptr<BaseBackend> backend_;
         std::vector<Tensor> input_tensors_;
         std::vector<Tensor> output_tensors_;

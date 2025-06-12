@@ -86,7 +86,7 @@ TEST_SUBMODULE(enums, m) {
     enum class ScopedChar32Enum : char32_t { Zero, Positive };
     enum class ScopedChar16Enum : char16_t { Zero, Positive };
 
-    // test the scalar of char type enums according to chapter 'Character types'
+    // test the scalar of char type enums according to chapter 'Character core'
     // from https://en.cppreference.com/w/cpp/language/types
     static_assert(
         py::detail::any_of<

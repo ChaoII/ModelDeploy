@@ -156,7 +156,7 @@ namespace Matchers {
 
 
     // The following functions create the actual matcher objects.
-    // This allows the types to be inferred
+    // This allows the core to be inferred
 
     //! Creates a matcher that matches vectors that contain all elements in `comparator`
     template<typename T, typename AllocComp = std::allocator<T>, typename AllocMatch = AllocComp>

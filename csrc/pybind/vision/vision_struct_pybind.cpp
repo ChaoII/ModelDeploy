@@ -333,6 +333,33 @@ namespace modeldeploy::vision {
             .def_readwrite("out_w", &LetterBoxRecord::out_w)
             .def_readwrite("pad_h", &LetterBoxRecord::pad_h)
             .def_readwrite("pad_w", &LetterBoxRecord::pad_w)
-            .def_readwrite("scale", &LetterBoxRecord::scale);
+            .def_readwrite("scale", &LetterBoxRecord::scale)
+            .def(pybind11::pickle(
+                [](const LetterBoxRecord& l) {
+                    return pybind11::make_tuple(l.ipt_h, l.ipt_w, l.out_h, l.out_w, l.pad_h, l.pad_w, l.scale);
+                },
+                [](const pybind11::tuple& t) {
+                    if (t.size() != 7)
+                        throw std::runtime_error("LetterBoxRecord pickle with Invalid state!");
+                    LetterBoxRecord l;
+                    l.ipt_h = t[0].cast<float>();
+                    l.ipt_w = t[1].cast<float>();
+                    l.out_h = t[2].cast<float>();
+                    l.out_w = t[3].cast<float>();
+                    l.pad_h = t[4].cast<float>();
+                    l.pad_w = t[5].cast<float>();
+                    l.scale = t[6].cast<float>();
+                    return l;
+                }))
+            .def("__repr__", [](const LetterBoxRecord& l) {
+                return std::format(
+                    "LetterBoxRecord(ipt_h={}, ipt_w={}, out_h={}, out_w={}, pad_h={},pad_w={}, scale={})",
+                    l.ipt_h, l.ipt_w, l.out_h, l.out_w, l.pad_h, l.pad_w, l.scale);
+            })
+            .def("__repr__", [](const LetterBoxRecord& l) {
+                return std::format(
+                    "LetterBoxRecord(ipt_h={}, ipt_w={}, out_h={}, out_w={}, pad_h={},pad_w={}, scale={})",
+                    l.ipt_h, l.ipt_w, l.out_h, l.out_w, l.pad_h, l.pad_w, l.scale);
+            });
     }
 } // namespace fastdeploy

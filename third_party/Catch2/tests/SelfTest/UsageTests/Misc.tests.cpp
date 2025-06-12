@@ -389,7 +389,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Product with differing arities", "[template][product
 }
 
 using MyTypes = std::tuple<int, char, float>;
-TEMPLATE_LIST_TEST_CASE("Template test case with test types specified inside std::tuple", "[template][list]", MyTypes)
+TEMPLATE_LIST_TEST_CASE("Template test case with test core specified inside std::tuple", "[template][list]", MyTypes)
 {
     REQUIRE(std::is_arithmetic<TestType>::value);
 }
@@ -399,7 +399,7 @@ struct NonDefaultConstructibleType {
 };
 
 using MyNonDefaultConstructibleTypes = std::tuple<NonDefaultConstructibleType, float>;
-TEMPLATE_LIST_TEST_CASE("Template test case with test types specified inside non-default-constructible std::tuple", "[template][list]", MyNonDefaultConstructibleTypes)
+TEMPLATE_LIST_TEST_CASE("Template test case with test core specified inside non-default-constructible std::tuple", "[template][list]", MyNonDefaultConstructibleTypes)
 {
     REQUIRE(std::is_trivially_copyable<TestType>::value);
 }
@@ -414,7 +414,7 @@ struct NonCopyableAndNonMovableType {
 };
 
 using NonCopyableAndNonMovableTypes = std::tuple<NonCopyableAndNonMovableType, float>;
-TEMPLATE_LIST_TEST_CASE("Template test case with test types specified inside non-copyable and non-movable std::tuple", "[template][list]", NonCopyableAndNonMovableTypes)
+TEMPLATE_LIST_TEST_CASE("Template test case with test core specified inside non-copyable and non-movable std::tuple", "[template][list]", NonCopyableAndNonMovableTypes)
 {
     REQUIRE(std::is_default_constructible<TestType>::value);
 }

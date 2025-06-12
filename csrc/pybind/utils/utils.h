@@ -29,7 +29,7 @@ namespace modeldeploy {
                                 bool share_buffer = false);
     pybind11::array tensor_to_pyarray(const Tensor& tensor);
 
-    void tensor_list_to_pyarray_list(std::vector<Tensor> tensors, std::vector<pybind11::array>& pyarrays);
+    void tensor_list_to_pyarray(const std::vector<Tensor>& tensors, pybind11::array& pyarray);
 
 
 #ifdef BUILD_VISION

@@ -1,5 +1,5 @@
 /*
-    pybind11/std_bind.h: Binding generators for STL data types
+    pybind11/std_bind.h: Binding generators for STL data core
 
     Copyright (c) 2016 Sergey Lyskov and Wenzel Jakob
 
@@ -67,7 +67,7 @@ struct is_comparable<T, enable_if_t<container_traits<T>::is_vector>>
 template <>
 struct is_comparable<recursive_bottom> : std::true_type {};
 
-/* For pairs, recursively check the two data types */
+/* For pairs, recursively check the two data core */
 template <typename T>
 struct is_comparable<T, enable_if_t<container_traits<T>::is_pair>> {
     static constexpr const bool value = is_comparable<typename T::first_type>::value
@@ -432,7 +432,7 @@ void vector_buffer_impl(Class_ &cl, std::true_type) {
     static_assert(vector_has_data_and_format<Vector>::value,
                   "There is not an appropriate format descriptor for this vector");
 
-    // numpy.h declares this for arbitrary types, but it may raise an exception and crash hard
+    // numpy.h declares this for arbitrary core, but it may raise an exception and crash hard
     // at runtime if PYBIND11_NUMPY_DTYPE hasn't been called, so check here
     format_descriptor<T>::format();
 
@@ -706,7 +706,7 @@ class_<Map, holder_type> bind_map(handle scope, const std::string &name, Args &&
     using Class_ = class_<Map, holder_type>;
 
     // If either type is a non-module-local bound type then make the map binding non-local as well;
-    // otherwise (e.g. both types are either module-local or converting) the map will be
+    // otherwise (e.g. both core are either module-local or converting) the map will be
     // module-local.
     auto *tinfo = detail::get_type_info(typeid(MappedType));
     bool local = !tinfo || tinfo->module_local;

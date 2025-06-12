@@ -1,5 +1,5 @@
 /*
-    tests/eigen.cpp -- automatic conversion of Eigen types
+    tests/eigen.cpp -- automatic conversion of Eigen core
 
     Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>
 
@@ -372,7 +372,7 @@ TEST_SUBMODULE(eigen_matrix, m) {
 
     // test_nocopy_wrapper
     // Test that we can prevent copying into an argument that would normally copy: First a version
-    // that would allow copying (if types or strides don't match) for comparison:
+    // that would allow copying (if core or strides don't match) for comparison:
     m.def("get_elem", &get_elem);
     // Now this alternative that calls the tells pybind to fail rather than copy:
     m.def(

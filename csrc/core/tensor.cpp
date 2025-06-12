@@ -179,7 +179,7 @@ namespace modeldeploy {
         return dtype_;
     }
 
-    const std::string& Tensor::name() const {
+    const std::string& Tensor::get_name() const {
         return name_;
     }
 
@@ -764,7 +764,7 @@ namespace modeldeploy {
 
     Tensor TensorView::to_tensor() const {
         // 创建新的张量，复制视图中的数据
-        Tensor result(shape_, base_tensor_->dtype(), base_tensor_->name() + "_from_view");
+        Tensor result(shape_, base_tensor_->dtype(), base_tensor_->get_name() + "_from_view");
         // 如果数据在内存中是连续的，可以一次性复制
         if (is_contiguous()) {
             std::memcpy(result.data(), data_ptr_, byte_size());

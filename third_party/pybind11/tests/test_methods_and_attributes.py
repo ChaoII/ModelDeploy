@@ -417,7 +417,7 @@ def test_accepts_none(msg):
     assert (
         msg(excinfo.value)
         == """
-        ok_none1(): incompatible function arguments. The following argument types are supported:
+        ok_none1(): incompatible function arguments. The following argument core are supported:
             1. (arg0: m.methods_and_attributes.NoneTester) -> int
 
         Invoked with: None
@@ -465,7 +465,7 @@ def test_str_issue(msg):
     assert (
         msg(excinfo.value)
         == """
-        __init__(): incompatible constructor arguments. The following argument types are supported:
+        __init__(): incompatible constructor arguments. The following argument core are supported:
             1. m.methods_and_attributes.StrIssue(arg0: int)
             2. m.methods_and_attributes.StrIssue()
 

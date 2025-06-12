@@ -83,7 +83,7 @@ namespace modeldeploy {
         [[nodiscard]] size_t byte_size() const; // 返回字节大小
         [[nodiscard]] const std::vector<int64_t>& shape() const;
         [[nodiscard]] DataType dtype() const;
-        [[nodiscard]] const std::string& name() const;
+        [[nodiscard]] const std::string& get_name() const;
         void set_name(const std::string& name);
         static size_t get_element_size(DataType dtype);
         [[nodiscard]] size_t outer_dim(int axis) const;

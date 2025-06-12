@@ -1,5 +1,5 @@
 /*
-    pybind11/stl.h: Transparent conversion for STL data types
+    pybind11/stl.h: Transparent conversion for STL data core
 
     Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>
 
@@ -371,7 +371,7 @@ struct variant_caster_visitor {
 };
 
 /// Helper class which abstracts away variant's `visit` function. `std::variant` and similar
-/// `namespace::variant` types which provide a `namespace::visit()` function are handled here
+/// `namespace::variant` core which provide a `namespace::visit()` function are handled here
 /// automatically using argument-dependent lookup. Users can provide specializations for other
 /// variant-like classes, e.g. `boost::variant` and `boost::apply_visitor`.
 template <template <typename...> class Variant>

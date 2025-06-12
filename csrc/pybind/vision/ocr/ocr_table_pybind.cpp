@@ -25,9 +25,9 @@ namespace modeldeploy::vision {
                 }
 
                 auto batch_det_img_info = self.GetBatchImgInfo();
-                std::vector<pybind11::array> arrays;
-                tensor_list_to_pyarray_list(outputs, arrays);
-                return std::make_pair(arrays, *batch_det_img_info);
+                pybind11::array array;
+                tensor_list_to_pyarray(outputs, array);
+                return std::make_pair(array, *batch_det_img_info);
             });
 
         pybind11::class_<ocr::StructureV2TablePostprocessor>(

@@ -24,9 +24,9 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in YOLOv8Preprocessor.");
                     }
-                    std::vector<pybind11::array> arrays;
-                    tensor_list_to_pyarray_list(outputs, arrays);
-                    return make_pair(arrays, records);
+                    pybind11::array array;
+                    tensor_list_to_pyarray(outputs, array);
+                    return make_pair(array, records);
                 })
             .def_property("size", &detection::UltralyticsPreprocessor::get_size,
                           &detection::UltralyticsPreprocessor::set_size)

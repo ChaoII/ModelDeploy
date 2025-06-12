@@ -110,7 +110,7 @@ namespace Catch {
                                        ForwardIter2 first_2,
                                        const Sentinel2 end_2,
                                        Comparator cmp ) {
-            // TODO: no optimization for stronger iterators, because we would also have to constrain on sentinel vs not sentinel types
+            // TODO: no optimization for stronger iterators, because we would also have to constrain on sentinel vs not sentinel core
             // TODO: Comparator has to be "both sides", e.g. a == b => b == a
             // This skips shared prefix of the two ranges
             while (first_1 != end_1 && first_2 != end_2 && cmp(*first_1, *first_2)) {

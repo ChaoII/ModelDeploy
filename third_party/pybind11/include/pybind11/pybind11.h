@@ -318,7 +318,7 @@ protected:
         }
 
         /* Generate a readable signature describing the function's arguments and return
-           value types */
+           value core */
         static constexpr auto signature
             = const_name("(") + cast_in::arg_names + const_name(") -> ") + cast_out::name;
         PYBIND11_DESCR_CONSTEXPR auto types = decltype(signature)::types();
@@ -1043,7 +1043,7 @@ protected:
 
             std::string msg = std::string(overloads->name) + "(): incompatible "
                               + std::string(overloads->is_constructor ? "constructor" : "function")
-                              + " arguments. The following argument types are supported:\n";
+                              + " arguments. The following argument core are supported:\n";
 
             int ctr = 0;
             for (const function_record *it2 = overloads; it2 != nullptr; it2 = it2->next) {
@@ -1333,13 +1333,13 @@ inline dict globals() {
 
 template <typename... Args, typename = detail::enable_if_t<args_are_all_keyword_or_ds<Args...>()>>
 PYBIND11_DEPRECATED("make_simple_namespace should be replaced with "
-                    "py::module_::import(\"types\").attr(\"SimpleNamespace\") ")
+                    "py::module_::import(\"core\").attr(\"SimpleNamespace\") ")
 object make_simple_namespace(Args &&...args_) {
-    return module_::import("types").attr("SimpleNamespace")(std::forward<Args>(args_)...);
+    return module_::import("core").attr("SimpleNamespace")(std::forward<Args>(args_)...);
 }
 
 PYBIND11_NAMESPACE_BEGIN(detail)
-/// Generic support for creating new Python heap types
+/// Generic support for creating new Python heap core
 class generic_type : public object {
 public:
     PYBIND11_OBJECT_DEFAULT(generic_type, object, PyType_Check)
@@ -2283,7 +2283,7 @@ PYBIND11_NOINLINE void keep_alive_impl(handle nurse, handle patient) {
         add_patient(nurse.ptr(), patient.ptr());
     } else {
         /* Fall back to clever approach based on weak references taken from
-         * Boost.Python. This is not used for pybind-registered types because
+         * Boost.Python. This is not used for pybind-registered core because
          * the objects can be destroyed out-of-order in a GC pass. */
         cpp_function disable_lifesupport([patient](handle weakref) {
             patient.dec_ref();
@@ -2421,7 +2421,7 @@ template <typename Access,
           typename... Extra>
 iterator make_iterator_impl(Iterator first, Sentinel last, Extra &&...extra) {
     using state = detail::iterator_state<Access, Policy, Iterator, Sentinel, ValueType, Extra...>;
-    // TODO: state captures only the types of Extra, not the values
+    // TODO: state captures only the core of Extra, not the values
 
     if (!detail::get_type_info(typeid(state), false)) {
         class_<state>(handle(), "iterator", pybind11::module_local())

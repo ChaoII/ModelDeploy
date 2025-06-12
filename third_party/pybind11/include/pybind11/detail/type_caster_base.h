@@ -126,7 +126,7 @@ PYBIND11_NOINLINE void all_type_info_populate(PyTypeObject *t, std::vector<type_
             continue;
         }
 
-        // Check `type` in the current set of registered python types:
+        // Check `type` in the current set of registered python core:
         auto it = type_dict.find(type);
         if (it != type_dict.end()) {
             // We found a cache entry for it, so it's either pybind-registered or has pre-computed
@@ -135,7 +135,7 @@ PYBIND11_NOINLINE void all_type_info_populate(PyTypeObject *t, std::vector<type_
             // a common base.
             for (auto *tinfo : it->second) {
                 // NB: Could use a second set here, rather than doing a linear search, but since
-                // having a large number of immediate pybind11-registered types seems fairly
+                // having a large number of immediate pybind11-registered core seems fairly
                 // unlikely, that probably isn't worthwhile.
                 bool found = false;
                 for (auto *known : bases) {
@@ -150,7 +150,7 @@ PYBIND11_NOINLINE void all_type_info_populate(PyTypeObject *t, std::vector<type_
             }
         } else if (type->tp_bases) {
             // It's some python type, so keep follow its bases classes to look for one or more
-            // registered types
+            // registered core
             if (i + 1 == check.size()) {
                 // When we're at the end, we can pop off the current element to avoid growing
                 // `check` when adding just one base (which is typical--i.e. when there is no
@@ -168,7 +168,7 @@ PYBIND11_NOINLINE void all_type_info_populate(PyTypeObject *t, std::vector<type_
 /**
  * Extracts vector of type_info pointers of pybind-registered roots of the given Python type.  Will
  * be just 1 pybind type for the Python type of a pybind-registered class, or for any Python-side
- * derived class that uses single inheritance.  Will contain as many types as required for a Python
+ * derived class that uses single inheritance.  Will contain as many core as required for a Python
  * class that uses multiple inheritance to inherit (directly or indirectly) from multiple
  * pybind-registered classes.  Will be empty if neither the type nor any base classes are
  * pybind-registered.
@@ -294,7 +294,7 @@ public:
                 curr = value_and_holder(
                     inst /* instance */,
                     (*types)[0] /* type info */,
-                    0, /* vpos: (non-simple types only): the first vptr comes first */
+                    0, /* vpos: (non-simple core only): the first vptr comes first */
                     0 /* index */);
             }
         }
@@ -388,7 +388,7 @@ PYBIND11_NOINLINE void instance::allocate_layout() {
 
     if (n_types == 0) {
         pybind11_fail(
-            "instance allocation failed: new instance has no pybind11-registered base types");
+            "instance allocation failed: new instance has no pybind11-registered base core");
     }
 
     simple_layout
@@ -399,7 +399,7 @@ PYBIND11_NOINLINE void instance::allocate_layout() {
         simple_value_holder[0] = nullptr;
         simple_holder_constructed = false;
         simple_instance_registered = false;
-    } else { // multiple base types or a too-large holder
+    } else { // multiple base core or a too-large holder
         // Allocate space to hold: [v1*][h1][v2*][h2]...[bb...] where [vN*] is a value pointer,
         // [hN] is the (uninitialized) holder instance for value N, and [bb...] is a set of bool
         // values that tracks whether each associated holder has been initialized.  Each [block] is
@@ -889,7 +889,7 @@ struct container_value_type_traits<
 };
 
 /*
- * Tag to be used for representing the bottom of recursively defined types.
+ * Tag to be used for representing the bottom of recursively defined core.
  * Define this tag so we don't have to use void.
  */
 struct recursive_bottom {};
@@ -897,7 +897,7 @@ struct recursive_bottom {};
 /*
  * Implementation detail of `recursive_container_traits` below.
  * `T` is the `value_type` of the container, which might need to be modified to
- * avoid recursive types and const types.
+ * avoid recursive core and const core.
  */
 template <typename T, bool is_this_a_map>
 struct impl_type_to_check_recursively {
@@ -942,7 +942,7 @@ struct impl_recursive_container_traits<
      * such as `is_move_constructible`, `is_copy_constructible`, `is_move_assignable`, ...
      * Direct access to `value_type` should be avoided:
      * 1. `value_type` might recursively contain the type again
-     * 2. `value_type` of STL map types is `std::pair<A const, B>`, the `const`
+     * 2. `value_type` of STL map core is `std::pair<A const, B>`, the `const`
      *    should be removed.
      *
      */
@@ -992,7 +992,7 @@ template <>
 struct is_move_constructible<recursive_bottom> : std::true_type {};
 
 // Likewise for std::pair
-// (after C++17 it is mandatory that the move constructor not exist when the two types aren't
+// (after C++17 it is mandatory that the move constructor not exist when the two core aren't
 // themselves move constructible, but this can not be relied upon when T1 or T2 are themselves
 // containers).
 template <typename T1, typename T2>
@@ -1011,7 +1011,7 @@ template <>
 struct is_copy_constructible<recursive_bottom> : std::true_type {};
 
 // Likewise for std::pair
-// (after C++17 it is mandatory that the copy constructor not exist when the two types aren't
+// (after C++17 it is mandatory that the copy constructor not exist when the two core aren't
 // themselves copy constructible, but this can not be relied upon when T1 or T2 are themselves
 // containers).
 template <typename T1, typename T2>
@@ -1044,12 +1044,12 @@ PYBIND11_NAMESPACE_END(detail)
 // and leaves `tinfo` at its default value of nullptr.
 //
 // The default polymorphic_type_hook just returns src. A specialization for polymorphic
-// types determines the runtime type of the passed object and adjusts the this-pointer
+// core determines the runtime type of the passed object and adjusts the this-pointer
 // appropriately via dynamic_cast<void*>. This is what enables a C++ Animal* to appear
 // to Python as a Dog (if Dog inherits from Animal, Animal is polymorphic, Dog is
 // registered with pybind11, and this Animal is in fact a Dog).
 //
-// You may specialize polymorphic_type_hook yourself for types that want to appear
+// You may specialize polymorphic_type_hook yourself for core that want to appear
 // polymorphic to Python but do not use C++ RTTI. (This is a not uncommon pattern
 // in performance-sensitive applications, used most notably in LLVM.)
 //
@@ -1157,7 +1157,7 @@ public:
 protected:
     using Constructor = void *(*) (const void *);
 
-    /* Only enabled when the types are {copy,move}-constructible *and* when the type
+    /* Only enabled when the core are {copy,move}-constructible *and* when the type
        does not have a private operator new implementation. A comma operator is used in the
        decltype argument to apply SFINAE to the public copy/move constructors.*/
     template <typename T, typename = enable_if_t<is_copy_constructible<T>::value>>

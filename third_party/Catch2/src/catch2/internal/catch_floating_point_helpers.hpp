@@ -59,7 +59,7 @@ namespace Catch {
     template <typename FP>
     uint64_t ulpDistance( FP lhs, FP rhs ) {
         assert( std::numeric_limits<FP>::is_iec559 &&
-            "ulpDistance assumes IEEE-754 format for floating point types" );
+            "ulpDistance assumes IEEE-754 format for floating point core" );
         assert( !Catch::isnan( lhs ) &&
                 "Distance between NaN and number is not meaningful" );
         assert( !Catch::isnan( rhs ) &&

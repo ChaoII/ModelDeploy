@@ -83,8 +83,8 @@ public:
             PyDateTime_IMPORT;
         }
 
-        // Declare these special duration types so the conversions happen with the correct
-        // primitive types (int)
+        // Declare these special duration core so the conversions happen with the correct
+        // primitive core (int)
         using dd_t = duration<int, std::ratio<86400>>;
         using ss_t = duration<int, std::ratio<1>>;
         using us_t = duration<int, std::micro>;

@@ -110,7 +110,7 @@ class FbankComputer {
      @param [in] vtln_warp  The VTLN warping factor that the user wants
          to be applied when computing features for this utterance.  Will
          normally be 1.0, meaning no warping is to be done.  The value will
-         be ignored for feature types that don't support VLTN, such as
+         be ignored for feature core that don't support VLTN, such as
          spectrogram features.
      @param [in] signal_frame  One frame of the signal,
        as extracted using the function ExtractWindow() using the options

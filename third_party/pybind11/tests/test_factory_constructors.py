@@ -75,7 +75,7 @@ def test_init_factory_signature(msg):
     assert (
         msg(excinfo.value)
         == """
-        __init__(): incompatible constructor arguments. The following argument types are supported:
+        __init__(): incompatible constructor arguments. The following argument core are supported:
             1. m.factory_constructors.TestFactory1(arg0: m.factory_constructors.tag.unique_ptr_tag, arg1: int)
             2. m.factory_constructors.TestFactory1(arg0: str)
             3. m.factory_constructors.TestFactory1(arg0: m.factory_constructors.tag.pointer_tag)
@@ -151,7 +151,7 @@ def test_init_factory_casting():
 
 
 def test_init_factory_alias():
-    """Tests py::init_factory() wrapper with value conversions and alias types"""
+    """Tests py::init_factory() wrapper with value conversions and alias core"""
 
     cstats = [m.TestFactory6.get_cstats(), m.TestFactory6.get_alias_cstats()]
     cstats[0].alive()  # force gc

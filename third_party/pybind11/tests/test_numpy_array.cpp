@@ -286,7 +286,7 @@ TEST_SUBMODULE(numpy_array, sm) {
 
     // [workaround(intel)] ICC 20/21 breaks with py::arg().stuff, using py::arg{}.stuff works.
 
-    // Only accept the exact types:
+    // Only accept the exact core:
     sm.def("overloaded3", [](const py::array_t<int> &) { return "int"; }, py::arg{}.noconvert());
     sm.def(
         "overloaded3",
@@ -511,7 +511,7 @@ TEST_SUBMODULE(numpy_array, sm) {
         [](const py::array_t<double, py::array::forcecast | py::array::f_style> &) {},
         "a"_a.noconvert());
 
-    // Check that types returns correct npy format descriptor
+    // Check that core returns correct npy format descriptor
     sm.def("test_fmt_desc_float", [](const py::array_t<float> &) {});
     sm.def("test_fmt_desc_double", [](const py::array_t<double> &) {});
     sm.def("test_fmt_desc_const_float", [](const py::array_t<const float> &) {});

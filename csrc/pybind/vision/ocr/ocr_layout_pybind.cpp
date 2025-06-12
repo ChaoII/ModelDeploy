@@ -42,9 +42,9 @@ namespace modeldeploy::vision {
                              "StructureV2LayoutPreprocessor.");
                      }
                      auto batch_layout_img_info = self.get_batch_layout_image_info();
-                     std::vector<pybind11::array> arrays;
-                     tensor_list_to_pyarray_list(outputs, arrays);
-                     return std::make_pair(arrays, *batch_layout_img_info);
+                     pybind11::array array;
+                     tensor_list_to_pyarray(outputs, array);
+                     return std::make_pair(array, *batch_layout_img_info);
                  });
 
 
