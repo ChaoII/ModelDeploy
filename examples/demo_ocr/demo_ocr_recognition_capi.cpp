@@ -8,6 +8,7 @@
 #include <windows.h>
 #endif
 #include "capi/utils/md_image_capi.h"
+#include "capi/utils/md_utils_capi.h"
 #include "capi/vision/ocr/ocr_recognition_capi.h"
 
 int main(int argc, char** argv) {
@@ -18,9 +19,10 @@ int main(int argc, char** argv) {
     MDStatusCode ret;
     //简单百宝箱
     MDModel model;
+    const MDRuntimeOption option = md_create_default_runtime_option();
     if ((ret = md_create_ocr_recognition_model(&model,
                                                "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
-                                               "../../test_data/ppocrv4_dict.txt")) != 0) {
+                                               "../../test_data/ppocrv4_dict.txt", &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }

@@ -13,10 +13,10 @@ extern "C" {
 /// 初始化模型
 /// \param model 模型，请在外部申请内存比如 malloc，new等等，该方法会在内部开辟模型内存，并赋值
 /// \param parameters 文本识别模型参数结构体，参考OCRModelParameters结构体实现，注意在初始化时，一定参考注释的参数来初始化
+/// \param option
 /// \return 成功时返回MDStatusCode::Success，其他为失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_structure_table_model(
-    MDModel* model,
-    const MDStructureTableModelParameters* parameters);
+    MDModel* model, const MDStructureTableModelParameters* parameters, const MDRuntimeOption* option);
 
 /// 文本识别
 /// \param model 在 create_structure_table_model方法中创建的模型句柄

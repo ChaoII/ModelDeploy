@@ -3,12 +3,14 @@
 //
 
 #include "capi/utils/md_image_capi.h"
+#include "capi/utils/md_utils_capi.h"
 #include "capi/vision/lpr/lpr_det_capi.h"
 
 
 int main() {
     MDModel model;
-    md_create_lpr_det_model(&model, "../../test_data/test_models/yolov5plate.onnx");
+    const MDRuntimeOption option = md_create_default_runtime_option();
+    md_create_lpr_det_model(&model, "../../test_data/test_models/yolov5plate.onnx", &option);
     MDImage image = md_read_image("../../test_data/test_images/test_lpr_pipeline2.jpg");
     MDDetectionLandmarkResults c_results;
     md_lpr_det_predict(&model, &image, &c_results);

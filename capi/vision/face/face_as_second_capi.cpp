@@ -10,10 +10,10 @@
 
 
 MDStatusCode md_create_face_as_second_model(MDModel* model, const char* model_path,
-                                            const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto face_as_second_model = new modeldeploy::vision::face::SeetaFaceAsSecond(model_path, option);
+                                            const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto face_as_second_model = new modeldeploy::vision::face::SeetaFaceAsSecond(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_as_second_model->name().c_str());
     model->model_content = face_as_second_model;

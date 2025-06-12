@@ -95,11 +95,6 @@ typedef struct {
     const char* rec_model_file;
     /// ocr dictionary path
     const char* dict_path;
-    int use_gpu;
-    /// thread num default is 8
-    int thread_num;
-    /// model format default is PaddlePaddle
-    MDModelFormat format;
     /// maximum side length default 960
     int max_side_len;
     /// db threshold default 0.3
@@ -123,7 +118,6 @@ typedef struct {
     const char* table_model_file;
     const char* rec_label_file;
     const char* table_char_dict_path;
-    int thread_num;
     int max_side_len;
     double det_db_thresh;
     double det_db_box_thresh;

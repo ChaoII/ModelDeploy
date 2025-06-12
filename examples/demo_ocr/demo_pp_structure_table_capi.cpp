@@ -9,6 +9,7 @@
 #include <windows.h>
 #endif
 #include "capi/utils/md_image_capi.h"
+#include "capi/utils/md_utils_capi.h"
 #include "capi/vision/ocr/structure_pipeline_capi.h"
 
 int main(int argc, char** argv) {
@@ -24,7 +25,6 @@ int main(int argc, char** argv) {
         "../../test_data/test_models/ocr/SLANeXt_wired.onnx",
         "../../test_data/ppocrv4_dict.txt",
         "../../test_data/table_structure_dict_ch.txt",
-        8,
         1920,
         0.3,
         0.6,
@@ -33,7 +33,8 @@ int main(int argc, char** argv) {
         0,
         8
     };
-    if ((ret = md_create_structure_table_model(&model, &ocr_parameters)) != 0) {
+    const MDRuntimeOption option = md_create_default_runtime_option();
+    if ((ret = md_create_structure_table_model(&model, &ocr_parameters, &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }

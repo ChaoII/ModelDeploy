@@ -24,14 +24,13 @@ void points_to_polygon(const std::vector<MDPoint>& points, MDPolygon* polygon) {
 int main(int argc, char** argv) {
 #ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
 #endif
     MDStatusCode ret;
-    //简单百宝箱
     MDModel model;
+    const MDRuntimeOption option = md_create_default_runtime_option();
     if ((ret = md_create_ocr_recognition_model(&model,
                                                "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
-                                               "../../test_data/ppocrv4_dict.txt")) != 0) {
+                                               "../../test_data/ppocrv4_dict.txt", &option)) != 0) {
         md_free_ocr_recognition_model(&model);
         std::cout << ret << std::endl;
         return ret;

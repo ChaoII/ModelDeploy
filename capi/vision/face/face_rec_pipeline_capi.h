@@ -16,13 +16,10 @@ extern "C" {
 /// \param model 模型，请在外部申请内存比如 malloc，new等等，该方法会在内部开辟模型内存，并赋值
 /// \param face_det_model_file
 /// \param face_rec_model_file
-/// \param thread_num 线程数
+/// \param option
 /// \return MDStatusCode::Success成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_face_rec_pipeline_model(
-    MDModel* model,
-    const char* face_det_model_file,
-    const char* face_rec_model_file,
-    int thread_num = 8);
+    MDModel* model, const char* face_det_model_file, const char* face_rec_model_file, const MDRuntimeOption* option);
 
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_detection_model创建的模型

@@ -14,10 +14,10 @@
 
 
 MDStatusCode md_create_obb_model(MDModel* model, const char* model_path,
-                                 const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto obb_model = new modeldeploy::vision::detection::UltralyticsObb(model_path, option);
+                                 const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto obb_model = new modeldeploy::vision::detection::UltralyticsObb(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(obb_model->name().c_str());
     model->model_content = obb_model;

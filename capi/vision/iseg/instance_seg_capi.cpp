@@ -11,11 +11,10 @@
 #include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-MDStatusCode md_create_instance_seg_model(MDModel* model, const char* model_path,
-                                          const int thread_num) {
-    modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(thread_num);
-    const auto instance_seg_model = new modeldeploy::vision::detection::UltralyticsSeg(model_path, option);
+MDStatusCode md_create_instance_seg_model(MDModel* model, const char* model_path, const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
+    const auto instance_seg_model = new modeldeploy::vision::detection::UltralyticsSeg(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(instance_seg_model->name().c_str());
     model->model_content = instance_seg_model;

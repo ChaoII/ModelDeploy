@@ -3,12 +3,14 @@
 //
 
 #include "capi/utils/md_image_capi.h"
+#include "capi/utils/md_utils_capi.h"
 #include "capi/vision/face/face_det_capi.h"
 
 
 int main() {
     MDModel model;
-    md_create_face_det_model(&model, "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
+    const MDRuntimeOption option = md_create_default_runtime_option();
+    md_create_face_det_model(&model, "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx", &option);
     MDImage image = md_read_image("../../test_data/test_images/test_face_detection3.jpg");
     MDDetectionLandmarkResults c_results;
     md_face_det_predict(&model, &image, &c_results);
