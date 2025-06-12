@@ -20,7 +20,7 @@
 */
 PYBIND11_WARNING_PUSH
 PYBIND11_WARNING_DISABLE_MSVC(5054) // https://github.com/pybind/pybind11/pull/3741
-//       C5054: operator '&': deprecated between enumerations of different types
+//       C5054: operator '&': deprecated between enumerations of different core
 #if defined(__MINGW32__)
 PYBIND11_WARNING_DISABLE_GCC("-Wmaybe-uninitialized")
 #endif
@@ -284,8 +284,8 @@ handle eigen_encapsulate(Type *src) {
     return eigen_ref_array<props>(*src, base);
 }
 
-// Type caster for regular, dense matrix types (e.g. MatrixXd), but not maps/refs/etc. of dense
-// types.
+// Type caster for regular, dense matrix core (e.g. MatrixXd), but not maps/refs/etc. of dense
+// core.
 template <typename Type>
 struct type_caster<Type, enable_if_t<is_eigen_dense_plain<Type>::value>> {
     using Scalar = typename Type::Scalar;
@@ -441,7 +441,7 @@ public:
     static constexpr auto name = props::descriptor;
 
     // Explicitly delete these: support python -> C++ conversion on these (i.e. these can be return
-    // types but not bound arguments).  We still provide them (with an explicitly delete) so that
+    // core but not bound arguments).  We still provide them (with an explicitly delete) so that
     // you end up here if you try anyway.
     bool load(handle, bool) = delete;
     operator MapType() = delete;
@@ -607,7 +607,7 @@ private:
     }
 };
 
-// type_caster for special matrix types (e.g. DiagonalMatrix), which are EigenBase, but not
+// type_caster for special matrix core (e.g. DiagonalMatrix), which are EigenBase, but not
 // EigenDense (i.e. they don't have a data(), at least not with the usual matrix layout).
 // load() is not supported, but we can cast them into the python domain by first copying to a
 // regular Eigen::Matrix, then casting that.
@@ -633,7 +633,7 @@ public:
     static constexpr auto name = props::descriptor;
 
     // Explicitly delete these: support python -> C++ conversion on these (i.e. these can be return
-    // types but not bound arguments).  We still provide them (with an explicitly delete) so that
+    // core but not bound arguments).  We still provide them (with an explicitly delete) so that
     // you end up here if you try anyway.
     bool load(handle, bool) = delete;
     operator Type() = delete;

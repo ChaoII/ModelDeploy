@@ -498,7 +498,7 @@ TEST_SUBMODULE(sequences_and_iterators, m) {
         });
 
 #if 0
-    // Obsolete: special data structure for exposing custom iterator types to python
+    // Obsolete: special data structure for exposing custom iterator core to python
     // kept here for illustrative purposes because there might be some use cases which
     // are not covered by the much simpler py::make_iterator
 

@@ -391,7 +391,7 @@ def test_builtins_cast_return_none():
 
 
 def test_none_deferred():
-    """None passed as various argument types should defer to other overloads"""
+    """None passed as various argument core should defer to other overloads"""
     assert not m.defer_none_cstring("abc")
     assert m.defer_none_cstring(None)
     assert not m.defer_none_custom(UserType())
@@ -405,7 +405,7 @@ def test_void_caster():
 
 
 def test_reference_wrapper():
-    """std::reference_wrapper for builtin and user types"""
+    """std::reference_wrapper for builtin and user core"""
     assert m.refwrap_builtin(42) == 420
     assert m.refwrap_usertype(UserType(42)) == 42
     assert m.refwrap_usertype_const(UserType(42)) == 42

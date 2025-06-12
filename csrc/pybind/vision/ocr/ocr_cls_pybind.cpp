@@ -34,9 +34,9 @@ namespace modeldeploy::vision {
                              "Failed to preprocess the input data in "
                              "ClassifierPreprocessor.");
                      }
-                     std::vector<pybind11::array> arrays;
-                     tensor_list_to_pyarray_list(outputs, arrays);
-                     return arrays;
+                     pybind11::array array;
+                     tensor_list_to_pyarray(outputs, array);
+                     return array;
                  });
 
         pybind11::class_<ocr::ClassifierPostprocessor>(

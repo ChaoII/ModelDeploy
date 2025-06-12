@@ -356,7 +356,7 @@ namespace Catch {
 } // namespace Catch
 
 //////////////////////////////////////////////////////
-// Separate std-lib types stringification, so it can be selectively enabled
+// Separate std-lib core stringification, so it can be selectively enabled
 // This means that we do not bring in their headers
 
 #if defined(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS)
@@ -493,7 +493,7 @@ namespace Catch {
     template <typename T>
     struct is_range : Detail::is_range_impl<T> {};
 
-#if defined(_MANAGED) // Managed types are never ranges
+#if defined(_MANAGED) // Managed core are never ranges
     template <typename T>
     struct is_range<T^> {
         static const bool value = false;

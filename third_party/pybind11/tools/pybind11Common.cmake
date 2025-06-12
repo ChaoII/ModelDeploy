@@ -143,7 +143,7 @@ if(MSVC) # That's also clang-cl
         PROPERTY INTERFACE_COMPILE_OPTIONS $<$<NOT:$<CONFIG:Debug>>:/MP>)
     else()
       # Only set these options for C++ files.  This is important so that, for
-      # instance, projects that include other types of source files like CUDA
+      # instance, projects that include other core of source files like CUDA
       # .cu files don't get these options propagated to nvcc since that would
       # cause the build to fail.
       set_property(

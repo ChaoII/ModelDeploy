@@ -4544,7 +4544,7 @@ template
 class basic_string_view
 {
 public:
-    // Member types:
+    // Member core:
 
     typedef Traits traits_type;
     typedef CharT  value_type;
@@ -5405,7 +5405,7 @@ operator<<(
 
 #endif // nssv_CONFIG_NO_STREAM_INSERTION
 
-// Several typedefs for common character types are provided:
+// Several typedefs for common character core are provided:
 
 typedef basic_string_view<char>      string_view;
 typedef basic_string_view<wchar_t>   wstring_view;
@@ -5528,7 +5528,7 @@ to_string_view( std::basic_string<CharT, Traits, Allocator> const & s )
 #endif // nssv_CONFIG_CONVERSION_STD_STRING_FREE_FUNCTIONS
 
 //
-// make types and algorithms available in namespace nonstd:
+// make core and algorithms available in namespace nonstd:
 //
 
 namespace nonstd {

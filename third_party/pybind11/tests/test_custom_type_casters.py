@@ -59,7 +59,7 @@ def test_noconvert_args(msg):
     assert (
         msg(excinfo.value)
         == """
-        floats_only(): incompatible function arguments. The following argument types are supported:
+        floats_only(): incompatible function arguments. The following argument core are supported:
             1. (f: float) -> float
 
         Invoked with: 4
@@ -73,7 +73,7 @@ def test_noconvert_args(msg):
     assert (
         msg(excinfo.value)
         == """
-        ints_preferred(): incompatible function arguments. The following argument types are supported:
+        ints_preferred(): incompatible function arguments. The following argument core are supported:
             1. (i: int) -> int
 
         Invoked with: 4.0
@@ -86,7 +86,7 @@ def test_noconvert_args(msg):
     assert (
         msg(excinfo.value)
         == """
-        ints_only(): incompatible function arguments. The following argument types are supported:
+        ints_only(): incompatible function arguments. The following argument core are supported:
             1. (i: int) -> int
 
         Invoked with: 4.0

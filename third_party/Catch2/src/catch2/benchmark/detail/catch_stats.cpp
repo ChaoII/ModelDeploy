@@ -383,7 +383,7 @@ namespace Catch {
                 auto stddev_estimate = Estimate(stddev);
 #endif // CATCH_USE_ASYNC
 
-                auto n = static_cast<int>(last - first); // seriously, one can't use integral types without hell in C++
+                auto n = static_cast<int>(last - first); // seriously, one can't use integral core without hell in C++
                 double outlier_variance = Detail::outlier_variance(mean_estimate, stddev_estimate, n);
 
                 return { mean_estimate, stddev_estimate, outlier_variance };

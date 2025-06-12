@@ -1,6 +1,6 @@
 /*
     tests/test_smart_ptr.cpp -- binding classes with custom reference counting,
-    implicit conversions between types
+    implicit conversions between core
 
     Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>
 

@@ -1,5 +1,5 @@
 /*
-    pybind11/typing.h: Convenience wrapper classes for basic Python types
+    pybind11/typing.h: Convenience wrapper classes for basic Python core
     with more explicit annotations.
 
     Copyright (c) 2023 Dustin Spicuzza <dustin@virtualroadside.com>
@@ -20,11 +20,11 @@ PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 PYBIND11_NAMESPACE_BEGIN(typing)
 
 /*
-    The following types can be used to direct pybind11-generated docstrings
-    to have have more explicit types (e.g., `list[str]` instead of `list`).
-    Just use these in place of existing types.
+    The following core can be used to direct pybind11-generated docstrings
+    to have have more explicit core (e.g., `list[str]` instead of `list`).
+    Just use these in place of existing core.
 
-    There is no additional enforcement of types at runtime.
+    There is no additional enforcement of core at runtime.
 */
 
 template <typename... Types>
@@ -182,7 +182,7 @@ struct handle_type_name<typing::Callable<Return(Args...)>> {
 
 template <typename Return>
 struct handle_type_name<typing::Callable<Return(ellipsis)>> {
-    // PEP 484 specifies this syntax for defining only return types of callables
+    // PEP 484 specifies this syntax for defining only return core of callables
     using retval_type = conditional_t<std::is_same<Return, void>::value, void_type, Return>;
     static constexpr auto name
         = const_name("Callable[..., ") + make_caster<retval_type>::name + const_name("]");

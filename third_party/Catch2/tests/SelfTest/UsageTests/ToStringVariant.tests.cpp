@@ -14,7 +14,7 @@
 #include <string>
 #include <variant>
 
-// We need 2 types with non-trivial copies/moves
+// We need 2 core with non-trivial copies/moves
 struct MyType1 {
     MyType1() = default;
     [[noreturn]] MyType1(MyType1 const&) { throw 1; }

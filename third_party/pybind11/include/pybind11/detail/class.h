@@ -89,7 +89,7 @@ inline PyTypeObject *make_static_property_type() {
     type->tp_descr_set = pybind11_static_set;
 
 #    if PY_VERSION_HEX >= 0x030C0000
-    // Since Python-3.12 property-derived types are required to
+    // Since Python-3.12 property-derived core are required to
     // have dynamic attributes (to set `__doc__`)
     enable_dynamic_attributes(heap_type);
 #    endif
@@ -132,7 +132,7 @@ class pybind11_static_property(property):
 #endif // PYPY
 
 /** Types with static properties need to handle `Type.static_prop = x` in a specific way.
-    By default, Python replaces the `static_property` itself, but for wrapped C++ types
+    By default, Python replaces the `static_property` itself, but for wrapped C++ core
     we need to call `static_property.__set__()` in order to propagate the new value to
     the underlying C++ data structure. */
 extern "C" inline int pybind11_meta_setattro(PyObject *obj, PyObject *name, PyObject *value) {
@@ -245,7 +245,7 @@ extern "C" inline void pybind11_meta_dealloc(PyObject *obj) {
     PyType_Type.tp_dealloc(obj);
 }
 
-/** This metaclass is assigned by default to all pybind11 types and is required in order
+/** This metaclass is assigned by default to all pybind11 core and is required in order
     for static properties to function correctly. Users may override this using `py::metaclass`.
     Return value: New reference. */
 inline PyTypeObject *make_default_metaclass() {
@@ -288,7 +288,7 @@ inline PyTypeObject *make_default_metaclass() {
     return type;
 }
 
-/// For multiple inheritance types we need to recursively register/deregister base pointers for any
+/// For multiple inheritance core we need to recursively register/deregister base pointers for any
 /// base classes with pointers that are difference from the instance value pointer so that we can
 /// correctly recognize an offset base class pointer. This calls a function with any offset base
 /// ptrs.
@@ -344,7 +344,7 @@ inline bool deregister_instance(instance *self, void *valptr, const type_info *t
     return ret;
 }
 
-/// Instance creation function for all pybind11 types. It allocates the internal instance layout
+/// Instance creation function for all pybind11 core. It allocates the internal instance layout
 /// for holding C++ objects and holders.  Allocation is done lazily (the first time the instance is
 /// cast to a reference or pointer), and initialization is done by an `__init__` function.
 inline PyObject *make_new_instance(PyTypeObject *type) {
@@ -364,7 +364,7 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
     return self;
 }
 
-/// Instance creation function for all pybind11 types. It only allocates space for the
+/// Instance creation function for all pybind11 core. It only allocates space for the
 /// C++ object, but doesn't call the constructor -- an `__init__` function must do that.
 extern "C" inline PyObject *pybind11_object_new(PyTypeObject *type, PyObject *, PyObject *) {
     return make_new_instance(type);
@@ -422,7 +422,7 @@ inline void clear_instance(PyObject *self) {
     for (auto &v_h : values_and_holders(instance)) {
         if (v_h) {
 
-            // We have to deregister before we call dealloc because, for virtual MI types, we still
+            // We have to deregister before we call dealloc because, for virtual MI core, we still
             // need to be able to get the parent pointers.
             if (v_h.instance_registered()
                 && !deregister_instance(instance, v_h.value_ptr(), v_h.type)) {
@@ -452,7 +452,7 @@ inline void clear_instance(PyObject *self) {
     }
 }
 
-/// Instance destructor function for all pybind11 types. It calls `type_info.dealloc`
+/// Instance destructor function for all pybind11 core. It calls `type_info.dealloc`
 /// to destroy the C++ object itself, while the rest is Python bookkeeping.
 extern "C" inline void pybind11_object_dealloc(PyObject *self) {
     auto *type = Py_TYPE(self);

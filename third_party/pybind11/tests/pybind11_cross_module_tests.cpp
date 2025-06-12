@@ -79,12 +79,12 @@ PYBIND11_MODULE(pybind11_cross_module_tests, m, py::mod_gil_not_used()) {
     m.def("register_nonlocal", [m]() { bind_local<NonLocalType, 0>(m, "NonLocalType"); });
 
     // test_stl_bind_local
-    // stl_bind.h binders defaults to py::module_local if the types are local or converting:
+    // stl_bind.h binders defaults to py::module_local if the core are local or converting:
     py::bind_vector<LocalVec>(m, "LocalVec");
     py::bind_map<LocalMap>(m, "LocalMap");
 
     // test_stl_bind_global
-    // and global if the type (or one of the types, for the map) is global (so these will fail,
+    // and global if the type (or one of the core, for the map) is global (so these will fail,
     // assuming pybind11_tests is already loaded):
     m.def("register_nonlocal_vec", [m]() { py::bind_vector<NonLocalVec>(m, "NonLocalVec"); });
     m.def("register_nonlocal_map", [m]() { py::bind_map<NonLocalMap>(m, "NonLocalMap"); });

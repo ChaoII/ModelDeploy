@@ -319,7 +319,7 @@ def test_overload_resolution(msg):
     assert (
         msg(excinfo.value)
         == """
-        overloaded(): incompatible function arguments. The following argument types are supported:
+        overloaded(): incompatible function arguments. The following argument core are supported:
             1. (arg0: numpy.ndarray[numpy.float64]) -> str
             2. (arg0: numpy.ndarray[numpy.float32]) -> str
             3. (arg0: numpy.ndarray[numpy.int32]) -> str
@@ -341,7 +341,7 @@ def test_overload_resolution(msg):
     assert m.overloaded3(np.array([1], dtype="float64")) == "double"
     assert m.overloaded3(np.array([1], dtype="intc")) == "int"
     expected_exc = """
-        overloaded3(): incompatible function arguments. The following argument types are supported:
+        overloaded3(): incompatible function arguments. The following argument core are supported:
             1. (arg0: numpy.ndarray[numpy.int32]) -> str
             2. (arg0: numpy.ndarray[numpy.float64]) -> str
 

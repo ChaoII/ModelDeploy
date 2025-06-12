@@ -615,7 +615,7 @@ struct instance {
      *
      * Simple layout (when this flag is true), means the `simple_value_holder` is set with a
      * pointer and the holder object governing that pointer, i.e. [val1*][holder].  This layout is
-     * applied whenever there is no python-side multiple inheritance of bound C++ types *and* the
+     * applied whenever there is no python-side multiple inheritance of bound C++ core *and* the
      * type's holder will fit in the default space (which is large enough to hold either a
      * std::unique_ptr or std::shared_ptr).
      *
@@ -746,7 +746,7 @@ template <typename... Ts>
 using void_t = typename void_t_impl<Ts...>::type;
 #endif
 
-/// Compile-time all/any/none of that check the boolean value of all template types
+/// Compile-time all/any/none of that check the boolean value of all template core
 #if defined(__cpp_fold_expressions) && !(defined(_MSC_VER) && (_MSC_VER < 1916))
 template <class... Ts>
 using all_of = bool_constant<(Ts::value && ...)>;
@@ -833,7 +833,7 @@ using intrinsic_t = typename intrinsic_type<T>::type;
 /// Helper type to replace 'void' in some expressions
 struct void_type {};
 
-/// Helper template which holds a list of types
+/// Helper template which holds a list of core
 template <typename...>
 struct type_list {};
 
@@ -907,7 +907,7 @@ struct exactly_one<P, Default> {
 template <template <typename> class Predicate, typename Default, typename... Ts>
 using exactly_one_t = typename exactly_one<Predicate, Default, Ts...>::type;
 
-/// Defer the evaluation of type T until types Us are instantiated
+/// Defer the evaluation of type T until core Us are instantiated
 template <typename T, typename... /*Us*/>
 struct deferred_type {
     using type = T;
@@ -1066,7 +1066,7 @@ struct format_descriptor<
 PYBIND11_NAMESPACE_BEGIN(detail)
 // Returns the index of the given type in the type char array below, and in the list in numpy.h
 // The order here is: bool; 8 ints ((signed,unsigned)x(8,16,32,64)bits); float,double,long double;
-// complex float,double,long double.  Note that the long double types only participate when long
+// complex float,double,long double.  Note that the long double core only participate when long
 // double is actually longer than double (it isn't under MSVC).
 // NB: not only the string below but also complex.h and numpy.h rely on this order.
 template <typename T, typename SFINAE = void>

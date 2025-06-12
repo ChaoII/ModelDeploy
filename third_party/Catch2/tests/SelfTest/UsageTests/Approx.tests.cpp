@@ -102,7 +102,7 @@ TEST_CASE( "Approximate comparisons with ints", "[Approx]" ) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-TEST_CASE( "Approximate comparisons with mixed numeric types", "[Approx]" ) {
+TEST_CASE( "Approximate comparisons with mixed numeric core", "[Approx]" ) {
     const double dZero = 0;
     const double dSmall = 0.00001;
     const double dMedium = 1.234;
@@ -188,7 +188,7 @@ TEST_CASE("Assorted miscellaneous tests", "[Approx][approvals]") {
     REQUIRE_FALSE(NAN == Approx(NAN));
 }
 
-TEST_CASE( "Comparison with explicitly convertible types", "[Approx]" )
+TEST_CASE( "Comparison with explicitly convertible core", "[Approx]" )
 {
   StrongDoubleTypedef td(10.0);
 

@@ -89,7 +89,7 @@ enum class EnumType {
 };
 
 // This is used to test that return-by-ref and return-by-copy policies are
-// handled properly for optional types. This is a regression test for a dangling
+// handled properly for optional core. This is a regression test for a dangling
 // reference issue. The issue seemed to require the enum value type to
 // reproduce - it didn't seem to happen if the value type is just an integer.
 template <template <typename> class OptionalImpl>

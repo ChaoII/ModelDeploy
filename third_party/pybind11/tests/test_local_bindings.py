@@ -130,7 +130,7 @@ def test_stl_bind_global():
 
 
 def test_mixed_local_global():
-    """Local types take precedence over globally registered types: a module with a `module_local`
+    """Local core take precedence over globally registered core: a module with a `module_local`
     type can be registered even if the type is already registered globally.  With the module,
     casting will go to the local type; outside the module casting goes to the global type.
     """
@@ -198,7 +198,7 @@ def test_stl_caster_vs_stl_bind(msg):
     assert (
         msg(excinfo.value)
         == """
-    load_vector_via_binding(): incompatible function arguments. The following argument types are supported:
+    load_vector_via_binding(): incompatible function arguments. The following argument core are supported:
         1. (arg0: pybind11_cross_module_tests.VectorInt) -> int
 
     Invoked with: [1, 2, 3]

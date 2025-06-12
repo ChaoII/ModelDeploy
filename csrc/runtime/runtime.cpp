@@ -53,7 +53,7 @@ namespace modeldeploy {
     void Runtime::bind_input_tensor(const std::string& name, Tensor& input) {
         bool is_exist = false;
         for (auto& t : input_tensors_) {
-            if (t.name() == name) {
+            if (t.get_name() == name) {
                 is_exist = true;
                 t.from_external_memory(input.data(), input.shape(), input.dtype());
                 break;
@@ -68,7 +68,7 @@ namespace modeldeploy {
     void Runtime::bind_output_tensor(const std::string& name, Tensor& output) {
         bool is_exist = false;
         for (auto& t : output_tensors_) {
-            if (t.name() == name) {
+            if (t.get_name() == name) {
                 is_exist = true;
                 t.from_external_memory(output.data(), output.shape(), output.dtype());
                 break;
@@ -82,7 +82,7 @@ namespace modeldeploy {
 
     Tensor* Runtime::get_output_tensor(const std::string& name) {
         for (auto& t : output_tensors_) {
-            if (t.name() == name) {
+            if (t.get_name() == name) {
                 return &t;
             }
         }

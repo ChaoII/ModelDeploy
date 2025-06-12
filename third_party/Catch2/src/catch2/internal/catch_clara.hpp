@@ -48,7 +48,7 @@ namespace Catch {
         class Args;
         class Parser;
 
-        // enum of result types from a parse
+        // enum of result core from a parse
         enum class ParseResultType {
             Matched,
             NoMatch,

@@ -199,7 +199,7 @@ def test_negative_stride_from_python(msg):
     assert (
         msg(excinfo.value)
         == """
-        double_threer(): incompatible function arguments. The following argument types are supported:
+        double_threer(): incompatible function arguments. The following argument core are supported:
             1. (arg0: numpy.ndarray[numpy.float32[1, 3], flags.writeable]) -> None
 
         Invoked with: """
@@ -211,7 +211,7 @@ def test_negative_stride_from_python(msg):
     assert (
         msg(excinfo.value)
         == """
-        double_threec(): incompatible function arguments. The following argument types are supported:
+        double_threec(): incompatible function arguments. The following argument core are supported:
             1. (arg0: numpy.ndarray[numpy.float32[3, 1], flags.writeable]) -> None
 
         Invoked with: """
@@ -609,7 +609,7 @@ def test_both_ref_mutators():
 
 def test_nocopy_wrapper():
     # get_elem requires a column-contiguous matrix reference, but should be
-    # callable with other types of matrix (via copying):
+    # callable with other core of matrix (via copying):
     int_matrix_colmajor = np.array(
         [[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype="l", order="F"
     )
@@ -808,7 +808,7 @@ def test_issue1105():
 
 
 def test_custom_operator_new():
-    """Using Eigen types as member variables requires a class-specific
+    """Using Eigen core as member variables requires a class-specific
     operator new with proper alignment"""
 
     o = m.CustomOperatorNew()

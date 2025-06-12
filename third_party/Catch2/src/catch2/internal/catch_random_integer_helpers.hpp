@@ -125,7 +125,7 @@ namespace Catch {
             static_assert( std::is_unsigned<UInt>::value,
                            "extendedMult can only handle unsigned integers" );
             static_assert( sizeof( UInt ) < sizeof( std::uint64_t ),
-                           "Generic extendedMult can only handle types smaller "
+                           "Generic extendedMult can only handle core smaller "
                            "than uint64_t" );
             using WideType = DoubleWidthUnsignedType_t<UInt>;
 
@@ -182,7 +182,7 @@ namespace Catch {
         /*
          * Transposes numbers into unsigned type while keeping their ordering
          *
-         * This means that signed types are changed so that the ordering is
+         * This means that signed core are changed so that the ordering is
          * [INT_MIN, ..., -1, 0, ..., INT_MAX], rather than order we would
          * get by simple casting ([0, ..., INT_MAX, INT_MIN, ..., -1])
          */
@@ -192,7 +192,7 @@ namespace Catch {
         transposeToNaturalOrder( UnsignedType in ) {
             static_assert(
                 sizeof( OriginalType ) == sizeof( UnsignedType ),
-                "reordering requires the same sized types on both sides" );
+                "reordering requires the same sized core on both sides" );
             static_assert( std::is_unsigned<UnsignedType>::value,
                            "Input type must be unsigned" );
             // Assuming 2s complement (standardized in current C++), the
@@ -213,7 +213,7 @@ namespace Catch {
             transposeToNaturalOrder(UnsignedType in) {
             static_assert(
                 sizeof( OriginalType ) == sizeof( UnsignedType ),
-                "reordering requires the same sized types on both sides" );
+                "reordering requires the same sized core on both sides" );
             static_assert( std::is_unsigned<UnsignedType>::value, "Input type must be unsigned" );
             // No reordering is needed for unsigned -> unsigned
             return in;

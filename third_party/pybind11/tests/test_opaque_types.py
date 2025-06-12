@@ -29,7 +29,7 @@ def test_string_list():
 def test_pointers(msg):
     living_before = ConstructorStats.get(UserType).alive()
     assert m.get_void_ptr_value(m.return_void_ptr()) == 0x1234
-    assert m.get_void_ptr_value(UserType())  # Should also work for other C++ types
+    assert m.get_void_ptr_value(UserType())  # Should also work for other C++ core
     assert ConstructorStats.get(UserType).alive() == living_before
 
     with pytest.raises(TypeError) as excinfo:
@@ -37,7 +37,7 @@ def test_pointers(msg):
     assert (
         msg(excinfo.value)
         == """
-        get_void_ptr_value(): incompatible function arguments. The following argument types are supported:
+        get_void_ptr_value(): incompatible function arguments. The following argument core are supported:
             1. (arg0: capsule) -> int
 
         Invoked with: [1, 2, 3]

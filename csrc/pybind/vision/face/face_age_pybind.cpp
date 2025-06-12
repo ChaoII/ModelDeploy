@@ -24,9 +24,10 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "Failed to preprocess the input data in SeetaFaceAgePreprocessor.");
                     }
-                    std::vector<pybind11::array> arrays;
-                    tensor_list_to_pyarray_list(outputs, arrays);
-                    return arrays;
+
+                    pybind11::array array;
+                    tensor_list_to_pyarray(outputs, array);
+                    return array;
                 })
             .def_property("size", &face::SeetaFaceAgePreprocessor::get_size,
                           &face::SeetaFaceAgePreprocessor::set_size);

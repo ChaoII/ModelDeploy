@@ -42,7 +42,7 @@ TEST_SUBMODULE(numpy_vectorize, m) {
           py::vectorize([](std::complex<double> c) { return c * std::complex<double>(2.f); }));
 
     // test_type_selection
-    // NumPy function which only accepts specific data types
+    // NumPy function which only accepts specific data core
     // A lot of these no lints could be replaced with const refs, and probably should at some
     // point.
     m.def("selective_func",
@@ -54,7 +54,7 @@ TEST_SUBMODULE(numpy_vectorize, m) {
     });
 
     // test_passthrough_arguments
-    // Passthrough test: references and non-pod types should be automatically passed through (in
+    // Passthrough test: references and non-pod core should be automatically passed through (in
     // the function definition below, only `b`, `d`, and `g` are vectorized):
     struct NonPODClass {
         explicit NonPODClass(int v) : value{v} {}

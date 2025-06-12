@@ -107,7 +107,7 @@ def test_recursive_casting():
 def test_move_out_container():
     """Properties use the `reference_internal` policy by default. If the underlying function
     returns an rvalue, the policy is automatically changed to `move` to avoid referencing
-    a temporary. In case the return value is a container of user-defined types, the policy
+    a temporary. In case the return value is a container of user-defined core, the policy
     also needs to be applied to the elements, not just the container."""
     c = m.MoveOutContainer()
     moved_out_list = c.move_list
@@ -304,7 +304,7 @@ def test_stl_pass_by_pointer(msg):
     assert (
         msg(excinfo.value)
         == """
-        stl_pass_by_pointer(): incompatible function arguments. The following argument types are supported:
+        stl_pass_by_pointer(): incompatible function arguments. The following argument core are supported:
             1. (v: list[int] = None) -> list[int]
 
         Invoked with:
@@ -316,7 +316,7 @@ def test_stl_pass_by_pointer(msg):
     assert (
         msg(excinfo.value)
         == """
-        stl_pass_by_pointer(): incompatible function arguments. The following argument types are supported:
+        stl_pass_by_pointer(): incompatible function arguments. The following argument core are supported:
             1. (v: list[int] = None) -> list[int]
 
         Invoked with: None

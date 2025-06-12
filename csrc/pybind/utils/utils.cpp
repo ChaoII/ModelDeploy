@@ -26,7 +26,8 @@ namespace modeldeploy {
             dt = pybind11::dtype::of<int8_t>();
         }
         else {
-            MD_LOG_FATAL << "The function doesn't support data type of %s." << datatype_to_string(md_dtype) << std::endl;
+            MD_LOG_FATAL << "The function doesn't support data type of %s." << datatype_to_string(md_dtype) <<
+                std::endl;
         }
         return dt;
     }
@@ -55,7 +56,7 @@ namespace modeldeploy {
         return DataType::FP32;
     }
 
-    void py_array_to_tensor(pybind11::array& pyarray, Tensor* tensor, const bool share_buffer) {
+    void pyarray_to_tensor(pybind11::array& pyarray, Tensor* tensor, const bool share_buffer) {
         const auto dtype = numpy_data_type_to_md_data_type(pyarray.dtype());
         std::vector<int64_t> data_shape;
         data_shape.insert(data_shape.begin(), pyarray.shape(), pyarray.shape() + pyarray.ndim());
@@ -73,7 +74,7 @@ namespace modeldeploy {
                                 const bool share_buffer) {
         tensor->resize(pyarray.size());
         for (auto i = 0; i < pyarray.size(); ++i) {
-            py_array_to_tensor(pyarray[i], &(*tensor)[i], share_buffer);
+            pyarray_to_tensor(pyarray[i], &(*tensor)[i], share_buffer);
         }
     }
 
@@ -84,11 +85,9 @@ namespace modeldeploy {
         return out;
     }
 
-    void tensor_list_to_pyarray_list(std::vector<Tensor> tensors, std::vector<pybind11::array>& pyarrays) {
-        pyarrays.resize(tensors.size());
-        for (auto i = 0; i < tensors.size(); ++i) {
-            pyarrays[i] = tensor_to_pyarray(tensors[i]);
-        }
+    void tensor_list_to_pyarray(const std::vector<Tensor>& tensors, pybind11::array& pyarray) {
+        const auto tensor = Tensor::concat(tensors, 0);
+        pyarray = tensor_to_pyarray(tensor);
     }
 
 

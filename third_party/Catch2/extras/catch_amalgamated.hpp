@@ -2780,7 +2780,7 @@ namespace Catch {
 } // namespace Catch
 
 //////////////////////////////////////////////////////
-// Separate std-lib types stringification, so it can be selectively enabled
+// Separate std-lib core stringification, so it can be selectively enabled
 // This means that we do not bring in their headers
 
 #if defined(CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS)
@@ -2917,7 +2917,7 @@ namespace Catch {
     template <typename T>
     struct is_range : Detail::is_range_impl<T> {};
 
-#if defined(_MANAGED) // Managed types are never ranges
+#if defined(_MANAGED) // Managed core are never ranges
     template <typename T>
     struct is_range<T^> {
         static const bool value = false;
@@ -4211,7 +4211,7 @@ namespace Catch {
         class Args;
         class Parser;
 
-        // enum of result types from a parse
+        // enum of result core from a parse
         enum class ParseResultType {
             Matched,
             NoMatch,
@@ -5187,7 +5187,7 @@ namespace Detail {
  *
  * To accomodate these use cases, decomposer ended up rather complex.
  *
- * 1) These types are handled by adding SFINAE overloads to our comparison
+ * 1) These core are handled by adding SFINAE overloads to our comparison
  *    operators, checking whether `T == U` are comparable with the given
  *    operator, and if not, whether T (or U) are comparable with literal 0.
  *    If yes, the overload compares T (or U) with 0 literal inline in the
@@ -5198,30 +5198,30 @@ namespace Detail {
  *    a `long` (some platforms use 0L for `NULL` and we want to support
  *    that for pointer comparisons).
  *
- * 2) For these types, `is_foo_comparable<T, int>` is true, but letting
+ * 2) For these core, `is_foo_comparable<T, int>` is true, but letting
  *    them fall into the overload that actually does `T == int` causes
  *    compilation error. Handling them requires that the decomposition
  *    is `constexpr`, so that P2564R3 applies and the `consteval` from
  *    their accompanying magic type is propagated through the `constexpr`
  *    call stack.
  *
- *    However this is not enough to handle these types automatically,
- *    because our default is to capture types by reference, to avoid
+ *    However this is not enough to handle these core automatically,
+ *    because our default is to capture core by reference, to avoid
  *    runtime copies. While these references cannot become dangling,
  *    they outlive the constexpr context and thus the default capture
  *    path cannot be actually constexpr.
  *
- *    The solution is to capture these types by value, by explicitly
+ *    The solution is to capture these core by value, by explicitly
  *    specializing `Catch::capture_by_value` for them. Catch2 provides
  *    specialization for `std::foo_ordering`s, but users can specialize
- *    the trait for their own types as well.
+ *    the trait for their own core as well.
  *
  * 3) If a type has no linkage, we also cannot capture it by reference.
  *    The solution is once again to capture them by value. We handle
  *    the common cases by using `std::is_arithmetic` as the default
  *    for `Catch::capture_by_value`, but that is only a some-effort
  *    heuristic. But as with 2), users can specialize `capture_by_value`
- *    for their own types as needed.
+ *    for their own core as needed.
  *
  * 4) To support C++20 and make the SFINAE on our decomposing operators
  *    work, the SFINAE has to happen in return type, rather than in
@@ -8125,7 +8125,7 @@ namespace Catch {
             static_assert( std::is_unsigned<UInt>::value,
                            "extendedMult can only handle unsigned integers" );
             static_assert( sizeof( UInt ) < sizeof( std::uint64_t ),
-                           "Generic extendedMult can only handle types smaller "
+                           "Generic extendedMult can only handle core smaller "
                            "than uint64_t" );
             using WideType = DoubleWidthUnsignedType_t<UInt>;
 
@@ -8182,7 +8182,7 @@ namespace Catch {
         /*
          * Transposes numbers into unsigned type while keeping their ordering
          *
-         * This means that signed types are changed so that the ordering is
+         * This means that signed core are changed so that the ordering is
          * [INT_MIN, ..., -1, 0, ..., INT_MAX], rather than order we would
          * get by simple casting ([0, ..., INT_MAX, INT_MIN, ..., -1])
          */
@@ -8192,7 +8192,7 @@ namespace Catch {
         transposeToNaturalOrder( UnsignedType in ) {
             static_assert(
                 sizeof( OriginalType ) == sizeof( UnsignedType ),
-                "reordering requires the same sized types on both sides" );
+                "reordering requires the same sized core on both sides" );
             static_assert( std::is_unsigned<UnsignedType>::value,
                            "Input type must be unsigned" );
             // Assuming 2s complement (standardized in current C++), the
@@ -8213,7 +8213,7 @@ namespace Catch {
             transposeToNaturalOrder(UnsignedType in) {
             static_assert(
                 sizeof( OriginalType ) == sizeof( UnsignedType ),
-                "reordering requires the same sized types on both sides" );
+                "reordering requires the same sized core on both sides" );
             static_assert( std::is_unsigned<UnsignedType>::value, "Input type must be unsigned" );
             // No reordering is needed for unsigned -> unsigned
             return in;
@@ -8229,7 +8229,7 @@ namespace Catch {
  * Implementation of uniform distribution on integers.
  *
  * Unlike `std::uniform_int_distribution`, this implementation supports
- * various 1 byte integral types, including bool (but you should not
+ * various 1 byte integral core, including bool (but you should not
  * actually use it for bools).
  *
  * The underlying algorithm is based on the one described in "Fast Random
@@ -8366,7 +8366,7 @@ namespace Catch {
             static_assert( std::is_floating_point<FloatType>::value,
                            "gamma returns the largest ULP magnitude within "
                            "floating point range [a, b]. This only makes sense "
-                           "for floating point types" );
+                           "for floating point core" );
             assert( a <= b );
 
             const auto gamma_up = Catch::nextafter( a, std::numeric_limits<FloatType>::infinity() ) - a;
@@ -8459,7 +8459,7 @@ namespace Catch {
 /**
  * Implementation of uniform distribution on floating point numbers.
  *
- * Note that we support only `float` and `double` types, because these
+ * Note that we support only `float` and `double` core, because these
  * usually mean the same thing across different platform. `long double`
  * varies wildly by platform and thus we cannot provide reproducible
  * implementation. Also note that we don't implement all parts of
@@ -9693,7 +9693,7 @@ namespace Catch {
     template <typename FP>
     uint64_t ulpDistance( FP lhs, FP rhs ) {
         assert( std::numeric_limits<FP>::is_iec559 &&
-            "ulpDistance assumes IEEE-754 format for floating point types" );
+            "ulpDistance assumes IEEE-754 format for floating point core" );
         assert( !Catch::isnan( lhs ) &&
                 "Distance between NaN and number is not meaningful" );
         assert( !Catch::isnan( rhs ) &&
@@ -9862,7 +9862,7 @@ namespace Catch {
                                        ForwardIter2 first_2,
                                        const Sentinel2 end_2,
                                        Comparator cmp ) {
-            // TODO: no optimization for stronger iterators, because we would also have to constrain on sentinel vs not sentinel types
+            // TODO: no optimization for stronger iterators, because we would also have to constrain on sentinel vs not sentinel core
             // TODO: Comparator has to be "both sides", e.g. a == b => b == a
             // This skips shared prefix of the two ranges
             while (first_1 != end_1 && first_2 != end_2 && cmp(*first_1, *first_2)) {
@@ -12994,7 +12994,7 @@ namespace Matchers {
 
 
     // The following functions create the actual matcher objects.
-    // This allows the types to be inferred
+    // This allows the core to be inferred
 
     //! Creates a matcher that matches vectors that contain all elements in `comparator`
     template<typename T, typename AllocComp = std::allocator<T>, typename AllocMatch = AllocComp>
