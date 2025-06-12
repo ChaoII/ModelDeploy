@@ -10,25 +10,22 @@ namespace modeldeploy::vision {
     void bind_face_det(const pybind11::module& m) {
         pybind11::class_<face::ScrfdPreprocessor>(m, "ScrfdPreprocessor")
             .def(pybind11::init<>())
-            .def(
-                "run",
-                [](const face::ScrfdPreprocessor& self,
-                   std::vector<pybind11::array>& im_list) {
-                    std::vector<cv::Mat> images;
-                    images.reserve(im_list.size());
-                    for (auto& image : im_list) {
-                        images.push_back(pyarray_to_cv_mat(image));
-                    }
-                    std::vector<LetterBoxRecord> records;
-                    std::vector<Tensor> outputs;
-                    if (!self.run(&images, &outputs, &records)) {
-                        throw std::runtime_error(
-                            "Failed to preprocess the input data in ScrfdPreprocessor.");
-                    }
-                    pybind11::array array;
-                    tensor_list_to_pyarray(outputs, array);
-                    return make_pair(array, records);
-                })
+            .def("run",
+                 [](const face::ScrfdPreprocessor& self,
+                    std::vector<pybind11::array>& im_list) {
+                     std::vector<cv::Mat> images;
+                     images.reserve(im_list.size());
+                     for (auto& image : im_list) {
+                         images.push_back(pyarray_to_cv_mat(image));
+                     }
+                     std::vector<LetterBoxRecord> records;
+                     std::vector<Tensor> outputs;
+                     if (!self.run(&images, &outputs, &records)) {
+                         throw std::runtime_error(
+                             "Failed to preprocess the input data in ScrfdPreprocessor.");
+                     }
+                     return make_pair(outputs, records);
+                 }, pybind11::arg("im_list"))
             .def_property("size", &face::ScrfdPreprocessor::get_size,
                           &face::ScrfdPreprocessor::set_size)
             .def_property("padding_value",
@@ -56,7 +53,7 @@ namespace modeldeploy::vision {
                              "ScrfdPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"), pybind11::arg("records"))
             .def("run",
                  [](face::ScrfdPostprocessor& self,
                     std::vector<pybind11::array>& input_arrays,
@@ -69,7 +66,7 @@ namespace modeldeploy::vision {
                              "Failed to postprocess the runtime ScrfdPostprocessor in LprDetPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"), pybind11::arg("records"))
             .def_property("conf_threshold",
                           &face::ScrfdPostprocessor::get_conf_threshold,
                           &face::ScrfdPostprocessor::set_conf_threshold)
@@ -83,24 +80,24 @@ namespace modeldeploy::vision {
         pybind11::class_<face::Scrfd, BaseModel>(m, "Scrfd")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](face::Scrfd& self, pybind11::array& data) {
-                     const auto mat = pyarray_to_cv_mat(data);
+                 [](face::Scrfd& self, pybind11::array& image) {
+                     const auto mat = pyarray_to_cv_mat(image);
                      std::vector<DetectionLandmarkResult> result;
                      self.predict(mat, &result);
                      return result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict",
                  [](face::Scrfd& self,
-                    std::vector<pybind11::array>& data) {
-                     std::vector<cv::Mat> images;
-                     images.reserve(data.size());
-                     for (auto& image : data) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                    std::vector<pybind11::array>& images) {
+                     std::vector<cv::Mat> _images;
+                     _images.reserve(images.size());
+                     for (auto& image : images) {
+                         _images.push_back(pyarray_to_cv_mat(image));
                      }
                      std::vector<std::vector<DetectionLandmarkResult>> results;
-                     self.batch_predict(images, &results);
+                     self.batch_predict(_images, &results);
                      return results;
-                 })
+                 }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",
                                    &face::Scrfd::get_preprocessor)
             .def_property_readonly("postprocessor",

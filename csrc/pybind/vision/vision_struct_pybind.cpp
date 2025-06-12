@@ -249,8 +249,7 @@ namespace modeldeploy::vision {
         pybind11::enum_<FaceAntiSpoofResult>(m, "FaceAntiSpoofResult")
             .value("REAL", FaceAntiSpoofResult::REAL)
             .value("FUZZY", FaceAntiSpoofResult::FUZZY)
-            .value("SPOOF", FaceAntiSpoofResult::SPOOF)
-            .export_values();
+            .value("SPOOF", FaceAntiSpoofResult::SPOOF);
 
         pybind11::class_<OCRResult>(m, "OCRResult")
             .def(pybind11::init())

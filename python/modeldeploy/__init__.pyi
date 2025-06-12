@@ -2,10 +2,11 @@
 Make programmer easier to deploy deeplearning model, save time to save the world!
 """
 from __future__ import annotations
+import numpy
 import typing
 from . import audio
 from . import vision
-__all__ = ['Backend', 'BaseModel', 'CPU', 'DataType', 'Device', 'FP32', 'FP64', 'GPU', 'INT32', 'INT64', 'INT8', 'NONE', 'ORT', 'OrtBackendOption', 'RuntimeOption', 'TensorInfo', 'UINT8', 'UNKNOW', 'audio', 'vision']
+__all__ = ['Backend', 'BaseModel', 'DataType', 'Device', 'Runtime', 'RuntimeOption', 'Tensor', 'TensorInfo', 'audio', 'vision']
 class Backend:
     """
     Members:
@@ -44,15 +45,16 @@ class Backend:
     def value(self) -> int:
         ...
 class BaseModel:
+    runtime_option: RuntimeOption
     def __init__(self) -> None:
         """
         Default Constructor
         """
     def get_custom_meta_data(self) -> dict:
         ...
-    def get_input_info(self, arg0: int) -> ...:
+    def get_input_info(self, index: int) -> TensorInfo:
         ...
-    def get_output_info(self, arg0: int) -> ...:
+    def get_output_info(self, index: int) -> TensorInfo:
         ...
     def initialized(self) -> bool:
         ...
@@ -151,26 +153,39 @@ class Device:
     @property
     def value(self) -> int:
         ...
-class OrtBackendOption:
-    device: Device
-    device_id: int
-    enable_fp16: bool
-    enable_trt: bool
-    execution_mode: int
-    external_stream: capsule
-    graph_optimization_level: int
-    inter_op_num_threads: int
-    intra_op_num_threads: int
-    model_buffer: str
-    model_filepath: str
-    model_from_memory: bool
-    optimized_model_filepath: str
-    trt_max_shape: str
-    trt_min_shape: str
-    trt_opt_shape: str
+class Runtime:
     def __init__(self) -> None:
         ...
-    def set_cpu_thread_num(self, arg0: int) -> None:
+    def bind_input_tensor(self, name: str, input: Tensor) -> None:
+        ...
+    def bind_output_tensor(self, name: str, output: Tensor) -> None:
+        ...
+    def get_input_info(self, index: int) -> TensorInfo:
+        ...
+    def get_output_info(self, index: int) -> TensorInfo:
+        ...
+    def get_output_tensor(self, name: str) -> typing.Any:
+        ...
+    @typing.overload
+    def infer(self, inputs: dict[str, numpy.ndarray]) -> list[numpy.ndarray]:
+        ...
+    @typing.overload
+    def infer(self, inputs: dict[str, Tensor]) -> list[Tensor]:
+        ...
+    @typing.overload
+    def infer(self, inputs: list[Tensor]) -> list[Tensor]:
+        ...
+    @typing.overload
+    def infer(self) -> None:
+        ...
+    def init(self, arg0: RuntimeOption) -> bool:
+        ...
+    def num_inputs(self) -> int:
+        ...
+    def num_outputs(self) -> int:
+        ...
+    @property
+    def option(self) -> RuntimeOption:
         ...
 class RuntimeOption:
     backend: Backend
@@ -184,23 +199,40 @@ class RuntimeOption:
     model_from_memory: bool
     def __init__(self) -> None:
         ...
-    def set_cpu_thread_num(self, arg0: int) -> None:
+    def set_cpu_thread_num(self, thread_num: int = -1) -> None:
         ...
-    def set_external_raw_stream(self, arg0: int) -> None:
+    def set_model_path(self, model_path: str) -> None:
         ...
-    def set_external_stream(self, stream: capsule) -> None:
-        """
-        A pointer to an external stream
-        """
-    def set_model_path(self, arg0: str) -> None:
-        ...
-    def set_ort_graph_opt_level(self, arg0: int) -> None:
+    def set_ort_graph_opt_level(self, level: int = -1) -> None:
         ...
     def use_cpu(self) -> None:
         ...
-    def use_gpu(self, arg0: int) -> None:
+    def use_gpu(self, device_id: int = 0) -> None:
         ...
     def use_ort_backend(self) -> None:
+        ...
+class Tensor:
+    name: str
+    @staticmethod
+    def from_external_data(name: str, data_addr: int, shape: list[int], data_type: str) -> Tensor:
+        ...
+    def __init__(self) -> None:
+        """
+        Default Constructor
+        """
+    def __repr__(self) -> str:
+        ...
+    def __str__(self) -> str:
+        ...
+    def from_numpy(self, pyarray: numpy.ndarray, share_buffer: bool = False) -> None:
+        ...
+    def to_numpy(self) -> numpy.ndarray:
+        ...
+    @property
+    def dtype(self) -> DataType:
+        ...
+    @property
+    def shape(self) -> list[int]:
         ...
 class TensorInfo:
     dtype: DataType
@@ -212,14 +244,3 @@ class TensorInfo:
         ...
     def __str__(self) -> str:
         ...
-CPU: Device  # value = <Device.CPU: 0>
-FP32: DataType  # value = <DataType.FP32: 0>
-FP64: DataType  # value = <DataType.FP64: 1>
-GPU: Device  # value = <Device.GPU: 1>
-INT32: DataType  # value = <DataType.INT32: 2>
-INT64: DataType  # value = <DataType.INT64: 3>
-INT8: DataType  # value = <DataType.INT8: 5>
-NONE: Backend  # value = <Backend.NONE: 1>
-ORT: Backend  # value = <Backend.ORT: 0>
-UINT8: DataType  # value = <DataType.UINT8: 4>
-UNKNOW: DataType  # value = <DataType.UNKNOW: 6>

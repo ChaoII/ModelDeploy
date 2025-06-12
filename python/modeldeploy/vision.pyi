@@ -6,7 +6,7 @@ import modeldeploy
 import numpy
 import pybind11_stubgen.typing_ext
 import typing
-__all__ = ['Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionLandmarkResult', 'DetectionResult', 'FUZZY', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'Point2f', 'Point3f', 'PoseResult', 'REAL', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SPOOF', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsCls', 'UltralyticsClsPostprocessor', 'UltralyticsClsPreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_cls', 'vis_det', 'vis_det_landmarks', 'vis_iseg', 'vis_lpr', 'vis_obb', 'vis_ocr', 'vis_pose']
+__all__ = ['Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionLandmarkResult', 'DetectionResult', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'Point2f', 'Point3f', 'PoseResult', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsCls', 'UltralyticsClsPostprocessor', 'UltralyticsClsPreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_cls', 'vis_det', 'vis_det_landmarks', 'vis_iseg', 'vis_lpr', 'vis_obb', 'vis_ocr', 'vis_pose']
 class Classifier(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
@@ -14,9 +14,9 @@ class Classifier(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> OCRResult:
+    def batch_predict(self, images: list[numpy.ndarray]) -> OCRResult:
         ...
-    def predict(self, arg0: numpy.ndarray) -> OCRResult:
+    def predict(self, image: numpy.ndarray) -> OCRResult:
         ...
     @property
     def postprocessor(self) -> ClassifierPostprocessor:
@@ -29,18 +29,18 @@ class ClassifierPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> tuple[list[int], list[float]]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> tuple[list[int], list[float]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[int], list[float]]:
+    def run(self, inputs: list[numpy.ndarray]) -> tuple[list[int], list[float]]:
         ...
 class ClassifierPreprocessor:
     cls_image_shape: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
-    def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
+    def set_normalize(self, mean: list[float], std: list[float], is_scale: bool) -> None:
         ...
 class ClassifyResult:
     feature: list[float]
@@ -59,9 +59,9 @@ class DBDetector(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[OCRResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[OCRResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> OCRResult:
+    def predict(self, image: numpy.ndarray) -> OCRResult:
         ...
     @property
     def postprocessor(self) -> DBDetectorPostprocessor:
@@ -78,17 +78,17 @@ class DBDetectorPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]]:
+    def run(self, inputs: list[modeldeploy.Tensor], batch_det_img_info: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]]:
+    def run(self, inputs: list[numpy.ndarray], batch_det_img_info: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]]:
         ...
 class DBDetectorPreprocessor:
     max_side_len: int
     static_shape_infer: bool
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
         ...
@@ -164,7 +164,7 @@ class FaceRecognitionResult:
 class FaceRecognizerPipeline(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: str, arg2: modeldeploy.RuntimeOption) -> None:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[FaceRecognitionResult]:
+    def predict(self, image: numpy.ndarray) -> list[FaceRecognitionResult]:
         ...
 class InstanceSegResult:
     box: Rect2f
@@ -185,7 +185,15 @@ class LetterBoxRecord:
     pad_h: float
     pad_w: float
     scale: float
+    def __getstate__(self) -> tuple:
+        ...
     def __init__(self) -> None:
+        ...
+    def __repr__(self) -> str:
+        ...
+    def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def __str__(self) -> str:
         ...
 class LprDetPostprocessor:
     conf_threshold: float
@@ -193,10 +201,10 @@ class LprDetPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
+    def run(self, inputs: list[modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
         ...
     @property
     def landmarks_per_card_(self) -> int:
@@ -211,7 +219,7 @@ class LprDetPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -222,9 +230,9 @@ class LprDetPreprocessor:
 class LprDetection(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[list[DetectionLandmarkResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[DetectionLandmarkResult]]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[DetectionLandmarkResult]:
+    def predict(self, image: numpy.ndarray) -> list[DetectionLandmarkResult]:
         ...
     @property
     def postprocessor(self) -> LprDetPostprocessor:
@@ -235,29 +243,29 @@ class LprDetection(modeldeploy.BaseModel):
 class LprPipeline:
     def __init__(self, arg0: str, arg1: str, arg2: modeldeploy.RuntimeOption) -> None:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[LprResult]:
+    def predict(self, image: numpy.ndarray) -> list[LprResult]:
         ...
 class LprRecPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> list[LprResult]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> list[LprResult]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> list[LprResult]:
+    def run(self, inputs: list[numpy.ndarray]) -> list[LprResult]:
         ...
 class LprRecPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
 class LprRecognizer(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[LprResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[LprResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> LprResult:
+    def predict(self, image: numpy.ndarray) -> LprResult:
         ...
     @property
     def postprocessor(self) -> LprRecPostprocessor:
@@ -310,20 +318,20 @@ class ObbResult:
         ...
 class PPStructureV2Table(modeldeploy.BaseModel):
     rec_batch_size: int
-    def __init__(self, arg0: str, arg1: str, arg2: str, arg3: str, arg4: str, arg5: int, arg6: float, arg7: float, arg8: float, arg9: str, arg10: bool, arg11: int, arg12: modeldeploy.RuntimeOption) -> None:
+    def __init__(self, det_model_file: str, rec_model_file: str, table_model_file: str, rec_label_file: str, table_char_dict_path: str, max_side_len: int = 960, det_db_thresh: float = 0.3, det_db_box_thresh: float = 0.6, det_db_unclip_ratio: float = 1.5, det_db_score_mode: str = 'slow', use_dilation: bool = False, rec_batch_size: int = 8, option: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[OCRResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[OCRResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> OCRResult:
+    def predict(self, image: numpy.ndarray) -> OCRResult:
         ...
 class PaddleOCR(modeldeploy.BaseModel):
     cls_batch_size: int
     rec_batch_size: int
-    def __init__(self, arg0: str, arg1: str, arg2: str, arg3: str, arg4: int, arg5: float, arg6: float, arg7: float, arg8: str, arg9: bool, arg10: int, arg11: modeldeploy.RuntimeOption) -> None:
+    def __init__(self, det_model_path: str, cls_model_path: str, rec_model_path: str, dict_path: str, max_side_len: int = 960, det_db_thresh: float = 0.3, det_db_box_thresh: float = 0.6, det_db_unclip_ratio: float = 1.5, det_db_score_mode: str = 'slow', use_dilation: bool = False, rec_batch_size: int = 6, option: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[OCRResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[OCRResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> OCRResult:
+    def predict(self, image: numpy.ndarray) -> OCRResult:
         ...
 class Point2f:
     x: float
@@ -370,9 +378,9 @@ class Recognizer(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> OCRResult:
+    def batch_predict(self, images: list[numpy.ndarray]) -> OCRResult:
         ...
-    def predict(self, arg0: numpy.ndarray) -> OCRResult:
+    def predict(self, image: numpy.ndarray) -> OCRResult:
         ...
     @property
     def postprocessor(self) -> RecognizerPostprocessor:
@@ -384,17 +392,17 @@ class RecognizerPostprocessor:
     def __init__(self, arg0: str) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> tuple[list[str], list[float]]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> tuple[list[str], list[float]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[str], list[float]]:
+    def run(self, inputs: list[numpy.ndarray]) -> tuple[list[str], list[float]]:
         ...
 class RecognizerPreprocessor:
     rec_image_shape: list[int]
     static_shape_infer: bool
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
         ...
@@ -432,9 +440,9 @@ class RotatedRect:
 class SeetaFaceAge(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[int]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[int]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> int:
+    def predict(self, image: numpy.ndarray) -> int:
         ...
     @property
     def postprocessor(self) -> SeetaFaceAgePostprocessor:
@@ -446,38 +454,38 @@ class SeetaFaceAgePostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> list[int]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> list[int]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> list[int]:
+    def run(self, inputs: list[numpy.ndarray]) -> list[int]:
         ...
 class SeetaFaceAgePreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
 class SeetaFaceAsFirst(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def predict(self, arg0: numpy.ndarray) -> float:
+    def predict(self, image: numpy.ndarray) -> float:
         ...
 class SeetaFaceAsPipeline(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: str, arg2: str, arg3: modeldeploy.RuntimeOption) -> None:
         ...
-    def predict(self, arg0: numpy.ndarray, arg1: float, arg2: float) -> list[FaceAntiSpoofResult]:
+    def predict(self, image: numpy.ndarray, fuse_threshold: float = 0.8, clarity_threshold: float = 0.3) -> list[FaceAntiSpoofResult]:
         ...
 class SeetaFaceAsSecond(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[tuple[int, float]]:
+    def predict(self, image: numpy.ndarray) -> list[tuple[int, float]]:
         ...
 class SeetaFaceGender(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[int]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[int]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> int:
+    def predict(self, image: numpy.ndarray) -> int:
         ...
     @property
     def postprocessor(self) -> SeetaFaceGenderPostprocessor:
@@ -489,23 +497,23 @@ class SeetaFaceGenderPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> list[int]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> list[int]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> list[int]:
+    def run(self, inputs: list[numpy.ndarray]) -> list[int]:
         ...
 class SeetaFaceGenderPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
 class SeetaFaceID(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[FaceRecognitionResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[FaceRecognitionResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> FaceRecognitionResult:
+    def predict(self, image: numpy.ndarray) -> FaceRecognitionResult:
         ...
     @property
     def postprocessor(self) -> SeetaFaceIDPostprocessor:
@@ -517,16 +525,16 @@ class SeetaFaceIDPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> list[FaceRecognitionResult]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> list[FaceRecognitionResult]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> list[FaceRecognitionResult]:
+    def run(self, inputs: list[numpy.ndarray]) -> list[FaceRecognitionResult]:
         ...
 class SeetaFaceIDPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
 class StructureV2Layout(modeldeploy.BaseModel):
     @typing.overload
@@ -535,9 +543,9 @@ class StructureV2Layout(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[list[DetectionResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[DetectionResult]]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[DetectionResult]:
+    def predict(self, image: numpy.ndarray) -> list[DetectionResult]:
         ...
     @property
     def postprocessor(self) -> StructureV2LayoutPostprocessor:
@@ -553,27 +561,27 @@ class StructureV2LayoutPostprocessor:
     score_threshold: float
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[...], arg1: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> list[list[DetectionResult]]:
+    def run(self, inputs: list[modeldeploy.Tensor], batch_layout_img_info: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> list[list[DetectionResult]]:
         ...
 class StructureV2LayoutPreprocessor:
     layout_image_shape: list[int]
     static_shape_infer: bool
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
-    def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
+    def set_normalize(self, mean: list[float], std: list[float], is_scale: bool) -> None:
         ...
 class StructureV2SERViLayoutXLMModel(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> None:
+    def batch_predict(self, images: list[numpy.ndarray]) -> None:
         ...
-    def get_input_info(self, arg0: int) -> modeldeploy.TensorInfo:
+    def get_input_info(self, index: int) -> modeldeploy.TensorInfo:
         ...
-    def infer(self, arg0: dict[str, numpy.ndarray]) -> list[numpy.ndarray]:
+    def infer(self, inputs: dict[str, numpy.ndarray]) -> list[numpy.ndarray]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> None:
+    def predict(self, image: numpy.ndarray) -> None:
         ...
 class StructureV2Table(modeldeploy.BaseModel):
     @typing.overload
@@ -582,9 +590,9 @@ class StructureV2Table(modeldeploy.BaseModel):
     @typing.overload
     def __init__(self) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[OCRResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[OCRResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> OCRResult:
+    def predict(self, image: numpy.ndarray) -> OCRResult:
         ...
     @property
     def postprocessor(self) -> StructureV2TablePostprocessor:
@@ -596,22 +604,22 @@ class StructureV2TablePostprocessor:
     def __init__(self, arg0: str) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> tuple[list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]], list[list[str]]]:
+    def run(self, inputs: list[modeldeploy.Tensor], batch_det_img_info: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> tuple[list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]], list[list[str]]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> tuple[list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]], list[list[str]]]:
+    def run(self, inputs: list[numpy.ndarray], batch_det_img_info: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]) -> tuple[list[list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]], list[list[str]]]:
         ...
 class StructureV2TablePreprocessor:
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
 class UltralyticsCls(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[ClassifyResult]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[ClassifyResult]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> ClassifyResult:
+    def predict(self, image: numpy.ndarray) -> ClassifyResult:
         ...
     @property
     def postprocessor(self) -> UltralyticsClsPostprocessor:
@@ -623,23 +631,23 @@ class UltralyticsClsPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...]) -> list[ClassifyResult]:
+    def run(self, inputs: list[modeldeploy.Tensor]) -> list[ClassifyResult]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray]) -> list[ClassifyResult]:
+    def run(self, input_array: list[numpy.ndarray]) -> list[ClassifyResult]:
         ...
 class UltralyticsClsPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> list[numpy.ndarray]:
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.Tensor]:
         ...
 class UltralyticsDet(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[list[DetectionResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[DetectionResult]]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[DetectionResult]:
+    def predict(self, image: numpy.ndarray) -> list[DetectionResult]:
         ...
     @property
     def postprocessor(self) -> UltralyticsPostprocessor:
@@ -650,9 +658,9 @@ class UltralyticsDet(modeldeploy.BaseModel):
 class UltralyticsObb(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[list[ObbResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[ObbResult]]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[ObbResult]:
+    def predict(self, image: numpy.ndarray) -> list[ObbResult]:
         ...
     @property
     def postprocessor(self) -> UltralyticsObbPostprocessor:
@@ -666,10 +674,10 @@ class UltralyticsObbPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[ObbResult]]:
+    def run(self, inputs: list[modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[ObbResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[ObbResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[ObbResult]]:
         ...
 class UltralyticsObbPreprocessor:
     is_mini_pad: bool
@@ -678,7 +686,7 @@ class UltralyticsObbPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -689,9 +697,9 @@ class UltralyticsObbPreprocessor:
 class UltralyticsPose(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[list[PoseResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[PoseResult]]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[PoseResult]:
+    def predict(self, image: numpy.ndarray) -> list[PoseResult]:
         ...
     @property
     def postprocessor(self) -> UltralyticsPosePostprocessor:
@@ -705,10 +713,10 @@ class UltralyticsPosePostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[PoseResult]]:
+    def run(self, inputs: list[modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[PoseResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[PoseResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[PoseResult]]:
         ...
 class UltralyticsPosePreprocessor:
     is_mini_pad: bool
@@ -717,7 +725,7 @@ class UltralyticsPosePreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -731,10 +739,10 @@ class UltralyticsPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
+    def run(self, inputs: list[modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
         ...
 class UltralyticsPreprocessor:
     is_mini_pad: bool
@@ -743,7 +751,7 @@ class UltralyticsPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -754,9 +762,9 @@ class UltralyticsPreprocessor:
 class UltralyticsSeg(modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, arg0: list[numpy.ndarray]) -> list[list[InstanceSegResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[InstanceSegResult]]:
         ...
-    def predict(self, arg0: numpy.ndarray) -> list[InstanceSegResult]:
+    def predict(self, image: numpy.ndarray) -> list[InstanceSegResult]:
         ...
     @property
     def postprocessor(self) -> UltralyticsSegPostprocessor:
@@ -770,10 +778,10 @@ class UltralyticsSegPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, arg0: list[...], arg1: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
+    def run(self, inputs: list[modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
         ...
     @typing.overload
-    def run(self, arg0: list[numpy.ndarray], arg1: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
         ...
 class UltralyticsSegPreprocessor:
     is_mini_pad: bool
@@ -782,7 +790,7 @@ class UltralyticsSegPreprocessor:
     size: list[int]
     def __init__(self) -> None:
         ...
-    def run(self, arg0: list[numpy.ndarray]) -> tuple[list[numpy.ndarray], list[LetterBoxRecord]]:
+    def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
     @property
     def stride(self) -> bool:
@@ -790,22 +798,19 @@ class UltralyticsSegPreprocessor:
     @stride.setter
     def stride(self, arg1: int) -> None:
         ...
-def vis_cls(arg0: numpy.ndarray, arg1: ClassifyResult, arg2: int, arg3: float, arg4: str, arg5: int, arg6: float, arg7: bool) -> numpy.ndarray:
+def vis_cls(image: numpy.ndarray, result: ClassifyResult, top_k: int, threshold: float, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_det(arg0: numpy.ndarray, arg1: list[DetectionResult], arg2: float, arg3: str, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
+def vis_det(image: numpy.ndarray, result: list[DetectionResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_det_landmarks(arg0: numpy.ndarray, arg1: list[DetectionLandmarkResult], arg2: str, arg3: int, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
+def vis_det_landmarks(image: numpy.ndarray, result: list[DetectionLandmarkResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_iseg(arg0: numpy.ndarray, arg1: list[InstanceSegResult], arg2: float, arg3: str, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
+def vis_iseg(image: numpy.ndarray, result: list[InstanceSegResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_lpr(arg0: numpy.ndarray, arg1: list[LprResult], arg2: str, arg3: int, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
+def vis_lpr(image: numpy.ndarray, result: list[LprResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_obb(arg0: numpy.ndarray, arg1: list[ObbResult], arg2: float, arg3: str, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
+def vis_obb(image: numpy.ndarray, result: list[ObbResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_ocr(arg0: numpy.ndarray, arg1: OCRResult, arg2: str, arg3: int, arg4: float, arg5: bool) -> numpy.ndarray:
+def vis_ocr(image: numpy.ndarray, result: OCRResult, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_pose(arg0: numpy.ndarray, arg1: list[PoseResult], arg2: str, arg3: int, arg4: int, arg5: float, arg6: bool) -> numpy.ndarray:
+def vis_pose(image: numpy.ndarray, result: list[PoseResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
     ...
-FUZZY: FaceAntiSpoofResult  # value = <FaceAntiSpoofResult.FUZZY: 1>
-REAL: FaceAntiSpoofResult  # value = <FaceAntiSpoofResult.REAL: 0>
-SPOOF: FaceAntiSpoofResult  # value = <FaceAntiSpoofResult.SPOOF: 2>

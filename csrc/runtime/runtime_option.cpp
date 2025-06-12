@@ -25,7 +25,7 @@ namespace modeldeploy {
         ort_option.external_stream_ = external_stream;
     }
 
-    void RuntimeOption::set_cpu_thread_num(int thread_num) {
+    void RuntimeOption::set_cpu_thread_num(const int thread_num) {
         ort_option.set_cpu_thread_num(thread_num);
     }
 

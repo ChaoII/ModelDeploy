@@ -7,13 +7,14 @@
 #include "csrc/runtime/runtime.h"
 
 namespace modeldeploy {
-    std::vector<pybind11::array> infer_with_numpy_map(Runtime& self, std::map<std::string, pybind11::array>& data) {
+    std::vector<pybind11::array>
+    infer_with_numpy_map(const Runtime& self, std::map<std::string, pybind11::array>& inputs) {
         // 原第一个 lambda 的实现
-        std::vector<Tensor> inputs;
-        inputs.reserve(data.size());
-        for (auto& [name, array] : data) {
+        std::vector<Tensor> _inputs;
+        _inputs.reserve(inputs.size());
+        for (auto& [name, array] : inputs) {
             // 获取 shape
-            std::vector<int64_t> data_shape(array.shape(), array.shape() + array.ndim());
+            std::vector data_shape(array.shape(), array.shape() + array.ndim());
             // 获取 dtype 并分配 Tensor
             auto dtype = numpy_data_type_to_md_data_type(array.dtype());
             Tensor tensor;
@@ -21,12 +22,12 @@ namespace modeldeploy {
             tensor.set_name(name);
             // 拷贝数据（TODO: 后续考虑使用 SetExternalData 避免拷贝）
             tensor.from_external_memory(array.mutable_data(), tensor.shape(), tensor.dtype());
-            // memcpy(tensor.data(), array.mutable_data(), array.nbytes());
-            inputs.push_back(std::move(tensor));
+            // memcpy(tensor.inputs(), array.mutable_data(), array.nbytes());
+            _inputs.push_back(std::move(tensor));
         }
 
         std::vector<Tensor> outputs(self.num_outputs());
-        self.infer(inputs, &outputs);
+        self.infer(_inputs, &outputs);
         std::vector<pybind11::array> results;
         results.reserve(outputs.size());
         for (size_t i = 0; i < outputs.size(); ++i) {
@@ -39,25 +40,25 @@ namespace modeldeploy {
     }
 
 
-    std::vector<Tensor> infer_with_tensor_map(Runtime& self, std::map<std::string, Tensor>& data) {
+    std::vector<Tensor> infer_with_tensor_map(const Runtime& self, std::map<std::string, Tensor>& inputs) {
         // 原第二个 lambda 的实现
-        std::vector<Tensor> inputs;
-        inputs.reserve(data.size());
-        for (auto iter = data.begin(); iter != data.end(); ++iter) {
+        std::vector<Tensor> _inputs;
+        _inputs.reserve(inputs.size());
+        for (auto iter = inputs.begin(); iter != inputs.end(); ++iter) {
             Tensor tensor;
             tensor.from_external_memory(iter->second.data(), iter->second.shape(),
                                         iter->second.dtype());
             tensor.set_name(iter->first);
-            inputs.push_back(tensor);
+            _inputs.push_back(tensor);
         }
         std::vector<Tensor> outputs;
-        if (!self.infer(inputs, &outputs)) {
+        if (!self.infer(_inputs, &outputs)) {
             throw std::runtime_error("Failed to inference with Runtime.");
         }
         return outputs;
     }
 
-    std::vector<Tensor> infer_with_tensor_vector(Runtime& self, std::vector<Tensor>& inputs) {
+    std::vector<Tensor> infer_with_tensor_vector(const Runtime& self, std::vector<Tensor>& inputs) {
         // 原第三个 lambda 的实现
         std::vector<Tensor> outputs;
         self.infer(inputs, &outputs);
@@ -76,22 +77,23 @@ namespace modeldeploy {
 
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")
             .def(pybind11::init())
-            .def("set_model_path", &RuntimeOption::set_model_path)
-            .def("use_gpu", &RuntimeOption::use_gpu)
+            .def("set_model_path", &RuntimeOption::set_model_path, pybind11::arg("model_path"))
+            .def("use_gpu", &RuntimeOption::use_gpu, pybind11::arg("device_id") = 0)
             .def("use_cpu", &RuntimeOption::use_cpu)
-            .def("set_ort_graph_opt_level", &RuntimeOption::set_ort_graph_opt_level)
-            .def_readwrite("model_buffer", &RuntimeOption::model_buffer)
-            // .def_readwrite("ort_option", &RuntimeOption::ort_option)
-            .def("set_external_stream", &RuntimeOption::set_external_stream,
-                 pybind11::arg("stream"),
-                 pybind11::doc("A pointer to an external stream")
-            )
-            .def("set_external_raw_stream",
-                 [](RuntimeOption& self, size_t external_stream) {
-                     self.set_external_stream(reinterpret_cast<void*>(external_stream));
-                 })
-            .def("set_cpu_thread_num", &RuntimeOption::set_cpu_thread_num)
+            .def("set_ort_graph_opt_level", &RuntimeOption::set_ort_graph_opt_level, pybind11::arg("level") = -1)
+            .def("set_cpu_thread_num", &RuntimeOption::set_cpu_thread_num, pybind11::arg("thread_num") = -1)
             .def("use_ort_backend", &RuntimeOption::use_ort_backend)
+            // 不暴露给python
+            // .def_readwrite("ort_option", &RuntimeOption::ort_option)
+            // .def("set_external_stream", &RuntimeOption::set_external_stream,
+            //      pybind11::arg("stream"),
+            //      pybind11::doc("A pointer to an external stream")
+            // )
+            // .def("set_external_raw_stream",
+            //      [](RuntimeOption& self, size_t external_stream) {
+            //          self.set_external_stream(reinterpret_cast<void*>(external_stream));
+            //      })
+            .def_readwrite("model_buffer", &RuntimeOption::model_buffer)
             .def_readwrite("model_file", &RuntimeOption::model_file)
             .def_readwrite("backend", &RuntimeOption::backend)
             .def_readwrite("cpu_thread_num", &RuntimeOption::cpu_thread_num)
@@ -100,15 +102,6 @@ namespace modeldeploy {
             .def_readwrite("model_from_memory", &RuntimeOption::model_from_memory)
             .def_readwrite("enable_trt", &RuntimeOption::enable_trt)
             .def_readwrite("enable_fp16", &RuntimeOption::enable_fp16);
-
-        pybind11::enum_<DataType>(m, "DataType")
-            .value("FP32", DataType::FP32)
-            .value("FP64", DataType::FP64)
-            .value("INT32", DataType::INT32)
-            .value("INT64", DataType::INT64)
-            .value("INT8", DataType::INT8)
-            .value("UINT8", DataType::UINT8)
-            .value("UNKNOW", DataType::UNKNOW);
 
 
         pybind11::class_<TensorInfo>(m, "TensorInfo")
@@ -122,11 +115,11 @@ namespace modeldeploy {
         pybind11::class_<Runtime>(m, "Runtime")
             .def(pybind11::init())
             .def("init", &Runtime::init)
-            .def("infer", infer_with_numpy_map)
-            .def("infer", infer_with_tensor_map)
-            .def("infer", infer_with_tensor_vector)
-            .def("bind_input_tensor", &Runtime::bind_input_tensor)
-            .def("bind_output_tensor", &Runtime::bind_output_tensor)
+            .def("infer", infer_with_numpy_map, pybind11::arg("inputs"))
+            .def("infer", infer_with_tensor_map, pybind11::arg("inputs"))
+            .def("infer", infer_with_tensor_vector, pybind11::arg("inputs"))
+            .def("bind_input_tensor", &Runtime::bind_input_tensor, pybind11::arg("name"), pybind11::arg("input"))
+            .def("bind_output_tensor", &Runtime::bind_output_tensor, pybind11::arg("name"), pybind11::arg("output"))
             .def("infer", [](Runtime& self) { self.infer(); })
             .def("get_output_tensor",
                  [](Runtime& self, const std::string& name) {
@@ -135,11 +128,11 @@ namespace modeldeploy {
                          return pybind11::cast(nullptr);
                      }
                      return pybind11::cast(*output);
-                 })
+                 }, pybind11::arg("name"))
             .def("num_inputs", &Runtime::num_inputs)
             .def("num_outputs", &Runtime::num_outputs)
-            .def("get_input_info", &Runtime::get_input_info)
-            .def("get_output_info", &Runtime::get_output_info)
+            .def("get_input_info", &Runtime::get_input_info, pybind11::arg("index"))
+            .def("get_output_info", &Runtime::get_output_info, pybind11::arg("index"))
             .def_readonly("option", &Runtime::option);
     }
 }

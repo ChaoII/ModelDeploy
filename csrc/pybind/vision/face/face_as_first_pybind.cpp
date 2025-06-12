@@ -11,11 +11,11 @@ namespace modeldeploy::vision {
         pybind11::class_<face::SeetaFaceAsFirst, BaseModel>(m, "SeetaFaceAsFirst")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](face::SeetaFaceAsFirst& self, pybind11::array& data) {
-                     auto mat = pyarray_to_cv_mat(data);
+                 [](face::SeetaFaceAsFirst& self, pybind11::array& image) {
+                     auto mat = pyarray_to_cv_mat(image);
                      float result;
                      self.predict(mat, &result);
                      return result;
-                 });
+                 }, pybind11::arg("image"));
     }
 } // namespace modeldeploy

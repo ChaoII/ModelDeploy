@@ -10,24 +10,21 @@ namespace modeldeploy::vision {
     void bind_face_gender(const pybind11::module& m) {
         pybind11::class_<face::SeetaFaceGenderPreprocessor>(m, "SeetaFaceGenderPreprocessor")
             .def(pybind11::init<>())
-            .def(
-                "run",
-                [](const face::SeetaFaceGenderPreprocessor& self,
-                   std::vector<pybind11::array>& im_list) {
-                    std::vector<cv::Mat> images;
-                    images.reserve(im_list.size());
-                    for (auto& image : im_list) {
-                        images.push_back(pyarray_to_cv_mat(image));
-                    }
-                    std::vector<Tensor> outputs;
-                    if (!self.run(&images, &outputs)) {
-                        throw std::runtime_error(
-                            "Failed to preprocess the input data in SeetaFaceGenderPreprocessor.");
-                    }
-                    pybind11::array array;
-                    tensor_list_to_pyarray(outputs, array);
-                    return array;
-                })
+            .def("run",
+                 [](const face::SeetaFaceGenderPreprocessor& self,
+                    std::vector<pybind11::array>& im_list) {
+                     std::vector<cv::Mat> images;
+                     images.reserve(im_list.size());
+                     for (auto& image : im_list) {
+                         images.push_back(pyarray_to_cv_mat(image));
+                     }
+                     std::vector<Tensor> outputs;
+                     if (!self.run(&images, &outputs)) {
+                         throw std::runtime_error(
+                             "Failed to preprocess the input data in SeetaFaceGenderPreprocessor.");
+                     }
+                     return outputs;
+                 }, pybind11::arg("im_list"))
             .def_property("size", &face::SeetaFaceGenderPreprocessor::get_size,
                           &face::SeetaFaceGenderPreprocessor::set_size);
 
@@ -43,7 +40,7 @@ namespace modeldeploy::vision {
                              "SeetaFaceGenderPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"))
             .def("run",
                  [](face::SeetaFaceGenderPostprocessor& self,
                     std::vector<pybind11::array>& input_arrays) {
@@ -55,30 +52,30 @@ namespace modeldeploy::vision {
                              "Failed to postprocess the runtime SeetaFaceGenderPostprocessor in LprDetPostprocessor.");
                      }
                      return results;
-                 });
+                 }, pybind11::arg("inputs"));
 
 
         pybind11::class_<face::SeetaFaceGender, BaseModel>(m, "SeetaFaceGender")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](face::SeetaFaceGender& self, pybind11::array& data) {
-                     const auto mat = pyarray_to_cv_mat(data);
-                     int res;
-                     self.predict(mat, &res);
-                     return res;
-                 })
+                 [](face::SeetaFaceGender& self, pybind11::array& image) {
+                     const auto mat = pyarray_to_cv_mat(image);
+                     int result;
+                     self.predict(mat, &result);
+                     return result;
+                 }, pybind11::arg("image"))
             .def("batch_predict",
                  [](face::SeetaFaceGender& self,
-                    std::vector<pybind11::array>& data) {
-                     std::vector<cv::Mat> images;
-                     images.reserve(data.size());
-                     for (auto& image : data) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                    std::vector<pybind11::array>& images) {
+                     std::vector<cv::Mat> _images;
+                     _images.reserve(images.size());
+                     for (auto& image : images) {
+                         _images.push_back(pyarray_to_cv_mat(image));
                      }
                      std::vector<int> results;
-                     self.batch_predict(images, &results);
+                     self.batch_predict(_images, &results);
                      return results;
-                 })
+                 }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",
                                    &face::SeetaFaceGender::get_preprocessor)
             .def_property_readonly("postprocessor",

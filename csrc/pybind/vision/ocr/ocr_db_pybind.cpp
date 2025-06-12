@@ -20,7 +20,7 @@ namespace modeldeploy::vision {
             .def("set_normalize",
                  [](ocr::DBDetectorPreprocessor& self,
                     const std::vector<float>& mean, const std::vector<float>& std,
-                    bool is_scale) {
+                    const bool is_scale) {
                      self.set_normalize(mean, std, is_scale);
                  })
             .def("run",
@@ -33,10 +33,8 @@ namespace modeldeploy::vision {
                      std::vector<Tensor> outputs;
                      self.apply(&images, &outputs);
                      auto batch_det_img_info = self.get_batch_img_info();
-                     pybind11::array array;
-                     tensor_list_to_pyarray(outputs, array);
-                     return std::make_pair(array, *batch_det_img_info);
-                 });
+                     return std::make_pair(outputs, *batch_det_img_info);
+                 }, pybind11::arg("im_list"));
 
 
         pybind11::class_<ocr::DBDetectorPostprocessor>(
@@ -69,7 +67,7 @@ namespace modeldeploy::vision {
                              "DBDetectorPostprocessor.");
                      }
                      return results;
-                 })
+                 }, pybind11::arg("inputs"), pybind11::arg("batch_det_img_info"))
             .def("run",
                  [](ocr::DBDetectorPostprocessor& self,
                     std::vector<pybind11::array>& input_array,
@@ -79,11 +77,10 @@ namespace modeldeploy::vision {
                      pyarray_to_tensor_list(input_array, &inputs, /*share_buffer=*/true);
                      if (!self.apply(inputs, &results, batch_det_img_info)) {
                          throw std::runtime_error(
-                             "Failed to preprocess the input data in "
-                             "DBDetectorPostprocessor.");
+                             "Failed to preprocess the input data in DBDetectorPostprocessor.");
                      }
                      return results;
-                 });
+                 }, pybind11::arg("inputs"), pybind11::arg("batch_det_img_info"));
 
         pybind11::class_<ocr::DBDetector, BaseModel>(m, "DBDetector")
             .def(pybind11::init<std::string, RuntimeOption>())
@@ -93,21 +90,21 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &ocr::DBDetector::get_postprocessor)
             .def("predict",
-                 [](ocr::DBDetector& self, pybind11::array& data) {
-                     auto mat = pyarray_to_cv_mat(data);
+                 [](ocr::DBDetector& self, pybind11::array& image) {
+                     auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
                      self.predict(mat, &ocr_result);
                      return ocr_result;
-                 })
+                 }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::DBDetector& self,
-                                     std::vector<pybind11::array>& data) {
-                std::vector<cv::Mat> images;
-                for (auto& image : data) {
-                    images.push_back(pyarray_to_cv_mat(image));
+                                     std::vector<pybind11::array>& images) {
+                std::vector<cv::Mat> _images;
+                for (auto& image : images) {
+                    _images.push_back(pyarray_to_cv_mat(image));
                 }
                 std::vector<OCRResult> ocr_results;
-                self.batch_predict(images, &ocr_results);
+                self.batch_predict(_images, &ocr_results);
                 return ocr_results;
-            });
+            }, pybind11::arg("images"));
     }
 } // namespace modeldeploy
