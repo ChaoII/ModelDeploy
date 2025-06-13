@@ -11,10 +11,12 @@ namespace ModelDeploy.vision.detection
         private MDModel _model;
         private bool _disposed;
 
-        public UltralyticsDet(string modelDir, MDRuntimeOption option)
+        public UltralyticsDet(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_detection_model(ref _model, modelDir, ref option), "Create detection model");
+            var nativeRuntimeOption = option.ToNative();
+            Utils.Check(md_create_detection_model(ref _model, modelDir, ref nativeRuntimeOption),
+                "Create detection model");
         }
 
         public void SetInputSize(int width, int height)

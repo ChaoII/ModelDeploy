@@ -11,10 +11,11 @@ namespace ModelDeploy.vision.obb
         private MDModel _model;
         private bool _disposed;
 
-        public UltralyticsObb(string modelDir, int threadNum = 8)
+        public UltralyticsObb(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_obb_model(ref _model, modelDir, threadNum), "Create detection model");
+            var optionNative = option.ToNative();
+            Utils.Check(md_create_obb_model(ref _model, modelDir, ref optionNative), "Create detection model");
         }
 
         public void SetInputSize(int width, int height)
@@ -81,7 +82,7 @@ namespace ModelDeploy.vision.obb
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_obb_model(ref MDModel model, string modelDir, int threadNum);
+        private static extern int md_create_obb_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_obb_input_size(ref MDModel model, MDSize size);

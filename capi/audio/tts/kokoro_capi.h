@@ -12,7 +12,7 @@ extern "C" {
 
 
 MODELDEPLOY_CAPI_EXPORT MDStatusCode
-md_create_kokoro_model(MDModel* model, const MDKokoroParameters* kokoro_parameters);
+md_create_kokoro_model(MDModel* model, const MDKokoroParameters* kokoro_parameters, const MDRuntimeOption* option);
 
 
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_kokoro_model_predict(const MDModel* model, const char* input_text,

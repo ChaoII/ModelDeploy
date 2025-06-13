@@ -11,10 +11,11 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
-        public Scrfd(string modelDir, int threadNum = 8)
+        public Scrfd(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_det_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_face_det_model(ref _model, modelPath, ref nativeOption), "Create detection model");
         }
 
 
@@ -62,7 +63,8 @@ namespace ModelDeploy.vision.face
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_det_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_face_det_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_det_predict(ref MDModel model, ref MDImage image,
@@ -88,10 +90,11 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
-        public SeetaFaceId(string modelDir, int threadNum = 8)
+        public SeetaFaceId(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_rec_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_face_rec_model(ref _model, modelPath, ref nativeOption), "Create detection model");
         }
 
 
@@ -137,7 +140,8 @@ namespace ModelDeploy.vision.face
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_rec_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_face_rec_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_rec_predict(ref MDModel model, ref MDImage image,
@@ -161,10 +165,11 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
-        public SeetaFaceAge(string modelDir, int threadNum = 8)
+        public SeetaFaceAge(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_age_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_face_age_model(ref _model, modelDir, ref nativeOption), "Create detection model");
         }
 
 
@@ -191,7 +196,8 @@ namespace ModelDeploy.vision.face
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_age_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_face_age_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_age_predict(ref MDModel model, ref MDImage image,
@@ -214,10 +220,11 @@ namespace ModelDeploy.vision.face
             Male
         }
 
-        public SeetaFaceGender(string modelDir, int threadNum = 8)
+        public SeetaFaceGender(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_gender_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_face_gender_model(ref _model, modelDir, ref nativeOption), "Create detection model");
         }
 
 
@@ -244,7 +251,8 @@ namespace ModelDeploy.vision.face
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_gender_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_face_gender_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_gender_predict(ref MDModel model, ref MDImage image,
@@ -261,10 +269,12 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
-        public SeetaFaceAsFirst(string modelDir, int threadNum = 8)
+        public SeetaFaceAsFirst(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_as_first_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_face_as_first_model(ref _model, modelDir, ref nativeOption),
+                "Create detection model");
         }
 
 
@@ -291,7 +301,8 @@ namespace ModelDeploy.vision.face
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_as_first_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_face_as_first_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_as_first_predict(ref MDModel model, ref MDImage image, ref float cResult);
@@ -307,10 +318,12 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
-        public SeetaFaceAsSecond(string modelDir, int threadNum = 8)
+        public SeetaFaceAsSecond(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_as_second_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_face_as_second_model(ref _model, modelPath, ref nativeOption),
+                "Create detection model");
         }
 
 
@@ -345,7 +358,7 @@ namespace ModelDeploy.vision.face
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
-            md_create_face_as_second_model(ref MDModel model, string modelPath, int threadNum = 8);
+            md_create_face_as_second_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_as_second_predict(ref MDModel model, ref MDImage image,
@@ -367,11 +380,12 @@ namespace ModelDeploy.vision.face
 
 
         public SeetaFaceAntiSpoof(string faceDetModelFile, string firstModelFile, string secondModelFile,
-            int threadNum = 8)
+            RuntimeOption option)
         {
             _model = new MDModel();
+            var nativeOption = option.ToNative();
             Utils.Check(md_create_face_as_pipeline_model(ref _model, faceDetModelFile, firstModelFile, secondModelFile,
-                threadNum), "Create detection model");
+                ref nativeOption), "Create detection model");
         }
 
 
@@ -414,7 +428,7 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_create_face_as_pipeline_model(ref MDModel model, string faceDetModelFile, string firstModelFile,
-                string secondModelFile, int threadNum = 8);
+                string secondModelFile, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_as_pipeline_predict(ref MDModel model, ref MDImage image,
@@ -435,10 +449,12 @@ namespace ModelDeploy.vision.face
         private bool _disposed;
 
 
-        public FaceRecognizerPipeline(string faceDetModelFile, string faceRecModelFile, int threadNum = 8)
+        public FaceRecognizerPipeline(string faceDetModelFile, string faceRecModelFile, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_face_rec_pipeline_model(ref _model, faceDetModelFile, faceRecModelFile, threadNum),
+            var nativeOption = option.ToNative();
+            Utils.Check(
+                md_create_face_rec_pipeline_model(ref _model, faceDetModelFile, faceRecModelFile, ref nativeOption),
                 "Create detection model");
         }
 
@@ -482,7 +498,7 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_create_face_rec_pipeline_model(ref MDModel model, string faceDetModelFile, string faceRecModelFile,
-                int threadNum = 8);
+                ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_rec_pipeline_predict(ref MDModel model, ref MDImage image,

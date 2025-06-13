@@ -11,12 +11,15 @@
 #include "capi/common/md_micro.h"
 #include "capi/audio/tts/kokoro_capi.h"
 
+#include <capi/utils/internal/utils.h>
+
 
 namespace fs = std::filesystem;
 
-MDStatusCode md_create_kokoro_model(MDModel* model, const MDKokoroParameters* kokoro_parameters) {
-    modeldeploy::RuntimeOption runtime_option;
-    runtime_option.set_cpu_thread_num(kokoro_parameters->num_threads);
+MDStatusCode md_create_kokoro_model(MDModel* model, const MDKokoroParameters* kokoro_parameters,
+                                    const MDRuntimeOption* option) {
+    modeldeploy::RuntimeOption _option;
+    c_runtime_option_2_runtime_option(option, &_option);
     const auto kokoro_model = new modeldeploy::audio::tts::Kokoro(
         fs::path(kokoro_parameters->model_path).string(),
         fs::path(kokoro_parameters->tokens_path).string(),
@@ -27,7 +30,7 @@ MDStatusCode md_create_kokoro_model(MDModel* model, const MDKokoroParameters* ko
         fs::path(kokoro_parameters->voice_bin_path).string(),
         fs::path(kokoro_parameters->jieba_dir).string(),
         fs::path(kokoro_parameters->text_normalization_dir).string(),
-        runtime_option);
+        _option);
     model->type = MDModelType::TTS;
     model->format = MDModelFormat::ONNX;
     model->model_content = kokoro_model;

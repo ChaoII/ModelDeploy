@@ -43,7 +43,7 @@ MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRec
 
 
 void md_print_face_rec_result(const MDFaceRecognizerResult* c_result) {
-    std::vector<modeldeploy::vision::FaceRecognitionResult> result;
+    std::vector<modeldeploy::vision::FaceRecognitionResult> result(1);
     c_result_2_face_recognizer_result(c_result, &result[0]);
     dis_face_rec(result);
 }

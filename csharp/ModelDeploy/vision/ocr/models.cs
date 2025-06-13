@@ -11,10 +11,11 @@ namespace ModelDeploy.vision.ocr
         private MDModel _model;
         private bool _disposed;
 
-        public PaddleOcr(MDOCRModelParameters parameters)
+        public PaddleOcr(MDOCRModelParameters parameters, RuntimeOption option)
         {
             _model = new MDModel();
-            if (md_create_ocr_model(ref _model, ref parameters) != 0)
+            var nativeOption = option.ToNative();
+            if (md_create_ocr_model(ref _model, ref parameters, ref nativeOption) != 0)
                 throw new Exception("md_create_ocr_model failed.");
         }
 
@@ -54,7 +55,8 @@ namespace ModelDeploy.vision.ocr
         ~PaddleOcr() => Dispose();
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_ocr_model(ref MDModel model, ref MDOCRModelParameters parameters);
+        private static extern int md_create_ocr_model(ref MDModel model, ref MDOCRModelParameters parameters,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_ocr_model_predict(ref MDModel model, ref MDImage image, ref MDOCRResults results);
@@ -78,10 +80,11 @@ namespace ModelDeploy.vision.ocr
         private MDModel _model;
         private bool _disposed;
 
-        public OcrRecognition(string modelPath, string dictPath, int threadNum = 1)
+        public OcrRecognition(string modelPath, string dictPath, RuntimeOption option)
         {
             _model = new MDModel();
-            if (md_create_ocr_recognition_model(ref _model, modelPath, dictPath, threadNum) != 0)
+            var nativeOption = option.ToNative();
+            if (md_create_ocr_recognition_model(ref _model, modelPath, dictPath, ref nativeOption) != 0)
             {
                 md_free_ocr_recognition_model(ref _model);
                 throw new Exception("md_create_ocr_recognition_model failed.");
@@ -143,7 +146,7 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_ocr_recognition_model(ref MDModel model, string modelPath, string dictPath,
-            int threadNum);
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_ocr_recognition_model_predict(ref MDModel model, ref MDImage image,
@@ -168,10 +171,11 @@ namespace ModelDeploy.vision.ocr
         private MDModel _model;
         private bool _disposed;
 
-        public PaddleStructureTable(MDStructureTableModelParameters parameters)
+        public PaddleStructureTable(MDStructureTableModelParameters parameters, RuntimeOption option)
         {
             _model = new MDModel();
-            if (md_create_structure_table_model(ref _model, ref parameters) != 0)
+            var nativeRuntimeOption = option.ToNative();
+            if (md_create_structure_table_model(ref _model, ref parameters, ref nativeRuntimeOption) != 0)
                 throw new Exception("md_create_ocr_model failed.");
         }
 
@@ -209,7 +213,7 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_structure_table_model(ref MDModel model,
-            ref MDStructureTableModelParameters parameters);
+            ref MDStructureTableModelParameters parameters, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_structure_table_model_predict(ref MDModel model, ref MDImage image,

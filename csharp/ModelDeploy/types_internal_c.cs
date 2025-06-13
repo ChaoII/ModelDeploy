@@ -149,7 +149,6 @@ namespace ModelDeploy
             public string voice_bin_path;
             public string jieba_dir;
             public string text_normalization_dir;
-            public int num_threads;
         }
 
         [StructLayout(LayoutKind.Sequential)]
