@@ -11,10 +11,11 @@ namespace ModelDeploy.vision.lpr
         private MDModel _model;
         private bool _disposed;
 
-        public LprDetection(string modelDir, int threadNum = 8)
+        public LprDetection(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_lpr_det_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_lpr_det_model(ref _model, modelDir, ref nativeOption), "Create detection model");
         }
 
 
@@ -75,7 +76,8 @@ namespace ModelDeploy.vision.lpr
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_lpr_det_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_lpr_det_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_lpr_det_predict(ref MDModel model, ref MDImage image,
@@ -103,10 +105,11 @@ namespace ModelDeploy.vision.lpr
         private MDModel _model;
         private bool _disposed;
 
-        public LprRecognizer(string modelDir, int threadNum = 8)
+        public LprRecognizer(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_lpr_rec_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_lpr_rec_model(ref _model, modelDir, ref nativeOption), "Create detection model");
         }
 
 
@@ -153,7 +156,8 @@ namespace ModelDeploy.vision.lpr
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_lpr_rec_model(ref MDModel model, string modelPath, int threadNum = 8);
+        private static extern int md_create_lpr_rec_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_lpr_rec_predict(ref MDModel model, ref MDImage image,
@@ -177,10 +181,11 @@ namespace ModelDeploy.vision.lpr
         private MDModel _model;
         private bool _disposed;
 
-        public LprPipeline(string lprDetModelFile, string lprRecModelFile, int threadNum = 8)
+        public LprPipeline(string lprDetModelFile, string lprRecModelFile, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_lpr_pipeline_model(ref _model, lprDetModelFile, lprRecModelFile, threadNum),
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_lpr_pipeline_model(ref _model, lprDetModelFile, lprRecModelFile, ref nativeOption),
                 "Create detection model");
         }
 
@@ -243,7 +248,7 @@ namespace ModelDeploy.vision.lpr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_lpr_pipeline_model(ref MDModel model, string lprDetModelFile,
-            string lprRecModelFile, int threadNum = 8);
+            string lprRecModelFile, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_lpr_pipeline_predict(ref MDModel model, ref MDImage image,

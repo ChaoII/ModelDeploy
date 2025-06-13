@@ -6,6 +6,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+#include <capi/utils/md_utils_capi.h>
+
 #include "capi/audio/tts/kokoro_capi.h"
 
 
@@ -22,8 +24,8 @@ int main() {
     params.voice_bin_path = "../../test_data/test_models/kokoro_v1_1/voices.bin";
     params.jieba_dir = "../../test_data/test_models/kokoro_v1_1/dict/";
     params.text_normalization_dir = "../../test_data/";
-    params.num_threads = -1;
-    auto kokoro = md_create_kokoro_model(&model, &params);
+    auto option = md_create_default_runtime_option();
+    auto kokoro = md_create_kokoro_model(&model, &params, &option);
     const char* test_str0 = "来听一听, 这个是什么口音? How are you doing your kaldi? Are you ok? Thank you! 你觉得中英文说得如何呢?";
     const char* test_str = "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。";
     const char* test_str1 =

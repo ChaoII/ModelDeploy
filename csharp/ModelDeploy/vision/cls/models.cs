@@ -11,10 +11,12 @@ namespace ModelDeploy.vision.classification
         private MDModel _model;
         private bool _disposed;
 
-        public UltralyticsCls(string modelDir, int threadNum = 8)
+        public UltralyticsCls(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_classification_model(ref _model, modelDir, threadNum), "Create detection model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_classification_model(ref _model, modelPath, ref nativeOption),
+                "Create detection model");
         }
 
         public void SetInputSize(int width, int height)
@@ -69,7 +71,8 @@ namespace ModelDeploy.vision.classification
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_classification_model(ref MDModel model, string modelDir, int threadNum);
+        private static extern int md_create_classification_model(ref MDModel model, string modelPath,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_classification_input_size(ref MDModel model, MDSize size);

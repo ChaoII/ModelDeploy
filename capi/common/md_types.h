@@ -144,7 +144,6 @@ typedef struct {
     const char* voice_bin_path;
     const char* jieba_dir;
     const char* text_normalization_dir;
-    int num_threads;
 } MDKokoroParameters;
 
 

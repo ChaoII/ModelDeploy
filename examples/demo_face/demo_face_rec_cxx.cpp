@@ -14,8 +14,8 @@ int main() {
     assert(faceid_model.is_initialized());
     auto im0 = cv::imread("../../test_data/test_images/test_face_id1.jpg");
     auto im1 = cv::imread("../../test_data/test_images/test_face_id4.jpg");
-    std::vector<modeldeploy::vision::FaceRecognitionResult> result0;
-    std::vector<modeldeploy::vision::FaceRecognitionResult> result1;
+    std::vector<modeldeploy::vision::FaceRecognitionResult> result0(1);
+    std::vector<modeldeploy::vision::FaceRecognitionResult> result1(1);
     faceid_model.predict(im0, &result0[0]);
     faceid_model.predict(im1, &result1[0]);
     const auto similarity = modeldeploy::vision::utils::compute_similarity(result0[0].embedding, result1[0].embedding);

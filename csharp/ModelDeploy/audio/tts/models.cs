@@ -10,10 +10,11 @@ namespace ModelDeploy.audio.tts
         private MDModel _model;
         private bool _disposed;
 
-        public Kokoro(MDKokoroParameters parameters)
+        public Kokoro(MDKokoroParameters parameters, RuntimeOption option)
         {
             _model = new MDModel();
-            Utils.Check(md_create_kokoro_model(ref _model, ref parameters), "Create model");
+            var nativeOption = option.ToNative();
+            Utils.Check(md_create_kokoro_model(ref _model, ref parameters, ref nativeOption), "Create model");
         }
 
         public TtsResult Predict(string text, string voice, float speed)
@@ -49,7 +50,8 @@ namespace ModelDeploy.audio.tts
         ~Kokoro() => Dispose();
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_kokoro_model(ref MDModel model, ref MDKokoroParameters parameters);
+        private static extern int md_create_kokoro_model(ref MDModel model, ref MDKokoroParameters parameters,
+            ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_kokoro_model_predict(ref MDModel model, IntPtr text, string voice, float speed,

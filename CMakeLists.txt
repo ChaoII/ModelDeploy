@@ -115,6 +115,10 @@ if (BUILD_PYTHON)
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
     pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
     target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
+    set_target_properties(modeldeploy PROPERTIES
+            INSTALL_RPATH "$ORIGIN"
+            BUILD_WITH_INSTALL_RPATH TRUE
+    )
     install(TARGETS modeldeploy DESTINATION modeldeploy)
     install(TARGETS ${LIBRARY_NAME}
             RUNTIME DESTINATION modeldeploy
