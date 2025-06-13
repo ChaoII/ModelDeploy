@@ -31,7 +31,7 @@ namespace modeldeploy {
 
 
 #ifdef BUILD_VISION
-    cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray);
+    cv::Mat pyarray_to_cv_mat(const pybind11::array& pyarray);
 
     pybind11::array cv_mat_to_pyarray(const cv::Mat& mat);
 

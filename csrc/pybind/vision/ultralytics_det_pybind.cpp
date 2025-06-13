@@ -11,17 +11,22 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](const detection::UltralyticsPreprocessor& self,
-                    std::vector<pybind11::array>& im_list) {
+                    const std::vector<pybind11::array>& im_list) {
                      std::vector<cv::Mat> images;
                      images.reserve(im_list.size());
+                     std::cout << "im_list size: " << im_list.size() << std::endl;
                      for (auto& image : im_list) {
                          images.push_back(pyarray_to_cv_mat(image));
                      }
+                     std::cout << "images size: " << images.size() << std::endl;
                      std::vector<LetterBoxRecord> records;
                      std::vector<Tensor> outputs;
                      if (!self.run(&images, &outputs, &records)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in YOLOv8Preprocessor.");
+                     }
+                     for (auto& output : outputs) {
+                         output.set_owns_data(true);
                      }
                      return make_pair(outputs, records);
                  }, pybind11::arg("im_list"))

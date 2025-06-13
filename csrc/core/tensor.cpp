@@ -187,6 +187,14 @@ namespace modeldeploy {
         name_ = name;
     }
 
+    bool Tensor::get_owns_data() const {
+        return owns_data_;
+    }
+
+    void Tensor::set_owns_data(const bool owns_data) {
+        owns_data_ = owns_data;
+    }
+
     template <typename T>
     void Tensor::set_data(const T* data, const size_t size) {
         if (size * sizeof(T) != byte_size()) {

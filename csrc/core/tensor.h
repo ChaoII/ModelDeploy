@@ -87,6 +87,8 @@ namespace modeldeploy {
         void set_name(const std::string& name);
         static size_t get_element_size(DataType dtype);
         [[nodiscard]] size_t outer_dim(int axis) const;
+        [[nodiscard]] bool get_owns_data() const;
+        void set_owns_data(bool owns_data);
 
         // 数据操作接口 - 优化版本
         template <typename T>
