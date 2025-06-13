@@ -140,7 +140,7 @@ namespace modeldeploy {
         return CV_8U;
     }
 
-    int numpy_data_type_to_open_cv_type_v2(pybind11::array& pyarray) {
+    int numpy_data_type_to_open_cv_type_v2(const pybind11::array& pyarray) {
         if (pybind11::isinstance<pybind11::array_t<std::int32_t>>(pyarray)) {
             return CV_32S;
         }
@@ -179,7 +179,7 @@ namespace modeldeploy {
         }
     }
 
-    cv::Mat pyarray_to_cv_mat(pybind11::array& pyarray) {
+    cv::Mat pyarray_to_cv_mat(const pybind11::array& pyarray) {
         if (pyarray.ndim() != 3) {
             throw std::runtime_error("Expected 3D array (HWC) for image input");
         }
