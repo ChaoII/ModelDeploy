@@ -1,8 +1,10 @@
+import pickle
+
 import tritonclient.http as httpclient
 import cv2
 
 # 1. 读取图像并转为 RGB 格式，添加 batch 维度
-image = cv2.imread('vis_result.jpg')
+image = cv2.imread('test_detection0.jpg')
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)[None]  # shape: [1, H, W, 3]
 
 # 2. Triton Server 地址
@@ -38,6 +40,9 @@ response = client.infer(
 # 8. 获取输出
 output0 = response.as_numpy('preprocess_output_0')  # shape: [1, 3, H, W]
 output1 = response.as_numpy('preprocess_output_1')  # shape: [1, ?] 字节格式
+
+pickle.dump(output0, open('output0.pkl', 'wb'))
+pickle.dump(output1, open('output1.pkl', 'wb'))
 
 # 9. 打印输出信息
 print("Output 0 shape:", output0.shape, output0.dtype)

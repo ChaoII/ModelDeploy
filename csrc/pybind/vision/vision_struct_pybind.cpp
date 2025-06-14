@@ -78,6 +78,14 @@ namespace modeldeploy::vision {
                     rect2f.height = t[3].cast<float>();
                     return rect2f;
                 }))
+            .def("to_dict", [](const Rect2f& rect2f) {
+                pybind11::dict dict;
+                dict["x"] = rect2f.x;
+                dict["y"] = rect2f.y;
+                dict["width"] = rect2f.width;
+                dict["height"] = rect2f.height;
+                return dict;
+            })
             .def("__repr__", [](const Rect2f& rect2f) {
                 return rect2f.to_string();
             })
@@ -181,7 +189,45 @@ namespace modeldeploy::vision {
                     d.score = t[1].cast<float>();
                     d.label_id = t[2].cast<int32_t>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const DetectionResult& d) {
+                pybind11::dict result;
+                pybind11::dict box_dict;
+                box_dict["x"] = d.box.x;
+                box_dict["y"] = d.box.y;
+                box_dict["width"] = d.box.width;
+                box_dict["height"] = d.box.height;
+
+                result["box"] = box_dict;
+                result["score"] = d.score;
+                result["label_id"] = d.label_id;
+                return result;
+            }).def_static("from_dict", [](const pybind11::dict& d) {
+                DetectionResult r;
+                // 解析嵌套的 box 字典
+                if (d.contains("box")) {
+                    const auto box_dict = d["box"].cast<pybind11::dict>();
+
+                    Rect2f rect;
+                    if (box_dict.contains("x")) rect.x = box_dict["x"].cast<float>();
+                    if (box_dict.contains("y")) rect.y = box_dict["y"].cast<float>();
+                    if (box_dict.contains("width")) rect.width = box_dict["width"].cast<float>();
+                    if (box_dict.contains("height")) rect.height = box_dict["height"].cast<float>();
+                    r.box = rect;
+                }
+
+                if (d.contains("score")) r.score = d["score"].cast<float>();
+                if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
+
+                return r;
+            }).def("__str__", [](const DetectionResult& d) {
+                return "<DetectionResult label_id=" + std::to_string(d.label_id) +
+                    ", score=" + std::to_string(d.score) + ", box=" + d.box.to_string() + ">";
+            })
+            .def("__repr__", [](const DetectionResult& d) {
+                return "<DetectionResult label_id=" + std::to_string(d.label_id) +
+                    ", score=" + std::to_string(d.score) + ", box=" + d.box.to_string() + ">";
+            });
 
         pybind11::class_<InstanceSegResult>(m, "InstanceSegResult")
             .def(pybind11::init())
@@ -324,7 +370,7 @@ namespace modeldeploy::vision {
                     return d;
                 }));
 
-        pybind11::class_<LetterBoxRecord>(m, "LetterBoxRecord")
+        pybind11::class_<LetterBoxRecord>(m, "LetterBoxRecord", pybind11::dynamic_attr())
             .def(pybind11::init())
             .def_readwrite("ipt_w", &LetterBoxRecord::ipt_w)
             .def_readwrite("ipt_h", &LetterBoxRecord::ipt_h)
@@ -351,6 +397,28 @@ namespace modeldeploy::vision {
                     };
                     return l;
                 }))
+            .def("to_dict", [](const LetterBoxRecord& l) {
+                pybind11::dict d;
+                d["ipt_w"] = l.ipt_w;
+                d["ipt_h"] = l.ipt_h;
+                d["out_w"] = l.out_w;
+                d["out_h"] = l.out_h;
+                d["pad_w"] = l.pad_w;
+                d["pad_h"] = l.pad_h;
+                d["scale"] = l.scale;
+                return d;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                LetterBoxRecord l = {};
+                if (d.contains("ipt_w")) l.ipt_w = d["ipt_w"].cast<float>();
+                if (d.contains("ipt_h")) l.ipt_h = d["ipt_h"].cast<float>();
+                if (d.contains("out_w")) l.out_w = d["out_w"].cast<float>();
+                if (d.contains("out_h")) l.out_h = d["out_h"].cast<float>();
+                if (d.contains("pad_w")) l.pad_w = d["pad_w"].cast<float>();
+                if (d.contains("pad_h")) l.pad_h = d["pad_h"].cast<float>();
+                if (d.contains("scale")) l.scale = d["scale"].cast<float>();
+                return l;
+            })
             .def("__str__", &LetterBoxRecord::str)
             .def("__repr__", &LetterBoxRecord::str);
     }
