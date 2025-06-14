@@ -1,0 +1,4 @@
+
+name: "yolo11n"
+backend: "onnxruntime"
+max_batch_size : 8

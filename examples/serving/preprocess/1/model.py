@@ -3,7 +3,7 @@ import numpy as np
 import time
 import traceback
 import sys
-
+import pickle
 import modeldeploy as md
 import triton_python_backend_utils as pb_utils
 
@@ -45,24 +45,10 @@ class TritonPythonModel:
                 print("input shape:", data.shape, data.dtype)
                 # 调用你的 C++ 绑定预处理
                 outputs, im_infos = self.preprocessor_.run(data)
-                print("preprocessor output ok")
-                print("preprocessor output ok1")
-                print("preprocessor output ok2")
-                try:
-                    print("outputs[0] type:", type(outputs[0]))
-                    out_tensor = outputs[0].to_numpy()
-                    print("step1 done")
-                except Exception as e:
-                    print("step1 error:", e)
-                try:
-                    output_tensor_0 = pb_utils.Tensor(self.output_names[0], out_tensor)
-                    print("step2 done")
-                    print("out_tensor0", output_tensor_0.shape, output_tensor_0.dtype)
-                except Exception as e:
-                    print("step2 error:", e)
-                output_tensor_1 = pb_utils.Tensor(self.output_names[1], np.array(im_infos, dtype=np.object_))
-                print("output_tensor_1", output_tensor_1.shape, output_tensor_1.dtype)
-
+                im_infos_dict = [pickle.dumps(i) for i in im_infos]
+                out_tensor = outputs[0].to_numpy()
+                output_tensor_0 = pb_utils.Tensor(self.output_names[0], out_tensor)
+                output_tensor_1 = pb_utils.Tensor(self.output_names[1], np.array(im_infos_dict, dtype=np.object_))
                 inference_response = pb_utils.InferenceResponse(
                     output_tensors=[output_tensor_0, output_tensor_1])
                 responses.append(inference_response)
