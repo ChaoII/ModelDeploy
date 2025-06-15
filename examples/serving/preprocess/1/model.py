@@ -36,25 +36,26 @@ class TritonPythonModel:
             raise
 
     def execute(self, requests):
-        print("[preprocess] execute called, batch size =", len(requests))
         responses = []
         try:
+            im_list = []
             for request in requests:
-                data = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
-                data = data.as_numpy()
-                print("input shape:", data.shape, data.dtype)
-                # 调用你的 C++ 绑定预处理
-                outputs, im_infos = self.preprocessor_.run(data)
-                im_infos_dict = [pickle.dumps(i) for i in im_infos]
-                out_tensor = outputs[0].to_numpy()
+                arr = pb_utils.get_input_tensor_by_name(request, self.input_names[0]).as_numpy()
+                if arr.shape[0] != 1:
+                    raise ValueError("Only per-request batch size of 1 is supported in dynamic batching mode.")
+                im_list.append(arr[0])  # shape: [H, W, 3]
+            batch_input = np.stack(im_list, axis=0)  # shape: [N, H, W, 3]
+            print("batch_input shape: ", batch_input.shape)
+            outputs, im_infos = self.preprocessor_.run(batch_input)
+            for i in range(len(requests)):
+                out_tensor = outputs[0].to_numpy()[i]
+                im_info_bytes = pickle.dumps(im_infos[i])
                 output_tensor_0 = pb_utils.Tensor(self.output_names[0], out_tensor)
-                output_tensor_1 = pb_utils.Tensor(self.output_names[1], np.array(im_infos_dict, dtype=np.object_))
-                inference_response = pb_utils.InferenceResponse(
-                    output_tensors=[output_tensor_0, output_tensor_1])
-                responses.append(inference_response)
+                output_tensor_1 = pb_utils.Tensor(self.output_names[1], np.array(im_info_bytes, dtype=np.object_))
+                responses.append(pb_utils.InferenceResponse(output_tensors=[output_tensor_0, output_tensor_1]))
+
         except Exception as e:
-            print("[preprocess] ERROR during execute:", e)
-            traceback.print_exc(file=sys.stdout)
+            print("Error:", e)
             for _ in requests:
                 responses.append(pb_utils.InferenceResponse(
                     output_tensors=[], error=pb_utils.TritonError(str(e))))
