@@ -1,6 +1,9 @@
 name: "preprocess"
 backend: "python"
-max_batch_size: 1
+max_batch_size: 4
+dynamic_batching {
+  max_queue_delay_microseconds: 500000  # 等待 10ms 批处理（单位：微秒）
+}
 
 input [
   {
