@@ -1,19 +1,17 @@
-import modeldeploy
-import cv2
 from pathlib import Path
-import numpy as np
+
+import cv2
+import modeldeploy
 
 base_path = Path("E:/CLionProjects/ModelDeploy/test_data")
 image = cv2.imread(base_path / "test_images/test_detection.jpg")
 option = modeldeploy.RuntimeOption()
 option.set_model_path(str(base_path / "test_models" / "yolo11n.onnx"))
-image_ = cv2.imread("vis_result.jpg")
 
 # 预处理是带batch的
 preprocessor = modeldeploy.vision.UltralyticsPreprocessor()
+# list[Tensor] List[LetterBoxRecord] list[np.array]
 (pre_images, letter_box_records) = preprocessor.run([image])
-
-print(pre_images)
 
 runtime = modeldeploy.Runtime()
 runtime.init(option)
@@ -25,9 +23,4 @@ run_time_result = runtime.infer(inputs)
 postprocessor = modeldeploy.vision.UltralyticsPostprocessor()
 # 包含batch维度
 results = postprocessor.run(run_time_result, letter_box_records)
-
-# batch
-for result in results:
-    # box
-    for result_ in result:
-        print(result_.box)
+print(results)

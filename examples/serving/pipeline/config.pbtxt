@@ -1,6 +1,6 @@
 name: "pipeline"
 platform: "ensemble"
-max_batch_size: 1
+max_batch_size: 4
 input [
   {
     name: "INPUT"

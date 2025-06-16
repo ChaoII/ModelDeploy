@@ -25,6 +25,7 @@ namespace modeldeploy::vision {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in YOLOv8Preprocessor.");
                      }
+                     // set ownership,执行深拷贝
                      for (auto& output : outputs) {
                          output.set_owns_data(true);
                      }

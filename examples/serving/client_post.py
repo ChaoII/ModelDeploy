@@ -1,52 +1,46 @@
 import json
 import pickle
-
-import modeldeploy
-from tritonclient.utils import np_to_triton_dtype
+from concurrent.futures import ThreadPoolExecutor
 
 import tritonclient.http as httpclient
-import numpy as np
+from tritonclient.utils import np_to_triton_dtype
 
-output0 = pickle.load(open("infer_output0.pkl", "rb"))
-output1 = pickle.load(open("output1.pkl", "rb"))
 
-out0 = np.array(output0)
-out1 = np.array(output1, dtype=np.object_)
+def send_request(idx):
+    # 1. 创建 client
+    client = httpclient.InferenceServerClient(url="172.168.1.112:8000")
 
-# 2. Triton Server 地址
-server_addr = '192.168.1.5:8000'
+    # 2. 构造输入
+    output0 = pickle.load(open("infer_output0.pkl", "rb"))  # shape = [1,84,6300]
+    output1 = pickle.load(open("output1.pkl", "rb"))  # shape = [1,1]
 
-# 3. 创建 client
-client = httpclient.InferenceServerClient(url=server_addr)
+    infer_input0 = httpclient.InferInput(name='POST_INPUT_0', shape=output0.shape,
+                                         datatype=np_to_triton_dtype(output0.dtype))
+    infer_input1 = httpclient.InferInput(name='POST_INPUT_1', shape=output1.shape,
+                                         datatype=np_to_triton_dtype(output1.dtype))
+    infer_input0.set_data_from_numpy(output0)
+    infer_input1.set_data_from_numpy(output1)
 
-# 4. 模型名称与版本号
-model_name = 'postprocess'
-model_version = '1'
+    print(f"[Client {idx}] input0 shape: {output0.shape} | input1 shape: {output1.shape}")
 
-# 5. 构造输入
-inputs = []
-infer_input0 = httpclient.InferInput(name='POST_INPUT_0', shape=out0.shape, datatype=np_to_triton_dtype(out0.dtype))
-infer_input1 = httpclient.InferInput(name='POST_INPUT_1', shape=out1.shape, datatype=np_to_triton_dtype(out1.dtype))
-infer_input0.set_data_from_numpy(out0)
-infer_input1.set_data_from_numpy(out1)
-inputs.append(infer_input0)
-inputs.append(infer_input1)
+    inputs = [
+        infer_input0,
+        infer_input1
+    ]
 
-# 6. 构造预期输出
-outputs = [
-    httpclient.InferRequestedOutput('POST_OUTPUT'),
-]
+    # 3. 构造预期输出
+    outputs = [
+        httpclient.InferRequestedOutput('POST_OUTPUT'),
+    ]
 
-# 7. 执行推理
-response = client.infer(
-    model_name=model_name,
-    model_version=model_version,
-    inputs=inputs,
-    outputs=outputs
-)
+    # 4. 执行推理
+    response = client.infer(model_name="postprocess", model_version="1", inputs=inputs, outputs=outputs)
+    # 5. 获取输出
+    output0 = response.as_numpy('POST_OUTPUT')  # shape=[1,]
+    value = json.loads(output0[0])
+    print(f"[Client {idx}] Response OK, output0 shape: {output0.shape}, value is: {value}")
 
-# 8. 获取输出
-output0 = response.as_numpy('POST_OUTPUT')
-for out_ in output0:
-    r = json.loads(out_.decode())
-    print(r)
+
+# # 使用 8 个线程并发请求
+with ThreadPoolExecutor(max_workers=7) as pool:
+    pool.map(send_request, range(7))
