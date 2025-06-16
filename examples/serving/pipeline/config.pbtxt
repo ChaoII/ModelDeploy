@@ -10,7 +10,7 @@ input [
 ]
 output [
   {
-    name: "detction_result"
+    name: "detection_result"
     data_type: TYPE_STRING
     dims: [ -1 ]
   }
@@ -58,7 +58,7 @@ ensemble_scheduling {
       }
       output_map {
         key: "POST_OUTPUT"
-        value: "detction_result"
+        value: "detection_result"
       }
     }
   ]
