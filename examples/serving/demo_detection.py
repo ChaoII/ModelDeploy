@@ -12,6 +12,5 @@ model = modeldeploy.vision.UltralyticsDet(str(base_path / "test_models" / "yolo1
 # results = model.predict(image)
 results = model.batch_predict([image])
 
-for result in results:
-    for _res in result:
-        print(_res.box)
+# list[list[DetectionResult]]
+print(results)
