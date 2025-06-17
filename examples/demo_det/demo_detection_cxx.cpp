@@ -19,7 +19,6 @@ int main() {
     for (int i = 0; i < warm_up_count; ++i) {
         yolo11_det.predict(img, &result);
     }
-
     TimerArray timers;
     int loop_count = 100;
     for (int i = 0; i < loop_count; ++i) {

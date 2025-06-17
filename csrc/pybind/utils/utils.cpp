@@ -184,11 +184,11 @@ namespace modeldeploy {
             throw std::runtime_error("Expected 3D array (HWC) for image input");
         }
         const auto _cv_type = numpy_data_type_to_open_cv_type_v2(pyarray);
-        const int height = pyarray.shape()[0];
-        const int width = pyarray.shape()[1];
-        const int channels = pyarray.shape()[2];
+        const int height = pyarray.shape()[0]; //H
+        const int width = pyarray.shape()[1]; //W
+        const int channels = pyarray.shape()[2]; //C
         const auto cv_type = CV_MAKETYPE(_cv_type, channels);
-        // 注意：py::array::data() 返回的是 const void*
+        // 注意：pyarray::data() 返回的是 const void*
         const auto data_ptr = const_cast<void*>(pyarray.data());
         cv::Mat mat(height, width, cv_type, data_ptr);
         return mat;
@@ -200,13 +200,12 @@ namespace modeldeploy {
 
         // 构造 shape 和 strides（以 HWC 格式）
         const std::vector<int64_t> shape = {mat.rows, mat.cols, mat.channels()};
-        std::vector strides = {
+        const std::vector strides = {
             static_cast<size_t>(mat.step[0]),
             static_cast<size_t>(mat.step[1]), (mat.elemSize1())
         };
-
         // 构造共享内存 numpy array，不复制数据
-        return pybind11::array(pybind11::dtype(np_dtype), shape, strides, mat.data);
+        return pybind11::array{pybind11::dtype(np_dtype), shape, strides, mat.data};
     }
 
 #endif

@@ -36,8 +36,7 @@ namespace modeldeploy::vision {
                      std::vector<ClassifyResult> results;
                      if (!self.run(inputs, &results)) {
                          throw std::runtime_error(
-                             "Failed to postprocess the runtime result in "
-                             "UltralyticsClsPostprocessor.");
+                             "Failed to postprocess the runtime result in UltralyticsClsPostprocessor.");
                      }
                      return results;
                  }, pybind11::arg("inputs"))

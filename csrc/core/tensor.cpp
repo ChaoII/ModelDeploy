@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <utility>
 #include <cmath>
-
+#include <format>
 #include "md_log.h"
 
 namespace modeldeploy {
@@ -51,7 +51,7 @@ namespace modeldeploy {
         case DataType::INT64: return sizeof(int64_t);
         case DataType::UINT8: return sizeof(uint8_t);
         case DataType::INT8: return sizeof(int8_t);
-        default: throw std::runtime_error("不支持的数据类型");
+        default: throw std::runtime_error("Unsupported dtype");
         }
     }
 
@@ -90,6 +90,7 @@ namespace modeldeploy {
           dtype_(other.dtype_), element_size_(other.element_size_) {
         if (other.owns_data_) {
             // 如果原始张量拥有数据，我们需要复制数据
+            std::cout << "heavy copy.." << std::endl;
             memory_ = std::make_shared<MemoryBlock>(other.byte_size());
             data_ptr_ = memory_->data();
             std::memcpy(data_ptr_, other.data_ptr_, other.byte_size());
@@ -97,6 +98,7 @@ namespace modeldeploy {
         }
         else {
             // 如果原始张量不拥有数据，我们共享同一个内存块
+            std::cout << "light copy.." << std::endl;
             memory_ = other.memory_;
             data_ptr_ = other.data_ptr_;
             owns_data_ = false;
@@ -110,6 +112,7 @@ namespace modeldeploy {
           data_ptr_(other.data_ptr_), owns_data_(other.owns_data_) {
         other.data_ptr_ = nullptr;
         other.owns_data_ = false;
+        std::cout << "move..." << std::endl;
     }
 
     Tensor& Tensor::operator=(const Tensor& other) {
@@ -122,6 +125,7 @@ namespace modeldeploy {
 
             if (other.owns_data_) {
                 // 复制数据
+
                 memory_ = std::make_shared<MemoryBlock>(other.byte_size());
                 data_ptr_ = memory_->data();
                 std::memcpy(data_ptr_, other.data_ptr_, other.byte_size());
@@ -147,7 +151,6 @@ namespace modeldeploy {
             memory_ = std::move(other.memory_);
             data_ptr_ = other.data_ptr_;
             owns_data_ = other.owns_data_;
-
             other.data_ptr_ = nullptr;
             other.owns_data_ = false;
         }
@@ -198,7 +201,7 @@ namespace modeldeploy {
     template <typename T>
     void Tensor::set_data(const T* data, const size_t size) {
         if (size * sizeof(T) != byte_size()) {
-            throw std::runtime_error("数据大小不匹配");
+            throw std::runtime_error("dtype mismatch");
         }
         std::memcpy(data_ptr_, data, byte_size());
     }
@@ -206,7 +209,7 @@ namespace modeldeploy {
     template <typename T>
     void Tensor::set_data(std::vector<T>&& data) {
         if (data.size() * sizeof(T) != byte_size()) {
-            throw std::runtime_error("数据大小不匹配");
+            throw std::runtime_error("dtype mismatch");
         }
         // 创建新的内存块直接使用移动后的数据
         auto raw_data = data.data();
@@ -220,7 +223,6 @@ namespace modeldeploy {
                 std::vector<T>().swap(vec);
             }
         );
-
         data_ptr_ = memory_->data();
         owns_data_ = true;
     }
@@ -228,7 +230,7 @@ namespace modeldeploy {
     template <typename T>
     const T* Tensor::data_ptr() const {
         if (sizeof(T) != element_size_) {
-            throw std::runtime_error("类型大小不匹配");
+            throw std::runtime_error("dtype mismatch");
         }
         return static_cast<const T*>(data_ptr_);
     }
@@ -236,7 +238,7 @@ namespace modeldeploy {
     template <typename T>
     std::vector<T> Tensor::get_data() const {
         if (sizeof(T) != element_size_) {
-            throw std::runtime_error("类型大小不匹配");
+            throw std::runtime_error("dtype mismatch");
         }
         std::vector<T> result(size());
         std::memcpy(result.data(), data_ptr_, byte_size());
@@ -248,12 +250,16 @@ namespace modeldeploy {
     template <typename T>
     T& Tensor::at(const std::vector<int64_t>& indices) {
         if (indices.size() != shape_.size()) {
-            throw std::runtime_error("索引数量与张量维度不匹配");
+            throw std::runtime_error(
+                std::format("Error: Number of indices doesn't match tensor rank, indices size: {}, "
+                            "tensor rank: {}", indices.size(), shape_.size())
+            );
         }
         // 验证索引范围
         for (size_t i = 0; i < indices.size(); ++i) {
             if (indices[i] < 0 || indices[i] >= shape_[i]) {
-                throw std::runtime_error("");
+                throw std::runtime_error(
+                    std::format("Error: Index out of range, index{} = {}, shape{}={} ", i, indices[i], i, shape_[i]));
             }
         }
         // 计算偏移量
@@ -292,7 +298,10 @@ namespace modeldeploy {
         const size_t new_size = std::accumulate(new_shape.begin(), new_shape.end(),
                                                 1LL, std::multiplies());
         if (new_size != size()) {
-            throw std::runtime_error("无法重塑：元素数量不匹配");
+            throw std::runtime_error(
+                std::format("Error: New shape size doesn't match tensor size, new shape size: {}, "
+                            "tensor size: {}", new_size, size())
+            );
         }
         std::vector<int64_t> new_strides(new_shape.size());
         if (!new_strides.empty()) {
@@ -306,16 +315,20 @@ namespace modeldeploy {
 
     TensorView Tensor::transpose(const std::vector<int64_t>& axes) const {
         if (axes.size() != shape_.size()) {
-            throw std::runtime_error("转置的轴数与tensor维度不匹配");
+            throw std::runtime_error(
+                std::format("Error: Number of axes doesn't match tensor rank, "
+                            "axes size: {}, shape size: {} ", axes.size(), shape_.size()));
         }
         // 检查轴是否有效
         std::vector used(shape_.size(), false);
         for (auto& axe : axes) {
             if (axe < 0 || axe >= static_cast<int64_t>(shape_.size())) {
-                throw std::runtime_error("转置轴超出范围");
+                throw std::runtime_error(
+                    std::format("Error: Axis out of range, axis >= 0 and axis <= {}, "
+                                "current axis: {}", shape_.size(), axe));
             }
             if (used[axe]) {
-                throw std::runtime_error("转置轴重复");
+                throw std::runtime_error(std::format("Error: Duplicate axis, axis: {}", axe));
             }
             used[axe] = true;
         }
@@ -331,13 +344,16 @@ namespace modeldeploy {
 
     TensorView Tensor::slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const {
         if (starts.size() != shape_.size() || ends.size() != shape_.size()) {
-            throw std::runtime_error("切片的起始和结束索引必须与tensor维度匹配");
+            throw std::runtime_error(std::format(
+                "Error: Number of axes doesn't match tensor rank, starts size = {}, ends size = {}, shape size = ",
+                starts.size(), ends.size(), shape_.size()));
         }
         // 验证切片范围
         std::vector<int64_t> new_shape(shape_.size());
         for (size_t i = 0; i < shape_.size(); ++i) {
             if (starts[i] < 0 || starts[i] >= shape_[i] || ends[i] > shape_[i] || starts[i] >= ends[i]) {
-                throw std::runtime_error("无效的切片范围");
+                throw std::runtime_error(
+                    std::format("Error: Slice out of range, axis: {}, start: {}, end: {}", i, starts[i], ends[i]));
             }
             new_shape[i] = ends[i] - starts[i];
         }
@@ -558,7 +574,7 @@ namespace modeldeploy {
 
     Tensor Tensor::concat(const std::vector<Tensor>& tensors, const int axis) {
         if (tensors.empty()) {
-            throw std::runtime_error("连接的张量列表为空");
+            throw std::runtime_error("Empty tensor list for concatenation");
         }
 
         // 验证所有tensor的维度（除了连接轴）都相同
@@ -567,15 +583,15 @@ namespace modeldeploy {
 
         for (const auto& tensor : tensors) {
             if (tensor.dtype() != tensors[0].dtype()) {
-                throw std::runtime_error("所有张量必须具有相同的数据类型");
+                throw std::runtime_error("All tensors must have same data type");
             }
             const auto& current_shape = tensor.shape();
             if (current_shape.size() != first_shape.size()) {
-                throw std::runtime_error("所有张量必须具有相同的维度数");
+                throw std::runtime_error("All tensors must have same rank");
             }
             for (size_t i = 0; i < first_shape.size(); ++i) {
                 if (i != static_cast<size_t>(axis) && current_shape[i] != first_shape[i]) {
-                    throw std::runtime_error("除了连接轴外，所有维度必须相同");
+                    throw std::runtime_error("All non-concat dimensions must be equal");
                 }
             }
             concat_size += current_shape[axis];
@@ -617,7 +633,7 @@ namespace modeldeploy {
     Tensor Tensor::softmax(int axis) const {
         // 确保数据类型是浮点类型
         if (dtype_ != DataType::FP32) {
-            throw std::runtime_error("Softmax操作只支持FP32类型");
+            throw std::runtime_error("Softmax only supports FP32 type");
         }
         // 处理负轴，转换为正轴
         if (axis < 0) {
@@ -625,7 +641,7 @@ namespace modeldeploy {
         }
         // 检查轴是否有效
         if (axis < 0 || axis >= static_cast<int>(shape_.size())) {
-            throw std::runtime_error("Softmax操作的轴超出范围");
+            throw std::runtime_error("Softmax axis out of range");
         }
         // 创建结果张量
         Tensor result(shape_, dtype_, name_ + "_softmax");
@@ -674,7 +690,7 @@ namespace modeldeploy {
             axis += static_cast<int>(shape_.size()) + 1;
         }
         if (axis < 0 || axis > static_cast<int64_t>(shape_.size())) {
-            throw std::runtime_error("扩展维度的轴超出范围");
+            throw std::runtime_error("Axis for dimension expansion out of range");
         }
         shape_.insert(shape_.begin() + axis, 1);
         calculate_strides();
@@ -686,7 +702,7 @@ namespace modeldeploy {
 
     size_t Tensor::get_dim_size(const size_t dim) const {
         if (dim >= shape_.size()) {
-            throw std::runtime_error("维度索引超出范围");
+            throw std::runtime_error("Dimension index out of range");
         }
         return shape_[dim];
     }
@@ -716,11 +732,11 @@ namespace modeldeploy {
 
     void Tensor::validate_shape(const std::vector<int64_t>& shape) {
         if (shape.empty()) {
-            throw std::runtime_error("不允许空形状");
+            throw std::runtime_error("Shape cannot be empty");
         }
 
-        if (std::any_of(shape.begin(), shape.end(), [](const int64_t dim) { return dim <= 0; })) {
-            throw std::runtime_error("所有维度必须为正数");
+        if (std::ranges::any_of(shape, [](const int64_t dim) { return dim <= 0; })) {
+            throw std::runtime_error("All dimensions must be positive");
         }
     }
 
@@ -818,7 +834,7 @@ namespace modeldeploy {
         const size_t new_size = std::accumulate(new_shape.begin(), new_shape.end(),
                                                 1LL, std::multiplies());
         if (new_size != size()) {
-            throw std::runtime_error("无法重塑：元素数量不匹配");
+            throw std::runtime_error("Cannot reshape, total elements count mismatch");
         }
         // 如果当前视图是连续的，可以直接创建新形状的视图
         if (is_contiguous()) {
@@ -838,16 +854,16 @@ namespace modeldeploy {
     // TensorView::transpose方法的实现
     TensorView TensorView::transpose(const std::vector<int64_t>& axes) const {
         if (axes.size() != shape_.size()) {
-            throw std::runtime_error("转置的轴数与视图维度不匹配");
+            throw std::runtime_error("Number of transpose axes does not match tensor rank");
         }
         // 检查轴是否有效
         std::vector used(shape_.size(), false);
         for (auto& axe : axes) {
             if (axe < 0 || axe >= static_cast<int64_t>(shape_.size())) {
-                throw std::runtime_error("转置轴超出范围");
+                throw std::runtime_error("Number of axes for transpose does not match view dimensions");
             }
             if (used[axe]) {
-                throw std::runtime_error("转置轴重复");
+                throw std::runtime_error("Duplicate axis in transpose");
             }
             used[axe] = true;
         }
@@ -863,13 +879,13 @@ namespace modeldeploy {
 
     TensorView TensorView::slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const {
         if (starts.size() != shape_.size() || ends.size() != shape_.size()) {
-            throw std::runtime_error("切片的起始和结束索引必须与视图维度匹配");
+            throw std::runtime_error("Slice indices must match view dimensions");
         }
         // 验证切片范围
         std::vector<int64_t> new_shape(shape_.size());
         for (size_t i = 0; i < shape_.size(); ++i) {
             if (starts[i] < 0 || starts[i] >= shape_[i] || ends[i] > shape_[i] || starts[i] >= ends[i]) {
-                throw std::runtime_error("无效的切片范围");
+                throw std::runtime_error("Invalid slicing bounds");
             }
             new_shape[i] = ends[i] - starts[i];
         }
@@ -898,12 +914,12 @@ namespace modeldeploy {
     template <typename T>
     T& TensorView::at(const std::vector<int64_t>& indices) {
         if (indices.size() != shape_.size()) {
-            throw std::runtime_error("索引数量与视图维度不匹配");
+            throw std::runtime_error("Indices rank mismatch");
         }
         // 验证索引范围
         for (size_t i = 0; i < indices.size(); ++i) {
             if (indices[i] < 0 || indices[i] >= shape_[i]) {
-                throw std::runtime_error("索引超出范围");
+                throw std::runtime_error("Indices out of range");
             }
         }
         // 计算偏移量

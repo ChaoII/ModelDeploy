@@ -4,7 +4,7 @@ import cv2
 import modeldeploy
 
 base_path = Path("E:/CLionProjects/ModelDeploy/test_data")
-image = cv2.imread(base_path / "test_images/test_detection.jpg")
+image = cv2.imread(base_path / "test_images/test_detection0.jpg")
 option = modeldeploy.RuntimeOption()
 option.set_model_path(str(base_path / "test_models" / "yolo11n.onnx"))
 

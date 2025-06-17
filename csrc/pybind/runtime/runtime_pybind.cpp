@@ -40,16 +40,14 @@ namespace modeldeploy {
     }
 
 
-    std::vector<Tensor> infer_with_tensor_map(const Runtime& self, std::map<std::string, Tensor>& inputs) {
+    std::vector<Tensor> infer_with_tensor_map(const Runtime& self, const pybind11::dict& py_inputs) {
         // 原第二个 lambda 的实现
         std::vector<Tensor> _inputs;
-        _inputs.reserve(inputs.size());
-        for (auto iter = inputs.begin(); iter != inputs.end(); ++iter) {
-            Tensor tensor;
-            tensor.from_external_memory(iter->second.data(), iter->second.shape(),
-                                        iter->second.dtype());
-            tensor.set_name(iter->first);
-            _inputs.push_back(tensor);
+        for (auto [tensor_name, tensor] : py_inputs) {
+            auto name = pybind11::cast<std::string>(tensor_name);
+            auto& t = pybind11::cast<Tensor&>(tensor); // 引用，不复制
+            t.set_name(name);
+            _inputs.push_back(std::move(t)); // 这里要看 Tensor 是否支持共享或 move
         }
         std::vector<Tensor> outputs;
         if (!self.infer(_inputs, &outputs)) {
