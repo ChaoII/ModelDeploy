@@ -19,9 +19,7 @@ namespace modeldeploy {
 
     DataType numpy_data_type_to_md_data_type(const pybind11::dtype& np_dtype);
 
-    void pyarray_to_tensor(pybind11::array& pyarray, Tensor* tensor,
-                           bool share_buffer = false);
-
+    void pyarray_to_tensor(pybind11::array& pyarray, Tensor* tensor, bool share_buffer = false);
 
     void pyarray_to_tensor_list(std::vector<pybind11::array>& pyarray,
                                 std::vector<Tensor>* tensor,
@@ -66,4 +64,6 @@ namespace modeldeploy {
         MD_LOG_FATAL << "CTypeToFDDataType only support int8/int32/int64/float32/float64 now." << std::endl;
         return DataType::FP32;
     }
+
+
 } // namespace modeldeploy

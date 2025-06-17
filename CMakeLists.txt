@@ -4,7 +4,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 set(LIBRARY_NAME "ModelDeploySDK")
-set(SOURCE "")
+set(SOURCE ""
+        csrc/pybind/utils/result_convert.h)
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
