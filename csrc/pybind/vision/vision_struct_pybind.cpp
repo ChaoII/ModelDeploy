@@ -3,6 +3,7 @@
 //
 
 #include "csrc/pybind/utils/utils.h"
+#include "csrc/pybind/utils/result_convert.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
@@ -18,12 +19,14 @@ namespace modeldeploy::vision {
                 [](const pybind11::tuple& t) {
                     if (t.size() != 2)
                         throw std::runtime_error(
-                            "Mask pickle with invalid state!");
+                            "Point2f pickle with invalid state!");
                     Point2f point2f;
                     point2f.x = t[0].cast<float>();
                     point2f.y = t[1].cast<float>();
                     return point2f;
                 }))
+            .def("to_dict", point2f_to_dict)
+            .def_static("from_dict", dict_to_point2f)
             .def("__repr__", [](const Point2f& point2f) {
                 return point2f.to_string();
             })
@@ -44,13 +47,15 @@ namespace modeldeploy::vision {
                 [](const pybind11::tuple& t) {
                     if (t.size() != 3)
                         throw std::runtime_error(
-                            "Mask pickle with invalid state!");
+                            "Point3f pickle with invalid state!");
                     Point3f point3f;
                     point3f.x = t[0].cast<float>();
                     point3f.y = t[1].cast<float>();
                     point3f.z = t[2].cast<float>();
                     return point3f;
                 }))
+            .def("to_dict", point3f_to_dict)
+            .def_static("from_dict", dict_to_point3f)
             .def("__repr__", [](const Point3f& point3f) {
                 return point3f.to_string();
             })
@@ -70,7 +75,7 @@ namespace modeldeploy::vision {
                 [](const pybind11::tuple& t) {
                     if (t.size() != 4)
                         throw std::runtime_error(
-                            "Mask pickle with invalid state!");
+                            "Rect2f pickle with invalid state!");
                     Rect2f rect2f;
                     rect2f.x = t[0].cast<float>();
                     rect2f.y = t[1].cast<float>();
@@ -78,14 +83,8 @@ namespace modeldeploy::vision {
                     rect2f.height = t[3].cast<float>();
                     return rect2f;
                 }))
-            .def("to_dict", [](const Rect2f& rect2f) {
-                pybind11::dict dict;
-                dict["x"] = rect2f.x;
-                dict["y"] = rect2f.y;
-                dict["width"] = rect2f.width;
-                dict["height"] = rect2f.height;
-                return dict;
-            })
+            .def("to_dict", rect2f_to_dict)
+            .def_static("from_dict", dict_to_rect2f)
             .def("__repr__", [](const Rect2f& rect2f) {
                 return rect2f.to_string();
             })
@@ -108,7 +107,7 @@ namespace modeldeploy::vision {
                 [](const pybind11::tuple& t) {
                     if (t.size() != 5)
                         throw std::runtime_error(
-                            "Mask pickle with invalid state!");
+                            "RotatedRect pickle with invalid state!");
                     RotatedRect rotated_rect;
                     rotated_rect.xc = t[0].cast<float>();
                     rotated_rect.yc = t[1].cast<float>();
@@ -117,6 +116,8 @@ namespace modeldeploy::vision {
                     rotated_rect.angle = t[4].cast<float>();
                     return rotated_rect;
                 }))
+            .def("to_dict", rotated_rect_to_dict)
+            .def_static("from_dict", dict_to_rotated_rect)
             .def("__repr__", [](const RotatedRect& rotated_rect) {
                 return rotated_rect.to_string();
             })
@@ -141,7 +142,10 @@ namespace modeldeploy::vision {
                     mask.buffer = t[0].cast<std::vector<uint8_t>>();
                     mask.shape = t[1].cast<std::vector<int64_t>>();
                     return mask;
-                }));
+                }))
+            .def("to_dict", mask_to_dict)
+            .def_static("from_dict", dict_to_mask);
+
 
         pybind11::class_<ClassifyResult>(m, "ClassifyResult")
             .def(pybind11::init())
@@ -160,16 +164,35 @@ namespace modeldeploy::vision {
                         throw std::runtime_error(
                             "ClassifyResult pickle with invalid state!");
                     }
-
                     ClassifyResult c;
                     c.label_ids = t[0].cast<std::vector<int32_t>>();
                     c.scores = t[1].cast<std::vector<float>>();
                     if (t.size() == 3) {
                         c.feature = t[2].cast<std::vector<float>>();
                     }
-
                     return c;
-                }));
+                }))
+            .def("to_dict", [](const ClassifyResult& c) {
+                pybind11::dict d;
+                d["label_ids"] = pybind11::cast(c.label_ids);
+                d["scores"] = pybind11::cast(c.scores);
+                if (!c.feature.empty()) {
+                    d["feature"] = pybind11::cast(c.feature);
+                }
+                return d;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                if (!d.contains("label_ids") || !d.contains("scores")) {
+                    throw std::runtime_error("ClassifyResult.from_dict: missing required fields");
+                }
+                ClassifyResult c;
+                c.label_ids = d["label_ids"].cast<std::vector<int32_t>>();
+                c.scores = d["scores"].cast<std::vector<float>>();
+                if (d.contains("feature")) {
+                    c.feature = d["feature"].cast<std::vector<float>>();
+                }
+                return c;
+            });
 
 
         pybind11::class_<DetectionResult>(m, "DetectionResult")
@@ -192,12 +215,7 @@ namespace modeldeploy::vision {
                 }))
             .def("to_dict", [](const DetectionResult& d) {
                 pybind11::dict result;
-                pybind11::dict box_dict;
-                box_dict["x"] = d.box.x;
-                box_dict["y"] = d.box.y;
-                box_dict["width"] = d.box.width;
-                box_dict["height"] = d.box.height;
-
+                auto box_dict = rect2f_to_dict(d.box);
                 result["box"] = box_dict;
                 result["score"] = d.score;
                 result["label_id"] = d.label_id;
@@ -207,15 +225,8 @@ namespace modeldeploy::vision {
                 // 解析嵌套的 box 字典
                 if (d.contains("box")) {
                     const auto box_dict = d["box"].cast<pybind11::dict>();
-
-                    Rect2f rect;
-                    if (box_dict.contains("x")) rect.x = box_dict["x"].cast<float>();
-                    if (box_dict.contains("y")) rect.y = box_dict["y"].cast<float>();
-                    if (box_dict.contains("width")) rect.width = box_dict["width"].cast<float>();
-                    if (box_dict.contains("height")) rect.height = box_dict["height"].cast<float>();
-                    r.box = rect;
+                    r.box = dict_to_rect2f(box_dict);
                 }
-
                 if (d.contains("score")) r.score = d["score"].cast<float>();
                 if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
 
@@ -248,7 +259,27 @@ namespace modeldeploy::vision {
                     d.score = t[2].cast<float>();
                     d.label_id = t[3].cast<int32_t>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const InstanceSegResult& r) {
+                pybind11::dict d;
+                d["box"] = rect2f_to_dict(r.box);
+                d["mask"] = mask_to_dict(r.mask);
+                d["score"] = r.score;
+                d["label_id"] = r.label_id;
+                return d;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                if (!d.contains("box") || !d.contains("mask") ||
+                    !d.contains("score") || !d.contains("label_id")) {
+                    throw std::runtime_error("InstanceSegResult.from_dict: missing required fields");
+                }
+                InstanceSegResult r;
+                r.box = dict_to_rect2f(d["box"]);
+                r.mask = dict_to_mask(d["mask"]);
+                r.score = d["score"].cast<float>();
+                r.label_id = d["label_id"].cast<int32_t>();
+                return r;
+            });
 
 
         pybind11::class_<ObbResult>(m, "ObbResult")
@@ -268,13 +299,37 @@ namespace modeldeploy::vision {
                     d.score = t[1].cast<float>();
                     d.label_id = t[2].cast<int32_t>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const ObbResult& d) {
+                pybind11::dict result;
+                result["rotated_box"] = rotated_rect_to_dict(d.rotated_box);;
+                result["score"] = d.score;
+                result["label_id"] = d.label_id;
+                return result;
+            }).def_static("from_dict", [](const pybind11::dict& d) {
+                ObbResult r;
+                // 解析嵌套的 box 字典
+                if (d.contains("rotated_box")) {
+                    const auto box_dict = d["rotated_box"].cast<pybind11::dict>();
+                    r.rotated_box = dict_to_rotated_rect(box_dict);
+                }
+                if (d.contains("score")) r.score = d["score"].cast<float>();
+                if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
+                return r;
+            }).def("__str__", [](const ObbResult& d) {
+                return "<ObbResult label_id=" + std::to_string(d.label_id) +
+                    ", score=" + std::to_string(d.score) + ", box=" + d.rotated_box.to_string() + ">";
+            })
+            .def("__repr__", [](const ObbResult& d) {
+                return "<ObbResult label_id=" + std::to_string(d.label_id) +
+                    ", score=" + std::to_string(d.score) + ", box=" + d.rotated_box.to_string() + ">";
+            });
 
 
         pybind11::class_<PoseResult>(m, "PoseResult")
             .def(pybind11::init())
             .def_readwrite("box", &PoseResult::box)
-            .def_readwrite("mask", &PoseResult::keypoints)
+            .def_readwrite("keypoints", &PoseResult::keypoints)
             .def_readwrite("label_id", &PoseResult::label_id)
             .def_readwrite("score", &PoseResult::score)
             .def(pybind11::pickle(
@@ -290,7 +345,48 @@ namespace modeldeploy::vision {
                     d.score = t[2].cast<float>();
                     d.label_id = t[3].cast<int32_t>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const PoseResult& p) {
+                pybind11::dict result;
+                result["box"] = rect2f_to_dict(p.box);
+                // 2. 处理 keypoints（Point3f 的 vector）
+                pybind11::list kps;
+                for (const auto& kp : p.keypoints) {
+                    pybind11::dict pt;
+                    pt["x"] = kp.x;
+                    pt["y"] = kp.y;
+                    pt["z"] = kp.z;
+                    kps.append(pt);
+                }
+                result["keypoints"] = kps;
+                // 3. 其他字段
+                result["score"] = p.score;
+                result["label_id"] = p.label_id;
+                return result;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                PoseResult r;
+                // 1. box
+                if (d.contains("box")) {
+                    r.box = dict_to_rect2f(d["box"]);
+                }
+                // 2. keypoints
+                if (d.contains("keypoints")) {
+                    auto kps_list = d["keypoints"].cast<pybind11::list>();
+                    for (auto kp_obj : kps_list) {
+                        auto kp_dict = kp_obj.cast<pybind11::dict>();
+                        Point3f kp;
+                        kp.x = kp_dict["x"].cast<float>();
+                        kp.y = kp_dict["y"].cast<float>();
+                        kp.z = kp_dict["z"].cast<float>();
+                        r.keypoints.push_back(kp);
+                    }
+                }
+                // 3. 其他字段
+                if (d.contains("score")) r.score = d["score"].cast<float>();
+                if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
+                return r;
+            });
 
         pybind11::enum_<FaceAntiSpoofResult>(m, "FaceAntiSpoofResult")
             .value("REAL", FaceAntiSpoofResult::REAL)
@@ -306,7 +402,33 @@ namespace modeldeploy::vision {
             .def_readwrite("cls_labels", &OCRResult::cls_labels)
             .def_readwrite("table_boxes", &OCRResult::table_boxes)
             .def_readwrite("table_structure", &OCRResult::table_structure)
-            .def_readwrite("table_html", &OCRResult::table_html);
+            .def_readwrite("table_html", &OCRResult::table_html)
+            .def("to_dict", [](const OCRResult& r) {
+                pybind11::dict d;
+                d["boxes"] = r.boxes;
+                d["text"] = r.text;
+                d["rec_scores"] = r.rec_scores;
+                d["cls_scores"] = r.cls_scores;
+                d["cls_labels"] = r.cls_labels;
+                d["table_boxes"] = r.table_boxes;
+                d["table_structure"] = r.table_structure;
+                d["table_html"] = r.table_html;
+                return d;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                OCRResult r = {};
+                if (d.contains("boxes")) r.boxes = d["boxes"].cast<std::vector<std::array<int, 8>>>();
+                if (d.contains("text")) r.text = d["text"].cast<std::vector<std::string>>();
+                if (d.contains("rec_scores")) r.rec_scores = d["rec_scores"].cast<std::vector<float>>();
+                if (d.contains("cls_scores")) r.cls_scores = d["cls_scores"].cast<std::vector<float>>();
+                if (d.contains("cls_labels")) r.cls_labels = d["cls_labels"].cast<std::vector<int32_t>>();
+                if (d.contains("table_boxes")) r.table_boxes = d["table_boxes"].cast<std::vector<std::array<int, 8>>>();
+                if (d.contains("table_structure"))
+                    r.table_structure = d["table_structure"].cast<std::vector<
+                        std::string>>();
+                if (d.contains("table_html")) r.table_html = d["table_html"].cast<std::string>();
+                return r;
+            });
 
         pybind11::class_<DetectionLandmarkResult>(m, "DetectionLandmarkResult")
             .def(pybind11::init())
@@ -326,7 +448,46 @@ namespace modeldeploy::vision {
                     d.score = t[2].cast<float>();
                     d.label_id = t[3].cast<int32_t>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const DetectionLandmarkResult& p) {
+                pybind11::dict result;
+                result["box"] = rect2f_to_dict(p.box);
+                // 2. 处理 keypoints（Point3f 的 vector）
+                pybind11::list kps;
+                for (const auto& kp : p.landmarks) {
+                    pybind11::dict pt;
+                    pt["x"] = kp.x;
+                    pt["y"] = kp.y;
+                    kps.append(pt);
+                }
+                result["landmarks"] = kps;
+                // 3. 其他字段
+                result["score"] = p.score;
+                result["label_id"] = p.label_id;
+                return result;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                DetectionLandmarkResult r;
+                // 1. box
+                if (d.contains("box")) {
+                    r.box = dict_to_rect2f(d["box"]);
+                }
+                // 2.landmarks
+                if (d.contains("landmarks")) {
+                    auto kps_list = d["landmarks"].cast<pybind11::list>();
+                    for (auto kp_obj : kps_list) {
+                        auto kp_dict = kp_obj.cast<pybind11::dict>();
+                        Point2f lmk;
+                        lmk.x = kp_dict["x"].cast<float>();
+                        lmk.y = kp_dict["y"].cast<float>();
+                        r.landmarks.push_back(lmk);
+                    }
+                }
+                // 3. 其他字段
+                if (d.contains("score")) r.score = d["score"].cast<float>();
+                if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
+                return r;
+            });
 
 
         pybind11::class_<FaceRecognitionResult>(m, "FaceRecognitionResult")
@@ -342,7 +503,19 @@ namespace modeldeploy::vision {
                     FaceRecognitionResult d;
                     d.embedding = t[0].cast<std::vector<float>>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const FaceRecognitionResult& f) {
+                pybind11::dict result;
+                result["embedding"] = pybind11::cast(f.embedding);
+                return result;
+            }).def_static("from_dict", [](const pybind11::dict& d) {
+                FaceRecognitionResult f;
+                // 解析嵌套的 box 字典
+                if (d.contains("embedding")) {
+                    f.embedding = d["embedding"].cast<std::vector<float>>();
+                }
+                return f;
+            });
 
         pybind11::class_<LprResult>(m, "LprResult")
             .def(pybind11::init())
@@ -368,7 +541,50 @@ namespace modeldeploy::vision {
                     d.car_plate_str = t[4].cast<std::string>();
                     d.car_plate_color = t[5].cast<std::string>();
                     return d;
-                }));
+                }))
+            .def("to_dict", [](const LprResult& p) {
+                pybind11::dict result;
+                result["box"] = rect2f_to_dict(p.box);
+                // 2. 处理 keypoints（Point3f 的 vector）
+                pybind11::list kps;
+                for (const auto& kp : p.landmarks) {
+                    pybind11::dict pt;
+                    pt["x"] = kp.x;
+                    pt["y"] = kp.y;
+                    kps.append(pt);
+                }
+                result["landmarks"] = kps;
+                // 3. 其他字段
+                result["score"] = p.score;
+                result["label_id"] = p.label_id;
+                result["car_plate_str"] = p.car_plate_str;
+                result["car_plate_color"] = p.car_plate_color;
+                return result;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                LprResult r;
+                // 1. box
+                if (d.contains("box")) {
+                    r.box = dict_to_rect2f(d["box"]);
+                }
+                // 2.landmarks
+                if (d.contains("landmarks")) {
+                    auto kps_list = d["landmarks"].cast<pybind11::list>();
+                    for (auto kp_obj : kps_list) {
+                        auto kp_dict = kp_obj.cast<pybind11::dict>();
+                        Point2f lmk;
+                        lmk.x = kp_dict["x"].cast<float>();
+                        lmk.y = kp_dict["y"].cast<float>();
+                        r.landmarks.push_back(lmk);
+                    }
+                }
+                // 3. 其他字段
+                if (d.contains("score")) r.score = d["score"].cast<float>();
+                if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
+                if (d.contains("car_plate_str")) r.car_plate_str = d["car_plate_str"].cast<std::string>();
+                if (d.contains("car_plate_color")) r.car_plate_color = d["car_plate_color"].cast<std::string>();
+                return r;
+            });
 
         pybind11::class_<LetterBoxRecord>(m, "LetterBoxRecord", pybind11::dynamic_attr())
             .def(pybind11::init())
