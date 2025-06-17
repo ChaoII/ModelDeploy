@@ -14,23 +14,17 @@ namespace modeldeploy::vision {
                     const std::vector<pybind11::array>& im_list) {
                      std::vector<cv::Mat> images;
                      images.reserve(im_list.size());
-                     std::cout << "im_list size: " << im_list.size() << std::endl;
                      for (auto& image : im_list) {
                          images.push_back(pyarray_to_cv_mat(image));
                      }
-                     std::cout << "images size: " << images.size() << std::endl;
                      std::vector<LetterBoxRecord> records;
                      std::vector<Tensor> outputs;
                      if (!self.run(&images, &outputs, &records)) {
                          throw std::runtime_error(
-                             "Failed to preprocess the input data in YOLOv8Preprocessor.");
+                             "Failed to preprocess the input data in UltralyticsPreprocessor.");
                      }
-                     // set ownership,执行深拷贝
-                     for (auto& output : outputs) {
-                         output.set_owns_data(true);
-                     }
-                     return make_pair(outputs, records);
-                 }, pybind11::arg("im_list"))
+                     return make_pair(std::move(outputs), std::move(records));
+                 }, pybind11::arg("im_list"), pybind11::return_value_policy::move)
             .def_property("size", &detection::UltralyticsPreprocessor::get_size,
                           &detection::UltralyticsPreprocessor::set_size)
             .def_property("padding_value",
@@ -55,8 +49,7 @@ namespace modeldeploy::vision {
                      std::vector<std::vector<DetectionResult>> results;
                      if (!self.run(inputs, &results, records)) {
                          throw std::runtime_error(
-                             "Failed to postprocess the runtime result in "
-                             "UltralyticsPostprocessor.");
+                             "Failed to postprocess the runtime result in UltralyticsPostprocessor.");
                      }
                      return results;
                  }, pybind11::arg("inputs"), pybind11::arg("records"))
@@ -69,8 +62,7 @@ namespace modeldeploy::vision {
                      pyarray_to_tensor_list(input_array, &inputs, /*share_buffer=*/true);
                      if (!self.run(inputs, &results, records)) {
                          throw std::runtime_error(
-                             "Failed to postprocess the runtime result in "
-                             "UltralyticsPostprocessor.");
+                             "Failed to postprocess the runtime result in UltralyticsPostprocessor.");
                      }
                      return results;
                  }, pybind11::arg("inputs"), pybind11::arg("records"))
@@ -84,7 +76,7 @@ namespace modeldeploy::vision {
         pybind11::class_<detection::UltralyticsDet, BaseModel>(m, "UltralyticsDet")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](detection::UltralyticsDet& self, pybind11::array& image) {
+                 [](detection::UltralyticsDet& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<DetectionResult> result;
                      self.predict(mat, &result);
@@ -92,7 +84,7 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("image"))
             .def("batch_predict",
                  [](detection::UltralyticsDet& self,
-                    std::vector<pybind11::array>& images) {
+                    const std::vector<pybind11::array>& images) {
                      std::vector<cv::Mat> _images;
                      _images.reserve(images.size());
                      for (auto& image : images) {

@@ -23,7 +23,7 @@ namespace modeldeploy::vision {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in UltralyticsObbPreprocessor.");
                      }
-                     return make_pair(outputs, records);
+                     return make_pair(std::move(outputs), std::move(records));
                  }, pybind11::arg("im_list"))
             .def_property("size", &detection::UltralyticsObbPreprocessor::get_size,
                           &detection::UltralyticsObbPreprocessor::set_size)

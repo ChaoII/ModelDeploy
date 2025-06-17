@@ -23,7 +23,7 @@ namespace modeldeploy::vision {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in YOLOv8Preprocessor.");
                      }
-                     return make_pair(outputs, records);
+                     return make_pair(std::move(outputs), std::move(records));
                  }, pybind11::arg("im_list"))
             .def_property("size", &detection::UltralyticsSegPreprocessor::get_size,
                           &detection::UltralyticsSegPreprocessor::set_size)
@@ -49,8 +49,7 @@ namespace modeldeploy::vision {
                      std::vector<std::vector<InstanceSegResult>> results;
                      if (!self.run(inputs, &results, records)) {
                          throw std::runtime_error(
-                             "Failed to postprocess the runtime result in "
-                             "UltralyticsSegPostprocessor.");
+                             "Failed to postprocess the runtime result in UltralyticsSegPostprocessor.");
                      }
                      return results;
                  }, pybind11::arg("inputs"), pybind11::arg("records"))
@@ -86,7 +85,7 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("image"))
             .def("batch_predict",
                  [](detection::UltralyticsSeg& self,
-                    std::vector<pybind11::array>& images) {
+                    const std::vector<pybind11::array>& images) {
                      std::vector<cv::Mat> _images;
                      _images.reserve(images.size());
                      for (auto& image : images) {
