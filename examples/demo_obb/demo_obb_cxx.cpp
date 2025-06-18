@@ -8,8 +8,9 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.use_gpu();
+    option.enable_trt = true;
 
-    modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/yolo11n-obb.onnx", option);
+    modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/yolo11n-obb_nms.onnx", option);
     auto img = cv::imread("../../test_data/test_images/test_obb1.jpg");
     std::vector<modeldeploy::vision::ObbResult> result;
     TimerArray timers;

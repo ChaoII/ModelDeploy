@@ -17,7 +17,6 @@ namespace modeldeploy::vision::classification {
         // 注意yolov8-cls在模型中已经做过softmax了。
         // infer_result = infer_result.softmax(1);
         results->resize(batch);
-
         for (size_t bs = 0; bs < batch; ++bs) {
             (*results)[bs].clear();
             // output (1,1000) score class_num 1000

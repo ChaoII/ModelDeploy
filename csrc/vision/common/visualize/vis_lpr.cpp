@@ -5,18 +5,21 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     cv::Mat vis_lpr(cv::Mat& cv_image, const std::vector<LprResult>& result,
                     const std::string& font_path, const int font_size,
                     const int landmark_radius, const double alpha, const bool save_result) {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         const cv::FontFace font(font_path);
-        const cv::Scalar cv_color = get_random_color();
+        static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
         // 绘制半透明部分（填充矩形）
         for (const auto& _result : result) {
-            // const std::string text = plate_str + " " + plate_color + " " + std::to_string(score).substr(0, 4);
+            auto class_id = _result.label_id;
+            if (!color_map.contains(class_id)) {
+                color_map[class_id] = get_random_color();
+            }
+            auto cv_color = color_map[class_id];
             const std::string text = _result.car_plate_str + " " + _result.car_plate_color + " " +
                 std::to_string(_result.score).substr(0, 4);
             draw_rectangle_and_text(overlay, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, -1, false);
@@ -24,6 +27,8 @@ namespace modeldeploy::vision
         cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
         // 绘制对象矩形矩形边框、文字背景边框、文字、关键点
         for (const auto& _result : result) {
+            auto class_id = _result.label_id;
+            auto cv_color = color_map[class_id];
             const std::string text = _result.car_plate_str + " " + _result.car_plate_color + " " +
                 std::to_string(_result.score).substr(0, 4);
             draw_rectangle_and_text(cv_image, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, 1, true);

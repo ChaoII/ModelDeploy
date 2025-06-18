@@ -18,7 +18,7 @@ namespace modeldeploy::vision::lpr {
         const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionLandmarkResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
-        results->reserve(batch);
+        results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             if (tensors[0].dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
@@ -106,7 +106,7 @@ namespace modeldeploy::vision::lpr {
                     landmark.y = std::min(landmark.y, ipt_h - 1.0f);
                 }
             }
-            results->push_back(std::move(_results));
+            results->at(bs) = std::move(_results);
         }
         return true;
     }

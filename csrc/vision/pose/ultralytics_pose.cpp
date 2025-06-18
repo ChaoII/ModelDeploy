@@ -34,12 +34,12 @@ namespace modeldeploy::vision::detection {
                                         std::vector<std::vector<PoseResult>>* results, TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
         std::vector<cv::Mat> _images = images;
-        if (timers) timers->post_timer.start();
+        if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(&_images, &reused_input_tensors_, &letter_box_records)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
-        if (timers) timers->post_timer.stop();
+        if (timers) timers->pre_timer.stop();
 
         reused_input_tensors_[0].set_name(get_input_info(0).name);
         if (timers) timers->infer_timer.start();

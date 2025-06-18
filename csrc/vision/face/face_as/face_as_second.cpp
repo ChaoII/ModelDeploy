@@ -53,6 +53,7 @@ namespace modeldeploy::vision::face {
         const auto& class_predictions = infer_result[0];
         const auto& box_encodings = infer_result[1];
         const size_t size = box_encodings.shape()[1];
+        result->resize(size);
         for (int i = 0; i < size; ++i) {
             // 获取类别预测
             std::vector<float> class_pred;
@@ -64,7 +65,7 @@ namespace modeldeploy::vision::face {
             if (score < 0.8) {
                 continue;
             }
-            result->emplace_back(label, score);
+            result->at(i) = {label, score};
         }
         return true;
     }

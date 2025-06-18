@@ -18,7 +18,7 @@ namespace modeldeploy::vision {
         cv::FontFace font(font_path);
         constexpr int margin = 5;
         // 根据label_id获取颜色
-        std::map<int, cv::Scalar_<int>> color_map;
+        static std::map<int, cv::Scalar_<int>> color_map;
         // 绘制半透明部分（填充矩形）
         for (int i = 0; i < top_k; ++i) {
             if (result.scores[i] < score_threshold) {

@@ -16,7 +16,7 @@ namespace modeldeploy::vision {
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         // 根据label_id获取颜色
-        std::map<int, cv::Scalar_<int>> color_map;
+        static std::map<int, cv::Scalar_<int>> color_map;
         // 绘制半透明部分（填充矩形）
         for (int i = 0; i < result.size(); ++i) {
             if (result[i].score < threshold) {

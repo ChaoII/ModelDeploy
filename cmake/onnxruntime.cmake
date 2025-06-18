@@ -70,9 +70,19 @@ if (NOT onnxruntime_SOURCE_DIR)
 endif ()
 
 # for debug
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(onnxruntime_SOURCE_DIR "E:/develop/onnxruntime-win-x64-gpu-1.22.0")
-endif ()
+#if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+set(onnxruntime_SOURCE_DIR "E:/develop/onnxruntime-win-x64-gpu-1.22.0")
+#endif ()
 include_directories(${onnxruntime_SOURCE_DIR}/include)
 link_directories(${onnxruntime_SOURCE_DIR}/lib)
 list(APPEND DEPENDS onnxruntime)
+
+
+file(GLOB SHARED_LIBS
+        "${onnxruntime_SOURCE_DIR}/lib/*.dll"
+        "${onnxruntime_SOURCE_DIR}/lib/*.so"
+        "${onnxruntime_SOURCE_DIR}/lib/*.dylib"
+)
+
+# 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
+file(COPY ${SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)

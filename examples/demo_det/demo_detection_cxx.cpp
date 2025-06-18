@@ -5,6 +5,37 @@
 #include "csrc/vision.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
+
+void test_camera() {
+    cv::VideoCapture cap(0);
+    if (!cap.isOpened()) {
+        std::cout << "Cannot open camera" << std::endl;
+        return;
+    }
+
+    modeldeploy::RuntimeOption option;
+    option.use_gpu();
+    option.enable_trt = true;
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.onnx", option);
+    std::vector<modeldeploy::vision::DetectionResult> result;
+    // yolov8.get_preprocessor().set_size({1440, 1440});
+    yolo11_det.get_preprocessor().set_mini_pad(true);
+
+    cv::Mat frame;
+    while (true) {
+        if (cap.read(frame)) {
+            std::cout << "width:" << frame.cols << " height:" << frame.rows << std::endl;
+            yolo11_det.predict(frame, &result);
+            auto r = modeldeploy::vision::vis_det(frame, result);
+            cv::imshow("frame", r);
+            if (cv::waitKey(1) == 'q') {
+                break;
+            }
+        }
+    }
+}
+
+
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(8);
@@ -15,7 +46,7 @@ int main() {
     std::vector<modeldeploy::vision::DetectionResult> result;
     // yolov8.get_preprocessor().set_size({1440, 1440});
     yolo11_det.get_preprocessor().set_mini_pad(true);
-    int warm_up_count = 1;
+    int warm_up_count = 10;
     for (int i = 0; i < warm_up_count; ++i) {
         yolo11_det.predict(img, &result);
     }
@@ -31,4 +62,5 @@ int main() {
                                      false);
     cv::imshow("test", vis_image);
     cv::waitKey(0);
+    // test_camera();
 }

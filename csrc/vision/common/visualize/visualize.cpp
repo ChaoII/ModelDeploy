@@ -5,8 +5,7 @@
 #include <random>
 #include "csrc/vision/common/visualize/visualize.h"
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     cv::Scalar get_random_color() {
         std::random_device rd; // 获取随机数种子
         std::mt19937 gen(rd()); // 使用Mersenne Twister算法生成随机数
@@ -37,9 +36,13 @@ namespace modeldeploy::vision
     void draw_landmarks(cv::Mat& cv_image,
                         const std::vector<cv::Point2f>& landmarks,
                         const int landmark_radius) {
-        for (auto& landmark : landmarks) {
-            auto landmark_color = get_random_color();
-            cv::circle(cv_image, landmark, landmark_radius, landmark_color, -1);
+        static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
+        for (size_t i = 0; i < landmarks.size(); ++i) {
+            if (!color_map.contains(i)) {
+                color_map[i] = get_random_color();
+            }
+            auto landmark_color = color_map[i];
+            cv::circle(cv_image, landmarks[i], landmark_radius, landmark_color, -1);
         }
     }
 }

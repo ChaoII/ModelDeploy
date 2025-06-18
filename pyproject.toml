@@ -22,3 +22,7 @@ cmake.define.BUILD_EXAMPLES = "OFF"
 cmake.define.BUILD_TESTS = "OFF"
 cmake.define.CMAKE_POLICY_VERSION_MINIMUM = "3.5"
 cmake.args = ["-G", "Ninja"]
+
+[tool.setuptools]
+packages = ["modeldeploy"]
+package-dir = { "" = "python" }

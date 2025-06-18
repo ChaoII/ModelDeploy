@@ -10,7 +10,7 @@ namespace modeldeploy::vision::lpr {
     bool LprRecPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<LprResult>* results) const {
         const size_t batch = tensors[0].shape()[0];
-        results->reserve(batch);
+        results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             if (tensors[0].dtype() != DataType::FP32 || tensors[1].dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
@@ -43,7 +43,7 @@ namespace modeldeploy::vision::lpr {
             }
             result.car_plate_str = plate_str;
             result.car_plate_color = plate_color;
-            results->push_back(std::move(result));
+            results->at(bs) = std::move(result);
         }
         return true;
     }

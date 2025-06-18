@@ -65,6 +65,7 @@ namespace modeldeploy::vision::face {
             total_num_boxes += tensors.at(f).shape()[1];
         }
         const size_t batch = tensors[0].shape()[0];
+        results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             const float ipt_h = letter_box_records[bs].ipt_h;
             const float ipt_w = letter_box_records[bs].ipt_w;
@@ -155,7 +156,7 @@ namespace modeldeploy::vision::face {
                     }
                 }
             }
-            results->push_back(std::move(_results));
+            results->at(bs) = std::move(_results);
         }
         return true;
     }
