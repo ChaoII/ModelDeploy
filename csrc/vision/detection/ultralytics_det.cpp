@@ -31,6 +31,7 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
+
     bool UltralyticsDet::batch_predict(const std::vector<cv::Mat>& images,
                                        std::vector<std::vector<DetectionResult>>* results,
                                        TimerArray* timers) {

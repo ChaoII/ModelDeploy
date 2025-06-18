@@ -131,15 +131,7 @@ if (BUILD_PYTHON)
             "${CMAKE_BINARY_DIR}/bin/*.so"
             "${CMAKE_BINARY_DIR}/bin/*.dylib"
     )
-
-    foreach (dll_file ${EXTRA_DLLS})
-        add_custom_command(TARGET modeldeploy POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${dll_file}"
-                "${CMAKE_SOURCE_DIR}/python/modeldeploy/"
-                COMMENT "Copying ${dll_file} to python/modeldeploy/"
-        )
-    endforeach ()
+    install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
 endif ()
 
 

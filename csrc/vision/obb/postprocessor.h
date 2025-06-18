@@ -25,6 +25,14 @@ namespace modeldeploy::vision::detection {
                  std::vector<std::vector<ObbResult>>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;
 
+        bool run_without_nms(const std::vector<Tensor>& tensors,
+                             std::vector<std::vector<ObbResult>>* results,
+                             const std::vector<LetterBoxRecord>& letter_box_records) const;
+
+        bool run_with_nms(const std::vector<Tensor>& tensors,
+                          std::vector<std::vector<ObbResult>>* results,
+                          const std::vector<LetterBoxRecord>& letter_box_records) const;
+
         /// Set conf_threshold, default 0.25
         void set_conf_threshold(const float& conf_threshold) {
             conf_threshold_ = conf_threshold;

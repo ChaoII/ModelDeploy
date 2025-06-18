@@ -13,6 +13,14 @@ namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPostprocessor {
     public:
         UltralyticsPostprocessor();
+        bool run_without_nms(const std::vector<Tensor>& tensors,
+                             std::vector<std::vector<DetectionResult>>* results,
+                             const std::vector<LetterBoxRecord>& letter_box_records) const;
+
+        bool run_with_nms(const std::vector<Tensor>& tensors,
+                          std::vector<std::vector<DetectionResult>>* results,
+                          const std::vector<LetterBoxRecord>& letter_box_records) const;
+
         bool run(const std::vector<Tensor>& tensors,
                  std::vector<std::vector<DetectionResult>>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;

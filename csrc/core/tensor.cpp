@@ -90,7 +90,6 @@ namespace modeldeploy {
           dtype_(other.dtype_), element_size_(other.element_size_) {
         if (other.owns_data_) {
             // 如果原始张量拥有数据，我们需要复制数据
-            std::cout << "heavy copy.." << std::endl;
             memory_ = std::make_shared<MemoryBlock>(other.byte_size());
             data_ptr_ = memory_->data();
             std::memcpy(data_ptr_, other.data_ptr_, other.byte_size());
@@ -98,7 +97,6 @@ namespace modeldeploy {
         }
         else {
             // 如果原始张量不拥有数据，我们共享同一个内存块
-            std::cout << "light copy.." << std::endl;
             memory_ = other.memory_;
             data_ptr_ = other.data_ptr_;
             owns_data_ = false;
@@ -112,7 +110,6 @@ namespace modeldeploy {
           data_ptr_(other.data_ptr_), owns_data_(other.owns_data_) {
         other.data_ptr_ = nullptr;
         other.owns_data_ = false;
-        std::cout << "move..." << std::endl;
     }
 
     Tensor& Tensor::operator=(const Tensor& other) {
@@ -125,7 +122,6 @@ namespace modeldeploy {
 
             if (other.owns_data_) {
                 // 复制数据
-
                 memory_ = std::make_shared<MemoryBlock>(other.byte_size());
                 data_ptr_ = memory_->data();
                 std::memcpy(data_ptr_, other.data_ptr_, other.byte_size());

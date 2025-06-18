@@ -22,6 +22,14 @@ namespace modeldeploy::vision::detection {
        * \param[in] letter_box_records The shape info list, record input_shape and output_shape
        * \return true if the postprocess successed, otherwise false
        */
+        bool run_without_nms(std::vector<Tensor>& tensors,
+                             std::vector<std::vector<InstanceSegResult>>* results,
+                             const std::vector<LetterBoxRecord>& letter_box_records) const;
+
+        bool run_with_nms(std::vector<Tensor>& tensors,
+                          std::vector<std::vector<InstanceSegResult>>* results,
+                          const std::vector<LetterBoxRecord>& letter_box_records) const;
+
         bool run(std::vector<Tensor>& tensors,
                  std::vector<std::vector<InstanceSegResult>>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;
