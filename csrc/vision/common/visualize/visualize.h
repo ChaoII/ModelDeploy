@@ -22,29 +22,29 @@ namespace modeldeploy::vision {
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_cls(
         cv::Mat& cv_image,
         const ClassifyResult& result,
-        int top_k,
-        float score_threshold,
-        const std::string& font_path,
-        int font_size,
-        double alpha, bool save_result);
+        int top_k = 1,
+        float score_threshold = 0.5,
+        const std::string& font_path = "",
+        int font_size = 14,
+        double alpha = 0.15, bool save_result = false);
 
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_det(
         cv::Mat& cv_image, const std::vector<DetectionResult>& result, double threshold = 0.5,
         const std::string& font_path = "", int font_size = 14,
-        double alpha = 0.5, bool save_result = false);
+        double alpha = 0.15, bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_iseg(
         cv::Mat& cv_image, const std::vector<InstanceSegResult>& result,
         double threshold = 0.5,
         const std::string& font_path = "", int font_size = 14,
-        double alpha = 0.5, bool save_result = false);
+        double alpha = 0.15, bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_obb(
         cv::Mat& cv_image, const std::vector<ObbResult>& result,
         double threshold = 0.5,
         const std::string& font_path = "", int font_size = 14,
-        double alpha = 0.5, bool save_result = false);
+        double alpha = 0.15, bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_ocr(
         cv::Mat& image, const OCRResult& result, const std::string& font_path,
@@ -53,18 +53,18 @@ namespace modeldeploy::vision {
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_det_landmarks(
         cv::Mat cv_image, const std::vector<DetectionLandmarkResult>& result,
         const std::string& font_path, int font_size = 14,
-        int landmark_radius = 4, double alpha = 0.5,
+        int landmark_radius = 4, double alpha = 0.15,
         bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_lpr(
         cv::Mat& cv_image, const std::vector<LprResult>& result,
         const std::string& font_path, int font_size = 14,
-        int landmark_radius = 4, double alpha = 0.5,
+        int landmark_radius = 4, double alpha = 0.15,
         bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_pose(
         cv::Mat& cv_image, const std::vector<PoseResult>& result,
         const std::string& font_path, int font_size = 14,
-        int landmark_radius = 4, double alpha = 0.5,
+        int landmark_radius = 4, double alpha = 0.15,
         bool save_result = false);
 }

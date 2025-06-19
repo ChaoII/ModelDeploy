@@ -16,7 +16,8 @@ option(BUILD_PYTHON "build with python" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(WITH_STATIC_CRT "build for mt" OFF)
-option(WITH_GPU "enable gpu" OFF)
+option(WITH_GPU "Enable ONNXRuntime GPU" OFF)
+
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
