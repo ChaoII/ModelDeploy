@@ -29,6 +29,10 @@ namespace modeldeploy {
         return infer(reused_input_tensors_, &reused_output_tensors_);
     }
 
+    bool BaseModel::set_runtime(Runtime* clone_runtime) {
+        runtime_ = std::unique_ptr<Runtime>(clone_runtime);
+        return true;
+    }
 
     size_t BaseModel::num_inputs() { return runtime_->num_inputs(); }
 

@@ -57,7 +57,13 @@ namespace modeldeploy {
 
         [[nodiscard]] virtual std::map<std::string, std::string> get_custom_meta_data() const = 0;
 
-        virtual bool infer(std::vector<Tensor>& inputs,
-                           std::vector<Tensor>* outputs) = 0;
+        virtual bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) = 0;
+
+        virtual std::unique_ptr<BaseBackend> clone(RuntimeOption& runtime_option, void* stream = nullptr,
+                                                   const int device_id = -1) {
+            MD_LOG_ERROR << "Clone no support " << runtime_option.backend << " " << stream
+                << " " << device_id << std::endl;
+            return nullptr;
+        }
     };
 }

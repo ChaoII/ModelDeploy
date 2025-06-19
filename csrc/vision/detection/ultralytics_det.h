@@ -22,6 +22,8 @@ namespace modeldeploy::vision::detection {
                                    std::vector<std::vector<DetectionResult>>* results,
                                    TimerArray* timers = nullptr);
 
+        std::unique_ptr<UltralyticsDet> clone() const;
+
         virtual UltralyticsPreprocessor& get_preprocessor() {
             return preprocessor_;
         }

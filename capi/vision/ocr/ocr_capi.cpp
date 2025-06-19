@@ -22,20 +22,22 @@ MDStatusCode md_create_ocr_model(MDModel* model,
     const auto det_model_file_path = fs::path(parameters->det_model_file);
     const auto cls_model_file_path = fs::path(parameters->cls_model_file);
     const auto rec_model_file_path = fs::path(parameters->rec_model_file);
+    const auto dict__file_path = fs::path(parameters->dict_path);
 
     modeldeploy::RuntimeOption _option;
     c_runtime_option_2_runtime_option(option, &_option);
     const auto ocr_model = new modeldeploy::vision::ocr::PaddleOCR(det_model_file_path.string(),
                                                                    cls_model_file_path.string(),
                                                                    rec_model_file_path.string(),
-                                                                   parameters->dict_path,
-                                                                   parameters->max_side_len,
-                                                                   parameters->det_db_thresh,
-                                                                   parameters->det_db_box_thresh,
-                                                                   parameters->det_db_unclip_ratio,
-                                                                   parameters->det_db_score_mode,
-                                                                   parameters->use_dilation,
-                                                                   parameters->rec_batch_size, _option);
+                                                                   dict__file_path.string(), _option);
+    ocr_model->get_detector()->get_preprocessor().set_max_side_len(parameters->max_side_len);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_thresh(parameters->det_db_thresh);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_box_thresh(parameters->det_db_box_thresh);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_unclip_ratio(parameters->det_db_unclip_ratio);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_score_mode(parameters->det_db_score_mode);
+    ocr_model->get_detector()->get_postprocessor().set_use_dilation(parameters->use_dilation);
+    ocr_model->set_rec_batch_size(parameters->rec_batch_size);
+    ocr_model->set_cls_batch_size(parameters->rec_batch_size);
 
     model->type = MDModelType::OCR;
     model->format = MDModelFormat::ONNX;

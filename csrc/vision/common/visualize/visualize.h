@@ -48,7 +48,7 @@ namespace modeldeploy::vision {
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_ocr(
         cv::Mat& image, const OCRResult& result, const std::string& font_path,
-        int font_size, double alpha, bool save_result);
+        int font_size = 14, double alpha = 0.15, bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT cv::Mat vis_det_landmarks(
         cv::Mat cv_image, const std::vector<DetectionLandmarkResult>& result,

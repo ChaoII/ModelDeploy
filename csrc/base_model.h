@@ -24,6 +24,10 @@ namespace modeldeploy {
 
         virtual bool infer();
 
+        virtual Runtime* clone_runtime() { return runtime_->clone(); }
+
+        virtual bool set_runtime(Runtime* clone_runtime);
+
         virtual size_t num_inputs();
 
         virtual size_t num_outputs();
@@ -37,11 +41,6 @@ namespace modeldeploy {
         virtual void release_reused_buffer() {
             reused_input_tensors_.shrink_to_fit();
             reused_output_tensors_.shrink_to_fit();
-        }
-
-        virtual bool set_runtime(Runtime* clone_runtime) {
-            runtime_ = std::unique_ptr<Runtime>(clone_runtime);
-            return true;
         }
 
         virtual std::map<std::string, std::string> get_custom_meta_data();

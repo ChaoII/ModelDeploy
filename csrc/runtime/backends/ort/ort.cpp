@@ -161,12 +161,11 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;
             return false;
         }
-        std::string model_buffer;
-        if (!read_binary_from_file(option.model_file, &model_buffer)) {
+        if (!read_binary_from_file(option.model_file, &model_buffer_)) {
             MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
             return false;
         }
-        return init_from_onnx(model_buffer, option_);
+        return init_from_onnx(model_buffer_, option_);
     }
 
 
@@ -177,13 +176,14 @@ namespace modeldeploy {
         }
         try {
             build_option(option);
-            session_ = {env_, model_buffer.data(), model_buffer.size(), session_options_};
-            binding_ = std::make_unique<Ort::IoBinding>(session_);
+            shared_session_ = std::make_shared<Ort::Session>(env_, model_buffer.data(), model_buffer.size(),
+                                                             session_options_);
+            binding_ = std::make_unique<Ort::IoBinding>(*shared_session_);
             const Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-            const Ort::Allocator allocator(session_, memory_info);
-            const size_t n_inputs = session_.GetInputCount();
-            const size_t n_outputs = session_.GetOutputCount();
+            const Ort::Allocator allocator(*shared_session_, memory_info);
+            const size_t n_inputs = shared_session_->GetInputCount();
+            const size_t n_outputs = shared_session_->GetOutputCount();
             // 模型输入输出信息
             tabulate::Table input_table;
             input_table.format().font_color(tabulate::Color::yellow)
@@ -194,8 +194,8 @@ namespace modeldeploy {
             input_table.add_row({"Type", "Index", "Name", "Data Type", "Shape"});
             input_table[0].format().font_style({tabulate::FontStyle::bold});
             for (size_t i = 0; i < n_inputs; ++i) {
-                auto input_name_ptr = session_.GetInputNameAllocated(i, allocator);
-                auto type_info = session_.GetInputTypeInfo(i);
+                auto input_name_ptr = shared_session_->GetInputNameAllocated(i, allocator);
+                auto type_info = shared_session_->GetInputTypeInfo(i);
                 std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
                 const auto data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
                 input_table.add_row({
@@ -210,8 +210,8 @@ namespace modeldeploy {
 
             // 输出表格
             for (size_t i = 0; i < n_outputs; ++i) {
-                auto output_name_ptr = session_.GetOutputNameAllocated(i, allocator);
-                auto type_info = session_.GetOutputTypeInfo(i);
+                auto output_name_ptr = shared_session_->GetOutputNameAllocated(i, allocator);
+                auto type_info = shared_session_->GetOutputTypeInfo(i);
                 std::vector<int64_t> shape = type_info.GetTensorTypeAndShapeInfo().GetShape();
                 const auto data_type = type_info.GetTensorTypeAndShapeInfo().GetElementType();
                 input_table.add_row({
@@ -256,7 +256,7 @@ namespace modeldeploy {
             binding_->BindOutput(output_info.name.c_str(), output_memory_info);
         }
         try {
-            session_.Run({}, *binding_);
+            shared_session_->Run({}, *binding_);
         }
         catch (const std::exception& e) {
             MD_LOG_ERROR << "Failed to Infer: " << e.what() << std::endl;
@@ -269,6 +269,58 @@ namespace modeldeploy {
         }
         return true;
     }
+
+    std::unique_ptr<BaseBackend> OrtBackend::clone(RuntimeOption& runtime_option,
+                                                   void* stream,
+                                                   const int device_id) {
+        // auto backend = std::make_unique<OrtBackend>();
+        // // 1. 拷贝初始化参数
+        // backend->option_ = this->option_;
+        // backend->inputs_desc_ = this->inputs_desc_;
+        // backend->outputs_desc_ = this->outputs_desc_;
+        // // 2. 使用传入的 RuntimeOption 覆盖必要字段
+        // runtime_option.device = device_id >= 0 ? Device::GPU : Device::CPU;
+        // runtime_option.device_id = device_id;
+        // runtime_option.ort_option.device = runtime_option.device;
+        // runtime_option.ort_option.device_id = device_id;
+        // if (stream) {
+        //     runtime_option.ort_option.external_stream_ = stream;
+        // }
+        // backend->option_ = runtime_option.ort_option;
+        // // 3. 克隆用同样的模型 buffer 初始化
+        // if (!this->model_buffer_.empty()) {
+        //     backend->model_buffer_ = this->model_buffer_;
+        //     backend->init_from_onnx(this->model_buffer_, backend->option_);
+        // }
+        // else {
+        //     MD_LOG_ERROR << "[clone] model_buffer_ is empty! Cannot clone backend." << std::endl;
+        //     return nullptr;
+        // }
+        //
+        // return backend;
+
+        auto backend = std::make_unique<OrtBackend>();
+
+        // 共享 Session、model_buffer、输入输出描述
+        backend->shared_session_ = this->shared_session_;
+        backend->model_buffer_ = this->model_buffer_;
+        backend->inputs_desc_ = this->inputs_desc_;
+        backend->outputs_desc_ = this->outputs_desc_;
+        backend->option_ = this->option_;
+
+        runtime_option.device = (device_id >= 0) ? Device::GPU : Device::CPU;
+        runtime_option.device_id = device_id;
+        runtime_option.ort_option.device = runtime_option.device;
+        runtime_option.ort_option.device_id = device_id;
+
+        if (stream) {
+            runtime_option.ort_option.external_stream_ = stream;
+        }
+        // 每个线程各自持有自己的 binding
+        backend->binding_ = std::make_unique<Ort::IoBinding>(*backend->shared_session_);
+        return backend;
+    }
+
 
     TensorInfo OrtBackend::get_input_info(const int index) {
         TensorInfo info;
@@ -311,7 +363,7 @@ namespace modeldeploy {
     std::map<std::string, std::string> OrtBackend::get_custom_meta_data() const {
         std::map<std::string, std::string> data;
         const Ort::AllocatorWithDefaultOptions allocator;
-        const Ort::ModelMetadata model_metadata = session_.GetModelMetadata();
+        const Ort::ModelMetadata model_metadata = shared_session_->GetModelMetadata();
         // 获取自定义元数据数量
         const auto keys = model_metadata.GetCustomMetadataMapKeysAllocated(allocator);
         // 遍历所有自定义元数据

@@ -15,6 +15,8 @@ namespace modeldeploy {
 
         bool infer();
 
+        Runtime* clone(void* stream = nullptr, int device_id = -1);
+
         [[nodiscard]] size_t num_inputs() const { return backend_->num_inputs(); }
 
         [[nodiscard]] size_t num_outputs() const { return backend_->num_outputs(); }
