@@ -7,48 +7,55 @@ set(onnxruntime_win_x64_static_1.20.1_mt_FILE_NAME "onnxruntime_win_x64_static_1
 set(onnxruntime_win_x64_static_1.20.1_md_FILE_NAME "onnxruntime_win_x64_static_1.20.1_md.zip")
 set(onnxruntime_linux_x64_static_1.22.0_FILE_NAME "onnxruntime_linux_x64_static_1.22.0.zip")
 set(onnxruntime_linux_aarch64_static_1.22.0_FILE_NAME "onnxruntime_linux_aarch64_static_1.22.0.zip")
+set(onnxruntime_linux_x64_gpu_1_22_0_FILE_NAME "onnxruntime-linux-x64-gpu-1.22.0.zip")
+set(onnxruntime_win_x64_gpu_1_22_0_FILE_NAME "onnxruntime-win-x64-gpu-1.22.0.zip")
+
+
 set(ONNXRUNTIME_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
 include(FetchContent)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    if (WITH_STATIC_CRT)
-        set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1.20.1_mt_FILE_NAME})
+    if (WITH_GPU)
+        set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_gpu_1_22_0_FILE_NAME})
         set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-        set(ONNXRUNTIME_HASH "SHA256=06c19e1c9214f9f7b7c780d14424696f1eee3c39724f738607caa33760fa4cb1")
+        set(ONNXRUNTIME_HASH "SHA256=c16a4cb5baa366a2de79e9a65036c20c937c310073632f068be18db8d213daf2")
     else ()
-        set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1.20.1_md_FILE_NAME})
-        set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-        set(ONNXRUNTIME_HASH "SHA256=8f1df4b53222ed4b92cd809157b219441ea52a9d74442a1254a9ff2e22852f78")
+        if (WITH_STATIC_CRT)
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1.20.1_mt_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=06c19e1c9214f9f7b7c780d14424696f1eee3c39724f738607caa33760fa4cb1")
+        else ()
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1.20.1_md_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=8f1df4b53222ed4b92cd809157b219441ea52a9d74442a1254a9ff2e22852f78")
+        endif ()
     endif ()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-        set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_static_1.22.0_FILE_NAME})
-        set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-        set(ONNXRUNTIME_HASH "SHA256=8b39de5745c45baea301d47223164296bf5a3c14b9599afb92d829106d92aa7c")
-    elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_aarch64_static_1.22.0_FILE_NAME})
-        set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-        set(ONNXRUNTIME_HASH "SHA256=8b4e4da3183ba51ce4ac7558d9f6631cb3df7ffad9eb6ff048166167a8d79523")
+    if (WITH_GPU)
+        if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_gpu_1_22_0_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=625b96d23e76a33ea4ec27d8340a4d99dd44ec2dc7f77b2900481d3ee794e0ea")
+        else ()
+            message(FATAL_ERROR "Unsupported system arch : ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for GPU. Please set -DWITH_GPU=OFF")
+        endif ()
+    elseif ()
+        if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_static_1.22.0_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=8b39de5745c45baea301d47223164296bf5a3c14b9599afb92d829106d92aa7c")
+        elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_aarch64_static_1.22.0_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=8b4e4da3183ba51ce4ac7558d9f6631cb3df7ffad9eb6ff048166167a8d79523")
+        else ()
+            message(FATAL_ERROR "Unsupported system arch:" ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})
+        endif ()
     endif ()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-    message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
+    message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})
 endif ()
 
-set(possible_file_locations
-        $ENV{HOME}/Downloads/${ONNXRUNTIME_FILE_NAME}
-        ${CMAKE_SOURCE_DIR}/${ONNXRUNTIME_FILE_NAME}
-        ${CMAKE_BINARY_DIR}/${ONNXRUNTIME_FILE_NAME}
-        /tmp/${ONNXRUNTIME_FILE_NAME})
-
-
-foreach (f IN LISTS possible_file_locations)
-    if (EXISTS ${f})
-        set(ONNXRUNTIME_URL "${f}")
-        file(TO_CMAKE_PATH "${ONNXRUNTIME_URL}" ONNXRUNTIME_URL)
-        message(STATUS "Found local downloaded onnxruntime: ${ONNXRUNTIME_URL}")
-        break()
-    endif ()
-endforeach ()
 
 FetchContent_Declare(onnxruntime
         URL
@@ -65,24 +72,21 @@ else ()
     message(STATUS "onnxruntime is already populated")
 endif ()
 message(STATUS "onnxruntime is downloaded to ${onnxruntime_SOURCE_DIR}")
-if (NOT onnxruntime_SOURCE_DIR)
-    message(FATAL_ERROR "onnxruntime_SOURCE_DIR is not set after population")
-endif ()
 
-# for debug
-#if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-set(onnxruntime_SOURCE_DIR "E:/develop/onnxruntime-win-x64-gpu-1.22.0")
-#endif ()
 include_directories(${onnxruntime_SOURCE_DIR}/include)
 link_directories(${onnxruntime_SOURCE_DIR}/lib)
 list(APPEND DEPENDS onnxruntime)
 
 
+# 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
 file(GLOB SHARED_LIBS
         "${onnxruntime_SOURCE_DIR}/lib/*.dll"
         "${onnxruntime_SOURCE_DIR}/lib/*.so"
         "${onnxruntime_SOURCE_DIR}/lib/*.dylib"
 )
-
-# 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
 file(COPY ${SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
+
+
+
+
+

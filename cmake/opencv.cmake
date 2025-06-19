@@ -35,21 +35,6 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
 
-set(possible_file_locations
-        $ENV{HOME}/Downloads/${OPENCV_FILE_NAME}
-        ${CMAKE_SOURCE_DIR}/${OPENCV_FILE_NAME}
-        ${CMAKE_BINARY_DIR}/${OPENCV_FILE_NAME}
-        /tmp/${OPENCV_FILE_NAME})
-
-
-foreach (f IN LISTS possible_file_locations)
-    if (EXISTS ${f})
-        set(OPENCV_URL "${f}")
-        file(TO_CMAKE_PATH "${OPENCV_URL}" OPENCV_URL)
-        message(STATUS "Found local downloaded opencv: ${OPENCV_URL}")
-        break()
-    endif ()
-endforeach ()
 
 FetchContent_Declare(opencv
         URL
@@ -69,6 +54,7 @@ message(STATUS "opencv is downloaded to ${opencv_SOURCE_DIR}")
 if (NOT opencv_SOURCE_DIR)
     message(FATAL_ERROR "opencv_SOURCE_DIR is not set after population")
 endif ()
+
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(OpenCV_DIR "${opencv_SOURCE_DIR}/x64/vc17/staticlib")
