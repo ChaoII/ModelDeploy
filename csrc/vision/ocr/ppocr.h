@@ -19,13 +19,7 @@ namespace modeldeploy::vision::ocr {
                   const std::string& cls_model_path,
                   const std::string& rec_model_path,
                   const std::string& dict_path,
-                  int max_side_len = 960,
-                  double det_db_thresh = 0.3,
-                  double det_db_box_thresh = 0.6,
-                  double det_db_unclip_ratio = 1.5,
-                  const std::string& det_db_score_mode = "slow",
-                  bool use_dilation = false,
-                  int rec_batch_size = 6, const RuntimeOption& option = RuntimeOption());
+                  const RuntimeOption& option = RuntimeOption());
 
         ~PaddleOCR() override;
 
@@ -63,10 +57,16 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] int get_rec_batch_size() const;
 
+        std::shared_ptr<DBDetector> get_detector();
+        
+        std::shared_ptr<Classifier> get_classifier();
+
+        std::shared_ptr<Recognizer> get_recognizer();
+
     protected:
-        std::unique_ptr<DBDetector> detector_ = nullptr;
-        std::unique_ptr<Classifier> classifier_ = nullptr;
-        std::unique_ptr<Recognizer> recognizer_ = nullptr;
+        std::shared_ptr<DBDetector> detector_ = nullptr;
+        std::shared_ptr<Classifier> classifier_ = nullptr;
+        std::shared_ptr<Recognizer> recognizer_ = nullptr;
 
     private:
         int cls_batch_size_ = 1;

@@ -50,6 +50,15 @@ namespace modeldeploy {
         return result;
     }
 
+    Runtime* Runtime::clone(void* stream, const int device_id) {
+        Runtime* runtime = new Runtime();
+        MD_LOG_INFO << "Runtime Clone with Backend:: " << option.backend << " in " << option.device << "." << std::endl;
+        runtime->option = option;
+        runtime->backend_ = backend_->clone(option, stream, device_id);
+        return runtime;
+    }
+
+
     void Runtime::bind_input_tensor(const std::string& name, Tensor& input) {
         bool is_exist = false;
         for (auto& t : input_tensors_) {
@@ -94,8 +103,8 @@ namespace modeldeploy {
     void Runtime::CreateOrtBackend() {
         backend_ = std::make_unique<OrtBackend>();
         if (!backend_->init(option)) {
-            MD_LOG_ERROR << "Failed to initialize Backend::ORT." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
         }
-        MD_LOG_INFO << "Runtime initialized with Backend::ORT in " << option.device << "." << std::endl;
+        MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
     }
 }

@@ -32,6 +32,9 @@ namespace modeldeploy {
 
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
+        std::unique_ptr<BaseBackend> clone(RuntimeOption& runtime_option,
+                                           void* stream = nullptr, int device_id = -1) override;
+
         [[nodiscard]] size_t num_inputs() const override { return inputs_desc_.size(); }
 
         [[nodiscard]] size_t num_outputs() const override { return outputs_desc_.size(); }
@@ -47,13 +50,14 @@ namespace modeldeploy {
                             const OrtBackendOption& option = OrtBackendOption());
 
         Ort::Env env_{ORT_LOGGING_LEVEL_WARNING, "MD"};
-        Ort::Session session_{nullptr};
+        std::shared_ptr<Ort::Session> shared_session_{nullptr};
         Ort::SessionOptions session_options_;
         std::unique_ptr<Ort::IoBinding> binding_;
         std::vector<OrtValueInfo> inputs_desc_;
         std::vector<OrtValueInfo> outputs_desc_;
         bool initialized_ = false;
-        std::string model_file_name;
+        std::string model_file_name_;
+        std::string model_buffer_;
         OrtBackendOption option_;
     };
 }

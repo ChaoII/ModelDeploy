@@ -14,4 +14,28 @@ namespace modeldeploy {
         CPU,
         GPU
     };
+
+    inline std::string device_to_string(const Device device) {
+        switch (device) {
+        case Device::CPU: return "CPU";
+        case Device::GPU: return "GPU";
+        default: return "Unknown";
+        }
+    }
+
+    inline std::string backend_to_string(const Backend backend) {
+        switch (backend) {
+        case Backend::ORT: return "ORT";
+        case Backend::NONE: return "NONE";
+        default: return "Unknown";
+        }
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const Device device) {
+        return os << device_to_string(device);
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const Backend backend) {
+        return os << backend_to_string(backend);
+    }
 }

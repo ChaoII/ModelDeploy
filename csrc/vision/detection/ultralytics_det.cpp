@@ -58,4 +58,10 @@ namespace modeldeploy::vision::detection {
         if (timers) timers->post_timer.stop();
         return true;
     }
+
+    std::unique_ptr<UltralyticsDet> UltralyticsDet::clone() const {
+        std::unique_ptr<UltralyticsDet> clone_model = std::make_unique<UltralyticsDet>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 }

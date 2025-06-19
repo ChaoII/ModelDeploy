@@ -11,28 +11,12 @@ namespace modeldeploy::vision::ocr {
                          const std::string& cls_model_path,
                          const std::string& rec_model_path,
                          const std::string& dict_path,
-                         const int max_side_len,
-                         const double det_db_thresh,
-                         const double det_db_box_thresh,
-                         const double det_db_unclip_ratio,
-                         const std::string& det_db_score_mode,
-                         const bool use_dilation,
-                         const int rec_batch_size,
                          const RuntimeOption& option) {
-        detector_ = std::make_unique<DBDetector>(det_model_path, option);
-        detector_->get_preprocessor().set_max_side_len(max_side_len);
-        detector_->get_postprocessor().set_det_db_thresh(det_db_thresh);
-        detector_->get_postprocessor().set_det_db_box_thresh(det_db_box_thresh);
-        detector_->get_postprocessor().set_det_db_score_mode(det_db_score_mode);
-        detector_->get_postprocessor().set_det_db_score_mode(det_db_score_mode);
-        detector_->get_postprocessor().set_use_dilation(use_dilation);
-        detector_->get_postprocessor().set_det_db_unclip_ratio(det_db_unclip_ratio);
+        detector_ = std::make_shared<DBDetector>(det_model_path, option);
         if (!cls_model_path.empty()) {
-            classifier_ = std::make_unique<Classifier>(cls_model_path, option);
-            set_cls_batch_size(rec_batch_size);
+            classifier_ = std::make_shared<Classifier>(cls_model_path, option);
         }
-        recognizer_ = std::make_unique<Recognizer>(rec_model_path, dict_path, option);
-        set_rec_batch_size(rec_batch_size);
+        recognizer_ = std::make_shared<Recognizer>(rec_model_path, dict_path, option);
     }
 
     PaddleOCR::~PaddleOCR() = default;
@@ -71,6 +55,19 @@ namespace modeldeploy::vision::ocr {
     }
 
     int PaddleOCR::get_rec_batch_size() const { return rec_batch_size_; }
+
+
+    std::shared_ptr<DBDetector> PaddleOCR::get_detector() {
+        return detector_;
+    }
+
+    std::shared_ptr<Classifier> PaddleOCR::get_classifier() {
+        return classifier_;
+    }
+
+    std::shared_ptr<Recognizer> PaddleOCR::get_recognizer() {
+        return recognizer_;
+    }
 
 
     bool PaddleOCR::predict(cv::Mat* image, OCRResult* result, TimerArray* timers) {
