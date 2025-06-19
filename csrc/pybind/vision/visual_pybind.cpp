@@ -23,7 +23,7 @@ namespace modeldeploy::vision {
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("top_k"),
               pybind11::arg("threshold"), pybind11::arg("font_path") = ""
-              , pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.5,
+              , pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
 
 
@@ -35,7 +35,7 @@ namespace modeldeploy::vision {
                   const cv::Mat vis_im = vis_det(im, result, threshold, font_path, font_size, alpha, save_result);
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("threshold") = 0.5,
-              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.5,
+              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
 
         m.def("vis_iseg", [](pybind11::array& im_data, const std::vector<InstanceSegResult>& result,
@@ -47,7 +47,7 @@ namespace modeldeploy::vision {
                                                   save_result);
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("threshold") = 0.5,
-              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.5,
+              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
         m.def("vis_obb", [](pybind11::array& im_data, const std::vector<ObbResult>& result,
                             const double threshold = 0.5,
@@ -57,7 +57,7 @@ namespace modeldeploy::vision {
                   const cv::Mat vis_im = vis_obb(cv_image, result, threshold, font_path, font_size, alpha, save_result);
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("threshold") = 0.5,
-              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.5,
+              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
 
         m.def("vis_ocr", [](pybind11::array& im_data, const OCRResult& result,
@@ -67,7 +67,7 @@ namespace modeldeploy::vision {
                   const cv::Mat vis_im = vis_ocr(cv_image, result, font_path, font_size, alpha, save_result);
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("font_path") = "",
-              pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.5,
+              pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
 
 
@@ -81,7 +81,7 @@ namespace modeldeploy::vision {
                                                            alpha, save_result);
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("font_path") = "",
-              pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4, pybind11::arg("alpha") = 0.5,
+              pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4, pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
 
         m.def("vis_lpr", [](pybind11::array& im_data,
@@ -95,7 +95,7 @@ namespace modeldeploy::vision {
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("font_path") = "",
               pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4,
-              pybind11::arg("alpha") = 0.5, pybind11::arg("save_result") = false);
+              pybind11::arg("alpha") = 0.15, pybind11::arg("save_result") = false);
 
         m.def("vis_pose", [](pybind11::array& im_data,
                              const std::vector<PoseResult>& result,
@@ -108,6 +108,6 @@ namespace modeldeploy::vision {
                   return cv_mat_to_pyarray(vis_im);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("font_path") = "",
               pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4,
-              pybind11::arg("alpha") = 0.5, pybind11::arg("save_result") = false);
+              pybind11::arg("alpha") = 0.15, pybind11::arg("save_result") = false);
     }
 } // namespace fastdeploy
