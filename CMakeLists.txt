@@ -9,6 +9,7 @@ set(SOURCE ""
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
+option(ENABLE_ORT "enable ort backend" ON)
 option(ENABLE_MNN "enable mnn backend" ON)
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
@@ -39,12 +40,8 @@ endif ()
 if (MSVC)
     if (WITH_STATIC_CRT)
         add_compile_options(
-                $<$<CONFIG:>:/MT>
-                $<$<CONFIG:Debug>:/MTd>
-                $<$<CONFIG:Release>:/MT>
-                $<$<CONFIG:RelWithDebInfo>:/MT>
-                $<$<CONFIG:MinSizeRel>:/MT>
-        )
+                $<$<CONFIG:>:/MT> $<$<CONFIG:Debug>:/MTd> $<$<CONFIG:Release>:/MT>
+                $<$<CONFIG:RelWithDebInfo>:/MT> $<$<CONFIG:MinSizeRel>:/MT>)
     endif ()
     add_compile_options(/wd4819 /wd4244)
     add_definitions(-DMD_CXX_EXPORT)
@@ -57,40 +54,41 @@ endif ()
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
-include("${CMAKE_SOURCE_DIR}/cmake/onnxruntime.cmake")
-include("${CMAKE_SOURCE_DIR}/cmake/mnn.cmake")
-file(GLOB_RECURSE RUNTIME_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/*.cpp)
-file(GLOB_RECURSE CORE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/core/*.cpp)
-file(GLOB_RECURSE FUNCTION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/function/*.cpp)
-file(GLOB_RECURSE UTILS_SOURCE ${CMAKE_SOURCE_DIR}/csrc/utils/*.cpp)
-list(APPEND SOURCE ${RUNTIME_SOURCE} ${VISION_SOURCE} ${CORE_SOURCE} ${FUNCTION_SOURCE} ${UTILS_SOURCE})
-list(APPEND SOURCE csrc/base_model.cpp)
+
+file(GLOB_RECURSE ALL_SOURCE ${CMAKE_SOURCE_DIR}/csrc/*.cpp)
+file(GLOB_RECURSE ORT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/ort/*.cpp)
+file(GLOB_RECURSE MNN_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/mnn/*.cpp)
+file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
+file(GLOB_RECURSE AUDIO_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
+file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
+
+list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
+
+
+if (ENABLE_ORT)
+    add_definitions(-DENABLE_ORT)
+    include("${CMAKE_SOURCE_DIR}/cmake/onnxruntime.cmake")
+    list(APPEND ALL_SOURCE ${ORT_BACKEND_SOURCE})
+    list(APPEND DEPENDS onnxruntime)
+endif ()
+
+if (ENABLE_MNN)
+    add_definitions(-DENABLE_MNN)
+    include("${CMAKE_SOURCE_DIR}/cmake/mnn.cmake")
+    list(APPEND ALL_SOURCE ${MNN_BACKEND_SOURCE})
+    list(APPEND DEPENDS MNN)
+endif ()
+
 
 if (BUILD_VISION)
     add_definitions(-DBUILD_VISION)
-    # opencv
     include("${CMAKE_SOURCE_DIR}/cmake/opencv.cmake")
-    # for debug
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(OpenCV_DIR "E:/develop/opencv/build/x64/vc16/lib")
-    endif ()
-    find_package(OpenCV CONFIG REQUIRED)
-    if (NOT OpenCV_FOUND)
-        message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")
-    endif ()
-    message(STATUS "OpenCV version: ${OpenCV_VERSION}")
-    include_directories(${OpenCV_INCLUDE_DIRS})
-    file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*/*.cpp ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
-    list(APPEND SOURCE ${VISION_SOURCE})
+    list(APPEND ALL_SOURCE ${VISION_SOURCE})
     list(APPEND DEPENDS ${OpenCV_LIBS})
 endif ()
 
 if (BUILD_AUDIO)
     add_definitions(-DBUILD_AUDIO)
-    file(GLOB_RECURSE ASR_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/asr/*.cpp)
-    file(GLOB_RECURSE VAD_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/vad/*.cpp)
-    file(GLOB_RECURSE TTS_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*.cpp ${CMAKE_SOURCE_DIR}/csrc/audio/tts/*/*.cpp)
-    file(GLOB_RECURSE ASR_PIPELINE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
     set(BUILD_TESTING OFF CACHE BOOL "Disable testing for samplerate" FORCE)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/samplerate)
     set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF CACHE BOOL "Disable Python binding for kaldi-native-fbank" FORCE)
@@ -100,23 +98,22 @@ if (BUILD_AUDIO)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cppjieba)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
-    list(APPEND SOURCE ${ASR_SOURCE} ${VAD_SOURCE} ${TTS_SOURCE} ${ASR_PIPELINE_SOURCE})
+    list(APPEND ALL_SOURCE ${AUDIO_SOURCE})
     list(APPEND DEPENDS samplerate kaldi-native-fbank-core cppjieba)
 endif ()
 
-
 if (BUILD_CAPI)
-    include(${CMAKE_SOURCE_DIR}/capi/CMakeLists.txt)
+    include("${CMAKE_SOURCE_DIR}/capi/CMakeLists.txt")
     if (MSVC)
         add_definitions(-DMD_CAPI)
     endif ()
+    list(APPEND ALL_SOURCE ${CAPI_SOURCE})
 endif ()
 
-add_library(${LIBRARY_NAME} SHARED ${SOURCE})
+add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 
 if (BUILD_PYTHON)
-    file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
     find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
     pybind11_add_module(modeldeploy ${PYBIND_SOURCE})

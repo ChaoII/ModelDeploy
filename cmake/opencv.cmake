@@ -67,3 +67,13 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
+
+# for debug
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(OpenCV_DIR "E:/develop/opencv/build/x64/vc16/lib")
+endif ()
+find_package(OpenCV CONFIG REQUIRED)
+if (NOT OpenCV_FOUND)
+    message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")
+endif ()
+message(STATUS "OpenCV version: ${OpenCV_VERSION}")
