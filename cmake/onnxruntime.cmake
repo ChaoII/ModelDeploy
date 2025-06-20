@@ -75,16 +75,14 @@ message(STATUS "onnxruntime is downloaded to ${onnxruntime_SOURCE_DIR}")
 
 include_directories(${onnxruntime_SOURCE_DIR}/include)
 link_directories(${onnxruntime_SOURCE_DIR}/lib)
-list(APPEND DEPENDS onnxruntime)
-
 
 # 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
-file(GLOB SHARED_LIBS
+file(GLOB ORT_SHARED_LIBS
         "${onnxruntime_SOURCE_DIR}/lib/*.dll"
         "${onnxruntime_SOURCE_DIR}/lib/*.so"
         "${onnxruntime_SOURCE_DIR}/lib/*.dylib"
 )
-file(COPY ${SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
+file(COPY ${ORT_SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
 
 
