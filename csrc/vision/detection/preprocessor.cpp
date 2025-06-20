@@ -12,7 +12,7 @@ namespace modeldeploy::vision::detection {
     UltralyticsPreprocessor::UltralyticsPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
-        is_mini_pad_ = true;
+        is_mini_pad_ = false;
         is_no_pad_ = false;
         is_scale_up_ = true;
         stride_ = 32;

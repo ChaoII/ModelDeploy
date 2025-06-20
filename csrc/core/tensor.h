@@ -17,8 +17,9 @@ namespace modeldeploy {
         INT64,
         UINT8,
         INT8,
-        UNKNOW
+        UNKNOWN
     };
+
 
     // 辅助函数实现
     inline std::string datatype_to_string(const DataType dtype) {
@@ -29,10 +30,15 @@ namespace modeldeploy {
         case DataType::INT64: return "INT64";
         case DataType::UINT8: return "UINT8";
         case DataType::INT8: return "INT8";
-        case DataType::UNKNOW: return "UNKNOWN";
+        case DataType::UNKNOWN: return "UNKNOWN";
         default: return "";
         }
     }
+
+    inline std::ostream& operator<<(std::ostream& os, const DataType& dtype) {
+        return os << datatype_to_string(dtype);
+    }
+
 
     // 内存池管理器
     class MemoryPool {

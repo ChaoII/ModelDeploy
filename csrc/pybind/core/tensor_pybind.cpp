@@ -14,7 +14,7 @@ namespace modeldeploy {
             .value("INT64", DataType::INT64)
             .value("INT8", DataType::INT8)
             .value("UINT8", DataType::UINT8)
-            .value("UNKNOW", DataType::UNKNOW);
+            .value("UNKNOWN", DataType::UNKNOWN);
 
 
         pybind11::class_<Tensor>(m, "Tensor")
@@ -33,7 +33,7 @@ namespace modeldeploy {
             .def_static("from_external_data",
                         [](const std::string& name, const size_t data_addr,
                            const std::vector<int64_t>& shape, const std::string& data_type) {
-                            auto tensor_data_type = DataType::UNKNOW;
+                            auto tensor_data_type = DataType::UNKNOWN;
                             if (data_type == "FP32") {
                                 tensor_data_type = DataType::FP32;
                             }

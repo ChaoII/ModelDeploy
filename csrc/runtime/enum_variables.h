@@ -7,6 +7,7 @@
 namespace modeldeploy {
     enum Backend {
         ORT,
+        MNN,
         NONE
     };
 
@@ -26,6 +27,7 @@ namespace modeldeploy {
     inline std::string backend_to_string(const Backend backend) {
         switch (backend) {
         case Backend::ORT: return "ORT";
+        case Backend::MNN: return "MNN";
         case Backend::NONE: return "NONE";
         default: return "Unknown";
         }

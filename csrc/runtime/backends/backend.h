@@ -55,7 +55,9 @@ namespace modeldeploy {
 
         virtual std::vector<TensorInfo> get_output_infos() = 0;
 
-        [[nodiscard]] virtual std::map<std::string, std::string> get_custom_meta_data() const = 0;
+        [[nodiscard]] virtual std::map<std::string, std::string> get_custom_meta_data() const {
+            return std::map<std::string, std::string>{};
+        }
 
         virtual bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) = 0;
 

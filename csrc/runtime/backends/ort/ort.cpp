@@ -2,9 +2,9 @@
 // Created by aichao on 2025/2/20.
 //
 #include <iostream>
-#include <fstream>
 #include <filesystem>
 #include <tabulate/tabulate.hpp>
+#include "csrc/runtime/backends/ort/utils.h"
 #include "csrc/runtime/backends/ort/ort.h"
 #include "csrc/utils/utils.h"
 #include "csrc/core/md_log.h"
@@ -273,31 +273,6 @@ namespace modeldeploy {
     std::unique_ptr<BaseBackend> OrtBackend::clone(RuntimeOption& runtime_option,
                                                    void* stream,
                                                    const int device_id) {
-        // auto backend = std::make_unique<OrtBackend>();
-        // // 1. 拷贝初始化参数
-        // backend->option_ = this->option_;
-        // backend->inputs_desc_ = this->inputs_desc_;
-        // backend->outputs_desc_ = this->outputs_desc_;
-        // // 2. 使用传入的 RuntimeOption 覆盖必要字段
-        // runtime_option.device = device_id >= 0 ? Device::GPU : Device::CPU;
-        // runtime_option.device_id = device_id;
-        // runtime_option.ort_option.device = runtime_option.device;
-        // runtime_option.ort_option.device_id = device_id;
-        // if (stream) {
-        //     runtime_option.ort_option.external_stream_ = stream;
-        // }
-        // backend->option_ = runtime_option.ort_option;
-        // // 3. 克隆用同样的模型 buffer 初始化
-        // if (!this->model_buffer_.empty()) {
-        //     backend->model_buffer_ = this->model_buffer_;
-        //     backend->init_from_onnx(this->model_buffer_, backend->option_);
-        // }
-        // else {
-        //     MD_LOG_ERROR << "[clone] model_buffer_ is empty! Cannot clone backend." << std::endl;
-        //     return nullptr;
-        // }
-        //
-        // return backend;
 
         auto backend = std::make_unique<OrtBackend>();
 
