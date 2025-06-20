@@ -19,7 +19,7 @@ namespace modeldeploy {
         if (option.backend == Backend::ORT) {
             create_ort_backend();
         }
-        if (option.backend == Backend::MNN) {
+        else if (option.backend == Backend::MNN) {
             create_mnn_backend();
         }
         else {
