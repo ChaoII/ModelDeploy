@@ -75,8 +75,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DBUILD_AUDIO=ON
           -DBUILD_VISION=ON 
-          -DBUILD_PYTHON=ON
-          -DWITH_GPU=OFF
+          -DBUILD_FACE=ON
+          -DBUILD_CAPI=ON
 
       - name: Build
         # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
