@@ -33,6 +33,10 @@ namespace modeldeploy {
         backend = Backend::ORT;
     }
 
+    void RuntimeOption::use_mnn_backend() {
+        backend = Backend::MNN;
+    }
+
     void RuntimeOption::set_ort_graph_opt_level(const int level) {
         const std::vector supported_level{-1, 0, 1, 2};
         if (std::ranges::find(supported_level, level) == supported_level.end()) {

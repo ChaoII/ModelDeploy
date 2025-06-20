@@ -6,6 +6,8 @@
 #include "csrc/runtime/backends/ort/ort.h"
 #include "csrc/runtime/runtime.h"
 
+#include "backends/mnn/mnn_backend.h"
+
 
 namespace modeldeploy {
     bool Runtime::init(const RuntimeOption& _option) {
@@ -15,7 +17,10 @@ namespace modeldeploy {
             return false;
         }
         if (option.backend == Backend::ORT) {
-            CreateOrtBackend();
+            create_ort_backend();
+        }
+        if (option.backend == Backend::MNN) {
+            create_mnn_backend();
         }
         else {
             return false;
@@ -100,8 +105,16 @@ namespace modeldeploy {
     }
 
 
-    void Runtime::CreateOrtBackend() {
+    void Runtime::create_ort_backend() {
         backend_ = std::make_unique<OrtBackend>();
+        if (!backend_->init(option)) {
+            MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
+        }
+        MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
+    }
+
+    void Runtime::create_mnn_backend() {
+        backend_ = std::make_unique<MnnBackend>();
         if (!backend_->init(option)) {
             MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
         }

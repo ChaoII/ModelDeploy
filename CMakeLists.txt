@@ -9,6 +9,7 @@ set(SOURCE ""
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
+option(ENABLE_MNN "enable mnn backend" ON)
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_VISION "build vision module" ON)
 option(BUILD_CAPI "build with capi" ON)
@@ -16,7 +17,7 @@ option(BUILD_PYTHON "build with python" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(WITH_STATIC_CRT "build for mt" OFF)
-option(WITH_GPU "Enable ONNXRuntime GPU" OFF)
+option(WITH_GPU "Enable GPU" OFF)
 
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -24,9 +25,9 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-if(POLICY CMP0169)
+if (POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
-endif()
+endif ()
 
 #find_package(OpenMP)
 #if (OpenMP_CXX_FOUND)
@@ -57,6 +58,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
 include("${CMAKE_SOURCE_DIR}/cmake/onnxruntime.cmake")
+include("${CMAKE_SOURCE_DIR}/cmake/mnn.cmake")
 file(GLOB_RECURSE RUNTIME_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/*.cpp)
 file(GLOB_RECURSE CORE_SOURCE ${CMAKE_SOURCE_DIR}/csrc/core/*.cpp)
 file(GLOB_RECURSE FUNCTION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/function/*.cpp)
@@ -112,7 +114,6 @@ endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${SOURCE})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
-
 
 if (BUILD_PYTHON)
     file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)

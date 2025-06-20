@@ -158,7 +158,7 @@ static class Program
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.jpg"));
         PaddleOcr ppocr = new PaddleOcr(parameters, option);
         OcrResults results = ppocr.Predict(image);
-        ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.5, true);
+        ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.15, true);
         image.Show();
         foreach (var result in results.Data)
         {
@@ -396,13 +396,13 @@ static class Program
         // TestFace();
         // TestLpr();
         // TestSenseVoice();
-        TestKokoro();
+        // TestKokoro();
         // TestDetection();
         // TestInstanceSeg();
         // TestObb();
         // TestPose();
         // TestImage();
-        // TestOCR();
+        TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();

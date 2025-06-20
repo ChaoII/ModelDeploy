@@ -24,7 +24,7 @@ namespace modeldeploy::vision::utils
         if (type == 2) {
             MD_LOG_ERROR << "While calling cv_dtype_to_md_dtype(), "
                 "get UINT16 type which is not supported now." << std::endl;
-            return DataType::UNKNOW;
+            return DataType::UNKNOWN;
         }
         if (type == 4) {
             return DataType::INT32;
@@ -38,7 +38,7 @@ namespace modeldeploy::vision::utils
 
         MD_LOG_ERROR << "While calling cv_dtype_to_md_dtype(), get type = "
             << type << ", which is not expected." << std::endl;
-        return DataType::UNKNOW;
+        return DataType::UNKNOWN;
     }
 
 

@@ -44,7 +44,9 @@ namespace modeldeploy {
         RuntimeOption option;
 
     private:
-        void CreateOrtBackend();
+        void create_ort_backend();
+
+        void create_mnn_backend();
 
         std::unique_ptr<BaseBackend> backend_;
         std::vector<Tensor> input_tensors_;

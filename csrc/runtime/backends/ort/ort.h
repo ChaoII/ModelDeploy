@@ -7,11 +7,10 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "option.h"
-#include "utils.h"
 #include "csrc/core/md_decl.h"
 #include "onnxruntime_cxx_api.h"
 #include "csrc/runtime/backends/backend.h"
+#include "csrc/runtime/backends/ort/option.h"
 
 namespace modeldeploy {
     struct OrtValueInfo {
