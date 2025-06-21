@@ -153,6 +153,7 @@ namespace modeldeploy {
         option_.device = option.device;
         option_.enable_trt = option.enable_trt;
         option_.enable_fp16 = option.enable_fp16;
+        option_.model_filepath = option.model_file;
 
         if (option_.model_from_memory) {
             return init_from_onnx(option.model_buffer, option_);
@@ -273,7 +274,6 @@ namespace modeldeploy {
     std::unique_ptr<BaseBackend> OrtBackend::clone(RuntimeOption& runtime_option,
                                                    void* stream,
                                                    const int device_id) {
-
         auto backend = std::make_unique<OrtBackend>();
 
         // 共享 Session、model_buffer、输入输出描述

@@ -48,6 +48,7 @@ namespace modeldeploy {
         void build_option(const RuntimeOption& option);
 
         MnnBackendOption option_;
+        std::string model_buffer_;
         MNN::Session* session_ = nullptr;
         std::shared_ptr<MNN::Interpreter> net_;
         std::vector<TensorInfo> inputs_desc_;

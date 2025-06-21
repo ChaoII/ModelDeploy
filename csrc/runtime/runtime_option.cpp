@@ -30,11 +30,19 @@ namespace modeldeploy {
     }
 
     void RuntimeOption::use_ort_backend() {
+#ifdef ENABLE_ORT
         backend = Backend::ORT;
+#else
+        MD_LOG_FATAL<< "The ModelDeploy didn't compile with OnnxRuntime backend."<<std::endl;
+#endif
     }
 
     void RuntimeOption::use_mnn_backend() {
+#ifdef ENABLE_MNN
         backend = Backend::MNN;
+#else
+        MD_LOG_FATAL << "The ModelDeploy didn't compile with MNN backend." << std::endl;
+#endif
     }
 
     void RuntimeOption::set_ort_graph_opt_level(const int level) {

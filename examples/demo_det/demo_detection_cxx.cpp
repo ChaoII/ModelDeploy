@@ -39,10 +39,10 @@ void test_camera() {
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(8);
-    option.use_mnn_backend();
+    option.use_ort_backend();
     // option.use_gpu();
     // option.enable_trt = true;
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.mnn", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.onnx", option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().set_size({640, 640});
