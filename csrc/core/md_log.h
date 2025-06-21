@@ -46,10 +46,17 @@ namespace modeldeploy {
 
     class LogStreamWrapper {
     public:
-        explicit LogStreamWrapper(std::ostream& os) : os_(os), is_null_(false) {
+        explicit LogStreamWrapper(std::ostream& os, const bool fatal = false) : os_(os), is_null_(false),
+            fatal_(fatal) {
         }
 
-        explicit LogStreamWrapper(std::nullptr_t) : os_(std::cout), is_null_(true) {
+        explicit LogStreamWrapper(std::nullptr_t) : os_(std::cout), is_null_(true), fatal_(false) {
+        }
+
+        ~LogStreamWrapper() {
+            if (fatal_) {
+                std::exit(EXIT_FAILURE); // fatal 日志触发立即退出
+            }
         }
 
         template <typename T>
@@ -75,6 +82,7 @@ namespace modeldeploy {
     private:
         std::ostream& os_;
         bool is_null_;
+        bool fatal_;
     };
 
     class MODELDEPLOY_CXX_EXPORT LogManager {
@@ -144,7 +152,7 @@ namespace modeldeploy {
             if (hasPrintedPrefix) {
                 *log_stream_ << ": ";
             }
-            return LogStreamWrapper(*log_stream_);
+            return LogStreamWrapper(*log_stream_, level == LogLevel::MD_LOG_F);
         }
 
     private:

@@ -4,9 +4,6 @@
 
 #include <MNN/Tensor.hpp>
 #include "csrc/runtime/backends/mnn/mnn_backend.h"
-
-#include <csrc/runtime/backends/ort/utils.h>
-
 #include "csrc/runtime/backends/mnn/utils.h"
 
 namespace modeldeploy {
@@ -18,8 +15,12 @@ namespace modeldeploy {
                 << std::endl;
             return false;
         }
+        if (!read_binary_from_file(runtime_option.model_file, &model_buffer_)) {
+            MD_LOG_ERROR << "Failed to read model file: " << runtime_option.model_file << std::endl;
+            return false;
+        }
         const auto interpreter =
-            MNN::Interpreter::createFromFile(runtime_option.model_file.c_str());
+            MNN::Interpreter::createFromBuffer(model_buffer_.c_str(), model_buffer_.size());
         if (!interpreter) {
             MD_LOG_ERROR << "load mnn model file error, ensure model file is correct." << std::endl;
             return false;
@@ -70,7 +71,7 @@ namespace modeldeploy {
         std::cout << termcolor::green << "[model file:"
             << std::filesystem::absolute(runtime_option.model_file).filename().string()
             << " model size: " << std::fixed << std::setprecision(3)
-            << static_cast<float>(runtime_option.model_buffer.size()) / 1024 / 1024.0f << "MB]"
+            << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
             << termcolor::reset << std::endl;
         std::cout << input_table << std::endl;
         initialized_ = true;

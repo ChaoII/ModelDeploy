@@ -3,19 +3,20 @@
 //
 
 
-#include "csrc/runtime/backends/ort/ort.h"
 #include "csrc/runtime/runtime.h"
 
-#include "backends/mnn/mnn_backend.h"
+#ifdef ENABLE_ORT
+#include "csrc/runtime/backends/ort/ort.h"
+#endif
+#ifdef ENABLE_MNN
+#include "csrc/runtime/backends/mnn/mnn_backend.h"
+#endif
 
 
 namespace modeldeploy {
     bool Runtime::init(const RuntimeOption& _option) {
         option = _option;
 
-        if (option.backend == Backend::NONE) {
-            return false;
-        }
         if (option.backend == Backend::ORT) {
             create_ort_backend();
         }
@@ -23,6 +24,7 @@ namespace modeldeploy {
             create_mnn_backend();
         }
         else {
+            MD_LOG_ERROR << "The " << option.backend << " backend is not supported now." << std::endl;
             return false;
         }
         return true;
@@ -104,20 +106,27 @@ namespace modeldeploy {
         return nullptr;
     }
 
-
     void Runtime::create_ort_backend() {
+#ifdef ENABLE_ORT
         backend_ = std::make_unique<OrtBackend>();
         if (!backend_->init(option)) {
             MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
         }
+#else
+        MD_LOG_FATAL << "OrtBackend is not available, please compiled with ENABLE_ORT=ON." << std::endl;
+#endif
         MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
     }
 
     void Runtime::create_mnn_backend() {
+#ifdef ENABLE_MNN
         backend_ = std::make_unique<MnnBackend>();
         if (!backend_->init(option)) {
             MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
         }
+#else
+        MD_LOG_FATAL << "MNNBackend is not available, please compiled with ENABLE_MNN=ON." << std::endl;
+#endif
         MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
     }
 }
