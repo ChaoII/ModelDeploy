@@ -8,13 +8,20 @@ set(mnn_win_x64_static_3_2_0_md_FILE_NAME "mnn_win_x64_static_3_2_0_md.zip")
 set(mnn_win_x64_static_3_2_0_mt_FILE_NAME "mnn_win_x64_static_3_2_0_mt.zip")
 set(mnn_linux_x64_static_3_2_0_FILE_NAME "mnn_linux_x64_static_3_2_0.zip")
 set(mnn_linux_aarch64_static_3_2_0_FILE_NAME "mnn_linux_aarch64_static_3_2_0.zip")
+set(mnn_win_x64_gpu_3_2_0_FILE_NAME "mnn_win_x64_gpu_3_2_0.zip")
 
 
 set(MNN_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
 include(FetchContent)
 
 if (WITH_GPU)
-    message(FATAL_ERROR "mnn backend GPU is not supported for Windows")
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+        set(MNN_FILE_NAME ${mnn_win_x64_gpu_3_2_0_FILE_NAME})
+        set(MNN_URL ${MNN_BASE_URL}/${MNN_FILE_NAME})
+        set(MNN_HASH "SHA256=ba1404ba39571b7929dd991d8baf67c0eb77ee99ad92629fd9c8f940c8e4c572")
+    else ()
+        message(FATAL_ERROR "Unsupported system : ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for WITH_GPU=ON")
+    endif ()
 else ()
     if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /WHOLEARCHIVE:MNN")
@@ -69,9 +76,9 @@ link_directories(${MNN_LIB_DIR})
 
 # 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
 file(GLOB MNN_SHARED_LIBS
-        "${MNN_SOURCE_DIR}/lib/*.dll"
-        "${MNN_SOURCE_DIR}/lib/*.so"
-        "${MNN_SOURCE_DIR}/lib/*.dylib"
+        "${MNN_LIB_DIR}/*.dll"
+        "${MNN_LIB_DIR}/*.so"
+        "${MNN_LIB_DIR}/*.dylib"
 )
 file(COPY ${MNN_SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
