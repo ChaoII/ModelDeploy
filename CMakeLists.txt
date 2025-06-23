@@ -4,8 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 set(LIBRARY_NAME "ModelDeploySDK")
-set(SOURCE ""
-        csrc/pybind/utils/result_convert.h)
+set(SOURCE "")
 set(DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
@@ -39,14 +38,10 @@ endif ()
 
 if (MSVC)
     if (WITH_STATIC_CRT)
-        add_compile_options(
-                $<$<CONFIG:>:/MT> $<$<CONFIG:Debug>:/MTd> $<$<CONFIG:Release>:/MT>
-                $<$<CONFIG:RelWithDebInfo>:/MT> $<$<CONFIG:MinSizeRel>:/MT>)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
     endif ()
-    add_compile_options(/wd4819 /wd4244)
+    add_compile_options(/wd4819 /wd4244 /utf-8)
     add_definitions(-DMD_CXX_EXPORT)
-    add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
     endif ()
@@ -122,18 +117,17 @@ if (BUILD_PYTHON)
             INSTALL_RPATH "$ORIGIN"
             BUILD_WITH_INSTALL_RPATH TRUE
     )
-    install(TARGETS modeldeploy DESTINATION modeldeploy)
-    install(TARGETS ${LIBRARY_NAME}
-            RUNTIME DESTINATION modeldeploy
-            LIBRARY DESTINATION modeldeploy)
-
     # 安装依赖的第三方动态库
     file(GLOB EXTRA_DLLS
             "${CMAKE_BINARY_DIR}/bin/*.dll"
             "${CMAKE_BINARY_DIR}/bin/*.so"
             "${CMAKE_BINARY_DIR}/bin/*.dylib"
     )
-    install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
+    install(TARGETS modeldeploy DESTINATION python/modeldeploy)
+    install(TARGETS ${LIBRARY_NAME}
+            RUNTIME DESTINATION python/modeldeploy
+            LIBRARY DESTINATION python/modeldeploy)
+    install(FILES ${EXTRA_DLLS} DESTINATION python/modeldeploy)  # 使用 install 而非 copy
 endif ()
 
 
