@@ -29,13 +29,6 @@ if (POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
 endif ()
 
-#find_package(OpenMP)
-#if (OpenMP_CXX_FOUND)
-#    list(APPEND OpenMP::OpenMP_CXX)
-#else ()
-#    message(WARNING "OpenMP not found. Compilation will be without OpenMP support.")
-#endif ()
-
 if (MSVC)
     if (WITH_STATIC_CRT)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
