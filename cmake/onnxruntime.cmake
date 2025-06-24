@@ -5,10 +5,10 @@ message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
 
 set(onnxruntime_win_x64_static_1_20_1_mt_FILE_NAME "onnxruntime_win_x64_static_1_20_1_mt.zip")
 set(onnxruntime_win_x64_static_1_20_1_md_FILE_NAME "onnxruntime_win_x64_static_1_20_1_md.zip")
-set(onnxruntime_win_x64_gpu_1_22_0_FILE_NAME "onnxruntime-win-x64-gpu-1_22_0.zip")
+set(onnxruntime_win_x64_gpu_1_22_0_FILE_NAME "onnxruntime_win_x64_gpu_1_22_0.zip")
 set(onnxruntime_linux_x64_static_1_22_0_FILE_NAME "onnxruntime_linux_x64_static_1_22_0.zip")
 set(onnxruntime_linux_aarch64_static_1_22_0_FILE_NAME "onnxruntime_linux_aarch64_static_1_22_0.zip")
-set(onnxruntime_linux_x64_gpu_1_22_0_FILE_NAME "onnxruntime-linux-x64-gpu-1_22_0.zip")
+set(onnxruntime_linux_x64_gpu_1_22_0_FILE_NAME "onnxruntime_linux_x64_gpu_1_22_0.zip")
 
 
 set(ONNXRUNTIME_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
@@ -35,7 +35,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
         if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
             set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_gpu_1_22_0_FILE_NAME})
             set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-            set(ONNXRUNTIME_HASH "SHA256=e891c98e424bb5064034c312a2ed659e37f49bccc6f25b9c86d7fc91104d5d19")
+            set(ONNXRUNTIME_HASH "SHA256=750854123289251900beb397dd7938d060dc4e945a1b074070d152e88ec09af5")
         else ()
             message(FATAL_ERROR "Unsupported system arch : ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for GPU. Please set -DWITH_GPU=OFF")
         endif ()
@@ -76,12 +76,27 @@ message(STATUS "onnxruntime is downloaded to ${onnxruntime_SOURCE_DIR}")
 include_directories(${onnxruntime_SOURCE_DIR}/include)
 link_directories(${onnxruntime_SOURCE_DIR}/lib)
 
-# 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
-file(GLOB ORT_SHARED_LIBS
-        "${onnxruntime_SOURCE_DIR}/lib/*.dll"
-        "${onnxruntime_SOURCE_DIR}/lib/*.so"
-        "${onnxruntime_SOURCE_DIR}/lib/*.dylib"
+find_library(ONNXRUNTIME_LIB onnxruntime
+        PATHS "${onnxruntime_SOURCE_DIR}/lib"
+        NO_DEFAULT_PATH
 )
+
+add_library(onnxruntime::onnxruntime STATIC IMPORTED GLOBAL)
+
+
+set_target_properties(onnxruntime::onnxruntime PROPERTIES
+        IMPORTED_LOCATION "${ONNXRUNTIME_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${onnxruntime_SOURCE_DIR}/include"
+)
+
+# 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
+if (WIN32)
+    file(GLOB ORT_SHARED_LIBS "${onnxruntime_SOURCE_DIR}/lib/*.dll")
+elseif (APPLE)
+    file(GLOB ORT_SHARED_LIBS "${onnxruntime_SOURCE_DIR}/lib/*.dylib")
+else ()
+    file(GLOB ORT_SHARED_LIBS "${onnxruntime_SOURCE_DIR}/lib/*.so" "${onnxruntime_SOURCE_DIR}/lib/*.so.*")
+endif ()
 file(COPY ${ORT_SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
 

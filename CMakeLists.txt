@@ -57,7 +57,7 @@ if (ENABLE_ORT)
     add_definitions(-DENABLE_ORT)
     include("${CMAKE_SOURCE_DIR}/cmake/onnxruntime.cmake")
     list(APPEND ALL_SOURCE ${ORT_BACKEND_SOURCE})
-    list(APPEND DEPENDS onnxruntime)
+    list(APPEND DEPENDS onnxruntime::onnxruntime)
 endif ()
 
 if (ENABLE_MNN)
