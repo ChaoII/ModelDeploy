@@ -114,27 +114,7 @@ namespace modeldeploy {
             const auto tensor = net_->getSessionInput(session_, input.get_name().c_str());
             net_->resizeTensor(tensor, convert_shape<int64_t, int>(input.shape()));
             const auto mnn_tensor = new MNN::Tensor(tensor, MNN::Tensor::CAFFE);
-            if (input.dtype() == DataType::FP32) {
-                memcpy(mnn_tensor->host<float>(), input.data(), input.byte_size());
-            }
-            else if (input.dtype() == DataType::FP64) {
-                memcpy(mnn_tensor->host<double>(), input.data(), input.byte_size());
-            }
-            else if (input.dtype() == DataType::INT8) {
-                memcpy(mnn_tensor->host<int8_t>(), input.data(), input.byte_size());
-            }
-            else if (input.dtype() == DataType::INT64) {
-                memcpy(mnn_tensor->host<int64_t>(), input.data(), input.byte_size());
-            }
-            else if (input.dtype() == DataType::INT32) {
-                memcpy(mnn_tensor->host<int32_t>(), input.data(), input.byte_size());
-            }
-            else if (input.dtype() == DataType::UINT8) {
-                memcpy(mnn_tensor->host<uint8_t>(), input.data(), input.byte_size());
-            }
-            else {
-                MD_LOG_FATAL << "Unexpected data type of " << input.dtype() << std::endl;
-            }
+            memcpy(mnn_tensor->host<void>(), input.data(), input.byte_size());
             tensor->copyFromHostTensor(mnn_tensor);
             MNN::Tensor::destroy(mnn_tensor);
         }
@@ -147,7 +127,6 @@ namespace modeldeploy {
                 mnn_dtype_to_md_dtype(tensor->getType())) {
                 outputs_desc_[i].dtype = mnn_dtype_to_md_dtype(tensor->getType());
             }
-
             outputs->resize(outputs_desc_.size());
             (*outputs)[i].allocate(convert_shape<int, int64_t>(tensor->shape()),
                                    outputs_desc_[i].dtype, outputs_desc_[i].name);
@@ -169,18 +148,13 @@ namespace modeldeploy {
         MNN::BackendConfig backend_config;
 
         if (option.device == Device::CPU) {
-            config.type = static_cast<MNNForwardType>(MNNForwardType::MNN_FORWARD_CPU);
+            config.type = MNNForwardType::MNN_FORWARD_CPU;
             if (option_.cpu_thread_num > 0) {
                 config.numThread = option_.cpu_thread_num;
             }
         }
         else if (option.device == Device::GPU) {
 #if defined(__x86_64__) || defined(_M_X64)
-            if (option_.forward_type != mnn::MNNForwardType::MNN_FORWARD_CUDA) {
-                MD_LOG_WARN << "MnnBackend only support MNN_FORWARD_CUDA Format type, "
-                    "switch to MNN_FORWARD_CUDA"
-                    << std::endl;
-            }
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_CUDA);
 #elif defined(__aarch64__)
             config.type = static_cast<MNNForwardType>(option_.forward_type);
@@ -197,9 +171,8 @@ namespace modeldeploy {
 #if defined(__aarch64__)
             backend_config.power = static_cast<MNN::BackendConfig::PowerMode>(option_.power_mode);
 #else
-            MD_LOG_ERROR << "power mode of MNN_Power_High and MNN_Power_Low only be "
-                "supported for aarch64 cpu, switch to MNN_Power_Normal"
-                << std::endl;
+            MD_LOG_WARN << "power mode of MNN_Power_High and MNN_Power_Low only be "
+                "supported for aarch64 cpu, switch to MNN_Power_Normal" << std::endl;
 #endif
         }
         backend_config.memory = static_cast<MNN::BackendConfig::MemoryMode>(option_.memory_mode);
