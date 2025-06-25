@@ -4,7 +4,8 @@
 
 #include "csrc/vision.h"
 #include "csrc/vision/common/visualize/visualize.h"
-
+#include <MNN/expr/Executor.hpp>
+#include <MNN/Interpreter.hpp>
 
 void test_camera() {
     cv::VideoCapture cap(0);
@@ -37,13 +38,14 @@ void test_camera() {
 
 
 int main() {
+
     modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(8);
-    option.use_ort_backend();
-    option.use_gpu();
+    option.set_cpu_thread_num(6);
+    option.use_mnn_backend();
+    option.use_gpu(0);
     // option.enable_fp16 = true;
     // option.enable_trt = true;
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.onnx", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.mnn", option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     // yolo11_det.get_preprocessor().set_size({640, 640});
