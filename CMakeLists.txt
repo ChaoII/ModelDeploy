@@ -20,10 +20,16 @@ option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" OFF)
 
 
-if(WITH_GPU)
+if (WITH_GPU)
     add_definitions(-DWITH_GPU)
 endif ()
+file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" MD_VERSION)
+string(STRIP ${MD_VERSION} MD_VERSION)
 
+add_definitions(-DMD_VERSION="${MD_VERSION}")
+
+
+message(${MD_VERSION})
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -104,6 +110,7 @@ if (BUILD_CAPI)
 endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
+set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 
 if (BUILD_PYTHON)
@@ -121,11 +128,11 @@ if (BUILD_PYTHON)
             "${CMAKE_BINARY_DIR}/bin/*.so"
             "${CMAKE_BINARY_DIR}/bin/*.dylib"
     )
-    install(TARGETS modeldeploy DESTINATION python/modeldeploy)
+    install(TARGETS modeldeploy DESTINATION modeldeploy)
     install(TARGETS ${LIBRARY_NAME}
-            RUNTIME DESTINATION python/modeldeploy
-            LIBRARY DESTINATION python/modeldeploy)
-    install(FILES ${EXTRA_DLLS} DESTINATION python/modeldeploy)  # 使用 install 而非 copy
+            RUNTIME DESTINATION modeldeploy
+            LIBRARY DESTINATION modeldeploy)
+    install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
 endif ()
 
 
