@@ -29,7 +29,8 @@ namespace modeldeploy {
             return false;
         }
         net_.reset(interpreter, MNN::Interpreter::destroy);
-        net_->setSessionMode(MNN::Interpreter::Session_Backend_Auto);
+        net_->setSessionMode(MNN::Interpreter::Session_Backend_Fix);
+        net_->setSessionHint(MNN::Interpreter::GEOMETRY_COMPUTE_MASK, 0);
         net_->setSessionHint(MNN::Interpreter::MAX_TUNING_NUMBER, 5);
         build_option(runtime_option);
         const auto mnn_inputs = net_->getSessionInputAll(session_);
