@@ -23,9 +23,11 @@ namespace modeldeploy {
         m.doc() =
             "Make programmer easier to deploy deeplearning model, save time to save "
             "the world!";
+        m.def("get_version", []() { return std::string(MD_VERSION); }, "Get version of modeldeploy.");
         bind_tensor(m);
         bind_runtime(m);
         bind_base_model(m);
+
 
 #ifdef BUILD_VISION
         auto vision_module =
