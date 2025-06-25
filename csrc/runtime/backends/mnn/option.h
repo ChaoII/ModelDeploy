@@ -64,7 +64,7 @@ namespace modeldeploy {
     } // namespace mnn
     struct MnnBackendOption {
         int device_id = 0;
-        std::string cache_file_path;
+        std::string cache_file_path="./.tempcache";
         int cpu_thread_num = -1;
         mnn::MNNForwardType forward_type = mnn::MNN_FORWARD_AUTO;
         mnn::PrecisionMode precision = mnn::MNN_Precision_Normal;

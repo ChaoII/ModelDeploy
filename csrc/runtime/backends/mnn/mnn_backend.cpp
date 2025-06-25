@@ -2,9 +2,12 @@
 // Created by aichao on 2025/6/20.
 //
 
+#define MNN_USER_SET_DEVICE
+#include <MNN/MNNSharedContext.h>
 #include <MNN/Tensor.hpp>
 #include "csrc/runtime/backends/mnn/mnn_backend.h"
 #include "csrc/runtime/backends/mnn/utils.h"
+
 
 namespace modeldeploy {
     MnnBackend::~MnnBackend() = default;
@@ -146,7 +149,7 @@ namespace modeldeploy {
         }
         MNN::ScheduleConfig config;
         MNN::BackendConfig backend_config;
-
+        MNNDeviceContext device_context;
         if (option.device == Device::CPU) {
             config.type = MNNForwardType::MNN_FORWARD_CPU;
             if (option_.cpu_thread_num > 0) {
@@ -162,7 +165,8 @@ namespace modeldeploy {
             FDASSERT(false, "MnnBackend GPU only support aarch64 and x64 platform");
 #endif
             if (option.device_id >= 0) {
-                SET_MNN_GPU_ID(option.device_id);
+                device_context.deviceId = option.device_id;
+                backend_config.sharedContext = &device_context;
             }
             config.mode = option_.gpu_mode;
             backend_config.precision = static_cast<MNN::BackendConfig::PrecisionMode>(option_.precision);
@@ -173,6 +177,7 @@ namespace modeldeploy {
 #else
             MD_LOG_WARN << "power mode of MNN_Power_High and MNN_Power_Low only be "
                 "supported for aarch64 cpu, switch to MNN_Power_Normal" << std::endl;
+            option_.power_mode = mnn::PowerMode::MNN_Power_Normal;
 #endif
         }
         backend_config.memory = static_cast<MNN::BackendConfig::MemoryMode>(option_.memory_mode);

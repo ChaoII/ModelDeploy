@@ -11,17 +11,6 @@
 #include "csrc/runtime/backends/backend.h"
 #include "csrc/runtime/backends/mnn/option.h"
 
-#ifdef WITH_GPU
-#define MNN_USER_SET_DEVICE
-#include <MNN/MNNSharedContext.h>
-#define SET_MNN_GPU_ID(x)                                                    \
-MNNDeviceContext cuda_context;                                               \
-cuda_context.deviceId = x;                                                   \
-backend_config.sharedContext = &cuda_context;
-#else
-#define SET_MNN_GPU_ID(x) void(x)
-#endif
-
 
 namespace modeldeploy {
     class MnnBackend : public BaseBackend {
