@@ -5,7 +5,7 @@
 #define MNN_USER_SET_DEVICE
 #include <MNN/MNNSharedContext.h>
 #include <MNN/Tensor.hpp>
-#include "csrc/runtime/backends/mnn/mnn_backend.h"
+#include "csrc/runtime/backends/mnn/mnn_session_api.h"
 #include "csrc/runtime/backends/mnn/utils.h"
 
 

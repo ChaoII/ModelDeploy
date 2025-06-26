@@ -13,13 +13,17 @@ namespace modeldeploy {
 
     enum Device {
         CPU,
-        GPU
+        GPU,
+        OPENCL,
+        VULKAN,
     };
 
     inline std::string device_to_string(const Device device) {
         switch (device) {
         case Device::CPU: return "CPU";
         case Device::GPU: return "GPU";
+        case Device::OPENCL: return "OPENCL";
+        case Device::VULKAN: return "VULKAN";
         default: return "Unknown";
         }
     }
