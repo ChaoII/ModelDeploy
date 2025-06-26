@@ -17,6 +17,8 @@ namespace modeldeploy {
 
         void use_gpu(int gpu_id = 0);
 
+        void use_opencl(int device_id = 0);
+
         void set_external_stream(void* external_stream);
 
         void set_cpu_thread_num(int thread_num);
@@ -37,7 +39,7 @@ namespace modeldeploy {
 
         bool enable_fp16 = false;
         int cpu_thread_num = -1;
-        int device_id = 0;
+        int device_id = -1;
         bool enable_trt = false;
         bool model_from_memory = false;
         std::string model_buffer;

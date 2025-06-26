@@ -20,6 +20,11 @@ namespace modeldeploy {
         device_id = gpu_id;
     }
 
+    void RuntimeOption::use_opencl(const int device_id) {
+        device = Device::OPENCL;
+        this->device_id = device_id;
+    }
+
 
     void RuntimeOption::set_external_stream(void* external_stream) {
         ort_option.external_stream_ = external_stream;
@@ -27,13 +32,14 @@ namespace modeldeploy {
 
     void RuntimeOption::set_cpu_thread_num(const int thread_num) {
         ort_option.set_cpu_thread_num(thread_num);
+        mnn_option.cpu_thread_num = thread_num;
     }
 
     void RuntimeOption::use_ort_backend() {
 #ifdef ENABLE_ORT
         backend = Backend::ORT;
 #else
-        MD_LOG_FATAL<< "The ModelDeploy didn't compile with OnnxRuntime backend."<<std::endl;
+        MD_LOG_FATAL << "The ModelDeploy didn't compile with OnnxRuntime backend." << std::endl;
 #endif
     }
 

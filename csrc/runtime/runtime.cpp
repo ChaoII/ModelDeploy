@@ -9,7 +9,7 @@
 #include "csrc/runtime/backends/ort/ort.h"
 #endif
 #ifdef ENABLE_MNN
-#include "csrc/runtime/backends/mnn/mnn_backend.h"
+#include "csrc/runtime/backends/mnn/mnn_module_api.h"
 #endif
 
 
@@ -58,7 +58,7 @@ namespace modeldeploy {
     }
 
     Runtime* Runtime::clone(void* stream, const int device_id) {
-        Runtime* runtime = new Runtime();
+        auto* runtime = new Runtime();
         MD_LOG_INFO << "Runtime Clone with Backend:: " << option.backend << " in " << option.device << "." << std::endl;
         runtime->option = option;
         runtime->backend_ = backend_->clone(option, stream, device_id);
