@@ -48,6 +48,8 @@ namespace modeldeploy {
 
         void create_mnn_backend();
 
+        void create_trt_backend();
+
         std::unique_ptr<BaseBackend> backend_;
         std::vector<Tensor> input_tensors_;
         std::vector<Tensor> output_tensors_;

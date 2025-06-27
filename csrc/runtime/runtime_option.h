@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "backends/trt/option.h"
 #include "csrc/runtime/backends/mnn/option.h"
 #include "csrc/runtime/backends/ort/option.h"
 #include "csrc/runtime/enum_variables.h"
@@ -27,6 +28,8 @@ namespace modeldeploy {
 
         void use_mnn_backend();
 
+        void use_trt_backend();
+
         void set_trt_min_shape(const std::string& trt_min_shape);
 
         void set_trt_opt_shape(const std::string& trt_opt_shape);
@@ -36,6 +39,8 @@ namespace modeldeploy {
         OrtBackendOption ort_option;
 
         MnnBackendOption mnn_option;
+
+        TrtBackendOption trt_option;
 
         bool enable_fp16 = false;
         int cpu_thread_num = -1;
