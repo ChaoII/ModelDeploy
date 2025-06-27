@@ -4,6 +4,9 @@
 
 
 #include "csrc/runtime/runtime.h"
+#ifdef ENABLE_TRT
+#include "backends/trt/trt.h"
+#endif
 
 #ifdef ENABLE_ORT
 #include "csrc/runtime/backends/ort/ort.h"
@@ -22,6 +25,9 @@ namespace modeldeploy {
         }
         else if (option.backend == Backend::MNN) {
             create_mnn_backend();
+        }
+        else if (option.backend == Backend::TRT) {
+            create_trt_backend();
         }
         else {
             MD_LOG_ERROR << "The " << option.backend << " backend is not supported now." << std::endl;
@@ -126,6 +132,18 @@ namespace modeldeploy {
         }
 #else
         MD_LOG_FATAL << "MNNBackend is not available, please compiled with ENABLE_MNN=ON." << std::endl;
+#endif
+        MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
+    }
+
+    void Runtime::create_trt_backend() {
+#ifdef ENABLE_TRT
+        backend_ = std::make_unique<TrtBackend>();
+        if (!backend_->init(option)) {
+            MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
+        }
+#else
+        MD_LOG_FATAL << "MNNBackend is not available, please compiled with ENABLE_TRT=ON." << std::endl;
 #endif
         MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
     }

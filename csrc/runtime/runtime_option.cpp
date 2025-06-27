@@ -51,6 +51,14 @@ namespace modeldeploy {
 #endif
     }
 
+    void RuntimeOption::use_trt_backend() {
+#ifdef ENABLE_TRT
+        backend = Backend::TRT;
+#else
+        MD_LOG_FATAL << "The ModelDeploy didn't compile with TRT backend." << std::endl;
+#endif
+    }
+
     void RuntimeOption::set_ort_graph_opt_level(const int level) {
         const std::vector supported_level{-1, 0, 1, 2};
         if (std::ranges::find(supported_level, level) == supported_level.end()) {

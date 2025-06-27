@@ -13,6 +13,57 @@
 namespace modeldeploy {
     MnnBackend::~MnnBackend() = default;
 
+    void MnnBackend::build_option(const RuntimeOption& option) {
+        option_ = option.mnn_option;
+        MNN::ScheduleConfig config;
+        MNN::BackendConfig backend_config;
+        MNNDeviceContext device_context;
+        if (option.device == Device::CPU) {
+            config.type = MNNForwardType::MNN_FORWARD_CPU;
+            if (option_.cpu_thread_num > 0) {
+                config.numThread = option_.cpu_thread_num;
+            }
+        }
+        else if (option.device == Device::GPU) {
+            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_CUDA);
+        }
+        else if (option.device == Device::OPENCL) {
+            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_OPENCL);
+        }
+        else {
+            MD_LOG_WARN << "Unsupported device: " << option.device << " switch to Auto." << std::endl;
+            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_AUTO);
+        }
+        if (option.device_id >= 0) {
+            device_context.deviceId = option.device_id;
+            backend_config.sharedContext = &device_context;
+            // union 类型，如果是Device为CPU那么这里设置就会出错
+            config.mode = option_.gpu_mode;
+        }
+        backend_config.precision = static_cast<MNN::BackendConfig::PrecisionMode>(option_.precision);
+        if (option_.power_mode != mnn::PowerMode::MNN_Power_Normal) {
+#if defined(__aarch64__)
+            backend_config.power = static_cast<MNN::BackendConfig::PowerMode>(option_.power_mode);
+#else
+            MD_LOG_WARN << "power mode of MNN_Power_High and MNN_Power_Low only be "
+                "supported for aarch64 cpu, switch to MNN_Power_Normal" << std::endl;
+            option_.power_mode = mnn::PowerMode::MNN_Power_Normal;
+#endif
+        }
+        backend_config.memory = static_cast<MNN::BackendConfig::MemoryMode>(option_.memory_mode);
+        config.backendConfig = &backend_config;
+        rtmgr_ = std::shared_ptr<
+            MNN::Express::Executor::RuntimeManager>(
+            MNN::Express::Executor::RuntimeManager::createRuntimeManager(config),
+            MNN::Express::Executor::RuntimeManager::destroy);
+
+        if (!option_.cache_file_path.empty()) {
+            rtmgr_->setCache(option_.cache_file_path);
+        }
+        rtmgr_->setHint(MNN::Interpreter::GEOMETRY_COMPUTE_MASK, 0);
+    }
+
+
     bool MnnBackend::init(const RuntimeOption& runtime_option) {
         if (initialized_) {
             MD_LOG_ERROR << "MnnBackend is already initialized, cannot initialize again."
@@ -153,55 +204,6 @@ namespace modeldeploy {
         return true;
     }
 
-    void MnnBackend::build_option(const RuntimeOption& option) {
-        option_ = option.mnn_option;
-        MNN::ScheduleConfig config;
-        MNN::BackendConfig backend_config;
-        MNNDeviceContext device_context;
-        if (option.device == Device::CPU) {
-            config.type = MNNForwardType::MNN_FORWARD_CPU;
-            if (option_.cpu_thread_num > 0) {
-                config.numThread = option_.cpu_thread_num;
-            }
-        }
-        else if (option.device == Device::GPU) {
-            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_CUDA);
-        }
-        else if (option.device == Device::OPENCL) {
-            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_OPENCL);
-        }
-        else {
-            MD_LOG_WARN << "Unsupported device: " << option.device << " switch to Auto." << std::endl;
-            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_AUTO);
-        }
-        if (option.device_id >= 0) {
-            device_context.deviceId = option.device_id;
-            backend_config.sharedContext = &device_context;
-            // union 类型，如果是Device为CPU那么这里设置就会出错
-            config.mode = option_.gpu_mode;
-        }
-        backend_config.precision = static_cast<MNN::BackendConfig::PrecisionMode>(option_.precision);
-        if (option_.power_mode != mnn::PowerMode::MNN_Power_Normal) {
-#if defined(__aarch64__)
-            backend_config.power = static_cast<MNN::BackendConfig::PowerMode>(option_.power_mode);
-#else
-            MD_LOG_WARN << "power mode of MNN_Power_High and MNN_Power_Low only be "
-                "supported for aarch64 cpu, switch to MNN_Power_Normal" << std::endl;
-            option_.power_mode = mnn::PowerMode::MNN_Power_Normal;
-#endif
-        }
-        backend_config.memory = static_cast<MNN::BackendConfig::MemoryMode>(option_.memory_mode);
-        config.backendConfig = &backend_config;
-        rtmgr_ = std::shared_ptr<
-            MNN::Express::Executor::RuntimeManager>(
-            MNN::Express::Executor::RuntimeManager::createRuntimeManager(config),
-            MNN::Express::Executor::RuntimeManager::destroy);
-
-        if (!option_.cache_file_path.empty()) {
-            rtmgr_->setCache(option_.cache_file_path);
-        }
-        rtmgr_->setHint(MNN::Interpreter::GEOMETRY_COMPUTE_MASK, 0);
-    }
 
     std::map<std::string, std::string> MnnBackend::get_custom_meta_data() const {
         return net_->getInfo()->metaData;

@@ -8,6 +8,7 @@ namespace modeldeploy {
     enum Backend {
         ORT,
         MNN,
+        TRT,
         NONE
     };
 
@@ -32,6 +33,7 @@ namespace modeldeploy {
         switch (backend) {
         case Backend::ORT: return "ORT";
         case Backend::MNN: return "MNN";
+        case Backend::TRT: return "TRT";
         case Backend::NONE: return "NONE";
         default: return "Unknown";
         }
