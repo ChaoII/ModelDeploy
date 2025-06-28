@@ -1,17 +1,6 @@
-// Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Created by aichao on 2025/6/27.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include "csrc/runtime/backends/trt/trt.h"
 
 #include <cstring>
@@ -20,6 +9,7 @@
 
 #include "NvInferRuntime.h"
 #include "csrc/utils/utils.h"
+#include "csrc/runtime/backends/trt/buffers.h"
 
 
 namespace modeldeploy {
@@ -78,24 +68,9 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to call deserializeCudaEngine()." << std::endl;
             return false;
         }
-        const int nb_bindings = engine_->getNbIOTensors();
-        for (int i = 0; i < nb_bindings; ++i) {
-            const char* name = engine_->getIOTensorName(i);
-            const nvinfer1::Dims dims = engine_->getTensorShape(name);
-            const nvinfer1::DataType dtype = engine_->getTensorDataType(name);
-            bool is_input = engine_->getTensorIOMode(name) == nvinfer1::TensorIOMode::kINPUT;
-            std::string shape_str = vector_to_string(ToVec(dims));
-            std::string type_str = datatype_to_string(GetFDDataType(dtype));
-            if (is_input) {
-                inputs_desc_.emplace_back(TrtValueInfo{name, ToVec(dims), dtype});
-            }
-            else {
-                outputs_desc_.emplace_back(TrtValueInfo{name, ToVec(dims), dtype});
-            }
-        }
+        get_input_output_info();
         context_ = std::shared_ptr<nvinfer1::IExecutionContext>(
             engine_->createExecutionContext());
-        GetInputOutputInfo();
 
         for (int32_t i = 0; i < engine_->getNbIOTensors(); ++i) {
             auto const name = engine_->getIOTensorName(i);
@@ -107,14 +82,6 @@ namespace modeldeploy {
                 name, 0, nvinfer1::OptProfileSelector::kMAX));
             auto max = ToVec(engine_->getProfileShape(
                 name, 0, nvinfer1::OptProfileSelector::kMIN));
-            auto iter = shape_range_info_.find(name);
-            if (iter == shape_range_info_.end()) {
-                MD_LOG_ERROR << "There's no input named '" << name << "' in loaded model."
-                    << std::endl;
-                return false;
-            }
-            iter->second.Update(min);
-            iter->second.Update(max);
         }
         MD_LOG_INFO << "Build TensorRT Engine from cache file: " << trt_engine_file
             << " with shape range information as below," << std::endl;
@@ -147,7 +114,7 @@ namespace modeldeploy {
             return false;
         }
 
-        shape_range_info_.insert(std::make_pair("images", ShapeRangeInfo({1, 3, 640, 640})));
+        // shape_range_info_.insert(std::make_pair("images", ShapeRangeInfo({1, 3, 640, 640})));
         const uint32_t flags =
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH) |
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kSTRONGLY_TYPED);
@@ -171,6 +138,9 @@ namespace modeldeploy {
             << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
             << termcolor::reset << std::endl;
         // return init_from_onnx(model_buffer_, option_);
+        if (cudaStreamCreate(&stream_) != 0) {
+            MD_LOG_FATAL << "Cant not call cudaStreamCreate()." << std::endl;
+        }
         return LoadTrtCache(trt_option.model_file);
     }
 
@@ -273,36 +243,53 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Require " << num_inputs() << "inputs, but get " << inputs.size() << "." << std::endl;
             return false;
         }
-        if (ShapeRangeInfoUpdated(inputs)) {
-            // meet new shape output of predefined max/min shape
-            // rebuild the tensorrt engine
-            MD_LOG_WARN
-                << "TensorRT engine will be rebuilt once shape range information "
-                "changed, this may take lots of time, you can set a proper shape "
-                "range before loading model to avoid rebuilding process. refer "
-                "https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/en/"
-                "faq/"
-                "tensorrt_tricks.md for more details."
-                << std::endl;
-            BuildTrtEngine();
-        }
+        // if (ShapeRangeInfoUpdated(inputs)) {
+        //     // meet new shape output of predefined max/min shape
+        //     // rebuild the tensorrt engine
+        //     MD_LOG_WARN
+        //         << "TensorRT engine will be rebuilt once shape range information "
+        //         "changed, this may take lots of time, you can set a proper shape "
+        //         "range before loading model to avoid rebuilding process. refer "
+        //         "https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/en/"
+        //         "faq/"
+        //         "tensorrt_tricks.md for more details."
+        //         << std::endl;
+        // }
 
         cudaSetDevice(option_.gpu_id);
-        SetInputs(inputs);
-        AllocateOutputsBuffer(outputs);
 
-        if (!context_->executeV2(bindings_.data())) {
-            MD_LOG_ERROR << "Failed to Infer with TensorRT." << std::endl;
+        BufferManager buffers(engine_, 0);
+
+        for (auto& input : inputs) {
+            const std::string& name = input.get_name();
+            nvinfer1::Dims dims = ToDims(input.shape());
+            if (!context_->setInputShape(name.c_str(), dims)) {
+                MD_LOG_ERROR << "Failed to set input shape for " << name;
+                return false;
+            }
+            auto* hostDataBuffer = static_cast<float*>(buffers.getHostBuffer(name));
+            memcpy(hostDataBuffer, input.data(), input.byte_size());
+            if (!context_->setTensorAddress(name.c_str(), buffers.getDeviceBuffer(name))) {
+                MD_LOG_ERROR << "Failed to set input tensor address for " << name;
+                return false;
+            }
+        }
+        buffers.copyInputToDevice();
+        if (!context_->executeV2(buffers.getDeviceBindings().data())) {
+            MD_LOG_ERROR << "Failed to run inference with TensorRT.";
             return false;
         }
-        for (size_t i = 0; i < outputs->size(); ++i) {
-            // if the final output tensor's dtype is different from the model output
-            // tensor's dtype, then we need cast the data to the final output's dtype
-            auto model_output_dtype =
-                GetFDDataType(outputs_device_buffer_[(*outputs)[i].get_name()].dtype());
-            casted_output_tensors_[(*outputs)[i].get_name()].from_external_memory(
-                outputs_device_buffer_[(*outputs)[i].get_name()].data(),
-                (*outputs)[i].shape(), model_output_dtype);
+        buffers.copyOutputToHost();
+        outputs->resize(outputs_desc_.size());
+        for (int i = 0; i < outputs_desc_.size(); i++) {
+            auto name = outputs_desc_[i].name;
+            nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
+            std::vector<int64_t> shape(dims.d, dims.d + dims.nbDims);
+
+            auto device_ptr = static_cast<float*>(buffers.getHostBuffer(name));
+            (*outputs)[i].allocate(shape,
+                                   DataType::FP32, name);
+            memcpy((*outputs)[i].data(), device_ptr, buffers.size(name));
         }
         return true;
     }
@@ -339,101 +326,7 @@ namespace modeldeploy {
             }
         }
         std::cout << io_table << std::endl;
-    }
-
-    void TrtBackend::SetInputs(const std::vector<Tensor>& inputs) {
-        for (const auto& item : inputs) {
-            // auto idx = engine_->getBindingIndex(item.name.c_str());
-            auto iter = io_name_index_.find(item.get_name());
-            if (iter == io_name_index_.end()) {
-                MD_LOG_FATAL << "TRTBackend SetInputs not find name: " << item.get_name() << std::endl;
-            }
-            auto idx = iter->second;
-            auto const name = iter->first;
-            std::vector<int> shape(item.shape().begin(), item.shape().end());
-            auto dims = ToDims(shape);
-            context_->setInputShape(name.c_str(), dims);
-
-            // Allocate input buffer memory
-            inputs_device_buffer_[item.get_name()].resize(dims);
-
-            // copy from cpu to gpu
-            if (item.dtype() == DataType::INT64) {
-                int64_t* data = static_cast<int64_t*>(const_cast<void*>(item.data()));
-                std::vector<int32_t> casted_data(data, data + item.size());
-                // FDASSERT(cudaMemcpyAsync(inputs_device_buffer_[item.name].data(),
-                //                          static_cast<void*>(casted_data.data()),
-                //                          item.Nbytes() / 2, cudaMemcpyHostToDevice,
-                //                          stream_) == 0,
-                //          "Error occurs while copy memory from CPU to GPU.");
-                // WARN: For cudaMemcpyHostToDevice direction, cudaMemcpyAsync need page-locked host
-                // memory to avoid any overlap to occur. The page-locked feature need by cudaMemcpyAsync
-                // may not guarantee by FDTensor now. Reference:
-                // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#creation-and-destruction
-                if (!cudaMemcpy(inputs_device_buffer_[item.get_name()].data(),
-                                static_cast<void*>(casted_data.data()),
-                                item.byte_size() / 2, cudaMemcpyHostToDevice) == 0) {
-                    MD_LOG_FATAL << "Error occurs while copy memory from CPU to GPU." << std::endl;
-                }
-            }
-            else {
-                // FDASSERT(cudaMemcpyAsync(inputs_device_buffer_[item.name].data(),
-                //                          item.Data(), item.Nbytes(),
-                //                          cudaMemcpyHostToDevice, stream_) == 0,
-                //          "Error occurs while copy memory from CPU to GPU.");
-                // WARN: For cudaMemcpyHostToDevice direction, cudaMemcpyAsync need page-locked host
-                // memory to avoid any overlap to occur. The page-locked feature need by cudaMemcpyAsync
-                // may not guarantee by FDTensor now. Reference:
-                // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#creation-and-destruction
-                if (!cudaMemcpy(inputs_device_buffer_[item.get_name()].data(),
-                                item.data(), item.byte_size(),
-                                cudaMemcpyHostToDevice) == 0) {
-                    MD_LOG_FATAL << "Error occurs while copy memory from CPU to GPU." << std::endl;
-                }
-            }
-
-            // binding input buffer
-            bindings_[idx] = inputs_device_buffer_[item.get_name()].data();
-        }
-    }
-
-    void TrtBackend::AllocateOutputsBuffer(std::vector<Tensor>* outputs) {
-        if (outputs->size() != outputs_desc_.size()) {
-            outputs->resize(outputs_desc_.size());
-        }
-        for (size_t i = 0; i < outputs_desc_.size(); ++i) {
-            // auto idx = engine_->getBindingIndex(outputs_desc_[i].name.c_str());
-            auto idx_iter = io_name_index_.find(outputs_desc_[i].name);
-            if (idx_iter == io_name_index_.end()) {
-                MD_LOG_FATAL << "TRTBackend Outputs not find name: " << outputs_desc_[i].name << std::endl;
-            }
-
-            auto idx = idx_iter->second;
-            auto name = idx_iter->first;
-            auto output_dims = context_->getTensorShape(name.c_str());
-
-            // find the original index of output
-            auto iter = outputs_order_.find(outputs_desc_[i].name);
-            if (iter == outputs_order_.end()) {
-                MD_LOG_FATAL << "Cannot find output: " << outputs_desc_[i].name <<
-                    " of tensorrt network from the original model." << std::endl;
-            }
-
-            auto ori_idx = iter->second;
-
-            // Allocate output buffer memory
-            outputs_device_buffer_[outputs_desc_[i].name].resize(output_dims);
-
-            // binding output buffer
-            bindings_[idx] = outputs_device_buffer_[outputs_desc_[i].name].data();
-
-            // set user's outputs info
-            std::vector<int64_t> shape(output_dims.d,
-                                       output_dims.d + output_dims.nbDims);
-            // (*outputs)[ori_idx].is_pinned_memory = option_.enable_pinned_memory;
-            (*outputs)[ori_idx].resize(shape, outputs_desc_[i].original_dtype,
-                                       outputs_desc_[i].name);
-        }
+        bindings_.resize(inputs_desc_.size());
     }
 
 
@@ -488,7 +381,6 @@ namespace modeldeploy {
             auto clone_option = option_;
             clone_option.gpu_id = device_id;
             clone_option.external_stream_ = stream;
-
 
             std::string model_buffer = "";
             if (!

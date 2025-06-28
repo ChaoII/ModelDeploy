@@ -1,20 +1,6 @@
 //
-// Created by aichao on 2025/2/20.
+// Created by aichao on 2025/6/27.
 //
-
-// Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 #pragma once
 
@@ -109,14 +95,12 @@ namespace modeldeploy {
         std::vector<void*> bindings_;
         std::vector<TrtValueInfo> inputs_desc_;
         std::vector<TrtValueInfo> outputs_desc_;
-        std::map<std::string, FDDeviceBuffer> inputs_device_buffer_;
-        std::map<std::string, FDDeviceBuffer> outputs_device_buffer_;
         std::map<std::string, int> io_name_index_;
 
         std::string model_buffer_;
         std::string calibration_str_;
         bool save_external_ = false;
-        std::string model_file_name_ = "";
+        std::string model_file_name_;
 
         // Sometimes while the number of outputs > 1
         // the output order of tensorrt may not be same
@@ -143,10 +127,7 @@ namespace modeldeploy {
 
         void get_input_output_info();
         bool CreateTrtEngineFromOnnx(const std::string& onnx_model_buffer);
-        bool BuildTrtEngine();
         bool LoadTrtCache(const std::string& trt_engine_file);
         int ShapeRangeInfoUpdated(const std::vector<Tensor>& inputs);
-        void SetInputs(const std::vector<Tensor>& inputs);
-        void AllocateOutputsBuffer(std::vector<Tensor>* outputs);
     };
 } // namespace fastdeploy
