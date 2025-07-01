@@ -47,7 +47,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
         elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
             set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_aarch64_static_1_22_0_FILE_NAME})
             set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-            set(ONNXRUNTIME_HASH "SHA256=4252cb8f804236b0abc0b6d2a29421d2091e6aa37bd3af9d694c6acc66693c25")
+            set(ONNXRUNTIME_HASH "SHA256=8c2fe08a3e3b0cee84503e4b76c30787b21ba206567db27cc1d63ab0026c0d56")
         else ()
             message(FATAL_ERROR "Unsupported system arch:" ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})
         endif ()
@@ -55,7 +55,6 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 else ()
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})
 endif ()
-
 
 FetchContent_Declare(onnxruntime
         URL
