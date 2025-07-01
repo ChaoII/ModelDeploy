@@ -164,7 +164,7 @@ namespace modeldeploy::vision::ocr {
                     dis_list[j][2] = static_cast<float>(j);
                 }
                 // find min dis idx
-                std::ranges::sort(dis_list, vision::ocr::comparison_dis);
+                std::sort(dis_list.begin(), dis_list.end(), vision::ocr::comparison_dis);
                 matched[dis_list[0][2]].push_back(ocr_result.text[i]);
             }
 

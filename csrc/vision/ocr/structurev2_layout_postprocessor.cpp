@@ -102,7 +102,7 @@ namespace modeldeploy::vision::ocr {
                         bbox_data + idx * 4 * reg_max_,
                         bbox_data + (idx + 1) * 4 * reg_max_);
                     auto box = dis_pred_to_bbox(bbox_pred, col, row, fpn_stride_[i], in_w, in_h, reg_max_);
-                    bbox_results[label].emplace_back(box, label, score);
+                    bbox_results[label].push_back({box, label, score});
                 }
             }
         }
@@ -120,15 +120,16 @@ namespace modeldeploy::vision::ocr {
             vision::utils::nms(&bbox_result, nms_threshold_);
             // fill output results
             for (auto& _bbox_result : bbox_result) {
-                result->emplace_back(
-                    Rect2f{
-                        _bbox_result.box.x / scale_factor_w,
-                        _bbox_result.box.y / scale_factor_h,
-                        _bbox_result.box.width / scale_factor_w,
-                        _bbox_result.box.height / scale_factor_h,
-                    },
-                    _bbox_result.score,
-                    _bbox_result.label_id
+                result->push_back({
+                        Rect2f{
+                            _bbox_result.box.x / scale_factor_w,
+                            _bbox_result.box.y / scale_factor_h,
+                            _bbox_result.box.width / scale_factor_w,
+                            _bbox_result.box.height / scale_factor_h,
+                        },
+                        _bbox_result.label_id,
+                        _bbox_result.score
+                    }
                 );
             }
         }

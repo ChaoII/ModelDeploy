@@ -34,7 +34,7 @@ namespace modeldeploy::vision::detection {
                 const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
                 float confidence = *max_class_score;
                 // filter boxes by conf_threshold
-                if (confidence <= conf_threshold_) [[likely]] {
+                if (confidence <= conf_threshold_) {
                     continue;
                 }
                 int32_t label_id = std::distance(attr_ptr + 4, max_class_score);
@@ -45,7 +45,7 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2],
                     attr_ptr[3]
                 };
-                _results.emplace_back(box, label_id, confidence);
+                _results.push_back({box, label_id, confidence});
             }
             if (_results.empty()) {
                 continue;
@@ -102,12 +102,12 @@ namespace modeldeploy::vision::detection {
             _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
-                const float score = *(attr_ptr + 4);
+                const float score = attr_ptr[4];
                 // filter boxes by conf_threshold
-                if (score <= conf_threshold_) [[likely]] {
+                if (score <= conf_threshold_) {
                     continue;
                 }
-                int32_t label_id = *(attr_ptr + 5);
+                int32_t label_id = attr_ptr[5];
                 // convert from [x1, y1, x2, y2] to [x, y, width, height]
                 Rect2f box = {
                     attr_ptr[0],
@@ -115,7 +115,7 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2] - attr_ptr[0],
                     attr_ptr[3] - attr_ptr[1]
                 };
-                _results.emplace_back(box, label_id, score);
+                _results.push_back({box, label_id, score});
             }
             if (_results.empty()) {
                 continue;

@@ -55,7 +55,7 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[3]
                 };
                 mask_embeddings.emplace_back(std::move(mask_embedding));
-                _results.emplace_back(box, Mask(), label_id, confidence);
+                _results.push_back({box, Mask(), label_id, confidence});
             }
             if (_results.empty()) {
                 continue;
@@ -182,7 +182,7 @@ namespace modeldeploy::vision::detection {
                 if (score <= conf_threshold_) {
                     continue;
                 }
-                auto label_id = attr_ptr[5];
+                int32_t label_id = attr_ptr[5];
                 // convert from [x1, y1, x2, y2] to [w, y, w, h]
                 Rect2f box{
                     attr_ptr[0],
@@ -191,7 +191,7 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[3] - attr_ptr[1]
                 };
                 mask_embeddings.emplace_back(std::move(mask_embedding));
-                _results.emplace_back(box, Mask(), label_id, score);
+                _results.push_back({box, Mask(), label_id, score});
             }
             if (_results.empty()) {
                 continue;

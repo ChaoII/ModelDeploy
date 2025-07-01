@@ -36,9 +36,9 @@ namespace modeldeploy::vision {
     void draw_landmarks(cv::Mat& cv_image,
                         const std::vector<cv::Point2f>& landmarks,
                         const int landmark_radius) {
-        static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
+        static std::map<size_t, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
         for (size_t i = 0; i < landmarks.size(); ++i) {
-            if (!color_map.contains(i)) {
+            if (color_map.find(i) == color_map.end()) {
                 color_map[i] = get_random_color();
             }
             auto landmark_color = color_map[i];

@@ -603,13 +603,13 @@ namespace modeldeploy::vision {
                     if (t.size() != 7)
                         throw std::runtime_error("LetterBoxRecord pickle with Invalid state!");
                     const LetterBoxRecord l{
-                        .ipt_w = t[0].cast<float>(),
-                        .ipt_h = t[1].cast<float>(),
-                        .out_w = t[2].cast<float>(),
-                        .out_h = t[3].cast<float>(),
-                        .pad_w = t[4].cast<float>(),
-                        .pad_h = t[5].cast<float>(),
-                        .scale = t[6].cast<float>(),
+                        t[0].cast<float>(),
+                        t[1].cast<float>(),
+                        t[2].cast<float>(),
+                        t[3].cast<float>(),
+                        t[4].cast<float>(),
+                        t[5].cast<float>(),
+                        t[6].cast<float>(),
                     };
                     return l;
                 }))

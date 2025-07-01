@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     modeldeploy::RuntimeOption option;
     option.use_gpu();
     option.enable_fp16 = true;
-    option.enable_trt = true;
+    // option.enable_trt = true;
     std::string model_file = "../../test_data/test_models/yolo11n-seg_nms.onnx";
     std::string image_file = "../../test_data/test_images/test_person.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file, option);

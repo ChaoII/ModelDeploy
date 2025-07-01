@@ -120,7 +120,7 @@ namespace modeldeploy::vision::face {
                             landmarks.emplace_back(kps_x, kps_y);
                         }
                     }
-                    _results.emplace_back(Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf);
+                    _results.push_back({Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf});
                     count += 1; // limit boxes for nms.
                     if (count > max_nms_) {
                         break;

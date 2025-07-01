@@ -29,11 +29,14 @@ int32_t main() {
     const std::string voice_bin = "../../test_data/test_models/kokoro_v1_1/voices.bin";
     const std::string jieba_dir = "../../test_data/test_models/kokoro_v1_1/dict/";
     const std::string text_normalization_dir = "../../test_data/";
+    modeldeploy::RuntimeOption option;
+    option.use_gpu(0);
     auto kokoro = modeldeploy::audio::tts::Kokoro(kokoro_onnx,
                                                   tokens,
                                                   lexicons, voice_bin,
                                                   jieba_dir,
-                                                  text_normalization_dir);
+                                                  text_normalization_dir,
+                                                  option);
 
     const std::string test_str = "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。";
     std::string test_str1 =
@@ -56,6 +59,6 @@ int32_t main() {
     // zm_054,zm_055,zm_056,zm_057,zm_058,zm_061,zm_062,zm_063,zm_064,
     // zm_065,zm_066,zm_068,zm_069,zm_080,zm_081,zm_082,zm_089,zm_091,
     // zm_095,zm_096,zm_097,zm_098,zm_100
-    kokoro.predict(test_str2, "zf_001", 0.9, &out_data);
-    modeldeploy::audio::tts::write_wave("out.wav", kokoro.get_sample_rate(), out_data.data(), out_data.size());
+    kokoro.predict(test_str3, "zf_001", 0.9, &out_data);
+    modeldeploy::audio::tts::write_wave(std::string("out.wav"), kokoro.get_sample_rate(), out_data.data(), out_data.size());
 }

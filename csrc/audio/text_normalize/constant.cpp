@@ -59,16 +59,16 @@ namespace modeldeploy::audio {
     std::wstring full_width_to_half_width(const std::wstring& input) {
         std::wstring result;
         for (wchar_t ch : input) {
-            if (F2H_ASCII_LETTERS.contains(ch)) {
+            if (F2H_ASCII_LETTERS.find(ch) != F2H_ASCII_LETTERS.end()) {
                 result += F2H_ASCII_LETTERS[ch];
             }
-            else if (F2H_DIGITS.contains(ch)) {
+            else if (F2H_DIGITS.find(ch) != F2H_DIGITS.end()) {
                 result += F2H_DIGITS[ch];
             }
-            else if (F2H_PUNCTUATIONS.contains(ch)) {
+            else if (F2H_PUNCTUATIONS.find(ch) != F2H_PUNCTUATIONS.end()) {
                 result += F2H_PUNCTUATIONS[ch];
             }
-            else if (F2H_SPACE.contains(ch)) {
+            else if (F2H_SPACE.find(ch) != F2H_SPACE.end()) {
                 result += F2H_SPACE[ch];
             }
             else {
@@ -82,16 +82,16 @@ namespace modeldeploy::audio {
     std::wstring half_width_to_full_width(const std::wstring& input) {
         std::wstring result;
         for (wchar_t ch : input) {
-            if (H2F_ASCII_LETTERS.contains(ch)) {
+            if (H2F_ASCII_LETTERS.find(ch) != H2F_ASCII_LETTERS.end()) {
                 result += H2F_ASCII_LETTERS[ch];
             }
-            else if (H2F_DIGITS.contains(ch)) {
+            else if (H2F_DIGITS.find(ch) != H2F_DIGITS.end()) {
                 result += H2F_DIGITS[ch];
             }
-            else if (H2F_PUNCTUATIONS.contains(ch)) {
+            else if (H2F_PUNCTUATIONS.find(ch) != H2F_PUNCTUATIONS.end()) {
                 result += H2F_PUNCTUATIONS[ch];
             }
-            else if (H2F_SPACE.contains(ch)) {
+            else if (H2F_SPACE.find(ch) != H2F_SPACE.end()) {
                 result += H2F_SPACE[ch];
             }
             else {

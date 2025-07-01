@@ -4,7 +4,6 @@
 
 #include <functional>
 #include <map>
-#include <ranges>
 #include <regex>
 #include <string>
 #include <unordered_map>
@@ -123,7 +122,7 @@ namespace modeldeploy::audio {
     // 加、减、乘、除、大于、小于、等于
     std::wstring replace_math_symbol(const std::wsmatch& match) {
         const auto symbol = match.str(0)[0];
-        if (asmd_map.contains(symbol))
+        if (asmd_map.find(symbol) != asmd_map.end())
             return match.prefix().str() + asmd_map.at(symbol) + match.suffix().str();
         return {};
     }
@@ -208,9 +207,9 @@ namespace modeldeploy::audio {
             return {DIGITS[stripped[0]]};
         }
         int largest_unit = 0;
-        for (const auto& it : std::ranges::reverse_view(UNITS)) {
-            if (it.first < stripped.size()) {
-                largest_unit = it.first;
+        for (auto it = UNITS.rbegin(); it != UNITS.rend(); ++it) {
+            if (it->first < stripped.size()) {
+                largest_unit = it->first;
                 break;
             }
         }

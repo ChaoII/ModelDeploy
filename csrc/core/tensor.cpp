@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <utility>
 #include <cmath>
-#include <format>
 #include "md_log.h"
 
 namespace modeldeploy {
@@ -246,16 +245,18 @@ namespace modeldeploy {
     template <typename T>
     T& Tensor::at(const std::vector<int64_t>& indices) {
         if (indices.size() != shape_.size()) {
-            throw std::runtime_error(
-                std::format("Error: Number of indices doesn't match tensor rank, indices size: {}, "
-                            "tensor rank: {}", indices.size(), shape_.size())
-            );
+            std::ostringstream oss;
+            oss << "Error: Number of indices doesn't match tensor rank, indices size: "
+                << indices.size() << ", tensor rank: " << shape_.size();
+            throw std::runtime_error(oss.str());
         }
         // 验证索引范围
         for (size_t i = 0; i < indices.size(); ++i) {
             if (indices[i] < 0 || indices[i] >= shape_[i]) {
-                throw std::runtime_error(
-                    std::format("Error: Index out of range, index{} = {}, shape{}={} ", i, indices[i], i, shape_[i]));
+                std::ostringstream oss;
+                oss << "Error: Index out of range, index" << i << " = " << indices[i]
+                    << ", shape" << i << " = " << shape_[i];
+                throw std::runtime_error(oss.str());
             }
         }
         // 计算偏移量
@@ -294,10 +295,10 @@ namespace modeldeploy {
         const size_t new_size = std::accumulate(new_shape.begin(), new_shape.end(),
                                                 1LL, std::multiplies());
         if (new_size != size()) {
-            throw std::runtime_error(
-                std::format("Error: New shape size doesn't match tensor size, new shape size: {}, "
-                            "tensor size: {}", new_size, size())
-            );
+            std::ostringstream oss;
+            oss << "Error: New shape size doesn't match tensor size, new shape size: "
+                << new_size << ", tensor size: " << size();
+            throw std::runtime_error(oss.str());
         }
         std::vector<int64_t> new_strides(new_shape.size());
         if (!new_strides.empty()) {
@@ -311,20 +312,24 @@ namespace modeldeploy {
 
     TensorView Tensor::transpose(const std::vector<int64_t>& axes) const {
         if (axes.size() != shape_.size()) {
-            throw std::runtime_error(
-                std::format("Error: Number of axes doesn't match tensor rank, "
-                            "axes size: {}, shape size: {} ", axes.size(), shape_.size()));
+            std::ostringstream oss;
+            oss << "Error: Number of axes doesn't match tensor rank, "
+                << "axes size: " << axes.size() << ", shape size: " << shape_.size();
+            throw std::runtime_error(oss.str());
         }
         // 检查轴是否有效
         std::vector used(shape_.size(), false);
         for (auto& axe : axes) {
             if (axe < 0 || axe >= static_cast<int64_t>(shape_.size())) {
-                throw std::runtime_error(
-                    std::format("Error: Axis out of range, axis >= 0 and axis <= {}, "
-                                "current axis: {}", shape_.size(), axe));
+                std::ostringstream oss;
+                oss << "Error: Axis out of range, axis >= 0 and axis <= "
+                    << shape_.size() << ", current axis: " << axe;
+                throw std::runtime_error(oss.str());
             }
             if (used[axe]) {
-                throw std::runtime_error(std::format("Error: Duplicate axis, axis: {}", axe));
+                std::ostringstream oss;
+                oss << "Error: Duplicate axis, axis: " << axe;
+                throw std::runtime_error(oss.str());
             }
             used[axe] = true;
         }
@@ -340,16 +345,21 @@ namespace modeldeploy {
 
     TensorView Tensor::slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const {
         if (starts.size() != shape_.size() || ends.size() != shape_.size()) {
-            throw std::runtime_error(std::format(
-                "Error: Number of axes doesn't match tensor rank, starts size = {}, ends size = {}, shape size = ",
-                starts.size(), ends.size(), shape_.size()));
+            std::ostringstream oss;
+            oss << "Error: Number of axes doesn't match tensor rank, starts size = "
+                << starts.size() << ", ends size = " << ends.size()
+                << ", shape size = " << shape_.size();
+            throw std::runtime_error(oss.str());
         }
         // 验证切片范围
         std::vector<int64_t> new_shape(shape_.size());
         for (size_t i = 0; i < shape_.size(); ++i) {
             if (starts[i] < 0 || starts[i] >= shape_[i] || ends[i] > shape_[i] || starts[i] >= ends[i]) {
-                throw std::runtime_error(
-                    std::format("Error: Slice out of range, axis: {}, start: {}, end: {}", i, starts[i], ends[i]));
+                std::ostringstream oss;
+                oss << "Error: Slice out of range, axis: " << i
+                    << ", start: " << starts[i]
+                    << ", end: " << ends[i];
+                throw std::runtime_error(oss.str());
             }
             new_shape[i] = ends[i] - starts[i];
         }
@@ -731,7 +741,7 @@ namespace modeldeploy {
             throw std::runtime_error("Shape cannot be empty");
         }
 
-        if (std::ranges::any_of(shape, [](const int64_t dim) { return dim <= 0; })) {
+        if (std::any_of(shape.begin(), shape.end(), [](const int64_t dim) { return dim <= 0; })) {
             throw std::runtime_error("All dimensions must be positive");
         }
     }

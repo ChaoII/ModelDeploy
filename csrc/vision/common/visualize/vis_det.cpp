@@ -7,23 +7,22 @@
 
 
 namespace modeldeploy::vision {
-
     cv::Mat vis_det(cv::Mat& cv_image, const std::vector<DetectionResult>& result,
-                          const double threshold,
-                          const std::string& font_path, const int font_size,
-                          const double alpha, const bool save_result) {
+                    const double threshold,
+                    const std::string& font_path, const int font_size,
+                    const double alpha, const bool save_result) {
         cv::Mat overlay;
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         // 根据label_id获取颜色
-        static std::map<int, cv::Scalar_<int>> color_map;  // ← 每类颜色只初始化一次
+        static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
         // 绘制半透明部分（填充矩形）
         for (int i = 0; i < result.size(); ++i) {
             if (result[i].score < threshold) {
                 continue;
             }
             auto class_id = result[i].label_id;
-            if (!color_map.contains(class_id)) {
+            if (color_map.find(class_id) == color_map.end()) {
                 color_map[class_id] = get_random_color();
             }
             cv::Rect2f rect = {result[i].box.x, result[i].box.y, result[i].box.width, result[i].box.height};

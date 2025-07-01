@@ -16,7 +16,7 @@ namespace modeldeploy::vision {
         // 绘制半透明部分（填充矩形）
         for (const auto& _result : result) {
             auto class_id = _result.label_id;
-            if (!color_map.contains(class_id)) {
+            if (color_map.find(class_id) == color_map.end()) {
                 color_map[class_id] = get_random_color();
             }
             auto cv_color = color_map[class_id];
@@ -32,10 +32,11 @@ namespace modeldeploy::vision {
             draw_rectangle_and_text(cv_image, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, 1, true);
 
             std::vector<cv::Point2f> cv_landmarks;
-            std::ranges::transform(_result.landmarks, std::back_inserter(cv_landmarks),
-                                   [](const Point2f& point) {
-                                       return point.to_cv_point2f();
-                                   });
+            std::transform(_result.landmarks.begin(), _result.landmarks.end(),
+                           std::back_inserter(cv_landmarks),
+                           [](const Point2f& point) {
+                               return point.to_cv_point2f();
+                           });
             draw_landmarks(cv_image, cv_landmarks, landmark_radius);
         }
         if (save_result) {

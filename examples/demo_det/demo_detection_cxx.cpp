@@ -41,11 +41,11 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
     option.use_gpu();
-    option.use_trt_backend();
+    option.use_ort_backend();
     // option.use_gpu(0);
     // option.enable_fp16 = true;
     // option.enable_trt = true;
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.engine", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx", option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     // yolo11_det.get_preprocessor().set_size({640, 640});

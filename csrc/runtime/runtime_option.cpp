@@ -61,7 +61,7 @@ namespace modeldeploy {
 
     void RuntimeOption::set_ort_graph_opt_level(const int level) {
         const std::vector supported_level{-1, 0, 1, 2};
-        if (std::ranges::find(supported_level, level) == supported_level.end()) {
+        if (std::find(supported_level.begin(), supported_level.end(), level) == supported_level.end()) {
             MD_LOG_ERROR << "Invalid graph optimization level: " << level << ", supported levels are: "
                 << vector_to_string(supported_level) << std::endl;
         }

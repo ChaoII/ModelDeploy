@@ -50,7 +50,8 @@ namespace modeldeploy {
         // CUDA
         if (option.device == Device::GPU) {
             // 获取所有可用 Provider
-            const bool has_trt = std::ranges::find(all_providers, "TensorrtExecutionProvider") != all_providers.end();
+            const bool has_trt = std::find(all_providers.begin(), all_providers.end(),
+                                           "TensorrtExecutionProvider") != all_providers.end();
             const std::string device_id_str = std::to_string(option.device_id);
             // ==== 1. 尝试启用 TensorRT（优先） ====
             if (option.enable_trt) {
@@ -109,7 +110,7 @@ namespace modeldeploy {
             }
 
             // ==== 2. 启用 CUDA（作为 fallback 或主力） ====
-            if (std::ranges::find(all_providers, "CUDAExecutionProvider") != all_providers.end()) {
+            if (std::find(all_providers.begin(), all_providers.end(), "CUDAExecutionProvider") != all_providers.end()) {
                 OrtCUDAProviderOptionsV2* cuda_options = nullptr;
                 Ort::ThrowOnError(Ort::GetApi().CreateCUDAProviderOptions(&cuda_options));
 

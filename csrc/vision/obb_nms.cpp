@@ -5,7 +5,6 @@
 #include <array>
 #include <numeric>
 #include <vector>
-#include <ranges>
 #include "csrc/vision/utils.h"
 
 namespace modeldeploy::vision::utils {
@@ -121,7 +120,7 @@ namespace modeldeploy::vision::utils {
         // Step 1: 根据分数排序得到索引
         std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
-        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+        std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int a, const int b) {
             return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 

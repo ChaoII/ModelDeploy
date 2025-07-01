@@ -23,7 +23,7 @@ namespace modeldeploy::vision::ocr {
             dict_character.push_back(line);
         }
         if (merge_no_span_structure) {
-            if (std::ranges::find(dict_character, "<td></td>") == dict_character.end()) {
+            if (std::find(dict_character.begin(), dict_character.end(), "<td></td>") == dict_character.end()) {
                 dict_character.emplace_back("<td></td>");
             }
             for (auto it = dict_character.begin(); it != dict_character.end();) {
@@ -77,7 +77,7 @@ namespace modeldeploy::vision::ocr {
                 continue;
 
             std::string text = dict_character[structure_idx];
-            if (std::ranges::find(td_tokens, text) != td_tokens.end()) {
+            if (std::find(td_tokens.begin(),td_tokens.end(), text) != td_tokens.end()) {
                 std::array<int, 8> bbox{};
                 // box dim: en->4, ch->8
                 if (box_dim == 4) {

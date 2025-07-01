@@ -56,7 +56,6 @@ namespace modeldeploy {
     }
 
     Ort::Value create_ort_value(Tensor& tensor, const Ort::MemoryInfo& memory_info) {
-
         auto ort_value = Ort::Value::CreateTensor(
             memory_info, tensor.data(), tensor.byte_size(), tensor.shape().data(),
             tensor.shape().size(), get_ort_dtype(tensor.dtype()));
@@ -116,7 +115,8 @@ namespace modeldeploy {
             {ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, "INT64"},
             // 添加更多类型映射...
         };
-        return type_map.contains(type) ? type_map.at(type) : "UNKNOWN";
+        auto it = type_map.find(type);
+        return it != type_map.end() ? it->second : "UNKNOWN";
     }
 
     std::string shape_to_string(const std::vector<int64_t>& shape) {
