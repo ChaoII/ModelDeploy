@@ -115,7 +115,7 @@ namespace modeldeploy::audio::tts {
         std::vector<std::string> tokens;
         for (const auto& sent : parts) {
             const unsigned char byte = static_cast<unsigned>(sent[0]);
-            if (punc_set_.contains(sent[0])) {
+            if (punc_set_.find(sent[0]) != punc_set_.end()) {
                 for (const auto s : sent) {
                     std::string tmp(1, s);
                     tokens.push_back(tmp);
@@ -124,7 +124,7 @@ namespace modeldeploy::audio::tts {
             }
             else if (byte < 0xC0) {
                 // eng
-                if (word2token_.contains(sent)) {
+                if (word2token_.find(sent) != word2token_.end()) {
                     tokens.insert(tokens.end(), word2token_[sent].begin(), word2token_[sent].end());
                 }
                 else {
@@ -135,13 +135,13 @@ namespace modeldeploy::audio::tts {
                 std::vector<std::string> out;
                 jieba_->Cut(sent, out);
                 for (auto& o : out) {
-                    if (word2token_.contains(o)) {
+                    if (word2token_.find(o) != word2token_.end()) {
                         tokens.insert(tokens.end(), word2token_[o].begin(), word2token_[o].end());
                     }
                     else {
                         // split into single hanzi
                         for (const auto& hanzi : utf8_to_charset(o)) {
-                            if (word2token_.contains(hanzi)) {
+                            if (word2token_.find(hanzi) != word2token_.end()) {
                                 tokens.insert(tokens.end(), word2token_[hanzi].begin(), word2token_[hanzi].end());
                             }
                             else {
@@ -275,14 +275,14 @@ namespace modeldeploy::audio::tts {
             else
                 len = 1;
             const auto sub = text.substr(i, len);
-            const bool is_punc = punc_set_.contains(text[i]);
+            const bool is_punc = punc_set_.find(text[i]) != punc_set_.end();
             const size_t tmp_len = is_punc ? 0 : len;
             if (cur_len != -1 && tmp_len != cur_len) {
                 if (cur_len == 1) {
-                    std::ranges::transform(cur, cur.begin(),
-                                           [](const unsigned char c) {
-                                               return std::tolower(c);
-                                           });
+                    std::transform(cur.begin(), cur.end(), cur.begin(),
+                                   [](unsigned char c) {
+                                       return std::tolower(c);
+                                   });
                 }
                 if (cur != " ") {
                     ret.push_back(cur);

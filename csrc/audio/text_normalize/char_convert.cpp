@@ -88,7 +88,7 @@ namespace modeldeploy::audio {
     std::wstring traditional_to_simplified(const std::wstring& text) {
         std::wstring result;
         for (wchar_t ch : text) {
-            if (t2s_dict.contains(ch)) {
+            if (t2s_dict.find(ch) != t2s_dict.end()) {
                 result += t2s_dict[ch];
             }
             else {
@@ -102,7 +102,7 @@ namespace modeldeploy::audio {
     std::wstring simplified_to_traditional(const std::wstring& text) {
         std::wstring result;
         for (wchar_t ch : text) {
-            if (s2t_dict.contains(ch)) {
+            if (s2t_dict.find(ch) != s2t_dict.end()) {
                 result += s2t_dict[ch];
             }
             else {

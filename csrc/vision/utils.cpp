@@ -4,15 +4,12 @@
 
 
 #include <execution>
-#include <ranges>
-
 #include "csrc/vision/utils.h"
 #include "csrc//vision/common/processors/pad.h"
 #include "csrc//vision/common/processors/resize.h"
 #include "csrc/core/md_log.h"
 
-namespace modeldeploy::vision::utils
-{
+namespace modeldeploy::vision::utils {
     DataType cv_dtype_to_md_dtype(int type) {
         type = type % 8;
         if (type == 0) {
@@ -125,7 +122,7 @@ namespace modeldeploy::vision::utils
         // Step 1: 根据分数排序得到索引
         std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
-        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+        std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int a, const int b) {
             return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 
@@ -166,7 +163,7 @@ namespace modeldeploy::vision::utils
         // Step 1: 根据分数排序得到索引
         std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0); // 初始化索引 [0, 1, ..., N-1]
-        std::ranges::sort(sorted_indices, [&](const int a, const int b) {
+        std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int a, const int b) {
             return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 
@@ -205,7 +202,7 @@ namespace modeldeploy::vision::utils
     void nms(std::vector<PoseResult>* result, const float iou_threshold) {
         const size_t N = result->size();
         // Step 1: 根据分数排序得到索引
-        std::ranges::sort(*result, [&](const PoseResult& a, const PoseResult& b) {
+        std::sort(result->begin(), result->end(), [&](const PoseResult& a, const PoseResult& b) {
             return a.score > b.score; // 分数高的排前面
         });
 
@@ -240,9 +237,10 @@ namespace modeldeploy::vision::utils
     void nms(std::vector<DetectionLandmarkResult>* result, const float iou_threshold) {
         const size_t N = result->size();
         // Step 1: 根据分数排序得到索引
-        std::ranges::sort(*result, [&](const DetectionLandmarkResult& a, const DetectionLandmarkResult& b) {
-            return a.score > b.score; // 分数高的排前面
-        });
+        std::sort(result->begin(), result->end(),
+                  [&](const DetectionLandmarkResult& a, const DetectionLandmarkResult& b) {
+                      return a.score > b.score; // 分数高的排前面
+                  });
 
         std::vector<size_t> index_;
         // Step 2: NMS 主逻辑

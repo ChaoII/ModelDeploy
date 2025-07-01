@@ -54,7 +54,7 @@ MDStatusCode md_kokoro_model_predict(const MDModel* model, const char* input_tex
     c_results->size = static_cast<int>(data.size());
     c_results->data = new float[data.size()];
     c_results->sample_rate = kokoro_model->get_sample_rate();
-    std::ranges::copy(data, c_results->data);
+    std::copy(data.begin(), data.end(), c_results->data);
     return MDStatusCode::Success;
 }
 

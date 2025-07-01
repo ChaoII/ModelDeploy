@@ -51,7 +51,7 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2], attr_ptr[3],
                     attr_ptr[dim2 - 1] * 180 / 3.141592653f
                 };
-                _results.emplace_back(rotated_boxes, label_id, confidence);
+                _results.push_back({rotated_boxes, label_id, confidence});
             }
             if (_results.empty()) {
                 continue;
@@ -107,7 +107,7 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2], attr_ptr[3],
                     attr_ptr[dim2 - 1] * 180 / 3.141592653f
                 };
-                _results.emplace_back(rotated_boxes, label_id, score);
+                _results.push_back({rotated_boxes, label_id, score});
             }
             if (_results.empty()) {
                 continue;

@@ -15,20 +15,19 @@ namespace modeldeploy::vision {
         output_table.add_row({"order", "Dim", "Min", "Max", "Mean"});
 
 
-        for(int i=0;i<results.size();i++){
-          auto embedding = results[i].embedding;
-            const auto max_it = std::ranges::max_element(embedding);
-            const auto min_it = std::ranges::min_element(embedding);
+        for (int i = 0; i < results.size(); i++) {
+            auto embedding = results[i].embedding;
+            const auto max_it = std::max_element(embedding.begin(), embedding.end());
+            const auto min_it = std::min_element(embedding.begin(), embedding.end());
             const auto total_val = std::accumulate(embedding.begin(), embedding.end(), 0.0f);
             const float mean_val = total_val / static_cast<float>(embedding.size());
             output_table.add_row({
-std::to_string(i),
+                std::to_string(i),
                 std::to_string(embedding.size()),
                 std::to_string(*min_it),
                 std::to_string(*max_it),
                 std::to_string(mean_val)
             });
-
         }
 
         std::cout << termcolor::cyan << "FaceRecognitionResult:" << termcolor::reset << std::endl;

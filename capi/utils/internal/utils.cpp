@@ -197,7 +197,7 @@ void c_results_2_detection_results(
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height),
         };
-        results->emplace_back(box, c_results->data[i].label_id, c_results->data[i].score);
+        results->push_back({box, c_results->data[i].label_id, c_results->data[i].score});
     }
 }
 
@@ -233,7 +233,7 @@ void c_results_2_obb_results(
             c_results->data[i].rotated_box.height,
             c_results->data[i].rotated_box.angle,
         };
-        results->emplace_back(rotated_box, c_results->data[i].label_id, c_results->data[i].score);
+        results->push_back({rotated_box, c_results->data[i].label_id, c_results->data[i].score});
     }
 }
 
@@ -265,12 +265,12 @@ void iseg_results_2_c_results(
         // 拷贝buffer
         const auto& mask_buffer = results[i].mask.buffer;
         c_results->data[i].mask.buffer = new char[mask_buffer.size()];
-        std::ranges::copy(mask_buffer, c_results->data[i].mask.buffer);
+        std::copy(mask_buffer.begin(), mask_buffer.end(), c_results->data[i].mask.buffer);
         c_results->data[i].mask.buffer_size = static_cast<int>(mask_buffer.size());
         // 拷贝shape
         const auto& mask_shape = results[i].mask.shape;
         c_results->data[i].mask.shape = new int[mask_shape.size()];
-        std::ranges::copy(mask_shape, c_results->data[i].mask.shape);
+        std::copy(mask_shape.begin(), mask_shape.end(), c_results->data[i].mask.shape);
         c_results->data[i].mask.num_dims = static_cast<int>(mask_shape.size());
     }
 }
@@ -296,7 +296,7 @@ void c_results_2_iseg_results(
                 c_results->data[i].mask.shape,
                 c_results->data[i].mask.shape + c_results->data[i].mask.num_dims);
         }
-        results->emplace_back(box, mask, c_results->data[i].label_id, c_results->data[i].score);
+        results->push_back({box, mask, c_results->data[i].label_id, c_results->data[i].score});
     }
 }
 
@@ -345,7 +345,7 @@ void c_results_2_pose_results(
                                    c_results->data[i].keypoints[j].y,
                                    c_results->data[i].keypoints[j].z);
         }
-        results->emplace_back(box, keypoints, c_results->data[i].label_id, c_results->data[i].score);
+        results->push_back({box, keypoints, c_results->data[i].label_id, c_results->data[i].score});
     }
 }
 
@@ -483,7 +483,7 @@ void c_results_2_detection_landmark_result(
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
                                    static_cast<float>(c_results->data[i].landmarks[j].y));
         }
-        results->emplace_back(box, landmarks, c_results->data[i].label_id, c_results->data[i].score);
+        results->push_back({box, landmarks, c_results->data[i].label_id, c_results->data[i].score});
     }
 }
 
@@ -543,8 +543,10 @@ void c_results_2_lpr_results(
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
                                    static_cast<float>(c_results->data[i].landmarks[j].y));
         }
-        results->emplace_back(box, landmarks, c_results->data[i].label_id, c_results->data[i].score,
-                              c_results->data[i].car_plate_str, c_results->data[i].car_plate_color);
+        results->push_back({
+            box, landmarks, c_results->data[i].label_id, c_results->data[i].score,
+            c_results->data[i].car_plate_str, c_results->data[i].car_plate_color
+        });
     }
 }
 
@@ -554,7 +556,7 @@ void face_recognizer_result_2_c_result(
     const FaceRecognitionResult& result, MDFaceRecognizerResult* c_result) {
     c_result->size = static_cast<int>(result.embedding.size());
     c_result->embedding = new float[c_result->size];
-    std::ranges::copy(result.embedding, c_result->embedding);
+    std::copy(result.embedding.begin(), result.embedding.end(), c_result->embedding);
 }
 
 
@@ -572,7 +574,7 @@ void face_recognizer_results_2_c_results(
     c_results->data = new MDFaceRecognizerResult[results.size()];
     for (int i = 0; i < results.size(); i++) {
         c_results->data[i].embedding = new float[results[i].embedding.size()];
-        std::ranges::copy(results[i].embedding, c_results->data[i].embedding);
+        std::copy(results[i].embedding.begin(), results[i].embedding.end(), c_results->data[i].embedding);
         c_results->data[i].size = static_cast<int>(results[i].embedding.size());
     }
 }

@@ -109,7 +109,7 @@ namespace modeldeploy::audio {
             {80, "eightieth"}, {90, "ninetieth"}
         };
 
-        if (ordinal_map.contains(num)) {
+        if (ordinal_map.find(num) != ordinal_map.end()) {
             return ordinal_map.at(num);
         }
         // Handle cases like 21, 22, 23, etc.
@@ -117,11 +117,15 @@ namespace modeldeploy::audio {
         const int ones = num % 10; // Get the ones place
 
         // Handle cases like 21st, 22nd, 23rd, 31st, 32nd, 33rd, etc.
-        if (ordinal_map.contains(tens) && ordinal_map.contains(ones)) {
-            return ordinal_map.at(tens) + " " + ordinal_map.at(ones);
+        const auto tens_it = ordinal_map.find(tens);
+        const auto ones_it = ordinal_map.find(ones);
+
+        if (tens_it != ordinal_map.end() && ones_it != ordinal_map.end()) {
+            return tens_it->second + " " + ones_it->second;
         }
-        if (ordinal_map.contains(ones)) {
-            return number_to_words(tens) + " " + ordinal_map.at(ones);
+
+        if (ones_it != ordinal_map.end()) {
+            return number_to_words(tens) + " " + ones_it->second;
         }
         // For other cases, default to using number_to_words
         return number_to_words(num) + (ones == 1 ? "st" : ones == 2 ? "nd" : ones == 3 ? "rd" : "th");
@@ -134,7 +138,7 @@ namespace modeldeploy::audio {
         // First, convert the commas to facilitate further conversion of decimals and other subsequent numbers.
         while (std::regex_search(result, match, comma_number_re)) {
             std::string no_commas = match.str(0);
-            std::erase(no_commas, ',');
+            no_commas.erase(std::remove(no_commas.begin(), no_commas.end(), ','), no_commas.end());
             result.replace(match.position(0), match.length(0), no_commas);
         }
         while (std::regex_search(result, match, ordinal_re)) {

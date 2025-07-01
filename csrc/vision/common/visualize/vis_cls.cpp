@@ -25,7 +25,7 @@ namespace modeldeploy::vision {
                 continue;
             }
             auto class_id = result.label_ids[i];
-            if (!color_map.contains(class_id)) {
+            if (color_map.find(class_id) == color_map.end()) {
                 color_map[class_id] = get_random_color();
             }
             auto cv_color = color_map[class_id];

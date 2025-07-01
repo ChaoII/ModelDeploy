@@ -45,8 +45,10 @@ namespace modeldeploy::audio {
                const std::string& tokens,
                const std::string& vad_onnx) {
         running_ = true;
-        sense_voice_ = std::make_unique<asr::SenseVoice>(asr_onnx, tokens);
-        vad_ = std::make_unique<vad::SileroVAD>(vad_onnx);
+        modeldeploy::RuntimeOption option;
+        option.use_gpu(0);
+        sense_voice_ = std::make_unique<asr::SenseVoice>(asr_onnx, tokens, option);
+        vad_ = std::make_unique<vad::SileroVAD>(vad_onnx, option);
         th_ = std::thread(&AAsr::run, this);
     }
 

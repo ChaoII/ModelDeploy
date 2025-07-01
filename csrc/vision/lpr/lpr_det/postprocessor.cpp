@@ -38,7 +38,7 @@ namespace modeldeploy::vision::lpr {
                 // 1: 双层车牌
                 std::vector<float> cls_confs = {attr_ptr + 13, attr_ptr + dim2};
                 const int class_id = argmax(cls_confs);
-                const auto cls_conf = *std::ranges::max_element(cls_confs);
+                const auto cls_conf = *std::max_element(cls_confs.begin(), cls_confs.end());
                 float confidence = obj_conf * cls_conf;
                 // filter boxes by conf_threshold
                 if (confidence <= conf_threshold_) {
@@ -60,7 +60,7 @@ namespace modeldeploy::vision::lpr {
                             landmarks_ptr[j], landmarks_ptr[j + 1]);
                     }
                 }
-                _results.emplace_back(Rect2f{x - w / 2.f, y - h / 2.f, w, h}, landmarks, class_id, confidence);
+                _results.push_back({Rect2f{x - w / 2.f, y - h / 2.f, w, h}, landmarks, class_id, confidence});
             }
             if (_results.empty()) {
                 continue;

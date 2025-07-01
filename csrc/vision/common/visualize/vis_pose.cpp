@@ -4,8 +4,7 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/common/visualize/visualize.h"
 
-namespace modeldeploy::vision
-{
+namespace modeldeploy::vision {
     struct PoseParams {
         static constexpr float kpt_threshold = 0.5;
         static constexpr bool is_draw_kpt_line = true;
@@ -106,7 +105,7 @@ namespace modeldeploy::vision
         // 绘制半透明部分（填充矩形）
         for (const auto& _result : result) {
             auto class_id = _result.label_id;
-            if (!color_map.contains(class_id)) {
+            if (color_map.find(class_id) == color_map.end()) {
                 color_map[class_id] = get_random_color();
             }
             auto cv_color = color_map[class_id];
@@ -121,10 +120,11 @@ namespace modeldeploy::vision
             const std::string text = "score: " + std::to_string(_result.score).substr(0, 4);
             draw_rectangle_and_text(cv_image, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, 1, true);
             std::vector<cv::Point3f> cv_keypoints;
-            std::ranges::transform(_result.keypoints, std::back_inserter(cv_keypoints),
-                                   [](const Point3f& point) {
-                                       return point.to_cv_point3f();
-                                   });
+            std::transform(_result.keypoints.begin(), _result.keypoints.end(),
+                           std::back_inserter(cv_keypoints),
+                           [](const Point3f& point) {
+                               return point.to_cv_point3f();
+                           });
             draw_keypoints(cv_image, cv_keypoints, landmark_radius);
         }
 

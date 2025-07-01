@@ -60,7 +60,7 @@ namespace modeldeploy::vision::detection {
                             keypoints_ptr[j], keypoints_ptr[j + 1], keypoints_ptr[j + 2]);
                     }
                 }
-                _results.emplace_back(box, keypoints, label_id, confidence);
+                _results.push_back({box, keypoints, label_id, confidence});
             }
             if (_results.empty()) {
                 continue;
@@ -152,7 +152,7 @@ namespace modeldeploy::vision::detection {
                             keypoints_ptr[j], keypoints_ptr[j + 1], keypoints_ptr[j + 2]);
                     }
                 }
-                _results.emplace_back(box, keypoints, label_id, score);
+                _results.push_back({box, keypoints, label_id, score});
             }
             if (_results.empty()) {
                 continue;
