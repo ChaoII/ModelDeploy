@@ -77,7 +77,7 @@ if (ENABLE_MNN)
     add_definitions(-DENABLE_MNN)
     include("${CMAKE_SOURCE_DIR}/cmake/mnn.cmake")
     list(APPEND ALL_SOURCE ${MNN_BACKEND_SOURCE})
-    list(APPEND DEPENDS MNN)
+    list(APPEND DEPENDS ${MNN_LIBS})
 endif ()
 
 if (ENABLE_TRT)
