@@ -44,7 +44,7 @@ namespace modeldeploy {
         return true;
     }
 
-    bool TrtBackend::LoadTrtCache(const std::string& trt_engine_file) {
+    bool TrtBackend::load_trt_cache(const std::string& trt_engine_file) {
         cudaSetDevice(option_.gpu_id);
 
         std::string engine_buffer;
@@ -61,8 +61,7 @@ namespace modeldeploy {
             return false;
         }
         engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(
-            runtime->deserializeCudaEngine(engine_buffer.data(),
-                                           engine_buffer.size()),
+            runtime->deserializeCudaEngine(engine_buffer.data(), engine_buffer.size()),
             FDInferDeleter());
         if (!engine_) {
             MD_LOG_ERROR << "Failed to call deserializeCudaEngine()." << std::endl;
@@ -113,26 +112,21 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
             return false;
         }
-
-        // shape_range_info_.insert(std::make_pair("images", ShapeRangeInfo({1, 3, 640, 640})));
-        const uint32_t flags =
+        constexpr uint32_t flags =
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH) |
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kSTRONGLY_TYPED);
 
-        builder_ = std::unique_ptr<nvinfer1::IBuilder>(
-            nvinfer1::createInferBuilder(*FDTrtLogger::Get()));
+        builder_ = std::unique_ptr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(*FDTrtLogger::Get()));
         if (!builder_) {
             MD_LOG_ERROR << "Failed to call createInferBuilder()." << std::endl;
             return false;
         }
-        network_ = std::unique_ptr<nvinfer1::INetworkDefinition>(
-            builder_->createNetworkV2(flags));
+        network_ = std::unique_ptr<nvinfer1::INetworkDefinition>(builder_->createNetworkV2(flags));
         if (!network_) {
             MD_LOG_ERROR << "Failed to call createNetworkV2()." << std::endl;
             return false;
         }
-        runtime_ = std::unique_ptr<nvinfer1::IRuntime>(
-            nvinfer1::createInferRuntime(*FDTrtLogger::Get()));
+        runtime_ = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(*FDTrtLogger::Get()));
         std::cout << termcolor::green << "[TensorRT model buffer loaded, size: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
@@ -141,158 +135,165 @@ namespace modeldeploy {
         if (cudaStreamCreate(&stream_) != 0) {
             MD_LOG_FATAL << "Cant not call cudaStreamCreate()." << std::endl;
         }
-        return LoadTrtCache(trt_option.model_file);
+        if (!trt_option.cache_file_path.empty())
+            return load_trt_cache(trt_option.cache_file_path);
+        return init_from_onnx(model_buffer_);
     }
 
 
-    bool TrtBackend::init_from_onnx(const std::string& model_buffer, const TrtBackendOption& option) {
+    bool TrtBackend::init_from_onnx(const std::string& model_buffer) {
         if (initialized_) {
             std::cerr << "TrtBackend is already initialized, cannot initialize again." << std::endl;
             return false;
         }
-        try {
-            // 1. 创建 ONNX Parser
-            auto parser = nvonnxparser::createParser(*network_, *FDTrtLogger::Get());
-            if (!parser->parse(model_buffer.c_str(), model_buffer.size())) {
-                std::cerr << "Failed to parse ONNX model with TensorRT" << std::endl;
-                return false;
-            }
-            // 2. 构建 engine
-            auto config = builder_->createBuilderConfig();
-            auto profile = builder_->createOptimizationProfile();
-            for (const auto& item : shape_range_info_) {
-                if (!profile->setDimensions(item.first.c_str(),
-                                            nvinfer1::OptProfileSelector::kMIN,
-                                            ToDims(item.second.min))) {
-                    MD_LOG_FATAL << "[TrtBackend] Failed to set min_shape for input: " << item.first <<
-                        " in TrtBackend." << std::endl;
-                }
 
-                if (!profile->setDimensions(item.first.c_str(),
-                                            nvinfer1::OptProfileSelector::kMAX, ToDims(item.second.max))) {
-                    MD_LOG_FATAL << "[TrtBackend] Failed to set max_shape for input: " << item.first <<
-                        " in TrtBackend." << std::endl;
-                }
-                if (item.second.opt.size() == 0) {
-                    if (!profile->setDimensions(item.first.c_str(),
-                                                nvinfer1::OptProfileSelector::kOPT, ToDims(item.second.max))) {
-                        MD_LOG_FATAL << "[TrtBackend] Failed to set opt_shape for input: " << item.first <<
-                            " in TrtBackend." << std::endl;
-                    }
-                }
-                else {
-                    if (item.second.opt.size() != item.second.shape.size()) {
-                        MD_LOG_FATAL << "Require the dimension of opt in shape range information equal to "
-                            "dimension of input: " << item.first << " in this model, but now it's " << item.second.opt.
-                            size() << " != " << item.second.shape.size() << "." << std::endl;
-                    }
-
-                    if (!
-                        profile->setDimensions(item.first.c_str(),
-                                               nvinfer1::OptProfileSelector::kOPT,
-                                               ToDims(item.second.opt))) {
-                        MD_LOG_FATAL << "[TrtBackend] Failed to set opt_shape for input: " << item.first <<
-                            " in TrtBackend." << std::endl;
-                    }
-                }
-            }
-            config->addOptimizationProfile(profile);
-            std::unique_ptr<nvinfer1::IHostMemory> plan = std::unique_ptr<nvinfer1::IHostMemory>{
-                builder_->buildSerializedNetwork(*network_, *config)
-            };
-            engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(
-                runtime_->deserializeCudaEngine(plan->data(), plan->size()));
-
-            if (!engine_) {
-                std::cerr << "Failed to build TensorRT engine." << std::endl;
-                return false;
-            }
-
-            // 3. 创建上下文
-            context_ = std::unique_ptr<nvinfer1::IExecutionContext>(engine_->createExecutionContext());
-            if (!context_) {
-                std::cerr << "Failed to create execution context." << std::endl;
-                return false;
-            }
-            initialized_ = true;
-            return true;
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Exception caught during TensorRT init: " << e.what() << std::endl;
+        // 1. 创建 ONNX Parser
+        auto parser = nvonnxparser::createParser(*network_, *FDTrtLogger::Get());
+        if (!parser->parse(model_buffer.c_str(), model_buffer.size())) {
+            std::cerr << "Failed to parse ONNX model with TensorRT" << std::endl;
             return false;
         }
+        // 2. 构建 engine
+        const auto config = builder_->createBuilderConfig();
+        const auto profile = builder_->createOptimizationProfile();
+        for (const auto& item : shape_range_info_) {
+            if (!profile->setDimensions(item.first.c_str(),
+                                        nvinfer1::OptProfileSelector::kMIN,
+                                        ToDims(item.second.min))) {
+                MD_LOG_FATAL << "[TrtBackend] Failed to set min_shape for input: " << item.first <<
+                    " in TrtBackend." << std::endl;
+            }
+
+            if (!profile->setDimensions(item.first.c_str(),
+                                        nvinfer1::OptProfileSelector::kMAX, ToDims(item.second.max))) {
+                MD_LOG_FATAL << "[TrtBackend] Failed to set max_shape for input: " << item.first <<
+                    " in TrtBackend." << std::endl;
+            }
+            if (item.second.opt.size() == 0) {
+                if (!profile->setDimensions(item.first.c_str(),
+                                            nvinfer1::OptProfileSelector::kOPT, ToDims(item.second.max))) {
+                    MD_LOG_FATAL << "[TrtBackend] Failed to set opt_shape for input: " << item.first <<
+                        " in TrtBackend." << std::endl;
+                }
+            }
+            else {
+                if (item.second.opt.size() != item.second.shape.size()) {
+                    MD_LOG_FATAL << "Require the dimension of opt in shape range information equal to "
+                        "dimension of input: " << item.first << " in this model, but now it's " << item.second.opt.
+                        size() << " != " << item.second.shape.size() << "." << std::endl;
+                }
+
+                if (!
+                    profile->setDimensions(item.first.c_str(),
+                                           nvinfer1::OptProfileSelector::kOPT,
+                                           ToDims(item.second.opt))) {
+                    MD_LOG_FATAL << "[TrtBackend] Failed to set opt_shape for input: " << item.first <<
+                        " in TrtBackend." << std::endl;
+                }
+            }
+        }
+        config->addOptimizationProfile(profile);
+        std::unique_ptr<nvinfer1::IHostMemory> plan = std::unique_ptr<nvinfer1::IHostMemory>{
+            builder_->buildSerializedNetwork(*network_, *config)
+        };
+        engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(
+            runtime_->deserializeCudaEngine(plan->data(), plan->size()));
+
+        if (!engine_) {
+            std::cerr << "Failed to build TensorRT engine." << std::endl;
+            return false;
+        }
+
+        // 3. 创建上下文
+        context_ = std::unique_ptr<nvinfer1::IExecutionContext>(engine_->createExecutionContext());
+        if (!context_) {
+            std::cerr << "Failed to create execution context." << std::endl;
+            return false;
+        }
+        initialized_ = true;
+        return true;
     }
 
-    int TrtBackend::ShapeRangeInfoUpdated(const std::vector<Tensor>& inputs) {
+    int TrtBackend::shape_range_info_updated(const std::vector<Tensor>& inputs) {
         bool need_update_engine = false;
-        for (size_t i = 0; i < inputs.size(); ++i) {
-            auto iter = shape_range_info_.find(inputs[i].get_name());
+        for (const auto& input : inputs) {
+            auto iter = shape_range_info_.find(input.get_name());
             if (iter == shape_range_info_.end()) {
-                MD_LOG_ERROR << "There's no input named '" << inputs[i].get_name() << "' in loaded model." << std::endl;
+                MD_LOG_ERROR << "There's no input named '" << input.get_name() << "' in loaded model." << std::endl;
             }
-            if (iter->second.Update(inputs[i].shape()) == 1) {
+            if (iter->second.Update(input.shape()) == 1) {
                 need_update_engine = true;
             }
         }
         return need_update_engine;
     }
 
-    bool TrtBackend::infer(std::vector<Tensor>& inputs,
-                           std::vector<Tensor>* outputs) {
+    bool TrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
         if (inputs.size() != num_inputs()) {
-            MD_LOG_ERROR << "Require " << num_inputs() << "inputs, but get " << inputs.size() << "." << std::endl;
+            MD_LOG_ERROR << "Require " << num_inputs() << " inputs, but got " << inputs.size() << "." << std::endl;
             return false;
         }
-        // if (ShapeRangeInfoUpdated(inputs)) {
-        //     // meet new shape output of predefined max/min shape
-        //     // rebuild the tensorrt engine
-        //     MD_LOG_WARN
-        //         << "TensorRT engine will be rebuilt once shape range information "
-        //         "changed, this may take lots of time, you can set a proper shape "
-        //         "range before loading model to avoid rebuilding process. refer "
-        //         "https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/en/"
-        //         "faq/"
-        //         "tensorrt_tricks.md for more details."
-        //         << std::endl;
-        // }
 
-        cudaSetDevice(option_.gpu_id);
-
-        BufferManager buffers(engine_, 0);
-
+        cudaError_t error = cudaSetDevice(option_.gpu_id);
+        if (error != cudaSuccess) {
+            MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
+            return false;
+        }
+        std::vector<CudaBufferPrt> device_input_buffers;
+        std::vector<CudaBufferPrt> device_output_buffers;
+        // 处理输入缓冲区
         for (auto& input : inputs) {
             const std::string& name = input.get_name();
             nvinfer1::Dims dims = ToDims(input.shape());
+            // 设置输入形状
             if (!context_->setInputShape(name.c_str(), dims)) {
                 MD_LOG_ERROR << "Failed to set input shape for " << name;
                 return false;
             }
-            auto* hostDataBuffer = static_cast<float*>(buffers.getHostBuffer(name));
-            memcpy(hostDataBuffer, input.data(), input.byte_size());
-            if (!context_->setTensorAddress(name.c_str(), buffers.getDeviceBuffer(name))) {
-                MD_LOG_ERROR << "Failed to set input tensor address for " << name;
-                return false;
-            }
+            // 分配并复制数据到设备
+            const size_t buffer_size = input.byte_size();
+            device_input_buffers.emplace_back(allocate_cuda_buffer(buffer_size));
+            device_input_buffers.back()->copy_to_device(input.data());
         }
-        buffers.copyInputToDevice();
-        if (!context_->executeV2(buffers.getDeviceBindings().data())) {
-            MD_LOG_ERROR << "Failed to run inference with TensorRT.";
+
+        // 处理输出缓冲区
+        for (auto& output_desc : outputs_desc_) {
+            auto name = output_desc.name;
+            nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
+            size_t buffer_size = Volume(dims) * TrtDataTypeSize(output_desc.dtype);
+            // 分配输出缓冲区
+            device_output_buffers.emplace_back(allocate_cuda_buffer(buffer_size));
+        }
+
+        // 准备TensorRT的输入输出绑定
+        std::vector<void*> bindings;
+        bindings.reserve(inputs.size() + outputs_desc_.size());
+
+        // 输入绑定
+        for (const auto& buffer : device_input_buffers) {
+            bindings.push_back(buffer->data());
+        }
+        // 输出绑定
+        for (const auto& buffer : device_output_buffers) {
+            bindings.push_back(buffer->data());
+        }
+        // 执行推理
+        if (!context_->executeV2(bindings.data())) {
+            MD_LOG_ERROR << "Failed to run inference with TensorRT." << std::endl;
             return false;
         }
-        buffers.copyOutputToHost();
+        // 复制输出数据回主机
         outputs->resize(outputs_desc_.size());
         for (int i = 0; i < outputs_desc_.size(); i++) {
             auto name = outputs_desc_[i].name;
             nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
             std::vector<int64_t> shape(dims.d, dims.d + dims.nbDims);
-
-            auto device_ptr = static_cast<float*>(buffers.getHostBuffer(name));
-            (*outputs)[i].allocate(shape,
-                                   DataType::FP32, name);
-            memcpy((*outputs)[i].data(), device_ptr, buffers.size(name));
+            (*outputs)[i].allocate(shape, DataType::FP32, name);
+            device_output_buffers[i]->copy_to_host((*outputs)[i].data());
         }
         return true;
     }
+
 
     void TrtBackend::get_input_output_info() {
         // 4. 打印输入输出信息
@@ -381,8 +382,7 @@ namespace modeldeploy {
             auto clone_option = option_;
             clone_option.gpu_id = device_id;
             clone_option.external_stream_ = stream;
-
-            std::string model_buffer = "";
+            std::string model_buffer;
             if (!
                 read_binary_from_file(clone_option.model_file, &model_buffer)) {
                 MD_LOG_FATAL << "Fail to read binary from model file while cloning TrtBackend" << std::endl;
@@ -406,10 +406,8 @@ namespace modeldeploy {
         casted_backend->inputs_desc_.assign(inputs_desc_.begin(), inputs_desc_.end());
         casted_backend->outputs_desc_.assign(outputs_desc_.begin(),
                                              outputs_desc_.end());
-        casted_backend->outputs_order_.insert(outputs_order_.begin(),
-                                              outputs_order_.end());
-        casted_backend->shape_range_info_.insert(shape_range_info_.begin(),
-                                                 shape_range_info_.end());
+
+        casted_backend->shape_range_info_.insert(shape_range_info_.begin(), shape_range_info_.end());
         casted_backend->engine_ = engine_;
         casted_backend->context_ = std::shared_ptr<nvinfer1::IExecutionContext>(
             casted_backend->engine_->createExecutionContext());

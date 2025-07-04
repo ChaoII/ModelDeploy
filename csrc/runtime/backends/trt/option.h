@@ -37,50 +37,17 @@ namespace modeldeploy {
                       const std::vector<int32_t>& min,
                       const std::vector<int32_t>& opt = std::vector<int32_t>(),
                       const std::vector<int32_t>& max = std::vector<int32_t>()) {
-            min_shape[tensor_name].clear();
-            max_shape[tensor_name].clear();
-            opt_shape[tensor_name].clear();
-            min_shape[tensor_name].assign(min.begin(), min.end());
             if (opt.empty()) {
-                opt_shape[tensor_name].assign(min.begin(), min.end());
+                opt_shape[tensor_name] = min;
             }
             else {
-                opt_shape[tensor_name].assign(opt.begin(), opt.end());
+                opt_shape[tensor_name] = opt;
             }
             if (max.empty()) {
-                max_shape[tensor_name].assign(min.begin(), min.end());
+                max_shape[tensor_name] = opt_shape[tensor_name];
             }
             else {
-                max_shape[tensor_name].assign(max.begin(), max.end());
-            }
-        }
-
-        /** \brief Set Input data for input tensor for the model  while using TensorRT backend
-       *
-       * \param[in] tensor_name The name of input for the model which is dynamic shape
-       * \param[in] min_data The input data for minimal shape for the input tensor
-       * \param[in] opt_data The input data for optimized shape for the input tensor
-       * \param[in] max_data The input data for maximum shape for the input tensor, if set as default value, it will keep same with min_data
-       */
-        void SetInputData(const std::string& tensor_name,
-                          const std::vector<float> min_data,
-                          const std::vector<float> opt_data = std::vector<float>(),
-                          const std::vector<float> max_data = std::vector<float>()) {
-            max_input_data[tensor_name].clear();
-            min_input_data[tensor_name].clear();
-            opt_input_data[tensor_name].clear();
-            min_input_data[tensor_name].assign(min_data.begin(), min_data.end());
-            if (opt_data.empty()) {
-                opt_input_data[tensor_name].assign(min_data.begin(), min_data.end());
-            }
-            else {
-                opt_input_data[tensor_name].assign(opt_data.begin(), opt_data.end());
-            }
-            if (max_data.empty()) {
-                max_input_data[tensor_name].assign(min_data.begin(), min_data.end());
-            }
-            else {
-                max_input_data[tensor_name].assign(max_data.begin(), max_data.end());
+                max_shape[tensor_name] = max;
             }
         }
 
@@ -90,18 +57,12 @@ namespace modeldeploy {
         /// and load it directly while execute the code again
         std::string cache_file_path;
 
-        std::map<std::string, std::vector<float>> max_input_data;
-        std::map<std::string, std::vector<float>> min_input_data;
-        std::map<std::string, std::vector<float>> opt_input_data;
-        // The below parameters may be removed in next version, please do not
-        // visit or use them directly
         std::map<std::string, std::vector<int32_t>> max_shape;
         std::map<std::string, std::vector<int32_t>> min_shape;
         std::map<std::string, std::vector<int32_t>> opt_shape;
         bool enable_pinned_memory = false;
         void* external_stream_ = nullptr;
         int gpu_id = 0;
-        std::string model_file = ""; // Path of model file
-        std::string params_file = ""; // Path of parameters file, can be empty
+        std::string model_file;
     };
 } // namespace fastdeploy

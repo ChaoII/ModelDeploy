@@ -63,8 +63,8 @@ namespace modeldeploy {
         bool init(const RuntimeOption& runtime_option);
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
-        size_t num_inputs() const override { return inputs_desc_.size(); }
-        size_t num_outputs() const override { return outputs_desc_.size(); }
+        [[nodiscard]] size_t num_inputs() const override { return inputs_desc_.size(); }
+        [[nodiscard]] size_t num_outputs() const override { return outputs_desc_.size(); }
         TensorInfo get_input_info(int index) override;
         TensorInfo get_output_info(int index) override;
         std::vector<TensorInfo> get_input_infos() override;
@@ -73,17 +73,14 @@ namespace modeldeploy {
                                            void* stream = nullptr,
                                            int device_id = -1) override;
 
-        ~TrtBackend() {
+        ~TrtBackend() override {
             if (parser_) {
                 parser_.reset();
             }
         }
 
     private:
-        void BuildOption(const TrtBackendOption& option);
-        bool init_from_onnx(const std::string& model_buffer,
-                            const TrtBackendOption& option = TrtBackendOption());
-
+        bool init_from_onnx(const std::string& model_buffer);
         TrtBackendOption option_;
         std::shared_ptr<nvinfer1::ICudaEngine> engine_;
         std::shared_ptr<nvinfer1::IExecutionContext> context_;
@@ -98,36 +95,16 @@ namespace modeldeploy {
         std::map<std::string, int> io_name_index_;
 
         std::string model_buffer_;
-        std::string calibration_str_;
-        bool save_external_ = false;
-        std::string model_file_name_;
 
-        // Sometimes while the number of outputs > 1
-        // the output order of tensorrt may not be same
-        // with the original onnx model
-        // So this parameter will record to origin outputs
-        // order, to help recover the rigt order
-        std::map<std::string, int> outputs_order_;
 
-        // temporary store onnx model content
-        // once it used to build trt egnine done
-        // it will be released
-        std::string onnx_model_buffer_;
         // Stores shape information of the loaded model
-        // For dynmaic shape will record its range information
+        // For dynamic shape will record its range information
         // Also will update the range information while inferencing
         std::map<std::string, ShapeRangeInfo> shape_range_info_;
 
-        // If the final output tensor's dtype is different from the
-        // model output tensor's dtype, then we need cast the data
-        // to the final output's dtype.
-        // E.g. When trt model output tensor is int32, but final tensor is int64
-        // This map stores the casted tensors.
-        std::map<std::string, Tensor> casted_output_tensors_;
-
         void get_input_output_info();
-        bool CreateTrtEngineFromOnnx(const std::string& onnx_model_buffer);
-        bool LoadTrtCache(const std::string& trt_engine_file);
-        int ShapeRangeInfoUpdated(const std::vector<Tensor>& inputs);
+        bool create_trt_engine_from_onnx(const std::string& onnx_model_buffer);
+        bool load_trt_cache(const std::string& trt_engine_file);
+        int shape_range_info_updated(const std::vector<Tensor>& inputs);
     };
 } // namespace fastdeploy
