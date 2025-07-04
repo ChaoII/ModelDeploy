@@ -44,19 +44,7 @@ namespace modeldeploy {
 
     std::vector<int> ToVec(const nvinfer1::Dims& dim);
 
-    template <typename T>
-    std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
-        out << "[";
-        for (size_t i = 0; i < vec.size(); ++i) {
-            if (i != vec.size() - 1) {
-                out << vec[i] << ", ";
-            }
-            else {
-                out << vec[i] << "]";
-            }
-        }
-        return out;
-    }
+
 
     class FDTrtLogger : public nvinfer1::ILogger {
     public:

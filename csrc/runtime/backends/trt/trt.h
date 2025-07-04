@@ -48,7 +48,6 @@ namespace modeldeploy {
         std::string name;
         std::vector<int> shape;
         nvinfer1::DataType dtype; // dtype of TRT model
-        DataType original_dtype; // dtype of original ONNX/Paddle model
     };
 
     std::vector<int> toVec(const nvinfer1::Dims& dim);
@@ -89,7 +88,6 @@ namespace modeldeploy {
         std::unique_ptr<nvinfer1::IBuilder> builder_;
         std::unique_ptr<nvinfer1::INetworkDefinition> network_;
         cudaStream_t stream_{};
-        std::vector<void*> bindings_;
         std::vector<TrtValueInfo> inputs_desc_;
         std::vector<TrtValueInfo> outputs_desc_;
         std::map<std::string, int> io_name_index_;

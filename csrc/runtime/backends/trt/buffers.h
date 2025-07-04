@@ -47,6 +47,6 @@ private:
 
 using CudaBufferPrt = std::unique_ptr<CudaBuffer>;
 
-inline std::unique_ptr<CudaBuffer> allocate_cuda_buffer(size_t size) {
+inline CudaBufferPrt allocate_cuda_buffer(size_t size) {
     return std::make_unique<CudaBuffer>(size);
 }
