@@ -127,7 +127,7 @@ namespace modeldeploy {
     }
 
     int64_t Volume(const nvinfer1::Dims& d) {
-        return std::accumulate(d.d, d.d + d.nbDims, 1, std::multiplies<int64_t>());
+        return std::accumulate(d.d, d.d + d.nbDims, 1, std::multiplies<>());
     }
 
     nvinfer1::Dims ToDims(const std::vector<int>& vec) {

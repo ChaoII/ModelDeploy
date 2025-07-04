@@ -9,7 +9,7 @@ enable_language(CUDA)
 find_package(CUDAToolkit REQUIRED)
 
 
-set(TRT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/TensorRT-10.8.0.43" CACHE PATH "TRT_DIR" FORCE)
+set(TRT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/TensorRT-10.9.0.34" CACHE PATH "TRT_DIR" FORCE)
 set(TRT_LIB_DIR "${TRT_DIR}/lib")
 set(TRT_INC_DIR "${TRT_DIR}/include")
 
