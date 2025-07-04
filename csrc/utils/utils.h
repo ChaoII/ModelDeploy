@@ -91,6 +91,21 @@ namespace modeldeploy {
         return oss.str();
     }
 
+    template <typename T>
+    std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
+        out << "[";
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (i != vec.size() - 1) {
+                out << vec[i] << ", ";
+            }
+            else {
+                out << vec[i] << "]";
+            }
+        }
+        return out;
+    }
+
+
     std::vector<unsigned char> base64_decode(const std::string& base64_str);
 
     int argmax(const std::vector<float>& vec);

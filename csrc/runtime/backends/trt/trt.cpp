@@ -102,7 +102,7 @@ namespace modeldeploy {
         }
 
         if (option.model_from_memory) {
-            return init_from_onnx(option.model_buffer, option_);
+            return init_from_onnx(option.model_buffer);
         }
         if (!std::filesystem::exists(option.model_file)) {
             MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;
@@ -135,9 +135,9 @@ namespace modeldeploy {
         if (cudaStreamCreate(&stream_) != 0) {
             MD_LOG_FATAL << "Cant not call cudaStreamCreate()." << std::endl;
         }
-        if (!trt_option.cache_file_path.empty())
-            return load_trt_cache(trt_option.cache_file_path);
-        return init_from_onnx(model_buffer_);
+        // if (!trt_option.cache_file_path.empty())
+        //     return load_trt_cache(trt_option.cache_file_path);
+        return load_trt_cache(trt_option.model_file);
     }
 
 
@@ -268,8 +268,7 @@ namespace modeldeploy {
         // 准备TensorRT的输入输出绑定
         std::vector<void*> bindings;
         bindings.reserve(inputs.size() + outputs_desc_.size());
-
-        // 输入绑定
+        // 逐个元素添加进 bin
         for (const auto& buffer : device_input_buffers) {
             bindings.push_back(buffer->data());
         }
@@ -309,7 +308,7 @@ namespace modeldeploy {
             const char* name = engine_->getIOTensorName(i);
             const nvinfer1::Dims dims = engine_->getTensorShape(name);
             const nvinfer1::DataType dtype = engine_->getTensorDataType(name);
-            bool is_input = engine_->getTensorIOMode(name) == nvinfer1::TensorIOMode::kINPUT;
+            const bool is_input = engine_->getTensorIOMode(name) == nvinfer1::TensorIOMode::kINPUT;
             std::string shape_str = vector_to_string(ToVec(dims));
             std::string type_str = datatype_to_string(GetFDDataType(dtype));
             io_table.add_row({
@@ -327,27 +326,27 @@ namespace modeldeploy {
             }
         }
         std::cout << io_table << std::endl;
-        bindings_.resize(inputs_desc_.size());
     }
 
 
     TensorInfo TrtBackend::get_input_info(int index) {
         if (index >= num_inputs()) {
-            MD_LOG_FATAL << "The index: " << index << " should less than the number of inputs: " << num_inputs() << "."
-                << std::endl;
+            MD_LOG_FATAL << "The index: " << index << " should less than the number of inputs: "
+                << num_inputs() << "." << std::endl;
         }
 
         TensorInfo info;
         info.name = inputs_desc_[index].name;
-        info.shape.assign(inputs_desc_[index].shape.begin(),
-                          inputs_desc_[index].shape.end());
-        info.dtype = inputs_desc_[index].original_dtype;
+        info.shape = inputs_desc_[index].shape;
+        info.dtype = GetFDDataType(inputs_desc_[index].dtype);
         return info;
     }
 
     std::vector<TensorInfo> TrtBackend::get_input_infos() {
+        const auto size = inputs_desc_.size();
         std::vector<TensorInfo> infos;
-        for (auto i = 0; i < inputs_desc_.size(); i++) {
+        infos.reserve(size);
+        for (auto i = 0; i < size; i++) {
             infos.emplace_back(get_input_info(i));
         }
         return infos;
@@ -362,13 +361,15 @@ namespace modeldeploy {
         info.name = outputs_desc_[index].name;
         info.shape.assign(outputs_desc_[index].shape.begin(),
                           outputs_desc_[index].shape.end());
-        info.dtype = outputs_desc_[index].original_dtype;
+        info.dtype = GetFDDataType(outputs_desc_[index].dtype);
         return info;
     }
 
     std::vector<TensorInfo> TrtBackend::get_output_infos() {
+        const auto size = outputs_desc_.size();
         std::vector<TensorInfo> infos;
-        for (auto i = 0; i < outputs_desc_.size(); i++) {
+        infos.reserve(size);
+        for (auto i = 0; i < size; i++) {
             infos.emplace_back(get_output_info(i));
         }
         return infos;
@@ -387,7 +388,7 @@ namespace modeldeploy {
                 read_binary_from_file(clone_option.model_file, &model_buffer)) {
                 MD_LOG_FATAL << "Fail to read binary from model file while cloning TrtBackend" << std::endl;
             }
-            if (!casted_backend->init_from_onnx(model_buffer, clone_option)) {
+            if (!casted_backend->init_from_onnx(model_buffer)) {
                 MD_LOG_FATAL << "Clone model from ONNX failed while initialize TrtBackend." << std::endl;
             }
 
