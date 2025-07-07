@@ -90,6 +90,7 @@ namespace ModelDeploy.utils
         public string TrtMinShape { get; set; } = "";
         public string TrtOptShape { get; set; } = "";
         public string TrtMaxShape { get; set; } = "";
+        public string TrtEngineCachePath { get; set; } = "./trt_engine";
         public bool EnableFp16 { get; set; } = false;
         public int CpuThreadNum { get; set; } = 0;
         public int DeviceId { get; set; } = 0;
@@ -105,6 +106,7 @@ namespace ModelDeploy.utils
                 trt_min_shape = TrtMinShape,
                 trt_opt_shape = TrtOptShape,
                 trt_max_shape = TrtMaxShape,
+                trt_engine_cache_path = TrtEngineCachePath,
                 enable_fp16 = EnableFp16 ? 1 : 0,
                 cpu_thread_num = CpuThreadNum,
                 device_id = DeviceId,

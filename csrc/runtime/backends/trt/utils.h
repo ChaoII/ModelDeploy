@@ -16,21 +16,8 @@
 
 
 namespace modeldeploy {
-    struct FDInferDeleter {
-        template <typename T>
-        void operator()(T* obj) const {
-            if (obj) {
-                delete obj;
-                //      obj->destroy();
-            }
-        }
-    };
-
-    template <typename T>
-    using FDUniquePtr = std::unique_ptr<T, FDInferDeleter>;
-
+    
     int64_t Volume(const nvinfer1::Dims& d);
-
     nvinfer1::Dims ToDims(const std::vector<int>& vec);
     nvinfer1::Dims ToDims(const std::vector<int64_t>& vec);
 
@@ -43,18 +30,17 @@ namespace modeldeploy {
     DataType ReaderDtypeToFDDtype(int reader_dtype);
 
     std::vector<int> ToVec(const nvinfer1::Dims& dim);
+    
 
-
-
-    class FDTrtLogger : public nvinfer1::ILogger {
+    class MDTrtLogger : public nvinfer1::ILogger {
     public:
-        static FDTrtLogger* logger;
+        static MDTrtLogger* logger;
 
-        static FDTrtLogger* Get() {
+        static MDTrtLogger* Get() {
             if (logger != nullptr) {
                 return logger;
             }
-            logger = new FDTrtLogger();
+            logger = new MDTrtLogger();
             return logger;
         }
 
@@ -115,7 +101,7 @@ namespace modeldeploy {
         std::vector<int64_t> opt;
         std::vector<int8_t> is_static;
         // return
-        // -1: new shape is inillegal
+        // -1: new shape is illegal
         // 0 : new shape is able to inference
         // 1 : new shape is out of range, need to update engine
         int Update(const std::vector<int64_t>& new_shape);

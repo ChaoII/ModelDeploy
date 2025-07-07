@@ -30,10 +30,11 @@ namespace modeldeploy {
 
         void use_trt_backend();
 
+        //images:1x3x224x224
         void set_trt_min_shape(const std::string& trt_min_shape);
-
+        //images:4x3x640x640
         void set_trt_opt_shape(const std::string& trt_opt_shape);
-
+        //images:8x3x1280x1280
         void set_trt_max_shape(const std::string& trt_max_shape);
 
         OrtBackendOption ort_option;

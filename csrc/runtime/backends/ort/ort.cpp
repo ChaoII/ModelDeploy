@@ -76,19 +76,25 @@ namespace modeldeploy {
                     values_trt.push_back("1");
 
                     keys_trt.push_back("trt_engine_cache_path");
-                    values_trt.push_back("./");
+                    values_trt.push_back(option.trt_engine_cache_path.c_str());
+
+                    // keys_trt.push_back("trt_dump_ep_context_model");
+                    // values_trt.push_back("1");
+                    //
+                    // keys_trt.push_back("trt_ep_context_file_path");
+                    // values_trt.push_back("./trt_ep_ctx");
 
                     // （可选）动态 shape profile 设置
                     if (!option.trt_min_shape.empty()) {
-                        keys_trt.push_back("trt_profile_min_shape");
+                        keys_trt.push_back("trt_profile_min_shapes");
                         values_trt.push_back(option.trt_min_shape.c_str());
                     }
                     if (!option.trt_opt_shape.empty()) {
-                        keys_trt.push_back("trt_profile_opt_shape");
+                        keys_trt.push_back("trt_profile_opt_shapes");
                         values_trt.push_back(option.trt_opt_shape.c_str());
                     }
                     if (!option.trt_max_shape.empty()) {
-                        keys_trt.push_back("trt_profile_max_shape");
+                        keys_trt.push_back("trt_profile_max_shapes");
                         values_trt.push_back(option.trt_max_shape.c_str());
                     }
 

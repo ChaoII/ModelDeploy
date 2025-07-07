@@ -363,6 +363,7 @@ namespace ModelDeploy
             public string trt_min_shape;
             public string trt_opt_shape;
             public string trt_max_shape;
+            public string trt_engine_cache_path;
             public int enable_fp16;
             public int cpu_thread_num;
             public int device_id;

@@ -68,11 +68,18 @@ static class Program
     {
         RuntimeOption option = new RuntimeOption
         {
-            CpuThreadNum = 1
+            Backend = Backend.ORT,
+            Device = Device.GPU,
+            EnableTrt = true,
+            EnableFp16 = true,
+            TrtEngineCachePath = "trt_engine",
+            TrtMinShape = "images:1x3x640x640",
+            TrtOptShape = "images:1x3x640x640",
+            TrtMaxShape = "images:1x3x1280x1280",
         };
         using var yolov8 =
             new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolo11n.onnx"), option);
-        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection.jpg"));
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection0.jpg"));
         // yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
         yolov8.DrawDetectionResult(image, results, 0.3, Path.Combine(TestDataPath, "msyh.ttc"));
@@ -397,12 +404,12 @@ static class Program
         // TestLpr();
         // TestSenseVoice();
         // TestKokoro();
-        // TestDetection();
+        TestDetection();
         // TestInstanceSeg();
         // TestObb();
         // TestPose();
         // TestImage();
-        TestOCR();
+        // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();

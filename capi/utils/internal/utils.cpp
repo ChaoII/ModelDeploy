@@ -597,6 +597,7 @@ void c_runtime_option_2_runtime_option(
     modeldeploy::RuntimeOption* option) {
     option->set_cpu_thread_num(c_option->cpu_thread_num);
     option->set_ort_graph_opt_level(c_option->graph_opt_level);
+    option->ort_option.trt_engine_cache_path = c_option->trt_engine_cache_path;
     option->enable_fp16 = c_option->enable_fp16;
     option->enable_trt = c_option->enable_trt;
     option->device_id = c_option->device_id;
