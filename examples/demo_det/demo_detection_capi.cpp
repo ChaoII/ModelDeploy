@@ -14,11 +14,12 @@ int main() {
     MDModel model;
     MDRuntimeOption runtime_option = md_create_default_runtime_option();
     runtime_option.cpu_thread_num = 8;
-    runtime_option.device  = MD_DEVICE_GPU;
+    runtime_option.device = MD_DEVICE_GPU;
+    runtime_option.trt_engine_cache_path = "./trt_engine";
     runtime_option.device_id = 0;
     runtime_option.enable_fp16 = 1;
     runtime_option.enable_trt = 1;
-    if (ret = md_create_detection_model(&model, "../../test_data/test_models/yolo11n.onnx", &runtime_option); ret) {
+    if (ret = md_create_detection_model(&model, "../../test_data/test_models/yolo11n_nms.onnx", &runtime_option); ret) {
         std::cout << ret << std::endl;
         return ret;
     }

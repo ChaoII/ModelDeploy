@@ -65,6 +65,7 @@ MDRuntimeOption md_create_default_runtime_option() {
         "",
         "",
         "",
+        "./trt_engine",
         0,
         -1,
         0,

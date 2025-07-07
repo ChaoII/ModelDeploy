@@ -45,11 +45,15 @@
     {
         CPU = 0,
         GPU = 1,
+        OPENCL = 2,
+        VULKAN = 3
     }
 
     public enum Backend
     {
         ORT = 0,
-        NONE = 1,
+        MNN = 1,
+        TRT = 2,
+        NONE = 3
     }
 }

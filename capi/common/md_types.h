@@ -335,20 +335,27 @@ typedef struct {
     int sample_rate;
 } MDTTSResult;
 
+
 enum MDDevice {
     MD_DEVICE_CPU = 0,
-    MD_DEVICE_GPU = 1
+    MD_DEVICE_GPU = 1,
+    MD_DEVICE_OPENCL = 2,
+    MD_DEVICE_VULKAN = 3
 };
+
 
 enum MDBackend {
     MD_BACKEND_ORT = 0,
-    MD_BACKEND_NONE = 1
+    MD_BACKEND_MNN = 1,
+    MD_BACKEND_TRT = 2,
+    MD_BACKEND_NONE = 3
 };
 
 typedef struct {
     const char* trt_min_shape;
     const char* trt_opt_shape;
     const char* trt_max_shape;
+    const char* trt_engine_cache_path;
     int enable_fp16;
     int cpu_thread_num;
     int device_id;

@@ -53,7 +53,7 @@ namespace modeldeploy {
             return false;
         }
 
-        FDUniquePtr<nvinfer1::IRuntime> runtime{
+        const FDUniquePtr<nvinfer1::IRuntime> runtime{
             nvinfer1::createInferRuntime(*FDTrtLogger::Get())
         };
         if (!runtime) {
