@@ -153,4 +153,4 @@ namespace modeldeploy {
         std::copy_n(vec.begin(), dims.nbDims, std::begin(dims.d));
         return dims;
     }
-} // namespace fastdeploy
+} // namespace modeldeploy

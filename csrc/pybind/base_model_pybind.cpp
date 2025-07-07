@@ -27,4 +27,4 @@ namespace modeldeploy {
             .def("initialized", &BaseModel::is_initialized)
             .def_readwrite("runtime_option", &BaseModel::runtime_option);
     }
-} // namespace fastdeploy
+} // namespace modeldeploy

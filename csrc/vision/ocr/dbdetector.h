@@ -74,4 +74,4 @@ namespace modeldeploy::vision::ocr {
         DBDetectorPreprocessor preprocessor_;
         DBDetectorPostprocessor postprocessor_;
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

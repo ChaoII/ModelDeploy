@@ -638,4 +638,4 @@ namespace modeldeploy::vision {
             .def("__str__", &LetterBoxRecord::str)
             .def("__repr__", &LetterBoxRecord::str);
     }
-} // namespace fastdeploy
+} // namespace modeldeploy

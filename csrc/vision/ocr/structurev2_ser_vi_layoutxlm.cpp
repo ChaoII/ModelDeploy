@@ -17,7 +17,7 @@ namespace modeldeploy::vision::ocr {
 
     bool StructureV2SERViLayoutXLMModel::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
         return true;

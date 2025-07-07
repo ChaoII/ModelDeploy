@@ -72,4 +72,4 @@ namespace modeldeploy {
         mnn::MemoryMode memory_mode = mnn::MNN_Memory_Normal;
         int gpu_mode = mnn::MNN_GPU_TUNING_NONE;
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

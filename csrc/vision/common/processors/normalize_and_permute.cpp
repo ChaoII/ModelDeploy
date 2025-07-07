@@ -80,4 +80,4 @@ namespace modeldeploy::vision {
         auto op = NormalizeAndPermute(mean, std, is_scale, min, max, swap_rb);
         return op(mat);
     }
-} // namespace fastdeploy
+} // namespace modeldeploy

@@ -16,7 +16,7 @@ namespace modeldeploy::audio::vad {
 
     bool SileroVAD::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            std::cerr << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
         auto Sample_rate = SampleRate::SR_16K;

@@ -81,4 +81,4 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &classification::UltralyticsCls::get_postprocessor);
     }
-} // namespace fastdeploy
+} // namespace modeldeploy

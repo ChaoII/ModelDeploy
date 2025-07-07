@@ -45,4 +45,4 @@ namespace modeldeploy::vision::detection {
         float conf_threshold_;
         float nms_threshold_;
     };
-} // namespace fastdeploy
+} // namespace modeldeploy
