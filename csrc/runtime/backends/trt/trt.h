@@ -105,4 +105,4 @@ namespace modeldeploy {
         bool load_trt_cache(const std::string& trt_engine_file);
         int shape_range_info_updated(const std::vector<Tensor>& inputs);
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

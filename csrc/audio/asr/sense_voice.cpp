@@ -21,7 +21,7 @@ namespace modeldeploy::audio::asr {
 
     bool SenseVoice::initialize() {
         if (!init_runtime()) {
-            std::cerr << "Failed to initialize fastdeploy backend." << std::endl;
+            std::cerr << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
         std::map<std::string, std::string> meta = get_custom_meta_data();

@@ -26,7 +26,7 @@ namespace modeldeploy::vision::ocr {
     // Init
     bool StructureV2Table::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize fastdeploy backend." << std::endl;
+            MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
         return true;

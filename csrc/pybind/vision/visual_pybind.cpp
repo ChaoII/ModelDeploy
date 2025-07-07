@@ -110,4 +110,4 @@ namespace modeldeploy::vision {
               pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4,
               pybind11::arg("alpha") = 0.15, pybind11::arg("save_result") = false);
     }
-} // namespace fastdeploy
+} // namespace modeldeploy

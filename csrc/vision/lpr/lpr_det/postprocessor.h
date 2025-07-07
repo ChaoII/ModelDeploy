@@ -47,4 +47,4 @@ namespace modeldeploy::vision::lpr {
         float nms_threshold_;
         int landmarks_per_card_;
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

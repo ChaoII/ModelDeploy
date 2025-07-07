@@ -65,4 +65,4 @@ namespace modeldeploy {
         int gpu_id = 0;
         std::string model_file;
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

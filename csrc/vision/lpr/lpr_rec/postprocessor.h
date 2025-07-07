@@ -28,4 +28,4 @@ namespace modeldeploy::vision::lpr {
             "Y", "Z", "险", "品"
         };
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

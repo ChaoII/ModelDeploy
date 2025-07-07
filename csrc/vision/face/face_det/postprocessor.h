@@ -67,4 +67,4 @@ namespace modeldeploy::vision::face {
         int landmarks_per_face_ = 5;
         std::unordered_map<int, std::vector<SCRFDPoint>> center_points_;
     };
-} // namespace fastdeploy
+} // namespace modeldeploy

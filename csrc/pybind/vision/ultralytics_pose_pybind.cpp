@@ -101,4 +101,4 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &detection::UltralyticsPose::get_postprocessor);
     }
-} // namespace fastdeploy
+} // namespace modeldeploy
