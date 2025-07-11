@@ -35,12 +35,12 @@ namespace modeldeploy::vision::face {
 
 
         /// Set landmarks_per_face, default 5
-        void set_landmarks_per_face(const float& landmarks_per_face) {
+        void set_landmarks_per_face(const int& landmarks_per_face) {
             landmarks_per_face_ = landmarks_per_face;
         }
 
         /// Get landmarks_per_face, default 5
-        [[nodiscard]] float get_landmarks_per_face() const { return landmarks_per_face_; }
+        [[nodiscard]] int get_landmarks_per_face() const { return landmarks_per_face_; }
 
     protected:
         void generate_points(int width, int height);
