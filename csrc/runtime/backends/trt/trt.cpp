@@ -13,7 +13,7 @@
 
 
 namespace modeldeploy {
-    FDTrtLogger* FDTrtLogger::logger = nullptr;
+    MDTrtLogger* MDTrtLogger::logger = nullptr;
 
     // Check if the model can build tensorrt engine now
     // If the model has dynamic input shape, it will require defined shape
@@ -53,8 +53,8 @@ namespace modeldeploy {
             return false;
         }
 
-        const FDUniquePtr<nvinfer1::IRuntime> runtime{
-            nvinfer1::createInferRuntime(*FDTrtLogger::Get())
+        const std::unique_ptr<nvinfer1::IRuntime> runtime{
+            nvinfer1::createInferRuntime(*MDTrtLogger::get())
         };
         if (!runtime) {
             MD_LOG_ERROR << "Failed to call createInferRuntime()." << std::endl;
@@ -62,7 +62,7 @@ namespace modeldeploy {
         }
         engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(
             runtime->deserializeCudaEngine(engine_buffer.data(), engine_buffer.size()),
-            FDInferDeleter());
+            InferDeleter());
         if (!engine_) {
             MD_LOG_ERROR << "Failed to call deserializeCudaEngine()." << std::endl;
             return false;
@@ -116,7 +116,7 @@ namespace modeldeploy {
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH) |
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kSTRONGLY_TYPED);
 
-        builder_ = std::unique_ptr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(*FDTrtLogger::Get()));
+        builder_ = std::unique_ptr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(*MDTrtLogger::get()));
         if (!builder_) {
             MD_LOG_ERROR << "Failed to call createInferBuilder()." << std::endl;
             return false;
@@ -126,7 +126,7 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to call createNetworkV2()." << std::endl;
             return false;
         }
-        runtime_ = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(*FDTrtLogger::Get()));
+        runtime_ = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
         std::cout << termcolor::green << "[TensorRT model buffer loaded, size: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
@@ -148,7 +148,7 @@ namespace modeldeploy {
         }
 
         // 1. 创建 ONNX Parser
-        auto parser = nvonnxparser::createParser(*network_, *FDTrtLogger::Get());
+        auto parser = nvonnxparser::createParser(*network_, *MDTrtLogger::get());
         if (!parser->parse(model_buffer.c_str(), model_buffer.size())) {
             std::cerr << "Failed to parse ONNX model with TensorRT" << std::endl;
             return false;

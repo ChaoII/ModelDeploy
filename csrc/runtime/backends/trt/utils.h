@@ -16,7 +16,14 @@
 
 
 namespace modeldeploy {
-    
+    struct InferDeleter {
+        template <typename T>
+        void operator()(T* obj) const {
+            delete obj;
+        }
+    };
+
+
     int64_t Volume(const nvinfer1::Dims& d);
     nvinfer1::Dims ToDims(const std::vector<int>& vec);
     nvinfer1::Dims ToDims(const std::vector<int64_t>& vec);
@@ -30,13 +37,13 @@ namespace modeldeploy {
     DataType ReaderDtypeToFDDtype(int reader_dtype);
 
     std::vector<int> ToVec(const nvinfer1::Dims& dim);
-    
+
 
     class MDTrtLogger : public nvinfer1::ILogger {
     public:
         static MDTrtLogger* logger;
 
-        static MDTrtLogger* Get() {
+        static MDTrtLogger* get() {
             if (logger != nullptr) {
                 return logger;
             }
@@ -44,7 +51,7 @@ namespace modeldeploy {
             return logger;
         }
 
-        void SetLog(bool enable_info = false, bool enable_warning = false) {
+        void set_log(bool enable_info = false, bool enable_warning = false) {
             enable_info_ = enable_info;
             enable_warning_ = enable_warning;
         }
