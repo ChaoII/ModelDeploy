@@ -23,20 +23,18 @@ namespace modeldeploy {
         }
     };
 
+    // TensorRT中计算张量元素总量的方法
+    int64_t volume(const nvinfer1::Dims& d);
 
-    int64_t Volume(const nvinfer1::Dims& d);
-    nvinfer1::Dims ToDims(const std::vector<int>& vec);
-    nvinfer1::Dims ToDims(const std::vector<int64_t>& vec);
+    nvinfer1::Dims vec_to_dims(const std::vector<int>& vec);
 
-    size_t TrtDataTypeSize(const nvinfer1::DataType& dtype);
+    nvinfer1::Dims vec_to_dims(const std::vector<int64_t>& vec);
 
-    DataType GetFDDataType(const nvinfer1::DataType& dtype);
+    size_t trt_data_type_size(const nvinfer1::DataType& dtype);
 
-    nvinfer1::DataType ReaderDtypeToTrtDtype(int reader_dtype);
+    DataType trt_dtype_to_md_dtype(const nvinfer1::DataType& dtype);
 
-    DataType ReaderDtypeToFDDtype(int reader_dtype);
-
-    std::vector<int> ToVec(const nvinfer1::Dims& dim);
+    std::vector<int> dims_to_vec(const nvinfer1::Dims& dim);
 
 
     class MDTrtLogger : public nvinfer1::ILogger {
@@ -111,11 +109,11 @@ namespace modeldeploy {
         // -1: new shape is illegal
         // 0 : new shape is able to inference
         // 1 : new shape is out of range, need to update engine
-        int Update(const std::vector<int64_t>& new_shape);
+        int update(const std::vector<int64_t>& new_shape);
 
-        int Update(const std::vector<int>& new_shape) {
+        int update(const std::vector<int>& new_shape) {
             std::vector<int64_t> new_shape_int64(new_shape.begin(), new_shape.end());
-            return Update(new_shape_int64);
+            return update(new_shape_int64);
         }
 
         friend std::ostream& operator<<(std::ostream& out,

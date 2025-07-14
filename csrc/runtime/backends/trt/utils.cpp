@@ -1,7 +1,7 @@
 #include "csrc/runtime/backends/trt/utils.h"
 
 namespace modeldeploy {
-    int ShapeRangeInfo::Update(const std::vector<int64_t>& new_shape) {
+    int ShapeRangeInfo::update(const std::vector<int64_t>& new_shape) {
         if (new_shape.size() != shape.size()) {
             return -1;
         }
@@ -40,7 +40,7 @@ namespace modeldeploy {
         return need_update_engine;
     }
 
-    size_t TrtDataTypeSize(const nvinfer1::DataType& dtype) {
+    size_t trt_data_type_size(const nvinfer1::DataType& dtype) {
         if (dtype == nvinfer1::DataType::kFLOAT) {
             return sizeof(float);
         }
@@ -57,7 +57,7 @@ namespace modeldeploy {
         return sizeof(bool);
     }
 
-    DataType GetFDDataType(const nvinfer1::DataType& dtype) {
+    DataType trt_dtype_to_md_dtype(const nvinfer1::DataType& dtype) {
         if (dtype == nvinfer1::DataType::kFLOAT) {
             return DataType::FP32;
         }
@@ -71,66 +71,16 @@ namespace modeldeploy {
         return DataType::FP32;
     }
 
-    nvinfer1::DataType ReaderDtypeToTrtDtype(int reader_dtype) {
-        if (reader_dtype == 0) {
-            return nvinfer1::DataType::kFLOAT;
-        }
-        else if (reader_dtype == 1) {
-            MD_LOG_FATAL << "TensorRT cannot support data type of double now." << std::endl;
-        }
-        else if (reader_dtype == 2) {
-            MD_LOG_FATAL << "TensorRT cannot support data type of uint8 now." << std::endl;
-        }
-        else if (reader_dtype == 3) {
-            return nvinfer1::DataType::kINT8;
-        }
-        else if (reader_dtype == 4) {
-            return nvinfer1::DataType::kINT32;
-        }
-        else if (reader_dtype == 5) {
-            // regard int64 as int32
-            return nvinfer1::DataType::kINT32;
-        }
-        else if (reader_dtype == 6) {
-            return nvinfer1::DataType::kHALF;
-        }
-        MD_LOG_FATAL << "Received unexpected data type of" << reader_dtype << "." << std::endl;
-        return nvinfer1::DataType::kFLOAT;
-    }
-
-    DataType ReaderDtypeToFDDtype(int reader_dtype) {
-        if (reader_dtype == 0) {
-            return DataType::FP32;
-        }
-        else if (reader_dtype == 1) {
-            return DataType::FP64;
-        }
-        else if (reader_dtype == 2) {
-            return DataType::UINT8;
-        }
-        else if (reader_dtype == 3) {
-            return DataType::INT8;
-        }
-        else if (reader_dtype == 4) {
-            return DataType::INT32;
-        }
-        else if (reader_dtype == 5) {
-            return DataType::INT64;
-        }
-        MD_LOG_FATAL << "Received unexpected data type of " << reader_dtype << "." << std::endl;
-        return DataType::FP32;
-    }
-
-    std::vector<int> ToVec(const nvinfer1::Dims& dim) {
+    std::vector<int> dims_to_vec(const nvinfer1::Dims& dim) {
         std::vector<int> out(dim.d, dim.d + dim.nbDims);
         return out;
     }
 
-    int64_t Volume(const nvinfer1::Dims& d) {
+    int64_t volume(const nvinfer1::Dims& d) {
         return std::accumulate(d.d, d.d + d.nbDims, 1, std::multiplies<>());
     }
 
-    nvinfer1::Dims ToDims(const std::vector<int>& vec) {
+    nvinfer1::Dims ivec_to_dims(const std::vector<int>& vec) {
         int limit = static_cast<int>(nvinfer1::Dims::MAX_DIMS);
         if (static_cast<int>(vec.size()) > limit) {
             MD_LOG_WARN << "Vector too long, only first 8 elements are used in dimension."
@@ -142,7 +92,7 @@ namespace modeldeploy {
         return dims;
     }
 
-    nvinfer1::Dims ToDims(const std::vector<int64_t>& vec) {
+    nvinfer1::Dims vec_to_dims(const std::vector<int64_t>& vec) {
         int limit = static_cast<int>(nvinfer1::Dims::MAX_DIMS);
         if (static_cast<int>(vec.size()) > limit) {
             MD_LOG_WARN << "Vector too long, only first 8 elements are used in dimension."

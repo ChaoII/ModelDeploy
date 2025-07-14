@@ -33,7 +33,7 @@ namespace modeldeploy {
          * \param[in] opt The optimized shape for the input tensor, just set the most common shape, if set as default value, it will keep same with min_shape
          * \param[in] max The maximum shape for the input tensor, if set as default value, it will keep same with min_shape
          */
-        void SetShape(const std::string& tensor_name,
+        void set_shape(const std::string& tensor_name,
                       const std::vector<int32_t>& min,
                       const std::vector<int32_t>& opt = std::vector<int32_t>(),
                       const std::vector<int32_t>& max = std::vector<int32_t>()) {
