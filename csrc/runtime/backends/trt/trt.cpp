@@ -15,12 +15,6 @@
 namespace modeldeploy {
     MDTrtLogger* MDTrtLogger::logger = nullptr;
 
-    // Check if the model can build tensorrt engine now
-    // If the model has dynamic input shape, it will require defined shape
-    // information We can set the shape range information by function
-    // SetTrtInputShape() But if the shape range is not defined, then the engine
-    // cannot build, in this case, The engine will build once there's data feeded,
-    // and the shape range will be updated
     bool CanBuildEngine(
         const std::map<std::string, ShapeRangeInfo>& shape_range_info) {
         for (auto iter = shape_range_info.begin(); iter != shape_range_info.end(); ++iter) {
@@ -77,9 +71,9 @@ namespace modeldeploy {
             if (engine_->getTensorIOMode(name) != nvinfer1::TensorIOMode::kINPUT) {
                 continue;
             }
-            auto min = ToVec(engine_->getProfileShape(
+            auto min = dims_to_vec(engine_->getProfileShape(
                 name, 0, nvinfer1::OptProfileSelector::kMAX));
-            auto max = ToVec(engine_->getProfileShape(
+            auto max = dims_to_vec(engine_->getProfileShape(
                 name, 0, nvinfer1::OptProfileSelector::kMIN));
         }
         MD_LOG_INFO << "Build TensorRT Engine from cache file: " << trt_engine_file
@@ -159,19 +153,19 @@ namespace modeldeploy {
         for (const auto& item : shape_range_info_) {
             if (!profile->setDimensions(item.first.c_str(),
                                         nvinfer1::OptProfileSelector::kMIN,
-                                        ToDims(item.second.min))) {
+                                        vec_to_dims(item.second.min))) {
                 MD_LOG_FATAL << "[TrtBackend] Failed to set min_shape for input: " << item.first <<
                     " in TrtBackend." << std::endl;
             }
 
             if (!profile->setDimensions(item.first.c_str(),
-                                        nvinfer1::OptProfileSelector::kMAX, ToDims(item.second.max))) {
+                                        nvinfer1::OptProfileSelector::kMAX, vec_to_dims(item.second.max))) {
                 MD_LOG_FATAL << "[TrtBackend] Failed to set max_shape for input: " << item.first <<
                     " in TrtBackend." << std::endl;
             }
-            if (item.second.opt.size() == 0) {
+            if (item.second.opt.empty()) {
                 if (!profile->setDimensions(item.first.c_str(),
-                                            nvinfer1::OptProfileSelector::kOPT, ToDims(item.second.max))) {
+                                            nvinfer1::OptProfileSelector::kOPT, vec_to_dims(item.second.max))) {
                     MD_LOG_FATAL << "[TrtBackend] Failed to set opt_shape for input: " << item.first <<
                         " in TrtBackend." << std::endl;
                 }
@@ -186,7 +180,7 @@ namespace modeldeploy {
                 if (!
                     profile->setDimensions(item.first.c_str(),
                                            nvinfer1::OptProfileSelector::kOPT,
-                                           ToDims(item.second.opt))) {
+                                           vec_to_dims(item.second.opt))) {
                     MD_LOG_FATAL << "[TrtBackend] Failed to set opt_shape for input: " << item.first <<
                         " in TrtBackend." << std::endl;
                 }
@@ -221,7 +215,7 @@ namespace modeldeploy {
             if (iter == shape_range_info_.end()) {
                 MD_LOG_ERROR << "There's no input named '" << input.get_name() << "' in loaded model." << std::endl;
             }
-            if (iter->second.Update(input.shape()) == 1) {
+            if (iter->second.update(input.shape()) == 1) {
                 need_update_engine = true;
             }
         }
@@ -244,7 +238,7 @@ namespace modeldeploy {
         // 处理输入缓冲区
         for (auto& input : inputs) {
             const std::string& name = input.get_name();
-            nvinfer1::Dims dims = ToDims(input.shape());
+            nvinfer1::Dims dims = vec_to_dims(input.shape());
             // 设置输入形状
             if (!context_->setInputShape(name.c_str(), dims)) {
                 MD_LOG_ERROR << "Failed to set input shape for " << name;
@@ -260,7 +254,7 @@ namespace modeldeploy {
         for (auto& output_desc : outputs_desc_) {
             auto name = output_desc.name;
             nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
-            size_t buffer_size = Volume(dims) * TrtDataTypeSize(output_desc.dtype);
+            size_t buffer_size = volume(dims) * trt_data_type_size(output_desc.dtype);
             // 分配输出缓冲区
             device_output_buffers.emplace_back(allocate_cuda_buffer(buffer_size));
         }
@@ -309,8 +303,8 @@ namespace modeldeploy {
             const nvinfer1::Dims dims = engine_->getTensorShape(name);
             const nvinfer1::DataType dtype = engine_->getTensorDataType(name);
             const bool is_input = engine_->getTensorIOMode(name) == nvinfer1::TensorIOMode::kINPUT;
-            std::string shape_str = vector_to_string(ToVec(dims));
-            std::string type_str = datatype_to_string(GetFDDataType(dtype));
+            std::string shape_str = vector_to_string(dims_to_vec(dims));
+            std::string type_str = datatype_to_string(trt_dtype_to_md_dtype(dtype));
             io_table.add_row({
                 is_input ? "Input" : "Output",
                 std::to_string(i),
@@ -319,10 +313,10 @@ namespace modeldeploy {
                 shape_str
             });
             if (is_input) {
-                inputs_desc_.emplace_back(TrtValueInfo{name, ToVec(dims), dtype});
+                inputs_desc_.emplace_back(TrtValueInfo{name, dims_to_vec(dims), dtype});
             }
             else {
-                outputs_desc_.emplace_back(TrtValueInfo{name, ToVec(dims), dtype});
+                outputs_desc_.emplace_back(TrtValueInfo{name, dims_to_vec(dims), dtype});
             }
         }
         std::cout << io_table << std::endl;
@@ -338,7 +332,7 @@ namespace modeldeploy {
         TensorInfo info;
         info.name = inputs_desc_[index].name;
         info.shape = inputs_desc_[index].shape;
-        info.dtype = GetFDDataType(inputs_desc_[index].dtype);
+        info.dtype = trt_dtype_to_md_dtype(inputs_desc_[index].dtype);
         return info;
     }
 
@@ -361,7 +355,7 @@ namespace modeldeploy {
         info.name = outputs_desc_[index].name;
         info.shape.assign(outputs_desc_[index].shape.begin(),
                           outputs_desc_[index].shape.end());
-        info.dtype = GetFDDataType(outputs_desc_[index].dtype);
+        info.dtype = trt_dtype_to_md_dtype(outputs_desc_[index].dtype);
         return info;
     }
 

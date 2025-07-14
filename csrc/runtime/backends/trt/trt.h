@@ -16,32 +16,7 @@
 #include "csrc/runtime/backends/trt/utils.h"
 #include "csrc/runtime/backends/trt/option.h"
 
-class Int8EntropyCalibrator2 : public nvinfer1::IInt8EntropyCalibrator2 {
-public:
-    explicit Int8EntropyCalibrator2(const std::string& calibration_cache)
-        : calibration_cache_(calibration_cache) {
-    }
 
-    int getBatchSize() const noexcept override { return 0; }
-
-    bool getBatch(void* bindings[], const char* names[],
-                  int nbBindings) noexcept override {
-        return false;
-    }
-
-    const void* readCalibrationCache(size_t& length) noexcept override {
-        length = calibration_cache_.size();
-        return length ? calibration_cache_.data() : nullptr;
-    }
-
-    void writeCalibrationCache(const void* cache,
-                               size_t length) noexcept override {
-        MD_LOG_ERROR << "NOT IMPLEMENT." << std::endl;
-    }
-
-private:
-    const std::string calibration_cache_;
-};
 
 namespace modeldeploy {
     struct TrtValueInfo {
@@ -51,15 +26,13 @@ namespace modeldeploy {
     };
 
     std::vector<int> toVec(const nvinfer1::Dims& dim);
-    size_t TrtDataTypeSize(const nvinfer1::DataType& dtype);
-    DataType GetFDDataType(const nvinfer1::DataType& dtype);
 
     class TrtBackend : public BaseBackend {
     public:
         TrtBackend() : engine_(nullptr), context_(nullptr) {
         }
 
-        bool init(const RuntimeOption& runtime_option);
+        bool init(const RuntimeOption& runtime_option) override;
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
         [[nodiscard]] size_t num_inputs() const override { return inputs_desc_.size(); }
@@ -90,14 +63,7 @@ namespace modeldeploy {
         cudaStream_t stream_{};
         std::vector<TrtValueInfo> inputs_desc_;
         std::vector<TrtValueInfo> outputs_desc_;
-        std::map<std::string, int> io_name_index_;
-
         std::string model_buffer_;
-
-
-        // Stores shape information of the loaded model
-        // For dynamic shape will record its range information
-        // Also will update the range information while inferencing
         std::map<std::string, ShapeRangeInfo> shape_range_info_;
 
         void get_input_output_info();

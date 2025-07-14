@@ -5,14 +5,11 @@ message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
 
 
 enable_language(CUDA)
-
+# for cudaMalloc()
 find_package(CUDAToolkit REQUIRED)
-
-
 set(TRT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/TensorRT-10.9.0.34" CACHE PATH "TRT_DIR" FORCE)
 set(TRT_LIB_DIR "${TRT_DIR}/lib")
 set(TRT_INC_DIR "${TRT_DIR}/include")
-
 
 find_library(NVINFER_LIB nvinfer_10
         PATHS "${TRT_LIB_DIR}"
@@ -24,10 +21,8 @@ find_library(NVONNXPARSER_LIB nvonnxparser_10
         NO_DEFAULT_PATH
 )
 
-
 add_library(trt::nvinfer STATIC IMPORTED GLOBAL)
 add_library(trt::nvonnxparser STATIC IMPORTED GLOBAL)
-
 
 set_target_properties(trt::nvinfer PROPERTIES
         IMPORTED_LOCATION "${NVINFER_LIB}"

@@ -93,15 +93,7 @@ namespace modeldeploy {
 
     template <typename T>
     std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
-        out << "[";
-        for (size_t i = 0; i < vec.size(); ++i) {
-            if (i != vec.size() - 1) {
-                out << vec[i] << ", ";
-            }
-            else {
-                out << vec[i] << "]";
-            }
-        }
+        out << vector_to_string(vec);
         return out;
     }
 
