@@ -17,7 +17,6 @@
 #include "csrc/runtime/backends/trt/option.h"
 
 
-
 namespace modeldeploy {
     struct TrtValueInfo {
         std::string name;
@@ -25,27 +24,26 @@ namespace modeldeploy {
         nvinfer1::DataType dtype; // dtype of TRT model
     };
 
-    std::vector<int> toVec(const nvinfer1::Dims& dim);
 
-    class TrtBackend : public BaseBackend {
+    class TrtBackendImpl {
     public:
-        TrtBackend() : engine_(nullptr), context_(nullptr) {
+        TrtBackendImpl() : engine_(nullptr), context_(nullptr) {
         }
 
-        bool init(const RuntimeOption& runtime_option) override;
-        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
+        bool init(const RuntimeOption& runtime_option);
+        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs);
 
-        [[nodiscard]] size_t num_inputs() const override { return inputs_desc_.size(); }
-        [[nodiscard]] size_t num_outputs() const override { return outputs_desc_.size(); }
-        TensorInfo get_input_info(int index) override;
-        TensorInfo get_output_info(int index) override;
-        std::vector<TensorInfo> get_input_infos() override;
-        std::vector<TensorInfo> get_output_infos() override;
-        std::unique_ptr<BaseBackend> clone(RuntimeOption& runtime_option,
-                                           void* stream = nullptr,
-                                           int device_id = -1) override;
+        [[nodiscard]] size_t num_inputs() const { return inputs_desc_.size(); }
+        [[nodiscard]] size_t num_outputs() const { return outputs_desc_.size(); }
+        TensorInfo get_input_info(int index);
+        TensorInfo get_output_info(int index);
+        std::vector<TensorInfo> get_input_infos();
+        std::vector<TensorInfo> get_output_infos();
+        std::unique_ptr<TrtBackendImpl> clone(RuntimeOption& runtime_option,
+                                              void* stream = nullptr,
+                                              int device_id = -1);
 
-        ~TrtBackend() override {
+        ~TrtBackendImpl() {
             if (parser_) {
                 parser_.reset();
             }
@@ -53,6 +51,7 @@ namespace modeldeploy {
 
     private:
         bool init_from_onnx(const std::string& model_buffer);
+        bool initialized_ = false;
         TrtBackendOption option_;
         std::shared_ptr<nvinfer1::ICudaEngine> engine_;
         std::shared_ptr<nvinfer1::IExecutionContext> context_;

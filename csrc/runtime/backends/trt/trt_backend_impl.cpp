@@ -1,7 +1,7 @@
 //
 // Created by aichao on 2025/6/27.
 //
-#include "csrc/runtime/backends/trt/trt.h"
+#include "csrc/runtime/backends/trt/trt_backend_impl.h"
 
 #include <cstring>
 #include <fstream>
@@ -38,7 +38,7 @@ namespace modeldeploy {
         return true;
     }
 
-    bool TrtBackend::load_trt_cache(const std::string& trt_engine_file) {
+    bool TrtBackendImpl::load_trt_cache(const std::string& trt_engine_file) {
         cudaSetDevice(option_.gpu_id);
 
         std::string engine_buffer;
@@ -84,7 +84,7 @@ namespace modeldeploy {
         return true;
     }
 
-    bool TrtBackend::init(const RuntimeOption& option) {
+    bool TrtBackendImpl::init(const RuntimeOption& option) {
         auto trt_option = option.trt_option;
         trt_option.model_file = option.model_file;
         trt_option.gpu_id = option.device_id;
@@ -135,7 +135,7 @@ namespace modeldeploy {
     }
 
 
-    bool TrtBackend::init_from_onnx(const std::string& model_buffer) {
+    bool TrtBackendImpl::init_from_onnx(const std::string& model_buffer) {
         if (initialized_) {
             std::cerr << "TrtBackend is already initialized, cannot initialize again." << std::endl;
             return false;
@@ -208,7 +208,7 @@ namespace modeldeploy {
         return true;
     }
 
-    int TrtBackend::shape_range_info_updated(const std::vector<Tensor>& inputs) {
+    int TrtBackendImpl::shape_range_info_updated(const std::vector<Tensor>& inputs) {
         bool need_update_engine = false;
         for (const auto& input : inputs) {
             auto iter = shape_range_info_.find(input.get_name());
@@ -222,7 +222,7 @@ namespace modeldeploy {
         return need_update_engine;
     }
 
-    bool TrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
+    bool TrtBackendImpl::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
         if (inputs.size() != num_inputs()) {
             MD_LOG_ERROR << "Require " << num_inputs() << " inputs, but got " << inputs.size() << "." << std::endl;
             return false;
@@ -288,7 +288,7 @@ namespace modeldeploy {
     }
 
 
-    void TrtBackend::get_input_output_info() {
+    void TrtBackendImpl::get_input_output_info() {
         // 4. 打印输入输出信息
         tabulate::Table io_table;
         io_table.format().font_color(tabulate::Color::yellow)
@@ -323,7 +323,7 @@ namespace modeldeploy {
     }
 
 
-    TensorInfo TrtBackend::get_input_info(int index) {
+    TensorInfo TrtBackendImpl::get_input_info(int index) {
         if (index >= num_inputs()) {
             MD_LOG_FATAL << "The index: " << index << " should less than the number of inputs: "
                 << num_inputs() << "." << std::endl;
@@ -336,7 +336,7 @@ namespace modeldeploy {
         return info;
     }
 
-    std::vector<TensorInfo> TrtBackend::get_input_infos() {
+    std::vector<TensorInfo> TrtBackendImpl::get_input_infos() {
         const auto size = inputs_desc_.size();
         std::vector<TensorInfo> infos;
         infos.reserve(size);
@@ -346,7 +346,7 @@ namespace modeldeploy {
         return infos;
     }
 
-    TensorInfo TrtBackend::get_output_info(int index) {
+    TensorInfo TrtBackendImpl::get_output_info(int index) {
         if (index >= num_outputs()) {
             MD_LOG_FATAL << "The index: " << index << " should less than the number of outputs: "
                 << num_outputs() << "." << std::endl;
@@ -359,7 +359,7 @@ namespace modeldeploy {
         return info;
     }
 
-    std::vector<TensorInfo> TrtBackend::get_output_infos() {
+    std::vector<TensorInfo> TrtBackendImpl::get_output_infos() {
         const auto size = outputs_desc_.size();
         std::vector<TensorInfo> infos;
         infos.reserve(size);
@@ -369,10 +369,10 @@ namespace modeldeploy {
         return infos;
     }
 
-    std::unique_ptr<BaseBackend> TrtBackend::clone(RuntimeOption& runtime_option,
-                                                   void* stream, int device_id) {
-        std::unique_ptr<BaseBackend> new_backend = std::make_unique<TrtBackend>();
-        auto casted_backend = dynamic_cast<TrtBackend*>(new_backend.get());
+    std::unique_ptr<TrtBackendImpl> TrtBackendImpl::clone(RuntimeOption& runtime_option,
+                                                          void* stream, int device_id) {
+        std::unique_ptr<TrtBackendImpl> new_backend = std::make_unique<TrtBackendImpl>();
+        auto casted_backend = dynamic_cast<TrtBackendImpl*>(new_backend.get());
         if (device_id > 0 && device_id != option_.gpu_id) {
             auto clone_option = option_;
             clone_option.gpu_id = device_id;

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 #include "csrc/utils/utils.h"
 #include "csrc/core/tensor.h"
 #include "csrc/core/md_log.h"

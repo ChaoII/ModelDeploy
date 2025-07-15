@@ -6,14 +6,12 @@
 #include <MNN/MNNSharedContext.h>
 #include <MNN/expr/Executor.hpp>
 #include <MNN/expr/ExprCreator.hpp>
-#include "csrc/runtime/backends/mnn/mnn_module_api.h"
 #include "csrc/runtime/backends/mnn/utils.h"
+#include "csrc/runtime/backends/mnn/mnn_backend_impl.h"
 
 
 namespace modeldeploy {
-    MnnBackend::~MnnBackend() = default;
-
-    void MnnBackend::build_option(const RuntimeOption& option) {
+    void MnnBackendImpl::build_option(const RuntimeOption& option) {
         option_ = option.mnn_option;
         MNN::ScheduleConfig config;
         MNN::BackendConfig backend_config;
@@ -64,7 +62,7 @@ namespace modeldeploy {
     }
 
 
-    bool MnnBackend::init(const RuntimeOption& runtime_option) {
+    bool MnnBackendImpl::init(const RuntimeOption& runtime_option) {
         if (initialized_) {
             MD_LOG_ERROR << "MnnBackend is already initialized, cannot initialize again."
                 << std::endl;
@@ -145,7 +143,7 @@ namespace modeldeploy {
         return true;
     }
 
-    TensorInfo MnnBackend::get_input_info(int index) {
+    TensorInfo MnnBackendImpl::get_input_info(int index) {
         if (index > num_inputs()) {
             MD_LOG_FATAL <<
                 "The index: " << index << " should less than the number of inputs: "
@@ -154,9 +152,9 @@ namespace modeldeploy {
         return inputs_desc_[index];
     }
 
-    std::vector<TensorInfo> MnnBackend::get_input_infos() { return inputs_desc_; }
+    std::vector<TensorInfo> MnnBackendImpl::get_input_infos() { return inputs_desc_; }
 
-    TensorInfo MnnBackend::get_output_info(int index) {
+    TensorInfo MnnBackendImpl::get_output_info(int index) {
         if (index > num_outputs()) {
             MD_LOG_FATAL <<
                 "The index: " << index << " should less than the number of outputs: "
@@ -165,10 +163,10 @@ namespace modeldeploy {
         return outputs_desc_[index];
     }
 
-    std::vector<TensorInfo> MnnBackend::get_output_infos() { return outputs_desc_; }
+    std::vector<TensorInfo> MnnBackendImpl::get_output_infos() { return outputs_desc_; }
 
-    bool MnnBackend::infer(std::vector<Tensor>& inputs,
-                           std::vector<Tensor>* outputs) {
+    bool MnnBackendImpl::infer(std::vector<Tensor>& inputs,
+                               std::vector<Tensor>* outputs) {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR << "[MnnBackend] Size of the inputs(" << inputs.size()
                 << ") should keep same with the inputs of this model("
@@ -205,7 +203,7 @@ namespace modeldeploy {
     }
 
 
-    std::map<std::string, std::string> MnnBackend::get_custom_meta_data() const {
+    std::map<std::string, std::string> MnnBackendImpl::get_custom_meta_data() const {
         return net_->getInfo()->metaData;
     }
 } // namespace modeldeploy

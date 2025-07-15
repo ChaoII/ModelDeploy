@@ -5,14 +5,14 @@
 
 #include "csrc/runtime/runtime.h"
 #ifdef ENABLE_TRT
-#include "backends/trt/trt.h"
+#include "backends/trt/trt_backend.h"
 #endif
 
 #ifdef ENABLE_ORT
-#include "csrc/runtime/backends/ort/ort.h"
+#include "csrc/runtime/backends/ort/ort_backend.h"
 #endif
 #ifdef ENABLE_MNN
-#include "csrc/runtime/backends/mnn/mnn_module_api.h"
+#include "csrc/runtime/backends/mnn/mnn_backend.h"
 #endif
 
 

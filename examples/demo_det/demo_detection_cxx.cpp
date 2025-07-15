@@ -45,7 +45,8 @@ int main() {
     option.enable_fp16 = true;
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms_dyn.engine", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms_dyn.engine",
+                                                              option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().set_size({320, 320});
