@@ -56,3 +56,13 @@ quantize_dynamic(
     weight_type=QuantType.QUInt8,  # 参数类型 Int8 / UInt8
 )
 ```
+
+#### 4.trt engine生成
+```bash
+trtexec --onnx=yolo11n_nms.onnx ^
+        --saveEngine=yolo11n_nms_dyn.engine ^
+        --fp16 ^
+        --minShapes=images:1x3x320x320 ^
+        --optShapes=images:1x3x640x640 ^
+        --maxShapes=images:4x3x1280x1280
+```
