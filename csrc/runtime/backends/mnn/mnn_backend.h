@@ -4,23 +4,16 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-#include "csrc/core/md_decl.h"
 #include "csrc/runtime/backends/backend.h"
-#include "csrc/runtime/backends/ort/option.h"
 
 namespace modeldeploy {
-    class OrtBackendImpl;
+    class MnnBackendImpl;
 
-    class MODELDEPLOY_CXX_EXPORT OrtBackend : public BaseBackend {
+    class MODELDEPLOY_CXX_EXPORT MnnBackend : public BaseBackend {
     public:
-        OrtBackend();
+        MnnBackend();
 
-        ~OrtBackend() override;
-
-        void build_option(const OrtBackendOption& option) const;
+        ~MnnBackend() override;
 
         bool init(const RuntimeOption& option) override;
 
@@ -44,6 +37,6 @@ namespace modeldeploy {
         [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const override;
 
     private:
-        std::unique_ptr<OrtBackendImpl> impl_;
+        std::unique_ptr<MnnBackendImpl> impl_;
     };
 }

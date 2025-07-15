@@ -1,23 +1,17 @@
 //
 // Created by aichao on 2025/2/20.
 //
-#include <filesystem>
-#include <tabulate/tabulate.hpp>
-#include "csrc/runtime/backends/ort/ort.h"
-#include "csrc/runtime/backends/ort/ort_impl.h"
+
+#include "csrc/runtime/backends/ort/ort_backend.h"
+#include "csrc/runtime/backends/ort/ort_backend_impl.h"
 
 
 namespace modeldeploy {
     OrtBackend::OrtBackend(): impl_(std::make_unique<OrtBackendImpl>()) {
     }
 
-    OrtBackend::~OrtBackend() {
-    }
+    OrtBackend::~OrtBackend() = default;
 
-
-    void OrtBackend::build_option(const OrtBackendOption& option) const {
-        impl_->build_option(option);
-    }
 
     bool OrtBackend::init(const RuntimeOption& option) {
         return impl_->init(option);
