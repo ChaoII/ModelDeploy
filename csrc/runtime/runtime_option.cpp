@@ -2,6 +2,7 @@
 // Created by aichao on 2025/5/22.
 //
 
+#include <algorithm>
 #include "runtime/runtime_option.h"
 #include "utils/utils.h"
 

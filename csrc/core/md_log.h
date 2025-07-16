@@ -5,33 +5,11 @@
 #pragma once
 
 #include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <ctime>
 #include <cstring>
+#include <sstream>
+#include <cstdint>
 #include "core/md_decl.h"
 
-#ifdef _MSC_VER
-#define localtime(timep, tm_ptr) localtime_s(tm_ptr, timep)
-#else
-#define localtime(timep, tm_ptr) localtime_r(timep, tm_ptr)
-#endif
-
-#define CUS_FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1   \
-    : (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__))
-
-#define MD_LOG_DEBUG modeldeploy::LogManager::getInstance() \
-    .logStream(modeldeploy::LogLevel::MD_LOG_D, CUS_FILENAME, __FUNCTION__, __LINE__)
-#define MD_LOG_INFO modeldeploy::LogManager::getInstance() \
-    .logStream(modeldeploy::LogLevel::MD_LOG_I, "", "", -1)
-#define MD_LOG_WARN modeldeploy::LogManager::getInstance() \
-    .logStream(modeldeploy::LogLevel::MD_LOG_W, "", "", -1)
-#define MD_LOG_ERROR modeldeploy::LogManager::getInstance() \
-    .logStream(modeldeploy::LogLevel::MD_LOG_E, CUS_FILENAME, __FUNCTION__, __LINE__)
-#define MD_LOG_FATAL modeldeploy::LogManager::getInstance() \
-    .logStream(modeldeploy::LogLevel::MD_LOG_F, "", "", -1)
-
-#define MD_SET_LOG_LEVEL(level) modeldeploy::LogManager::getInstance().set_log_level(level)
 
 namespace modeldeploy {
     enum class LogLevel : std::uint8_t {
@@ -100,3 +78,25 @@ namespace modeldeploy {
         } // Default log level is INFO
     };
 } // namespace modeldeploy
+
+#ifdef _MSC_VER
+#define localtime(timep, tm_ptr) localtime_s(tm_ptr, timep)
+#else
+#define localtime(timep, tm_ptr) localtime_r(timep, tm_ptr)
+#endif
+
+#define CUS_FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1   \
+: (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__))
+
+#define MD_LOG_DEBUG modeldeploy::LogManager::getInstance() \
+.logStream(modeldeploy::LogLevel::MD_LOG_D, CUS_FILENAME, __FUNCTION__, __LINE__)
+#define MD_LOG_INFO modeldeploy::LogManager::getInstance() \
+.logStream(modeldeploy::LogLevel::MD_LOG_I, "", "", -1)
+#define MD_LOG_WARN modeldeploy::LogManager::getInstance() \
+.logStream(modeldeploy::LogLevel::MD_LOG_W, "", "", -1)
+#define MD_LOG_ERROR modeldeploy::LogManager::getInstance() \
+.logStream(modeldeploy::LogLevel::MD_LOG_E, CUS_FILENAME, __FUNCTION__, __LINE__)
+#define MD_LOG_FATAL modeldeploy::LogManager::getInstance() \
+.logStream(modeldeploy::LogLevel::MD_LOG_F, "", "", -1)
+
+#define MD_SET_LOG_LEVEL(level) modeldeploy::LogManager::getInstance().set_log_level(level)

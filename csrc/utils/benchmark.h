@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <vector>
+#include <string>
 #include "core/md_decl.h"
 
 class Timer {
