@@ -21,7 +21,7 @@ namespace modeldeploy {
         MD_LOG_F
     };
 
-    class LogStreamWrapper {
+    class MODELDEPLOY_CXX_EXPORT LogStreamWrapper {
     public:
         explicit LogStreamWrapper(std::ostream& os, const bool fatal = false) : os_(os), is_null_(false),
             fatal_(fatal) {
