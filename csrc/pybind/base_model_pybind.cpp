@@ -2,7 +2,7 @@
 // Created by aichao on 2025/6/9.
 //
 
-#include "csrc/base_model.h"
+#include "base_model.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 

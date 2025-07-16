@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "csrc/base_model.h"
+#include "base_model.h"
 
 
 /** \brief All classification model APIs are defined inside this namespace

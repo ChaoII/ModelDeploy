@@ -10,9 +10,9 @@
 #include <mutex>
 #include <thread>
 #include <condition_variable>
-#include "csrc/base_model.h"
-#include "csrc/audio/asr/sense_voice.h"
-#include "csrc/audio/vad/silero_vad.h"
+#include "base_model.h"
+#include "audio/asr/sense_voice.h"
+#include "audio/vad/silero_vad.h"
 
 namespace modeldeploy::audio {
     class MODELDEPLOY_CXX_EXPORT AAsr {

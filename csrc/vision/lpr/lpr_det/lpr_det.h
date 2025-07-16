@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "csrc/base_model.h"
-#include "csrc/vision/lpr/lpr_det/preprocessor.h"
-#include "csrc/vision/lpr/lpr_det/postprocessor.h"
+#include "base_model.h"
+#include "vision/lpr/lpr_det/preprocessor.h"
+#include "vision/lpr/lpr_det/postprocessor.h"
 
 namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprDetection : public BaseModel {

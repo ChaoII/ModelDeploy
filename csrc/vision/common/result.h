@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/common/struct.h"
+#include "core/md_decl.h"
+#include "vision/common/struct.h"
 #include <opencv2/opencv.hpp>
 
 namespace modeldeploy::vision {

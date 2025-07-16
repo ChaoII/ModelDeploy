@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/detection/postprocessor.h"
+#include "core/md_log.h"
+#include "vision/detection/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsPostprocessor::UltralyticsPostprocessor() {

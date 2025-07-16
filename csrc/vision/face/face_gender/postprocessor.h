@@ -3,8 +3,8 @@
 //
 
 #pragma once
-#include "csrc/core/tensor.h"
-#include "csrc/vision/common/result.h"
+#include "core/tensor.h"
+#include "vision/common/result.h"
 
 
 namespace modeldeploy::vision::face {

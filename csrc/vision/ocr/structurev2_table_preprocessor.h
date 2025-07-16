@@ -3,10 +3,10 @@
 //
 
 #pragma once
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/pad.h"
-#include "csrc/vision/common/processors/normalize.h"
-#include "csrc/vision/common/processors/hwc2chw.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/normalize.h"
+#include "vision/common/processors/hwc2chw.h"
 #include "opencv2/opencv.hpp"
 
 

@@ -14,7 +14,7 @@
 #define NOGDI
 #define NOCRYPT
 #endif
-#include "csrc/audio/text_normalize/number.h"
+#include "audio/text_normalize/number.h"
 
 namespace modeldeploy::audio {
     // 数字和单位的映射

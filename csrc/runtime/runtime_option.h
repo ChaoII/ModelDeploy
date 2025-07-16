@@ -5,9 +5,9 @@
 #pragma once
 
 #include "backends/trt/option.h"
-#include "csrc/runtime/backends/mnn/option.h"
-#include "csrc/runtime/backends/ort/option.h"
-#include "csrc/runtime/enum_variables.h"
+#include "runtime/backends/mnn/option.h"
+#include "runtime/backends/ort/option.h"
+#include "runtime/enum_variables.h"
 
 
 namespace modeldeploy {

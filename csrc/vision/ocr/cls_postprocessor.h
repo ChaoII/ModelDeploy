@@ -3,8 +3,8 @@
 //
 
 #pragma once
-#include "csrc/core/md_decl.h"
-#include "csrc/core/tensor.h"
+#include "core/md_decl.h"
+#include "core/tensor.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT ClassifierPostprocessor {

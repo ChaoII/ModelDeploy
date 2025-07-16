@@ -12,9 +12,9 @@
 
 #include "NvInfer.h"
 #include "NvOnnxParser.h"
-#include "csrc/runtime/backends/backend.h"
-#include "csrc/runtime/backends/trt/utils.h"
-#include "csrc/runtime/backends/trt/option.h"
+#include "runtime/backends/backend.h"
+#include "runtime/backends/trt/utils.h"
+#include "runtime/backends/trt/option.h"
 
 
 namespace modeldeploy {

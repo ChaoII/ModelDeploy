@@ -3,8 +3,8 @@
 //
 
 #include <opencv2/opencv.hpp>
-#include "csrc/vision/ocr/det_postprocessor.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/det_postprocessor.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 
 namespace modeldeploy::vision::ocr {

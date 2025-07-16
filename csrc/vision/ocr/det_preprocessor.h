@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "csrc/vision/common/processors/pad.h"
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/normalize_and_permute.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/normalize_and_permute.h"
 
 
 namespace modeldeploy::vision::ocr {

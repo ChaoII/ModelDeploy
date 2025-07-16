@@ -7,7 +7,7 @@
 #include <functional>
 #include <iostream>
 
-#include "csrc/core/md_decl.h"
+#include "core/md_decl.h"
 
 namespace modeldeploy {
     enum class DataType {

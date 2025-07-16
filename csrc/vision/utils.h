@@ -5,10 +5,9 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
-
-#include "csrc/core/tensor.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/common/struct.h"
+#include "core/tensor.h"
+#include "vision/common/result.h"
+#include "vision/common/struct.h"
 
 
 namespace modeldeploy::vision::utils {

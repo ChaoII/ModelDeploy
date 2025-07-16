@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "csrc/base_model.h"
-#include "csrc/vision/classification/preprocessor.h"
-#include "csrc/vision/classification/postprocessor.h"
+#include "base_model.h"
+#include "vision/classification/preprocessor.h"
+#include "vision/classification/postprocessor.h"
 
 namespace modeldeploy::vision::classification {
     /*! @brief YOLOv5Cls model object used when to load a YOLOv5Cls model exported by YOLOv5Cls.

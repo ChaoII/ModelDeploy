@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <iostream>
 #include <samplerate/include/samplerate.h>
-#include "csrc/core/md_log.h"
-#include "csrc/audio//asr_pipeline.h"
+#include "core/md_log.h"
+#include "audio//asr_pipeline.h"
 
 namespace modeldeploy::audio {
     static std::vector<float> resample(const std::vector<float>& input, const int inputRate) {

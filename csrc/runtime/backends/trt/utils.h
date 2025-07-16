@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "NvInfer.h"
-#include "csrc/core/tensor.h"
-#include "csrc/utils/utils.h"
+#include "core/tensor.h"
+#include "utils/utils.h"
 
 
 namespace modeldeploy {

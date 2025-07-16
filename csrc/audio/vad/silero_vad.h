@@ -5,7 +5,7 @@
 #pragma once
 
 
-#include "csrc/base_model.h"
+#include "base_model.h"
 
 namespace modeldeploy::audio::vad {
     class MODELDEPLOY_CXX_EXPORT SileroVAD : public BaseModel {

@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "csrc/base_model.h"
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/common/result.h"
+#include "base_model.h"
+#include "core/md_decl.h"
+#include "vision/common/result.h"
 
 namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.

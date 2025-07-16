@@ -2,9 +2,9 @@
 // // Created by aichao on 2025/4/7.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/utils.h"
-#include "csrc/vision/face/face_rec_pipeline/face_rec_pipeline.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/face/face_rec_pipeline/face_rec_pipeline.h"
 
 namespace modeldeploy::vision::face {
     FaceRecognizerPipeline::FaceRecognizerPipeline(const std::string& det_model_path,

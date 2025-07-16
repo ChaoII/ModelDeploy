@@ -5,12 +5,12 @@
 #pragma once
 
 #include <vector>
-#include "csrc/core/md_decl.h"
-#include "csrc/base_model.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/ocr/classifier.h"
-#include "csrc/vision/ocr/dbdetector.h"
-#include "csrc/vision/ocr/recognizer.h"
+#include "core/md_decl.h"
+#include "base_model.h"
+#include "vision/common/result.h"
+#include "vision/ocr/classifier.h"
+#include "vision/ocr/dbdetector.h"
+#include "vision/ocr/recognizer.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT PaddleOCR : public BaseModel {

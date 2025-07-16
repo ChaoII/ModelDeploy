@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/audio/tts/kokoro.h"
+#include "pybind/utils/utils.h"
+#include "audio/tts/kokoro.h"
 
 namespace modeldeploy::audio {
     void bind_kokoro(pybind11::module& m) {

@@ -4,7 +4,7 @@
 
 
 #include "cast.h"
-#include "csrc/core/md_log.h"
+#include "core/md_log.h"
 
 
 namespace modeldeploy::vision {

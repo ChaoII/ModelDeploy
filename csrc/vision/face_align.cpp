@@ -2,8 +2,8 @@
 // Created by aichao on 2025/3/25.
 //
 
-#include "csrc/vision/utils.h"
-#include "csrc/core/md_log.h"
+#include "vision/utils.h"
+#include "core/md_log.h"
 
 namespace modeldeploy::vision::utils {
     cv::Mat mean_axis0(const cv::Mat& src) {

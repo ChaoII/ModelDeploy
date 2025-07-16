@@ -2,9 +2,9 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "./det_preprocessor.h"
-
-#include "./utils/ocr_utils.h"
+#include "vision/utils.h"
+#include "vision/ocr/det_preprocessor.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     std::array<int, 4> DBDetectorPreprocessor::ocr_detector_get_info(

@@ -2,8 +2,8 @@
 // Created by aichao on 2025/5/30.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/obb/ultralytics_obb.h"
+#include "core/md_log.h"
+#include "vision/obb/ultralytics_obb.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsObb::UltralyticsObb(const std::string& model_file,

@@ -2,9 +2,10 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/ocr/cls_preprocessor.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/ocr/cls_preprocessor.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     ClassifierPreprocessor::ClassifierPreprocessor() {

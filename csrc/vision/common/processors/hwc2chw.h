@@ -7,8 +7,8 @@
 
 #include <string>
 #include <opencv2/opencv.hpp>
-#include "csrc/core/md_decl.h"
-#include "csrc/core/tensor.h"
+#include "core/md_decl.h"
+#include "core/tensor.h"
 
 namespace modeldeploy::vision {
     /*! @brief Processor for transform images from HWC to CHW.

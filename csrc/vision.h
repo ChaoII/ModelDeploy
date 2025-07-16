@@ -12,5 +12,7 @@
 #include "vision/pose/ultralytics_pose.h"
 #include "vision/iseg/ultralytics_seg.h"
 #include "vision/classification/ultralytics_cls.h"
-#include "csrc/vision/face/face_models.h"
-#include "csrc/vision/lpr/lpr_models.h"
+#include "vision/face/face_models.h"
+#include "vision/lpr/lpr_models.h"
+
+#include "vision/common/visualize/visualize.h"

@@ -3,8 +3,8 @@
 //
 
 #include <numeric>
-#include "csrc/core/md_log.h"
-#include "csrc/vision/common/display/display.h"
+#include <tabulate/tabulate.hpp>
+#include "vision/common/display/display.h"
 
 namespace modeldeploy::vision {
     void dis_face_rec(std::vector<FaceRecognitionResult> results) {

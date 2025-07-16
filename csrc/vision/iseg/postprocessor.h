@@ -2,9 +2,9 @@
 // Created by aichao on 2025/4/14.
 //
 #pragma once
-#include "csrc/core/tensor.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/common/struct.h"
+#include "core/tensor.h"
+#include "vision/common/result.h"
+#include "vision/common/struct.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Postprocessor object for YOLOv5Seg serials model.

@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/obb/ultralytics_obb.h"
+#include "pybind/utils/utils.h"
+#include "vision/obb/ultralytics_obb.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_obb(const pybind11::module& m) {

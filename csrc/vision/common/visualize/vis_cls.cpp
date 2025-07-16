@@ -2,8 +2,8 @@
 // Created by aichao on 2025/5/26.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/common/visualize/visualize.h"
+#include "core/md_log.h"
+#include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
     cv::Mat vis_cls(cv::Mat& cv_image,

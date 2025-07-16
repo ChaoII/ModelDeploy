@@ -2,16 +2,16 @@
 // Created by aichao on 2025/3/26.
 //
 
-#include <csrc/core/md_log.h>
+#include <core/md_log.h>
 
-#include "csrc/vision/utils.h"
-#include "csrc/utils/utils.h"
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/color_space_convert.h"
-#include "csrc/vision/common/processors/hwc2chw.h"
-#include "csrc/vision/common/processors/cast.h"
-#include "csrc/vision/common/processors/convert.h"
-#include "csrc/vision/face/face_as/face_as_second.h"
+#include "vision/utils.h"
+#include "utils/utils.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/color_space_convert.h"
+#include "vision/common/processors/hwc2chw.h"
+#include "vision/common/processors/cast.h"
+#include "vision/common/processors/convert.h"
+#include "vision/face/face_as/face_as_second.h"
 
 
 namespace modeldeploy::vision::face {

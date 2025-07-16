@@ -2,7 +2,7 @@
 // Created by aichao on 2025/6/9.
 //
 
-#include "csrc/pybind/utils/utils.h"
+#include "pybind/utils/utils.h"
 
 namespace modeldeploy {
     pybind11::dtype md_data_type_to_numpy_data_type(const DataType& md_dtype) {

@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/face/face_rec/seetaface.h"
+#include "pybind/utils/utils.h"
+#include "vision/face/face_rec/seetaface.h"
 
 namespace modeldeploy::vision {
     void bind_face_rec(const pybind11::module& m) {

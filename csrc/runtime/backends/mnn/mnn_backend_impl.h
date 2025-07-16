@@ -7,9 +7,9 @@
 #include <memory>
 #include <vector>
 #include <MNN/expr/Module.hpp>
-#include "csrc/core/tensor.h"
-#include "csrc/runtime/backends/backend.h"
-#include "csrc/runtime/backends/mnn/option.h"
+#include "core/tensor.h"
+#include "runtime/backends/backend.h"
+#include "runtime/backends/mnn/option.h"
 
 namespace modeldeploy {
     class MnnBackendImpl  {

@@ -3,7 +3,7 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
+#include "pybind/utils/utils.h"
 
 namespace modeldeploy {
     void bind_tensor(pybind11::module& m) {

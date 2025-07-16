@@ -3,10 +3,10 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
+#include "pybind/utils/utils.h"
 
-#include "csrc/vision/ocr/structurev2_layout.h"
-#include "csrc/vision/ocr/structurev2_ser_vi_layoutxlm.h"
+#include "vision/ocr/structurev2_layout.h"
+#include "vision/ocr/structurev2_ser_vi_layoutxlm.h"
 
 
 namespace modeldeploy::vision {

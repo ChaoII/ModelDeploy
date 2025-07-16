@@ -1,9 +1,9 @@
 //
 // Created by aichao on 2025/3/21.
 //
-#include "csrc/vision/ocr//structurev2_ser_vi_layoutxlm.h"
+#include "vision/ocr//structurev2_ser_vi_layoutxlm.h"
 
-#include <csrc/core/md_log.h>
+#include <core/md_log.h>
 
 
 namespace modeldeploy::vision::ocr {

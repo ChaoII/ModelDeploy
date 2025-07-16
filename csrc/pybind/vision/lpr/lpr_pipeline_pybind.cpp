@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
+#include "pybind/utils/utils.h"
+#include "vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
 namespace modeldeploy::vision {
     void bind_lpr_pipeline(const pybind11::module& m) {

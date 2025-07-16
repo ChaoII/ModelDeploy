@@ -4,8 +4,8 @@
 
 #pragma once
 #include <string>
-#include "csrc/core/md_decl.h"
-#include "csrc/runtime/enum_variables.h"
+#include "core/md_decl.h"
+#include "runtime/enum_variables.h"
 
 namespace modeldeploy {
     /*! @brief Option object to configure ONNX Runtime backend

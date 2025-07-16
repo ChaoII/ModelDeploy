@@ -2,13 +2,13 @@
 // Created by aichao on 2025/2/24.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/classification/preprocessor.h"
-#include "csrc/vision/common/processors/center_crop.h"
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/convert.h"
-#include "csrc/vision/common/processors/color_space_convert.h"
-#include "csrc/vision/common/processors/normalize_and_permute.h"
+#include "core/md_log.h"
+#include "vision/classification/preprocessor.h"
+#include "vision/common/processors/center_crop.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/convert.h"
+#include "vision/common/processors/color_space_convert.h"
+#include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::classification {
     UltralyticsClsPreprocessor::UltralyticsClsPreprocessor() {

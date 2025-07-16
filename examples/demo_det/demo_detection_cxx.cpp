@@ -3,7 +3,7 @@
 //
 
 #include "csrc/vision.h"
-#include "csrc/vision/common/visualize/visualize.h"
+
 
 
 void test_camera() {

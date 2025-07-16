@@ -2,10 +2,10 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/lpr/lpr_det/postprocessor.h"
+#include "core/md_log.h"
+#include "vision/lpr/lpr_det/postprocessor.h"
 
-#include <csrc/utils/utils.h>
+#include <utils/utils.h>
 
 namespace modeldeploy::vision::lpr {
     LprDetPostprocessor::LprDetPostprocessor() {

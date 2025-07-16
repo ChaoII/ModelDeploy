@@ -5,7 +5,7 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
-#include "csrc/core/md_decl.h"
+#include "core/md_decl.h"
 
 namespace modeldeploy::vision {
     class MODELDEPLOY_CXX_EXPORT Pad {

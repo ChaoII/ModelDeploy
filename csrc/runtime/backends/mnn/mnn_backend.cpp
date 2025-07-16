@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "csrc/runtime/backends/mnn/mnn_backend_impl.h"
-#include "csrc/runtime/backends/mnn/mnn_backend.h"
+#include "runtime/backends/mnn/mnn_backend_impl.h"
+#include "runtime/backends/mnn/mnn_backend.h"
 
 
 namespace modeldeploy {

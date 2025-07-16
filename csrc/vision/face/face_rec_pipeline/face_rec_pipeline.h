@@ -5,11 +5,11 @@
 #pragma once
 
 
-#include "csrc/core/md_decl.h"
-#include "csrc/base_model.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/face/face_det/scrfd.h"
-#include "csrc/vision/face/face_rec/seetaface.h"
+#include "core/md_decl.h"
+#include "base_model.h"
+#include "vision/common/result.h"
+#include "vision/face/face_det/scrfd.h"
+#include "vision/face/face_rec/seetaface.h"
 
 namespace modeldeploy::vision::face {
     class MODELDEPLOY_CXX_EXPORT FaceRecognizerPipeline : public BaseModel {

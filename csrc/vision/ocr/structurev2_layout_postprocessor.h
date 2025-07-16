@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "csrc/vision/common/result.h"
-#include "csrc/core/tensor.h"
+#include "vision/common/result.h"
+#include "core/tensor.h"
 
 
 namespace modeldeploy::vision::ocr

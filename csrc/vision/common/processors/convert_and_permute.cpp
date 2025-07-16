@@ -4,7 +4,7 @@
 
 #include "convert_and_permute.h"
 
-#include <csrc/core/md_log.h>
+#include <core/md_log.h>
 
 namespace modeldeploy::vision {
     ConvertAndPermute::ConvertAndPermute(const std::vector<float>& alpha,

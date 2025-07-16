@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/lpr/lpr_det/lpr_det.h"
+#include "pybind/utils/utils.h"
+#include "vision/lpr/lpr_det/lpr_det.h"
 
 namespace modeldeploy::vision {
     void bind_lpr_det(const pybind11::module& m) {

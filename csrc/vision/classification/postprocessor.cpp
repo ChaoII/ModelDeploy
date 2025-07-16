@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/24.
 //
 
-#include "csrc/vision/utils.h"
-#include "csrc/vision/classification/postprocessor.h"
+#include "vision/utils.h"
+#include "vision/classification/postprocessor.h"
 
 namespace modeldeploy::vision::classification {
     UltralyticsClsPostprocessor::UltralyticsClsPostprocessor() {

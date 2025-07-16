@@ -3,9 +3,9 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/utils.h"
-#include "csrc/vision/face/face_rec/postprocessor.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/face/face_rec/postprocessor.h"
 
 
 namespace modeldeploy::vision::face {

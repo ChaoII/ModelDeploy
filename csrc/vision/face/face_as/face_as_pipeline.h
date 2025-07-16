@@ -3,11 +3,11 @@
 //
 #pragma once
 
-#include "csrc/base_model.h"
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/face/face_det/scrfd.h"
-#include "csrc/vision/face/face_as/face_as_first.h"
-#include "csrc/vision/face/face_as/face_as_second.h"
+#include "base_model.h"
+#include "core/md_decl.h"
+#include "vision/face/face_det/scrfd.h"
+#include "vision/face/face_as/face_as_first.h"
+#include "vision/face/face_as/face_as_second.h"
 
 namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.

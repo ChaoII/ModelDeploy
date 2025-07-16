@@ -5,7 +5,7 @@
 #include <array>
 #include <numeric>
 #include <vector>
-#include "csrc/vision/utils.h"
+#include "vision/utils.h"
 
 namespace modeldeploy::vision::utils {
     struct Point {

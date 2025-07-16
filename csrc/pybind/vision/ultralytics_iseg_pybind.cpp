@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/iseg/ultralytics_seg.h"
+#include "pybind/utils/utils.h"
+#include "vision/iseg/ultralytics_seg.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_iseg(const pybind11::module& m) {

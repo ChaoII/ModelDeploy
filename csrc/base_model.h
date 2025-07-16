@@ -6,10 +6,10 @@
 
 #include <string>
 #include <map>
-#include "csrc/utils/benchmark.h"
-#include "csrc/core/tensor.h"
-#include "csrc/core/md_decl.h"
-#include "csrc/runtime/runtime.h"
+#include "core/tensor.h"
+#include "core/md_decl.h"
+#include "runtime/runtime.h"
+#include "utils/benchmark.h"
 
 
 namespace modeldeploy {

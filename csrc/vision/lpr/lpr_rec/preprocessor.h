@@ -2,9 +2,9 @@
 // Created by aichao on 2025/2/20.
 //
 #pragma once
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/utils.h"
-#include "csrc/vision/common/struct.h"
+#include "core/md_decl.h"
+#include "vision/utils.h"
+#include "vision/common/struct.h"
 
 namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprRecPreprocessor {

@@ -2,8 +2,8 @@
 // Created by aichao on 2025/06/2.
 //
 #pragma once
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/utils.h"
+#include "core/md_decl.h"
+#include "vision/utils.h"
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPosePreprocessor {

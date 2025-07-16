@@ -3,8 +3,8 @@
 //
 
 #include <fstream>
-#include "csrc/audio/tts/utils.h"
-#include "csrc/utils/utils.h"
+#include "audio/tts/utils.h"
+#include "utils/utils.h"
 
 namespace modeldeploy::audio::tts {
     std::vector<float> load_vec(const std::string& fin) {

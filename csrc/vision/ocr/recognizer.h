@@ -4,10 +4,10 @@
 
 
 #pragma once
-#include "csrc/base_model.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/ocr/rec_preprocessor.h"
-#include "csrc/vision/ocr/rec_postprocessor.h"
+#include "base_model.h"
+#include "vision/common/result.h"
+#include "vision/ocr/rec_preprocessor.h"
+#include "vision/ocr/rec_postprocessor.h"
 
 namespace modeldeploy::vision::ocr {
     /*! @brief Recognizer object is used to load the recognition model provided by PaddleOCR.

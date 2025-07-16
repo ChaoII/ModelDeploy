@@ -2,11 +2,11 @@
 // Created by aichao on 2025/06/2.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/pose/preprocessor.h"
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/pad.h"
-#include "csrc/vision/common/processors/convert_and_permute.h"
+#include "core/md_log.h"
+#include "vision/pose/preprocessor.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsPosePreprocessor::UltralyticsPosePreprocessor() {

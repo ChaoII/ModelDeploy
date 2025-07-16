@@ -1,8 +1,8 @@
 //
 // Created by 84945 on 2025/6/2.
 //
-#include "csrc/core/md_log.h"
-#include "csrc/vision/common/visualize/visualize.h"
+#include "core/md_log.h"
+#include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
     struct PoseParams {

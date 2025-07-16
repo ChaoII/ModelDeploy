@@ -4,8 +4,8 @@
 
 #include <map>
 #include <utility>
-#include "csrc/vision/ocr/utils/clipper.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
+#include "vision/ocr/utils/clipper.h"
+#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 
 namespace modeldeploy::vision::ocr {

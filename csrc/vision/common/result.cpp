@@ -5,7 +5,7 @@
 #include <numeric>
 #include <iostream>
 #include "tabulate/tabulate.hpp"
-#include "csrc/vision/common/result.h"
+#include "vision/common/result.h"
 
 
 namespace modeldeploy::vision {

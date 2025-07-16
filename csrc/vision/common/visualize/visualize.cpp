@@ -3,7 +3,7 @@
 //
 
 #include <random>
-#include "csrc/vision/common/visualize/visualize.h"
+#include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
     cv::Scalar get_random_color() {

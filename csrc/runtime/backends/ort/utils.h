@@ -5,7 +5,7 @@
 #pragma once
 #include <string>
 #include <onnxruntime_cxx_api.h>
-#include "csrc/core/tensor.h"
+#include "core/tensor.h"
 
 namespace modeldeploy {
     ONNXTensorElementDataType get_ort_dtype(const DataType& dtype);

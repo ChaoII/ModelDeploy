@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "csrc/base_model.h"
-#include "csrc/vision/face/face_rec/postprocessor.h"
-#include "csrc/vision/face/face_rec/preprocessor.h"
+#include "base_model.h"
+#include "vision/face/face_rec/postprocessor.h"
+#include "vision/face/face_rec/preprocessor.h"
 
 
 namespace modeldeploy::vision::face

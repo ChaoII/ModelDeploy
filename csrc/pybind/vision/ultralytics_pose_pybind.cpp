@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/pose/ultralytics_pose.h"
+#include "pybind/utils/utils.h"
+#include "vision/pose/ultralytics_pose.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_pose(const pybind11::module& m) {

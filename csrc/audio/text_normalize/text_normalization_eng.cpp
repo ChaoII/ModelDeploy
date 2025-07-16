@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <sstream>
 
-#include "csrc/audio/text_normalize/text_normalization_eng.h"
+#include "audio/text_normalize/text_normalization_eng.h"
 
 
 namespace modeldeploy::audio {

@@ -2,7 +2,7 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     std::vector<int> xyxyxyxy2xyxy(const std::array<int, 8>& box) {

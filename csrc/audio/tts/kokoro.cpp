@@ -5,8 +5,9 @@
 #include <fstream>
 #include <regex>
 #include <memory>
-#include "csrc/audio/tts/kokoro.h"
-#include "csrc/audio/tts/utils.h"
+#include "audio/tts/kokoro.h"
+#include "audio/tts/utils.h"
+#include <tabulate/tabulate.hpp>
 
 namespace fs = std::filesystem;
 

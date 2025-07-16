@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
-#include "csrc/core/tensor.h"
+#include "core/tensor.h"
 
 
 namespace modeldeploy::vision {

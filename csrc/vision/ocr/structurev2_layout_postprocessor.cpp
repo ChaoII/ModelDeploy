@@ -2,10 +2,10 @@
 // Created by aichao on 2025/3/21.
 //
 
-#include "csrc/vision/ocr/structurev2_layout_postprocessor.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
-#include "csrc/vision/utils.h"
-#include "csrc/core/md_log.h"
+#include "vision/ocr/structurev2_layout_postprocessor.h"
+#include "vision/ocr/utils/ocr_utils.h"
+#include "vision/utils.h"
+#include "core/md_log.h"
 #include <numeric>
 
 

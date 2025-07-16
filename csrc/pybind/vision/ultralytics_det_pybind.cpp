@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/9.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/detection/ultralytics_det.h"
+#include "pybind/utils/utils.h"
+#include "vision/detection/ultralytics_det.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_det(const pybind11::module& m) {

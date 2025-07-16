@@ -1,11 +1,13 @@
 //
 // Created by aichao on 2025/3/24.
 //
-#include "csrc/vision/face/face_gender/preprocessor.h"
-#include <csrc/core/md_log.h>
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/hwc2chw.h"
-#include "csrc/vision/common/processors/cast.h"
+
+#include "vision/face/face_gender/preprocessor.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/hwc2chw.h"
+#include "vision/common/processors/cast.h"
 
 
 namespace modeldeploy::vision::face {

@@ -3,9 +3,9 @@
 //
 
 #pragma once
-#include "csrc/core/md_decl.h"
-#include "csrc/core/tensor.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
+#include "core/md_decl.h"
+#include "core/tensor.h"
+#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT DBDetectorPostprocessor {
