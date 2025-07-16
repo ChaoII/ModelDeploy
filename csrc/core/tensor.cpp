@@ -2,9 +2,12 @@
 #include <stdexcept>
 #include <cstring>
 #include <numeric>
+#include <sstream>
 #include <algorithm>
 #include <utility>
 #include <cmath>
+#include <iomanip>
+
 #include "md_log.h"
 
 namespace modeldeploy {
