@@ -31,7 +31,7 @@ namespace modeldeploy::vision {
     };
 
 
-    struct MODELDEPLOY_CXX_EXPORT Point2f {
+    struct Point2f {
         float x;
         float y;
 
@@ -57,7 +57,7 @@ namespace modeldeploy::vision {
     };
 
 
-    struct MODELDEPLOY_CXX_EXPORT Point3f {
+    struct Point3f {
         float x;
         float y;
         float z;
@@ -86,7 +86,7 @@ namespace modeldeploy::vision {
     };
 
 
-    struct MODELDEPLOY_CXX_EXPORT Rect2f {
+    struct Rect2f {
         float x;
         float y;
         float width;
@@ -117,7 +117,7 @@ namespace modeldeploy::vision {
         }
     };
 
-    struct MODELDEPLOY_CXX_EXPORT RotatedRect {
+    struct RotatedRect {
         float xc;
         float yc;
         float width;
