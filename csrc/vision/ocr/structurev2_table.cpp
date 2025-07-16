@@ -3,11 +3,11 @@
 //
 
 #include "opencv2/opencv.hpp"
-#include "csrc/vision/ocr/structurev2_table.h"
+#include "vision/ocr/structurev2_table.h"
 
-#include <csrc/core/md_log.h>
+#include <core/md_log.h>
 
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 
 namespace modeldeploy::vision::ocr {

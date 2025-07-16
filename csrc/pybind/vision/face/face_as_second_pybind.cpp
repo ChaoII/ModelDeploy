@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/face/face_as/face_as_second.h"
+#include "pybind/utils/utils.h"
+#include "vision/face/face_as/face_as_second.h"
 
 namespace modeldeploy::vision {
     void bind_face_as_second(const pybind11::module& m) {

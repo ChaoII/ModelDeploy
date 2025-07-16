@@ -8,10 +8,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "opencv2/opencv.hpp"
-#include "csrc/core/tensor.h"
+#include "core/tensor.h"
 #include <type_traits>
-#include <csrc/core/md_log.h>
-#include "csrc/vision/common/struct.h"
+#include <core/md_log.h>
+#include "vision/common/struct.h"
 
 
 namespace modeldeploy {

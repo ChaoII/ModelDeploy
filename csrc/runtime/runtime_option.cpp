@@ -2,8 +2,8 @@
 // Created by aichao on 2025/5/22.
 //
 
-#include "csrc/runtime/runtime_option.h"
-#include "csrc/utils/utils.h"
+#include "runtime/runtime_option.h"
+#include "utils/utils.h"
 
 
 namespace modeldeploy {

@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "csrc/core/tensor.h"
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
+#include "core/tensor.h"
+#include "core/md_decl.h"
+#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 
 namespace modeldeploy::vision::ocr {

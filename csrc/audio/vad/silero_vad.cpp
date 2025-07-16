@@ -2,9 +2,9 @@
 // Created by aichao on 2025/5/19.
 //
 
-#include "csrc/audio/vad/silero_vad.h"
+#include "audio/vad/silero_vad.h"
 #include <fstream>
-#include <csrc/utils/utils.h>
+#include <utils/utils.h>
 #include <kaldi-native-fbank/csrc/online-feature.h>
 
 namespace modeldeploy::audio::vad {

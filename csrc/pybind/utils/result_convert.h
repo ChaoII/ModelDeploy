@@ -4,8 +4,8 @@
 
 #pragma once
 #include <pybind11/pybind11.h>
-#include <csrc/vision/common/struct.h>
-#include <csrc/vision/common/result.h>
+#include <vision/common/struct.h>
+#include <vision/common/result.h>
 
 namespace modeldeploy::vision {
     Rect2f dict_to_rect2f(const pybind11::dict& box_dict);

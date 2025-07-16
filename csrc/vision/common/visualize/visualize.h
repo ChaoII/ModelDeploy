@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/common/result.h"
+#include "core/md_decl.h"
+#include "vision/common/result.h"
 
 namespace modeldeploy::vision {
     cv::Scalar get_random_color();

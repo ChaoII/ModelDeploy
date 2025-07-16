@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "csrc/audio/text_normalize/number.h"
+#include "audio/text_normalize/number.h"
 
 namespace modeldeploy::audio {
     std::unordered_map<std::wstring, std::wstring> measure_dict = {

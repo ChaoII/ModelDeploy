@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "csrc/core/md_decl.h"
-#include "csrc/vision/ocr/utils/ocr_postprocess_op.h"
-#include "csrc/core/tensor.h"
+#include "core/md_decl.h"
+#include "vision/ocr/utils/ocr_postprocess_op.h"
+#include "core/tensor.h"
 
 namespace modeldeploy::vision::ocr {
     /*! @brief Postprocessor object for Recognizer serials model.

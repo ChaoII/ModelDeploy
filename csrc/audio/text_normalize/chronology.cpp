@@ -5,8 +5,8 @@
 #include <regex>
 #include <string>
 #include <unordered_map>
-#include "csrc/audio/text_normalize/number.h"
-#include "csrc/audio/text_normalize/chronology.h"
+#include "audio/text_normalize/number.h"
+#include "audio/text_normalize/chronology.h"
 
 namespace modeldeploy::audio {
     // 时刻表达式 (使用宽字符 wregex)

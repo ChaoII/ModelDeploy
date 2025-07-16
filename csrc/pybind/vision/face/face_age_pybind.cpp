@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/face/face_age/seetaface_age.h"
+#include "pybind/utils/utils.h"
+#include "vision/face/face_age/seetaface_age.h"
 
 namespace modeldeploy::vision {
     void bind_face_age(const pybind11::module& m) {

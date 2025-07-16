@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/ocr/ppstructurev2_table.h"
+#include "pybind/utils/utils.h"
+#include "vision/ocr/ppstructurev2_table.h"
 
 namespace modeldeploy::vision {
     void bind_table_pipeline(const pybind11::module& m) {

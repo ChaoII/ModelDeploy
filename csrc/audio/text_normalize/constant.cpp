@@ -11,7 +11,7 @@
 #define NOCRYPT
 #endif
 
-#include "csrc/audio/text_normalize/constant.h"
+#include "audio/text_normalize/constant.h"
 
 namespace modeldeploy::audio {
     std::unordered_map<wchar_t, wchar_t> F2H_ASCII_LETTERS;

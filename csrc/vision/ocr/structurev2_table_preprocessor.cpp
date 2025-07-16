@@ -2,11 +2,10 @@
 // Created by aichao on 2025/3/21.
 //
 
-#include "csrc/vision/ocr/structurev2_table_preprocessor.h"
-
-#include <csrc/core/md_log.h>
-
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/structurev2_table_preprocessor.h"
 
 
 namespace modeldeploy::vision::ocr {

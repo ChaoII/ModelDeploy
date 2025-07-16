@@ -5,11 +5,11 @@
 #pragma once
 
 #include <vector>
-#include "csrc/base_model.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/ocr/structurev2_table.h"
-#include "csrc/vision/ocr/dbdetector.h"
-#include "csrc/vision/ocr/recognizer.h"
+#include "base_model.h"
+#include "vision/common/result.h"
+#include "vision/ocr/structurev2_table.h"
+#include "vision/ocr/dbdetector.h"
+#include "vision/ocr/recognizer.h"
 
 
 /** \brief This pipeline can launch detection model, classification model and recognition model sequentially. All OCR pipeline APIs are defined inside this namespace.

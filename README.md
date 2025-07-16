@@ -1,33 +1,105 @@
 #### 1.编译
 
-1. `release/v1.0`的audio部分使用了funasr sdk源码，具有2pass功能，但是相对不灵活，缺失tts模型之后引用了sherpa-onnx源码
-2. 从`release/v1.1` 开始人脸识别部分全部转换为onnxruntime推理，放弃了seetaface的tennis推理引擎 
-3. 从`release/v1.2` 为老版本的`md_tensor.h`的方案，其优势是灵活可以与不同硬件设备直接集成，但是编译速度很慢很慢，之后重构了tensor类，编译速度大大提升，库体积大小与重构前相当 
-4. 如果主干分支bug多，速度慢，请切换至`release/v1.2`分支
-
 ```bash
+# 拉取源码
 git clone https://github.com/ChaoII/ModelDeploy.git
-cmake -S . -B build -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_FACE=ON -DBUILD_CAPI=ON
-cmake --build build --config Release
+# 配置生成 如果是msvc 请打开x64 Native Tools Command Prompt for VS 2022 终端 为了加速编译最好使用Ninja生成器
+cmake -S . -B build -G Ninja -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=OFF -DBUILD_PYTHON=OFF -DENABLE_MNN=OFF -DENABLE_ORT=ON -DENABLE_TRT=OFF -DWITH_GPU=OFF -DCMAKE_INSTALL_PREFIX=install
+# 编译
+cmake --build build --config Release --parallel
+# 安装
+cmake --install build
 ```
 
-经过以上命令后会生成一个`ModelDeploySDK`动态库
-注意编译过程中的一些依赖在[百度网盘获取](https://pan.baidu.com/s/1HkutYev3GkKYTvn6NKmBFA?pwd=j5z7)
+**注意：**
 
-1. `OnnxRuntime`和`OpenCV`静态库均存在`MT`和`MD`版本，请配套使用，
-2. 在开启`-DBUILD_AUDIO`选项后，依赖很多第三方库，第三方库的源码在`audio_deps`文件夹下，将里面的所有压缩包放进项目的`$
-   {CMAKE_BINARY_DIR}`即可，会自动解压并依赖
-3. `msvc`项目默认为`MD`版本，当使用`MT`版本静态库时，需要在`CMakeLists.txt`中修改如下：
+1. `msvc`项目默认为`MD`版本，当使用`MT`版本静态库时，需要在`CMakeLists.txt`中修改如下：
+2. 安装完成后会自动将ModelDeploySDK的后端依赖拷贝到lib目录中，比如开启`ort`，`mnn` 就会将`MNN.dll`和`onnxruntime.dll`
+   拷贝进lib目录下
+3. `ModelDeploySDK`需要完整的`c++17`标准支持的编译器进行编译
+4. 对于使用`onnxruntime`后端`GPU`时，`windows`系统需要`windows10`、`windows11`、`windows server 2022` 及
+   `windows server 2025`，其它系统请自行测试
+5. `ModelDeploySDK`内置的`opencv`和`onnxruntime`静态库依赖是在`visual studio 2022` 和 `ubuntu 24.04`上编译，如果出现错误，请自行编译依赖
+6. `ModelDeploySDK` 全部是基于`64`位系统来的，`2025`年了不要再用`32`位系统了
 
-```CMakeLists.txt
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MT")
+#### 2.使用方法(以windows为例)
+
+编译并安装完成后会生成一个目录`install`, 包含一个`include`和`lib`子目录，其中`include`目录包含头文件，`lib`目录包含动态库和符号文件
+
+- 创建一个新cmake项目`test_modeldeploy`,`CMakeLists.txt`文件中添加modeldeploy的头文件路径和库文件路径
+
+```cmake
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+PROJECT(test_modeldeploy C CXX)
+# 注意modeldeploy需要完整的c++17标准支持
+set(CMAKE_CXX_STANDARD 17)
+# msvc中必须添加该编译选项
+if (MSVC)
+    add_compile_options(/utf-8)
+endif ()
+# 设置modeldeploy的头文件目录和库文件牡蛎
+set(MD_DIR "E:/CLionProjects/ModelDeploy/build/install")
+set(MD_INC_DIR "${MD_DIR}/include")
+set(MD_LIB_DIR "${MD_DIR}/lib")
+include_directories(${MD_INC_DIR})
+link_directories(${MD_LIB_DIR})
+# 设置opencv目录（注意本SDK未将opencv显示导出，需要自行指定本地的opencv目录）
+set(OpenCV_DIR "E:/develop/opencv5.x/x64/vc17/staticlib")
+find_package(OpenCV REQUIRED)
+# 添加可执行文件和依赖的库
+add_executable(test_modeldeploy ${PROJECT_SOURCE_DIR}/main.cpp)
+target_link_libraries(test_modeldeploy ModelDeploySDK ${OpenCV_LIBS})
 ```
 
-#### 2.使用混合精度推理
+- 创建一个main.cpp文件，并添加以下代码
+
+```c++
+#include "modeldeploy/vision.h"
+#include <opencv2/opencv.hpp>
+
+int main() {
+    modeldeploy::RuntimeOption option;
+    option.set_cpu_thread_num(10);
+    option.use_gpu();
+    option.use_trt_backend();
+    option.use_gpu(0);
+    option.enable_fp16 = true;
+    option.enable_trt = true;
+    option.ort_option.trt_engine_cache_path = "./trt_engine";
+    // 注意：trt后端需要提前准备trtexec生成的.engine文件，下方有讲onnx转trt engine的命令
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("./yolo11n_nms_dyn.engine",option);
+    auto img = cv::imread("./test_person.jpg");
+    std::vector<modeldeploy::vision::DetectionResult> result;
+    yolo11_det.get_preprocessor().set_size({320, 320});
+    int warming_up_count = 10;
+    for (int i = 0; i < warming_up_count; ++i) {
+        yolo11_det.predict(img, &result);
+    }
+    // 性能测试
+    TimerArray timers;
+    int loop_count = 100;
+    for (int i = 0; i < loop_count; ++i) {
+        yolo11_det.predict(img, &result, &timers);
+    }
+    timers.print_benchmark();
+    const auto vis_image =
+        modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,true);
+    cv::imshow("test", vis_image);
+    cv::waitKey(0);
+}
+```
+
+更多示例请查看[example](./examples)
+
+
+#### 3.OnnxRuntime使用混合精度推理
+
 将fp32模型转换为fp16模型，在输入输出插入cast算子，将fp32转换为fp16，然后将输出参数从fp16转化为fp32
+
 ```python
 import onnx
 from onnxconverter_common import float16
+
 # 加载原始 FP32 模型
 model = onnx.load("model_fp32.onnx")
 # 转为混合精度：内部节点为 float16，但输入/输出保持 float32
@@ -38,10 +110,14 @@ model_mixed = float16.convert_float_to_float16(
 # 保存新模型
 onnx.save(model_mixed, "model_mixed.onnx")
 ```
-#### 3.模型量化
+
+#### 4.OnnxRRuntime模型量化减小体积
+
 此处仅为减小模型体积，使用uint8动态量化
+
 ```python
 from onnxruntime.quantization import QuantType, quantize_dynamic
+
 # 模型路径
 model_fp32 = 'model_fp32.onnx'
 model_quant_dynamic = 'model_quant_dynamic.onnx'
@@ -57,7 +133,8 @@ quantize_dynamic(
 )
 ```
 
-#### 4.trt engine生成
+#### 5.trt engine生成
+
 ```bash
 trtexec --onnx=yolo11n_nms.onnx ^
         --saveEngine=yolo11n_nms_dyn.engine ^

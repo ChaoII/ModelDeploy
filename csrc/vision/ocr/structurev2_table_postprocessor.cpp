@@ -3,8 +3,8 @@
 //
 
 #include <fstream>
-#include "csrc/vision/ocr/structurev2_table_postprocessor.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/structurev2_table_postprocessor.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 
 namespace modeldeploy::vision::ocr {

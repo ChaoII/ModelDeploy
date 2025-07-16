@@ -2,9 +2,9 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/pybind/utils/result_convert.h"
-#include "csrc/vision/common/visualize/visualize.h"
+#include "pybind/utils/utils.h"
+#include "pybind/utils/result_convert.h"
+#include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
     void bind_vision_struct(const pybind11::module& m) {

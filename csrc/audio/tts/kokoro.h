@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "csrc/base_model.h"
+#include "base_model.h"
 #include "cppjieba/Jieba.hpp"
-#include "csrc/audio/text_normalize/text_normalization.h"
+#include "audio/text_normalize/text_normalization.h"
 
 
 namespace modeldeploy::audio::tts

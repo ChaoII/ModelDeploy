@@ -3,9 +3,9 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
-#include "csrc/vision/ocr/ppstructurev2_table.h"
+#include "core/md_log.h"
+#include "vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/ppstructurev2_table.h"
 
 namespace modeldeploy::vision::ocr {
     PPStructureV2Table::PPStructureV2Table(const std::string& det_model_file,

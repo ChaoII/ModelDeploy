@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "csrc/base_model.h"
-#include "csrc/vision/detection/preprocessor.h"
-#include "csrc/vision/detection/postprocessor.h"
+#include "base_model.h"
+#include "vision/detection/preprocessor.h"
+#include "vision/detection/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsDet : public BaseModel {

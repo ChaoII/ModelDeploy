@@ -2,10 +2,9 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "rec_postprocessor.h"
 #include <fstream>
-#include <csrc/core/md_log.h>
-
+#include "vision/ocr/rec_postprocessor.h"
+#include "core/md_log.h"
 #include "utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {

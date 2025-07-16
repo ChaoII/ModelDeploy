@@ -6,67 +6,32 @@
 
 #include <chrono>
 #include <vector>
-#include <array>
-#include "tabulate/tabulate.hpp"
+#include "core/md_decl.h"
 
 class Timer {
 public:
     using Clock = std::chrono::high_resolution_clock;
 
-    void start() {
-        start_time_ = Clock::now();
-    }
+    void start();
 
-    void stop() {
-        end_time_ = Clock::now();
-        durations_.push_back(std::chrono::duration<double, std::milli>(end_time_ - start_time_).count());
-    }
+    void stop();
 
-    [[nodiscard]] double average_ms() const {
-        if (durations_.empty()) return 0.0;
-        double sum = 0.0;
-        for (const double d : durations_) sum += d;
-        return sum / durations_.size();
-    }
+    [[nodiscard]] double average_ms() const;
 
-    void push_back(const double duration) {
-        durations_.push_back(duration);
-    }
+    void push_back(const double duration);
 
-    void reset() {
-        durations_.clear();
-    }
+    void reset();
 
-    void print(const std::string& tag) const {
-        std::cout << termcolor::cyan << tag << ": avg = " << average_ms() << " ms" << termcolor::reset << std::endl;
-    }
+    void print(const std::string& tag) const;
 
-    void set_durations(const std::vector<double>& durations) {
-        durations_ = durations;
-    }
+    void set_durations(const std::vector<double>& durations);
 
-    [[nodiscard]] std::vector<double> get_durations() const {
-        return durations_;
-    }
+    [[nodiscard]] std::vector<double> get_durations() const;
 
 
-    Timer operator+(const Timer& other) const {
-        Timer result;
-        const size_t n = std::min(durations_.size(), other.durations_.size());
-        result.durations_.reserve(n);
-        for (size_t i = 0; i < n; ++i) {
-            result.durations_.push_back(durations_[i] + other.durations_[i]);
-        }
-        return result;
-    }
+    Timer operator+(const Timer& other) const;
 
-    Timer& operator+=(const Timer& other) {
-        const size_t n = std::min(durations_.size(), other.durations_.size());
-        for (size_t i = 0; i < n; ++i) {
-            durations_[i] += other.durations_[i];
-        }
-        return *this;
-    }
+    Timer& operator+=(const Timer& other);
 
 private:
     Clock::time_point start_time_;
@@ -74,43 +39,19 @@ private:
     std::vector<double> durations_;
 };
 
-struct TimerArray {
+struct MODELDEPLOY_CXX_EXPORT TimerArray {
     Timer pre_timer;
     Timer infer_timer;
     Timer post_timer;
 
-    [[nodiscard]] double total_ms() const {
-        return pre_timer.average_ms() + infer_timer.average_ms() + post_timer.average_ms();
-    }
+    [[nodiscard]] double total_ms() const;
 
-    TimerArray operator+(const TimerArray& other) const {
-        return TimerArray{
-            pre_timer + other.pre_timer,
-            infer_timer + other.infer_timer,
-            post_timer + other.post_timer
-        };
-    }
+    TimerArray operator+(const TimerArray& other) const;
 
     // 重载 +=
-    TimerArray& operator+=(const TimerArray& other) {
-        pre_timer += other.pre_timer;
-        infer_timer += other.infer_timer;
-        post_timer += other.post_timer;
-        return *this;
-    }
+    TimerArray& operator+=(const TimerArray& other);
 
+    void reset();
 
-    void reset() {
-        pre_timer.reset();
-        infer_timer.reset();
-        post_timer.reset();
-    }
-
-    void print_benchmark() const {
-        pre_timer.print("[Preprocess ]");
-        infer_timer.print("[Inference  ]");
-        post_timer.print("[Postprocess]");
-        std::cout << termcolor::magenta << "[Total      ]" << ": avg = "
-            << total_ms() << " ms" << termcolor::reset << std::endl;
-    }
+    void print_benchmark() const;
 };

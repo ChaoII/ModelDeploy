@@ -4,7 +4,7 @@
 
 // 如果不加这个头文件，那么std::vector<T> 不会自动转换成python的list
 #include <pybind11/stl.h>
-#include "csrc/pybind/utils/result_convert.h"
+#include "pybind/utils/result_convert.h"
 
 namespace modeldeploy::vision {
     Rect2f dict_to_rect2f(const pybind11::dict& box_dict) {

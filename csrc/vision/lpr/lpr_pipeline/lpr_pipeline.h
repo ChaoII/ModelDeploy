@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "csrc/core/md_decl.h"
-#include "csrc/base_model.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/lpr/lpr_det/lpr_det.h"
-#include "csrc/vision/lpr/lpr_rec/lpr_rec.h"
+#include "core/md_decl.h"
+#include "base_model.h"
+#include "vision/common/result.h"
+#include "vision/lpr/lpr_det/lpr_det.h"
+#include "vision/lpr/lpr_rec/lpr_rec.h"
 
 namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprPipeline : public BaseModel {

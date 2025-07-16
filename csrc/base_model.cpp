@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "csrc/base_model.h"
-#include "csrc/core/md_log.h"
+#include "base_model.h"
+#include "core/md_log.h"
 
 namespace modeldeploy {
     bool BaseModel::init_runtime() {

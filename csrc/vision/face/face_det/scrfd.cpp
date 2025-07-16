@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/face/face_det/scrfd.h"
+#include "core/md_log.h"
+#include "vision/face/face_det/scrfd.h"
 
 #include <chrono>
 

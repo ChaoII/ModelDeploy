@@ -3,10 +3,10 @@
 //
 
 #pragma once
-#include "csrc/base_model.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/ocr/det_postprocessor.h"
-#include "csrc/vision/ocr/det_preprocessor.h"
+#include "base_model.h"
+#include "vision/common/result.h"
+#include "vision/ocr/det_postprocessor.h"
+#include "vision/ocr/det_preprocessor.h"
 
 
 namespace modeldeploy::vision::ocr {

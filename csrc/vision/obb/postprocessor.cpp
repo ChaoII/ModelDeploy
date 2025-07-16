@@ -3,11 +3,11 @@
 //
 
 #include <numeric>
-#include "csrc/core/md_log.h"
-#include "csrc/vision/utils.h"
-#include "csrc/vision/obb/postprocessor.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/obb/postprocessor.h"
 
-#include <csrc/utils/utils.h>
+#include <utils/utils.h>
 
 namespace modeldeploy::vision::detection {
     UltralyticsObbPostprocessor::UltralyticsObbPostprocessor() {

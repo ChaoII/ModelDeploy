@@ -2,13 +2,10 @@
 // Created by aichao on 2025/2/21.
 //
 
-
-#include "rec_preprocessor.h"
-
-#include <csrc/core/md_log.h>
-
-
-#include "./utils/ocr_utils.h"
+#include "core/md_log.h"
+#include "vision/utils.h"
+#include "vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/rec_preprocessor.h"
 
 namespace modeldeploy::vision::ocr {
     RecognizerPreprocessor::RecognizerPreprocessor() {

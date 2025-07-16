@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "csrc/core/tensor.h"
-#include "csrc/runtime/runtime_option.h"
-#include "csrc/runtime/backends/backend.h"
+#include "core/tensor.h"
+#include "runtime/runtime_option.h"
+#include "runtime/backends/backend.h"
 
 namespace modeldeploy {
     struct MODELDEPLOY_CXX_EXPORT Runtime {

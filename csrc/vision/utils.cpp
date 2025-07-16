@@ -4,10 +4,10 @@
 
 
 #include <execution>
-#include "csrc/vision/utils.h"
-#include "csrc//vision/common/processors/pad.h"
-#include "csrc//vision/common/processors/resize.h"
-#include "csrc/core/md_log.h"
+#include "vision/utils.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/resize.h"
+#include "core/md_log.h"
 
 namespace modeldeploy::vision::utils {
     DataType cv_dtype_to_md_dtype(int type) {

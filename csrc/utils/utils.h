@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <vector>
 #include <iterator>
-#include "csrc/core/md_log.h"
+#include "core/md_log.h"
 
 namespace modeldeploy {
     ///

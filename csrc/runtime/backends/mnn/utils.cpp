@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/19.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/runtime/backends/mnn/utils.h"
+#include "core/md_log.h"
+#include "runtime/backends/mnn/utils.h"
 
 #include <unordered_map>
 

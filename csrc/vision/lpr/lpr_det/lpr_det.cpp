@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/lpr/lpr_det/lpr_det.h"
+#include "core/md_log.h"
+#include "vision/lpr/lpr_det/lpr_det.h"
 
 
 namespace modeldeploy::vision::lpr {

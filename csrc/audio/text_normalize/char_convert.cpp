@@ -15,8 +15,8 @@
 #define NOCRYPT
 #include <windows.h>
 #endif
-#include "csrc/audio/text_normalize/char_convert.h"
-#include "csrc/core/md_log.h"
+#include "audio/text_normalize/char_convert.h"
+#include "core/md_log.h"
 
 namespace modeldeploy::audio {
     std::unordered_map<wchar_t, wchar_t> s2t_dict;

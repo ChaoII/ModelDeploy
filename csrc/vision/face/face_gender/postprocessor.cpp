@@ -2,8 +2,8 @@
 // Created by aichao on 2025/3/24.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/face/face_gender/postprocessor.h"
+#include "core/md_log.h"
+#include "vision/face/face_gender/postprocessor.h"
 
 namespace modeldeploy::vision::face {
     bool SeetaFaceGenderPostprocessor::run(const std::vector<Tensor>& infer_result, std::vector<int>* genders) const {

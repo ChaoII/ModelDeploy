@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/face/face_as/face_as_pipeline.h"
+#include "pybind/utils/utils.h"
+#include "vision/face/face_as/face_as_pipeline.h"
 
 namespace modeldeploy::vision {
     void bind_as_pipeline(const pybind11::module& m) {

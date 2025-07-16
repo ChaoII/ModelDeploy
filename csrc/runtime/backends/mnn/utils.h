@@ -5,7 +5,7 @@
 #pragma once
 #include <string>
 #include <MNN/Interpreter.hpp>
-#include "csrc/core/tensor.h"
+#include "core/tensor.h"
 
 namespace modeldeploy {
     halide_type_t md_dtype_to_mnn_dtype(const DataType& dtype);

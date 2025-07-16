@@ -5,10 +5,10 @@
 #include <vector>
 #include <map>
 #include <memory>
-#include "csrc/utils/utils.h"
-#include "csrc/core/tensor.h"
-#include "csrc/core/md_log.h"
-#include "csrc/runtime/runtime_option.h"
+#include "utils/utils.h"
+#include "core/tensor.h"
+#include "core/md_log.h"
+#include "runtime/runtime_option.h"
 
 namespace modeldeploy {
     struct TensorInfo {

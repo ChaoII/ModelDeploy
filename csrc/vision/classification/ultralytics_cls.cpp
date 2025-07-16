@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/classification/ultralytics_cls.h"
+#include "core/md_log.h"
+#include "vision/classification/ultralytics_cls.h"
 
 
 namespace modeldeploy::vision::classification {

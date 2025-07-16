@@ -3,9 +3,9 @@
 //
 
 #pragma once
-#include "csrc/core/tensor.h"
-#include "csrc/vision/common/result.h"
-#include "csrc/vision/common/struct.h"
+#include "core/tensor.h"
+#include "vision/common/result.h"
+#include "vision/common/struct.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Preprocessor object for YOLOv5Seg serials model.

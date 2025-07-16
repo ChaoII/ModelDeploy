@@ -2,8 +2,8 @@
 // Created by aichao on 2025/5/30.
 //
 #pragma once
-#include "csrc/core/tensor.h"
-#include "csrc/vision/common/result.h"
+#include "core/tensor.h"
+#include "vision/common/result.h"
 
 namespace modeldeploy::vision::detection {
     /*! @brief Postprocessor object for YOLOv8OBB serials model.

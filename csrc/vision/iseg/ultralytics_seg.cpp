@@ -2,8 +2,8 @@
 // Created by aichao on 2025/4/14.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/iseg/ultralytics_seg.h"
+#include "core/md_log.h"
+#include "vision/iseg/ultralytics_seg.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsSeg::UltralyticsSeg(const std::string& model_file,

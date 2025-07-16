@@ -48,7 +48,9 @@ if (MSVC)
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
     endif ()
 endif ()
+
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/csrc)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
 
@@ -120,6 +122,10 @@ endif ()
 add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
 set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
+if (MSVC)
+    target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
+endif ()
+
 
 if (BUILD_PYTHON)
     find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
@@ -143,7 +149,6 @@ if (BUILD_PYTHON)
     install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
 endif ()
 
-
 if (BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
@@ -152,5 +157,27 @@ if (BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif ()
+
+
+include(GNUInstallDirs)
+
+# 安装头文件（递归所有 .h）
+install(DIRECTORY csrc/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/modeldeploy
+        FILES_MATCHING PATTERN "*.h")
+
+# 安装库文件（例如 libModelDeploySDK.so / .a / .dll）
+install(TARGETS ModelDeploySDK
+        EXPORT ModelDeploySDKTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+file(GLOB THIRD_LIBS
+        "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dll"
+        "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.so"
+        "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dylib"
+)
+install(FILES ${THIRD_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 

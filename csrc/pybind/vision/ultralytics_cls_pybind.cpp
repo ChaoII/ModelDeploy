@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/classification/ultralytics_cls.h"
+#include "pybind/utils/utils.h"
+#include "vision/classification/ultralytics_cls.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_cls(const pybind11::module& m) {

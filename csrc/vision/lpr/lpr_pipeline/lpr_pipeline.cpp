@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
+#include "core/md_log.h"
+#include "vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
 namespace modeldeploy::vision::lpr {
     LprPipeline::LprPipeline(const std::string& det_model_path,

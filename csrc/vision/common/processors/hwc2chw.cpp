@@ -5,7 +5,7 @@
 
 #include "hwc2chw.h"
 
-#include "csrc/vision/utils.h"
+#include "vision/utils.h"
 
 namespace modeldeploy::vision {
     bool HWC2CHW::impl(cv::Mat* im) {

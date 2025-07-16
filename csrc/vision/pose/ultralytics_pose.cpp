@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/pose/ultralytics_pose.h"
+#include "core/md_log.h"
+#include "vision/pose/ultralytics_pose.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsPose::UltralyticsPose(const std::string& model_file, const RuntimeOption& custom_option) {

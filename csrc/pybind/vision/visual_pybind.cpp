@@ -3,8 +3,8 @@
 //
 
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/common/visualize/visualize.h"
+#include "pybind/utils/utils.h"
+#include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
     void bind_visualize(pybind11::module& m) {

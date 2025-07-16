@@ -14,14 +14,14 @@
 #    define NOCRYPT
 #endif
 
-#include "csrc/core/md_log.h"
-#include "csrc/audio/text_normalize/char_convert.h"
-#include "csrc/audio/text_normalize/chronology.h"
-#include "csrc/audio/text_normalize/constant.h"
-#include "csrc/audio/text_normalize/number.h"
-#include "csrc/audio/text_normalize/phonecode.h"
-#include "csrc/audio/text_normalize/quantifier.h"
-#include "csrc/audio/text_normalize/text_normalization.h"
+#include "core/md_log.h"
+#include "audio/text_normalize/char_convert.h"
+#include "audio/text_normalize/chronology.h"
+#include "audio/text_normalize/constant.h"
+#include "audio/text_normalize/number.h"
+#include "audio/text_normalize/phonecode.h"
+#include "audio/text_normalize/quantifier.h"
+#include "audio/text_normalize/text_normalization.h"
 
 
 namespace modeldeploy::audio {

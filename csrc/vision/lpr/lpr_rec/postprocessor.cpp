@@ -2,9 +2,9 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/utils/utils.h"
-#include "csrc/core/md_log.h"
-#include "csrc/vision/lpr/lpr_rec/postprocessor.h"
+#include "utils/utils.h"
+#include "core/md_log.h"
+#include "vision/lpr/lpr_rec/postprocessor.h"
 
 namespace modeldeploy::vision::lpr {
     bool LprRecPostprocessor::run(

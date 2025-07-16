@@ -2,8 +2,8 @@
 // Created by aichao on 2025/2/19.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/runtime/backends/ort/utils.h"
+#include "core/md_log.h"
+#include "runtime/backends/ort/utils.h"
 
 #include <map>
 

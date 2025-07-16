@@ -3,9 +3,9 @@
 //
 
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
-#include "csrc/vision/ocr/structurev2_layout.h"
+#include "core/md_log.h"
+#include "vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/structurev2_layout.h"
 
 
 namespace modeldeploy::vision::ocr {

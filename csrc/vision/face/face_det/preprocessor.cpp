@@ -2,17 +2,17 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/face/face_det/preprocessor.h"
+#include "core/md_log.h"
+#include "vision/face/face_det/preprocessor.h"
 
-#include <csrc/vision/common/processors/cast.h>
-#include <csrc/vision/common/processors/color_space_convert.h>
-#include <csrc/vision/common/processors/convert.h>
-#include <csrc/vision/common/processors/hwc2chw.h>
+#include <vision/common/processors/cast.h>
+#include <vision/common/processors/color_space_convert.h>
+#include <vision/common/processors/convert.h>
+#include <vision/common/processors/hwc2chw.h>
 
-#include "csrc/vision/common/processors/resize.h"
-#include "csrc/vision/common/processors/pad.h"
-#include "csrc/vision/common/processors/convert_and_permute.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::face {
     ScrfdPreprocessor::ScrfdPreprocessor() {

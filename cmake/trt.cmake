@@ -41,7 +41,7 @@ elseif (APPLE)
 else ()
     file(GLOB TRT_SHARED_LIBS "${TRT_LIB_DIR}/*.so" "${TRT_LIB_DIR}/*.so.*")
 endif ()
-file(COPY ${TRT_SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
+#file(COPY ${TRT_SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
 
 

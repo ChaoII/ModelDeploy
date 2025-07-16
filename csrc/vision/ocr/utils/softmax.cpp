@@ -2,7 +2,7 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     static float fast_exp(const float x) {

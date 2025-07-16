@@ -2,9 +2,9 @@
 // Created by aichao on 2025/2/21.
 //
 
-#include "csrc/core/md_log.h"
-#include "csrc/vision/ocr/classifier.h"
-#include "csrc/vision/ocr/utils/ocr_utils.h"
+#include "core/md_log.h"
+#include "vision/ocr/classifier.h"
+#include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
     Classifier::Classifier() = default;

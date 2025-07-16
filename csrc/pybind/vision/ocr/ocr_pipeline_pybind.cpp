@@ -2,8 +2,8 @@
 // Created by aichao on 2025/6/10.
 //
 
-#include "csrc/pybind/utils/utils.h"
-#include "csrc/vision/ocr/ppocr.h"
+#include "pybind/utils/utils.h"
+#include "vision/ocr/ppocr.h"
 
 namespace modeldeploy::vision {
     void bind_ocr_pipeline(const pybind11::module& m) {
