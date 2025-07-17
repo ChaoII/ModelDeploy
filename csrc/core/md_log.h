@@ -43,7 +43,6 @@ namespace modeldeploy {
             }
             return *this;
         }
-
         LogStreamWrapper& operator<<(std::ostream&(*manip)(std::ostream&));
 
     private:

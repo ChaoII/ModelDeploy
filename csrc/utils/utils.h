@@ -91,6 +91,7 @@ namespace modeldeploy {
         return oss.str();
     }
 
+
     template <typename T>
     std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
         out << vector_to_string(vec);
@@ -99,11 +100,10 @@ namespace modeldeploy {
 
 
     std::vector<unsigned char> base64_decode(const std::string& base64_str);
-    
+
     // Base64编码函数
     std::string base64_encode(const std::vector<unsigned char>& data);
     std::string base64_encode(const std::string& data);
-
 
 
     int argmax(const std::vector<float>& vec);

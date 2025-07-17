@@ -3,11 +3,9 @@
 //
 
 #include <algorithm>
+#include <filesystem>
 #include "utils/utils.h"
 #include "runtime/runtime_option.h"
-
-#include <filesystem>
-
 #include "encryption/encryption.h"
 
 
@@ -108,10 +106,10 @@ namespace modeldeploy {
     }
 
     void RuntimeOption::set_ort_graph_opt_level(const int level) {
-        const std::vector supported_level{-1, 0, 1, 2};
+        const std::vector<int> supported_level{-1, 0, 1, 2};
         if (std::find(supported_level.begin(), supported_level.end(), level) == supported_level.end()) {
             MD_LOG_ERROR << "Invalid graph optimization level: " << level << ", supported levels are: "
-                << supported_level << std::endl;
+                << vector_to_string(supported_level) << std::endl;
         }
         ort_option.graph_optimization_level = level;
     }
