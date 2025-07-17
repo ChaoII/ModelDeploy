@@ -11,9 +11,6 @@
 #include "tabulate/tabulate.hpp"
 
 
-
-
-
 namespace modeldeploy {
     LogStreamWrapper& LogStreamWrapper::operator<<(std::ostream&(*manip)(std::ostream&)) {
         if (!is_null_) {
