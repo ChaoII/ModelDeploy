@@ -75,7 +75,8 @@ namespace modeldeploy {
 
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")
             .def(pybind11::init())
-            .def("set_model_path", &RuntimeOption::set_model_path, pybind11::arg("model_path"))
+            .def("set_model_path", &RuntimeOption::set_model_path, pybind11::arg("model_path"),
+                 pybind11::arg("password") = "")
             .def("use_gpu", &RuntimeOption::use_gpu, pybind11::arg("device_id") = 0)
             .def("use_cpu", &RuntimeOption::use_cpu)
             .def("set_ort_graph_opt_level", &RuntimeOption::set_ort_graph_opt_level, pybind11::arg("level") = -1)

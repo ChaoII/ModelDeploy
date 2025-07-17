@@ -12,7 +12,7 @@
 
 namespace modeldeploy {
     struct MODELDEPLOY_CXX_EXPORT RuntimeOption {
-        void set_model_path(const std::string& model_path);
+        void set_model_path(const std::string& model_path, const std::string& password = "");
 
         void use_cpu();
 
@@ -43,6 +43,7 @@ namespace modeldeploy {
 
         TrtBackendOption trt_option;
 
+        std::string password;
         bool enable_fp16 = false;
         int cpu_thread_num = -1;
         int device_id = -1;

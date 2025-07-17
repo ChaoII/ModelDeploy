@@ -12,13 +12,13 @@
 namespace fs = std::filesystem;
 
 namespace modeldeploy::audio::tts {
-    Kokoro::Kokoro(const std::string& model_file_path, const std::string& token_path_str,
+    Kokoro::Kokoro(const std::string& model_file, const std::string& token_path_str,
                    const std::vector<std::string>& lexicons, const std::string& voices_bin,
                    const std::string& jieba_dir,
                    const std::string& text_normalization_dir,
                    const RuntimeOption& custom_option) {
         runtime_option = custom_option;
-        runtime_option.model_file = model_file_path;
+        runtime_option.set_model_path(model_file);
         token_path_str_ = token_path_str;
         lexicons_ = lexicons;
         voices_bin_ = voices_bin;

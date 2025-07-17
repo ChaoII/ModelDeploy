@@ -15,7 +15,7 @@ namespace modeldeploy::vision::face {
     SeetaFaceAsFirst::SeetaFaceAsFirst(const std::string& model_file,
                                        const RuntimeOption& custom_option) {
         runtime_option = custom_option;
-        runtime_option.model_file = model_file;
+        runtime_option.set_model_path(model_file);
         initialized_ = Initialize();
     }
 
