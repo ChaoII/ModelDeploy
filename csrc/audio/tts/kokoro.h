@@ -13,7 +13,7 @@ namespace modeldeploy::audio::tts
 {
     class MODELDEPLOY_CXX_EXPORT Kokoro : public BaseModel {
     public:
-        Kokoro(const std::string& model_file_path, const std::string& token_path_str,
+        Kokoro(const std::string& model_file, const std::string& token_path_str,
                const std::vector<std::string>& lexicons, const std::string& voices_bin,
                const std::string& jieba_dir,
                const std::string& text_normalization_dir,

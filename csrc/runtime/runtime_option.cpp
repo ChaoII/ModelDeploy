@@ -3,13 +3,60 @@
 //
 
 #include <algorithm>
-#include "runtime/runtime_option.h"
 #include "utils/utils.h"
+#include "runtime/runtime_option.h"
+
+#include <filesystem>
+
+#include "encryption/encryption.h"
 
 
 namespace modeldeploy {
-    void RuntimeOption::set_model_path(const std::string& model_path) {
-        model_file = model_path;
+    void RuntimeOption::set_model_path(const std::string& model_path, const std::string& password) {
+        if (is_encrypted_model_file(model_path)) {
+            std::string buffer, format;
+            auto decrypt_password = password;
+            if (password.empty()) {
+                decrypt_password = this->password;
+            }
+            if (!read_encrypted_model_to_buffer(model_path, decrypt_password, &buffer, &format)) {
+                MD_LOG_FATAL << "decrypt model failed" << std::endl;
+            }
+            model_from_memory = true;
+            model_buffer = buffer;
+            // 你可以根据format自动切换后端
+            if (format == "onnx") {
+                use_ort_backend();
+            }
+            else if (format == "mnn") {
+                use_mnn_backend();
+            }
+            else if (format == "engine") {
+                use_trt_backend();
+            }
+            else {
+                MD_LOG_FATAL << "model format error" << std::endl;
+            }
+        }
+        else {
+            const std::filesystem::path path(model_path);
+            if (path.has_extension()) {
+                if (path.extension() == ".onnx") {
+                    use_ort_backend();
+                }
+                else if (path.extension() == ".mnn") {
+                    use_mnn_backend();
+                }
+                else if (path.extension() == ".engine") {
+                    use_trt_backend();
+                }
+                else {
+                    MD_LOG_FATAL << "model format error" << std::endl;
+                }
+            }
+            model_file = model_path;
+            model_from_memory = false;
+        }
     }
 
 
@@ -64,7 +111,7 @@ namespace modeldeploy {
         const std::vector supported_level{-1, 0, 1, 2};
         if (std::find(supported_level.begin(), supported_level.end(), level) == supported_level.end()) {
             MD_LOG_ERROR << "Invalid graph optimization level: " << level << ", supported levels are: "
-                << vector_to_string(supported_level) << std::endl;
+                << supported_level << std::endl;
         }
         ort_option.graph_optimization_level = level;
     }

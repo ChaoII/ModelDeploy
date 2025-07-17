@@ -14,7 +14,7 @@ namespace modeldeploy::audio::asr {
                            const std::string& token_path_str,
                            const RuntimeOption& custom_option) {
         runtime_option = custom_option;
-        runtime_option.model_file = model_file;
+        runtime_option.set_model_path(model_file);
         token_path_str_ = token_path_str;
         initialized_ = initialize();
     }

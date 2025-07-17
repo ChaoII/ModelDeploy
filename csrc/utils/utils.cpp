@@ -133,6 +133,55 @@ namespace modeldeploy {
         return ret;
     }
 
+    // Base64实现
+    std::string base64_encode(const std::vector<unsigned char>& data) {
+        const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string ret;
+        int in_len = static_cast<int>(data.size());
+        int i = 0;
+        int j = 0;
+        unsigned char char_array_3[3];
+        unsigned char char_array_4[4];
+        while (in_len--) {
+            char_array_3[i++] = data[j++];
+            if (i == 3) {
+                char_array_4[0] = (char_array_3[0] << 2) + ((char_array_3[1] & 0x30) >> 4);
+                char_array_4[1] = ((char_array_3[1] & 0xf) << 4) + ((char_array_3[2] & 0x3c) >> 2);
+                char_array_4[2] = ((char_array_3[2] & 0x3) << 6) + char_array_4[3];
+
+                for (i = 0; i < 4; i++) {
+                    ret += base64_chars[char_array_4[i]];
+                }
+                i = 0;
+            }
+        }
+
+        if (i) {
+            for (j = i; j < 3; j++) {
+                char_array_3[j] = 0;
+            }
+            char_array_4[0] = (char_array_3[0] << 2) + ((char_array_3[1] & 0x30) >> 4);
+            char_array_4[1] = ((char_array_3[1] & 0xf) << 4) + ((char_array_3[2] & 0x3c) >> 2);
+            char_array_4[2] = ((char_array_3[2] & 0x3) << 6) + char_array_4[3];
+
+            for (j = 0; j < i + 1; j++) {
+                ret += base64_chars[char_array_4[j]];
+            }
+
+            while ((i++ < 3)) {
+                ret += '=';
+            }
+        }
+
+        return ret;
+    }
+
+    std::string base64_encode(const std::string& data) {
+        std::vector<unsigned char> vec(data.begin(), data.end());
+        return base64_encode(vec);
+    }
+
+
     int argmax(const std::vector<float>& vec) {
         if (vec.empty()) {
             MD_LOG_ERROR << "Vector is empty." << std::endl;

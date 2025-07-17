@@ -38,14 +38,8 @@ namespace modeldeploy {
         return true;
     }
 
-    bool TrtBackendImpl::load_trt_cache(const std::string& trt_engine_file) {
+    bool TrtBackendImpl::load_trt_cache(const std::string& engine_buffer) {
         cudaSetDevice(option_.gpu_id);
-
-        std::string engine_buffer;
-        if (!read_binary_from_file(trt_engine_file, &engine_buffer)) {
-            MD_LOG_ERROR << "Failed to load TensorRT Engine from " << trt_engine_file << "." << std::endl;
-            return false;
-        }
 
         const std::unique_ptr<nvinfer1::IRuntime> runtime{
             nvinfer1::createInferRuntime(*MDTrtLogger::get())
@@ -76,7 +70,7 @@ namespace modeldeploy {
             auto max = dims_to_vec(engine_->getProfileShape(
                 name, 0, nvinfer1::OptProfileSelector::kMIN));
         }
-        MD_LOG_INFO << "Build TensorRT Engine from cache file: " << trt_engine_file
+        MD_LOG_INFO << "Build TensorRT Engine from cache"
             << " with shape range information as below," << std::endl;
         for (const auto& item : shape_range_info_) {
             MD_LOG_INFO << item.second << std::endl;
@@ -96,7 +90,7 @@ namespace modeldeploy {
         }
 
         if (option.model_from_memory) {
-            return init_from_onnx(option.model_buffer);
+            return load_trt_cache(option.model_buffer);
         }
         if (!std::filesystem::exists(option.model_file)) {
             MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;
@@ -131,7 +125,7 @@ namespace modeldeploy {
         }
         // if (!trt_option.cache_file_path.empty())
         //     return load_trt_cache(trt_option.cache_file_path);
-        return load_trt_cache(trt_option.model_file);
+        return load_trt_cache(model_buffer_);
     }
 
 

@@ -67,7 +67,7 @@ namespace modeldeploy {
 
         void get_input_output_info();
         bool create_trt_engine_from_onnx(const std::string& onnx_model_buffer);
-        bool load_trt_cache(const std::string& trt_engine_file);
+        bool load_trt_cache(const std::string& engine_buffer);
         int shape_range_info_updated(const std::vector<Tensor>& inputs);
     };
 } // namespace modeldeploy
