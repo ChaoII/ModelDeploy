@@ -64,12 +64,7 @@ namespace modeldeploy::vision::ocr {
     [[maybe_unused]] int PPStructureV2Table::get_rec_batch_size() const { return rec_batch_size_; }
 
 
-    bool PPStructureV2Table::predict(cv::Mat* image,
-                                     modeldeploy::vision::OCRResult* result) {
-        return predict(*image, result);
-    }
-
-    bool PPStructureV2Table::predict(const cv::Mat& image,
+    bool PPStructureV2Table::predict(const ImageData& image,
                                      modeldeploy::vision::OCRResult* result) {
         std::vector<modeldeploy::vision::OCRResult> batch_result(1);
         const bool success = batch_predict({image}, &batch_result);
@@ -81,7 +76,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool PPStructureV2Table::batch_predict(
-        const std::vector<cv::Mat>& images,
+        const std::vector<ImageData>& images,
         std::vector<modeldeploy::vision::OCRResult>* batch_result) {
         batch_result->clear();
         batch_result->resize(images.size());
@@ -101,15 +96,18 @@ namespace modeldeploy::vision::ocr {
             modeldeploy::vision::OCRResult& ocr_result = (*batch_result)[i_batch];
             // Get croped images by detection result
             const std::vector<std::array<int, 8>>& boxes = ocr_result.boxes;
-            const cv::Mat& img = images[i_batch];
-            std::vector<cv::Mat> image_list;
+            const ImageData& img = images[i_batch];
+            std::vector<ImageData> image_list;
             if (boxes.empty()) {
                 image_list.emplace_back(img);
             }
             else {
                 image_list.resize(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
-                    image_list[i_box] = vision::ocr::get_rotate_crop_image(img, boxes[i_box]);
+                    cv::Mat _cv_image;
+                    img.to_mat(&_cv_image);
+                    auto crop_image = get_rotate_crop_image(_cv_image, boxes[i_box]);
+                    image_list[i_box] = ImageData::from_mat(&crop_image);
                 }
             }
 
@@ -119,7 +117,7 @@ namespace modeldeploy::vision::ocr {
             std::vector<float> width_list;
             width_list.reserve(image_list.size());
             for (auto& image : image_list) {
-                width_list.push_back(static_cast<float>(image.cols) / image.rows);
+                width_list.push_back(static_cast<float>(image.width()) / image.height());
             }
             std::vector<int> indices = vision::ocr::arg_sort(width_list);
 

@@ -41,10 +41,10 @@ MDStatusCode md_instance_seg_predict(const MDModel* model, MDImage* image, MDIse
         MD_LOG_ERROR << "Model type is not instance_seg!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::InstanceSegResult> results;
     const auto instance_seg_model = static_cast<modeldeploy::vision::detection::UltralyticsSeg*>(model->model_content);
-    if (const bool res_status = instance_seg_model->predict(cv_image, &results); !res_status) {
+    if (const bool res_status = instance_seg_model->predict(image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     iseg_results_2_c_results(results, c_results);
@@ -62,10 +62,10 @@ void md_print_instance_seg_result(const MDIsegResults* c_results) {
 void md_draw_instance_seg_result(const MDImage* image, const MDIsegResults* c_results,
                                  const double threshold, const char* font_path, const int font_size,
                                  const double alpha, const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::InstanceSegResult> results;
     c_results_2_iseg_results(c_results, &results);
-    modeldeploy::vision::vis_iseg(cv_image, results, threshold, font_path, font_size, alpha, save_result);
+    modeldeploy::vision::vis_iseg(image_data, results, threshold, font_path, font_size, alpha, save_result);
 }
 
 void md_free_instance_seg_result(MDIsegResults* c_results) {

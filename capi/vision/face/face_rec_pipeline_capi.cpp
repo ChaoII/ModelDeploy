@@ -33,13 +33,13 @@ MDStatusCode md_face_rec_pipeline_predict(const MDModel* model, MDImage* image, 
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     const auto face_rec_pipeline_model = static_cast<
         modeldeploy::vision::face::FaceRecognizerPipeline*>(model->model_content);
 
     std::vector<FaceRecognitionResult> results;
     if (const bool res_status = face_rec_pipeline_model->predict(
-        cv_image, &results); !res_status) {
+        image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
 

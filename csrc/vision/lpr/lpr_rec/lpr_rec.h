@@ -4,6 +4,7 @@
 #pragma once
 
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/lpr/lpr_rec/preprocessor.h"
 #include "vision/lpr/lpr_rec/postprocessor.h"
 
@@ -15,10 +16,10 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::string name() const override { return "LprRecognizer"; }
 
-        virtual bool predict(const cv::Mat& image, LprResult* result,
+        virtual bool predict(const ImageData& image, LprResult* result,
                              TimerArray* timers = nullptr);
 
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<LprResult>* results,
                                    TimerArray* timers = nullptr);
 

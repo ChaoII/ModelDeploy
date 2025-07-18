@@ -6,14 +6,15 @@
 #include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
-    cv::Mat vis_cls(cv::Mat& cv_image,
-                               const ClassifyResult& result,
-                               const int top_k,
-                               const float score_threshold,
-                               const std::string& font_path,
-                               const int font_size,
-                               const double alpha, const bool save_result) {
-        cv::Mat overlay;
+    ImageData vis_cls(ImageData& image,
+                      const ClassifyResult& result,
+                      const int top_k,
+                      const float score_threshold,
+                      const std::string& font_path,
+                      const int font_size,
+                      const double alpha, const bool save_result) {
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         constexpr int margin = 5;
@@ -49,7 +50,7 @@ namespace modeldeploy::vision {
             const auto size = cv::getTextSize(cv::Size(0, 0), text,
                                               origin, font, font_size);
             cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
-            cv::putText(cv_image, text, cv::Point(origin.x, origin.y-1),
+            cv::putText(cv_image, text, cv::Point(origin.x, origin.y - 1),
                         cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]), font, font_size);
         }
 
@@ -57,6 +58,6 @@ namespace modeldeploy::vision {
             MD_LOG_INFO << "Save classification result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
-        return cv_image;
+        return image;
     }
 }

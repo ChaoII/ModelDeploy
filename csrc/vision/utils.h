@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <opencv2/opencv.hpp>
+#include "common/image_data.h"
 #include "core/tensor.h"
 #include "vision/common/result.h"
 #include "vision/common/struct.h"
@@ -15,7 +15,7 @@ namespace modeldeploy::vision::utils {
 
     DataType cv_dtype_to_md_dtype(int type);
 
-    MODELDEPLOY_CXX_EXPORT cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size);
+    MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 
@@ -36,8 +36,8 @@ namespace modeldeploy::vision::utils {
 
     std::vector<float> compute_sqrt(const std::vector<float>& vec);
 
-    MODELDEPLOY_CXX_EXPORT std::vector<cv::Mat> align_face_with_five_points(
-        const cv::Mat& image, std::vector<DetectionLandmarkResult>& result,
+    MODELDEPLOY_CXX_EXPORT std::vector<ImageData> align_face_with_five_points(
+        const ImageData& image, std::vector<DetectionLandmarkResult>& result,
         std::vector<std::array<float, 2>> std_landmarks =
         {
             {89.3095f, 72.9025f},

@@ -26,7 +26,7 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool DBDetector::predict(const cv::Mat& img,
+    bool DBDetector::predict(const ImageData& img,
                              std::vector<std::array<int, 8>>* boxes_result) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
         if (!batch_predict({img}, &det_results)) {
@@ -36,14 +36,14 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool DBDetector::predict(const cv::Mat& img, OCRResult* ocr_result) {
+    bool DBDetector::predict(const ImageData& img, OCRResult* ocr_result) {
         if (!predict(img, &ocr_result->boxes)) {
             return false;
         }
         return true;
     }
 
-    bool DBDetector::batch_predict(const std::vector<cv::Mat>& images,
+    bool DBDetector::batch_predict(const std::vector<ImageData>& images,
                                    std::vector<OCRResult>* ocr_results) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
         if (!batch_predict(images, &det_results)) {
@@ -57,10 +57,15 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool DBDetector::batch_predict(
-        const std::vector<cv::Mat>& images,
+        const std::vector<ImageData>& images,
         std::vector<std::vector<std::array<int, 8>>>* det_results) {
-        std::vector<cv::Mat> images_ = images;
-        if (!preprocessor_.apply(&images_, &reused_input_tensors_)) {
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
+        }
+        if (!preprocessor_.apply(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

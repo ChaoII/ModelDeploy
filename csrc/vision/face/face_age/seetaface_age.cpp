@@ -22,7 +22,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAge::predict(const cv::Mat& image, int* age) {
+    bool SeetaFaceAge::predict(const ImageData& image, int* age) {
         std::vector<int> ages;
         if (!batch_predict({image}, &ages)) {
             return false;
@@ -33,13 +33,15 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAge::batch_predict(const std::vector<cv::Mat>& images,
+    bool SeetaFaceAge::batch_predict(const std::vector<ImageData>& images,
                                      std::vector<int>* ages) {
-        std::vector<cv::Mat> fd_images = images;
-        if (images.size() != 1) {
-            MD_LOG_ERROR << "Only support batch = 1 now." << std::endl;
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
         }
-        if (!preprocessor_.run(&fd_images, &reused_input_tensors_)) {
+        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }

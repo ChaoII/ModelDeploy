@@ -70,11 +70,7 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool PaddleOCR::predict(cv::Mat* image, OCRResult* result, TimerArray* timers) {
-        return predict(*image, result);
-    }
-
-    bool PaddleOCR::predict(const cv::Mat& image, OCRResult* result, TimerArray* timers) {
+    bool PaddleOCR::predict(const ImageData& image, OCRResult* result, TimerArray* timers) {
         std::vector<OCRResult> batch_result(1);
         if (const bool success = batch_predict({image}, &batch_result, timers); !success) {
             return success;
@@ -84,7 +80,7 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool PaddleOCR::batch_predict(
-        const std::vector<cv::Mat>& images,
+        const std::vector<ImageData>& images,
         std::vector<OCRResult>* batch_result, TimerArray* timers) {
         batch_result->clear();
         batch_result->resize(images.size());
@@ -106,15 +102,18 @@ namespace modeldeploy::vision::ocr {
             OCRResult& ocr_result = (*batch_result)[i_batch];
             // Get cropped images by detection result
             const std::vector<std::array<int, 8>>& boxes = ocr_result.boxes;
-            const cv::Mat& img = images[i_batch];
-            std::vector<cv::Mat> image_list;
+            const ImageData& img = images[i_batch];
+            std::vector<ImageData> image_list;
             if (boxes.empty()) {
                 image_list.emplace_back(img);
             }
             else {
                 image_list.resize(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
-                    image_list[i_box] = get_rotate_crop_image(img, boxes[i_box]);
+                    cv::Mat _cropped_img;
+                    img.to_mat(&_cropped_img);
+                    auto _cv_image = get_rotate_crop_image(_cropped_img, boxes[i_box]);
+                    image_list[i_box] = ImageData::from_mat(&_cv_image);
                 }
             }
             std::vector<int32_t>* cls_labels_ptr = &ocr_result.cls_labels;
@@ -133,9 +132,10 @@ namespace modeldeploy::vision::ocr {
                     }
                     for (size_t i_img = start_index; i_img < end_index; ++i_img) {
                         if (cls_labels_ptr->at(i_img) % 2 == 1 &&
-                            cls_scores_ptr->at(i_img) >
-                            classifier_->get_postprocessor().get_cls_thresh()) {
-                            cv::rotate(image_list[i_img], image_list[i_img], 1);
+                            cls_scores_ptr->at(i_img) > classifier_->get_postprocessor().get_cls_thresh()) {
+                            cv::Mat _cv_image;
+                            image_list[i_img].to_mat(&_cv_image);
+                            cv::rotate(_cv_image, _cv_image, 1);
                         }
                     }
                 }
@@ -144,7 +144,7 @@ namespace modeldeploy::vision::ocr {
             std::vector<float> width_list;
             width_list.reserve(image_list.size());
             for (const auto& image : image_list) {
-                width_list.push_back(static_cast<float>(image.cols) / static_cast<float>(image.rows));
+                width_list.push_back(static_cast<float>(image.width()) / static_cast<float>(image.height()));
             }
             std::vector<int> indices = arg_sort(width_list);
             for (size_t start_index = 0; start_index < image_list.size();

@@ -22,14 +22,14 @@ MDStatusCode md_create_ocr_model(MDModel* model,
     const auto det_model_file_path = fs::path(parameters->det_model_file);
     const auto cls_model_file_path = fs::path(parameters->cls_model_file);
     const auto rec_model_file_path = fs::path(parameters->rec_model_file);
-    const auto dict__file_path = fs::path(parameters->dict_path);
+    const auto dict_file_path = fs::path(parameters->dict_path);
 
     modeldeploy::RuntimeOption _option;
     c_runtime_option_2_runtime_option(option, &_option);
     const auto ocr_model = new modeldeploy::vision::ocr::PaddleOCR(det_model_file_path.string(),
                                                                    cls_model_file_path.string(),
                                                                    rec_model_file_path.string(),
-                                                                   dict__file_path.string(), _option);
+                                                                   dict_file_path.string(), _option);
     ocr_model->get_detector()->get_preprocessor().set_max_side_len(parameters->max_side_len);
     ocr_model->get_detector()->get_postprocessor().set_det_db_thresh(parameters->det_db_thresh);
     ocr_model->get_detector()->get_postprocessor().set_det_db_box_thresh(parameters->det_db_box_thresh);
@@ -51,10 +51,10 @@ MDStatusCode md_create_ocr_model(MDModel* model,
 }
 
 MDRect md_get_text_position(const MDModel* model, MDImage* image, const char* text) {
-    const cv::Mat cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::OCRResult res;
     const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
-    if (const bool res_status = ocr_model->predict(cv_image, &res); !res_status) {
+    if (const bool res_status = ocr_model->predict(image_data, &res); !res_status) {
         return MDRect{0, 0, 0, 0};
     }
     for (int i = 0; i < res.boxes.size(); ++i) {
@@ -73,10 +73,10 @@ MDRect md_get_text_position(const MDModel* model, MDImage* image, const char* te
 
 
 MDStatusCode md_ocr_model_predict(const MDModel* model, MDImage* image, MDOCRResults* c_results) {
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::OCRResult result;
     const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
-    if (const bool res_status = ocr_model->predict(cv_image, &result); !res_status) {
+    if (const bool res_status = ocr_model->predict(image_data, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     ocr_result_2_c_results(result, c_results);
@@ -91,10 +91,10 @@ void md_print_ocr_result(const MDOCRResults* results) {
 
 void md_draw_ocr_result(const MDImage* image, const MDOCRResults* c_results, const char* font_path,
                         const int font_size, const double alpha, const int save_result) {
-    cv::Mat cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::OCRResult result;
     c_results_2_ocr_result(c_results, &result);
-    modeldeploy::vision::vis_ocr(cv_image, result, font_path, font_size, alpha, save_result);
+    modeldeploy::vision::vis_ocr(image_data, result, font_path, font_size, alpha, save_result);
 }
 
 void md_free_ocr_result(MDOCRResults* c_results) {

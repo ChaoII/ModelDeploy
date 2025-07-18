@@ -4,8 +4,10 @@
 
 
 #pragma once
+
 #include "base_model.h"
 #include "vision/common/result.h"
+#include "vision/common/image_data.h"
 #include "vision/ocr/rec_preprocessor.h"
 #include "vision/ocr/rec_postprocessor.h"
 
@@ -30,20 +32,20 @@ namespace modeldeploy::vision::ocr {
 
         /** \brief Predict the input image and get OCR recognition model result.
          *
-         * \param[in] img The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] text The text result of rec model will be written into this parameter.
          * \param[in] rec_score The sccore result of rec model will be written into this parameter.
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool predict(const cv::Mat& img, std::string* text, float* rec_score);
+        virtual bool predict(const ImageData& image, std::string* text, float* rec_score);
 
         /** \brief Predict the input image and get OCR recognition model result.
          *
-         * \param[in] img The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] ocr_result The output of OCR recognition model result will be writen to this structure.
          * \return true if the prediction is successes, otherwise false.
          */
-        virtual bool predict(const cv::Mat& img, OCRResult* ocr_result);
+        virtual bool predict(const ImageData& image, OCRResult* ocr_result);
 
         /** \brief BatchPredict the input image and get OCR recognition model result.
          *
@@ -51,7 +53,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] ocr_result The output of OCR recognition model result will be writen to this structure.
          * \return true if the prediction is successes, otherwise false.
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images, OCRResult* ocr_result);
+        virtual bool batch_predict(const std::vector<ImageData>& images, OCRResult* ocr_result);
 
         /** \brief BatchPredict the input image and get OCR recognition model result.
          *
@@ -60,10 +62,10 @@ namespace modeldeploy::vision::ocr {
          * \param[in] rec_scores The list of sccore result of rec model will be written into this vector.
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::string>* texts, std::vector<float>* rec_scores);
 
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::string>* texts, std::vector<float>* rec_scores,
                                    size_t start_index, size_t end_index,
                                    const std::vector<int>& indices);

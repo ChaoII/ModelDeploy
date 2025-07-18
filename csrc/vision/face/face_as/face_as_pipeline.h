@@ -31,13 +31,13 @@ namespace modeldeploy::vision::face {
 
         /** \brief Predict the face detection result for an input image
          *
-         * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] results The output face FaceAntiSpoof result will be writen to this structure
          * \param fuse_threshold
          * \param clarity_threshold
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(const cv::Mat& im, std::vector<FaceAntiSpoofResult>* results, float fuse_threshold = 0.8f,
+        bool predict(const ImageData& image, std::vector<FaceAntiSpoofResult>* results, float fuse_threshold = 0.8f,
                      float clarity_threshold = 0.3) const;
 
 

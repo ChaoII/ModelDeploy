@@ -34,13 +34,13 @@ MDStatusCode md_face_as_pipeline_predict(const MDModel* model, MDImage* image, M
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     const auto face_as_pipeline_model = static_cast<
         modeldeploy::vision::face::SeetaFaceAsPipeline*>(model->model_content);
 
     std::vector<FaceAntiSpoofResult> results;
     if (const bool res_status = face_as_pipeline_model->predict(
-        cv_image, &results, fuse_threshold, clarity_threshold); !res_status) {
+        image_data, &results, fuse_threshold, clarity_threshold); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     const size_t face_size = results.size();

@@ -22,7 +22,7 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprDetection::predict(const cv::Mat& image, std::vector<DetectionLandmarkResult>* result,
+    bool LprDetection::predict(const ImageData& image, std::vector<DetectionLandmarkResult>* result,
                                TimerArray* timers) {
         std::vector<std::vector<DetectionLandmarkResult>> results;
         if (!batch_predict({image}, &results, timers)) {
@@ -32,11 +32,16 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprDetection::batch_predict(const std::vector<cv::Mat>& images,
+    bool LprDetection::batch_predict(const std::vector<ImageData>& images,
                                      std::vector<std::vector<DetectionLandmarkResult>>* results,
                                      TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
-        std::vector<cv::Mat> _images = images;
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
+        }
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(&_images, &reused_input_tensors_, &letter_box_records)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
