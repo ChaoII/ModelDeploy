@@ -29,11 +29,11 @@ MDStatusCode md_lpr_rec_predict(const MDModel* model, MDImage* image, MDLPRResul
     if (model->type != MDModelType::LPR) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::LprResult> results;
     results.resize(1);
     const auto lpr_rec_model = static_cast<modeldeploy::vision::lpr::LprRecognizer*>(model->model_content);
-    if (const bool res_status = lpr_rec_model->predict(cv_image, &results[0]); !res_status) {
+    if (const bool res_status = lpr_rec_model->predict(image_data, &results[0]); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     lpr_results_2_c_results(results, c_result);

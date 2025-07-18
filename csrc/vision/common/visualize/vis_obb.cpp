@@ -7,11 +7,12 @@
 
 
 namespace modeldeploy::vision {
-    cv::Mat vis_obb(cv::Mat& cv_image, const std::vector<ObbResult>& result,
-                    const double threshold,
-                    const std::string& font_path, const int font_size,
-                    const double alpha, const bool save_result) {
-        cv::Mat overlay;
+    ImageData vis_obb(ImageData& image, const std::vector<ObbResult>& result,
+                      const double threshold,
+                      const std::string& font_path, const int font_size,
+                      const double alpha, const bool save_result) {
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         // 根据label_id获取颜色
@@ -74,6 +75,6 @@ namespace modeldeploy::vision {
             MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
-        return cv_image;
+        return image;
     }
 } // namespace modeldeploy::vision

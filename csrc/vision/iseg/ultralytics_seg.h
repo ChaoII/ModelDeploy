@@ -4,7 +4,9 @@
 
 #pragma once
 
+
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/iseg/preprocessor.h"
 #include "vision/iseg/postprocessor.h"
 
@@ -27,18 +29,20 @@ namespace modeldeploy::vision::detection {
         *
         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
         * \param[in] result The output detection result will be writen to this structure
+        * \param timers
         * \return true if the prediction successed, otherwise false
         */
-        virtual bool predict(const cv::Mat& image, std::vector<InstanceSegResult>* result,
+        virtual bool predict(const ImageData& image, std::vector<InstanceSegResult>* result,
                              TimerArray* timers = nullptr);
 
         /** \brief Predict the detection results for a batch of input images
         *
         * \param[in] images The input image list, each element comes from cv::imread()
         * \param[in] results The output detection result list
+        * \param timers
         * \return true if the prediction successed, otherwise false
         */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::vector<InstanceSegResult>>* results,
                                    TimerArray* timers = nullptr);
 

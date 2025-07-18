@@ -22,7 +22,7 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprRecognizer::predict(const cv::Mat& image, LprResult* result, TimerArray* timers) {
+    bool LprRecognizer::predict(const ImageData& image, LprResult* result, TimerArray* timers) {
         std::vector<LprResult> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
@@ -31,10 +31,15 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprRecognizer::batch_predict(const std::vector<cv::Mat>& images,
+    bool LprRecognizer::batch_predict(const std::vector<ImageData>& images,
                                       std::vector<LprResult>* results,
                                       TimerArray* timers) {
-        std::vector<cv::Mat> _images = images;
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
+        }
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;

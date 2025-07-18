@@ -27,7 +27,7 @@ namespace modeldeploy::vision::face {
     }
 
 
-    bool FaceRecognizerPipeline::predict(const cv::Mat& image, std::vector<FaceRecognitionResult>* results,
+    bool FaceRecognizerPipeline::predict(const ImageData& image, std::vector<FaceRecognitionResult>* results,
                                          TimerArray* timers) {
         if (timers) {
             timers->pre_timer.push_back(0);

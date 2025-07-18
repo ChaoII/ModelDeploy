@@ -26,7 +26,7 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool Recognizer::predict(const cv::Mat& img, std::string* text,
+    bool Recognizer::predict(const ImageData& img, std::string* text,
                              float* rec_score) {
         std::vector<std::string> texts(1);
         std::vector<float> rec_scores(1);
@@ -38,7 +38,7 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool Recognizer::predict(const cv::Mat& img, OCRResult* ocr_result) {
+    bool Recognizer::predict(const ImageData& img, OCRResult* ocr_result) {
         ocr_result->text.resize(1);
         ocr_result->rec_scores.resize(1);
         if (!predict(img, &ocr_result->text[0], &ocr_result->rec_scores[0])) {
@@ -47,18 +47,18 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool Recognizer::batch_predict(const std::vector<cv::Mat>& images,
+    bool Recognizer::batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::string>* texts,
                                    std::vector<float>* rec_scores) {
         return batch_predict(images, texts, rec_scores, 0, images.size(), {});
     }
 
-    bool Recognizer::batch_predict(const std::vector<cv::Mat>& images,
+    bool Recognizer::batch_predict(const std::vector<ImageData>& images,
                                    OCRResult* ocr_result) {
         return batch_predict(images, &ocr_result->text, &ocr_result->rec_scores);
     }
 
-    bool Recognizer::batch_predict(const std::vector<cv::Mat>& images,
+    bool Recognizer::batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::string>* texts,
                                    std::vector<float>* rec_scores,
                                    const size_t start_index, const size_t end_index,
@@ -68,8 +68,13 @@ namespace modeldeploy::vision::ocr {
             MD_LOG_ERROR << "indices.size() should be 0 or " << images.size() << "." << std::endl;
             return false;
         }
-        const std::vector<cv::Mat>& images_ = images;
-        if (!preprocessor_.run(&images_, &reused_input_tensors_, start_index,
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
+        }
+        if (!preprocessor_.run(&_images, &reused_input_tensors_, start_index,
                                end_index, indices)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;

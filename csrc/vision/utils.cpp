@@ -311,10 +311,10 @@ namespace modeldeploy::vision::utils {
         letter_box_record->scale = scale;
     }
 
-    cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size) {
+    ImageData center_crop(const ImageData& image, const cv::Size& crop_size) {
         // 获取输入图像的尺寸
-        const int img_height = image.rows;
-        const int img_width = image.cols;
+        const int img_height = image.height();
+        const int img_width = image.width();
         // 获取裁剪尺寸
         const int crop_height = crop_size.height;
         const int crop_width = crop_size.width;
@@ -324,12 +324,14 @@ namespace modeldeploy::vision::utils {
             MD_LOG_ERROR << "Crop size is larger than the input image size." << std::endl;
             return image; // 或者抛出异常
         }
+        cv::Mat cv_image;
+        image.to_mat(&cv_image);
         // 计算裁剪区域的起始坐标
         const int top = (img_height - crop_height) / 2;
         const int left = (img_width - crop_width) / 2;
         // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clone()操作
-        const cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
-        return cropped_image.clone();
+        const cv::Mat cropped_image = cv_image(cv::Rect(left, top, crop_width, crop_height)).clone();
+        return ImageData::from_mat(&cropped_image);
     }
 
     void print_mat_type(const cv::Mat& mat) {

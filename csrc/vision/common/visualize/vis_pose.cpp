@@ -94,11 +94,12 @@ namespace modeldeploy::vision {
         }
     }
 
-    cv::Mat vis_pose(cv::Mat& cv_image, const std::vector<PoseResult>& result,
-                     const std::string& font_path, const int font_size,
-                     const int landmark_radius, const double alpha,
-                     const bool save_result) {
-        cv::Mat overlay;
+    ImageData vis_pose(ImageData& image, const std::vector<PoseResult>& result,
+                       const std::string& font_path, const int font_size,
+                       const int landmark_radius, const double alpha,
+                       const bool save_result) {
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
         const cv::FontFace font(font_path);
         static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
@@ -127,12 +128,10 @@ namespace modeldeploy::vision {
                            });
             draw_keypoints(cv_image, cv_keypoints, landmark_radius);
         }
-
-
         if (save_result) {
             MD_LOG_INFO << "Save pose result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
-        return cv_image;
+        return image;
     }
 }

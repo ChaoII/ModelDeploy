@@ -44,10 +44,10 @@ MDStatusCode md_pose_predict(const MDModel* model, MDImage* image, MDPoseResults
         MD_LOG_ERROR << "Model type is not pose!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::PoseResult> results;
     const auto pose_model = static_cast<modeldeploy::vision::detection::UltralyticsPose*>(model->model_content);
-    if (const bool res_status = pose_model->predict(cv_image, &results); !res_status) {
+    if (const bool res_status = pose_model->predict(image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     pose_results_2_c_results(results, c_results);
@@ -66,10 +66,10 @@ void md_draw_pose_result(const MDImage* image, const MDPoseResults* c_results,
                          const char* font_path, const int font_size,
                          const int keypoint_radius,
                          const double alpha, const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::PoseResult> results;
     c_results_2_pose_results(c_results, &results);
-    modeldeploy::vision::vis_pose(cv_image, results, font_path, font_size, keypoint_radius, alpha, save_result);
+    modeldeploy::vision::vis_pose(image_data, results, font_path, font_size, keypoint_radius, alpha, save_result);
 }
 
 void md_free_pose_result(MDPoseResults* c_results) {

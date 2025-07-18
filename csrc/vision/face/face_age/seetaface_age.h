@@ -5,6 +5,7 @@
 #pragma once
 
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/face/face_age/postprocessor.h"
 #include "vision/face/face_age/preprocessor.h"
 
@@ -19,7 +20,7 @@ namespace modeldeploy::vision::face {
          * \param[in] model_file Path of model file, e.g ./adaface.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        explicit SeetaFaceAge(const std::string &model_file, const RuntimeOption &custom_option = RuntimeOption());
+        explicit SeetaFaceAge(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "seetaface age predict"; }
 
@@ -29,7 +30,7 @@ namespace modeldeploy::vision::face {
          * \param[in] age The output age will be writen to this structure
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool predict(const cv::Mat &image, int *age);
+        virtual bool predict(const ImageData& image, int* age);
 
         /** \brief Predict the detection results for a batch of input images
          *
@@ -37,16 +38,16 @@ namespace modeldeploy::vision::face {
          * \param[in] ages The output age list
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool batch_predict(const std::vector<cv::Mat> &images,
-                                   std::vector<int> *ages);
+        virtual bool batch_predict(const std::vector<ImageData>& images,
+                                   std::vector<int>* ages);
 
         /// Get preprocessor reference of AdaFace
-        virtual SeetaFaceAgePreprocessor &get_preprocessor() {
+        virtual SeetaFaceAgePreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of AdaFace
-        virtual SeetaFaceAgePostprocessor &get_postprocessor() {
+        virtual SeetaFaceAgePostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 

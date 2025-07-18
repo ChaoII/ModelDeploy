@@ -22,7 +22,7 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool UltralyticsCls::predict(const cv::Mat& im, ClassifyResult* result) {
+    bool UltralyticsCls::predict(const ImageData& im, ClassifyResult* result) {
         std::vector<ClassifyResult> results;
         if (!batch_predict({im}, &results)) {
             return false;
@@ -31,8 +31,13 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool UltralyticsCls::batch_predict(const std::vector<cv::Mat>& images, std::vector<ClassifyResult>* results) {
-        std::vector<cv::Mat> _images = images;
+    bool UltralyticsCls::batch_predict(const std::vector<ImageData>& images, std::vector<ClassifyResult>* results) {
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
+        }
         if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;

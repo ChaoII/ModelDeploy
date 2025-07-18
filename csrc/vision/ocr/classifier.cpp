@@ -21,16 +21,15 @@ namespace modeldeploy::vision::ocr {
             MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
-
         return true;
     }
 
 
-    bool Classifier::predict(const cv::Mat& img, int32_t* cls_label,
+    bool Classifier::predict(const ImageData& image, int32_t* cls_label,
                              float* cls_score) {
         std::vector<int32_t> cls_labels(1);
         std::vector<float> cls_scores(1);
-        if (const bool success = batch_predict({img}, &cls_labels, &cls_scores); !success) {
+        if (const bool success = batch_predict({image}, &cls_labels, &cls_scores); !success) {
             return success;
         }
         *cls_label = cls_labels[0];
@@ -38,35 +37,40 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool Classifier::predict(const cv::Mat& img, OCRResult* ocr_result) {
+    bool Classifier::predict(const ImageData& image, OCRResult* ocr_result) {
         ocr_result->cls_labels.resize(1);
         ocr_result->cls_scores.resize(1);
-        if (!predict(img, &ocr_result->cls_labels[0],
+        if (!predict(image, &ocr_result->cls_labels[0],
                      &ocr_result->cls_scores[0])) {
             return false;
         }
         return true;
     }
 
-    bool Classifier::batch_predict(const std::vector<cv::Mat>& images,
+    bool Classifier::batch_predict(const std::vector<ImageData>& images,
                                    OCRResult* ocr_result) {
         return batch_predict(images, &ocr_result->cls_labels,
                              &ocr_result->cls_scores);
     }
 
-    bool Classifier::batch_predict(const std::vector<cv::Mat>& images,
+    bool Classifier::batch_predict(const std::vector<ImageData>& images,
                                    std::vector<int32_t>* cls_labels,
                                    std::vector<float>* cls_scores) {
         return batch_predict(images, cls_labels, cls_scores, 0, images.size());
     }
 
-    bool Classifier::batch_predict(const std::vector<cv::Mat>& images,
+    bool Classifier::batch_predict(const std::vector<ImageData>& images,
                                    std::vector<int32_t>* cls_labels,
                                    std::vector<float>* cls_scores,
                                    const size_t start_index, const size_t end_index) {
         const size_t total_size = images.size();
-        const std::vector<cv::Mat>& images_ = images;
-        if (!preprocessor_.run(&images_, &reused_input_tensors_, start_index, end_index)) {
+        std::vector<cv::Mat> _images;
+        for (const auto& image : images) {
+            cv::Mat image_;
+            image.to_mat(&image_);
+            _images.push_back(image_);
+        }
+        if (!preprocessor_.run(&_images, &reused_input_tensors_, start_index, end_index)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }

@@ -58,9 +58,11 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAsFirst::predict(cv::Mat& im, float* result) {
+    bool SeetaFaceAsFirst::predict(const ImageData& image, float* result) {
         std::vector<Tensor> input_tensors(1);
-        if (!preprocess(&im, &input_tensors[0])) {
+        cv::Mat _image;
+        image.to_mat(&_image);
+        if (!preprocess(&_image, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

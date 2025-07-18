@@ -6,10 +6,11 @@
 #include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
-    cv::Mat vis_lpr(cv::Mat& cv_image, const std::vector<LprResult>& result,
-                    const std::string& font_path, const int font_size,
-                    const int landmark_radius, const double alpha, const bool save_result) {
-        cv::Mat overlay;
+    ImageData vis_lpr(ImageData& image, const std::vector<LprResult>& result,
+                      const std::string& font_path, const int font_size,
+                      const int landmark_radius, const double alpha, const bool save_result) {
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
         const cv::FontFace font(font_path);
         static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
@@ -44,6 +45,6 @@ namespace modeldeploy::vision {
             MD_LOG_INFO << "Save lpr result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
-        return cv_image;
+        return image;
     }
 }

@@ -79,7 +79,7 @@ namespace modeldeploy::vision::lpr {
         return out;
     }
 
-    bool LprPipeline::predict(const cv::Mat& image, std::vector<LprResult>* results, TimerArray* times) {
+    bool LprPipeline::predict(const ImageData& image, std::vector<LprResult>* results, TimerArray* times) {
         std::vector<DetectionLandmarkResult> det_result;
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
@@ -102,13 +102,15 @@ namespace modeldeploy::vision::lpr {
             for (int j = 0; j < 4; ++j) {
                 points[j] = det_result[i].landmarks[j].to_cv_point2f();
             }
-            cv::Mat transform_image = transform_from_4points(image, points);
+            cv::Mat _image;
+            image.to_mat(&_image);
+            cv::Mat transform_image = transform_from_4points(_image, points);
             // 如果是双层车牌 0 单层车牌 1 双层车牌
             if (det_result[i].label_id) {
                 transform_image = get_split_merge(transform_image);
             }
             LprResult tmp_result;
-            recognizer_->predict(transform_image, &tmp_result);
+            recognizer_->predict(ImageData::from_mat(&transform_image), &tmp_result);
             (*results)[i].car_plate_color = tmp_result.car_plate_color;
             (*results)[i].car_plate_str = tmp_result.car_plate_str;
         }

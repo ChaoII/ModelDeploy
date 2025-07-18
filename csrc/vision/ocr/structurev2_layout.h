@@ -4,8 +4,10 @@
 
 #pragma once
 
+
 #include "base_model.h"
 #include "vision/common/result.h"
+#include "vision/common/image_data.h"
 #include "vision/ocr/utils/ocr_postprocess_op.h"
 #include "vision/ocr/structurev2_layout_preprocessor.h"
 #include "vision/ocr/structurev2_layout_postprocessor.h"
@@ -30,27 +32,19 @@ namespace modeldeploy::vision::ocr {
         /// Get model's name
         [[nodiscard]] std::string name() const override { return "pp-structurev2-layout"; }
 
-        /** \brief DEPRECATED Predict the detection result for an input image
-         *
-         * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
-         * \param[in] result The output detection result
-         * \return true if the prediction successed, otherwise false
-         */
-        virtual bool predict(cv::Mat* im, std::vector<DetectionResult>* result);
-
         /** \brief Predict the detection result for an input image
-         * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] result The output detection result
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool predict(const cv::Mat& im, std::vector<DetectionResult>* result);
+        virtual bool predict(const ImageData& image, std::vector<DetectionResult>* result);
 
         /** \brief Predict the detection result for an input image list
          * \param[in] images The input image list, all the elements come from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] results The output detection result list
          * \return true if the prediction successfully, otherwise false
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::vector<DetectionResult>>* results);
 
         /// Get preprocessor reference ofStructureV2LayoutPreprocessor
