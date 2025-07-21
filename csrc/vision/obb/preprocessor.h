@@ -21,7 +21,7 @@ namespace modeldeploy::vision::detection {
         * \param[in] letter_box_records The shape info list, record input_shape and output_shape
         * \return true if the preprocess successed, otherwise false
         */
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
@@ -65,7 +65,7 @@ namespace modeldeploy::vision::detection {
         [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output,
+        bool preprocess(ImageData* image, Tensor* output,
                         LetterBoxRecord* letter_box_record) const;
 
         // target size, tuple of (width, height), default size = {640, 640}

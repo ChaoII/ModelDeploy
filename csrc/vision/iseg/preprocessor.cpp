@@ -19,15 +19,18 @@ namespace modeldeploy::vision::detection {
         stride_ = 32;
     }
 
-    void UltralyticsSegPreprocessor::letter_box(cv::Mat* mat, LetterBoxRecord* letter_box_record) const {
-        letter_box_record->ipt_h = static_cast<float>(mat->rows);
-        letter_box_record->ipt_w = static_cast<float>(mat->cols);
-        auto scale = std::min(size_[1] * 1.0 / mat->rows, size_[0] * 1.0 / mat->cols);
+    void UltralyticsSegPreprocessor::letter_box(ImageData* image, LetterBoxRecord* letter_box_record) const {
+        cv::Mat mat;
+        image->to_mat(&mat);
+
+        letter_box_record->ipt_h = static_cast<float>(mat.rows);
+        letter_box_record->ipt_w = static_cast<float>(mat.cols);
+        auto scale = std::min(size_[1] * 1.0 / mat.rows, size_[0] * 1.0 / mat.cols);
         if (!is_scale_up_) {
             scale = std::min(scale, 1.0);
         }
-        int resize_h = static_cast<int>(round(mat->rows * scale));
-        int resize_w = static_cast<int>(round(mat->cols * scale));
+        int resize_h = static_cast<int>(round(mat.rows * scale));
+        int resize_w = static_cast<int>(round(mat.cols * scale));
         int pad_w = size_[0] - resize_w;
         int pad_h = size_[1] - resize_h;
         if (is_mini_pad_) {
@@ -41,7 +44,7 @@ namespace modeldeploy::vision::detection {
             resize_w = size_[0];
         }
         if (std::fabs(scale - 1.0f) > 1e-06) {
-            Resize::apply(mat, resize_w, resize_h);
+            Resize::apply(&mat, resize_w, resize_h);
         }
         if (pad_h > 0 || pad_w > 0) {
             const float half_h = static_cast<float>(pad_h) * 1.0f / 2;
@@ -50,34 +53,36 @@ namespace modeldeploy::vision::detection {
             const float half_w = static_cast<float>(pad_w) * 1.0f / 2;
             const int left = static_cast<int>(round(half_w - 0.1));
             const int right = static_cast<int>(round(half_w + 0.1));
-            Pad::apply(mat, top, bottom, left, right, padding_value_);
+            Pad::apply(&mat, top, bottom, left, right, padding_value_);
         }
-        letter_box_record->out_h = static_cast<float>(mat->rows);
-        letter_box_record->out_w = static_cast<float>(mat->cols);
+        letter_box_record->out_h = static_cast<float>(mat.rows);
+        letter_box_record->out_w = static_cast<float>(mat.cols);
         letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
         letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
         letter_box_record->scale = static_cast<float>(scale);
     }
 
     bool UltralyticsSegPreprocessor::preprocess(
-        cv::Mat* mat, Tensor* output,
+        ImageData* image, Tensor* output,
         LetterBoxRecord* letter_box_record) const {
-        // Record the shape of image and the shape of preprocessed image
+        cv::Mat mat;
+        image->to_mat(&mat);
 
+        // Record the shape of image and the shape of preprocessed image
         // yolov5seg's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        letter_box(mat, letter_box_record);
+        letter_box(image, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        ConvertAndPermute::apply(mat, alpha, beta, true);
-        utils::mat_to_tensor(*mat, output);
+        ConvertAndPermute::apply(&mat, alpha, beta, true);
+        utils::mat_to_tensor(mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
     bool UltralyticsSegPreprocessor::run(
-        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+        std::vector<ImageData>* images, std::vector<Tensor>* outputs,
         std::vector<LetterBoxRecord>* letter_box_records) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;

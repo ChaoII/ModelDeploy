@@ -40,7 +40,7 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
     option.use_gpu();
-    // option.use_trt_backend();
+    option.use_ort_backend();
     option.use_gpu(0);
     option.password = "1234";
     option.enable_fp16 = true;
@@ -49,6 +49,7 @@ int main() {
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx",
                                                               option);
     auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_person.jpg");
+    auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().set_size({640, 640});
     constexpr int warming_up_count = 10;
@@ -62,8 +63,8 @@ int main() {
     }
     timers.print_benchmark();
     const auto vis_image =
-        modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,
+        modeldeploy::vision::vis_det(img1, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,
                                      true);
-    vis_image.imshow("result");
+    img1.imshow("result");
     // test_camera();
 }

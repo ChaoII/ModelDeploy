@@ -64,12 +64,7 @@ namespace modeldeploy::vision::ocr {
                                    std::vector<float>* cls_scores,
                                    const size_t start_index, const size_t end_index) {
         const size_t total_size = images.size();
-        std::vector<cv::Mat> _images;
-        for (const auto& image : images) {
-            cv::Mat image_;
-            image.to_mat(&image_);
-            _images.push_back(image_);
-        }
+        std::vector<ImageData> _images = images;
         if (!preprocessor_.run(&_images, &reused_input_tensors_, start_index, end_index)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;

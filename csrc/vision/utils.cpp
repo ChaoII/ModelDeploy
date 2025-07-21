@@ -5,9 +5,9 @@
 
 #include <execution>
 #include "vision/utils.h"
+#include "core/md_log.h"
 #include "vision/common/processors/pad.h"
 #include "vision/common/processors/resize.h"
-#include "core/md_log.h"
 
 namespace modeldeploy::vision::utils {
     DataType cv_dtype_to_md_dtype(int type) {
@@ -36,6 +36,26 @@ namespace modeldeploy::vision::utils {
         MD_LOG_ERROR << "While calling cv_dtype_to_md_dtype(), get type = "
             << type << ", which is not expected." << std::endl;
         return DataType::UNKNOWN;
+    }
+
+    cv::Point2f point2f_to_cv_type(const Point2f point2f) {
+        return cv::Point2f{point2f.x, point2f.y};
+    }
+
+    cv::Point3f point3f_to_cv_type(Point3f point3f) {
+        return {point3f.x, point3f.y, point3f.z};
+    }
+
+    cv::Rect2f rect2f_to_cv_type(Rect2f rect2f) {
+        return {rect2f.x, rect2f.y, rect2f.width, rect2f.height};
+    }
+
+    cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect) {
+        return {
+            cv::Point2f(rotated_rect.xc, rotated_rect.yc),
+            cv::Point2f(rotated_rect.width, rotated_rect.height),
+            rotated_rect.angle
+        };
     }
 
 
@@ -139,7 +159,7 @@ namespace modeldeploy::vision::utils {
                 const int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -180,7 +200,7 @@ namespace modeldeploy::vision::utils {
                 int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -216,8 +236,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (box_i.to_cv_Rect2f().area() == 0 || box_j.to_cv_Rect2f().area() == 0) continue;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                if (rect2f_to_cv_type(box_i).area() == 0 || rect2f_to_cv_type(box_j).area() == 0) continue;
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }
@@ -252,8 +272,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (box_i.to_cv_Rect2f().area() == 0 || box_j.to_cv_Rect2f().area() == 0) continue;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                if (rect2f_to_cv_type(box_i).area() == 0 || rect2f_to_cv_type(box_j).area() == 0) continue;
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }

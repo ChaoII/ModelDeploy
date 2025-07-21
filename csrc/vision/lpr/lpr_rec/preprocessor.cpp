@@ -13,21 +13,23 @@ namespace modeldeploy::vision::lpr {
         size_ = {168, 48};
     }
 
-    bool LprRecPreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
+    bool LprRecPreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // preprocess steps
         // 1. Resize
         // 2. convert_and_permute(swap_rb=true)
-        Resize::apply(mat, size_[0], size_[1]);
+        cv::Mat mat;
+        image->to_mat(&mat);
+        Resize::apply(&mat, size_[0], size_[1]);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {-0.588f, -0.588f, -0.588f};
-        ConvertAndPermute::apply(mat, alpha, beta, true);
-        utils::mat_to_tensor(*mat, output);
+        ConvertAndPermute::apply(&mat, alpha, beta, true);
+        utils::mat_to_tensor(mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
     bool LprRecPreprocessor::run(
-        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const {
+        std::vector<ImageData>* images, std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;

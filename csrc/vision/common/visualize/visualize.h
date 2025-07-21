@@ -7,6 +7,7 @@
 #include "core/md_decl.h"
 #include "vision/common/result.h"
 #include "vision/common/image_data.h"
+#include <opencv2/opencv.hpp>
 
 namespace modeldeploy::vision {
     cv::Scalar get_random_color();

@@ -19,10 +19,12 @@ namespace modeldeploy::vision::ocr {
     }
 
     void ClassifierPreprocessor::ocr_classifier_resize_image(
-        cv::Mat* mat, const std::vector<int>& cls_image_shape) const {
+        ImageData* image, const std::vector<int>& cls_image_shape) const {
+        cv::Mat mat;
+        image->to_mat(&mat);
         const int img_h = cls_image_shape[1];
         const int img_w = cls_image_shape[2];
-        const float ratio = static_cast<float>(mat->cols) / static_cast<float>(mat->rows);
+        const float ratio = static_cast<float>(mat.cols) / static_cast<float>(mat.rows);
         int resize_w;
         if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w))
             resize_w = img_w;
@@ -30,10 +32,10 @@ namespace modeldeploy::vision::ocr {
             resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
 
         resize_op_->set_width_and_height(resize_w, img_h);
-        (*resize_op_)(mat);
+        (*resize_op_)(&mat);
     }
 
-    bool ClassifierPreprocessor::run(const std::vector<cv::Mat>* images,
+    bool ClassifierPreprocessor::run(const std::vector<ImageData>* images,
                                      std::vector<Tensor>* outputs,
                                      const size_t start_index, const size_t end_index) {
         if (static_cast<int>(images->size()) == 0 || end_index <= start_index ||
@@ -42,31 +44,33 @@ namespace modeldeploy::vision::ocr {
                 "end_index <= images->size()" << std::endl;
             return false;
         }
-        std::vector<cv::Mat> mats(end_index - start_index);
+        std::vector<ImageData> mats(end_index - start_index);
         for (size_t i = start_index; i < end_index; ++i) {
             mats[i - start_index] = images->at(i);
         }
         return apply(&mats, outputs);
     }
 
-    bool ClassifierPreprocessor::apply(std::vector<cv::Mat>* image_batch,
+    bool ClassifierPreprocessor::apply(std::vector<ImageData>* image_batch,
                                        std::vector<Tensor>* outputs) {
+        std::vector<cv::Mat> _images;
         for (auto& image : *image_batch) {
-            cv::Mat* mat = &image;
-            ocr_classifier_resize_image(mat, cls_image_shape_);
-            (*normalize_op_)(mat);
+            cv::Mat mat;
+            image.to_mat(&mat);
+            ocr_classifier_resize_image(&image, cls_image_shape_);
+            (*normalize_op_)(&mat);
             std::vector<float> value = {0, 0, 0};
-            if (mat->cols < cls_image_shape_[2]) {
-                pad_op_->set_padding_size(0, 0, 0, cls_image_shape_[2] - mat->cols);
-                (*pad_op_)(mat);
+            if (mat.cols < cls_image_shape_[2]) {
+                pad_op_->set_padding_size(0, 0, 0, cls_image_shape_[2] - mat.cols);
+                (*pad_op_)(&mat);
             }
-            (*hwc2chw_op_)(mat);
+            (*hwc2chw_op_)(&mat);
+            _images.push_back(mat);
         }
         // Only have 1 output tensor.
         outputs->resize(1);
         // Get the NCHW tensor
-        utils::mats_to_tensor(*image_batch, &(*outputs)[0]);
-
+        utils::mats_to_tensor(_images, &(*outputs)[0]);
         return true;
     }
 }

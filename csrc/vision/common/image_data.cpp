@@ -10,6 +10,7 @@ namespace modeldeploy {
     public:
         cv::Mat mat;
         ImageDataImpl() = default;
+
         ImageDataImpl(const int w, const int h, const int c, const int type)
             : mat(h, w, type) {
             // 注意：OpenCV 是 height, width 顺序

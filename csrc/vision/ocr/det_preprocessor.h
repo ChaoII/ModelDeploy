@@ -3,8 +3,8 @@
 //
 #pragma once
 
-#include "vision/common/processors/pad.h"
 #include "vision/common/processors/resize.h"
+#include "vision/common/processors/pad.h"
 #include "vision/common/processors/normalize_and_permute.h"
 
 
@@ -14,7 +14,7 @@ namespace modeldeploy::vision::ocr {
         virtual ~DBDetectorPreprocessor() = default;
         DBDetectorPreprocessor();
 
-        virtual bool apply(std::vector<cv::Mat>* image_batch,
+        virtual bool apply(std::vector<ImageData>* image_batch,
                            std::vector<Tensor>* outputs);
 
         void set_max_side_len(int max_side_len) { max_side_len_ = max_side_len; }
@@ -49,9 +49,9 @@ namespace modeldeploy::vision::ocr {
         bool get_static_shape_infer() const { return static_shape_infer_; }
 
     private:
-        bool resize_image(cv::Mat* img, int resize_w, int resize_h,
+        bool resize_image(ImageData* image, int resize_w, int resize_h,
                           int max_resize_w, int max_resize_h) const;
-        std::array<int, 4> ocr_detector_get_info(const cv::Mat* img, int max_size_len) const;
+        std::array<int, 4> ocr_detector_get_info(const ImageData* image, int max_size_len) const;
         // for recording the switch of hwc2chw
         bool disable_permute_ = false;
         // for recording the switch of normalize

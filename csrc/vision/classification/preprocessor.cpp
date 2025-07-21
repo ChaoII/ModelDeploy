@@ -15,34 +15,32 @@ namespace modeldeploy::vision::classification {
         size_ = {224, 224}; //{h,w}
     }
 
-    bool UltralyticsClsPreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
-        if (mat->empty()) {
-            MD_LOG_ERROR << "Input image is empty." << std::endl;
-            return false;
-        }
-
+    bool UltralyticsClsPreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // yolov8-cls's preprocess steps
         // 1. CenterCrop
         // 2. Normalize
         // CenterCrop
-        const int crop_size = std::min(mat->rows, mat->cols);
-        CenterCrop::apply(mat, crop_size, crop_size);
-        Resize::apply(mat, size_[0], size_[1], -1, -1, cv::INTER_LINEAR);
+
+        cv::Mat mat;
+        image->to_mat(&mat);
+        const int crop_size = std::min(mat.rows, mat.cols);
+        CenterCrop::apply(image, crop_size, crop_size);
+        Resize::apply(&mat, size_[0], size_[1], -1, -1, cv::INTER_LINEAR);
         // Normalize
-        BGR2RGB::apply(mat);
+        BGR2RGB::apply(&mat);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        Convert::apply(mat, alpha, beta);
+        Convert::apply(&mat, alpha, beta);
         const std::vector mean = {0.485f, 0.456f, 0.406f};
         const std::vector std = {0.229f, 0.224f, 0.225f};
-        NormalizeAndPermute::apply(mat, mean, std, false);
-        utils::mat_to_tensor(*mat, output);
+        NormalizeAndPermute::apply(&mat, mean, std, false);
+        utils::mat_to_tensor(mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
     bool UltralyticsClsPreprocessor::run(
-        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const {
+        std::vector<ImageData>* images, std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0."
                 << std::endl;

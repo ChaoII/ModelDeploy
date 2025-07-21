@@ -7,8 +7,8 @@
 
 #include <string>
 #include <vector>
-#include <opencv2/opencv.hpp>
 #include "core/tensor.h"
+#include "vision/common/image_data.h"
 
 
 namespace modeldeploy::vision {
@@ -19,18 +19,18 @@ namespace modeldeploy::vision {
         explicit Cast(const std::string& dtype = "float") : dtype_(dtype) {
         }
 
-        bool impl(cv::Mat* mat) const;
+        bool impl(ImageData* image) const;
 
-        bool operator()(cv::Mat* mat) const;
+        bool operator()(ImageData* image) const;
 
         std::string name() { return "Cast"; }
         /** \brief Process the input images
          *
-         * \param[in] mat The input image data
+         * \param[in] image The input image data
          * \param[in] dtype type of data will be casted to
          * \return true if the process successfully, otherwise false
          */
-        static bool apply(cv::Mat* mat, const std::string& dtype);
+        static bool apply(ImageData* image, const std::string& dtype);
 
         std::string get_dtype() const { return dtype_; }
 

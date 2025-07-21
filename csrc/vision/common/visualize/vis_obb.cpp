@@ -2,6 +2,8 @@
 // Created by aichao on 2025/4/1.
 //
 
+#include <vision/utils.h>
+
 #include "core/md_log.h"
 #include "vision/common/visualize/visualize.h"
 
@@ -29,7 +31,7 @@ namespace modeldeploy::vision {
                 color_map[class_id] = get_random_color();
             }
             cv::Point2f _points[4];
-            result[i].rotated_box.to_cv_rotated_rect().points(_points);
+            utils::rotated_rect_to_cv_type(result[i].rotated_box).points(_points);
             std::vector<cv::Point> points;
             points.reserve(4);
             for (auto& _point : _points) {
@@ -55,7 +57,7 @@ namespace modeldeploy::vision {
             auto class_id = result[c].label_id;
             auto roted_boxes = result[c].rotated_box;
             cv::Point2f _points[4];
-            roted_boxes.to_cv_rotated_rect().points(_points);
+            utils::rotated_rect_to_cv_type(roted_boxes).points(_points);
             auto cv_color = color_map[class_id];
             std::vector<cv::Point> points;
             points.reserve(4);

@@ -4,9 +4,10 @@
 
 #pragma once
 
+#include <vector>
+#include <array>
 #include "core/md_decl.h"
 #include "vision/common/struct.h"
-#include <opencv2/opencv.hpp>
 
 namespace modeldeploy::vision {
     enum ResultType {
