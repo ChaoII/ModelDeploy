@@ -3,9 +3,9 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
 #include "vision/detection/preprocessor.h"
 #include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
 #include "vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::detection {

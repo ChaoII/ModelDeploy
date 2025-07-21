@@ -64,9 +64,12 @@ namespace modeldeploy {
         return img;
     }
 
-    void ImageData::to_mat(void* mat) const {
+    void ImageData::to_mat(void* mat, bool is_copy) const {
         auto* m = static_cast<cv::Mat*>(mat);
-        *m = impl_->mat; // 浅拷贝（共用数据指针）
+        if (!is_copy)
+            *m = impl_->mat; // 浅拷贝（共用数据指针）
+        else
+            *m = impl_->mat.clone();
     }
 
     void ImageData::images_to_mats(const std::vector<ImageData>& images, const std::vector<void*>& mats) {

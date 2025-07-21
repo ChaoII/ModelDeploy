@@ -3,6 +3,7 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
 #include "vision/lpr/lpr_det/preprocessor.h"
 #include "vision/common/processors/resize.h"
 #include "vision/common/processors/pad.h"

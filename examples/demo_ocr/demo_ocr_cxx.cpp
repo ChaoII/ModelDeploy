@@ -20,7 +20,7 @@ int main() {
 
     modeldeploy::RuntimeOption option;
     option.use_gpu();
-    option.enable_trt = true;
+    // option.enable_trt = true;
     option.enable_fp16 = true;
     modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",

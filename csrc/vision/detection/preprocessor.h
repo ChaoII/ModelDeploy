@@ -2,9 +2,12 @@
 // Created by aichao on 2025/2/20.
 //
 #pragma once
+
+#include <vector>
+#include "core/tensor.h"
 #include "core/md_decl.h"
-#include "vision/utils.h"
 #include "vision/common/struct.h"
+#include "vision/common/image_data.h"
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor {

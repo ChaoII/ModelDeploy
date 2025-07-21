@@ -27,7 +27,7 @@ namespace modeldeploy::vision::face {
                 "now, resize to 256 and may loss precision" << std::endl;
             Resize::apply(&mat, 256, 256);
         }
-        CenterCrop::apply(image, size_[0], size_[1]);
+        CenterCrop::apply(&mat, size_[0], size_[1]);
         BGR2RGB::apply(&mat);
         HWC2CHW::apply(&mat);
         Cast::apply(image, "float");

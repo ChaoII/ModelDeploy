@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include "vision/ocr/det_postprocessor.h"
 #include "vision/ocr/utils/ocr_utils.h"
+#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 
 namespace modeldeploy::vision::ocr {

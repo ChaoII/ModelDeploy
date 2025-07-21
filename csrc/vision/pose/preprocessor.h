@@ -1,9 +1,13 @@
 //
 // Created by aichao on 2025/06/2.
 //
+
 #pragma once
+
 #include "core/md_decl.h"
-#include "vision/utils.h"
+#include "core/tensor.h"
+#include "vision/common/image_data.h"
+#include "vision/common/struct.h"
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPosePreprocessor {

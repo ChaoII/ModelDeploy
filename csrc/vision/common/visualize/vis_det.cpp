@@ -3,8 +3,8 @@
 //
 
 #include "core/md_log.h"
+#include "vision/common/visualize/utils.h"
 #include "vision/common/visualize/visualize.h"
-
 
 namespace modeldeploy::vision {
     ImageData vis_det(ImageData& image, const std::vector<DetectionResult>& result,

@@ -5,17 +5,13 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/ocr/utils/ocr_utils.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/normalize_and_permute.h"
 #include "vision/ocr/structurev2_layout_preprocessor.h"
 
 
 namespace modeldeploy::vision::ocr {
     StructureV2LayoutPreprocessor::StructureV2LayoutPreprocessor() {
-        // default width(608) and height(900)
-        resize_op_ =
-            std::make_shared<Resize>(layout_image_shape_[2], layout_image_shape_[1]);
-        normalize_permute_op_ = std::make_shared<NormalizeAndPermute>(
-            std::vector({0.485f, 0.456f, 0.406f}),
-            std::vector({0.229f, 0.224f, 0.225f}), true);
     }
 
     std::array<int, 4> StructureV2LayoutPreprocessor::get_layout_image_info(ImageData* image) {
@@ -33,29 +29,19 @@ namespace modeldeploy::vision::ocr {
         };
     }
 
-    bool StructureV2LayoutPreprocessor::resize_layout_image(ImageData* image,
-                                                            const int resize_w,
-                                                            const int resize_h) const {
-        cv::Mat mat;
-        image->to_mat(&mat);
-        resize_op_->set_width_and_height(resize_w, resize_h);
-        (*resize_op_)(&mat);
-        return true;
-    }
 
     bool StructureV2LayoutPreprocessor::run(std::vector<ImageData>* image_batch,
                                             std::vector<Tensor>* outputs) {
         batch_layout_img_info_.clear();
         batch_layout_img_info_.resize(image_batch->size());
-        cv::Mat _images;
+        std::vector<cv::Mat> _images;
         for (size_t i = 0; i < image_batch->size(); ++i) {
             ImageData* image = &image_batch->at(i);
             cv::Mat mat;
             image->to_mat(&mat);
             batch_layout_img_info_[i] = get_layout_image_info(image);
-            resize_layout_image(image, batch_layout_img_info_[i][2],
-                                batch_layout_img_info_[i][3]);
-            (*normalize_permute_op_)(&mat);
+            Resize::apply(&mat, batch_layout_img_info_[i][2], batch_layout_img_info_[i][3]);
+            NormalizeAndPermute::apply(&mat, mean_, std_, is_scale_);
             _images.push_back(mat);
         }
         outputs->resize(1);

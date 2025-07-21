@@ -21,7 +21,7 @@ namespace modeldeploy::vision::face {
         cv::Mat mat;
         image->to_mat(&mat);
         if (mat.rows == 256 && mat.cols == 256) {
-            CenterCrop::apply(image, size_[0], size_[1]);
+            CenterCrop::apply(&mat, size_[0], size_[1]);
         }
         else if (mat.rows == size_[0] && mat.cols == size_[1]) {
             MD_LOG_WARN << "the width and height is already to " << size_[0] << " and  " << size_[1] << std::endl;
@@ -30,7 +30,7 @@ namespace modeldeploy::vision::face {
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss predict precision." << std::endl;
             Resize::apply(&mat, 256, 256);
-            CenterCrop::apply(image, size_[0], size_[1]);
+            CenterCrop::apply(&mat, size_[0], size_[1]);
         }
         // BGR2RGB::Run(mat); 前处理不需要转换为RGB
         HWC2CHW::apply(&mat);

@@ -4,10 +4,7 @@
 
 #pragma once
 
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/normalize.h"
-#include "vision/common/processors/hwc2chw.h"
+
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT ClassifierPreprocessor {
@@ -42,7 +39,9 @@ namespace modeldeploy::vision::ocr {
         void set_normalize(const std::vector<float>& mean,
                            const std::vector<float>& std,
                            bool is_scale) {
-            normalize_op_ = std::make_shared<Normalize>(mean, std, is_scale);
+            mean_ = mean;
+            std_ = std;
+            is_scale_ = is_scale;
         }
 
         /// Set cls_image_shape for the classification preprocess
@@ -54,13 +53,10 @@ namespace modeldeploy::vision::ocr {
         [[nodiscard]] std::vector<int> get_cls_image_shape() const { return cls_image_shape_; }
 
     private:
-        void ocr_classifier_resize_image(ImageData* image,
-                                         const std::vector<int>& cls_image_shape) const;
 
         std::vector<int> cls_image_shape_ = {3, 48, 192};
-        std::shared_ptr<Resize> resize_op_;
-        std::shared_ptr<Pad> pad_op_;
-        std::shared_ptr<Normalize> normalize_op_;
-        std::shared_ptr<HWC2CHW> hwc2chw_op_;
+        std::vector<float> mean_{0.5f, 0.5f, 0.5f};
+        std::vector<float> std_{0.5f, 0.5f, 0.5f};
+        bool is_scale_ = true;
     };
 } // namespace ocr

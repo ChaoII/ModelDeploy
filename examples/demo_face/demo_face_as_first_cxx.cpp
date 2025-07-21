@@ -8,7 +8,6 @@
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceAsFirst(
         "../../test_data/test_models/face/fas_first.onnx");
-    assert(faceid_model.is_initialized());
     auto im0 = modeldeploy::ImageData::imread("../../test_data/test_images/test_face_id4.jpg");
     float result;
     if (!faceid_model.predict(im0, &result)) {

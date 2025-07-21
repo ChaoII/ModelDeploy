@@ -3,12 +3,9 @@
 //
 
 #include "opencv2/opencv.hpp"
-#include "vision/ocr/structurev2_table.h"
-
-#include <core/md_log.h>
-
+#include "core/md_log.h"
 #include "vision/ocr/utils/ocr_utils.h"
-
+#include "vision/ocr/structurev2_table.h"
 
 namespace modeldeploy::vision::ocr {
     StructureV2Table::StructureV2Table() {

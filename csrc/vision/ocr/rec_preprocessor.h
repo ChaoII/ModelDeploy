@@ -5,13 +5,6 @@
 
 #pragma once
 #include "core/tensor.h"
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/cast.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/hwc2chw.h"
-#include "vision/common/processors/normalize.h"
-#include "vision/common/processors/normalize_and_permute.h"
-
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT RecognizerPreprocessor final {
@@ -40,7 +33,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        bool apply(std::vector<ImageData>* image_batch, std::vector<Tensor>* outputs) const;
+        bool apply(const std::vector<ImageData>* image_batch, std::vector<Tensor>* outputs) const;
 
         /// Set static_shape_infer is true or not. When deploy PP-OCR
         /// on hardware which can not support dynamic input shape very well,
@@ -58,9 +51,9 @@ namespace modeldeploy::vision::ocr {
         void set_normalize(const std::vector<float>& mean,
                            const std::vector<float>& std,
                            bool is_scale) {
-            normalize_permute_op_ =
-                std::make_shared<NormalizeAndPermute>(mean, std, is_scale);
-            normalize_op_ = std::make_shared<Normalize>(mean, std, is_scale);
+            mean_ = mean;
+            std_ = std;
+            is_scale_ = is_scale;
         }
 
         /// Set rec_image_shape for the recognition preprocess
@@ -71,26 +64,12 @@ namespace modeldeploy::vision::ocr {
         /// Get rec_image_shape for the recognition preprocess
         std::vector<int> get_rec_image_shape() { return rec_image_shape_; }
 
-        /// This function will disable normalize in preprocessing step.
-        void disable_normalize() { disable_permute_ = true; }
-        /// This function will disable hwc2chw in preprocessing step.
-        void disable_permute() { disable_normalize_ = true; }
-
     private:
-        void ocr_recognizer_resize_image(ImageData* image, float max_wh_ratio,
-                                         const std::vector<int>& rec_image_shape,
-                                         bool static_shape_infer) const;
-        // for recording the switch of hwc2chw
-        bool disable_permute_ = false;
-        // for recording the switch of normalize
-        bool disable_normalize_ = false;
         std::vector<int> rec_image_shape_ = {3, 48, 320};
         bool static_shape_infer_ = false;
-        std::shared_ptr<Resize> resize_op_;
-        std::shared_ptr<Pad> pad_op_;
-        std::shared_ptr<NormalizeAndPermute> normalize_permute_op_;
-        std::shared_ptr<Normalize> normalize_op_;
-        std::shared_ptr<HWC2CHW> hwc2chw_op_;
-        std::shared_ptr<Cast> cast_op_;
+        std::vector<float> mean_ = {0.5f, 0.5f, 0.5f};
+        std::vector<float> std_ = {0.5f, 0.5f, 0.5f};
+        bool is_scale_ = true;
+        std::vector<float> pad_value_ = {127, 127, 127};
     };
 } // namespace ocr

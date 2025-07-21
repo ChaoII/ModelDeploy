@@ -12,7 +12,9 @@
 
 
 namespace modeldeploy::vision::utils {
-    MODELDEPLOY_CXX_EXPORT bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = false);
+    MODELDEPLOY_CXX_EXPORT bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = true);
+
+    bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor);
 
     DataType cv_dtype_to_md_dtype(int type);
 

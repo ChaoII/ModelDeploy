@@ -4,10 +4,9 @@
 
 #pragma once
 
-#include <map>
-#include "vision/utils.h"
 #include "core/md_decl.h"
 #include "core/tensor.h"
+#include "vision/common/image_data.h"
 
 namespace modeldeploy::vision::classification {
     /*! @brief Preprocessor object for YOLOv5Cls serials model.

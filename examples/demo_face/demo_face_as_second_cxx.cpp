@@ -8,7 +8,6 @@
 int main() {
     auto face_antispoof_model = modeldeploy::vision::face::SeetaFaceAsSecond(
         "../../test_data/test_models/face/fas_second.onnx");
-    assert(face_antispoof_model.is_initialized());
     auto im0 = modeldeploy::ImageData::imread("../../test_data/test_images/test_face_as_second2.jpg");
     std::vector<std::tuple<int, float>> results;
     if (!face_antispoof_model.predict(im0, &results)) {
