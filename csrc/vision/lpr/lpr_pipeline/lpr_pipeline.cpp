@@ -3,6 +3,7 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
 #include "vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
 namespace modeldeploy::vision::lpr {

@@ -3,11 +3,7 @@
 //
 
 #pragma once
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/normalize.h"
-#include "vision/common/processors/hwc2chw.h"
-#include "opencv2/opencv.hpp"
+
 
 
 namespace modeldeploy::vision::ocr {
@@ -46,19 +42,14 @@ namespace modeldeploy::vision::ocr {
         }
 
     private:
-        void structure_v2_table_resize_image(ImageData* mat, int batch_idx);
-        // for recording the switch of hwc2chw
-        bool disable_permute_ = false;
-        // for recording the switch of normalize
-        bool disable_normalize_ = false;
-        // for SLANet or SLANet_Plus max_len = 484,for SLANeXt_wired max_len = 512
+        // for SLANet or SLANet_Plus max_len = 484, for SLANeXt_wired max_len = 512
         int max_len = 512;
         std::vector<int> rec_image_shape_ = {3, max_len, max_len};
         bool static_shape_infer_ = false;
-        std::shared_ptr<Resize> resize_op_;
-        std::shared_ptr<Pad> pad_op_;
-        std::shared_ptr<Normalize> normalize_op_;
-        std::shared_ptr<HWC2CHW> hwc2chw_op_;
+        std::vector<float> mean_ = {0.485f, 0.456f, 0.406f};
+        std::vector<float> std_ = {0.229f, 0.224f, 0.225f};
+        std::vector<float> pad_value_ = {0.0f, 0.0f, 0.0f};
+        bool is_scale_ = true;
         std::vector<std::array<int, 4>> batch_det_img_info_;
     };
 } // namespace modeldeploy::vision::ocr

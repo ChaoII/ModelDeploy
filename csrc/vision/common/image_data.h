@@ -34,7 +34,7 @@ namespace modeldeploy {
 
         [[nodiscard]] ImageData clone() const;
         static ImageData from_mat(const void* mat); // mat为cv::Mat*
-        void to_mat(void* mat) const; // mat为cv::Mat*
+        void to_mat(void* mat, bool is_copy = false) const; // mat为cv::Mat*
         static void images_to_mats(const std::vector<ImageData>& images, const std::vector<void*>& mats);
         static ImageData imread(const std::string& filename);
         [[nodiscard]] bool imwrite(const std::string& filename) const;

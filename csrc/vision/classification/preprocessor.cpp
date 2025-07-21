@@ -3,6 +3,7 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
 #include "vision/classification/preprocessor.h"
 #include "vision/common/processors/center_crop.h"
 #include "vision/common/processors/resize.h"
@@ -24,7 +25,7 @@ namespace modeldeploy::vision::classification {
         cv::Mat mat;
         image->to_mat(&mat);
         const int crop_size = std::min(mat.rows, mat.cols);
-        CenterCrop::apply(image, crop_size, crop_size);
+        CenterCrop::apply(&mat, crop_size, crop_size);
         Resize::apply(&mat, size_[0], size_[1], -1, -1, cv::INTER_LINEAR);
         // Normalize
         BGR2RGB::apply(&mat);

@@ -3,9 +3,10 @@
 //
 
 #include <fstream>
-#include "vision/ocr/rec_postprocessor.h"
 #include "core/md_log.h"
 #include "utils/ocr_utils.h"
+#include "vision/ocr/rec_postprocessor.h"
+#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
     std::vector<std::string> read_dict(const std::string& path) {

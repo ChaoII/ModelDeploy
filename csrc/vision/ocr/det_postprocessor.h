@@ -5,7 +5,6 @@
 #pragma once
 #include "core/md_decl.h"
 #include "core/tensor.h"
-#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT DBDetectorPostprocessor {
@@ -64,6 +63,5 @@ namespace modeldeploy::vision::ocr {
         double det_db_unclip_ratio_ = 1.5;
         std::string det_db_score_mode_ = "slow";
         bool use_dilation_ = false;
-        PostProcessor util_post_processor_;
     };
 } // namespace ocr

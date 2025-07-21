@@ -5,44 +5,17 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/ocr/utils/ocr_utils.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/normalize.h"
+#include "vision/common/processors/hwc2chw.h"
 #include "vision/ocr/structurev2_table_preprocessor.h"
 
 
 namespace modeldeploy::vision::ocr {
     StructureV2TablePreprocessor::StructureV2TablePreprocessor() {
-        resize_op_ = std::make_shared<Resize>(-1, -1);
-        std::vector<float> value = {0, 0, 0};
-        pad_op_ = std::make_shared<Pad>(0, 0, 0, 0, value);
-
-        std::vector mean = {0.485f, 0.456f, 0.406f};
-        std::vector std = {0.229f, 0.224f, 0.225f};
-        normalize_op_ = std::make_shared<Normalize>(mean, std, true);
-        hwc2chw_op_ = std::make_shared<HWC2CHW>();
     }
 
-    void StructureV2TablePreprocessor::structure_v2_table_resize_image(ImageData* image,
-                                                                       const int batch_idx) {
-        cv::Mat mat;
-        image->to_mat(&mat);
-        const auto width = static_cast<float>(mat.cols);
-        const auto height = static_cast<float>(mat.rows);
-        const float ratio = max_len / (std::max(height, width) * 1.0);
-        const int resize_h = static_cast<int>(height * ratio);
-        const int resize_w = static_cast<int>(width * ratio);
-
-        resize_op_->set_width_and_height(resize_w, resize_h);
-        (*resize_op_)(&mat);
-
-        (*normalize_op_)(&mat);
-        pad_op_->set_padding_size(0, max_len - resize_h, 0,
-                                  max_len - resize_w);
-        (*pad_op_)(&mat);
-        (*hwc2chw_op_)(&mat);
-        batch_det_img_info_[batch_idx] = {
-            static_cast<int>(width), static_cast<int>(height), resize_w,
-            resize_h
-        };
-    }
 
     bool StructureV2TablePreprocessor::run(std::vector<ImageData>* images,
                                            std::vector<Tensor>* outputs,
@@ -70,11 +43,23 @@ namespace modeldeploy::vision::ocr {
                                            std::vector<Tensor>* outputs) {
         batch_det_img_info_.clear();
         batch_det_img_info_.resize(image_batch->size());
-        cv::Mat _images;
+        std::vector<cv::Mat> _images;
         for (size_t i = 0; i < image_batch->size(); ++i) {
             cv::Mat mat;
             image_batch->at(i).to_mat(&mat);
-            structure_v2_table_resize_image(&image_batch->at(i), i);
+            const auto width = static_cast<float>(mat.cols);
+            const auto height = static_cast<float>(mat.rows);
+            const float ratio = max_len / (std::max(height, width) * 1.0);
+            const int resize_h = static_cast<int>(height * ratio);
+            const int resize_w = static_cast<int>(width * ratio);
+            Resize::apply(&mat, resize_w, resize_h);
+            Normalize::apply(&mat, mean_, std_,is_scale_);
+            Pad::apply(&mat,0, max_len - resize_h, 0, max_len - resize_w,pad_value_);
+            HWC2CHW::apply(&mat);
+            batch_det_img_info_[i] = {
+                static_cast<int>(width), static_cast<int>(height), resize_w,
+                resize_h
+            };
             _images.push_back(mat);
         }
 

@@ -8,7 +8,6 @@
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceGender(
         "../../test_data/test_models/face/gender_predictor.onnx");
-    assert(faceid_model.is_initialized());
     const auto im0 = modeldeploy::ImageData::imread("../../test_data/test_images/test_face_gender1.jpg");
     int gender_id = 0;
     if (!faceid_model.predict(im0, &gender_id)) {

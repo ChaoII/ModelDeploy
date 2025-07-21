@@ -1,9 +1,10 @@
 //
 // Created by 84945 on 2025/6/2.
 //
-#include <vision/utils.h>
 
+#include "vision/utils.h"
 #include "core/md_log.h"
+#include "vision/common/visualize/utils.h"
 #include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {

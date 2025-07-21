@@ -58,6 +58,12 @@ namespace modeldeploy::vision::utils {
         };
     }
 
+    bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor) {
+        cv::Mat mat;
+        image_data->to_mat(&mat);
+        return mat_to_tensor(mat, tensor);
+    }
+
 
     bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, const bool is_copy) {
         const auto dtype = cv_dtype_to_md_dtype(mat.type());

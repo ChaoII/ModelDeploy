@@ -6,7 +6,6 @@
 #pragma once
 
 #include "core/md_decl.h"
-#include "vision/ocr/utils/ocr_postprocess_op.h"
 #include "core/tensor.h"
 
 namespace modeldeploy::vision::ocr {
