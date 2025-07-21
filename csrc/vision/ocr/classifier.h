@@ -7,7 +7,6 @@
 #include "base_model.h"
 #include "vision/common/result.h"
 #include "vision/common/image_data.h"
-#include "vision/ocr/utils/ocr_postprocess_op.h"
 #include "vision/ocr/cls_postprocessor.h"
 #include "vision/ocr/cls_preprocessor.h"
 

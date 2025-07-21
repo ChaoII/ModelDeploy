@@ -12,6 +12,7 @@
 #include "vision/common/processors/normalize.h"
 #include "vision/common/processors/normalize_and_permute.h"
 
+
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT RecognizerPreprocessor final {
     public:
@@ -27,7 +28,7 @@ namespace modeldeploy::vision::ocr {
          * \param indices
          * \return true if the preprocess successes, otherwise false
          */
-        bool run(const std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+        bool run(const std::vector<ImageData>* images, std::vector<Tensor>* outputs,
                  size_t start_index, size_t end_index,
                  const std::vector<int>& indices) const;
 
@@ -39,7 +40,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        bool apply(std::vector<cv::Mat>* image_batch, std::vector<Tensor>* outputs) const;
+        bool apply(std::vector<ImageData>* image_batch, std::vector<Tensor>* outputs) const;
 
         /// Set static_shape_infer is true or not. When deploy PP-OCR
         /// on hardware which can not support dynamic input shape very well,
@@ -76,7 +77,7 @@ namespace modeldeploy::vision::ocr {
         void disable_permute() { disable_normalize_ = true; }
 
     private:
-        void ocr_recognizer_resize_image(cv::Mat* mat, float max_wh_ratio,
+        void ocr_recognizer_resize_image(ImageData* image, float max_wh_ratio,
                                          const std::vector<int>& rec_image_shape,
                                          bool static_shape_infer) const;
         // for recording the switch of hwc2chw

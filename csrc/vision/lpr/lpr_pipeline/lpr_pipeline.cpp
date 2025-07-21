@@ -100,7 +100,7 @@ namespace modeldeploy::vision::lpr {
                 return false;
             }
             for (int j = 0; j < 4; ++j) {
-                points[j] = det_result[i].landmarks[j].to_cv_point2f();
+                points[j] = utils::point2f_to_cv_type(det_result[i].landmarks[j]);
             }
             cv::Mat _image;
             image.to_mat(&_image);

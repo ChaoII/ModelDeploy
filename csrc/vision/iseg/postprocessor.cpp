@@ -136,7 +136,7 @@ namespace modeldeploy::vision::detection {
                 cv::Rect roi(_x1, _y1, _x2 - _x1, _y2 - _y1);
                 dest = dest(roi);
                 cv::resize(dest, mask, cv::Size2f{ipt_w, ipt_h}, 0, 0, cv::INTER_LINEAR);
-                mask = mask(box.to_cv_Rect2f());
+                mask = mask(utils::rect2f_to_cv_type(box));
                 mask = mask > mask_threshold_;
                 // save mask in DetectionResult
                 int keep_mask_h = static_cast<int>(box.height);
@@ -270,7 +270,7 @@ namespace modeldeploy::vision::detection {
                 cv::Rect roi(_x1, _y1, _x2 - _x1, _y2 - _y1);
                 dest = dest(roi);
                 cv::resize(dest, mask, cv::Size2f{ipt_w, ipt_h}, 0, 0, cv::INTER_LINEAR);
-                mask = mask(box.to_cv_Rect2f());
+                mask = mask(utils::rect2f_to_cv_type(box));
                 mask = mask > mask_threshold_;
                 // save mask in DetectionResult
                 int keep_mask_h = static_cast<int>(box.height);

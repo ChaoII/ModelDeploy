@@ -21,7 +21,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        virtual bool run(std::vector<cv::Mat> *image_batch, std::vector<Tensor> *outputs);
+        virtual bool run(std::vector<ImageData> *image_batch, std::vector<Tensor> *outputs);
 
         /// Set preprocess normalize parameters, please call this API to customize
         /// the normalize parameters, otherwise it will use the default normalize
@@ -66,9 +66,9 @@ namespace modeldeploy::vision::ocr {
         bool get_static_shape_infer() const { return static_shape_infer_; }
 
     private:
-        bool resize_layout_image(cv::Mat *img, int resize_w, int resize_h) const;
+        bool resize_layout_image(ImageData *image, int resize_w, int resize_h) const;
 
-        std::array<int, 4> get_layout_image_info(cv::Mat *img);
+        std::array<int, 4> get_layout_image_info(ImageData *image);
 
         // for recording the switch of hwc2chw
         bool disable_permute_ = false;

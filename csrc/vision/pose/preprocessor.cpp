@@ -19,25 +19,27 @@ namespace modeldeploy::vision::detection {
     }
 
 
-    bool UltralyticsPosePreprocessor::preprocess(cv::Mat* mat, Tensor* output,
+    bool UltralyticsPosePreprocessor::preprocess(ImageData* image, Tensor* output,
                                                  LetterBoxRecord* letter_box_record) const {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        utils::letter_box(mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_, padding_value_, stride_,
+        cv::Mat mat;
+        image->to_mat(&mat);
+        utils::letter_box(&mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_, padding_value_, stride_,
                           letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        ConvertAndPermute::apply(mat, alpha, beta, true);
+        ConvertAndPermute::apply(&mat, alpha, beta, true);
         // Record output shape of preprocessed image
 
-        utils::mat_to_tensor(*mat, output);
+        utils::mat_to_tensor(mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
     bool UltralyticsPosePreprocessor::run(
-        std::vector<cv::Mat>* images,
+        std::vector<ImageData>* images,
         std::vector<Tensor>* outputs,
         std::vector<LetterBoxRecord>* letter_box_records) const {
         if (images->empty()) {

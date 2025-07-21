@@ -11,7 +11,7 @@ namespace modeldeploy::vision::face {
     public:
         ScrfdPreprocessor();
 
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -43,7 +43,7 @@ namespace modeldeploy::vision::face {
         [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const;
+        bool preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
         std::vector<int> size_{640, 640};
         /// padding value, size should be the same as channels
@@ -58,6 +58,5 @@ namespace modeldeploy::vision::face {
         bool is_scale_up_ = true;
         /// padding stride, for is_mini_pad
         int stride_ = 32;
-
     };
 } // namespace detection

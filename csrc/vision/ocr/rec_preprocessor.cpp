@@ -6,6 +6,12 @@
 #include "vision/utils.h"
 #include "vision/ocr/utils/ocr_utils.h"
 #include "vision/ocr/rec_preprocessor.h"
+#include "vision/common/processors/pad.h"
+#include "vision/common/processors/cast.h"
+#include "vision/common/processors/resize.h"
+#include "vision/common/processors/hwc2chw.h"
+#include "vision/common/processors/normalize.h"
+#include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::ocr {
     RecognizerPreprocessor::RecognizerPreprocessor() {
@@ -22,14 +28,17 @@ namespace modeldeploy::vision::ocr {
     }
 
     void RecognizerPreprocessor::ocr_recognizer_resize_image(
-        cv::Mat* mat, const float max_wh_ratio,
+        ImageData* image, const float max_wh_ratio,
         const std::vector<int>& rec_image_shape, const bool static_shape_infer) const {
         const int img_h = rec_image_shape[1];
         int img_w = rec_image_shape[2];
 
+        cv::Mat mat;
+        image->to_mat(&mat);
+
         if (!static_shape_infer) {
             img_w = static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
-            const float ratio = static_cast<float>(mat->cols) / static_cast<float>(mat->rows);
+            const float ratio = static_cast<float>(mat.cols) / static_cast<float>(mat.rows);
             int resize_w;
             if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w)) {
                 resize_w = img_w;
@@ -38,27 +47,27 @@ namespace modeldeploy::vision::ocr {
                 resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
             }
             resize_op_->set_width_and_height(resize_w, img_h);
-            (*resize_op_)(mat);
-            pad_op_->set_padding_size(0, 0, 0, img_w - mat->cols);
-            (*pad_op_)(mat);
+            (*resize_op_)(&mat);
+            pad_op_->set_padding_size(0, 0, 0, img_w - mat.cols);
+            (*pad_op_)(&mat);
         }
         else {
-            if (mat->cols >= img_w) {
+            if (mat.cols >= img_w) {
                 // Resize W to 320
                 resize_op_->set_width_and_height(img_w, img_h);
-                (*resize_op_)(mat);
+                (*resize_op_)(&mat);
             }
             else {
-                resize_op_->set_width_and_height(mat->cols, img_h);
-                (*resize_op_)(mat);
+                resize_op_->set_width_and_height(mat.cols, img_h);
+                (*resize_op_)(&mat);
                 // Pad to 320
-                pad_op_->set_padding_size(0, 0, 0, img_w - mat->cols);
-                (*pad_op_)(mat);
+                pad_op_->set_padding_size(0, 0, 0, img_w - mat.cols);
+                (*pad_op_)(&mat);
             }
         }
     }
 
-    bool RecognizerPreprocessor::run(const std::vector<cv::Mat>* images,
+    bool RecognizerPreprocessor::run(const std::vector<ImageData>* images,
                                      std::vector<Tensor>* outputs,
                                      const size_t start_index, const size_t end_index,
                                      const std::vector<int>& indices) const {
@@ -69,7 +78,7 @@ namespace modeldeploy::vision::ocr {
             return false;
         }
 
-        std::vector<cv::Mat> mats(end_index - start_index);
+        std::vector<ImageData> mats(end_index - start_index);
         for (size_t i = start_index; i < end_index; ++i) {
             size_t real_index = i;
             if (!indices.empty()) {
@@ -80,24 +89,27 @@ namespace modeldeploy::vision::ocr {
         return apply(&mats, outputs);
     }
 
-    bool RecognizerPreprocessor::apply(std::vector<cv::Mat>* image_batch,
+    bool RecognizerPreprocessor::apply(std::vector<ImageData>* image_batch,
                                        std::vector<Tensor>* outputs) const {
         const int img_h = rec_image_shape_[1];
         const int img_w = rec_image_shape_[2];
         float max_wh_ratio = static_cast<float>(img_w) * 1.0f / static_cast<float>(img_h);
-        for (const auto& mat : *image_batch) {
-            float ori_wh_ratio = static_cast<float>(mat.cols) * 1.0f / static_cast<float>(mat.rows);
+        for (const auto& image : *image_batch) {
+            float ori_wh_ratio = static_cast<float>(image.width()) * 1.0f / static_cast<float>(image.height());
             max_wh_ratio = std::max(max_wh_ratio, ori_wh_ratio);
         }
 
+        cv::Mat _images;
         for (auto& image : *image_batch) {
-            cv::Mat* mat = &image;
-            ocr_recognizer_resize_image(mat, max_wh_ratio, rec_image_shape_, static_shape_infer_);
-            (*normalize_permute_op_)(mat);
+            cv::Mat mat;
+            image.to_mat(&mat);
+            ocr_recognizer_resize_image(&image, max_wh_ratio, rec_image_shape_, static_shape_infer_);
+            (*normalize_permute_op_)(&mat);
+            _images.push_back(mat);
         }
         // Only have 1 output Tensor.
         outputs->resize(1);
-        utils::mats_to_tensor(*image_batch, &(*outputs)[0]);
+        utils::mats_to_tensor(_images, &(*outputs)[0]);
         return true;
     }
 }

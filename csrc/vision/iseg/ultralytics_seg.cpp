@@ -35,12 +35,7 @@ namespace modeldeploy::vision::detection {
                                        std::vector<std::vector<InstanceSegResult>>* results,
                                        TimerArray* timers) {
         std::vector<LetterBoxRecord> ims_info;
-        std::vector<cv::Mat> _images;
-        for (const auto& image : images) {
-            cv::Mat image_;
-            image.to_mat(&image_);
-            _images.push_back(image_);
-        }
+        std::vector<ImageData> _images = images;
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(&_images, &reused_input_tensors_, &ims_info)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;

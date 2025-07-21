@@ -1,6 +1,8 @@
 //
 // Created by 84945 on 2025/6/2.
 //
+#include <vision/utils.h>
+
 #include "core/md_log.h"
 #include "vision/common/visualize/visualize.h"
 
@@ -111,7 +113,8 @@ namespace modeldeploy::vision {
             }
             auto cv_color = color_map[class_id];
             const std::string text = "score: " + std::to_string(_result.score).substr(0, 4);
-            draw_rectangle_and_text(overlay, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, -1, false);
+            draw_rectangle_and_text(overlay, utils::rect2f_to_cv_type(_result.box), text, cv_color, font, font_size, -1,
+                                    false);
         }
         cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
         // 绘制对象矩形矩形边框、文字背景边框、文字、关键点
@@ -119,12 +122,13 @@ namespace modeldeploy::vision {
             auto class_id = _result.label_id;
             auto cv_color = color_map[class_id];
             const std::string text = "score: " + std::to_string(_result.score).substr(0, 4);
-            draw_rectangle_and_text(cv_image, _result.box.to_cv_Rect2f(), text, cv_color, font, font_size, 1, true);
+            draw_rectangle_and_text(cv_image, utils::rect2f_to_cv_type(_result.box), text, cv_color,
+                                    font, font_size, 1, true);
             std::vector<cv::Point3f> cv_keypoints;
             std::transform(_result.keypoints.begin(), _result.keypoints.end(),
                            std::back_inserter(cv_keypoints),
                            [](const Point3f& point) {
-                               return point.to_cv_point3f();
+                               return utils::point3f_to_cv_type(point);
                            });
             draw_keypoints(cv_image, cv_keypoints, landmark_radius);
         }

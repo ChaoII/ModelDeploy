@@ -138,7 +138,7 @@ namespace modeldeploy::vision::utils {
                 if (suppressed[j]) continue;
 
                 const auto& box_j = (*result)[j].rotated_box;
-                const float iou = rotated_iou(box_i.to_cv_rotated_rect(), box_j.to_cv_rotated_rect());
+                const float iou = rotated_iou(rotated_rect_to_cv_type(box_i), rotated_rect_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }

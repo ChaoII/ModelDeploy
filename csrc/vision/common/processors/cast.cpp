@@ -5,24 +5,28 @@
 
 #include "cast.h"
 #include "core/md_log.h"
+#include <opencv2/opencv.hpp>
 
 
 namespace modeldeploy::vision {
-    bool Cast::impl(cv::Mat* mat) const {
-        const int c = mat->channels();
+    bool Cast::impl(ImageData* image) const {
+
+        cv::Mat mat;
+        image->to_mat(&mat);
+        const int c = image->channels();
         if (dtype_ == "float") {
-            if (mat->type() != CV_32FC(c)) {
-                mat->convertTo(*mat, CV_32FC(c));
+            if (mat.type() != CV_32FC(c)) {
+                mat.convertTo(mat, CV_32FC(c));
             }
         }
         else if (dtype_ == "float16") {
-            if (mat->type() != CV_16FC(c)) {
-                mat->convertTo(*mat, CV_16FC(c));
+            if (mat.type() != CV_16FC(c)) {
+                mat.convertTo(mat, CV_16FC(c));
             }
         }
         else if (dtype_ == "double") {
-            if (mat->type() != CV_64FC(c)) {
-                mat->convertTo(*mat, CV_64FC(c));
+            if (mat.type() != CV_64FC(c)) {
+                mat.convertTo(mat, CV_64FC(c));
             }
         }
         else {
@@ -32,13 +36,13 @@ namespace modeldeploy::vision {
         return true;
     }
 
-    bool Cast::operator()(cv::Mat* mat) const {
-        return impl(mat);
+    bool Cast::operator()(ImageData* image) const {
+        return impl(image);
     }
 
 
-    bool Cast::apply(cv::Mat* mat, const std::string& dtype) {
+    bool Cast::apply(ImageData* image, const std::string& dtype) {
         const auto op = Cast(dtype);
-        return op(mat);
+        return op(image);
     }
 } // namespace modeldeploy::vision

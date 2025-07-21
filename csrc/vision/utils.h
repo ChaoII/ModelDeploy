@@ -4,16 +4,26 @@
 
 #pragma once
 
+#include <array>
 #include "common/image_data.h"
 #include "core/tensor.h"
 #include "vision/common/result.h"
-#include "vision/common/struct.h"
+#include <opencv2/opencv.hpp>
 
 
 namespace modeldeploy::vision::utils {
     MODELDEPLOY_CXX_EXPORT bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = false);
 
     DataType cv_dtype_to_md_dtype(int type);
+
+    cv::Point2f point2f_to_cv_type(Point2f point2f);
+
+    cv::Point3f point3f_to_cv_type(Point3f point3f);
+
+    cv::Rect2f rect2f_to_cv_type(Rect2f rect2f);
+
+    cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);
+
 
     MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 

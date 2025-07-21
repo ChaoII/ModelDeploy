@@ -30,16 +30,21 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAsSecond::preprocess(cv::Mat* mat, Tensor* output) {
+    bool SeetaFaceAsSecond::preprocess(ImageData* image, Tensor* output) {
         const std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         const std::vector beta_ = {-1.0f, -1.0f, -1.0f};
 
-        Resize::apply(mat, size_[0], size_[1]);
-        Convert::apply(mat, alpha_, beta_);
-        HWC2CHW::apply(mat);
-        Cast::apply(mat, "float");
 
-        if (!utils::mat_to_tensor(*mat, output)) {
+        cv::Mat mat;
+        image->to_mat(&mat);
+
+
+        Resize::apply(&mat, size_[0], size_[1]);
+        Convert::apply(&mat, alpha_, beta_);
+        HWC2CHW::apply(&mat);
+        Cast::apply(image, "float");
+
+        if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -72,8 +77,7 @@ namespace modeldeploy::vision::face {
 
     bool SeetaFaceAsSecond::predict(const ImageData& image, std::vector<std::tuple<int, float>>* result) {
         std::vector<Tensor> input_tensors(1);
-        cv::Mat _image;
-        image.to_mat(&_image);
+        auto _image = image;
         if (!preprocess(&_image, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;

@@ -13,27 +13,29 @@
 
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceAgePreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
+    bool SeetaFaceAgePreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]
         // 2. HWC2CHW
         // 3. Cast
-        if (mat->rows == 256 && mat->cols == 256) {
-            CenterCrop::apply(mat, size_[0], size_[1]);
+        cv::Mat mat;
+        image->to_mat(&mat);
+        if (mat.rows == 256 && mat.cols == 256) {
+            CenterCrop::apply(image, size_[0], size_[1]);
         }
-        else if (mat->rows == size_[0] && mat->cols == size_[1]) {
+        else if (mat.rows == size_[0] && mat.cols == size_[1]) {
             MD_LOG_WARN << "the width and height is already to " << size_[0] << " and  " << size_[1] << std::endl;
         }
         else {
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss predict precision." << std::endl;
-            Resize::apply(mat, 256, 256);
-            CenterCrop::apply(mat, size_[0], size_[1]);
+            Resize::apply(&mat, 256, 256);
+            CenterCrop::apply(image, size_[0], size_[1]);
         }
         // BGR2RGB::Run(mat); 前处理不需要转换为RGB
-        HWC2CHW::apply(mat);
-        Cast::apply(mat, "float");
-        if (!utils::mat_to_tensor(*mat, output)) {
+        HWC2CHW::apply(&mat);
+        Cast::apply(image, "float");
+        if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -41,7 +43,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAgePreprocessor::run(std::vector<cv::Mat>* images,
+    bool SeetaFaceAgePreprocessor::run(std::vector<ImageData>* images,
                                        std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
