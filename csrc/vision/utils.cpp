@@ -317,12 +317,11 @@ namespace modeldeploy::vision::utils {
             const int right = static_cast<int>(round(half_w + 0.1));
             Pad::apply(mat, top, bottom, left, right, padding_value);
         }
-        cv::imwrite("2132.jpg", *mat);
         letter_box_record->out_h = static_cast<float>(mat->rows);
         letter_box_record->out_w = static_cast<float>(mat->cols);
         letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
         letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
-        letter_box_record->scale = scale;
+        letter_box_record->scale = static_cast<float>(scale);
     }
 
     ImageData center_crop(const ImageData& image, const cv::Size& crop_size) {
