@@ -28,7 +28,7 @@ namespace modeldeploy::vision::detection {
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
         ConvertAndPermute::apply(mat, alpha, beta, true);
-        utils::mat_to_tensor(*mat, output);
+        utils::mat_to_tensor(*mat, output, false);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
