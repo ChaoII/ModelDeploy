@@ -4,7 +4,6 @@
 
 #pragma once
 #include "core/tensor.h"
-#include "vision/common/result.h"
 #include "vision/common/struct.h"
 
 namespace modeldeploy::vision::detection {
@@ -38,34 +37,9 @@ namespace modeldeploy::vision::detection {
         /// Get padding value, size should be the same as channels
         [[nodiscard]] std::vector<float> get_padding_value() const { return padding_value_; }
 
-        /// Set is_scale_up, if is_scale_up is false, the input image only
-      /// can be zoom out, the maximum resize scale cannot exceed 1.0, default true
-        void set_scale_up(const bool is_scale_up) {
-            is_scale_up_ = is_scale_up;
-        }
-
-        /// Get is_scale_up, default true
-        [[nodiscard]] bool get_scale_up() const { return is_scale_up_; }
-
-        /// Set is_mini_pad, pad to the minimum rectange
-      /// which height and width is times of stride
-        void set_mini_pad(const bool is_mini_pad) {
-            is_mini_pad_ = is_mini_pad;
-        }
-
-        /// Get is_mini_pad, default false
-        [[nodiscard]] bool get_mini_pad() const { return is_mini_pad_; }
-
-        /// Set padding stride, only for mini_pad mode
-        void set_stride(const int stride) {
-            stride_ = stride;
-        }
-
-        /// Get padding stride, default 32
-        [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(ImageData* image, Tensor* output,
+        bool preprocess(const ImageData* image, Tensor* output,
                         LetterBoxRecord* letter_box_record) const;
 
         // target size, tuple of (width, height), default size = {640, 640}
@@ -73,19 +47,5 @@ namespace modeldeploy::vision::detection {
 
         // padding value, size should be the same as channels
         std::vector<float> padding_value_;
-
-        // only pad to the minimum rectangle which height and width is times of stride
-        bool is_mini_pad_;
-
-        // while is_mini_pad = false and is_no_pad = true,
-        // will resize the image to the set size
-        bool is_no_pad_;
-
-        // if is_scale_up is false, the input image only can be zoom out,
-        // the maximum resize scale cannot exceed 1.0
-        bool is_scale_up_;
-
-        // padding stride, for is_mini_pad
-        int stride_;
     };
 }

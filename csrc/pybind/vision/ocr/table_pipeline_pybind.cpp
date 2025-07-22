@@ -41,15 +41,16 @@ namespace modeldeploy::vision {
                  [](ocr::PPStructureV2Table& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      OCRResult result;
-                     self.predict(mat, &result);
+                     self.predict(ImageData::from_mat(&mat), &result);
                      return result;
                  }, pybind11::arg("image"))
 
             .def("batch_predict",
                  [](ocr::PPStructureV2Table& self, std::vector<pybind11::array>& images) {
-                     std::vector<cv::Mat> _images;
+                     std::vector<ImageData> _images;
                      for (auto& image : images) {
-                         _images.push_back(pyarray_to_cv_mat(image));
+                         auto cv_image = pyarray_to_cv_mat(image);
+                         _images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<OCRResult> results;
                      self.batch_predict(_images, &results);

@@ -635,7 +635,7 @@ namespace modeldeploy::vision {
                 if (d.contains("scale")) l.scale = d["scale"].cast<float>();
                 return l;
             })
-            .def("__str__", &LetterBoxRecord::str)
-            .def("__repr__", &LetterBoxRecord::str);
+            .def("__str__", &LetterBoxRecord::to_string)
+            .def("__repr__", &LetterBoxRecord::to_string);
     }
 } // namespace modeldeploy

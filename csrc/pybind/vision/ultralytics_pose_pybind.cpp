@@ -12,10 +12,11 @@ namespace modeldeploy::vision {
             .def("run",
                  [](const detection::UltralyticsPosePreprocessor& self,
                     std::vector<pybind11::array>& im_list) {
-                     std::vector<cv::Mat> images;
+                     std::vector<ImageData> images;
                      images.reserve(im_list.size());
                      for (auto& image : im_list) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                         auto cv_image = pyarray_to_cv_mat(image);
+                         images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<LetterBoxRecord> records;
                      std::vector<Tensor> outputs;
@@ -81,16 +82,17 @@ namespace modeldeploy::vision {
                  [](detection::UltralyticsPose& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<PoseResult> result;
-                     self.predict(mat, &result);
+                     self.predict(ImageData::from_mat(&mat), &result);
                      return result;
                  }, pybind11::arg("image"))
             .def("batch_predict",
                  [](detection::UltralyticsPose& self,
                     std::vector<pybind11::array>& images) {
-                     std::vector<cv::Mat> _images;
+                     std::vector<ImageData> _images;
                      _images.reserve(images.size());
                      for (auto& image : images) {
-                         _images.push_back(pyarray_to_cv_mat(image));
+                         auto cv_image = pyarray_to_cv_mat(image);
+                         _images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<std::vector<PoseResult>> results;
                      self.batch_predict(_images, &results);

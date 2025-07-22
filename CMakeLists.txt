@@ -21,9 +21,6 @@ option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
 
 
-if (WITH_GPU)
-    add_definitions(-DWITH_GPU)
-endif ()
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" MD_VERSION)
 string(STRIP ${MD_VERSION} MD_VERSION)
 
@@ -38,11 +35,18 @@ if (POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
 endif ()
 
+
+## Only for CXX compiler (not CUDA)
+#if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+#    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4819>" "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>" "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+#endif ()
+
+
 if (MSVC)
     if (WITH_STATIC_CRT)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
     endif ()
-    add_compile_options(/wd4819 /wd4244 /utf-8)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4819>" "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>" "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     add_definitions(-DMD_CXX_EXPORT)
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
@@ -61,8 +65,23 @@ file(GLOB_RECURSE TRT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/t
 file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
 file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
+file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu)
 
 list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
+
+
+if (WITH_GPU)
+    add_definitions(-DWITH_GPU)
+    enable_language(CUDA)
+    # https://developer.nvidia.com/cuda-gpus
+    set(CMAKE_CUDA_ARCHITECTURES 86)   # RTX 40 系列示例
+    # for cudaMalloc()
+    find_package(CUDAToolkit REQUIRED)
+    include_directories(${CUDAToolkit_INCLUDE_DIRS})
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler /utf-8")
+    list(APPEND ALL_SOURCE ${CUDA_SOURCE})
+    list(APPEND DEPENDS CUDA::cudart)
+endif ()
 
 
 if (ENABLE_ORT)
@@ -85,7 +104,6 @@ if (ENABLE_TRT)
     list(APPEND ALL_SOURCE ${TRT_BACKEND_SOURCE})
     list(APPEND DEPENDS trt::nvinfer)
     list(APPEND DEPENDS trt::nvonnxparser)
-    list(APPEND DEPENDS CUDA::cudart)
 endif ()
 
 

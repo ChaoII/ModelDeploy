@@ -41,8 +41,8 @@ namespace modeldeploy::vision::utils {
 
     void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold);
 
-    void letter_box(cv::Mat* mat, const std::vector<int>& size, bool is_scale_up, bool is_mini_pad, bool is_no_pad,
-                    const std::vector<float>& padding_value, int stride, LetterBoxRecord* letter_box_record);
+    void letter_box(cv::Mat* mat, const std::vector<int>& size,
+                    const std::vector<float>& padding_value, LetterBoxRecord* letter_box_record);
 
     void print_mat_type(const cv::Mat& mat);
 

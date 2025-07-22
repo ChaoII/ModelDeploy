@@ -25,14 +25,15 @@ namespace modeldeploy::vision {
                  })
             .def("run",
                  [](ocr::DBDetectorPreprocessor& self,
-                    std::vector<pybind11::array>& im_list) {
-                     std::vector<cv::Mat> images;
+                    const std::vector<pybind11::array>& im_list) {
+                     std::vector<ImageData> images;
                      for (auto& image : im_list) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                         const auto cv_image = pyarray_to_cv_mat(image);
+                         images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<Tensor> outputs;
                      self.apply(&images, &outputs);
-                     auto batch_det_img_info = self.get_batch_img_info();
+                     const auto batch_det_img_info = self.get_batch_img_info();
                      return std::make_pair(outputs, *batch_det_img_info);
                  }, pybind11::arg("im_list"));
 
@@ -90,17 +91,18 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor",
                                    &ocr::DBDetector::get_postprocessor)
             .def("predict",
-                 [](ocr::DBDetector& self, pybind11::array& image) {
+                 [](ocr::DBDetector& self, const pybind11::array& image) {
                      auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
-                     self.predict(mat, &ocr_result);
+                     self.predict(ImageData::from_mat(&mat), &ocr_result);
                      return ocr_result;
                  }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::DBDetector& self,
-                                     std::vector<pybind11::array>& images) {
-                std::vector<cv::Mat> _images;
+                                     const std::vector<pybind11::array>& images) {
+                std::vector<ImageData> _images;
                 for (auto& image : images) {
-                    _images.push_back(pyarray_to_cv_mat(image));
+                    const auto cv_image = pyarray_to_cv_mat(image);
+                    _images.push_back(ImageData::from_mat(&cv_image));
                 }
                 std::vector<OCRResult> ocr_results;
                 self.batch_predict(_images, &ocr_results);

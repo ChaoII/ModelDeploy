@@ -295,29 +295,16 @@ namespace modeldeploy::vision::utils {
         result->swap(new_result);
     }
 
-    void letter_box(cv::Mat* mat, const std::vector<int>& size, const bool is_scale_up, const bool is_mini_pad,
-                    const bool is_no_pad, const std::vector<float>& padding_value, const int stride,
+    void letter_box(cv::Mat* mat, const std::vector<int>& size,
+                    const std::vector<float>& padding_value,
                     LetterBoxRecord* letter_box_record) {
         letter_box_record->ipt_h = static_cast<float>(mat->rows);
         letter_box_record->ipt_w = static_cast<float>(mat->cols);
         auto scale = std::min(size[1] * 1.0 / mat->rows, size[0] * 1.0 / mat->cols);
-        if (!is_scale_up) {
-            scale = std::min(scale, 1.0);
-        }
         int resize_h = static_cast<int>(round(mat->rows * scale));
         int resize_w = static_cast<int>(round(mat->cols * scale));
         int pad_w = size[0] - resize_w;
         int pad_h = size[1] - resize_h;
-        if (is_mini_pad) {
-            pad_h = pad_h % stride;
-            pad_w = pad_w % stride;
-        }
-        else if (is_no_pad) {
-            pad_h = 0;
-            pad_w = 0;
-            resize_h = size[1];
-            resize_w = size[0];
-        }
         if (std::fabs(scale - 1.0f) > 1e-06) {
             Resize::apply(mat, resize_w, resize_h);
         }
@@ -330,6 +317,7 @@ namespace modeldeploy::vision::utils {
             const int right = static_cast<int>(round(half_w + 0.1));
             Pad::apply(mat, top, bottom, left, right, padding_value);
         }
+        cv::imwrite("2132.jpg", *mat);
         letter_box_record->out_h = static_cast<float>(mat->rows);
         letter_box_record->out_w = static_cast<float>(mat->cols);
         letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
