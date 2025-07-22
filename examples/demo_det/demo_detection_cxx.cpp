@@ -42,7 +42,7 @@ int main() {
     option.use_gpu();
     option.use_ort_backend();
     option.use_gpu(0);
-    option.password = "1234";
+    // option.password = "1234";
     option.enable_fp16 = true;
     option.enable_trt = false;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
@@ -51,6 +51,7 @@ int main() {
     auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_person.jpg");
     auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
+    // yolo11_det.get_preprocessor().use_cuda_preproc();
     yolo11_det.get_preprocessor().set_size({640, 640});
     constexpr int warming_up_count = 10;
     for (int i = 0; i < warming_up_count; ++i) {

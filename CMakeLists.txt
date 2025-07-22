@@ -36,12 +36,6 @@ if (POLICY CMP0169)
 endif ()
 
 
-## Only for CXX compiler (not CUDA)
-#if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-#    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4819>" "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>" "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
-#endif ()
-
-
 if (MSVC)
     if (WITH_STATIC_CRT)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
