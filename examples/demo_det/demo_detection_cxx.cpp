@@ -44,13 +44,13 @@ int main() {
     option.use_gpu(0);
     option.password = "1234";
     option.enable_fp16 = true;
-    option.enable_trt = true;
+    option.enable_trt = false;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/model.engine",
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx",
                                                               option);
     auto img = cv::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
-    yolo11_det.get_preprocessor().set_size({320, 320});
+    yolo11_det.get_preprocessor().set_size({640, 640});
     int warming_up_count = 10;
     for (int i = 0; i < warming_up_count; ++i) {
         yolo11_det.predict(img, &result);
