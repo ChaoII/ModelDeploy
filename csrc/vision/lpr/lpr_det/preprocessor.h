@@ -45,7 +45,7 @@ namespace modeldeploy::vision::lpr {
         [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
+        bool preprocess(const ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
         std::vector<int> size_;
         std::vector<float> padding_value_;

@@ -15,7 +15,7 @@ namespace modeldeploy::vision {
                     const float clarity_threshold) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<FaceAntiSpoofResult> results;
-                     self.predict(mat, &results, fuse_threshold, clarity_threshold);
+                     self.predict(ImageData::from_mat(&mat), &results, fuse_threshold, clarity_threshold);
                      return results;
                  }, pybind11::arg("image"),
                  pybind11::arg("fuse_threshold") = 0.8,

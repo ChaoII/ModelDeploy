@@ -9,9 +9,10 @@ namespace modeldeploy::vision {
     void bind_lpr_pipeline(const pybind11::module& m) {
         pybind11::class_<lpr::LprPipeline>(m, "LprPipeline")
             .def(pybind11::init<std::string, std::string, RuntimeOption>())
-            .def("predict", [](lpr::LprPipeline& self, pybind11::array& image) {
+            .def("predict", [](lpr::LprPipeline& self, const pybind11::array& image) {
+                const auto cv_image = pyarray_to_cv_mat(image);
                 std::vector<LprResult> results;
-                self.predict(pyarray_to_cv_mat(image), &results);
+                self.predict(ImageData::from_mat(&cv_image), &results);
                 return results;
             }, pybind11::arg("image"));
     }

@@ -3,37 +3,27 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
+#include "vision/common/processors/yolo_preproc.cuh"
 #include "vision/detection/preprocessor.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/convert_and_permute.h"
+#include "vision/common/processors/yolo_preproc.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsPreprocessor::UltralyticsPreprocessor() {
         size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
-        is_mini_pad_ = false;
-        is_no_pad_ = false;
-        is_scale_up_ = true;
-        stride_ = 32;
     }
 
 
     bool UltralyticsPreprocessor::preprocess(ImageData* image, Tensor* output,
                                              LetterBoxRecord* letter_box_record) const {
-        // yolov8's preprocess steps
-        // 1. letterbox
-        // 2. convert_and_permute(swap_rb=true)
-        cv::Mat mat;
-        image->to_mat(&mat);
-        utils::letter_box(&mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_,
-                          padding_value_, stride_, letter_box_record);
-        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        const std::vector beta = {0.0f, 0.0f, 0.0f};
-        ConvertAndPermute::apply(&mat, alpha, beta, true);
-        utils::mat_to_tensor(mat, output, true);
-        output->expand_dim(0); // reshape to n, c, h, w
-        return true;
+        if (use_cuda_preproc_) {
+#ifdef WITH_GPU
+            return yolo_preprocess_cuda(image, output, size_, padding_value_, letter_box_record);
+#else
+            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::ebndl;
+#endif
+        }
+        return yolo_preprocess_cpu(image, output, size_, padding_value_, letter_box_record);
     }
 
     bool UltralyticsPreprocessor::run(

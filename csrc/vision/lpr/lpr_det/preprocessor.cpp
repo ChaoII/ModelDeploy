@@ -20,14 +20,13 @@ namespace modeldeploy::vision::lpr {
     }
 
 
-    bool LprDetPreprocessor::preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const {
+    bool LprDetPreprocessor::preprocess(const ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
         cv::Mat mat;
         image->to_mat(&mat);
-        utils::letter_box(&mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_,
-                          padding_value_, stride_, letter_box_record);
+        utils::letter_box(&mat, size_, padding_value_, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
         ConvertAndPermute::apply(&mat, alpha, beta, true);
