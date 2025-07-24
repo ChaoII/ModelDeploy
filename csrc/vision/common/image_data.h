@@ -10,10 +10,13 @@
 #include <cstdint>
 #include <string>
 #include "core/md_decl.h"
+#include "core/tensor.h"
+#include "vision/common/struct.h"
 
 
 namespace modeldeploy {
     class ImageDataImpl; // 前置声明
+
 
     class MODELDEPLOY_CXX_EXPORT ImageData {
     public:
@@ -31,6 +34,17 @@ namespace modeldeploy {
         [[nodiscard]] const uint8_t* data() const;
         uint8_t* data();
 
+
+        void to_tensor(Tensor* tensor) const;
+
+        void letter_box(const std::vector<int>& size,
+                        const std::vector<float>& padding_value,
+                        vision::LetterBoxRecord* letter_box_record) const;
+
+        void convert_and_permute(const std::vector<float>& alpha, const std::vector<float>& beta,
+                                 bool swap_rb = true) const;
+
+        [[nodiscard]] bool empty() const;
 
         [[nodiscard]] ImageData clone() const;
         static ImageData from_mat(const void* mat); // mat为cv::Mat*

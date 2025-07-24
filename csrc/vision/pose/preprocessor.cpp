@@ -5,9 +5,10 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/pose/preprocessor.h"
-#include <vision/common/processors/yolo_preproc.cuh>
 #include <vision/common/processors/yolo_preproc.h>
-
+#ifdef WITH_GPU
+#include "vision/common/processors/yolo_preproc.cuh"
+#endif
 namespace modeldeploy::vision::detection {
     UltralyticsPosePreprocessor::UltralyticsPosePreprocessor() {
         size_ = {640, 640};

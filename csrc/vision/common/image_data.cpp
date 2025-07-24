@@ -5,6 +5,9 @@
 #include "vision/common/image_data.h"
 #include <opencv2/opencv.hpp>
 
+#include "processors/convert_and_permute.h"
+#include "vision/utils.h"
+
 namespace modeldeploy {
     class ImageDataImpl {
     public:
@@ -16,14 +19,14 @@ namespace modeldeploy {
             // 注意：OpenCV 是 height, width 顺序
         }
 
-        int width() const { return mat.cols; }
-        int height() const { return mat.rows; }
-        int channels() const { return mat.channels(); }
-        int type() const { return mat.type(); }
-        size_t size() const { return mat.total() * mat.elemSize(); }
+        [[nodiscard]] int width() const { return mat.cols; }
+        [[nodiscard]] int height() const { return mat.rows; }
+        [[nodiscard]] int channels() const { return mat.channels(); }
+        [[nodiscard]] int type() const { return mat.type(); }
+        [[nodiscard]] size_t size() const { return mat.total() * mat.elemSize(); }
 
         uint8_t* data() { return mat.data; }
-        const uint8_t* data() const { return mat.data; }
+        [[nodiscard]] const uint8_t* data() const { return mat.data; }
     };
 
 
@@ -56,12 +59,22 @@ namespace modeldeploy {
     const uint8_t* ImageData::data() const { return impl_->mat.data; }
     uint8_t* ImageData::data() { return impl_->mat.data; }
 
+
+    void ImageData::to_tensor(Tensor* tensor) const {
+        vision::utils::mat_to_tensor(impl_->mat, tensor, false);
+    }
+
+
     ImageData ImageData::from_mat(const void* mat_ptr) {
         const auto* m = static_cast<const cv::Mat*>(mat_ptr);
         ImageData img;
         img.impl_ = std::make_shared<ImageDataImpl>();
         img.impl_->mat = *m; // header 拷贝，不复制数据
         return img;
+    }
+
+    bool ImageData::empty() const {
+        return !impl_ || impl_->mat.empty();
     }
 
     void ImageData::to_mat(void* mat, bool is_copy) const {
@@ -87,16 +100,24 @@ namespace modeldeploy {
 
     // 保存图片
     bool ImageData::imwrite(const std::string& filename) const {
-        cv::Mat m;
-        to_mat(&m);
-        return cv::imwrite(filename, m);
+        return cv::imwrite(filename, impl_->mat);
     }
 
     // 显示图片
     void ImageData::imshow(const std::string& win_name) const {
-        cv::Mat m;
-        to_mat(&m);
-        cv::imshow(win_name, m);
+        cv::imshow(win_name, impl_->mat);
         cv::waitKey(0);
+    }
+
+
+    void ImageData::letter_box(const std::vector<int>& size,
+                               const std::vector<float>& padding_value,
+                               vision::LetterBoxRecord* letter_box_record) const {
+        vision::utils::letter_box(&impl_->mat, size, padding_value, letter_box_record);
+    }
+
+    void ImageData::convert_and_permute(const std::vector<float>& alpha, const std::vector<float>& beta,
+                                        const bool swap_rb) const {
+        vision::ConvertAndPermute::apply(&impl_->mat, alpha, beta, swap_rb);
     }
 }

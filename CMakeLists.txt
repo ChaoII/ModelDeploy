@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -40,7 +40,12 @@ if (MSVC)
     if (WITH_STATIC_CRT)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
     endif ()
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4819>" "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>" "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+    add_compile_options(
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4819>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4251>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     add_definitions(-DMD_CXX_EXPORT)
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
@@ -63,7 +68,6 @@ file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/
 
 list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
 
-
 if (WITH_GPU)
     add_definitions(-DWITH_GPU)
     enable_language(CUDA)
@@ -71,8 +75,12 @@ if (WITH_GPU)
     set(CMAKE_CUDA_ARCHITECTURES 86)   # RTX 40 系列示例
     # for cudaMalloc()
     find_package(CUDAToolkit REQUIRED)
+    set(CMAKE_CUDA_STANDARD 17)
     include_directories(${CUDAToolkit_INCLUDE_DIRS})
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler /utf-8")
+    if (MSVC)
+        # -diag-suppress=1394 抑制c++标准库导出警告
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler /utf-8 -diag-suppress=1394")
+    endif ()
     list(APPEND ALL_SOURCE ${CUDA_SOURCE})
     list(APPEND DEPENDS CUDA::cudart)
 endif ()

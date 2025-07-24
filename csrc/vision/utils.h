@@ -16,6 +16,10 @@ namespace modeldeploy::vision::utils {
 
     bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor);
 
+    bool image_data_to_tensor(ImageData& image, Tensor* tensor, bool is_copy);
+
+    cv::Mat image_data_to_mat(ImageData& image);
+
     DataType cv_dtype_to_md_dtype(int type);
 
     cv::Point2f point2f_to_cv_type(Point2f point2f);

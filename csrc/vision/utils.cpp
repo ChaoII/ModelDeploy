@@ -64,6 +64,9 @@ namespace modeldeploy::vision::utils {
         return mat_to_tensor(mat, tensor);
     }
 
+    cv::Mat image_data_to_mat(ImageData& image) {
+        return {image.height(), image.width(), image.type(), image.data()};
+    }
 
     bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, const bool is_copy) {
         const auto dtype = cv_dtype_to_md_dtype(mat.type());
@@ -83,6 +86,29 @@ namespace modeldeploy::vision::utils {
             // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
             // 确保mat在tensor生命周期结束前有效
             tensor->from_external_memory(mat.data, {mat.channels(), mat.rows, mat.cols}, dtype);
+        }
+        return true;
+    }
+
+    bool image_data_to_tensor(ImageData& image, Tensor* tensor, const bool is_copy) {
+        const auto dtype = cv_dtype_to_md_dtype(image.type());
+        if (is_copy) {
+            const size_t num_bytes = image.height() * image.width() * image.channels() *
+                Tensor::get_element_size(dtype);
+            tensor->allocate({image.channels(), image.height(), image.width()}, dtype);
+            if (num_bytes != tensor->byte_size()) {
+                MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
+                    "but now size of Tensor = " << tensor->byte_size()
+                    << ", size of Mat = " << num_bytes << "." << std::endl;
+                return false;
+            }
+            memcpy(tensor->data(), image.data(), num_bytes);
+        }
+        else {
+            // OpenCV Mat 的内存管理由 Mat 自己处理，这里不需要额外操作
+            // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
+            // 确保mat在tensor生命周期结束前有效
+            tensor->from_external_memory(image.data(), {image.channels(), image.height(), image.width()}, dtype);
         }
         return true;
     }
