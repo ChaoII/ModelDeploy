@@ -2,6 +2,9 @@
 // Created by aichao on 2025/2/24.
 //
 
+#include <complex>
+#include <vision/common/display/display.h>
+
 #include "csrc/vision.h"
 
 
@@ -49,7 +52,7 @@ int main() {
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx",
                                                               option);
     auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_person.jpg");
-    auto img1 = img.clone();
+    // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
     // yolo11_det.get_preprocessor().use_cuda_preproc();
     yolo11_det.get_preprocessor().set_size({640, 640});
@@ -64,8 +67,8 @@ int main() {
     }
     timers.print_benchmark();
     const auto vis_image =
-        modeldeploy::vision::vis_det(img1, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,
+        modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,
                                      true);
-    img1.imshow("result");
+    img.imshow("result");
     // test_camera();
 }

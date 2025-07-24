@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cmath>
 #include "core/md_decl.h"
 #include "vision/common/result.h"
 

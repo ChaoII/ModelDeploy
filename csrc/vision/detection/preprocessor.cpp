@@ -3,9 +3,11 @@
 //
 
 #include "core/md_log.h"
-#include "vision/common/processors/yolo_preproc.cuh"
 #include "vision/detection/preprocessor.h"
 #include "vision/common/processors/yolo_preproc.h"
+#ifdef WITH_GPU
+#include "vision/common/processors/yolo_preproc.cuh"
+#endif
 
 namespace modeldeploy::vision::detection {
     UltralyticsPreprocessor::UltralyticsPreprocessor() {
@@ -20,7 +22,7 @@ namespace modeldeploy::vision::detection {
 #ifdef WITH_GPU
             return yolo_preprocess_cuda(image, output, size_, padding_value_, letter_box_record);
 #else
-            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::ebndl;
+            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
 #endif
         }
         return yolo_preprocess_cpu(image, output, size_, padding_value_, letter_box_record);

@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
+#include <vision/common/image_data.h>
+
 #include "core/md_decl.h"
 #include "core/tensor.h"
 
@@ -48,6 +50,11 @@ namespace modeldeploy::vision {
          * \return true if the process successful, otherwise false
          */
         static bool apply(cv::Mat* mat, const std::vector<float>& mean,
+                          const std::vector<float>& std, bool is_scale = true,
+                          const std::vector<float>& min = std::vector<float>(),
+                          const std::vector<float>& max = std::vector<float>(), bool swap_rb = false);
+
+        static bool apply(ImageData* image, const std::vector<float>& mean,
                           const std::vector<float>& std, bool is_scale = true,
                           const std::vector<float>& min = std::vector<float>(),
                           const std::vector<float>& max = std::vector<float>(), bool swap_rb = false);

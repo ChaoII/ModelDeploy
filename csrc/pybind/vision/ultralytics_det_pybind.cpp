@@ -30,15 +30,7 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsPreprocessor::set_size)
             .def_property("padding_value",
                           &detection::UltralyticsPreprocessor::get_padding_value,
-                          &detection::UltralyticsPreprocessor::set_padding_value)
-            .def_property("is_scale_up",
-                          &detection::UltralyticsPreprocessor::get_scale_up,
-                          &detection::UltralyticsPreprocessor::set_scale_up)
-            .def_property("is_mini_pad",
-                          &detection::UltralyticsPreprocessor::get_mini_pad,
-                          &detection::UltralyticsPreprocessor::set_mini_pad)
-            .def_property("stride", &detection::UltralyticsPreprocessor::get_stride,
-                          &detection::UltralyticsPreprocessor::set_stride);
+                          &detection::UltralyticsPreprocessor::set_padding_value);
 
         pybind11::class_<detection::UltralyticsPostprocessor>(
                 m, "UltralyticsPostprocessor")
