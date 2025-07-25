@@ -11,6 +11,7 @@
 
 namespace modeldeploy {
     void RuntimeOption::set_model_path(const std::string& model_path, const std::string& password) {
+        model_file = model_path;
         if (is_encrypted_model_file(model_path)) {
             std::string buffer, format;
             auto decrypt_password = password;
@@ -52,7 +53,6 @@ namespace modeldeploy {
                     MD_LOG_FATAL << "model format error" << std::endl;
                 }
             }
-            model_file = model_path;
             model_from_memory = false;
         }
     }
