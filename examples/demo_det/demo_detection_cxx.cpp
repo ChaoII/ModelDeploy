@@ -42,14 +42,13 @@ void test_camera() {
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
-    option.use_gpu();
     option.use_ort_backend();
-    option.use_gpu(0);
-    // option.password = "1234";
+    // option.use_gpu(0);
+    option.password = "123456";
     option.enable_fp16 = true;
     option.enable_trt = false;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx",
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/model.onnx",
                                                               option);
     auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_person.jpg");
     // auto img1 = img.clone();

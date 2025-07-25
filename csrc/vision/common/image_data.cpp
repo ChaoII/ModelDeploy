@@ -50,6 +50,55 @@ namespace modeldeploy {
         return copy;
     }
 
+    ImageData ImageData::from_raw_nocopy(unsigned char* data, const int width, const int height, const int channels) {
+        int type;
+        if (channels == 3) {
+            type = CV_8UC3;
+        }
+        else if (channels == 4) {
+            type = CV_8UC4;
+        }
+        else if (channels == 1) {
+            type = CV_8UC1;
+        }
+        else {
+            throw std::invalid_argument("Invalid number of channels: " + std::to_string(channels));
+        }
+        ImageData image;
+        auto impl = std::make_shared<ImageDataImpl>();
+        // 注意：构造 cv::Mat 绑定外部数据（不会复制）
+        impl->mat = cv::Mat(height, width, type, data);
+        image.impl_ = std::move(impl);
+        return image;
+    }
+
+    ImageData ImageData::from_raw(const unsigned char* data, const int width, const int height, const int channels) {
+        int type;
+        if (channels == 3) {
+            type = CV_8UC3;
+        }
+        else if (channels == 4) {
+            type = CV_8UC4;
+        }
+        else if (channels == 1) {
+            type = CV_8UC1;
+        }
+        else {
+            throw std::invalid_argument("Invalid number of channels: " + std::to_string(channels));
+        }
+
+        ImageData image;
+        auto impl = std::make_shared<ImageDataImpl>();
+        // 分配内部 cv::Mat 空间
+        impl->mat = cv::Mat(height, width, type);
+
+        // 执行深拷贝
+        if (data) {
+            std::memcpy(impl->mat.data, data, impl->mat.total() * impl->mat.elemSize());
+        }
+        image.impl_ = std::move(impl);
+        return image;
+    }
 
     int ImageData::width() const { return impl_->mat.cols; }
     int ImageData::height() const { return impl_->mat.rows; }
