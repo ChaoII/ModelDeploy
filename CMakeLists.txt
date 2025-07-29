@@ -146,6 +146,21 @@ if (MSVC)
     target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
 endif ()
 
+if (UNIX AND NOT APPLE)
+    # Linux
+    set_target_properties(${LIBRARY_NAME} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "$ORIGIN"
+            BUILD_RPATH "$ORIGIN"
+    )
+elseif (APPLE)
+    # macOS
+    set_target_properties(${LIBRARY_NAME} PROPERTIES
+            INSTALL_RPATH "@loader_path"
+            BUILD_RPATH "@loader_path"
+    )
+endif ()
+
 
 if (BUILD_PYTHON)
     find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
@@ -160,6 +175,7 @@ if (BUILD_PYTHON)
     file(GLOB EXTRA_DLLS
             "${CMAKE_BINARY_DIR}/bin/*.dll"
             "${CMAKE_BINARY_DIR}/bin/*.so"
+            "${CMAKE_BINARY_DIR}/bin/*.so.*"
             "${CMAKE_BINARY_DIR}/bin/*.dylib"
     )
     install(TARGETS modeldeploy DESTINATION modeldeploy)
@@ -197,6 +213,7 @@ if (NOT BUILD_PYTHON)
     file(GLOB THIRD_LIBS
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dll"
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.so"
+            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.so.*"
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dylib"
     )
     install(FILES ${THIRD_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
