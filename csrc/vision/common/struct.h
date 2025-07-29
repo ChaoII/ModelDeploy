@@ -4,7 +4,10 @@
 
 
 #pragma once
-#include <opencv2/opencv.hpp>
+
+#include <cstdint>
+#include <string>
+#include <sstream>
 
 namespace modeldeploy::vision {
     struct LetterBoxRecord {
@@ -16,7 +19,7 @@ namespace modeldeploy::vision {
         float pad_h;
         float scale;
 
-        [[nodiscard]] std::string str() const {
+        [[nodiscard]] std::string to_string() const {
             std::ostringstream oss;
             oss << "LetterBoxRecord(ipt_h=" << ipt_h
                 << ", ipt_w=" << ipt_w
@@ -45,10 +48,6 @@ namespace modeldeploy::vision {
             this->y = y;
         }
 
-        [[nodiscard]] cv::Point2f to_cv_point2f() const {
-            return cv::Point2f{this->x, this->y};
-        }
-
         [[nodiscard]] std::string to_string() const {
             std::stringstream ss;
             ss << "x: " << this->x << " y: " << this->y;
@@ -72,10 +71,6 @@ namespace modeldeploy::vision {
             this->x = x;
             this->y = y;
             this->z = z;
-        }
-
-        [[nodiscard]] cv::Point3f to_cv_point3f() const {
-            return {this->x, this->y, this->z};
         }
 
         [[nodiscard]] std::string to_string() const {
@@ -106,10 +101,6 @@ namespace modeldeploy::vision {
             this->height = height;
         }
 
-        [[nodiscard]] cv::Rect2f to_cv_Rect2f() const {
-            return {this->x, this->y, this->width, this->height};
-        }
-
         [[nodiscard]] std::string to_string() const {
             std::stringstream ss;
             ss << "x: " << this->x << " y: " << this->y << " width: " << this->width << " height: " << this->height;
@@ -138,10 +129,6 @@ namespace modeldeploy::vision {
             this->width = width;
             this->height = height;
             this->angle = angle;
-        }
-
-        [[nodiscard]] cv::RotatedRect to_cv_rotated_rect() const {
-            return {cv::Point2f(this->xc, this->yc), cv::Point2f(this->width, this->height), this->angle};
         }
 
         [[nodiscard]] std::string to_string() const {

@@ -38,17 +38,15 @@ int main() {
     // size of the rec models will be the same as the number of boxes detected
     // by the det model.
     pp_structure_v2_table.set_rec_batch_size(rec_batch_size);
-    auto im = cv::imread(image_file);
+    auto im = modeldeploy::ImageData::imread(image_file);
     auto im_bak = im.clone();
     modeldeploy::vision::OCRResult result;
-    if (!pp_structure_v2_table.predict(&im, &result)) {
+    if (!pp_structure_v2_table.predict(im, &result)) {
         std::cerr << "Failed to predict." << std::endl;
         return -1;
     }
     auto vis_image = modeldeploy::vision::vis_ocr(im_bak, result, "../../test_data/msyh.ttc", 20, 0.5, 0);
-
-    cv::imshow("result", vis_image);
-    cv::waitKey(0);
+    vis_image.imshow("result");
 
     modeldeploy::vision::dis_ocr(result);
 }

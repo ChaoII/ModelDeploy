@@ -14,7 +14,7 @@ namespace modeldeploy::vision {
                  [](face::SeetaFaceAsSecond& self, pybind11::array& image) {
                      auto mat = pyarray_to_cv_mat(image);
                      std::vector<std::tuple<int, float>> result;
-                     self.predict(mat, &result);
+                     self.predict(ImageData::from_mat(&mat), &result);
                      return result;
                  }, pybind11::arg("image"));
     }

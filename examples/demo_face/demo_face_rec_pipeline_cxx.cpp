@@ -14,10 +14,14 @@ int main() {
 #ifdef WIN32
     SetConsoleOutputCP(CP_UTF8);
 #endif
+
+    modeldeploy::RuntimeOption option;
+    option.use_gpu();
+
     auto model = modeldeploy::vision::face::FaceRecognizerPipeline(
         "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx",
-        "../../test_data/test_models/face/face_recognizer.onnx");
-    const auto im = cv::imread("../../test_data/test_images/test_face_detection4.jpg");
+        "../../test_data/test_models/face/face_recognizer.onnx", option);
+    const auto im = modeldeploy::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");
     auto im_bak = im.clone();
     TimerArray timers;
     constexpr int loop_count = 50;

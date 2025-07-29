@@ -3,7 +3,9 @@
 //
 #pragma once
 
+
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/lpr/lpr_det/preprocessor.h"
 #include "vision/lpr/lpr_det/postprocessor.h"
 
@@ -15,10 +17,10 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::string name() const override { return "LprDetection"; }
 
-        virtual bool predict(const cv::Mat& image, std::vector<DetectionLandmarkResult>* result,
+        virtual bool predict(const ImageData& image, std::vector<DetectionLandmarkResult>* result,
                              TimerArray* timers = nullptr);
 
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::vector<DetectionLandmarkResult>>* results,
                                    TimerArray* timers = nullptr);
 

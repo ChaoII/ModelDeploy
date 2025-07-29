@@ -3,15 +3,17 @@
 //
 
 #include "core/md_log.h"
+#include "vision/common/visualize/utils.h"
 #include "vision/common/visualize/visualize.h"
 
 
 namespace modeldeploy::vision {
-    cv::Mat vis_iseg(cv::Mat& cv_image, const std::vector<InstanceSegResult>& result,
+    ImageData vis_iseg(ImageData& image, const std::vector<InstanceSegResult>& result,
                      const double threshold,
                      const std::string& font_path, const int font_size,
                      const double alpha, const bool save_result) {
-        cv::Mat overlay;
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         // 根据label_id获取颜色
@@ -72,13 +74,13 @@ namespace modeldeploy::vision {
             // 定义 ROI 区域
             cv::Mat roi(cv_image, rect);
             // 使用 addWeighted 混合原始图像和 mask
-            cv::addWeighted(roi, 0.2, colored_mask, 0.8, 0, roi);
+            cv::addWeighted(roi, 0.5, colored_mask, 0.5, 0, roi);
         }
         // for roted_box
         if (save_result) {
             MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
-        return cv_image;
+        return image;
     }
 } // namespace modeldeploy::vision

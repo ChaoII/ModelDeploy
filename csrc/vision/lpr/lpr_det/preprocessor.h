@@ -2,16 +2,18 @@
 // Created by aichao on 2025/2/20.
 //
 #pragma once
+
 #include "core/md_decl.h"
-#include "vision/utils.h"
+#include "core/tensor.h"
 #include "vision/common/struct.h"
+#include "vision/common/image_data.h"
 
 namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprDetPreprocessor {
     public:
         LprDetPreprocessor();
 
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -43,7 +45,7 @@ namespace modeldeploy::vision::lpr {
         [[nodiscard]] bool get_stride() const { return stride_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const;
+        bool preprocess(const ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
         std::vector<int> size_;
         std::vector<float> padding_value_;

@@ -74,9 +74,14 @@ namespace modeldeploy {
         rtmgr_->setMode(MNN::Interpreter::Session_Release);
 
 
-        if (!read_binary_from_file(runtime_option.model_file, &model_buffer_)) {
-            MD_LOG_ERROR << "Failed to read model file: " << runtime_option.model_file << std::endl;
-            return false;
+        if (runtime_option.model_from_memory) {
+            model_buffer_ = runtime_option.model_buffer;
+        }
+        else {
+            if (!read_binary_from_file(runtime_option.model_file, &model_buffer_)) {
+                MD_LOG_ERROR << "Failed to read model file: " << runtime_option.model_file << std::endl;
+                return false;
+            }
         }
 
         net_ = std::shared_ptr<MNN::Express::Module>(

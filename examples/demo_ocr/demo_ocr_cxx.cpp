@@ -20,14 +20,14 @@ int main() {
 
     modeldeploy::RuntimeOption option;
     option.use_gpu();
-    option.enable_trt = true;
+    // option.enable_trt = true;
     option.enable_fp16 = true;
     modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
                                             "../../test_data/ppocrv5_dict.txt",
                                             option);
-    auto img = cv::imread("../../test_data/test_images/test_ocr1.jpg");
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_ocr1.jpg");
     ocr.set_rec_batch_size(16);
     ocr.set_rec_batch_size(16);
     modeldeploy::vision::OCRResult result;
@@ -39,6 +39,5 @@ int main() {
     timers.print_benchmark();
     modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc");
-    cv::imshow("test", vis_image);
-    cv::waitKey(0);
+    vis_image.imshow("ocr");
 }

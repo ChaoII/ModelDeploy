@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include <map>
 #include "core/tensor.h"
 #include "core/md_decl.h"
-#include "vision/ocr/utils/ocr_postprocess_op.h"
 
 
 namespace modeldeploy::vision::ocr {
@@ -36,8 +36,6 @@ namespace modeldeploy::vision::ocr {
                  const std::vector<std::array<int, 4>> &batch_det_img_info);
 
     private:
-        PostProcessor util_post_processor_;
-
         bool single_batch_post_processor(const float *structure_probs,
                                          const float *bbox_preds,
                                          size_t slice_dim,

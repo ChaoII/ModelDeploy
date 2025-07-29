@@ -4,8 +4,7 @@
 #pragma once
 
 #include "base_model.h"
-#include "core/md_decl.h"
-#include "vision/common/result.h"
+#include "vision/common/image_data.h"
 
 namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.
@@ -17,18 +16,18 @@ namespace modeldeploy::vision::face {
          * \param[in] model_file Path of model file, e.g ./scrfd.onnx
          * \param[in] custom_option RuntimeOption for inference, the default will use cpu, and choose the backend defined in "valid_cpu_backends"
          */
-        explicit SeetaFaceAsSecond(const std::string &model_file,
-                                          const RuntimeOption &custom_option = RuntimeOption());
+        explicit SeetaFaceAsSecond(const std::string& model_file,
+                                   const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "face_as_second"; }
 
         /** \brief Predict the face detection result for an input image
          *
-         * \param[in] im The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format
          * \param[in] result The output face detection result will be writen to this structure
          * \return true if the prediction successed, otherwise false
          */
-        bool predict(cv::Mat& im, std::vector<std::tuple<int, float>> *result);
+        bool predict(const ImageData& image, std::vector<std::tuple<int, float>>* result);
 
         /// Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default (640, 640)
         std::vector<int> size_{300, 300};
@@ -36,8 +35,8 @@ namespace modeldeploy::vision::face {
     private:
         bool Initialize();
 
-        bool preprocess(cv::Mat *mat, Tensor *output);
+        bool preprocess(ImageData* image, Tensor* output);
 
-        bool postprocess(const std::vector<Tensor> &infer_result, std::vector<std::tuple<int, float>> *result);
+        bool postprocess(const std::vector<Tensor>& infer_result, std::vector<std::tuple<int, float>>* result);
     };
 }

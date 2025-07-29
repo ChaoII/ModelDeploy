@@ -11,6 +11,11 @@
 #include <csrc/core/md_log.h>
 
 
+modeldeploy::ImageData md_image_to_image_data(const MDImage* image) {
+    cv::Mat cv_image = md_image_to_mat(image);
+    return modeldeploy::ImageData::from_mat(&cv_image);
+}
+
 cv::Mat md_image_to_mat(const MDImage* image) {
     if (!image) {
         return {};
@@ -40,17 +45,12 @@ MDImage* mat_to_md_image(const cv::Mat& mat) {
     return md_image;
 }
 
-#ifdef BUILD_FACE
-SeetaImageData md_image_to_seeta_image(const MDImage* image) {
-    const SeetaImageData seeta_image{
-        image->width,
-        image->height,
-        image->channels,
-        image->data
-    };
-    return seeta_image;
+MDImage* image_data_to_md_image(const modeldeploy::ImageData& mat) {
+    cv::Mat cv_image;
+    mat.to_mat(&cv_image);
+    return mat_to_md_image(cv_image);
 }
-#endif
+
 
 void draw_rect_internal(cv::Mat& cv_image, const cv::Rect& rect, const cv::Scalar& cv_color, const double alpha) {
     cv::Mat overlay;
@@ -340,6 +340,7 @@ void c_results_2_pose_results(
             static_cast<float>(c_results->data[i].box.height)
         };
         std::vector<Point3f> keypoints;
+        keypoints.reserve(c_results->data[i].keypoints_size);
         for (int j = 0; j < c_results->data[i].keypoints_size; j++) {
             keypoints.emplace_back(c_results->data[i].keypoints[j].x,
                                    c_results->data[i].keypoints[j].y,
@@ -479,6 +480,7 @@ void c_results_2_detection_landmark_result(
             static_cast<float>(c_results->data[i].box.height)
         };
         std::vector<Point2f> landmarks;
+        landmarks.reserve(c_results->data[i].landmarks_size);
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
                                    static_cast<float>(c_results->data[i].landmarks[j].y));
@@ -539,6 +541,7 @@ void c_results_2_lpr_results(
             static_cast<float>(c_results->data[i].box.height)
         };
         std::vector<Point2f> landmarks;
+        landmarks.reserve(c_results->data[i].landmarks_size);
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
                                    static_cast<float>(c_results->data[i].landmarks[j].y));
@@ -596,7 +599,7 @@ void c_runtime_option_2_runtime_option(
     const MDRuntimeOption* c_option,
     modeldeploy::RuntimeOption* option) {
     option->set_cpu_thread_num(c_option->cpu_thread_num);
-    option->set_ort_graph_opt_level(c_option->graph_opt_level);
+    option->ort_option.graph_optimization_level = c_option->graph_opt_level;
     option->ort_option.trt_engine_cache_path = c_option->trt_engine_cache_path;
     option->enable_fp16 = c_option->enable_fp16;
     option->enable_trt = c_option->enable_trt;
@@ -606,4 +609,5 @@ void c_runtime_option_2_runtime_option(
     option->set_trt_min_shape(c_option->trt_min_shape);
     option->set_trt_opt_shape(c_option->trt_opt_shape);
     option->set_trt_max_shape(c_option->trt_max_shape);
+    option->password = c_option->password;
 }

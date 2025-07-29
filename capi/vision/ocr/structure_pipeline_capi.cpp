@@ -50,11 +50,11 @@ MDStatusCode md_create_structure_table_model(MDModel* model, const MDStructureTa
 
 
 MDStatusCode md_structure_table_model_predict(const MDModel* model, MDImage* image, MDOCRResults* c_results) {
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::OCRResult result;
     const auto structure_table_model = static_cast<modeldeploy::vision::ocr::PPStructureV2Table*>(model->
         model_content);
-    if (const bool res_status = structure_table_model->predict(cv_image, &result); !res_status) {
+    if (const bool res_status = structure_table_model->predict(image_data, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     ocr_result_2_c_results(result, c_results);
@@ -69,10 +69,10 @@ void md_print_structure_table_result(const MDOCRResults* results) {
 
 void md_draw_structure_table_result(const MDImage* image, const MDOCRResults* c_results, const char* font_path,
                                     const int font_size, const double alpha, const int save_result) {
-    cv::Mat cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::OCRResult result;
     c_results_2_ocr_result(c_results, &result);
-    modeldeploy::vision::vis_ocr(cv_image, result, font_path, font_size, alpha, save_result);
+    modeldeploy::vision::vis_ocr(image_data, result, font_path, font_size, alpha, save_result);
 }
 
 void md_free_structure_table_result(MDOCRResults* c_results) {

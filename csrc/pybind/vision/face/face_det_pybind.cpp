@@ -12,11 +12,12 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](const face::ScrfdPreprocessor& self,
-                    std::vector<pybind11::array>& im_list) {
-                     std::vector<cv::Mat> images;
+                    const std::vector<pybind11::array>& im_list) {
+                     std::vector<ImageData> images;
                      images.reserve(im_list.size());
                      for (auto& image : im_list) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                         const auto cv_image = pyarray_to_cv_mat(image);
+                         images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<LetterBoxRecord> records;
                      std::vector<Tensor> outputs;
@@ -80,19 +81,20 @@ namespace modeldeploy::vision {
         pybind11::class_<face::Scrfd, BaseModel>(m, "Scrfd")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](face::Scrfd& self, pybind11::array& image) {
+                 [](face::Scrfd& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<DetectionLandmarkResult> result;
-                     self.predict(mat, &result);
+                     self.predict(ImageData::from_mat(&mat), &result);
                      return result;
                  }, pybind11::arg("image"))
             .def("batch_predict",
                  [](face::Scrfd& self,
-                    std::vector<pybind11::array>& images) {
-                     std::vector<cv::Mat> _images;
+                    const std::vector<pybind11::array>& images) {
+                     std::vector<ImageData> _images;
                      _images.reserve(images.size());
                      for (auto& image : images) {
-                         _images.push_back(pyarray_to_cv_mat(image));
+                         const auto cv_image = pyarray_to_cv_mat(image);
+                         _images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<std::vector<DetectionLandmarkResult>> results;
                      self.batch_predict(_images, &results);

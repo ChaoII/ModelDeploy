@@ -36,13 +36,13 @@ MDStatusCode md_lpr_pipeline_predict(const MDModel* model, MDImage* image,
     if (model->type != MDModelType::LPR) {
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     const auto lpr_pipeline_model = static_cast<
         modeldeploy::vision::lpr::LprPipeline*>(model->model_content);
 
     std::vector<LprResult> results;
     if (const bool res_status = lpr_pipeline_model->predict(
-        cv_image, &results); !res_status) {
+        image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
 
@@ -61,10 +61,10 @@ void md_draw_lpr_pipeline_result(
     const char* font_path, const int font_size,
     const int landmark_radius, const double alpha,
     const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<LprResult> results;
     c_results_2_lpr_results(c_results, &results);
-    modeldeploy::vision::vis_lpr(cv_image, results, font_path, font_size,
+    modeldeploy::vision::vis_lpr(image_data, results, font_path, font_size,
                                  landmark_radius, alpha, save_result);
 }
 

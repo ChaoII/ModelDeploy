@@ -11,7 +11,7 @@
 int main() {
     auto model = modeldeploy::vision::lpr::LprDetection("../../test_data/test_models/yolov5plate.onnx");
 
-    auto im = cv::imread("../../test_data/test_images/test_lpr_pipeline2.jpg");
+    auto im = modeldeploy::ImageData::imread("../../test_data/test_images/test_lpr_pipeline2.jpg");
     auto im_bak = im.clone();
 
     std::vector<modeldeploy::vision::DetectionLandmarkResult> res;
@@ -23,9 +23,8 @@ int main() {
     const auto image = modeldeploy::vision::vis_det_landmarks(im_bak, res,
                                                               "../../test_data/msyh.ttc", 14, 2, 0.3, true);
 
+    image.imshow("result");
     // cv::resize(image, image, cv::Size(0, 0), 0.5, 0.5);
 
-    cv::imshow("result", image);
-    cv::waitKey(0);
     return 0;
 }

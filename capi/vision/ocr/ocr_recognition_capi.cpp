@@ -33,11 +33,11 @@ MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImag
         MD_LOG_ERROR << "Model type is not OCR" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     const auto ocr_rec_model = static_cast<modeldeploy::vision::ocr::Recognizer*>(model->model_content);
     std::string text;
     float score;
-    if (const bool res_status = ocr_rec_model->predict(cv_image, &text, &score); !res_status) {
+    if (const bool res_status = ocr_rec_model->predict(image_data, &text, &score); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     result->box.size = 0;
@@ -62,12 +62,13 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
     std::vector<std::string> text_ptr;
     std::vector<float> rec_scores_ptr;
     std::vector<int> indices;
-    std::vector<cv::Mat> image_list;
+    std::vector<modeldeploy::ImageData> image_list;
     image_list.reserve(size);
     indices.reserve(size);
     for (int i = 0; i < size; i++) {
         indices.push_back(i);
-        image_list.push_back(get_rotate_crop_image(cv_image, &polygon[i]));
+        auto crop_image = get_rotate_crop_image(cv_image, &polygon[i]);
+        image_list.push_back(modeldeploy::ImageData::from_mat(&crop_image));
     }
     int result_index = 0;
     results->size = size;

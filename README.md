@@ -11,6 +11,35 @@ cmake --build build --config Release --parallel
 cmake --install build
 ```
 
+#### 2.模型加密
+
+ModelDeploy采用XOR实现了简单的模型加密功能
+##### 2.1 模型加密文件格式：
+- [4字节] 魔数 "MDEN (ModelDeploy ENcrypted)
+- [4字节] 版本号 (当前为1
+- [4字节] 模型格式字符串长度
+- [N字节] 模型格式字符串 (如 "onnx",mnn", engine)
+- [4字节] 模型原始字节的CRC32校验和
+- [4字节] 加密数据长度
+- [N字节] 加密后的模型数据(XOR)
+##### 2.2 模型加密方法：
+
+```bash
+model_encrypted encrypt input_model_path output_model_path password [format(mnn onnx engine)]
+# 例如：
+# 写入模型格式，ModelDeploy可以读取加密后的模型自动选择推理后端
+model_encrypted encrypt yolo11n.onnx yolo11n_nms.mdenc 123456 onnx
+```
+
+##### 2.3 加密模型的使用
+加密模型的使用与未加密模型的使用方式基本一致，在RuntimeOption中设置秘钥即可
+```c++
+modeldeploy::RuntimeOption option;
+option.password = "123456";
+modeldeploy::vision::detection::UltralyticsDet yolo11_det("yolo11n.mdenc", option);
+...
+```
+
 **注意：**
 
 1. `msvc`项目默认为`MD`版本，当使用`MT`版本静态库时，需要在`CMakeLists.txt`中修改如下：
@@ -90,7 +119,6 @@ int main() {
 ```
 
 更多示例请查看[example](./examples)
-
 
 #### 3.OnnxRuntime使用混合精度推理
 

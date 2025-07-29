@@ -23,7 +23,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceID::predict(const cv::Mat& image, FaceRecognitionResult* result, TimerArray* timers) {
+    bool SeetaFaceID::predict(const ImageData& image, FaceRecognitionResult* result, TimerArray* timers) {
         std::vector<FaceRecognitionResult> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
@@ -34,11 +34,11 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceID::batch_predict(const std::vector<cv::Mat>& images,
+    bool SeetaFaceID::batch_predict(const std::vector<ImageData>& images,
                                     std::vector<FaceRecognitionResult>* results, TimerArray* timers) {
-        std::vector<cv::Mat> fd_images = images;
+        std::vector<ImageData> _images = images;
         if (timers) timers->pre_timer.start();
-        if (!preprocessor_.run(&fd_images, &reused_input_tensors_)) {
+        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }

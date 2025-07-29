@@ -31,10 +31,10 @@ MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRec
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::FaceRecognitionResult result;
     const auto face_rec_model = static_cast<modeldeploy::vision::face::SeetaFaceID*>(model->model_content);
-    if (const bool res_status = face_rec_model->predict(cv_image, &result); !res_status) {
+    if (const bool res_status = face_rec_model->predict(image_data, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     face_recognizer_result_2_c_result(result, c_result);

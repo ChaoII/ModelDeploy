@@ -13,23 +13,25 @@
 
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceIDPreprocessor::preprocess(cv::Mat* mat, Tensor* output) const {
+    bool SeetaFaceIDPreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // 经过人脸对齐后[256, 256]的图像
         // 1. CenterCrop [256,256]->[248,248]
         // 2. BGR2RGB
         // 3. HWC2CHW
         // 4. Cast
-        if (mat->rows != 256 || mat->cols != 256) {
+        cv::Mat mat;
+        image->to_mat(&mat);
+        if (mat.rows != 256 || mat.cols != 256) {
             MD_LOG_WARN <<
                 "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss precision" << std::endl;
-            Resize::apply(mat, 256, 256);
+            Resize::apply(&mat, 256, 256);
         }
-        CenterCrop::apply(mat, size_[0], size_[1]);
-        BGR2RGB::apply(mat);
-        HWC2CHW::apply(mat);
-        Cast::apply(mat, "float");
-        if (!utils::mat_to_tensor(*mat, output)) {
+        CenterCrop::apply(&mat, size_[0], size_[1]);
+        BGR2RGB::apply(&mat);
+        HWC2CHW::apply(&mat);
+        Cast::apply(image, "float");
+        if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -37,7 +39,7 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceIDPreprocessor::run(std::vector<cv::Mat>* images,
+    bool SeetaFaceIDPreprocessor::run(std::vector<ImageData>* images,
                                       std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;

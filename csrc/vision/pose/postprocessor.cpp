@@ -3,6 +3,7 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
 #include "vision/pose/postprocessor.h"
 
 namespace modeldeploy::vision::detection {

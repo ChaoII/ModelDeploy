@@ -27,23 +27,25 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAsFirst::preprocess(cv::Mat* mat, Tensor* output) {
-        if (mat->rows == 256 && mat->cols == 256) {
-            CenterCrop::apply(mat, size_[0], size_[1]);
+    bool SeetaFaceAsFirst::preprocess(ImageData* image, Tensor* output) {
+        cv::Mat mat;
+        image->to_mat(&mat);
+        if (mat.rows == 256 && mat.cols == 256) {
+            CenterCrop::apply(&mat, size_[0], size_[1]);
         }
-        else if (mat->rows == size_[0] && mat->cols == size_[1]) {
+        else if (mat.rows == size_[0] && mat.cols == size_[1]) {
             MD_LOG_WARN << "the width and height is already to [" << size_[0] << "," << size_[1] << "] " << std::endl;
         }
         else {
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss predict precision" << std::endl;
-            Resize::apply(mat, 256, 256);
-            CenterCrop::apply(mat, size_[0], size_[1]);
+            Resize::apply(&mat, 256, 256);
+            CenterCrop::apply(&mat, size_[0], size_[1]);
         }
-        cv::cvtColor(*mat, *mat, cv::COLOR_BGR2YCrCb);
-        HWC2CHW::apply(mat);
-        Cast::apply(mat, "float");
-        if (!utils::mat_to_tensor(*mat, output)) {
+        cv::cvtColor(mat, mat, cv::COLOR_BGR2YCrCb);
+        HWC2CHW::apply(&mat);
+        Cast::apply(image, "float");
+        if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
         }
@@ -58,9 +60,10 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAsFirst::predict(cv::Mat& im, float* result) {
+    bool SeetaFaceAsFirst::predict(const ImageData& image, float* result) {
         std::vector<Tensor> input_tensors(1);
-        if (!preprocess(&im, &input_tensors[0])) {
+        auto _image = image;
+        if (!preprocess(&_image, &input_tensors[0])) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

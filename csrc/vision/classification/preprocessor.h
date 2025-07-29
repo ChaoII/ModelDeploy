@@ -4,10 +4,9 @@
 
 #pragma once
 
-#include <map>
-#include "vision/utils.h"
 #include "core/md_decl.h"
 #include "core/tensor.h"
+#include "vision/common/image_data.h"
 
 namespace modeldeploy::vision::classification {
     /*! @brief Preprocessor object for YOLOv5Cls serials model.
@@ -24,7 +23,7 @@ namespace modeldeploy::vision::classification {
    * \param[in] outputs The output tensors which will feed in runtime
    * \return true if the preprocess successfully, otherwise false
    */
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const;
+        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs) const;
 
         /// Set target size, tuple of (width, height), default size = {224, 224}
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -33,7 +32,7 @@ namespace modeldeploy::vision::classification {
         [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output) const;
+        bool preprocess(ImageData* image, Tensor* output) const;
 
         // target size, tuple of (width, height), default size = {224, 224}
         std::vector<int> size_;

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/obb/preprocessor.h"
 #include "vision/obb/postprocessor.h"
 
@@ -30,7 +31,7 @@ namespace modeldeploy::vision::detection {
         * \param timers
         * \return true if the prediction successed, otherwise false
         */
-        virtual bool predict(const cv::Mat& image, std::vector<ObbResult>* result, TimerArray* timers = nullptr);
+        bool predict(const ImageData& image, std::vector<ObbResult>* result, TimerArray* timers = nullptr);
 
         /** \brief Predict the detection results for a batch of input images
         *
@@ -39,16 +40,16 @@ namespace modeldeploy::vision::detection {
         * \param timers
         * \return true if the prediction successed, otherwise false
         */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
-                                   std::vector<std::vector<ObbResult>>* results, TimerArray* timers = nullptr);
+        bool batch_predict(const std::vector<ImageData>& images,
+                           std::vector<std::vector<ObbResult>>* results, TimerArray* timers = nullptr);
 
         /// Get preprocessor reference of YOLOv5Seg
-        virtual UltralyticsObbPreprocessor& get_preprocessor() {
+        UltralyticsObbPreprocessor& get_preprocessor() {
             return preprocessor_;
         }
 
         /// Get postprocessor reference of YOLOv5Seg
-        virtual UltralyticsObbPostprocessor& get_postprocessor() {
+        UltralyticsObbPostprocessor& get_postprocessor() {
             return postprocessor_;
         }
 

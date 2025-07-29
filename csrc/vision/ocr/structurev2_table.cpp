@@ -3,12 +3,9 @@
 //
 
 #include "opencv2/opencv.hpp"
-#include "vision/ocr/structurev2_table.h"
-
-#include <core/md_log.h>
-
+#include "core/md_log.h"
 #include "vision/ocr/utils/ocr_utils.h"
-
+#include "vision/ocr/structurev2_table.h"
 
 namespace modeldeploy::vision::ocr {
     StructureV2Table::StructureV2Table() {
@@ -33,12 +30,12 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool StructureV2Table::predict(const cv::Mat& img,
+    bool StructureV2Table::predict(const ImageData& image,
                                    std::vector<std::array<int, 8>>* boxes_result,
                                    std::vector<std::string>* structure_result) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
         std::vector<std::vector<std::string>> structure_results;
-        if (!batch_predict({img}, &det_results, &structure_results)) {
+        if (!batch_predict({image}, &det_results, &structure_results)) {
             return false;
         }
         *boxes_result = std::move(det_results[0]);
@@ -46,16 +43,16 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool StructureV2Table::predict(const cv::Mat& img,
+    bool StructureV2Table::predict(const ImageData& image,
                                    vision::OCRResult* ocr_result) {
-        if (!predict(img, &ocr_result->table_boxes, &ocr_result->table_structure)) {
+        if (!predict(image, &ocr_result->table_boxes, &ocr_result->table_structure)) {
             return false;
         }
         return true;
     }
 
     bool StructureV2Table::batch_predict(
-        const std::vector<cv::Mat>& images,
+        const std::vector<ImageData>& images,
         std::vector<vision::OCRResult>* ocr_results) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
         std::vector<std::vector<std::string>> structure_results;
@@ -71,11 +68,11 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool StructureV2Table::batch_predict(
-        const std::vector<cv::Mat>& images,
+        const std::vector<ImageData>& images,
         std::vector<std::vector<std::array<int, 8>>>* det_results,
         std::vector<std::vector<std::string>>* structure_results) {
-        std::vector<cv::Mat> images_ = images;
-        if (!preprocessor_.run(&images_, &reused_input_tensors_)) {
+        std::vector<ImageData> _images = images;
+        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }

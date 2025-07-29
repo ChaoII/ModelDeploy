@@ -21,7 +21,7 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsSeg::predict(const cv::Mat& image, std::vector<InstanceSegResult>* result,
+    bool UltralyticsSeg::predict(const ImageData& image, std::vector<InstanceSegResult>* result,
                                  TimerArray* timers) {
         std::vector<std::vector<InstanceSegResult>> results;
         if (!batch_predict({image}, &results, timers)) {
@@ -31,13 +31,13 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsSeg::batch_predict(const std::vector<cv::Mat>& images,
+    bool UltralyticsSeg::batch_predict(const std::vector<ImageData>& images,
                                        std::vector<std::vector<InstanceSegResult>>* results,
                                        TimerArray* timers) {
         std::vector<LetterBoxRecord> ims_info;
-        std::vector<cv::Mat> images_ = images;
+        std::vector<ImageData> _images = images;
         if (timers) timers->pre_timer.start();
-        if (!preprocessor_.run(&images_, &reused_input_tensors_, &ims_info)) {
+        if (!preprocessor_.run(&_images, &reused_input_tensors_, &ims_info)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }

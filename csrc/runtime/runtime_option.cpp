@@ -11,6 +11,7 @@
 
 namespace modeldeploy {
     void RuntimeOption::set_model_path(const std::string& model_path, const std::string& password) {
+        model_file = model_path;
         if (is_encrypted_model_file(model_path)) {
             std::string buffer, format;
             auto decrypt_password = password;
@@ -52,7 +53,6 @@ namespace modeldeploy {
                     MD_LOG_FATAL << "model format error" << std::endl;
                 }
             }
-            model_file = model_path;
             model_from_memory = false;
         }
     }
@@ -103,15 +103,6 @@ namespace modeldeploy {
 #else
         MD_LOG_FATAL << "The ModelDeploy didn't compile with TRT backend." << std::endl;
 #endif
-    }
-
-    void RuntimeOption::set_ort_graph_opt_level(const int level) {
-        const std::vector<int> supported_level{-1, 0, 1, 2};
-        if (std::find(supported_level.begin(), supported_level.end(), level) == supported_level.end()) {
-            MD_LOG_ERROR << "Invalid graph optimization level: " << level << ", supported levels are: "
-                << vector_to_string(supported_level) << std::endl;
-        }
-        ort_option.graph_optimization_level = level;
     }
 
     //input:8x3x224x224

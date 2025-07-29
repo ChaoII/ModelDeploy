@@ -6,7 +6,7 @@
 
 #include "base_model.h"
 #include "vision/common/result.h"
-#include "vision/ocr/utils/ocr_postprocess_op.h"
+#include "vision/common/image_data.h"
 #include "vision/ocr/structurev2_table_postprocessor.h"
 #include "vision/ocr/structurev2_table_preprocessor.h"
 
@@ -37,22 +37,22 @@ namespace modeldeploy::vision::ocr {
 
         /** \brief Predict the input image and get OCR detection model result.
         *
-        * \param[in] img The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
+        * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
         * \param[in] boxes_result The output of OCR detection model result will be writen to this structure.
         * \param structure_result
         * \return true if the prediction is successed, otherwise false.
         */
-        virtual bool predict(const cv::Mat& img,
+        virtual bool predict(const ImageData& image,
                              std::vector<std::array<int, 8>>* boxes_result,
                              std::vector<std::string>* structure_result);
 
         /** \brief Predict the input image and get OCR detection model result.
          *
-         * \param[in] img The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
+         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] ocr_result The output of OCR detection model result will be writen to this structure.
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool predict(const cv::Mat& img, vision::OCRResult* ocr_result);
+        virtual bool predict(const ImageData& image, vision::OCRResult* ocr_result);
 
         /** \brief BatchPredict the input image and get OCR detection model result.
         *
@@ -60,7 +60,7 @@ namespace modeldeploy::vision::ocr {
         * \param[in] det_results The output of OCR detection model result will be writen to this structure.
         * \return true if the prediction is successed, otherwise false.
         */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::vector<std::array<int, 8>>>* det_results,
                                    std::vector<std::vector<std::string>>* structure_results);
 
@@ -70,7 +70,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] ocr_results The output of OCR detection model result will be writen to this structure.
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<vision::OCRResult>* ocr_results);
 
         /// Get preprocessor reference of StructureV2TablePreprocessor
