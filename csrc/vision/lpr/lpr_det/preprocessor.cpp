@@ -3,6 +3,7 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
 #include "vision/lpr/lpr_det/preprocessor.h"
 #include "vision/common/processors/resize.h"
 #include "vision/common/processors/pad.h"
@@ -19,22 +20,23 @@ namespace modeldeploy::vision::lpr {
     }
 
 
-    bool LprDetPreprocessor::preprocess(cv::Mat* mat, Tensor* output, LetterBoxRecord* letter_box_record) const {
+    bool LprDetPreprocessor::preprocess(const ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        utils::letter_box(mat, size_, is_scale_up_, is_mini_pad_, is_no_pad_,
-                          padding_value_, stride_, letter_box_record);
+        cv::Mat mat;
+        image->to_mat(&mat);
+        utils::letter_box(&mat, size_, padding_value_, letter_box_record);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        ConvertAndPermute::apply(mat, alpha, beta, true);
-        utils::mat_to_tensor(*mat, output);
+        ConvertAndPermute::apply(&mat, alpha, beta, true);
+        utils::mat_to_tensor(mat, output);
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
     bool LprDetPreprocessor::run(
-        std::vector<cv::Mat>* images, std::vector<Tensor>* outputs,
+        std::vector<ImageData>* images, std::vector<Tensor>* outputs,
         std::vector<LetterBoxRecord>* letter_box_records) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;

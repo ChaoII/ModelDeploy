@@ -50,15 +50,8 @@ namespace modeldeploy::vision::ocr {
                            int rec_batch_size = 8, const RuntimeOption& option = RuntimeOption());
 
 
-        /** \brief Predict the input image and get OCR result.
-         *
-         * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
-         * \param[in] result The output OCR result will be writen to this structure.
-         * \return true if the prediction successed, otherwise false.
-         */
-        virtual bool predict(cv::Mat* image, modeldeploy::vision::OCRResult* result);
 
-        virtual bool predict(const cv::Mat& image, modeldeploy::vision::OCRResult* result);
+        virtual bool predict(const ImageData& image, modeldeploy::vision::OCRResult* result);
 
         /** \brief BatchPredict the input image and get OCR result.
          *
@@ -66,7 +59,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] batch_result The output list of OCR result will be writen to this structure.
          * \return true if the prediction successfully otherwise false.
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<modeldeploy::vision::OCRResult>* batch_result);
 
         [[nodiscard]] bool is_initialized() const override;

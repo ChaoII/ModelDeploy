@@ -4,9 +4,8 @@
 
 #pragma once
 #include "core/md_decl.h"
-#include "vision/utils.h"
+#include "core/tensor.h"
 #include "vision/common/result.h"
-#include "vision/common/struct.h"
 
 
 namespace modeldeploy::vision::lpr {

@@ -29,10 +29,10 @@ MDStatusCode md_face_as_first_predict(const MDModel* model, MDImage* image, floa
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     const auto face_as_first_model = static_cast<modeldeploy::vision::face::SeetaFaceAsFirst*>(model->
         model_content);
-    if (const bool res_status = face_as_first_model->predict(cv_image, c_result); !res_status) {
+    if (const bool res_status = face_as_first_model->predict(image_data, c_result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     return MDStatusCode::Success;

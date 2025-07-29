@@ -3,13 +3,15 @@
 //
 
 #include "core/md_log.h"
+#include "vision/common/visualize/utils.h"
 #include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision {
-    cv::Mat vis_ocr(cv::Mat& image, const OCRResult& result, const std::string& font_path,
-                    const int font_size, const double alpha, const bool save_result) {
-        cv::Mat overlay;
-        image.copyTo(overlay);
+    ImageData vis_ocr(ImageData& image, const OCRResult& result, const std::string& font_path,
+                      const int font_size, const double alpha, const bool save_result) {
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
+        cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         cv::Scalar cv_color = get_random_color();
         // 绘制半透明部分（填充多边形）和文字背景色
@@ -39,7 +41,7 @@ namespace modeldeploy::vision {
         //     cv::rectangle(overlay, size, cv_color, 1, cv::LINE_AA, 0);
         // }
 
-        cv::addWeighted(overlay, alpha, image, 1 - alpha, 0, image);
+        cv::addWeighted(overlay, alpha, cv_image, 1 - alpha, 0, cv_image);
         // 绘制多边形边框，文字背景边框，文字
         for (int i = 0; i < result.boxes.size(); ++i) {
             const auto polygon = result.boxes[i];
@@ -48,12 +50,12 @@ namespace modeldeploy::vision {
             for (int j = 0; j < polygon.size(); j += 2) {
                 points.emplace_back(polygon[j], polygon[j + 1]);
             }
-            cv::polylines(image, points, true, cv_color, 1, cv::LINE_AA, 0);
+            cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
             const auto size = cv::getTextSize(cv::Size(0, 0), result.text[i],
                                               {points[0].x, points[0].y}, font, font_size);
-            cv::rectangle(image, size, cv_color, 1, cv::LINE_AA, 0);
+            cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
             const auto inv_color = cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]);
-            cv::putText(image, result.text[i], {points[0].x, points[0].y - 2},
+            cv::putText(cv_image, result.text[i], {points[0].x, points[0].y - 2},
                         inv_color, font, font_size);
         }
         // 绘制表格单元格
@@ -64,16 +66,17 @@ namespace modeldeploy::vision {
         //     for (int k = 0; k < polygon.size(); k += 2) {
         //         points.emplace_back(polygon[k], polygon[k + 1]);
         //     }
-        //     cv::polylines(image, points, true, cv_color, 1, cv::LINE_AA, 0);
+        //     cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
         //     const auto size = cv::getTextSize(cv::Size(0, 0), result.table_structure[j],
         //                                       {points[0].x, points[0].y}, font, font_size);
-        //     cv::rectangle(image, size, cv_color, 1, cv::LINE_AA, 0);
+        //     cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
         //     const auto inv_color = cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]);
-        //     cv::putText(image, result.table_structure[j], {points[0].x, points[0].y - 2},
+        //     cv::putText(cv_image, result.table_structure[j], {points[0].x, points[0].y - 2},
         //                 inv_color, font, font_size);
         // }
         if (save_result) {
-            cv::imwrite("vis_result.jpg", image);
+            MD_LOG_INFO << "Save OCR result to [vis_result.jpg]" << std::endl;
+            cv::imwrite("vis_result.jpg", cv_image);
         }
         return image;
     }

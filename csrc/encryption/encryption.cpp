@@ -85,9 +85,10 @@ namespace modeldeploy {
     // 模型加密文件格式：
     // [4字节] 魔数 "MDEN (ModelDeploy ENcrypted)
     // [4字节] 版本号 (当前为1
-    // [4] 模型格式字符串长度
+    // [4字节] 模型格式字符串长度
     // [N字节] 模型格式字符串 (如 "onnx",mnn", engine)
-    // [4节] 加密数据长度
+    // [4字节] 模型原始字节的CRC32校验和
+    // [4字节] 加密数据长度
     // [N字节] 加密后的模型数据
 
     const std::string MAGIC_HEADER = "MDEN";
@@ -114,15 +115,19 @@ namespace modeldeploy {
         }
 
         // 写入文件头
+        // 魔数4字节
         out_file.write(MAGIC_HEADER.c_str(), 4);
+        // 版本号
         out_file.write(reinterpret_cast<const char*>(&CURRENT_VERSION), 4);
 
         // 写入模型格式
         auto format_len = static_cast<uint32_t>(model_format.length());
+        // 模型格式长度4字节
         out_file.write(reinterpret_cast<const char*>(&format_len), 4);
+        // 模型格式
         out_file.write(model_format.c_str(), format_len);
 
-        // 写入校验和
+        // 写入校验和4字节
         out_file.write(reinterpret_cast<const char*>(&original_crc), 4);
 
         // 写入加密数据

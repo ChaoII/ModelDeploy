@@ -3,9 +3,12 @@
 //
 
 #pragma once
+
+
 #include "core/md_decl.h"
-#include "vision/common/result.h"
 #include "core/tensor.h"
+#include "vision/common/result.h"
+#include "vision/common/image_data.h"
 
 
 namespace modeldeploy::vision::face {
@@ -23,7 +26,7 @@ namespace modeldeploy::vision::face {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successful, otherwise false
          */
-        bool run(std::vector<cv::Mat>* images, std::vector<Tensor>* outputs) const;
+        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs) const;
 
         /// Get Size
         std::vector<int> get_size() { return size_; }
@@ -32,7 +35,7 @@ namespace modeldeploy::vision::face {
         void set_size(const std::vector<int>& size) { size_ = size; }
 
     protected:
-        bool preprocess(cv::Mat* mat, Tensor* output) const;
+        bool preprocess(ImageData* image, Tensor* output) const;
         // Argument for image preprocessing step, tuple of (width, height),
         // decide the target size after resize, default (112, 112)
         std::vector<int> size_{112, 112};

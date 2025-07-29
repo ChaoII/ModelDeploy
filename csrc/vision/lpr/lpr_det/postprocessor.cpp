@@ -3,9 +3,10 @@
 //
 
 #include "core/md_log.h"
+#include "vision/utils.h"
+#include "utils/utils.h"
 #include "vision/lpr/lpr_det/postprocessor.h"
 
-#include <utils/utils.h>
 
 namespace modeldeploy::vision::lpr {
     LprDetPostprocessor::LprDetPostprocessor() {

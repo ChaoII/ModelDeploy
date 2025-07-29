@@ -2,10 +2,10 @@
 // Created by aichao on 2025/3/21.
 //
 
+#include <numeric>
 #include <fstream>
-#include "vision/ocr/structurev2_table_postprocessor.h"
 #include "vision/ocr/utils/ocr_utils.h"
-
+#include "vision/ocr/structurev2_table_postprocessor.h"
 
 namespace modeldeploy::vision::ocr {
     StructureV2TablePostprocessor::StructureV2TablePostprocessor() {

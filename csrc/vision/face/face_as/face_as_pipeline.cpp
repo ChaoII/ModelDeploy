@@ -102,14 +102,16 @@ namespace modeldeploy::vision::face {
         return blur_val;
     }
 
-    float clarity_estimate(cv::Mat& image) {
-        if (!image.data || image.cols < 9 || image.rows < 9) return 0.0;
+    float clarity_estimate(const ImageData& image) {
+        cv::Mat cv_image;
+        image.to_mat(&cv_image);
+        if (!cv_image.data || cv_image.cols < 9 || cv_image.rows < 9) return 0.0;
         cv::Mat gray_image;
-        cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
-        float blur_val = re_blur(image.data, image.cols, image.rows);
+        cv::cvtColor(cv_image, gray_image, cv::COLOR_BGR2GRAY);
+        const float blur_val = re_blur(cv_image.data, cv_image.cols, cv_image.rows);
         float clarity = 1.0f - blur_val;
-        float T1 = 0.3;
-        float T2 = 0.55;
+        constexpr float T1 = 0.3;
+        constexpr float T2 = 0.55;
         if (clarity <= T1) {
             clarity = 0.0;
         }
@@ -123,12 +125,12 @@ namespace modeldeploy::vision::face {
     }
 
 
-    bool SeetaFaceAsPipeline::predict(const cv::Mat& im,
+    bool SeetaFaceAsPipeline::predict(const ImageData& image,
                                       std::vector<FaceAntiSpoofResult>* results,
                                       const float fuse_threshold,
                                       const float clarity_threshold) const {
-        cv::Mat im_bak0 = im.clone();
-        cv::Mat im_bak1 = im.clone();
+        const ImageData im_bak0 = image.clone();
+        const ImageData im_bak1 = image.clone();
         std::vector<std::tuple<int, float>> face_as_second_result;
         face_as_second_->predict(im_bak0, &face_as_second_result);
         std::vector<float> passive_results;
@@ -138,11 +140,11 @@ namespace modeldeploy::vision::face {
             return false;
         }
         results->resize(face_det_result.size());
-        auto align_im_list = utils::align_face_with_five_points(im, face_det_result);
+        auto align_im_list = utils::align_face_with_five_points(image, face_det_result);
         for (auto& align_image : align_im_list) {
             float passive_result;
             const auto clarity = clarity_estimate(align_image);
-            face_as_first_->predict(align_image, &passive_result);
+            face_as_first_->predict(ImageData::from_mat(&align_image), &passive_result);
             const float result = has_box ? 0.0f : passive_result;
             if (result > fuse_threshold) {
                 if (clarity >= clarity_threshold) {

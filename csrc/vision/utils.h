@@ -4,18 +4,34 @@
 
 #pragma once
 
-#include <opencv2/opencv.hpp>
+#include <array>
+#include "common/image_data.h"
 #include "core/tensor.h"
 #include "vision/common/result.h"
-#include "vision/common/struct.h"
+#include <opencv2/opencv.hpp>
 
 
 namespace modeldeploy::vision::utils {
-    MODELDEPLOY_CXX_EXPORT bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = false);
+    MODELDEPLOY_CXX_EXPORT bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = true);
+
+    bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor);
+
+    bool image_data_to_tensor(ImageData& image, Tensor* tensor, bool is_copy);
+
+    cv::Mat image_data_to_mat(ImageData& image);
 
     DataType cv_dtype_to_md_dtype(int type);
 
-    MODELDEPLOY_CXX_EXPORT cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size);
+    cv::Point2f point2f_to_cv_type(Point2f point2f);
+
+    cv::Point3f point3f_to_cv_type(Point3f point3f);
+
+    cv::Rect2f rect2f_to_cv_type(Rect2f rect2f);
+
+    cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);
+
+
+    MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 
@@ -29,15 +45,15 @@ namespace modeldeploy::vision::utils {
 
     void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold);
 
-    void letter_box(cv::Mat* mat, const std::vector<int>& size, bool is_scale_up, bool is_mini_pad, bool is_no_pad,
-                    const std::vector<float>& padding_value, int stride, LetterBoxRecord* letter_box_record);
+    void letter_box(cv::Mat* mat, const std::vector<int>& size,
+                    const std::vector<float>& padding_value, LetterBoxRecord* letter_box_record);
 
     void print_mat_type(const cv::Mat& mat);
 
     std::vector<float> compute_sqrt(const std::vector<float>& vec);
 
-    MODELDEPLOY_CXX_EXPORT std::vector<cv::Mat> align_face_with_five_points(
-        const cv::Mat& image, std::vector<DetectionLandmarkResult>& result,
+    MODELDEPLOY_CXX_EXPORT std::vector<ImageData> align_face_with_five_points(
+        const ImageData& image, std::vector<DetectionLandmarkResult>& result,
         std::vector<std::array<float, 2>> std_landmarks =
         {
             {89.3095f, 72.9025f},

@@ -5,9 +5,9 @@
 
 #include <execution>
 #include "vision/utils.h"
+#include "core/md_log.h"
 #include "vision/common/processors/pad.h"
 #include "vision/common/processors/resize.h"
-#include "core/md_log.h"
 
 namespace modeldeploy::vision::utils {
     DataType cv_dtype_to_md_dtype(int type) {
@@ -38,6 +38,35 @@ namespace modeldeploy::vision::utils {
         return DataType::UNKNOWN;
     }
 
+    cv::Point2f point2f_to_cv_type(const Point2f point2f) {
+        return cv::Point2f{point2f.x, point2f.y};
+    }
+
+    cv::Point3f point3f_to_cv_type(Point3f point3f) {
+        return {point3f.x, point3f.y, point3f.z};
+    }
+
+    cv::Rect2f rect2f_to_cv_type(Rect2f rect2f) {
+        return {rect2f.x, rect2f.y, rect2f.width, rect2f.height};
+    }
+
+    cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect) {
+        return {
+            cv::Point2f(rotated_rect.xc, rotated_rect.yc),
+            cv::Point2f(rotated_rect.width, rotated_rect.height),
+            rotated_rect.angle
+        };
+    }
+
+    bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor) {
+        cv::Mat mat;
+        image_data->to_mat(&mat);
+        return mat_to_tensor(mat, tensor);
+    }
+
+    cv::Mat image_data_to_mat(ImageData& image) {
+        return {image.height(), image.width(), image.type(), image.data()};
+    }
 
     bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, const bool is_copy) {
         const auto dtype = cv_dtype_to_md_dtype(mat.type());
@@ -57,6 +86,29 @@ namespace modeldeploy::vision::utils {
             // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
             // 确保mat在tensor生命周期结束前有效
             tensor->from_external_memory(mat.data, {mat.channels(), mat.rows, mat.cols}, dtype);
+        }
+        return true;
+    }
+
+    bool image_data_to_tensor(ImageData& image, Tensor* tensor, const bool is_copy) {
+        const auto dtype = cv_dtype_to_md_dtype(image.type());
+        if (is_copy) {
+            const size_t num_bytes = image.height() * image.width() * image.channels() *
+                Tensor::get_element_size(dtype);
+            tensor->allocate({image.channels(), image.height(), image.width()}, dtype);
+            if (num_bytes != tensor->byte_size()) {
+                MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
+                    "but now size of Tensor = " << tensor->byte_size()
+                    << ", size of Mat = " << num_bytes << "." << std::endl;
+                return false;
+            }
+            memcpy(tensor->data(), image.data(), num_bytes);
+        }
+        else {
+            // OpenCV Mat 的内存管理由 Mat 自己处理，这里不需要额外操作
+            // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
+            // 确保mat在tensor生命周期结束前有效
+            tensor->from_external_memory(image.data(), {image.channels(), image.height(), image.width()}, dtype);
         }
         return true;
     }
@@ -139,7 +191,7 @@ namespace modeldeploy::vision::utils {
                 const int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -180,7 +232,7 @@ namespace modeldeploy::vision::utils {
                 int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -216,8 +268,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (box_i.to_cv_Rect2f().area() == 0 || box_j.to_cv_Rect2f().area() == 0) continue;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                if (rect2f_to_cv_type(box_i).area() == 0 || rect2f_to_cv_type(box_j).area() == 0) continue;
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }
@@ -252,8 +304,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (box_i.to_cv_Rect2f().area() == 0 || box_j.to_cv_Rect2f().area() == 0) continue;
-                const float iou = rect_iou(box_i.to_cv_Rect2f(), box_j.to_cv_Rect2f());
+                if (rect2f_to_cv_type(box_i).area() == 0 || rect2f_to_cv_type(box_j).area() == 0) continue;
+                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }
@@ -269,29 +321,16 @@ namespace modeldeploy::vision::utils {
         result->swap(new_result);
     }
 
-    void letter_box(cv::Mat* mat, const std::vector<int>& size, const bool is_scale_up, const bool is_mini_pad,
-                    const bool is_no_pad, const std::vector<float>& padding_value, const int stride,
+    void letter_box(cv::Mat* mat, const std::vector<int>& size,
+                    const std::vector<float>& padding_value,
                     LetterBoxRecord* letter_box_record) {
         letter_box_record->ipt_h = static_cast<float>(mat->rows);
         letter_box_record->ipt_w = static_cast<float>(mat->cols);
         auto scale = std::min(size[1] * 1.0 / mat->rows, size[0] * 1.0 / mat->cols);
-        if (!is_scale_up) {
-            scale = std::min(scale, 1.0);
-        }
         int resize_h = static_cast<int>(round(mat->rows * scale));
         int resize_w = static_cast<int>(round(mat->cols * scale));
         int pad_w = size[0] - resize_w;
         int pad_h = size[1] - resize_h;
-        if (is_mini_pad) {
-            pad_h = pad_h % stride;
-            pad_w = pad_w % stride;
-        }
-        else if (is_no_pad) {
-            pad_h = 0;
-            pad_w = 0;
-            resize_h = size[1];
-            resize_w = size[0];
-        }
         if (std::fabs(scale - 1.0f) > 1e-06) {
             Resize::apply(mat, resize_w, resize_h);
         }
@@ -308,13 +347,13 @@ namespace modeldeploy::vision::utils {
         letter_box_record->out_w = static_cast<float>(mat->cols);
         letter_box_record->pad_h = static_cast<float>(pad_h) / 2.0f;
         letter_box_record->pad_w = static_cast<float>(pad_w) / 2.0f;
-        letter_box_record->scale = scale;
+        letter_box_record->scale = static_cast<float>(scale);
     }
 
-    cv::Mat center_crop(const cv::Mat& image, const cv::Size& crop_size) {
+    ImageData center_crop(const ImageData& image, const cv::Size& crop_size) {
         // 获取输入图像的尺寸
-        const int img_height = image.rows;
-        const int img_width = image.cols;
+        const int img_height = image.height();
+        const int img_width = image.width();
         // 获取裁剪尺寸
         const int crop_height = crop_size.height;
         const int crop_width = crop_size.width;
@@ -324,12 +363,14 @@ namespace modeldeploy::vision::utils {
             MD_LOG_ERROR << "Crop size is larger than the input image size." << std::endl;
             return image; // 或者抛出异常
         }
+        cv::Mat cv_image;
+        image.to_mat(&cv_image);
         // 计算裁剪区域的起始坐标
         const int top = (img_height - crop_height) / 2;
         const int left = (img_width - crop_width) / 2;
         // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clone()操作
-        const cv::Mat cropped_image = image(cv::Rect(left, top, crop_width, crop_height));
-        return cropped_image.clone();
+        const cv::Mat cropped_image = cv_image(cv::Rect(left, top, crop_width, crop_height)).clone();
+        return ImageData::from_mat(&cropped_image);
     }
 
     void print_mat_type(const cv::Mat& mat) {

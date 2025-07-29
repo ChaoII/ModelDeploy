@@ -20,7 +20,7 @@ namespace modeldeploy::vision::face {
 
         ~FaceRecognizerPipeline() override;
 
-        virtual bool predict(const cv::Mat& image, std::vector<FaceRecognitionResult>* results,
+        virtual bool predict(const ImageData& image, std::vector<FaceRecognitionResult>* results,
                              TimerArray* timers = nullptr);
 
         [[nodiscard]] bool is_initialized() const override;

@@ -363,6 +363,7 @@ typedef struct {
     MDDevice device;
     MDBackend backend;
     int graph_opt_level;
+    const char* password;
 } MDRuntimeOption;
 
 

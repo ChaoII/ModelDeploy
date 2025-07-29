@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -21,9 +21,6 @@ option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
 
 
-if (WITH_GPU)
-    add_definitions(-DWITH_GPU)
-endif ()
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" MD_VERSION)
 string(STRIP ${MD_VERSION} MD_VERSION)
 
@@ -38,11 +35,17 @@ if (POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
 endif ()
 
+
 if (MSVC)
     if (WITH_STATIC_CRT)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
     endif ()
-    add_compile_options(/wd4819 /wd4244 /utf-8)
+    add_compile_options(
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4819>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4251>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     add_definitions(-DMD_CXX_EXPORT)
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
@@ -61,8 +64,26 @@ file(GLOB_RECURSE TRT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/t
 file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
 file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
+file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu)
 
 list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
+
+if (WITH_GPU)
+    add_definitions(-DWITH_GPU)
+    enable_language(CUDA)
+    # https://developer.nvidia.com/cuda-gpus
+    set(CMAKE_CUDA_ARCHITECTURES 86)   # RTX 40 系列示例
+    # for cudaMalloc()
+    find_package(CUDAToolkit REQUIRED)
+    set(CMAKE_CUDA_STANDARD 17)
+    include_directories(${CUDAToolkit_INCLUDE_DIRS})
+    if (MSVC)
+        # -diag-suppress=1394 抑制c++标准库导出警告
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler /utf-8 -diag-suppress=1394")
+    endif ()
+    list(APPEND ALL_SOURCE ${CUDA_SOURCE})
+    list(APPEND DEPENDS CUDA::cudart)
+endif ()
 
 
 if (ENABLE_ORT)
@@ -85,7 +106,6 @@ if (ENABLE_TRT)
     list(APPEND ALL_SOURCE ${TRT_BACKEND_SOURCE})
     list(APPEND DEPENDS trt::nvinfer)
     list(APPEND DEPENDS trt::nvonnxparser)
-    list(APPEND DEPENDS CUDA::cudart)
 endif ()
 
 
@@ -119,12 +139,26 @@ if (BUILD_CAPI)
     list(APPEND ALL_SOURCE ${CAPI_SOURCE})
 endif ()
 
-add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE}
-        csrc/encryption/encryption.h)
+add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
 set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 if (MSVC)
     target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
+endif ()
+
+if (UNIX AND NOT APPLE)
+    # Linux
+    set_target_properties(${LIBRARY_NAME} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "$ORIGIN"
+            BUILD_RPATH "$ORIGIN"
+    )
+elseif (APPLE)
+    # macOS
+    set_target_properties(${LIBRARY_NAME} PROPERTIES
+            INSTALL_RPATH "@loader_path"
+            BUILD_RPATH "@loader_path"
+    )
 endif ()
 
 
@@ -141,6 +175,7 @@ if (BUILD_PYTHON)
     file(GLOB EXTRA_DLLS
             "${CMAKE_BINARY_DIR}/bin/*.dll"
             "${CMAKE_BINARY_DIR}/bin/*.so"
+            "${CMAKE_BINARY_DIR}/bin/*.so.*"
             "${CMAKE_BINARY_DIR}/bin/*.dylib"
     )
     install(TARGETS modeldeploy DESTINATION modeldeploy)
@@ -178,6 +213,7 @@ if (NOT BUILD_PYTHON)
     file(GLOB THIRD_LIBS
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dll"
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.so"
+            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.so.*"
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dylib"
     )
     install(FILES ${THIRD_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})

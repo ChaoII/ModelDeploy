@@ -20,7 +20,6 @@ namespace modeldeploy {
             Tensor tensor;
             tensor.allocate(data_shape, dtype);
             tensor.set_name(name);
-            // 拷贝数据（TODO: 后续考虑使用 SetExternalData 避免拷贝）
             tensor.from_external_memory(array.mutable_data(), tensor.shape(), tensor.dtype());
             // memcpy(tensor.inputs(), array.mutable_data(), array.nbytes());
             _inputs.push_back(std::move(tensor));
@@ -100,7 +99,8 @@ namespace modeldeploy {
             .def_readwrite("device", &RuntimeOption::device)
             .def_readwrite("model_from_memory", &RuntimeOption::model_from_memory)
             .def_readwrite("enable_trt", &RuntimeOption::enable_trt)
-            .def_readwrite("enable_fp16", &RuntimeOption::enable_fp16);
+            .def_readwrite("enable_fp16", &RuntimeOption::enable_fp16)
+            .def_readwrite("password", &RuntimeOption::password);
 
 
         pybind11::class_<TensorInfo>(m, "TensorInfo")

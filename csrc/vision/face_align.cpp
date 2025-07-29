@@ -106,23 +106,22 @@ namespace modeldeploy::vision::utils {
         return T;
     }
 
-    std::vector<cv::Mat> align_face_with_five_points(
-        const cv::Mat& image, std::vector<DetectionLandmarkResult>& result,
+    std::vector<ImageData> align_face_with_five_points(
+        const ImageData& image, std::vector<DetectionLandmarkResult>& result,
         std::vector<std::array<float, 2>> std_landmarks,
         std::array<int, 2> output_size) {
         if (std_landmarks.size() != 5) {
             MD_LOG_ERROR << "The landmarks.size() must be 5." << std::endl;
         }
-        if (image.empty()) {
-            MD_LOG_ERROR << "The input_image can't be empty.";
-        }
-        std::vector<cv::Mat> output_images;
+        std::vector<ImageData> output_images;
         output_images.reserve(result.size());
         if (result.empty()) {
             MD_LOG_ERROR << "The result is empty." << std::endl;
             return output_images;
         }
 
+        cv::Mat cv_image;
+        image.to_mat(&cv_image);
         cv::Mat src(5, 2, CV_32FC1, std_landmarks.data());
         for (int i = 0; i < result.size(); i++) {
             cv::Mat dst(5, 2, CV_32FC1, result[i].landmarks.data());
@@ -131,12 +130,12 @@ namespace modeldeploy::vision::utils {
             cv::Rect map_matrix_r = cv::Rect(0, 0, 3, 2);
             cv::Mat(m, map_matrix_r).copyTo(map_matrix);
             cv::Mat cropped_image_aligned;
-            cv::warpAffine(image, cropped_image_aligned, map_matrix,
+            cv::warpAffine(cv_image, cropped_image_aligned, map_matrix,
                            {output_size[0], output_size[1]});
             if (cropped_image_aligned.empty()) {
                 MD_LOG_ERROR << "croppedImageAligned is empty." << std::endl;
             }
-            output_images.emplace_back(cropped_image_aligned);
+            output_images.emplace_back(ImageData::from_mat(&cropped_image_aligned));
         }
         return output_images;
     }

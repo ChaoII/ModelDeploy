@@ -1,9 +1,8 @@
 //
-// Created by aichao on 2025/5/22.
+// Created by aichao on 2025/7/21.
 //
-
 #include <random>
-#include "vision/common/visualize/visualize.h"
+#include "vision/common/visualize/utils.h"
 
 namespace modeldeploy::vision {
     cv::Scalar get_random_color() {

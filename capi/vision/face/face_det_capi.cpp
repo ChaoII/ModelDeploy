@@ -32,10 +32,10 @@ MDStatusCode md_face_det_predict(const MDModel* model, MDImage* image, MDDetecti
     if (model->type != MDModelType::FACE) {
         return MDStatusCode::ModelTypeError;
     }
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
     const auto face_det_model = static_cast<modeldeploy::vision::face::Scrfd*>(model->model_content);
-    if (const bool res_status = face_det_model->predict(cv_image, &results); !res_status) {
+    if (const bool res_status = face_det_model->predict(image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     detection_landmark_result_2_c_results(results, c_results);
@@ -53,10 +53,10 @@ void md_print_face_det_result(const MDDetectionLandmarkResults* c_results) {
 void md_draw_face_det_result(const MDImage* image, const MDDetectionLandmarkResults* c_results,
                              const char* font_path, const int font_size, const int landmark_radius,
                              const double alpha, const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
     c_results_2_detection_landmark_result(c_results, &results);
-    modeldeploy::vision::vis_det_landmarks(cv_image, results, font_path, font_size,
+    modeldeploy::vision::vis_det_landmarks(image_data, results, font_path, font_size,
                                            landmark_radius, alpha, save_result);
 }
 

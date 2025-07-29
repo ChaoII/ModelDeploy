@@ -42,10 +42,10 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
         MD_LOG_ERROR << "Model type is not detection!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::DetectionResult> results;
     const auto detection_model = static_cast<modeldeploy::vision::detection::UltralyticsDet*>(model->model_content);
-    if (const bool res_status = detection_model->predict(cv_image, &results); !res_status) {
+    if (const bool res_status = detection_model->predict(image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     detection_results_2_c_results(results, c_results);
@@ -63,10 +63,10 @@ void md_print_detection_result(const MDDetectionResults* c_results) {
 void md_draw_detection_result(const MDImage* image, const MDDetectionResults* c_results,
                               const double threshold, const char* font_path, const int font_size,
                               const double alpha, const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::DetectionResult> results;
     c_results_2_detection_results(c_results, &results);
-    modeldeploy::vision::vis_det(cv_image, results, threshold, font_path, font_size, alpha, save_result);
+    modeldeploy::vision::vis_det(image_data, results, threshold, font_path, font_size, alpha, save_result);
 }
 
 void md_free_detection_result(MDDetectionResults* c_results) {

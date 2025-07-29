@@ -4,6 +4,7 @@
 #pragma once
 
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/detection/preprocessor.h"
 #include "vision/detection/postprocessor.h"
 
@@ -15,14 +16,14 @@ namespace modeldeploy::vision::detection {
 
         [[nodiscard]] std::string name() const override { return "UltralyticsDet"; }
 
-        virtual bool predict(const cv::Mat& image, std::vector<DetectionResult>* result,
+        virtual bool predict(const ImageData& image, std::vector<DetectionResult>* result,
                              TimerArray* timers = nullptr);
 
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<std::vector<DetectionResult>>* results,
                                    TimerArray* timers = nullptr);
 
-        std::unique_ptr<UltralyticsDet> clone() const;
+        [[nodiscard]] std::unique_ptr<UltralyticsDet> clone() const;
 
         virtual UltralyticsPreprocessor& get_preprocessor() {
             return preprocessor_;

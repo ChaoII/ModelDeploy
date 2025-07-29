@@ -3,15 +3,16 @@
 //
 
 #include "core/md_log.h"
+#include "vision/common/visualize/utils.h"
 #include "vision/common/visualize/visualize.h"
 
-
 namespace modeldeploy::vision {
-    cv::Mat vis_det(cv::Mat& cv_image, const std::vector<DetectionResult>& result,
-                    const double threshold,
-                    const std::string& font_path, const int font_size,
-                    const double alpha, const bool save_result) {
-        cv::Mat overlay;
+    ImageData vis_det(ImageData& image, const std::vector<DetectionResult>& result,
+                      const double threshold,
+                      const std::string& font_path, const int font_size,
+                      const double alpha, const bool save_result) {
+        cv::Mat cv_image, overlay;
+        image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         // 根据label_id获取颜色
@@ -58,6 +59,6 @@ namespace modeldeploy::vision {
             MD_LOG_INFO << "Save detection result to [vis_result.jpg]" << std::endl;
             cv::imwrite("vis_result.jpg", cv_image);
         }
-        return cv_image;
+        return image;
     }
 } // namespace modeldeploy::vision

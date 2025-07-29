@@ -38,21 +38,17 @@ namespace modeldeploy {
         void set_trt_max_shape(const std::string& trt_max_shape);
 
         OrtBackendOption ort_option;
-
         MnnBackendOption mnn_option;
-
         TrtBackendOption trt_option;
-
         std::string password;
         bool enable_fp16 = false;
-        int cpu_thread_num = -1;
-        int device_id = -1;
         bool enable_trt = false;
         bool model_from_memory = false;
+        int cpu_thread_num = -1;
+        int device_id = -1;
         std::string model_buffer;
         Device device = Device::CPU;
         std::string model_file;
         Backend backend = Backend::ORT;
-        void set_ort_graph_opt_level(int level = -1);
     };
 }

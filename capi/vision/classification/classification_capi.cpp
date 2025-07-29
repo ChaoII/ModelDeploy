@@ -46,11 +46,11 @@ MDStatusCode md_classification_predict(const MDModel* model, MDImage* image, MDC
         MD_LOG_ERROR << "Model type is not classification!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::ClassifyResult result;
     const auto detection_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
         model_content);
-    if (const bool res_status = detection_model->predict(cv_image, &result); !res_status) {
+    if (const bool res_status = detection_model->predict(image_data, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     classification_result_2_c_results(result, c_results);
@@ -70,10 +70,10 @@ void md_draw_classification_result(const MDImage* image, const MDClassificationR
                                    const float score_threshold,
                                    const char* font_path, const int font_size,
                                    const double alpha, const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::ClassifyResult result;
     c_results_2_classification_result(c_results, &result);
-    modeldeploy::vision::vis_cls(cv_image, result, top_k, score_threshold,
+    modeldeploy::vision::vis_cls(image_data, result, top_k, score_threshold,
                                  font_path, font_size, alpha, save_result);
 }
 

@@ -39,7 +39,7 @@ namespace modeldeploy {
         /// file path for optimized model
         std::string optimized_model_filepath;
 
-        std::string trt_engine_cache_path;
+        std::string trt_engine_cache_path = "./";
 
         std::string model_buffer;
 

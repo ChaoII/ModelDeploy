@@ -4,7 +4,9 @@
 
 #pragma once
 
+
 #include "base_model.h"
+#include "vision/common/image_data.h"
 #include "vision/classification/preprocessor.h"
 #include "vision/classification/postprocessor.h"
 
@@ -28,7 +30,7 @@ namespace modeldeploy::vision::classification {
          * \param[in] result The output classification result will be writen to this structure
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool predict(const cv::Mat& img, ClassifyResult* result);
+        virtual bool predict(const ImageData& img, ClassifyResult* result);
 
         /** \brief Predict the classification results for a batch of input images
          *
@@ -36,7 +38,7 @@ namespace modeldeploy::vision::classification {
          * \param[in] results The output classification result list
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool batch_predict(const std::vector<cv::Mat>& images,
+        virtual bool batch_predict(const std::vector<ImageData>& images,
                                    std::vector<ClassifyResult>* results);
 
         /// Get preprocessor reference of YOLOv5Cls

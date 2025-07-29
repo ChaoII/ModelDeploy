@@ -12,11 +12,12 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](const face::SeetaFaceIDPreprocessor& self,
-                    std::vector<pybind11::array>& im_list) {
-                     std::vector<cv::Mat> images;
+                    const std::vector<pybind11::array>& im_list) {
+                     std::vector<ImageData> images;
                      images.reserve(im_list.size());
                      for (auto& image : im_list) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                         auto cv_image = pyarray_to_cv_mat(image);
+                         images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<Tensor> outputs;
                      if (!self.run(&images, &outputs)) {
@@ -58,22 +59,24 @@ namespace modeldeploy::vision {
         pybind11::class_<face::SeetaFaceID, BaseModel>(m, "SeetaFaceID")
             .def(pybind11::init<std::string, RuntimeOption>())
             .def("predict",
-                 [](face::SeetaFaceID& self, pybind11::array& image) {
+                 [](face::SeetaFaceID& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
+                     const auto image_data = ImageData::from_mat(&mat);
                      FaceRecognitionResult result;
-                     self.predict(mat, &result);
+                     self.predict(image_data, &result);
                      return result;
                  }, pybind11::arg("image"))
             .def("batch_predict",
                  [](face::SeetaFaceID& self,
-                    std::vector<pybind11::array>& data) {
-                     std::vector<cv::Mat> images;
-                     images.reserve(data.size());
-                     for (auto& image : data) {
-                         images.push_back(pyarray_to_cv_mat(image));
+                    const std::vector<pybind11::array>& images) {
+                     std::vector<ImageData> _images;
+                     _images.reserve(images.size());
+                     for (auto& image : images) {
+                         const auto cv_image = pyarray_to_cv_mat(image);
+                         _images.push_back(ImageData::from_mat(&cv_image));
                      }
                      std::vector<FaceRecognitionResult> results;
-                     self.batch_predict(images, &results);
+                     self.batch_predict(_images, &results);
                      return results;
                  }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",

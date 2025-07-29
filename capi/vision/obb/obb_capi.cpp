@@ -44,10 +44,10 @@ MDStatusCode md_obb_predict(const MDModel* model, MDImage* image, MDObbResults* 
         MD_LOG_ERROR << "Model type is not obb!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto cv_image = md_image_to_mat(image);
+    const auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::ObbResult> results;
     const auto obb_model = static_cast<modeldeploy::vision::detection::UltralyticsObb*>(model->model_content);
-    if (const bool res_status = obb_model->predict(cv_image, &results); !res_status) {
+    if (const bool res_status = obb_model->predict(image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
     obb_results_2_c_results(results, c_results);
@@ -65,10 +65,10 @@ void md_print_obb_result(const MDObbResults* c_results) {
 void md_draw_obb_result(const MDImage* image, const MDObbResults* c_results,
                         const double threshold, const char* font_path, const int font_size,
                         const double alpha, const int save_result) {
-    auto cv_image = md_image_to_mat(image);
+    auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::ObbResult> results;
     c_results_2_obb_results(c_results, &results);
-    modeldeploy::vision::vis_obb(cv_image, results, threshold, font_path, font_size, alpha, save_result);
+    modeldeploy::vision::vis_obb(image_data, results, threshold, font_path, font_size, alpha, save_result);
 }
 
 void md_free_obb_result(MDObbResults* c_results) {
