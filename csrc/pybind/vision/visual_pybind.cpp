@@ -33,17 +33,30 @@ namespace modeldeploy::vision {
 
         m.def("vis_det",
               [](pybind11::array& im_data, const std::vector<DetectionResult>& result,
-                 const double threshold = 0.5, const std::string& font_path = "", const int font_size = 14,
-                 const double alpha = 0.5, const bool save_result = false) {
+                 const double threshold = 0.5, const pybind11::dict& label_map = pybind11::dict(),
+                 const std::string& font_path = "",
+                 const int font_size = 14, const double alpha = 0.5, const bool save_result = false) {
                   auto im = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData::from_mat(&im);
-                  const ImageData vis_im = vis_det(image_data, result, threshold, font_path, font_size, alpha,
-                                                   save_result);
+                  std::unordered_map<int, std::string> cpp_map;
+                  for (const auto& item : label_map) {
+                      int key = pybind11::cast<int>(item.first);
+                      const auto value = pybind11::cast<std::string>(item.second);
+                      cpp_map[key] = value;
+                  }
+                  const ImageData vis_im = vis_det(image_data, result, threshold, cpp_map, font_path,
+                                                   font_size, alpha, save_result);
                   cv::Mat mat;
                   vis_im.to_mat(&mat);
                   return cv_mat_to_pyarray(mat);
-              }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("threshold") = 0.5,
-              pybind11::arg("font_path") = "", pybind11::arg("font_size") = 14, pybind11::arg("alpha") = 0.15,
+              },
+              pybind11::arg("image"),
+              pybind11::arg("result"),
+              pybind11::arg("threshold") = 0.5,
+              pybind11::arg("label_map") = pybind11::dict(),
+              pybind11::arg("font_path") = "",
+              pybind11::arg("font_size") = 14,
+              pybind11::arg("alpha") = 0.15,
               pybind11::arg("save_result") = false);
 
         m.def("vis_iseg", [](pybind11::array& im_data, const std::vector<InstanceSegResult>& result,

@@ -24,15 +24,16 @@ namespace modeldeploy {
                      }
                      return py_meta;
                  })
-              .def("get_label_map",
+            .def("get_label_map",
                  [](BaseModel& self, const std::string& label_map_key) {
                      const std::unordered_map<int, std::string> label_map = self.get_label_map(label_map_key);
                      pybind11::dict py_label_map;
                      for (const auto& kv : label_map) {
                          py_label_map[pybind11::int_(kv.first)] = pybind11::str(kv.second);
                      }
+                     return py_label_map;
                  }
-              )
+            )
             .def("initialized", &BaseModel::is_initialized)
             .def_readwrite("runtime_option", &BaseModel::runtime_option);
     }
