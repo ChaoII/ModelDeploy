@@ -5,6 +5,7 @@
 #pragma once
 #include <filesystem>
 #include <vector>
+#include <unordered_map>
 #include <iterator>
 #include "core/md_log.h"
 
@@ -17,6 +18,9 @@ namespace modeldeploy {
     /// @param contents 指向字符串的指针，用于存储读取的文件内容
     /// @return bool 表示是否成功读取文件内容
     bool read_binary_from_file(const std::string& path, std::string* contents);
+
+
+    std::unordered_map<int, std::string> parse_label_map(const std::string& label_string);
 
 
     std::vector<std::string> string_split(const std::string& s, const std::string& delimiter);
@@ -103,6 +107,7 @@ namespace modeldeploy {
 
     // Base64编码函数
     std::string base64_encode(const std::vector<unsigned char>& data);
+
     std::string base64_encode(const std::string& data);
 
 

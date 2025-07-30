@@ -44,6 +44,9 @@ namespace modeldeploy {
         }
 
         virtual std::map<std::string, std::string> get_custom_meta_data();
+
+        virtual std::unordered_map<int, std::string> get_label_map(const std::string& label_map_key);
+
         RuntimeOption runtime_option{};
 
     protected:
