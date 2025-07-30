@@ -6,6 +6,7 @@
 
 #include <codecvt>
 #include <fstream>
+#include <regex>
 
 namespace modeldeploy {
     std::vector<int64_t> get_stride(const std::vector<int64_t>& dims) {
@@ -86,6 +87,21 @@ namespace modeldeploy {
     std::string wstring_to_string(const std::wstring& ws) {
         std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
         return conv.to_bytes(ws);
+    }
+
+
+    std::unordered_map<int, std::string> parse_label_map(const std::string& label_string) {
+        std::unordered_map<int, std::string> result;
+        // 匹配形如 0: 'head' 的片段
+        std::regex pattern(R"((\d+):\s*'([^']+)')");
+        auto begin = std::sregex_iterator(label_string.begin(), label_string.end(), pattern);
+        auto end = std::sregex_iterator();
+        for (std::sregex_iterator i = begin; i != end; ++i) {
+            int key = std::stoi((*i)[1]);
+            std::string value = (*i)[2];
+            result[key] = value;
+        }
+        return result;
     }
 
     std::vector<std::string> string_split(const std::string& s, const std::string& delimiter) {

@@ -30,8 +30,7 @@ namespace modeldeploy::vision::utils {
 
     cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);
 
-
-    MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
+    ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 

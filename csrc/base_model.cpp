@@ -53,4 +53,14 @@ namespace modeldeploy {
     std::map<std::string, std::string> BaseModel::get_custom_meta_data() {
         return runtime_->get_custom_meta_data();
     }
+
+
+    std::unordered_map<int, std::string> BaseModel::get_label_map(const std::string& label_map_key) {
+        const auto meta_data = get_custom_meta_data();
+        if (meta_data.find(label_map_key) == meta_data.end()) {
+            return {};
+        }
+        const auto& label_string = meta_data.at(label_map_key);
+        return parse_label_map(label_string);
+    }
 }

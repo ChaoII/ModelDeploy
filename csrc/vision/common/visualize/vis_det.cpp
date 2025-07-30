@@ -9,6 +9,7 @@
 namespace modeldeploy::vision {
     ImageData vis_det(ImageData& image, const std::vector<DetectionResult>& result,
                       const double threshold,
+                      const std::unordered_map<int, std::string>& label_map,
                       const std::string& font_path, const int font_size,
                       const double alpha, const bool save_result) {
         cv::Mat cv_image, overlay;
@@ -26,11 +27,14 @@ namespace modeldeploy::vision {
             if (color_map.find(class_id) == color_map.end()) {
                 color_map[class_id] = get_random_color();
             }
+            auto class_name = label_map.find(class_id) != label_map.end()
+                                  ? label_map.at(class_id)
+                                  : std::to_string(class_id);
             cv::Rect2f rect = {result[i].box.x, result[i].box.y, result[i].box.width, result[i].box.height};
             auto cv_color = color_map[class_id];
             // 绘制对象矩形框
             cv::rectangle(overlay, rect, cv_color, -1);
-            std::string text = std::to_string(class_id) + ": " + std::to_string(result[i].score).substr(0, 4);
+            std::string text = class_name + ": " + std::to_string(result[i].score).substr(0, 4);
             const auto size = cv::getTextSize(cv::Size(0, 0),
                                               text, cv::Point(rect.x, rect.y), font, font_size);
             // 绘制标签背景
@@ -44,10 +48,13 @@ namespace modeldeploy::vision {
                 continue;
             }
             auto class_id = result[c].label_id;
+            auto class_name = label_map.find(class_id) != label_map.end()
+                                  ? label_map.at(class_id)
+                                  : std::to_string(class_id);
             cv::Rect2f rect = {result[c].box.x, result[c].box.y, result[c].box.width, result[c].box.height};
             auto cv_color = color_map[class_id];
             cv::rectangle(cv_image, rect, cv_color, 1, cv::LINE_AA, 0);
-            std::string text = std::to_string(class_id) + ": " + std::to_string(result[c].score).substr(0, 4);
+            std::string text = class_name + ": " + std::to_string(result[c].score).substr(0, 4);
             const auto size = cv::getTextSize(cv::Size(0, 0), text,
                                               cv::Point2f(rect.x, rect.y), font, font_size);
             cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);

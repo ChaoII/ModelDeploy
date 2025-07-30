@@ -242,10 +242,12 @@ namespace modeldeploy::vision::detection {
             // (n,160,160)
             cv::Mat masks = matmul_result.t();
             masks = masks.reshape(static_cast<int>(_results.size()), {mask_w, mask_h});
-            // split for boxes nums
+
+            //split for boxes nums
             std::vector<cv::Mat> mask_channels;
             mask_channels.reserve(_results.size());
             cv::split(masks, mask_channels);
+
             // scale the boxes to the origin image shape
             const float ipt_h = letter_box_records[bs].ipt_h;
             const float ipt_w = letter_box_records[bs].ipt_w;

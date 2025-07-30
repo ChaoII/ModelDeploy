@@ -66,7 +66,8 @@ void md_draw_detection_result(const MDImage* image, const MDDetectionResults* c_
     auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::DetectionResult> results;
     c_results_2_detection_results(c_results, &results);
-    modeldeploy::vision::vis_det(image_data, results, threshold, font_path, font_size, alpha, save_result);
+    // todo add label_map
+    modeldeploy::vision::vis_det(image_data, results, threshold, {}, font_path, font_size, alpha, save_result);
 }
 
 void md_free_detection_result(MDDetectionResults* c_results) {

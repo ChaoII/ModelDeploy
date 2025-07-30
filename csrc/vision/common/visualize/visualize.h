@@ -9,7 +9,6 @@
 #include "vision/common/image_data.h"
 
 namespace modeldeploy::vision {
-
     MODELDEPLOY_CXX_EXPORT ImageData vis_cls(
         ImageData& image,
         const ClassifyResult& result,
@@ -22,6 +21,7 @@ namespace modeldeploy::vision {
 
     MODELDEPLOY_CXX_EXPORT ImageData vis_det(
         ImageData& image, const std::vector<DetectionResult>& result, double threshold = 0.5,
+        const std::unordered_map<int, std::string>& label_map = {},
         const std::string& font_path = "", int font_size = 14,
         double alpha = 0.15, bool save_result = false);
 
