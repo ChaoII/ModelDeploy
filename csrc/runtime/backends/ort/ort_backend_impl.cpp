@@ -247,7 +247,7 @@ namespace modeldeploy {
         }
     }
 
-    bool OrtBackendImpl::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
+    bool OrtBackendImpl::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) const {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR <<
                 "[OrtBackend] Size of the inputs(" << inputs.size() <<
@@ -280,7 +280,7 @@ namespace modeldeploy {
 
     std::unique_ptr<OrtBackendImpl> OrtBackendImpl::clone(RuntimeOption& runtime_option,
                                                           void* stream,
-                                                          const int device_id) {
+                                                          const int device_id) const {
         auto backend = std::make_unique<OrtBackendImpl>();
 
         // 共享 Session、model_buffer、输入输出描述
@@ -290,10 +290,11 @@ namespace modeldeploy {
         backend->outputs_desc_ = this->outputs_desc_;
         backend->option_ = this->option_;
 
-        runtime_option.device = (device_id >= 0) ? Device::GPU : Device::CPU;
+        runtime_option.ort_option = this->option_;
+        runtime_option.device = this->option_.device;
         runtime_option.device_id = device_id;
-        runtime_option.ort_option.device = runtime_option.device;
-        runtime_option.ort_option.device_id = device_id;
+        runtime_option.enable_fp16 = this->option_.enable_fp16;
+        runtime_option.enable_trt = this->option_.enable_trt;
 
         if (stream) {
             runtime_option.ort_option.external_stream_ = stream;
@@ -314,7 +315,7 @@ namespace modeldeploy {
     }
 
     std::vector<TensorInfo> OrtBackendImpl::get_input_infos() {
-        auto size = inputs_desc_.size();
+        const auto size = inputs_desc_.size();
         std::vector<TensorInfo> infos;
         infos.reserve(size);
         for (auto i = 0; i < size; i++) {
@@ -333,7 +334,7 @@ namespace modeldeploy {
     }
 
     std::vector<TensorInfo> OrtBackendImpl::get_output_infos() {
-        auto size = outputs_desc_.size();
+        const auto size = outputs_desc_.size();
         std::vector<TensorInfo> infos;
         infos.reserve(size);
         for (auto i = 0; i < outputs_desc_.size(); i++) {

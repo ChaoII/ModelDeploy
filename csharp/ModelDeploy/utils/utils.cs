@@ -99,6 +99,8 @@ namespace ModelDeploy.utils
         public Backend Backend { get; set; } = Backend.ORT;
         public int GraphOptLevel { get; set; } = -1;
 
+        public string Password { get; set; } = "";
+
         public MDRuntimeOption ToNative()
         {
             return new MDRuntimeOption
@@ -113,7 +115,8 @@ namespace ModelDeploy.utils
                 enable_trt = EnableTrt ? 1 : 0,
                 device = Device,
                 backend = Backend,
-                graph_opt_level = GraphOptLevel
+                graph_opt_level = GraphOptLevel,
+                password = Password
             };
         }
     }

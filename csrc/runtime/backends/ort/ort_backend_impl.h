@@ -28,10 +28,10 @@ namespace modeldeploy {
 
         bool init(const RuntimeOption& option) ;
 
-        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) ;
+        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) const;
 
         std::unique_ptr<OrtBackendImpl> clone(RuntimeOption& runtime_option,
-                                           void* stream = nullptr, int device_id = -1);
+                                           void* stream = nullptr, int device_id = -1) const;
 
         [[nodiscard]] size_t num_inputs() const  { return inputs_desc_.size(); }
 
