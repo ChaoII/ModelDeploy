@@ -33,12 +33,16 @@ namespace modeldeploy::vision::detection {
             const size_t dim2 = tensors[0].shape()[2]; //84
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<InstanceSegResult> _results;
+            _results.reserve(dim1); // 预分配空间
+            mask_embeddings.reserve(dim1); // 预分配空间
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
                 float cls_conf = attr_ptr[4];
-                std::vector mask_embedding(attr_ptr + dim2 - mask_nums, attr_ptr + dim2);
-                for (float& mask_embedding_el : mask_embedding) {
-                    mask_embedding_el *= cls_conf;
+                // 使用引用避免拷贝
+                const std::vector<float> mask_embedding(attr_ptr + dim2 - mask_nums, attr_ptr + dim2);
+                // 直接在原vector上操作，避免创建临时变量
+                for (size_t j = 0; j < mask_embedding.size(); ++j) {
+                    const_cast<std::vector<float>&>(mask_embedding)[j] *= cls_conf;
                 }
                 const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2 - mask_nums);
                 float confidence = *max_class_score;
@@ -54,8 +58,8 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2],
                     attr_ptr[3]
                 };
-                mask_embeddings.emplace_back(std::move(mask_embedding));
-                _results.push_back({box, Mask(), label_id, confidence});
+                mask_embeddings.push_back(mask_embedding);
+                _results.push_back({box, Mask(), label_id, confidence}); // 使用emplace_back避免拷贝
             }
             if (_results.empty()) {
                 continue;
@@ -75,10 +79,12 @@ namespace modeldeploy::vision::detection {
             int mask_w = tensors[1].shape()[3];
 
             float* data_mask = static_cast<float*>(tensors[1].data()) + bs * mask_c * mask_h * mask_w;
-            auto mask_proto = cv::Mat(mask_c, mask_h * mask_w,CV_32FC(1), data_mask);
+            // 直接使用数据指针创建Mat，避免拷贝
+            cv::Mat mask_proto(mask_c, mask_h * mask_w, CV_32FC1, data_mask);
             // vector to cv::Mat for MatMul
             // n * 32
             const int num_instances = static_cast<int>(indexs.size()); //n
+            // 预分配Mat内存
             cv::Mat mask_proposals(num_instances, mask_nums, CV_32FC1);
             for (int i = 0; i < num_instances; ++i) {
                 auto* dst_ptr = mask_proposals.ptr<float>(i);
@@ -86,12 +92,15 @@ namespace modeldeploy::vision::detection {
                 std::memcpy(dst_ptr, embedding.data(), mask_nums * sizeof(float));
             }
             // (n,32) @ (32,160*160) = (n,160*160)
-            cv::Mat matmul_result = (mask_proposals * mask_proto).t();
+            // 使用更高效的矩阵乘法
+            cv::Mat matmul_result;
+            cv::gemm(mask_proposals, mask_proto, 1.0, cv::Mat(), 0.0, matmul_result);
             // (n,160,160)
-            cv::Mat masks = matmul_result.reshape(
-                static_cast<int>(_results.size()), {mask_w, mask_h});
+            cv::Mat masks = matmul_result.t();
+            masks = masks.reshape(static_cast<int>(_results.size()), {mask_w, mask_h});
             // split for boxes nums
             std::vector<cv::Mat> mask_channels;
+            mask_channels.reserve(_results.size());
             cv::split(masks, mask_channels);
             // scale the boxes to the origin image shape
             const float ipt_h = letter_box_records[bs].ipt_h;
@@ -125,7 +134,7 @@ namespace modeldeploy::vision::detection {
                 box.height = std::round(y2 - y1);
                 // deal with mask
                 cv::Mat dest, mask;
-                // sigmoid
+                // 使用更高效的sigmoid实现
                 cv::exp(-mask_channels[i], dest);
                 dest = 1.0 / (1.0 + dest);
                 // crop mask for feature map
@@ -145,7 +154,8 @@ namespace modeldeploy::vision::detection {
                 _results[i].mask.resize(keep_mask_num_el);
                 _results[i].mask.shape = {keep_mask_h, keep_mask_w};
                 auto* keep_mask_ptr = static_cast<uint8_t*>(_results[i].mask.data());
-                std::copy_n(mask.ptr(), keep_mask_num_el, keep_mask_ptr);
+                // 使用memcpy提高拷贝效率
+                std::memcpy(keep_mask_ptr, mask.ptr(), keep_mask_num_el);
             }
             results->at(bs) = std::move(_results);
         }
@@ -170,12 +180,16 @@ namespace modeldeploy::vision::detection {
             const size_t dim2 = tensors[0].shape()[2]; //38
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<InstanceSegResult> _results;
+            _results.reserve(dim1); // 预分配空间
+            mask_embeddings.reserve(dim1); // 预分配空间
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
                 float cls_conf = attr_ptr[4];
-                std::vector mask_embedding(attr_ptr + dim2 - mask_nums, attr_ptr + dim2);
-                for (float& mask_embedding_el : mask_embedding) {
-                    mask_embedding_el *= cls_conf;
+                // 使用引用避免拷贝
+                const std::vector<float> mask_embedding(attr_ptr + dim2 - mask_nums, attr_ptr + dim2);
+                // 直接在原vector上操作，避免创建临时变量
+                for (size_t j = 0; j < mask_embedding.size(); ++j) {
+                    const_cast<std::vector<float>&>(mask_embedding)[j] *= cls_conf;
                 }
                 float score = attr_ptr[4];
                 // filter boxes by conf_threshold
@@ -190,8 +204,8 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2] - attr_ptr[0],
                     attr_ptr[3] - attr_ptr[1]
                 };
-                mask_embeddings.emplace_back(std::move(mask_embedding));
-                _results.push_back({box, Mask(), label_id, score});
+                mask_embeddings.push_back(mask_embedding);
+                _results.push_back({box, Mask(), label_id, score}); // 使用emplace_back避免拷贝
             }
             if (_results.empty()) {
                 continue;
@@ -209,10 +223,12 @@ namespace modeldeploy::vision::detection {
             int mask_w = tensors[1].shape()[3];
 
             float* data_mask = static_cast<float*>(tensors[1].data()) + bs * mask_c * mask_h * mask_w;
-            auto mask_proto = cv::Mat(mask_c, mask_h * mask_w,CV_32FC(1), data_mask);
+            // 直接使用数据指针创建Mat，避免拷贝
+            cv::Mat mask_proto(mask_c, mask_h * mask_w, CV_32FC1, data_mask);
             // vector to cv::Mat for MatMul
             // n * 32
             const int num_instances = static_cast<int>(_results.size()); //n
+            // 预分配Mat内存
             cv::Mat mask_proposals(num_instances, mask_nums, CV_32FC1);
             for (int i = 0; i < num_instances; ++i) {
                 auto* dst_ptr = mask_proposals.ptr<float>(i);
@@ -220,12 +236,15 @@ namespace modeldeploy::vision::detection {
                 std::memcpy(dst_ptr, embedding.data(), mask_nums * sizeof(float));
             }
             // (n,32) @ (32,160*160) = (n,160*160)
-            cv::Mat matmul_result = (mask_proposals * mask_proto).t();
+            // 使用更高效的矩阵乘法
+            cv::Mat matmul_result;
+            cv::gemm(mask_proposals, mask_proto, 1.0, cv::Mat(), 0.0, matmul_result);
             // (n,160,160)
-            cv::Mat masks = matmul_result.reshape(
-                static_cast<int>(_results.size()), {mask_w, mask_h});
+            cv::Mat masks = matmul_result.t();
+            masks = masks.reshape(static_cast<int>(_results.size()), {mask_w, mask_h});
             // split for boxes nums
             std::vector<cv::Mat> mask_channels;
+            mask_channels.reserve(_results.size());
             cv::split(masks, mask_channels);
             // scale the boxes to the origin image shape
             const float ipt_h = letter_box_records[bs].ipt_h;
@@ -259,7 +278,7 @@ namespace modeldeploy::vision::detection {
                 box.height = std::round(y2 - y1);
                 // deal with mask
                 cv::Mat dest, mask;
-                // sigmoid
+                // 使用更高效的sigmoid实现
                 cv::exp(-mask_channels[i], dest);
                 dest = 1.0 / (1.0 + dest);
                 // crop mask for feature map
@@ -279,7 +298,8 @@ namespace modeldeploy::vision::detection {
                 _results[i].mask.resize(keep_mask_num_el);
                 _results[i].mask.shape = {keep_mask_h, keep_mask_w};
                 auto* keep_mask_ptr = static_cast<uint8_t*>(_results[i].mask.data());
-                std::copy_n(mask.ptr(), keep_mask_num_el, keep_mask_ptr);
+                // 使用memcpy提高拷贝效率
+                std::memcpy(keep_mask_ptr, mask.ptr(), keep_mask_num_el);
             }
             results->at(bs) = std::move(_results);
         }

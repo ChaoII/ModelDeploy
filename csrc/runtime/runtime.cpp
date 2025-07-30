@@ -65,9 +65,9 @@ namespace modeldeploy {
 
     Runtime* Runtime::clone(void* stream, const int device_id) {
         auto* runtime = new Runtime();
-        MD_LOG_INFO << "Runtime Clone with Backend:: " << option.backend << " in " << option.device << "." << std::endl;
-        runtime->option = option;
         runtime->backend_ = backend_->clone(option, stream, device_id);
+        runtime->option = option;
+        MD_LOG_INFO << "Runtime Clone with Backend::" << option.backend << " in " << option.device << "." << std::endl;
         return runtime;
     }
 

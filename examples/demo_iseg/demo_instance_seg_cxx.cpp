@@ -15,8 +15,8 @@ int main(int argc, char** argv) {
     option.use_ort_backend();
     option.enable_fp16 = true;
     option.enable_trt = true;
-    std::string model_file = "../../test_data/test_models/yolo11n-seg_nms.onnx";
-    std::string image_file = "../../test_data/test_images/test_person.jpg";
+    const std::string model_file = "../../test_data/test_models/yolo11n-seg_nms.onnx";
+    const std::string image_file = "../../test_data/test_images/test_person.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file, option);
     model.get_preprocessor().use_cuda_preproc();
     auto im = modeldeploy::ImageData::imread(image_file);

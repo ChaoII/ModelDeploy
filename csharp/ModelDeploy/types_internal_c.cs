@@ -371,6 +371,7 @@ namespace ModelDeploy
             public Device device;
             public Backend backend;
             public int graph_opt_level;
+            public string password;
         }
     }
 }
