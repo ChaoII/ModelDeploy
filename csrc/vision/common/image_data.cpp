@@ -122,6 +122,19 @@ namespace modeldeploy {
         return img;
     }
 
+    void ImageData::update_from_mat(const void* mat_ptr, const bool is_copy) {
+        const auto* m = static_cast<const cv::Mat*>(mat_ptr);
+        if (!impl_) {
+            impl_ = std::make_shared<ImageDataImpl>();
+        }
+        if (is_copy) {
+            impl_->mat = m->clone(); // 深拷贝，数据独立
+        }
+        else {
+            impl_->mat = *m; // 浅拷贝，共享数据指针
+        }
+    }
+
     bool ImageData::empty() const {
         return !impl_ || impl_->mat.empty();
     }

@@ -21,10 +21,10 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsDet::predict(const ImageData& im, std::vector<DetectionResult>* result,
+    bool UltralyticsDet::predict(const ImageData& image, std::vector<DetectionResult>* result,
                                  TimerArray* timers) {
         std::vector<std::vector<DetectionResult>> results;
-        if (!batch_predict({im}, &results, timers)) {
+        if (!batch_predict({image}, &results, timers)) {
             return false;
         }
         *result = std::move(results[0]);
