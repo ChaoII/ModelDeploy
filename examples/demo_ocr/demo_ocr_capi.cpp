@@ -44,6 +44,14 @@ int main(int argc, char** argv) {
         std::cout << ret << std::endl;
         return ret;
     }
+
+    for (int i = 0; i < results.size; i++) {
+        auto rect = md_create_rect_from_polygon(&results.data[i].box);
+        auto image_crop = md_crop_image(&image, &rect);
+        md_show_image(&image_crop);
+    }
+
+
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     md_draw_ocr_result(&image, &results, "../../test_data/msyh.ttc", 12, 0.1, 1);
     const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;

@@ -36,6 +36,24 @@ MDPolygon* md_create_polygon_from_rect(const MDRect* rect) {
     return polygon;
 }
 
+MDRect md_create_rect_from_polygon(const MDPolygon* polygon) {
+    float min_x = std::numeric_limits<float>::max();
+    float max_x = std::numeric_limits<float>::lowest();
+    float min_y = std::numeric_limits<float>::max();
+    float max_y = std::numeric_limits<float>::lowest();
+    for (int i = 0; i < polygon->size; i++) {
+        if (polygon->data[i].x < min_x) min_x = polygon->data[i].x;
+        if (polygon->data[i].x > max_x) max_x = polygon->data[i].x;
+        if (polygon->data[i].y < min_y) min_y = polygon->data[i].y;
+        if (polygon->data[i].y > max_y) max_y = polygon->data[i].y;
+    }
+    return MDRect{
+        static_cast<int>(min_x),
+        static_cast<int>(min_y),
+        static_cast<int>(max_x - min_x),
+        static_cast<int>(max_y - min_y)
+    };
+}
 
 MDPoint md_get_center_point(const MDRect* rect) {
     return MDPoint{rect->x + rect->width / 2, rect->y + rect->height / 2};

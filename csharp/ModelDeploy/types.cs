@@ -130,6 +130,23 @@ namespace ModelDeploy
             return cPolygons;
         }
 
+        public Rect ToRect()
+        {
+            float minX = float.MaxValue;
+            float maxX = float.MinValue;
+            float minY = float.MaxValue;
+            float maxY = float.MinValue;
+            for (int i = 0; i < Points.Count; i++)
+            {
+                if (Points[i].X < minX) minX = Points[i].X;
+                if (Points[i].X > maxX) maxX = Points[i].X;
+                if (Points[i].Y < minY) minY = Points[i].Y;
+                if (Points[i].Y > maxY) maxY = Points[i].Y;
+            }
+
+            return new Rect { X = (int)minX, Y = (int)minY, Width = (int)(maxX - minX), Height = (int)(maxY - minY) };
+        }
+
         public static void FreeMDPolygon(MDPolygon polygon)
         {
             if (polygon.data != IntPtr.Zero)

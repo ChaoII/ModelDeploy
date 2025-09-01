@@ -39,6 +39,7 @@ int32_t main() {
                                                   option);
 
     const std::string test_str = "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。";
+    const std::string test_str0 = "是的，我知道文心一言。文心一言是百度公司推出的一款大型语言模型，和我一样，它也可以回答问题、创作文字、编程、推理、多语言交流等。不过，我们是不同的产品，分别由不同的公司开发。如果你有任何问题，我会尽力帮助你解答。";
     std::string test_str1 =
         "来听一听, 这个是什么口音? 现在是北京时间12:24:35，我的电话是18571498072. How are you doing? Are you ok? Thank you! 你觉得中英文说得如何呢?";
     const std::string test_str2 =
@@ -59,6 +60,6 @@ int32_t main() {
     // zm_054,zm_055,zm_056,zm_057,zm_058,zm_061,zm_062,zm_063,zm_064,
     // zm_065,zm_066,zm_068,zm_069,zm_080,zm_081,zm_082,zm_089,zm_091,
     // zm_095,zm_096,zm_097,zm_098,zm_100
-    kokoro.predict(test_str3, "zf_001", 0.9, &out_data);
+    kokoro.predict(test_str0, "zf_001", 0.9, &out_data);
     modeldeploy::audio::tts::write_wave(std::string("out.wav"), kokoro.get_sample_rate(), out_data.data(), out_data.size());
 }
