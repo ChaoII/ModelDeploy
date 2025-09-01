@@ -26,6 +26,12 @@ MODELDEPLOY_CAPI_EXPORT bool md_get_button_enable_status(const MDImage* image, i
 /// @return
 MODELDEPLOY_CAPI_EXPORT MDPolygon* md_create_polygon_from_rect(const MDRect* rect);
 
+    /// 将MDRect转化为MDPolygon多边形
+    /// @param polygon MDPolygon
+    /// @return
+MODELDEPLOY_CAPI_EXPORT MDRect md_create_rect_from_polygon(const MDPolygon* polygon);
+
+
 /// 获取矩形的中心点
 /// \param rect
 /// \return

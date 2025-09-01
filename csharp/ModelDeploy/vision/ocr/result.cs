@@ -9,10 +9,10 @@ namespace ModelDeploy.vision.ocr
 {
     public class OcrResult
     {
-        private Polygon Box { get; set; }
+        public Polygon Box { get; set; }
         public string Text { get; private set; }
-        private float Score { get; set; }
-        private Polygon TableBox { get; set; }
+        public float Score { get; set; }
+        public Polygon TableBox { get; set; }
         public string TableStructure { get; private set; }
 
 

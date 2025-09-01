@@ -169,6 +169,9 @@ static class Program
         image.Show();
         foreach (var result in results.Data)
         {
+            var rect = result.Box.ToRect();
+            var image_crop = image.Crop(rect);
+            image_crop.Show();
             Console.WriteLine(result.Text);
         }
 
@@ -404,12 +407,12 @@ static class Program
         // TestLpr();
         // TestSenseVoice();
         // TestKokoro();
-        TestDetection();
+        // TestDetection();
         // TestInstanceSeg();
         // TestObb();
         // TestPose();
         // TestImage();
-        // TestOCR();
+        TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();
