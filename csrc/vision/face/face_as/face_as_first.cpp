@@ -44,7 +44,7 @@ namespace modeldeploy::vision::face {
         }
         cv::cvtColor(mat, mat, cv::COLOR_BGR2YCrCb);
         HWC2CHW::apply(&mat);
-        Cast::apply(image, "float");
+        Cast::apply(&mat, "float");
         if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;

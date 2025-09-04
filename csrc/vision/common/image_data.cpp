@@ -24,7 +24,6 @@ namespace modeldeploy {
         [[nodiscard]] int channels() const { return mat.channels(); }
         [[nodiscard]] int type() const { return mat.type(); }
         [[nodiscard]] size_t size() const { return mat.total() * mat.elemSize(); }
-
         uint8_t* data() { return mat.data; }
         [[nodiscard]] const uint8_t* data() const { return mat.data; }
     };
@@ -35,6 +34,11 @@ namespace modeldeploy {
 
     ImageData::ImageData(int width, int height, int channels, int type)
         : impl_(std::make_shared<ImageDataImpl>(width, height, channels, type)) {
+    }
+
+    ImageData::ImageData(const cv::Mat* mat) {
+        impl_ = std::make_shared<ImageDataImpl>();
+        impl_->mat = *mat;
     }
 
     ImageData::ImageData(const ImageData& other) = default;
@@ -114,24 +118,22 @@ namespace modeldeploy {
     }
 
 
-    ImageData ImageData::from_mat(const void* mat_ptr) {
-        const auto* m = static_cast<const cv::Mat*>(mat_ptr);
+    ImageData ImageData::from_mat(const cv::Mat* mat_ptr) {
         ImageData img;
         img.impl_ = std::make_shared<ImageDataImpl>();
-        img.impl_->mat = *m; // header 拷贝，不复制数据
+        img.impl_->mat = *mat_ptr; // header 拷贝，不复制数据
         return img;
     }
 
-    void ImageData::update_from_mat(const void* mat_ptr, const bool is_copy) {
-        const auto* m = static_cast<const cv::Mat*>(mat_ptr);
+    void ImageData::update_from_mat(const cv::Mat* mat_ptr, const bool is_copy) {
         if (!impl_) {
             impl_ = std::make_shared<ImageDataImpl>();
         }
         if (is_copy) {
-            impl_->mat = m->clone(); // 深拷贝，数据独立
+            impl_->mat = mat_ptr->clone(); // 深拷贝，数据独立
         }
         else {
-            impl_->mat = *m; // 浅拷贝，共享数据指针
+            impl_->mat = *mat_ptr; // 浅拷贝，共享数据指针
         }
     }
 
@@ -139,15 +141,14 @@ namespace modeldeploy {
         return !impl_ || impl_->mat.empty();
     }
 
-    void ImageData::to_mat(void* mat, bool is_copy) const {
-        auto* m = static_cast<cv::Mat*>(mat);
+    void ImageData::to_mat(cv::Mat* mat_ptr, bool is_copy) const {
         if (!is_copy)
-            *m = impl_->mat; // 浅拷贝（共用数据指针）
+            *mat_ptr = impl_->mat; // 浅拷贝（共用数据指针）
         else
-            *m = impl_->mat.clone();
+            *mat_ptr = impl_->mat.clone();
     }
 
-    void ImageData::images_to_mats(const std::vector<ImageData>& images, const std::vector<void*>& mats) {
+    void ImageData::images_to_mats(const std::vector<ImageData>& images, const std::vector<cv::Mat*>& mats) {
         for (size_t i = 0; i < images.size(); ++i) {
             images[i].to_mat(mats[i]);
         }

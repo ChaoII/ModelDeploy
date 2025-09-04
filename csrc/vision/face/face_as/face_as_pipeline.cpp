@@ -144,7 +144,7 @@ namespace modeldeploy::vision::face {
         for (auto& align_image : align_im_list) {
             float passive_result;
             const auto clarity = clarity_estimate(align_image);
-            face_as_first_->predict(ImageData::from_mat(&align_image), &passive_result);
+            face_as_first_->predict(align_image, &passive_result);
             const float result = has_box ? 0.0f : passive_result;
             if (result > fuse_threshold) {
                 if (clarity >= clarity_threshold) {

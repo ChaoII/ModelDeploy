@@ -30,7 +30,7 @@ namespace modeldeploy::vision::face {
         CenterCrop::apply(&mat, size_[0], size_[1]);
         BGR2RGB::apply(&mat);
         HWC2CHW::apply(&mat);
-        Cast::apply(image, "float");
+        Cast::apply(&mat, "float");
         if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;

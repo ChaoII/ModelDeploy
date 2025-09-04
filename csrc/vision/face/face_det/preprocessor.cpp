@@ -39,7 +39,7 @@ namespace modeldeploy::vision::face {
         const std::vector beta = {-127.5f / 128.f, -127.5f / 128.f, -127.5f / 128.f};
         Convert::apply(&mat, alpha, beta);
         HWC2CHW::apply(&mat);
-        Cast::apply(image, "float");
+        Cast::apply(&mat, "float");
         if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
             return false;
