@@ -13,6 +13,9 @@
 #include "core/tensor.h"
 #include "vision/common/struct.h"
 
+namespace cv {
+    class Mat;
+}
 
 namespace modeldeploy {
     class ImageDataImpl; // 前置声明
@@ -23,6 +26,7 @@ namespace modeldeploy {
         ImageData();
         ImageData(int width, int height, int channels, int type);
         ImageData(const ImageData& other);
+        explicit ImageData(const cv::Mat* mat);
         ImageData& operator=(const ImageData& other);
         ~ImageData();
 
@@ -49,10 +53,10 @@ namespace modeldeploy {
         [[nodiscard]] ImageData clone() const;
         static ImageData from_raw(const unsigned char* data, int width, int height, int channels);
         static ImageData from_raw_nocopy(unsigned char* data, int width, int height, int channels);
-        static ImageData from_mat(const void* mat); // mat为cv::Mat*
-        void update_from_mat(const void* mat_ptr, bool is_copy = false);
-        void to_mat(void* mat, bool is_copy = false) const; // mat为cv::Mat*
-        static void images_to_mats(const std::vector<ImageData>& images, const std::vector<void*>& mats);
+        static ImageData from_mat(const cv::Mat* mat_ptr); // mat为cv::Mat*
+        void update_from_mat(const cv::Mat* mat_ptr, bool is_copy = false);
+        void to_mat(cv::Mat* mat_ptr, bool is_copy = false) const; // mat为cv::Mat*
+        static void images_to_mats(const std::vector<ImageData>& images, const std::vector<cv::Mat*>& mats);
         static ImageData imread(const std::string& filename);
         [[nodiscard]] bool imwrite(const std::string& filename) const;
         void imshow(const std::string& win_name) const;

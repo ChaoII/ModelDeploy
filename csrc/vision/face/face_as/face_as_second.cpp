@@ -42,7 +42,7 @@ namespace modeldeploy::vision::face {
         Resize::apply(&mat, size_[0], size_[1]);
         Convert::apply(&mat, alpha_, beta_);
         HWC2CHW::apply(&mat);
-        Cast::apply(image, "float");
+        Cast::apply(&mat, "float");
 
         if (!utils::mat_to_tensor(mat, output)) {
             MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
