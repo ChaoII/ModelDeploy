@@ -19,6 +19,31 @@ namespace ModelDeploy.vision.ocr
                 throw new Exception("md_create_ocr_model failed.");
         }
 
+        public void SetMaxSideLen(int maxSideLen)
+        {
+            Utils.Check(md_ocr_det_set_max_side_len(ref _model, maxSideLen), "ocr_det_set_max_side_len");
+        }
+
+        public void UseDilation(bool useDilation = false)
+        {
+            Utils.Check(md_ocr_det_db_set_use_dilation(ref _model, useDilation ? 1 : 0), "ocr_det_db_set_use_dilation");
+        }
+
+        public void UnclipRatio(double dbUnclipRatio = 1.5)
+        {
+            Utils.Check(md_ocr_det_db_unclip_ratio(ref _model, dbUnclipRatio), "ocr_det_db_unclip_ratio");
+        }
+
+        public void SetDbThresh(double dbThresh = 0.3)
+        {
+            Utils.Check(md_ocr_det_set_db_thresh(ref _model, dbThresh), "ocr_det_set_db_thresh");
+        }
+
+        public void SetDbBoxThresh(double dbBoxThresh = 0.6)
+        {
+            Utils.Check(md_ocr_det_set_db_box_thresh(ref _model, dbBoxThresh), "ocr_det_set_db_box_thresh");
+        }
+
         public OcrResults Predict(Image image)
         {
             MDOCRResults cResults = new MDOCRResults();
@@ -57,6 +82,22 @@ namespace ModelDeploy.vision.ocr
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_ocr_model(ref MDModel model, ref MDOCRModelParameters parameters,
             ref MDRuntimeOption option);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_ocr_det_set_max_side_len(ref MDModel model, int maxSideLen = 960);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_ocr_det_set_db_thresh(ref MDModel model, double dbThresh = 0.3);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_ocr_det_set_db_box_thresh(ref MDModel model, double dbBoxThresh = 0.6);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_ocr_det_db_unclip_ratio(ref MDModel model, double dbUnclipRatio = 1.5);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_ocr_det_db_set_use_dilation(ref MDModel model, int useDilation = 0);
+
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_ocr_model_predict(ref MDModel model, ref MDImage image, ref MDOCRResults results);
