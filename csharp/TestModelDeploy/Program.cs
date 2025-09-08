@@ -164,6 +164,9 @@ static class Program
         RuntimeOption option = new RuntimeOption();
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.jpg"));
         PaddleOcr ppocr = new PaddleOcr(parameters, option);
+        ppocr.SetMaxSideLen(1920);
+        ppocr.UseDilation();
+        ppocr.SetDbThresh(0.3);
         OcrResults results = ppocr.Predict(image);
         ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.15, true);
         image.Show();

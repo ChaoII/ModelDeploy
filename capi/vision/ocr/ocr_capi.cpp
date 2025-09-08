@@ -50,6 +50,38 @@ MDStatusCode md_create_ocr_model(MDModel* model,
     return MDStatusCode::Success;
 }
 
+
+MDStatusCode md_ocr_det_set_max_side_len(const MDModel* model, const int max_side_len) {
+    const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
+    ocr_model->get_detector()->get_preprocessor().set_max_side_len(max_side_len);
+    return MDStatusCode::Success;
+}
+
+MDStatusCode md_ocr_det_set_db_thresh(const MDModel* model, const double db_thresh) {
+    const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_thresh(db_thresh);
+    return MDStatusCode::Success;
+}
+
+MDStatusCode md_ocr_det_set_db_box_thresh(const MDModel* model, const double db_box_thresh) {
+    const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_box_thresh(db_box_thresh);
+    return MDStatusCode::Success;
+}
+
+MDStatusCode md_ocr_det_db_unclip_ratio(const MDModel* model, const double db_unclip_ratio) {
+    const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
+    ocr_model->get_detector()->get_postprocessor().set_det_db_unclip_ratio(db_unclip_ratio);
+    return MDStatusCode::Success;
+}
+
+MDStatusCode md_ocr_det_db_set_use_dilation(const MDModel* model, const int use_dilation) {
+    const auto ocr_model = static_cast<modeldeploy::vision::ocr::PaddleOCR*>(model->model_content);
+    ocr_model->get_detector()->get_postprocessor().set_use_dilation(use_dilation);
+    return MDStatusCode::Success;
+}
+
+
 MDRect md_get_text_position(const MDModel* model, MDImage* image, const char* text) {
     auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::OCRResult res;

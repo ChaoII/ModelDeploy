@@ -38,6 +38,13 @@ int main(int argc, char** argv) {
         std::cout << ret << std::endl;
         return ret;
     }
+
+    md_ocr_det_set_max_side_len(&model, 1920);
+    md_ocr_det_db_set_use_dilation(&model, 1);
+    md_ocr_det_set_db_thresh(&model, 0.3);
+    md_ocr_det_set_db_box_thresh(&model, 0.6);
+    md_ocr_det_db_unclip_ratio(&model,1.8);
+
     MDImage image = md_read_image("../../test_data/test_images/test_ocr9.jpg");
     MDOCRResults results;
     if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {

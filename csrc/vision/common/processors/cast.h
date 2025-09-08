@@ -6,6 +6,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include "core/tensor.h"
@@ -17,14 +18,14 @@ namespace modeldeploy::vision {
      */
     class MODELDEPLOY_CXX_EXPORT Cast {
     public:
-        explicit Cast(const std::string& dtype = "float") : dtype_(dtype) {
+        explicit Cast(std::string  dtype = "float") : dtype_(std::move(dtype)) {
         }
 
         bool impl(cv::Mat* mat) const;
 
         bool operator()(cv::Mat* mat) const;
 
-        std::string name() { return "Cast"; }
+        static std::string name() { return "Cast"; }
         /** \brief Process the input images
          *
          * \param[in] mat The input image data
@@ -33,7 +34,7 @@ namespace modeldeploy::vision {
          */
         static bool apply(cv::Mat* mat, const std::string& dtype);
 
-        std::string get_dtype() const { return dtype_; }
+        [[nodiscard]] std::string get_dtype() const { return dtype_; }
 
     private:
         std::string dtype_;
