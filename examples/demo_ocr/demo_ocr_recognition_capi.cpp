@@ -21,12 +21,13 @@ int main(int argc, char** argv) {
     MDModel model;
     const MDRuntimeOption option = md_create_default_runtime_option();
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
-                                               "../../test_data/ppocrv4_dict.txt", &option)) != 0) {
+                                               "../../test_data/test_models/ocr/ppocrv5_server/rec_infer.onnx",
+                                               "../../test_data/ppocrv5_dict.txt", &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
-    MDImage image = md_read_image("../../test_data/test_images/test_ocr_recognition1.png");
+    // MDImage image = md_read_image("../../test_data/test_images/test_ocr_recognition1.jpg");
+    MDImage image = md_read_image("C:/Users/aichao/Desktop/2.jpg");
     MDOCRResult result;
     if ((ret = md_ocr_recognition_model_predict(&model, &image, &result)) != 0) {
         std::cout << ret << std::endl;

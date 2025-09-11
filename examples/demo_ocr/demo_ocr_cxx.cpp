@@ -2,14 +2,10 @@
 // Created by aichao on 2025/2/24.
 //
 
-#include <capi/utils/md_utils_capi.h>
-#include <capi/utils/internal/utils.h>
-
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 #ifdef WIN32
-
 #include <windows.h>
 #endif
 
@@ -23,18 +19,18 @@ int main() {
     option.enable_trt = false;
     option.enable_fp16 = true;
     modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx",
-                                            "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
-                                            "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
+                                            "",
+                                            "../../test_data/test_models/ocr/ppocrv5_server/rec_infer.onnx",
                                             "../../test_data/ppocrv5_dict.txt",
                                             option);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/ocr1.jpg");
-    ocr.set_rec_batch_size(16);
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/ocr2.jpg");
+    // auto img = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/pictures_test/35.png");
     ocr.set_rec_batch_size(16);
     ocr.get_detector()->get_preprocessor().set_max_side_len(1440);
     // ocr.get_detector()->get_preprocessor().set_det_image_shape({3, 1440, 1440});
     ocr.get_detector()->get_postprocessor().set_det_db_thresh(0.3);
     // ocr.get_detector()->get_postprocessor().set_det_db_box_thresh(0.5);
-    ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.8);
+    ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(2.0);
     // ocr.get_detector()->get_postprocessor().set_use_dilation(true);
     modeldeploy::vision::OCRResult result;
     TimerArray timers;
