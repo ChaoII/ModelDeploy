@@ -149,19 +149,20 @@ static class Program
         MDOCRModelParameters parameters = new MDOCRModelParameters
         {
             // 最后注意必须加斜杠
-            det_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/det_infer.onnx"),
-            cls_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/cls_infer.onnx"),
-            rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/rec_infer.onnx"),
+            det_model_file = Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/det_infer.onnx"),
+            cls_model_file = "",
+            rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_server/rec_infer.onnx"),
             dict_path = Path.Combine(TestDataPath, "ppocrv5_dict.txt"),
-            max_side_len = 1920,
+            max_side_len = 1440,
             det_db_thresh = 0.3,
             det_db_box_thresh = 0.6,
-            det_db_unclip_ratio = 1.5,
+            det_db_unclip_ratio = 2.0,
             det_db_score_mode = "slow",
             use_dilation = 0,
             rec_batch_size = 8,
         };
         RuntimeOption option = new RuntimeOption();
+        option.Device = Device.GPU;
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.jpg"));
         PaddleOcr ppocr = new PaddleOcr(parameters, option);
         ppocr.SetMaxSideLen(1920);
@@ -174,7 +175,7 @@ static class Program
         {
             var rect = result.Box.ToRect();
             var image_crop = image.Crop(rect);
-            image_crop.Show();
+            // image_crop.Show();
             Console.WriteLine(result.Text);
         }
 

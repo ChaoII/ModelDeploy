@@ -23,9 +23,12 @@ namespace modeldeploy::vision {
                 points.emplace_back(polygon[j], polygon[j + 1]);
             }
             cv::fillPoly(overlay, points, cv_color, cv::LINE_AA, 0);
-            const auto size = cv::getTextSize(cv::Size(0, 0), result.text[i],
-                                              {points[0].x, points[0].y}, font, font_size);
-            cv::rectangle(overlay, size, cv_color, -1, cv::LINE_AA, 0);
+            // 绘制文字背景 兼容只做检测的时候绘制
+            if (!result.text.empty()) {
+                const auto size = cv::getTextSize(cv::Size(0, 0), result.text[i],
+                                                  {points[0].x, points[0].y}, font, font_size);
+                cv::rectangle(overlay, size, cv_color, -1, cv::LINE_AA, 0);
+            }
         }
         // 绘制表格单元格
         // for (int j = 0; j < result.table_boxes.size(); j++) {
@@ -51,12 +54,15 @@ namespace modeldeploy::vision {
                 points.emplace_back(polygon[j], polygon[j + 1]);
             }
             cv::polylines(cv_image, points, true, cv_color, 1, cv::LINE_AA, 0);
-            const auto size = cv::getTextSize(cv::Size(0, 0), result.text[i],
-                                              {points[0].x, points[0].y}, font, font_size);
-            cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
-            const auto inv_color = cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]);
-            cv::putText(cv_image, result.text[i], {points[0].x, points[0].y - 2},
-                        inv_color, font, font_size);
+            // 绘制文字背景边框和文本 兼容只做检测的时候绘制
+            if (!result.text.empty()) {
+                const auto size = cv::getTextSize(cv::Size(0, 0), result.text[i],
+                                                  {points[0].x, points[0].y}, font, font_size);
+                cv::rectangle(cv_image, size, cv_color, 1, cv::LINE_AA, 0);
+                const auto inv_color = cv::Scalar(255 - cv_color[0], 255 - cv_color[1], 255 - cv_color[2]);
+                cv::putText(cv_image, result.text[i], {points[0].x, points[0].y - 2},
+                            inv_color, font, font_size);
+            }
         }
         // 绘制表格单元格
         // for (int j = 0; j < result.table_boxes.size(); j++) {
