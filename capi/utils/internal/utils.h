@@ -26,7 +26,6 @@ modeldeploy::ImageData md_image_to_image_data(const MDImage* image);
 
 cv::Mat md_image_to_mat(const MDImage* image);
 
-
 ///
 /// 将OpenCV的Mat对象转换为MDImage对象。
 ///
