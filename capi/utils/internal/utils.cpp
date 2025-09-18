@@ -10,7 +10,6 @@
 
 #include <csrc/core/md_log.h>
 
-
 modeldeploy::ImageData md_image_to_image_data(const MDImage* image) {
     cv::Mat cv_image = md_image_to_mat(image);
     return modeldeploy::ImageData::from_mat(&cv_image);

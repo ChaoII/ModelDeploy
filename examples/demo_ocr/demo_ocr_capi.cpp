@@ -20,43 +20,45 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     MDOCRModelParameters ocr_parameters = {
-        "../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
+        "../../test_data/test_models/ocr/ppocrv5_mobile/det_infer2.onnx",
         "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
-        "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
-        "../../test_data/ppocrv5_dict.txt",
-        1920,
+        "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer1.onnx",
+        "../../test_data/dict.txt",
+        1440,
         0.3,
         0.6,
         1.5,
         "slow",
         0,
-        8
+        16
     };
 
-    const MDRuntimeOption option = md_create_default_runtime_option();
+    MDRuntimeOption option = md_create_default_runtime_option();
+    option.device = MD_DEVICE_GPU;
+    option.enable_fp16 = 1;
     if ((ret = md_create_ocr_model(&model, &ocr_parameters, &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
 
-    md_ocr_det_set_max_side_len(&model, 1920);
-    md_ocr_det_db_set_use_dilation(&model, 1);
-    md_ocr_det_set_db_thresh(&model, 0.3);
-    md_ocr_det_set_db_box_thresh(&model, 0.6);
-    md_ocr_det_db_unclip_ratio(&model,1.8);
+    // md_ocr_det_set_max_side_len(&model, 1920);
+    // md_ocr_det_db_set_use_dilation(&model, 1);
+    // md_ocr_det_set_db_thresh(&model, 0.3);
+    // md_ocr_det_set_db_box_thresh(&model, 0.6);
+    // md_ocr_det_db_unclip_ratio(&model,1.8);
 
-    MDImage image = md_read_image("../../test_data/test_images/test_ocr9.jpg");
+    MDImage image = md_read_image("C:/Users/aichao/Desktop/pictures_test/35.png");
     MDOCRResults results;
     if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }
 
-    for (int i = 0; i < results.size; i++) {
-        auto rect = md_create_rect_from_polygon(&results.data[i].box);
-        auto image_crop = md_crop_image(&image, &rect);
-        md_show_image(&image_crop);
-    }
+    // for (int i = 0; i < results.size; i++) {
+    //     auto rect = md_create_rect_from_polygon(&results.data[i].box);
+    //     auto image_crop = md_crop_image(&image, &rect);
+    //     md_show_image(&image_crop);
+    // }
 
 
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
