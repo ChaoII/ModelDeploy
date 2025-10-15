@@ -24,6 +24,9 @@ int main() {
             return -1;
         }
     }
+    std::vector<modeldeploy::vision::DetectionLandmarkResult> res1;
+
+    modeldeploy::vision::dis_lmk(res1);
     timers.print_benchmark();
     // res.display();
     const auto image = modeldeploy::vision::vis_det_landmarks(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);

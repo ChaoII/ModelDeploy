@@ -15,4 +15,5 @@
 #include "vision/face/face_models.h"
 #include "vision/lpr/lpr_models.h"
 
+#include "vision/common/display/display.h"
 #include "vision/common/visualize/visualize.h"

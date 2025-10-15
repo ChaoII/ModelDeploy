@@ -39,9 +39,17 @@ namespace modeldeploy::vision::face {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
         }
+        if (det_result.empty()) {
+            MD_LOG_WARN << "Cant not find any face!" << std::endl;
+            return false;
+        }
+        utils::sorted_det_land_mark_results(det_result);
         const auto aligned_images =
             modeldeploy::vision::utils::align_face_with_five_points(image, det_result);
-        recognizer_->batch_predict(aligned_images, results);
+        if (!recognizer_->batch_predict(aligned_images, results)) {
+            MD_LOG_ERROR << "recognizer predict failed" << std::endl;
+            return false;
+        }
         if (timers)timers->infer_timer.stop();
         return true;
     }
