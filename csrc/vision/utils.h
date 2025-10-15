@@ -32,6 +32,10 @@ namespace modeldeploy::vision::utils {
 
     MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 
+    MODELDEPLOY_CXX_EXPORT void sorted_det_land_mark_results(std::vector<DetectionLandmarkResult>& results);
+
+    MODELDEPLOY_CXX_EXPORT void sorted_det_results(std::vector<DetectionResult>& results);
+
     bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 
     void obb_nms(std::vector<ObbResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);

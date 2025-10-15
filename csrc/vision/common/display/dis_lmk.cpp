@@ -11,13 +11,12 @@ namespace modeldeploy::vision {
         output_table.format().font_color(tabulate::Color::green)
                     .border_color(tabulate::Color::magenta)
                     .corner_color(tabulate::Color::magenta);
-
         output_table.add_row({
             "order",
             "box([x, y, width, height])",
             "label_id",
             "score",
-            "landmarks(" + std::to_string(result[0].landmarks.size()) + " * point)"
+            "landmarks(" + std::to_string(result.size() > 0 ? result[0].landmarks.size() : 0) +" * point)"
         });
         for (size_t i = 0; i < result.size(); ++i) {
             std::string row_str_box = "["

@@ -130,6 +130,19 @@ namespace modeldeploy::vision::utils {
         return true;
     }
 
+    void sorted_det_land_mark_results(std::vector<DetectionLandmarkResult>& results) {
+        std::sort(results.begin(), results.end(), [](const DetectionLandmarkResult& a,
+                                                     const DetectionLandmarkResult& b) {
+            return a.box.width * a.box.height > b.box.width * b.box.height;
+        });
+    }
+
+    void sorted_det_results(std::vector<DetectionResult>& results) {
+        std::sort(results.begin(), results.end(), [](const DetectionResult& a,
+                                                     const DetectionResult& b) {
+            return a.box.width * a.box.height > b.box.width * b.box.height;
+        });
+    }
 
     float rect_iou(const cv::Rect2f& rect1, const cv::Rect2f& rect2) {
         // 手动计算
