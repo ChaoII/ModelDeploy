@@ -102,22 +102,6 @@ namespace modeldeploy::vision {
               pybind11::arg("save_result") = false);
 
 
-        m.def("vis_det_landmarks", [](pybind11::array& im_data,
-                                      const std::vector<DetectionLandmarkResult>& result,
-                                      const std::string& font_path = "", const int font_size = 14,
-                                      const int landmark_radius = 4, const double alpha = 0.5,
-                                      const bool save_result = false) {
-                  auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
-                  const ImageData vis_im = vis_det_landmarks(image_data, result, font_path, font_size, landmark_radius,
-                                                             alpha, save_result);
-                  cv::Mat mat;
-                  vis_im.to_mat(&mat);
-                  return cv_mat_to_pyarray(mat);
-              }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("font_path") = "",
-              pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4, pybind11::arg("alpha") = 0.15,
-              pybind11::arg("save_result") = false);
-
         m.def("vis_lpr", [](pybind11::array& im_data,
                             const std::vector<LprResult>& result,
                             const std::string& font_path = "", const int font_size = 14,
@@ -134,15 +118,16 @@ namespace modeldeploy::vision {
               pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4,
               pybind11::arg("alpha") = 0.15, pybind11::arg("save_result") = false);
 
-        m.def("vis_pose", [](pybind11::array& im_data,
-                             const std::vector<PoseResult>& result,
-                             const std::string& font_path = "", const int font_size = 14,
-                             const int landmark_radius = 4, const double alpha = 0.5,
-                             const bool save_result = false) {
+        m.def("vis_keypoints", [](pybind11::array& im_data,
+                                  const std::vector<KeyPointsResult>& result,
+                                  const std::string& font_path = "", const int font_size = 14,
+                                  const int landmark_radius = 4, const double alpha = 0.5,
+                                  const bool save_result = false) {
                   auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData::from_mat(&cv_image);
-                  const ImageData vis_im = vis_pose(image_data, result, font_path, font_size, landmark_radius, alpha,
-                                                    save_result);
+                  const ImageData vis_im = vis_keypoints(image_data, result, font_path, font_size, landmark_radius,
+                                                         alpha,
+                                                         save_result);
                   cv::Mat mat;
                   vis_im.to_mat(&mat);
                   return cv_mat_to_pyarray(mat);

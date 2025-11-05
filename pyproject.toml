@@ -4,10 +4,10 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "modeldeploy"
-version = "1.5.0"
+version = "1.6.0"
 description = "ModelDeploy with C++ inference and pybind11 bindings"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "Aichao", email = "849453582@qq.com" }]
 
