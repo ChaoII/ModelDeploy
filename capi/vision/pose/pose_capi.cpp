@@ -77,7 +77,7 @@ void md_print_keypoint_result(const MDKeyPointResults* c_results) {
 void md_draw_keypoint_result(const MDImage* image, const MDKeyPointResults* c_results,
                              const char* font_path, const int font_size,
                              const int keypoint_radius,
-                             const double alpha, const int save_result) {
+                             const double alpha, const int save_result, const int draw_lines) {
     auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::KeyPointsResult> results;
     c_results_2_keypoint_results(c_results, &results);
@@ -98,7 +98,8 @@ void md_draw_keypoint_result(const MDImage* image, const MDKeyPointResults* c_re
                                            font_size,
                                            keypoint_radius,
                                            alpha,
-                                           save_result);
+                                           save_result,
+                                           draw_lines);
     }
 }
 

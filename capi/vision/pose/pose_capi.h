@@ -51,6 +51,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_keypoint_result(
 /// \param keypoint_radius
 /// \param alpha 不透明度
 /// \param save_result 保存结果, 如果>0将保存绘制后的图片vis_result.jpg
+/// \param draw_lines 是否绘制连接线
 MODELDEPLOY_CAPI_EXPORT void md_draw_keypoint_result(
     const MDImage* image,
     const MDKeyPointResults* c_results,
@@ -58,7 +59,8 @@ MODELDEPLOY_CAPI_EXPORT void md_draw_keypoint_result(
     int font_size,
     int keypoint_radius,
     double alpha,
-    int save_result);
+    int save_result,
+    int draw_lines);
 
 /// 释放检测结果
 /// @param c_results 由md_pose_predict生成的检测结果

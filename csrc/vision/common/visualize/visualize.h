@@ -57,5 +57,5 @@ namespace modeldeploy::vision {
         ImageData& image, const std::vector<KeyPointsResult>& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.15,
-        bool save_result = false);
+        bool save_result = false, bool draw_lines=false);
 }

@@ -122,17 +122,17 @@ namespace modeldeploy::vision {
                                   const std::vector<KeyPointsResult>& result,
                                   const std::string& font_path = "", const int font_size = 14,
                                   const int landmark_radius = 4, const double alpha = 0.5,
-                                  const bool save_result = false) {
+                                  const bool save_result = false, const bool draw_lines = false) {
                   auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData::from_mat(&cv_image);
                   const ImageData vis_im = vis_keypoints(image_data, result, font_path, font_size, landmark_radius,
                                                          alpha,
-                                                         save_result);
+                                                         save_result, draw_lines);
                   cv::Mat mat;
                   vis_im.to_mat(&mat);
                   return cv_mat_to_pyarray(mat);
               }, pybind11::arg("image"), pybind11::arg("result"), pybind11::arg("font_path") = "",
               pybind11::arg("font_size") = 14, pybind11::arg("landmark_radius") = 4,
-              pybind11::arg("alpha") = 0.15, pybind11::arg("save_result") = false);
+              pybind11::arg("alpha") = 0.15, pybind11::arg("save_result") = false, pybind11::arg("draw_lines") = false);
     }
 } // namespace modeldeploy

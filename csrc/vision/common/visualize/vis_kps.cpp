@@ -11,7 +11,7 @@ namespace modeldeploy::vision {
     ImageData vis_keypoints(ImageData& image, const std::vector<KeyPointsResult>& result,
                             const std::string& font_path, const int font_size,
                             const int landmark_radius, const double alpha,
-                            const bool save_result) {
+                            const bool save_result, const bool draw_lines) {
         cv::Mat cv_image, overlay;
         image.to_mat(&cv_image);
         cv_image.copyTo(overlay);
@@ -42,7 +42,7 @@ namespace modeldeploy::vision {
                            [](const Point3f& point) {
                                return utils::point3f_to_cv_type(point);
                            });
-            draw_landmarks(cv_image, cv_keypoints, landmark_radius);
+            draw_landmarks(cv_image, cv_keypoints, landmark_radius, draw_lines);
         }
         if (save_result) {
             MD_LOG_INFO << "Save pose result to [vis_result.jpg]" << std::endl;

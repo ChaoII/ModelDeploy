@@ -23,7 +23,7 @@ int main() {
     }
     md_set_keypoint_num(&model, 2);
     const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    auto im = md_read_image("../../test_data/test_images/zc0.jpg");
+    auto im = md_read_image("../../test_data/test_images/test_zc0.jpg");
     MDKeyPointResults result;
     if ((ret = md_keypoint_predict(&model, &im, &result)) != 0) {
         std::cout << ret << std::endl;

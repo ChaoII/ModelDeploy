@@ -9,6 +9,10 @@ cmake -S . -B build -G Ninja -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=OFF
 cmake --build build --config Release --parallel
 # 安装
 cmake --install build
+
+# 如果需要编译python wheel包
+pip install build
+python -m build
 ```
 
 #### 2.模型加密
