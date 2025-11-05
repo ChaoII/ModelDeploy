@@ -1,5 +1,5 @@
 //
-// Created by aichao on 2025/2/24.
+// Created by aichao on 2025/11/05.
 //
 
 #include <chrono>
@@ -11,9 +11,9 @@ int main() {
     option.use_gpu();
     option.enable_trt = true;
     option.enable_fp16 = true;
-    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/yolo11n-pose.onnx", option);
-    yolov8.get_postprocessor().set_keypoints_num(17);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_person.jpg");
+    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/zc.onnx", option);
+    yolov8.get_postprocessor().set_keypoints_num(2);
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_zc0.jpg");
     std::vector<modeldeploy::vision::KeyPointsResult> result;
     int warm_up_count = 20;
     for (int i = 0; i < warm_up_count; ++i) {
@@ -28,6 +28,7 @@ int main() {
     timers.print_benchmark();
     // result.display();
     const auto vis_image =
-        modeldeploy::vision::vis_pose(img, result, "../../test_data/test_models/msyh.ttc", 12, 4, 0.3, false);
+        modeldeploy::vision::vis_keypoints(img, result, "../../test_data/test_models/msyh.ttc", 12, 10, 0.3, true,
+                                           true);
     vis_image.imshow("result");
 }
