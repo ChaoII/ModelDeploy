@@ -39,7 +39,7 @@ namespace modeldeploy::vision {
                  [](const detection::UltralyticsPosePostprocessor& self,
                     const std::vector<Tensor>& inputs,
                     const std::vector<LetterBoxRecord>& records) {
-                     std::vector<std::vector<PoseResult>> results;
+                     std::vector<std::vector<KeyPointsResult>> results;
                      if (!self.run(inputs, &results, records)) {
                          throw std::runtime_error(
                              "Failed to postprocess the runtime result in "
@@ -51,7 +51,7 @@ namespace modeldeploy::vision {
                  [](detection::UltralyticsPosePostprocessor& self,
                     std::vector<pybind11::array>& input_array,
                     const std::vector<LetterBoxRecord>& records) {
-                     std::vector<std::vector<PoseResult>> results;
+                     std::vector<std::vector<KeyPointsResult>> results;
                      std::vector<Tensor> inputs;
                      pyarray_to_tensor_list(input_array, &inputs, /*share_buffer=*/true);
                      if (!self.run(inputs, &results, records)) {
@@ -73,7 +73,7 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](detection::UltralyticsPose& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
-                     std::vector<PoseResult> result;
+                     std::vector<KeyPointsResult> result;
                      self.predict(ImageData::from_mat(&mat), &result);
                      return result;
                  }, pybind11::arg("image"))
@@ -86,7 +86,7 @@ namespace modeldeploy::vision {
                          auto cv_image = pyarray_to_cv_mat(image);
                          _images.push_back(ImageData::from_mat(&cv_image));
                      }
-                     std::vector<std::vector<PoseResult>> results;
+                     std::vector<std::vector<KeyPointsResult>> results;
                      self.batch_predict(_images, &results);
                      return results;
                  }, pybind11::arg("images"))

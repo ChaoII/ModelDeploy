@@ -326,27 +326,27 @@ namespace modeldeploy::vision {
             });
 
 
-        pybind11::class_<PoseResult>(m, "PoseResult")
+        pybind11::class_<KeyPointsResult>(m, "KeyPointsResult")
             .def(pybind11::init())
-            .def_readwrite("box", &PoseResult::box)
-            .def_readwrite("keypoints", &PoseResult::keypoints)
-            .def_readwrite("label_id", &PoseResult::label_id)
-            .def_readwrite("score", &PoseResult::score)
+            .def_readwrite("box", &KeyPointsResult::box)
+            .def_readwrite("keypoints", &KeyPointsResult::keypoints)
+            .def_readwrite("label_id", &KeyPointsResult::label_id)
+            .def_readwrite("score", &KeyPointsResult::score)
             .def(pybind11::pickle(
-                [](const PoseResult& d) {
+                [](const KeyPointsResult& d) {
                     return pybind11::make_tuple(d.box, d.keypoints, d.score, d.label_id);
                 },
                 [](const pybind11::tuple& t) {
                     if (t.size() != 4)
-                        throw std::runtime_error("PoseResult pickle with Invalid state!");
-                    PoseResult d;
+                        throw std::runtime_error("KeyPointsResult pickle with Invalid state!");
+                    KeyPointsResult d;
                     d.box = t[0].cast<Rect2f>();
                     d.keypoints = t[1].cast<std::vector<Point3f>>();
                     d.score = t[2].cast<float>();
                     d.label_id = t[3].cast<int32_t>();
                     return d;
                 }))
-            .def("to_dict", [](const PoseResult& p) {
+            .def("to_dict", [](const KeyPointsResult& p) {
                 pybind11::dict result;
                 result["box"] = rect2f_to_dict(p.box);
                 // 2. 处理 keypoints（Point3f 的 vector）
@@ -365,7 +365,7 @@ namespace modeldeploy::vision {
                 return result;
             })
             .def_static("from_dict", [](const pybind11::dict& d) {
-                PoseResult r;
+                KeyPointsResult r;
                 // 1. box
                 if (d.contains("box")) {
                     r.box = dict_to_rect2f(d["box"]);
@@ -430,65 +430,6 @@ namespace modeldeploy::vision {
                 return r;
             });
 
-        pybind11::class_<DetectionLandmarkResult>(m, "DetectionLandmarkResult")
-            .def(pybind11::init())
-            .def_readwrite("box", &DetectionLandmarkResult::box)
-            .def_readwrite("landmarks", &DetectionLandmarkResult::landmarks)
-            .def_readwrite("label_id", &DetectionLandmarkResult::label_id)
-            .def_readwrite("score", &DetectionLandmarkResult::score).def(pybind11::pickle(
-                [](const DetectionLandmarkResult& d) {
-                    return pybind11::make_tuple(d.box, d.landmarks, d.score, d.label_id);
-                },
-                [](const pybind11::tuple& t) {
-                    if (t.size() != 4)
-                        throw std::runtime_error("DetectionLandmarkResult pickle with Invalid state!");
-                    DetectionLandmarkResult d;
-                    d.box = t[0].cast<Rect2f>();
-                    d.landmarks = t[1].cast<std::vector<Point2f>>();
-                    d.score = t[2].cast<float>();
-                    d.label_id = t[3].cast<int32_t>();
-                    return d;
-                }))
-            .def("to_dict", [](const DetectionLandmarkResult& p) {
-                pybind11::dict result;
-                result["box"] = rect2f_to_dict(p.box);
-                // 2. 处理 keypoints（Point3f 的 vector）
-                pybind11::list kps;
-                for (const auto& kp : p.landmarks) {
-                    pybind11::dict pt;
-                    pt["x"] = kp.x;
-                    pt["y"] = kp.y;
-                    kps.append(pt);
-                }
-                result["landmarks"] = kps;
-                // 3. 其他字段
-                result["score"] = p.score;
-                result["label_id"] = p.label_id;
-                return result;
-            })
-            .def_static("from_dict", [](const pybind11::dict& d) {
-                DetectionLandmarkResult r;
-                // 1. box
-                if (d.contains("box")) {
-                    r.box = dict_to_rect2f(d["box"]);
-                }
-                // 2.landmarks
-                if (d.contains("landmarks")) {
-                    auto kps_list = d["landmarks"].cast<pybind11::list>();
-                    for (auto kp_obj : kps_list) {
-                        auto kp_dict = kp_obj.cast<pybind11::dict>();
-                        Point2f lmk;
-                        lmk.x = kp_dict["x"].cast<float>();
-                        lmk.y = kp_dict["y"].cast<float>();
-                        r.landmarks.push_back(lmk);
-                    }
-                }
-                // 3. 其他字段
-                if (d.contains("score")) r.score = d["score"].cast<float>();
-                if (d.contains("label_id")) r.label_id = d["label_id"].cast<int32_t>();
-                return r;
-            });
-
 
         pybind11::class_<FaceRecognitionResult>(m, "FaceRecognitionResult")
             .def(pybind11::init())
@@ -520,14 +461,14 @@ namespace modeldeploy::vision {
         pybind11::class_<LprResult>(m, "LprResult")
             .def(pybind11::init())
             .def_readwrite("box", &LprResult::box)
-            .def_readwrite("landmarks", &LprResult::landmarks)
+            .def_readwrite("landmarks", &LprResult::keypoints)
             .def_readwrite("label_id", &LprResult::label_id)
             .def_readwrite("score", &LprResult::score)
             .def_readwrite("car_plate_str", &LprResult::car_plate_str)
             .def_readwrite("car_plate_color", &LprResult::car_plate_color)
             .def(pybind11::pickle(
                 [](const LprResult& d) {
-                    return pybind11::make_tuple(d.box, d.landmarks, d.label_id, d.score, d.car_plate_str,
+                    return pybind11::make_tuple(d.box, d.keypoints, d.label_id, d.score, d.car_plate_str,
                                                 d.car_plate_color);
                 },
                 [](const pybind11::tuple& t) {
@@ -535,7 +476,7 @@ namespace modeldeploy::vision {
                         throw std::runtime_error("LprResult pickle with Invalid state!");
                     LprResult d;
                     d.box = t[0].cast<Rect2f>();
-                    d.landmarks = t[1].cast<std::vector<Point2f>>();
+                    d.keypoints = t[1].cast<std::vector<Point3f>>();
                     d.label_id = t[2].cast<int32_t>();
                     d.score = t[3].cast<float>();
                     d.car_plate_str = t[4].cast<std::string>();
@@ -547,13 +488,14 @@ namespace modeldeploy::vision {
                 result["box"] = rect2f_to_dict(p.box);
                 // 2. 处理 keypoints（Point3f 的 vector）
                 pybind11::list kps;
-                for (const auto& kp : p.landmarks) {
+                for (const auto& kp : p.keypoints) {
                     pybind11::dict pt;
                     pt["x"] = kp.x;
                     pt["y"] = kp.y;
+                    pt["z"] = kp.z;
                     kps.append(pt);
                 }
-                result["landmarks"] = kps;
+                result["keypoints"] = kps;
                 // 3. 其他字段
                 result["score"] = p.score;
                 result["label_id"] = p.label_id;
@@ -572,10 +514,11 @@ namespace modeldeploy::vision {
                     auto kps_list = d["landmarks"].cast<pybind11::list>();
                     for (auto kp_obj : kps_list) {
                         auto kp_dict = kp_obj.cast<pybind11::dict>();
-                        Point2f lmk;
+                        Point3f lmk;
                         lmk.x = kp_dict["x"].cast<float>();
                         lmk.y = kp_dict["y"].cast<float>();
-                        r.landmarks.push_back(lmk);
+                        lmk.z = kp_dict["z"].cast<float>();
+                        r.keypoints.push_back(lmk);
                     }
                 }
                 // 3. 其他字段
