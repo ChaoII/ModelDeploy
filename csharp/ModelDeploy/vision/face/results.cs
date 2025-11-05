@@ -5,71 +5,71 @@ using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.vision.face
 {
-    public class DetectionLandmarkResult
+    public class KeyPointResult
     {
         public Rect Box { get; set; }
-        public List<Point> Landmarks { get; set; }
+        public List<Point3F> Landmarks { get; set; }
         public int LabelId { get; set; }
         public float Score { get; set; }
 
-        private static readonly int NativeSize = Marshal.SizeOf<MDDetectionLandmarkResult>();
+        private static readonly int NativeSize = Marshal.SizeOf<MDKeyPointResult>();
 
-        private static DetectionLandmarkResult FromNative(MDDetectionLandmarkResult cResult)
+        private static KeyPointResult FromNative(MDKeyPointResult cResult)
         {
-            var detResult = new DetectionLandmarkResult
+            var detResult = new KeyPointResult
             {
                 Box = Rect.FromNative(cResult.box),
                 LabelId = cResult.label_id,
                 Score = cResult.score,
-                Landmarks = new List<Point>(cResult.landmarks_size)
+                Landmarks = new List<Point3F>(cResult.keypoints_size)
             };
-            for (var i = 0; i < cResult.landmarks_size; i++)
+            for (var i = 0; i < cResult.keypoints_size; i++)
             {
-                var currentPtr = IntPtr.Add(cResult.landmarks_data, i * Marshal.SizeOf<MDPoint>());
-                var cPoint = Marshal.PtrToStructure<MDPoint>(currentPtr);
-                detResult.Landmarks.Add(Point.FromNative(cPoint));
+                var currentPtr = IntPtr.Add(cResult.keypoints_data, i * Marshal.SizeOf<MDPoint3f>());
+                var cPoint = Marshal.PtrToStructure<MDPoint3f>(currentPtr);
+                detResult.Landmarks.Add(Point3F.FromNative(cPoint));
             }
 
             return detResult;
         }
 
-        private static MDDetectionLandmarkResult ToNative(DetectionLandmarkResult result)
+        private static MDKeyPointResult ToNative(KeyPointResult result)
         {
-            var cResult = new MDDetectionLandmarkResult
+            var cResult = new MDKeyPointResult
             {
                 box = result.Box.ToNative(),
                 label_id = result.LabelId,
                 score = result.Score,
-                landmarks_size = result.Landmarks.Count,
-                landmarks_data = result.Landmarks.Count > 0
-                    ? Marshal.AllocHGlobal(result.Landmarks.Count * Marshal.SizeOf<MDPoint>())
+                keypoints_size = result.Landmarks.Count,
+                keypoints_data = result.Landmarks.Count > 0
+                    ? Marshal.AllocHGlobal(result.Landmarks.Count * Marshal.SizeOf<MDPoint3f>())
                     : IntPtr.Zero
             };
             for (var i = 0; i < result.Landmarks.Count; i++)
             {
-                var currentPtr = IntPtr.Add(cResult.landmarks_data, i * Marshal.SizeOf<MDPoint>());
+                var currentPtr = IntPtr.Add(cResult.keypoints_data, i * Marshal.SizeOf<MDPoint3f>());
                 Marshal.StructureToPtr(result.Landmarks[i].ToNative(), currentPtr, false);
             }
 
             return cResult;
         }
 
-        public static List<DetectionLandmarkResult> FromNativeArray(MDDetectionLandmarkResults cResults)
+        public static List<KeyPointResult> FromNativeArray(MDKeyPointResults cResults)
         {
-            var results = new List<DetectionLandmarkResult>(cResults.size);
+            var results = new List<KeyPointResult>(cResults.size);
             for (int i = 0; i < cResults.size; i++)
             {
                 IntPtr ptr = IntPtr.Add(cResults.data, i * NativeSize);
-                var native = Marshal.PtrToStructure<MDDetectionLandmarkResult>(ptr);
+                var native = Marshal.PtrToStructure<MDKeyPointResult>(ptr);
                 results.Add(FromNative(native));
             }
 
             return results;
         }
 
-        public static MDDetectionLandmarkResults ToNativeArray(List<DetectionLandmarkResult> results)
+        public static MDKeyPointResults ToNativeArray(List<KeyPointResult> results)
         {
-            var cResults = new MDDetectionLandmarkResults
+            var cResults = new MDKeyPointResults
             {
                 size = results.Count,
                 data = results.Count > 0

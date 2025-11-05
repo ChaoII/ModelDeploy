@@ -412,9 +412,9 @@ static class Program
         // TestDetection();
         // TestInstanceSeg();
         // TestObb();
-        // TestPose();
+        TestPose();
         // TestImage();
-        TestOCR();
+        // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();

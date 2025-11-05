@@ -6,7 +6,7 @@
 #include "vision/common/display/display.h"
 
 namespace modeldeploy::vision {
-    void dis_pose(const std::vector<PoseResult>& result) {
+    void dis_pose(const std::vector<KeyPointsResult>& result) {
         tabulate::Table output_table;
         output_table.format().font_color(tabulate::Color::green)
                     .border_color(tabulate::Color::magenta)

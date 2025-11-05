@@ -81,7 +81,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprPipeline::predict(const ImageData& image, std::vector<LprResult>* results, TimerArray* times) {
-        std::vector<DetectionLandmarkResult> det_result;
+        std::vector<KeyPointsResult> det_result;
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
@@ -93,15 +93,15 @@ namespace modeldeploy::vision::lpr {
             (*results)[i].box = det_result[i].box;
             (*results)[i].score = det_result[i].score;
             (*results)[i].label_id = det_result[i].label_id;
-            (*results)[i].landmarks = det_result[i].landmarks;
+            (*results)[i].keypoints = det_result[i].keypoints;
 
             std::array<cv::Point2f, 4> points;
-            if (det_result[i].landmarks.size() != 4) {
+            if (det_result[i].keypoints.size() != 4) {
                 MD_LOG_ERROR << "detector predict failed" << std::endl;
                 return false;
             }
             for (int j = 0; j < 4; ++j) {
-                points[j] = utils::point2f_to_cv_type(det_result[i].landmarks[j]);
+                points[j] = utils::point2f_to_cv_type(Point2f(det_result[i].keypoints[j].x, det_result[i].keypoints[j].y));
             }
             cv::Mat _image;
             image.to_mat(&_image);

@@ -23,7 +23,7 @@ namespace ModelDeploy
         }
     }
 
-    public class Point3f
+    public class Point3F
     {
         public float X { get; set; }
         public float Y { get; set; }
@@ -31,9 +31,9 @@ namespace ModelDeploy
 
         public override string ToString() => $"{{x:{X}, y:{Y},  z:{Z}}}";
 
-        public static Point3f FromNative(MDPoint3f point)
+        public static Point3F FromNative(MDPoint3f point)
         {
-            return new Point3f { X = point.x, Y = point.y, Z = point.z };
+            return new Point3F { X = point.x, Y = point.y, Z = point.z };
         }
 
         public MDPoint3f ToNative()

@@ -17,11 +17,11 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::string name() const override { return "LprDetection"; }
 
-        virtual bool predict(const ImageData& image, std::vector<DetectionLandmarkResult>* result,
+        virtual bool predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                              TimerArray* timers = nullptr);
 
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<std::vector<DetectionLandmarkResult>>* results,
+                                   std::vector<std::vector<KeyPointsResult>>* results,
                                    TimerArray* timers = nullptr);
 
         virtual LprDetPreprocessor& get_preprocessor() {

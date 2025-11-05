@@ -192,14 +192,14 @@ void c_results_2_iseg_results(
     std::vector<InstanceSegResult>* results);
 
 
-void pose_results_2_c_results(
-    const std::vector<PoseResult>& results,
-    MDPoseResults* c_results);
+void keypoint_results_2_c_results(
+    const std::vector<KeyPointsResult>& results,
+    MDKeyPointResults* c_results);
 
 
-void c_results_2_pose_results(
-    const MDPoseResults* c_results,
-    std::vector<PoseResult>* results);
+void c_results_2_keypoint_results(
+    const MDKeyPointResults* c_results,
+    std::vector<KeyPointsResult>* results);
 
 
 void ocr_result_2_c_results(
@@ -211,15 +211,6 @@ void c_results_2_ocr_result(
     const MDOCRResults* c_results,
     OCRResult* result);
 
-
-void detection_landmark_result_2_c_results(
-    const std::vector<DetectionLandmarkResult>& results,
-    MDDetectionLandmarkResults* c_results);
-
-
-void c_results_2_detection_landmark_result(
-    const MDDetectionLandmarkResults* c_results,
-    std::vector<DetectionLandmarkResult>* results);
 
 void lpr_results_2_c_results(
     const std::vector<LprResult>& results,

@@ -81,7 +81,7 @@ namespace modeldeploy::vision {
     };
 
 
-    struct MODELDEPLOY_CXX_EXPORT PoseResult {
+    struct MODELDEPLOY_CXX_EXPORT KeyPointsResult {
         Rect2f box;
         std::vector<Point3f> keypoints;
         int32_t label_id{};
@@ -103,16 +103,6 @@ namespace modeldeploy::vision {
         void clear();
     };
 
-
-    struct MODELDEPLOY_CXX_EXPORT DetectionLandmarkResult {
-        Rect2f box;
-        std::vector<Point2f> landmarks;
-        int label_id{};
-        float score{};
-        ResultType type = ResultType::FACE_DETECTION;
-    };
-
-
     struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult {
         std::vector<float> embedding;
         ResultType type = ResultType::FACE_RECOGNITION;
@@ -121,7 +111,7 @@ namespace modeldeploy::vision {
     struct MODELDEPLOY_CXX_EXPORT LprResult {
         Rect2f box;
         // 4 points
-        std::vector<Point2f> landmarks;
+        std::vector<Point3f> keypoints;
         int label_id{};
         float score{};
         std::string car_plate_str;

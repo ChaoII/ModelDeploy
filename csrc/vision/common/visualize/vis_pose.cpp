@@ -81,8 +81,8 @@ namespace modeldeploy::vision {
             const cv::Point3f keypoint = keypoints[j];
             if (keypoint.z < PoseParams::kpt_threshold)
                 continue;
-            cv::Scalar kptColor = PoseParams::pose_palette[PoseParams::kpt_color[j]];
-            cv::circle(cv_image, cv::Point(keypoint.x, keypoint.y), keypoint_radius, kptColor, -1, 8);
+            const cv::Scalar& kpt_color = PoseParams::pose_palette[PoseParams::kpt_color[j]];
+            cv::circle(cv_image, cv::Point2f(keypoint.x, keypoint.y), keypoint_radius, kpt_color, -1, 8);
         }
 
         if (is_draw_kpt_line) {
@@ -91,13 +91,17 @@ namespace modeldeploy::vision {
                 const auto kpt1 = keypoints[PoseParams::skeleton[j][1] - 1];
                 if (kpt0.z < PoseParams::kpt_threshold || kpt1.z < PoseParams::kpt_threshold)
                     continue;
-                cv::Scalar kptColor = PoseParams::pose_palette[PoseParams::limb_color[j]];
-                cv::line(cv_image, cv::Point(kpt0.x, kpt0.y), cv::Point(kpt1.x, kpt1.y), kptColor, 1, cv::LINE_AA);
+                const cv::Scalar& kpt_color = PoseParams::pose_palette[PoseParams::limb_color[j]];
+                cv::line(cv_image, cv::Point2f(kpt0.x, kpt0.y),
+                         cv::Point2f(kpt1.x, kpt1.y),
+                         kpt_color,
+                         1,
+                         cv::LINE_AA);
             }
         }
     }
 
-    ImageData vis_pose(ImageData& image, const std::vector<PoseResult>& result,
+    ImageData vis_pose(ImageData& image, const std::vector<KeyPointsResult>& result,
                        const std::string& font_path, const int font_size,
                        const int landmark_radius, const double alpha,
                        const bool save_result) {
@@ -131,7 +135,7 @@ namespace modeldeploy::vision {
                            [](const Point3f& point) {
                                return utils::point3f_to_cv_type(point);
                            });
-            draw_keypoints(cv_image, cv_keypoints, landmark_radius);
+            draw_keypoints(cv_image, cv_keypoints, landmark_radius, true);
         }
         if (save_result) {
             MD_LOG_INFO << "Save pose result to [vis_result.jpg]" << std::endl;

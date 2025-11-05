@@ -27,46 +27,46 @@ MDStatusCode md_create_lpr_det_model(MDModel* model, const char* model_path,
 }
 
 
-MDStatusCode md_lpr_det_predict(const MDModel* model, MDImage* image, MDDetectionLandmarkResults* c_results) {
+MDStatusCode md_lpr_det_predict(const MDModel* model, MDImage* image, MDKeyPointResults* c_results) {
     if (model->type != MDModelType::LPR) {
         return MDStatusCode::ModelTypeError;
     }
     const auto image_data = md_image_to_image_data(image);
-    std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
+    std::vector<modeldeploy::vision::KeyPointsResult> results;
     const auto lpr_det_model = static_cast<modeldeploy::vision::lpr::LprDetection*>(model->model_content);
     if (const bool res_status = lpr_det_model->predict(image_data, &results); !res_status) {
         return MDStatusCode::ModelPredictFailed;
     }
-    detection_landmark_result_2_c_results(results, c_results);
+    keypoint_results_2_c_results(results, c_results);
     return MDStatusCode::Success;
 }
 
 
-void md_print_lpr_det_result(const MDDetectionLandmarkResults* c_results) {
-    std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
-    c_results_2_detection_landmark_result(c_results, &results);
+void md_print_lpr_det_result(const MDKeyPointResults* c_results) {
+    std::vector<modeldeploy::vision::KeyPointsResult> results;
+    c_results_2_keypoint_results(c_results, &results);
     dis_lmk(results);
 }
 
 
-void md_draw_lpr_det_result(const MDImage* image, const MDDetectionLandmarkResults* c_results,
+void md_draw_lpr_det_result(const MDImage* image, const MDKeyPointResults* c_results,
                             const char* font_path, const int font_size, const int landmark_radius,
                             const double alpha, const int save_result) {
     auto image_data = md_image_to_image_data(image);
-    std::vector<modeldeploy::vision::DetectionLandmarkResult> results;
-    c_results_2_detection_landmark_result(c_results, &results);
-    modeldeploy::vision::vis_det_landmarks(image_data, results, font_path, font_size,
-                                           landmark_radius, alpha, save_result);
+    std::vector<modeldeploy::vision::KeyPointsResult> results;
+    c_results_2_keypoint_results(c_results, &results);
+    modeldeploy::vision::vis_keypoints(image_data, results, font_path, font_size,
+                                       landmark_radius, alpha, save_result);
 }
 
 
-void md_free_lpr_det_result(MDDetectionLandmarkResults* c_results) {
+void md_free_lpr_det_result(MDKeyPointResults* c_results) {
     if (c_results->size > 0 && c_results->data != nullptr) {
         for (int i = 0; i < c_results->size; i++) {
-            if (c_results->data[i].landmarks) {
-                delete[] c_results->data[i].landmarks;
-                c_results->data[i].landmarks = nullptr;
-                c_results->data[i].landmarks_size = 0;
+            if (c_results->data[i].keypoints) {
+                delete[] c_results->data[i].keypoints;
+                c_results->data[i].keypoints = nullptr;
+                c_results->data[i].keypoints_size = 0;
             }
         }
         delete[] c_results->data;

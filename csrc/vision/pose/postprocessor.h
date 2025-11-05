@@ -13,15 +13,15 @@ namespace modeldeploy::vision::detection {
     public:
         UltralyticsPosePostprocessor();
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<std::vector<PoseResult>>* results,
+                 std::vector<std::vector<KeyPointsResult>>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;
 
         bool run_without_nms(const std::vector<Tensor>& tensors,
-                             std::vector<std::vector<PoseResult>>* results,
+                             std::vector<std::vector<KeyPointsResult>>* results,
                              const std::vector<LetterBoxRecord>& letter_box_records) const;
 
         bool run_with_nms(const std::vector<Tensor>& tensors,
-                          std::vector<std::vector<PoseResult>>* results,
+                          std::vector<std::vector<KeyPointsResult>>* results,
                           const std::vector<LetterBoxRecord>& letter_box_records) const;
 
         /// Set conf_threshold, default 0.25
@@ -39,6 +39,14 @@ namespace modeldeploy::vision::detection {
 
         /// Get nms_threshold, default 0.5
         [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
+
+
+        [[nodiscard]] float get_keypoints_num() const { return keypoints_num_; }
+
+        void set_keypoints_num(const int& keypoints_num) {
+            keypoints_num_ = keypoints_num;
+        }
+
 
     protected:
         int keypoints_num_;

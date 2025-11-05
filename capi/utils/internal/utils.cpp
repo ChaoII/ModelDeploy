@@ -300,11 +300,11 @@ void c_results_2_iseg_results(
 }
 
 
-void pose_results_2_c_results(
-    const std::vector<PoseResult>& results,
-    MDPoseResults* c_results) {
+void keypoint_results_2_c_results(
+    const std::vector<KeyPointsResult>& results,
+    MDKeyPointResults* c_results) {
     c_results->size = results.size();
-    c_results->data = new MDPoseResult[c_results->size];
+    c_results->data = new MDKeyPointResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
         c_results->data[i].box = {
             static_cast<int>(results[i].box.x),
@@ -327,9 +327,9 @@ void pose_results_2_c_results(
 }
 
 
-void c_results_2_pose_results(
-    const MDPoseResults* c_results,
-    std::vector<PoseResult>* results) {
+void c_results_2_keypoint_results(
+    const MDKeyPointResults* c_results,
+    std::vector<KeyPointsResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
         auto box = Rect2f{
@@ -442,53 +442,6 @@ void c_results_2_ocr_result(
 
 
 // 注意开辟内存需要成对的销毁
-void detection_landmark_result_2_c_results(
-    const std::vector<DetectionLandmarkResult>& results,
-    MDDetectionLandmarkResults* c_results) {
-    c_results->size = results.size();
-    c_results->data = new MDDetectionLandmarkResult[c_results->size];
-    for (int i = 0; i < c_results->size; i++) {
-        c_results->data[i].box = {
-            static_cast<int>(results[i].box.x),
-            static_cast<int>(results[i].box.y),
-            static_cast<int>(results[i].box.width),
-            static_cast<int>(results[i].box.height)
-        };
-        c_results->data[i].landmarks_size = static_cast<int>(results[i].landmarks.size());
-        c_results->data[i].landmarks = new MDPoint[results[i].landmarks.size()];
-        for (int j = 0; j < results[i].landmarks.size(); j++) {
-            c_results->data[i].landmarks[j] = {
-                static_cast<int>(results[i].landmarks[j].x),
-                static_cast<int>(results[i].landmarks[j].y),
-            };
-        }
-        c_results->data[i].label_id = results[i].label_id;
-        c_results->data[i].score = results[i].score;
-    }
-}
-
-void c_results_2_detection_landmark_result(
-    const MDDetectionLandmarkResults* c_results,
-    std::vector<DetectionLandmarkResult>* results) {
-    results->reserve(c_results->size);
-    for (int i = 0; i < c_results->size; i++) {
-        auto box = Rect2f{
-            static_cast<float>(c_results->data[i].box.x),
-            static_cast<float>(c_results->data[i].box.y),
-            static_cast<float>(c_results->data[i].box.width),
-            static_cast<float>(c_results->data[i].box.height)
-        };
-        std::vector<Point2f> landmarks;
-        landmarks.reserve(c_results->data[i].landmarks_size);
-        for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
-            landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
-                                   static_cast<float>(c_results->data[i].landmarks[j].y));
-        }
-        results->push_back({box, landmarks, c_results->data[i].label_id, c_results->data[i].score});
-    }
-}
-
-// 注意开辟内存需要成对的销毁
 void lpr_results_2_c_results(
     const std::vector<LprResult>& results, MDLPRResults* c_results) {
     // 针对单纯的车牌识别模型
@@ -514,12 +467,12 @@ void lpr_results_2_c_results(
             static_cast<int>(results[i].box.width),
             static_cast<int>(results[i].box.height)
         };
-        c_results->data[i].landmarks_size = static_cast<int>(results[i].landmarks.size());
-        c_results->data[i].landmarks = new MDPoint[results[i].landmarks.size()];
-        for (int j = 0; j < results[i].landmarks.size(); j++) {
+        c_results->data[i].landmarks_size = static_cast<int>(results[i].keypoints.size());
+        c_results->data[i].landmarks = new MDPoint[results[i].keypoints.size()];
+        for (int j = 0; j < results[i].keypoints.size(); j++) {
             c_results->data[i].landmarks[j] = {
-                static_cast<int>(results[i].landmarks[j].x),
-                static_cast<int>(results[i].landmarks[j].y),
+                static_cast<int>(results[i].keypoints[j].x),
+                static_cast<int>(results[i].keypoints[j].y),
             };
         }
         c_results->data[i].label_id = results[i].label_id;
@@ -539,11 +492,11 @@ void c_results_2_lpr_results(
             static_cast<float>(c_results->data[i].box.width),
             static_cast<float>(c_results->data[i].box.height)
         };
-        std::vector<Point2f> landmarks;
+        std::vector<Point3f> landmarks;
         landmarks.reserve(c_results->data[i].landmarks_size);
         for (int j = 0; j < c_results->data[i].landmarks_size; j++) {
             landmarks.emplace_back(static_cast<float>(c_results->data[i].landmarks[j].x),
-                                   static_cast<float>(c_results->data[i].landmarks[j].y));
+                                   static_cast<float>(c_results->data[i].landmarks[j].y), 0.0f);
         }
         results->push_back({
             box, landmarks, c_results->data[i].label_id, c_results->data[i].score,

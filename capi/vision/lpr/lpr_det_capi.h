@@ -27,11 +27,11 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_lpr_det_model(
 /// \return MDStatusCode::Success 成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_lpr_det_predict(
     const MDModel* model, MDImage* image,
-    MDDetectionLandmarkResults* c_results);
+    MDKeyPointResults* c_results);
 
 /// 打印检测结果
 MODELDEPLOY_CAPI_EXPORT void md_print_lpr_det_result(
-    const MDDetectionLandmarkResults* c_results);
+    const MDKeyPointResults* c_results);
 
 /// 绘制检测结果
 /// \param image 原始图像
@@ -43,7 +43,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_lpr_det_result(
 /// \param save_result 保存结果, 如果>0将保存绘制后的图片vis_result.jpg
 MODELDEPLOY_CAPI_EXPORT void md_draw_lpr_det_result(
     const MDImage* image,
-    const MDDetectionLandmarkResults* c_results,
+    const MDKeyPointResults* c_results,
     const char* font_path,
     int font_size,
     int landmark_radius,
@@ -53,7 +53,7 @@ MODELDEPLOY_CAPI_EXPORT void md_draw_lpr_det_result(
 /// 释放检测结果
 /// @param c_results 由md_detection_predict生成的检测结果
 MODELDEPLOY_CAPI_EXPORT void md_free_lpr_det_result(
-    MDDetectionLandmarkResults* c_results);
+    MDKeyPointResults* c_results);
 
 /// 释放检测模型
 /// @param model 由create_detection_model创建的模型

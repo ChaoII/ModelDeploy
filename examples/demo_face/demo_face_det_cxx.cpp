@@ -14,7 +14,7 @@ int main() {
             "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
     auto im = modeldeploy::ImageData::imread(image_file);
     auto im_bak = im.clone();
-    std::vector<modeldeploy::vision::DetectionLandmarkResult> res;
+    std::vector<modeldeploy::vision::KeyPointsResult> res;
 
     int loop = 100;
     TimerArray timers;
@@ -24,12 +24,12 @@ int main() {
             return -1;
         }
     }
-    std::vector<modeldeploy::vision::DetectionLandmarkResult> res1;
+    std::vector<modeldeploy::vision::KeyPointsResult> res1;
 
     modeldeploy::vision::dis_lmk(res1);
     timers.print_benchmark();
     // res.display();
-    const auto image = modeldeploy::vision::vis_det_landmarks(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
+    const auto image = modeldeploy::vision::vis_keypoints(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
     image.imshow("result");
     const auto vis_im_list =
         modeldeploy::vision::utils::align_face_with_five_points(im, res);

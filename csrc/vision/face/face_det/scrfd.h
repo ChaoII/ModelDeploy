@@ -17,11 +17,11 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::string name() const override { return "Scrfd"; }
 
-        virtual bool predict(const ImageData& image, std::vector<DetectionLandmarkResult>* result,
+        virtual bool predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                              TimerArray* timers = nullptr);
 
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<std::vector<DetectionLandmarkResult>>* results,
+                                   std::vector<std::vector<KeyPointsResult>>* results,
                                    TimerArray* timers = nullptr);
 
         virtual ScrfdPreprocessor& get_preprocessor() {

@@ -134,7 +134,7 @@ namespace modeldeploy::vision::face {
         std::vector<std::tuple<int, float>> face_as_second_result;
         face_as_second_->predict(im_bak0, &face_as_second_result);
         std::vector<float> passive_results;
-        std::vector<DetectionLandmarkResult> face_det_result;
+        std::vector<KeyPointsResult> face_det_result;
         const bool has_box = !face_as_second_result.empty();
         if (!face_det_->predict(im_bak1, &face_det_result)) {
             return false;

@@ -33,15 +33,25 @@ namespace modeldeploy::vision {
     }
 
     void draw_landmarks(cv::Mat& cv_image,
-                        const std::vector<cv::Point2f>& landmarks,
-                        const int landmark_radius) {
+                        const std::vector<cv::Point3f>& landmarks,
+                        const int landmark_radius, const bool draw_lines) {
         static std::map<size_t, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
         for (size_t i = 0; i < landmarks.size(); ++i) {
             if (color_map.find(i) == color_map.end()) {
                 color_map[i] = get_random_color();
             }
             auto landmark_color = color_map[i];
-            cv::circle(cv_image, landmarks[i], landmark_radius, landmark_color, -1);
+            cv::circle(cv_image, cv::Point2f(landmarks[i].x, landmarks[i].y), landmark_radius, landmark_color, -1);
+        }
+
+        if (draw_lines && landmarks.size() > 1) {
+            for (int j = 0; j < landmarks.size() - 1; ++j) {
+                const auto kpt0 = landmarks[j];
+                const auto kpt1 = landmarks[j + 1];
+                cv::Scalar line_color = color_map[j];
+                cv::arrowedLine(cv_image, cv::Point(kpt0.x, kpt0.y), cv::Point(kpt1.x, kpt1.y), line_color, 1,
+                                cv::LINE_AA, 0, 0.03);
+            }
         }
     }
 }

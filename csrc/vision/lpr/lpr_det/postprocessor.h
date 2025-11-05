@@ -14,7 +14,7 @@ namespace modeldeploy::vision::lpr {
     public:
         LprDetPostprocessor();
         bool run(const std::vector<Tensor>& tensors,
-                 std::vector<std::vector<DetectionLandmarkResult>>* results,
+                 std::vector<std::vector<KeyPointsResult>>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;
 
         /// Set conf_threshold, default 0.25

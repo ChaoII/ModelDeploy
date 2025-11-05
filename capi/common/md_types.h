@@ -12,6 +12,7 @@ enum MDModelFormat {
 enum MDModelType {
     Classification = 0,
     Detection,
+    Keypoint,
     OCR,
     FACE,
     LPR,
@@ -211,12 +212,12 @@ typedef struct {
     int keypoints_size;
     int label_id;
     float score;
-} MDPoseResult;
+} MDKeyPointResult;
 
 typedef struct {
-    MDPoseResult* data;
+    MDKeyPointResult* data;
     int size;
-} MDPoseResults;
+} MDKeyPointResults;
 
 
 typedef struct {
@@ -232,21 +233,6 @@ typedef struct {
     char* table_html;
     int size;
 } MDOCRResults;
-
-
-typedef struct {
-    MDRect box;
-    MDPoint* landmarks;
-    int landmarks_size;
-    int label_id;
-    float score;
-} MDDetectionLandmarkResult;
-
-
-typedef struct {
-    MDDetectionLandmarkResult* data;
-    int size;
-} MDDetectionLandmarkResults;
 
 typedef struct {
     MDRect box;

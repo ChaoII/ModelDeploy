@@ -130,9 +130,9 @@ namespace modeldeploy::vision::utils {
         return true;
     }
 
-    void sorted_det_land_mark_results(std::vector<DetectionLandmarkResult>& results) {
-        std::sort(results.begin(), results.end(), [](const DetectionLandmarkResult& a,
-                                                     const DetectionLandmarkResult& b) {
+    void sorted_det_land_mark_results(std::vector<KeyPointsResult>& results) {
+        std::sort(results.begin(), results.end(), [](const KeyPointsResult& a,
+                                                     const KeyPointsResult& b) {
             return a.box.width * a.box.height > b.box.width * b.box.height;
         });
     }
@@ -264,10 +264,10 @@ namespace modeldeploy::vision::utils {
     }
 
 
-    void nms(std::vector<PoseResult>* result, const float iou_threshold) {
+    void nms(std::vector<KeyPointsResult>* result, const float iou_threshold) {
         const size_t N = result->size();
         // Step 1: 根据分数排序得到索引
-        std::sort(result->begin(), result->end(), [&](const PoseResult& a, const PoseResult& b) {
+        std::sort(result->begin(), result->end(), [&](const KeyPointsResult& a, const KeyPointsResult& b) {
             return a.score > b.score; // 分数高的排前面
         });
 
@@ -288,9 +288,8 @@ namespace modeldeploy::vision::utils {
                 }
             }
         }
-
         // Step 3: 根据 keep_indices 重建结果
-        std::vector<PoseResult> new_result;
+        std::vector<KeyPointsResult> new_result;
         new_result.reserve(index_.size());
         for (const auto idx : index_) {
             new_result.push_back(std::move((*result)[idx])); // 移动语义
@@ -298,41 +297,6 @@ namespace modeldeploy::vision::utils {
         result->swap(new_result);
     }
 
-
-    void nms(std::vector<DetectionLandmarkResult>* result, const float iou_threshold) {
-        const size_t N = result->size();
-        // Step 1: 根据分数排序得到索引
-        std::sort(result->begin(), result->end(),
-                  [&](const DetectionLandmarkResult& a, const DetectionLandmarkResult& b) {
-                      return a.score > b.score; // 分数高的排前面
-                  });
-
-        std::vector<size_t> index_;
-        // Step 2: NMS 主逻辑
-        std::vector<bool> suppressed(N);
-        for (size_t m = 0; m < N; ++m) {
-            if (suppressed[m]) continue;
-            index_.push_back(m);
-            const auto& box_i = result->at(m).box;
-            for (size_t n = m + 1; n < N; ++n) {
-                if (suppressed[n]) continue;
-                const auto& box_j = result->at(n).box;
-                if (rect2f_to_cv_type(box_i).area() == 0 || rect2f_to_cv_type(box_j).area() == 0) continue;
-                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
-                if (iou > iou_threshold) {
-                    suppressed[n] = true;
-                }
-            }
-        }
-
-        // Step 3: 根据 keep_indices 重建结果
-        std::vector<DetectionLandmarkResult> new_result;
-        new_result.reserve(index_.size());
-        for (const auto idx : index_) {
-            new_result.push_back(std::move((*result)[idx])); // 移动语义
-        }
-        result->swap(new_result);
-    }
 
     void letter_box(cv::Mat* mat, const std::vector<int>& size,
                     const std::vector<float>& padding_value,

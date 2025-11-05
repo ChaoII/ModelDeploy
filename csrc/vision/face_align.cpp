@@ -107,7 +107,7 @@ namespace modeldeploy::vision::utils {
     }
 
     std::vector<ImageData> align_face_with_five_points(
-        const ImageData& image, std::vector<DetectionLandmarkResult>& result,
+        const ImageData& image, std::vector<KeyPointsResult>& result,
         std::vector<std::array<float, 2>> std_landmarks,
         std::array<int, 2> output_size) {
         if (std_landmarks.size() != 5) {
@@ -122,8 +122,19 @@ namespace modeldeploy::vision::utils {
         cv::Mat cv_image;
         image.to_mat(&cv_image);
         cv::Mat src(5, 2, CV_32FC1, std_landmarks.data());
+
+
         for (int i = 0; i < result.size(); i++) {
-            cv::Mat dst(5, 2, CV_32FC1, result[i].landmarks.data());
+            std::vector<cv::Point2f> keypoints;
+            keypoints.reserve(result[i].keypoints.size());
+
+            for (int j = 0; j < result[i].keypoints.size(); j++) {
+                keypoints.emplace_back(result[i].keypoints[j].x,
+                                       result[i].keypoints[j].y);
+            }
+
+
+            cv::Mat dst(5, 2, CV_32FC1, keypoints.data());
             cv::Mat m = similar_transform(dst, src);
             cv::Mat map_matrix;
             cv::Rect map_matrix_r = cv::Rect(0, 0, 3, 2);

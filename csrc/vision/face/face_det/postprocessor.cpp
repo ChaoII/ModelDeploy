@@ -39,7 +39,7 @@ namespace modeldeploy::vision::face {
 
 
     bool ScrfdPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionLandmarkResult>>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) {
         const size_t fmc = downsample_strides_.size();
         // scrfd has 6,9,10,15 output tensors
@@ -76,7 +76,7 @@ namespace modeldeploy::vision::face {
             const float pad_h = letter_box_records[bs].pad_h;
             const float pad_w = letter_box_records[bs].pad_w;
             generate_points(out_w, out_h);
-            std::vector<DetectionLandmarkResult> _results;
+            std::vector<KeyPointsResult> _results;
             _results.reserve(static_cast<int>(total_num_boxes));
             unsigned int count = 0;
             // loop each stride
@@ -104,7 +104,7 @@ namespace modeldeploy::vision::face {
                     const float y1 = ((cy - t) * static_cast<float>(current_stride) - pad_h) / scale; // cy - t y1
                     const float x2 = ((cx + r) * static_cast<float>(current_stride) - pad_w) / scale; // cx + r x2
                     const float y2 = ((cy + b) * static_cast<float>(current_stride) - pad_h) / scale; // cy + b y2
-                    std::vector<Point2f> landmarks;
+                    std::vector<Point3f> landmarks;
                     landmarks.reserve(landmarks_per_face_);
                     if (use_kps_) {
                         const auto* landmarks_ptr =
@@ -118,7 +118,7 @@ namespace modeldeploy::vision::face {
                             // cx + l x
                             const float kps_y = ((cy + kps_t) * static_cast<float>(current_stride) - pad_h) / scale;
                             // cy + t y
-                            landmarks.emplace_back(kps_x, kps_y);
+                            landmarks.emplace_back(kps_x, kps_y,0.0f);
                         }
                     }
                     _results.push_back({Rect2f{x1, y1, x2 - x1, y2 - y1}, landmarks, 0, cls_conf});
@@ -136,7 +136,7 @@ namespace modeldeploy::vision::face {
             // scale and clip box
             for (auto& _result : _results) {
                 auto& box = _result.box;
-                auto& landmarks = _result.landmarks;
+                auto& landmarks = _result.keypoints;
                 // 左上角不能越界
                 box.x = std::max(box.x, 0.0f);
                 box.y = std::max(box.y, 0.0f);

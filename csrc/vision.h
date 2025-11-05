@@ -17,3 +17,4 @@
 
 #include "vision/common/display/display.h"
 #include "vision/common/visualize/visualize.h"
+#include "vision/utils.h"

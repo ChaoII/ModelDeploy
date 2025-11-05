@@ -37,11 +37,11 @@ namespace modeldeploy::vision {
                 std::to_string(_result.score).substr(0, 4);
             draw_rectangle_and_text(cv_image, utils::rect2f_to_cv_type(_result.box), text, cv_color,
                                     font, font_size, 1, true);
-            std::vector<cv::Point2f> cv_landmarks;
-            std::transform(_result.landmarks.begin(), _result.landmarks.end(),
+            std::vector<cv::Point3f> cv_landmarks;
+            std::transform(_result.keypoints.begin(), _result.keypoints.end(),
                            std::back_inserter(cv_landmarks),
-                           [](const Point2f& point) {
-                               return utils::point2f_to_cv_type(point);
+                           [](const Point3f& point) {
+                               return utils::point3f_to_cv_type(point);
                            });
             draw_landmarks(cv_image, cv_landmarks, landmark_radius);
         }
