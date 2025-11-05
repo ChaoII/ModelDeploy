@@ -32,7 +32,7 @@ namespace modeldeploy::vision::utils {
 
     MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 
-    MODELDEPLOY_CXX_EXPORT void sorted_det_land_mark_results(std::vector<DetectionLandmarkResult>& results);
+    MODELDEPLOY_CXX_EXPORT void sorted_det_land_mark_results(std::vector<KeyPointsResult>& results);
 
     MODELDEPLOY_CXX_EXPORT void sorted_det_results(std::vector<DetectionResult>& results);
 
@@ -44,9 +44,7 @@ namespace modeldeploy::vision::utils {
 
     void nms(std::vector<InstanceSegResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
-    void nms(std::vector<PoseResult>* result, float iou_threshold);
-
-    void nms(std::vector<DetectionLandmarkResult>* result, float iou_threshold);
+    void nms(std::vector<KeyPointsResult>* result, float iou_threshold);
 
     void letter_box(cv::Mat* mat, const std::vector<int>& size,
                     const std::vector<float>& padding_value, LetterBoxRecord* letter_box_record);
@@ -56,7 +54,7 @@ namespace modeldeploy::vision::utils {
     std::vector<float> compute_sqrt(const std::vector<float>& vec);
 
     MODELDEPLOY_CXX_EXPORT std::vector<ImageData> align_face_with_five_points(
-        const ImageData& image, std::vector<DetectionLandmarkResult>& result,
+        const ImageData& image, std::vector<KeyPointsResult>& result,
         std::vector<std::array<float, 2>> std_landmarks =
         {
             {89.3095f, 72.9025f},

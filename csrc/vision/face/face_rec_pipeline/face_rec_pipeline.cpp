@@ -34,7 +34,7 @@ namespace modeldeploy::vision::face {
             timers->post_timer.push_back(0);
             timers->infer_timer.start();
         }
-        std::vector<DetectionLandmarkResult> det_result;
+        std::vector<KeyPointsResult> det_result;
         if (!detector_->predict(image, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;

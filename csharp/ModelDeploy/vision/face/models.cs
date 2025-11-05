@@ -19,13 +19,13 @@ namespace ModelDeploy.vision.face
         }
 
 
-        public List<DetectionLandmarkResult> Predict(Image image)
+        public List<KeyPointResult> Predict(Image image)
         {
-            var cResults = new MDDetectionLandmarkResults();
+            var cResults = new MDKeyPointResults();
             Utils.Check(md_face_det_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
             try
             {
-                return new List<DetectionLandmarkResult>(DetectionLandmarkResult.FromNativeArray(cResults));
+                return new List<KeyPointResult>(KeyPointResult.FromNativeArray(cResults));
             }
             finally
             {
@@ -33,10 +33,10 @@ namespace ModelDeploy.vision.face
             }
         }
 
-        public void DrawFaceResult(Image image, List<DetectionLandmarkResult> results, string fontPath,
+        public void DrawFaceResult(Image image, List<KeyPointResult> results, string fontPath,
             int fontSize = 12, int landmarkRadius = 2, double alpha = 0.5, bool saveResult = false)
         {
-            var cResults = DetectionLandmarkResult.ToNativeArray(results);
+            var cResults = KeyPointResult.ToNativeArray(results);
             try
             {
                 md_draw_face_det_result(ref image.RawImage, ref cResults, fontPath, fontSize, landmarkRadius, alpha,
@@ -68,16 +68,16 @@ namespace ModelDeploy.vision.face
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_det_predict(ref MDModel model, ref MDImage image,
-            ref MDDetectionLandmarkResults cResults);
+            ref MDKeyPointResults cResults);
 
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_face_det_result(ref MDImage image,
-            ref MDDetectionLandmarkResults cResults, string fontPath, int fontSize,
+            ref MDKeyPointResults cResults, string fontPath, int fontSize,
             int landmarkRadius, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_det_result(ref MDDetectionLandmarkResults cResults);
+        private static extern void md_free_face_det_result(ref MDKeyPointResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_det_model(ref MDModel model);

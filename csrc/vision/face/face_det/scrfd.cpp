@@ -23,9 +23,9 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool Scrfd::predict(const ImageData& image, std::vector<DetectionLandmarkResult>* result,
+    bool Scrfd::predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                         TimerArray* timers) {
-        std::vector<std::vector<DetectionLandmarkResult>> results;
+        std::vector<std::vector<KeyPointsResult>> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
         }
@@ -34,7 +34,7 @@ namespace modeldeploy::vision::face {
     }
 
     bool Scrfd::batch_predict(const std::vector<ImageData>& images,
-                              std::vector<std::vector<DetectionLandmarkResult>>* results,
+                              std::vector<std::vector<KeyPointsResult>>* results,
                               TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
         std::vector<ImageData> _images = images;

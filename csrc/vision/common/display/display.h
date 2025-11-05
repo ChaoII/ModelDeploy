@@ -19,11 +19,11 @@ namespace modeldeploy::vision {
 
     MODELDEPLOY_CXX_EXPORT void dis_ocr(const OCRResult& results);
 
-    MODELDEPLOY_CXX_EXPORT void dis_lmk(const std::vector<DetectionLandmarkResult>& result);
+    MODELDEPLOY_CXX_EXPORT void dis_lmk(const std::vector<KeyPointsResult>& result);
 
     MODELDEPLOY_CXX_EXPORT void dis_lpr(const std::vector<LprResult>& result);
 
-    MODELDEPLOY_CXX_EXPORT void dis_pose(const std::vector<PoseResult>& result);
+    MODELDEPLOY_CXX_EXPORT void dis_pose(const std::vector<KeyPointsResult>& result);
 
     MODELDEPLOY_CXX_EXPORT void dis_face_rec(std::vector<FaceRecognitionResult> results);
 }

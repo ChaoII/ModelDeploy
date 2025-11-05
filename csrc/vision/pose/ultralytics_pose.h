@@ -17,10 +17,10 @@ namespace modeldeploy::vision::detection {
 
         [[nodiscard]] std::string name() const override { return "UltralyticsPose"; }
 
-        bool predict(const ImageData& image, std::vector<PoseResult>* result, TimerArray* timers = nullptr);
+        bool predict(const ImageData& image, std::vector<KeyPointsResult>* result, TimerArray* timers = nullptr);
 
         bool batch_predict(const std::vector<ImageData>& images,
-                           std::vector<std::vector<PoseResult>>* results, TimerArray* timers = nullptr);
+                           std::vector<std::vector<KeyPointsResult>>* results, TimerArray* timers = nullptr);
 
         UltralyticsPosePreprocessor& get_preprocessor() {
             return preprocessor_;

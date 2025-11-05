@@ -22,9 +22,9 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprDetection::predict(const ImageData& image, std::vector<DetectionLandmarkResult>* result,
+    bool LprDetection::predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                                TimerArray* timers) {
-        std::vector<std::vector<DetectionLandmarkResult>> results;
+        std::vector<std::vector<KeyPointsResult>> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
         }
@@ -33,7 +33,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetection::batch_predict(const std::vector<ImageData>& images,
-                                     std::vector<std::vector<DetectionLandmarkResult>>* results,
+                                     std::vector<std::vector<KeyPointsResult>>* results,
                                      TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
         std::vector<ImageData> _images = images;

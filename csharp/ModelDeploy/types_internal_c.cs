@@ -242,7 +242,7 @@ namespace ModelDeploy
 
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDPoseResult
+        public struct MDKeyPointResult
         {
             public MDRect box;
             public IntPtr keypoints_data;
@@ -252,29 +252,12 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDPoseResults
+        public struct MDKeyPointResults
         {
             public IntPtr data;
             public int size;
         }
-
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MDDetectionLandmarkResult
-        {
-            public MDRect box;
-            public IntPtr landmarks_data;
-            public int landmarks_size;
-            public int label_id;
-            public float score;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MDDetectionLandmarkResults
-        {
-            public IntPtr data;
-            public int size;
-        }
+        
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDLPRResult

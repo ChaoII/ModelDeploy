@@ -19,13 +19,13 @@ namespace ModelDeploy.vision.lpr
         }
 
 
-        public List<face.DetectionLandmarkResult> Predict(Image image)
+        public List<face.KeyPointResult> Predict(Image image)
         {
-            var cResults = new MDDetectionLandmarkResults();
+            var cResults = new MDKeyPointResults();
             Utils.Check(md_lpr_det_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
             try
             {
-                return new List<face.DetectionLandmarkResult>(face.DetectionLandmarkResult.FromNativeArray(cResults));
+                return new List<face.KeyPointResult>(face.KeyPointResult.FromNativeArray(cResults));
             }
             finally
             {
@@ -33,9 +33,9 @@ namespace ModelDeploy.vision.lpr
             }
         }
 
-        public void Display(List<face.DetectionLandmarkResult> results)
+        public void Display(List<face.KeyPointResult> results)
         {
-            var cResults = face.DetectionLandmarkResult.ToNativeArray(results);
+            var cResults = face.KeyPointResult.ToNativeArray(results);
             try
             {
                 md_print_lpr_det_result(ref cResults);
@@ -46,10 +46,10 @@ namespace ModelDeploy.vision.lpr
             }
         }
 
-        public void DrawDetectionResult(Image image, List<face.DetectionLandmarkResult> results, string fontPath,
+        public void DrawDetectionResult(Image image, List<face.KeyPointResult> results, string fontPath,
             int fontSize = 12, int landmarkRadius = 2, double alpha = 0.5, int saveResult = 1)
         {
-            var cResults = face.DetectionLandmarkResult.ToNativeArray(results);
+            var cResults = face.KeyPointResult.ToNativeArray(results);
             try
             {
                 md_draw_lpr_det_result(ref image.RawImage, ref cResults, fontPath, fontSize, landmarkRadius, alpha,
@@ -81,18 +81,18 @@ namespace ModelDeploy.vision.lpr
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_lpr_det_predict(ref MDModel model, ref MDImage image,
-            ref MDDetectionLandmarkResults cResults);
+            ref MDKeyPointResults cResults);
 
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_lpr_det_result(ref MDImage image, ref MDDetectionLandmarkResults cResults,
+        private static extern void md_draw_lpr_det_result(ref MDImage image, ref MDKeyPointResults cResults,
             string fontPath, int fontSize, int landmarkRadius, double alpha, int saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_lpr_det_result(ref MDDetectionLandmarkResults cResults);
+        private static extern void md_print_lpr_det_result(ref MDKeyPointResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_det_result(ref MDDetectionLandmarkResults cResults);
+        private static extern void md_free_lpr_det_result(ref MDKeyPointResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_lpr_det_model(ref MDModel model);

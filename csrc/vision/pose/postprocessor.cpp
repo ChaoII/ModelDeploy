@@ -14,7 +14,7 @@ namespace modeldeploy::vision::detection {
     }
 
     bool UltralyticsPosePostprocessor::run_without_nms(
-        const std::vector<Tensor>& tensors, std::vector<std::vector<PoseResult>>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
         //  4(xc,yc,w,h)+1(conf)+17(keypoints)*3(x,y,conf)=56
@@ -34,7 +34,7 @@ namespace modeldeploy::vision::detection {
             const size_t dim2 = tensor_transpose.shape()[2]; //56
             const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * dim1 * dim2;
 
-            std::vector<PoseResult> _results;
+            std::vector<KeyPointsResult> _results;
             _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 // 4(xc,yc,w,h)+1(conf)+17(keypoints)*3(x,y,conf)=56
@@ -108,7 +108,7 @@ namespace modeldeploy::vision::detection {
     }
 
     bool UltralyticsPosePostprocessor::run_with_nms(
-        const std::vector<Tensor>& tensors, std::vector<std::vector<PoseResult>>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
         //  4(x1,y1,x2,y2)+1(conf)+1(class_id)+17(keypoints)*3(x,y,conf)=57
@@ -126,7 +126,7 @@ namespace modeldeploy::vision::detection {
             const size_t dim1 = tensors[0].shape()[1]; //300
             const size_t dim2 = tensors[0].shape()[2]; //6
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
-            std::vector<PoseResult> _results;
+            std::vector<KeyPointsResult> _results;
             _results.reserve(tensors[0].shape()[1]);
             for (size_t i = 0; i < dim1; ++i) {
                 // 4(x1,y1,x2,y2)+1(conf)+1(class_id)+17(keypoints)*3(x,y,conf)=57
@@ -199,13 +199,13 @@ namespace modeldeploy::vision::detection {
     }
 
     bool UltralyticsPosePostprocessor::run(const std::vector<Tensor>& tensors,
-                                           std::vector<std::vector<PoseResult>>* results,
+                                           std::vector<std::vector<KeyPointsResult>>* results,
                                            const std::vector<LetterBoxRecord>& letter_box_records) const {
         if (tensors[0].shape().size() != 3) {
             MD_LOG_ERROR << "Only support post process with 3D tensor." << std::endl;
             return false;
         }
-        if (tensors[0].shape()[2] == 57) {
+        if (tensors[0].shape()[2] == 5 + keypoints_num_ * 3 + 1) {
             return run_with_nms(tensors, results, letter_box_records);
         }
         return run_without_nms(tensors, results, letter_box_records);

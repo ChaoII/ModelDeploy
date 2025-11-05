@@ -16,7 +16,7 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionLandmarkResult>>* results,
+        const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
         results->resize(batch);
@@ -28,7 +28,7 @@ namespace modeldeploy::vision::lpr {
             const size_t dim1 = tensors[0].shape()[1]; //25200
             const size_t dim2 = tensors[0].shape()[2]; //15
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
-            std::vector<DetectionLandmarkResult> _results;
+            std::vector<KeyPointsResult> _results;
             _results.reserve(dim1);
             // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf0(单层车牌),cls_conf1(双层车牌)
             for (size_t i = 0; i < dim1; ++i) {
@@ -51,14 +51,14 @@ namespace modeldeploy::vision::lpr {
                 const float w = attr_ptr[2];
                 const float h = attr_ptr[3];
 
-                std::vector<Point2f> landmarks;
+                std::vector<Point3f> landmarks;
                 landmarks.reserve(landmarks_per_card_);
                 // decode landmarks (default 5 landmarks)
                 if (landmarks_per_card_ > 0) {
                     const float* landmarks_ptr = attr_ptr + 5;
                     for (size_t j = 0; j < landmarks_per_card_ * 2; j += 2) {
                         landmarks.emplace_back(
-                            landmarks_ptr[j], landmarks_ptr[j + 1]);
+                            landmarks_ptr[j], landmarks_ptr[j + 1], 0.0f);
                     }
                 }
                 _results.push_back({Rect2f{x - w / 2.f, y - h / 2.f, w, h}, landmarks, class_id, confidence});
@@ -77,7 +77,7 @@ namespace modeldeploy::vision::lpr {
 
             for (auto& result : _results) {
                 auto& box = result.box;
-                auto& landmarks = result.landmarks;
+                auto& landmarks = result.keypoints;
                 // clip box()
                 //1 先减去 padding;2除以缩放因子scale 3最后限制在原始图像范围内 [0, width], [0, height]。
                 float x1 = (box.x - pad_w) / scale;

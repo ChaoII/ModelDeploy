@@ -41,12 +41,6 @@ namespace modeldeploy::vision {
         ImageData& image, const OCRResult& result, const std::string& font_path,
         int font_size = 14, double alpha = 0.15, bool save_result = false);
 
-    MODELDEPLOY_CXX_EXPORT ImageData vis_det_landmarks(
-        ImageData& image, const std::vector<DetectionLandmarkResult>& result,
-        const std::string& font_path, int font_size = 14,
-        int landmark_radius = 4, double alpha = 0.15,
-        bool save_result = false);
-
     MODELDEPLOY_CXX_EXPORT ImageData vis_lpr(
         ImageData& image, const std::vector<LprResult>& result,
         const std::string& font_path, int font_size = 14,
@@ -54,7 +48,13 @@ namespace modeldeploy::vision {
         bool save_result = false);
 
     MODELDEPLOY_CXX_EXPORT ImageData vis_pose(
-        ImageData& image, const std::vector<PoseResult>& result,
+        ImageData& image, const std::vector<KeyPointsResult>& result,
+        const std::string& font_path, int font_size = 14,
+        int landmark_radius = 4, double alpha = 0.15,
+        bool save_result = false);
+
+    MODELDEPLOY_CXX_EXPORT ImageData vis_keypoints(
+        ImageData& image, const std::vector<KeyPointsResult>& result,
         const std::string& font_path, int font_size = 14,
         int landmark_radius = 4, double alpha = 0.15,
         bool save_result = false);
