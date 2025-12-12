@@ -170,7 +170,7 @@ void c_results_2_classification_result(
 void detection_results_2_c_results(
     const std::vector<DetectionResult>& results,
     MDDetectionResults* c_results) {
-    c_results->size = results.size();
+    c_results->size = static_cast<int>(results.size());
     c_results->data = new MDDetectionResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
         auto [x, y, width, height] = results[i].box;
@@ -203,10 +203,10 @@ void c_results_2_detection_results(
 void obb_results_2_c_results(
     const std::vector<ObbResult>& results,
     MDObbResults* c_results) {
-    c_results->size = results.size();
+    c_results->size = static_cast<int>(results.size());
     c_results->data = new MDObbResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
-        auto rotated_box = results[i].rotated_box;
+        const auto rotated_box = results[i].rotated_box;
         c_results->data[i].rotated_box = {
             rotated_box.xc,
             rotated_box.yc,
@@ -240,7 +240,7 @@ void c_results_2_obb_results(
 void iseg_results_2_c_results(
     const std::vector<InstanceSegResult>& results,
     MDIsegResults* c_results) {
-    c_results->size = results.size();
+    c_results->size = static_cast<int>(results.size());
     c_results->data = new MDIsegResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
         auto [x, y, width, height] = results[i].box;
@@ -303,7 +303,7 @@ void c_results_2_iseg_results(
 void keypoint_results_2_c_results(
     const std::vector<KeyPointsResult>& results,
     MDKeyPointResults* c_results) {
-    c_results->size = results.size();
+    c_results->size = static_cast<int>(results.size());
     c_results->data = new MDKeyPointResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
         c_results->data[i].box = {
@@ -332,7 +332,7 @@ void c_results_2_keypoint_results(
     std::vector<KeyPointsResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        auto box = Rect2f{
+        const auto box = Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
@@ -458,7 +458,7 @@ void lpr_results_2_c_results(
         return;
     }
 
-    c_results->size = results.size();
+    c_results->size = static_cast<int>(results.size());
     c_results->data = new MDLPRResult[c_results->size];
     for (int i = 0; i < c_results->size; i++) {
         c_results->data[i].box = {

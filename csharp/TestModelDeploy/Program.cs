@@ -404,7 +404,7 @@ static class Program
 
     static void Main(string[] args)
     {
-        // TestClassification();
+        TestClassification();
         // TestFace();
         // TestLpr();
         // TestSenseVoice();
@@ -412,7 +412,7 @@ static class Program
         // TestDetection();
         // TestInstanceSeg();
         // TestObb();
-        TestPose();
+        // TestPose();
         // TestImage();
         // TestOCR();
         // TestOcrRecognition();

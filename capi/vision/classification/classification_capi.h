@@ -24,8 +24,18 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_classification_model(
 /// \param size 模型输入的大小，在onnx模型中，检测模型默认输入大小为640*640，如果模型输入大小不一致，需要调用该方法设置
 /// \return MDStatusCode::Success 成功，其他失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_set_classification_input_size(
-    const MDModel* model,
-    MDSize size);
+    const MDModel* model, MDSize size);
+/// 在分类模型预处理中，是否进行中心裁剪，一些训练使用相同宽高的图片可以使用， 但是在行人属性识别时，宽高不一致，需要调用该方法关闭
+/// @param model
+/// @return
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_disable_classification_center_crop(const MDModel* model);
+
+/// 是否使用多标签分类
+/// @param model
+/// @param multi_label
+/// @return
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_set_classification_multi_label(const MDModel* model, int multi_label);
+
 /// 执行预测，检测结果保存在results中
 /// \param model 由create_classification_model创建的模型
 /// \param c_results 检测结果结构体，请在调用该方法前申请内存，该方法会在内部申请内存，并释放
