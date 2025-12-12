@@ -19,14 +19,18 @@ namespace modeldeploy::vision::classification {
     bool UltralyticsClsPreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // yolov8-cls's preprocess steps
         // 1. CenterCrop
+        // 2. Resize
         // 2. Normalize
-        // CenterCrop
-
+        if (image->width() <= 0 || image->height() <= 0) {
+            return false;
+        }
         cv::Mat mat;
         image->to_mat(&mat);
-        const int crop_size = std::min(mat.rows, mat.cols);
-        CenterCrop::apply(&mat, crop_size, crop_size);
-        Resize::apply(&mat, size_[0], size_[1], -1, -1, cv::INTER_LINEAR);
+        if (enable_center_crop_) {
+            const int crop_size = std::min(mat.rows, mat.cols);
+            CenterCrop::apply(&mat, crop_size, crop_size);
+        }
+        Resize::apply(&mat, size_[0], size_[1]);
         // Normalize
         BGR2RGB::apply(&mat);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
@@ -56,7 +60,6 @@ namespace modeldeploy::vision::classification {
                 return false;
             }
         }
-
         if (tensors.size() == 1) {
             (*outputs)[0] = std::move(tensors[0]);
         }

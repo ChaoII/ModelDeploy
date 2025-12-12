@@ -6,12 +6,11 @@
 #include <map>
 #include "csrc/vision.h"
 #include "csrc/core/md_log.h"
+#include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "capi/vision/classification/classification_capi.h"
-
-#include <csrc/vision/common/display/display.h>
 
 
 MDStatusCode md_create_classification_model(MDModel* model, const char* model_path,
@@ -38,6 +37,29 @@ MDStatusCode md_set_classification_input_size(const MDModel* model, const MDSize
     const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
         model_content);
     classification_model->get_preprocessor().set_size({size.height, size.height});
+    return MDStatusCode::Success;
+}
+
+
+MDStatusCode md_disable_classification_center_crop(const MDModel* model) {
+    if (model->type != MDModelType::Classification) {
+        MD_LOG_ERROR << "Model type is not classification!" << std::endl;
+        return MDStatusCode::ModelTypeError;
+    }
+    const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+        model_content);
+    classification_model->get_preprocessor().disable_center_crop();
+    return MDStatusCode::Success;
+}
+
+MDStatusCode md_set_classification_multi_label(const MDModel* model, int multi_label) {
+    if (model->type != MDModelType::Classification) {
+        MD_LOG_ERROR << "Model type is not classification!" << std::endl;
+        return MDStatusCode::ModelTypeError;
+    }
+    const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+        model_content);
+    classification_model->get_postprocessor().set_multi_label(multi_label);
     return MDStatusCode::Success;
 }
 

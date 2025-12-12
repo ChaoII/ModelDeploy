@@ -24,7 +24,17 @@ namespace ModelDeploy.vision.classification
             var size = new MDSize { width = width, height = height };
             Utils.Check(md_set_classification_input_size(ref _model, size), "Set detection input size");
         }
+        
+        public void DisableCenterCrop()
+        {
+            Utils.Check(md_disable_classification_center_crop(ref _model), "Disable classification center crop");
+        }
 
+        public void SetMultiLabel(bool isMultiLabel)
+        {
+            Utils.Check(md_set_classification_multi_label(ref _model, isMultiLabel ? 1 : 0), "Set classification multi label");
+        }
+        
         public List<ClassificationResult> Predict(Image image)
         {
             var cResults = new MDClassificationResults();
@@ -76,6 +86,11 @@ namespace ModelDeploy.vision.classification
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_classification_input_size(ref MDModel model, MDSize size);
+        
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_disable_classification_center_crop(ref MDModel model);
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_set_classification_multi_label(ref MDModel model, int isMutiLabel);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_classification_predict(ref MDModel model, ref MDImage image,

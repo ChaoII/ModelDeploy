@@ -17,7 +17,7 @@ namespace ModelDeploy.vision.iseg
             var nativeOption = option.ToNative();
             Utils.Check(md_create_instance_seg_model(ref _model, modelPath, ref nativeOption), "Create detection model");
         }
-
+        
         public void SetInputSize(int width, int height)
         {
             var size = new MDSize { width = width, height = height };

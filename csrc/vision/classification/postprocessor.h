@@ -3,7 +3,6 @@
 //
 
 #pragma once
-#include <map>
 #include "core/md_decl.h"
 #include "vision/common/result.h"
 #include "core/tensor.h"
@@ -26,14 +25,19 @@ namespace modeldeploy::vision::classification {
                  std::vector<ClassifyResult>* results) const;
 
         /// Set topk, default 1
-        void set_top_k(const int& top_k) {
-            top_k_ = top_k;
-        }
+        void set_top_k(const int& top_k) {top_k_ = top_k;}
 
         /// Get topk, default 1
         [[nodiscard]] int get_top_k() const { return top_k_; }
 
+        // Set multi_label, default false
+        void set_multi_label(const bool& multi_label) {multi_label_ = multi_label;}
+
+        /// Get multi_label, default false
+        [[nodiscard]] bool get_multi_label() const { return multi_label_; }
+
     protected:
         int top_k_;
+        bool multi_label_ = false;
     };
 }

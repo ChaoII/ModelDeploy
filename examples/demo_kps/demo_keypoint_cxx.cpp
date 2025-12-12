@@ -28,7 +28,7 @@ int main() {
     timers.print_benchmark();
     // result.display();
     const auto vis_image =
-        modeldeploy::vision::vis_keypoints(img, result, "../../test_data/test_models/msyh.ttc", 12, 10, 0.3, true,
+        modeldeploy::vision::vis_keypoints(img, result, "../../test_data/test_models/msyh.ttc", 12, 10, 0.4, true,
                                            true);
     vis_image.imshow("result");
 }
