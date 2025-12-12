@@ -242,12 +242,43 @@ namespace ModelDeploy
             return image;
         }
 
+        public static Image FromCompressedBytes(byte[] data, int byteSize)
+        {
+            var image = new Image { RawImage = md_from_compressed_bytes(data, byteSize) };
+            image.Update();
+            return image;
+        }
+
+        public static Image FromBgr24Data(byte[] data, int width, int height)
+        {
+            var image = new Image { RawImage = md_from_bgr24_data(data, width, height) };
+            image.Update();
+            return image;
+        }
+        
+        public static Image FromRgb24Data(byte[] data, int width, int height)
+        {
+            var image = new Image { RawImage = md_from_rgb24_data(data, width, height) };
+            image.Update();
+            return image;
+        }
+        
+        public static Image FromRgb24DataToBgr24(byte[] data, int width, int height)
+        {
+            var image = new Image { RawImage = md_from_rgb24_data_to_bgr24(data, width, height) };
+            image.Update();
+            return image;
+        }
+        
+        
+        
         public static Image FromBase64String(string base64String)
         {
             var image = new Image { RawImage = md_from_base64_str(base64String) };
             image.Update();
             return image;
         }
+
 
         public static Image FromNative(MDImage mdImage)
         {
@@ -278,6 +309,18 @@ namespace ModelDeploy
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_read_image(string imagePath);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_compressed_bytes(byte[] data, int byteSize);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_bgr24_data(byte[] data, int width, int height);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_rgb24_data(byte[] data, int width, int height);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_rgb24_data_to_bgr24(byte[] data, int width, int height);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_from_base64_str(string base64String);
