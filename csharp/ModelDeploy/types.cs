@@ -237,53 +237,92 @@ namespace ModelDeploy
 
         public static Image Read(string imagePath)
         {
-            var image = new Image { RawImage = md_read_image(imagePath) };
-            image.Update();
+            var nativeImage = md_read_image(imagePath) ;
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
             return image;
         }
 
         public static Image FromCompressedBytes(byte[] data, int byteSize)
         {
-            var image = new Image { RawImage = md_from_compressed_bytes(data, byteSize) };
-            image.Update();
+            var nativeImage = md_from_compressed_bytes(data, byteSize);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
             return image;
         }
 
         public static Image FromBgr24Data(byte[] data, int width, int height)
         {
-            var image = new Image { RawImage = md_from_bgr24_data(data, width, height) };
-            image.Update();
+            var nativeImage = md_from_bgr24_data(data, width, height);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
             return image;
         }
-        
+
         public static Image FromRgb24Data(byte[] data, int width, int height)
         {
-            var image = new Image { RawImage = md_from_rgb24_data(data, width, height) };
-            image.Update();
+            var nativeImage = md_from_rgb24_data(data, width, height);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
             return image;
         }
-        
+
         public static Image FromRgb24DataToBgr24(byte[] data, int width, int height)
         {
-            var image = new Image { RawImage = md_from_rgb24_data_to_bgr24(data, width, height) };
-            image.Update();
+            var nativeImage = md_from_rgb24_data_to_bgr24(data, width, height);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
             return image;
         }
-        
-        
-        
+
+
         public static Image FromBase64String(string base64String)
         {
-            var image = new Image { RawImage = md_from_base64_str(base64String) };
-            image.Update();
+            var nativeImage = md_from_base64_str(base64String);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
             return image;
         }
 
-
-        public static Image FromNative(MDImage mdImage)
+        private static Image FromNative(MDImage mdImage)
         {
-            var image = new Image { RawImage = mdImage };
-            image.Update();
+            var image = new Image
+            {
+                Width = mdImage.width,
+                Height = mdImage.height,
+                Channels = mdImage.channels,
+                RawImage = mdImage
+            };
             return image;
         }
 
