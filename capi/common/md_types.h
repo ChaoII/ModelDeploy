@@ -82,7 +82,6 @@ typedef struct {
     int height;
     int channels;
     unsigned char* data;
-    int type;
 } MDImage;
 
 typedef struct {

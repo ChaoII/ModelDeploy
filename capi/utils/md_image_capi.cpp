@@ -44,7 +44,7 @@ MDImage md_from_bgr24_data(const unsigned char* data, const int width, const int
     return *mat_to_md_image(img_bgr);
 }
 
-MDImage md_from_rgb24_data(const unsigned char* data, int width, int height) {
+MDImage md_from_rgb24_data(const unsigned char* data, const int width, const int height) {
     const auto img_rgb = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
     return *mat_to_md_image(img_rgb);
 }
@@ -75,7 +75,7 @@ MDImage md_read_image(const char* path) {
     return *mat_to_md_image(image);
 }
 
-MDImage md_read_image_from_device(int device_id, int frame_width, int frame_height, bool is_save_file) {
+MDImage md_read_image_from_device(int device_id, const int frame_width, const int frame_height, const bool is_save_file) {
 #ifdef _WIN32
     cv::VideoCapture cap(device_id, cv::CAP_DSHOW);
 #else
