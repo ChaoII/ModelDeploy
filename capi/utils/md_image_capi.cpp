@@ -39,6 +39,24 @@ MDImage md_from_compressed_bytes(const unsigned char* bytes, const int size) {
     return *mat_to_md_image(img_decompressed);
 }
 
+MDImage md_from_bgr24_data(const unsigned char* data, const int width, const int height) {
+    const auto img_bgr = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
+    return *mat_to_md_image(img_bgr);
+}
+
+MDImage md_from_rgb24_data(const unsigned char* data, int width, int height) {
+    const auto img_rgb = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
+    return *mat_to_md_image(img_rgb);
+}
+
+MDImage md_from_rgb24_data_to_bgr24(const unsigned char* data, const int width, const int height) {
+    const auto img_rgb = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
+    cv::Mat img_bgr;
+    cv::cvtColor(img_rgb, img_bgr, cv::COLOR_RGB2BGR);
+    return *mat_to_md_image(img_bgr);
+}
+
+
 MDImage md_from_base64_str(const char* base64_str) {
     const std::vector buffer = modeldeploy::base64_decode(base64_str);
     const cv::Mat img_decode = cv::imdecode(buffer, cv::IMREAD_COLOR);

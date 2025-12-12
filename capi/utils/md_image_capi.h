@@ -34,6 +34,30 @@ MODELDEPLOY_CAPI_EXPORT MDImage md_clone_image(const MDImage* image);
 /// \return MDImage指针
 MODELDEPLOY_CAPI_EXPORT MDImage md_from_compressed_bytes(const unsigned char* bytes, int size);
 
+/// 从原始的BGR24 数据生成一个MDImage对象（注意需要手动释放MDImage）。
+///
+/// @param data BGR24 数据。
+/// @param width 图像宽度。
+/// @param height 图像高度。
+/// @return 返回一个MDImage对象，表示生成的图像。
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_bgr24_data(const unsigned char* data, int width, int height);
+
+/// 从原始的RGB24 数据生成一个MDImage对象（注意需要手动释放MDImage）。
+/// @param data RGB24 数据。
+/// @param width 图像宽度。
+/// @param height 图像高度。
+/// @return 返回一个MDImage对象，表示生成的图像。
+///
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_rgb24_data(const unsigned char* data, int width, int height);
+
+///  从RGB24数据转换为BGR24数据
+/// @param data rgb24数据
+/// @param width 图像宽度。
+/// @param height 图像高度。
+/// @return MDImage
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_rgb24_data_to_bgr24(const unsigned char* data, int width, int height);
+
+
 
 ///  从base64编码的字符串生成一个MDImage对象（注意需要手动释放MDImage）。
 ///
