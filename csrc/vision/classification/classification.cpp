@@ -4,17 +4,17 @@
 
 
 #include "core/md_log.h"
-#include "vision/classification/ultralytics_cls.h"
+#include "vision/classification/classification.h"
 
 
 namespace modeldeploy::vision::classification {
-    UltralyticsCls::UltralyticsCls(const std::string& model_file, const RuntimeOption& custom_option) {
+    Classification::Classification(const std::string& model_file, const RuntimeOption& custom_option) {
         runtime_option = custom_option;
         runtime_option.set_model_path(model_file);
         initialized_ = initialize();
     }
 
-    bool UltralyticsCls::initialize() {
+    bool Classification::initialize() {
         if (!init_runtime()) {
             MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
@@ -22,7 +22,7 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool UltralyticsCls::predict(const ImageData& im, ClassifyResult* result) {
+    bool Classification::predict(const ImageData& im, ClassifyResult* result) {
         std::vector<ClassifyResult> results;
         if (!batch_predict({im}, &results)) {
             return false;
@@ -31,7 +31,7 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool UltralyticsCls::batch_predict(const std::vector<ImageData>& images, std::vector<ClassifyResult>* results) {
+    bool Classification::batch_predict(const std::vector<ImageData>& images, std::vector<ClassifyResult>* results) {
         std::vector<ImageData> _images = images;
         if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;

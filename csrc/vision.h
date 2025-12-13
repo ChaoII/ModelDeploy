@@ -11,9 +11,13 @@
 #include "vision/obb/ultralytics_obb.h"
 #include "vision/pose/ultralytics_pose.h"
 #include "vision/iseg/ultralytics_seg.h"
-#include "vision/classification/ultralytics_cls.h"
+#include "vision/classification/classification.h"
 #include "vision/face/face_models.h"
 #include "vision/lpr/lpr_models.h"
+
+// pipeline
+#include "vision/pipeline/pedestrian_attribute.h"
+
 
 #include "vision/common/display/display.h"
 #include "vision/common/visualize/visualize.h"

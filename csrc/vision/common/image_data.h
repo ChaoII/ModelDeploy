@@ -38,6 +38,7 @@ namespace modeldeploy {
         [[nodiscard]] const uint8_t* data() const;
         uint8_t* data();
 
+        ImageData crop(const vision::Rect2f& rect) const;
 
         void to_tensor(Tensor* tensor) const;
 

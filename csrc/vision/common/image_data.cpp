@@ -117,6 +117,15 @@ namespace modeldeploy {
         vision::utils::mat_to_tensor(impl_->mat, tensor, false);
     }
 
+    ImageData ImageData::crop(const vision::Rect2f& rect) const {
+        const cv::Rect2f cv_rect(rect.x, rect.y, rect.width, rect.height);
+        const auto crop_cv_mat = impl_->mat(cv_rect).clone();
+        ImageData img;
+        img.impl_ = std::make_shared<ImageDataImpl>();
+        img.impl_->mat = crop_cv_mat;
+        return img;
+    }
+
 
     ImageData ImageData::from_mat(const cv::Mat* mat_ptr) {
         ImageData img;

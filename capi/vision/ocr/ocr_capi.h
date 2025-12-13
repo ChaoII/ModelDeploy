@@ -24,7 +24,7 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_ocr_model(
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_det_set_max_side_len(const MDModel* model, int max_side_len = 960);
 ///
 /// @param model 在 create_ocr_model方法中创建的模型句柄
-    /// @param db_thresh db detection 二值化阈值 【太低 → 背景噪声进来，容易把不相干的区域粘连；太高 → 检测框容易断裂，文字被切碎。】默认值为0.3
+/// @param db_thresh db detection 二值化阈值 【太低 → 背景噪声进来，容易把不相干的区域粘连；太高 → 检测框容易断裂，文字被切碎。】默认值为0.3
 /// @return 成功时返回MDStatusCode::Success，其他为失败
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_det_set_db_thresh(const MDModel* model, double db_thresh = 0.3);
 ///

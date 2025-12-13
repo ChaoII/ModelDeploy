@@ -6,7 +6,7 @@
 
 namespace modeldeploy::vision {
     void bind_vision_struct(const pybind11::module&);
-    void bind_ultralytics_cls(const pybind11::module&);
+    void bind_classification(const pybind11::module&);
     void bind_ultralytics_det(const pybind11::module&);
     void bind_ultralytics_iseg(const pybind11::module&);
     void bind_ultralytics_obb(const pybind11::module&);
@@ -30,11 +30,13 @@ namespace modeldeploy::vision {
     void bind_ocr_layout(const pybind11::module&);
     void bind_ocr_table(const pybind11::module&);
     void bind_table_pipeline(const pybind11::module&);
+    void bind_attr(const pybind11::module&);
+
 
 
     void bind_vision(pybind11::module& m) {
         bind_vision_struct(m);
-        bind_ultralytics_cls(m);
+        bind_classification(m);
         bind_ultralytics_det(m);
         bind_ultralytics_iseg(m);
         bind_ultralytics_obb(m);
@@ -57,5 +59,6 @@ namespace modeldeploy::vision {
         bind_ocr_layout(m);
         bind_ocr_table(m);
         bind_table_pipeline(m);
+        bind_attr(m);
     }
 }

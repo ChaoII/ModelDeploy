@@ -10,11 +10,11 @@
 namespace modeldeploy::vision::classification {
     /*! @brief Postprocessor object for YOLOv5Cls serials model.
     */
-    class MODELDEPLOY_CXX_EXPORT UltralyticsClsPostprocessor {
+    class MODELDEPLOY_CXX_EXPORT ClassificationPostprocessor {
     public:
         /** \brief Create a postprocessor instance for YOLOv5Cls serials model
         */
-        UltralyticsClsPostprocessor();
+        ClassificationPostprocessor();
         /** \brief Process the result of runtime and fill to ClassifyResult structure
         *
         * \param[in] tensors The inference result from runtime

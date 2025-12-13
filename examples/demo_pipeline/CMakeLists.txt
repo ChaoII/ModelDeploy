@@ -1,0 +1,6 @@
+
+add_executable(pedestrian_attribute_capi pedestrian_attribute_capi.cpp)
+target_link_libraries(pedestrian_attribute_capi PUBLIC ${LIBRARY_NAME})
+
+add_executable(pedestrian_attribute_cxx pedestrian_attribute_cxx.cpp)
+target_link_libraries(pedestrian_attribute_cxx PUBLIC ${LIBRARY_NAME})

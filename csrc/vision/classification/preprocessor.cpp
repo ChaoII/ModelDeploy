@@ -12,11 +12,11 @@
 #include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::classification {
-    UltralyticsClsPreprocessor::UltralyticsClsPreprocessor() {
+    ClassificationPreprocessor::ClassificationPreprocessor() {
         size_ = {224, 224}; //{h,w}
     }
 
-    bool UltralyticsClsPreprocessor::preprocess(ImageData* image, Tensor* output) const {
+    bool ClassificationPreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // yolov8-cls's preprocess steps
         // 1. CenterCrop
         // 2. Resize
@@ -44,7 +44,7 @@ namespace modeldeploy::vision::classification {
         return true;
     }
 
-    bool UltralyticsClsPreprocessor::run(
+    bool ClassificationPreprocessor::run(
         std::vector<ImageData>* images, std::vector<Tensor>* outputs) const {
         if (images->empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0."
