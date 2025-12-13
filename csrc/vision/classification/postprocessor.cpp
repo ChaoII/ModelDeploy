@@ -8,11 +8,11 @@
 #include <numeric>
 
 namespace modeldeploy::vision::classification {
-    UltralyticsClsPostprocessor::UltralyticsClsPostprocessor() {
+    ClassificationPostprocessor::ClassificationPostprocessor() {
         top_k_ = 1;
     }
 
-    bool UltralyticsClsPostprocessor::run(
+    bool ClassificationPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) const {
         const int64_t batch = tensors[0].shape()[0];
         const Tensor& infer_result = tensors[0];

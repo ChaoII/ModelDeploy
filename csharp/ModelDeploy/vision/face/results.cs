@@ -96,11 +96,7 @@ namespace ModelDeploy.vision.face
 
         public static FaceRecognizerResult FromNative(MDFaceRecognizerResult cResult)
         {
-            var detResult = new FaceRecognizerResult
-            {
-                Embedding = new List<float>(cResult.size)
-            };
-
+            var detResult = new FaceRecognizerResult();
             float[] buffer = new float[cResult.size];
             Marshal.Copy(cResult.embedding, buffer, 0, cResult.size);
             detResult.Embedding = new List<float>(buffer);

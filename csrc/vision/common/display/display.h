@@ -26,4 +26,7 @@ namespace modeldeploy::vision {
     MODELDEPLOY_CXX_EXPORT void dis_pose(const std::vector<KeyPointsResult>& result);
 
     MODELDEPLOY_CXX_EXPORT void dis_face_rec(std::vector<FaceRecognitionResult> results);
+
+    MODELDEPLOY_CXX_EXPORT void dis_attr(const std::vector<AttributeResult>& result);
+
 }

@@ -221,6 +221,15 @@ void c_results_2_lpr_results(
     std::vector<LprResult>* results);
 
 
+void attr_results_2_c_results(
+    const std::vector<AttributeResult>& results,
+    MDAttributeResults* c_results);
+
+void c_results_2_attr_results(
+    const MDAttributeResults* c_results,
+    std::vector<AttributeResult>* results);
+
+
 void face_recognizer_result_2_c_result(
     const FaceRecognitionResult& result,
     MDFaceRecognizerResult* c_result);

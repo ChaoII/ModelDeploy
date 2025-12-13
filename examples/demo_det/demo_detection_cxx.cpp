@@ -12,17 +12,16 @@ int main() {
     option.use_gpu(0);
     option.password = "123456";
     option.enable_fp16 = true;
-    // option.enable_trt = true;
+    option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("C:/Users/aichao/Desktop/fsdownload/line_edit.onnx",
-                                                              option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det.onnx", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
-    auto img = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/4321.png");
+    auto img = modeldeploy::ImageData::imread("F:/zhgd/Detection/images/train/frame_00000.jpg");
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
-    // yolo11_det.get_preprocessor().use_cuda_preproc();
-    yolo11_det.get_preprocessor().set_size({640, 640});
+    yolo11_det.get_preprocessor().use_cuda_preproc();
+    yolo11_det.get_preprocessor().set_size({1280, 1280});
     constexpr int warming_up_count = 10;
     for (int i = 0; i < warming_up_count; ++i) {
         yolo11_det.predict(img, &result);

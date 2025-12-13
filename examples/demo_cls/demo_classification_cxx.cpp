@@ -9,7 +9,7 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.use_gpu();
-    modeldeploy::vision::classification::UltralyticsCls cls_model("../../test_data/test_models/zhgd_ml.onnx",
+    modeldeploy::vision::classification::Classification cls_model("../../test_data/test_models/zhgd_ml.onnx",
                                                                   option);
     cls_model.get_preprocessor().set_size({192, 256});
     cls_model.get_preprocessor().disable_center_crop();

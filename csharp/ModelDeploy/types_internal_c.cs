@@ -277,8 +277,24 @@ namespace ModelDeploy
             public IntPtr data;
             public int size;
         }
+        
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDAttrResult
+        {
+            public MDRect box;
+            public int box_label_id;
+            public float box_score;
+            public IntPtr attr_scores;
+            public int attr_scores_size;
+        }
 
-
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDAttrResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+        
         [StructLayout(LayoutKind.Sequential)]
         public struct MDFaceRecognizerResult
         {

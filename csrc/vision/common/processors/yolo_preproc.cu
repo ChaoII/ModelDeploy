@@ -4,6 +4,7 @@
 
 #include "vision/common/processors/yolo_preproc.cuh"
 #include <cuda_fp16.h>
+#include <core/md_log.h>
 
 __global__ void kernel_yolo_preproc(
     const uint8_t* __restrict__ src,
@@ -141,12 +142,14 @@ namespace modeldeploy::vision {
         auto* output_ptr_cpu = static_cast<float*>(output->data());
         // 3. 在 GPU 内存分配临时缓冲区
         float* d_output = nullptr;
-        size_t output_size = 3UL * dst_h * dst_w * sizeof(float);
+        const size_t output_size = 3UL * dst_h * dst_w * sizeof(float);
         cudaError_t err = cudaMalloc(&d_output, output_size);
         if (err != cudaSuccess) {
             std::cerr << "cudaMalloc failed: " << cudaGetErrorString(err) << std::endl;
+            cudaFree(d_output);
             return false;
         }
+
         // 4. CUDA 流
         cudaStream_t stream = nullptr;
         // 5. 归一化参数和 pad_value

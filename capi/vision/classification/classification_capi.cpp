@@ -17,7 +17,7 @@ MDStatusCode md_create_classification_model(MDModel* model, const char* model_pa
                                             const MDRuntimeOption* option) {
     modeldeploy::RuntimeOption _option;
     c_runtime_option_2_runtime_option(option, &_option);
-    const auto classification_model = new modeldeploy::vision::classification::UltralyticsCls(model_path, _option);
+    const auto classification_model = new modeldeploy::vision::classification::Classification(model_path, _option);
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(classification_model->name().c_str());
     model->model_content = classification_model;
@@ -34,7 +34,7 @@ MDStatusCode md_set_classification_input_size(const MDModel* model, const MDSize
         MD_LOG_ERROR << "Model type is not classification!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+    const auto classification_model = static_cast<modeldeploy::vision::classification::Classification*>(model->
         model_content);
     classification_model->get_preprocessor().set_size({size.height, size.height});
     return MDStatusCode::Success;
@@ -46,7 +46,7 @@ MDStatusCode md_disable_classification_center_crop(const MDModel* model) {
         MD_LOG_ERROR << "Model type is not classification!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+    const auto classification_model = static_cast<modeldeploy::vision::classification::Classification*>(model->
         model_content);
     classification_model->get_preprocessor().disable_center_crop();
     return MDStatusCode::Success;
@@ -57,7 +57,7 @@ MDStatusCode md_set_classification_multi_label(const MDModel* model, int multi_l
         MD_LOG_ERROR << "Model type is not classification!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
-    const auto classification_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+    const auto classification_model = static_cast<modeldeploy::vision::classification::Classification*>(model->
         model_content);
     classification_model->get_postprocessor().set_multi_label(multi_label);
     return MDStatusCode::Success;
@@ -70,7 +70,7 @@ MDStatusCode md_classification_predict(const MDModel* model, MDImage* image, MDC
     }
     const auto image_data = md_image_to_image_data(image);
     modeldeploy::vision::ClassifyResult result;
-    const auto detection_model = static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->
+    const auto detection_model = static_cast<modeldeploy::vision::classification::Classification*>(model->
         model_content);
     if (const bool res_status = detection_model->predict(image_data, &result); !res_status) {
         return MDStatusCode::ModelPredictFailed;
@@ -109,7 +109,7 @@ void md_free_classification_result(MDClassificationResults* c_results) {
 
 void md_free_classification_model(MDModel* model) {
     if (model->model_content != nullptr) {
-        delete static_cast<modeldeploy::vision::classification::UltralyticsCls*>(model->model_content);
+        delete static_cast<modeldeploy::vision::classification::Classification*>(model->model_content);
         model->model_content = nullptr;
     }
     if (model->model_name != nullptr) {

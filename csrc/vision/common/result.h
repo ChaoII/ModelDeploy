@@ -117,4 +117,11 @@ namespace modeldeploy::vision {
         std::string car_plate_str;
         std::string car_plate_color;
     };
+
+    struct MODELDEPLOY_CXX_EXPORT AttributeResult {
+        Rect2f box;
+        int32_t box_label_id{};
+        float box_score{};
+        std::vector<float> attr_scores{};
+    };
 }

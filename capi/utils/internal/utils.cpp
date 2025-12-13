@@ -7,11 +7,10 @@
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "csrc/vision/utils.h"
-
-#include <csrc/core/md_log.h>
+#include "csrc/core/md_log.h"
 
 modeldeploy::ImageData md_image_to_image_data(const MDImage* image) {
-    cv::Mat cv_image = md_image_to_mat(image);
+    const cv::Mat cv_image = md_image_to_mat(image);
     return modeldeploy::ImageData::from_mat(&cv_image);
 }
 
@@ -190,7 +189,7 @@ void c_results_2_detection_results(
     std::vector<DetectionResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        Rect2f box = {
+        const Rect2f box = {
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
@@ -225,7 +224,7 @@ void c_results_2_obb_results(
     std::vector<ObbResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        RotatedRect rotated_box = {
+        const RotatedRect rotated_box = {
             c_results->data[i].rotated_box.xc,
             c_results->data[i].rotated_box.yc,
             c_results->data[i].rotated_box.width,
@@ -280,7 +279,7 @@ void c_results_2_iseg_results(
     std::vector<InstanceSegResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        Rect2f box = {
+        const Rect2f box = {
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
@@ -486,7 +485,7 @@ void c_results_2_lpr_results(
     const MDLPRResults* c_results, std::vector<LprResult>* results) {
     results->reserve(c_results->size);
     for (int i = 0; i < c_results->size; i++) {
-        auto box = Rect2f{
+        const auto box = Rect2f{
             static_cast<float>(c_results->data[i].box.x),
             static_cast<float>(c_results->data[i].box.y),
             static_cast<float>(c_results->data[i].box.width),
@@ -502,6 +501,47 @@ void c_results_2_lpr_results(
             box, landmarks, c_results->data[i].label_id, c_results->data[i].score,
             c_results->data[i].car_plate_str, c_results->data[i].car_plate_color
         });
+    }
+}
+
+// 注意此处需要成对的销毁 使用了new
+void attr_results_2_c_results(
+    const std::vector<AttributeResult>& results, MDAttributeResults* c_results) {
+    c_results->size = static_cast<int>(results.size());
+    c_results->data = new MDAttributeResult[c_results->size];
+    for (int i = 0; i < c_results->size; i++) {
+        auto [x, y, width, height] = results[i].box;
+        c_results->data[i].box = {
+            static_cast<int>(x),
+            static_cast<int>(y),
+            static_cast<int>(width),
+            static_cast<int>(height)
+        };
+        c_results->data[i].box_score = results[i].box_score;
+        c_results->data[i].box_label_id = results[i].box_label_id;
+        c_results->data[i].attr_scores_size = static_cast<int>(results[i].attr_scores.size());
+        c_results->data[i].attr_scores = new float[results[i].attr_scores.size()];
+        std::copy(results[i].attr_scores.begin(), results[i].attr_scores.end(),
+                  c_results->data[i].attr_scores);
+    }
+}
+
+void c_results_2_attr_results(
+    const MDAttributeResults* c_results, std::vector<AttributeResult>* results) {
+    results->reserve(c_results->size);
+    for (int i = 0; i < c_results->size; i++) {
+        const Rect2f box = {
+            static_cast<float>(c_results->data[i].box.x),
+            static_cast<float>(c_results->data[i].box.y),
+            static_cast<float>(c_results->data[i].box.width),
+            static_cast<float>(c_results->data[i].box.height),
+        };
+        const int box_label_id = c_results->data[i].box_label_id;
+        const float box_score = c_results->data[i].box_score;
+        float* attr_scores_ptr = c_results->data[i].attr_scores;
+        const int attr_scores_size = c_results->data[i].attr_scores_size;
+        const std::vector attr_scores(attr_scores_ptr, attr_scores_ptr + attr_scores_size);
+        results->push_back({box, box_label_id, box_score, attr_scores});
     }
 }
 

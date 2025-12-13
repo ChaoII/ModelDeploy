@@ -11,11 +11,11 @@
 namespace modeldeploy::vision::classification {
     /*! @brief Preprocessor object for YOLOv5Cls serials model.
     */
-    class MODELDEPLOY_CXX_EXPORT UltralyticsClsPreprocessor {
+    class MODELDEPLOY_CXX_EXPORT ClassificationPreprocessor {
     public:
         /** \brief Create a preprocessor instance for YOLOv5Cls serials model
         */
-        UltralyticsClsPreprocessor();
+        ClassificationPreprocessor();
 
         /** \brief Process the input image and prepare input tensors for runtime
        *

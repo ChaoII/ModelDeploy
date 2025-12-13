@@ -227,14 +227,7 @@ namespace ModelDeploy
         public int Channels { get; set; }
 
         public MDImage RawImage;
-
-        public void Update()
-        {
-            Width = RawImage.width;
-            Height = RawImage.height;
-            Channels = RawImage.channels;
-        }
-
+        
         public static Image Read(string imagePath)
         {
             var nativeImage = md_read_image(imagePath) ;

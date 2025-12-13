@@ -60,7 +60,7 @@ MODELDEPLOY_CAPI_EXPORT void md_draw_keypoint_result(
     int keypoint_radius,
     double alpha,
     int save_result,
-    int draw_lines);
+    int draw_lines = 0);
 
 /// 释放检测结果
 /// @param c_results 由md_pose_predict生成的检测结果

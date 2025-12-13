@@ -16,6 +16,7 @@ enum MDModelType {
     OCR,
     FACE,
     LPR,
+    PIPELINE,
     ASR,
     TTS
 };
@@ -249,6 +250,18 @@ typedef struct {
     int size;
 } MDLPRResults;
 
+typedef struct {
+    MDRect box;
+    int box_label_id;
+    float box_score;
+    float* attr_scores;
+    int attr_scores_size;
+} MDAttributeResult;
+
+typedef struct {
+    MDAttributeResult* data;
+    int size;
+} MDAttributeResults;
 
 typedef struct {
     float* embedding;
