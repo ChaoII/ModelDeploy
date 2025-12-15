@@ -72,7 +72,7 @@ namespace ModelDeploy.vision.pipeline
         }
 
 
-        public void DrawDetectionResult(Image image, List<AttributeResult> results,
+        public void DrawAttributeResult(Image image, List<AttributeResult> results,
             double threshold, string fontPath, int fontSize = 12, double alpha = 0.5, bool saveResult = false)
         {
             var cResults = AttributeResult.ToNativeArray(results);

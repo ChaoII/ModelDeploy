@@ -5,7 +5,6 @@
 
 #include <cstring>
 #include <fstream>
-#include <unordered_map>
 #include <tabulate/tabulate.hpp>
 #include "NvInferRuntime.h"
 #include "utils/utils.h"

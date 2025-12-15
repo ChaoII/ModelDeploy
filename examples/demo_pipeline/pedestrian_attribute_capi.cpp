@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     option.device = MD_DEVICE_GPU;
     option.enable_trt = 1;
     option.enable_fp16 = 1;
-    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/cc.onnx",
+    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/zhgd_det.onnx",
                                     "../../test_data/test_models/zhgd_ml.onnx", &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;

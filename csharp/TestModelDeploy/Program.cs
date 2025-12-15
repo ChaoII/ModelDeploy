@@ -11,6 +11,7 @@ using ModelDeploy.vision.lpr;
 using ModelDeploy.vision.obb;
 using ModelDeploy.vision.ocr;
 using ModelDeploy.vision.pose;
+using ModelDeploy.vision.pipeline;
 
 namespace TestModelDeploy;
 
@@ -70,7 +71,7 @@ static class Program
         {
             Backend = Backend.ORT,
             Device = Device.GPU,
-            EnableTrt = true,
+            EnableTrt = false,
             EnableFp16 = true,
             TrtEngineCachePath = "trt_engine",
             TrtMinShape = "images:1x3x640x640",
@@ -363,6 +364,25 @@ static class Program
         Console.WriteLine(results.TableHtml);
     }
 
+    static void TestPedestrianAttribute()
+    {
+        RuntimeOption option = new RuntimeOption();
+        Image image = Image.Read("F:/zhgd/Detection/images/train/IMG_20251204_102951.jpg");
+        var detModelPath = Path.Combine(TestDataPath, "test_models/cc.onnx");
+        var clsModelPath = Path.Combine(TestDataPath, "test_models/zhgd_ml.onnx");
+        PedestrianAttribute pedestrianAttribute = new PedestrianAttribute(detModelPath, clsModelPath, option);
+        pedestrianAttribute.SetDetInputSize(1280, 1280);
+        pedestrianAttribute.SetClsInputSize(192, 256);
+        pedestrianAttribute.SetClsBatchSize(8);
+        pedestrianAttribute.SetDetThreshold(0.5f);
+        List<AttributeResult> results = pedestrianAttribute.Predict(image);
+        pedestrianAttribute.DrawAttributeResult(image, results, 0.6,
+            Path.Combine(TestDataPath, "msyh.ttc"), 14, 0.1, true);
+        image.Show();
+        pedestrianAttribute.Display(results);
+    }
+
+
     static void TestStructureTable()
     {
         MDStructureTableModelParameters parameters = new MDStructureTableModelParameters
@@ -404,7 +424,7 @@ static class Program
 
     static void Main(string[] args)
     {
-        TestClassification();
+        // TestClassification();
         // TestFace();
         // TestLpr();
         // TestSenseVoice();
@@ -418,6 +438,7 @@ static class Program
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();
+        TestPedestrianAttribute();
         // 测试GC
         GC.Collect();
         GC.WaitForPendingFinalizers();
