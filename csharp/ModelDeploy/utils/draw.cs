@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.utils
@@ -13,7 +12,6 @@ namespace ModelDeploy.utils
         {
             var cRect = rect.ToNative();
             md_draw_text(ref image.RawImage, ref cRect, text, fontPath, fontSize, color.ToNative(), alpha);
-            image.Update();
         }
 
         /// <summary>
@@ -22,7 +20,6 @@ namespace ModelDeploy.utils
         public static void DrawRect(Image image, Rect rect, Color color, double alpha)
         {
             md_draw_rect(ref image.RawImage, rect.ToNative(), color.ToNative(), alpha);
-            image.Update();
         }
 
         /// <summary>
@@ -37,10 +34,8 @@ namespace ModelDeploy.utils
             }
             finally
             {
-                
                 Marshal.FreeHGlobal(cPolygon.data); // 保证内存释放
             }
-            image.Update();
         }
 
         #region DllImports

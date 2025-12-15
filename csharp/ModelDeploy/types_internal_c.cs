@@ -279,7 +279,7 @@ namespace ModelDeploy
         }
         
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDAttrResult
+        public struct MDAttributeResult
         {
             public MDRect box;
             public int box_label_id;
@@ -289,7 +289,7 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct MDAttrResults
+        public struct MDAttributeResults
         {
             public IntPtr data;
             public int size;

@@ -6,84 +6,84 @@ using ModelDeploy.utils;
 
 namespace ModelDeploy.vision.pipeline
 {
-    public sealed class  PedestrianAttribute: IDisposable
+    public sealed class PedestrianAttribute : IDisposable
     {
         private MDModel _model;
         private bool _disposed;
 
-        public PedestrianAttribute(string detModelOath,string clsModelPath, RuntimeOption option)
+        public PedestrianAttribute(string detModelPath, string clsModelPath, RuntimeOption option)
         {
             _model = new MDModel();
             var nativeRuntimeOption = option.ToNative();
-            Utils.Check(md_create_detection_model(ref _model, modelDir, ref nativeRuntimeOption),
+            Utils.Check(md_create_attr_model(ref _model, detModelPath,clsModelPath, ref nativeRuntimeOption),
                 "Create PedestrianAttribute model");
         }
 
         public void SetDetInputSize(int width, int height)
         {
             var size = new MDSize { width = width, height = height };
-            Utils.Check(md_set_detection_input_size(ref _model, size), "Set detection input size");
+            Utils.Check(md_set_attr_det_input_size(ref _model, size), "Set detection input size");
         }
+
         public void SetClsInputSize(int width, int height)
         {
             var size = new MDSize { width = width, height = height };
-            Utils.Check(md_set_detection_input_size(ref _model, size), "Set detection input size");
+            Utils.Check(md_set_attr_cls_input_size(ref _model, size), "Set cls input size");
         }
-        
+
         public void SetClsBatchSize(int batchSize)
         {
-            Utils.Check(md_set_detection_input_size(ref _model, size), "Set detection input size");
+            Utils.Check(md_set_attr_cls_batch_size(ref _model, batchSize), "Set cls batch size");
         }
-        
-                
+
+
         public void SetDetThreshold(float threshold)
         {
-            Utils.Check(md_set_detection_input_size(ref _model, size), "Set detection input size");
+            Utils.Check(md_set_attr_det_threshold(ref _model, threshold), "Set det threshold");
         }
-        
-        
 
-        public List<DetectionResult> Predict(Image image)
+
+        public List<AttributeResult> Predict(Image image)
         {
-            var cResults = new MDDetectionResults();
-            Utils.Check(md_detection_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
+            var cResults = new MDAttributeResults();
+            Utils.Check(md_attr_model_predict(ref _model, ref image.RawImage, ref cResults), "Detection predict");
             try
             {
-                return new List<DetectionResult>(DetectionResult.FromNativeArray(cResults));
+                return new List<AttributeResult>(AttributeResult.FromNativeArray(cResults));
             }
             finally
             {
-                md_free_detection_result(ref cResults);
+                md_free_attr_result(ref cResults);
             }
         }
 
 
-        public void Display(List<DetectionResult> results)
+        public void Display(List<AttributeResult> results)
         {
-            var cResults = DetectionResult.ToNativeArray(results);
+            var cResults = AttributeResult.ToNativeArray(results);
             try
             {
-                md_print_detection_result(ref cResults);
+                md_print_attr_result(ref cResults);
             }
             finally
             {
-                md_free_detection_result(ref cResults);
+                md_free_attr_result(ref cResults);
             }
         }
 
 
-        public void DrawDetectionResult(Image image, List<DetectionResult> results,
+        public void DrawDetectionResult(Image image, List<AttributeResult> results,
             double threshold, string fontPath, int fontSize = 12, double alpha = 0.5, bool saveResult = false)
         {
-            var cResults = DetectionResult.ToNativeArray(results);
+            var cResults = AttributeResult.ToNativeArray(results);
             try
             {
-                md_draw_detection_result(ref image.RawImage, ref cResults,
+                md_draw_attr_result(ref image.RawImage, ref cResults,
                     threshold, fontPath, fontSize, alpha, saveResult);
             }
             finally
             {
-                md_free_detection_result(ref cResults);
+                md_free_attr_result(ref cResults);
             }
         }
 
@@ -91,39 +91,49 @@ namespace ModelDeploy.vision.pipeline
         {
             if (!_disposed)
             {
-                md_free_detection_model(ref _model);
+                md_free_attr_model(ref _model);
                 _disposed = true;
                 GC.SuppressFinalize(this);
             }
         }
 
-        ~UltralyticsDet() => Dispose();
+        ~PedestrianAttribute() => Dispose();
 
         #region Native bindings
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_detection_model(ref MDModel model, string modelDir,
-            ref MDRuntimeOption option);
+        private static extern int md_create_attr_model(
+            ref MDModel model, string detModelPath, string clsModelPath, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_detection_input_size(ref MDModel model, MDSize size);
+        private static extern int md_set_attr_det_input_size(ref MDModel model, MDSize size);
+        
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_set_attr_cls_input_size(ref MDModel model, MDSize size);
+        
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_set_attr_cls_batch_size(ref MDModel model, int batchSize);
+        
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_set_attr_det_threshold(ref MDModel model, float threshold);
+        
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_detection_predict(ref MDModel model, ref MDImage image,
-            ref MDDetectionResults results);
+        private static extern int md_attr_model_predict(ref MDModel model, ref MDImage image,
+            ref MDAttributeResults results);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_detection_result(ref MDDetectionResults cResults);
+        private static extern void md_print_attr_result(ref MDAttributeResults cResults);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_detection_result(ref MDImage image, ref MDDetectionResults result,
+        private static extern void md_draw_attr_result(ref MDImage image, ref MDAttributeResults result,
             double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_detection_result(ref MDDetectionResults results);
+        private static extern void md_free_attr_result(ref MDAttributeResults results);
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_detection_model(ref MDModel model);
+        private static extern void md_free_attr_model(ref MDModel model);
 
         #endregion
     }
