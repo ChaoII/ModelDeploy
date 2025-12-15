@@ -39,6 +39,7 @@ namespace modeldeploy {
         }
         else {
             const std::filesystem::path path(model_path);
+            // todo 此处的告警需要优化，因为不一定从后缀判断推理引擎，有可能是用户输错了
             if (path.has_extension()) {
                 if (path.extension() == ".onnx") {
                     use_ort_backend();

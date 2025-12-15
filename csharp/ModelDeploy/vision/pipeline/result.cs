@@ -32,6 +32,7 @@ namespace ModelDeploy.vision.pipeline
             cResult.box = result.Box.ToNative();
             cResult.box_label_id = result.BoxLabelId;
             cResult.box_score = result.BoxScore;
+            cResult.attr_scores_size = result.AttrScores.Count;
             // 此处手动开辟内存会在C语言中释放
             cResult.attr_scores = Marshal.AllocHGlobal(cResult.attr_scores_size * sizeof(float));
             Marshal.Copy(result.AttrScores.ToArray(), 0, cResult.attr_scores, cResult.attr_scores_size);
