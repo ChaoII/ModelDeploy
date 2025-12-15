@@ -98,7 +98,6 @@ namespace ModelDeploy.utils
         public Device Device { get; set; } = Device.CPU;
         public Backend Backend { get; set; } = Backend.ORT;
         public int GraphOptLevel { get; set; } = -1;
-
         public string Password { get; set; } = "";
 
         public MDRuntimeOption ToNative()
