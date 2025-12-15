@@ -56,6 +56,27 @@ MDImage md_from_rgb24_data_to_bgr24(const unsigned char* data, const int width, 
     return *mat_to_md_image(img_bgr);
 }
 
+MDImage md_from_yuv420p_data_to_bgr24(const unsigned char* data, const int width, int height) {
+    const auto img_yuv = cv::Mat(height * 3 / 2, width, CV_8UC1, const_cast<unsigned char*>(data));
+    cv::Mat img_bgr;
+    cv::cvtColor(img_yuv, img_bgr, cv::COLOR_YUV2BGR_I420);
+    return *mat_to_md_image(img_bgr);
+}
+
+MDImage md_from_nv12_data_to_bgr24(const unsigned char* data, const int width, const int height) {
+    const auto img_yuv_nv12 = cv::Mat(height * 3 / 2, width, CV_8UC1, const_cast<unsigned char*>(data));
+    cv::Mat img_bgr;
+    cv::cvtColor(img_yuv_nv12, img_bgr, cv::COLOR_YUV2BGR_NV12);
+    return *mat_to_md_image(img_bgr);
+}
+
+MDImage md_from_nv21_data_to_bgr24(const unsigned char* data, const int width, const int height) {
+    const auto img_yuv_nv21 = cv::Mat(height * 3 / 2, width, CV_8UC1, const_cast<unsigned char*>(data));
+    cv::Mat img_bgr;
+    cv::cvtColor(img_yuv_nv21, img_bgr, cv::COLOR_YUV2BGR_NV21);
+    return *mat_to_md_image(img_bgr);
+}
+
 
 MDImage md_from_base64_str(const char* base64_str) {
     const std::vector buffer = modeldeploy::base64_decode(base64_str);
@@ -75,7 +96,8 @@ MDImage md_read_image(const char* path) {
     return *mat_to_md_image(image);
 }
 
-MDImage md_read_image_from_device(int device_id, const int frame_width, const int frame_height, const bool is_save_file) {
+MDImage md_read_image_from_device(int device_id, const int frame_width, const int frame_height,
+                                  const bool is_save_file) {
 #ifdef _WIN32
     cv::VideoCapture cap(device_id, cv::CAP_DSHOW);
 #else

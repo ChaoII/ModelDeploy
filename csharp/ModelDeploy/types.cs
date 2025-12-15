@@ -227,10 +227,10 @@ namespace ModelDeploy
         public int Channels { get; set; }
 
         public MDImage RawImage;
-        
+
         public static Image Read(string imagePath)
         {
-            var nativeImage = md_read_image(imagePath) ;
+            var nativeImage = md_read_image(imagePath);
             var image = new Image
             {
                 Width = nativeImage.width,
@@ -283,6 +283,46 @@ namespace ModelDeploy
         public static Image FromRgb24DataToBgr24(byte[] data, int width, int height)
         {
             var nativeImage = md_from_rgb24_data_to_bgr24(data, width, height);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
+            return image;
+        }
+
+
+        public static Image FromYuv420PDataToBgr24(byte[] data, int width, int height)
+        {
+            var nativeImage = md_from_yuv420p_data_to_bgr24(data, width, height);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
+            return image;
+        }
+
+        public static Image FromNv12DataToBgr24(byte[] data, int width, int height)
+        {
+            var nativeImage = md_from_nv12_data_to_bgr24(data, width, height);
+            var image = new Image
+            {
+                Width = nativeImage.width,
+                Height = nativeImage.height,
+                Channels = nativeImage.channels,
+                RawImage = nativeImage
+            };
+            return image;
+        }
+
+        public static Image FromNv21DataToBgr24(byte[] data, int width, int height)
+        {
+            var nativeImage = md_from_nv21_data_to_bgr24(data, width, height);
             var image = new Image
             {
                 Width = nativeImage.width,
@@ -353,6 +393,16 @@ namespace ModelDeploy
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_from_rgb24_data_to_bgr24(byte[] data, int width, int height);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_yuv420p_data_to_bgr24(byte[] data, int width, int height);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_nv12_data_to_bgr24(byte[] data, int width, int height);
+
+        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDImage md_from_nv21_data_to_bgr24(byte[] data, int width, int height);
+
 
         [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_from_base64_str(string base64String);

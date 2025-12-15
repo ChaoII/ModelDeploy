@@ -57,6 +57,26 @@ MODELDEPLOY_CAPI_EXPORT MDImage md_from_rgb24_data(const unsigned char* data, in
 /// @return MDImage
 MODELDEPLOY_CAPI_EXPORT MDImage md_from_rgb24_data_to_bgr24(const unsigned char* data, int width, int height);
 
+///  从YUV420P数据转换为BGR24数据
+/// @param data yuv420p数据
+/// @param width 宽度
+/// @param height 高度
+/// @return MDImage
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_yuv420p_data_to_bgr24(const unsigned char* data, int width, int height);
+
+///  从NV12数据转换为BGR24数据
+/// @param data nv12数据
+/// @param width 宽度
+/// @param height 高度
+/// @return  MDImage
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_nv12_data_to_bgr24(const unsigned char* data, int width, int height);
+
+///  从NV21数据转换为BGR24数据
+/// @param data nv21数据
+/// @param width 宽度
+/// @param height 高度
+/// @return MDImage
+MODELDEPLOY_CAPI_EXPORT MDImage md_from_nv21_data_to_bgr24(const unsigned char* data, int width, int height);
 
 
 ///  从base64编码的字符串生成一个MDImage对象（注意需要手动释放MDImage）。
