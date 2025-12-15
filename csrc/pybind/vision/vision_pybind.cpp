@@ -30,7 +30,7 @@ namespace modeldeploy::vision {
     void bind_ocr_layout(const pybind11::module&);
     void bind_ocr_table(const pybind11::module&);
     void bind_table_pipeline(const pybind11::module&);
-    void bind_attr(const pybind11::module&);
+    void bind_attr_pipeline(const pybind11::module&);
 
 
 
@@ -59,6 +59,6 @@ namespace modeldeploy::vision {
         bind_ocr_layout(m);
         bind_ocr_table(m);
         bind_table_pipeline(m);
-        bind_attr(m);
+        bind_attr_pipeline(m);
     }
 }
