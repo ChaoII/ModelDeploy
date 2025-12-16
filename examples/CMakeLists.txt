@@ -7,6 +7,7 @@ add_subdirectory(demo_kps)
 add_subdirectory(demo_iseg)
 add_subdirectory(demo_face)
 add_subdirectory(demo_lpr)
+
 add_subdirectory(demo_audio)
 add_subdirectory(demo_pipeline)
 add_subdirectory(tools)

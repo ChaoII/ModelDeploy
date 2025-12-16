@@ -16,7 +16,7 @@ int main() {
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
         "../../test_data/test_models/zhgd_det.engine",
         "../../test_data/test_models/zhgd_ml.engine", option);
-    auto img = modeldeploy::ImageData::imread("F:/zhgd/Detection/images/train/IMG_20251204_102951.jpg");
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
     pedestrian_attribute.set_cls_batch_size(8);
     pedestrian_attribute.set_det_input_size({1280, 1280});
     pedestrian_attribute.set_det_threshold(0.5);
