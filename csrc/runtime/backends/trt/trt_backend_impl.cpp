@@ -40,15 +40,15 @@ namespace modeldeploy {
     bool TrtBackendImpl::load_trt_cache(const std::string& engine_buffer) {
         cudaSetDevice(option_.gpu_id);
 
-        const std::unique_ptr<nvinfer1::IRuntime> runtime{
+        runtime_ = std::unique_ptr<nvinfer1::IRuntime>(
             nvinfer1::createInferRuntime(*MDTrtLogger::get())
-        };
-        if (!runtime) {
+        );
+        if (!runtime_) {
             MD_LOG_ERROR << "Failed to call createInferRuntime()." << std::endl;
             return false;
         }
         engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(
-            runtime->deserializeCudaEngine(engine_buffer.data(), engine_buffer.size()),
+            runtime_->deserializeCudaEngine(engine_buffer.data(), engine_buffer.size()),
             InferDeleter());
         if (!engine_) {
             MD_LOG_ERROR << "Failed to call deserializeCudaEngine()." << std::endl;
@@ -100,7 +100,6 @@ namespace modeldeploy {
             return false;
         }
         constexpr uint32_t flags =
-            1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH) |
             1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kSTRONGLY_TYPED);
 
         builder_ = std::unique_ptr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(*MDTrtLogger::get()));
