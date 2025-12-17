@@ -7,12 +7,46 @@
 #include "capi/common/md_micro.h"
 #include "capi/utils/internal/utils.h"
 #include "csrc/vision/utils.h"
+
+#include <capi/utils/md_utils_capi.h>
+
 #include "csrc/core/md_log.h"
 
 modeldeploy::ImageData md_image_to_image_data(const MDImage* image) {
     const cv::Mat cv_image = md_image_to_mat(image);
     return modeldeploy::ImageData::from_mat(&cv_image);
 }
+
+std::unordered_map<int, std::string> md_map_to_map(MDMapData* c_map) {
+    if (!c_map) {
+        return {};
+    }
+    std::unordered_map<int, std::string> map;
+    for (int i = 0; i < c_map->size; i++) {
+        map[c_map->data[i].key] = c_map->data[i].value;
+    }
+    return map;
+}
+
+MDMapData map_to_md_map(const std::unordered_map<int, std::string>& map) {
+    if (map.empty()) {
+        return {};
+    }
+    // 分配 MDMapData 结构体
+    MDMapData new_map_data;
+    new_map_data.size = static_cast<int>(map.size());
+    // 分配 KeyValuePair 数组
+    new_map_data.data = static_cast<MDKeyValuePair*>(malloc(sizeof(MDKeyValuePair) * map.size()));
+    int idx = 0;
+    for (const auto& kvp : map) {
+        // 设置key
+        const auto md_kvp = md_create_key_value_pair(kvp.first, kvp.second.c_str());
+        new_map_data.data[idx] = md_kvp;
+        idx++;
+    }
+    return new_map_data;
+}
+
 
 cv::Mat md_image_to_mat(const MDImage* image) {
     if (!image) {

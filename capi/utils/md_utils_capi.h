@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+MODELDEPLOY_CAPI_EXPORT MDKeyValuePair md_create_key_value_pair(int key, const char* value);
+
+MODELDEPLOY_CAPI_EXPORT void md_free_md_map(MDMapData* c_map);
+
 /// 打印位置信息
 /// \param rect
 MODELDEPLOY_CAPI_EXPORT void md_print_rect(const MDRect* rect);
@@ -26,9 +30,9 @@ MODELDEPLOY_CAPI_EXPORT bool md_get_button_enable_status(const MDImage* image, i
 /// @return
 MODELDEPLOY_CAPI_EXPORT MDPolygon* md_create_polygon_from_rect(const MDRect* rect);
 
-    /// 将MDRect转化为MDPolygon多边形
-    /// @param polygon MDPolygon
-    /// @return
+/// 将MDRect转化为MDPolygon多边形
+/// @param polygon MDPolygon
+/// @return
 MODELDEPLOY_CAPI_EXPORT MDRect md_create_rect_from_polygon(const MDPolygon* polygon);
 
 

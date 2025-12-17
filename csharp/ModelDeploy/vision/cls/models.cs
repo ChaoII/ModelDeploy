@@ -80,30 +80,30 @@ namespace ModelDeploy.vision.classification
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_classification_model(ref MDModel model, string modelPath,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_classification_input_size(ref MDModel model, MDSize size);
         
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_disable_classification_center_crop(ref MDModel model);
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_classification_multi_label(ref MDModel model, int isMutiLabel);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_classification_predict(ref MDModel model, ref MDImage image,
             ref MDClassificationResults results);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_classification_result(ref MDImage image, ref MDClassificationResults result,
             int topK, float scoreThreshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_classification_result(ref MDClassificationResults results);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_classification_model(ref MDModel model);
 
         #endregion

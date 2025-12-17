@@ -26,6 +26,17 @@ namespace ModelDeploy.utils
             return unmanagedPtr;
         }
 
+        public static MDMapData DictoryToMDMapData()
+        {
+            return new MDMapData
+            {
+                size = 0,
+                data = IntPtr.Zero
+            };
+            
+            
+        }
+
         /// <summary>
         /// 从 UTF-8 非托管指针转换为托管字符串。
         /// </summary>
@@ -60,7 +71,7 @@ namespace ModelDeploy.utils
             return md_get_button_enable_status(ref image.RawImage, pixThreshold, rateThreshold);
         }
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern bool md_get_button_enable_status(ref MDImage image, int pixThreshold,
             double rateThreshold);
     }

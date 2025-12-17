@@ -62,24 +62,24 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_face_det_model(ref MDModel model, string modelPath,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_det_predict(ref MDModel model, ref MDImage image,
             ref MDKeyPointResults cResults);
 
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_face_det_result(ref MDImage image,
             ref MDKeyPointResults cResults, string fontPath, int fontSize,
             int landmarkRadius, double alpha, bool saveResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_det_result(ref MDKeyPointResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_det_model(ref MDModel model);
 
         #endregion
@@ -139,21 +139,21 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_face_rec_model(ref MDModel model, string modelPath,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_rec_predict(ref MDModel model, ref MDImage image,
             ref MDFaceRecognizerResult cResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_print_face_rec_result(ref MDFaceRecognizerResult cResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_rec_result(ref MDFaceRecognizerResult cResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_rec_model(ref MDModel model);
 
         #endregion
@@ -195,15 +195,15 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_face_age_model(ref MDModel model, string modelPath,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_age_predict(ref MDModel model, ref MDImage image,
             ref int cResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_age_model(ref MDModel model);
 
         #endregion
@@ -250,15 +250,15 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_face_gender_model(ref MDModel model, string modelPath,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_gender_predict(ref MDModel model, ref MDImage image,
             ref int cResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_gender_model(ref MDModel model);
 
         #endregion
@@ -300,14 +300,14 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_face_as_first_model(ref MDModel model, string modelPath,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_as_first_predict(ref MDModel model, ref MDImage image, ref float cResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_first_model(ref MDModel model);
 
         #endregion
@@ -356,18 +356,18 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_create_face_as_second_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_as_second_predict(ref MDModel model, ref MDImage image,
             ref MDFaceAsSecondResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_second_result(ref MDFaceAsSecondResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_second_model(ref MDModel model);
 
         #endregion
@@ -425,19 +425,19 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_create_face_as_pipeline_model(ref MDModel model, string faceDetModelFile, string firstModelFile,
                 string secondModelFile, ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_as_pipeline_predict(ref MDModel model, ref MDImage image,
             ref MDFaceAsResults cResults, float fuseThreshold = 0.8f, float clarityThreshold = 0.3f);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_pipeline_result(ref MDFaceAsResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_pipeline_model(ref MDModel model);
 
         #endregion
@@ -495,23 +495,23 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int
             md_create_face_rec_pipeline_model(ref MDModel model, string faceDetModelFile, string faceRecModelFile,
                 ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_face_rec_pipeline_predict(ref MDModel model, ref MDImage image,
             ref MDFaceRecognizerResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_print_face_rec_pipeline_result(ref MDFaceRecognizerResults cResults);
 
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_rec_pipeline_result(ref MDFaceRecognizerResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_rec_pipeline_model(ref MDModel model);
 
         #endregion

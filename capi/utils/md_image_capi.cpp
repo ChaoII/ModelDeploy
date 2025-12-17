@@ -39,6 +39,35 @@ MDImage md_from_compressed_bytes(const unsigned char* bytes, const int size) {
     return *mat_to_md_image(img_decompressed);
 }
 
+MDImage md_to_compressed_bytes(MDImage* image, const char* ext) {
+    std::vector<unsigned char> buffer;
+    cv::Mat mat = md_image_to_mat(image);
+    if (mat.empty()) {
+        return {};
+    }
+    // 压缩图像
+    std::vector<int> params;
+    if (strcmp(ext, ".jpg") == 0) {
+        params = {cv::IMWRITE_JPEG_QUALITY, 95};
+    }
+    else if (strcmp(ext, ".png") == 0) {
+        params = {cv::IMWRITE_PNG_COMPRESSION, 3};
+    }
+
+    bool success = cv::imencode(ext, mat, buffer, params);
+    if (!success) {
+        return {};
+    }
+    MDImage new_image;
+    new_image.width = image->width;
+    new_image.height = image->height;
+    new_image.channels = image->channels;
+    new_image.data = static_cast<unsigned char*>(malloc(buffer.size()));
+    std::memcpy(new_image.data, image->data, buffer.size());
+    return new_image;
+}
+
+
 MDImage md_from_bgr24_data(const unsigned char* data, const int width, const int height) {
     const auto img_bgr = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
     return *mat_to_md_image(img_bgr);

@@ -78,8 +78,8 @@ namespace modeldeploy::vision::detection {
                 // 重新赋值到 box
                 box.x = std::roundf(x1);
                 box.y = std::roundf(y1);
-                box.width = std::roundf(x2 - x1);
-                box.height = std::roundf(y2 - y1);
+                box.width = std::roundf(x2 - x1 - 0.5f);
+                box.height = std::roundf(y2 - y1 - 0.5f);
             }
             (*results)[bs] = std::move(_results);
         }
@@ -148,8 +148,8 @@ namespace modeldeploy::vision::detection {
                 // 重新赋值到 box
                 box.x = std::roundf(x1);
                 box.y = std::roundf(y1);
-                box.width = std::roundf(x2 - x1);
-                box.height = std::roundf(y2 - y1);
+                box.width = std::roundf(x2 - x1 - 0.5f);
+                box.height = std::roundf(y2 - y1 - 0.5f);
             }
             (*results)[bs] = std::move(_results);
         }

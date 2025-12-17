@@ -33,6 +33,16 @@ enum MDStatusCode {
     WriteWaveFailed
 };
 
+typedef struct MDKeyValuePair {
+    int key;
+    char* value;
+} MDKeyValuePair;
+
+typedef struct MDMapData {
+    int size;
+    MDKeyValuePair* data;
+} MDMapData;
+
 typedef struct {
     char* model_name;
     MDModelType type;

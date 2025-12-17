@@ -21,37 +21,44 @@ __global__ void kernel_yolo_preproc(
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= dst_w || y >= dst_h) return;
 
-    // 计算缩放比例和padding
-    const float scale = fminf(float(dst_h) / src_h, float(dst_w) / src_w);
-    const int new_h = int(src_h * scale + 0.5f);
-    const int new_w = int(src_w * scale + 0.5f);
-    const int pad_h = (dst_h - new_h) / 2;
-    const int pad_w = (dst_w - new_w) / 2;
+    // 使用共享内存缓存计算结果，避免重复计算
+    __shared__ float shared_scale, shared_pad_h, shared_pad_w;
 
-    // 写缩放信息（一个线程即可）
-    if (x == 0 && y == 0) {
-        *scale_out = scale;
-        *pad_h_out = float(pad_h);
-        *pad_w_out = float(pad_w);
+    // 第一个线程计算共享参数
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+        shared_scale = fminf(float(dst_h) / src_h, float(dst_w) / src_w);
+        const int new_h = int(src_h * shared_scale + 0.5f);
+        const int new_w = int(src_w * shared_scale + 0.5f);
+        shared_pad_h = (dst_h - new_h) * 0.5f;
+        shared_pad_w = (dst_w - new_w) * 0.5f;
+
+        *scale_out = shared_scale;
+        *pad_h_out = shared_pad_h;
+        *pad_w_out = shared_pad_w;
     }
+    __syncthreads();
 
-    // 目标坐标 → 源坐标
-    const int src_y = (y - pad_h) * src_h / new_h;
-    const int src_x = (x - pad_w) * src_w / new_w;
+    // 目标坐标 → 源坐标，使用共享变量
+    const int src_y = int((y - shared_pad_h) * src_h / (src_h * shared_scale));
+    const int src_x = int((x - shared_pad_w) * src_w / (src_w * shared_scale));
+
+    const int dst_idx = y * dst_w + x;
 
     if (src_y < 0 || src_y >= src_h || src_x < 0 || src_x >= src_w) {
-        for (int c = 0; c < 3; ++c) {
-            dst[c * dst_h * dst_w + y * dst_w + x] = (pad_value - mean[c]) * std[c];
-        }
+        // padding: 一次性计算所有通道，减少循环开销
+        dst[dst_idx] = (pad_value - mean[0]) * std[0];
+        dst[dst_h * dst_w + dst_idx] = (pad_value - mean[1]) * std[1];
+        dst[2 * dst_h * dst_w + dst_idx] = (pad_value - mean[2]) * std[2];
     }
     else {
         const int src_idx = src_y * src_step + src_x * 3;
         const float b = src[src_idx + 0];
         const float g = src[src_idx + 1];
         const float r = src[src_idx + 2];
-        dst[0 * dst_h * dst_w + y * dst_w + x] = (r - mean[0]) * std[0];
-        dst[1 * dst_h * dst_w + y * dst_w + x] = (g - mean[1]) * std[1];
-        dst[2 * dst_h * dst_w + y * dst_w + x] = (b - mean[2]) * std[2];
+        // 使用预计算的索引，减少重复计算
+        dst[dst_idx] = (r - mean[0]) * std[0];
+        dst[dst_h * dst_w + dst_idx] = (g - mean[1]) * std[1];
+        dst[2 * dst_h * dst_w + dst_idx] = (b - mean[2]) * std[2];
     }
 }
 
@@ -61,7 +68,8 @@ cudaError_t yolo_preproc(
     const float mean[3], const float std[3],
     const float pad_value,
     modeldeploy::vision::LetterBoxRecord* info_out) {
-    dim3 block(32, 32);
+    // 使用更优的线程块配置
+    dim3 block(16, 16); // 减少warp分歧，提高占用率
     dim3 grid((dst_w + block.x - 1) / block.x,
               (dst_h + block.y - 1) / block.y);
 
@@ -69,9 +77,11 @@ cudaError_t yolo_preproc(
     uint8_t* d_src = nullptr;
     bool need_copy = true;
 
+    // 优化指针属性检查
     cudaPointerAttributes attr{};
-    if (cudaPointerGetAttributes(&attr, src) == cudaSuccess) {
-        if (attr.type == cudaMemoryTypeDevice) need_copy = false;
+    if (cudaSuccess == cudaPointerGetAttributes(&attr, src) &&
+        attr.type == cudaMemoryTypeDevice) {
+        need_copy = false;
     }
 
     if (need_copy) {
@@ -82,30 +92,37 @@ cudaError_t yolo_preproc(
         d_src = const_cast<uint8_t*>(src);
     }
 
-    // 分配辅助参数内存
-    float *d_mean, *d_std, *d_scale, *d_pad_w, *d_pad_h;
-    cudaMalloc(&d_mean, 3 * sizeof(float));
-    cudaMalloc(&d_std, 3 * sizeof(float));
+    // 使用栈分配小内存，减少malloc调用
+    float mean_std[6];
+    for (int i = 0; i < 3; ++i) {
+        mean_std[i] = mean[i];
+        mean_std[i + 3] = std[i];
+    }
+
+    float* d_mean_std;
+    cudaMalloc(&d_mean_std, 6 * sizeof(float));
+    cudaMemcpyAsync(d_mean_std, mean_std, sizeof(float) * 6, cudaMemcpyHostToDevice, stream);
+
+    float *d_scale, *d_pad_w, *d_pad_h;
     cudaMalloc(&d_scale, sizeof(float));
     cudaMalloc(&d_pad_w, sizeof(float));
     cudaMalloc(&d_pad_h, sizeof(float));
 
-    cudaMemcpyAsync(d_mean, mean, sizeof(float) * 3, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyAsync(d_std, std, sizeof(float) * 3, cudaMemcpyHostToDevice, stream);
-
     kernel_yolo_preproc<<<grid, block, 0, stream>>>(
         d_src, src_h, src_w, src_w * 3,
-        dst, dst_h, dst_w, d_mean, d_std, pad_value,
+        dst, dst_h, dst_w, d_mean_std, d_mean_std + 3, pad_value,
         d_scale, d_pad_w, d_pad_h);
 
-    // 拷贝 letterbox 信息
+    // 异步拷贝 letterbox 信息，减少同步等待
     float scale, pad_w, pad_h;
     cudaMemcpyAsync(&scale, d_scale, sizeof(float), cudaMemcpyDeviceToHost, stream);
     cudaMemcpyAsync(&pad_w, d_pad_w, sizeof(float), cudaMemcpyDeviceToHost, stream);
     cudaMemcpyAsync(&pad_h, d_pad_h, sizeof(float), cudaMemcpyDeviceToHost, stream);
 
-    // 等待 stream 完成后填充 info_out
-    cudaStreamSynchronize(stream);
+    // 仅在需要info_out时同步
+    if (info_out) {
+        cudaStreamSynchronize(stream);
+    }
 
     if (info_out) {
         info_out->ipt_w = static_cast<float>(src_w);
@@ -117,10 +134,9 @@ cudaError_t yolo_preproc(
         info_out->scale = scale;
     }
 
-    // 清理
+    // 清理 - 按分配逆序释放
     if (need_copy) cudaFree(d_src);
-    cudaFree(d_mean);
-    cudaFree(d_std);
+    cudaFree(d_mean_std);
     cudaFree(d_scale);
     cudaFree(d_pad_w);
     cudaFree(d_pad_h);
@@ -146,12 +162,17 @@ namespace modeldeploy::vision {
         cudaError_t err = cudaMalloc(&d_output, output_size);
         if (err != cudaSuccess) {
             std::cerr << "cudaMalloc failed: " << cudaGetErrorString(err) << std::endl;
-            cudaFree(d_output);
             return false;
         }
 
-        // 4. CUDA 流
-        cudaStream_t stream = nullptr;
+        // 4. 创建和管理CUDA流
+        cudaStream_t stream;
+        cudaError_t stream_err = cudaStreamCreate(&stream);
+        if (stream_err != cudaSuccess) {
+            std::cerr << "cudaStreamCreate failed: " << cudaGetErrorString(stream_err) << std::endl;
+            cudaFree(d_output);
+            return false;
+        }
         // 5. 归一化参数和 pad_value
         constexpr float mean[3] = {0.0f, 0.0f, 0.0f};
         constexpr float std[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
@@ -176,8 +197,9 @@ namespace modeldeploy::vision {
             cudaFree(d_output);
             return false;
         }
-        // 8. 释放 GPU 内存
+        // 8. 释放 GPU 内存和流
         cudaFree(d_output);
+        cudaStreamDestroy(stream);
         // 9. 添加 batch 维度
         output->expand_dim(0);
         return true;

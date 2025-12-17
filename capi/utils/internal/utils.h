@@ -24,6 +24,10 @@
 modeldeploy::ImageData md_image_to_image_data(const MDImage* image);
 
 
+std::unordered_map<int, std::string> md_map_to_map(MDMapData* c_map);
+
+MDMapData map_to_md_map(const std::unordered_map<int, std::string>& map);
+
 cv::Mat md_image_to_mat(const MDImage* image);
 
 ///
@@ -39,20 +43,6 @@ cv::Mat md_image_to_mat(const MDImage* image);
 MDImage* image_data_to_md_image(const modeldeploy::ImageData& mat);
 
 MDImage* mat_to_md_image(const cv::Mat& mat);
-
-#ifdef BUILD_FACE
-
-///
-/// 将MDImage类型的图像转换为SeetaImageData类型的图像
-///
-/// @param image 指向MDImage类型图像的指针，这是输入图像数据
-/// @return 返回一个SeetaImageData类型的图像，这是转换后的图像数据
-///
-/// 此函数的目的是为了在不同图像处理库之间进行图像数据转换，以便在使用不同库的函数时保持兼容性
-///
-SeetaImageData md_image_to_seeta_image(const MDImage* image);
-
-#endif
 
 ///
 /// 在图像上绘制半透明矩形的内部函数。

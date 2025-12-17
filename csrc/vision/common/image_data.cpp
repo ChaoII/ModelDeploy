@@ -119,6 +119,7 @@ namespace modeldeploy {
 
     ImageData ImageData::crop(const vision::Rect2f& rect) const {
         const cv::Rect2f cv_rect(rect.x, rect.y, rect.width, rect.height);
+        auto s = impl_->mat(cv_rect);
         const auto crop_cv_mat = impl_->mat(cv_rect).clone();
         ImageData img;
         img.impl_ = std::make_shared<ImageDataImpl>();

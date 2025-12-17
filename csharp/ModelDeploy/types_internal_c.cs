@@ -7,6 +7,21 @@ namespace ModelDeploy
     namespace types_internal_c
     {
         [StructLayout(LayoutKind.Sequential)]
+        public struct MDKeyValuePair
+        {
+            public int key;
+            public string value;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDMapData
+        {
+            public int size;
+            public IntPtr data;
+        }
+
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct MDModel
         {
             string model_name;
@@ -257,7 +272,7 @@ namespace ModelDeploy
             public IntPtr data;
             public int size;
         }
-        
+
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDLPRResult
@@ -277,7 +292,7 @@ namespace ModelDeploy
             public IntPtr data;
             public int size;
         }
-        
+
         [StructLayout(LayoutKind.Sequential)]
         public struct MDAttributeResult
         {
@@ -294,7 +309,7 @@ namespace ModelDeploy
             public IntPtr data;
             public int size;
         }
-        
+
         [StructLayout(LayoutKind.Sequential)]
         public struct MDFaceRecognizerResult
         {

@@ -367,9 +367,10 @@ static class Program
     static void TestPedestrianAttribute()
     {
         RuntimeOption option = new RuntimeOption();
+        option.Device = Device.GPU;
         Image image = Image.Read("F:/zhgd/Detection/images/train/IMG_20251204_102951.jpg");
-        var detModelPath = Path.Combine(TestDataPath, "test_models/cc.onnx");
-        var clsModelPath = Path.Combine(TestDataPath, "test_models/zhgd_ml.onnx");
+        var detModelPath = Path.Combine(TestDataPath, "test_models/zhgd_det.engine");
+        var clsModelPath = Path.Combine(TestDataPath, "test_models/zhgd_ml.engine");
         PedestrianAttribute pedestrianAttribute = new PedestrianAttribute(detModelPath, clsModelPath, option);
         pedestrianAttribute.SetDetInputSize(1280, 1280);
         pedestrianAttribute.SetClsInputSize(192, 256);

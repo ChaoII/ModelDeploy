@@ -2,15 +2,31 @@
 // Created by AC on 2024/12/16.
 //
 #include <filesystem>
+#include "capi/common/md_micro.h"
 #include "capi/utils/md_utils_capi.h"
 #include "capi/utils/internal/utils.h"
 
 namespace fs = std::filesystem;
 
+
+MDKeyValuePair md_create_key_value_pair(const int key, const char* value) {
+    MDKeyValuePair pair;
+    pair.key = key;
+    pair.value = strdup(value);
+    return pair;
+}
+
+void md_free_md_map(MDMapData* c_map) {
+    for (int i = 0; i < c_map->size; i++) {
+        free(c_map->data[i].value);
+    }
+    free(c_map->data);
+    c_map->size = 0;
+}
+
 void md_print_rect(const MDRect* rect) {
     std::cout << format_rect(*rect) << std::endl;
 }
-
 
 bool md_get_button_enable_status(const MDImage* image, const int pix_threshold, const double rate_threshold) {
     auto cv_image = md_image_to_mat(image);

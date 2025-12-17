@@ -16,7 +16,7 @@ int main() {
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
         "../../test_data/test_models/zhgd_det.engine",
         "../../test_data/test_models/zhgd_ml.engine", option);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/2341.jpg");
     pedestrian_attribute.set_cls_batch_size(8);
     pedestrian_attribute.set_det_input_size({1280, 1280});
     pedestrian_attribute.set_det_threshold(0.5);
@@ -38,6 +38,6 @@ int main() {
     label_map.insert({2, "safety_rope"});
     label_map.insert({3, "work_uniform"});
     const auto vis_image =
-        modeldeploy::vision::vis_attr(img, results, 0.7, label_map, "../../test_data/msyh.ttc", 14, 0.15, 1);
+        modeldeploy::vision::vis_attr(img, results, 0.7, label_map, "../../test_data/msyh.ttc", 6, 0.15, 1);
     vis_image.imshow("pedestrian");
 }
