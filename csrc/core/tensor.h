@@ -44,8 +44,11 @@ namespace modeldeploy {
     class MemoryPool {
     public:
         static void* allocate(size_t size);
-        static void deallocate(void* ptr, size_t size);
         static void* reallocate(void* ptr, size_t new_size);
+        static void* allocate_cuda(size_t size);
+        static void deallocate(void* ptr);
+        static void* reallocate_cuda(void* ptr, size_t new_size);
+        static void deallocate_cuda(void* ptr);
     };
 
     // 内存块封装，支持引用计数
