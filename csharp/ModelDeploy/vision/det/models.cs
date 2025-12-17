@@ -83,28 +83,28 @@ namespace ModelDeploy.vision.detection
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_detection_model(ref MDModel model, string modelDir,
             ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_detection_input_size(ref MDModel model, MDSize size);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_detection_predict(ref MDModel model, ref MDImage image,
             ref MDDetectionResults results);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_print_detection_result(ref MDDetectionResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_detection_result(ref MDImage image, ref MDDetectionResults result,
             double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_detection_result(ref MDDetectionResults results);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_detection_model(ref MDModel model);
 
         #endregion

@@ -101,38 +101,38 @@ namespace ModelDeploy.vision.pipeline
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_attr_model(
             ref MDModel model, string detModelPath, string clsModelPath, ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_det_input_size(ref MDModel model, MDSize size);
         
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_cls_input_size(ref MDModel model, MDSize size);
         
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_cls_batch_size(ref MDModel model, int batchSize);
         
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_det_threshold(ref MDModel model, float threshold);
         
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_attr_model_predict(ref MDModel model, ref MDImage image,
             ref MDAttributeResults results);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_print_attr_result(ref MDAttributeResults cResults);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_attr_result(ref MDImage image, ref MDAttributeResults result,
             double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_attr_result(ref MDAttributeResults results);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_attr_model(ref MDModel model);
 
         #endregion

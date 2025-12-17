@@ -13,6 +13,8 @@
 #include "csrc/vision/common/visualize/visualize.h"
 #include "capi/vision/pipeline/pedestrian_attribute_capi.h"
 
+#include <capi/utils/md_utils_capi.h>
+
 
 namespace fs = std::filesystem;
 
@@ -101,6 +103,7 @@ void md_print_attr_result(const MDAttributeResults* c_results) {
 void md_draw_attr_result(const MDImage* image,
                          const MDAttributeResults* c_results,
                          const double threshold,
+                         MDMapData* c_label_map,
                          const char* font_path,
                          const int font_size,
                          const double alpha,
@@ -108,8 +111,8 @@ void md_draw_attr_result(const MDImage* image,
     auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::AttributeResult> results;
     c_results_2_attr_results(c_results, &results);
-    // todo add label_map
-    modeldeploy::vision::vis_attr(image_data, results, threshold, {}, font_path, font_size, alpha, save_result);
+    const auto label_map = md_map_to_map(c_label_map);
+    modeldeploy::vision::vis_attr(image_data, results, threshold, label_map, font_path, font_size, alpha, save_result);
 }
 
 void md_free_attr_result(MDAttributeResults* c_results) {

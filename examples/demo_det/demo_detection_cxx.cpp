@@ -8,16 +8,16 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
-    option.use_ort_backend();
+    option.use_trt_backend();
     option.use_gpu(0);
     option.password = "123456";
     option.enable_fp16 = true;
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det.onnx", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det.engine", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
-    auto img = modeldeploy::ImageData::imread("F:/zhgd/Detection/images/train/frame_00000.jpg");
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/2341.jpg");
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().use_cuda_preproc();

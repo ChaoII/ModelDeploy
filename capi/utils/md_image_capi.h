@@ -34,6 +34,12 @@ MODELDEPLOY_CAPI_EXPORT MDImage md_clone_image(const MDImage* image);
 /// \return MDImage指针
 MODELDEPLOY_CAPI_EXPORT MDImage md_from_compressed_bytes(const unsigned char* bytes, int size);
 
+/// 将MDImage对象转换为压缩字节（注意需要手动释放MDImage）
+/// \param image
+/// \param ext 文件后缀
+/// \return 压缩字节
+MODELDEPLOY_CAPI_EXPORT MDImage md_to_compressed_bytes(MDImage* image, const char* ext);
+
 /// 从原始的BGR24 数据生成一个MDImage对象（注意需要手动释放MDImage）。
 ///
 /// @param data BGR24 数据。

@@ -40,14 +40,14 @@ namespace ModelDeploy.utils
 
         #region DllImports
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_text(ref MDImage image, ref MDRect rect, string text, string fontPath,
             int fontSize, MDColor color, double alpha);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_rect(ref MDImage image, MDRect rect, MDColor color, double alpha);
 
-        [DllImport("ModelDeploySDK.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_polygon(ref MDImage image, MDPolygon polygon, MDColor color, double alpha);
 
         #endregion

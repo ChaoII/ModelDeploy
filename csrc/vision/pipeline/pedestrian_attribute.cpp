@@ -107,6 +107,7 @@ namespace modeldeploy::vision::pipeline {
                 MD_LOG_WARN << "There's no detection result in image " << i_batch << "." << std::endl;
                 return true;
             }
+            // std::cout << "det_result" << det_result.size() << std::endl;
             image_list.resize(det_result.size());
             attr_result.resize(det_result.size());
             for (size_t i_box = 0; i_box < det_result.size(); ++i_box) {
