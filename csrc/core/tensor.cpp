@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <utility>
 #include <cmath>
+#include <cuda_runtime.h>
 #include <iomanip>
 
 #include "md_log.h"
@@ -16,7 +17,7 @@ namespace modeldeploy {
         return malloc(size);
     }
 
-    void MemoryPool::deallocate(void* ptr, size_t) {
+    void MemoryPool::deallocate(void* ptr) {
         free(ptr);
     }
 
@@ -24,9 +25,29 @@ namespace modeldeploy {
         return realloc(ptr, new_size);
     }
 
+    void* MemoryPool::allocate_cuda(const size_t size) {
+        void* ptr = nullptr;
+        const cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostAllocWriteCombined);
+        if (err != cudaSuccess) {
+            // 记录日志 or 抛异常
+            return nullptr;
+        }
+        return ptr;
+    }
+
+    void* MemoryPool::reallocate_cuda(void* ptr, const size_t new_size) {
+        return nullptr;
+    }
+
+    void MemoryPool::deallocate_cuda(void* ptr) {
+        if (!ptr) return;
+        cudaFreeHost(ptr);
+    }
+
+
     // MemoryBlock实现
     MemoryBlock::MemoryBlock(const size_t size)
-        : size_(size), deleter_([](void* ptr) { MemoryPool::deallocate(ptr, 0); }) {
+        : size_(size), deleter_([](void* ptr) { MemoryPool::deallocate(ptr); }) {
         data_ = MemoryPool::allocate(size);
         if (!data_) {
             throw std::bad_alloc();
