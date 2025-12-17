@@ -31,6 +31,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set(Jetson OFF)
 if (POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
 endif ()
@@ -101,11 +103,25 @@ if (ENABLE_MNN)
 endif ()
 
 if (ENABLE_TRT)
-    add_definitions(-DENABLE_TRT)
-    include("${CMAKE_SOURCE_DIR}/cmake/trt.cmake")
-    list(APPEND ALL_SOURCE ${TRT_BACKEND_SOURCE})
-    list(APPEND DEPENDS trt::nvinfer)
-    list(APPEND DEPENDS trt::nvonnxparser)
+    if (APPLE)
+        message(FATAL_ERROR "Apple does not support TRT backend")
+    else ()
+        add_definitions(-DENABLE_TRT)
+        include("${CMAKE_SOURCE_DIR}/cmake/trt.cmake")
+        list(APPEND ALL_SOURCE ${TRT_BACKEND_SOURCE})
+        list(APPEND DEPENDS trt::nvinfer)
+        list(APPEND DEPENDS trt::nvonnxparser)
+        if (EXISTS "/etc/nv_tegra_release")
+            message(STATUS "detect Jetson")
+            find_package(TBB REQUIRED)
+            if (TBB_FOUND)
+                list(APPEND DEPENDS TBB::tbb)
+            else ()
+                message(WARNING "Cant not find tbb library, maybe link error!")
+            endif ()
+            set(Jetson ON)
+        endif ()
+    endif ()
 endif ()
 
 
@@ -144,6 +160,17 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 if (MSVC)
     target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
+endif ()
+
+if (Jetson)
+    message(STATUS "Add Jetson build options")
+    target_compile_options(${LIBRARY_NAME} PRIVATE
+            -O2
+            -march=armv8-a
+            -mtune=cortex-a78
+            -ffast-math
+            -fopenmp
+    )
 endif ()
 
 if (UNIX AND NOT APPLE)

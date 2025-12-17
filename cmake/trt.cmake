@@ -34,8 +34,6 @@ set_target_properties(trt::nvonnxparser PROPERTIES
 # 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
 if (WIN32)
     file(GLOB TRT_SHARED_LIBS "${TRT_LIB_DIR}/*.dll")
-elseif (APPLE)
-    file(GLOB TRT_SHARED_LIBS "${TRT_LIB_DIR}/*.dylib")
 else ()
     file(GLOB TRT_SHARED_LIBS "${TRT_LIB_DIR}/*.so" "${TRT_LIB_DIR}/*.so.*")
 endif ()
