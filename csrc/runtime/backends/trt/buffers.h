@@ -2,6 +2,7 @@
 // Created by aichao on 2025/6/27.
 //
 #pragma once
+#include <core/md_log.h>
 
 class CudaBuffer {
 public:

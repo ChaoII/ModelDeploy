@@ -16,7 +16,7 @@ int main() {
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
         "../../test_data/test_models/zhgd_det.engine",
         "../../test_data/test_models/zhgd_ml.engine", option);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/2341.jpg");
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
     pedestrian_attribute.set_cls_batch_size(8);
     pedestrian_attribute.set_det_input_size({1280, 1280});
     pedestrian_attribute.set_det_threshold(0.5);
@@ -26,6 +26,7 @@ int main() {
     int loop_count = 50;
     for (int i = 0; i < loop_count; i++) {
         pedestrian_attribute.predict(img, &results, &timers);
+        // std::cout << i << "th loop" << std::endl;
     }
     timers.print_benchmark();
     modeldeploy::vision::dis_attr(results);

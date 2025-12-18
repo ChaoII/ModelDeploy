@@ -95,8 +95,10 @@ namespace ModelDeploy.vision.pipeline
         {
             if (!_disposed)
             {
+                Console.WriteLine("before PedestrianAttribute model disposed");
                 md_free_attr_model(ref _model);
                 _disposed = true;
+                Console.WriteLine("after PedestrianAttribute model disposed");
                 GC.SuppressFinalize(this);
             }
         }

@@ -261,10 +261,10 @@ namespace ModelDeploy
             };
             return image;
         }
-        
+
         public static Image ToCompressedBytes(Image image, string ext)
         {
-            var nativeImage = md_to_compressed_bytes(ref image.RawImage,ext);
+            var nativeImage = md_to_compressed_bytes(ref image.RawImage, ext);
             var newImage = new Image
             {
                 Width = nativeImage.width,
@@ -274,7 +274,7 @@ namespace ModelDeploy
             };
             return newImage;
         }
-        
+
         public static Image FromBgr24Data(byte[] data, int width, int height)
         {
             var nativeImage = md_from_bgr24_data(data, width, height);
@@ -406,6 +406,7 @@ namespace ModelDeploy
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_from_compressed_bytes(byte[] data, int byteSize);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern MDImage md_to_compressed_bytes(ref MDImage image, string ext);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]

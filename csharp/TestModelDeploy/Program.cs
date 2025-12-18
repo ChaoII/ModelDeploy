@@ -371,13 +371,12 @@ static class Program
         Image image = Image.Read("F:/zhgd/Detection/images/train/IMG_20251204_102951.jpg");
         var detModelPath = Path.Combine(TestDataPath, "test_models/zhgd_det.engine");
         var clsModelPath = Path.Combine(TestDataPath, "test_models/zhgd_ml.engine");
-        PedestrianAttribute pedestrianAttribute = new PedestrianAttribute(detModelPath, clsModelPath, option);
+        using PedestrianAttribute pedestrianAttribute = new PedestrianAttribute(detModelPath, clsModelPath, option);
         pedestrianAttribute.SetDetInputSize(1280, 1280);
         pedestrianAttribute.SetClsInputSize(192, 256);
         pedestrianAttribute.SetClsBatchSize(8);
         pedestrianAttribute.SetDetThreshold(0.5f);
         List<AttributeResult> results = pedestrianAttribute.Predict(image);
-
         Dictionary<int, string> labelMap = new Dictionary<int, string>
         {
             { 0, "张三" },
@@ -388,7 +387,6 @@ static class Program
 
         pedestrianAttribute.DrawAttributeResult(image, results, 0.6, labelMap,
             Path.Combine(TestDataPath, "msyh.ttc"), 14, 0.1, true);
-
 
         image.Show();
         pedestrianAttribute.Display(results);
@@ -451,7 +449,7 @@ static class Program
         // TestStructureTable();
         TestPedestrianAttribute();
         // 测试GC
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
+        // GC.Collect();
+        // GC.WaitForPendingFinalizers();
     }
 }

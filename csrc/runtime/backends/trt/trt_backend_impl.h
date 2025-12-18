@@ -5,7 +5,6 @@
 #pragma once
 
 #include <cuda_runtime_api.h>
-#include <iostream>
 #include <map>
 #include <string>
 #include <vector>
@@ -29,6 +28,7 @@ namespace modeldeploy {
     public:
         TrtBackendImpl() : engine_(nullptr), context_(nullptr) {
         }
+        ~TrtBackendImpl();
 
         bool init(const RuntimeOption& runtime_option);
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs);
@@ -39,18 +39,13 @@ namespace modeldeploy {
         TensorInfo get_output_info(int index);
         std::vector<TensorInfo> get_input_infos();
         std::vector<TensorInfo> get_output_infos();
-        std::unique_ptr<TrtBackendImpl> clone(RuntimeOption& runtime_option,
+        std::unique_ptr<TrtBackendImpl> clone(const RuntimeOption& runtime_option,
                                               void* stream = nullptr,
                                               int device_id = -1);
 
-        ~TrtBackendImpl() {
-            if (parser_) {
-                parser_.reset();
-            }
-        }
 
     private:
-        bool init_from_onnx(const std::string& model_buffer);
+        // bool init_from_onnx(const std::string& model_buffer);
         bool initialized_ = false;
         TrtBackendOption option_;
         std::shared_ptr<nvinfer1::ICudaEngine> engine_;
@@ -65,9 +60,12 @@ namespace modeldeploy {
         std::string model_buffer_;
         std::map<std::string, ShapeRangeInfo> shape_range_info_;
 
+
+
+
         void get_input_output_info();
-        bool create_trt_engine_from_onnx(const std::string& onnx_model_buffer);
+        // bool create_trt_engine_from_onnx(const std::string& onnx_model_buffer);
         bool load_trt_cache(const std::string& engine_buffer);
-        int shape_range_info_updated(const std::vector<Tensor>& inputs);
+        // int shape_range_info_updated(const std::vector<Tensor>& inputs);
     };
 } // namespace modeldeploy
