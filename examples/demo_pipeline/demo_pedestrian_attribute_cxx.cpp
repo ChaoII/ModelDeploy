@@ -28,10 +28,7 @@ int main() {
         pedestrian_attribute.predict(img, &results, &timers);
     }
     timers.print_benchmark();
-
     modeldeploy::vision::dis_attr(results);
-
-
     std::unordered_map<int, std::string> label_map;
     label_map.insert({0, "safety_helmet"});
     label_map.insert({1, "reflective_vest"});

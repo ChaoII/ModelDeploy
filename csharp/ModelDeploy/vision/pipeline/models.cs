@@ -15,7 +15,7 @@ namespace ModelDeploy.vision.pipeline
         {
             _model = new MDModel();
             var nativeRuntimeOption = option.ToNative();
-            Utils.Check(md_create_attr_model(ref _model, detModelPath,clsModelPath, ref nativeRuntimeOption),
+            Utils.Check(md_create_attr_model(ref _model, detModelPath, clsModelPath, ref nativeRuntimeOption),
                 "Create PedestrianAttribute model");
         }
 
@@ -73,17 +73,21 @@ namespace ModelDeploy.vision.pipeline
 
 
         public void DrawAttributeResult(Image image, List<AttributeResult> results,
-            double threshold, string fontPath, int fontSize = 12, double alpha = 0.5, bool saveResult = false)
+            double threshold, Dictionary<int, string> labelMap, string fontPath, int fontSize = 12,
+            double alpha = 0.5, bool saveResult = false)
         {
             var cResults = AttributeResult.ToNativeArray(results);
+            var cMap = Utils.DictionaryToMDMapData(labelMap);
+
             try
             {
                 md_draw_attr_result(ref image.RawImage, ref cResults,
-                    threshold, fontPath, fontSize, alpha, saveResult);
+                    threshold, ref cMap, fontPath, fontSize, alpha, saveResult);
             }
             finally
             {
                 md_free_attr_result(ref cResults);
+                Utils.md_free_md_map(ref cMap);
             }
         }
 
@@ -107,16 +111,16 @@ namespace ModelDeploy.vision.pipeline
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_det_input_size(ref MDModel model, MDSize size);
-        
+
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_cls_input_size(ref MDModel model, MDSize size);
-        
+
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_cls_batch_size(ref MDModel model, int batchSize);
-        
+
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_set_attr_det_threshold(ref MDModel model, float threshold);
-        
+
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_attr_model_predict(ref MDModel model, ref MDImage image,
@@ -127,7 +131,7 @@ namespace ModelDeploy.vision.pipeline
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_attr_result(ref MDImage image, ref MDAttributeResults result,
-            double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
+            double threshold, ref MDMapData labelMap, string fontPath, int fontSize, double alpha, bool saveResult);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_attr_result(ref MDAttributeResults results);
