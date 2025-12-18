@@ -9,7 +9,7 @@
 namespace fs = std::filesystem;
 
 
-MDKeyValuePair md_create_key_value_pair(const int key, const char* value) {
+MDKeyValuePair md_create_key_value_pair(int key, const char* value) {
     MDKeyValuePair pair;
     pair.key = key;
     pair.value = strdup(value);

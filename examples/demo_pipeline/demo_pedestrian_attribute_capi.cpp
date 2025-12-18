@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
     md_set_attr_cls_input_size(&model, {192, 256});
     md_set_attr_det_input_size(&model, {1280, 1280});
     md_set_attr_det_threshold(&model, 0.5);
-    MDImage image = md_read_image("F:/zhgd/Detection/images/train/IMG_20251204_102951.jpg");
+    MDImage image = md_read_image("../../test_data/test_images/test_pedestrian_attribute.jpg");
     MDAttributeResults results;
     if ((ret = md_attr_model_predict(&model, &image, &results)) != 0) {
         std::cout << ret << std::endl;
