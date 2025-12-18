@@ -10,7 +10,7 @@ namespace ModelDeploy
         public struct MDKeyValuePair
         {
             public int key;
-            public string value;
+            public IntPtr value;
         }
 
         [StructLayout(LayoutKind.Sequential)]

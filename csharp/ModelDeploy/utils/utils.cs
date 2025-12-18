@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using ModelDeploy.types_internal_c;
@@ -26,15 +27,29 @@ namespace ModelDeploy.utils
             return unmanagedPtr;
         }
 
-        public static MDMapData DictoryToMDMapData()
+        public static MDMapData DictionaryToMDMapData(Dictionary<int, string> dict)
         {
-            return new MDMapData
+            var cMap = new MDMapData
             {
-                size = 0,
-                data = IntPtr.Zero
+                size = dict.Count,
+                data = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(MDKeyValuePair)) * dict.Count)
             };
-            
-            
+    
+            int i = 0;
+            foreach (var kvp in dict)
+            {
+                // 将字符串转换为 UTF-8 字节数组
+                byte[] utf8Bytes = Encoding.UTF8.GetBytes(kvp.Value);
+                // 为C端分配内存（记得在 C 端释放）
+                IntPtr utf8Ptr = Marshal.AllocHGlobal(utf8Bytes.Length + 1);
+                Marshal.Copy(utf8Bytes, 0, utf8Ptr, utf8Bytes.Length);
+                Marshal.WriteByte(utf8Ptr, utf8Bytes.Length, 0); // 添加 null 终止符
+                var cPair = md_create_key_value_pair(kvp.Key, utf8Ptr);
+                IntPtr ptr = IntPtr.Add(cMap.data, i * Marshal.SizeOf(typeof(MDKeyValuePair)));
+                Marshal.StructureToPtr(cPair, ptr, false);
+                i++;
+            }
+            return cMap;
         }
 
         /// <summary>
@@ -70,6 +85,13 @@ namespace ModelDeploy.utils
         {
             return md_get_button_enable_status(ref image.RawImage, pixThreshold, rateThreshold);
         }
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern MDKeyValuePair md_create_key_value_pair(int key, IntPtr value);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void md_free_md_map(ref MDMapData cMap);
+
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern bool md_get_button_enable_status(ref MDImage image, int pixThreshold,

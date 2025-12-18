@@ -36,10 +36,10 @@ int main(int argc, char** argv) {
     }
 
     MDMapData label_map;
-    const auto l1 = md_create_key_value_pair(0, "unknown");
-    const auto l2 = md_create_key_value_pair(1, "male");
-    const auto l3 = md_create_key_value_pair(2, "female");
-    const auto l4 = md_create_key_value_pair(3, "child");
+    const auto l1 = md_create_key_value_pair(0, "张三");
+    const auto l2 = md_create_key_value_pair(1, "李四");
+    const auto l3 = md_create_key_value_pair(2, "王五");
+    const auto l4 = md_create_key_value_pair(3, "赵六");
 
     label_map.size = 4;
     label_map.data = static_cast<MDKeyValuePair*>(malloc(sizeof(MDKeyValuePair) * label_map.size));
@@ -47,8 +47,6 @@ int main(int argc, char** argv) {
     label_map.data[1] = l2;
     label_map.data[2] = l3;
     label_map.data[3] = l4;
-
-    md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 14, 0.5, 1);
 
     md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 14, 0.5, 1);
     md_print_attr_result(&results);

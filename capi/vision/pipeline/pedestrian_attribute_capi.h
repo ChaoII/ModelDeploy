@@ -61,7 +61,7 @@ MODELDEPLOY_CAPI_EXPORT void md_print_attr_result(const MDAttributeResults* c_re
 /// \param image 原始图像
 /// \param c_results attr识别结果
 /// \param threshold 阈值
-/// \param label_map 标签映射
+/// \param c_label_map 标签映射
 /// \param font_path 字体路径
 /// \param font_size 字体大小
 /// \param alpha 不透明度

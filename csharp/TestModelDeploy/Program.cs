@@ -377,12 +377,22 @@ static class Program
         pedestrianAttribute.SetClsBatchSize(8);
         pedestrianAttribute.SetDetThreshold(0.5f);
         List<AttributeResult> results = pedestrianAttribute.Predict(image);
-        pedestrianAttribute.DrawAttributeResult(image, results, 0.6,
+
+        Dictionary<int, string> labelMap = new Dictionary<int, string>
+        {
+            { 0, "张三" },
+            { 1, "李四" },
+            { 2, "王五" },
+            { 3, "赵六" }
+        };
+
+        pedestrianAttribute.DrawAttributeResult(image, results, 0.6, labelMap,
             Path.Combine(TestDataPath, "msyh.ttc"), 14, 0.1, true);
+
+
         image.Show();
         pedestrianAttribute.Display(results);
     }
-
 
     static void TestStructureTable()
     {
