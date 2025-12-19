@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <utility>
 #include <cmath>
+#ifdef WITH_GPU
 #include <cuda_runtime.h>
+#endif
+
 #include <iomanip>
 
 #include "md_log.h"
@@ -26,6 +29,7 @@ namespace modeldeploy {
     }
 
     void* MemoryPool::allocate_cuda(const size_t size) {
+#ifdef WITH_GPU
         void* ptr = nullptr;
         const cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostAllocWriteCombined);
         if (err != cudaSuccess) {
@@ -33,6 +37,9 @@ namespace modeldeploy {
             return nullptr;
         }
         return ptr;
+#else
+        MD_LOG_FATAL << "MemoryPool::allocate_cuda is not supported, please build [-DWITH_GPU=ON] "<<std::endl;
+#endif
     }
 
     void* MemoryPool::reallocate_cuda(void* ptr, const size_t new_size) {
@@ -40,8 +47,12 @@ namespace modeldeploy {
     }
 
     void MemoryPool::deallocate_cuda(void* ptr) {
+#ifdef WITH_GPU
         if (!ptr) return;
         cudaFreeHost(ptr);
+#else
+        MD_LOG_FATAL << "MemoryPool::allocate_cuda is not supported, please build [-DWITH_GPU=ON] "<<std::endl;
+#endif
     }
 
 
