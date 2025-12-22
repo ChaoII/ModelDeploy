@@ -60,7 +60,6 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
             return false;
         }
-
         std::cout << termcolor::green << "[TensorRT model buffer loaded, size: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
@@ -77,16 +76,13 @@ namespace modeldeploy {
         // 重要：必须按照正确的顺序销毁对象
         // 1. 首先销毁执行上下文
         context_.reset();
-
         // 2. 销毁CUDA流
         if (stream_ != nullptr) {
             cudaStreamDestroy(stream_);
             stream_ = nullptr;
         }
-
         // 3. 销毁引擎（必须在运行时之前销毁）
         engine_.reset();
-
         // 4. 最后销毁运行时
         runtime_.reset();
     }
@@ -101,7 +97,6 @@ namespace modeldeploy {
         }
         get_input_output_info();
         context_.reset(engine_->createExecutionContext());
-
         for (int32_t i = 0; i < engine_->getNbIOTensors(); ++i) {
             auto const name = engine_->getIOTensorName(i);
             if (engine_->getTensorIOMode(name) != nvinfer1::TensorIOMode::kINPUT) {

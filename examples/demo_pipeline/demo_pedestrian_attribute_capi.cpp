@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     option.backend = MD_BACKEND_TRT;
     option.enable_trt = 1;
     option.enable_fp16 = 1;
-    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/zhgd_det.engine",
+    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/zhgd_det_20251219.engine",
                                     "../../test_data/test_models/zhgd_ml.engine", &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
     md_set_attr_cls_input_size(&model, {192, 256});
     md_set_attr_det_input_size(&model, {1280, 1280});
     md_set_attr_det_threshold(&model, 0.5);
-    MDImage image = md_read_image("../../test_data/test_images/test_pedestrian_attribute.jpg");
+    MDImage image = md_read_image("../../test_data/test_images/test_pedestrian_attribute1.jpg");
     MDAttributeResults results;
     if ((ret = md_attr_model_predict(&model, &image, &results)) != 0) {
         std::cout << ret << std::endl;
@@ -47,8 +47,8 @@ int main(int argc, char** argv) {
     label_map.data[1] = l2;
     label_map.data[2] = l3;
     label_map.data[3] = l4;
-
-    md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 14, 0.5, 1);
+    constexpr int abnormal_ids[] = {0, 1};
+    md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 14, 0.2, 1, abnormal_ids, 2);
     md_print_attr_result(&results);
     md_free_attr_result(&results);
     md_show_image(&image);

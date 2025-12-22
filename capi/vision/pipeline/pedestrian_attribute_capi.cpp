@@ -107,12 +107,21 @@ void md_draw_attr_result(const MDImage* image,
                          const char* font_path,
                          const int font_size,
                          const double alpha,
-                         const int save_result) {
+                         const int save_result,
+                         const int* abnormal_ids,
+                         const int abnormal_size,
+                         const int show_attr) {
     auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::AttributeResult> results;
     c_results_2_attr_results(c_results, &results);
     const auto label_map = md_map_to_map(c_label_map);
-    modeldeploy::vision::vis_attr(image_data, results, threshold, label_map, font_path, font_size, alpha, save_result);
+    std::vector<int> abnormal_id_vec;
+    abnormal_id_vec.reserve(abnormal_size);
+    for (int i = 0; i < abnormal_size; i++) {
+        abnormal_id_vec.push_back(abnormal_ids[i]);
+    }
+    modeldeploy::vision::vis_attr(image_data, results, threshold, label_map, font_path,
+                                  font_size, alpha, save_result, abnormal_id_vec, show_attr);
 }
 
 void md_free_attr_result(MDAttributeResults* c_results) {

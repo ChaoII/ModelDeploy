@@ -368,8 +368,8 @@ static class Program
     {
         RuntimeOption option = new RuntimeOption();
         option.Device = Device.GPU;
-        Image image = Image.Read("F:/zhgd/Detection/images/train/IMG_20251204_102951.jpg");
-        var detModelPath = Path.Combine(TestDataPath, "test_models/zhgd_det.engine");
+        Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_pedestrian_attribute1.jpg"));
+        var detModelPath = Path.Combine(TestDataPath, "test_models/zhgd_det_20251219.engine");
         var clsModelPath = Path.Combine(TestDataPath, "test_models/zhgd_ml.engine");
         using PedestrianAttribute pedestrianAttribute = new PedestrianAttribute(detModelPath, clsModelPath, option);
         pedestrianAttribute.SetDetInputSize(1280, 1280);
@@ -386,7 +386,7 @@ static class Program
         };
 
         pedestrianAttribute.DrawAttributeResult(image, results, 0.6, labelMap,
-            Path.Combine(TestDataPath, "msyh.ttc"), 14, 0.1, true);
+            Path.Combine(TestDataPath, "msyh.ttc"), 10, 0.1, true, [0, 1], false);
 
         image.Show();
         pedestrianAttribute.Display(results);

@@ -74,15 +74,15 @@ namespace ModelDeploy.vision.pipeline
 
         public void DrawAttributeResult(Image image, List<AttributeResult> results,
             double threshold, Dictionary<int, string> labelMap, string fontPath, int fontSize = 12,
-            double alpha = 0.5, bool saveResult = false)
+            double alpha = 0.5, bool saveResult = false, int[] abnormalIds = null, bool showAttr = false)
         {
             var cResults = AttributeResult.ToNativeArray(results);
             var cMap = Utils.DictionaryToMDMapData(labelMap);
-
             try
             {
                 md_draw_attr_result(ref image.RawImage, ref cResults,
-                    threshold, ref cMap, fontPath, fontSize, alpha, saveResult);
+                    threshold, ref cMap, fontPath, fontSize, alpha, saveResult, abnormalIds,
+                    abnormalIds.Length, showAttr ? 1 : 0);
             }
             finally
             {
@@ -133,7 +133,8 @@ namespace ModelDeploy.vision.pipeline
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_draw_attr_result(ref MDImage image, ref MDAttributeResults result,
-            double threshold, ref MDMapData labelMap, string fontPath, int fontSize, double alpha, bool saveResult);
+            double threshold, ref MDMapData labelMap, string fontPath, int fontSize, double alpha, bool saveResult,
+            int[] abnormalIds, int abnormalIdsSize, int showAttr);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_attr_result(ref MDAttributeResults results);

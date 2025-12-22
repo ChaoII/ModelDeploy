@@ -9,12 +9,12 @@ set(TRT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/TensorRT-10.9.0.34" C
 set(TRT_LIB_DIR "${TRT_DIR}/lib")
 set(TRT_INC_DIR "${TRT_DIR}/include")
 
-find_library(NVINFER_LIB nvinfer
+find_library(NVINFER_LIB nvinfer_10
         PATHS "${TRT_LIB_DIR}"
         NO_DEFAULT_PATH
 )
 
-find_library(NVONNXPARSER_LIB nvonnxparser
+find_library(NVONNXPARSER_LIB nvonnxparser_10
         PATHS "${TRT_LIB_DIR}"
         NO_DEFAULT_PATH
 )
