@@ -66,6 +66,10 @@ MODELDEPLOY_CAPI_EXPORT void md_print_attr_result(const MDAttributeResults* c_re
 /// \param font_size 字体大小
 /// \param alpha 不透明度
 /// \param save_result 是否保存结果
+/// \param abnormal_ids 异常id
+/// \param abnormal_size 异常id大小
+/// \param show_attr 是否显示属性
+/// \return
 MODELDEPLOY_CAPI_EXPORT void md_draw_attr_result(const MDImage* image,
                                                  const MDAttributeResults* c_results,
                                                  double threshold,
@@ -73,7 +77,10 @@ MODELDEPLOY_CAPI_EXPORT void md_draw_attr_result(const MDImage* image,
                                                  const char* font_path,
                                                  int font_size,
                                                  double alpha,
-                                                 int save_result);
+                                                 int save_result,
+                                                 const int* abnormal_ids = nullptr,
+                                                 int abnormal_size = 0,
+                                                 int show_attr = 0);
 
 /// 释放文本识别结果
 /// @param c_results 模型识别结果，通过md_ocr_model_predict方法手动开辟了内存空间，需要手动释放
