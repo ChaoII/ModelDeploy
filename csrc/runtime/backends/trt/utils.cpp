@@ -1,5 +1,7 @@
 #include "runtime/backends/trt/utils.h"
 
+#include <numeric>
+
 namespace modeldeploy {
     int ShapeRangeInfo::update(const std::vector<int64_t>& new_shape) {
         if (new_shape.size() != shape.size()) {
@@ -44,16 +46,15 @@ namespace modeldeploy {
         if (dtype == nvinfer1::DataType::kFLOAT) {
             return sizeof(float);
         }
-        else if (dtype == nvinfer1::DataType::kHALF) {
+        if (dtype == nvinfer1::DataType::kHALF) {
             return sizeof(float) / 2;
         }
-        else if (dtype == nvinfer1::DataType::kINT8) {
+        if (dtype == nvinfer1::DataType::kINT8) {
             return sizeof(int8_t);
         }
-        else if (dtype == nvinfer1::DataType::kINT32) {
+        if (dtype == nvinfer1::DataType::kINT32) {
             return sizeof(int32_t);
         }
-        // kBOOL
         return sizeof(bool);
     }
 
@@ -61,10 +62,10 @@ namespace modeldeploy {
         if (dtype == nvinfer1::DataType::kFLOAT) {
             return DataType::FP32;
         }
-        else if (dtype == nvinfer1::DataType::kINT8) {
+        if (dtype == nvinfer1::DataType::kINT8) {
             return DataType::INT8;
         }
-        else if (dtype == nvinfer1::DataType::kINT32) {
+        if (dtype == nvinfer1::DataType::kINT32) {
             return DataType::INT32;
         }
         // kBOOL
@@ -80,11 +81,10 @@ namespace modeldeploy {
         return std::accumulate(d.d, d.d + d.nbDims, 1, std::multiplies<>());
     }
 
-    nvinfer1::Dims ivec_to_dims(const std::vector<int>& vec) {
-        int limit = static_cast<int>(nvinfer1::Dims::MAX_DIMS);
+    nvinfer1::Dims vec_to_dims(const std::vector<int>& vec) {
+        const int limit = static_cast<int>(nvinfer1::Dims::MAX_DIMS);
         if (static_cast<int>(vec.size()) > limit) {
-            MD_LOG_WARN << "Vector too long, only first 8 elements are used in dimension."
-                << std::endl;
+            MD_LOG_WARN << "Vector too long, only first 8 elements are used in dimension." << std::endl;
         }
         // Pick first nvinfer1::Dims::MAX_DIMS elements
         nvinfer1::Dims dims{std::min(static_cast<int>(vec.size()), limit), {}};
@@ -93,10 +93,9 @@ namespace modeldeploy {
     }
 
     nvinfer1::Dims vec_to_dims(const std::vector<int64_t>& vec) {
-        int limit = static_cast<int>(nvinfer1::Dims::MAX_DIMS);
+        const int limit = nvinfer1::Dims::MAX_DIMS;
         if (static_cast<int>(vec.size()) > limit) {
-            MD_LOG_WARN << "Vector too long, only first 8 elements are used in dimension."
-                << std::endl;
+            MD_LOG_WARN << "Vector too long, only first 8 elements are used in dimension." << std::endl;
         }
         // Pick first nvinfer1::Dims::MAX_DIMS elements
         nvinfer1::Dims dims{std::min(static_cast<int>(vec.size()), limit), {}};

@@ -10,7 +10,9 @@ namespace modeldeploy::vision::pipeline {
                                              const std::string& mlc_model_path,
                                              const RuntimeOption& option) {
         detector_ = std::make_shared<detection::UltralyticsDet>(det_model_path, option);
-        detector_->get_preprocessor().use_cuda_preproc();
+        if (option.device_id != -1) {
+            detector_->get_preprocessor().use_cuda_preproc();
+        }
         classifier_ = std::make_shared<classification::Classification>(mlc_model_path, option);
         classifier_->get_preprocessor().disable_center_crop();
         classifier_->get_postprocessor().set_multi_label(true);

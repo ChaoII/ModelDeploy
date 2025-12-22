@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     label_map.data[2] = l3;
     label_map.data[3] = l4;
     constexpr int abnormal_ids[] = {0, 1};
-    md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 14, 0.2, 1, abnormal_ids, 2);
+    md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 8, 0.2, 1, abnormal_ids, 2,true);
     md_print_attr_result(&results);
     md_free_attr_result(&results);
     md_show_image(&image);

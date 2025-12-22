@@ -4,40 +4,58 @@
 
 #pragma once
 
-
+#include <memory>
+#include <string>
+#include <vector>
+#include "onnxruntime_cxx_api.h"
 #include "runtime/backends/backend.h"
+#include "runtime/backends/ort/option.h"
 
 namespace modeldeploy {
-    class OrtBackendImpl;
+    struct OrtValueInfo {
+        std::string name;
+        std::vector<int64_t> shape;
+        ONNXTensorElementDataType dtype;
+    };
 
-    class MODELDEPLOY_CXX_EXPORT OrtBackend : public BaseBackend {
+    class OrtBackend : public BaseBackend {
     public:
-        OrtBackend();
+        OrtBackend() = default;
 
-        ~OrtBackend() override;
+        ~OrtBackend() override = default;
+
+        void build_option(const OrtBackendOption& option);
 
         bool init(const RuntimeOption& option) override;
 
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
-        std::unique_ptr<BaseBackend> clone(RuntimeOption& runtime_option,
-                                           void* stream = nullptr, int device_id = -1) override;
+        std::unique_ptr<OrtBackend> clone(RuntimeOption& runtime_option,
+                                          void* stream = nullptr, int device_id = -1) const;
 
-        [[nodiscard]] size_t num_inputs() const override;
+        [[nodiscard]] size_t num_inputs() const override { return inputs_desc_.size(); }
 
-        [[nodiscard]] size_t num_outputs() const override;
+        [[nodiscard]] size_t num_outputs() const override { return outputs_desc_.size(); }
 
         TensorInfo get_input_info(int index) override;
-
         TensorInfo get_output_info(int index) override;
-
         std::vector<TensorInfo> get_input_infos() override;
-
         std::vector<TensorInfo> get_output_infos() override;
-
         [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const override;
 
     private:
-        std::unique_ptr<OrtBackendImpl> impl_;
+        bool init_from_onnx(const std::string& model_buffer,
+                            const OrtBackendOption& option = OrtBackendOption());
+
+        Ort::Env env_{ORT_LOGGING_LEVEL_WARNING, "MD"};
+        std::shared_ptr<Ort::Session> shared_session_{nullptr};
+        Ort::SessionOptions session_options_;
+        std::unique_ptr<Ort::IoBinding> binding_;
+        std::vector<OrtValueInfo> inputs_desc_;
+        std::vector<OrtValueInfo> outputs_desc_;
+        bool initialized_ = false;
+        std::string model_file_name_;
+        std::string model_buffer_;
+        OrtBackendOption option_;
     };
 }
