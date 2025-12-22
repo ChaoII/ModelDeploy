@@ -3,7 +3,6 @@
 //
 
 #pragma once
-#include <iostream>
 #include <map>
 #include <string>
 #include <vector>
@@ -34,9 +33,9 @@ namespace modeldeploy {
          * \param[in] max The maximum shape for the input tensor, if set as default value, it will keep same with min_shape
          */
         void set_shape(const std::string& tensor_name,
-                      const std::vector<int32_t>& min,
-                      const std::vector<int32_t>& opt = std::vector<int32_t>(),
-                      const std::vector<int32_t>& max = std::vector<int32_t>()) {
+                       const std::vector<int32_t>& min,
+                       const std::vector<int32_t>& opt = std::vector<int32_t>(),
+                       const std::vector<int32_t>& max = std::vector<int32_t>()) {
             if (opt.empty()) {
                 opt_shape[tensor_name] = min;
             }
@@ -56,12 +55,11 @@ namespace modeldeploy {
         /// by this interface it will save the tensorrt engine to `cache_file_path`,
         /// and load it directly while execute the code again
         std::string cache_file_path;
-
         std::map<std::string, std::vector<int32_t>> max_shape;
         std::map<std::string, std::vector<int32_t>> min_shape;
         std::map<std::string, std::vector<int32_t>> opt_shape;
         bool enable_pinned_memory = false;
-        void* external_stream_ = nullptr;
+        void* external_stream = nullptr;
         int gpu_id = 0;
         std::string model_file;
     };

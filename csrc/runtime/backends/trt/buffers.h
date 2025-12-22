@@ -6,26 +6,42 @@
 
 class CudaBuffer {
 public:
-    explicit CudaBuffer(size_t size) : size_(size), data_(nullptr) {
-        const cudaError_t err = cudaMalloc(&data_, size_);
+    explicit CudaBuffer(const size_t size) : byte_size_(size) {
+        const cudaError_t err = cudaMalloc(&buffer_, byte_size_);
         if (err != cudaSuccess) {
             MD_LOG_ERROR << "CUDA malloc failed: " << cudaGetErrorString(err);
             throw std::runtime_error("CUDA memory allocation failed");
         }
     }
 
-    ~CudaBuffer() {
-        if (data_) {
-            cudaFree(data_);
-        }
+    explicit CudaBuffer(void* external_buffer, const size_t byte_size) {
+        byte_size_ = byte_size;
+        external_buffer_ = external_buffer;
     }
 
-    [[nodiscard]] void* data() const { return data_; }
-    [[nodiscard]] size_t size() const { return size_; }
+    ~CudaBuffer() {
+        if (buffer_) {
+            cudaFree(buffer_);
+        }
+        external_buffer_ = nullptr;
+    }
+
+    [[nodiscard]] void* data() const {
+        if (external_buffer_)
+            return external_buffer_;
+        return buffer_;
+    }
+
+    [[nodiscard]] size_t byte_size() const { return byte_size_; }
 
     // 复制数据到设备
-    void copy_to_device(const void* host_data) const {
-        cudaError_t err = cudaMemcpy(data_, host_data, size_, cudaMemcpyHostToDevice);
+    void copy_from_host(const void* host_data) const {
+        void* device_buffer = nullptr;
+        if (external_buffer_)
+            device_buffer = external_buffer_;
+        else
+            device_buffer = buffer_;
+        const cudaError_t err = cudaMemcpy(device_buffer, host_data, byte_size_, cudaMemcpyHostToDevice);
         if (err != cudaSuccess) {
             MD_LOG_ERROR << "CUDA memory copy failed for buffer: " << cudaGetErrorString(err);
             throw std::runtime_error("CUDA memory copy to device failed");
@@ -34,16 +50,22 @@ public:
 
     // 从设备复制数据到主机
     void copy_to_host(void* host_data) const {
-        cudaError_t err = cudaMemcpy(host_data, data_, size_, cudaMemcpyDeviceToHost);
+        const cudaError_t err = cudaMemcpy(host_data, buffer_, byte_size_, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) {
             MD_LOG_ERROR << "CUDA memory copy failed for buffer: " << cudaGetErrorString(err);
             throw std::runtime_error("CUDA memory copy to host failed");
         }
     }
 
+    void shared_from_external(const size_t byte_size, void* external_buffer) {
+        byte_size_ = byte_size;
+        external_buffer_ = external_buffer;
+    }
+
 private:
-    size_t size_;
-    void* data_;
+    size_t byte_size_ = 0;
+    void* buffer_ = nullptr;
+    void* external_buffer_ = nullptr;
 };
 
 using CudaBufferPrt = std::unique_ptr<CudaBuffer>;

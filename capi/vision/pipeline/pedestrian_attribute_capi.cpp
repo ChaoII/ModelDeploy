@@ -13,8 +13,6 @@
 #include "csrc/vision/common/visualize/visualize.h"
 #include "capi/vision/pipeline/pedestrian_attribute_capi.h"
 
-#include <capi/utils/md_utils_capi.h>
-
 
 namespace fs = std::filesystem;
 

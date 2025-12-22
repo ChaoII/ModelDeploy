@@ -4,9 +4,7 @@
 
 #include <algorithm>
 #include <iostream>
-#include <map>
 #include <memory>
-#include <numeric>
 #include <string>
 #include <vector>
 
@@ -49,7 +47,7 @@ namespace modeldeploy {
             return logger;
         }
 
-        void set_log(bool enable_info = false, bool enable_warning = false) {
+        void set_log(const bool enable_info = false, const bool enable_warning = false) {
             enable_info_ = enable_info;
             enable_warning_ = enable_warning;
         }
