@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <utility>
 #include <cmath>
+#include <iomanip>
+#include "md_log.h"
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
 // CUDA错误检查宏
@@ -21,9 +23,6 @@
     } while(0)
 #endif
 
-#include <iomanip>
-
-#include "md_log.h"
 
 namespace modeldeploy {
     // MemoryBlock实现
@@ -133,9 +132,14 @@ namespace modeldeploy {
         }
     }
 
-    Tensor::Tensor(const std::vector<int64_t>& shape, const DataType dtype, Device device, std::string name)
-        : name_(std::move(name)), shape_(shape), dtype_(dtype), device_(device),
-          element_size_(get_element_size(dtype)) {
+    Tensor::Tensor(const std::vector<int64_t>& shape,
+                   const DataType dtype,
+                   Device device,
+                   std::string name): name_(std::move(name)),
+                                      shape_(shape),
+                                      dtype_(dtype),
+                                      device_(device),
+                                      element_size_(get_element_size(dtype)) {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         memory_ = std::make_shared<MemoryBlock>(total_size, device);
@@ -143,10 +147,16 @@ namespace modeldeploy {
         calculate_strides();
     }
 
-    Tensor::Tensor(void* data, const std::vector<int64_t>& shape, const DataType dtype, Device device,
-                   std::function<void(void*)> deleter, std::string name)
-        : name_(std::move(name)), shape_(shape), dtype_(dtype), device_(device),
-          element_size_(get_element_size(dtype)) {
+    Tensor::Tensor(void* data,
+                   const std::vector<int64_t>& shape,
+                   const DataType dtype,
+                   Device device,
+                   std::function<void(void*)> deleter,
+                   std::string name): name_(std::move(name)),
+                                      shape_(shape),
+                                      dtype_(dtype),
+                                      device_(device),
+                                      element_size_(get_element_size(dtype)) {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         if (deleter) {
@@ -209,7 +219,7 @@ namespace modeldeploy {
             element_size_ = other.element_size_;
             device_ = other.device_;
             if (other.owns_data_) {
-                // // 如果原始张量拥有数据，需要复制数据
+                // 如果原始张量拥有数据，需要复制数据
                 memory_ = std::make_shared<MemoryBlock>(other.data_ptr_, other.byte_size(), other.device_);
                 data_ptr_ = memory_->data();
                 owns_data_ = true;
@@ -266,6 +276,10 @@ namespace modeldeploy {
         return dtype_;
     }
 
+    Device Tensor::device() const {
+        return device_;
+    }
+
     const std::string& Tensor::get_name() const {
         return name_;
     }
@@ -302,6 +316,14 @@ namespace modeldeploy {
             throw std::runtime_error("dtype mismatch");
         }
         return static_cast<const T*>(data_ptr_);
+    }
+
+    template <typename T>
+    T* Tensor::data_ptr() {
+        if (sizeof(T) != element_size_) {
+            throw std::runtime_error("dtype mismatch");
+        }
+        return static_cast<T*>(data_ptr_);
     }
 
     // 索引操作
@@ -519,8 +541,8 @@ namespace modeldeploy {
 
     bool Tensor::copy_from_extern_memory(void* data, const size_t byte_size, const Device extern_device) {
         if (this->byte_size() != byte_size) {
-            MD_LOG_ERROR << "Error: Invalid byte size, expected: " << this->byte_size() << ", actual: " << byte_size <<
-                std::endl;
+            MD_LOG_ERROR << "Error: Invalid byte size, expected: " << this->byte_size()
+                << ", actual: " << byte_size << std::endl;
             return false;
         }
         if (!memory_->copy_from_extern_buffer(data, byte_size, extern_device)) {
@@ -548,8 +570,8 @@ namespace modeldeploy {
         std::ostringstream oss;
         switch (dtype) {
         case DataType::FP32:
-            oss << std::fixed << std::setw(max_ele_width) << std::setprecision(4) << static_cast<const float*>(data)[
-                index];
+            oss << std::fixed << std::setw(max_ele_width) << std::setprecision(4)
+                << static_cast<const float*>(data)[index];
             break;
         case DataType::FP64:
             oss << static_cast<const double*>(data)[index];
@@ -662,11 +684,9 @@ namespace modeldeploy {
         if (tensors.empty()) {
             throw std::runtime_error("Empty tensor list for concatenation");
         }
-
         // 验证所有tensor的维度（除了连接轴）都相同
         const auto& first_shape = tensors[0].shape();
         int64_t concat_size = 0;
-
         for (const auto& tensor : tensors) {
             if (tensor.dtype() != tensors[0].dtype()) {
                 throw std::runtime_error("All tensors must have same data type");
@@ -704,7 +724,6 @@ namespace modeldeploy {
         }
         // 复制数据
         auto dest_ptr = static_cast<char*>(result.data());
-
         for (size_t i = 0; i < outer_iterations; ++i) {
             for (const auto& tensor : tensors) {
                 const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] * slice_size;
@@ -717,7 +736,7 @@ namespace modeldeploy {
     }
 
     Tensor Tensor::softmax(int axis) const {
-        // 确保数据类型是浮点类型
+        // 确保数据类型是浮点类型，其它类型精度直接拉稀
         if (dtype_ != DataType::FP32) {
             throw std::runtime_error("Softmax only supports FP32 type");
         }
@@ -1037,6 +1056,7 @@ namespace modeldeploy {
 
     // 这里添加了Tensor类中的数据操作接口的显式实例化
     template const double* Tensor::data_ptr<double>() const;
+    template float* Tensor::data_ptr<float>();
 
     // 显式实例化TensorView的常用类型
     template float& Tensor::at<float>(const std::vector<int64_t>&);

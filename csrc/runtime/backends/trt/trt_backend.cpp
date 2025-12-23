@@ -123,8 +123,15 @@ namespace modeldeploy {
             }
             // 分配并复制数据到设备
             const size_t buffer_size = input.byte_size();
-            auto input_buffer = allocate_cuda_buffer(buffer_size);
-            input_buffer->copy_from_host(input.data());
+            CudaBufferPrt input_buffer = nullptr;
+            if (input.device() == Device::GPU) {
+                input_buffer = std::make_unique<CudaBuffer>();
+                input_buffer->shared_from_external(buffer_size, input.data());
+            }
+            else {
+                input_buffer = allocate_cuda_buffer(buffer_size);
+                input_buffer->copy_from_host(input.data());
+            }
             context_->setTensorAddress(name.c_str(), input_buffer->data());
             device_buffers.push_back(std::move(input_buffer));
         }

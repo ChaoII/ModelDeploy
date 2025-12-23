@@ -6,6 +6,8 @@
 
 class CudaBuffer {
 public:
+    CudaBuffer() = default;
+
     explicit CudaBuffer(const size_t size) : byte_size_(size) {
         const cudaError_t err = cudaMalloc(&buffer_, byte_size_);
         if (err != cudaSuccess) {
@@ -42,6 +44,14 @@ public:
         else
             device_buffer = buffer_;
         const cudaError_t err = cudaMemcpy(device_buffer, host_data, byte_size_, cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) {
+            MD_LOG_ERROR << "CUDA memory copy failed for buffer: " << cudaGetErrorString(err);
+            throw std::runtime_error("CUDA memory copy to device failed");
+        }
+    }
+
+    void copy_from_device(const void* device_data) const {
+        const cudaError_t err = cudaMemcpy(buffer_, device_data, byte_size_, cudaMemcpyDeviceToDevice);
         if (err != cudaSuccess) {
             MD_LOG_ERROR << "CUDA memory copy failed for buffer: " << cudaGetErrorString(err);
             throw std::runtime_error("CUDA memory copy to device failed");
