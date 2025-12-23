@@ -15,17 +15,22 @@ pip install build
 python -m build
 ```
 
+在生成pybind文件后运行 `pybind11-stubgen modeldelploy` 可生成pyi的接口文档
+
 #### 2.模型加密
 
 ModelDeploy采用XOR实现了简单的模型加密功能
+
 ##### 2.1 模型加密文件格式：
-- [4字节] 魔数 "MDEN (ModelDeploy ENcrypted)
+
+- [4字节] 魔数 "MDEN (ModelDeploy Encrypted)
 - [4字节] 版本号 (当前为1
 - [4字节] 模型格式字符串长度
-- [N字节] 模型格式字符串 (如 "onnx",mnn", engine)
+- [N字节] 模型格式字符串 (如 "onnx", "mnn", "engine")
 - [4字节] 模型原始字节的CRC32校验和
 - [4字节] 加密数据长度
 - [N字节] 加密后的模型数据(XOR)
+
 ##### 2.2 模型加密方法：
 
 ```bash
@@ -36,7 +41,9 @@ model_encrypted encrypt yolo11n.onnx yolo11n_nms.mdenc 123456 onnx
 ```
 
 ##### 2.3 加密模型的使用
+
 加密模型的使用与未加密模型的使用方式基本一致，在RuntimeOption中设置秘钥即可
+
 ```c++
 modeldeploy::RuntimeOption option;
 option.password = "123456";
@@ -62,11 +69,11 @@ modeldeploy::vision::detection::UltralyticsDet yolo11_det("yolo11n.mdenc", optio
 - 创建一个新cmake项目`test_modeldeploy`,`CMakeLists.txt`文件中添加modeldeploy的头文件路径和库文件路径
 
 ```cmake
-CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
 PROJECT(test_modeldeploy C CXX)
 # 注意modeldeploy需要完整的c++17标准支持
 set(CMAKE_CXX_STANDARD 17)
-# msvc中必须添加该编译选项
+# msvc中必须添加该编译选项,不然会出现一堆该死的编码问题
 if (MSVC)
     add_compile_options(/utf-8)
 endif ()
@@ -76,32 +83,32 @@ set(MD_INC_DIR "${MD_DIR}/include")
 set(MD_LIB_DIR "${MD_DIR}/lib")
 include_directories(${MD_INC_DIR})
 link_directories(${MD_LIB_DIR})
-# 设置opencv目录（注意本SDK未将opencv显示导出，需要自行指定本地的opencv目录）
-set(OpenCV_DIR "E:/develop/opencv5.x/x64/vc17/staticlib")
-find_package(OpenCV REQUIRED)
-# 添加可执行文件和依赖的库
+# 添加可执行文件和依赖的库，很高兴的告诉大家在1.6版本后，ModelDeploySDK对OpenCV的接口进行封装(ImageData类)，
+# 在依赖ModelDeploySDk时，无需依赖本地的OpenCV
 add_executable(test_modeldeploy ${PROJECT_SOURCE_DIR}/main.cpp)
-target_link_libraries(test_modeldeploy ModelDeploySDK ${OpenCV_LIBS})
+target_link_libraries(test_modeldeploy ModelDeploySDK)
 ```
 
 - 创建一个main.cpp文件，并添加以下代码
 
 ```c++
 #include "modeldeploy/vision.h"
-#include <opencv2/opencv.hpp>
 
 int main() {
     modeldeploy::RuntimeOption option;
+    // 使用GPU后CPU线程基本无效，请自行测试
     option.set_cpu_thread_num(10);
-    option.use_gpu();
-    option.use_trt_backend();
     option.use_gpu(0);
+    // onnxruntime 后端可以开启TRTProviderExecutor
+    option.use_trt_backend();
+    // 开启fp16支持
     option.enable_fp16 = true;
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    // 注意：trt后端需要提前准备trtexec生成的.engine文件，下方有讲onnx转trt engine的命令
+    // 注意：trt后端需要提前准备trtexec生成的.engine文件，我个人觉得在使用onnx模型时，
+    // 需要提前使用trtexec生成.engine文件，在线build engine太费时间，参数还不好调整
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("./yolo11n_nms_dyn.engine",option);
-    auto img = cv::imread("./test_person.jpg");
+    auto img = modeldeploy::ImageData::imread("./test_person.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().set_size({320, 320});
     int warming_up_count = 10;
@@ -117,8 +124,7 @@ int main() {
     timers.print_benchmark();
     const auto vis_image =
         modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,true);
-    cv::imshow("test", vis_image);
-    cv::waitKey(0);
+    vis_image.show("vis");
 }
 ```
 
@@ -127,6 +133,7 @@ int main() {
 #### 3.OnnxRuntime使用混合精度推理
 
 将fp32模型转换为fp16模型，在输入输出插入cast算子，将fp32转换为fp16，然后将输出参数从fp16转化为fp32
+其实我个人觉得没必要，用OnnxRuntime推理时用GPU就老老实实用trt provider，开启pf32会自动生成fp16的engine
 
 ```python
 import onnx
@@ -166,6 +173,8 @@ quantize_dynamic(
 ```
 
 #### 5.trt engine生成
+
+# 以下只是一个示例，更多参数请自行翻阅官网
 
 ```bash
 trtexec --onnx=yolo11n_nms.onnx ^

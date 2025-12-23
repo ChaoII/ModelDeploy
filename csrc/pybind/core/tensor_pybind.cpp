@@ -51,7 +51,8 @@ namespace modeldeploy {
                             void* data_ptr = nullptr;
                             data_ptr = reinterpret_cast<void*>(data_addr);
                             Tensor fd_tensor;
-                            fd_tensor.from_external_memory(data_ptr, shape, tensor_data_type, nullptr, name);
+                            fd_tensor.from_external_memory(data_ptr, shape, tensor_data_type, nullptr, Device::CPU,
+                                                           name);
                             return fd_tensor;
                         }, pybind11::arg("name"),
                         pybind11::arg("data_addr"),
