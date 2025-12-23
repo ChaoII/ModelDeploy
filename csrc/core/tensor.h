@@ -6,8 +6,8 @@
 #include <stdexcept>
 #include <functional>
 #include <iostream>
-
 #include "core/md_decl.h"
+#include "core/enum_variables.h"
 
 namespace modeldeploy {
     enum class DataType {
@@ -40,31 +40,25 @@ namespace modeldeploy {
     }
 
 
-    // 内存池管理器
-    class MemoryPool {
-    public:
-        static void* allocate(size_t size);
-        static void* reallocate(void* ptr, size_t new_size);
-        static void* allocate_cuda(size_t size);
-        static void deallocate(void* ptr);
-        static void* reallocate_cuda(void* ptr, size_t new_size);
-        static void deallocate_cuda(void* ptr);
-    };
-
     // 内存块封装，支持引用计数
     class MemoryBlock {
     public:
-        explicit MemoryBlock(size_t size);
-        MemoryBlock(void* data, size_t size, std::function<void(void*)> deleter);
+        explicit MemoryBlock(size_t size, Device device);
+        // 通过外部buffer拷贝buffer并构造一个MemoryBlock
+        MemoryBlock(const void* data, size_t size, Device device);
+        // 外部数据共享构造一个MemoryBlock，如果不传deleter，则默认使用内存的释放Tensor不做管理
+        MemoryBlock(void* data, size_t size, Device device, std::function<void(void*)> deleter);
         ~MemoryBlock();
-
         void* data() { return data_; }
         [[nodiscard]] const void* data() const { return data_; }
         [[nodiscard]] size_t size() const { return size_; }
+        bool copy_from_extern_buffer(void* data, size_t size, Device extern_device) const;
+        bool shared_from_extern_buffer(void* data, size_t size, Device extern_device);
 
     private:
         void* data_;
         size_t size_;
+        Device device_;
         std::function<void(void*)> deleter_;
     };
 
@@ -74,8 +68,8 @@ namespace modeldeploy {
     public:
         // 构造函数
         Tensor() = default;
-        Tensor(const std::vector<int64_t>& shape, DataType dtype, std::string name = "");
-        Tensor(void* data, const std::vector<int64_t>& shape, DataType dtype,
+        Tensor(const std::vector<int64_t>& shape, DataType dtype, Device device = Device::CPU, std::string name = "");
+        Tensor(void* data, const std::vector<int64_t>& shape, DataType dtype, Device device,
                std::function<void(void*)> deleter = nullptr, std::string name = "");
         Tensor(const Tensor& other);
         Tensor(Tensor&& other) noexcept;
@@ -101,13 +95,9 @@ namespace modeldeploy {
 
         // 数据操作接口 - 优化版本
         template <typename T>
-        void set_data(const T* data, size_t size);
-        template <typename T>
-        void set_data(std::vector<T>&& data); // 移动语义版本
+        void set_data(const T* data, size_t size, Device device, bool copy);
         template <typename T>
         const T* data_ptr() const; // 返回指针而非复制
-        template <typename T>
-        std::vector<T> get_data() const; // 保留兼容性
 
         // 索引操作
         template <typename T>
@@ -130,11 +120,16 @@ namespace modeldeploy {
         // 原地操作
         [[nodiscard]] Tensor clone() const;
         void resize(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
-        void allocate(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
+        void allocate(const std::vector<int64_t>& shape,
+                      const DataType& dtype,
+                      Device device = Device::CPU,
+                      const std::string& name = "");
         void from_external_memory(void* data,
                                   const std::vector<int64_t>& shape, DataType dtype,
-                                  std::function<void(void*)> deleter = [](void*) {
-                                  }, std::string name = "");
+                                  std::function<void(void*)> deleter = nullptr,
+                                  Device device = Device::CPU,
+                                  std::string name = "");
+        bool copy_from_extern_memory(void* data, size_t byte_size, Device extern_device);
         // 其他操作
         void set_display_max_ele_width(int width);
         void print(std::ostream& os = std::cout) const;
@@ -158,6 +153,7 @@ namespace modeldeploy {
         std::vector<int64_t> strides_{};
         DataType dtype_{DataType::FP32};
         std::shared_ptr<MemoryBlock> memory_{}; // 替代原来的data_buffer_
+        Device device_{Device::CPU};
         size_t element_size_{0};
         void* data_ptr_{nullptr}; // 指向实际数据的指针，可能是memory_内部的数据或外部数据
         bool owns_data_{true}; // 是否拥有数据所有权

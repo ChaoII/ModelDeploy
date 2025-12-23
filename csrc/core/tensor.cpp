@@ -8,6 +8,17 @@
 #include <cmath>
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
+// CUDA错误检查宏
+#define CUDA_CHECK(call) \
+    do { \
+    cudaError_t error = (call); \
+    if (error != cudaSuccess) { \
+    std::ostringstream oss; \
+    oss << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " \
+    << cudaGetErrorString(error); \
+    throw std::runtime_error(oss.str()); \
+    } \
+    } while(0)
 #endif
 
 #include <iomanip>
@@ -15,59 +26,92 @@
 #include "md_log.h"
 
 namespace modeldeploy {
-    // MemoryPool实现
-    void* MemoryPool::allocate(const size_t size) {
-        return malloc(size);
-    }
-
-    void MemoryPool::deallocate(void* ptr) {
-        free(ptr);
-    }
-
-    void* MemoryPool::reallocate(void* ptr, const size_t new_size) {
-        return realloc(ptr, new_size);
-    }
-
-    void* MemoryPool::allocate_cuda(const size_t size) {
-#ifdef WITH_GPU
-        void* ptr = nullptr;
-        const cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostAllocWriteCombined);
-        if (err != cudaSuccess) {
-            // 记录日志 or 抛异常
-            return nullptr;
-        }
-        return ptr;
-#else
-        MD_LOG_FATAL << "MemoryPool::allocate_cuda is not supported, please build [-DWITH_GPU=ON] "<<std::endl;
-#endif
-    }
-
-    void* MemoryPool::reallocate_cuda(void* ptr, const size_t new_size) {
-        return nullptr;
-    }
-
-    void MemoryPool::deallocate_cuda(void* ptr) {
-#ifdef WITH_GPU
-        if (!ptr) return;
-        cudaFreeHost(ptr);
-#else
-        MD_LOG_FATAL << "MemoryPool::allocate_cuda is not supported, please build [-DWITH_GPU=ON] "<<std::endl;
-#endif
-    }
-
-
     // MemoryBlock实现
-    MemoryBlock::MemoryBlock(const size_t size)
-        : size_(size), deleter_([](void* ptr) { MemoryPool::deallocate(ptr); }) {
-        data_ = MemoryPool::allocate(size);
+    MemoryBlock::MemoryBlock(const size_t size, Device device)
+        : size_(size), device_(device), deleter_(nullptr) {
+        if (device == Device::CPU) {
+            data_ = std::malloc(size);
+            deleter_ = [](void* ptr) { free(ptr); };
+        }
+#ifdef WITH_GPU
+        else if (device == Device::GPU) {
+            CUDA_CHECK(cudaMalloc(&data_, size));
+            deleter_ = [](void* ptr) { cudaFree(ptr); };
+        }
+#endif
+        else {
+            throw std::runtime_error("Unsupported device type");
+        }
+
         if (!data_) {
             throw std::bad_alloc();
         }
     }
 
-    MemoryBlock::MemoryBlock(void* data, const size_t size, std::function<void(void*)> deleter)
-        : data_(data), size_(size), deleter_(std::move(deleter)) {
+    MemoryBlock::MemoryBlock(const void* data, const size_t size, const Device device): size_(size), device_(device) {
+        if (device == Device::CPU) {
+            data_ = std::malloc(size);
+            if (!data_) {
+                MD_LOG_ERROR << "Failed to allocate memory";
+                return;
+            }
+            std::memcpy(data_, data, size);
+            deleter_ = [](void* ptr) { free(ptr); };
+        }
+        else if (device == Device::GPU) {
+            CUDA_CHECK(cudaMalloc(&data_, size));
+            CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToDevice));
+            deleter_ = [](void* ptr) { cudaFree(ptr); };
+        }
     }
+
+
+    MemoryBlock::MemoryBlock(void* data, const size_t size, const Device device, std::function<void(void*)> deleter)
+        : data_(data), size_(size), device_(device), deleter_(std::move(deleter)) {
+    }
+
+    bool MemoryBlock::copy_from_extern_buffer(void* data, size_t size, Device extern_device) const {
+        if (size_ < size) {
+            MD_LOG_ERROR << "Failed to allocate memory";
+            return false;
+        }
+        if (extern_device == Device::CPU && device_ == Device::CPU) {
+            std::memcpy(data_, data, size);
+            if (!data_) {
+                MD_LOG_ERROR << "Failed to allocate memory";
+                return false;
+            }
+        }
+        try {
+#ifdef WITH_GPU
+            if (extern_device == Device::GPU && device_ == Device::GPU) {
+                CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToDevice));
+            }
+            if (extern_device == Device::CPU && device_ == Device::GPU) {
+                CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyHostToDevice));
+            }
+            if (extern_device == Device::GPU && device_ == Device::CPU) {
+                CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToHost));
+            }
+        }
+        catch (const std::exception& e) {
+            MD_LOG_ERROR << "CUDA error: " << e.what();
+            return false;
+        }
+#endif
+        return true;
+    }
+
+    bool MemoryBlock::shared_from_extern_buffer(void* data, const size_t size, const Device extern_device) {
+        if (device_ != extern_device) {
+            MD_LOG_ERROR << "Device mismatch";
+            return false;
+        }
+        data_ = data;
+        size_ = size;
+        return true;
+    }
+
 
     MemoryBlock::~MemoryBlock() {
         if (data_ && deleter_) {
@@ -89,44 +133,50 @@ namespace modeldeploy {
         }
     }
 
-    Tensor::Tensor(const std::vector<int64_t>& shape, const DataType dtype, std::string name)
-        : name_(std::move(name)), shape_(shape), dtype_(dtype), element_size_(get_element_size(dtype)) {
+    Tensor::Tensor(const std::vector<int64_t>& shape, const DataType dtype, Device device, std::string name)
+        : name_(std::move(name)), shape_(shape), dtype_(dtype), device_(device),
+          element_size_(get_element_size(dtype)) {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
-        memory_ = std::make_shared<MemoryBlock>(total_size);
+        memory_ = std::make_shared<MemoryBlock>(total_size, device);
         data_ptr_ = memory_->data();
         calculate_strides();
     }
 
-    Tensor::Tensor(void* data, const std::vector<int64_t>& shape, const DataType dtype,
+    Tensor::Tensor(void* data, const std::vector<int64_t>& shape, const DataType dtype, Device device,
                    std::function<void(void*)> deleter, std::string name)
-        : name_(std::move(name)), shape_(shape), dtype_(dtype), element_size_(get_element_size(dtype)) {
+        : name_(std::move(name)), shape_(shape), dtype_(dtype), device_(device),
+          element_size_(get_element_size(dtype)) {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
-
         if (deleter) {
             // 使用外部内存和自定义删除器
-            memory_ = std::make_shared<MemoryBlock>(data, total_size, std::move(deleter));
+            memory_ = std::make_shared<MemoryBlock>(data, total_size, device, std::move(deleter));
             owns_data_ = false;
         }
         else {
             // 复制外部数据
-            memory_ = std::make_shared<MemoryBlock>(total_size);
-            std::memcpy(memory_->data(), data, total_size);
+            memory_ = std::make_shared<MemoryBlock>(total_size, device);
+            if (!memory_->copy_from_extern_buffer(data, total_size, device)) {
+                MD_LOG_ERROR << "Failed to copy data from extern buffer";
+                return;
+            }
             owns_data_ = true;
         }
         data_ptr_ = memory_->data();
         calculate_strides();
     }
 
-    Tensor::Tensor(const Tensor& other)
-        : name_(other.name_), shape_(other.shape_), strides_(other.strides_),
-          dtype_(other.dtype_), element_size_(other.element_size_) {
+    Tensor::Tensor(const Tensor& other): name_(other.name_),
+                                         shape_(other.shape_),
+                                         strides_(other.strides_),
+                                         dtype_(other.dtype_),
+                                         device_(other.device_),
+                                         element_size_(other.element_size_) {
         if (other.owns_data_) {
-            // 如果原始张量拥有数据，我们需要复制数据
-            memory_ = std::make_shared<MemoryBlock>(other.byte_size());
+            // 如果原始张量拥有数据，需要复制数据
+            memory_ = std::make_shared<MemoryBlock>(other.data_ptr_, other.byte_size(), other.device_);
             data_ptr_ = memory_->data();
-            std::memcpy(data_ptr_, other.data_ptr_, other.byte_size());
             owns_data_ = true;
         }
         else {
@@ -137,11 +187,15 @@ namespace modeldeploy {
         }
     }
 
-    Tensor::Tensor(Tensor&& other) noexcept
-        : name_(std::move(other.name_)), shape_(std::move(other.shape_)),
-          strides_(std::move(other.strides_)), dtype_(other.dtype_),
-          memory_(std::move(other.memory_)), element_size_(other.element_size_),
-          data_ptr_(other.data_ptr_), owns_data_(other.owns_data_) {
+    Tensor::Tensor(Tensor&& other) noexcept: name_(std::move(other.name_)),
+                                             shape_(std::move(other.shape_)),
+                                             strides_(std::move(other.strides_)),
+                                             dtype_(other.dtype_),
+                                             memory_(std::move(other.memory_)),
+                                             device_(other.device_),
+                                             element_size_(other.element_size_),
+                                             data_ptr_(other.data_ptr_),
+                                             owns_data_(other.owns_data_) {
         other.data_ptr_ = nullptr;
         other.owns_data_ = false;
     }
@@ -153,12 +207,11 @@ namespace modeldeploy {
             strides_ = other.strides_;
             dtype_ = other.dtype_;
             element_size_ = other.element_size_;
-
+            device_ = other.device_;
             if (other.owns_data_) {
-                // 复制数据
-                memory_ = std::make_shared<MemoryBlock>(other.byte_size());
+                // // 如果原始张量拥有数据，需要复制数据
+                memory_ = std::make_shared<MemoryBlock>(other.data_ptr_, other.byte_size(), other.device_);
                 data_ptr_ = memory_->data();
-                std::memcpy(data_ptr_, other.data_ptr_, other.byte_size());
                 owns_data_ = true;
             }
             else {
@@ -179,6 +232,7 @@ namespace modeldeploy {
             dtype_ = other.dtype_;
             element_size_ = other.element_size_;
             memory_ = std::move(other.memory_);
+            device_ = other.device_;
             data_ptr_ = other.data_ptr_;
             owns_data_ = other.owns_data_;
             other.data_ptr_ = nullptr;
@@ -229,32 +283,17 @@ namespace modeldeploy {
     }
 
     template <typename T>
-    void Tensor::set_data(const T* data, const size_t size) {
+    void Tensor::set_data(const T* data, const size_t size, Device device, const bool copy) {
         if (size * sizeof(T) != byte_size()) {
             throw std::runtime_error("dtype mismatch");
         }
-        std::memcpy(data_ptr_, data, byte_size());
-    }
-
-    template <typename T>
-    void Tensor::set_data(std::vector<T>&& data) {
-        if (data.size() * sizeof(T) != byte_size()) {
-            throw std::runtime_error("dtype mismatch");
+        if (copy) {
+            memory_->copy_from_extern_buffer(data, byte_size(), device);
         }
-        // 创建新的内存块直接使用移动后的数据
-        auto raw_data = data.data();
-        size_t data_size = data.size() * sizeof(T);
-        // 使用自定义删除器释放内存
-        data.clear(); // 清空但不释放内存
-        memory_ = std::make_shared<MemoryBlock>(
-            raw_data, data_size,
-            [vec = std::move(data)](void*) mutable {
-                // 当内存块被销毁时，让vector的析构函数释放内存
-                std::vector<T>().swap(vec);
-            }
-        );
+        else {
+            memory_->shared_from_extern_buffer(data, byte_size(), device);
+        }
         data_ptr_ = memory_->data();
-        owns_data_ = true;
     }
 
     template <typename T>
@@ -264,17 +303,6 @@ namespace modeldeploy {
         }
         return static_cast<const T*>(data_ptr_);
     }
-
-    template <typename T>
-    std::vector<T> Tensor::get_data() const {
-        if (sizeof(T) != element_size_) {
-            throw std::runtime_error("dtype mismatch");
-        }
-        std::vector<T> result(size());
-        std::memcpy(result.data(), data_ptr_, byte_size());
-        return result;
-    }
-
 
     // 索引操作
     template <typename T>
@@ -423,8 +451,7 @@ namespace modeldeploy {
         // 保存旧的数据信息
         const DataType old_dtype = dtype_;
         const size_t old_total_size = byte_size();
-        const void* old_data = data_ptr_;
-
+        void* old_data = data_ptr_;
         // 更新元数据
         if (!name.empty()) {
             name_ = name;
@@ -441,12 +468,11 @@ namespace modeldeploy {
             return;
         }
         // 分配新内存
-        auto new_memory = std::make_shared<MemoryBlock>(new_size);
-        void* new_data = new_memory->data();
+        auto new_memory = std::make_shared<MemoryBlock>(new_size, device_);
         // 如果数据类型相同，尝试复制旧数据
         if (old_dtype == dtype && old_data != nullptr) {
             const size_t copy_size = std::min(old_total_size, new_size);
-            std::memcpy(new_data, old_data, copy_size);
+            new_memory->copy_from_extern_buffer(old_data, copy_size, device_);
         }
         // 更新内存和数据指针
         memory_ = std::move(new_memory);
@@ -454,21 +480,23 @@ namespace modeldeploy {
         owns_data_ = true;
     }
 
-    void Tensor::allocate(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name) {
+    void Tensor::allocate(const std::vector<int64_t>& shape, const DataType& dtype, Device device,
+                          const std::string& name) {
         validate_shape(shape);
         name_ = name;
         shape_ = shape;
         dtype_ = dtype;
         element_size_ = get_element_size(dtype);
+        device_ = device;
         calculate_strides();
         size_t total_size = calculate_total_size();
-        memory_ = std::make_shared<MemoryBlock>(total_size);
+        memory_ = std::make_shared<MemoryBlock>(total_size, device);
         data_ptr_ = memory_->data();
         owns_data_ = true;
     }
 
     void Tensor::from_external_memory(void* data, const std::vector<int64_t>& shape, const DataType dtype,
-                                      std::function<void(void*)> deleter, std::string name) {
+                                      std::function<void(void*)> deleter, Device device, std::string name) {
         name_ = std::move(name);
         shape_ = shape,
             dtype_ = dtype,
@@ -477,17 +505,30 @@ namespace modeldeploy {
         size_t total_size = calculate_total_size();
         if (deleter) {
             // 使用外部内存和自定义删除器
-            memory_ = std::make_shared<MemoryBlock>(data, total_size, std::move(deleter));
+            memory_ = std::make_shared<MemoryBlock>(data, total_size, device, std::move(deleter));
             owns_data_ = false;
         }
         else {
             // 复制外部数据
-            memory_ = std::make_shared<MemoryBlock>(total_size);
-            std::memcpy(memory_->data(), data, total_size);
+            memory_ = std::make_shared<MemoryBlock>(data, total_size, device);
             owns_data_ = true;
         }
         data_ptr_ = memory_->data();
         calculate_strides();
+    }
+
+    bool Tensor::copy_from_extern_memory(void* data, const size_t byte_size, const Device extern_device) {
+        if (this->byte_size() != byte_size) {
+            MD_LOG_ERROR << "Error: Invalid byte size, expected: " << this->byte_size() << ", actual: " << byte_size <<
+                std::endl;
+            return false;
+        }
+        if (!memory_->copy_from_extern_buffer(data, byte_size, extern_device)) {
+            MD_LOG_ERROR << "Error: Failed to copy from extern memory" << std::endl;
+            return false;
+        }
+        data_ptr_ = memory_->data();
+        return true;
     }
 
 
@@ -502,7 +543,8 @@ namespace modeldeploy {
     }
 
 
-    std::string data_ptr_to_string(const void* data, const size_t index, const DataType dtype, int max_ele_width) {
+    std::string data_ptr_to_string(const void* data, const size_t index, const DataType dtype,
+                                   const int max_ele_width) {
         std::ostringstream oss;
         switch (dtype) {
         case DataType::FP32:
@@ -536,6 +578,9 @@ namespace modeldeploy {
         if (is_empty()) {
             std::cout << "Empty tensor" << std::endl;
             return;
+        }
+        if (device_ != Device::CPU) {
+            MD_LOG_ERROR << "Tensor is not on CPU";
         }
         std::function<void(const void*, const std::vector<int64_t>&, std::vector<size_t>&, size_t)> print_helper;
         print_helper = [&](const void* data, const std::vector<int64_t>& shape,
@@ -642,7 +687,7 @@ namespace modeldeploy {
         std::vector<int64_t> new_shape = first_shape;
         new_shape[axis] = concat_size;
         // 创建结果张量
-        Tensor result(new_shape, tensors[0].dtype(), "concat_result");
+        Tensor result(new_shape, tensors[0].dtype(), Device::CPU, "concat_result");
         // 计算每个张量的元素大小
         const size_t element_size = tensors[0].element_size_;
         // 计算轴步长
@@ -685,7 +730,7 @@ namespace modeldeploy {
             throw std::runtime_error("Softmax axis out of range");
         }
         // 创建结果张量
-        Tensor result(shape_, dtype_, name_ + "_softmax");
+        Tensor result(shape_, dtype_, Device::CPU, name_ + "_softmax");
         // 获取数据指针
         const auto* src_data = static_cast<const float*>(data_ptr_);
         auto* dest_data = static_cast<float*>(result.data());
@@ -829,7 +874,7 @@ namespace modeldeploy {
 
     Tensor TensorView::to_tensor() const {
         // 创建新的张量，复制视图中的数据
-        Tensor result(shape_, base_tensor_->dtype(), base_tensor_->get_name() + "_from_view");
+        Tensor result(shape_, base_tensor_->dtype(), Device::CPU, base_tensor_->get_name() + "_from_view");
         // 如果数据在内存中是连续的，可以一次性复制
         if (is_contiguous()) {
             std::memcpy(result.data(), data_ptr_, byte_size());
@@ -991,10 +1036,7 @@ namespace modeldeploy {
     template const int8_t& TensorView::at<int8_t>(const std::vector<int64_t>&) const;
 
     // 这里添加了Tensor类中的数据操作接口的显式实例化
-    template void Tensor::set_data<double>(const double*, size_t);
-    template void Tensor::set_data<double>(std::vector<double>&&);
     template const double* Tensor::data_ptr<double>() const;
-    template std::vector<double> Tensor::get_data<double>() const;
 
     // 显式实例化TensorView的常用类型
     template float& Tensor::at<float>(const std::vector<int64_t>&);

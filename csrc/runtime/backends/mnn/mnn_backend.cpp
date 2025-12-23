@@ -170,7 +170,7 @@ namespace modeldeploy {
     std::vector<TensorInfo> MnnBackend::get_output_infos() { return outputs_desc_; }
 
     bool MnnBackend::infer(std::vector<Tensor>& inputs,
-                               std::vector<Tensor>* outputs) {
+                           std::vector<Tensor>* outputs) {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR << "[MnnBackend] Size of the inputs(" << inputs.size()
                 << ") should keep same with the inputs of this model("
@@ -200,7 +200,7 @@ namespace modeldeploy {
             outputs_desc_[i].name = mnn_outputs[i]->name();
             outputs->resize(outputs_desc_.size());
             (*outputs)[i].allocate(convert_shape<int, int64_t>(outputs_desc_[i].shape),
-                                   outputs_desc_[i].dtype, outputs_desc_[i].name);
+                                   outputs_desc_[i].dtype, Device::CPU, outputs_desc_[i].name);
             memcpy((*outputs)[i].data(), mnn_outputs[i]->readMap<void>(), (*outputs)[i].byte_size());
         }
         return true;

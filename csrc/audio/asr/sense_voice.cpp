@@ -108,16 +108,16 @@ namespace modeldeploy::audio::asr {
         outputs->resize(4); // x,x_length,language,text_norm
         //x
         const std::vector<int64_t> shape_0 = {1, static_cast<int64_t>(feats.size() / 560), 560};
-        (*outputs)[0] = std::move(Tensor(feats.data(), shape_0, DataType::FP32));
+        (*outputs)[0] = std::move(Tensor(feats.data(), shape_0, DataType::FP32, Device::CPU));
         //x_length
         auto x_length = static_cast<int32_t>(feats.size() / 560);
-        (*outputs)[1] = std::move(Tensor(&x_length, std::vector<int64_t>{1}, DataType::INT32));
+        (*outputs)[1] = std::move(Tensor(&x_length, std::vector<int64_t>{1}, DataType::INT32, Device::CPU));
         //language
         int32_t lang = lang_id_["lang_zh"];
-        (*outputs)[2] = std::move(Tensor(&lang, std::vector<int64_t>{1}, DataType::INT32));
+        (*outputs)[2] = std::move(Tensor(&lang, std::vector<int64_t>{1}, DataType::INT32, Device::CPU));
         //text_norm
         int32_t text_norm = with_itn_;
-        (*outputs)[3] = std::move(Tensor(&text_norm, std::vector<int64_t>{1}, DataType::INT32));
+        (*outputs)[3] = std::move(Tensor(&text_norm, std::vector<int64_t>{1}, DataType::INT32, Device::CPU));
         return true;
     }
 

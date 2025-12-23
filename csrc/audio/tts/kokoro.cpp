@@ -172,12 +172,12 @@ namespace modeldeploy::audio::tts {
         outputs->resize(3); // tokens,style,speed
         //tokens
         const std::vector shape_0 = {1, static_cast<int64_t>(token_ids.size())};
-        (*outputs)[0] = std::move(Tensor(token_ids.data(), shape_0, DataType::INT64));
+        (*outputs)[0] = std::move(Tensor(token_ids.data(), shape_0, DataType::INT64,Device::CPU));
         // style
         const std::vector shape_1 = {style_dims_[1], style_dims_[2]};
-        (*outputs)[1] = std::move(Tensor(style.data(), shape_1, DataType::FP32));
+        (*outputs)[1] = std::move(Tensor(style.data(), shape_1, DataType::FP32,Device::CPU));
         //speed
-        (*outputs)[2] = std::move(Tensor(&speed, std::vector<int64_t>{1}, DataType::FP32));
+        (*outputs)[2] = std::move(Tensor(&speed, std::vector<int64_t>{1}, DataType::FP32,Device::CPU));
         return true;
     }
 
