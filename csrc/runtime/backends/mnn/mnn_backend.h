@@ -4,39 +4,44 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+#include <MNN/expr/Module.hpp>
+#include "core/tensor.h"
 #include "runtime/backends/backend.h"
+#include "runtime/backends/mnn/option.h"
 
 namespace modeldeploy {
-    class MnnBackendImpl;
-
-    class MODELDEPLOY_CXX_EXPORT MnnBackend : public BaseBackend {
+    class MnnBackend : public BaseBackend {
     public:
-        MnnBackend();
+        MnnBackend() = default;
+        ~MnnBackend() override = default;
+        bool init(const RuntimeOption& runtime_option) override;
 
-        ~MnnBackend() override;
+        void build_option(const RuntimeOption& option);
 
-        bool init(const RuntimeOption& option) override;
+        [[nodiscard]] size_t num_inputs() const override {
+            return inputs_desc_.size();
+        }
 
-        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
-
-        std::unique_ptr<BaseBackend> clone(RuntimeOption& runtime_option,
-                                           void* stream = nullptr, int device_id = -1) override;
-
-        [[nodiscard]] size_t num_inputs() const override;
-
-        [[nodiscard]] size_t num_outputs() const override;
+        [[nodiscard]] size_t num_outputs() const override {
+            return outputs_desc_.size();
+        }
 
         TensorInfo get_input_info(int index) override;
-
         TensorInfo get_output_info(int index) override;
-
         std::vector<TensorInfo> get_input_infos() override;
-
         std::vector<TensorInfo> get_output_infos() override;
-
+        bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
         [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const override;
 
     private:
-        std::unique_ptr<MnnBackendImpl> impl_;
+        bool initialized_ = false;
+        std::shared_ptr<MNN::Express::Executor::RuntimeManager> rtmgr_;
+        MnnBackendOption option_;
+        std::string model_buffer_;
+        std::shared_ptr<MNN::Express::Module> net_;
+        std::vector<TensorInfo> inputs_desc_;
+        std::vector<TensorInfo> outputs_desc_;
     };
-}
+} // namespace modeldeploy
