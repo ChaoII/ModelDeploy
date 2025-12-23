@@ -5,6 +5,7 @@
 #include "utils/utils.h"
 #include "pybind/utils/utils.h"
 #include "runtime/runtime.h"
+#include "core/enum_variables.h"
 
 namespace modeldeploy {
     std::vector<pybind11::array>
@@ -64,12 +65,16 @@ namespace modeldeploy {
 
     void bind_runtime(pybind11::module& m) {
         pybind11::enum_<Device>(m, "Device")
-            .value("CPU", CPU)
-            .value("GPU", GPU);
+            .value("CPU", Device::CPU)
+            .value("GPU", Device::GPU)
+            .value("OPENCL", Device::OPENCL)
+            .value("VULKAN", Device::VULKAN);
 
         pybind11::enum_<Backend>(m, "Backend")
             .value("NONE", NONE)
-            .value("ORT", ORT);
+            .value("ORT", ORT)
+            .value("TRT", ORT)
+            .value("MNN", MNN);
 
 
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")
