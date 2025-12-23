@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <thread>
 #include "csrc/vision.h"
-#include "vision/common/display/display.h"
 
 namespace fs = std::filesystem;
 
@@ -57,20 +56,18 @@ void get_image_list(std::vector<std::vector<std::string>>* image_list, const std
 
 int main() {
     modeldeploy::RuntimeOption option;
-    option.set_cpu_thread_num(10);
-    option.use_ort_backend();
+    option.use_trt_backend();
     option.use_gpu(0);
     option.enable_fp16 = true;
     option.enable_trt = true;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
     const modeldeploy::vision::detection::UltralyticsDet model(
-        "../../test_data/test_models/yolo11n.onnx", option);
+        "../../test_data/test_models/yolo11n.engine", option);
     if (!model.is_initialized()) {
         std::cerr << "Failed to initialize model." << std::endl;
         return -1;
     }
     const std::string image_file_path = "F:/ultralytics_workspace/dataset/D000007/split/images/train";
-    constexpr int thread_num = 16;
+    constexpr int thread_num = 8;
     std::vector<decltype(model.clone())> models;
     models.reserve(thread_num);
     for (int i = 0; i < thread_num; ++i) {

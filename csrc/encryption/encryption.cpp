@@ -65,7 +65,7 @@ namespace modeldeploy {
         };
 
         uint32_t crc = 0xFFFFFFFF;
-        for (char c : data) {
+        for (const char c : data) {
             crc = crc_table[(crc ^ static_cast<uint8_t>(c)) & 0xFF] ^ crc >> 8;
         }
         return crc ^ 0xFFFFFFFF;
@@ -83,16 +83,16 @@ namespace modeldeploy {
     }
 
     // 模型加密文件格式：
-    // [4字节] 魔数 "MDEN (ModelDeploy ENcrypted)
-    // [4字节] 版本号 (当前为1
+    // [4字节] 魔数 "MDEN (ModelDeploy Encrypted)
+    // [4字节] 版本号 (当前为1)
     // [4字节] 模型格式字符串长度
-    // [N字节] 模型格式字符串 (如 "onnx",mnn", engine)
+    // [N字节] 模型格式字符串 (如 "onnx", "mnn", "engine")
     // [4字节] 模型原始字节的CRC32校验和
     // [4字节] 加密数据长度
     // [N字节] 加密后的模型数据
 
-    const std::string MAGIC_HEADER = "MDEN";
-    constexpr uint32_t CURRENT_VERSION = 1;
+    const static std::string MAGIC_HEADER = "MDEN";
+    constexpr static uint32_t CURRENT_VERSION = 1;
 
     bool encrypt_model_file(const std::string& input_path, const std::string& output_path,
                             const std::string& password, const std::string& model_format) {
@@ -103,38 +103,32 @@ namespace modeldeploy {
         }
 
         // 计算原始数据的CRC32校验和
-        uint32_t original_crc = calculate_crc32(model_data);
+        const uint32_t original_crc = calculate_crc32(model_data);
 
         // 加密模型数据
-        std::string encrypted_data = xor_encrypt(model_data, password);
-
+        const std::string encrypted_data = xor_encrypt(model_data, password);
         std::ofstream out_file(output_path, std::ios::binary);
         if (!out_file.is_open()) {
             MD_LOG_ERROR << "Failed to create encrypted file: " << output_path << std::endl;
             return false;
         }
-
         // 写入文件头
         // 魔数4字节
         out_file.write(MAGIC_HEADER.c_str(), 4);
         // 版本号
         out_file.write(reinterpret_cast<const char*>(&CURRENT_VERSION), 4);
-
         // 写入模型格式
-        auto format_len = static_cast<uint32_t>(model_format.length());
+        const auto format_len = static_cast<uint32_t>(model_format.length());
         // 模型格式长度4字节
         out_file.write(reinterpret_cast<const char*>(&format_len), 4);
         // 模型格式
         out_file.write(model_format.c_str(), format_len);
-
         // 写入校验和4字节
         out_file.write(reinterpret_cast<const char*>(&original_crc), 4);
-
         // 写入加密数据
-        auto data_len = static_cast<uint32_t>(encrypted_data.length());
+        const auto data_len = static_cast<uint32_t>(encrypted_data.length());
         out_file.write(reinterpret_cast<const char*>(&data_len), 4);
         out_file.write(encrypted_data.c_str(), data_len);
-
         out_file.close();
         MD_LOG_INFO << "Model encrypted successfully: " << output_path << std::endl;
         return true;
@@ -147,7 +141,6 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to open encrypted file: " << input_path << std::endl;
             return false;
         }
-
         // 读取并验证魔数
         char magic[4];
         in_file.read(magic, 4);
@@ -155,7 +148,6 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Invalid encrypted file format" << std::endl;
             return false;
         }
-
         // 读取版本号
         uint32_t version;
         in_file.read(reinterpret_cast<char*>(&version), 4);
@@ -163,34 +155,28 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Unsupported version: " << version << std::endl;
             return false;
         }
-
         // 读取模型格式
         uint32_t format_len;
         in_file.read(reinterpret_cast<char*>(&format_len), 4);
         std::string model_format(format_len, '\0');
         in_file.read(&model_format[0], format_len);
-
         // 读取原始校验和
         uint32_t original_crc;
         in_file.read(reinterpret_cast<char*>(&original_crc), 4);
-
         // 读取加密数据
         uint32_t data_len;
         in_file.read(reinterpret_cast<char*>(&data_len), 4);
         std::string encrypted_data(data_len, '\0');
         in_file.read(&encrypted_data[0], data_len);
         in_file.close();
-
         // 解密数据
         std::string decrypted_data = xor_encrypt(encrypted_data, password);
-
         // 验证解密后的校验和
         uint32_t decrypted_crc = calculate_crc32(decrypted_data);
         if (decrypted_crc != original_crc) {
             MD_LOG_ERROR << "Decryption failed: Incorrect key or corrupted file." << std::endl;
             return false;
         }
-
         // 写入解密后的文件
         std::ofstream out_file(output_path, std::ios::binary);
         if (!out_file.is_open()) {
@@ -199,7 +185,6 @@ namespace modeldeploy {
         }
         out_file.write(decrypted_data.c_str(), static_cast<int64_t>(decrypted_data.length()));
         out_file.close();
-
         MD_LOG_INFO << "Model decrypted successfully: " << output_path << std::endl;
         return true;
     }
@@ -222,13 +207,11 @@ namespace modeldeploy {
         }
         // 跳过魔数和版本号
         file.seekg(8);
-
         // 读取模型格式字符串
         uint32_t format_len;
         file.read(reinterpret_cast<char*>(&format_len), 4);
         std::string model_format(format_len, '\0');
         file.read(&model_format[0], format_len);
-
         file.close();
         return model_format;
     }
@@ -238,13 +221,11 @@ namespace modeldeploy {
         if (!model_buffer || !model_format) {
             return false;
         }
-
         std::ifstream file(file_path, std::ios::binary);
         if (!file.is_open()) {
             MD_LOG_ERROR << "Failed to open encrypted file: " << file_path << std::endl;
             return false;
         }
-
         // 读取并验证魔数
         char magic[4];
         file.read(magic, 4);
@@ -252,7 +233,6 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Invalid encrypted file format" << std::endl;
             return false;
         }
-
         // 读取版本号
         uint32_t version;
         file.read(reinterpret_cast<char*>(&version), 4);
@@ -260,27 +240,22 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Unsupported version: " << version << std::endl;
             return false;
         }
-
         // 读取模型格式字符串
         uint32_t format_len;
         file.read(reinterpret_cast<char*>(&format_len), 4);
         model_format->resize(format_len);
         file.read(&(*model_format)[0], format_len);
-
         // 读取校验和
         uint32_t crc_ref;
         file.read(reinterpret_cast<char*>(&crc_ref), 4);
-
         // 读取加密数据
         uint32_t data_len;
         file.read(reinterpret_cast<char*>(&data_len), 4);
         std::string encrypted_data(data_len, '\0');
         file.read(&encrypted_data[0], data_len);
         file.close();
-
         // 解密数据
         *model_buffer = xor_encrypt(encrypted_data, password);
-
         // 校验解密后的数据
         const uint32_t crc_now = calculate_crc32(*model_buffer);
         if (crc_now != crc_ref) {

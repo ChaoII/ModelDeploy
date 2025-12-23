@@ -24,7 +24,11 @@ namespace modeldeploy {
         option_ = option.trt_option;
         option_.model_file = option.model_file;
         option_.gpu_id = option.device_id;
-        cudaSetDevice(option_.gpu_id);
+        const cudaError_t error = cudaSetDevice(option_.gpu_id);
+        if (error != cudaSuccess) {
+            MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
+            return false;
+        }
         runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
         if (option.model_from_memory) {
             return load_trt_cache(option.model_buffer);
@@ -105,11 +109,7 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Require " << num_inputs() << " inputs, but got " << inputs.size() << "." << std::endl;
             return false;
         }
-        const cudaError_t error = cudaSetDevice(option_.gpu_id);
-        if (error != cudaSuccess) {
-            MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
-            return false;
-        }
+
         // z自动管理分贝的cuda 内存
         std::vector<CudaBufferPrt> device_buffers;
         // 处理输入缓冲区
@@ -211,8 +211,8 @@ namespace modeldeploy {
         return infos;
     }
 
-    std::unique_ptr<TrtBackend> TrtBackend::clone(const RuntimeOption& runtime_option,
-                                                  void* stream, const int device_id) {
+    std::unique_ptr<BaseBackend> TrtBackend::clone(const RuntimeOption& runtime_option,
+                                                   void* stream, const int device_id) {
         auto new_backend = std::make_unique<TrtBackend>();
         if (device_id > 0 && device_id != option_.gpu_id) {
             auto clone_option = option_;

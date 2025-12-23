@@ -15,7 +15,7 @@ namespace modeldeploy {
 
         bool infer();
 
-        Runtime* clone(void* stream = nullptr, int device_id = -1);
+        std::unique_ptr<Runtime> clone(void* stream = nullptr, int device_id = -1) const;
 
         [[nodiscard]] size_t num_inputs() const { return backend_->num_inputs(); }
 
@@ -44,11 +44,11 @@ namespace modeldeploy {
         RuntimeOption option;
 
     private:
-        void create_ort_backend();
+        bool create_ort_backend();
 
-        void create_mnn_backend();
+        bool create_mnn_backend();
 
-        void create_trt_backend();
+        bool create_trt_backend();
 
         std::unique_ptr<BaseBackend> backend_;
         std::vector<Tensor> input_tensors_;

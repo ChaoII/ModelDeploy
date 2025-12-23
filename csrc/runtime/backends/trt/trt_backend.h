@@ -40,9 +40,9 @@ namespace modeldeploy {
         TensorInfo get_output_info(int index) override;
         std::vector<TensorInfo> get_input_infos() override;
         std::vector<TensorInfo> get_output_infos() override;
-        std::unique_ptr<TrtBackend> clone(const RuntimeOption& runtime_option,
-                                              void* stream = nullptr,
-                                              int device_id = -1);
+        std::unique_ptr<BaseBackend> clone(const RuntimeOption& runtime_option,
+                                           void* stream = nullptr,
+                                           int device_id = -1) override;
 
     private:
         bool initialized_ = false;
