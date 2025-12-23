@@ -15,25 +15,8 @@ namespace modeldeploy {
             .def("num_outputs", &BaseModel::num_outputs)
             .def("get_input_info", &BaseModel::get_input_info, pybind11::arg("index"))
             .def("get_output_info", &BaseModel::get_output_info, pybind11::arg("index"))
-            .def("get_custom_meta_data",
-                 [](BaseModel& self) {
-                     const std::map<std::string, std::string> meta = self.get_custom_meta_data();
-                     pybind11::dict py_meta;
-                     for (const auto& kv : meta) {
-                         py_meta[pybind11::str(kv.first)] = pybind11::str(kv.second);
-                     }
-                     return py_meta;
-                 })
-            .def("get_label_map",
-                 [](BaseModel& self, const std::string& label_map_key) {
-                     const std::unordered_map<int, std::string> label_map = self.get_label_map(label_map_key);
-                     pybind11::dict py_label_map;
-                     for (const auto& kv : label_map) {
-                         py_label_map[pybind11::int_(kv.first)] = pybind11::str(kv.second);
-                     }
-                     return py_label_map;
-                 }
-            )
+            .def("get_custom_meta_data", &BaseModel::get_custom_meta_data)
+            .def("get_label_map", &BaseModel::get_label_map)
             .def("initialized", &BaseModel::is_initialized)
             .def_readwrite("runtime_option", &BaseModel::runtime_option);
     }
