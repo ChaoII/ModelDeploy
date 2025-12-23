@@ -87,7 +87,7 @@ namespace modeldeploy {
             }
         }
         if (!is_exist) {
-            Tensor new_tensor(input.data(), input.shape(), input.dtype());
+            Tensor new_tensor(input.data(), input.shape(), input.dtype(), Device::CPU);
             input_tensors_.emplace_back(std::move(new_tensor));
         }
     }
@@ -102,7 +102,7 @@ namespace modeldeploy {
             }
         }
         if (!is_exist) {
-            Tensor new_tensor(output.data(), output.shape(), output.dtype());
+            Tensor new_tensor(output.data(), output.shape(), output.dtype(), Device::CPU);
             input_tensors_.emplace_back(std::move(new_tensor));
         }
     }

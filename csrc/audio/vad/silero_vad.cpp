@@ -74,13 +74,13 @@ namespace modeldeploy::audio::vad {
         input_.assign(data.begin(), data.end());
         outputs->resize(4); // input,sr,h,c
         //input
-        (*outputs)[0] = std::move(Tensor(input_.data(), input_node_shape_, DataType::FP32));
+        (*outputs)[0] = std::move(Tensor(input_.data(), input_node_shape_, DataType::FP32,Device::CPU));
         //sr
-        (*outputs)[1] = std::move(Tensor(sr_.data(), sr_node_shape_, DataType::INT64));
+        (*outputs)[1] = std::move(Tensor(sr_.data(), sr_node_shape_, DataType::INT64,Device::CPU));
         //h
-        (*outputs)[2] = std::move(Tensor(h_.data(), hc_node_shape_, DataType::FP32));
+        (*outputs)[2] = std::move(Tensor(h_.data(), hc_node_shape_, DataType::FP32,Device::CPU));
         //c
-        (*outputs)[3] = std::move(Tensor(c_.data(), hc_node_shape_, DataType::FP32));
+        (*outputs)[3] = std::move(Tensor(c_.data(), hc_node_shape_, DataType::FP32,Device::CPU));
         return true;
     }
 

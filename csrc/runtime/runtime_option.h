@@ -7,7 +7,7 @@
 #include "backends/trt/option.h"
 #include "runtime/backends/mnn/option.h"
 #include "runtime/backends/ort/option.h"
-#include "runtime/enum_variables.h"
+#include "core/enum_variables.h"
 
 
 namespace modeldeploy {

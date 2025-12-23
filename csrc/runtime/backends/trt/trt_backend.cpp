@@ -155,7 +155,7 @@ namespace modeldeploy {
             auto name = outputs_desc_[i].name;
             nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
             std::vector shape(dims.d, dims.d + dims.nbDims);
-            (*outputs)[i].allocate(shape, DataType::FP32, name);
+            (*outputs)[i].allocate(shape, DataType::FP32, Device::CPU, name);
             const void* device_buffer = context_->getTensorAddress(name.c_str());
             cudaMemcpyAsync((*outputs)[i].data(), device_buffer, (*outputs)[i].byte_size(),
                             cudaMemcpyDeviceToHost, stream_);

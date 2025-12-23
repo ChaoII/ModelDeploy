@@ -99,7 +99,7 @@ namespace modeldeploy {
                 " while calling OrtBackend::CopyToCpu()." << std::endl;
         }
         const void* value_ptr = value.GetTensorData<void*>();
-        tensor->allocate(shape, dtype, name);
+        tensor->allocate(shape, dtype, Device::CPU, name);
         memcpy(tensor->data(), value_ptr, num_el);
     }
 

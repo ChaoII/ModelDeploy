@@ -11,8 +11,7 @@ namespace modeldeploy {
         TRT,
         NONE
     };
-
-    enum Device {
+    enum class Device {
         CPU,
         GPU,
         OPENCL,
