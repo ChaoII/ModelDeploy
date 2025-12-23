@@ -30,8 +30,8 @@ namespace modeldeploy {
 
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
-        std::unique_ptr<OrtBackend> clone(RuntimeOption& runtime_option,
-                                          void* stream = nullptr, int device_id = -1) const;
+        std::unique_ptr<BaseBackend> clone(const RuntimeOption& runtime_option,
+                                           void* stream = nullptr, int device_id = -1) override;
 
         [[nodiscard]] size_t num_inputs() const override { return inputs_desc_.size(); }
 

@@ -19,7 +19,7 @@ namespace modeldeploy {
                 decrypt_password = this->password;
             }
             if (!read_encrypted_model_to_buffer(model_path, decrypt_password, &buffer, &format)) {
-                MD_LOG_FATAL << "decrypt model failed" << std::endl;
+                MD_LOG_FATAL << "Current model is encrypted, but decrypt model failed " << std::endl;
             }
             model_from_memory = true;
             model_buffer = buffer;
@@ -51,7 +51,7 @@ namespace modeldeploy {
                     use_trt_backend();
                 }
                 else {
-                    MD_LOG_FATAL << "model format error" << std::endl;
+                    MD_LOG_FATAL << "Model format unsupported!" << std::endl;
                 }
             }
             model_from_memory = false;
@@ -74,7 +74,8 @@ namespace modeldeploy {
 
 
     void RuntimeOption::set_external_stream(void* external_stream) {
-        ort_option.external_stream_ = external_stream;
+        ort_option.external_stream = external_stream;
+        trt_option.external_stream = external_stream;
     }
 
     void RuntimeOption::set_cpu_thread_num(const int thread_num) {
@@ -106,6 +107,7 @@ namespace modeldeploy {
 #endif
     }
 
+    // for onnxruntime-trt
     //input:8x3x224x224
     void RuntimeOption::set_trt_min_shape(const std::string& trt_min_shape) {
         ort_option.trt_min_shape = trt_min_shape;

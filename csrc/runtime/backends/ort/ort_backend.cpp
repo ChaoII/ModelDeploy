@@ -126,9 +126,9 @@ namespace modeldeploy {
                 keys_cuda.push_back("device_id");
                 values_cuda.push_back(device_id_str.c_str());
 
-                if (option.external_stream_) {
+                if (option.external_stream) {
                     const std::string stream_str = std::to_string(
-                        reinterpret_cast<uintptr_t>(option.external_stream_));
+                        reinterpret_cast<uintptr_t>(option.external_stream));
                     keys_cuda.push_back("user_compute_stream");
                     values_cuda.push_back(stream_str.c_str());
                 }
@@ -247,7 +247,7 @@ namespace modeldeploy {
         }
     }
 
-    bool OrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs)  {
+    bool OrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR <<
                 "[OrtBackend] Size of the inputs(" << inputs.size() <<
@@ -278,30 +278,35 @@ namespace modeldeploy {
         return true;
     }
 
-    std::unique_ptr<OrtBackend> OrtBackend::clone(RuntimeOption& runtime_option,
-                                                          void* stream,
-                                                          const int device_id) const {
-        auto backend = std::make_unique<OrtBackend>();
-
+    std::unique_ptr<BaseBackend> OrtBackend::clone(const RuntimeOption& runtime_option,
+                                                   void* stream, const int device_id) {
+        auto new_backend = std::make_unique<OrtBackend>();
+        // 克隆到新设备，那就是完全重建
+        if (device_id > 0 && device_id != option_.device_id) {
+            auto clone_option = option_;
+            clone_option.device_id = device_id;
+            clone_option.external_stream = stream;
+            std::string model_buffer;
+            if (!read_binary_from_file(runtime_option.model_file, &model_buffer)) {
+                MD_LOG_FATAL << "Fail to read binary from model file while cloning TrtBackend" << std::endl;
+            }
+            if (!new_backend->init_from_onnx(model_buffer)) {
+                MD_LOG_FATAL << "Clone model from engine file initialize TrtBackend." << std::endl;
+            }
+            return new_backend;
+        }
         // 共享 Session、model_buffer、输入输出描述
-        backend->shared_session_ = this->shared_session_;
-        backend->model_buffer_ = this->model_buffer_;
-        backend->inputs_desc_ = this->inputs_desc_;
-        backend->outputs_desc_ = this->outputs_desc_;
-        backend->option_ = this->option_;
-
-        runtime_option.ort_option = this->option_;
-        runtime_option.device = this->option_.device;
-        runtime_option.device_id = device_id;
-        runtime_option.enable_fp16 = this->option_.enable_fp16;
-        runtime_option.enable_trt = this->option_.enable_trt;
-
+        new_backend->shared_session_ = this->shared_session_;
+        new_backend->model_buffer_ = this->model_buffer_;
+        new_backend->inputs_desc_ = this->inputs_desc_;
+        new_backend->outputs_desc_ = this->outputs_desc_;
+        new_backend->option_ = this->option_;
         if (stream) {
-            runtime_option.ort_option.external_stream_ = stream;
+            new_backend->option_.external_stream = stream;
         }
         // 每个线程各自持有自己的 binding
-        backend->binding_ = std::make_unique<Ort::IoBinding>(*backend->shared_session_);
-        return backend;
+        new_backend->binding_ = std::make_unique<Ort::IoBinding>(*new_backend->shared_session_);
+        return new_backend;
     }
 
 

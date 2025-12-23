@@ -15,7 +15,6 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsDet::initialize() {
         if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
         return true;
@@ -60,7 +59,7 @@ namespace modeldeploy::vision::detection {
     }
 
     std::unique_ptr<UltralyticsDet> UltralyticsDet::clone() const {
-        std::unique_ptr<UltralyticsDet> clone_model = std::make_unique<UltralyticsDet>(*this);
+        auto clone_model = std::make_unique<UltralyticsDet>(*this);
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }

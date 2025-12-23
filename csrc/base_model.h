@@ -24,9 +24,9 @@ namespace modeldeploy {
 
         virtual bool infer();
 
-        virtual Runtime* clone_runtime() { return runtime_->clone(); }
+        virtual std::unique_ptr<Runtime> clone_runtime() { return runtime_->clone(); }
 
-        virtual bool set_runtime(Runtime* clone_runtime);
+        virtual bool set_runtime(std::unique_ptr<Runtime> clone_runtime);
 
         virtual size_t num_inputs();
 

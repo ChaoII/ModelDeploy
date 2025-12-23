@@ -33,7 +33,7 @@ namespace modeldeploy {
         /// Inference device id
         int device_id = 0;
 
-        void* external_stream_ = nullptr;
+        void* external_stream = nullptr;
         /// Use fp16 to infer
         bool enable_fp16 = false;
         /// file path for optimized model

@@ -62,7 +62,7 @@ namespace modeldeploy {
 
         virtual bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) = 0;
 
-        virtual std::unique_ptr<BaseBackend> clone(RuntimeOption& runtime_option, void* stream = nullptr,
+        virtual std::unique_ptr<BaseBackend> clone(const RuntimeOption& runtime_option, void* stream = nullptr,
                                                    const int device_id = -1) {
             MD_LOG_ERROR << "Clone no support " << runtime_option.backend << " " << stream
                 << " " << device_id << std::endl;
