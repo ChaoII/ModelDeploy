@@ -63,8 +63,8 @@ __global__ void kernel_yolo_preproc(
 }
 
 cudaError_t yolo_preproc(
-    const uint8_t* src, int src_h, int src_w,
-    float* dst, int dst_h, int dst_w, cudaStream_t stream,
+    const uint8_t* src, const int src_h, const int src_w,
+    float* dst, const int dst_h, const int dst_w, cudaStream_t stream,
     const float mean[3], const float std[3],
     const float pad_value,
     modeldeploy::vision::LetterBoxRecord* info_out) {
@@ -153,54 +153,39 @@ namespace modeldeploy::vision {
         const int src_w = image->width();
         int dst_h = dst_size[1];
         int dst_w = dst_size[0];
-        // 2. 在 CPU 内存分配 output Tensor (float32, CHW)
-        output->allocate({3, dst_h, dst_w}, DataType::FP32);
-        auto* output_ptr_cpu = static_cast<float*>(output->data());
-        // 3. 在 GPU 内存分配临时缓冲区
-        float* d_output = nullptr;
-        const size_t output_size = 3UL * dst_h * dst_w * sizeof(float);
-        cudaError_t err = cudaMalloc(&d_output, output_size);
-        if (err != cudaSuccess) {
-            std::cerr << "cudaMalloc failed: " << cudaGetErrorString(err) << std::endl;
-            return false;
-        }
-
-        // 4. 创建和管理CUDA流
+        cudaError_t err = cudaSuccess;
+        // 2. 在 GPU 内存分配 output Tensor (float32, CHW)
+        output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+        // 3. 创建和管理CUDA流
         cudaStream_t stream;
-        cudaError_t stream_err = cudaStreamCreate(&stream);
-        if (stream_err != cudaSuccess) {
+        if (const cudaError_t stream_err = cudaStreamCreate(&stream); stream_err != cudaSuccess) {
             std::cerr << "cudaStreamCreate failed: " << cudaGetErrorString(stream_err) << std::endl;
-            cudaFree(d_output);
             return false;
         }
-        // 5. 归一化参数和 pad_value
+        // 4. 归一化参数和 pad_value
         constexpr float mean[3] = {0.0f, 0.0f, 0.0f};
         constexpr float std[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const auto pad_value = pad_val[0];
 
-        // 6. 调用 CUDA kernel
-        err = yolo_preproc(
-            input_ptr, src_h, src_w,
-            d_output, dst_h, dst_w,
-            stream,
-            mean, std, pad_value,
-            letter_box_record);
+        // 5. 调用 CUDA kernel
+        err = yolo_preproc(input_ptr,
+                           src_h,
+                           src_w,
+                           output->data_ptr<float>(),
+                           dst_h,
+                           dst_w,
+                           stream,
+                           mean,
+                           std,
+                           pad_value,
+                           letter_box_record);
         if (err != cudaSuccess) {
             std::cerr << "yolo11n_preproc failed: " << cudaGetErrorString(err) << std::endl;
-            cudaFree(d_output);
             return false;
         }
-        // 7. cudaMemcpy 从 GPU 拷贝回 CPU Tensor
-        err = cudaMemcpy(output_ptr_cpu, d_output, output_size, cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess) {
-            std::cerr << "cudaMemcpy D2H failed: " << cudaGetErrorString(err) << std::endl;
-            cudaFree(d_output);
-            return false;
-        }
-        // 8. 释放 GPU 内存和流
-        cudaFree(d_output);
+        // 6. 释放 GPU 流
         cudaStreamDestroy(stream);
-        // 9. 添加 batch 维度
+        // 7. 添加 batch 维度
         output->expand_dim(0);
         return true;
     }

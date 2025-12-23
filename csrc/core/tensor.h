@@ -10,44 +10,14 @@
 #include "core/enum_variables.h"
 
 namespace modeldeploy {
-    enum class DataType {
-        FP32,
-        FP64,
-        INT32,
-        INT64,
-        UINT8,
-        INT8,
-        UNKNOWN
-    };
-
-
-    // 辅助函数实现
-    inline std::string datatype_to_string(const DataType dtype) {
-        switch (dtype) {
-        case DataType::FP32: return "FP32";
-        case DataType::FP64: return "FP64";
-        case DataType::INT32: return "INT32";
-        case DataType::INT64: return "INT64";
-        case DataType::UINT8: return "UINT8";
-        case DataType::INT8: return "INT8";
-        case DataType::UNKNOWN: return "UNKNOWN";
-        default: return "";
-        }
-    }
-
-    inline std::ostream& operator<<(std::ostream& os, const DataType& dtype) {
-        return os << datatype_to_string(dtype);
-    }
-
-
     // 内存块封装，支持引用计数
     class MemoryBlock {
     public:
         explicit MemoryBlock(size_t size, Device device);
         // 通过外部buffer拷贝buffer并构造一个MemoryBlock
-        MemoryBlock(const void* data, size_t size, Device device);
-        // 外部数据共享构造一个MemoryBlock，如果不传deleter，则默认使用内存的释放Tensor不做管理
-        MemoryBlock(void* data, size_t size, Device device, std::function<void(void*)> deleter);
+        explicit MemoryBlock(const void* data, size_t size, Device device);
+        // 外部数据共享构造一个MemoryBlock，如果不传deleter，则内存的释放由外部管理，比如OpenCV的mat
+        explicit MemoryBlock(void* data, size_t size, Device device, std::function<void(void*)> deleter);
         ~MemoryBlock();
         void* data() { return data_; }
         [[nodiscard]] const void* data() const { return data_; }
@@ -86,6 +56,7 @@ namespace modeldeploy {
         [[nodiscard]] size_t byte_size() const; // 返回字节大小
         [[nodiscard]] const std::vector<int64_t>& shape() const;
         [[nodiscard]] DataType dtype() const;
+        [[nodiscard]] Device device() const;
         [[nodiscard]] const std::string& get_name() const;
         void set_name(const std::string& name);
         static size_t get_element_size(DataType dtype);
@@ -98,6 +69,8 @@ namespace modeldeploy {
         void set_data(const T* data, size_t size, Device device, bool copy);
         template <typename T>
         const T* data_ptr() const; // 返回指针而非复制
+        template <typename T>
+        T* data_ptr(); // 返回指针而非复制
 
         // 索引操作
         template <typename T>
