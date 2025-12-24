@@ -81,8 +81,8 @@ namespace modeldeploy {
                 return false;
             }
         }
-        try {
 #ifdef WITH_GPU
+        try {
             if (extern_device == Device::GPU && device_ == Device::GPU) {
                 CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToDevice));
             }
