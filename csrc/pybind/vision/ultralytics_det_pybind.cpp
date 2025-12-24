@@ -30,7 +30,8 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsPreprocessor::set_size)
             .def_property("padding_value",
                           &detection::UltralyticsPreprocessor::get_padding_value,
-                          &detection::UltralyticsPreprocessor::set_padding_value);
+                          &detection::UltralyticsPreprocessor::set_padding_value)
+            .def("use_cuda_preproc", &detection::UltralyticsPreprocessor::use_cuda_preproc);
 
         pybind11::class_<detection::UltralyticsPostprocessor>(
                 m, "UltralyticsPostprocessor")

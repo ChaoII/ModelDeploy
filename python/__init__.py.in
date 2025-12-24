@@ -1,0 +1,182 @@
+import logging
+import os
+import sys
+
+
+def is_built_with_gpu() -> bool:
+    return True if "@WITH_GPU@" == "ON" else False
+
+
+def is_built_with_ort() -> bool:
+    return True if "@ENABLE_ORT@" == "ON" else False
+
+
+def is_built_with_trt() -> bool:
+    return True if "@ENABLE_TRT@" == "ON" else False
+
+
+def is_built_with_mnn() -> bool:
+    return True if "@ENABLE_MNN@" == "ON" else False
+
+
+def get_default_cuda_directory() -> str:
+    if not is_built_with_gpu():
+        return ""
+    return os.environ.get("CUDA_PATH", "")
+
+
+def get_default_trt_directory() -> str:
+    if not is_built_with_gpu():
+        return ""
+    return os.environ.get("TENSORRT_PATH", "")
+
+
+def get_default_cuda_major_version() -> str:
+    if not is_built_with_gpu():
+        return ""
+    return "@CUDA_MAJOR_VERSION@"
+
+
+def get_default_trt_major_version() -> str:
+    if not is_built_with_trt():
+        return ""
+    return "@TRT_MAJOR_VERSION@"
+
+
+def find_cudart(search_dir: str) -> bool:
+    if search_dir is None:
+        logging.info("[ModelDeploy][ERROR]: search_dir can not be NoneTpye.")
+        return False
+    cudart_lib_name = f"cudart64_{get_default_cuda_major_version()}.dll"
+    cudart_lib_path = os.path.join(search_dir, cudart_lib_name)
+    return os.path.exists(cudart_lib_path)
+
+
+def find_trt(search_dir: str) -> bool:
+    if search_dir is None:
+        logging.info("[ModelDeploy][ERROR]: search_dir can not be NoneTpye.")
+        return False
+    cudart_lib_name = f"nvinfer_{get_default_trt_major_version()}.dll"
+    cudart_lib_path = os.path.join(search_dir, cudart_lib_name)
+    return os.path.exists(cudart_lib_path)
+
+
+def find_cudart_from_sys() -> bool:
+    sys_paths = os.environ["path"].strip().split(";")
+    for sys_path in sys_paths:
+        if find_cudart(sys_path):
+            logging.info(f"[ModelDeploy][INFO]:  Successfully found CUDA ToolKit from system PATH env -> {sys_path}")
+            return True
+    return False
+
+
+def find_trt_from_sys() -> bool:
+    sys_paths = os.environ["path"].strip().split(";")
+    for sys_path in sys_paths:
+        if find_trt(sys_path):
+            logging.info(f"[ModelDeploy][INFO]:  Successfully found TRT from system PATH env -> {sys_path}")
+            return True
+    return False
+
+
+def add_system_search_paths():
+    sys_paths = os.environ["path"].strip().split(";")
+    for sys_path in sys_paths:
+        if sys_path and os.path.exists(sys_path):
+            try:
+                os.add_dll_directory(sys_path)
+            except Exception as e:
+                logging.debug(f"[ModelDeploy] 无法添加 DLL 目录 {sys_path}: {e}")
+
+
+def add_dll_search_dir(dir_path):
+    os.environ["path"] = dir_path + ";" + os.environ["path"]
+    sys.path.insert(0, dir_path)
+    os.add_dll_directory(dir_path)
+
+
+def add_custom_cuda_path():
+    default_cuda_dir = get_default_cuda_directory()
+    default_cuda_version = get_default_cuda_major_version()
+    cuda_shared_lib_dir = os.path.join(default_cuda_dir, "bin")
+    custom_cuda_envs = ["CUDA_DIRECTORY", "CUDA_HOME", "CUDA_ROOT", "CUDA_PATH"]
+    custom_cuda_dir = ""
+    if not os.path.exists(cuda_shared_lib_dir):
+        # try to get cuda directory from user's local env
+        for custom_env in custom_cuda_envs:
+            custom_cuda_dir = os.getenv(custom_env, "")
+            custom_cuda_dir = custom_cuda_dir.strip().split(";")[0]
+            if os.path.exists(custom_cuda_dir) and custom_cuda_dir != "":
+                break
+        if not os.path.exists(custom_cuda_dir) or custom_cuda_dir == "":
+            logging.warn(
+                f"\n--- Modeldeploy was built with gpu, \
+                    \n--- but the default cuda directory does not exists. \
+                    \n--- Please setup one of {custom_cuda_envs} manually, \
+                    \n--- this path should look like: C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.8.")
+            return
+        # path to cuda dlls
+        cuda_shared_lib_dir = os.path.join(custom_cuda_dir, "bin")
+    add_dll_search_dir(cuda_shared_lib_dir)
+    # try pre find cudart with major version, e.g 12/13
+    if not find_cudart(cuda_shared_lib_dir):
+        custom_cuda_version = os.path.basename(custom_cuda_dir)
+        logging.warn(
+            f"\n--- Modeldeploy was built with CUDA major version {default_cuda_version}, \
+                \n--- but found custom CUDA version {custom_cuda_version} at {custom_cuda_dir} \
+                \n--- Please setup one of {custom_cuda_envs} manually")
+        return
+    logging.info(f"[Modeldeploy][INFO]:  Successfully found CUDA ToolKit from -> {cuda_shared_lib_dir}")
+
+
+def add_custom_trt_path():
+    default_trt_dir = get_default_trt_directory()
+    default_trt_version = get_default_trt_major_version()
+    trt_shared_lib_dir = os.path.join(default_trt_dir, "lib")
+    custom_trt_envs = ["TENSORRT_DIRECTORY", "TENSORRT_HOME", "TENSORRT_ROOT", "TENSORRT_PATH",
+                       "TRT_DIRECTORY", "TRT_HOME", "TRT_ROOT", "TRT_PATH"]
+    custom_trt_dir = ""
+    if not os.path.exists(trt_shared_lib_dir):
+        # try to get cuda directory from user's local env
+        for custom_env in custom_trt_envs:
+            custom_trt_dir = os.getenv(custom_env, "")
+            custom_trt_dir = custom_trt_dir.strip().split(";")[0]
+            if os.path.exists(custom_trt_dir) and custom_trt_dir != "":
+                break
+        if not os.path.exists(custom_trt_dir) or custom_trt_dir == "":
+            logging.warn(
+                f"\n--- Modeldeploy was built with TRT Backend \
+                    \n--- but the default trt directory does not exists. \
+                    \n--- Please setup one of {custom_trt_envs} manually, \
+                    \n--- this path should look like: C:\\Program Files\\NVIDIA GPU Computing Toolkit\\TensorRT-10.9.0.34")
+            return
+        # path to trt dlls
+        trt_shared_lib_dir = os.path.join(custom_trt_dir, "lib")
+    add_dll_search_dir(trt_shared_lib_dir)
+    if not find_trt(trt_shared_lib_dir):
+        custom_cuda_version = os.path.basename(custom_trt_dir)
+        logging.warn(
+            f"\n--- Modeldeploy was built with CUDA major version {default_trt_version}, \
+                \n--- but found custom CUDA version {custom_cuda_version} at {custom_trt_dir} \
+                \n--- Please setup one of {custom_trt_envs} manually")
+        return
+    logging.info(f"[Modeldeploy][INFO]:  Successfully found TENSORRT from -> {trt_shared_lib_dir}")
+
+
+if os.name == "nt":
+    if is_built_with_gpu():
+        add_system_search_paths()
+        if not find_cudart_from_sys():
+            add_custom_cuda_path()
+
+    if is_built_with_trt():
+        add_system_search_paths()
+        if not find_trt_from_sys():
+            add_custom_trt_path()
+
+try:
+    from .modeldeploy import *
+except Exception as e:
+    raise RuntimeError(f"Modeldeploy initialized failed! Error: {e}")
+
+__version__ = get_version()

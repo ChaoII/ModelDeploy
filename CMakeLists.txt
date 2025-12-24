@@ -78,6 +78,7 @@ if (WITH_GPU)
     # for cudaMalloc()
     find_package(CUDAToolkit REQUIRED)
     set(CMAKE_CUDA_STANDARD 17)
+    set(CUDA_MAJOR_VERSION ${CUDAToolkit_VERSION_MAJOR})
     include_directories(${CUDAToolkit_INCLUDE_DIRS})
     if (MSVC)
         # -diag-suppress=1394 抑制c++标准库导出警告
@@ -208,11 +209,13 @@ if (BUILD_PYTHON)
             "${CMAKE_BINARY_DIR}/bin/*.so.*"
             "${CMAKE_BINARY_DIR}/bin/*.dylib"
     )
+    configure_file(${CMAKE_SOURCE_DIR}/python/__init__.py.in ${CMAKE_SOURCE_DIR}/python/modeldeploy/__init__.py)
     install(TARGETS modeldeploy DESTINATION modeldeploy)
     install(TARGETS ${LIBRARY_NAME}
             RUNTIME DESTINATION modeldeploy
             LIBRARY DESTINATION modeldeploy)
     install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
+    install(FILES ${CMAKE_SOURCE_DIR}/python/modeldeploy/__init__.py DESTINATION modeldeploy)
 endif ()
 
 if (BUILD_EXAMPLES)

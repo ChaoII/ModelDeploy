@@ -6,7 +6,7 @@ import numpy
 import typing
 from . import audio
 from . import vision
-__all__ = ['Backend', 'BaseModel', 'DataType', 'Device', 'Runtime', 'RuntimeOption', 'Tensor', 'TensorInfo', 'audio', 'vision']
+__all__ = ['Backend', 'BaseModel', 'DataType', 'Device', 'Runtime', 'RuntimeOption', 'Tensor', 'TensorInfo', 'audio', 'get_version', 'vision']
 class Backend:
     """
     Members:
@@ -14,10 +14,16 @@ class Backend:
       NONE
     
       ORT
+    
+      TRT
+    
+      MNN
     """
-    NONE: typing.ClassVar[Backend]  # value = <Backend.NONE: 1>
+    MNN: typing.ClassVar[Backend]  # value = <Backend.MNN: 1>
+    NONE: typing.ClassVar[Backend]  # value = <Backend.NONE: 3>
     ORT: typing.ClassVar[Backend]  # value = <Backend.ORT: 0>
-    __members__: typing.ClassVar[dict[str, Backend]]  # value = {'NONE': <Backend.NONE: 1>, 'ORT': <Backend.ORT: 0>}
+    TRT: typing.ClassVar[Backend]  # value = <Backend.ORT: 0>
+    __members__: typing.ClassVar[dict[str, Backend]]  # value = {'NONE': <Backend.NONE: 3>, 'ORT': <Backend.ORT: 0>, 'TRT': <Backend.ORT: 0>, 'MNN': <Backend.MNN: 1>}
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -50,9 +56,11 @@ class BaseModel:
         """
         Default Constructor
         """
-    def get_custom_meta_data(self) -> dict:
+    def get_custom_meta_data(self) -> dict[str, str]:
         ...
     def get_input_info(self, index: int) -> TensorInfo:
+        ...
+    def get_label_map(self, arg0: str) -> dict[int, str]:
         ...
     def get_output_info(self, index: int) -> TensorInfo:
         ...
@@ -80,7 +88,7 @@ class DataType:
     
       UINT8
     
-      UNKNOW
+      UNKNOWN
     """
     FP32: typing.ClassVar[DataType]  # value = <DataType.FP32: 0>
     FP64: typing.ClassVar[DataType]  # value = <DataType.FP64: 1>
@@ -88,8 +96,8 @@ class DataType:
     INT64: typing.ClassVar[DataType]  # value = <DataType.INT64: 3>
     INT8: typing.ClassVar[DataType]  # value = <DataType.INT8: 5>
     UINT8: typing.ClassVar[DataType]  # value = <DataType.UINT8: 4>
-    UNKNOW: typing.ClassVar[DataType]  # value = <DataType.UNKNOW: 6>
-    __members__: typing.ClassVar[dict[str, DataType]]  # value = {'FP32': <DataType.FP32: 0>, 'FP64': <DataType.FP64: 1>, 'INT32': <DataType.INT32: 2>, 'INT64': <DataType.INT64: 3>, 'INT8': <DataType.INT8: 5>, 'UINT8': <DataType.UINT8: 4>, 'UNKNOW': <DataType.UNKNOW: 6>}
+    UNKNOWN: typing.ClassVar[DataType]  # value = <DataType.UNKNOWN: 6>
+    __members__: typing.ClassVar[dict[str, DataType]]  # value = {'FP32': <DataType.FP32: 0>, 'FP64': <DataType.FP64: 1>, 'INT32': <DataType.INT32: 2>, 'INT64': <DataType.INT64: 3>, 'INT8': <DataType.INT8: 5>, 'UINT8': <DataType.UINT8: 4>, 'UNKNOWN': <DataType.UNKNOWN: 6>}
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -123,10 +131,16 @@ class Device:
       CPU
     
       GPU
+    
+      OPENCL
+    
+      VULKAN
     """
     CPU: typing.ClassVar[Device]  # value = <Device.CPU: 0>
     GPU: typing.ClassVar[Device]  # value = <Device.GPU: 1>
-    __members__: typing.ClassVar[dict[str, Device]]  # value = {'CPU': <Device.CPU: 0>, 'GPU': <Device.GPU: 1>}
+    OPENCL: typing.ClassVar[Device]  # value = <Device.OPENCL: 2>
+    VULKAN: typing.ClassVar[Device]  # value = <Device.VULKAN: 3>
+    __members__: typing.ClassVar[dict[str, Device]]  # value = {'CPU': <Device.CPU: 0>, 'GPU': <Device.GPU: 1>, 'OPENCL': <Device.OPENCL: 2>, 'VULKAN': <Device.VULKAN: 3>}
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -170,7 +184,7 @@ class Runtime:
     def infer(self, inputs: dict[str, numpy.ndarray]) -> list[numpy.ndarray]:
         ...
     @typing.overload
-    def infer(self, inputs: dict[str, Tensor]) -> list[Tensor]:
+    def infer(self, inputs: dict) -> list[Tensor]:
         ...
     @typing.overload
     def infer(self, inputs: list[Tensor]) -> list[Tensor]:
@@ -197,19 +211,22 @@ class RuntimeOption:
     model_buffer: str
     model_file: str
     model_from_memory: bool
+    password: str
     def __init__(self) -> None:
         ...
     def set_cpu_thread_num(self, thread_num: int = -1) -> None:
         ...
-    def set_model_path(self, model_path: str) -> None:
-        ...
-    def set_ort_graph_opt_level(self, level: int = -1) -> None:
+    def set_model_path(self, model_path: str, password: str = '') -> None:
         ...
     def use_cpu(self) -> None:
         ...
     def use_gpu(self, device_id: int = 0) -> None:
         ...
+    def use_mnn_backend(self) -> None:
+        ...
     def use_ort_backend(self) -> None:
+        ...
+    def use_trt_backend(self) -> None:
         ...
 class Tensor:
     name: str
@@ -244,3 +261,7 @@ class TensorInfo:
         ...
     def __str__(self) -> str:
         ...
+def get_version() -> str:
+    """
+    Get version of modeldeploy.
+    """

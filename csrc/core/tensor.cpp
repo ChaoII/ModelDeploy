@@ -58,9 +58,13 @@ namespace modeldeploy {
             deleter_ = [](void* ptr) { free(ptr); };
         }
         else if (device == Device::GPU) {
+#ifdef WITH_GPU
             CUDA_CHECK(cudaMalloc(&data_, size));
             CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToDevice));
             deleter_ = [](void* ptr) { cudaFree(ptr); };
+#else
+            throw std::runtime_error("Unsupported device type");
+#endif
         }
     }
 

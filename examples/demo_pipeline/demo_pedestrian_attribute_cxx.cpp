@@ -12,10 +12,10 @@ int main() {
     option.use_gpu();
     option.enable_trt = true;
     option.enable_fp16 = true;
-    option.use_trt_backend();
+    option.use_ort_backend();
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
-        "../../test_data/test_models/zhgd_det_20251219.engine",
-        "../../test_data/test_models/zhgd_ml.engine", option);
+        "../../test_data/test_models/zhgd_det_20251219.onnx",
+        "../../test_data/test_models/zhgd_ml_20251219.onnx", option);
     auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
     pedestrian_attribute.set_cls_batch_size(8);
     pedestrian_attribute.set_det_input_size({1280, 1280});
