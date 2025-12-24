@@ -6,7 +6,51 @@ import modeldeploy.modeldeploy
 import numpy
 import pybind11_stubgen.typing_ext
 import typing
-__all__ = ['Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionLandmarkResult', 'DetectionResult', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'Point2f', 'Point3f', 'PoseResult', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsCls', 'UltralyticsClsPostprocessor', 'UltralyticsClsPreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_cls', 'vis_det', 'vis_det_landmarks', 'vis_iseg', 'vis_lpr', 'vis_obb', 'vis_ocr', 'vis_pose']
+__all__ = ['AttributeResult', 'Classification', 'ClassificationPostprocessor', 'ClassificationPreprocessor', 'Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionResult', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'KeyPointsResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'PedestrianAttribute', 'Point2f', 'Point3f', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_attr', 'vis_cls', 'vis_det', 'vis_iseg', 'vis_keypoints', 'vis_lpr', 'vis_obb', 'vis_ocr']
+class AttributeResult:
+    box: Rect2f
+    box_label_id: int
+    box_score: float
+    car_plate_str: list[float]
+    @staticmethod
+    def from_dict(arg0: dict) -> AttributeResult:
+        ...
+    def __getstate__(self) -> tuple:
+        ...
+    def __init__(self) -> None:
+        ...
+    def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
+        ...
+class Classification(modeldeploy.modeldeploy.BaseModel):
+    def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
+        ...
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[ClassifyResult]:
+        ...
+    def predict(self, image: numpy.ndarray) -> ClassifyResult:
+        ...
+    @property
+    def postprocessor(self) -> ClassificationPostprocessor:
+        ...
+    @property
+    def preprocessor(self) -> ClassificationPreprocessor:
+        ...
+class ClassificationPostprocessor:
+    def __init__(self) -> None:
+        ...
+    @typing.overload
+    def run(self, inputs: list[modeldeploy.modeldeploy.Tensor]) -> list[ClassifyResult]:
+        ...
+    @typing.overload
+    def run(self, input_array: list[numpy.ndarray]) -> list[ClassifyResult]:
+        ...
+class ClassificationPreprocessor:
+    size: list[int]
+    def __init__(self) -> None:
+        ...
+    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.modeldeploy.Tensor]:
+        ...
 class Classifier(modeldeploy.modeldeploy.BaseModel):
     @typing.overload
     def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
@@ -46,11 +90,16 @@ class ClassifyResult:
     feature: list[float]
     label_ids: list[int]
     scores: list[float]
+    @staticmethod
+    def from_dict(arg0: dict) -> ClassifyResult:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
         ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
         ...
 class DBDetector(modeldeploy.modeldeploy.BaseModel):
     @typing.overload
@@ -91,17 +140,6 @@ class DBDetectorPreprocessor:
     def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.modeldeploy.Tensor], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
     def set_normalize(self, arg0: list[float], arg1: list[float], arg2: bool) -> None:
-        ...
-class DetectionLandmarkResult:
-    box: Rect2f
-    label_id: int
-    landmarks: list[Point2f]
-    score: float
-    def __getstate__(self) -> tuple:
-        ...
-    def __init__(self) -> None:
-        ...
-    def __setstate__(self, arg0: tuple) -> None:
         ...
 class DetectionResult:
     box: Rect2f
@@ -164,11 +202,16 @@ class FaceAntiSpoofResult:
         ...
 class FaceRecognitionResult:
     embedding: list[float]
+    @staticmethod
+    def from_dict(arg0: dict) -> FaceRecognitionResult:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
         ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
         ...
 class FaceRecognizerPipeline(modeldeploy.modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: str, arg2: modeldeploy.modeldeploy.RuntimeOption) -> None:
@@ -180,11 +223,32 @@ class InstanceSegResult:
     label_id: int
     mask: Mask
     score: float
+    @staticmethod
+    def from_dict(arg0: dict) -> InstanceSegResult:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
         ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
+        ...
+class KeyPointsResult:
+    box: Rect2f
+    keypoints: list[Point3f]
+    label_id: int
+    score: float
+    @staticmethod
+    def from_dict(arg0: dict) -> KeyPointsResult:
+        ...
+    def __getstate__(self) -> tuple:
+        ...
+    def __init__(self) -> None:
+        ...
+    def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
         ...
 class LetterBoxRecord:
     ipt_h: float
@@ -215,10 +279,10 @@ class LprDetPostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, inputs: list[modeldeploy.modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
+    def run(self, inputs: list[modeldeploy.modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[KeyPointsResult]]:
         ...
     @typing.overload
-    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[DetectionLandmarkResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[KeyPointsResult]]:
         ...
     @property
     def landmarks_per_card_(self) -> int:
@@ -244,9 +308,9 @@ class LprDetPreprocessor:
 class LprDetection(modeldeploy.modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[DetectionLandmarkResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[KeyPointsResult]]:
         ...
-    def predict(self, image: numpy.ndarray) -> list[DetectionLandmarkResult]:
+    def predict(self, image: numpy.ndarray) -> list[KeyPointsResult]:
         ...
     @property
     def postprocessor(self) -> LprDetPostprocessor:
@@ -292,22 +356,32 @@ class LprResult:
     car_plate_color: str
     car_plate_str: str
     label_id: int
-    landmarks: list[Point2f]
+    landmarks: list[Point3f]
     score: float
+    @staticmethod
+    def from_dict(arg0: dict) -> LprResult:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
         ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
         ...
 class Mask:
     buffer: list[int]
     shape: list[int]
+    @staticmethod
+    def from_dict(arg0: dict) -> Mask:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
         ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def to_dict(self) -> dict:
         ...
 class OCRResult:
     boxes: list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(8)]]
@@ -318,17 +392,31 @@ class OCRResult:
     table_html: str
     table_structure: list[str]
     text: list[str]
+    @staticmethod
+    def from_dict(arg0: dict) -> OCRResult:
+        ...
     def __init__(self) -> None:
+        ...
+    def to_dict(self) -> dict:
         ...
 class ObbResult:
     label_id: int
     rotated_box: RotatedRect
     score: float
+    @staticmethod
+    def from_dict(arg0: dict) -> ObbResult:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
         ...
+    def __repr__(self) -> str:
+        ...
     def __setstate__(self, arg0: tuple) -> None:
+        ...
+    def __str__(self) -> str:
+        ...
+    def to_dict(self) -> dict:
         ...
 class PPStructureV2Table(modeldeploy.modeldeploy.BaseModel):
     rec_batch_size: int
@@ -341,15 +429,40 @@ class PPStructureV2Table(modeldeploy.modeldeploy.BaseModel):
 class PaddleOCR(modeldeploy.modeldeploy.BaseModel):
     cls_batch_size: int
     rec_batch_size: int
-    def __init__(self, det_model_path: str, cls_model_path: str, rec_model_path: str, dict_path: str, max_side_len: int = 960, det_db_thresh: float = 0.3, det_db_box_thresh: float = 0.6, det_db_unclip_ratio: float = 1.5, det_db_score_mode: str = 'slow', use_dilation: bool = False, rec_batch_size: int = 6, option: modeldeploy.modeldeploy.RuntimeOption) -> None:
+    def __init__(self, det_model_path: str, cls_model_path: str, rec_model_path: str, dict_path: str, option: modeldeploy.modeldeploy.RuntimeOption) -> None:
         ...
     def batch_predict(self, images: list[numpy.ndarray]) -> list[OCRResult]:
         ...
+    def get_classifier(self) -> Classifier:
+        ...
+    def get_detector(self) -> DBDetector:
+        ...
+    def get_recognizer(self) -> Recognizer:
+        ...
     def predict(self, image: numpy.ndarray) -> OCRResult:
+        ...
+class PedestrianAttribute(modeldeploy.modeldeploy.BaseModel):
+    cls_batch_size: int
+    cls_input_size: list[int]
+    det_input_size: list[int]
+    def __init__(self, det_model_path: str, cls_model_path: str, option: modeldeploy.modeldeploy.RuntimeOption) -> None:
+        ...
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[AttributeResult]]:
+        ...
+    def get_classifier(self) -> Classification:
+        ...
+    def get_detector(self) -> UltralyticsDet:
+        ...
+    def predict(self, image: numpy.ndarray) -> list[AttributeResult]:
+        ...
+    def set_det_threshold(self, arg0: float) -> None:
         ...
 class Point2f:
     x: float
     y: float
+    @staticmethod
+    def from_dict(arg0: dict) -> Point2f:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
@@ -359,11 +472,16 @@ class Point2f:
     def __setstate__(self, arg0: tuple) -> None:
         ...
     def __str__(self) -> str:
+        ...
+    def to_dict(self) -> dict:
         ...
 class Point3f:
     x: float
     y: float
     z: float
+    @staticmethod
+    def from_dict(arg0: dict) -> Point3f:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
@@ -374,16 +492,7 @@ class Point3f:
         ...
     def __str__(self) -> str:
         ...
-class PoseResult:
-    box: Rect2f
-    label_id: int
-    mask: list[Point3f]
-    score: float
-    def __getstate__(self) -> tuple:
-        ...
-    def __init__(self) -> None:
-        ...
-    def __setstate__(self, arg0: tuple) -> None:
+    def to_dict(self) -> dict:
         ...
 class Recognizer(modeldeploy.modeldeploy.BaseModel):
     @typing.overload
@@ -425,6 +534,9 @@ class Rect2f:
     width: float
     x: float
     y: float
+    @staticmethod
+    def from_dict(arg0: dict) -> Rect2f:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
@@ -443,6 +555,9 @@ class RotatedRect:
     width: float
     xc: float
     yc: float
+    @staticmethod
+    def from_dict(arg0: dict) -> RotatedRect:
+        ...
     def __getstate__(self) -> tuple:
         ...
     def __init__(self) -> None:
@@ -452,6 +567,8 @@ class RotatedRect:
     def __setstate__(self, arg0: tuple) -> None:
         ...
     def __str__(self) -> str:
+        ...
+    def to_dict(self) -> dict:
         ...
 class SeetaFaceAge(modeldeploy.modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
@@ -630,34 +747,6 @@ class StructureV2TablePreprocessor:
         ...
     def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.modeldeploy.Tensor], list[typing.Annotated[list[int], pybind11_stubgen.typing_ext.FixedSize(4)]]]:
         ...
-class UltralyticsCls(modeldeploy.modeldeploy.BaseModel):
-    def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
-        ...
-    def batch_predict(self, images: list[numpy.ndarray]) -> list[ClassifyResult]:
-        ...
-    def predict(self, image: numpy.ndarray) -> ClassifyResult:
-        ...
-    @property
-    def postprocessor(self) -> UltralyticsClsPostprocessor:
-        ...
-    @property
-    def preprocessor(self) -> UltralyticsClsPreprocessor:
-        ...
-class UltralyticsClsPostprocessor:
-    def __init__(self) -> None:
-        ...
-    @typing.overload
-    def run(self, inputs: list[modeldeploy.modeldeploy.Tensor]) -> list[ClassifyResult]:
-        ...
-    @typing.overload
-    def run(self, input_array: list[numpy.ndarray]) -> list[ClassifyResult]:
-        ...
-class UltralyticsClsPreprocessor:
-    size: list[int]
-    def __init__(self) -> None:
-        ...
-    def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.modeldeploy.Tensor]:
-        ...
 class UltralyticsDet(modeldeploy.modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
         ...
@@ -696,26 +785,18 @@ class UltralyticsObbPostprocessor:
     def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[ObbResult]]:
         ...
 class UltralyticsObbPreprocessor:
-    is_mini_pad: bool
-    is_scale_up: bool
     padding_value: list[float]
     size: list[int]
     def __init__(self) -> None:
         ...
     def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
-    @property
-    def stride(self) -> bool:
-        ...
-    @stride.setter
-    def stride(self, arg1: int) -> None:
-        ...
 class UltralyticsPose(modeldeploy.modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
         ...
-    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[PoseResult]]:
+    def batch_predict(self, images: list[numpy.ndarray]) -> list[list[KeyPointsResult]]:
         ...
-    def predict(self, image: numpy.ndarray) -> list[PoseResult]:
+    def predict(self, image: numpy.ndarray) -> list[KeyPointsResult]:
         ...
     @property
     def postprocessor(self) -> UltralyticsPosePostprocessor:
@@ -729,25 +810,17 @@ class UltralyticsPosePostprocessor:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def run(self, inputs: list[modeldeploy.modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[PoseResult]]:
+    def run(self, inputs: list[modeldeploy.modeldeploy.Tensor], records: list[LetterBoxRecord]) -> list[list[KeyPointsResult]]:
         ...
     @typing.overload
-    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[PoseResult]]:
+    def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[KeyPointsResult]]:
         ...
 class UltralyticsPosePreprocessor:
-    is_mini_pad: bool
-    is_scale_up: bool
     padding_value: list[float]
     size: list[int]
     def __init__(self) -> None:
         ...
     def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.modeldeploy.Tensor], list[LetterBoxRecord]]:
-        ...
-    @property
-    def stride(self) -> bool:
-        ...
-    @stride.setter
-    def stride(self, arg1: int) -> None:
         ...
 class UltralyticsPostprocessor:
     conf_threshold: float
@@ -761,19 +834,13 @@ class UltralyticsPostprocessor:
     def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[DetectionResult]]:
         ...
 class UltralyticsPreprocessor:
-    is_mini_pad: bool
-    is_scale_up: bool
     padding_value: list[float]
     size: list[int]
     def __init__(self) -> None:
         ...
     def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
-    @property
-    def stride(self) -> bool:
-        ...
-    @stride.setter
-    def stride(self, arg1: int) -> None:
+    def use_cuda_preproc(self) -> None:
         ...
 class UltralyticsSeg(modeldeploy.modeldeploy.BaseModel):
     def __init__(self, arg0: str, arg1: modeldeploy.modeldeploy.RuntimeOption) -> None:
@@ -800,33 +867,25 @@ class UltralyticsSegPostprocessor:
     def run(self, inputs: list[numpy.ndarray], records: list[LetterBoxRecord]) -> list[list[InstanceSegResult]]:
         ...
 class UltralyticsSegPreprocessor:
-    is_mini_pad: bool
-    is_scale_up: bool
     padding_value: list[float]
     size: list[int]
     def __init__(self) -> None:
         ...
     def run(self, im_list: list[numpy.ndarray]) -> tuple[list[modeldeploy.modeldeploy.Tensor], list[LetterBoxRecord]]:
         ...
-    @property
-    def stride(self) -> bool:
-        ...
-    @stride.setter
-    def stride(self, arg1: int) -> None:
-        ...
-def vis_cls(image: numpy.ndarray, result: ClassifyResult, top_k: int, threshold: float, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_attr(image: numpy.ndarray, result: list[AttributeResult], threshold: float = 0.5, label_map: dict[int, str] = {}, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False, abnormal_ids: list[int] = [], show_attr: bool = True) -> numpy.ndarray:
     ...
-def vis_det(image: numpy.ndarray, result: list[DetectionResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_cls(image: numpy.ndarray, result: ClassifyResult, top_k: int, threshold: float, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_det_landmarks(image: numpy.ndarray, result: list[DetectionLandmarkResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_det(image: numpy.ndarray, result: list[DetectionResult], threshold: float = 0.5, label_map: dict[int, str] = {}, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_iseg(image: numpy.ndarray, result: list[InstanceSegResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_iseg(image: numpy.ndarray, result: list[InstanceSegResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_lpr(image: numpy.ndarray, result: list[LprResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_keypoints(image: numpy.ndarray, result: list[KeyPointsResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.15, save_result: bool = False, draw_lines: bool = False) -> numpy.ndarray:
     ...
-def vis_obb(image: numpy.ndarray, result: list[ObbResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_lpr(image: numpy.ndarray, result: list[LprResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_ocr(image: numpy.ndarray, result: OCRResult, font_path: str = '', font_size: int = 14, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_obb(image: numpy.ndarray, result: list[ObbResult], threshold: float = 0.5, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...
-def vis_pose(image: numpy.ndarray, result: list[PoseResult], font_path: str = '', font_size: int = 14, landmark_radius: int = 4, alpha: float = 0.5, save_result: bool = False) -> numpy.ndarray:
+def vis_ocr(image: numpy.ndarray, result: OCRResult, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...

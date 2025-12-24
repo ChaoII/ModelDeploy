@@ -9,6 +9,22 @@ set(TRT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/TensorRT-10.9.0.34" C
 set(TRT_LIB_DIR "${TRT_DIR}/lib")
 set(TRT_INC_DIR "${TRT_DIR}/include")
 
+# 获取编译时TensorRT主版本号
+set(TRT_VERSION_HPP "${TRT_INC_DIR}/NvInferVersion.h")
+if(EXISTS "${TRT_VERSION_HPP}")
+    # 读取版本头文件
+    file(READ "${TRT_VERSION_HPP}" TRT_VERSION_CONTENT)
+    # 提取宏定义
+    string(REGEX MATCH "#define NV_TENSORRT_MAJOR ([0-9]+)"
+            TRT_MAJOR_MATCH ${TRT_VERSION_CONTENT})
+    if(TRT_MAJOR_MATCH)
+        set(TRT_MAJOR_VERSION ${CMAKE_MATCH_1})
+        message(STATUS "TensorRT 主版本: ${TRT_MAJOR_VERSION}")
+    endif()
+endif()
+
+
+
 find_library(NVINFER_LIB nvinfer_10
         PATHS "${TRT_LIB_DIR}"
         NO_DEFAULT_PATH

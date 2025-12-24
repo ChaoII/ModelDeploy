@@ -458,6 +458,43 @@ namespace modeldeploy::vision {
                 return f;
             });
 
+        pybind11::class_<AttributeResult>(m, "AttributeResult")
+            .def(pybind11::init())
+            .def_readwrite("box", &AttributeResult::box)
+            .def_readwrite("box_label_id", &AttributeResult::box_label_id)
+            .def_readwrite("box_score", &AttributeResult::box_score)
+            .def_readwrite("attr_scores", &AttributeResult::attr_scores)
+            .def(pybind11::pickle(
+                [](const AttributeResult& d) {
+                    return pybind11::make_tuple(d.box, d.box_label_id, d.box_score, d.attr_scores);
+                },
+                [](const pybind11::tuple& t) {
+                    if (t.size() != 4)
+                        throw std::runtime_error("AttributeResult pickle with Invalid state!");
+                    AttributeResult d;
+                    d.box = t[0].cast<Rect2f>();
+                    d.box_label_id = t[2].cast<int32_t>();
+                    d.box_score = t[3].cast<float>();
+                    d.attr_scores = t[4].cast<std::vector<float>>();
+                    return d;
+                }))
+            .def("to_dict", [](const AttributeResult& p) {
+                pybind11::dict result;
+                result["box"] = rect2f_to_dict(p.box);
+                result["box_label_id"] = p.box_label_id;
+                result["box_score"] = p.box_score;
+                result["attr_scores"] = p.attr_scores;
+                return result;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                AttributeResult r;
+                if (d.contains("box")) r.box = dict_to_rect2f(d["box"]);
+                if (d.contains("box_label_id")) r.box_label_id = d["box_label_id"].cast<int32_t>();
+                if (d.contains("box_score")) r.box_score = d["box_score"].cast<float>();
+                if (d.contains("attr_scores")) r.attr_scores = d["attr_scores"].cast<std::vector<float>>();
+                return r;
+            });
+
         pybind11::class_<LprResult>(m, "LprResult")
             .def(pybind11::init())
             .def_readwrite("box", &LprResult::box)

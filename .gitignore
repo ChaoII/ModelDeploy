@@ -3,7 +3,7 @@ build
 build_msvc
 build_linux
 build_debug
-
+python/modeldeploy/__init__.py
 dist
 .idea
 # Prerequisites
