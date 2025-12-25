@@ -3,6 +3,7 @@ build
 build_msvc
 build_linux
 build_debug
+build_linux_trt
 python/modeldeploy/__init__.py
 dist
 .idea

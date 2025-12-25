@@ -1,39 +1,33 @@
-#
-message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
-message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
-message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
+# trt.cmake
 
 
-
-set(TRT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/TensorRT-10.9.0.34" CACHE PATH "TRT_DIR" FORCE)
 set(TRT_LIB_DIR "${TRT_DIR}/lib")
 set(TRT_INC_DIR "${TRT_DIR}/include")
 
 # 获取编译时TensorRT主版本号
 set(TRT_VERSION_HPP "${TRT_INC_DIR}/NvInferVersion.h")
-if(EXISTS "${TRT_VERSION_HPP}")
+if (EXISTS "${TRT_VERSION_HPP}")
     # 读取版本头文件
     file(READ "${TRT_VERSION_HPP}" TRT_VERSION_CONTENT)
     # 提取宏定义
     string(REGEX MATCH "#define NV_TENSORRT_MAJOR ([0-9]+)"
             TRT_MAJOR_MATCH ${TRT_VERSION_CONTENT})
-    if(TRT_MAJOR_MATCH)
+    if (TRT_MAJOR_MATCH)
         set(TRT_MAJOR_VERSION ${CMAKE_MATCH_1})
         message(STATUS "TensorRT 主版本: ${TRT_MAJOR_VERSION}")
-    endif()
-endif()
+    endif ()
+endif ()
 
+if (WIN32)
+    set(NVINFER_LIB_NAME nvinfer_${TRT_MAJOR_VERSION})
+    set(NVONNXPARSER_LIB_NAME nvonnxparser_${TRT_MAJOR_VERSION})
+else (LINUX)
+    set(NVINFER_LIB_NAME nvinfer)
+    set(NVONNXPARSER_LIB_NAME nvonnxparser)
+endif ()
 
-
-find_library(NVINFER_LIB nvinfer_10
-        PATHS "${TRT_LIB_DIR}"
-        NO_DEFAULT_PATH
-)
-
-find_library(NVONNXPARSER_LIB nvonnxparser_10
-        PATHS "${TRT_LIB_DIR}"
-        NO_DEFAULT_PATH
-)
+find_library(NVINFER_LIB ${NVINFER_LIB_NAME} PATHS "${TRT_LIB_DIR}" NO_DEFAULT_PATH)
+find_library(NVONNXPARSER_LIB ${NVONNXPARSER_LIB_NAME} PATHS "${TRT_LIB_DIR}" NO_DEFAULT_PATH)
 
 add_library(trt::nvinfer STATIC IMPORTED GLOBAL)
 add_library(trt::nvonnxparser STATIC IMPORTED GLOBAL)
