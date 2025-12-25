@@ -35,7 +35,7 @@ jobs:
         run: |
           cmake -S . -B build ^
             -G Ninja ^
-            -DCMAKE_BUILD_YPE=Release ^
+            -DCMAKE_BUILD_TYPE=Release ^
             -DCMAKE_INSTALL_PREFIX=install ^
             -DBUILD_AUDIO=ON ^
             -DBUILD_VISION=ON ^
@@ -43,7 +43,7 @@ jobs:
             -DBUILD_CAPI=ON ^
             -DWITH_GPU=ON ^
             -DENABLE_TRT=ON ^
-            -DTRT_DR="%TENSORRT_ROOT%" ^
+            -DTRT_DIR="%TENSORRT_ROOT%" ^
             -DENABLE_MNN=OFF ^
             -DENABLE_ORT=OFF ^
             -DENABLE_TF=OFF ^
