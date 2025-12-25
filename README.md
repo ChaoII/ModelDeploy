@@ -128,6 +128,30 @@ int main() {
 }
 ```
 
+```python
+import time
+import cv2
+import modeldeploy
+
+runtime_option = modeldeploy.RuntimeOption()
+runtime_option.use_gpu()
+runtime_option.use_trt_backend()
+model = modeldeploy.vision.PedestrianAttribute(
+    "../test_data/test_models/zhgd_det_20251219.engine",
+    "../test_data/test_models/zhgd_ml.engine", runtime_option)
+model.cls_batch_size = 8
+model.det_input_size = [1280, 1280]
+model.set_det_threshold(0.5)
+model.cls_input_size = [192, 256]
+image = cv2.imread("../test_data/test_images/test_pedestrian_attribute1.jpg")
+loop_count = 100
+start_time = time.time()
+for _ in range(loop_count):
+    results = model.predict(image)
+end_time = time.time()
+print(f"{loop_count} loops, {end_time - start_time} seconds, {loop_count / (end_time - start_time)} FPS")
+```
+
 更多示例请查看[example](./examples)
 
 #### 3.OnnxRuntime使用混合精度推理

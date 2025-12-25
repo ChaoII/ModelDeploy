@@ -1,0 +1,51 @@
+name: Windows-GPU
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1️⃣ 激活 VS 2022 编译环境（非常关键）
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # 2️⃣ 打印环境，方便排错
+      - name: Dump environment
+        run: |
+          echo CUDA_PATH=%CUDA_PATH%
+          echo TENSORRT_ROOT=%TENSORRT_ROOT%
+          where cl
+          where nvcc
+
+      # 3️⃣ CMake Configure
+      - name: Configure
+        run: |
+          cmake -S . -B build ^
+            -G Ninja ^
+            -DBUILD_AUDIO=ON ^
+            -DBUILD_VISION=ON  ^
+            -DBUILD_FACE=ON ^
+            -DBUILD_CAPI=ON ^
+            -DWITH_GPU=ON ^
+            -DENABLE_TRT=ON ^
+            -DTRT_DR=%TENSORRT_ROOT% ^
+            -DENABLE_MNN=OFF ^
+            -DENABLE_ORT=OFF
+
+      # 4️⃣ Build
+      - name: Build
+        run: |
+          cmake --build build --config Release --parallel

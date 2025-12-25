@@ -20,6 +20,7 @@ cmake.define.WITH_GPU = { env = "WITH_GPU", default = "OFF" }
 cmake.define.ENABLE_ORT = { env = "ENABLE_ORT", default = "ON" }
 cmake.define.ENABLE_MNN = { env = "ENABLE_MNN", default = "OFF" }
 cmake.define.ENABLE_TRT = { env = "ENABLE_TRT", default = "OFF" }
+cmake.define.TRT_DIR = { env = "TRT_DIR", default = "" }
 cmake.define.BUILD_PYTHON = "ON"
 cmake.define.BUILD_CAPI = "OFF"
 cmake.define.BUILD_EXAMPLES = "OFF"

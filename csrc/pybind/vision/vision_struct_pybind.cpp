@@ -101,13 +101,16 @@ namespace modeldeploy::vision {
             .def_readwrite("angle", &RotatedRect::angle)
             .def(pybind11::pickle(
                 [](const RotatedRect& rotated_rect) {
-                    return pybind11::make_tuple(rotated_rect.xc, rotated_rect.yc, rotated_rect.width,
-                                                rotated_rect.height, rotated_rect.angle);
+                    return pybind11::make_tuple(
+                        rotated_rect.xc,
+                        rotated_rect.yc,
+                        rotated_rect.width,
+                        rotated_rect.height,
+                        rotated_rect.angle);
                 },
                 [](const pybind11::tuple& t) {
                     if (t.size() != 5)
-                        throw std::runtime_error(
-                            "RotatedRect pickle with invalid state!");
+                        throw std::runtime_error("RotatedRect pickle with invalid state!");
                     RotatedRect rotated_rect;
                     rotated_rect.xc = t[0].cast<float>();
                     rotated_rect.yc = t[1].cast<float>();
@@ -302,7 +305,7 @@ namespace modeldeploy::vision {
                 }))
             .def("to_dict", [](const ObbResult& d) {
                 pybind11::dict result;
-                result["rotated_box"] = rotated_rect_to_dict(d.rotated_box);;
+                result["rotated_box"] = rotated_rect_to_dict(d.rotated_box);
                 result["score"] = d.score;
                 result["label_id"] = d.label_id;
                 return result;
@@ -372,7 +375,7 @@ namespace modeldeploy::vision {
                 }
                 // 2. keypoints
                 if (d.contains("keypoints")) {
-                    auto kps_list = d["keypoints"].cast<pybind11::list>();
+                    const auto kps_list = d["keypoints"].cast<pybind11::list>();
                     for (auto kp_obj : kps_list) {
                         auto kp_dict = kp_obj.cast<pybind11::dict>();
                         Point3f kp;
@@ -548,7 +551,7 @@ namespace modeldeploy::vision {
                 }
                 // 2.landmarks
                 if (d.contains("landmarks")) {
-                    auto kps_list = d["landmarks"].cast<pybind11::list>();
+                    const auto kps_list = d["landmarks"].cast<pybind11::list>();
                     for (auto kp_obj : kps_list) {
                         auto kp_dict = kp_obj.cast<pybind11::dict>();
                         Point3f lmk;

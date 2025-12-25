@@ -7,16 +7,36 @@
 #include "csrc/vision/common/visualize/visualize.h"
 
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc < 5) {
+        std::cout << "usage: demo_pedestrian_attribute_cxx det_model ml_model image_path backend" << std::endl;
+        return 1;
+    }
+
+
+    const std::string det_model = argv[1];
+    const std::string ml_model = argv[2];
+    const std::string image_path = argv[3];
+    const std::string backend = argv[4];
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
+    if (backend == "ort") {
+        option.use_gpu();
+        option.use_ort_backend();
+    }
+
+    else if (backend == "trt") {
+        option.use_gpu();
+        option.use_trt_backend();
+    }
+    else if (backend == "mnn") {
+        option.use_gpu();
+        option.use_mnn_backend();
+    }
     option.enable_trt = true;
     option.enable_fp16 = true;
-    option.use_ort_backend();
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
-        "../../test_data/test_models/zhgd_det_20251219.onnx",
-        "../../test_data/test_models/zhgd_ml_20251219.onnx", option);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
+        det_model, ml_model, option);
+    auto img = modeldeploy::ImageData::imread(image_path);
     pedestrian_attribute.set_cls_batch_size(8);
     pedestrian_attribute.set_det_input_size({1280, 1280});
     pedestrian_attribute.set_det_threshold(0.5);
@@ -36,6 +56,6 @@ int main() {
     label_map.insert({2, "safety_rope"});
     label_map.insert({3, "work_uniform"});
     const auto vis_image =
-        modeldeploy::vision::vis_attr(img, results, 0.5, label_map, "../../test_data/msyh.ttc", 6, 0.15, true,{0,1});
+        modeldeploy::vision::vis_attr(img, results, 0.5, label_map, "../../test_data/msyh.ttc", 6, 0.15, true, {0, 1});
     vis_image.imshow("pedestrian");
 }

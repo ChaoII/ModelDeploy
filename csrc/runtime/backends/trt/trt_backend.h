@@ -57,7 +57,6 @@ namespace modeldeploy {
         std::vector<TrtValueInfo> inputs_desc_;
         std::vector<TrtValueInfo> outputs_desc_;
         std::string model_buffer_;
-        std::map<std::string, ShapeRangeInfo> shape_range_info_;
 
         bool load_trt_cache(const std::string& engine_buffer);
     };
