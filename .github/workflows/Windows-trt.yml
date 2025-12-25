@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: Windows
+    runs-on: self-hosted
     defaults:
       run:
         shell: cmd
