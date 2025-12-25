@@ -1,4 +1,4 @@
-name: Windows-GPU
+name: Windows-GPU-TRT
 
 on:
   push:
@@ -16,21 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1️⃣ 激活 VS 2022 编译环境（非常关键）
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      # 2️⃣ 打印环境，方便排错
-      - name: Dump environment
-        run: |
-          echo CUDA_PATH=%CUDA_PATH%
-          echo TENSORRT_ROOT=%TENSORRT_ROOT%
-          where cl
-          where nvcc
-
-      # 3️⃣ CMake Configure
       - name: Configure
         run: |
           cmake -S . -B build ^
@@ -39,7 +29,6 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=install ^
             -DBUILD_AUDIO=ON ^
             -DBUILD_VISION=ON ^
-            -DBUILD_FACE=ON ^
             -DBUILD_CAPI=ON ^
             -DWITH_GPU=ON ^
             -DENABLE_TRT=ON ^
@@ -49,7 +38,6 @@ jobs:
             -DENABLE_TF=OFF ^
             -DBUILD_PYTHON=OFF
 
-      # 4️⃣ Build
       - name: Build
         run: |
           cmake --build build --config Release --parallel
