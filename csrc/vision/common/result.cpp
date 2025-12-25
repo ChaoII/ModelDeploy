@@ -59,7 +59,6 @@ namespace modeldeploy::vision {
         shape.clear();
     }
 
-
     void OCRResult::clear() {
         boxes.clear();
         text.clear();
@@ -67,6 +66,4 @@ namespace modeldeploy::vision {
         cls_scores.clear();
         cls_labels.clear();
     }
-
-
 }
