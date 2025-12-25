@@ -3,7 +3,7 @@
 //
 
 #include "csrc/audio/asr/sense_voice.h"
-
+#include <algorithm>
 #include <fstream>
 #include <csrc/utils/utils.h>
 #include <kaldi-native-fbank/csrc/feature-fbank.h>
