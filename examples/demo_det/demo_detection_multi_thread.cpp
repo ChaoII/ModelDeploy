@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <thread>
 #include "csrc/vision.h"
+#include <algorithm>
 #include "vision/common/display/display.h"
 
 namespace fs = std::filesystem;
