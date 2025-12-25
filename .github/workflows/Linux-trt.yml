@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted-Linux
+    runs-on: Ubuntu-local-24.04
     defaults:
       run:
         shell: bash
