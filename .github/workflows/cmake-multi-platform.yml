@@ -75,7 +75,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DBUILD_AUDIO=ON
           -DBUILD_VISION=ON 
-          -DBUILD_FACE=ON
           -DBUILD_CAPI=ON
           -DWITH_GPU=OFF
 

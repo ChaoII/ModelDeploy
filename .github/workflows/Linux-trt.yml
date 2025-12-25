@@ -1,0 +1,40 @@
+name: Linux-GPU-TRT
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: Ubuntu-local-24.04
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=install \
+            -DBUILD_AUDIO=ON \
+            -DBUILD_VISION=ON \
+            -DBUILD_CAPI=ON \
+            -DWITH_GPU=ON \
+            -DENABLE_TRT=ON \
+            -DTRT_DIR=$TENSORRT_HOME \
+            -DENABLE_MNN=OFF \
+            -DENABLE_ORT=OFF \
+            -DENABLE_TF=OFF \
+            -DBUILD_PYTHON=OFF
+
+      - name: Build
+        run: |
+          cmake --build build --config Release -j4
+      - name: Install
+        run: |
+          cmake --install build
