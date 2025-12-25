@@ -1,8 +1,14 @@
 # trt.cmake
 
 
-set(TRT_LIB_DIR "${TRT_DIR}/lib")
-set(TRT_INC_DIR "${TRT_DIR}/include")
+if (BUILD_ON_JETSON)
+    set(TRT_LIB_DIR "/usr/lib/aarch64-linux-gnu")
+    set(TRT_INC_DIR "/usr/include")
+else ()
+    set(TRT_LIB_DIR "${TRT_DIR}/lib")
+    set(TRT_INC_DIR "${TRT_DIR}/include")
+endif ()
+
 
 # 获取编译时TensorRT主版本号
 set(TRT_VERSION_HPP "${TRT_INC_DIR}/NvInferVersion.h")

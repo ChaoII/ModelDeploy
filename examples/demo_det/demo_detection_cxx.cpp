@@ -17,7 +17,7 @@ int main() {
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det_20251219.engine", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute1.jpg");
+    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().use_cuda_preproc();
