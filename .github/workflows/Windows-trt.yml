@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted-Windows
+    runs-on: Windows-local-11
     defaults:
       run:
         shell: cmd
@@ -21,14 +21,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-
-      # 2️⃣ 打印环境，方便排错
-      - name: Dump environment
-        run: |
-          echo CUDA_PATH=%CUDA_PATH%
-          echo TENSORRT_ROOT=%TENSORRT_ROOT%
-          where cl
-          where nvcc
 
       # 3️⃣ CMake Configure
       - name: Configure
