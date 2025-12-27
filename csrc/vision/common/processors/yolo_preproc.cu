@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <mutex>
 
-
-__constant__ float kMean[3] = {0.f, 0.f, 0.f};
-__constant__ float kStd[3] = {1.f / 255.f, 1.f / 255.f, 1.f / 255.f};
+// RGB 三通道归一化均值和标准差
+__constant__ float k_mean[3] = {0.f, 0.f, 0.f};
+__constant__ float k_std[3] = {1.f / 255.f, 1.f / 255.f, 1.f / 255.f};
 
 __global__ void kernel_yolo_preproc(
     const uint8_t* __restrict__ src,
@@ -20,6 +20,7 @@ __global__ void kernel_yolo_preproc(
     const float pad_value) {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    // 边界检查，并不一定线程数和像素的数量一致，有可能线程数量大于输出的像素数量
     if (x >= dst_w || y >= dst_h) return;
 
     const float src_xf = (x - pad_w) / scale;
@@ -31,22 +32,30 @@ __global__ void kernel_yolo_preproc(
     const int dst_idx = y * dst_w + x;
     const int plane = dst_h * dst_w;
 
+    // 这个范围内的像素都padding值
     if (src_x < 0 || src_x >= src_w || src_y < 0 || src_y >= src_h) {
-        const float v0 = (pad_value - kMean[0]) * kStd[0];
-        const float v1 = (pad_value - kMean[1]) * kStd[1];
-        const float v2 = (pad_value - kMean[2]) * kStd[2];
-        dst[dst_idx] = v0;
-        dst[plane + dst_idx] = v1;
+        const float v0 = (pad_value - k_mean[0]) * k_std[0];
+        const float v1 = (pad_value - k_mean[1]) * k_std[1];
+        const float v2 = (pad_value - k_mean[2]) * k_std[2];
+        dst[0 * plane + dst_idx] = v0;
+        dst[1 * plane + dst_idx] = v1;
         dst[2 * plane + dst_idx] = v2;
     }
     else {
+        // [B0G0R0 B1G1R1 B2G2R2 B3G3R3]
+        // [B4G4R4 B5G5R5 B6G6R6 B7G7R7]
+        // [B8G8R8 B9G9R9 ...... ......]
+
+        // [B0B1B2B3B4B5B6B7B8B9...]
+        // [G0G1G2G3G4G5G6G7G8G9...]
+        // [R0R1R2R3R4R5R6R7R8R9...]
         const int src_idx = src_y * src_step + src_x * 3;
         const float b = src[src_idx + 0];
         const float g = src[src_idx + 1];
         const float r = src[src_idx + 2];
-        dst[dst_idx] = (r - kMean[0]) * kStd[0];
-        dst[plane + dst_idx] = (g - kMean[1]) * kStd[1];
-        dst[2 * plane + dst_idx] = (b - kMean[2]) * kStd[2];
+        dst[0 * plane + dst_idx] = (r - k_mean[0]) * k_std[0];
+        dst[1 * plane + dst_idx] = (g - k_mean[1]) * k_std[1];
+        dst[2 * plane + dst_idx] = (b - k_mean[2]) * k_std[2];
     }
 }
 
@@ -99,7 +108,7 @@ namespace modeldeploy::vision {
         // 1️⃣ output: GPU, FP32, CHW
         output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
 
-        // 2️⃣ CUDA stream（保持你原来的行为）
+        // 2️⃣ CUDA stream
         cudaStream_t stream;
         if (cudaStreamCreate(&stream) != cudaSuccess) {
             return false;
@@ -160,7 +169,7 @@ namespace modeldeploy::vision {
         if (err != cudaSuccess) {
             return false;
         }
-        // 6️⃣ batch 维（保持你原行为）
+        // 6️⃣ 增加batch维
         output->expand_dim(0);
         return true;
     }
