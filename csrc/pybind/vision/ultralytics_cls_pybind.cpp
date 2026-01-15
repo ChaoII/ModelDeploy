@@ -25,6 +25,8 @@ namespace modeldeploy::vision {
                      }
                      return outputs;
                  }, pybind11::arg("im_list"))
+            .def("enable_center_crop", &classification::ClassificationPreprocessor::enable_center_crop)
+            .def("disable_center_crop", &classification::ClassificationPreprocessor::disable_center_crop)
             .def_property("size", &classification::ClassificationPreprocessor::get_size,
                           &classification::ClassificationPreprocessor::set_size);
 
@@ -53,7 +55,8 @@ namespace modeldeploy::vision {
                              "ClassificationPostprocessor.");
                      }
                      return results;
-                 }, pybind11::arg("input_array"));
+                 }, pybind11::arg("input_array"))
+            .def("set_multi_label", &classification::ClassificationPostprocessor::set_multi_label);
 
 
         pybind11::class_<classification::Classification, BaseModel>(m, "Classification")

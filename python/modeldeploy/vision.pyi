@@ -8,10 +8,10 @@ import pybind11_stubgen.typing_ext
 import typing
 __all__ = ['AttributeResult', 'Classification', 'ClassificationPostprocessor', 'ClassificationPreprocessor', 'Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionResult', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'KeyPointsResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'PedestrianAttribute', 'Point2f', 'Point3f', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_attr', 'vis_cls', 'vis_det', 'vis_iseg', 'vis_keypoints', 'vis_lpr', 'vis_obb', 'vis_ocr']
 class AttributeResult:
+    attr_scores: list[float]
     box: Rect2f
     box_label_id: int
     box_score: float
-    car_plate_str: list[float]
     @staticmethod
     def from_dict(arg0: dict) -> AttributeResult:
         ...
@@ -45,9 +45,15 @@ class ClassificationPostprocessor:
     @typing.overload
     def run(self, input_array: list[numpy.ndarray]) -> list[ClassifyResult]:
         ...
+    def set_multi_label(self, arg0: bool) -> None:
+        ...
 class ClassificationPreprocessor:
     size: list[int]
     def __init__(self) -> None:
+        ...
+    def disable_center_crop(self) -> None:
+        ...
+    def enable_center_crop(self) -> None:
         ...
     def run(self, im_list: list[numpy.ndarray]) -> list[modeldeploy.modeldeploy.Tensor]:
         ...
