@@ -1,7 +1,6 @@
 #include "vision/common/processors/yolo_preproc.cuh"
 #include <cuda_runtime.h>
 #include <algorithm>
-#include <mutex>
 
 // RGB 三通道归一化均值和标准差
 __constant__ float k_mean[3] = {0.f, 0.f, 0.f};
@@ -13,7 +12,8 @@ __global__ void kernel_yolo_preproc(
     const int src_w,
     const int src_step,
     float* __restrict__ dst,
-    const int dst_h, const int dst_w,
+    const int dst_h,
+    const int dst_w,
     const float scale,
     const float pad_w,
     const float pad_h,
@@ -105,16 +105,16 @@ namespace modeldeploy::vision {
         const int dst_h = dst_size[1];
         const float pad_value = pad_val[0];
 
-        // 1️⃣ output: GPU, FP32, CHW
+        // 1 output: GPU, FP32, CHW
         output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
 
-        // 2️⃣ CUDA stream
+        // 2 CUDA stream
         cudaStream_t stream;
         if (cudaStreamCreate(&stream) != cudaSuccess) {
             return false;
         }
 
-        // 3️⃣ letterbox（host 计算）
+        // 3 letterbox（host 计算）
         float scale, pad_w, pad_h;
         compute_letterbox(src_h, src_w, dst_h, dst_w, scale, pad_w, pad_h);
 
@@ -128,7 +128,7 @@ namespace modeldeploy::vision {
             letter_box_record->pad_h = pad_h;
         }
 
-        // 4️⃣ src 指针处理（workspace，避免反复 malloc）
+        // 4 src 指针处理（workspace，避免反复 malloc）
         const uint8_t* src = image->data();
         const size_t src_bytes = static_cast<size_t>(src_h) * src_w * image->channels();
         const uint8_t* d_src = nullptr;
@@ -147,7 +147,7 @@ namespace modeldeploy::vision {
             cudaMemcpyAsync(ws.d_src, src, src_bytes, cudaMemcpyHostToDevice, stream);
             d_src = ws.d_src;
         }
-        // 5️⃣ launch kernel
+        // 5 launch kernel
         dim3 block(16, 16);
         dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y);
 
@@ -169,7 +169,7 @@ namespace modeldeploy::vision {
         if (err != cudaSuccess) {
             return false;
         }
-        // 6️⃣ 增加batch维
+        // 6 增加batch维
         output->expand_dim(0);
         return true;
     }
