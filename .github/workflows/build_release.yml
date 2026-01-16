@@ -1,0 +1,194 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  release:
+    types: [published, created]
+
+env:
+  PROJECT_NAME: "ModelDeploy"
+  VERSION: "0.0.0.dev"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        build_type: [Release]
+        c_compiler: [gcc, cl]
+        include:
+          - os: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+            artifact_arch: win-x64
+            file_extension: .zip
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+            artifact_arch: linux-x64
+            file_extension: .tar.gz
+        exclude:
+          - os: windows-latest
+            c_compiler: gcc
+          - os: ubuntu-latest
+            c_compiler: cl
+
+    outputs:
+      artifact_paths: ${{ steps.package.outputs.artifact_paths }}
+      asset_names: ${{ steps.package.outputs.asset_names }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Set up MSVC Developer Command Prompt
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set reusable strings
+        id: strings
+        shell: bash
+        run: |
+          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+      - name: Configure CMake
+        run: >
+          cmake -S ${{ github.workspace }}
+          -B ${{ steps.strings.outputs.build-output-dir }}
+          -G Ninja
+          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DBUILD_AUDIO=ON
+          -DBUILD_VISION=ON
+          -DBUILD_CAPI=ON
+          -DWITH_GPU=OFF
+
+      - name: Build
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+
+
+      - name: Install to staging directory
+        run: |
+          cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ./install
+
+      - name: Create distribution package
+        id: package
+        run: |
+          # 获取当前时间戳用于 artifact
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Windows: 创建 ZIP
+            PACKAGE_NAME="${PROJECT_NAME}_${VERSION}_${matrix.artifact_arch}"
+            ARTIFACT_NAME="${PROJECT_NAME}_${TIMESTAMP}_${matrix.artifact_arch}.zip"
+          
+            7z a -r "${PACKAGE_NAME}.zip" ./install/*
+          
+            echo "artifact_path=${PACKAGE_NAME}.zip" >> $GITHUB_OUTPUT
+            echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+            echo "asset_name=${PACKAGE_NAME}.zip" >> $GITHUB_OUTPUT
+          
+          else
+            # Linux: 创建 tar.gz
+            PACKAGE_NAME="${PROJECT_NAME}_${VERSION}_${matrix.artifact_arch}"
+            ARTIFACT_NAME="${PROJECT_NAME}_${TIMESTAMP}_${matrix.artifact_arch}.tar.gz"
+          
+            tar -czf "${PACKAGE_NAME}.tar.gz" -C ./install .
+          
+            echo "artifact_path=${PACKAGE_NAME}.tar.gz" >> $GITHUB_OUTPUT
+            echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+            echo "asset_name=${PACKAGE_NAME}.tar.gz" >> $GITHUB_OUTPUT
+          fi
+          
+          # 设置矩阵级别的输出
+          echo "artifact_paths=${{ matrix.artifact_arch }}::${{ steps.package.outputs.artifact_path }}" >> $GITHUB_OUTPUT
+          echo "asset_names=${{ matrix.artifact_arch }}::${{ steps.package.outputs.asset_name }}" >> $GITHUB_OUTPUT
+
+      - name: Upload to Artifacts (CI/CD 测试用)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: ${{ steps.package.outputs.artifact_path }}
+          retention-days: 7
+
+  # 发布到 GitHub Releases (仅当创建标签时)
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        run: |
+          mkdir -p packages
+          gh run download ${{ github.run_id }} -n "*-artifact-*" -D packages/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare release assets
+        run: |
+          # 为发布重新命名文件
+          cd packages
+          for file in *; do
+            if [[ "$file" =~ ${PROJECT_NAME}_[0-9]{8}_[0-9]{6}_(.+)\.(zip|tar\.gz) ]]; then
+              arch=${BASH_REMATCH[1]}
+              ext=${BASH_REMATCH[2]}
+              new_name="${PROJECT_NAME}_${GITHUB_REF_NAME}_${arch}.${ext}"
+              mv "$file" "$new_name"
+              echo "Renamed $file to $new_name"
+            fi
+          done
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # 提取变更日志
+            PREV_TAG=$(git describe --tags --abbrev=0 ${GITHUB_REF_NAME}^ 2>/dev/null || echo "")
+            if [ -z "$PREV_TAG" ]; then
+              CHANGES=$(git log --oneline --pretty=format:"- %s" $GITHUB_REF_NAME)
+            else
+              CHANGES=$(git log --oneline --pretty=format:"- %s" $PREV_TAG..$GITHUB_REF_NAME)
+            fi
+          else
+            CHANGES="Development build"
+          fi
+          echo "changes<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## ModelDeploy ${{ github.ref_name }}
+            
+            **Build Date:** $(date +'%Y-%m-%d %H:%M:%S')
+            
+            ### Changes
+            ${{ steps.changelog.outputs.changes }}
+            
+            ### Supported Platforms
+            - **Windows x64**: Pre-built binaries for Windows
+            - **Linux x64**: Pre-built binaries for Linux
+            
+            ### Installation
+            Extract the archive and add the `bin` directory to your PATH.
+            
+            ### Usage
