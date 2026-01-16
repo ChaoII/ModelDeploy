@@ -63,6 +63,7 @@ jobs:
           -DBUILD_VISION=ON
           -DBUILD_CAPI=ON
           -DWITH_GPU=OFF
+          -DBUILD_PYTHON=OFF
 
       - name: Build
         run: cmake --build build
@@ -79,11 +80,12 @@ jobs:
             VERSION="${{ github.event.release.tag_name }}"
             VERSION="${VERSION#v}"
           else
-            VERSION="dev-${GITHUB_SHA::7}"
+              TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+              VERSION="dev_${TIMESTAMP}"
           fi
 
           NAME="${PROJECT_NAME}_${VERSION}_${{ matrix.artifact_arch }}"
-
+          echo "NAME=${NAME}" >> $GITHUB_ENV
           if [ "${{ matrix.ext }}" = "zip" ]; then
             7z a "${NAME}.zip" ./install/*
             echo "PKG=${NAME}.zip" >> $GITHUB_ENV
@@ -96,8 +98,8 @@ jobs:
       - name: Upload CI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PKG }}
-          path: ${{ env.PKG }}
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}
           retention-days: 7
 
   release:
