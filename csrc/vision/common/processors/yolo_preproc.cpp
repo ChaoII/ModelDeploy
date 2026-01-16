@@ -10,7 +10,8 @@
 
 
 namespace modeldeploy::vision {
-    bool yolo_preprocess_cpu(ImageData* image, Tensor* output, const std::vector<int>& dst_size,
+    bool yolo_preprocess_cpu(const ImageData* image, Tensor* output,
+                             const std::vector<int>& dst_size,
                              const std::vector<float>& pad_val,
                              LetterBoxRecord* letter_box_record) {
         // yolo's preprocess steps
@@ -26,7 +27,7 @@ namespace modeldeploy::vision {
         output->expand_dim(0); // reshape to n, c, h, w
         // 这里不能深拷贝，深拷贝cv::Mat mat持有的内存就会被释放那么output指向的内存也会被释放
         // image->update_from_mat(&mat);
-        *image = ImageData::from_mat(&mat);
+        // *image = ImageData::from_mat(&mat);
         return true;
     }
 }
