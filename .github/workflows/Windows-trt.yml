@@ -21,7 +21,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-
       # 3️⃣ CMake Configure
       - name: Configure
         run: |

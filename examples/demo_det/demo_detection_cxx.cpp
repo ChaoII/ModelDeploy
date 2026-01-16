@@ -20,7 +20,7 @@ int main() {
     auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute.jpg");
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
-    yolo11_det.get_preprocessor().use_cuda_preproc();
+    // yolo11_det.get_preprocessor().use_cuda_preproc();
     yolo11_det.get_preprocessor().set_size({1280, 1280});
     constexpr int warming_up_count = 10;
     for (int i = 0; i < warming_up_count; ++i) {
@@ -35,7 +35,7 @@ int main() {
     const auto vis_image =
         modeldeploy::vision::vis_det(img, result, 0.5, label_map, "../../test_data/msyh.ttc", 12, 0.3,
                                      true);
-    img.imshow("result");
+    vis_image.imshow("result");
     // test_camera();
 }
 

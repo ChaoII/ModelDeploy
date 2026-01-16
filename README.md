@@ -208,3 +208,12 @@ trtexec --onnx=yolo11n_nms.onnx ^
         --optShapes=images:1x3x640x640 ^
         --maxShapes=images:4x3x1280x1280
 ```
+
+#### 6. 路线图
+
+- [x] 重构`Tensor`支持`CUDA`
+- [x] 添加`ModelDeploy`的`Python`接口
+- [x] 添加`ModelDeploy`的`C#`接口
+- [ ] 添加更多的`cuda`预处理函数
+- [ ] 重构`ImageData`为`MdImage`, 支持常用的预处理比如`BGR->RGB`, `Cast` ,`HWC->CHW`, `Resize`, `Normalize`, `LetterBox`
+
