@@ -1,4 +1,4 @@
-name: Windows-GPU-TRT
+name: Windows-CUDA
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, Windows]
+    runs-on: [ self-hosted, Windows ]
     defaults:
       run:
         shell: cmd

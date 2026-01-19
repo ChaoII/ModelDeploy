@@ -1,4 +1,4 @@
-name: Linux-GPU-TRT
+name: Linux-CUDA
 
 on:
   push:
