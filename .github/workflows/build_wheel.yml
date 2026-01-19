@@ -5,7 +5,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
+env:
+  PROJECT_NAME: "ModelDeploy"
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -45,5 +46,11 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build wheels
-        # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
         run: python -m build
+
+      - name: Upload CI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}
+          path: dist/
+          retention-days: 7

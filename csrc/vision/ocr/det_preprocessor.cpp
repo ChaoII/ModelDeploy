@@ -36,7 +36,6 @@ namespace modeldeploy::vision::ocr {
     }
 
     DBDetectorPreprocessor::DBDetectorPreprocessor() {
-
     }
 
 

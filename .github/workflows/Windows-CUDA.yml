@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: Windows
+    runs-on: [self-hosted, Windows]
     defaults:
       run:
         shell: cmd
@@ -34,8 +34,8 @@ jobs:
             -DWITH_GPU=ON ^
             -DENABLE_TRT=ON ^
             -DTRT_DIR="%TENSORRT_ROOT%" ^
-            -DENABLE_MNN=OFF ^
-            -DENABLE_ORT=OFF ^
+            -DENABLE_MNN=ON ^
+            -DENABLE_ORT=ON ^
             -DBUILD_PYTHON=OFF
 
       # 4️⃣ Build
