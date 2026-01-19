@@ -18,15 +18,15 @@ int main() {
     option.use_gpu();
     option.enable_trt = false;
     option.enable_fp16 = true;
-    modeldeploy::vision::ocr::PaddleOCR ocr("C:/Users/aichao/Desktop/fsdownload/det_infer.onnx",
+    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
                                             "../../test_data/test_models/ocr/ppocrv4_mobile/cls_infer.onnx",
-                                            "C:/Users/aichao/Desktop/fsdownload/rec_infer.onnx",
-                                            "F:/unattended_laboratory/OCR/rec/dataset/dict.txt",
+                                            "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
+                                            "../../test_data/ppocrv5_dict.txt",
                                             option);
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/ocr2.jpg");
-    auto img = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/4324.png");
-    ocr.set_rec_batch_size(16);
-    ocr.get_detector()->get_preprocessor().set_max_side_len(1440);
+    auto img = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/stock/0010.jpg");
+    ocr.set_rec_batch_size(8);
+    ocr.get_detector()->get_preprocessor().set_max_side_len(640);
     ocr.get_detector()->get_postprocessor().set_det_db_thresh(0.3);
     ocr.get_detector()->get_postprocessor().set_det_db_box_thresh(0.6);
     ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.8);
