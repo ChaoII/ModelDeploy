@@ -5,6 +5,8 @@
 #include "core/md_log.h"
 #include "vision/ocr/ppocr.h"
 #include "vision/ocr/utils/ocr_utils.h"
+#include <opencv2/opencv.hpp>
+
 
 namespace modeldeploy::vision::ocr {
     PaddleOCR::PaddleOCR(const std::string& det_model_path,
@@ -90,14 +92,21 @@ namespace modeldeploy::vision::ocr {
             timers->post_timer.push_back(0);
             timers->infer_timer.start();
         }
+        std::cout << "=========-1===========" << std::endl;
+
         if (!detector_->batch_predict(images, &batch_boxes)) {
             MD_LOG_ERROR << "There's error while detecting image in PaddleOCR." << std::endl;
             return false;
         }
+
+        std::cout << "=========0===========" << std::endl;
+
         for (int i_batch = 0; i_batch < batch_boxes.size(); ++i_batch) {
             sort_boxes(&batch_boxes[i_batch]);
             (*batch_result)[i_batch].boxes = batch_boxes[i_batch];
         }
+        std::cout << "=========1===========" << std::endl;
+
         for (int i_batch = 0; i_batch < images.size(); ++i_batch) {
             OCRResult& ocr_result = (*batch_result)[i_batch];
             // Get cropped images by detection result
@@ -113,13 +122,15 @@ namespace modeldeploy::vision::ocr {
                     cv::Mat _cropped_img;
                     img.to_mat(&_cropped_img);
                     auto _cv_image = get_rotate_crop_image(_cropped_img, boxes[i_box]);
-                    image_list[i_box] = ImageData::from_mat(&_cv_image);
+                    image_list[i_box] = ImageData(std::move(_cv_image));
                 }
             }
             std::vector<int32_t>* cls_labels_ptr = &ocr_result.cls_labels;
             std::vector<float>* cls_scores_ptr = &ocr_result.cls_scores;
             std::vector<std::string>* text_ptr = &ocr_result.text;
             std::vector<float>* rec_scores_ptr = &ocr_result.rec_scores;
+            std::cout << "=========2===========" << std::endl;
+
             if (nullptr != classifier_) {
                 for (size_t start_index = 0; start_index < image_list.size();
                      start_index += cls_batch_size_) {

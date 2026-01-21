@@ -18,7 +18,7 @@ namespace cv {
 }
 
 namespace modeldeploy::vision {
-    class ImageData {
+    class MODELDEPLOY_CXX_EXPORT ImageData {
     public:
         ImageData() = default;
         ImageData(int width, int height, MdImageType type);
@@ -39,6 +39,7 @@ namespace modeldeploy::vision {
         [[nodiscard]] MdImageType type() const;
         [[nodiscard]] size_t element_count() const;
         [[nodiscard]] size_t element_bytes() const;
+        [[nodiscard]] size_t bytes() const;
         [[nodiscard]] const uint8_t* data() const;
         [[nodiscard]] uint8_t* data();
         [[nodiscard]] bool empty() const;
@@ -48,17 +49,18 @@ namespace modeldeploy::vision {
         // Caller must guarantee data lifetime >= ImageData lifetime
         static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false);
         static ImageData from_mat(const cv::Mat& mat, bool copy = false);
+        static void images_to_tensor(std::vector<ImageData> images, Tensor* tensor);
         void to_mat(cv::Mat* mat_ptr, bool copy = false) const;
         void to_tensor(Tensor* tensor, bool copy = false);
         static ImageData imread(const std::string& filename);
         [[nodiscard]] bool imwrite(const std::string& filename) const;
         void imshow(const std::string& win_name) const;
 
-
         // 预处理相关
         [[nodiscard]] ImageData crop(const Rect2f& rect) const;
         [[nodiscard]] ImageData resize(int width, int height) const;
         [[nodiscard]] ImageData cast(const std::string& dtype = "float", bool scale = true) const;
+        [[nodiscard]] ImageData pad(int top, int bottom, int left, int right, float value) const;
         [[nodiscard]] ImageData normalize(const std::vector<float>& mean, const std::vector<float>& std,
                                           bool swap_rb = true) const;
         [[nodiscard]] ImageData letter_box(const std::vector<int>& dst_size, float padding_value) const;
@@ -69,7 +71,7 @@ namespace modeldeploy::vision {
         [[nodiscard]] ImageData fuse_convert_and_permute() const;
 
     private:
-        std::unique_ptr<cv::Mat> mat_;
+        cv::Mat* mat_ = nullptr;
         MdImageType type_ = MdImageType::PKG_RGBA_U8;
         RawMemoryOwnership ownership_ = RawMemoryOwnership::Owned;
         int width_{};

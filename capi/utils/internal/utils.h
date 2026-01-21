@@ -21,7 +21,7 @@
 /// 通过将MDImage对象转换为OpenCV的Mat对象，使得用户可以利用OpenCV丰富的图像处理功能
 /// 对MDImage对象进行操作此函数确保了不同图像处理库之间的兼容性，提高了代码的灵活性和可用性
 ///
-modeldeploy::ImageData md_image_to_image_data(const MDImage* image);
+modeldeploy::vision::ImageData md_image_to_image_data(const MDImage* image);
 
 
 std::unordered_map<int, std::string> md_map_to_map(MDMapData* c_map);
@@ -40,7 +40,7 @@ cv::Mat md_image_to_mat(const MDImage* image);
 /// 允许在不同图像处理场景下互操作。通过封装Mat对象到MDImage中，可以更容易地
 /// 在基于MDImage的框架或应用程序中利用OpenCV的功能。
 ///
-MDImage* image_data_to_md_image(const modeldeploy::ImageData& mat);
+MDImage* image_data_to_md_image(const modeldeploy::vision::ImageData& mat);
 
 MDImage* mat_to_md_image(const cv::Mat& mat);
 

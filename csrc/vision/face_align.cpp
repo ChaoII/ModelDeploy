@@ -145,7 +145,7 @@ namespace modeldeploy::vision::utils {
             if (cropped_image_aligned.empty()) {
                 MD_LOG_ERROR << "croppedImageAligned is empty." << std::endl;
             }
-            output_images.emplace_back(ImageData::from_mat(&cropped_image_aligned));
+            output_images.emplace_back(ImageData(std::move(cropped_image_aligned)));
         }
         return output_images;
     }

@@ -6,7 +6,6 @@
 #include "core/md_log.h"
 #include "vision/face/face_det/scrfd.h"
 
-#include <chrono>
 
 namespace modeldeploy::vision::face {
     Scrfd::Scrfd(const std::string& model_file, const RuntimeOption& custom_option) {

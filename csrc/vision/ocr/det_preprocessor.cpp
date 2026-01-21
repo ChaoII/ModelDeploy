@@ -51,19 +51,16 @@ namespace modeldeploy::vision::ocr {
             max_resize_w = std::max(max_resize_w, batch_det_img_info_[i][2]);
             max_resize_h = std::max(max_resize_h, batch_det_img_info_[i][3]);
         }
-        std::vector<cv::Mat> _images;
+        std::vector<ImageData> processed_images;
         for (size_t i = 0; i < image_batch->size(); ++i) {
-            ImageData* image = &image_batch->at(i);
-            cv::Mat mat;
-            image->to_mat(&mat);
-            Resize::apply(&mat, batch_det_img_info_[i][2], batch_det_img_info_[i][3]);
-            Pad::apply(&mat, 0, max_resize_h - batch_det_img_info_[i][3], 0, max_resize_w - batch_det_img_info_[i][2],
-                       pad_value_);
-            NormalizeAndPermute::apply(&mat, {0.485f, 0.456f, 0.406f}, {0.229f, 0.224f, 0.225f}, true);
-            _images.push_back(mat);
+            ImageData image = image_batch->at(i);
+            auto s = image.resize(batch_det_img_info_[i][2], batch_det_img_info_[i][3]);
+            s = s.pad(0, max_resize_h - batch_det_img_info_[i][3], 0, max_resize_w - batch_det_img_info_[i][2], 0);
+            s = s.fuse_normalize_and_permute({0.485f, 0.456f, 0.406f}, {0.229f, 0.224f, 0.225f});
+            processed_images.push_back(s);
         }
         outputs->resize(1);
-        utils::mats_to_tensor(_images, &(*outputs)[0]);
+        ImageData::images_to_tensor(processed_images, &(*outputs)[0]);
         return true;
     }
 }

@@ -5,6 +5,8 @@
 #include "core/md_log.h"
 #include "vision/pipeline/pedestrian_attribute.h"
 
+#include <opencv2/opencv.hpp>
+
 namespace modeldeploy::vision::pipeline {
     PedestrianAttribute::PedestrianAttribute(const std::string& det_model_path,
                                              const std::string& mlc_model_path,

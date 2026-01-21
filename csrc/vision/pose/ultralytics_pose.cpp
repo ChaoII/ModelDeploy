@@ -2,6 +2,7 @@
 // Created by aichao on 2025/06/2.
 //
 
+#include <opencv2/opencv.hpp>
 
 #include "core/md_log.h"
 #include "vision/pose/ultralytics_pose.h"
