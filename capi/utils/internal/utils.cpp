@@ -12,9 +12,9 @@
 
 #include "csrc/core/md_log.h"
 
-modeldeploy::ImageData md_image_to_image_data(const MDImage* image) {
+modeldeploy::vision::ImageData md_image_to_image_data(const MDImage* image) {
     const cv::Mat cv_image = md_image_to_mat(image);
-    return modeldeploy::ImageData::from_mat(&cv_image);
+    return modeldeploy::vision::ImageData(std::move(cv_image));
 }
 
 std::unordered_map<int, std::string> md_map_to_map(MDMapData* c_map) {
@@ -77,7 +77,7 @@ MDImage* mat_to_md_image(const cv::Mat& mat) {
     return md_image;
 }
 
-MDImage* image_data_to_md_image(const modeldeploy::ImageData& mat) {
+MDImage* image_data_to_md_image(const modeldeploy::vision::ImageData& mat) {
     cv::Mat cv_image;
     mat.to_mat(&cv_image);
     return mat_to_md_image(cv_image);

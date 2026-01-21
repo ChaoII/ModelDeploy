@@ -60,10 +60,13 @@ namespace modeldeploy::vision::ocr {
         const std::vector<ImageData>& images,
         std::vector<std::vector<std::array<int, 8>>>* det_results) {
         std::vector<ImageData> _images = images;
+        std::cout<<"************0*************"<<std::endl;
+
         if (!preprocessor_.apply(&_images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
+        std::cout<<"************1*************"<<std::endl;
         const auto batch_det_img_info = preprocessor_.get_batch_img_info();
         reused_input_tensors_[0].set_name(get_input_info(0).name);
 

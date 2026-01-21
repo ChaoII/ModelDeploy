@@ -5,6 +5,7 @@
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
+#include "opencv2/opencv.hpp"
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -24,7 +25,7 @@ int main() {
                                             "../../test_data/ppocrv5_dict.txt",
                                             option);
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/ocr2.jpg");
-    auto img = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/stock/0010.jpg");
+    auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0010.jpg");
     ocr.set_rec_batch_size(8);
     ocr.get_detector()->get_preprocessor().set_max_side_len(640);
     ocr.get_detector()->get_postprocessor().set_det_db_thresh(0.3);

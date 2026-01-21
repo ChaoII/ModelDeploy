@@ -111,7 +111,7 @@ namespace modeldeploy::vision::lpr {
                 transform_image = get_split_merge(transform_image);
             }
             LprResult tmp_result;
-            recognizer_->predict(ImageData::from_mat(&transform_image), &tmp_result);
+            recognizer_->predict(ImageData(std::move(transform_image)), &tmp_result);
             (*results)[i].car_plate_color = tmp_result.car_plate_color;
             (*results)[i].car_plate_str = tmp_result.car_plate_str;
         }
