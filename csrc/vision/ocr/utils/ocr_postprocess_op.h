@@ -43,16 +43,5 @@ namespace modeldeploy::vision::ocr {
         static bool x_sort_fp32(const std::vector<float>& a, const std::vector<float>& b);
 
         static std::vector<std::vector<float>> mat2_vector(cv::Mat mat);
-
-        static int _max(const int a, const int b) { return a >= b ? a : b; }
-
-        static int _min(const int a, const int b) { return a >= b ? b : a; }
-
-        template <class T>
-        static T clamp(T x, T min, T max) {
-            if (x > max) return max;
-            if (x < min) return min;
-            return x;
-        }
     };
 } // namespace ocr

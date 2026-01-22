@@ -17,7 +17,7 @@ int main() {
 #endif
     auto model = modeldeploy::vision::lpr::LprRecognizer(
         "../../test_data/test_models/plate_recognition_color.onnx");
-    auto im = modeldeploy::ImageData::imread("../../test_data/test_images/test_lpr_recognizer.jpg");
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_lpr_recognizer.jpg");
     auto im_bak = im.clone();
     modeldeploy::vision::LprResult res;
     if (!model.predict(im, &res)) {

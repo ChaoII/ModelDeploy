@@ -17,11 +17,11 @@ namespace modeldeploy::vision {
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto im = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&im);
+                  auto image_data = ImageData(std::move(im));
                   const auto vis_im = vis_cls(image_data, result, top_k,
                                               threshold, font_path, font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -42,11 +42,11 @@ namespace modeldeploy::vision {
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto im = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&im);
+                  auto image_data = ImageData(std::move(im));
                   const ImageData vis_im = vis_det(image_data, result, threshold, label_map, font_path,
                                                    font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -66,11 +66,11 @@ namespace modeldeploy::vision {
                              const double alpha = 0.5,
                              const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
+                  auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_iseg(image_data, result, threshold, font_path,
                                                     font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -85,11 +85,11 @@ namespace modeldeploy::vision {
                             const std::string& font_path = "", const int font_size = 14,
                             const double alpha = 0.5, const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
+                  auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_obb(image_data, result, threshold, font_path,
                                                    font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -107,10 +107,10 @@ namespace modeldeploy::vision {
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
+                  auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_ocr(image_data, result, font_path, font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -128,11 +128,11 @@ namespace modeldeploy::vision {
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
+                  auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_lpr(image_data, result, font_path, font_size,
                                                    landmark_radius, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -152,11 +152,11 @@ namespace modeldeploy::vision {
                                   const bool save_result = false,
                                   const bool draw_lines = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
+                  auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_keypoints(image_data, result, font_path, font_size, landmark_radius,
                                                          alpha, save_result, draw_lines);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -179,11 +179,11 @@ namespace modeldeploy::vision {
                              const std::vector<int>& abnormal_ids = {},
                              const bool show_attr = true) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
-                  auto image_data = ImageData::from_mat(&cv_image);
+                  auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_attr(image_data, result, threshold, label_map, font_path, font_size,
                                                     alpha, save_result, abnormal_ids, show_attr);
                   cv::Mat mat;
-                  vis_im.to_mat(&mat);
+                  vis_im.to_mat(mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),

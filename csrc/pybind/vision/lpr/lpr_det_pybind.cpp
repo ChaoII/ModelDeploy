@@ -17,7 +17,7 @@ namespace modeldeploy::vision {
                      images.reserve(im_list.size());
                      for (auto& image : im_list) {
                          const auto cv_image = pyarray_to_cv_mat(image);
-                         images.push_back(ImageData::from_mat(&cv_image));
+                         images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<LetterBoxRecord> records;
                      std::vector<Tensor> outputs;
@@ -85,7 +85,7 @@ namespace modeldeploy::vision {
                  [](lpr::LprDetection& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<KeyPointsResult> result;
-                     self.predict(ImageData::from_mat(&mat), &result);
+                     self.predict(ImageData(std::move(mat)), &result);
                      return result;
                  }, pybind11::arg("image"))
             .def("batch_predict",
@@ -95,7 +95,7 @@ namespace modeldeploy::vision {
                      images.reserve(data.size());
                      for (auto& image : data) {
                          const auto cv_image = pyarray_to_cv_mat(image);
-                         images.push_back(ImageData::from_mat(&cv_image));
+                         images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<std::vector<KeyPointsResult>> results;
                      self.batch_predict(images, &results);

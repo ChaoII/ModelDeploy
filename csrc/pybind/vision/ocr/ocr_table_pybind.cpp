@@ -16,7 +16,7 @@ namespace modeldeploy::vision {
                 std::vector<ImageData> images;
                 for (auto& image : im_list) {
                     auto cv_image = pyarray_to_cv_mat(image);
-                    images.push_back(ImageData::from_mat(&cv_image));
+                    images.push_back(ImageData(std::move(cv_image)));
                 }
                 std::vector<Tensor> outputs;
                 if (!self.run(&images, &outputs)) {
@@ -76,7 +76,7 @@ namespace modeldeploy::vision {
                  [](ocr::StructureV2Table& self, pybind11::array& image) {
                      auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
-                     self.predict(ImageData::from_mat(&mat), &ocr_result);
+                     self.predict(ImageData(std::move(mat)), &ocr_result);
                      return ocr_result;
                  }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::StructureV2Table& self,
@@ -84,7 +84,7 @@ namespace modeldeploy::vision {
                 std::vector<ImageData> _images;
                 for (auto& image : images) {
                     auto cv_image = pyarray_to_cv_mat(image);
-                    _images.push_back(ImageData::from_mat(&cv_image));
+                    _images.push_back(ImageData(std::move(cv_image)));
                 }
                 std::vector<OCRResult> ocr_results;
                 self.batch_predict(_images, &ocr_results);

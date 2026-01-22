@@ -60,17 +60,19 @@ namespace modeldeploy::vision::ocr {
         const Tensor& tensor = tensors[0];
         // For DBDetector, the output tensor shape = [batch, 1, ?, ?]
         const size_t batch = tensor.shape()[0];
-        const size_t length = accumulate(tensor.shape().begin() + 1, tensor.shape().end(), 1,
-                                         std::multiplies());
+        const size_t dim1 = tensor.shape()[1];
+        const size_t dim2 = tensor.shape()[2];
+        const size_t dim3 = tensor.shape()[3];
+
+        const size_t db_out_length = dim1 * dim2 * dim3;
+
         auto tensor_data = static_cast<const float*>(tensor.data());
         results->resize(batch);
         for (int i_batch = 0; i_batch < batch; ++i_batch) {
-            single_batch_postprocessor(tensor_data, static_cast<int>(tensor.shape()[2]),
-                                       static_cast<int>(tensor.shape()[3]),
+            tensor_data = tensor_data + i_batch * db_out_length;
+            single_batch_postprocessor(tensor_data, dim2, dim3,
                                        batch_det_img_info[i_batch],
                                        &results->at(i_batch));
-
-            tensor_data = tensor_data + length;
         }
         return true;
     }

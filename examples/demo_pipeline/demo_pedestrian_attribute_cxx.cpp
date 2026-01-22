@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     option.enable_fp16 = true;
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
         det_model, ml_model, option);
-    auto img = modeldeploy::ImageData::imread(image_path);
+    auto img = modeldeploy::vision::ImageData::imread(image_path);
     pedestrian_attribute.set_cls_batch_size(8);
     pedestrian_attribute.set_det_input_size({1280, 1280});
     pedestrian_attribute.set_det_threshold(0.5);

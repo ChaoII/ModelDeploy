@@ -17,7 +17,7 @@ namespace modeldeploy::vision {
                      images.reserve(im_list.size());
                      for (auto& image : im_list) {
                          auto cv_image = pyarray_to_cv_mat(image);
-                         images.push_back(ImageData::from_mat(&cv_image));
+                         images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<Tensor> outputs;
                      if (!self.run(&images, &outputs)) {
@@ -61,7 +61,7 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](face::SeetaFaceID& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
-                     const auto image_data = ImageData::from_mat(&mat);
+                     const auto image_data = ImageData(std::move(mat));
                      FaceRecognitionResult result;
                      self.predict(image_data, &result);
                      return result;
@@ -73,7 +73,7 @@ namespace modeldeploy::vision {
                      _images.reserve(images.size());
                      for (auto& image : images) {
                          const auto cv_image = pyarray_to_cv_mat(image);
-                         _images.push_back(ImageData::from_mat(&cv_image));
+                         _images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<FaceRecognitionResult> results;
                      self.batch_predict(_images, &results);

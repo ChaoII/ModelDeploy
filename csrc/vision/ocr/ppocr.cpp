@@ -92,21 +92,15 @@ namespace modeldeploy::vision::ocr {
             timers->post_timer.push_back(0);
             timers->infer_timer.start();
         }
-        std::cout << "=========-1===========" << std::endl;
-
         if (!detector_->batch_predict(images, &batch_boxes)) {
             MD_LOG_ERROR << "There's error while detecting image in PaddleOCR." << std::endl;
             return false;
         }
 
-        std::cout << "=========0===========" << std::endl;
-
         for (int i_batch = 0; i_batch < batch_boxes.size(); ++i_batch) {
             sort_boxes(&batch_boxes[i_batch]);
             (*batch_result)[i_batch].boxes = batch_boxes[i_batch];
         }
-        std::cout << "=========1===========" << std::endl;
-
         for (int i_batch = 0; i_batch < images.size(); ++i_batch) {
             OCRResult& ocr_result = (*batch_result)[i_batch];
             // Get cropped images by detection result
@@ -117,36 +111,31 @@ namespace modeldeploy::vision::ocr {
                 image_list.emplace_back(img);
             }
             else {
-                image_list.resize(boxes.size());
+                image_list.reserve(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
-                    cv::Mat _cropped_img;
-                    img.to_mat(_cropped_img);
-                    auto _cv_image = get_rotate_crop_image(_cropped_img, boxes[i_box]);
-                    image_list[i_box] = ImageData(std::move(_cv_image));
+                    std::array<float, 8> box_f;
+                    std::transform(boxes[i_box].begin(), boxes[i_box].end(), box_f.begin(),
+                                   [](const int x) { return static_cast<float>(x); });
+                    image_list.emplace_back(img.rotate_crop(box_f));
                 }
             }
             std::vector<int32_t>* cls_labels_ptr = &ocr_result.cls_labels;
             std::vector<float>* cls_scores_ptr = &ocr_result.cls_scores;
             std::vector<std::string>* text_ptr = &ocr_result.text;
             std::vector<float>* rec_scores_ptr = &ocr_result.rec_scores;
-            std::cout << "=========2===========" << std::endl;
-
             if (nullptr != classifier_) {
                 for (size_t start_index = 0; start_index < image_list.size();
                      start_index += cls_batch_size_) {
                     const size_t end_index = std::min(start_index + cls_batch_size_, image_list.size());
                     if (!classifier_->batch_predict(image_list, cls_labels_ptr,
-                                                    cls_scores_ptr, start_index,
-                                                    end_index)) {
+                                                    cls_scores_ptr, start_index, end_index)) {
                         MD_LOG_ERROR << "There's error while recognizing image in OCR." << std::endl;
                         return false;
                     }
                     for (size_t i_img = start_index; i_img < end_index; ++i_img) {
                         if (cls_labels_ptr->at(i_img) % 2 == 1 &&
                             cls_scores_ptr->at(i_img) > classifier_->get_postprocessor().get_cls_thresh()) {
-                            cv::Mat _cv_image;
-                            image_list[i_img].to_mat(_cv_image);
-                            cv::rotate(_cv_image, _cv_image, 1);
+                            image_list[i_img].rotate(RotateFlags::ROTATE_180);
                         }
                     }
                 }

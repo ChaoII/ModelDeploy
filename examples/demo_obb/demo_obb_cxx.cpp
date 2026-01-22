@@ -11,7 +11,7 @@ int main() {
     // option.enable_trt = true;
 
     modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/yolo11n-obb_nms.onnx", option);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
+    auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
     std::vector<modeldeploy::vision::ObbResult> result;
     TimerArray timers;
     for (int i = 0; i < 100; i++) {

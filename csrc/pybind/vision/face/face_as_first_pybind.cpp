@@ -13,7 +13,7 @@ namespace modeldeploy::vision {
             .def("predict",
                  [](face::SeetaFaceAsFirst& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
-                     const auto image_data = ImageData::from_mat(&mat);
+                     const auto image_data = ImageData(std::move(mat));
                      float result;
                      self.predict(image_data, &result);
                      return result;

@@ -77,11 +77,6 @@ namespace modeldeploy::vision::utils {
 
     MODELDEPLOY_CXX_EXPORT std::vector<float> l2_normalize(const std::vector<float>& values);
 
-    template <typename T>
-    T clamp(T val, T min_val, T max_val) {
-        return std::min(std::max(val, min_val), max_val);
-    }
-
     std::array<float, 8> xcycwha_to_x1y1x2y2x3y3x4y4(float xc, float yc, float w, float h, float angle_rad);
     std::array<float, 5> x1y1x2y2x3y3x4y4_to_xcycwha(const std::array<float, 8>& pts);
 
