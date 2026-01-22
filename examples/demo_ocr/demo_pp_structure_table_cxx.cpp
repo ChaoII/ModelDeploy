@@ -38,7 +38,7 @@ int main() {
     // size of the rec models will be the same as the number of boxes detected
     // by the det model.
     pp_structure_v2_table.set_rec_batch_size(rec_batch_size);
-    auto im = modeldeploy::ImageData::imread(image_file);
+    auto im = modeldeploy::vision::ImageData::imread(image_file);
     auto im_bak = im.clone();
     modeldeploy::vision::OCRResult result;
     if (!pp_structure_v2_table.predict(im, &result)) {

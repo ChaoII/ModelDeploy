@@ -13,7 +13,7 @@ int main() {
     option.enable_fp16 = true;
     modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/yolo11n-pose.onnx", option);
     yolov8.get_postprocessor().set_keypoints_num(17);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_person.jpg");
+    auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::KeyPointsResult> result;
     int warm_up_count = 20;
     for (int i = 0; i < warm_up_count; ++i) {

@@ -142,7 +142,6 @@ namespace modeldeploy::vision {
         else {
             throw std::runtime_error("Invalid MdImageType format: " + md_image_type_to_string(type));
         }
-
         if (copy) {
             return ImageData(tmp_mat);
         }
@@ -150,19 +149,29 @@ namespace modeldeploy::vision {
     }
 
 
-    // 基本信息获取
     int ImageData::width() const { return impl_ ? impl_->width : 0; }
     int ImageData::height() const { return impl_ ? impl_->height : 0; }
     int ImageData::channels() const { return impl_ ? impl_->channels : 0; }
     MdImageType ImageData::type() const { return impl_ ? impl_->type : MdImageType::PKG_BGR_U8; }
     bool ImageData::empty() const { return !impl_ || impl_->empty(); }
 
-    // 内存信息
+
     size_t ImageData::element_count() const { return impl_ ? impl_->element_count() : 0; }
     size_t ImageData::element_bytes() const { return impl_ ? impl_->element_bytes() : 0; }
     size_t ImageData::bytes() const { return impl_ ? impl_->bytes() : 0; }
     const uint8_t* ImageData::data() const { return impl_ ? impl_->data() : nullptr; }
     uint8_t* ImageData::data() { return impl_ ? impl_->data() : nullptr; }
+
+
+    ImageData& ImageData::rotate(const RotateFlags flag) {
+        if (!impl_ || impl_->empty()) {
+            return *this;
+        }
+        cv::rotate(impl_->mat, impl_->mat, flag);
+        impl_->width = impl_->mat.cols;
+        impl_->height = impl_->mat.rows;
+        return *this;
+    }
 
 
     ImageData ImageData::crop(const Rect2f& rect) const {
@@ -178,6 +187,62 @@ namespace modeldeploy::vision {
         cv::Mat cropped = impl_->mat(cv_rect).clone();
         return ImageData(std::move(cropped));
     }
+
+    ImageData ImageData::rotate_crop(std::array<float, 8> box) const {
+        if (!impl_ || impl_->empty()) {
+            return ImageData();
+        }
+        cv::Mat image;
+        impl_->mat.copyTo(image);
+        std::vector<std::vector<float>> points;
+        for (int i = 0; i < 4; ++i) {
+            std::vector<float> tmp;
+            tmp.push_back(box[2 * i]);
+            tmp.push_back(box[2 * i + 1]);
+            points.push_back(tmp);
+        }
+        float x_collect[4] = {box[0], box[2], box[4], box[6]};
+        float y_collect[4] = {box[1], box[3], box[5], box[7]};
+        float left = *std::min_element(x_collect, x_collect + 4);
+        float right = *std::max_element(x_collect, x_collect + 4);
+        float top = *std::min_element(y_collect, y_collect + 4);
+        float bottom = *std::max_element(y_collect, y_collect + 4);
+        cv::Mat img_crop;
+        image(cv::Rect2f(left, top, right - left, bottom - top)).copyTo(img_crop);
+        for (auto& point : points) {
+            point[0] -= left;
+            point[1] -= top;
+        }
+
+        float img_crop_width = sqrt(pow(points[0][0] - points[1][0], 2) +
+            pow(points[0][1] - points[1][1], 2));
+        float img_crop_height = sqrt(pow(points[0][0] - points[3][0], 2) +
+            pow(points[0][1] - points[3][1], 2));
+
+        cv::Point2f pts_std[4];
+        pts_std[0] = cv::Point2f(0., 0.);
+        pts_std[1] = cv::Point2f(img_crop_width, 0.);
+        pts_std[2] = cv::Point2f(img_crop_width, img_crop_height);
+        pts_std[3] = cv::Point2f(0.f, img_crop_height);
+
+        cv::Point2f pointsf[4];
+        pointsf[0] = cv::Point2f(points[0][0], points[0][1]);
+        pointsf[1] = cv::Point2f(points[1][0], points[1][1]);
+        pointsf[2] = cv::Point2f(points[2][0], points[2][1]);
+        pointsf[3] = cv::Point2f(points[3][0], points[3][1]);
+        cv::Mat M = cv::getPerspectiveTransform(pointsf, pts_std);
+        cv::Mat dst_img;
+        cv::warpPerspective(img_crop, dst_img, M,
+                            cv::Size(img_crop_width, img_crop_height),
+                            cv::BORDER_REPLICATE);
+
+        if (dst_img.rows >= dst_img.cols * 1.5) {
+            cv::transpose(dst_img, dst_img);
+            cv::flip(dst_img, dst_img, 0);
+        }
+        return ImageData(std::move(dst_img));
+    }
+
 
     ImageData ImageData::resize(int width, int height) const {
         if (!impl_ || impl_->empty() || width <= 0 || height <= 0) {
@@ -226,7 +291,8 @@ namespace modeldeploy::vision {
         return ImageData(std::move(converted));
     }
 
-    ImageData ImageData::pad(int top, int bottom, int left, int right, float value) const {
+    ImageData ImageData::pad(const int top, const int bottom, const int left, const int right,
+                             const float value) const {
         if (!impl_ || impl_->empty()) {
             return ImageData();
         }
@@ -248,15 +314,43 @@ namespace modeldeploy::vision {
         return ImageData(std::move(padded));
     }
 
+    ImageData ImageData::convert(const std::vector<float>& alpha, const std::vector<float>& beta) const {
+        if (channels() != 3 || channels() != alpha.size() || channels() != beta.size()) {
+            MD_LOG_ERROR << "channels must be 3 and alpha/beta size must be 3" << std::endl;
+            return ImageData();
+        }
+        std::vector<cv::Mat> split_im;
+        cv::split(impl_->mat, split_im);
+        for (int c = 0; c < impl_->mat.channels(); c++) {
+            split_im[c].convertTo(split_im[c], CV_32FC1, alpha[c], beta[c]);
+        }
+        cv::Mat tmp_mat;
+        cv::merge(split_im, tmp_mat);
+        return ImageData(std::move(tmp_mat));
+    }
 
     ImageData ImageData::normalize(const std::vector<float>& mean,
                                    const std::vector<float>& std,
+                                   const bool scale,
                                    const bool swap_rb) const {
+        if (channels() != 3 || channels() != mean.size() || channels() != std.size()) {
+            MD_LOG_ERROR << "channels must be 3 and mean/std size must be 3" << std::endl;
+            return ImageData();
+        }
+        std::vector<float> alpha;
+        std::vector<float> beta;
+        for (int i = 0; i < channels(); i++) {
+            auto _alpha = 1.0f / std[i];
+            _alpha = scale ? _alpha / 255.0f : _alpha;
+            auto _beta = -mean[i] / std[i];
+            alpha.push_back(_alpha);
+            beta.push_back(_beta);
+        }
         std::vector<cv::Mat> split_im;
         cv::split(impl_->mat, split_im);
         if (swap_rb) std::swap(split_im[0], split_im[2]);
         for (int c = 0; c < impl_->mat.channels(); c++) {
-            split_im[c].convertTo(split_im[c], CV_32FC1, mean[c], std[c]);
+            split_im[c].convertTo(split_im[c], CV_32FC1, alpha[c], beta[c]);
         }
         cv::Mat tmp_mat;
         cv::merge(split_im, tmp_mat);
@@ -311,24 +405,32 @@ namespace modeldeploy::vision {
     }
 
     ImageData ImageData::fuse_normalize_and_permute(const std::vector<float>& mean,
-                                                    const std::vector<float>& std) const {
+                                                    const std::vector<float>& std,
+                                                    const bool scale) const {
         if (channels() != 3 || channels() != mean.size() || channels() != std.size()) {
             MD_LOG_ERROR << "channels must be 3 and mean/std size must be 3" << std::endl;
             return ImageData();
+        }
+        std::vector<float> alpha;
+        std::vector<float> beta;
+        for (int i = 0; i < channels(); i++) {
+            auto _alpha = 1.0f / std[i];
+            _alpha = scale ? _alpha / 255.0f : _alpha;
+            auto _beta = -mean[i] / std[i];
+            alpha.push_back(_alpha);
+            beta.push_back(_beta);
         }
         cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
         std::vector<cv::Mat> split_image;
         cv::split(impl_->mat, split_image);
         std::swap(split_image[0], split_image[2]);
-        for (int i = 0; i < channels(); ++i) {
+        for (int c = 0; c < channels(); ++c) {
             // 转换为浮点并归一化
             cv::Mat channel_float;
-            split_image[i].convertTo(channel_float, CV_32FC1, 1.0 / 255.0);
-            // 应用归一化
-            channel_float = (channel_float - mean[i]) / std[i];
+            split_image[c].convertTo(channel_float, CV_32FC1, alpha[c], beta[c]);
             // 展平为一行
             channel_float = channel_float.reshape(1, 1);
-            channel_float.copyTo(chw_image.row(i));
+            channel_float.copyTo(chw_image.row(c));
         }
 
         ImageData dst_image;
@@ -341,16 +443,21 @@ namespace modeldeploy::vision {
         return dst_image;
     }
 
-    ImageData ImageData::fuse_convert_and_permute() const {
-        cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
+    ImageData ImageData::fuse_convert_and_permute(const std::vector<float>& alpha,
+                                                  const std::vector<float>& beta) const {
+        if (channels() != 3 || channels() != alpha.size() || channels() != beta.size()) {
+            MD_LOG_ERROR << "channels must be 3 and alpha/beta size must be 3" << std::endl;
+            return ImageData();
+        }
+        const cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
         std::vector<cv::Mat> split_image;
         cv::split(impl_->mat, split_image);
         std::swap(split_image[0], split_image[2]);
-        for (int i = 0; i < 3; ++i) {
+        for (int c = 0; c < channels(); ++c) {
             cv::Mat channel_float;
-            split_image[i].convertTo(channel_float, CV_32FC1, 1.0 / 255.0);
+            split_image[c].convertTo(channel_float, CV_32FC1, alpha[c], beta[c]);
             channel_float = channel_float.reshape(1, 1);
-            channel_float.copyTo(chw_image.row(i));
+            channel_float.copyTo(chw_image.row(c));
         }
         ImageData dst_image;
         dst_image.impl_ = std::make_unique<ImageDataImpl>();
@@ -459,8 +566,7 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "Image is empty" << std::endl;
             return;
         }
-        auto dtype = utils::md_image_dtype_to_md_dtype(type());
-
+        const auto dtype = utils::md_image_dtype_to_md_dtype(type());
         const std::vector<int64_t> shape = {channels(), height(), width()};
         if (copy) {
             const size_t num_bytes = bytes();
@@ -473,9 +579,6 @@ namespace modeldeploy::vision {
             memcpy(tensor->data(), data(), num_bytes);
         }
         else {
-            // OpenCV Mat 的内存管理由 Mat 自己处理，这里不需要额外操作
-            // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
-            // 确保mat在tensor生命周期结束前有效
             tensor->from_external_memory(data(), shape, dtype);
         }
     }

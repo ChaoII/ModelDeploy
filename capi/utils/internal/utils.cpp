@@ -13,7 +13,7 @@
 #include "csrc/core/md_log.h"
 
 modeldeploy::vision::ImageData md_image_to_image_data(const MDImage* image) {
-    const cv::Mat cv_image = md_image_to_mat(image);
+    cv::Mat cv_image = md_image_to_mat(image);
     return modeldeploy::vision::ImageData(std::move(cv_image));
 }
 
@@ -49,9 +49,6 @@ MDMapData map_to_md_map(const std::unordered_map<int, std::string>& map) {
 
 
 cv::Mat md_image_to_mat(const MDImage* image) {
-    if (!image) {
-        return {};
-    }
     int cv_type = CV_8UC3;
     if (image->channels == 1) {
         cv_type = CV_8UC1;
@@ -73,14 +70,17 @@ MDImage* mat_to_md_image(const cv::Mat& mat) {
     md_image->data = static_cast<unsigned char*>(malloc(mat.total() * mat.elemSize()));
     // 复制数据
     std::memcpy(md_image->data, mat.data, mat.total() * mat.elemSize());
-    // 设置图像类型
     return md_image;
 }
 
-MDImage* image_data_to_md_image(const modeldeploy::vision::ImageData& mat) {
-    cv::Mat cv_image;
-    mat.to_mat(&cv_image);
-    return mat_to_md_image(cv_image);
+MDImage image_data_to_md_image(const modeldeploy::vision::ImageData& image) {
+    MDImage md_image;
+    md_image.width = image.width();
+    md_image.height = image.height();
+    md_image.channels = image.channels();
+    md_image.data = static_cast<unsigned char*>(malloc(image.bytes()));
+    std::memcpy(md_image.data, image.data(), image.bytes());
+    return md_image;
 }
 
 

@@ -12,7 +12,7 @@ int main() {
     auto model =
         modeldeploy::vision::face::Scrfd(
             "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
-    auto im = modeldeploy::ImageData::imread(image_file);
+    auto im = modeldeploy::vision::ImageData::imread(image_file);
     auto im_bak = im.clone();
     std::vector<modeldeploy::vision::KeyPointsResult> res;
 
@@ -34,7 +34,7 @@ int main() {
     const auto vis_im_list =
         modeldeploy::vision::utils::align_face_with_five_points(im, res);
     if (!vis_im_list.empty()) {
-        std::vector<modeldeploy::ImageData> cropped_images;
+        std::vector<modeldeploy::vision::ImageData> cropped_images;
         for (auto& align_image : vis_im_list) {
             auto img_crop = modeldeploy::vision::utils::center_crop(align_image, {248, 248});
             cropped_images.push_back(img_crop);

@@ -98,6 +98,12 @@ enum class ColorConvertType {
     CVT_PL_RGB2PA_RGB,
 };
 
+enum RotateFlags {
+    ROTATE_90 = 0,
+    ROTATE_180 = 1,
+    ROTATE_270 = 2,
+};
+
 inline std::string md_image_type_to_string(MdImageType type) {
     switch (type) {
     case MdImageType::GRAY_U8: return "GRAY_U8";

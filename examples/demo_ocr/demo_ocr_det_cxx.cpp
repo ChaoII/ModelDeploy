@@ -13,10 +13,10 @@ int main() {
     option.use_gpu();
     option.enable_trt = false;
     option.enable_fp16 = true;
-    modeldeploy::vision::ocr::DBDetector db_detector("../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx",
+    modeldeploy::vision::ocr::DBDetector db_detector("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
                                                      option);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/ocr2.jpg");
-    db_detector.get_preprocessor().set_max_side_len(1440);
+    auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0003.jpg");
+    db_detector.get_preprocessor().set_max_side_len(960);
     // db_detector.get_preprocessor().set_det_image_shape({3, 1440, 1440});
     db_detector.get_postprocessor().set_det_db_thresh(0.3);
     // db_detector.get_postprocessor().set_det_db_box_thresh(0.5);

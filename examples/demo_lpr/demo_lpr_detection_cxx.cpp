@@ -11,7 +11,7 @@
 int main() {
     auto model = modeldeploy::vision::lpr::LprDetection("../../test_data/test_models/yolov5plate.onnx");
 
-    auto im = modeldeploy::ImageData::imread("../../test_data/test_images/test_lpr_pipeline2.jpg");
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_lpr_pipeline2.jpg");
     auto im_bak = im.clone();
 
     std::vector<modeldeploy::vision::KeyPointsResult> res;

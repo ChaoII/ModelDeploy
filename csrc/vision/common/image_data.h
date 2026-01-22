@@ -58,18 +58,24 @@ namespace modeldeploy::vision {
         void imshow(const std::string& win_name) const;
 
         // 预处理相关
+        ImageData& rotate(RotateFlags flag);
         [[nodiscard]] ImageData crop(const Rect2f& rect) const;
+        [[nodiscard]] ImageData rotate_crop(std::array<float, 8> box) const;
         [[nodiscard]] ImageData resize(int width, int height) const;
         [[nodiscard]] ImageData cast(const std::string& dtype = "float", bool scale = true) const;
         [[nodiscard]] ImageData pad(int top, int bottom, int left, int right, float value) const;
+        [[nodiscard]] ImageData convert(const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
+                                        const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
         [[nodiscard]] ImageData normalize(const std::vector<float>& mean, const std::vector<float>& std,
-                                          bool swap_rb = true) const;
+                                          bool scale = true, bool swap_rb = true) const;
         [[nodiscard]] ImageData letter_box(const std::vector<int>& dst_size, float padding_value) const;
         [[nodiscard]] ImageData center_crop(const std::vector<int>& dst_size) const;
         [[nodiscard]] ImageData permute() const;
         [[nodiscard]] ImageData fuse_normalize_and_permute(const std::vector<float>& mean,
-                                                           const std::vector<float>& std) const;
-        [[nodiscard]] ImageData fuse_convert_and_permute() const;
+                                                           const std::vector<float>& std, bool scale = true) const;
+        [[nodiscard]] ImageData fuse_convert_and_permute(
+            const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
+            const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
 
     private:
         std::unique_ptr<ImageDataImpl> impl_;

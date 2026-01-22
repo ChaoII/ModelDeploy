@@ -6,32 +6,27 @@
 #include "vision/ocr/det_preprocessor.h"
 #include "vision/ocr/utils/ocr_utils.h"
 #include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
 #include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::ocr {
     std::array<int, 4> DBDetectorPreprocessor::ocr_detector_get_info(
         const ImageData* image, const int max_size_len) const {
-        cv::Mat img;
-        image->to_mat(img);
-        const int w = img.cols;
-        const int h = img.rows;
-        if (static_shape_infer_) {
-            return {w, h, det_image_shape_[2], det_image_shape_[1]};
+        const int w = image->width();
+        const int h = image->height();
+        if (static_img_size_.size() == 2) {
+            return {w, h, static_img_size_[0], static_img_size_[1]};
         }
         float ratio = 1.0f;
-        if (const int max_wh = w >= h ? w : h; max_wh > max_size_len) {
-            if (h > w) {
-                ratio = static_cast<float>(max_size_len) / static_cast<float>(h);
-            }
-            else {
-                ratio = static_cast<float>(max_size_len) / static_cast<float>(w);
-            }
+        const int max_wh = std::max(w, h);
+        if (max_wh > max_size_len) {
+            ratio = static_cast<float>(max_size_len) / max_wh;
         }
-        int resize_h = static_cast<int>(static_cast<float>(h) * ratio);
-        int resize_w = static_cast<int>(static_cast<float>(w) * ratio);
-        resize_h = std::max(static_cast<int>(std::round(static_cast<float>(resize_h) / 32) * 32), 32);
-        resize_w = std::max(static_cast<int>(std::round(static_cast<float>(resize_w) / 32) * 32), 32);
+        // 最小图片尺寸为32
+        int resize_h = std::max(static_cast<int>(h * ratio), 32);
+        int resize_w = std::max(static_cast<int>(w * ratio), 32);
+        // 如果尺寸不是32的倍数，则取最接近的32的倍数向上取整
+        resize_h = (resize_h + 31) / 32 * 32;
+        resize_w = (resize_w + 31) / 32 * 32;
         return {w, h, resize_w, resize_h};
     }
 
@@ -39,25 +34,28 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool DBDetectorPreprocessor::apply(std::vector<ImageData>* image_batch,
+    bool DBDetectorPreprocessor::apply(const std::vector<ImageData>& image_batch,
                                        std::vector<Tensor>* outputs) {
+        // 组batch找到当前batch最大的宽高组织
         int max_resize_w = 0;
         int max_resize_h = 0;
-        batch_det_img_info_.clear();
-        batch_det_img_info_.resize(image_batch->size());
-        for (size_t i = 0; i < image_batch->size(); ++i) {
-            const ImageData* mat = &image_batch->at(i);
-            batch_det_img_info_[i] = ocr_detector_get_info(mat, max_side_len_);
-            max_resize_w = std::max(max_resize_w, batch_det_img_info_[i][2]);
-            max_resize_h = std::max(max_resize_h, batch_det_img_info_[i][3]);
+        batch_info_.resize(image_batch.size());
+        for (size_t i = 0; i < image_batch.size(); ++i) {
+            const ImageData* mat = &image_batch.at(i);
+            batch_info_[i] = ocr_detector_get_info(mat, max_side_len_);
+            max_resize_w = std::max(max_resize_w, batch_info_[i][2]);
+            max_resize_h = std::max(max_resize_h, batch_info_[i][3]);
+            batch_info_[i][2] = max_resize_w;
+            batch_info_[i][3] = max_resize_h;
         }
         std::vector<ImageData> processed_images;
-        for (size_t i = 0; i < image_batch->size(); ++i) {
-            ImageData image = image_batch->at(i);
-            auto s = image.resize(batch_det_img_info_[i][2], batch_det_img_info_[i][3]);
-            s = s.pad(0, max_resize_h - batch_det_img_info_[i][3], 0, max_resize_w - batch_det_img_info_[i][2], 0);
-            s = s.fuse_normalize_and_permute({0.485f, 0.456f, 0.406f}, {0.229f, 0.224f, 0.225f});
-            processed_images.push_back(s);
+        processed_images.reserve(image_batch.size());
+        for (size_t i = 0; i < image_batch.size(); ++i) {
+            ImageData image = image_batch.at(i);
+            auto processed_image = image
+                                   .letter_box({max_resize_w, max_resize_h}, 0.0f)
+                                   .fuse_normalize_and_permute(mean_, std_);
+            processed_images.push_back(processed_image);
         }
         outputs->resize(1);
         ImageData::images_to_tensor(processed_images, &(*outputs)[0]);
