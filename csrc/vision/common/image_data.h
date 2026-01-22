@@ -18,9 +18,11 @@ namespace cv {
 }
 
 namespace modeldeploy::vision {
+    class ImageDataImpl;
+
     class MODELDEPLOY_CXX_EXPORT ImageData {
     public:
-        ImageData() = default;
+        ImageData();
         ImageData(int width, int height, MdImageType type);
         explicit ImageData(const cv::Mat& mat);
         explicit ImageData(cv::Mat&& mat);
@@ -48,9 +50,8 @@ namespace modeldeploy::vision {
         static ImageData cvt_color(const ImageData& image, ColorConvertType type);
         // Caller must guarantee data lifetime >= ImageData lifetime
         static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false);
-        static ImageData from_mat(const cv::Mat& mat, bool copy = false);
         static void images_to_tensor(std::vector<ImageData> images, Tensor* tensor);
-        void to_mat(cv::Mat* mat_ptr, bool copy = false) const;
+        void to_mat(cv::Mat& mat, bool copy = false) const;
         void to_tensor(Tensor* tensor, bool copy = false);
         static ImageData imread(const std::string& filename);
         [[nodiscard]] bool imwrite(const std::string& filename) const;
@@ -71,11 +72,6 @@ namespace modeldeploy::vision {
         [[nodiscard]] ImageData fuse_convert_and_permute() const;
 
     private:
-        cv::Mat* mat_ = nullptr;
-        MdImageType type_ = MdImageType::PKG_RGBA_U8;
-        RawMemoryOwnership ownership_ = RawMemoryOwnership::Owned;
-        int width_{};
-        int height_{};
-        int channels_{};
+        std::unique_ptr<ImageDataImpl> impl_;
     };
 }

@@ -120,7 +120,7 @@ namespace modeldeploy::vision::utils {
             return output_images;
         }
         cv::Mat cv_image;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         cv::Mat src(5, 2, CV_32FC1, std_landmarks.data());
 
 

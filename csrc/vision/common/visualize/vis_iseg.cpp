@@ -13,7 +13,7 @@ namespace modeldeploy::vision {
                      const std::string& font_path, const int font_size,
                      const double alpha, const bool save_result) {
         cv::Mat cv_image, overlay;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         // 根据label_id获取颜色

@@ -164,7 +164,7 @@ namespace modeldeploy::vision::utils {
 
     bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor) {
         cv::Mat mat;
-        image_data->to_mat(&mat);
+        image_data->to_mat(mat);
         return mat_to_tensor(mat, tensor);
     }
 
@@ -445,7 +445,7 @@ namespace modeldeploy::vision::utils {
             return image; // 或者抛出异常
         }
         cv::Mat cv_image;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         // 计算裁剪区域的起始坐标
         const int top = (img_height - crop_height) / 2;
         const int left = (img_width - crop_width) / 2;

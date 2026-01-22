@@ -27,7 +27,7 @@ namespace modeldeploy::vision::face {
         // 2. BGR->RGB
         // 3. HWC->CHW
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
         utils::letter_box(&mat, size_, padding_value_, letter_box_record);
         BGR2RGB::apply(&mat);
         // Normalize::Run(mat, std::vector<float>(mat->Channels(), 0.0),

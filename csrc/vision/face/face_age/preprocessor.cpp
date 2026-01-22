@@ -19,7 +19,7 @@ namespace modeldeploy::vision::face {
         // 2. HWC2CHW
         // 3. Cast
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
         if (mat.rows == 256 && mat.cols == 256) {
             CenterCrop::apply(&mat, size_[0], size_[1]);
         }

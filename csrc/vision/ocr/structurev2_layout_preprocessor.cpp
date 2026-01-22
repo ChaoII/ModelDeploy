@@ -16,7 +16,7 @@ namespace modeldeploy::vision::ocr {
 
     std::array<int, 4> StructureV2LayoutPreprocessor::get_layout_image_info(ImageData* image) {
         cv::Mat img;
-        image->to_mat(&img);
+        image->to_mat(img);
         if (static_shape_infer_) {
             return {
                 img.cols, img.rows, layout_image_shape_[2],
@@ -38,7 +38,7 @@ namespace modeldeploy::vision::ocr {
         for (size_t i = 0; i < image_batch->size(); ++i) {
             ImageData* image = &image_batch->at(i);
             cv::Mat mat;
-            image->to_mat(&mat);
+            image->to_mat(mat);
             batch_layout_img_info_[i] = get_layout_image_info(image);
             Resize::apply(&mat, batch_layout_img_info_[i][2], batch_layout_img_info_[i][3]);
             NormalizeAndPermute::apply(&mat, mean_, std_, is_scale_);

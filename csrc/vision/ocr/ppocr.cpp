@@ -120,7 +120,7 @@ namespace modeldeploy::vision::ocr {
                 image_list.resize(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
                     cv::Mat _cropped_img;
-                    img.to_mat(&_cropped_img);
+                    img.to_mat(_cropped_img);
                     auto _cv_image = get_rotate_crop_image(_cropped_img, boxes[i_box]);
                     image_list[i_box] = ImageData(std::move(_cv_image));
                 }
@@ -145,7 +145,7 @@ namespace modeldeploy::vision::ocr {
                         if (cls_labels_ptr->at(i_img) % 2 == 1 &&
                             cls_scores_ptr->at(i_img) > classifier_->get_postprocessor().get_cls_thresh()) {
                             cv::Mat _cv_image;
-                            image_list[i_img].to_mat(&_cv_image);
+                            image_list[i_img].to_mat(_cv_image);
                             cv::rotate(_cv_image, _cv_image, 1);
                         }
                     }

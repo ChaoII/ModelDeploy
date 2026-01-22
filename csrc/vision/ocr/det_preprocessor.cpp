@@ -13,7 +13,7 @@ namespace modeldeploy::vision::ocr {
     std::array<int, 4> DBDetectorPreprocessor::ocr_detector_get_info(
         const ImageData* image, const int max_size_len) const {
         cv::Mat img;
-        image->to_mat(&img);
+        image->to_mat(img);
         const int w = img.cols;
         const int h = img.rows;
         if (static_shape_infer_) {

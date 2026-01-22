@@ -10,107 +10,128 @@
 
 
 namespace modeldeploy::vision {
-    ImageData::ImageData(int width, int height, const MdImageType type):
-        width_(width), height_(height), type_(type) {
-        const int ocv_type = md_image_type_to_ocv_type(type);
-        mat_ = new cv::Mat(height, width, ocv_type);
-        ownership_ = RawMemoryOwnership::Owned;
-    }
+    class ImageDataImpl {
+    public:
+        cv::Mat mat;
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        MdImageType type = MdImageType::PKG_BGR_U8;
+        RawMemoryOwnership ownership = RawMemoryOwnership::Owned;
 
-    ImageData::~ImageData() {
-        // delete mat_;
-        // mat_ = nullptr;
-    }
+        ImageDataImpl() = default;
 
-    ImageData::ImageData(const ImageData& other) : type_(other.type_),
-                                                   width_(other.width_),
-                                                   height_(other.height_),
-                                                   channels_(other.channels_) {
-        if (other.mat_) {
-            mat_ = new cv::Mat(other.mat_->clone());
-            ownership_ = RawMemoryOwnership::Owned;
+        ImageDataImpl(int w, int h, MdImageType t)
+            : width(w), height(h), type(t) {
+            const int ocv_type = md_image_type_to_ocv_type(t);
+            mat = cv::Mat(height, width, ocv_type);
+            channels = mat.channels();
         }
+
+        ImageDataImpl(const cv::Mat& m, bool copy = true) {
+            if (copy) {
+                mat = m.clone();
+            }
+            else {
+                mat = m;
+            }
+            width = mat.cols;
+            height = mat.rows;
+            channels = mat.channels();
+            type = md_image_type_from_ocv_type(mat.type());
+        }
+
+        ImageDataImpl(cv::Mat&& m) : mat(std::move(m)) {
+            width = mat.cols;
+            height = mat.rows;
+            channels = mat.channels();
+            type = md_image_type_from_ocv_type(mat.type());
+        }
+
+        ImageDataImpl clone() const {
+            ImageDataImpl impl;
+            impl.mat = mat.clone();
+            impl.width = width;
+            impl.height = height;
+            impl.channels = channels;
+            impl.type = type;
+            impl.ownership = RawMemoryOwnership::Owned;
+            return impl;
+        }
+
+        bool empty() const { return mat.empty(); }
+        size_t element_count() const { return mat.total(); }
+        size_t element_bytes() const { return mat.elemSize(); }
+        size_t bytes() const { return element_count() * element_bytes(); }
+        const uint8_t* data() const { return mat.data; }
+        uint8_t* data() { return mat.data; }
+    };
+
+    ImageData::ImageData(): impl_(std::make_unique<ImageDataImpl>()) {
+    }
+
+    ImageData::ImageData(int width, int height, const MdImageType type)
+        : impl_(std::make_unique<ImageDataImpl>(width, height, type)) {
+    }
+
+
+    ImageData::ImageData(const cv::Mat& mat):
+        impl_(std::make_unique<ImageDataImpl>(mat, true)) {
+    }
+
+    ImageData::ImageData(cv::Mat&& mat):
+        impl_(std::make_unique<ImageDataImpl>(std::move(mat))) {
+    }
+
+    ImageData::~ImageData() = default;
+
+    ImageData::ImageData(const ImageData& other)
+        : impl_(other.impl_
+                    ? std::make_unique<ImageDataImpl>(*other.impl_)
+                    : std::make_unique<ImageDataImpl>()) {
     }
 
     ImageData& ImageData::operator=(const ImageData& other) {
-        if (this == &other) {
-            return *this;
+        if (this != &other) {
+            if (other.impl_) {
+                impl_ = std::make_unique<ImageDataImpl>(*other.impl_);
+            }
+            else {
+                impl_ = std::make_unique<ImageDataImpl>();
+            }
         }
-        mat_ = new cv::Mat(other.mat_->clone());
-        type_ = other.type_;
-        width_ = other.width_;
-        height_ = other.height_;
-        channels_ = other.channels_;
-        ownership_ = RawMemoryOwnership::Owned;
         return *this;
     }
 
     ImageData::ImageData(ImageData&& other) noexcept
-        : mat_(std::move(other.mat_)),
-          type_(other.type_),
-          ownership_(other.ownership_),
-          width_(other.width_),
-          height_(other.height_),
-          channels_(other.channels_) {
-        other.width_ = 0;
-        other.height_ = 0;
-        other.channels_ = 0;
+        : impl_(std::move(other.impl_)) {
+        other.impl_ = std::make_unique<ImageDataImpl>();
     }
 
     ImageData& ImageData::operator=(ImageData&& other) noexcept {
-        if (this == &other) {
-            return *this;
+        if (this != &other) {
+            impl_ = std::move(other.impl_);
+            other.impl_ = std::make_unique<ImageDataImpl>();
         }
-        mat_ = std::move(other.mat_);
-        type_ = other.type_;
-        width_ = other.width_;
-        height_ = other.height_;
-        channels_ = other.channels_;
-        ownership_ = other.ownership_;
-        other.width_ = 0;
-        other.height_ = 0;
-        other.channels_ = 0;
         return *this;
-    }
-
-    ImageData::ImageData(const cv::Mat& mat) {
-        mat_ = new cv::Mat(mat.clone());
-        type_ = md_image_type_from_ocv_type(mat_->type());
-        width_ = mat_->cols;
-        height_ = mat_->rows;
-        channels_ = mat_->channels();
-        ownership_ = RawMemoryOwnership::Owned;
-    }
-
-    ImageData::ImageData(cv::Mat&& mat) {
-        mat_ = new cv::Mat(mat);
-        // mat_ = std::make_unique<cv::Mat>(std::move(mat));
-        type_ = md_image_type_from_ocv_type(mat_->type());
-        width_ = mat_->cols;
-        height_ = mat_->rows;
-        channels_ = mat_->channels();
-        ownership_ = RawMemoryOwnership::Owned;
     }
 
 
     ImageData ImageData::clone() const {
-        ImageData copy;
-        // copy.mat_ = std::make_unique<cv::Mat>(mat_->clone());
-        copy.mat_ = new cv::Mat(mat_->clone());
-        copy.type_ = type_;
-        copy.width_ = width_;
-        copy.height_ = height_;
-        copy.channels_ = channels_;
-        return copy;
+        ImageData result;
+        if (impl_) {
+            result.impl_ = std::make_unique<ImageDataImpl>(impl_->clone());
+        }
+        return result;
     }
 
+
     ImageData ImageData::from_raw(unsigned char* data,
-                                  const int width,
-                                  const int height,
-                                  const MdImageType type,
-                                  const bool copy) {
+                                  int width,
+                                  int height,
+                                  MdImageType type,
+                                  bool copy) {
         const int ocv_type = md_image_type_to_ocv_type(type);
-        ImageData image;
         cv::Mat tmp_mat;
         if (ocv_type > 0) {
             tmp_mat = cv::Mat(height, width, ocv_type, data);
@@ -119,85 +140,96 @@ namespace modeldeploy::vision {
             tmp_mat = cv::Mat(height + height / 2, width, CV_8UC1, data);
         }
         else {
-            throw std::runtime_error("Invalid MdImageType format" + md_image_type_to_string(type));
+            throw std::runtime_error("Invalid MdImageType format: " + md_image_type_to_string(type));
         }
-        if (copy) {
-            // image.mat_ = std::make_unique<cv::Mat>(tmp_mat.clone());
-            image.mat_ = new cv::Mat(tmp_mat.clone());
-            image.ownership_ = RawMemoryOwnership::Owned;
-        }
-        else {
-            image.mat_ = new cv::Mat(tmp_mat);
 
-            // image.mat_ = std::make_unique<cv::Mat>(std::move(tmp_mat));
-            image.ownership_ = RawMemoryOwnership::Borrowed;
+        if (copy) {
+            return ImageData(tmp_mat);
         }
-        image.type_ = type;
-        image.width_ = width;
-        image.height_ = height;
-        image.channels_ = image.mat_->channels();
-        return image;
+        return ImageData(std::move(tmp_mat));
     }
 
-    int ImageData::width() const { return width_; }
-    int ImageData::height() const { return height_; }
-    int ImageData::channels() const { return channels_; }
-    MdImageType ImageData::type() const { return type_; }
 
-    size_t ImageData::element_count() const { return mat_->total(); }
-    size_t ImageData::element_bytes() const { return mat_->elemSize(); }
-    size_t ImageData::bytes() const { return element_count() * element_bytes(); }
+    // 基本信息获取
+    int ImageData::width() const { return impl_ ? impl_->width : 0; }
+    int ImageData::height() const { return impl_ ? impl_->height : 0; }
+    int ImageData::channels() const { return impl_ ? impl_->channels : 0; }
+    MdImageType ImageData::type() const { return impl_ ? impl_->type : MdImageType::PKG_BGR_U8; }
+    bool ImageData::empty() const { return !impl_ || impl_->empty(); }
 
-    const uint8_t* ImageData::data() const { return mat_->data; }
-    uint8_t* ImageData::data() { return mat_->data; }
-    bool ImageData::empty() const { return !mat_ || mat_->empty(); }
+    // 内存信息
+    size_t ImageData::element_count() const { return impl_ ? impl_->element_count() : 0; }
+    size_t ImageData::element_bytes() const { return impl_ ? impl_->element_bytes() : 0; }
+    size_t ImageData::bytes() const { return impl_ ? impl_->bytes() : 0; }
+    const uint8_t* ImageData::data() const { return impl_ ? impl_->data() : nullptr; }
+    uint8_t* ImageData::data() { return impl_ ? impl_->data() : nullptr; }
 
 
     ImageData ImageData::crop(const Rect2f& rect) const {
-        const cv::Rect2f cv_rect(rect.x, rect.y, rect.width, rect.height);
-        auto crop_cv_mat = (*mat_)(cv_rect).clone();
-        return ImageData(std::move(crop_cv_mat));
+        if (!impl_ || impl_->empty()) {
+            return ImageData();
+        }
+        cv::Rect2f cv_rect(rect.x, rect.y, rect.width, rect.height);
+        // 确保矩形在图像范围内
+        cv_rect = cv_rect & cv::Rect2f(0, 0, impl_->width, impl_->height);
+        if (cv_rect.width <= 0 || cv_rect.height <= 0) {
+            return ImageData();
+        }
+        cv::Mat cropped = impl_->mat(cv_rect).clone();
+        return ImageData(std::move(cropped));
     }
 
-    ImageData ImageData::resize(const int width, const int height) const {
-        ImageData image;
-        cv::Mat tmp_mat;
-        cv::resize(*mat_, tmp_mat, cv::Size(width, height));
-        return ImageData(std::move(tmp_mat));
+    ImageData ImageData::resize(int width, int height) const {
+        if (!impl_ || impl_->empty() || width <= 0 || height <= 0) {
+            return ImageData();
+        }
+
+        cv::Mat resized;
+        cv::resize(impl_->mat, resized, cv::Size(width, height));
+        return ImageData(std::move(resized));
     }
 
     ImageData ImageData::cast(const std::string& dtype, bool scale) const {
-        cv::Mat tmp_mat;
-        float scale_factor = 1.0f;
-        if (scale) {
-            scale_factor = 1.0f / 255.0f;
+        if (!impl_ || impl_->empty()) {
+            return ImageData();
         }
-        if (dtype == "float" || dtype == "float32") {
-            if (mat_->type() != CV_32FC(channels_)) {
-                mat_->convertTo(tmp_mat, CV_32FC(channels_), scale_factor);
+        float scale_factor = scale ? 1.0f / 255.0f : 1.0f;
+        cv::Mat converted;
+        if (dtype == "float" || dtype == "float32" || dtype == "fp32") {
+            if (impl_->mat.type() != CV_32FC(impl_->channels)) {
+                impl_->mat.convertTo(converted, CV_32FC(impl_->channels), scale_factor);
+            }
+            else {
+                converted = impl_->mat.clone();
             }
         }
-        else if (dtype == "float16") {
-            if (mat_->type() != CV_16FC(channels_)) {
-                mat_->convertTo(tmp_mat, CV_16FC(channels_), scale_factor);
+        else if (dtype == "float16" || dtype == "fp16") {
+            if (impl_->mat.type() != CV_16FC(impl_->channels)) {
+                impl_->mat.convertTo(converted, CV_16FC(impl_->channels), scale_factor);
+            }
+            else {
+                converted = impl_->mat.clone();
             }
         }
-        else if (dtype == "double" || dtype == "float64") {
-            if (mat_->type() != CV_64FC(channels_)) {
-                mat_->convertTo(tmp_mat, CV_64FC(channels_), scale_factor);
+        else if (dtype == "double" || dtype == "float64" || dtype == "fp64") {
+            if (impl_->mat.type() != CV_64FC(impl_->channels)) {
+                impl_->mat.convertTo(converted, CV_64FC(impl_->channels), scale_factor);
+            }
+            else {
+                converted = impl_->mat.clone();
             }
         }
         else {
-            MD_LOG_ERROR << "Cast not support for " << dtype << " now! will skip this operation." << std::endl;
+            MD_LOG_WARN << "Cast not supported for " << dtype << ", returning original image." << std::endl;
+            return clone();
         }
-        return ImageData(std::move(tmp_mat));
+        return ImageData(std::move(converted));
     }
 
-    ImageData ImageData::pad(const int top,
-                             const int bottom,
-                             const int left,
-                             const int right,
-                             const float value) const {
+    ImageData ImageData::pad(int top, int bottom, int left, int right, float value) const {
+        if (!impl_ || impl_->empty()) {
+            return ImageData();
+        }
         cv::Scalar padding_scalar;
         switch (channels()) {
         case 1: padding_scalar = cv::Scalar(value);
@@ -207,13 +239,13 @@ namespace modeldeploy::vision {
         case 4: padding_scalar = cv::Scalar(value, value, value, value);
             break;
         default: {
-            MD_LOG_ERROR << "Unsupported image channels." << std::endl;
+            MD_LOG_ERROR << "Unsupported image channels: " << channels() << std::endl;
             return ImageData();
         }
         }
-        cv::Mat pad_image;
-        cv::copyMakeBorder(*mat_, pad_image, top, bottom, left, right, cv::BORDER_CONSTANT, padding_scalar);
-        return ImageData(std::move(pad_image));
+        cv::Mat padded;
+        cv::copyMakeBorder(impl_->mat, padded, top, bottom, left, right, cv::BORDER_CONSTANT, padding_scalar);
+        return ImageData(std::move(padded));
     }
 
 
@@ -221,9 +253,9 @@ namespace modeldeploy::vision {
                                    const std::vector<float>& std,
                                    const bool swap_rb) const {
         std::vector<cv::Mat> split_im;
-        cv::split(*mat_, split_im);
+        cv::split(impl_->mat, split_im);
         if (swap_rb) std::swap(split_im[0], split_im[2]);
-        for (int c = 0; c < channels_; c++) {
+        for (int c = 0; c < impl_->mat.channels(); c++) {
             split_im[c].convertTo(split_im[c], CV_32FC1, mean[c], std[c]);
         }
         cv::Mat tmp_mat;
@@ -255,18 +287,21 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         }
-        cv::Mat tmp_image(dst_size[1], dst_size[0], md_image_type_to_ocv_type(type_), padding_scalar);
+        cv::Mat tmp_image(dst_size[1], dst_size[0], impl_->mat.type(), padding_scalar);
         cv::Mat roi = tmp_image(cv::Rect(pad_w, pad_h, resize_w, resize_h));
-        cv::resize(*mat_, roi, cv::Size(resize_w, resize_h));
+        cv::resize(impl_->mat, roi, cv::Size(resize_w, resize_h));
         return ImageData(std::move(tmp_image));
     }
 
     [[nodiscard]] ImageData ImageData::center_crop(const std::vector<int>& dst_size) const {
-        if (width_ < dst_size[0] || height_ < dst_size[1]) {
+        if (!impl_ || impl_->empty() || dst_size.size() != 2) {
+            return ImageData();
+        }
+        if (width() < dst_size[0] || height() < dst_size[1]) {
             throw std::invalid_argument("ImageData::center_crop: dst_size must be smaller than image size.");
         }
-        const int offset_x = (width_ - dst_size[0]) / 2;
-        const int offset_y = (height_ - dst_size[1]) / 2;
+        const int offset_x = (width() - dst_size[0]) / 2;
+        const int offset_y = (height() - dst_size[1]) / 2;
         const Rect2f crop_roi(offset_x, offset_y, dst_size[0], dst_size[1]);
         return crop(crop_roi);
     }
@@ -281,72 +316,81 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "channels must be 3 and mean/std size must be 3" << std::endl;
             return ImageData();
         }
-        ImageData dst_image;
-        cv::Mat chw_image(channels_, height_ * width_, CV_32FC1);
+        cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
         std::vector<cv::Mat> split_image;
-        cv::split(*mat_, split_image);
+        cv::split(impl_->mat, split_image);
         std::swap(split_image[0], split_image[2]);
-        for (int i = 0; i < split_image.size(); i++) {
-            std::cout<<"mean: "<<mean[i]<<" std: "<<std[i]<<std::endl;
-            split_image[i].convertTo(split_image[i], CV_32FC1, 1.0 / 255 * mean[i], std[i]);
-            split_image[i] = split_image[i].reshape(1, 1);
-            split_image[i].copyTo(chw_image.row(i));
+        for (int i = 0; i < channels(); ++i) {
+            // 转换为浮点并归一化
+            cv::Mat channel_float;
+            split_image[i].convertTo(channel_float, CV_32FC1, 1.0 / 255.0);
+            // 应用归一化
+            channel_float = (channel_float - mean[i]) / std[i];
+            // 展平为一行
+            channel_float = channel_float.reshape(1, 1);
+            channel_float.copyTo(chw_image.row(i));
         }
-        dst_image.mat_ = new cv::Mat(chw_image);
-        dst_image.type_ = MdImageType::PLA_RGB_F32;
-        dst_image.width_ = width();
-        dst_image.height_ = height();
-        dst_image.channels_ = channels();
-        dst_image.ownership_ = RawMemoryOwnership::Owned;
+
+        ImageData dst_image;
+        dst_image.impl_ = std::make_unique<ImageDataImpl>();
+        dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
+        dst_image.impl_->width = width();
+        dst_image.impl_->height = height();
+        dst_image.impl_->channels = channels();
+        dst_image.impl_->type = MdImageType::PLA_RGB_F32;
         return dst_image;
     }
 
     ImageData ImageData::fuse_convert_and_permute() const {
-        ImageData dst_image;
-        cv::Mat chw_image(channels_, height_ * width_, CV_32FC1);
+        cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
         std::vector<cv::Mat> split_image;
-        cv::split(*mat_, split_image);
+        cv::split(impl_->mat, split_image);
         std::swap(split_image[0], split_image[2]);
-        for (int i = 0; i < split_image.size(); i++) {
-            split_image[i].convertTo(split_image[i], CV_32FC1, 1.0 / 255, 0);
-            split_image[i] = split_image[i].reshape(1, 1);
-            split_image[i].copyTo(chw_image.row(i));
+        for (int i = 0; i < 3; ++i) {
+            cv::Mat channel_float;
+            split_image[i].convertTo(channel_float, CV_32FC1, 1.0 / 255.0);
+            channel_float = channel_float.reshape(1, 1);
+            channel_float.copyTo(chw_image.row(i));
         }
-        dst_image.mat_ = new cv::Mat(chw_image);
-        dst_image.type_ =  MdImageType::PLA_RGB_F32;
-        dst_image.width_ = width();
-        dst_image.height_ = height();
-        dst_image.channels_ = channels();
-        dst_image.ownership_ = RawMemoryOwnership::Owned;
+        ImageData dst_image;
+        dst_image.impl_ = std::make_unique<ImageDataImpl>();
+        dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
+        dst_image.impl_->width = width();
+        dst_image.impl_->height = height();
+        dst_image.impl_->channels = 3;
+        dst_image.impl_->type = MdImageType::PLA_RGB_F32;
         return dst_image;
     }
 
 
     ImageData ImageData::cvt_color(const ImageData& image, ColorConvertType type) {
-        auto ocv_color_convert_type = md_color_convert_type_to_ocv_color_convert_type(type);
-        if (ocv_color_convert_type > 0) {
-            cv::Mat tmp_mat;
-            cv::cvtColor(*image.mat_, tmp_mat, ocv_color_convert_type);
-            return ImageData(std::move(tmp_mat));
+        if (!image.impl_ || image.impl_->empty()) {
+            return ImageData();
+        }
+        const auto ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
+        if (ocv_type > 0) {
+            cv::Mat converted;
+            cv::cvtColor(image.impl_->mat, converted, ocv_type);
+            return ImageData(std::move(converted));
         }
         if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB) {
             ImageData dst_image;
-            const int single_channel_type = CV_MAKETYPE(image.mat_->depth(), 1);
+            dst_image.impl_ = std::make_unique<ImageDataImpl>();
+            const int single_channel_type = CV_MAKETYPE(image.impl_->mat.depth(), 1);
             cv::Mat chw_image(image.channels(), image.height() * image.width(), single_channel_type);
             std::vector<cv::Mat> split_image;
-            cv::split(*image.mat_, split_image);
+            cv::split(image.impl_->mat, split_image);
             for (int i = 0; i < split_image.size(); i++) {
                 split_image[i] = split_image[i].reshape(1, 1);
                 split_image[i].copyTo(chw_image.row(i));
             }
-            chw_image = chw_image.reshape(1, {image.channels(), image.height(), image.width()});
-            // dst_image.mat_ = std::make_unique<cv::Mat>(std::move(chw_image));
-            dst_image.mat_ = new cv::Mat(chw_image);
-            dst_image.type_ = image.mat_->depth() == CV_8U ? MdImageType::PLA_BGR_U8 : MdImageType::PLA_BGR_F32;
-            dst_image.width_ = image.width();
-            dst_image.height_ = image.height();
-            dst_image.channels_ = image.channels();
-            dst_image.ownership_ = RawMemoryOwnership::Owned;
+            dst_image.impl_->mat = chw_image.reshape(1, {image.channels(), image.height(), image.width()});
+            dst_image.impl_->width = image.width();
+            dst_image.impl_->height = image.height();
+            dst_image.impl_->channels = image.channels();
+            dst_image.impl_->type = image.impl_->mat.depth() == CV_8U
+                                        ? MdImageType::PLA_BGR_U8
+                                        : MdImageType::PLA_BGR_F32;
             return dst_image;
         }
         if (type == ColorConvertType::CVT_PL_BGR2PA_BGR || type == ColorConvertType::CVT_PL_RGB2PA_RGB) {
@@ -356,52 +400,31 @@ namespace modeldeploy::vision {
                 throw std::runtime_error("Invalid PL_BGR format: expected Planar layout");
             }
             ImageData dst_image;
+            dst_image.impl_ = std::make_unique<ImageDataImpl>();
+
             // 1 channel per row, total rows equal to channels
-            cv::Mat planarImage = image.mat_->reshape(1, image.channels());
+            cv::Mat planar_image = image.impl_->mat.reshape(1, image.channels());
             // 2. Split the planar image into separate channel matrices.
             std::vector<cv::Mat> split_images(image.channels());
             for (int i = 0; i < image.channels(); ++i) {
-                split_images[i] = planarImage.row(i).reshape(1, image.height()); // reshape each row back to H x W
+                split_images[i] = planar_image.row(i).reshape(1, image.height()); // reshape each row back to H x W
             }
             // 3. Merge these channel matrices into a single HWC image.
             cv::Mat hwc_image;
             cv::merge(split_images, hwc_image);
 
-            // dst_image.mat_ = std::make_unique<cv::Mat>(std::move(hwc_image));
-            dst_image.mat_ = new cv::Mat(hwc_image);
-
-            // dst_image.mat_ = std::make_unique<cv::Mat>(std::move(hwc_image));
-            dst_image.type_ = hwc_image.depth() == CV_8U
-                                  ? MdImageType::PKG_BGR_U8
-                                  : hwc_image.depth() == CV_32F
-                                  ? MdImageType::PKG_BGR_F32
-                                  : MdImageType::PKG_BGR_F64;
-            dst_image.width_ = image.width();
-            dst_image.height_ = image.height();
-            dst_image.channels_ = image.channels();
-            dst_image.ownership_ = RawMemoryOwnership::Owned;
+            dst_image.impl_->mat = hwc_image;
+            dst_image.impl_->width = image.width();
+            dst_image.impl_->height = image.height();
+            dst_image.impl_->channels = image.channels();
+            dst_image.impl_->type = hwc_image.depth() == CV_8U
+                                        ? MdImageType::PKG_BGR_U8
+                                        : hwc_image.depth() == CV_32F
+                                        ? MdImageType::PKG_BGR_F32
+                                        : MdImageType::PKG_BGR_F64;
             return dst_image;
         }
         throw std::runtime_error("Unsupported color conversion type");
-    }
-
-
-    ImageData ImageData::from_mat(const cv::Mat& mat, const bool copy) {
-        ImageData img;
-        if (copy) {
-            auto tmp = mat.clone();
-            img.mat_ = std::move(&tmp);
-            img.ownership_ = RawMemoryOwnership::Owned;
-        }
-        else {
-            img.mat_ = new cv::Mat(mat);
-            img.ownership_ = RawMemoryOwnership::Borrowed;
-        }
-        img.width_ = img.mat_->cols;
-        img.height_ = img.mat_->rows;
-        img.channels_ = img.mat_->channels();
-        img.type_ = md_image_type_from_ocv_type(img.mat_->type());
-        return img;
     }
 
     void ImageData::images_to_tensor(std::vector<ImageData> images, Tensor* tensor) {
@@ -415,8 +438,8 @@ namespace modeldeploy::vision {
         const int h = images[0].height();
         const int w = images[0].width();
 
-        for (auto& m : images) {
-            if (m.channels() != c || m.width() != w || m.height() != h) {
+        for (auto& img : images) {
+            if (img.channels() != c || img.width() != w || img.height() != h) {
                 MD_LOG_ERROR << "images shape is not equal" << std::endl;
                 return;
             }
@@ -431,23 +454,17 @@ namespace modeldeploy::vision {
         }
     }
 
-
-    void ImageData::to_mat(cv::Mat* mat_ptr, const bool copy) const {
-        if (!copy) {
-            // Shallow copy: share underlying data
-            *mat_ptr = *mat_;
-        }
-        else {
-            *mat_ptr = mat_->clone();
-        }
-    }
-
     void ImageData::to_tensor(Tensor* tensor, bool copy) {
-        const auto dtype = utils::cv_dtype_to_md_dtype(mat_->type());
+        if (!impl_ || impl_->empty()) {
+            MD_LOG_ERROR << "Image is empty" << std::endl;
+            return;
+        }
+        auto dtype = utils::md_image_dtype_to_md_dtype(type());
+
         const std::vector<int64_t> shape = {channels(), height(), width()};
         if (copy) {
-            const size_t num_bytes = element_count() * element_bytes();
-            tensor->allocate({channels(), height(), width()}, dtype);
+            const size_t num_bytes = bytes();
+            tensor->allocate(shape, dtype);
             if (num_bytes != tensor->byte_size()) {
                 MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
                     "but now size of Tensor = " << tensor->byte_size()
@@ -463,26 +480,44 @@ namespace modeldeploy::vision {
         }
     }
 
+    void ImageData::to_mat(cv::Mat& mat, const bool copy) const {
+        if (!impl_ || impl_->empty()) {
+            return;
+        }
+        if (copy) {
+            // Shallow copy: share underlying data
+            mat = impl_->mat.clone();
+        }
+        else {
+            mat = impl_->mat;
+        }
+    }
+
 
     ImageData ImageData::imread(const std::string& filename) {
-        cv::Mat m = cv::imread(filename);
-        if (m.empty()) {
-            throw std::runtime_error("Failed to read image: " + filename);
+        cv::Mat mat = cv::imread(filename);
+        if (mat.empty()) {
+            MD_LOG_ERROR << "Failed to read image: " << filename << std::endl;
+            return ImageData();
         }
-        return ImageData(std::move(m));
+        return ImageData(std::move(mat));
     }
 
     bool ImageData::imwrite(const std::string& filename) const {
-        if (!mat_ || mat_->empty()) {
-            std::cerr << "ImageData is empty." << std::endl;
+        if (!impl_ || impl_->empty()) {
+            MD_LOG_ERROR << "Cannot write empty image" << std::endl;
             return false;
         }
-        return cv::imwrite(filename, *mat_);
+        return cv::imwrite(filename, impl_->mat);
     }
 
     // 显示图片
     void ImageData::imshow(const std::string& win_name) const {
-        cv::imshow(win_name, *mat_);
+        if (!impl_ || impl_->empty()) {
+            MD_LOG_ERROR << "Cannot display empty image" << std::endl;
+            return;
+        }
+        cv::imshow(win_name, impl_->mat);
         cv::waitKey(0);
     }
 }
