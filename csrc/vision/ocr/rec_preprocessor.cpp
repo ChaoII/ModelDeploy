@@ -49,7 +49,7 @@ namespace modeldeploy::vision::ocr {
         std::vector<cv::Mat> _images;
         for (auto& image : *image_batch) {
             cv::Mat mat;
-            image.to_mat(&mat);
+            image.to_mat(mat);
             const int img_h_ = rec_image_shape_[1];
             int img_w_ = rec_image_shape_[2];
             if (!static_shape_infer_) {

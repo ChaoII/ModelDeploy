@@ -46,7 +46,7 @@ namespace modeldeploy::vision::ocr {
         std::vector<cv::Mat> _images;
         for (size_t i = 0; i < image_batch->size(); ++i) {
             cv::Mat mat;
-            image_batch->at(i).to_mat(&mat);
+            image_batch->at(i).to_mat(mat);
             const auto width = static_cast<float>(mat.cols);
             const auto height = static_cast<float>(mat.rows);
             const float ratio = max_len / (std::max(height, width) * 1.0);

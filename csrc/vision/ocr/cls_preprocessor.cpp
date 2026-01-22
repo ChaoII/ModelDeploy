@@ -39,7 +39,7 @@ namespace modeldeploy::vision::ocr {
         std::vector<cv::Mat> _images;
         for (auto& image : *image_batch) {
             cv::Mat mat;
-            image.to_mat(&mat);
+            image.to_mat(mat);
             const int img_h = cls_image_shape_[1];
             const int img_w = cls_image_shape_[2];
             const float ratio = static_cast<float>(mat.cols) / static_cast<float>(mat.rows);

@@ -16,7 +16,7 @@ namespace modeldeploy::vision::face {
         // 2. HWC2CHW
         // 3. Cast
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
         Resize::apply(&mat, size_[0], size_[1]);
         // BGR2RGB::Run(mat); 前处理不需要转换为RGB
         HWC2CHW::apply(&mat);

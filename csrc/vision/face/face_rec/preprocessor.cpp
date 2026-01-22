@@ -20,7 +20,7 @@ namespace modeldeploy::vision::face {
         // 3. HWC2CHW
         // 4. Cast
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
         if (mat.rows != 256 || mat.cols != 256) {
             MD_LOG_WARN <<
                 "the size of shape must be 256, ensure use face alignment? "

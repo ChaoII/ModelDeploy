@@ -10,7 +10,7 @@ namespace modeldeploy::vision {
     ImageData vis_ocr(ImageData& image, const OCRResult& result, const std::string& font_path,
                       const int font_size, const double alpha, const bool save_result) {
         cv::Mat cv_image, overlay;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         cv::Scalar cv_color = get_random_color();

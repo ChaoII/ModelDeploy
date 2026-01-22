@@ -25,7 +25,7 @@ namespace modeldeploy::vision::classification {
             return false;
         }
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
         if (enable_center_crop_) {
             const int crop_size = std::min(mat.rows, mat.cols);
             CenterCrop::apply(&mat, crop_size, crop_size);

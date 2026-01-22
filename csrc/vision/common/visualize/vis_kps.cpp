@@ -13,7 +13,7 @@ namespace modeldeploy::vision {
                             const int landmark_radius, const double alpha,
                             const bool save_result, const bool draw_lines) {
         cv::Mat cv_image, overlay;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         cv_image.copyTo(overlay);
         const cv::FontFace font(font_path);
         static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
