@@ -21,7 +21,7 @@ namespace modeldeploy::vision::detection {
         * \param[in]  letter_box_records The shape info list, record input_shape and output_shape
         * \return true if the preprocess successed, otherwise false
         */
-        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
+        bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
@@ -41,7 +41,7 @@ namespace modeldeploy::vision::detection {
         void use_cuda_preproc() { use_cuda_preproc_ = true; }
 
     protected:
-        bool preprocess(ImageData* image, Tensor* output,
+        bool preprocess(const ImageData& image, Tensor* output,
                         LetterBoxRecord* letter_box_record) const;
 
         bool use_cuda_preproc_ = false;
