@@ -12,52 +12,12 @@
 namespace modeldeploy::vision {
     class ImageDataImpl {
     public:
-        cv::Mat mat;
-        int width = 0;
-        int height = 0;
-        int channels = 0;
-        MdImageType type = MdImageType::PKG_BGR_U8;
-        RawMemoryOwnership ownership = RawMemoryOwnership::Owned;
-
         ImageDataImpl() = default;
+        ImageDataImpl(const ImageDataImpl& other) = default;
+        ImageDataImpl& operator=(const ImageDataImpl& other) = default;
+        ImageDataImpl(ImageDataImpl&& other) noexcept = default;
+        ImageDataImpl& operator=(ImageDataImpl&& other) noexcept = default;
 
-        ImageDataImpl(int w, int h, MdImageType t)
-            : width(w), height(h), type(t) {
-            const int ocv_type = md_image_type_to_ocv_type(t);
-            mat = cv::Mat(height, width, ocv_type);
-            channels = mat.channels();
-        }
-
-        ImageDataImpl(const cv::Mat& m, bool copy = true) {
-            if (copy) {
-                mat = m.clone();
-            }
-            else {
-                mat = m;
-            }
-            width = mat.cols;
-            height = mat.rows;
-            channels = mat.channels();
-            type = md_image_type_from_ocv_type(mat.type());
-        }
-
-        ImageDataImpl(cv::Mat&& m) : mat(std::move(m)) {
-            width = mat.cols;
-            height = mat.rows;
-            channels = mat.channels();
-            type = md_image_type_from_ocv_type(mat.type());
-        }
-
-        ImageDataImpl clone() const {
-            ImageDataImpl impl;
-            impl.mat = mat.clone();
-            impl.width = width;
-            impl.height = height;
-            impl.channels = channels;
-            impl.type = type;
-            impl.ownership = RawMemoryOwnership::Owned;
-            return impl;
-        }
 
         bool empty() const { return mat.empty(); }
         size_t element_count() const { return mat.total(); }
@@ -65,62 +25,52 @@ namespace modeldeploy::vision {
         size_t bytes() const { return element_count() * element_bytes(); }
         const uint8_t* data() const { return mat.data; }
         uint8_t* data() { return mat.data; }
+
+        cv::Mat mat;
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        MdImageType type = MdImageType::PKG_BGR_U8;
     };
 
-    ImageData::ImageData(): impl_(std::make_unique<ImageDataImpl>()) {
-    }
-
-    ImageData::ImageData(int width, int height, const MdImageType type)
-        : impl_(std::make_unique<ImageDataImpl>(width, height, type)) {
+    ImageData::ImageData(const int width, const int height, const MdImageType type)
+        : impl_(std::make_shared<ImageDataImpl>()) {
+        impl_->width = width;
+        impl_->height = height;
+        impl_->type = type;
+        const int ocv_type = md_image_type_to_ocv_type(type);
+        impl_->mat = cv::Mat(height, width, ocv_type);
+        impl_->channels = impl_->mat.channels();
     }
 
 
     ImageData::ImageData(const cv::Mat& mat):
-        impl_(std::make_unique<ImageDataImpl>(mat, true)) {
+        impl_(std::make_shared<ImageDataImpl>()) {
+        impl_->mat = mat;
+        impl_->width = mat.cols;
+        impl_->height = mat.rows;
+        impl_->channels = mat.channels();
+        impl_->type = md_image_type_from_ocv_type(mat.type());
     }
 
     ImageData::ImageData(cv::Mat&& mat):
-        impl_(std::make_unique<ImageDataImpl>(std::move(mat))) {
+        impl_(std::make_shared<ImageDataImpl>()) {
+        impl_->mat = std::move(mat);
+        impl_->width = impl_->mat.cols;
+        impl_->height = impl_->mat.rows;
+        impl_->channels = impl_->mat.channels();
+        impl_->type = md_image_type_from_ocv_type(impl_->mat.type());
     }
-
-    ImageData::~ImageData() = default;
-
-    ImageData::ImageData(const ImageData& other)
-        : impl_(other.impl_
-                    ? std::make_unique<ImageDataImpl>(*other.impl_)
-                    : std::make_unique<ImageDataImpl>()) {
-    }
-
-    ImageData& ImageData::operator=(const ImageData& other) {
-        if (this != &other) {
-            if (other.impl_) {
-                impl_ = std::make_unique<ImageDataImpl>(*other.impl_);
-            }
-            else {
-                impl_ = std::make_unique<ImageDataImpl>();
-            }
-        }
-        return *this;
-    }
-
-    ImageData::ImageData(ImageData&& other) noexcept
-        : impl_(std::move(other.impl_)) {
-        other.impl_ = std::make_unique<ImageDataImpl>();
-    }
-
-    ImageData& ImageData::operator=(ImageData&& other) noexcept {
-        if (this != &other) {
-            impl_ = std::move(other.impl_);
-            other.impl_ = std::make_unique<ImageDataImpl>();
-        }
-        return *this;
-    }
-
 
     ImageData ImageData::clone() const {
         ImageData result;
         if (impl_) {
-            result.impl_ = std::make_unique<ImageDataImpl>(impl_->clone());
+            result.impl_ = std::make_shared<ImageDataImpl>();
+            result.impl_->mat = impl_->mat.clone();
+            result.impl_->width = impl_->width;
+            result.impl_->height = impl_->height;
+            result.impl_->channels = impl_->channels;
+            result.impl_->type = impl_->type;
         }
         return result;
     }
@@ -131,6 +81,10 @@ namespace modeldeploy::vision {
                                   const int height,
                                   const MdImageType type,
                                   const bool copy) {
+        if (!data || width <= 0 || height <= 0) {
+            MD_LOG_ERROR << "Invalid parameters for from_raw" << std::endl;
+            return ImageData();
+        }
         const int ocv_type = md_image_type_to_ocv_type(type);
         cv::Mat tmp_mat;
         if (ocv_type > 0) {
@@ -144,9 +98,9 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         if (copy) {
-            return ImageData(tmp_mat);
+            return ImageData(tmp_mat.clone());
         }
-        return ImageData(std::move(tmp_mat));
+        return ImageData(tmp_mat);
     }
 
 
@@ -156,6 +110,9 @@ namespace modeldeploy::vision {
     MdImageType ImageData::type() const { return impl_ ? impl_->type : MdImageType::PKG_BGR_U8; }
     bool ImageData::empty() const { return !impl_ || impl_->empty(); }
 
+    bool ImageData::is_shared_with(const ImageData& other) const {
+        return impl_ && other.impl_ && impl_.get() == other.impl_.get();
+    }
 
     size_t ImageData::element_count() const { return impl_ ? impl_->element_count() : 0; }
     size_t ImageData::element_bytes() const { return impl_ ? impl_->element_bytes() : 0; }
@@ -215,9 +172,9 @@ namespace modeldeploy::vision {
             point[1] -= top;
         }
 
-        float img_crop_width = sqrt(pow(points[0][0] - points[1][0], 2) +
+        const float img_crop_width = sqrt(pow(points[0][0] - points[1][0], 2) +
             pow(points[0][1] - points[1][1], 2));
-        float img_crop_height = sqrt(pow(points[0][0] - points[3][0], 2) +
+        const float img_crop_height = sqrt(pow(points[0][0] - points[3][0], 2) +
             pow(points[0][1] - points[3][1], 2));
 
         cv::Point2f pts_std[4];
@@ -316,7 +273,7 @@ namespace modeldeploy::vision {
     }
 
     ImageData ImageData::convert(const std::vector<float>& alpha, const std::vector<float>& beta) const {
-        if (channels() != 3 || channels() != alpha.size() || channels() != beta.size()) {
+        if (channels() != 3 || alpha.size() != 3 || beta.size() != 3) {
             MD_LOG_ERROR << "channels must be 3 and alpha/beta size must be 3" << std::endl;
             return ImageData();
         }
@@ -435,7 +392,7 @@ namespace modeldeploy::vision {
         }
 
         ImageData dst_image;
-        dst_image.impl_ = std::make_unique<ImageDataImpl>();
+        dst_image.impl_ = std::make_shared<ImageDataImpl>();
         dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
         dst_image.impl_->width = width();
         dst_image.impl_->height = height();
@@ -461,7 +418,7 @@ namespace modeldeploy::vision {
             channel_float.copyTo(chw_image.row(c));
         }
         ImageData dst_image;
-        dst_image.impl_ = std::make_unique<ImageDataImpl>();
+        dst_image.impl_ = std::make_shared<ImageDataImpl>();
         dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
         dst_image.impl_->width = width();
         dst_image.impl_->height = height();
@@ -470,8 +427,16 @@ namespace modeldeploy::vision {
         return dst_image;
     }
 
+    ImageData ImageData::fuse_resize_and_pad(const int width, const int height,
+                                             const int pad_r, const int pad_b, const float pad_val) const {
+        // 不能加const不然退化为拷贝构造，当然在ImageData内部的设是shader copy 但是就不符合代码预期
+        cv::Mat dst(height + pad_b, width + pad_r, impl_->mat.type(), cv::Scalar::all(pad_val));
+        cv::Mat dst_roi = dst(cv::Rect(0, 0, width, height));
+        cv::resize(impl_->mat, dst_roi, cv::Size(width, height));
+        return ImageData(std::move(dst));
+    }
 
-    ImageData ImageData::cvt_color(const ImageData& image, ColorConvertType type) {
+    ImageData ImageData::cvt_color(const ImageData& image, const ColorConvertType type) {
         if (!image.impl_ || image.impl_->empty()) {
             return ImageData();
         }
@@ -483,7 +448,7 @@ namespace modeldeploy::vision {
         }
         if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB) {
             ImageData dst_image;
-            dst_image.impl_ = std::make_unique<ImageDataImpl>();
+            dst_image.impl_ = std::make_shared<ImageDataImpl>();
             const int single_channel_type = CV_MAKETYPE(image.impl_->mat.depth(), 1);
             cv::Mat chw_image(image.channels(), image.height() * image.width(), single_channel_type);
             std::vector<cv::Mat> split_image;
@@ -508,7 +473,7 @@ namespace modeldeploy::vision {
                 throw std::runtime_error("Invalid PL_BGR format: expected Planar layout");
             }
             ImageData dst_image;
-            dst_image.impl_ = std::make_unique<ImageDataImpl>();
+            dst_image.impl_ = std::make_shared<ImageDataImpl>();
 
             // 1 channel per row, total rows equal to channels
             cv::Mat planar_image = image.impl_->mat.reshape(1, image.channels());
@@ -562,7 +527,7 @@ namespace modeldeploy::vision {
         }
     }
 
-    void ImageData::to_tensor(Tensor* tensor, bool copy) {
+    void ImageData::to_tensor(Tensor* tensor, const bool copy) {
         if (!impl_ || impl_->empty()) {
             MD_LOG_ERROR << "Image is empty" << std::endl;
             return;

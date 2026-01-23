@@ -4,11 +4,6 @@
 
 #pragma once
 
-enum class RawMemoryOwnership {
-    Borrowed,
-    Owned
-};
-
 enum class MdImageType {
     GRAY_U8 = 0, // 单通道，unsigned char存储
     GRAY_U16, // 单通道，unsigned short存储

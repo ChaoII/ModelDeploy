@@ -22,18 +22,18 @@ namespace modeldeploy::vision {
 
     class MODELDEPLOY_CXX_EXPORT ImageData {
     public:
-        ImageData();
+        ImageData() = default;
         ImageData(int width, int height, MdImageType type);
         explicit ImageData(const cv::Mat& mat);
         explicit ImageData(cv::Mat&& mat);
 
-        ImageData(const ImageData& other);
-        ImageData& operator=(const ImageData& other);
+        // 全部是浅拷贝
+        ImageData(const ImageData& other) = default;
+        ImageData& operator=(const ImageData& other) = default;
+        ImageData(ImageData&& other) noexcept = default;
+        ImageData& operator=(ImageData&& other) noexcept = default;
 
-        ImageData(ImageData&& other) noexcept;
-        ImageData& operator=(ImageData&& other) noexcept;
-
-        ~ImageData();
+        ~ImageData() = default;
 
         [[nodiscard]] int width() const;
         [[nodiscard]] int height() const;
@@ -45,6 +45,9 @@ namespace modeldeploy::vision {
         [[nodiscard]] const uint8_t* data() const;
         [[nodiscard]] uint8_t* data();
         [[nodiscard]] bool empty() const;
+
+
+        [[nodiscard]] bool is_shared_with(const ImageData& other) const;
 
         [[nodiscard]] ImageData clone() const;
         static ImageData cvt_color(const ImageData& image, ColorConvertType type);
@@ -68,6 +71,18 @@ namespace modeldeploy::vision {
                                         const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
         [[nodiscard]] ImageData normalize(const std::vector<float>& mean, const std::vector<float>& std,
                                           bool scale = true, bool swap_rb = true) const;
+        //         目标尺寸 (dst)
+        //   +---------------------------+
+        //   |   +-------------------+   |
+        //   |   |                   |   |
+        //   |   |                   |   |
+        //   |   |     比例缩放后图    |   |
+        //   |   |                   |   |
+        //   |   |                   |   |
+        //   |   |                   |   |
+        //   |   +-------------------+   |
+        //   +---------------------------+
+        //     目标: width × height
         [[nodiscard]] ImageData letter_box(const std::vector<int>& dst_size, float padding_value) const;
         [[nodiscard]] ImageData center_crop(const std::vector<int>& dst_size) const;
         [[nodiscard]] ImageData permute() const;
@@ -77,7 +92,20 @@ namespace modeldeploy::vision {
             const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
             const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
 
+        //   +---------------------+---------+
+        //   |                     |         |
+        //   |  resize后的图像      |  pad_r  |
+        //   |  (width×height)     |  (右填充)|
+        //   |                     |         |
+        //   +---------------------+---------+
+        //   |                     |         |
+        //   |      pad_b          |  pad_b  |
+        //   |     (下填充)         |  pad_r  |
+        //   |                     | (右下角) |
+        //   +---------------------+---------+
+        [[nodiscard]] ImageData fuse_resize_and_pad(int width, int height, int pad_r, int pad_b, float pad_val) const;
+
     private:
-        std::unique_ptr<ImageDataImpl> impl_;
+        std::shared_ptr<ImageDataImpl> impl_;
     };
 }
