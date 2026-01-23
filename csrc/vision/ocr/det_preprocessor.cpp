@@ -37,23 +37,23 @@ namespace modeldeploy::vision::ocr {
     bool DBDetectorPreprocessor::apply(const std::vector<ImageData>& image_batch,
                                        std::vector<Tensor>* outputs) {
         // 组batch找到当前batch最大的宽高组织
+        const size_t batch_size = image_batch.size();
+        batch_info_.resize(batch_size);
         int max_resize_w = 0;
         int max_resize_h = 0;
-        batch_info_.resize(image_batch.size());
-        for (size_t i = 0; i < image_batch.size(); ++i) {
-            const ImageData* mat = &image_batch.at(i);
-            batch_info_[i] = ocr_detector_get_info(mat, max_side_len_);
+        for (size_t i = 0; i < batch_size; ++i) {
+            batch_info_[i] = ocr_detector_get_info(&image_batch.at(i), max_side_len_);
             max_resize_w = std::max(max_resize_w, batch_info_[i][2]);
             max_resize_h = std::max(max_resize_h, batch_info_[i][3]);
         }
         std::vector<ImageData> processed_images;
-        processed_images.reserve(image_batch.size());
-        for (size_t i = 0; i < image_batch.size(); ++i) {
+        processed_images.reserve(batch_size);
+        for (size_t i = 0; i < batch_size; ++i) {
             ImageData image = image_batch.at(i);
-            // resize 到指定的32倍数的尺寸，然后pad到max_size
-            auto processed_image = image.resize(batch_info_[i][2], batch_info_[i][3])
-                                        .pad(0, max_resize_h - batch_info_[i][3], 0,
-                                             max_resize_w - batch_info_[i][2], 0.0f)
+            // resize 到指定的32倍数的尺寸，然后pad到max_size,fuse_resize_and_pad和letterbox差别很大
+            auto processed_image = image.fuse_resize_and_pad(batch_info_[i][2], batch_info_[i][3],
+                                                             max_resize_w - batch_info_[i][2],
+                                                             max_resize_h - batch_info_[i][3], 0.0f)
                                         .fuse_normalize_and_permute(mean_, std_);
             processed_images.push_back(processed_image);
         }
