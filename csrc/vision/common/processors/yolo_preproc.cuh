@@ -9,7 +9,7 @@
 #include "vision/common/image_data.h"
 
 namespace modeldeploy::vision {
-    bool yolo_preprocess_cuda(ImageData* image,
+    bool yolo_preprocess_cuda(const ImageData& image,
                               Tensor* output,
                               const std::vector<int>& dst_size,
                               const std::vector<float>& pad_val,

@@ -1,6 +1,7 @@
 #include "vision/common/processors/yolo_preproc.cuh"
 #include <cuda_runtime.h>
 #include <algorithm>
+#include <vision/utils.h>
 
 // RGB 三通道归一化均值和标准差
 __constant__ float k_mean[3] = {0.f, 0.f, 0.f};
@@ -72,35 +73,18 @@ struct PreprocWorkspace {
 
 static thread_local PreprocWorkspace ws;
 
-inline void compute_letterbox(
-    const int src_h,
-    const int src_w,
-    const int dst_h,
-    const int dst_w,
-    float& scale,
-    float& pad_w,
-    float& pad_h) {
-    scale = std::min(
-        static_cast<float>(dst_h) / src_h,
-        static_cast<float>(dst_w) / src_w);
-    const float new_h = src_h * scale;
-    const float new_w = src_w * scale;
-    pad_h = (dst_h - new_h) * 0.5f;
-    pad_w = (dst_w - new_w) * 0.5f;
-}
-
 namespace modeldeploy::vision {
     bool yolo_preprocess_cuda(
-        ImageData* image,
+        const ImageData& image,
         Tensor* output,
         const std::vector<int>& dst_size,
         const std::vector<float>& pad_val,
         LetterBoxRecord* letter_box_record) {
-        if (!image || !output || dst_size.size() != 2 || pad_val.empty()) {
+        if (!output || dst_size.size() != 2 || pad_val.empty()) {
             return false;
         }
-        const int src_h = image->height();
-        const int src_w = image->width();
+        const int src_h = image.height();
+        const int src_w = image.width();
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
         const float pad_value = pad_val[0];
@@ -115,22 +99,10 @@ namespace modeldeploy::vision {
         }
 
         // 3 letterbox（host 计算）
-        float scale, pad_w, pad_h;
-        compute_letterbox(src_h, src_w, dst_h, dst_w, scale, pad_w, pad_h);
-
-        if (letter_box_record) {
-            letter_box_record->ipt_w = static_cast<float>(src_w);
-            letter_box_record->ipt_h = static_cast<float>(src_h);
-            letter_box_record->out_w = static_cast<float>(dst_w);
-            letter_box_record->out_h = static_cast<float>(dst_h);
-            letter_box_record->scale = scale;
-            letter_box_record->pad_w = pad_w;
-            letter_box_record->pad_h = pad_h;
-        }
-
+        *letter_box_record = utils::cal_letter_box_param({src_w, src_h}, {dst_w, dst_h});
         // 4 src 指针处理（workspace，避免反复 malloc）
-        const uint8_t* src = image->data();
-        const size_t src_bytes = static_cast<size_t>(src_h) * src_w * image->channels();
+        const uint8_t* src = image.data();
+        const size_t src_bytes = static_cast<size_t>(src_h) * src_w * image.channels();
         const uint8_t* d_src = nullptr;
         cudaPointerAttributes attr{};
         const bool is_device =
@@ -159,9 +131,9 @@ namespace modeldeploy::vision {
             output->data_ptr<float>(),
             dst_h,
             dst_w,
-            scale,
-            pad_w,
-            pad_h,
+            letter_box_record->scale,
+            letter_box_record->pad_w,
+            letter_box_record->pad_h,
             pad_value);
         const cudaError_t err = cudaGetLastError();
         cudaStreamSynchronize(stream);
