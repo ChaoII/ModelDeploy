@@ -127,10 +127,10 @@ namespace modeldeploy::vision {
 
 
     ImageData ImageData::from_raw(unsigned char* data,
-                                  int width,
-                                  int height,
-                                  MdImageType type,
-                                  bool copy) {
+                                  const int width,
+                                  const int height,
+                                  const MdImageType type,
+                                  const bool copy) {
         const int ocv_type = md_image_type_to_ocv_type(type);
         cv::Mat tmp_mat;
         if (ocv_type > 0) {
@@ -140,7 +140,8 @@ namespace modeldeploy::vision {
             tmp_mat = cv::Mat(height + height / 2, width, CV_8UC1, data);
         }
         else {
-            throw std::runtime_error("Invalid MdImageType format: " + md_image_type_to_string(type));
+            MD_LOG_ERROR << "Invalid MdImageType format: " << md_image_type_to_string(type) << std::endl;
+            return ImageData();
         }
         if (copy) {
             return ImageData(tmp_mat);
@@ -258,7 +259,7 @@ namespace modeldeploy::vision {
         if (!impl_ || impl_->empty()) {
             return ImageData();
         }
-        float scale_factor = scale ? 1.0f / 255.0f : 1.0f;
+        const float scale_factor = scale ? 1.0f / 255.0f : 1.0f;
         cv::Mat converted;
         if (dtype == "float" || dtype == "float32" || dtype == "fp32") {
             if (impl_->mat.type() != CV_32FC(impl_->channels)) {

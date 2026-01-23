@@ -45,16 +45,16 @@ namespace modeldeploy::vision::ocr {
             batch_info_[i] = ocr_detector_get_info(mat, max_side_len_);
             max_resize_w = std::max(max_resize_w, batch_info_[i][2]);
             max_resize_h = std::max(max_resize_h, batch_info_[i][3]);
-            batch_info_[i][2] = max_resize_w;
-            batch_info_[i][3] = max_resize_h;
         }
         std::vector<ImageData> processed_images;
         processed_images.reserve(image_batch.size());
         for (size_t i = 0; i < image_batch.size(); ++i) {
             ImageData image = image_batch.at(i);
-            auto processed_image = image
-                                   .letter_box({max_resize_w, max_resize_h}, 0.0f)
-                                   .fuse_normalize_and_permute(mean_, std_);
+            // resize 到指定的32倍数的尺寸，然后pad到max_size
+            auto processed_image = image.resize(batch_info_[i][2], batch_info_[i][3])
+                                        .pad(0, max_resize_h - batch_info_[i][3], 0,
+                                             max_resize_w - batch_info_[i][2], 0.0f)
+                                        .fuse_normalize_and_permute(mean_, std_);
             processed_images.push_back(processed_image);
         }
         outputs->resize(1);

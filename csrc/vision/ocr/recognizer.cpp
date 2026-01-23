@@ -26,11 +26,11 @@ namespace modeldeploy::vision::ocr {
     }
 
 
-    bool Recognizer::predict(const ImageData& img, std::string* text,
+    bool Recognizer::predict(const ImageData& image, std::string* text,
                              float* rec_score) {
         std::vector<std::string> texts(1);
         std::vector<float> rec_scores(1);
-        if (const bool success = batch_predict({img}, &texts, &rec_scores); !success) {
+        if (const bool success = batch_predict({image}, &texts, &rec_scores); !success) {
             return success;
         }
         *text = std::move(texts[0]);
@@ -68,8 +68,7 @@ namespace modeldeploy::vision::ocr {
             MD_LOG_ERROR << "indices.size() should be 0 or " << images.size() << "." << std::endl;
             return false;
         }
-        std::vector<ImageData> _images = images;
-        if (!preprocessor_.run(&_images, &reused_input_tensors_, start_index,
+        if (!preprocessor_.run(images, &reused_input_tensors_, start_index,
                                end_index, indices)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
