@@ -151,7 +151,7 @@ static class Program
         {
             // 最后注意必须加斜杠
             det_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/det_infer2.onnx"),
-            cls_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/cls_infer.onnx"),
+            cls_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv4_mobile/cls_infer.onnx"),
             rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/rec_infer1.onnx"),
             dict_path = Path.Combine(TestDataPath, "dict.txt"),
             max_side_len = 1440,
@@ -167,7 +167,17 @@ static class Program
         // Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_ocr1.jpg"));
         Image image = Image.Read("C:/Users/aichao/Desktop/pictures_test/35.png");
         PaddleOcr ppocr = new PaddleOcr(parameters, option);
-        OcrResults results = ppocr.Predict(image);
+        var startTime = DateTime.Now;
+        var loopCount = 20;
+        OcrResults results = new OcrResults();
+        for (var i = 0; i < loopCount; i++)
+        {
+            results = ppocr.Predict(image);
+            Console.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:fff"));
+        }
+
+        Console.WriteLine("Average Time: " + (DateTime.Now - startTime) / loopCount);
+
         ppocr.DrawOcrResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 15, 0.15, true);
         image.Show();
         foreach (var result in results.Data)
@@ -443,11 +453,11 @@ static class Program
         // TestObb();
         // TestPose();
         // TestImage();
-        // TestOCR();
+        TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();
-        TestPedestrianAttribute();
+        // TestPedestrianAttribute();
         // 测试GC
         // GC.Collect();
         // GC.WaitForPendingFinalizers();

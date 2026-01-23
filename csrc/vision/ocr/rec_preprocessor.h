@@ -21,7 +21,7 @@ namespace modeldeploy::vision::ocr {
          * \param indices
          * \return true if the preprocess successes, otherwise false
          */
-        bool run(const std::vector<ImageData>* images, std::vector<Tensor>* outputs,
+        bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                  size_t start_index, size_t end_index,
                  const std::vector<int>& indices) const;
 
@@ -33,7 +33,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] outputs The output tensors which will feed in runtime
          * \return true if the preprocess successed, otherwise false
          */
-        bool apply(const std::vector<ImageData>* image_batch, std::vector<Tensor>* outputs) const;
+        bool apply(const std::vector<ImageData>& image_batch, std::vector<Tensor>* outputs) const;
 
         /// Set static_shape_infer is true or not. When deploy PP-OCR
         /// on hardware which can not support dynamic input shape very well,
