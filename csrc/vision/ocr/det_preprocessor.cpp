@@ -4,9 +4,12 @@
 
 #include "vision/utils.h"
 #include "vision/ocr/det_preprocessor.h"
+#ifdef WITH_GPU
+#include "vision/common/processors/fusion_resize_pad_normalize_permute.cuh"
+#endif
+#include <vision/common/processors/fusion_resize_pad_normalize_permute.h>
 #include "vision/ocr/utils/ocr_utils.h"
 #include "vision/common/processors/resize.h"
-#include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::ocr {
     std::array<int, 4> DBDetectorPreprocessor::ocr_detector_get_info(
@@ -33,6 +36,30 @@ namespace modeldeploy::vision::ocr {
     DBDetectorPreprocessor::DBDetectorPreprocessor() {
     }
 
+    bool DBDetectorPreprocessor::preprocess(const ImageData& image, Tensor* output,
+                                            const std::vector<int>& resize_size,
+                                            const std::vector<int>& dst_size) const {
+        if (use_cuda_preproc_) {
+#ifdef WITH_GPU
+
+            return fusion_resize_pad_normalize_permute_cuda(image, output,
+                                                            resize_size,
+                                                            dst_size,
+                                                            mean_,
+                                                            std_,
+                                                            pad_value_);
+#else
+            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
+#endif
+        }
+        return fusion_resize_pad_normalize_permute_cpu(image, output,
+                                                       resize_size,
+                                                       dst_size,
+                                                       mean_,
+                                                       std_,
+                                                       pad_value_);
+    }
+
 
     bool DBDetectorPreprocessor::apply(const std::vector<ImageData>& image_batch,
                                        std::vector<Tensor>* outputs) {
@@ -46,19 +73,19 @@ namespace modeldeploy::vision::ocr {
             max_resize_w = std::max(max_resize_w, batch_info_[i][2]);
             max_resize_h = std::max(max_resize_h, batch_info_[i][3]);
         }
-        std::vector<ImageData> processed_images;
-        processed_images.reserve(batch_size);
+        outputs->resize(1);
+        std::vector<Tensor> tensors(image_batch.size());
         for (size_t i = 0; i < batch_size; ++i) {
             ImageData image = image_batch.at(i);
             // resize 到指定的32倍数的尺寸，然后pad到max_size,fuse_resize_and_pad和letterbox差别很大
-            auto processed_image = image.fuse_resize_and_pad(batch_info_[i][2], batch_info_[i][3],
-                                                             max_resize_w - batch_info_[i][2],
-                                                             max_resize_h - batch_info_[i][3], 0.0f)
-                                        .fuse_normalize_and_permute(mean_, std_);
-            processed_images.push_back(processed_image);
+            preprocess(image, &tensors[i], {batch_info_[i][2], batch_info_[i][3]}, {max_resize_w, max_resize_h});
         }
-        outputs->resize(1);
-        ImageData::images_to_tensor(processed_images, &(*outputs)[0]);
+        if (tensors.size() == 1) {
+            (*outputs)[0] = std::move(tensors[0]);
+        }
+        else {
+            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        }
         return true;
     }
 }

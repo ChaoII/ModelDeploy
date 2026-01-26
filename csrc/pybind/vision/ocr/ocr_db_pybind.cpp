@@ -61,7 +61,7 @@ namespace modeldeploy::vision {
                     const std::vector<Tensor>& inputs,
                     const std::vector<std::array<int, 4>>& batch_det_img_info) {
                      std::vector<std::vector<std::array<int, 8>>> results;
-                     if (!self.apply(inputs, &results, batch_det_img_info)) {
+                     if (!self.run(inputs, &results, batch_det_img_info)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in "
                              "DBDetectorPostprocessor.");
@@ -75,7 +75,7 @@ namespace modeldeploy::vision {
                      std::vector<std::vector<std::array<int, 8>>> results;
                      std::vector<Tensor> inputs;
                      pyarray_to_tensor_list(input_array, &inputs, /*share_buffer=*/true);
-                     if (!self.apply(inputs, &results, batch_det_img_info)) {
+                     if (!self.run(inputs, &results, batch_det_img_info)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in DBDetectorPostprocessor.");
                      }
