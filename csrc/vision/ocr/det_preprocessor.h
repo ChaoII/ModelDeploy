@@ -13,7 +13,10 @@ namespace modeldeploy::vision::ocr {
         virtual bool apply(const std::vector<ImageData>& image_batch,
                            std::vector<Tensor>* outputs);
 
-        void set_max_side_len(int max_side_len) { max_side_len_ = max_side_len; }
+
+        void use_cuda_preproc() { use_cuda_preproc_ = true; }
+
+        void set_max_side_len(const int max_side_len) { max_side_len_ = max_side_len; }
 
         [[nodiscard]] int get_max_side_len() const { return max_side_len_; }
 
@@ -34,9 +37,12 @@ namespace modeldeploy::vision::ocr {
         }
 
     private:
-        bool resize_image(ImageData* image, int resize_w, int resize_h,
-                          int max_resize_w, int max_resize_h) const;
+        bool preprocess(const ImageData& image, Tensor* output, const std::vector<int>& resize_size,
+                        const std::vector<int>& dst_size) const;
+
+
         std::array<int, 4> ocr_detector_get_info(const ImageData* image, int max_size_len) const;
+        bool use_cuda_preproc_ = false;
         // for recording the switch of hwc2chw
         int max_side_len_ = 960;
         std::vector<int> static_img_size_ = {};

@@ -11,20 +11,30 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.use_gpu();
-    option.enable_trt = false;
+    option.enable_trt = true;
     option.enable_fp16 = true;
     modeldeploy::vision::ocr::DBDetector db_detector("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
                                                      option);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
     // auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0003.jpg");
     db_detector.get_preprocessor().set_max_side_len(1440);
+    db_detector.get_preprocessor().use_cuda_preproc();
     // db_detector.get_preprocessor().set_det_image_shape({3, 1440, 1440});
     db_detector.get_postprocessor().set_det_db_thresh(0.3);
     // db_detector.get_postprocessor().set_det_db_box_thresh(0.5);
     db_detector.get_postprocessor().set_det_db_unclip_ratio(1.0);
     // db_detector.get_postprocessor().set_use_dilation(true);
     modeldeploy::vision::OCRResult result;
-    db_detector.predict(img, &result);
+    constexpr int warming_up_count = 10;
+    for (int i = 0; i < warming_up_count; ++i) {
+        db_detector.predict(img, &result);
+    }
+    TimerArray timers;
+    constexpr int loop_count = 100;
+    for (int i = 0; i < loop_count; ++i) {
+        db_detector.predict(img, &result, &timers);
+    }
+    timers.print_benchmark();
     modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc");
     vis_image.imshow("ocr_db_detector");

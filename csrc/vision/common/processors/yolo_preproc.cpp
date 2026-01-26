@@ -50,7 +50,6 @@ namespace modeldeploy::vision {
                 const int sy = static_cast<int>((dy - pad_h) / scale);
 
                 const uint8_t* p = src + (sy * src_w + sx) * 3;
-
                 float c0 = p[0] * inv_255;
                 float c1 = p[1] * inv_255;
                 float c2 = p[2] * inv_255;
@@ -95,7 +94,7 @@ namespace modeldeploy::vision {
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
         *letter_box_record = utils::cal_letter_box_param({image.width(), image.height()}, dst_size);
-        auto s = image.letter_box(dst_size, 114.0f).fuse_convert_and_permute();
+        auto s = image.letter_box(dst_size, pad_val[0]).fuse_convert_and_permute();
         // s = s.normalize({1/255.0f, 1/255.0f, 1/255.0f}, {0.0f, 0.0f, 0.0f});
         // s.imshow("letter_box");
         // s = s.permute();
