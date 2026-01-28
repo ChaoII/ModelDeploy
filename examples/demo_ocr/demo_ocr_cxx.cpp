@@ -26,11 +26,11 @@ int main() {
                                             option);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
     // auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0003.jpg");
-    ocr.set_rec_batch_size(8);
+    ocr.set_rec_batch_size(32);
     ocr.get_detector()->get_preprocessor().set_max_side_len(1440);
     ocr.get_detector()->get_postprocessor().set_det_db_thresh(0.3);
     ocr.get_detector()->get_postprocessor().set_det_db_box_thresh(0.6);
-    ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.0);
+    ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.5);
     // ocr.get_detector()->get_postprocessor().set_use_dilation(true);
     modeldeploy::vision::OCRResult result;
     TimerArray timers;

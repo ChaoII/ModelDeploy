@@ -8,8 +8,6 @@
 #include "vision/ocr/rec_preprocessor.h"
 #include "vision/common/processors/pad.h"
 #include "vision/common/processors/cast.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::ocr {
     RecognizerPreprocessor::RecognizerPreprocessor() {
@@ -19,22 +17,21 @@ namespace modeldeploy::vision::ocr {
                                      std::vector<Tensor>* outputs,
                                      const size_t start_index, const size_t end_index,
                                      const std::vector<int>& indices) const {
-        if (images.empty() || end_index <= start_index ||
-            end_index > images.size()) {
+        if (images.empty() || end_index <= start_index || end_index > images.size()) {
             MD_LOG_ERROR << "images->size() or index error. Correct is: 0 <= start_index < "
                 "end_index <= images->size()" << std::endl;;
             return false;
         }
 
-        std::vector<ImageData> mats(end_index - start_index);
+        std::vector<ImageData> real_images(end_index - start_index);
         for (size_t i = start_index; i < end_index; ++i) {
             size_t real_index = i;
             if (!indices.empty()) {
                 real_index = indices[i];
             }
-            mats[i - start_index] = images.at(real_index);
+            real_images[i - start_index] = images.at(real_index);
         }
-        return apply(mats, outputs);
+        return apply(real_images, outputs);
     }
 
     bool RecognizerPreprocessor::apply(const std::vector<ImageData>& image_batch,
@@ -49,29 +46,23 @@ namespace modeldeploy::vision::ocr {
         std::vector<ImageData> images;
         images.reserve(image_batch.size());
         for (auto& image : image_batch) {
-            const int img_h_ = rec_image_shape_[1];
-            int img_w_ = rec_image_shape_[2];
             ImageData processed_image;
             if (!static_shape_infer_) {
-                img_w_ = static_cast<int>(static_cast<float>(img_h_) * max_wh_ratio);
+                // 单个batch中的最大
+                const auto max_w = static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
                 const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
                 int resize_w;
-                if (ceilf(static_cast<float>(img_h_) * ratio) > static_cast<float>(img_w_)) {
-                    resize_w = img_w_;
+                if (std::ceilf(img_h * ratio) > max_w) {
+                    resize_w = max_w;
                 }
                 else {
-                    resize_w = static_cast<int>(ceilf(static_cast<float>(img_h_) * ratio));
+                    resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
                 }
-                processed_image = image.resize(resize_w, img_h_).pad(0, 0, 0, img_w_ - resize_w, 127.0f);
+                processed_image = image.resize(resize_w, img_h)
+                                       .pad(0, 0, 0, max_w - resize_w, 127.0f);
             }
             else {
-                if (image.width() >= img_w_) {
-                    processed_image = image.resize(img_w_, img_h_);
-                }
-                else {
-                    processed_image = image.resize(image.width(), img_h_);
-                    processed_image = processed_image.pad(0, 0, 0, img_w_ - processed_image.width(), 127.0f);
-                }
+                processed_image = image.resize(img_w, img_h);
             }
             processed_image = processed_image.fuse_normalize_and_permute(mean_, std_, is_scale_);
             images.emplace_back(processed_image);

@@ -19,7 +19,6 @@ namespace modeldeploy::vision {
         const int dst_h, // max_h
         const int resize_w,
         const int resize_h,
-        const bool swap_rb,
         const float alpha[3],
         const float beta[3],
         const float pad_value
@@ -115,7 +114,6 @@ namespace modeldeploy::vision {
             dst_h, // max_h
             resize_w,
             resize_h,
-            true,
             alpha,
             beta,
             pad_value

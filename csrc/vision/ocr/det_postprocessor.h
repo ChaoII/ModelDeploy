@@ -55,7 +55,7 @@ namespace modeldeploy::vision::ocr {
         [[nodiscard]] int get_use_dilation() const { return use_dilation_; }
 
     private:
-        bool single_batch_postprocessor(const float* prob, int w, int h,
+        bool single_batch_postprocessor(const float* prob, int h, int w,
                                         const std::array<int, 4>& det_img_info,
                                         std::vector<std::array<int, 8>>* boxes_result) const;
         double det_db_thresh_ = 0.3;
