@@ -40,33 +40,46 @@ namespace modeldeploy::vision::ocr {
         std::string& str_res = *text;
         float& score = *rec_score;
         score = 0.f;
-        int last_index = 0;
+        int last_index = -1;
         int count = 0;
-        float max_value = 0.0f;
+        const int time_steps = output_shape[1];
+        const int num_classes = output_shape[2];
 
-        for (int n = 0; n < output_shape[1]; n++) {
-            const int argmax_idx = static_cast<int>(
-                std::distance(&out_data[n * output_shape[2]],
-                              std::max_element(&out_data[n * output_shape[2]],
-                                               &out_data[(n + 1) * output_shape[2]])));
+        for (int t = 0; t < time_steps; ++t) {
+            const float* step = out_data + t * num_classes;
 
-            max_value = static_cast<float>(*std::max_element(&out_data[n * output_shape[2]],
-                                                             &out_data[(n + 1) * output_shape[2]]));
+            int best_idx = 0;
+            float best_score = step[0];
 
-            if (argmax_idx > 0 && !(n > 0 && argmax_idx == last_index)) {
-                score += max_value;
-                count += 1;
-                if (argmax_idx > label_list_.size()) {
-                    MD_LOG_ERROR << "The output index: " << argmax_idx << " is larger than the size of label_list: " <<
+            for (int c = 1; c < num_classes; ++c) {
+                if (step[c] > best_score) {
+                    best_score = step[c];
+                    best_idx = c;
+                }
+            }
+
+            if (best_idx > 0 && best_idx != last_index) {
+                if (best_idx > label_list_.size()) {
+                    MD_LOG_ERROR << "The output index: " << best_idx <<
+                        " is larger than the size of label_list: " <<
                         label_list_.size() << ". Please check the label file!" << std::endl;
                     return false;
                 }
-                str_res += label_list_[argmax_idx];
+                str_res += label_list_[best_idx];
+                score += best_score;
+                ++count;
             }
-            last_index = argmax_idx;
+            last_index = best_idx;
         }
-        score /= static_cast<float>(count) + 1e-6f;
-        if (count == 0 || std::isnan(score)) {
+
+        if (count > 0) {
+            score /= static_cast<float>(count);
+        }
+        else {
+            score = 0.f;
+        }
+
+        if (std::isnan(score)) {
             score = 0.f;
         }
         return true;
@@ -84,7 +97,8 @@ namespace modeldeploy::vision::ocr {
     bool RecognizerPostprocessor::run(const std::vector<Tensor>& tensors,
                                       std::vector<std::string>* texts,
                                       std::vector<float>* rec_scores,
-                                      const size_t start_index, const size_t total_size,
+                                      const size_t start_index,
+                                      const size_t total_size,
                                       const std::vector<int>& indices) const {
         if (!initialized_) {
             MD_LOG_ERROR << "Postprocessor is not initialized." << std::endl;
@@ -94,10 +108,11 @@ namespace modeldeploy::vision::ocr {
         // Recognizer have only 1 output tensor.
         const Tensor& tensor = tensors[0];
         // For Recognizer, the output tensor shape = [batch, ?, 6625]
-        const size_t batch = tensor.shape()[0];
-        const size_t length = accumulate(tensor.shape().begin() + 1,
-                                         tensor.shape().end(), 1,
-                                         std::multiplies());
+        const auto& shape = tensor.shape();
+        const int batch = shape[0];
+        const int time_steps = shape[1];
+        const int num_classes = shape[2];
+        const int stride = time_steps * num_classes;
 
         if (batch <= 0) {
             MD_LOG_ERROR << "The infer outputTensor.shape[0] <=0, wrong infer result." << std::endl;
@@ -108,12 +123,12 @@ namespace modeldeploy::vision::ocr {
                 "<= start_index < total_size" << std::endl;
             return false;
         }
-        if (start_index + batch > total_size) {
-            MD_LOG_ERROR <<
-                "start_index or total_size error. Correct is: start_index + "
-                "batch(outputTensor.shape[0]) <= total_size" << std::endl;
-            return false;
-        }
+        // if (start_index + batch > total_size) {
+        //     MD_LOG_ERROR <<
+        //         "start_index or total_size error. Correct is: start_index + "
+        //         "batch(outputTensor.shape[0]) <= total_size" << std::endl;
+        //     return false;
+        // }
         texts->resize(total_size);
         rec_scores->resize(total_size);
 
@@ -123,8 +138,8 @@ namespace modeldeploy::vision::ocr {
             if (!indices.empty()) {
                 real_index = indices[i_batch + start_index];
             }
-            if (!single_batch_postprocessor(tensor_data + i_batch * length,
-                                            tensor.shape(), &texts->at(real_index),
+            if (!single_batch_postprocessor(tensor_data + i_batch * stride,
+                                            shape, &texts->at(real_index),
                                             &rec_scores->at(real_index))) {
                 return false;
             }

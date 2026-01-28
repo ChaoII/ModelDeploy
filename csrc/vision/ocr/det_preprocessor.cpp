@@ -80,12 +80,7 @@ namespace modeldeploy::vision::ocr {
             // resize 到指定的32倍数的尺寸，然后pad到max_size,fuse_resize_and_pad和letterbox差别很大
             preprocess(image, &tensors[i], {batch_info_[i][2], batch_info_[i][3]}, {max_resize_w, max_resize_h});
         }
-        if (tensors.size() == 1) {
-            (*outputs)[0] = std::move(tensors[0]);
-        }
-        else {
-            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
-        }
+        (*outputs)[0] = tensors.size() > 1 ? std::move(Tensor::concat(tensors, 0)) : std::move(tensors[0]);
         return true;
     }
 }

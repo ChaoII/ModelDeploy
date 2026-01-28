@@ -10,14 +10,14 @@
 
 namespace modeldeploy::vision::ocr {
     bool DBDetectorPostprocessor::single_batch_postprocessor(
-        const float* prob, const int w, const int h,
+        const float* prob, const int h, const int w,
         const std::array<int, 4>& det_img_info,
         std::vector<std::array<int, 8>>* boxes_result) const {
-        const cv::Mat prob_map(w, h, CV_32F, const_cast<float*>(prob));
+        const cv::Mat prob_map(h, w, CV_32F, const_cast<float*>(prob));
         thread_local cv::Mat bin_map;
-        bin_map.create(w, h, CV_8UC1);
+        bin_map.create(h, w, CV_8UC1);
         // threshold
-        for (int i = 0; i < h * w; ++i) {
+        for (int i = 0; i < w * h; ++i) {
             bin_map.data[i] = prob[i] > det_db_thresh_ ? 255 : 0;
         }
         if (use_dilation_) {
