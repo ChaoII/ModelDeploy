@@ -56,8 +56,8 @@ namespace modeldeploy::vision::ocr {
         auto tensor_data = static_cast<const float*>(tensor.data());
         results->resize(batch);
         for (int i_batch = 0; i_batch < batch; ++i_batch) {
-            tensor_data = tensor_data + i_batch * db_out_length;
-            single_batch_postprocessor(tensor_data, dim2, dim3,
+            const float* prob = tensor_data + i_batch * db_out_length;
+            single_batch_postprocessor(prob, dim2, dim3,
                                        batch_img_info[i_batch],
                                        &results->at(i_batch));
         }
