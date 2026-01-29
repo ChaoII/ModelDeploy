@@ -10,8 +10,8 @@
 
 namespace modeldeploy::vision {
     bool fusion_resize_pad_normalize_permute_cpu(
-        const ImageData& image, Tensor* output,
-        const std::vector<int>& resize_size,
+        const std::vector<ImageData>&, Tensor* output,
+        const std::vector<std::array<int, 2>>& resize_sizes,
         const std::vector<int>& dst_size,
         const std::vector<float>& mean,
         const std::vector<float>& std,

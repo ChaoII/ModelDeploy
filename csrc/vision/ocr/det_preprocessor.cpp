@@ -25,11 +25,11 @@ namespace modeldeploy::vision::ocr {
             ratio = static_cast<float>(max_size_len) / max_wh;
         }
         // 最小图片尺寸为32
-        int resize_h = std::max(static_cast<int>(h * ratio), 32);
-        int resize_w = std::max(static_cast<int>(w * ratio), 32);
-        // 如果尺寸不是32的倍数，则取最接近的32的倍数向上取整
-        resize_h = (resize_h + 31) / 32 * 32;
-        resize_w = (resize_w + 31) / 32 * 32;
+        const float resize_h_f = std::max(h * ratio, 32.0f);
+        const float resize_w_f = std::max(w * ratio, 32.0f);
+        // 如果尺寸不是32的倍数，则取最接近的32的倍数
+        const int resize_h = std::max(static_cast<int>(std::round(resize_h_f / 32) * 32), 32);
+        const int resize_w = std::max(static_cast<int>(std::round(resize_w_f / 32) * 32), 32);
         return {w, h, resize_w, resize_h};
     }
 
@@ -41,23 +41,24 @@ namespace modeldeploy::vision::ocr {
                                             const std::vector<int>& dst_size) const {
         if (use_cuda_preproc_) {
 #ifdef WITH_GPU
-
-            return fusion_resize_pad_normalize_permute_cuda(image, output,
-                                                            resize_size,
-                                                            dst_size,
-                                                            mean_,
-                                                            std_,
-                                                            pad_value_);
+            //
+            // return fusion_resize_pad_normalize_permute_cuda(image, output,
+            //                                                 resize_size,
+            //                                                 dst_size,
+            //                                                 mean_,
+            //                                                 std_,
+            //                                                 pad_value_);
 #else
             MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
 #endif
         }
-        return fusion_resize_pad_normalize_permute_cpu(image, output,
-                                                       resize_size,
-                                                       dst_size,
-                                                       mean_,
-                                                       std_,
-                                                       pad_value_);
+        // return fusion_resize_pad_normalize_permute_cpu(image, output,
+        //                                                resize_size,
+        //                                                dst_size,
+        //                                                mean_,
+        //                                                std_,
+        //                                                pad_value_);
+        return true;
     }
 
 
@@ -66,21 +67,40 @@ namespace modeldeploy::vision::ocr {
         // 组batch找到当前batch最大的宽高组织
         const size_t batch_size = image_batch.size();
         batch_info_.resize(batch_size);
+
+        std::vector<std::array<int, 2>> resize_sizes(batch_size);
+
         int max_resize_w = 0;
         int max_resize_h = 0;
         for (size_t i = 0; i < batch_size; ++i) {
             batch_info_[i] = ocr_detector_get_info(&image_batch.at(i), max_side_len_);
             max_resize_w = std::max(max_resize_w, batch_info_[i][2]);
             max_resize_h = std::max(max_resize_h, batch_info_[i][3]);
+            resize_sizes[i] = {batch_info_[i][2], batch_info_[i][3]};
         }
         outputs->resize(1);
-        std::vector<Tensor> tensors(image_batch.size());
-        for (size_t i = 0; i < batch_size; ++i) {
-            ImageData image = image_batch.at(i);
-            // resize 到指定的32倍数的尺寸，然后pad到max_size,fuse_resize_and_pad和letterbox差别很大
-            preprocess(image, &tensors[i], {batch_info_[i][2], batch_info_[i][3]}, {max_resize_w, max_resize_h});
+
+
+        if (use_cuda_preproc_) {
+#ifdef WITH_GPU
+
+            return fusion_resize_pad_normalize_permute_cuda(image_batch, &(*outputs)[0],
+                                                            resize_sizes,
+                                                            {max_resize_w, max_resize_h},
+                                                            mean_,
+                                                            std_,
+                                                            pad_value_);
+#else
+            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
+#endif
         }
-        (*outputs)[0] = tensors.size() > 1 ? std::move(Tensor::concat(tensors, 0)) : std::move(tensors[0]);
-        return true;
+
+
+        return fusion_resize_pad_normalize_permute_cpu(image_batch, &(*outputs)[0],
+                                                       resize_sizes,
+                                                       {max_resize_w, max_resize_h},
+                                                       mean_,
+                                                       std_,
+                                                       pad_value_);
     }
 }
