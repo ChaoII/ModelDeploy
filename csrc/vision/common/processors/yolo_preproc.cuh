@@ -12,6 +12,6 @@ namespace modeldeploy::vision {
     bool yolo_preprocess_cuda(const ImageData& image,
                               Tensor* output,
                               const std::vector<int>& dst_size,
-                              const std::vector<float>& pad_val,
+                              float pad_val,
                               LetterBoxRecord* letter_box_record);
 }

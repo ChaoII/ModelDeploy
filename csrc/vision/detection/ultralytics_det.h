@@ -16,12 +16,12 @@ namespace modeldeploy::vision::detection {
 
         [[nodiscard]] std::string name() const override { return "UltralyticsDet"; }
 
-        virtual bool predict(const ImageData& image, std::vector<DetectionResult>* result,
-                             TimerArray* timers = nullptr);
+        bool predict(const ImageData& image, std::vector<DetectionResult>* result,
+                     TimerArray* timers = nullptr);
 
-        virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<std::vector<DetectionResult>>* results,
-                                   TimerArray* timers = nullptr);
+        bool batch_predict(const std::vector<ImageData>& images,
+                           std::vector<std::vector<DetectionResult>>* results,
+                           TimerArray* timers = nullptr);
 
         [[nodiscard]] std::unique_ptr<UltralyticsDet> clone() const;
 
