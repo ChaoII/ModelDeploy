@@ -11,7 +11,6 @@ __global__ void kernel_yolo_preproc(
     const uint8_t* __restrict__ src,
     const int src_h,
     const int src_w,
-    const int src_step,
     float* __restrict__ dst,
     const int dst_h,
     const int dst_w,
@@ -19,8 +18,8 @@ __global__ void kernel_yolo_preproc(
     const float pad_w,
     const float pad_h,
     const float pad_value) {
-    const int x = blockIdx.x * blockDim.x + threadIdx.x;
-    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     // 边界检查，并不一定线程数和像素的数量一致，有可能线程数量大于输出的像素数量
     if (x >= dst_w || y >= dst_h) return;
 
@@ -50,7 +49,7 @@ __global__ void kernel_yolo_preproc(
         // [B0B1B2B3B4B5B6B7B8B9...]
         // [G0G1G2G3G4G5G6G7G8G9...]
         // [R0R1R2R3R4R5R6R7R8R9...]
-        const int src_idx = src_y * src_step + src_x * 3;
+        const int src_idx = (src_y * src_w + src_x) * 3;
         const float b = src[src_idx + 0];
         const float g = src[src_idx + 1];
         const float r = src[src_idx + 2];
@@ -78,16 +77,15 @@ namespace modeldeploy::vision {
         const ImageData& image,
         Tensor* output,
         const std::vector<int>& dst_size,
-        const std::vector<float>& pad_val,
+        const float pad_val,
         LetterBoxRecord* letter_box_record) {
-        if (!output || dst_size.size() != 2 || pad_val.empty()) {
+        if (!output || dst_size.size() != 2) {
             return false;
         }
         const int src_h = image.height();
         const int src_w = image.width();
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
-        const float pad_value = pad_val[0];
 
         // 1 output: GPU, FP32, CHW
         output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
@@ -127,14 +125,13 @@ namespace modeldeploy::vision {
             d_src,
             src_h,
             src_w,
-            src_w * 3,
             output->data_ptr<float>(),
             dst_h,
             dst_w,
             letter_box_record->scale,
             letter_box_record->pad_w,
             letter_box_record->pad_h,
-            pad_value);
+            pad_val);
         const cudaError_t err = cudaGetLastError();
         cudaStreamSynchronize(stream);
         cudaStreamDestroy(stream);

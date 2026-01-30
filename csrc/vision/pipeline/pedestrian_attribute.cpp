@@ -97,7 +97,7 @@ namespace modeldeploy::vision::pipeline {
             timers->post_timer.push_back(0);
             timers->infer_timer.start();
         }
-        if (!detector_->batch_predict(images, &batch_detection_results)) {
+        if (!detector_->batch_predict(images, &batch_detection_results, nullptr)) {
             MD_LOG_ERROR << "There's error while detecting image in PedestrianAttribute." << std::endl;
             return false;
         }

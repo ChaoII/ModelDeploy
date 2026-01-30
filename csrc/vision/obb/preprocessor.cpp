@@ -13,7 +13,7 @@
 namespace modeldeploy::vision::detection {
     UltralyticsObbPreprocessor::UltralyticsObbPreprocessor() {
         size_ = {640, 640};
-        padding_value_ = {114.0, 114.0, 114.0};
+        padding_value_ = 114.0f;
     }
 
     bool UltralyticsObbPreprocessor::preprocess(const ImageData& image, Tensor* output,
