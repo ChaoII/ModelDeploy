@@ -169,9 +169,7 @@ if (BUILD_CAPI)
     list(APPEND ALL_SOURCE ${CAPI_SOURCE})
 endif ()
 
-add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE}
-        csrc/vision/yolo_base.h
-        csrc/vision/yolo_base.cpp)
+add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
 set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 if (MSVC)
