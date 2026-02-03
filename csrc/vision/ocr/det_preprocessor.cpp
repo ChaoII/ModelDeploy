@@ -2,12 +2,13 @@
 // Created by aichao on 2025/2/21.
 //
 
+#include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/ocr/det_preprocessor.h"
 #ifdef WITH_GPU
 #include "vision/common/processors/fusion_resize_pad_normalize_permute.cuh"
 #endif
-#include <vision/common/processors/fusion_resize_pad_normalize_permute.h>
+#include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
 #include "vision/ocr/utils/ocr_utils.h"
 #include "vision/common/processors/resize.h"
 
