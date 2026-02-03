@@ -14,13 +14,19 @@
 namespace modeldeploy::vision::utils {
     MODELDEPLOY_CXX_EXPORT bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, bool is_copy = true);
 
+    bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
+
     bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor);
 
-    bool image_data_to_tensor(ImageData& image, Tensor* tensor, bool is_copy);
+    // bool image_data_to_tensor(ImageData& image, Tensor* tensor, bool is_copy);
 
-    cv::Mat image_data_to_mat(ImageData& image);
+    // cv::Mat image_data_to_mat(ImageData& image);
+
+    LetterBoxRecord cal_letter_box_param(const std::vector<int>& src_size, const std::vector<int>& dst_size);
 
     DataType cv_dtype_to_md_dtype(int type);
+
+    DataType md_image_dtype_to_md_dtype(MdImageType type);
 
     cv::Point2f point2f_to_cv_type(Point2f point2f);
 
@@ -36,7 +42,6 @@ namespace modeldeploy::vision::utils {
 
     MODELDEPLOY_CXX_EXPORT void sorted_det_results(std::vector<DetectionResult>& results);
 
-    bool mats_to_tensor(const std::vector<cv::Mat>& mats, Tensor* tensor);
 
     void obb_nms(std::vector<ObbResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
@@ -71,11 +76,6 @@ namespace modeldeploy::vision::utils {
 
 
     MODELDEPLOY_CXX_EXPORT std::vector<float> l2_normalize(const std::vector<float>& values);
-
-    template <typename T>
-    T clamp(T val, T min_val, T max_val) {
-        return std::min(std::max(val, min_val), max_val);
-    }
 
     std::array<float, 8> xcycwha_to_x1y1x2y2x3y3x4y4(float xc, float yc, float w, float h, float angle_rad);
     std::array<float, 5> x1y1x2y2x3y3x4y4_to_xcycwha(const std::array<float, 8>& pts);

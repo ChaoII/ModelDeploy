@@ -30,18 +30,21 @@ namespace modeldeploy::vision::ocr {
         *
         * \param[in] img The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
         * \param[in] boxes_result The output of OCR detection model result will be writen to this structure.
+        * \param timers
         * \return true if the prediction is successed, otherwise false.
         */
         virtual bool predict(const ImageData& img,
-                             std::vector<std::array<int, 8>>* boxes_result);
+                             std::vector<std::array<int, 8>>* boxes_result,
+                             TimerArray* timers = nullptr);
 
         /** \brief Predict the input image and get OCR detection model result.
          *
          * \param[in] img The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] ocr_result The output of OCR detection model result will be writen to this structure.
+         * \param timers
          * \return true if the prediction is successes, otherwise false.
          */
-        virtual bool predict(const ImageData& img, OCRResult* ocr_result);
+        virtual bool predict(const ImageData& img, OCRResult* ocr_result, TimerArray* timers = nullptr);
 
         /** \brief BatchPredict the input image and get OCR detection model result.
         *
@@ -50,16 +53,19 @@ namespace modeldeploy::vision::ocr {
         * \return true if the prediction is successed, otherwise false.
         */
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<std::vector<std::array<int, 8>>>* det_results);
+                                   std::vector<std::vector<std::array<int, 8>>>* det_results,
+                                   TimerArray* timers = nullptr);
 
         /** \brief BatchPredict the input image and get OCR detection model result.
          *
          * \param[in] images The list input of image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] ocr_results The output of OCR detection model result will be writen to this structure.
+         * \param timers
          * \return true if the prediction is successed, otherwise false.
          */
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<vision::OCRResult>* ocr_results);
+                                   std::vector<vision::OCRResult>* ocr_results,
+                                   TimerArray* timers = nullptr);
 
         /// Get preprocessor reference of DBDetectorPreprocessor
         virtual DBDetectorPreprocessor& get_preprocessor() {

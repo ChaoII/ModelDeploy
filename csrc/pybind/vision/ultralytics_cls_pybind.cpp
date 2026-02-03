@@ -16,7 +16,7 @@ namespace modeldeploy::vision {
                      images.reserve(im_list.size());
                      for (auto& image : im_list) {
                          auto cv_image = pyarray_to_cv_mat(image);
-                         images.push_back(ImageData::from_mat(&cv_image));
+                         images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<Tensor> outputs;
                      if (!self.run(&images, &outputs)) {
@@ -65,7 +65,7 @@ namespace modeldeploy::vision {
                  [](classification::Classification& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      ClassifyResult result;
-                     self.predict(ImageData::from_mat(&mat), &result);
+                     self.predict(ImageData(std::move(mat)), &result);
                      return result;
                  }, pybind11::arg("image"))
             .def("batch_predict",
@@ -75,7 +75,7 @@ namespace modeldeploy::vision {
                      _images.reserve(images.size());
                      for (auto& image : images) {
                          auto cv_image = pyarray_to_cv_mat(image);
-                         _images.push_back(ImageData::from_mat(&cv_image));
+                         _images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<ClassifyResult> results;
                      self.batch_predict(_images, &results);

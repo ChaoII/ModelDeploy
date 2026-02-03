@@ -14,7 +14,7 @@ int main() {
     cls_model.get_preprocessor().set_size({192, 256});
     cls_model.get_preprocessor().disable_center_crop();
     cls_model.get_postprocessor().set_multi_label(true);
-    auto img = modeldeploy::ImageData::imread("../../test_data/test_images/test_face.jpg");
+    auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face.jpg");
     modeldeploy::vision::ClassifyResult results;
     cls_model.predict(img, &results);
     const auto vis_img = modeldeploy::vision::vis_cls(img, results, 1, 0.5,

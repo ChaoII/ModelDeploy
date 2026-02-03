@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.20)
 project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 17)
 
-
 set(LIBRARY_NAME "ModelDeploySDK")
 set(SOURCE "")
 set(DEPENDS "")
@@ -170,7 +169,9 @@ if (BUILD_CAPI)
     list(APPEND ALL_SOURCE ${CAPI_SOURCE})
 endif ()
 
-add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
+add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE}
+        csrc/vision/yolo_base.h
+        csrc/vision/yolo_base.cpp)
 set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
 if (MSVC)
@@ -191,7 +192,6 @@ elseif (APPLE)
             BUILD_RPATH "@loader_path"
     )
 endif ()
-
 
 if (BUILD_PYTHON)
     find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)

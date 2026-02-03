@@ -4,8 +4,6 @@
 #pragma once
 
 #include "opencv2/opencv.hpp"
-
-
 #include "csrc/vision/common/image_data.h"
 #include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
@@ -21,8 +19,19 @@
 /// 通过将MDImage对象转换为OpenCV的Mat对象，使得用户可以利用OpenCV丰富的图像处理功能
 /// 对MDImage对象进行操作此函数确保了不同图像处理库之间的兼容性，提高了代码的灵活性和可用性
 ///
-modeldeploy::ImageData md_image_to_image_data(const MDImage* image);
+modeldeploy::vision::ImageData md_image_to_image_data(const MDImage* image);
 
+///
+/// 将OpenCV的Mat对象转换为MDImage对象。
+///
+/// @param image 输入的OpenCV Mat对象，包含图像数据。
+/// @return 返回一个MDImage对象，表示转换后的图像。
+///
+/// 此函数的目的是在OpenCV图像处理库和MDImage图像表示之间提供一个接口，
+/// 允许在不同图像处理场景下互操作。通过封装Mat对象到MDImage中，可以更容易地
+/// 在基于MDImage的框架或应用程序中利用OpenCV的功能。
+///
+MDImage image_data_to_md_image(const modeldeploy::vision::ImageData& image);
 
 std::unordered_map<int, std::string> md_map_to_map(MDMapData* c_map);
 
@@ -30,17 +39,6 @@ MDMapData map_to_md_map(const std::unordered_map<int, std::string>& map);
 
 cv::Mat md_image_to_mat(const MDImage* image);
 
-///
-/// 将OpenCV的Mat对象转换为MDImage对象。
-///
-/// @param mat 输入的OpenCV Mat对象，包含图像数据。
-/// @return 返回一个MDImage对象，表示转换后的图像。
-///
-/// 此函数的目的是在OpenCV图像处理库和MDImage图像表示之间提供一个接口，
-/// 允许在不同图像处理场景下互操作。通过封装Mat对象到MDImage中，可以更容易地
-/// 在基于MDImage的框架或应用程序中利用OpenCV的功能。
-///
-MDImage* image_data_to_md_image(const modeldeploy::ImageData& mat);
 
 MDImage* mat_to_md_image(const cv::Mat& mat);
 

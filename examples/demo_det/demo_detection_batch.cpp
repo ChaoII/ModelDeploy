@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 void predict(modeldeploy::vision::detection::UltralyticsDet* model, const int thread_id,
              const std::vector<std::string>& images) {
     for (auto const& image_file : images) {
-        auto im = modeldeploy::ImageData::imread(image_file);
+        auto im = modeldeploy::vision::ImageData::imread(image_file);
         std::vector<modeldeploy::vision::DetectionResult> res;
         if (!model->predict(im, &res)) {
             std::cerr << "Failed to predict." << std::endl;
@@ -53,11 +53,11 @@ std::vector<std::vector<std::string>> get_image_list(const std::string& image_di
     return image_list;
 }
 
-std::vector<modeldeploy::ImageData> get_images(const std::vector<std::string>& images_strs) {
-    std::vector<modeldeploy::ImageData> images;
+std::vector<modeldeploy::vision::ImageData> get_images(const std::vector<std::string>& images_strs) {
+    std::vector<modeldeploy::vision::ImageData> images;
     images.reserve(images_strs.size());
     for (auto& images_str : images_strs) {
-        images.push_back(modeldeploy::ImageData::imread(images_str));
+        images.push_back(modeldeploy::vision::ImageData::imread(images_str));
     }
     return images;
 }

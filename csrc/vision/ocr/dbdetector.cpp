@@ -27,26 +27,28 @@ namespace modeldeploy::vision::ocr {
 
 
     bool DBDetector::predict(const ImageData& img,
-                             std::vector<std::array<int, 8>>* boxes_result) {
+                             std::vector<std::array<int, 8>>* boxes_result,
+                             TimerArray* timers) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
-        if (!batch_predict({img}, &det_results)) {
+        if (!batch_predict({img}, &det_results, timers)) {
             return false;
         }
         *boxes_result = std::move(det_results[0]);
         return true;
     }
 
-    bool DBDetector::predict(const ImageData& img, OCRResult* ocr_result) {
-        if (!predict(img, &ocr_result->boxes)) {
+    bool DBDetector::predict(const ImageData& img, OCRResult* ocr_result, TimerArray* timers) {
+        if (!predict(img, &ocr_result->boxes, timers)) {
             return false;
         }
         return true;
     }
 
     bool DBDetector::batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<OCRResult>* ocr_results) {
+                                   std::vector<OCRResult>* ocr_results,
+                                   TimerArray* timers) {
         std::vector<std::vector<std::array<int, 8>>> det_results;
-        if (!batch_predict(images, &det_results)) {
+        if (!batch_predict(images, &det_results, timers)) {
             return false;
         }
         ocr_results->resize(det_results.size());
@@ -58,12 +60,16 @@ namespace modeldeploy::vision::ocr {
 
     bool DBDetector::batch_predict(
         const std::vector<ImageData>& images,
-        std::vector<std::vector<std::array<int, 8>>>* det_results) {
-        std::vector<ImageData> _images = images;
-        if (!preprocessor_.apply(&_images, &reused_input_tensors_)) {
+        std::vector<std::vector<std::array<int, 8>>>* det_results,
+        TimerArray* timers) {
+        if (timers) timers->pre_timer.start();
+        if (!preprocessor_.apply(images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
             return false;
         }
+        if (timers) timers->pre_timer.stop();
+        if (timers) timers->infer_timer.start();
+
         const auto batch_det_img_info = preprocessor_.get_batch_img_info();
         reused_input_tensors_[0].set_name(get_input_info(0).name);
 
@@ -71,11 +77,14 @@ namespace modeldeploy::vision::ocr {
             MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
             return false;
         }
-        if (!postprocessor_.apply(reused_output_tensors_,
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
+        if (!postprocessor_.run(reused_output_tensors_,
                                   det_results, *batch_det_img_info)) {
             MD_LOG_ERROR << "Failed to postprocess the inference cls_results by runtime." << std::endl;
             return false;
         }
+        if (timers) timers->post_timer.stop();
         return true;
     }
 }

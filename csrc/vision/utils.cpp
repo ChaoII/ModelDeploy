@@ -10,6 +10,20 @@
 #include "vision/common/processors/resize.h"
 
 namespace modeldeploy::vision::utils {
+    LetterBoxRecord cal_letter_box_param(const std::vector<int>& src_size, const std::vector<int>& dst_size) {
+        const float src_w = static_cast<float>(src_size[0]);
+        const float src_h = static_cast<float>(src_size[1]);
+        const float dst_w = static_cast<float>(dst_size[0]);
+        const float dst_h = static_cast<float>(dst_size[1]);
+        const float scale = std::min(dst_h / src_h, dst_w / src_w);
+        const float resize_w = src_w * scale;
+        const float resize_h = src_h * scale;
+        const float pad_w = (dst_w - resize_w) * 0.5f;
+        const float pad_h = (dst_h - resize_h) * 0.5f;
+        return {src_w, src_h, dst_w, dst_h, pad_w, pad_h, scale};
+    }
+
+
     DataType cv_dtype_to_md_dtype(int type) {
         type = type % 8;
         if (type == 0) {
@@ -38,6 +52,96 @@ namespace modeldeploy::vision::utils {
         return DataType::UNKNOWN;
     }
 
+    DataType md_image_dtype_to_md_dtype(MdImageType type) {
+        if (type == MdImageType::GRAY_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_BGR_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_RGB_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PLA_BGR_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PLA_RGB_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PLA_BGRA_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PLA_RGBA_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PLA_BGR_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PLA_RGB_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PLA_BGRA_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PLA_RGBA_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_BGRA_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_RGBA_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_BGRA_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_RGBA_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_BGR565_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::PKG_RGB565_U8) {
+            return DataType::UINT8;
+        }
+        else if (type == MdImageType::GRAY_S32) {
+            return DataType::INT32;
+        }
+        else if (type == MdImageType::GRAY_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_BGR_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_RGB_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_BGR_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_RGB_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_BGRA_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_RGBA_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_BGRA_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::PKG_RGBA_F32) {
+            return DataType::FP32;
+        }
+        else if (type == MdImageType::GRAY_F64) {
+            return DataType::FP64;
+        }
+        MD_LOG_ERROR << "While calling md_image_dtype_to_md_dtype(), get unexpected type:" <<
+            md_image_type_to_string(type);
+        return DataType::UNKNOWN;
+    }
+
     cv::Point2f point2f_to_cv_type(const Point2f point2f) {
         return cv::Point2f{point2f.x, point2f.y};
     }
@@ -60,13 +164,13 @@ namespace modeldeploy::vision::utils {
 
     bool image_data_to_tensor(const ImageData* image_data, Tensor* tensor) {
         cv::Mat mat;
-        image_data->to_mat(&mat);
+        image_data->to_mat(mat);
         return mat_to_tensor(mat, tensor);
     }
 
-    cv::Mat image_data_to_mat(ImageData& image) {
-        return {image.height(), image.width(), image.type(), image.data()};
-    }
+    // cv::Mat image_data_to_mat(ImageData& image) {
+    //     return {image.height(), image.width(), image.type(), image.data()};
+    // }
 
     bool mat_to_tensor(cv::Mat& mat, Tensor* tensor, const bool is_copy) {
         const auto dtype = cv_dtype_to_md_dtype(mat.type());
@@ -91,7 +195,7 @@ namespace modeldeploy::vision::utils {
     }
 
     bool image_data_to_tensor(ImageData& image, Tensor* tensor, const bool is_copy) {
-        const auto dtype = cv_dtype_to_md_dtype(image.type());
+        const auto dtype = md_image_dtype_to_md_dtype(image.type());
         if (is_copy) {
             const size_t num_bytes = image.height() * image.width() * image.channels() *
                 Tensor::get_element_size(dtype);
@@ -341,13 +445,13 @@ namespace modeldeploy::vision::utils {
             return image; // 或者抛出异常
         }
         cv::Mat cv_image;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         // 计算裁剪区域的起始坐标
         const int top = (img_height - crop_height) / 2;
         const int left = (img_width - crop_width) / 2;
         // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clone()操作
         const cv::Mat cropped_image = cv_image(cv::Rect(left, top, crop_width, crop_height)).clone();
-        return ImageData::from_mat(&cropped_image);
+        return ImageData(std::move(cropped_image));
     }
 
     void print_mat_type(const cv::Mat& mat) {

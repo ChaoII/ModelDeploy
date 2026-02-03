@@ -2,6 +2,7 @@
 // Created by aichao on 2025/06/2.
 //
 
+#include <opencv2/opencv.hpp>
 
 #include "core/md_log.h"
 #include "vision/pose/ultralytics_pose.h"
@@ -33,9 +34,8 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsPose::batch_predict(const std::vector<ImageData>& images,
                                         std::vector<std::vector<KeyPointsResult>>* results, TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
-        std::vector<ImageData> _images = images;
         if (timers) timers->pre_timer.start();
-        if (!preprocessor_.run(&_images, &reused_input_tensors_, &letter_box_records)) {
+        if (!preprocessor_.run(images, &reused_input_tensors_, &letter_box_records)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }

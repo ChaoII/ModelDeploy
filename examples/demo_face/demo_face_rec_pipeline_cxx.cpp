@@ -21,7 +21,7 @@ int main() {
     auto model = modeldeploy::vision::face::FaceRecognizerPipeline(
         "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx",
         "../../test_data/test_models/face/face_recognizer.onnx", option);
-    const auto im = modeldeploy::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");
+    const auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");
     auto im_bak = im.clone();
     TimerArray timers;
     constexpr int loop_count = 50;

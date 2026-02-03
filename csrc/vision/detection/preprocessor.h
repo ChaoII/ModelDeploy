@@ -14,7 +14,7 @@ namespace modeldeploy::vision::detection {
     public:
         UltralyticsPreprocessor();
 
-        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
+        bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
         void set_size(const std::vector<int>& size) { size_ = size; }
@@ -30,7 +30,7 @@ namespace modeldeploy::vision::detection {
         [[nodiscard]] std::vector<float> get_padding_value() const { return padding_value_; }
 
     protected:
-        bool preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
+        bool preprocess(const ImageData& image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
         bool use_cuda_preproc_ = false;
         std::vector<int> size_;

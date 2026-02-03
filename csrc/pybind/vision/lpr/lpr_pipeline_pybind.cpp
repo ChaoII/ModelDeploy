@@ -12,7 +12,7 @@ namespace modeldeploy::vision {
             .def("predict", [](lpr::LprPipeline& self, const pybind11::array& image) {
                 const auto cv_image = pyarray_to_cv_mat(image);
                 std::vector<LprResult> results;
-                self.predict(ImageData::from_mat(&cv_image), &results);
+                self.predict(ImageData(std::move(cv_image)), &results);
                 return results;
             }, pybind11::arg("image"));
     }

@@ -104,7 +104,7 @@ namespace modeldeploy::vision::face {
 
     float clarity_estimate(const ImageData& image) {
         cv::Mat cv_image;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         if (!cv_image.data || cv_image.cols < 9 || cv_image.rows < 9) return 0.0;
         cv::Mat gray_image;
         cv::cvtColor(cv_image, gray_image, cv::COLOR_BGR2GRAY);

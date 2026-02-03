@@ -8,7 +8,7 @@
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceAsFirst(
         "../../test_data/test_models/face/fas_first.onnx");
-    auto im0 = modeldeploy::ImageData::imread("../../test_data/test_images/test_face_id4.jpg");
+    auto im0 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_id4.jpg");
     float result;
     if (!faceid_model.predict(im0, &result)) {
         std::cerr << "Failed to predict." << std::endl;

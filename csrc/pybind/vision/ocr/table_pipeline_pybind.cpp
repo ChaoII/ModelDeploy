@@ -41,7 +41,7 @@ namespace modeldeploy::vision {
                  [](ocr::PPStructureV2Table& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      OCRResult result;
-                     self.predict(ImageData::from_mat(&mat), &result);
+                     self.predict(ImageData(std::move(mat)), &result);
                      return result;
                  }, pybind11::arg("image"))
 
@@ -50,7 +50,7 @@ namespace modeldeploy::vision {
                      std::vector<ImageData> _images;
                      for (auto& image : images) {
                          auto cv_image = pyarray_to_cv_mat(image);
-                         _images.push_back(ImageData::from_mat(&cv_image));
+                         _images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<OCRResult> results;
                      self.batch_predict(_images, &results);

@@ -18,28 +18,28 @@ namespace modeldeploy::vision::ocr {
     ClassifierPreprocessor::ClassifierPreprocessor() {
     }
 
-    bool ClassifierPreprocessor::run(const std::vector<ImageData>* images,
+    bool ClassifierPreprocessor::run(const std::vector<ImageData>& images,
                                      std::vector<Tensor>* outputs,
                                      const size_t start_index, const size_t end_index) {
-        if (static_cast<int>(images->size()) == 0 || end_index <= start_index ||
-            end_index > images->size()) {
+        if (static_cast<int>(images.size()) == 0 || end_index <= start_index ||
+            end_index > images.size()) {
             MD_LOG_ERROR << "images->size() or index error. Correct is: 0 <= start_index < "
                 "end_index <= images->size()" << std::endl;
             return false;
         }
         std::vector<ImageData> mats(end_index - start_index);
         for (size_t i = start_index; i < end_index; ++i) {
-            mats[i - start_index] = images->at(i);
+            mats[i - start_index] = images.at(i);
         }
-        return apply(&mats, outputs);
+        return apply(mats, outputs);
     }
 
-    bool ClassifierPreprocessor::apply(std::vector<ImageData>* image_batch,
+    bool ClassifierPreprocessor::apply(const std::vector<ImageData>& image_batch,
                                        std::vector<Tensor>* outputs) {
         std::vector<cv::Mat> _images;
-        for (auto& image : *image_batch) {
+        for (auto& image : image_batch) {
             cv::Mat mat;
-            image.to_mat(&mat);
+            image.to_mat(mat);
             const int img_h = cls_image_shape_[1];
             const int img_w = cls_image_shape_[2];
             const float ratio = static_cast<float>(mat.cols) / static_cast<float>(mat.rows);

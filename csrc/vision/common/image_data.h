@@ -4,65 +4,108 @@
 
 #pragma once
 
-
 #include <memory>
 #include <vector>
 #include <cstdint>
 #include <string>
-#include "core/md_decl.h"
 #include "core/tensor.h"
 #include "vision/common/struct.h"
+#include "vision/common/basic_types.h"
+
 
 namespace cv {
     class Mat;
 }
 
-namespace modeldeploy {
-    class ImageDataImpl; // 前置声明
-
+namespace modeldeploy::vision {
+    class ImageDataImpl;
 
     class MODELDEPLOY_CXX_EXPORT ImageData {
     public:
-        ImageData();
-        ImageData(int width, int height, int channels, int type);
-        ImageData(const ImageData& other);
-        explicit ImageData(const cv::Mat* mat);
-        ImageData& operator=(const ImageData& other);
-        ~ImageData();
+        ImageData() = default;
+        ImageData(int width, int height, MdImageType type);
+        explicit ImageData(const cv::Mat& mat);
+        explicit ImageData(cv::Mat&& mat);
+
+        // 全部是浅拷贝
+        ImageData(const ImageData& other) = default;
+        ImageData& operator=(const ImageData& other) = default;
+        ImageData(ImageData&& other) noexcept = default;
+        ImageData& operator=(ImageData&& other) noexcept = default;
+
+        ~ImageData() = default;
 
         [[nodiscard]] int width() const;
         [[nodiscard]] int height() const;
         [[nodiscard]] int channels() const;
-        [[nodiscard]] int type() const;
-        [[nodiscard]] size_t data_size() const;
+        [[nodiscard]] MdImageType type() const;
+        [[nodiscard]] size_t element_count() const;
+        [[nodiscard]] size_t element_bytes() const;
+        [[nodiscard]] size_t bytes() const;
         [[nodiscard]] const uint8_t* data() const;
-        uint8_t* data();
-
-        ImageData crop(const vision::Rect2f& rect) const;
-
-        void to_tensor(Tensor* tensor) const;
-
-        void letter_box(const std::vector<int>& size,
-                        const std::vector<float>& padding_value,
-                        vision::LetterBoxRecord* letter_box_record) const;
-
-        void convert_and_permute(const std::vector<float>& alpha, const std::vector<float>& beta,
-                                 bool swap_rb = true) const;
-
+        [[nodiscard]] uint8_t* data();
         [[nodiscard]] bool empty() const;
 
+
+        [[nodiscard]] bool is_shared_with(const ImageData& other) const;
+
         [[nodiscard]] ImageData clone() const;
-        static ImageData from_raw(const unsigned char* data, int width, int height, int channels);
-        static ImageData from_raw_nocopy(unsigned char* data, int width, int height, int channels);
-        static ImageData from_mat(const cv::Mat* mat_ptr); // mat为cv::Mat*
-        void update_from_mat(const cv::Mat* mat_ptr, bool is_copy = false);
-        void to_mat(cv::Mat* mat_ptr, bool is_copy = false) const; // mat为cv::Mat*
-        static void images_to_mats(const std::vector<ImageData>& images, const std::vector<cv::Mat*>& mats);
+        static ImageData cvt_color(const ImageData& image, ColorConvertType type);
+        // Caller must guarantee data lifetime >= ImageData lifetime
+        static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false);
+        static void images_to_tensor(std::vector<ImageData> images, Tensor* tensor);
+        void to_mat(cv::Mat& mat, bool copy = false) const;
+        void to_tensor(Tensor* tensor, bool copy = false);
         static ImageData imread(const std::string& filename);
         [[nodiscard]] bool imwrite(const std::string& filename) const;
         void imshow(const std::string& win_name) const;
 
+        // 预处理相关
+        ImageData& rotate(RotateFlags flag);
+        [[nodiscard]] ImageData crop(const Rect2f& rect) const;
+        [[nodiscard]] ImageData rotate_crop(std::array<float, 8> box) const;
+        [[nodiscard]] ImageData resize(int width, int height) const;
+        [[nodiscard]] ImageData cast(const std::string& dtype = "float", bool scale = true) const;
+        [[nodiscard]] ImageData pad(int top, int bottom, int left, int right, float value) const;
+        [[nodiscard]] ImageData convert(const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
+                                        const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
+        [[nodiscard]] ImageData normalize(const std::vector<float>& mean, const std::vector<float>& std,
+                                          bool scale = true, bool swap_rb = true) const;
+        //         目标尺寸 (dst)
+        //   +---------------------------+
+        //   |   +-------------------+   |
+        //   |   |                   |   |
+        //   |   |                   |   |
+        //   |   |     比例缩放后图    |   |
+        //   |   |                   |   |
+        //   |   |                   |   |
+        //   |   |                   |   |
+        //   |   +-------------------+   |
+        //   +---------------------------+
+        //     目标: width × height
+        [[nodiscard]] ImageData letter_box(const std::vector<int>& dst_size, float padding_value) const;
+        [[nodiscard]] ImageData center_crop(const std::vector<int>& dst_size) const;
+        [[nodiscard]] ImageData permute() const;
+        [[nodiscard]] ImageData fuse_normalize_and_permute(const std::vector<float>& mean,
+                                                           const std::vector<float>& std, bool scale = true) const;
+        [[nodiscard]] ImageData fuse_convert_and_permute(
+            const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
+            const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
+
+        //   +---------------------+---------+
+        //   |                     |         |
+        //   |  resize后的图像      |  pad_r  |
+        //   |  (width×height)     |  (右填充)|
+        //   |                     |         |
+        //   +---------------------+---------+
+        //   |                     |         |
+        //   |      pad_b          |  pad_b  |
+        //   |     (下填充)         |  pad_r  |
+        //   |                     | (右下角) |
+        //   +---------------------+---------+
+        [[nodiscard]] ImageData fuse_resize_and_pad(int width, int height, int pad_r, int pad_b, float pad_val) const;
+
     private:
-        std::shared_ptr<ImageDataImpl> impl_; // PIMPL隐藏实现
+        std::shared_ptr<ImageDataImpl> impl_;
     };
 }

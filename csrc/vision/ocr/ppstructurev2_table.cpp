@@ -6,6 +6,8 @@
 #include "core/md_log.h"
 #include "vision/ocr/utils/ocr_utils.h"
 #include "vision/ocr/ppstructurev2_table.h"
+#include <opencv2/opencv.hpp>
+
 
 namespace modeldeploy::vision::ocr {
     PPStructureV2Table::PPStructureV2Table(const std::string& det_model_file,
@@ -105,9 +107,9 @@ namespace modeldeploy::vision::ocr {
                 image_list.resize(boxes.size());
                 for (size_t i_box = 0; i_box < boxes.size(); ++i_box) {
                     cv::Mat _cv_image;
-                    img.to_mat(&_cv_image);
+                    img.to_mat(_cv_image);
                     auto crop_image = get_rotate_crop_image(_cv_image, boxes[i_box]);
-                    image_list[i_box] = ImageData::from_mat(&crop_image);
+                    image_list[i_box] = ImageData(std::move(crop_image));
                 }
             }
 

@@ -11,7 +11,7 @@ int main() {
     auto table_model = modeldeploy::vision::ocr::StructureV2Table(
         "../../test_data/test_models/ocr/SLANet_plus.onnx",
         "../../test_data/table_structure_dict_ch.txt");
-    auto im = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/stock/0001.jpg");
+    auto im = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0001.jpg");
     auto im_bak = im.clone();
     modeldeploy::vision::OCRResult result;
     if (!table_model.predict(im, &result)) {

@@ -20,7 +20,7 @@ namespace modeldeploy::vision::detection {
         * \param[in] letter_box_records The shape info list, record input_shape and output_shape
         * \return true if the preprocess successed, otherwise false
         */
-        bool run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
+        bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
@@ -30,20 +30,20 @@ namespace modeldeploy::vision::detection {
         [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
         /// Set padding value, size should be the same as channels
-        void set_padding_value(const std::vector<float>& padding_value) {
+        void set_padding_value(float padding_value) {
             padding_value_ = padding_value;
         }
 
         /// Get padding value, size should be the same as channels
-        [[nodiscard]] std::vector<float> get_padding_value() const { return padding_value_; }
+        [[nodiscard]] float get_padding_value() const { return padding_value_; }
 
         void use_cuda_preproc() { use_cuda_preproc_ = true; }
 
     protected:
-        bool preprocess(ImageData* image, Tensor* output,
+        bool preprocess(const ImageData& image, Tensor* output,
                         LetterBoxRecord* letter_box_record) const;
         bool use_cuda_preproc_ = false;
         std::vector<int> size_;
-        std::vector<float> padding_value_;
+        float padding_value_;
     };
 }

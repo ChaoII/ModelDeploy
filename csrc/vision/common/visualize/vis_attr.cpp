@@ -14,7 +14,7 @@ namespace modeldeploy::vision {
                        const double alpha, const bool save_result, const std::vector<int>& abnormal_ids,
                        const bool show_attr) {
         cv::Mat cv_image, overlay;
-        image.to_mat(&cv_image);
+        image.to_mat(cv_image);
         cv_image.copyTo(overlay);
         cv::FontFace font(font_path);
         if (abnormal_ids.size() > result.size()) {
