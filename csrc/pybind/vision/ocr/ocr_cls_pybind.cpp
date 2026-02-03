@@ -30,7 +30,7 @@ namespace modeldeploy::vision {
                          images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<Tensor> outputs;
-                     if (!self.apply(&images, &outputs)) {
+                     if (!self.apply(images, &outputs)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in ClassifierPreprocessor.");
                      }
