@@ -52,7 +52,7 @@ namespace modeldeploy::vision::ocr {
                 const auto max_w = static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
                 const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
                 int resize_w;
-                if (std::ceilf(img_h * ratio) > max_w) {
+                if (std::ceil(img_h * ratio) > max_w) {
                     resize_w = max_w;
                 }
                 else {
