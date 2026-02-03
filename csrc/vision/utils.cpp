@@ -56,85 +56,85 @@ namespace modeldeploy::vision::utils {
         if (type == MdImageType::GRAY_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_BGR_U8) {
+        if (type == MdImageType::PKG_BGR_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_RGB_U8) {
+        if (type == MdImageType::PKG_RGB_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PLA_BGR_U8) {
+        if (type == MdImageType::PLA_BGR_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PLA_RGB_U8) {
+        if (type == MdImageType::PLA_RGB_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PLA_BGRA_U8) {
+        if (type == MdImageType::PLA_BGRA_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PLA_RGBA_U8) {
+        if (type == MdImageType::PLA_RGBA_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PLA_BGR_F32) {
+        if (type == MdImageType::PLA_BGR_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PLA_RGB_F32) {
+        if (type == MdImageType::PLA_RGB_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PLA_BGRA_F32) {
+        if (type == MdImageType::PLA_BGRA_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PLA_RGBA_F32) {
+        if (type == MdImageType::PLA_RGBA_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_BGRA_U8) {
+        if (type == MdImageType::PKG_BGRA_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_RGBA_U8) {
+        if (type == MdImageType::PKG_RGBA_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_BGRA_U8) {
+        if (type == MdImageType::PKG_BGRA_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_RGBA_U8) {
+        if (type == MdImageType::PKG_RGBA_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_BGR565_U8) {
+        if (type == MdImageType::PKG_BGR565_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::PKG_RGB565_U8) {
+        if (type == MdImageType::PKG_RGB565_U8) {
             return DataType::UINT8;
         }
-        else if (type == MdImageType::GRAY_S32) {
+        if (type == MdImageType::GRAY_S32) {
             return DataType::INT32;
         }
-        else if (type == MdImageType::GRAY_F32) {
+        if (type == MdImageType::GRAY_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_BGR_F32) {
+        if (type == MdImageType::PKG_BGR_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_RGB_F32) {
+        if (type == MdImageType::PKG_RGB_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_BGR_F32) {
+        if (type == MdImageType::PKG_BGR_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_RGB_F32) {
+        if (type == MdImageType::PKG_RGB_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_BGRA_F32) {
+        if (type == MdImageType::PKG_BGRA_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_RGBA_F32) {
+        if (type == MdImageType::PKG_RGBA_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_BGRA_F32) {
+        if (type == MdImageType::PKG_BGRA_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::PKG_RGBA_F32) {
+        if (type == MdImageType::PKG_RGBA_F32) {
             return DataType::FP32;
         }
-        else if (type == MdImageType::GRAY_F64) {
+        if (type == MdImageType::GRAY_F64) {
             return DataType::FP64;
         }
         MD_LOG_ERROR << "While calling md_image_dtype_to_md_dtype(), get unexpected type:" <<

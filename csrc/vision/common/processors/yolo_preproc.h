@@ -13,4 +13,11 @@ namespace modeldeploy::vision {
                              const std::vector<int>& dst_size,
                              float pad_val,
                              LetterBoxRecord* letter_box_record);
+
+
+    bool yolo_preprocess_cpu_batch(const std::vector<ImageData>& images, Tensor* output,
+                             const std::vector<int>& dst_size,
+                             float pad_val,
+                             std::vector<LetterBoxRecord>* letter_box_record);
+
 }

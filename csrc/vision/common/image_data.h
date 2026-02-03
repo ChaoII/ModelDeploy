@@ -105,6 +105,24 @@ namespace modeldeploy::vision {
         //   +---------------------+---------+
         [[nodiscard]] ImageData fuse_resize_and_pad(int width, int height, int pad_r, int pad_b, float pad_val) const;
 
+
+        template <typename T>
+        static std::vector<T> images_to_vector(const std::vector<ImageData>& imgs) {
+            size_t total_byte = 0;
+            for (auto& img : imgs) {
+                total_byte += img.bytes();
+            }
+            size_t length = total_byte / sizeof(T);
+            std::vector<T> out(length);
+            size_t offset = 0;
+            for (auto& img : imgs) {
+                const size_t elem_count = img.element_bytes() / sizeof(T);
+                std::memcpy(out.data() + offset, img.data(), img.element_bytes());
+                offset += elem_count;
+            }
+            return out;
+        }
+
     private:
         std::shared_ptr<ImageDataImpl> impl_;
     };
