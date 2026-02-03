@@ -17,31 +17,31 @@ namespace modeldeploy::vision::detection {
     }
 
 
-    bool UltralyticsPreprocessor::preprocess(ImageData* image, Tensor* output,
+    bool UltralyticsPreprocessor::preprocess(const ImageData& image, Tensor* output,
                                              LetterBoxRecord* letter_box_record) const {
         if (use_cuda_preproc_) {
 #ifdef WITH_GPU
-            return yolo_preprocess_cuda(image, output, size_, padding_value_, letter_box_record);
+            return yolo_preprocess_cuda(image, output, size_, padding_value_[0], letter_box_record);
 #else
             MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
 #endif
         }
-        return yolo_preprocess_cpu(image, output, size_, padding_value_, letter_box_record);
+        return yolo_preprocess_cpu(image, output, size_, padding_value_[0], letter_box_record);
     }
 
-    bool UltralyticsPreprocessor::run(std::vector<ImageData>* images, std::vector<Tensor>* outputs,
+    bool UltralyticsPreprocessor::run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                                       std::vector<LetterBoxRecord>* letter_box_records) const {
-        if (images->empty()) {
+        if (images.empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
-        letter_box_records->resize(images->size());
+        letter_box_records->resize(images.size());
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images->size());
-        for (size_t i = 0; i < images->size(); ++i) {
+        std::vector<Tensor> tensors(images.size());
+        for (size_t i = 0; i < images.size(); ++i) {
             // 修改了数据，并生成一个tensor,并记录预处理的一些参数，便于在后处理中还原
-            preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
+            preprocess(images[i], &tensors[i], &(*letter_box_records)[i]);
         }
         if (tensors.size() == 1) {
             (*outputs)[0] = std::move(tensors[0]);

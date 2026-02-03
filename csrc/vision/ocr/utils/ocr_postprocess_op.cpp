@@ -142,25 +142,24 @@ namespace modeldeploy::vision::ocr {
         std::vector<float> box_x;
         std::vector<float> box_y;
         for (const auto point : contour) {
-            box_x.push_back(static_cast<float>(point.x));
-            box_y.push_back(static_cast<float>(point.y));
+            box_x.push_back(point.x);
+            box_y.push_back(point.y);
         }
-        int xmin =
-            clamp(static_cast<int>(std::floor(*std::min_element(box_x.begin(), box_x.end()))), 0,
-                  width - 1);
-        int xmax =
-            clamp(static_cast<int>(std::ceil(*std::max_element(box_x.begin(), box_x.end()))), 0,
-                  width - 1);
-        int ymin =
-            clamp(static_cast<int>(std::floor(*std::min_element(box_y.begin(), box_y.end()))), 0,
-                  height - 1);
-        int ymax =
-            clamp(static_cast<int>(std::ceil(*std::max_element(box_y.begin(), box_y.end()))), 0,
-                  height - 1);
+
+        const float box_x_min = std::floor(*std::min_element(box_x.begin(), box_x.end()));
+        const float box_x_max = std::ceil(*std::max_element(box_x.begin(), box_x.end()));
+        const float box_y_min = std::floor(*std::min_element(box_y.begin(), box_y.end()));
+        const float box_y_max = std::ceil(*std::max_element(box_y.begin(), box_y.end()));
+
+        int xmin = std::clamp(static_cast<int>(box_x_min), 0, width - 1);
+        int xmax = std::clamp(static_cast<int>(box_x_max), 0, width - 1);
+        int ymin = std::clamp(static_cast<int>(box_y_min), 0, height - 1);
+        int ymax = std::clamp(static_cast<int>(box_y_max), 0, height - 1);
+
         cv::Mat mask = cv::Mat::zeros(ymax - ymin + 1, xmax - xmin + 1, CV_8UC1);
         auto* rook_point = new cv::Point[contour.size()];
         for (int i = 0; i < contour.size(); ++i) {
-            rook_point[i] = cv::Point(static_cast<int>(box_x[i]) - xmin, static_cast<int>(box_y[i]) - ymin);
+            rook_point[i] = cv::Point(box_x[i] - xmin, box_y[i] - ymin);
         }
         const cv::Point* ppt[1] = {rook_point};
         const int npt[] = {static_cast<int>(contour.size())};
@@ -181,28 +180,28 @@ namespace modeldeploy::vision::ocr {
 
         float box_x[4] = {array[0][0], array[1][0], array[2][0], array[3][0]};
         float box_y[4] = {array[0][1], array[1][1], array[2][1], array[3][1]};
+        const float box_x_min = std::floor(*std::min_element(box_x, box_x + 4));
+        const float box_x_max = std::ceil(*std::max_element(box_x, box_x + 4));
+        const float box_y_min = std::floor(*std::min_element(box_y, box_y + 4));
+        const float box_y_max = std::ceil(*std::max_element(box_y, box_y + 4));
 
-        int xmin = clamp(static_cast<int>(std::floor(*std::min_element(box_x, box_x + 4))), 0,
-                         width - 1);
-        int xmax = clamp(static_cast<int>(std::ceil(*std::max_element(box_x, box_x + 4))), 0,
-                         width - 1);
-        int ymin = clamp(static_cast<int>(std::floor(*std::min_element(box_y, box_y + 4))), 0,
-                         height - 1);
-        int ymax = clamp(static_cast<int>(std::ceil(*std::max_element(box_y, box_y + 4))), 0,
-                         height - 1);
+        int xmin = std::clamp(static_cast<int>(box_x_min), 0, width - 1);
+        int xmax = std::clamp(static_cast<int>(box_x_max), 0, width - 1);
+        int ymin = std::clamp(static_cast<int>(box_y_min), 0, height - 1);
+        int ymax = std::clamp(static_cast<int>(box_y_max), 0, height - 1);
         cv::Mat mask = cv::Mat::zeros(ymax - ymin + 1, xmax - xmin + 1, CV_8UC1);
         cv::Point root_point[4];
-        root_point[0] = cv::Point(static_cast<int>(array[0][0]) - xmin, static_cast<int>(array[0][1]) - ymin);
-        root_point[1] = cv::Point(static_cast<int>(array[1][0]) - xmin, static_cast<int>(array[1][1]) - ymin);
-        root_point[2] = cv::Point(static_cast<int>(array[2][0]) - xmin, static_cast<int>(array[2][1]) - ymin);
-        root_point[3] = cv::Point(static_cast<int>(array[3][0]) - xmin, static_cast<int>(array[3][1]) - ymin);
+        root_point[0] = cv::Point(array[0][0] - xmin, array[0][1] - ymin);
+        root_point[1] = cv::Point(array[1][0] - xmin, array[1][1] - ymin);
+        root_point[2] = cv::Point(array[2][0] - xmin, array[2][1] - ymin);
+        root_point[3] = cv::Point(array[3][0] - xmin, array[3][1] - ymin);
         const cv::Point* ppt[1] = {root_point};
         constexpr int npt[] = {4};
         cv::fillPoly(mask, ppt, npt, 1, cv::Scalar(1));
-        cv::Mat croppedImg;
+        cv::Mat cropped_img;
         pred(cv::Rect(xmin, ymin, xmax - xmin + 1, ymax - ymin + 1))
-            .copyTo(croppedImg);
-        const auto score = static_cast<float>(cv::mean(croppedImg, mask)[0]);
+            .copyTo(cropped_img);
+        const auto score = static_cast<float>(cv::mean(cropped_img, mask)[0]);
         return score;
     }
 
@@ -251,19 +250,16 @@ namespace modeldeploy::vision::ocr {
             if (ssid < min_size + 2) continue;
             const int dest_width = pred.cols;
             const int dest_height = pred.rows;
-            std::vector<std::vector<int>> int_clip_array;
-            for (int num_pt = 0; num_pt < 4; num_pt++) {
-                std::vector a{
-                    static_cast<int>(clamp<float>(
-                        roundf(clip_array[num_pt][0] / static_cast<float>(width) * static_cast<float>(dest_width)),
-                        0, static_cast<float>(dest_width))),
-                    static_cast<int>(clamp<float>(
-                        roundf(clip_array[num_pt][1] / static_cast<float>(height) * static_cast<float>(dest_height)),
-                        0, static_cast<float>(dest_height)))
-                };
-                int_clip_array.push_back(a);
+            std::vector<std::vector<int>> scaled_points;
+            scaled_points.reserve(4);
+            for (int pt_idx = 0; pt_idx < 4; pt_idx++) {
+                int x = std::lround(clip_array[pt_idx][0] / width * dest_width);
+                int y = std::lround(clip_array[pt_idx][1] / height * dest_height);
+                x = std::clamp(x, 0, dest_width - 1);
+                y = std::clamp(y, 0, dest_height - 1);
+                scaled_points.push_back({x, y});
             }
-            boxes.push_back(int_clip_array);
+            boxes.push_back(std::move(scaled_points));
         }
         return boxes;
     }
@@ -273,23 +269,25 @@ namespace modeldeploy::vision::ocr {
         const std::array<int, 4>& det_img_info) {
         const int ori_img_w = det_img_info[0];
         const int ori_img_h = det_img_info[1];
-        const float ratio_w = static_cast<float>(det_img_info[2]) / static_cast<float>(ori_img_w);
-        const float ratio_h = static_cast<float>(det_img_info[3]) / static_cast<float>(ori_img_h);
+        const int dst_img_w = det_img_info[2];
+        const int dst_img_h = det_img_info[3];
+        const float ratio_w = static_cast<float>(dst_img_w) / ori_img_w;
+        const float ratio_h = static_cast<float>(dst_img_h) / ori_img_h;
         std::vector<std::vector<std::vector<int>>> root_points;
         for (int n = 0; n < boxes.size(); n++) {
             boxes[n] = order_points_clockwise(boxes[n]);
             for (int m = 0; m < boxes[0].size(); m++) {
-                boxes[n][m][0] = static_cast<int>(static_cast<float>(boxes[n][m][0]) / ratio_w);
-                boxes[n][m][1] = static_cast<int>(static_cast<float>(boxes[n][m][1]) / ratio_h);
-                boxes[n][m][0] = _min(_max(boxes[n][m][0], 0), ori_img_w - 1);
-                boxes[n][m][1] = _min(_max(boxes[n][m][1], 0), ori_img_h - 1);
+                boxes[n][m][0] = boxes[n][m][0] / ratio_w;
+                boxes[n][m][1] = boxes[n][m][1] / ratio_h;
+                boxes[n][m][0] = std::clamp(boxes[n][m][0], 0, ori_img_w - 1);
+                boxes[n][m][1] = std::clamp(boxes[n][m][1], 0, ori_img_h - 1);
             }
         }
         for (auto& boxe : boxes) {
-            const int rect_width = static_cast<int>(sqrt(pow(boxe[0][0] - boxe[1][0], 2) +
-                pow(boxe[0][1] - boxe[1][1], 2)));
-            const int rect_height = static_cast<int>(sqrt(pow(boxe[0][0] - boxe[3][0], 2) +
-                pow(boxe[0][1] - boxe[3][1], 2)));
+            const int rect_width = sqrt(pow(boxe[0][0] - boxe[1][0], 2) +
+                pow(boxe[0][1] - boxe[1][1], 2));
+            const int rect_height = sqrt(pow(boxe[0][0] - boxe[3][0], 2) +
+                pow(boxe[0][1] - boxe[3][1], 2));
             if (rect_width <= 4 || rect_height <= 4) continue;
             root_points.push_back(boxe);
         }

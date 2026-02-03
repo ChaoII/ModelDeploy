@@ -104,14 +104,14 @@ namespace modeldeploy::vision::lpr {
                 points[j] = utils::point2f_to_cv_type(Point2f(det_result[i].keypoints[j].x, det_result[i].keypoints[j].y));
             }
             cv::Mat _image;
-            image.to_mat(&_image);
+            image.to_mat(_image);
             cv::Mat transform_image = transform_from_4points(_image, points);
             // 如果是双层车牌 0 单层车牌 1 双层车牌
             if (det_result[i].label_id) {
                 transform_image = get_split_merge(transform_image);
             }
             LprResult tmp_result;
-            recognizer_->predict(ImageData::from_mat(&transform_image), &tmp_result);
+            recognizer_->predict(ImageData(std::move(transform_image)), &tmp_result);
             (*results)[i].car_plate_color = tmp_result.car_plate_color;
             (*results)[i].car_plate_str = tmp_result.car_plate_str;
         }

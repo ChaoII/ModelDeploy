@@ -15,7 +15,7 @@ void predict(modeldeploy::vision::detection::UltralyticsDet* model, const int th
     thread_local int image_index = 0;
     for (auto const& image_file : images) {
         image_index++;
-        auto im = modeldeploy::ImageData::imread(image_file);
+        auto im = modeldeploy::vision::ImageData::imread(image_file);
         std::vector<modeldeploy::vision::DetectionResult> res;
         if (!model->predict(im, &res)) {
             std::cerr << "Failed to predict." << std::endl;

@@ -13,10 +13,10 @@
 namespace modeldeploy::vision::detection {
     UltralyticsObbPreprocessor::UltralyticsObbPreprocessor() {
         size_ = {640, 640};
-        padding_value_ = {114.0, 114.0, 114.0};
+        padding_value_ = 114.0f;
     }
 
-    bool UltralyticsObbPreprocessor::preprocess(ImageData* image, Tensor* output,
+    bool UltralyticsObbPreprocessor::preprocess(const ImageData& image, Tensor* output,
                                                 LetterBoxRecord* letter_box_record) const {
         if (use_cuda_preproc_) {
 #ifdef WITH_GPU
@@ -30,18 +30,18 @@ namespace modeldeploy::vision::detection {
 
 
     bool UltralyticsObbPreprocessor::run(
-        std::vector<ImageData>* images, std::vector<Tensor>* outputs,
+        const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
         std::vector<LetterBoxRecord>* letter_box_records) const {
-        if (images->empty()) {
+        if (images.empty()) {
             MD_LOG_ERROR << "The size of input images should be greater than 0." << std::endl;
             return false;
         }
-        letter_box_records->resize(images->size());
+        letter_box_records->resize(images.size());
         outputs->resize(1);
         // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images->size());
-        for (size_t i = 0; i < images->size(); ++i) {
-            preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
+        std::vector<Tensor> tensors(images.size());
+        for (size_t i = 0; i < images.size(); ++i) {
+            preprocess(images[i], &tensors[i], &(*letter_box_records)[i]);
         }
         if (tensors.size() == 1) {
             (*outputs)[0] = std::move(tensors[0]);

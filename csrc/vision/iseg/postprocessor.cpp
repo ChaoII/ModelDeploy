@@ -122,10 +122,10 @@ namespace modeldeploy::vision::detection {
                 float y2 = (box.y + box.height - pad_h) / scale;
 
                 // 限制在图像边界内
-                x1 = utils::clamp(x1, 0.0f, ipt_w);
-                y1 = utils::clamp(y1, 0.0f, ipt_h);
-                x2 = utils::clamp(x2, 0.0f, ipt_w);
-                y2 = utils::clamp(y2, 0.0f, ipt_h);
+                x1 = std::clamp(x1, 0.0f, ipt_w);
+                y1 = std::clamp(y1, 0.0f, ipt_h);
+                x2 = std::clamp(x2, 0.0f, ipt_w);
+                y2 = std::clamp(y2, 0.0f, ipt_h);
 
                 // 重新赋值到 box
                 box.x = std::round(x1);
@@ -199,8 +199,7 @@ namespace modeldeploy::vision::detection {
                 int32_t label_id = attr_ptr[5];
                 // convert from [x1, y1, x2, y2] to [w, y, w, h]
                 Rect2f box{
-                    attr_ptr[0],
-                    attr_ptr[1],
+                    attr_ptr[0], attr_ptr[1],
                     attr_ptr[2] - attr_ptr[0],
                     attr_ptr[3] - attr_ptr[1]
                 };
@@ -268,10 +267,10 @@ namespace modeldeploy::vision::detection {
                 float y2 = (box.y + box.height - pad_h) / scale;
 
                 // 限制在图像边界内
-                x1 = utils::clamp(x1, 0.0f, ipt_w);
-                y1 = utils::clamp(y1, 0.0f, ipt_h);
-                x2 = utils::clamp(x2, 0.0f, ipt_w);
-                y2 = utils::clamp(y2, 0.0f, ipt_h);
+                x1 = std::clamp(x1, 0.0f, ipt_w);
+                y1 = std::clamp(y1, 0.0f, ipt_h);
+                x2 = std::clamp(x2, 0.0f, ipt_w);
+                y2 = std::clamp(y2, 0.0f, ipt_h);
 
                 // 重新赋值到 box
                 box.x = std::round(x1);

@@ -19,7 +19,7 @@ namespace modeldeploy::vision::lpr {
         // 1. Resize
         // 2. convert_and_permute(swap_rb=true)
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
         Resize::apply(&mat, size_[0], size_[1]);
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {-0.588f, -0.588f, -0.588f};

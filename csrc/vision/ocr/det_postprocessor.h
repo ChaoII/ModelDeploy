@@ -13,12 +13,12 @@ namespace modeldeploy::vision::ocr {
          *
          * \param[in] tensors The inference result from runtime
          * \param[in] results The output result of detector
-         * \param[in] batch_det_img_info The detector_preprocess result
+         * \param[in] batch_img_info The detector_preprocess result
          * \return true if the postprocess successes, otherwise false
          */
-        bool apply(const std::vector<Tensor>& tensors,
+        bool run(const std::vector<Tensor>& tensors,
                    std::vector<std::vector<std::array<int, 8>>>* results,
-                   const std::vector<std::array<int, 4>>& batch_det_img_info);
+                   const std::vector<std::array<int, 4>>& batch_img_info) const;
 
         /// Set det_db_thresh for the detection postprocess, default is 0.3
         void set_det_db_thresh(const double det_db_thresh) { det_db_thresh_ = det_db_thresh; }
@@ -55,9 +55,9 @@ namespace modeldeploy::vision::ocr {
         [[nodiscard]] int get_use_dilation() const { return use_dilation_; }
 
     private:
-        bool single_batch_postprocessor(const float* out_data, int n2, int n3,
+        bool single_batch_postprocessor(const float* prob, int h, int w,
                                         const std::array<int, 4>& det_img_info,
-                                        std::vector<std::array<int, 8>>* boxes_result);
+                                        std::vector<std::array<int, 8>>* boxes_result) const;
         double det_db_thresh_ = 0.3;
         double det_db_box_thresh_ = 0.6;
         double det_db_unclip_ratio_ = 1.5;

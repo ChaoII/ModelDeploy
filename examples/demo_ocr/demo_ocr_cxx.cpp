@@ -5,6 +5,7 @@
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
+#include "opencv2/opencv.hpp"
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -18,18 +19,18 @@ int main() {
     option.use_gpu();
     option.enable_trt = false;
     option.enable_fp16 = true;
-    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer.onnx",
+    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer2.onnx",
                                             "../../test_data/test_models/ocr/ppocrv4_mobile/cls_infer.onnx",
-                                            "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer.onnx",
-                                            "../../test_data/ppocrv5_dict.txt",
+                                            "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer1.onnx",
+                                            "../../test_data/dict.txt",
                                             option);
-    // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/ocr2.jpg");
-    auto img = modeldeploy::ImageData::imread("C:/Users/aichao/Desktop/stock/0010.jpg");
+    auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
+    // auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0003.jpg");
     ocr.set_rec_batch_size(8);
-    ocr.get_detector()->get_preprocessor().set_max_side_len(640);
+    ocr.get_detector()->get_preprocessor().set_max_side_len(1440);
     ocr.get_detector()->get_postprocessor().set_det_db_thresh(0.3);
     ocr.get_detector()->get_postprocessor().set_det_db_box_thresh(0.6);
-    ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.8);
+    ocr.get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.5);
     // ocr.get_detector()->get_postprocessor().set_use_dilation(true);
     modeldeploy::vision::OCRResult result;
     TimerArray timers;

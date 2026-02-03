@@ -36,7 +36,7 @@ namespace modeldeploy::vision::face {
 
 
         cv::Mat mat;
-        image->to_mat(&mat);
+        image->to_mat(mat);
 
 
         Resize::apply(&mat, size_[0], size_[1]);

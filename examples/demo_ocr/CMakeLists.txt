@@ -5,6 +5,9 @@ target_link_libraries(demo_ocr_cxx PUBLIC ${LIBRARY_NAME})
 add_executable(demo_ocr_det_cxx demo_ocr_det_cxx.cpp)
 target_link_libraries(demo_ocr_det_cxx PUBLIC ${LIBRARY_NAME})
 
+add_executable(demo_ocr_rec_cxx demo_ocr_rec_cxx.cpp)
+target_link_libraries(demo_ocr_rec_cxx PUBLIC ${LIBRARY_NAME})
+
 add_executable(demo_ocr_capi demo_ocr_capi.cpp)
 target_link_libraries(demo_ocr_capi PUBLIC ${LIBRARY_NAME})
 

@@ -35,40 +35,52 @@ namespace modeldeploy::vision::ocr {
          * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] text The text result of rec model will be written into this parameter.
          * \param[in] rec_score The sccore result of rec model will be written into this parameter.
+         * \param timers
          * \return true if the prediction is successed, otherwise false.
          */
-        virtual bool predict(const ImageData& image, std::string* text, float* rec_score);
+        virtual bool predict(const ImageData& image, std::string* text, float* rec_score, TimerArray* timers = nullptr);
 
         /** \brief Predict the input image and get OCR recognition model result.
          *
          * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] ocr_result The output of OCR recognition model result will be writen to this structure.
+         * \param timers
          * \return true if the prediction is successes, otherwise false.
          */
-        virtual bool predict(const ImageData& image, OCRResult* ocr_result);
+        virtual bool predict(const ImageData& image,
+                             OCRResult* ocr_result,
+                             TimerArray* timers = nullptr);
 
         /** \brief BatchPredict the input image and get OCR recognition model result.
          *
          * \param[in] images The list of input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] ocr_result The output of OCR recognition model result will be writen to this structure.
+         * \param timers
          * \return true if the prediction is successes, otherwise false.
          */
-        virtual bool batch_predict(const std::vector<ImageData>& images, OCRResult* ocr_result);
+        virtual bool batch_predict(const std::vector<ImageData>& images,
+                                   OCRResult* ocr_result,
+                                   TimerArray* timers = nullptr);
 
         /** \brief BatchPredict the input image and get OCR recognition model result.
          *
          * \param[in] images The list of input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format.
          * \param[in] texts The list of text results of rec model will be written into this vector.
          * \param[in] rec_scores The list of sccore result of rec model will be written into this vector.
+         * \param timers
          * \return true if the prediction is successed, otherwise false.
          */
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<std::string>* texts, std::vector<float>* rec_scores);
+                                   std::vector<std::string>* texts,
+                                   std::vector<float>* rec_scores,
+                                   TimerArray* timers = nullptr);
 
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<std::string>* texts, std::vector<float>* rec_scores,
+                                   std::vector<std::string>* texts,
+                                   std::vector<float>* rec_scores,
                                    size_t start_index, size_t end_index,
-                                   const std::vector<int>& indices);
+                                   const std::vector<int>& indices,
+                                   TimerArray* timers = nullptr);
 
         /// Get preprocessor reference of DBDetectorPreprocessor
         virtual RecognizerPreprocessor& get_preprocessor() {

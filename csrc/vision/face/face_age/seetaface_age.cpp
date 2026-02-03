@@ -35,8 +35,7 @@ namespace modeldeploy::vision::face {
 
     bool SeetaFaceAge::batch_predict(const std::vector<ImageData>& images,
                                      std::vector<int>* ages) {
-        std::vector<ImageData> _images = images;
-        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
+        if (!preprocessor_.run(images, &reused_input_tensors_)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }

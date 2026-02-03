@@ -5,6 +5,8 @@
 #include "core/md_log.h"
 #include "vision/pipeline/pedestrian_attribute.h"
 
+#include <opencv2/opencv.hpp>
+
 namespace modeldeploy::vision::pipeline {
     PedestrianAttribute::PedestrianAttribute(const std::string& det_model_path,
                                              const std::string& mlc_model_path,
@@ -95,7 +97,7 @@ namespace modeldeploy::vision::pipeline {
             timers->post_timer.push_back(0);
             timers->infer_timer.start();
         }
-        if (!detector_->batch_predict(images, &batch_detection_results)) {
+        if (!detector_->batch_predict(images, &batch_detection_results, nullptr)) {
             MD_LOG_ERROR << "There's error while detecting image in PedestrianAttribute." << std::endl;
             return false;
         }

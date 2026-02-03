@@ -11,17 +11,16 @@ namespace modeldeploy::vision {
         // DBDetector
         pybind11::class_<ocr::DBDetectorPreprocessor>(m, "DBDetectorPreprocessor")
             .def(pybind11::init<>())
-            .def_property("static_shape_infer",
-                          &ocr::DBDetectorPreprocessor::get_static_shape_infer,
-                          &ocr::DBDetectorPreprocessor::set_static_shape_infer)
+            .def_property("static_img_size",
+                          &ocr::DBDetectorPreprocessor::get_static_img_size,
+                          &ocr::DBDetectorPreprocessor::set_static_img_size)
             .def_property("max_side_len",
                           &ocr::DBDetectorPreprocessor::get_max_side_len,
                           &ocr::DBDetectorPreprocessor::set_max_side_len)
             .def("set_normalize",
                  [](ocr::DBDetectorPreprocessor& self,
-                    const std::vector<float>& mean, const std::vector<float>& std,
-                    const bool is_scale) {
-                     self.set_normalize(mean, std, is_scale);
+                    const std::vector<float>& mean, const std::vector<float>& std) {
+                     self.set_normalize(mean, std);
                  })
             .def("run",
                  [](ocr::DBDetectorPreprocessor& self,
@@ -29,10 +28,10 @@ namespace modeldeploy::vision {
                      std::vector<ImageData> images;
                      for (auto& image : im_list) {
                          const auto cv_image = pyarray_to_cv_mat(image);
-                         images.push_back(ImageData::from_mat(&cv_image));
+                         images.push_back(ImageData(std::move(cv_image)));
                      }
                      std::vector<Tensor> outputs;
-                     self.apply(&images, &outputs);
+                     self.apply(images, &outputs);
                      const auto batch_det_img_info = self.get_batch_img_info();
                      return std::make_pair(outputs, *batch_det_img_info);
                  }, pybind11::arg("im_list"));
@@ -62,7 +61,7 @@ namespace modeldeploy::vision {
                     const std::vector<Tensor>& inputs,
                     const std::vector<std::array<int, 4>>& batch_det_img_info) {
                      std::vector<std::vector<std::array<int, 8>>> results;
-                     if (!self.apply(inputs, &results, batch_det_img_info)) {
+                     if (!self.run(inputs, &results, batch_det_img_info)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in "
                              "DBDetectorPostprocessor.");
@@ -76,7 +75,7 @@ namespace modeldeploy::vision {
                      std::vector<std::vector<std::array<int, 8>>> results;
                      std::vector<Tensor> inputs;
                      pyarray_to_tensor_list(input_array, &inputs, /*share_buffer=*/true);
-                     if (!self.apply(inputs, &results, batch_det_img_info)) {
+                     if (!self.run(inputs, &results, batch_det_img_info)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in DBDetectorPostprocessor.");
                      }
@@ -94,7 +93,7 @@ namespace modeldeploy::vision {
                  [](ocr::DBDetector& self, const pybind11::array& image) {
                      auto mat = pyarray_to_cv_mat(image);
                      OCRResult ocr_result;
-                     self.predict(ImageData::from_mat(&mat), &ocr_result);
+                     self.predict(ImageData(std::move(mat)), &ocr_result);
                      return ocr_result;
                  }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::DBDetector& self,
@@ -102,7 +101,7 @@ namespace modeldeploy::vision {
                 std::vector<ImageData> _images;
                 for (auto& image : images) {
                     const auto cv_image = pyarray_to_cv_mat(image);
-                    _images.push_back(ImageData::from_mat(&cv_image));
+                    _images.push_back(ImageData(std::move(cv_image)));
                 }
                 std::vector<OCRResult> ocr_results;
                 self.batch_predict(_images, &ocr_results);

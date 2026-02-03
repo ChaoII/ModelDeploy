@@ -25,26 +25,17 @@ namespace modeldeploy::vision::face {
         // scrfd's preprocess steps
         // 1. letterbox
         // 2. BGR->RGB
-        // 3. HWC->CHW
-        cv::Mat mat;
-        image->to_mat(&mat);
-        utils::letter_box(&mat, size_, padding_value_, letter_box_record);
-        BGR2RGB::apply(&mat);
-        // Normalize::Run(mat, std::vector<float>(mat->Channels(), 0.0),
-        //                std::vector<float>(mat->Channels(), 1.0));
-        // Compute `result = mat * alpha + beta` directly by channel
-        // Original Repo/tools/scrfd.py: cv2.dnn.blobFromImage(img, 1.0/128,
-        // input_size, (127.5, 127.5, 127.5), swapRB=True)
+        // 2. Convert
+        // 4. HWC->CHW
+
         const std::vector alpha = {1.f / 128.f, 1.f / 128.f, 1.f / 128.f};
         const std::vector beta = {-127.5f / 128.f, -127.5f / 128.f, -127.5f / 128.f};
-        Convert::apply(&mat, alpha, beta);
-        HWC2CHW::apply(&mat);
-        Cast::apply(&mat, "float");
-        if (!utils::mat_to_tensor(mat, output)) {
-            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
-            return false;
-        }
+        *letter_box_record = utils::cal_letter_box_param({image->width(), image->height()}, size_);
+        image->letter_box(size_, 0.0f)
+             .fuse_convert_and_permute(alpha, beta)
+             .to_tensor(output);
         output->expand_dim(0); // reshape to n, c, h, w
+
         return true;
     }
 

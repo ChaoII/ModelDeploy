@@ -62,13 +62,13 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
     std::vector<std::string> text_ptr;
     std::vector<float> rec_scores_ptr;
     std::vector<int> indices;
-    std::vector<modeldeploy::ImageData> image_list;
+    std::vector<ImageData> image_list;
     image_list.reserve(size);
     indices.reserve(size);
     for (int i = 0; i < size; i++) {
         indices.push_back(i);
         auto crop_image = get_rotate_crop_image(cv_image, &polygon[i]);
-        image_list.push_back(modeldeploy::ImageData::from_mat(&crop_image));
+        image_list.push_back(ImageData(std::move(crop_image)));
     }
     int result_index = 0;
     results->size = size;
