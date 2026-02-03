@@ -21,7 +21,7 @@ namespace modeldeploy::vision {
                          images.push_back(image_data);
                      }
                      std::vector<Tensor> outputs;
-                     if (!self.run(&images, &outputs)) {
+                     if (!self.run(images, &outputs)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in SeetaFaceAgePreprocessor.");
                      }

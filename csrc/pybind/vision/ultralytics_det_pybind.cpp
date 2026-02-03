@@ -20,7 +20,7 @@ namespace modeldeploy::vision {
                      }
                      std::vector<LetterBoxRecord> records;
                      std::vector<Tensor> outputs;
-                     if (!self.run(&images, &outputs, &records)) {
+                     if (!self.run(images, &outputs, &records)) {
                          throw std::runtime_error(
                              "Failed to preprocess the input data in UltralyticsPreprocessor.");
                      }
