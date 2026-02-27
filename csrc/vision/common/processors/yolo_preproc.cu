@@ -20,6 +20,7 @@ __global__ void kernel_yolo_preproc(
     const float pad_value) {
     const size_t x = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+    
     // 边界检查，并不一定线程数和像素的数量一致，有可能线程数量大于输出的像素数量
     if (x >= dst_w || y >= dst_h) return;
 
