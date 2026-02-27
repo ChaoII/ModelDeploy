@@ -563,6 +563,20 @@ namespace modeldeploy::vision {
     }
 
 
+
+    std::vector<uint8_t> ImageData::imencode(const ImageData& image,const std::string & ext){
+        std::vector<uint8_t> buf;
+        cv::imencode(ext, image.impl_->mat,buf );
+        return buf;
+    }
+
+    ImageData ImageData::imdecode(const std::vector<uint8_t>& buf){
+        cv::Mat mat = cv::imdecode(buf, cv::IMREAD_UNCHANGED);
+        if(mat.empty()) return ImageData();
+        return ImageData(std::move(mat));
+    }
+
+
     ImageData ImageData::imread(const std::string& filename) {
         cv::Mat mat = cv::imread(filename);
         if (mat.empty()) {

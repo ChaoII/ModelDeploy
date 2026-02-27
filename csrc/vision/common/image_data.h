@@ -56,9 +56,12 @@ namespace modeldeploy::vision {
         static void images_to_tensor(std::vector<ImageData> images, Tensor* tensor);
         void to_mat(cv::Mat& mat, bool copy = false) const;
         void to_tensor(Tensor* tensor, bool copy = false);
+        static std::vector<uint8_t> imencode(const ImageData& image, const std::string& ext);
+        static ImageData imdecode(const std::vector<uint8_t>& buf);
         static ImageData imread(const std::string& filename);
         [[nodiscard]] bool imwrite(const std::string& filename) const;
         void imshow(const std::string& win_name) const;
+
 
         // 预处理相关
         ImageData& rotate(RotateFlags flag);
