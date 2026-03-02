@@ -9,15 +9,34 @@
 
 
 namespace modeldeploy::vision {
-    bool yolo_preprocess_cpu(const ImageData& image, Tensor* output,
+    bool yolo_preprocess_cpu(const ImageData& image,
+                             Tensor* output,
                              const std::vector<int>& dst_size,
                              float pad_val,
                              LetterBoxRecord* letter_box_record);
 
 
-    bool yolo_preprocess_cpu_batch(const std::vector<ImageData>& images, Tensor* output,
-                             const std::vector<int>& dst_size,
-                             float pad_val,
-                             std::vector<LetterBoxRecord>* letter_box_record);
+    bool yolo_preprocess_bgr_cpu(const uint8_t* src,
+                                 const std::vector<int>& src_size,
+                                 Tensor* output,
+                                 const std::vector<int>& dst_size,
+                                 float pad_val,
+                                 LetterBoxRecord* letter_box_record);
 
+    bool yolo_preprocess_nv12_cpu(const uint8_t* src_y,
+                                  const uint8_t* src_uv,
+                                  const std::vector<int>& src_size,
+                                  int step_y,
+                                  int step_uv,
+                                  Tensor* output,
+                                  const std::vector<int>& dst_size,
+                                  float pad_value,
+                                  LetterBoxRecord* letter_box_record);
+
+
+    bool yolo_preprocess_cpu_batch(const std::vector<ImageData>& images,
+                                   Tensor* output,
+                                   const std::vector<int>& dst_size,
+                                   float pad_val,
+                                   std::vector<LetterBoxRecord>* letter_box_record);
 }
