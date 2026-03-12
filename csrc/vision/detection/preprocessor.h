@@ -17,6 +17,16 @@ namespace modeldeploy::vision::detection {
         bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
 
+
+        bool run(const uint8_t* src_y,
+                 const uint8_t* src_uv,
+                 const std::vector<int>& src_size,
+                 int step_y,
+                 int step_uv,
+                 Tensor* output,
+                 LetterBoxRecord* letter_box_record) const;
+
+
         void set_size(const std::vector<int>& size) { size_ = size; }
 
         [[nodiscard]] std::vector<int> get_size() const { return size_; }

@@ -29,6 +29,34 @@ namespace modeldeploy::vision::detection {
         return yolo_preprocess_cpu(image, output, size_, padding_value_[0], letter_box_record);
     }
 
+    bool UltralyticsPreprocessor::run(const uint8_t* src_y,
+                                      const uint8_t* src_uv,
+                                      const std::vector<int>& src_size,
+                                      const int step_y,
+                                      const int step_uv,
+                                      Tensor* output,
+                                      LetterBoxRecord* letter_box_record) const {
+        if (use_cuda_preproc_) {
+#ifdef WITH_GPU
+            return yolo_preprocess_nv12_cuda(src_y, src_uv, src_size,
+                                             step_y,
+                                             step_uv,
+                                             output, size_,
+                                             padding_value_[0],
+                                             letter_box_record);
+#else
+            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
+#endif
+        }
+        return yolo_preprocess_nv12_cpu(src_y, src_uv, src_size,
+                                        step_y,
+                                        step_uv,
+                                        output, size_,
+                                        padding_value_[0],
+                                        letter_box_record);
+    }
+
+
     bool UltralyticsPreprocessor::run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
                                       std::vector<LetterBoxRecord>* letter_box_records) const {
         if (images.empty()) {

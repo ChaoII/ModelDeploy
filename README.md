@@ -214,6 +214,13 @@ trtexec --onnx=yolo11n_nms.onnx ^
 - [x] 重构`Tensor`支持`CUDA`
 - [x] 添加`ModelDeploy`的`Python`接口
 - [x] 添加`ModelDeploy`的`C#`接口
+- [x] 重构`ImageData`为`MdImage`, 支持常用的预处理比如`BGR->RGB`, `Cast` ,`HWC->CHW`, `Resize`, `Normalize`, `LetterBox`
 - [ ] 添加更多的`cuda`预处理函数
-- [ ] 重构`ImageData`为`MdImage`, 支持常用的预处理比如`BGR->RGB`, `Cast` ,`HWC->CHW`, `Resize`, `Normalize`, `LetterBox`
+
+#### 7. 模型配置
+##### 7.1 通用配置
+##### 7.2 模型输入配置
+##### 7.3 模型输出配置
+
+
 
