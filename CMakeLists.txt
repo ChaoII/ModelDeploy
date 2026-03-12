@@ -232,7 +232,7 @@ if (NOT BUILD_PYTHON)
     # 安装头文件（递归所有 .h）
     install(DIRECTORY csrc/
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/modeldeploy
-            FILES_MATCHING PATTERN "*.h")
+            FILES_MATCHING PATTERN "*.h" PATTERN "*.cuh")
 
     # 安装库文件（例如 libModelDeploySDK.so / .a / .dll）
     install(TARGETS ModelDeploySDK
