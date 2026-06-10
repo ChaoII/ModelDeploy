@@ -57,7 +57,7 @@ endif ()
 
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    set(OpenCV_DIR "${opencv_SOURCE_DIR}" CACHE PATH "OpenCV directory" FORCE)
+    set(OpenCV_DIR "${opencv_SOURCE_DIR}/x64/vc17/staticlib")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
         set(OpenCV_DIR "${opencv_SOURCE_DIR}/lib/cmake/opencv5")
