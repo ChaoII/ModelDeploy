@@ -1,8 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
+#include <opencv2/core/mat.hpp>
 #include "vision/common/image_data.h"
 #include "vision/common/basic_types.h"
 #include "vision/common/struct.h"
+#include "core/tensor.h"
+
+using namespace modeldeploy;
 
 using namespace modeldeploy::vision;
 

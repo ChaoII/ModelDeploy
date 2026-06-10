@@ -6,6 +6,7 @@
 #include <filesystem>
 #include "capi/utils/md_image_capi.h"
 #include "csrc/vision/common/image_data.h"
+#include "csrc/vision.h"
 
 std::filesystem::path get_test_data_path();
 
@@ -15,6 +16,6 @@ std::filesystem::path get_test_data_path();
 void print_md_image_pixels(const MDImage* image, int rows = 5, int cols = 5);
 
 // C++ ImageData 版本
-void print_imagedata_pixels(const modeldeploy::ImageData& img, int rows = 5, int cols = 5);
+void print_imagedata_pixels(const modeldeploy::vision::ImageData& img, int rows = 5, int cols = 5);
 
-void compare_cpp_c_image(const modeldeploy::ImageData& img, const MDImage* c_image, int sample_count = 20);
+void compare_cpp_c_image(const modeldeploy::vision::ImageData& img, const MDImage* c_image, int sample_count = 20);

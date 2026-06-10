@@ -3,10 +3,14 @@
 #include <vector>
 #include <string>
 #include <array>
-#include "vision/vision.h"
+#include "csrc/vision.h"
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::vision;
+using namespace modeldeploy::vision::detection;
+using namespace modeldeploy::vision::classification;
+using namespace modeldeploy::vision::face;
+using namespace modeldeploy::vision::ocr;
 
 static fs::path get_test_data() {
     const char* env = std::getenv("TEST_DATA_DIR");
@@ -150,7 +154,7 @@ TEST_CASE("UltralyticsObb model", "[vision_models]") {
     REQUIRE(model.predict(img, &results, nullptr));
     REQUIRE(results.size() > 0);
     for (auto& r : results) {
-        REQUIRE(r.rotated_box.x > 0);
+        REQUIRE(r.rotated_box.xc > 0);
         REQUIRE(r.label_id >= 0);
         REQUIRE(r.score > 0);
     }

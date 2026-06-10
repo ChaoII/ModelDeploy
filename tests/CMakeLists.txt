@@ -1,4 +1,3 @@
-add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/third_party/Catch2")
 add_definitions(-DCATCH_CONFIG_ENABLE_BENCHMARKING)
 
 # === 核心库测试 ===
@@ -23,8 +22,8 @@ if (BUILD_VISION)
     add_test(NAME test_vision_models COMMAND test_vision_models)
     set_tests_properties(test_vision_models PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
 
-    add_executable(test_md_image test_md_image.cpp)
-    target_link_libraries(test_md_image PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain)
+    add_executable(test_md_image test_md_image.cpp utils.cpp)
+    target_link_libraries(test_md_image PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain ${OpenCV_LIBS})
     add_test(NAME test_md_image COMMAND test_md_image)
     set_tests_properties(test_md_image PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
 endif ()

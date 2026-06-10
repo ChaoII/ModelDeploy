@@ -48,7 +48,7 @@ void print_md_image_pixels(const MDImage* image, const int rows, const int cols)
 }
 
 // C++ ImageData 版本
-void print_imagedata_pixels(const modeldeploy::ImageData& img, const int rows, const int cols) {
+void print_imagedata_pixels(const modeldeploy::vision::ImageData& img, const int rows, const int cols) {
     const int max_r = std::min(rows, img.height());
     const int max_c = std::min(cols, img.width());
     std::cout << "ImageData pixels (decimal / hex):" << std::endl;
@@ -68,7 +68,7 @@ void print_imagedata_pixels(const modeldeploy::ImageData& img, const int rows, c
 }
 
 
-void compare_cpp_c_image(const modeldeploy::ImageData& img, const MDImage* c_image, const int sample_count) {
+void compare_cpp_c_image(const modeldeploy::vision::ImageData& img, const MDImage* c_image, const int sample_count) {
     if (!c_image || img.empty()) return;
     if (img.height() != c_image->height || img.width() != c_image->width || img.channels() != c_image->channels) {
         std::cerr << "Image dimension/channel mismatch!\n";
