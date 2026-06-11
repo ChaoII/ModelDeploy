@@ -17,6 +17,7 @@ option(BUILD_PYTHON "build with python" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(BUILD_BENCHMARK "build benchmarks" OFF)
+option(BUILD_ENCRYPTION "enable model encryption/decryption (requires OpenSSL)" ON)
 option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
 option(BUILD_ON_JETSON "Whether to build fastdeploy on Nvidia Jetson" OFF)
@@ -168,6 +169,27 @@ if (BUILD_CAPI)
         add_definitions(-DMD_CAPI)
     endif ()
     list(APPEND ALL_SOURCE ${CAPI_SOURCE})
+endif ()
+
+# 模型加密（可选，需要 OpenSSL）
+if (BUILD_ENCRYPTION)
+    find_package(OpenSSL QUIET)
+    if (OpenSSL_FOUND)
+        add_definitions(-DENABLE_ENCRYPTION)
+        include_directories(${OPENSSL_INCLUDE_DIR})
+        list(APPEND DEPENDS OpenSSL::SSL OpenSSL::Crypto)
+        message(STATUS "OpenSSL found: ${OPENSSL_VERSION}")
+    else()
+        message(WARNING "BUILD_ENCRYPTION=ON but OpenSSL not found. "
+            "Model encryption will be disabled.\n"
+            "  Windows: Download from https://slproweb.com/products/Win32OpenSSL.html\n"
+            "           Install the Win64 OpenSSL Light version (e.g. Win64 OpenSSL v3.x.x)\n"
+            "           Then set: cmake -DOPENSSL_ROOT_DIR=\"C:/Program Files/OpenSSL-Win64\"\n"
+            "  Linux:   sudo apt install libssl-dev  (Debian/Ubuntu)\n"
+            "           sudo dnf install openssl-devel  (Fedora/RHEL)\n"
+            "           sudo pacman -S openssl  (Arch)\n"
+            "  macOS:   brew install openssl")
+    endif()
 endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
