@@ -29,26 +29,129 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
             return false;
         }
-        runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
         if (option.model_from_memory) {
+            runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
             return load_trt_cache(option.model_buffer);
         }
         if (!std::filesystem::exists(option.model_file)) {
             MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;
             return false;
         }
-        if (!read_binary_from_file(option.model_file, &model_buffer_)) {
-            MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
-            return false;
+
+        // Check if this is an ONNX model (needs build) or pre-built engine
+        const bool is_onnx = option.model_file.size() > 5 &&
+            (option.model_file.substr(option.model_file.size() - 5) == ".onnx");
+
+        if (is_onnx) {
+            // --- Build TRT engine from ONNX ---
+            // Check cache first
+            const auto& cache_path = option_.cache_file_path;
+            if (!cache_path.empty() && std::filesystem::exists(cache_path)) {
+                auto onnx_time = std::filesystem::last_write_time(option.model_file);
+                auto cache_time = std::filesystem::last_write_time(cache_path);
+                if (cache_time >= onnx_time) {
+                    MD_LOG_INFO << "Loading cached TRT engine: " << cache_path << std::endl;
+                    runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
+                    if (!read_binary_from_file(cache_path, &model_buffer_)) {
+                        MD_LOG_ERROR << "Failed to read cached engine file." << std::endl;
+                        return false;
+                    }
+                    return load_trt_cache(model_buffer_);
+                }
+            }
+
+            // Build engine from ONNX
+            MD_LOG_INFO << "Building TensorRT engine from ONNX: " << option.model_file << std::endl;
+            auto builder = std::unique_ptr<nvinfer1::IBuilder>(
+                nvinfer1::createInferBuilder(*MDTrtLogger::get()));
+            if (!builder) { MD_LOG_ERROR << "Failed to create TRT builder." << std::endl; return false; }
+
+            const auto explicitBatch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
+            auto network = std::unique_ptr<nvinfer1::INetworkDefinition>(
+                builder->createNetworkV2(explicitBatch));
+            if (!network) { MD_LOG_ERROR << "Failed to create TRT network." << std::endl; return false; }
+
+            auto parser = std::unique_ptr<nvonnxparser::IParser>(
+                nvonnxparser::createParser(*network, *MDTrtLogger::get()));
+            if (!parser) { MD_LOG_ERROR << "Failed to create ONNX parser." << std::endl; return false; }
+
+            if (!parser->parseFromFile(option.model_file.c_str(),
+                                       static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
+                MD_LOG_ERROR << "Failed to parse ONNX model." << std::endl;
+                return false;
+            }
+
+            auto config = std::unique_ptr<nvinfer1::IBuilderConfig>(builder->createBuilderConfig());
+            if (!config) { MD_LOG_ERROR << "Failed to create TRT config." << std::endl; return false; }
+
+            config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, option_.max_workspace_size);
+
+            if (option_.enable_fp16) {
+                if (builder->platformHasFastFp16()) {
+                    config->setFlag(nvinfer1::BuilderFlag::kFP16);
+                } else {
+                    MD_LOG_WARN << "FP16 not supported on this platform, falling back to FP32." << std::endl;
+                }
+            }
+
+            // Set dynamic shape ranges if provided
+            if (!option_.min_shape.empty()) {
+                auto profile = builder->createOptimizationProfile();
+                for (auto& [name, min_dims] : option_.min_shape) {
+                    auto opt_it = option_.opt_shape.find(name);
+                    auto max_it = option_.max_shape.find(name);
+                    const auto& opt_dims = (opt_it != option_.opt_shape.end()) ? opt_it->second : min_dims;
+                    const auto& max_dims = (max_it != option_.max_shape.end()) ? max_it->second : min_dims;
+                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kMIN,
+                                           vec_to_dims(min_dims));
+                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kOPT,
+                                           vec_to_dims(opt_dims));
+                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kMAX,
+                                           vec_to_dims(max_dims));
+                }
+                config->addOptimizationProfile(profile);
+            }
+
+            auto* serialized_engine = builder->buildSerializedNetwork(*network, *config);
+            if (!serialized_engine) {
+                MD_LOG_ERROR << "Failed to build TRT engine from ONNX." << std::endl; return false;
+            }
+
+            // Save cache if path provided
+            if (!cache_path.empty()) {
+                std::ofstream ofs(cache_path, std::ios::binary);
+                if (ofs) {
+                    ofs.write(static_cast<const char*>(serialized_engine->data()),
+                              static_cast<std::streamsize>(serialized_engine->size()));
+                    MD_LOG_INFO << "TRT engine cached to: " << cache_path << std::endl;
+                }
+            }
+
+            // Deserialize into runtime engine
+            runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
+            model_buffer_.assign(static_cast<const char*>(serialized_engine->data()),
+                                 serialized_engine->size());
+            delete serialized_engine;
+            if (cudaStreamCreate(&stream_) != 0) {
+                MD_LOG_FATAL << "Cannot call cudaStreamCreate()." << std::endl;
+            }
+            return load_trt_cache(model_buffer_);
         }
-        std::cout << termcolor::green << "[TensorRT model buffer loaded, size: "
-            << std::fixed << std::setprecision(3)
-            << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
-            << termcolor::reset << std::endl;
-        if (cudaStreamCreate(&stream_) != 0) {
-            MD_LOG_FATAL << "Cant not call cudaStreamCreate()." << std::endl;
+        else {
+            // --- Load pre-built .engine file ---
+            runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
+            if (!read_binary_from_file(option.model_file, &model_buffer_)) {
+                MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
+                return false;
+            }
+            MD_LOG_INFO << "[TensorRT engine loaded, size: "
+                << std::fixed << std::setprecision(3)
+                << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]" << std::endl;
+            if (cudaStreamCreate(&stream_) != 0) {
+                MD_LOG_FATAL << "Cannot call cudaStreamCreate()." << std::endl;
+            }
+            return load_trt_cache(model_buffer_);
         }
-        return load_trt_cache(model_buffer_);
     }
 
     TrtBackend::~TrtBackend() {
