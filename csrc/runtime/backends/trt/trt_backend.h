@@ -14,6 +14,7 @@
 #include "runtime/backends/backend.h"
 #include "runtime/backends/trt/utils.h"
 #include "runtime/backends/trt/option.h"
+#include "runtime/backends/trt/buffers.h"
 
 
 namespace modeldeploy {
@@ -57,9 +58,10 @@ namespace modeldeploy {
         std::vector<TrtValueInfo> inputs_desc_;
         std::vector<TrtValueInfo> outputs_desc_;
         std::string model_buffer_;
+        std::vector<nvinfer1::Dims> last_input_shapes_;       // 缓存上次输入 shape，避免重复 setInputShape
+        std::vector<CudaBufferPrt> cached_output_buffers_;    // 复用输出 buffer，避免每次 cudaMalloc
 
         bool load_trt_cache(const std::string& engine_buffer);
-        /// 判断输入 shape 是否超出 engine profile 范围（仅用于友好报错）
         [[nodiscard]] bool shape_within_profile(const nvinfer1::Dims& dims, int input_idx) const;
     };
 } // namespace modeldeploy

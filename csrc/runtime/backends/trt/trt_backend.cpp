@@ -306,22 +306,30 @@ namespace modeldeploy {
             return false;
         }
 
-        // z自动管理分贝的cuda 内存
+        // 推理期间保持所有 device buffer 存活
         std::vector<CudaBufferPrt> device_buffers;
-        // 处理输入缓冲区
-        for (auto& input : inputs) {
+        last_input_shapes_.resize(inputs.size());
+
+        // ---- 处理输入 ----
+        for (size_t j = 0; j < inputs.size(); ++j) {
+            auto& input = inputs[j];
             const std::string& name = input.get_name();
             nvinfer1::Dims dims = vec_to_dims(input.shape());
-            // 设置输入形状
-            if (!context_->setInputShape(name.c_str(), dims)) {
-                MD_LOG_ERROR << "Failed to set input shape for " << name
-                    << " [" << vector_to_string(input.shape()) << "]. "
-                    << "The shape is outside the engine's optimization profile range. "
-                    << "Delete the cached .engine file to rebuild from ONNX."
-                    << std::endl;
-                return false;
+
+            // 仅当 shape 变化时才调 setInputShape（避免不必要的 validation 开销）
+            if (j >= last_input_shapes_.size() ||
+                std::memcmp(last_input_shapes_[j].d, dims.d, dims.nbDims * sizeof(int32_t)) != 0) {
+                if (!context_->setInputShape(name.c_str(), dims)) {
+                    MD_LOG_ERROR << "Failed to set input shape for " << name
+                        << " [" << vector_to_string(input.shape()) << "]. "
+                        << "The shape is outside the engine's optimization profile range. "
+                        << "Delete the cached .engine file to rebuild from ONNX."
+                        << std::endl;
+                    return false;
+                }
+                last_input_shapes_[j] = dims;
             }
-            // 分配并复制数据到设备
+
             const size_t buffer_size = input.byte_size();
             CudaBufferPrt input_buffer = nullptr;
             if (input.device() == Device::GPU) {
@@ -336,35 +344,35 @@ namespace modeldeploy {
             device_buffers.push_back(std::move(input_buffer));
         }
 
-        // 处理输出缓冲区
-        for (auto& output_desc : outputs_desc_) {
-            auto name = output_desc.name;
+        // ---- 处理输出（复用 buffer） ----
+        cached_output_buffers_.resize(outputs_desc_.size());
+        for (size_t j = 0; j < outputs_desc_.size(); j++) {
+            auto name = outputs_desc_[j].name;
             nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
-            const size_t buffer_size = volume(dims) * trt_data_type_size(output_desc.dtype);
-            // 分配输出缓冲区
-            auto output_buffer = allocate_cuda_buffer(buffer_size);
-            context_->setTensorAddress(name.c_str(), output_buffer->data());
-            device_buffers.push_back(std::move(output_buffer));
+            const size_t buffer_size = volume(dims) * trt_data_type_size(outputs_desc_[j].dtype);
+
+            // 只在 buffer 不够大时重新分配
+            if (!cached_output_buffers_[j] || cached_output_buffers_[j]->byte_size() < buffer_size) {
+                cached_output_buffers_[j] = allocate_cuda_buffer(buffer_size);
+            }
+            context_->setTensorAddress(name.c_str(), cached_output_buffers_[j]->data());
         }
 
-        // 执行推理
+        // ---- 执行推理 ----
         if (!context_->enqueueV3(stream_)) {
             MD_LOG_ERROR << "Failed to run inference with TensorRT." << std::endl;
             return false;
         }
-        if (cudaStreamSynchronize(stream_) != cudaSuccess) {
-            MD_LOG_ERROR << "CUDA error after inference, cudaStreamSynchronize" << std::endl;
-            return false;
-        }
-        // 复制输出数据回主机
+
+        // ---- 异步拷贝输出到主机（无需中间的 cudaStreamSynchronize） ----
         outputs->resize(outputs_desc_.size());
-        for (int i = 0; i < outputs_desc_.size(); i++) {
-            auto name = outputs_desc_[i].name;
+        for (size_t j = 0; j < outputs_desc_.size(); j++) {
+            auto name = outputs_desc_[j].name;
             nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
-            std::vector shape(dims.d, dims.d + dims.nbDims);
-            (*outputs)[i].allocate(shape, DataType::FP32, Device::CPU, name);
+            std::vector<int64_t> shape(dims.d, dims.d + dims.nbDims);
+            (*outputs)[j].allocate(shape, DataType::FP32, Device::CPU, name);
             const void* device_buffer = context_->getTensorAddress(name.c_str());
-            cudaMemcpyAsync((*outputs)[i].data(), device_buffer, (*outputs)[i].byte_size(),
+            cudaMemcpyAsync((*outputs)[j].data(), device_buffer, (*outputs)[j].byte_size(),
                             cudaMemcpyDeviceToHost, stream_);
         }
         cudaStreamSynchronize(stream_);
