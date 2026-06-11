@@ -14,6 +14,7 @@ set(TEST_SOURCES
     test_capi_image.cpp
     test_md_image.cpp
     test_vision_models.cpp
+    test_encryption.cpp
     utils.cpp
 )
 
