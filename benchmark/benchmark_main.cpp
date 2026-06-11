@@ -122,6 +122,7 @@ TEST_CASE("Detection inference", "[model][det][benchmark]") {
 #endif
 #if defined(WITH_GPU) && defined(ENABLE_TRT)
     cfgs[n++] = {"det/trt/gpu",    "yolo11n.engine",  2, 1, 4};
+    cfgs[n++] = {"det/trt/onnx",   "yolo11n_nms.onnx",2, 1, 4};
 #endif
     for (int i = 0; i < n; ++i) bench_det(cfgs[i]);
 }

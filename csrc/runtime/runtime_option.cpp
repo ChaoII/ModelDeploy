@@ -39,22 +39,21 @@ namespace modeldeploy {
         }
         else {
             const std::filesystem::path path(model_path);
-            // todo 此处的告警需要优化，因为不一定从后缀判断推理引擎，有可能是用户输错了
-            if (path.has_extension()) {
-                if (path.extension() == ".onnx") {
-                    use_ort_backend();
-                }
-                else if (path.extension() == ".mnn") {
-                    use_mnn_backend();
-                }
-                else if (path.extension() == ".engine") {
-                    use_trt_backend();
-                }
-                else {
-                    MD_LOG_FATAL << "Model format unsupported!" << std::endl;
-                }
-            }
             model_from_memory = false;
+            // 如果用户已显式设置 backend（非默认值），不覆盖
+            if (!path.has_extension()) return;
+            // 当 backend 仍为默认 ORT 且文件扩展名与 ORT 不匹配时，才自动推断
+            if (backend != Backend::ORT) return;
+            if (path.extension() == ".mnn") {
+#ifdef ENABLE_MNN
+                backend = Backend::MNN;
+#endif
+            }
+            else if (path.extension() == ".engine") {
+#ifdef ENABLE_TRT
+                backend = Backend::TRT;
+#endif
+            }
         }
     }
 
