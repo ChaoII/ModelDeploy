@@ -89,7 +89,9 @@ namespace modeldeploy {
             auto config = std::unique_ptr<nvinfer1::IBuilderConfig>(builder->createBuilderConfig());
             if (!config) { MD_LOG_ERROR << "Failed to create TRT config." << std::endl; return false; }
 
+            // === 与 trtexec 一致的优化配置 ===
             config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, option_.max_workspace_size);
+            config->setBuilderOptimizationLevel(5); // 最高优化等级（trtexec 默认 3）
 
             if (option_.enable_fp16) {
                 if (builder->platformHasFastFp16()) {
@@ -97,6 +99,19 @@ namespace modeldeploy {
                 } else {
                     MD_LOG_WARN << "FP16 not supported on this platform, falling back to FP32." << std::endl;
                 }
+            }
+
+            // 启用 TF32（Ampere+ 架构默认可用，trtexec 默认启用）
+            if (builder->platformHasTf32()) {
+                config->setFlag(nvinfer1::BuilderFlag::kTF32);
+            }
+
+            // Timing cache：让 builder 通过实际 kernel timing 选择最快实现
+            // 否则 builder 用 heuristic 选 kernel，性能差 1-3ms
+            auto timing_cache = std::unique_ptr<nvinfer1::ITimingCache>(
+                config->createTimingCache(nullptr, 0));
+            if (timing_cache) {
+                config->setTimingCache(*timing_cache, "global");
             }
 
             // Auto-detect dynamic shapes and set optimization profiles
