@@ -63,5 +63,8 @@ namespace modeldeploy {
 
         bool load_trt_cache(const std::string& engine_buffer);
         [[nodiscard]] bool shape_within_profile(const nvinfer1::Dims& dims, int input_idx) const;
+        bool build_engine_from_onnx(const std::string& onnx_name_hint,
+                                     const std::string& onnx_buffer,
+                                     const TrtBackendOption& opt);
     };
 } // namespace modeldeploy

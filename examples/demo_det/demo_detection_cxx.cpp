@@ -8,9 +8,9 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
-    option.use_ort_backend();
+    option.use_trt_backend();
     option.use_gpu(0);
-    option.password = "1234567";
+    option.password = "123456";
     option.enable_fp16 = true;
     option.enable_trt = false;
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms_encrypted.mdenc", option);

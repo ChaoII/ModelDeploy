@@ -30,31 +30,39 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
             return false;
         }
+        // 记录实际要加载的模型路径（可能是原始文件，也可能是 memory buffer 的临时文件）
+        std::string model_to_load = option.model_file;
+
         if (option.model_from_memory || option_.model_from_memory) {
-            runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
             auto& buf = option.model_from_memory ? option.model_buffer : option_.model_buffer;
-            return load_trt_cache(buf);
+            runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
+            if (load_trt_cache(buf)) return true;
+            // 不是 TRT 引擎 → 写入临时 ONNX 文件，走下方构建路径
+            auto tmp = std::filesystem::temp_directory_path() / "md_trt_build_temp.onnx";
+            { std::ofstream ofs(tmp, std::ios::binary); ofs.write(buf.data(), (std::streamsize)buf.size()); }
+            model_to_load = tmp.string();
+            MD_LOG_INFO << "Building TRT engine from memory buffer (temp file: " << model_to_load << ")..." << std::endl;
         }
-        if (!std::filesystem::exists(option.model_file)) {
-            MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;
+        if (!std::filesystem::exists(model_to_load)) {
+            MD_LOG_ERROR << "Model file does not exist: " << model_to_load << std::endl;
             return false;
         }
 
         // Check if this is an ONNX model (needs build) or pre-built engine
-        const bool is_onnx = option.model_file.size() > 5 &&
-            (option.model_file.substr(option.model_file.size() - 5) == ".onnx");
+        const bool is_onnx = model_to_load.size() > 5 &&
+            (model_to_load.substr(model_to_load.size() - 5) == ".onnx");
 
         if (is_onnx) {
             // --- Build TRT engine from ONNX ---
             // Auto-generate cache path: model.onnx → model.onnx.engine
             auto cache_path = option_.cache_file_path;
             if (cache_path.empty()) {
-                cache_path = option.model_file + ".engine";
+                cache_path = model_to_load + ".engine";
             }
 
             // Check cache first
             if (std::filesystem::exists(cache_path)) {
-                auto onnx_time = std::filesystem::last_write_time(option.model_file);
+                auto onnx_time = std::filesystem::last_write_time(model_to_load);
                 auto cache_time = std::filesystem::last_write_time(cache_path);
                 if (cache_time >= onnx_time) {
                     MD_LOG_INFO << "Loading cached TRT engine: " << cache_path << std::endl;
@@ -68,7 +76,7 @@ namespace modeldeploy {
             }
 
             // Build engine from ONNX
-            MD_LOG_INFO << "Building TensorRT engine from ONNX: " << option.model_file << std::endl;
+            MD_LOG_INFO << "Building TensorRT engine from ONNX: " << model_to_load << std::endl;
             auto builder = std::unique_ptr<nvinfer1::IBuilder>(
                 nvinfer1::createInferBuilder(*MDTrtLogger::get()));
             if (!builder) { MD_LOG_ERROR << "Failed to create TRT builder." << std::endl; return false; }
@@ -82,7 +90,7 @@ namespace modeldeploy {
                 nvonnxparser::createParser(*network, *MDTrtLogger::get()));
             if (!parser) { MD_LOG_ERROR << "Failed to create ONNX parser." << std::endl; return false; }
 
-            if (!parser->parseFromFile(option.model_file.c_str(),
+            if (!parser->parseFromFile(model_to_load.c_str(),
                                        static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
                 MD_LOG_ERROR << "Failed to parse ONNX model." << std::endl;
                 return false;
@@ -202,7 +210,7 @@ namespace modeldeploy {
 
             auto* serialized_engine = builder->buildSerializedNetwork(*network, *config);
             if (!serialized_engine) {
-                MD_LOG_ERROR << "Failed to build TRT engine from ONNX: " << option.model_file
+                MD_LOG_ERROR << "Failed to build TRT engine from ONNX: " << model_to_load
                     << ". The ONNX model may contain ops unsupported by TensorRT (e.g. NMS). "
                     << "Try using the model without embedded NMS (e.g. yolo11n.onnx instead of yolo11n_nms.onnx), "
                     << "or use ORT backend (MD_BACKEND_ORT) with option.enable_trt=1 for mixed EP execution."
@@ -233,8 +241,8 @@ namespace modeldeploy {
         else {
             // --- Load pre-built .engine file ---
             runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
-            if (!read_binary_from_file(option.model_file, &model_buffer_)) {
-                MD_LOG_ERROR << "Failed to read model file: " << option.model_file << std::endl;
+            if (!read_binary_from_file(model_to_load, &model_buffer_)) {
+                MD_LOG_ERROR << "Failed to read model file: " << model_to_load << std::endl;
                 return false;
             }
             MD_LOG_INFO << "[TensorRT engine loaded, size: "
