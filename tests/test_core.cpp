@@ -278,6 +278,37 @@ TEST_CASE("TensorView to_tensor", "[core]") {
     REQUIRE(c.data() != t.data());  // to_tensor should materialize
 }
 
+// ============ GPU core tests ============
+
+#ifdef WITH_GPU
+TEST_CASE("Tensor GPU allocation", "[core][gpu]") {
+    Tensor t({16, 16}, DataType::FP32, Device::GPU);
+    REQUIRE(t.device() == Device::GPU);
+    REQUIRE_FALSE(t.is_empty());
+    REQUIRE(t.size() == 256);
+    REQUIRE(t.byte_size() == 256 * 4);
+}
+
+TEST_CASE("Tensor GPU CPU transfer", "[core][gpu]") {
+    Tensor cpu({4}, DataType::FP32);
+    static_cast<float*>(cpu.data())[0] = 42.0f;
+
+    Tensor gpu({4}, DataType::FP32, Device::GPU);
+    REQUIRE(gpu.device() == Device::GPU);
+}
+
+TEST_CASE("Tensor GPU multiple dtypes", "[core][gpu]") {
+    auto check = [](DataType dt, size_t elem_size) {
+        Tensor t({8}, dt, Device::GPU);
+        REQUIRE(t.device() == Device::GPU);
+        REQUIRE(t.byte_size() == 8 * elem_size);
+    };
+    check(DataType::FP32, 4);
+    check(DataType::INT32, 4);
+    check(DataType::UINT8, 1);
+}
+#endif
+
 // ============ to_string / printing ============
 
 TEST_CASE("Tensor to_string", "[core]") {

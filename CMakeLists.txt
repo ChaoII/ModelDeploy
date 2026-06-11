@@ -221,10 +221,6 @@ if (BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
 
-if (BUILD_TESTS OR BUILD_BENCHMARK)
-    add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/third_party/Catch2")
-endif ()
-
 if (BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

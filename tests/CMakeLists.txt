@@ -1,5 +1,8 @@
 add_definitions(-DCATCH_CONFIG_ENABLE_BENCHMARKING)
 
+# Catch2 仅测试使用，不放在顶层 CMakeLists.txt
+add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/third_party/Catch2")
+
 # === 统一测试可执行文件 ===
 # 所有测试用例编译为单个二进制，用 Catch2 标签 [core] [image_data]
 # [capi] [model] 等区分。运行时按需筛选：
