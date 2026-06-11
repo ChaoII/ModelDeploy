@@ -7,6 +7,7 @@
 #include <MNN/expr/Executor.hpp>
 #include <MNN/expr/ExprCreator.hpp>
 #include <tabulate/tabulate.hpp>
+#include "core/md_log.h"
 #include "runtime/backends/mnn/utils.h"
 #include "runtime/backends/mnn/mnn_backend.h"
 
@@ -137,12 +138,13 @@ namespace modeldeploy {
                 vector_to_string(info.shape)
             });
         }
-        std::cout << termcolor::green << "[model file:"
+        MD_LOG_INFO
+            << "[model file:"
             << std::filesystem::absolute(runtime_option.model_file).filename().string()
             << " model size: " << std::fixed << std::setprecision(3)
             << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
-            << termcolor::reset << std::endl;
-        std::cout << input_table << std::endl;
+            << std::endl;
+        MD_LOG_INFO << std::endl << input_table << std::endl;
         initialized_ = true;
         return true;
     }

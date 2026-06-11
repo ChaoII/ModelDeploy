@@ -71,18 +71,14 @@ namespace modeldeploy {
     private:
         LogLevel current_level_;
         std::ostream* log_stream_;
+        mutable std::time_t cached_time_sec_;
+        mutable std::tm cached_tm_{};
 
         // Private constructor
-        LogManager() : current_level_(LogLevel::MD_LOG_I), log_stream_(&std::cout) {
-        } // Default log level is INFO
+        LogManager() : current_level_(LogLevel::MD_LOG_I), log_stream_(&std::cout), cached_time_sec_(0) {
+        }
     };
 } // namespace modeldeploy
-
-#ifdef _MSC_VER
-#define localtime(timep, tm_ptr) localtime_s(tm_ptr, timep)
-#else
-#define localtime(timep, tm_ptr) localtime_r(timep, tm_ptr)
-#endif
 
 #define CUS_FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1   \
 : (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__))

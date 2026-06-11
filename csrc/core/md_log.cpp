@@ -10,6 +10,11 @@
 #include "core/md_log.h"
 #include "tabulate/tabulate.hpp"
 
+#ifdef _MSC_VER
+#define MD_LOCALTIME(timep, tm_ptr) localtime_s(tm_ptr, timep)
+#else
+#define MD_LOCALTIME(timep, tm_ptr) localtime_r(timep, tm_ptr)
+#endif
 
 namespace modeldeploy {
     LogStreamWrapper& LogStreamWrapper::operator<<(std::ostream&(*manip)(std::ostream&)) {
@@ -30,53 +35,57 @@ namespace modeldeploy {
             return LogStreamWrapper(nullptr);
         }
 
+        // ERROR/FATAL → std::cerr, others → std::cout
+        std::ostream& out = (level >= LogLevel::MD_LOG_E) ? std::cerr : std::cout;
         const std::time_t now = std::time(nullptr);
-        std::tm localTime{};
-        localtime(&now, &localTime);
+
+        // Cache localtime to avoid repeated calls within the same second
+        if (now != cached_time_sec_) {
+            cached_time_sec_ = now;
+            MD_LOCALTIME(&now, &cached_tm_);
+        }
 
         switch (level) {
         case LogLevel::MD_LOG_D:
-            *log_stream_ << termcolor::blue;
-            *log_stream_ << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << " | DEBUG | ";
+            out << termcolor::blue;
+            out << std::put_time(&cached_tm_, "%Y-%m-%d %H:%M:%S") << " | DEBUG | ";
             break;
         case LogLevel::MD_LOG_I:
-            *log_stream_ << termcolor::green;
-            *log_stream_ << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << " | INFO  | ";
+            out << termcolor::green;
+            out << std::put_time(&cached_tm_, "%Y-%m-%d %H:%M:%S") << " | INFO  | ";
             break;
         case LogLevel::MD_LOG_W:
-            *log_stream_ << termcolor::yellow;
-            *log_stream_ << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << " | WARN  | ";
+            out << termcolor::yellow;
+            out << std::put_time(&cached_tm_, "%Y-%m-%d %H:%M:%S") << " | WARN  | ";
             break;
         case LogLevel::MD_LOG_E:
-            *log_stream_ << termcolor::red;
-            *log_stream_ << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << " | ERROR | ";
+            out << termcolor::red;
+            out << std::put_time(&cached_tm_, "%Y-%m-%d %H:%M:%S") << " | ERROR | ";
             break;
         case LogLevel::MD_LOG_F:
-            *log_stream_ << termcolor::on_red << termcolor::cyan;
-            *log_stream_ << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << " | FATAL | ";
+            out << termcolor::on_red << termcolor::cyan;
+            out << std::put_time(&cached_tm_, "%Y-%m-%d %H:%M:%S") << " | FATAL | ";
             break;
         default:
-            *log_stream_ << "[UNKNOWN] ";
+            out << "[UNKNOWN] ";
         }
 
-        // Build log prefix dynamically based on available data
         bool hasPrintedPrefix = false;
-        if (filename && strlen(filename) > 0) {
-            *log_stream_ << "[" << filename << "]";
+        if (filename && *filename) {
+            out << "[" << filename << "]";
             hasPrintedPrefix = true;
         }
-        if (function && strlen(function) > 0) {
-            *log_stream_ << "[" << function << "]";
+        if (function && *function) {
+            out << "[" << function << "]";
             hasPrintedPrefix = true;
         }
         if (line != -1) {
-            *log_stream_ << "[" << line << "]";
+            out << "[" << line << "]";
             hasPrintedPrefix = true;
         }
-        // Only add colon and space if any prefix was printed
         if (hasPrintedPrefix) {
-            *log_stream_ << ": ";
+            out << ": ";
         }
-        return LogStreamWrapper(*log_stream_, level == LogLevel::MD_LOG_F);
+        return LogStreamWrapper(out, level == LogLevel::MD_LOG_F);
     }
 } // namespace modeldeploy
