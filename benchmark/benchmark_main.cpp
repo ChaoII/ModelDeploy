@@ -53,7 +53,7 @@ static const char* device_name(int d) {
 }
 
 // ==================== Image operation bench (md_clone_image) ====================
-TEST_CASE("Image clone 640x480", "[imgproc][.benchmark]") {
+TEST_CASE("Image clone 640x480", "[imgproc][benchmark]") {
     auto img = md_read_image(img_file().string().c_str());
     if (!img.data) return;
     BENCHMARK("clone 640x480") { return md_clone_image(&img); };
@@ -86,7 +86,7 @@ static void bench_det(const BenchCfg& c) {
     md_free_detection_model(&m);
 }
 
-TEST_CASE("Detection inference", "[model][det][.benchmark]") {
+TEST_CASE("Detection inference", "[model][det][benchmark]") {
     const BenchCfg cfgs[] = {
         {"det/ort/cpu/t1", "yolo11n_nms.onnx", 0, 0, 1},
         {"det/ort/cpu/t4", "yolo11n_nms.onnx", 0, 0, 4},
@@ -116,7 +116,7 @@ static void bench_cls(const BenchCfg& c) {
     md_free_classification_model(&m);
 }
 
-TEST_CASE("Classification inference", "[model][cls][.benchmark]") {
+TEST_CASE("Classification inference", "[model][cls][benchmark]") {
     const BenchCfg cfgs[] = {
         {"cls/ort/cpu/t4", "yolo11n-cls.onnx", 0, 0, 4},
         {"cls/ort/gpu",    "yolo11n-cls.onnx", 0, 1, 4},
@@ -142,7 +142,7 @@ static void bench_obb(const BenchCfg& c) {
     md_free_obb_model(&m);
 }
 
-TEST_CASE("OBB inference", "[model][obb][.benchmark]") {
+TEST_CASE("OBB inference", "[model][obb][benchmark]") {
     const BenchCfg cfgs[] = {
         {"obb/ort/cpu/t4", "yolo11n-obb_nms.onnx", 0, 0, 4},
         {"obb/ort/gpu",    "yolo11n-obb_nms.onnx", 0, 1, 4},
@@ -168,7 +168,7 @@ static void bench_pose(const BenchCfg& c) {
     md_free_keypoint_model(&m);
 }
 
-TEST_CASE("Pose inference", "[model][pose][.benchmark]") {
+TEST_CASE("Pose inference", "[model][pose][benchmark]") {
     const BenchCfg cfgs[] = {
         {"pose/ort/cpu/t4", "yolo11n-pose_nms.onnx", 0, 0, 4},
         {"pose/ort/gpu",    "yolo11n-pose_nms.onnx", 0, 1, 4},
@@ -194,7 +194,7 @@ static void bench_seg(const BenchCfg& c) {
     md_free_instance_seg_model(&m);
 }
 
-TEST_CASE("Segmentation inference", "[model][seg][.benchmark]") {
+TEST_CASE("Segmentation inference", "[model][seg][benchmark]") {
     const BenchCfg cfgs[] = {
         {"seg/ort/cpu/t4", "yolo11n-seg_nms.onnx", 0, 0, 4},
         {"seg/ort/gpu",    "yolo11n-seg_nms.onnx", 0, 1, 4},
@@ -203,7 +203,7 @@ TEST_CASE("Segmentation inference", "[model][seg][.benchmark]") {
 }
 
 // ==================== Model load time ====================
-TEST_CASE("Model load time", "[load][.benchmark]") {
+TEST_CASE("Model load time", "[load][benchmark]") {
     struct LoadTest { const char* name; const char* rel; int backend; int device; int threads; MDStatusCode (*create)(MDModel*, const char*, const MDRuntimeOption*); };
     const LoadTest lt[] = {
         {"det/ort/cpu", "yolo11n_nms.onnx", 0, 0, 4, md_create_detection_model},
