@@ -193,21 +193,15 @@ namespace modeldeploy {
     bool read_encrypted_model_to_buffer(const std::string& path, const std::string& password,
                                         std::string* buf, std::string* fmt) {
         if (!buf || !fmt) return false;
-        if (is_password_invalid(password)) { MD_LOG_ERROR << "Password cannot be empty." << std::endl; return false; }
+        if (is_password_invalid(password)) return false;
         std::vector<uint8_t> salt, iv, cipher; uint32_t crc_ref;
         if (!read_header(path, fmt, &salt, &iv, &cipher, &crc_ref)) return false;
-
         std::string cs((const char*)cipher.data(), cipher.size());
-        if (calculate_crc32(cs) != crc_ref)
-        { MD_LOG_ERROR << "CRC mismatch." << std::endl; return false; }
-
+        if (calculate_crc32(cs) != crc_ref) return false;
         uint8_t key[AES_KEY_LEN];
         derive_key(password, salt.data(), (uint32_t)salt.size(), key);
-
         std::vector<uint8_t> plain;
-        if (!aes_decrypt(key, iv.data(), cipher.data(), (uint32_t)cipher.size(), &plain))
-        { MD_LOG_ERROR << "Decryption failed." << std::endl; buf->clear(); fmt->clear(); return false; }
-
+        if (!aes_decrypt(key, iv.data(), cipher.data(), (uint32_t)cipher.size(), &plain)) { buf->clear(); fmt->clear(); return false; }
         buf->assign((const char*)plain.data(), plain.size());
         return true;
     }

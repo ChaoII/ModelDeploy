@@ -19,10 +19,13 @@ namespace modeldeploy {
                 decrypt_password = this->password;
             }
             if (!read_encrypted_model_to_buffer(model_path, decrypt_password, &buffer, &format)) {
-                MD_LOG_FATAL << "Current model is encrypted, but decrypt model failed " << std::endl;
+                MD_LOG_FATAL << "Model decryption failed. Check password (set via option.password) "
+                    << "or that the file is not corrupted." << std::endl;
             }
             model_from_memory = true;
             model_buffer = buffer;
+            ort_option.model_from_memory = true;
+            ort_option.model_buffer = buffer;
             // 你可以根据format自动切换后端
             if (format == "onnx") {
                 use_ort_backend();
