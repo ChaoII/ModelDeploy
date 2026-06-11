@@ -10,6 +10,7 @@ dist
 # Prerequisites
 *.d
 models
+memory.md
 # Compiled Object files
 *.slo
 *.lo
@@ -31,10 +32,9 @@ test_data
 *.mod
 *.smod
 csharp/.idea
-csharp/ModelDeploy/bin
-csharp/ModelDeploy/obj
-csharp/TestModelDeploy/bin
-csharp/TestModelDeploy/obj
+csharp/*/bin
+csharp/*/obj
+csharp/**/*.DotSettings.user
 
 # Compiled Static libraries
 *.lai
