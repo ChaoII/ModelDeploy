@@ -1,37 +1,28 @@
 add_definitions(-DCATCH_CONFIG_ENABLE_BENCHMARKING)
 
-# === 核心库测试 ===
-add_executable(test_core test_core.cpp)
-target_link_libraries(test_core PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain)
-add_test(NAME test_core COMMAND test_core)
+# === 统一测试可执行文件 ===
+# 所有测试用例编译为单个二进制，用 Catch2 标签 [core] [image_data]
+# [capi] [model] 等区分。运行时按需筛选：
+#   test_modeldeploy          # 全部
+#   test_modeldeploy [core]   # 仅核心
+#   test_modeldeploy ~[gpu]   # 排除 GPU
 
-# === 图像测试（需要 vision + CAPI） ===
-if (BUILD_VISION)
-    add_executable(test_image_data test_image_data.cpp)
-    target_link_libraries(test_image_data PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain ${OpenCV_LIBS})
-    add_test(NAME test_image_data COMMAND test_image_data)
-    set_tests_properties(test_image_data PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
+set(TEST_SOURCES
+    test_core.cpp
+    test_image_data.cpp
+    test_capi_image.cpp
+    test_md_image.cpp
+    test_vision_models.cpp
+    utils.cpp
+)
 
-    add_executable(test_capi_image test_capi_image.cpp)
-    target_link_libraries(test_capi_image PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain)
-    add_test(NAME test_capi_image COMMAND test_capi_image)
-    set_tests_properties(test_capi_image PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
+add_executable(test_modeldeploy ${TEST_SOURCES})
+target_link_libraries(test_modeldeploy PRIVATE
+    ${LIBRARY_NAME}
+    Catch2::Catch2WithMain
+    ${OpenCV_LIBS})
+target_include_directories(test_modeldeploy PRIVATE ${CMAKE_SOURCE_DIR})
 
-    add_executable(test_vision_models test_vision_models.cpp)
-    target_link_libraries(test_vision_models PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain)
-    add_test(NAME test_vision_models COMMAND test_vision_models)
-    set_tests_properties(test_vision_models PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
-
-    add_executable(test_md_image test_md_image.cpp utils.cpp)
-    target_link_libraries(test_md_image PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain ${OpenCV_LIBS})
-    add_test(NAME test_md_image COMMAND test_md_image)
-    set_tests_properties(test_md_image PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
-endif ()
-
-# === 音频模型测试 ===
-if (BUILD_AUDIO)
-    add_executable(test_audio_models test_audio_models.cpp)
-    target_link_libraries(test_audio_models PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain)
-    add_test(NAME test_audio_models COMMAND test_audio_models)
-    set_tests_properties(test_audio_models PROPERTIES ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
-endif ()
+add_test(NAME test_modeldeploy COMMAND test_modeldeploy)
+set_tests_properties(test_modeldeploy PROPERTIES
+    ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
