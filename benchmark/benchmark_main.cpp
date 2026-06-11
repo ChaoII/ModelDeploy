@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
 #include "capi/common/md_types.h"
 #include "capi/common/md_decl.h"
@@ -16,6 +17,23 @@
 #include "capi/vision/obb/obb_capi.h"
 #include "capi/vision/pose/pose_capi.h"
 #include "capi/vision/iseg/instance_seg_capi.h"
+#include "core/md_log.h"
+
+using namespace modeldeploy;
+
+// RAII 日志静音器：抑制模型加载时的 INFO 日志和 std::cout 输出
+struct LogSilencer {
+    std::streambuf* old_buf;
+    std::ofstream null_stream;
+    LogSilencer() : null_stream("nul") {
+        old_buf = std::cout.rdbuf(null_stream.rdbuf());
+        MD_SET_LOG_LEVEL(LogLevel::MD_LOG_W);
+    }
+    ~LogSilencer() {
+        std::cout.rdbuf(old_buf);
+        MD_SET_LOG_LEVEL(LogLevel::MD_LOG_I);
+    }
+};
 
 namespace fs = std::filesystem;
 
@@ -74,6 +92,7 @@ static bool file_exists(const char* path) { return fs::exists(path); }
 static void bench_det(const BenchCfg& c) {
     auto mp = model_dir() / c.model_rel;
     if (!file_exists(mp.string().c_str())) return;
+    LogSilencer _silence;
     MDModel m; memset(&m, 0, sizeof(m));
     auto opt = make_opt(c.backend, c.device, c.threads);
     if (md_create_detection_model(&m, mp.string().c_str(), &opt) != 0) return;
@@ -242,6 +261,7 @@ TEST_CASE("Model load time", "[load][benchmark]") {
         if (!file_exists(mp.string().c_str())) continue;
         auto opt = make_opt(lt[i].backend, lt[i].device, lt[i].threads);
         BENCHMARK(lt[i].name) {
+            LogSilencer _s;
             MDModel m; memset(&m, 0, sizeof(m));
             lt[i].create(&m, mp.string().c_str(), &opt);
         };
