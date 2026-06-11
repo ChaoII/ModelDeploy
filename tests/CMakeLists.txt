@@ -1,5 +1,3 @@
-add_definitions(-DCATCH_CONFIG_ENABLE_BENCHMARKING)
-
 # Catch2 仅测试使用，不放在顶层 CMakeLists.txt
 add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/third_party/Catch2")
 

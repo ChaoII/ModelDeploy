@@ -552,29 +552,3 @@ TEST_CASE("ImageData read/write file", "[image_data]") {
     }
 }
 
-// ==================== Benchmarks ====================
-TEST_CASE("ImageData benchmarks", "[.benchmark][image_data]") {
-    auto small = create_gradient_image(320, 240);
-    auto medium = create_gradient_image(640, 480);
-    auto hd = create_gradient_image(1920, 1080);
-
-    BENCHMARK("resize 640x480 -> 224x224") {
-        return medium.resize(224, 224);
-    };
-
-    BENCHMARK("cvt_color BGR->RGB 640x480") {
-        return ImageData::cvt_color(medium, ColorConvertType::CVT_PA_BGR2PA_RGB);
-    };
-
-    BENCHMARK("normalize 640x480") {
-        return medium.normalize({0.485f, 0.456f, 0.406f}, {0.229f, 0.224f, 0.225f});
-    };
-
-    BENCHMARK("permute 640x480") {
-        return medium.permute();
-    };
-
-    BENCHMARK("fuse_normalize_and_permute 640x480") {
-        return medium.fuse_normalize_and_permute({0.485f, 0.456f, 0.406f}, {0.229f, 0.224f, 0.225f});
-    };
-}

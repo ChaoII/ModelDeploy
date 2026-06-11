@@ -1,5 +1,10 @@
 add_definitions(-DCATCH_CONFIG_ENABLE_BENCHMARKING)
 
+# Catch2 依赖
+if (NOT TARGET Catch2::Catch2WithMain)
+    add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/third_party/Catch2")
+endif ()
+
 add_executable(benchmark_image_data benchmark_image_data.cpp)
 target_link_libraries(benchmark_image_data PRIVATE ${LIBRARY_NAME} Catch2::Catch2WithMain ${OpenCV_LIBS})
 add_test(NAME benchmark_image_data COMMAND benchmark_image_data)
