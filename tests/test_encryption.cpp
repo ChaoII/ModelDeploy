@@ -79,19 +79,18 @@ TEST_CASE("Encryption roundtrip buffer", "[encryption]") {
     fs::remove(encrypted);
 }
 
-TEST_CASE("Encryption empty password", "[encryption]") {
+TEST_CASE("Encryption empty password rejected", "[encryption]") {
     auto tmp_dir = fs::temp_directory_path();
     auto input = tmp_dir / "test_empty_pwd.onnx";
     auto encrypted = tmp_dir / "test_empty_pwd.mdenc";
 
     {
         std::ofstream ofs(input, std::ios::binary);
-        ofs << "DATA_WITH_EMPTY_PASSWORD";
+        ofs << "DATA";
     }
 
-    // 空密码应该可以
-    REQUIRE(modeldeploy::encrypt_model_file(input.string(), encrypted.string(), "", "onnx"));
-    REQUIRE(modeldeploy::is_encrypted_model_file(encrypted.string()));
+    // 空密码应被拒绝（AES-256 不支持空密码）
+    REQUIRE_FALSE(modeldeploy::encrypt_model_file(input.string(), encrypted.string(), "", "onnx"));
 
     fs::remove(input);
     fs::remove(encrypted);
