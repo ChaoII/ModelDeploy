@@ -54,6 +54,9 @@ namespace modeldeploy {
 
         std::string trt_max_shape;
 
+        /// ONNX Runtime log severity (0=verbose,1=info,2=warning,3=error,4=fatal)
+        int log_severity_level = 3;
+
         void set_cpu_thread_num(const int num) {
             intra_op_num_threads = num;
             inter_op_num_threads = num;

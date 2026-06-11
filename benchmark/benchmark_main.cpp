@@ -60,6 +60,7 @@ static MDRuntimeOption make_opt(int backend, int device, int threads) {
     opt.trt_max_shape = "";
     opt.trt_engine_cache_path = "";
     opt.password = "";
+    opt.ort_log_severity = 3;
     return opt;
 }
 

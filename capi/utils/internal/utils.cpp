@@ -638,4 +638,5 @@ void c_runtime_option_2_runtime_option(
     option->set_trt_opt_shape(c_option->trt_opt_shape);
     option->set_trt_max_shape(c_option->trt_max_shape);
     option->password = c_option->password;
+    option->ort_option.log_severity_level = c_option->ort_log_severity;
 }
