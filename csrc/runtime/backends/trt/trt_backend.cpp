@@ -274,7 +274,24 @@ namespace modeldeploy {
                 std::to_string(i), name, type_str, shape_str
             });
         }
-        std::cout << io_table << std::endl;
+        MD_LOG_INFO << std::endl << io_table << std::endl;
+        // Log optimization profile ranges
+        const int nb_profiles = engine_->getNbOptimizationProfiles();
+        if (nb_profiles > 0) {
+            for (int p = 0; p < nb_profiles; ++p) {
+                for (int i = 0; i < engine_->getNbIOTensors(); ++i) {
+                    auto const name = engine_->getIOTensorName(i);
+                    if (engine_->getTensorIOMode(name) != nvinfer1::TensorIOMode::kINPUT) continue;
+                    auto min_d = engine_->getProfileShape(name, p, nvinfer1::OptProfileSelector::kMIN);
+                    auto opt_d = engine_->getProfileShape(name, p, nvinfer1::OptProfileSelector::kOPT);
+                    auto max_d = engine_->getProfileShape(name, p, nvinfer1::OptProfileSelector::kMAX);
+                    MD_LOG_INFO << "TRT profile[" << p << "] " << name
+                        << ": min=" << vector_to_string(dims_to_vec(min_d))
+                        << " opt=" << vector_to_string(dims_to_vec(opt_d))
+                        << " max=" << vector_to_string(dims_to_vec(max_d)) << std::endl;
+                }
+            }
+        }
         return true;
     }
 
@@ -292,7 +309,11 @@ namespace modeldeploy {
             nvinfer1::Dims dims = vec_to_dims(input.shape());
             // 设置输入形状
             if (!context_->setInputShape(name.c_str(), dims)) {
-                MD_LOG_ERROR << "Failed to set input shape for " << name;
+                MD_LOG_ERROR << "Failed to set input shape for " << name
+                    << " [" << vector_to_string(input.shape()) << "]. "
+                    << "The shape is outside the engine's optimization profile range. "
+                    << "Delete the cached .engine file to rebuild from ONNX."
+                    << std::endl;
                 return false;
             }
             // 分配并复制数据到设备

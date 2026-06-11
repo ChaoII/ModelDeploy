@@ -59,5 +59,7 @@ namespace modeldeploy {
         std::string model_buffer_;
 
         bool load_trt_cache(const std::string& engine_buffer);
+        /// 判断输入 shape 是否超出 engine profile 范围（仅用于友好报错）
+        [[nodiscard]] bool shape_within_profile(const nvinfer1::Dims& dims, int input_idx) const;
     };
 } // namespace modeldeploy

@@ -23,7 +23,7 @@ int main() {
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().use_cuda_preproc();
-    yolo11_det.get_preprocessor().set_size({1280, 1280});
+    yolo11_det.get_preprocessor().set_size({640, 640});
     constexpr int warming_up_count = 10;
     for (int i = 0; i < warming_up_count; ++i) {
         yolo11_det.predict(img, &result);
