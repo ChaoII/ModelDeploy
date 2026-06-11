@@ -44,9 +44,14 @@ namespace modeldeploy {
 
         if (is_onnx) {
             // --- Build TRT engine from ONNX ---
+            // Auto-generate cache path: model.onnx → model.onnx.engine
+            auto cache_path = option_.cache_file_path;
+            if (cache_path.empty()) {
+                cache_path = option.model_file + ".engine";
+            }
+
             // Check cache first
-            const auto& cache_path = option_.cache_file_path;
-            if (!cache_path.empty() && std::filesystem::exists(cache_path)) {
+            if (std::filesystem::exists(cache_path)) {
                 auto onnx_time = std::filesystem::last_write_time(option.model_file);
                 auto cache_time = std::filesystem::last_write_time(cache_path);
                 if (cache_time >= onnx_time) {
@@ -94,20 +99,53 @@ namespace modeldeploy {
                 }
             }
 
-            // Set dynamic shape ranges if provided
-            if (!option_.min_shape.empty()) {
+            // Auto-detect dynamic shapes and set optimization profiles
+            bool has_dynamic = false;
+            if (option_.min_shape.empty()) {
+                // No user-provided profile — check network for dynamic dims
+                auto profile = builder->createOptimizationProfile();
+                for (int i = 0; i < network->getNbInputs(); ++i) {
+                    auto* input = network->getInput(i);
+                    auto dims = input->getDimensions();
+                    if (dims.nbDims < 0) continue;
+                    bool input_dynamic = false;
+                    nvinfer1::Dims min_dims = dims, opt_dims = dims, max_dims = dims;
+                    for (int d = 0; d < dims.nbDims; ++d) {
+                        if (dims.d[d] == -1) {
+                            input_dynamic = true;
+                            has_dynamic = true;
+                            min_dims.d[d] = (d == 0) ? 1 : 32;         // batch=1, spatial=32
+                            opt_dims.d[d] = dims.d[d];                   // keep -1 → replace with a reasonable default
+                            max_dims.d[d] = (d == 0) ? 4 : 1280;        // batch=4, spatial=1280
+                        }
+                    }
+                    // For dynamic dims, set reasonable defaults if not provided by user
+                    if (input_dynamic) {
+                        // Replace remaining -1 in opt_dims with a default
+                        for (int d = 0; d < opt_dims.nbDims; ++d) {
+                            if (opt_dims.d[d] == -1) opt_dims.d[d] = 640;
+                        }
+                        profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMIN, min_dims);
+                        profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kOPT, opt_dims);
+                        profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMAX, max_dims);
+                    }
+                }
+                if (has_dynamic) {
+                    config->addOptimizationProfile(profile);
+                    MD_LOG_INFO << "Auto-set TRT optimization profile for dynamic shapes." << std::endl;
+                }
+            }
+            else {
+                // User-provided profiles
                 auto profile = builder->createOptimizationProfile();
                 for (auto& [name, min_dims] : option_.min_shape) {
                     auto opt_it = option_.opt_shape.find(name);
                     auto max_it = option_.max_shape.find(name);
                     const auto& opt_dims = (opt_it != option_.opt_shape.end()) ? opt_it->second : min_dims;
                     const auto& max_dims = (max_it != option_.max_shape.end()) ? max_it->second : min_dims;
-                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kMIN,
-                                           vec_to_dims(min_dims));
-                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kOPT,
-                                           vec_to_dims(opt_dims));
-                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kMAX,
-                                           vec_to_dims(max_dims));
+                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kMIN, vec_to_dims(min_dims));
+                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kOPT, vec_to_dims(opt_dims));
+                    profile->setDimensions(name.c_str(), nvinfer1::OptProfileSelector::kMAX, vec_to_dims(max_dims));
                 }
                 config->addOptimizationProfile(profile);
             }
@@ -117,8 +155,8 @@ namespace modeldeploy {
                 MD_LOG_ERROR << "Failed to build TRT engine from ONNX." << std::endl; return false;
             }
 
-            // Save cache if path provided
-            if (!cache_path.empty()) {
+            // Save cache
+            {
                 std::ofstream ofs(cache_path, std::ios::binary);
                 if (ofs) {
                     ofs.write(static_cast<const char*>(serialized_engine->data()),

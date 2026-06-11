@@ -8,8 +8,8 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
-    // option.use_trt_backend();
-    option.use_ort_backend();
+    option.use_trt_backend();
+    // option.use_ort_backend();
     option.use_gpu(0);
     option.password = "123456";
     option.enable_fp16 = true;
