@@ -24,6 +24,7 @@ namespace modeldeploy {
         option_ = option.trt_option;
         option_.model_file = option.model_file;
         option_.gpu_id = option.device_id;
+        option_.enable_fp16 = option.enable_fp16; // 同步用户设置的 FP16 标志
         const cudaError_t error = cudaSetDevice(option_.gpu_id);
         if (error != cudaSuccess) {
             MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;

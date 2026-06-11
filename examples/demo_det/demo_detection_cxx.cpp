@@ -15,7 +15,7 @@ int main() {
     option.enable_fp16 = true;
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det_20251219.engine", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det_20251219.onnx", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute1.jpg");
