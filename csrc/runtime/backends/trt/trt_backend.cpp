@@ -109,30 +109,63 @@ namespace modeldeploy {
                     auto dims = input->getDimensions();
                     if (dims.nbDims < 0) continue;
                     bool input_dynamic = false;
-                    nvinfer1::Dims min_dims = dims, opt_dims = dims, max_dims = dims;
+
+                    // Detect the layout: for 4D [N,C,H,W] image inputs,
+                    // infer a reasonable opt size from static dims (e.g. C=3)
+                    bool is_image_4d = (dims.nbDims == 4);
                     for (int d = 0; d < dims.nbDims; ++d) {
                         if (dims.d[d] == -1) {
                             input_dynamic = true;
                             has_dynamic = true;
-                            min_dims.d[d] = (d == 0) ? 1 : 32;         // batch=1, spatial=32
-                            opt_dims.d[d] = dims.d[d];                   // keep -1 → replace with a reasonable default
-                            max_dims.d[d] = (d == 0) ? 4 : 1280;        // batch=4, spatial=1280
                         }
                     }
-                    // For dynamic dims, set reasonable defaults if not provided by user
-                    if (input_dynamic) {
-                        // Replace remaining -1 in opt_dims with a default
-                        for (int d = 0; d < opt_dims.nbDims; ++d) {
-                            if (opt_dims.d[d] == -1) opt_dims.d[d] = 640;
+                    if (!input_dynamic) continue;
+
+                    nvinfer1::Dims min_dims = dims, opt_dims = dims, max_dims = dims;
+                    for (int d = 0; d < dims.nbDims; ++d) {
+                        if (dims.d[d] != -1) {
+                            // Static dimension — use as-is
+                            min_dims.d[d] = dims.d[d];
+                            opt_dims.d[d] = dims.d[d];
+                            max_dims.d[d] = dims.d[d];
+                            continue;
                         }
-                        profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMIN, min_dims);
-                        profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kOPT, opt_dims);
-                        profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMAX, max_dims);
+                        // Dynamic dimension — infer reasonable range
+                        if (d == 0) {
+                            // Batch dimension
+                            min_dims.d[d] = 1;
+                            opt_dims.d[d] = 1;
+                            max_dims.d[d] = 4;
+                        }
+                        else if (is_image_4d && (d == 2 || d == 3)) {
+                            // Spatial H/W for 4D image input
+                            min_dims.d[d] = 32;
+                            opt_dims.d[d] = 640; // common default; overridable via MDRuntimeOption
+                            max_dims.d[d] = 1280;
+                        }
+                        else {
+                            // Other dynamic dimensions (e.g. sequence length)
+                            min_dims.d[d] = 1;
+                            opt_dims.d[d] = 64;
+                            max_dims.d[d] = 512;
+                        }
                     }
+                    profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMIN, min_dims);
+                    profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kOPT, opt_dims);
+                    profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMAX, max_dims);
+                    auto dims_to_str = [](const nvinfer1::Dims& d) {
+                        std::string s = "[";
+                        for (int j = 0; j < d.nbDims; ++j) { if (j) s += ","; s += std::to_string(d.d[j]); }
+                        return s + "]";
+                    };
+                    MD_LOG_INFO << "TRT auto profile [" << input->getName() << "]: "
+                        << "min=" << dims_to_str(min_dims) << " "
+                        << "opt=" << dims_to_str(opt_dims) << " "
+                        << "max=" << dims_to_str(max_dims)
+                        << " (override via MDRuntimeOption.trt_min_shape)" << std::endl;
                 }
                 if (has_dynamic) {
                     config->addOptimizationProfile(profile);
-                    MD_LOG_INFO << "Auto-set TRT optimization profile for dynamic shapes." << std::endl;
                 }
             }
             else {
