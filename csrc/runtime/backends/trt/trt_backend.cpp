@@ -185,7 +185,12 @@ namespace modeldeploy {
 
             auto* serialized_engine = builder->buildSerializedNetwork(*network, *config);
             if (!serialized_engine) {
-                MD_LOG_ERROR << "Failed to build TRT engine from ONNX." << std::endl; return false;
+                MD_LOG_ERROR << "Failed to build TRT engine from ONNX: " << option.model_file
+                    << ". The ONNX model may contain ops unsupported by TensorRT (e.g. NMS). "
+                    << "Try using the model without embedded NMS (e.g. yolo11n.onnx instead of yolo11n_nms.onnx), "
+                    << "or use ORT backend (MD_BACKEND_ORT) with option.enable_trt=1 for mixed EP execution."
+                    << std::endl;
+                return false;
             }
 
             // Save cache
