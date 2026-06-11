@@ -1,10 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <array>
 #include <filesystem>
 #include <opencv2/core/mat.hpp>
 #include "vision/common/image_data.h"
 #include "vision/common/basic_types.h"
+#include "core/md_log.h"
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -149,14 +149,18 @@ TEST_CASE("ImageData from_raw", "[image_data]") {
     }
 
     SECTION("null data returns empty") {
+        MD_SET_LOG_LEVEL(LogLevel::MD_LOG_F); // suppress expected error
         auto img = ImageData::from_raw(nullptr, 100, 100, MdImageType::PKG_BGR_U8, true);
         REQUIRE(img.empty());
+        MD_SET_LOG_LEVEL(LogLevel::MD_LOG_I);
     }
 
     SECTION("zero dimensions return empty") {
+        MD_SET_LOG_LEVEL(LogLevel::MD_LOG_F); // suppress expected error
         std::vector<uint8_t> buf(100, 0);
         auto img = ImageData::from_raw(buf.data(), 0, 0, MdImageType::PKG_BGR_U8, true);
         REQUIRE(img.empty());
+        MD_SET_LOG_LEVEL(LogLevel::MD_LOG_I);
     }
 }
 
