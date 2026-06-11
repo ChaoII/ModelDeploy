@@ -62,5 +62,7 @@ namespace modeldeploy {
         void* external_stream = nullptr;
         int gpu_id = 0;
         std::string model_file;
+        bool model_from_memory = false;
+        std::string model_buffer;
     };
 } // namespace modeldeploy

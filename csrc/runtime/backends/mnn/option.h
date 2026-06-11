@@ -71,5 +71,7 @@ namespace modeldeploy {
         mnn::PowerMode power_mode = mnn::MNN_Power_Normal;
         mnn::MemoryMode memory_mode = mnn::MNN_Memory_Normal;
         int gpu_mode = mnn::MNN_GPU_TUNING_NONE;
+        bool model_from_memory = false;
+        std::string model_buffer;
     };
 } // namespace modeldeploy

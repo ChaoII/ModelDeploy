@@ -10,8 +10,20 @@
 
 
 namespace modeldeploy {
+    // 各后端支持的模型格式
+    static bool backend_supports_format(Backend backend, const std::string& ext) {
+        switch (backend) {
+            case Backend::ORT: return ext == ".onnx";
+            case Backend::MNN: return ext == ".mnn";
+            case Backend::TRT: return ext == ".onnx" || ext == ".engine";
+            default: return false;
+        }
+    }
+
     void RuntimeOption::set_model_path(const std::string& model_path, const std::string& password) {
         model_file = model_path;
+
+        // 解密加密模型（如适用）
         if (is_encrypted_model_file(model_path)) {
             std::string buffer, format;
             auto decrypt_password = password;
@@ -22,45 +34,45 @@ namespace modeldeploy {
                 MD_LOG_FATAL << "Model decryption failed. Check password (set via option.password) "
                     << "or that the file is not corrupted." << std::endl;
             }
+            // 同步到三个后端 option（各后端从各自的 option 或 RuntimeOption 读取）
             model_from_memory = true;
             model_buffer = buffer;
             ort_option.model_from_memory = true;
             ort_option.model_buffer = buffer;
-            // 你可以根据format自动切换后端
-            if (format == "onnx") {
-                use_ort_backend();
-            }
-            else if (format == "mnn") {
-                use_mnn_backend();
-            }
-            else if (format == "engine") {
-                use_trt_backend();
-            }
-            else {
-                MD_LOG_FATAL << "model format error" << std::endl;
-            }
+            trt_option.model_from_memory = true;
+            trt_option.model_buffer = buffer;
+            mnn_option.model_from_memory = true;
+            mnn_option.model_buffer = buffer;
+            return;
         }
-        else {
-            const std::filesystem::path path(model_path);
-            model_from_memory = false;
-            // 用户设置了密码但模型不是加密格式 → 提醒
-            if (!password.empty() || !this->password.empty()) {
-                MD_LOG_WARN << "Password provided but model file is not encrypted: "
-                    << model_path << ". The password will be ignored." << std::endl;
-            }
-            if (!path.has_extension()) return;
-            // 当 backend 仍为默认 ORT 且文件扩展名与 ORT 不匹配时，才自动推断
-            if (backend != Backend::ORT) return;
-            if (path.extension() == ".mnn") {
+
+        // 非加密模型
+        const std::filesystem::path path(model_path);
+        model_from_memory = false;
+
+        if (!password.empty() || !this->password.empty()) {
+            MD_LOG_WARN << "Password provided but model file is not encrypted: "
+                << model_path << ". The password will be ignored." << std::endl;
+        }
+
+        if (!path.has_extension()) return;
+
+        // 校验当前 backend 是否支持该格式；仅在默认 ORT 且不匹配时自动推断
+        const std::string ext = path.extension().string();
+        if (backend_supports_format(backend, ext)) return;
+
+        if (backend == Backend::ORT) {
+            if (ext == ".mnn") {
 #ifdef ENABLE_MNN
                 backend = Backend::MNN;
 #endif
             }
-            else if (path.extension() == ".engine") {
+            else if (ext == ".engine") {
 #ifdef ENABLE_TRT
                 backend = Backend::TRT;
 #endif
             }
+            // .onnx → ORT（已经是默认，不需要切换）
         }
     }
 

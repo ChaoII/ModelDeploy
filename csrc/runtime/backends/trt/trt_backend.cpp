@@ -30,9 +30,10 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
             return false;
         }
-        if (option.model_from_memory) {
+        if (option.model_from_memory || option_.model_from_memory) {
             runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
-            return load_trt_cache(option.model_buffer);
+            auto& buf = option.model_from_memory ? option.model_buffer : option_.model_buffer;
+            return load_trt_cache(buf);
         }
         if (!std::filesystem::exists(option.model_file)) {
             MD_LOG_ERROR << "Model file does not exist: " << option.model_file << std::endl;

@@ -8,14 +8,12 @@
 int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
-    option.use_trt_backend();
-    // option.use_ort_backend();
+    option.use_ort_backend();
     option.use_gpu(0);
-    option.password = "123456";
+    option.password = "1234567";
     option.enable_fp16 = true;
-    option.enable_trt = true;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/zhgd_det_20251219.onnx", option);
+    option.enable_trt = false;
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms_encrypted.mdenc", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute1.jpg");

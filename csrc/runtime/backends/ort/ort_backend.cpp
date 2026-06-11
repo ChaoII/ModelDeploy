@@ -162,7 +162,8 @@ namespace modeldeploy {
         option_.enable_fp16 = option.enable_fp16;
         option_.model_filepath = option.model_file;
 
-        if (option_.model_from_memory) {
+        // 读取 model_from_memory 时优先用主 RuntimeOption 的字段（与 TRT/MNN 后端保持一致）
+        if (option.model_from_memory || option_.model_from_memory) {
             return init_from_onnx(option.model_buffer, option_);
         }
         if (!std::filesystem::exists(option.model_file)) {
