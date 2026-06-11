@@ -40,7 +40,11 @@ namespace modeldeploy {
         else {
             const std::filesystem::path path(model_path);
             model_from_memory = false;
-            // 如果用户已显式设置 backend（非默认值），不覆盖
+            // 用户设置了密码但模型不是加密格式 → 提醒
+            if (!password.empty() || !this->password.empty()) {
+                MD_LOG_WARN << "Password provided but model file is not encrypted: "
+                    << model_path << ". The password will be ignored." << std::endl;
+            }
             if (!path.has_extension()) return;
             // 当 backend 仍为默认 ORT 且文件扩展名与 ORT 不匹配时，才自动推断
             if (backend != Backend::ORT) return;
