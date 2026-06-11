@@ -553,7 +553,7 @@ TEST_CASE("ImageData read/write file", "[image_data]") {
 }
 
 // ==================== Benchmarks ====================
-TEST_CASE("ImageData benchmarks", "[benchmark][image_data]") {
+TEST_CASE("ImageData benchmarks", "[.benchmark][image_data]") {
     auto small = create_gradient_image(320, 240);
     auto medium = create_gradient_image(640, 480);
     auto hd = create_gradient_image(1920, 1080);

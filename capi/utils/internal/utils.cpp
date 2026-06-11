@@ -63,13 +63,15 @@ cv::Mat md_image_to_mat(const MDImage* image) {
 
 MDImage* mat_to_md_image(const cv::Mat& mat) {
     const auto md_image = static_cast<MDImage*>(malloc(sizeof(MDImage)));
-    // 设置宽度和高度
     md_image->width = mat.cols;
     md_image->height = mat.rows;
     md_image->channels = mat.channels();
-    md_image->data = static_cast<unsigned char*>(malloc(mat.total() * mat.elemSize()));
-    // 复制数据
-    std::memcpy(md_image->data, mat.data, mat.total() * mat.elemSize());
+    if (mat.empty() || mat.total() == 0) {
+        md_image->data = nullptr;
+    } else {
+        md_image->data = static_cast<unsigned char*>(malloc(mat.total() * mat.elemSize()));
+        std::memcpy(md_image->data, mat.data, mat.total() * mat.elemSize());
+    }
     return md_image;
 }
 

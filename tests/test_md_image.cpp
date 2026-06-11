@@ -11,22 +11,26 @@
 #include "capi/utils/md_image_capi.h"
 #include <catch2/catch_test_macros.hpp>
 
+#include <opencv2/core.hpp>
 
+static bool test_images_available() {
+    auto dir = get_test_data_path() / "test_images";
+    return std::filesystem::exists(dir / "test_person.jpg") &&
+           std::filesystem::exists(dir / "test_base64_image.txt");
+}
 
-bool read_image() {
-    const std::filesystem::path image_path = TEST_DATA_DIR / "test_images" / "test_person.jpg";
-    const std::string image_path_str = image_path.string();
-    const MDImage image = md_read_image(image_path_str.c_str());
+static bool read_image() {
+    const auto dir = get_test_data_path() / "test_images";
+    const auto path = dir / "test_person.jpg";
+    const MDImage image = md_read_image(path.string().c_str());
     return image.data != nullptr && image.height == 675 && image.width == 900;
 }
 
-bool from_base64_str() {
-    const std::filesystem::path image_path = TEST_DATA_DIR/ "test_images" / "test_base64_image.txt";;
-    const std::string image_path_str = image_path.string();
-    std::ifstream file(image_path_str);
-    if (!file.is_open()) {
-        return false;
-    }
+static bool from_base64_str() {
+    const auto dir = get_test_data_path() / "test_images";
+    const auto path = dir / "test_base64_image.txt";
+    std::ifstream file(path);
+    if (!file.is_open()) return false;
     const std::string base64_str((std::istreambuf_iterator(file)), std::istreambuf_iterator<char>());
     file.close();
     const MDImage image = md_from_base64_str(base64_str.c_str());
@@ -35,6 +39,9 @@ bool from_base64_str() {
 
 
 TEST_CASE("ModelDeploy Image", "[md_image]") {
-    REQUIRE(read_image()==true);
-    REQUIRE(from_base64_str()==true);
+    if (!test_images_available()) {
+        FAIL("Test images not found. Set TEST_DATA_DIR environment variable.");
+    }
+    REQUIRE(read_image());
+    REQUIRE(from_base64_str());
 }
