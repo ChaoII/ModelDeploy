@@ -69,9 +69,11 @@ struct BenchCfg {
     int threads;
 };
 
+static bool file_exists(const char* path) { return fs::exists(path); }
+
 static void bench_det(const BenchCfg& c) {
     auto mp = model_dir() / c.model_rel;
-    if (!fs::exists(mp)) return;
+    if (!file_exists(mp.string().c_str())) return;
     MDModel m; memset(&m, 0, sizeof(m));
     auto opt = make_opt(c.backend, c.device, c.threads);
     if (md_create_detection_model(&m, mp.string().c_str(), &opt) != 0) return;
@@ -87,21 +89,27 @@ static void bench_det(const BenchCfg& c) {
 }
 
 TEST_CASE("Detection inference", "[model][det][benchmark]") {
-    const BenchCfg cfgs[] = {
-        {"det/ort/cpu/t1", "yolo11n_nms.onnx", 0, 0, 1},
-        {"det/ort/cpu/t4", "yolo11n_nms.onnx", 0, 0, 4},
-        {"det/ort/cpu/t8", "yolo11n_nms.onnx", 0, 0, 8},
-        {"det/ort/gpu",    "yolo11n_nms.onnx", 0, 1, 4},
-        {"det/mnn/cpu/t4", "yolo11n_nms.mnn",  1, 0, 4},
-        {"det/trt/gpu",    "yolo11n.engine",   2, 1, 4},
-    };
-    for (auto& c : cfgs) bench_det(c);
+    BenchCfg cfgs[16];
+    int n = 0;
+#ifdef ENABLE_ORT
+    cfgs[n++] = {"det/ort/cpu/t1", "yolo11n_nms.onnx", 0, 0, 1};
+    cfgs[n++] = {"det/ort/cpu/t4", "yolo11n_nms.onnx", 0, 0, 4};
+    cfgs[n++] = {"det/ort/cpu/t8", "yolo11n_nms.onnx", 0, 0, 8};
+    cfgs[n++] = {"det/ort/gpu",    "yolo11n_nms.onnx", 0, 1, 4};
+#endif
+#ifdef ENABLE_MNN
+    cfgs[n++] = {"det/mnn/cpu/t4", "yolo11n_nms.mnn", 1, 0, 4};
+#endif
+#if defined(WITH_GPU) && defined(ENABLE_TRT)
+    cfgs[n++] = {"det/trt/gpu",    "yolo11n.engine",  2, 1, 4};
+#endif
+    for (int i = 0; i < n; ++i) bench_det(cfgs[i]);
 }
 
 // ==================== Classification ====================
 static void bench_cls(const BenchCfg& c) {
     auto mp = model_dir() / c.model_rel;
-    if (!fs::exists(mp)) return;
+    if (!file_exists(mp.string().c_str())) return;
     MDModel m; memset(&m, 0, sizeof(m));
     auto opt = make_opt(c.backend, c.device, c.threads);
     if (md_create_classification_model(&m, mp.string().c_str(), &opt) != 0) return;
@@ -117,17 +125,19 @@ static void bench_cls(const BenchCfg& c) {
 }
 
 TEST_CASE("Classification inference", "[model][cls][benchmark]") {
-    const BenchCfg cfgs[] = {
-        {"cls/ort/cpu/t4", "yolo11n-cls.onnx", 0, 0, 4},
-        {"cls/ort/gpu",    "yolo11n-cls.onnx", 0, 1, 4},
-    };
-    for (auto& c : cfgs) bench_cls(c);
+    BenchCfg cfgs[4];
+    int n = 0;
+#ifdef ENABLE_ORT
+    cfgs[n++] = {"cls/ort/cpu/t4", "yolo11n-cls.onnx", 0, 0, 4};
+    cfgs[n++] = {"cls/ort/gpu",    "yolo11n-cls.onnx", 0, 1, 4};
+#endif
+    for (int i = 0; i < n; ++i) bench_cls(cfgs[i]);
 }
 
 // ==================== OBB ====================
 static void bench_obb(const BenchCfg& c) {
     auto mp = model_dir() / c.model_rel;
-    if (!fs::exists(mp)) return;
+    if (!file_exists(mp.string().c_str())) return;
     MDModel m; memset(&m, 0, sizeof(m));
     auto opt = make_opt(c.backend, c.device, c.threads);
     if (md_create_obb_model(&m, mp.string().c_str(), &opt) != 0) return;
@@ -143,17 +153,19 @@ static void bench_obb(const BenchCfg& c) {
 }
 
 TEST_CASE("OBB inference", "[model][obb][benchmark]") {
-    const BenchCfg cfgs[] = {
-        {"obb/ort/cpu/t4", "yolo11n-obb_nms.onnx", 0, 0, 4},
-        {"obb/ort/gpu",    "yolo11n-obb_nms.onnx", 0, 1, 4},
-    };
-    for (auto& c : cfgs) bench_obb(c);
+    BenchCfg cfgs[4];
+    int n = 0;
+#ifdef ENABLE_ORT
+    cfgs[n++] = {"obb/ort/cpu/t4", "yolo11n-obb_nms.onnx", 0, 0, 4};
+    cfgs[n++] = {"obb/ort/gpu",    "yolo11n-obb_nms.onnx", 0, 1, 4};
+#endif
+    for (int i = 0; i < n; ++i) bench_obb(cfgs[i]);
 }
 
 // ==================== Pose ====================
 static void bench_pose(const BenchCfg& c) {
     auto mp = model_dir() / c.model_rel;
-    if (!fs::exists(mp)) return;
+    if (!file_exists(mp.string().c_str())) return;
     MDModel m; memset(&m, 0, sizeof(m));
     auto opt = make_opt(c.backend, c.device, c.threads);
     if (md_create_keypoint_model(&m, mp.string().c_str(), &opt) != 0) return;
@@ -169,17 +181,19 @@ static void bench_pose(const BenchCfg& c) {
 }
 
 TEST_CASE("Pose inference", "[model][pose][benchmark]") {
-    const BenchCfg cfgs[] = {
-        {"pose/ort/cpu/t4", "yolo11n-pose_nms.onnx", 0, 0, 4},
-        {"pose/ort/gpu",    "yolo11n-pose_nms.onnx", 0, 1, 4},
-    };
-    for (auto& c : cfgs) bench_pose(c);
+    BenchCfg cfgs[4];
+    int n = 0;
+#ifdef ENABLE_ORT
+    cfgs[n++] = {"pose/ort/cpu/t4", "yolo11n-pose_nms.onnx", 0, 0, 4};
+    cfgs[n++] = {"pose/ort/gpu",    "yolo11n-pose_nms.onnx", 0, 1, 4};
+#endif
+    for (int i = 0; i < n; ++i) bench_pose(cfgs[i]);
 }
 
 // ==================== Segmentation ====================
 static void bench_seg(const BenchCfg& c) {
     auto mp = model_dir() / c.model_rel;
-    if (!fs::exists(mp)) return;
+    if (!file_exists(mp.string().c_str())) return;
     MDModel m; memset(&m, 0, sizeof(m));
     auto opt = make_opt(c.backend, c.device, c.threads);
     if (md_create_instance_seg_model(&m, mp.string().c_str(), &opt) != 0) return;
@@ -195,33 +209,41 @@ static void bench_seg(const BenchCfg& c) {
 }
 
 TEST_CASE("Segmentation inference", "[model][seg][benchmark]") {
-    const BenchCfg cfgs[] = {
-        {"seg/ort/cpu/t4", "yolo11n-seg_nms.onnx", 0, 0, 4},
-        {"seg/ort/gpu",    "yolo11n-seg_nms.onnx", 0, 1, 4},
-    };
-    for (auto& c : cfgs) bench_seg(c);
+    BenchCfg cfgs[4];
+    int n = 0;
+#ifdef ENABLE_ORT
+    cfgs[n++] = {"seg/ort/cpu/t4", "yolo11n-seg_nms.onnx", 0, 0, 4};
+    cfgs[n++] = {"seg/ort/gpu",    "yolo11n-seg_nms.onnx", 0, 1, 4};
+#endif
+    for (int i = 0; i < n; ++i) bench_seg(cfgs[i]);
 }
 
 // ==================== Model load time ====================
 TEST_CASE("Model load time", "[load][benchmark]") {
     struct LoadTest { const char* name; const char* rel; int backend; int device; int threads; MDStatusCode (*create)(MDModel*, const char*, const MDRuntimeOption*); };
-    const LoadTest lt[] = {
-        {"det/ort/cpu", "yolo11n_nms.onnx", 0, 0, 4, md_create_detection_model},
-        {"det/ort/gpu", "yolo11n_nms.onnx", 0, 1, 4, md_create_detection_model},
-        {"det/mnn/cpu", "yolo11n_nms.mnn",  1, 0, 4, md_create_detection_model},
-        {"det/trt/gpu", "yolo11n.engine",   2, 1, 4, md_create_detection_model},
-        {"cls/ort/cpu", "yolo11n-cls.onnx", 0, 0, 4, md_create_classification_model},
-        {"obb/ort/cpu", "yolo11n-obb_nms.onnx", 0, 0, 4, md_create_obb_model},
-        {"pose/ort/cpu","yolo11n-pose_nms.onnx",0, 0, 4, md_create_keypoint_model},
-        {"seg/ort/cpu", "yolo11n-seg_nms.onnx", 0, 0, 4, md_create_instance_seg_model},
-    };
-    for (auto& t : lt) {
-        auto mp = model_dir() / t.rel;
-        if (!fs::exists(mp)) continue;
-        auto opt = make_opt(t.backend, t.device, t.threads);
-        BENCHMARK(t.name) {
+    LoadTest lt[16];
+    int n = 0;
+#ifdef ENABLE_ORT
+    lt[n++] = {"det/ort/cpu", "yolo11n_nms.onnx", 0, 0, 4, md_create_detection_model};
+    lt[n++] = {"det/ort/gpu", "yolo11n_nms.onnx", 0, 1, 4, md_create_detection_model};
+    lt[n++] = {"cls/ort/cpu", "yolo11n-cls.onnx", 0, 0, 4, md_create_classification_model};
+    lt[n++] = {"obb/ort/cpu", "yolo11n-obb_nms.onnx", 0, 0, 4, md_create_obb_model};
+    lt[n++] = {"pose/ort/cpu","yolo11n-pose_nms.onnx",0, 0, 4, md_create_keypoint_model};
+    lt[n++] = {"seg/ort/cpu", "yolo11n-seg_nms.onnx", 0, 0, 4, md_create_instance_seg_model};
+#endif
+#ifdef ENABLE_MNN
+    lt[n++] = {"det/mnn/cpu", "yolo11n_nms.mnn",  1, 0, 4, md_create_detection_model};
+#endif
+#if defined(WITH_GPU) && defined(ENABLE_TRT)
+    lt[n++] = {"det/trt/gpu", "yolo11n.engine",  2, 1, 4, md_create_detection_model};
+#endif
+    for (int i = 0; i < n; ++i) {
+        auto mp = model_dir() / lt[i].rel;
+        if (!file_exists(mp.string().c_str())) continue;
+        auto opt = make_opt(lt[i].backend, lt[i].device, lt[i].threads);
+        BENCHMARK(lt[i].name) {
             MDModel m; memset(&m, 0, sizeof(m));
-            t.create(&m, mp.string().c_str(), &opt);
+            lt[i].create(&m, mp.string().c_str(), &opt);
         };
     }
 }
