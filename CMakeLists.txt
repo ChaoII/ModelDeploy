@@ -17,6 +17,7 @@ option(BUILD_PYTHON "build with python" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(BUILD_BENCHMARK "build benchmarks" OFF)
+option(BUILD_SURVEILLANCE "build AI surveillance application" OFF)
 option(BUILD_ENCRYPTION "enable model encryption/decryption (requires OpenSSL)" ON)
 option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
@@ -252,6 +253,8 @@ if (BUILD_BENCHMARK)
     enable_testing()
     add_subdirectory(benchmark)
 endif ()
+
+add_subdirectory(application)
 
 
 include(GNUInstallDirs)
