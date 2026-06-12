@@ -10,8 +10,16 @@
 
 
 namespace modeldeploy {
-    // 各后端支持的模型格式
-    static bool backend_supports_format(Backend backend, const std::string& ext) {
+    // 格式 → 唯一后端映射（加密模型严格按此对应）
+    static Backend backend_for_format(const std::string& fmt) {
+        if (fmt == "onnx")  return Backend::ORT;
+        if (fmt == "mnn")   return Backend::MNN;
+        if (fmt == "engine") return Backend::TRT;
+        return Backend::NONE;
+    }
+
+    // 非加密模型各后端兼容的扩展名
+    static bool backend_supports_ext(Backend backend, const std::string& ext) {
         switch (backend) {
             case Backend::ORT: return ext == ".onnx";
             case Backend::MNN: return ext == ".mnn";
@@ -23,18 +31,43 @@ namespace modeldeploy {
     void RuntimeOption::set_model_path(const std::string& model_path, const std::string& password) {
         model_file = model_path;
 
-        // 解密加密模型（如适用）
+        // ======================== 加密模型 ========================
         if (is_encrypted_model_file(model_path)) {
-            std::string buffer, format;
+            std::string buffer, encrypted_format;
             auto decrypt_password = password;
             if (password.empty()) {
                 decrypt_password = this->password;
             }
-            if (!read_encrypted_model_to_buffer(model_path, decrypt_password, &buffer, &format)) {
+            if (!read_encrypted_model_to_buffer(model_path, decrypt_password, &buffer, &encrypted_format)) {
                 MD_LOG_FATAL << "Model decryption failed. Check password (set via option.password) "
                     << "or that the file is not corrupted." << std::endl;
             }
-            // 同步到三个后端 option（各后端从各自的 option 或 RuntimeOption 读取）
+
+            // 加密模型必须使用与之匹配的唯一后端
+            Backend required = backend_for_format(encrypted_format);
+            if (required == Backend::NONE) {
+                MD_LOG_FATAL << "Unknown encrypted model format: " << encrypted_format << std::endl;
+            }
+#ifdef ENABLE_MNN
+            if (required == Backend::MNN && backend != Backend::MNN) {
+                MD_LOG_INFO << "Encrypted model format is " << encrypted_format
+                    << ", switching backend from " << static_cast<int>(backend) << " to MNN." << std::endl;
+                backend = Backend::MNN;
+            }
+#endif
+#ifdef ENABLE_TRT
+            if (required == Backend::TRT && backend != Backend::TRT) {
+                MD_LOG_INFO << "Encrypted model format is " << encrypted_format
+                    << ", switching backend from " << static_cast<int>(backend) << " to TRT." << std::endl;
+                backend = Backend::TRT;
+            }
+#endif
+            if (required == Backend::ORT && backend != Backend::ORT) {
+                MD_LOG_INFO << "Encrypted model format is " << encrypted_format
+                    << ", switching backend from " << static_cast<int>(backend) << " to ORT." << std::endl;
+                backend = Backend::ORT;
+            }
+
             model_from_memory = true;
             model_buffer = buffer;
             ort_option.model_from_memory = true;
@@ -46,7 +79,7 @@ namespace modeldeploy {
             return;
         }
 
-        // 非加密模型
+        // ======================== 非加密模型 ========================
         const std::filesystem::path path(model_path);
         model_from_memory = false;
 
@@ -57,10 +90,11 @@ namespace modeldeploy {
 
         if (!path.has_extension()) return;
 
-        // 校验当前 backend 是否支持该格式；仅在默认 ORT 且不匹配时自动推断
         const std::string ext = path.extension().string();
-        if (backend_supports_format(backend, ext)) return;
+        // 当前后端支持该格式 → 不动
+        if (backend_supports_ext(backend, ext)) return;
 
+        // 默认 ORT 时，按扩展名自动推断
         if (backend == Backend::ORT) {
             if (ext == ".mnn") {
 #ifdef ENABLE_MNN
@@ -72,7 +106,6 @@ namespace modeldeploy {
                 backend = Backend::TRT;
 #endif
             }
-            // .onnx → ORT（已经是默认，不需要切换）
         }
     }
 
