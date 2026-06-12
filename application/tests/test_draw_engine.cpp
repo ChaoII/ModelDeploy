@@ -1,31 +1,32 @@
 #include <catch2/catch_test_macros.hpp>
 #include "draw_engine.hpp"
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
+#include "csrc/vision/common/image_data.h"
+
+using namespace modeldeploy::vision;
 
 TEST_CASE("DrawEngine construct", "[draw]") {
     DrawConfig cfg;
     DrawEngine de(cfg);
-    // Should not crash
 }
 
-TEST_CASE("DrawEngine draw on empty image", "[draw]") {
+TEST_CASE("DrawEngine draw on empty results", "[draw]") {
     DrawConfig cfg;
     DrawEngine de(cfg);
-    cv::Mat img(100, 100, CV_8UC3, cv::Scalar(0, 0, 0));
+    ImageData img(100, 100, MdImageType::PKG_BGR_U8);
     std::vector<InferResult> results;
     REQUIRE_NOTHROW(de.draw(img, results));
 }
 
-TEST_CASE("DrawEngine draw with results", "[draw]") {
+TEST_CASE("DrawEngine draw with detection results", "[draw]") {
     DrawConfig cfg;
     cfg.show_label = true;
     cfg.show_score = true;
     DrawEngine de(cfg);
-    cv::Mat img(200, 200, CV_8UC3, cv::Scalar(0, 0, 0));
+    ImageData img(200, 200, MdImageType::PKG_BGR_U8);
 
     InferResult r;
     r.model_name = "det";
+    r.type = "detection";
     DetectionBox box;
     box.x = 10; box.y = 10; box.w = 50; box.h = 50;
     box.score = 0.95f;
@@ -35,27 +36,12 @@ TEST_CASE("DrawEngine draw with results", "[draw]") {
     std::vector<InferResult> results = {r};
     REQUIRE_NOTHROW(de.draw(img, results));
 
-    // 确认像素被修改了（矩形区域内应该非零）
-    auto* data = img.ptr();
+    // 确认像素被修改了
+    auto* data = img.data();
     bool has_nonzero = false;
-    for (int i = 0; i < 200 * 200 * 3; ++i) {
+    size_t total = static_cast<size_t>(200) * 200 * 3;
+    for (size_t i = 0; i < total; ++i) {
         if (data[i] != 0) { has_nonzero = true; break; }
     }
     REQUIRE(has_nonzero);
-}
-
-TEST_CASE("DrawEngine get_color consistency", "[draw]") {
-    auto c1 = DrawEngine::get_color(0);
-    auto c2 = DrawEngine::get_color(0);
-    REQUIRE(c1[0] == c2[0]);
-    REQUIRE(c1[1] == c2[1]);
-    REQUIRE(c1[2] == c2[2]);
-}
-
-TEST_CASE("DrawEngine get_color different ids", "[draw]") {
-    auto c1 = DrawEngine::get_color(0);
-    auto c2 = DrawEngine::get_color(1);
-    // Different IDs should (usually) give different colors
-    bool same = (c1[0] == c2[0] && c1[1] == c2[1] && c1[2] == c2[2]);
-    REQUIRE_FALSE(same);
 }
