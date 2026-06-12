@@ -37,7 +37,7 @@ namespace modeldeploy {
 
         // ERROR/FATAL → std::cerr, others → std::cout
         std::ostream& out = (level >= LogLevel::MD_LOG_E) ? std::cerr : std::cout;
-        const std::time_t now = std::time(nullptr);
+        const time_t now = time(nullptr);
 
         // Cache localtime to avoid repeated calls within the same second
         if (now != cached_time_sec_) {

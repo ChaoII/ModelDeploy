@@ -8,6 +8,7 @@
 #include <cstring>
 #include <sstream>
 #include <cstdint>
+#include <ctime>
 #include "core/md_decl.h"
 
 
@@ -71,8 +72,8 @@ namespace modeldeploy {
     private:
         LogLevel current_level_;
         std::ostream* log_stream_;
-        mutable std::time_t cached_time_sec_;
-        mutable std::tm cached_tm_{};
+        mutable time_t cached_time_sec_;
+        mutable struct tm cached_tm_{};
 
         // Private constructor
         LogManager() : current_level_(LogLevel::MD_LOG_I), log_stream_(&std::cout), cached_time_sec_(0) {
