@@ -39,6 +39,26 @@ jobs:
             with_gpu: false
             is_windows: true
 
+          - name: linux-gpu
+            runner: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+            artifact_arch: linux-x64-gpu
+            ext: tar.gz
+            with_gpu: true
+            is_windows: false
+            cuda_arch: "12.4"
+
+          - name: windows-gpu
+            runner: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+            artifact_arch: win-x64-gpu
+            ext: zip
+            with_gpu: true
+            is_windows: true
+            cuda_arch: "12.4"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -57,10 +77,20 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install openssl -y
 
+      - name: Setup CUDA
+        if: matrix.with_gpu
+        uses: Jimver/cuda-toolkit@v0.2
+        with:
+          cuda: ${{ matrix.cuda_arch }}
+
       - name: Set GPU flags
         shell: bash
         run: |
-          echo "GPU_FLAG=OFF" >> $GITHUB_ENV
+          if [ "${{ matrix.with_gpu }}" = "true" ]; then
+            echo "GPU_FLAG=ON" >> $GITHUB_ENV
+          else
+            echo "GPU_FLAG=OFF" >> $GITHUB_ENV
+          fi
           echo "TRT_FLAG=OFF" >> $GITHUB_ENV
 
       - name: Configure
@@ -90,6 +120,7 @@ jobs:
           unzip -q test_data.zip
 
       - name: Test
+        if: ${{ !matrix.with_gpu }}
         working-directory: build
         run: ctest -C Release --output-on-failure
         env:
