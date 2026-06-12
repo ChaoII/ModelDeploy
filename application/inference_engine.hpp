@@ -5,46 +5,37 @@
 #include <map>
 
 #include "capi/common/md_types.h"
-#include "capi/common/md_decl.h"
-#include "capi/utils/md_image_capi.h"
+#include "csrc/vision/detection/ultralytics_det.h"
+#include "csrc/vision/classification/classification.h"
+#include "csrc/vision/common/image_data.h"
+
 #include "config.hpp"
 
-/// 模型推理结果
-struct InferResult {
-    std::string model_name;
-    std::string type;  // "detection" | "classification" | etc.
-    std::vector<struct DetectionBox> boxes;
-};
-
 struct DetectionBox {
-    float x, y, w, h;        // 归一化或像素坐标
+    float x, y, w, h;
     float score;
     int label_id;
     std::string label_name;
 };
 
-/// ModelDeploy 推理引擎封装
+struct InferResult {
+    std::string model_name;
+    std::string type;
+    std::vector<DetectionBox> boxes;
+};
+
 class InferenceEngine {
 public:
-    InferenceEngine();
-    ~InferenceEngine();
+    InferenceEngine() = default;
+    ~InferenceEngine() { unload(); }
 
-    /// 加载模型
     bool load(const ModelConfig& cfg);
-
-    /// 卸载模型
     void unload();
-
-    /// 是否已加载
     bool is_loaded() const { return loaded_; }
 
-    /// 对 MDImage 执行推理
-    bool infer(MDImage* image, InferResult* result);
+    bool infer(const modeldeploy::vision::ImageData& image, InferResult* result);
 
-    /// 获取模型配置
     const ModelConfig& config() const { return cfg_; }
-
-    /// 获取模型输入尺寸
     std::pair<int, int> input_size() const {
         return {cfg_.input_size[0], cfg_.input_size[1]};
     }
@@ -52,9 +43,11 @@ public:
 private:
     bool loaded_ = false;
     ModelConfig cfg_;
-    MDModel model_{};
 
-    // 模型类型对应的 CAPI 函数
-    bool infer_detection(MDImage* image, InferResult* result);
-    bool infer_classification(MDImage* image, InferResult* result);
+    // C++ 模型实例（共用体风格，实际只用一个）
+    std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> det_model_;
+    std::unique_ptr<modeldeploy::vision::classification::Classification> cls_model_;
+
+    bool infer_detection(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_classification(const modeldeploy::vision::ImageData& image, InferResult* result);
 };

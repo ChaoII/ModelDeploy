@@ -1,53 +1,55 @@
 #include "inference_engine.hpp"
-#include <cstring>
+#include "csrc/runtime/runtime_option.h"
+#include "csrc/vision/common/result.h"
 #include <iostream>
 
-#include "capi/vision/detection/detection_capi.h"
-#include "capi/vision/classification/classification_capi.h"
-
-InferenceEngine::InferenceEngine() {
-    memset(&model_, 0, sizeof(model_));
-}
-
-InferenceEngine::~InferenceEngine() {
-    unload();
-}
+using namespace modeldeploy;
+using namespace modeldeploy::vision;
 
 bool InferenceEngine::load(const ModelConfig& cfg) {
     if (loaded_) unload();
     cfg_ = cfg;
 
-    MDRuntimeOption opt;
-    memset(&opt, 0, sizeof(opt));
-    opt.cpu_thread_num = 4;
-    opt.device = (cfg.device == "gpu") ? MD_DEVICE_GPU : MD_DEVICE_CPU;
-    opt.backend = (cfg.backend == "trt") ? MD_BACKEND_TRT
-                 : (cfg.backend == "mnn") ? MD_BACKEND_MNN
-                 : MD_BACKEND_ORT;
-    opt.enable_trt = 0;
-    opt.ort_log_severity = 3;
-    opt.trt_min_shape = "";
-    opt.trt_opt_shape = "";
-    opt.trt_max_shape = "";
-    opt.trt_engine_cache_path = "";
-    opt.password = "";
+    RuntimeOption opt;
+    if (cfg.device == "gpu") {
+        opt.use_gpu(0);
+    }
+    opt.set_cpu_thread_num(4);
 
-    MDStatusCode status = MDStatusCode::Success;
-
-    if (cfg.type == "detection" || cfg.type == "face_detection") {
-        status = md_create_detection_model(&model_, cfg.path.c_str(), &opt);
-    } else if (cfg.type == "classification") {
-        status = md_create_classification_model(&model_, cfg.path.c_str(), &opt);
-    } else if (cfg.type == "lpr_pipeline") {
-        status = md_create_detection_model(&model_, cfg.path.c_str(), &opt);
+    if (cfg.backend == "trt") {
+        opt.use_trt_backend();
+    } else if (cfg.backend == "mnn") {
+        opt.use_mnn_backend();
     } else {
-        std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
-        return false;
+        opt.use_ort_backend();
     }
 
-    if (status != MDStatusCode::Success) {
-        std::cerr << "[InferenceEngine] Failed to load model: " << cfg.path
-                  << " (error " << status << ")" << std::endl;
+    try {
+        if (cfg.type == "detection" || cfg.type == "face_detection") {
+            det_model_ = std::make_unique<detection::UltralyticsDet>(cfg.path, opt);
+            if (!det_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] Detection model init failed: " << cfg.path << std::endl;
+                det_model_.reset();
+                return false;
+            }
+            // 设置预处理
+            if (cfg_.input_size.size() == 2)
+                det_model_->get_preprocessor().set_size(cfg_.input_size);
+            if (cfg.device == "gpu")
+                det_model_->get_preprocessor().use_cuda_preproc();
+        } else if (cfg.type == "classification") {
+            cls_model_ = std::make_unique<classification::Classification>(cfg.path, opt);
+            if (!cls_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] Classification model init failed: " << cfg.path << std::endl;
+                cls_model_.reset();
+                return false;
+            }
+        } else {
+            std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[InferenceEngine] Exception loading model: " << e.what() << std::endl;
         return false;
     }
 
@@ -58,70 +60,57 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
 }
 
 void InferenceEngine::unload() {
-    if (model_.model_content) {
-        md_free_detection_model(&model_);
-        model_.model_content = nullptr;
-    }
-    if (model_.model_name) {
-        free(model_.model_name);
-        model_.model_name = nullptr;
-    }
+    det_model_.reset();
+    cls_model_.reset();
     loaded_ = false;
 }
 
-bool InferenceEngine::infer(MDImage* image, InferResult* result) {
-    if (!loaded_ || !image || !result) return false;
+bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
+    if (!loaded_ || !result) return false;
     result->model_name = cfg_.name;
     result->type = cfg_.type;
 
-    if (cfg_.type == "detection" || cfg_.type == "face_detection") {
+    if (cfg_.type == "detection" || cfg_.type == "face_detection")
         return infer_detection(image, result);
-    } else if (cfg_.type == "classification") {
+    if (cfg_.type == "classification")
         return infer_classification(image, result);
-    }
     return false;
 }
 
-bool InferenceEngine::infer_detection(MDImage* image, InferResult* result) {
-    MDDetectionResults c_results;
-    memset(&c_results, 0, sizeof(c_results));
+bool InferenceEngine::infer_detection(const ImageData& image, InferResult* result) {
+    if (!det_model_) return false;
 
-    auto st = md_detection_predict(&model_, image, &c_results);
-    if (st != MDStatusCode::Success) {
-        std::cerr << "[InferenceEngine] Detection predict failed: " << st << std::endl;
+    std::vector<DetectionResult> det_results;
+    if (!det_model_->predict(image, &det_results)) {
         return false;
     }
 
-    for (int i = 0; i < c_results.size; ++i) {
-        auto& d = c_results.data[i];
+    for (auto& d : det_results) {
         DetectionBox box;
-        box.x = static_cast<float>(d.box.x);
-        box.y = static_cast<float>(d.box.y);
-        box.w = static_cast<float>(d.box.width);
-        box.h = static_cast<float>(d.box.height);
+        box.x = d.box.x;
+        box.y = d.box.y;
+        box.w = d.box.width;
+        box.h = d.box.height;
         box.score = d.score;
         box.label_id = d.label_id;
         result->boxes.push_back(box);
     }
-
-    md_free_detection_result(&c_results);
     return true;
 }
 
-bool InferenceEngine::infer_classification(MDImage* image, InferResult* result) {
-    MDClassificationResults c_results;
-    memset(&c_results, 0, sizeof(c_results));
+bool InferenceEngine::infer_classification(const ImageData& image, InferResult* result) {
+    if (!cls_model_) return false;
 
-    auto st = md_classification_predict(&model_, image, &c_results);
-    if (st != MDStatusCode::Success) return false;
-
-    for (int i = 0; i < c_results.size; ++i) {
-        DetectionBox box;
-        box.score = c_results.data[i].score;
-        box.label_id = c_results.data[i].label_id;
-        result->boxes.push_back(box);
+    ClassifyResult cls_result;
+    if (!cls_model_->predict(image, &cls_result)) {
+        return false;
     }
 
-    md_free_classification_result(&c_results);
+    for (size_t i = 0; i < cls_result.label_ids.size(); ++i) {
+        DetectionBox box;
+        box.label_id = cls_result.label_ids[i];
+        box.score = cls_result.scores[i];
+        result->boxes.push_back(box);
+    }
     return true;
 }
