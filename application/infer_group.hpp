@@ -7,6 +7,7 @@
 #include "inference_engine.hpp"
 #include "perf_stats.hpp"
 #include "frame_pool.hpp"
+#include "csrc/vision/common/image_data.h"
 
 /// 多模型调度组：管理同一路视频上的多个推理模型
 class InferGroup {
@@ -18,9 +19,11 @@ public:
     bool init();
 
     /// 对一帧执行所有模型的推理
+    /// @param frame_out 可选，输出下载后的 BGR 帧（用于绘制/编码）
     bool run_models(uint8_t* y_plane, uint8_t* uv_plane,
                     int width, int height, int y_step, int uv_step,
-                    std::vector<InferResult>* results);
+                    std::vector<InferResult>* results,
+                    modeldeploy::vision::ImageData* frame_out = nullptr);
 
     /// 获取性能统计
     PerfStats& stats() { return stats_; }

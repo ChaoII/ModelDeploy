@@ -64,7 +64,7 @@ if (BUILD_SURVEILLANCE_TESTS)
 
     # 测试用源文件 = 除 main.cpp 外的所有应用源文件 + 测试源文件
     list(FILTER APP_SOURCES EXCLUDE REGEX "main\\.cpp$")
-    set(TEST_SOURCES tests/test_config.cpp tests/test_perf_stats.cpp tests/test_frame_pool.cpp tests/test_stream_decoder.cpp tests/test_inference_engine.cpp tests/test_infer_group.cpp tests/test_draw_engine.cpp tests/test_stream_encoder.cpp)
+    set(TEST_SOURCES tests/test_config.cpp tests/test_perf_stats.cpp tests/test_frame_pool.cpp tests/test_stream_decoder.cpp tests/test_inference_engine.cpp tests/test_infer_group.cpp tests/test_draw_engine.cpp tests/test_stream_encoder.cpp tests/test_pipeline.cpp)
     add_executable(surveillance_test ${TEST_SOURCES} ${APP_SOURCES})
     target_include_directories(surveillance_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}

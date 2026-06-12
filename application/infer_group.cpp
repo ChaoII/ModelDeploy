@@ -37,11 +37,11 @@ bool InferGroup::should_process(size_t idx) {
 
 bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                              int width, int height, int y_step, int uv_step,
-                             std::vector<InferResult>* results) {
+                             std::vector<InferResult>* results,
+                             ImageData* frame_out) {
     if (!initialized_) return false;
     results->clear();
 
-    // 从 GPU 下载 NV12 到 CPU 连续 buffer
     size_t y_size = static_cast<size_t>(height) * width;
     size_t uv_size = y_size / 2;
     size_t total = y_size + uv_size;
@@ -52,11 +52,15 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     cudaMemcpy2D(cpu_buf, width, y_plane, y_step, width, height, cudaMemcpyDeviceToHost);
     cudaMemcpy2D(cpu_buf + y_size, width, uv_plane, uv_step, width, height / 2, cudaMemcpyDeviceToHost);
 
-    // 创建 NV12 ImageData
     auto nv12_image = ImageData::from_raw(cpu_buf, width, height, MdImageType::NV12, true);
     frame_pool_.release(cpu_buf);
 
     if (nv12_image.empty()) return false;
+
+    // 输出 BGR 帧（用于绘制）
+    if (frame_out) {
+        *frame_out = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
+    }
 
     // 对每个模型执行推理
     for (size_t i = 0; i < engines_.size(); ++i) {
@@ -65,11 +69,9 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
         auto& engine = engines_[i];
         const auto& mcfg = engine->config();
 
-        // ROI 裁剪
         ImageData input_image = nv12_image;
         bool has_roi = (mcfg.roi[2] > 0 && mcfg.roi[3] > 0);
         if (has_roi) {
-            // crop() expects Rect2f with float coordinates
             Rect2f roi_rect = {static_cast<float>(mcfg.roi[0]),
                                static_cast<float>(mcfg.roi[1]),
                                static_cast<float>(mcfg.roi[2]),
