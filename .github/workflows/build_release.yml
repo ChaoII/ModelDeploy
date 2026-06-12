@@ -13,52 +13,31 @@ env:
 
 jobs:
   build:
-    name: Build (${{ matrix.runner }})
+    name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
 
     strategy:
       fail-fast: false
 
-    matrix:
-      include:
-        - name: linux-cpu
-          runner: ubuntu-latest
-          c_compiler: gcc
-          cpp_compiler: g++
-          artifact_arch: linux-x64
-          ext: tar.gz
-          with_gpu: false
-          is_windows: false
+      matrix:
+        include:
+          - name: linux-cpu
+            runner: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+            artifact_arch: linux-x64
+            ext: tar.gz
+            with_gpu: false
+            is_windows: false
 
-        - name: windows-cpu
-          runner: windows-latest
-          c_compiler: cl
-          cpp_compiler: cl
-          artifact_arch: win-x64
-          ext: zip
-          with_gpu: false
-          is_windows: true
-
-        # ===== 自托管 Linux GPU runner =====
-        - name: linux-gpu
-          runner: [ self-hosted, Linux, GPU ]
-          c_compiler: gcc
-          cpp_compiler: g++
-          artifact_arch: linux-x64-gpu
-          ext: tar.gz
-          with_gpu: true
-          is_windows: false
-
-        # ===== 自托管 Windows GPU runner =====
-        - name: windows-gpu
-          runner: [ self-hosted, Windows, GPU ]
-          c_compiler: cl
-          cpp_compiler: cl
-          artifact_arch: win-x64-gpu
-          ext: zip
-          with_gpu: true
-          is_windows: true
-
+          - name: windows-cpu
+            runner: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+            artifact_arch: win-x64
+            ext: zip
+            with_gpu: false
+            is_windows: true
 
     steps:
       - uses: actions/checkout@v4
@@ -70,26 +49,19 @@ jobs:
         if: matrix.is_windows
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install 7zip
-        if: matrix.is_windows
-        uses: crazy-max/ghaction-chocolatey@v3
-        with:
-          args: install 7zip
+      - name: Install OpenSSL (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
+      - name: Install OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        run: choco install openssl -y
 
       - name: Set GPU flags
         shell: bash
         run: |
-          if [ "${{ matrix.with_gpu }}" = "true" ]; then
-            echo "GPU_FLAG=ON" >> $GITHUB_ENV
-          else
-            echo "GPU_FLAG=OFF" >> $GITHUB_ENV
-          fi
-
-      - name: Set TRT_DIR
-        if: matrix.with_gpu
-        shell: bash
-        run: |
-          echo "TRT_DIR=${TENSORRT_HOME}" >> $GITHUB_ENV
+          echo "GPU_FLAG=OFF" >> $GITHUB_ENV
+          echo "TRT_FLAG=OFF" >> $GITHUB_ENV
 
       - name: Configure
         run: >
@@ -103,14 +75,25 @@ jobs:
           -DBUILD_VISION=ON
           -DBUILD_CAPI=ON
           -DWITH_GPU=${{ env.GPU_FLAG }}
-          -DENABLE_TRT=${{ env.GPU_FLAG }}
+          -DENABLE_TRT=${{ env.TRT_FLAG }}
           -DENABLE_ORT=ON
           -DENABLE_MNN=ON
-          -DTRT_DIR=${{ env.TRT_DIR }}
           -DBUILD_PYTHON=OFF
 
       - name: Build
         run: cmake --build build
+
+      - name: Download test data
+        shell: bash
+        run: |
+          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
+          unzip -q test_data.zip
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --output-on-failure
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}
 
       - name: Install
         run: cmake --install build --prefix install
@@ -120,14 +103,10 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
-          elif [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
-            VERSION="${{ github.event.release.tag_name }}"
-            VERSION="${VERSION#v}"
           else
-              TIMESTAMP=$(date +'%Y%m%d%H%M%S')
-              VERSION="dev_${TIMESTAMP}"
+            TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+            VERSION="dev_${TIMESTAMP}"
           fi
-
           NAME="${PROJECT_NAME}_${VERSION}_${{ matrix.artifact_arch }}"
           echo "NAME=${NAME}" >> $GITHUB_ENV
           if [ "${{ matrix.ext }}" = "zip" ]; then
@@ -138,16 +117,13 @@ jobs:
             echo "PKG=${NAME}.tar.gz" >> $GITHUB_ENV
           fi
 
-      # 👉 始终上传 CI Artifacts
       - name: Upload CI Artifact
         uses: actions/upload-artifact@v4
         with:
-          # path 和 name 一致就不会导致下载下来的Artifact套一层.zip了
           name: ${{ env.PKG }}
           path: ${{ env.PKG }}
           retention-days: 7
 
-      # 如果创建tag那么就上传Release Asset
       - name: Upload Release Asset
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1

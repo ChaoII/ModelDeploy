@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include "core/tensor.h"
 #include "vision/common/struct.h"

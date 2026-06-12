@@ -7,7 +7,6 @@
 #ifdef ENABLE_ENCRYPTION
 #include <openssl/evp.h>
 #include <openssl/rand.h>
-#include <openssl/sha.h>
 
 namespace modeldeploy {
 
@@ -15,11 +14,12 @@ namespace modeldeploy {
     static void derive_key(const std::string& password,
                            const uint8_t* salt, uint32_t salt_len,
                            uint8_t* out_key) {
-        SHA256_CTX ctx;
-        SHA256_Init(&ctx);
-        SHA256_Update(&ctx, password.data(), password.size());
-        SHA256_Update(&ctx, salt, salt_len);
-        SHA256_Final(out_key, &ctx);
+        EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+        EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+        EVP_DigestUpdate(ctx, password.data(), password.size());
+        EVP_DigestUpdate(ctx, salt, salt_len);
+        EVP_DigestFinal_ex(ctx, out_key, nullptr);
+        EVP_MD_CTX_free(ctx);
     }
 
     // ==================== AES-256-CBC 加密 ====================
