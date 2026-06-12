@@ -34,7 +34,14 @@ namespace ModelDeploy.audio.tts
         public static void WriteWav(TtsResult result, string outputPath)
         {
             MDTTSResult cResult = result.ToNative();
-            Utils.Check(md_write_wav(ref cResult, outputPath), "WriteWav");
+            try
+            {
+                Utils.Check(md_write_wav(ref cResult, outputPath), "WriteWav");
+            }
+            finally
+            {
+                md_free_kokoro_result(ref cResult);
+            }
         }
 
         public void Dispose()

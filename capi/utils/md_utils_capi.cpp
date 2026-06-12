@@ -107,6 +107,7 @@ MDRuntimeOption md_create_default_runtime_option() {
         MD_DEVICE_CPU,
         MD_BACKEND_ORT,
         -1,
-        ""
+        "",
+        3
     };
 }

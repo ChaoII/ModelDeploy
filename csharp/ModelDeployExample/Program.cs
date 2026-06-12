@@ -448,12 +448,12 @@ static class Program
         // TestLpr();
         // TestSenseVoice();
         // TestKokoro();
-        // TestDetection();
+        TestDetection();
         // TestInstanceSeg();
         // TestObb();
         // TestPose();
         // TestImage();
-        TestOCR();
+        // TestOCR();
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();

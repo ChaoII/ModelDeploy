@@ -1,11 +1,13 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
 namespace ModelDeploy.audio.asr
 {
-    public class SenseVoice
+    public class SenseVoice : IDisposable
     {
         private MDModel model;
+        private bool _disposed;
 
         public SenseVoice(MDSenseVoiceParameters parameters)
         {
@@ -15,6 +17,19 @@ namespace ModelDeploy.audio.asr
 
         ~SenseVoice()
         {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
             md_free_sense_voice_model(ref model);
         }
 

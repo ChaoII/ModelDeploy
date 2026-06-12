@@ -34,7 +34,7 @@ namespace ModelDeploy.utils
                 size = dict.Count,
                 data = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(MDKeyValuePair)) * dict.Count)
             };
-    
+
             int i = 0;
             foreach (var kvp in dict)
             {
@@ -49,6 +49,7 @@ namespace ModelDeploy.utils
                 Marshal.StructureToPtr(cPair, ptr, false);
                 i++;
             }
+
             return cMap;
         }
 
@@ -133,6 +134,9 @@ namespace ModelDeploy.utils
         public int GraphOptLevel { get; set; } = -1;
         public string Password { get; set; } = "";
 
+        public int OrtLogSeverity { get; set; } = 3;
+
+
         public MDRuntimeOption ToNative()
         {
             return new MDRuntimeOption
@@ -148,7 +152,8 @@ namespace ModelDeploy.utils
                 device = Device,
                 backend = Backend,
                 graph_opt_level = GraphOptLevel,
-                password = Password
+                password = Password,
+                ort_log_severity = OrtLogSeverity
             };
         }
     }

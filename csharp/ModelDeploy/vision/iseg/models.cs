@@ -47,7 +47,7 @@ namespace ModelDeploy.vision.iseg
             }
             finally
             {
-                md_print_instance_seg_result(ref cResults);
+                md_free_instance_seg_result(ref cResults);
             }
         }
 

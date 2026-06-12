@@ -220,13 +220,14 @@ namespace ModelDeploy
     }
 
 
-    public class Image
+    public class Image : IDisposable
     {
         public int Width { get; set; }
         public int Height { get; set; }
         public int Channels { get; set; }
 
         public MDImage RawImage;
+        private bool _disposed;
 
         public byte[] ToByteArray()
         {
@@ -382,7 +383,24 @@ namespace ModelDeploy
 
         ~Image()
         {
-            md_free_image(ref RawImage);
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            if (RawImage.data != IntPtr.Zero)
+            {
+                md_free_image(ref RawImage);
+                RawImage.data = IntPtr.Zero;
+            }
         }
 
         public Image Clone()

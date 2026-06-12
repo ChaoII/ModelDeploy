@@ -477,7 +477,14 @@ namespace ModelDeploy.vision.face
         public void Display(List<FaceRecognizerResult> results)
         {
             var cResult = FaceRecognizerResult.ToNativeArray(results);
-            md_print_face_rec_pipeline_result(ref cResult);
+            try
+            {
+                md_print_face_rec_pipeline_result(ref cResult);
+            }
+            finally
+            {
+                md_free_face_rec_pipeline_result(ref cResult);
+            }
         }
 
 

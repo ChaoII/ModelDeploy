@@ -386,6 +386,7 @@ namespace ModelDeploy
             public Backend backend;
             public int graph_opt_level;
             public string password;
+            public int ort_log_severity;
         }
     }
 }
