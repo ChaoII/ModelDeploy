@@ -125,6 +125,9 @@ jobs:
       - name: Setup MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          toolset: 14.40
+          arch: x64
 
       - name: Install OpenSSL
         if: runner.os == 'Linux'
