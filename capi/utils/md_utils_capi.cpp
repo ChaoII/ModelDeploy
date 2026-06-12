@@ -89,8 +89,9 @@ void print_polygon(const MDPolygon* polygon) {
 }
 
 void md_free_polygon(MDPolygon* polygon) {
-    polygon->size = 0;
     free(polygon->data);
+    polygon->data = nullptr;
+    polygon->size = 0;
 }
 
 MDRuntimeOption md_create_default_runtime_option() {

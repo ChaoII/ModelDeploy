@@ -1,0 +1,548 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="e82ca62a-265b-4226-b90e-79d345f9f8e0" name="aichao@ACPC 2026-06-12 16:32:17" runUser="ACPC\aichao" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-06-12T16:32:17.0636200+08:00" queuing="2026-06-12T16:32:17.0636204+08:00" start="2026-06-12T16:32:16.3149724+08:00" finish="2026-06-12T16:32:17.7002772+08:00" />
+  <TestSettings name="default" id="b70c2dbb-3f90-4500-a644-29a856264d93">
+    <Deployment runDeploymentRoot="aichao_ACPC_2026-06-12_16_32_17" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="83eaa226-9bf6-4dde-8da7-5fb65316aaec" testId="da86aa65-5d3b-00a8-ab42-928f34d7cf5f" testName="ToByteArray_ContentMatchesInput" computerName="ACPC" duration="00:00:00.0271330" startTime="2026-06-12T16:32:17.5727391+08:00" endTime="2026-06-12T16:32:17.5998728+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="83eaa226-9bf6-4dde-8da7-5fb65316aaec">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.ToByteArray_ContentMatchesInput() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 272&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="02d6972f-6f86-4c44-9d9a-2a8a45c04be0" testId="bcb9be5d-e2c0-5240-6006-c485ea8449e0" testName="FromCompressedBytes_FromTestImage_Decodes" computerName="ACPC" duration="00:00:00.0338680" startTime="2026-06-12T16:32:17.1453009+08:00" endTime="2026-06-12T16:32:17.1791698+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="02d6972f-6f86-4c44-9d9a-2a8a45c04be0">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_compressed_bytes(Byte[] data, Int32 byteSize)&#xD;
+   at ModelDeploy.Image.FromCompressedBytes(Byte[] data, Int32 byteSize) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 255&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromCompressedBytes_FromTestImage_Decodes() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 473&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c294e0d1-f27e-45d8-bed3-ca93d914848c" testId="16584cee-b90e-7f46-6a08-7745f02e5129" testName="Clone_PreservesDimensions" computerName="ACPC" duration="00:00:00.0265580" startTime="2026-06-12T16:32:16.8950209+08:00" endTime="2026-06-12T16:32:16.9215795+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c294e0d1-f27e-45d8-bed3-ca93d914848c">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Clone_PreservesDimensions() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 222&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="94003668-fd0a-497a-a64d-d78c850c45a5" testId="e13cf475-b0e0-e7a1-3783-2d134ed9bb40" testName="Crop_OutOfBounds_DoesNotCrash" computerName="ACPC" duration="00:00:00.0284620" startTime="2026-06-12T16:32:16.9221865+08:00" endTime="2026-06-12T16:32:16.9506493+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="94003668-fd0a-497a-a64d-d78c850c45a5">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Crop_OutOfBounds_DoesNotCrash() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 255&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="83824e57-9ec9-48a5-a154-91d726b4d5ad" testId="7093b519-2778-0ead-8c4f-fa3b3cb6435e" testName="Polygon_ToNativeAndBack" computerName="ACPC" duration="00:00:00.0005720" startTime="2026-06-12T16:32:17.4613529+08:00" endTime="2026-06-12T16:32:17.4619249+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="83824e57-9ec9-48a5-a154-91d726b4d5ad" />
+    <UnitTestResult executionId="6f11d3ff-cedb-4781-8cc9-d42a2f87720c" testId="205c54d5-470b-d0fe-de3e-b848fc0a62e2" testName="Image_MultipleDispose_DoesNotThrow" computerName="ACPC" duration="00:00:00.0293310" startTime="2026-06-12T16:32:17.4040306+08:00" endTime="2026-06-12T16:32:17.4333621+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6f11d3ff-cedb-4781-8cc9-d42a2f87720c">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Image_MultipleDispose_DoesNotThrow() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 395&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="69e2bf9f-8e58-4554-90f3-d8d20783d9ac" testId="254f2b49-c170-699f-ee8a-15e2195e12a5" testName="DrawRect_ModifiesPixels" computerName="ACPC" duration="00:00:00.0419900" startTime="2026-06-12T16:32:17.0342410+08:00" endTime="2026-06-12T16:32:17.0762315+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="69e2bf9f-8e58-4554-90f3-d8d20783d9ac">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.DrawRect_ModifiesPixels() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 341&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="472a9256-02ca-4e40-9e2b-e645e32fa06a" testId="27d5b0e3-69f5-9a99-2fa8-8744f67ea004" testName="RuntimeOption_ToNative_SetsFields" computerName="ACPC" duration="00:00:00.0001370" startTime="2026-06-12T16:32:17.5439577+08:00" endTime="2026-06-12T16:32:17.5440946+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="472a9256-02ca-4e40-9e2b-e645e32fa06a" />
+    <UnitTestResult executionId="7e877739-63d8-4354-af9c-324de0ee5d48" testId="693d9791-ce08-a604-fb4b-698a1d2d51f0" testName="Point_ToNativeAndBack" computerName="ACPC" duration="00:00:00.0001970" startTime="2026-06-12T16:32:17.4611439+08:00" endTime="2026-06-12T16:32:17.4613412+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7e877739-63d8-4354-af9c-324de0ee5d48" />
+    <UnitTestResult executionId="59e757c3-0e53-4a69-b650-737013b7a5a8" testId="67811a71-6b9b-f318-3d29-160430ee6c81" testName="Read_JpegFile_SetsCorrectProperties" computerName="ACPC" duration="00:00:00.0339640" startTime="2026-06-12T16:32:17.4623378+08:00" endTime="2026-06-12T16:32:17.4963026+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="59e757c3-0e53-4a69-b650-737013b7a5a8">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_read_image(String imagePath)&#xD;
+   at ModelDeploy.Image.Read(String imagePath) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 242&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Read_JpegFile_SetsCorrectProperties() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 133&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f680a5aa-becf-43f1-a3cd-c5be182468d5" testId="cae11199-1644-7a85-86ff-369ebb275101" testName="Size_ToNativeAndBack" computerName="ACPC" duration="00:00:00.0002799" startTime="2026-06-12T16:32:17.5724451+08:00" endTime="2026-06-12T16:32:17.5727248+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f680a5aa-becf-43f1-a3cd-c5be182468d5" />
+    <UnitTestResult executionId="b31e95c3-0d1f-4a6b-8214-eb1fb6701031" testId="69bdcc6b-8e6a-fb6d-8cf5-43b86d6c98e0" testName="FromBgr24Data_EmptyData_Throws" computerName="ACPC" duration="00:00:00.0412390" startTime="2026-06-12T16:32:17.0762561+08:00" endTime="2026-06-12T16:32:17.1174963+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b31e95c3-0d1f-4a6b-8214-eb1fb6701031">
+      <Output>
+        <ErrorInfo>
+          <Message>  Assert.That(caughtException, expression)&#xD;
+  Expected: &lt;System.AccessViolationException&gt;&#xD;
+  But was:  &lt;System.DllNotFoundException: Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)&#xD;
+   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.&lt;&gt;c.&lt;FromBgr24Data_EmptyData_Throws&gt;b__14_0() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 165&#xD;
+   at NUnit.Framework.Assert.Throws(IResolveConstraint expression, TestDelegate code, String message, Object[] args)&gt;&#xD;
+</Message>
+          <StackTrace>   at ModelDeployUnitTest.ModelDeployTests.FromBgr24Data_EmptyData_Throws() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 165&#xD;
+
+1)    at ModelDeployUnitTest.ModelDeployTests.FromBgr24Data_EmptyData_Throws() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 165&#xD;
+
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="24b3749c-a761-4a4f-a532-08a4720c54c5" testId="7eebbdde-5fd9-9c88-febe-c3352f3f0985" testName="Check_NonZeroCode_Throws" computerName="ACPC" duration="00:00:00.0167270" startTime="2026-06-12T16:32:16.7746234+08:00" endTime="2026-06-12T16:32:16.7913510+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="24b3749c-a761-4a4f-a532-08a4720c54c5">
+      <Output>
+        <ErrorInfo>
+          <Message>  Assert.That(caughtException, expression)&#xD;
+  Expected: &lt;System.Exception&gt;&#xD;
+  But was:  &lt;System.InvalidOperationException: test failed (error code: 1)&#xD;
+   at ModelDeploy.utils.Utils.Check(Int32 ret, String context) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\utils\utils.cs:line 79&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.&lt;&gt;c.&lt;Check_NonZeroCode_Throws&gt;b__40_0() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 462&#xD;
+   at NUnit.Framework.Assert.Throws(IResolveConstraint expression, TestDelegate code, String message, Object[] args)&gt;&#xD;
+</Message>
+          <StackTrace>   at ModelDeployUnitTest.ModelDeployTests.Check_NonZeroCode_Throws() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 462&#xD;
+
+1)    at ModelDeployUnitTest.ModelDeployTests.Check_NonZeroCode_Throws() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 462&#xD;
+
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="81694708-ca71-4a7f-813f-31d52f15e441" testId="93e6285b-d365-7262-c46b-c6f7b0369d9a" testName="RuntimeOption_DefaultValues" computerName="ACPC" duration="00:00:00.0005970" startTime="2026-06-12T16:32:17.5433454+08:00" endTime="2026-06-12T16:32:17.5439424+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="81694708-ca71-4a7f-813f-31d52f15e441" />
+    <UnitTestResult executionId="518fbeaa-d273-47ef-80d2-25c2840a05ad" testId="9c31e3fe-5ea7-777e-3898-841b4e13350b" testName="MDStatusCode_Enum_HasCorrectValues" computerName="ACPC" duration="00:00:00.0001820" startTime="2026-06-12T16:32:17.4609556+08:00" endTime="2026-06-12T16:32:17.4611378+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="518fbeaa-d273-47ef-80d2-25c2840a05ad" />
+    <UnitTestResult executionId="7a523efe-a246-4588-a9a0-93cd185e552e" testId="7bafd503-9bc8-8118-a970-f84bcb673c39" testName="Image_Dispose_FreesNativeMemory" computerName="ACPC" duration="00:00:00.0356090" startTime="2026-06-12T16:32:17.3683976+08:00" endTime="2026-06-12T16:32:17.4040076+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7a523efe-a246-4588-a9a0-93cd185e552e">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Image_Dispose_FreesNativeMemory() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 373&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="37c101b2-9f00-4d28-a26f-715e2245a458" testId="65792b37-a300-806e-3450-fd575e9bc04d" testName="ToByteArray_ZeroChannelImage_ReturnsZeros" computerName="ACPC" duration="00:00:00.0276970" startTime="2026-06-12T16:32:17.6271525+08:00" endTime="2026-06-12T16:32:17.6548497+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="37c101b2-9f00-4d28-a26f-715e2245a458">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.ToByteArray_ZeroChannelImage_ReturnsZeros() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 280&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="0db77a00-6feb-4ab8-af77-80304a6fd0a7" testId="9021c43b-4ea8-c1cb-625f-c8e694b437c2" testName="ToByteArray_ReturnsCorrectSize" computerName="ACPC" duration="00:00:00.0272270" startTime="2026-06-12T16:32:17.5998983+08:00" endTime="2026-06-12T16:32:17.6271259+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0db77a00-6feb-4ab8-af77-80304a6fd0a7">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.ToByteArray_ReturnsCorrectSize() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 263&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="54801d15-a407-4852-a7b1-0390c7ddd16b" testId="324ce131-7a4a-8167-cc9c-fc5a226181d3" testName="Check_ZeroCode_DoesNotThrow" computerName="ACPC" duration="00:00:00.0004240" startTime="2026-06-12T16:32:16.7914263+08:00" endTime="2026-06-12T16:32:16.7918499+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="54801d15-a407-4852-a7b1-0390c7ddd16b" />
+    <UnitTestResult executionId="988c1362-4ca4-4452-a350-c5ffee8a4a17" testId="dbaa5653-518b-2325-42db-35b8bd0539e7" testName="Color_ToNativeAndBack" computerName="ACPC" duration="00:00:00.0005670" startTime="2026-06-12T16:32:16.9216034+08:00" endTime="2026-06-12T16:32:16.9221703+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="988c1362-4ca4-4452-a350-c5ffee8a4a17" />
+    <UnitTestResult executionId="82899d73-3ff5-4303-873f-33273e509ab1" testId="876c731e-7d50-9b80-9bfc-37477f5930ce" testName="FromNv12DataToBgr24_ProducesValidImage" computerName="ACPC" duration="00:00:00.0343020" startTime="2026-06-12T16:32:17.1791962+08:00" endTime="2026-06-12T16:32:17.2134989+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="82899d73-3ff5-4303-873f-33273e509ab1">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_nv12_data_to_bgr24(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromNv12DataToBgr24(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 334&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromNv12DataToBgr24_ProducesValidImage() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 206&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="3a7d7d48-121c-4b21-86d0-a5e7deed23bf" testId="d35637b1-053e-1818-d0bd-db3a7f308bff" testName="DrawPolygon_ModifiesPixels" computerName="ACPC" duration="00:00:00.0427900" startTime="2026-06-12T16:32:16.9914330+08:00" endTime="2026-06-12T16:32:17.0342242+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3a7d7d48-121c-4b21-86d0-a5e7deed23bf">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.DrawPolygon_ModifiesPixels() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 358&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="005fb164-ba10-4b34-9038-5e01a8f85ffb" testId="38a0b5dc-33a3-ef55-c3aa-79722f57db97" testName="Clone_CreatesIndependentCopy" computerName="ACPC" duration="00:00:00.1031190" startTime="2026-06-12T16:32:16.7918638+08:00" endTime="2026-06-12T16:32:16.8949859+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="005fb164-ba10-4b34-9038-5e01a8f85ffb">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Clone_CreatesIndependentCopy() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 235&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="ed585003-e6c4-4951-9389-64e60a41f2f2" testId="3a3a72d3-9fcf-c975-8b41-3004577b3717" testName="FromYuv420PDataToBgr24_ProducesValidImage" computerName="ACPC" duration="00:00:00.0461709" startTime="2026-06-12T16:32:17.3222019+08:00" endTime="2026-06-12T16:32:17.3683736+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ed585003-e6c4-4951-9389-64e60a41f2f2">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_yuv420p_data_to_bgr24(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromYuv420PDataToBgr24(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 321&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromYuv420PDataToBgr24_ProducesValidImage() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 194&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="861f6305-a056-4863-9b01-d5d65140286f" testId="b7bd5ecb-4995-a18b-e704-44fafb76b7ed" testName="Rect_ToNativeAndBack" computerName="ACPC" duration="00:00:00.0003630" startTime="2026-06-12T16:32:17.5422552+08:00" endTime="2026-06-12T16:32:17.5426185+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="861f6305-a056-4863-9b01-d5d65140286f" />
+    <UnitTestResult executionId="be366343-32ba-48ba-83a9-1eb65b259d11" testId="0e63420b-05ec-fa7c-070a-aa457d4b2824" testName="PtrToStringUTF8_ConvertsCorrectly" computerName="ACPC" duration="00:00:00.0003840" startTime="2026-06-12T16:32:17.4619396+08:00" endTime="2026-06-12T16:32:17.4623234+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="be366343-32ba-48ba-83a9-1eb65b259d11" />
+    <UnitTestResult executionId="f3cd92fd-2ea5-4775-8fdb-df8d846cc5e7" testId="14dc8e43-93c7-c774-b3ee-cf389eff5c66" testName="Save_WritesFileToDisk" computerName="ACPC" duration="00:00:00.0282980" startTime="2026-06-12T16:32:17.5441045+08:00" endTime="2026-06-12T16:32:17.5724017+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f3cd92fd-2ea5-4775-8fdb-df8d846cc5e7">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Save_WritesFileToDisk() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 290&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d7ef25a0-7c49-499b-87b3-040d3702b0f8" testId="d8c9cad3-100b-bd95-b9d2-939244bd4ccc" testName="Read_NonExistentFile_ReturnsNullData" computerName="ACPC" duration="00:00:00.0459000" startTime="2026-06-12T16:32:17.4963298+08:00" endTime="2026-06-12T16:32:17.5422310+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d7ef25a0-7c49-499b-87b3-040d3702b0f8">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_read_image(String imagePath)&#xD;
+   at ModelDeploy.Image.Read(String imagePath) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 242&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Read_NonExistentFile_ReturnsNullData() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 145&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9dbf114e-eda7-46d5-96f3-49f03c6159cd" testId="deb9da1a-50ae-67c4-c0c9-bacfcd38ee5b" testName="Image_UsingBlock_CallsDispose" computerName="ACPC" duration="00:00:00.0275440" startTime="2026-06-12T16:32:17.4333870+08:00" endTime="2026-06-12T16:32:17.4609317+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9dbf114e-eda7-46d5-96f3-49f03c6159cd">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Image_UsingBlock_CallsDispose() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 384&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="0276e31c-d287-46a6-b834-236ca72358a1" testId="b4cd9f6e-a051-64f0-1177-f109c28b4e47" testName="Device_Enum_HasCorrectValues" computerName="ACPC" duration="00:00:00.0002490" startTime="2026-06-12T16:32:16.9911739+08:00" endTime="2026-06-12T16:32:16.9914228+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0276e31c-d287-46a6-b834-236ca72358a1" />
+    <UnitTestResult executionId="f35d28ca-c4c2-47a8-9644-8497c7164e5f" testId="9dd3d056-095a-6743-5aba-1af3ba0331fb" testName="FromNv21DataToBgr24_ProducesValidImage" computerName="ACPC" duration="00:00:00.0339280" startTime="2026-06-12T16:32:17.2135235+08:00" endTime="2026-06-12T16:32:17.2474520+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f35d28ca-c4c2-47a8-9644-8497c7164e5f">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_nv21_data_to_bgr24(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromNv21DataToBgr24(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 347&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromNv21DataToBgr24_ProducesValidImage() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 213&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5e747596-d502-41aa-980d-4af52898a335" testId="26071ba6-5b36-4064-3b74-9c382b996a86" testName="FromRgb24Data_SetsCorrectProperties" computerName="ACPC" duration="00:00:00.0450900" startTime="2026-06-12T16:32:17.2474762+08:00" endTime="2026-06-12T16:32:17.2925671+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5e747596-d502-41aa-980d-4af52898a335">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_rgb24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromRgb24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 294&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromRgb24Data_SetsCorrectProperties() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 171&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="e9e554bc-8c10-42f7-86c1-e437822eab55" testId="152b954a-aab7-7d1c-201f-9f37744e5a6d" testName="FromRgb24DataToBgr24_ConvertsColors" computerName="ACPC" duration="00:00:00.0295810" startTime="2026-06-12T16:32:17.2925919+08:00" endTime="2026-06-12T16:32:17.3221730+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e9e554bc-8c10-42f7-86c1-e437822eab55">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_rgb24_data_to_bgr24(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromRgb24DataToBgr24(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 307&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromRgb24DataToBgr24_ConvertsColors() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 179&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="a807f5de-f54a-469e-be35-843d4b1074cd" testId="5752a8bd-34f2-fe24-896c-af9ad2749687" testName="Crop_ReturnsCorrectDimensions" computerName="ACPC" duration="00:00:00.0404750" startTime="2026-06-12T16:32:16.9506745+08:00" endTime="2026-06-12T16:32:16.9911500+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a807f5de-f54a-469e-be35-843d4b1074cd">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.Crop_ReturnsCorrectDimensions() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 243&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="e3c5bf82-cab2-4ba2-9578-0ea8b5124d4a" testId="6f222068-a35f-6044-b6a2-af3408a15516" testName="RotatedRect_ToNativeAndBack" computerName="ACPC" duration="00:00:00.0006980" startTime="2026-06-12T16:32:17.5426324+08:00" endTime="2026-06-12T16:32:17.5433299+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e3c5bf82-cab2-4ba2-9578-0ea8b5124d4a" />
+    <UnitTestResult executionId="675cd8bd-3183-4764-9882-ed3bc2f04298" testId="4b338d09-2dac-7879-caee-007ebba226cb" testName="FromBgr24Data_SetsCorrectProperties" computerName="ACPC" duration="00:00:00.0277550" startTime="2026-06-12T16:32:17.1175203+08:00" endTime="2026-06-12T16:32:17.1452751+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="675cd8bd-3183-4764-9882-ed3bc2f04298">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DllNotFoundException : Unable to load DLL 'ModelDeploySDK' or one of its dependencies: 找不到指定的模块。 (0x8007007E)</Message>
+          <StackTrace>   at ModelDeploy.Image.md_from_bgr24_data(Byte[] data, Int32 width, Int32 height)&#xD;
+   at ModelDeploy.Image.FromBgr24Data(Byte[] data, Int32 width, Int32 height) in E:\CLionProjects\ModelDeploy\csharp\ModelDeploy\types.cs:line 281&#xD;
+   at ModelDeployUnitTest.ModelDeployTests.FromBgr24Data_SetsCorrectProperties() in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\UnitTest1.cs:line 153&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f6db8d5a-c1aa-4274-baa9-6ca7e7dfc2e7" testId="8ac17687-c11c-7a40-944f-bb3e3e610f47" testName="Backend_Enum_HasCorrectValues" computerName="ACPC" duration="00:00:00.0045400" startTime="2026-06-12T16:32:16.7695577+08:00" endTime="2026-06-12T16:32:16.7740725+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f6db8d5a-c1aa-4274-baa9-6ca7e7dfc2e7" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Clone_PreservesDimensions" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="16584cee-b90e-7f46-6a08-7745f02e5129">
+      <Execution id="c294e0d1-f27e-45d8-bed3-ca93d914848c" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Clone_PreservesDimensions" />
+    </UnitTest>
+    <UnitTest name="FromYuv420PDataToBgr24_ProducesValidImage" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="3a3a72d3-9fcf-c975-8b41-3004577b3717">
+      <Execution id="ed585003-e6c4-4951-9389-64e60a41f2f2" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromYuv420PDataToBgr24_ProducesValidImage" />
+    </UnitTest>
+    <UnitTest name="Image_Dispose_FreesNativeMemory" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="7bafd503-9bc8-8118-a970-f84bcb673c39">
+      <Execution id="7a523efe-a246-4588-a9a0-93cd185e552e" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Image_Dispose_FreesNativeMemory" />
+    </UnitTest>
+    <UnitTest name="RuntimeOption_ToNative_SetsFields" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="27d5b0e3-69f5-9a99-2fa8-8744f67ea004">
+      <Execution id="472a9256-02ca-4e40-9e2b-e645e32fa06a" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="RuntimeOption_ToNative_SetsFields" />
+    </UnitTest>
+    <UnitTest name="Rect_ToNativeAndBack" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="b7bd5ecb-4995-a18b-e704-44fafb76b7ed">
+      <Execution id="861f6305-a056-4863-9b01-d5d65140286f" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Rect_ToNativeAndBack" />
+    </UnitTest>
+    <UnitTest name="RuntimeOption_DefaultValues" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="93e6285b-d365-7262-c46b-c6f7b0369d9a">
+      <Execution id="81694708-ca71-4a7f-813f-31d52f15e441" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="RuntimeOption_DefaultValues" />
+    </UnitTest>
+    <UnitTest name="Save_WritesFileToDisk" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="14dc8e43-93c7-c774-b3ee-cf389eff5c66">
+      <Execution id="f3cd92fd-2ea5-4775-8fdb-df8d846cc5e7" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Save_WritesFileToDisk" />
+    </UnitTest>
+    <UnitTest name="PtrToStringUTF8_ConvertsCorrectly" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="0e63420b-05ec-fa7c-070a-aa457d4b2824">
+      <Execution id="be366343-32ba-48ba-83a9-1eb65b259d11" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="PtrToStringUTF8_ConvertsCorrectly" />
+    </UnitTest>
+    <UnitTest name="FromNv21DataToBgr24_ProducesValidImage" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="9dd3d056-095a-6743-5aba-1af3ba0331fb">
+      <Execution id="f35d28ca-c4c2-47a8-9644-8497c7164e5f" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromNv21DataToBgr24_ProducesValidImage" />
+    </UnitTest>
+    <UnitTest name="Image_UsingBlock_CallsDispose" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="deb9da1a-50ae-67c4-c0c9-bacfcd38ee5b">
+      <Execution id="9dbf114e-eda7-46d5-96f3-49f03c6159cd" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Image_UsingBlock_CallsDispose" />
+    </UnitTest>
+    <UnitTest name="Image_MultipleDispose_DoesNotThrow" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="205c54d5-470b-d0fe-de3e-b848fc0a62e2">
+      <Execution id="6f11d3ff-cedb-4781-8cc9-d42a2f87720c" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Image_MultipleDispose_DoesNotThrow" />
+    </UnitTest>
+    <UnitTest name="MDStatusCode_Enum_HasCorrectValues" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="9c31e3fe-5ea7-777e-3898-841b4e13350b">
+      <Execution id="518fbeaa-d273-47ef-80d2-25c2840a05ad" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="MDStatusCode_Enum_HasCorrectValues" />
+    </UnitTest>
+    <UnitTest name="FromCompressedBytes_FromTestImage_Decodes" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="bcb9be5d-e2c0-5240-6006-c485ea8449e0">
+      <Execution id="02d6972f-6f86-4c44-9d9a-2a8a45c04be0" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromCompressedBytes_FromTestImage_Decodes" />
+    </UnitTest>
+    <UnitTest name="FromRgb24Data_SetsCorrectProperties" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="26071ba6-5b36-4064-3b74-9c382b996a86">
+      <Execution id="5e747596-d502-41aa-980d-4af52898a335" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromRgb24Data_SetsCorrectProperties" />
+    </UnitTest>
+    <UnitTest name="Crop_ReturnsCorrectDimensions" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="5752a8bd-34f2-fe24-896c-af9ad2749687">
+      <Execution id="a807f5de-f54a-469e-be35-843d4b1074cd" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Crop_ReturnsCorrectDimensions" />
+    </UnitTest>
+    <UnitTest name="Clone_CreatesIndependentCopy" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="38a0b5dc-33a3-ef55-c3aa-79722f57db97">
+      <Execution id="005fb164-ba10-4b34-9038-5e01a8f85ffb" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Clone_CreatesIndependentCopy" />
+    </UnitTest>
+    <UnitTest name="DrawRect_ModifiesPixels" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="254f2b49-c170-699f-ee8a-15e2195e12a5">
+      <Execution id="69e2bf9f-8e58-4554-90f3-d8d20783d9ac" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="DrawRect_ModifiesPixels" />
+    </UnitTest>
+    <UnitTest name="RotatedRect_ToNativeAndBack" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="6f222068-a35f-6044-b6a2-af3408a15516">
+      <Execution id="e3c5bf82-cab2-4ba2-9578-0ea8b5124d4a" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="RotatedRect_ToNativeAndBack" />
+    </UnitTest>
+    <UnitTest name="FromBgr24Data_SetsCorrectProperties" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="4b338d09-2dac-7879-caee-007ebba226cb">
+      <Execution id="675cd8bd-3183-4764-9882-ed3bc2f04298" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromBgr24Data_SetsCorrectProperties" />
+    </UnitTest>
+    <UnitTest name="ToByteArray_ZeroChannelImage_ReturnsZeros" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="65792b37-a300-806e-3450-fd575e9bc04d">
+      <Execution id="37c101b2-9f00-4d28-a26f-715e2245a458" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="ToByteArray_ZeroChannelImage_ReturnsZeros" />
+    </UnitTest>
+    <UnitTest name="Backend_Enum_HasCorrectValues" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="8ac17687-c11c-7a40-944f-bb3e3e610f47">
+      <Execution id="f6db8d5a-c1aa-4274-baa9-6ca7e7dfc2e7" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Backend_Enum_HasCorrectValues" />
+    </UnitTest>
+    <UnitTest name="FromRgb24DataToBgr24_ConvertsColors" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="152b954a-aab7-7d1c-201f-9f37744e5a6d">
+      <Execution id="e9e554bc-8c10-42f7-86c1-e437822eab55" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromRgb24DataToBgr24_ConvertsColors" />
+    </UnitTest>
+    <UnitTest name="Read_NonExistentFile_ReturnsNullData" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="d8c9cad3-100b-bd95-b9d2-939244bd4ccc">
+      <Execution id="d7ef25a0-7c49-499b-87b3-040d3702b0f8" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Read_NonExistentFile_ReturnsNullData" />
+    </UnitTest>
+    <UnitTest name="Point_ToNativeAndBack" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="693d9791-ce08-a604-fb4b-698a1d2d51f0">
+      <Execution id="7e877739-63d8-4354-af9c-324de0ee5d48" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Point_ToNativeAndBack" />
+    </UnitTest>
+    <UnitTest name="Check_NonZeroCode_Throws" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="7eebbdde-5fd9-9c88-febe-c3352f3f0985">
+      <Execution id="24b3749c-a761-4a4f-a532-08a4720c54c5" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Check_NonZeroCode_Throws" />
+    </UnitTest>
+    <UnitTest name="ToByteArray_ContentMatchesInput" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="da86aa65-5d3b-00a8-ab42-928f34d7cf5f">
+      <Execution id="83eaa226-9bf6-4dde-8da7-5fb65316aaec" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="ToByteArray_ContentMatchesInput" />
+    </UnitTest>
+    <UnitTest name="FromBgr24Data_EmptyData_Throws" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="69bdcc6b-8e6a-fb6d-8cf5-43b86d6c98e0">
+      <Execution id="b31e95c3-0d1f-4a6b-8214-eb1fb6701031" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromBgr24Data_EmptyData_Throws" />
+    </UnitTest>
+    <UnitTest name="Read_JpegFile_SetsCorrectProperties" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="67811a71-6b9b-f318-3d29-160430ee6c81">
+      <Execution id="59e757c3-0e53-4a69-b650-737013b7a5a8" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Read_JpegFile_SetsCorrectProperties" />
+    </UnitTest>
+    <UnitTest name="Check_ZeroCode_DoesNotThrow" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="324ce131-7a4a-8167-cc9c-fc5a226181d3">
+      <Execution id="54801d15-a407-4852-a7b1-0390c7ddd16b" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Check_ZeroCode_DoesNotThrow" />
+    </UnitTest>
+    <UnitTest name="Crop_OutOfBounds_DoesNotCrash" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="e13cf475-b0e0-e7a1-3783-2d134ed9bb40">
+      <Execution id="94003668-fd0a-497a-a64d-d78c850c45a5" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Crop_OutOfBounds_DoesNotCrash" />
+    </UnitTest>
+    <UnitTest name="Device_Enum_HasCorrectValues" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="b4cd9f6e-a051-64f0-1177-f109c28b4e47">
+      <Execution id="0276e31c-d287-46a6-b834-236ca72358a1" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Device_Enum_HasCorrectValues" />
+    </UnitTest>
+    <UnitTest name="DrawPolygon_ModifiesPixels" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="d35637b1-053e-1818-d0bd-db3a7f308bff">
+      <Execution id="3a7d7d48-121c-4b21-86d0-a5e7deed23bf" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="DrawPolygon_ModifiesPixels" />
+    </UnitTest>
+    <UnitTest name="FromNv12DataToBgr24_ProducesValidImage" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="876c731e-7d50-9b80-9bfc-37477f5930ce">
+      <Execution id="82899d73-3ff5-4303-873f-33273e509ab1" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="FromNv12DataToBgr24_ProducesValidImage" />
+    </UnitTest>
+    <UnitTest name="Polygon_ToNativeAndBack" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="7093b519-2778-0ead-8c4f-fa3b3cb6435e">
+      <Execution id="83824e57-9ec9-48a5-a154-91d726b4d5ad" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Polygon_ToNativeAndBack" />
+    </UnitTest>
+    <UnitTest name="Color_ToNativeAndBack" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="dbaa5653-518b-2325-42db-35b8bd0539e7">
+      <Execution id="988c1362-4ca4-4452-a350-c5ffee8a4a17" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Color_ToNativeAndBack" />
+    </UnitTest>
+    <UnitTest name="Size_ToNativeAndBack" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="cae11199-1644-7a85-86ff-369ebb275101">
+      <Execution id="f680a5aa-becf-43f1-a3cd-c5be182468d5" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="Size_ToNativeAndBack" />
+    </UnitTest>
+    <UnitTest name="ToByteArray_ReturnsCorrectSize" storage="e:\clionprojects\modeldeploy\csharp\modeldeployunittest\bin\release\net9.0\modeldeployunittest.dll" id="9021c43b-4ea8-c1cb-625f-c8e694b437c2">
+      <Execution id="0db77a00-6feb-4ab8-af77-80304a6fd0a7" />
+      <TestMethod codeBase="E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll" adapterTypeName="executor://nunit3testexecutor/" className="ModelDeployUnitTest.ModelDeployTests" name="ToByteArray_ReturnsCorrectSize" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="da86aa65-5d3b-00a8-ab42-928f34d7cf5f" executionId="83eaa226-9bf6-4dde-8da7-5fb65316aaec" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bcb9be5d-e2c0-5240-6006-c485ea8449e0" executionId="02d6972f-6f86-4c44-9d9a-2a8a45c04be0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="16584cee-b90e-7f46-6a08-7745f02e5129" executionId="c294e0d1-f27e-45d8-bed3-ca93d914848c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e13cf475-b0e0-e7a1-3783-2d134ed9bb40" executionId="94003668-fd0a-497a-a64d-d78c850c45a5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7093b519-2778-0ead-8c4f-fa3b3cb6435e" executionId="83824e57-9ec9-48a5-a154-91d726b4d5ad" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="205c54d5-470b-d0fe-de3e-b848fc0a62e2" executionId="6f11d3ff-cedb-4781-8cc9-d42a2f87720c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="254f2b49-c170-699f-ee8a-15e2195e12a5" executionId="69e2bf9f-8e58-4554-90f3-d8d20783d9ac" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="27d5b0e3-69f5-9a99-2fa8-8744f67ea004" executionId="472a9256-02ca-4e40-9e2b-e645e32fa06a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="693d9791-ce08-a604-fb4b-698a1d2d51f0" executionId="7e877739-63d8-4354-af9c-324de0ee5d48" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="67811a71-6b9b-f318-3d29-160430ee6c81" executionId="59e757c3-0e53-4a69-b650-737013b7a5a8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cae11199-1644-7a85-86ff-369ebb275101" executionId="f680a5aa-becf-43f1-a3cd-c5be182468d5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="69bdcc6b-8e6a-fb6d-8cf5-43b86d6c98e0" executionId="b31e95c3-0d1f-4a6b-8214-eb1fb6701031" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7eebbdde-5fd9-9c88-febe-c3352f3f0985" executionId="24b3749c-a761-4a4f-a532-08a4720c54c5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="93e6285b-d365-7262-c46b-c6f7b0369d9a" executionId="81694708-ca71-4a7f-813f-31d52f15e441" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9c31e3fe-5ea7-777e-3898-841b4e13350b" executionId="518fbeaa-d273-47ef-80d2-25c2840a05ad" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7bafd503-9bc8-8118-a970-f84bcb673c39" executionId="7a523efe-a246-4588-a9a0-93cd185e552e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="65792b37-a300-806e-3450-fd575e9bc04d" executionId="37c101b2-9f00-4d28-a26f-715e2245a458" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9021c43b-4ea8-c1cb-625f-c8e694b437c2" executionId="0db77a00-6feb-4ab8-af77-80304a6fd0a7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="324ce131-7a4a-8167-cc9c-fc5a226181d3" executionId="54801d15-a407-4852-a7b1-0390c7ddd16b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dbaa5653-518b-2325-42db-35b8bd0539e7" executionId="988c1362-4ca4-4452-a350-c5ffee8a4a17" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="876c731e-7d50-9b80-9bfc-37477f5930ce" executionId="82899d73-3ff5-4303-873f-33273e509ab1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d35637b1-053e-1818-d0bd-db3a7f308bff" executionId="3a7d7d48-121c-4b21-86d0-a5e7deed23bf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="38a0b5dc-33a3-ef55-c3aa-79722f57db97" executionId="005fb164-ba10-4b34-9038-5e01a8f85ffb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3a3a72d3-9fcf-c975-8b41-3004577b3717" executionId="ed585003-e6c4-4951-9389-64e60a41f2f2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b7bd5ecb-4995-a18b-e704-44fafb76b7ed" executionId="861f6305-a056-4863-9b01-d5d65140286f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0e63420b-05ec-fa7c-070a-aa457d4b2824" executionId="be366343-32ba-48ba-83a9-1eb65b259d11" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="14dc8e43-93c7-c774-b3ee-cf389eff5c66" executionId="f3cd92fd-2ea5-4775-8fdb-df8d846cc5e7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d8c9cad3-100b-bd95-b9d2-939244bd4ccc" executionId="d7ef25a0-7c49-499b-87b3-040d3702b0f8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="deb9da1a-50ae-67c4-c0c9-bacfcd38ee5b" executionId="9dbf114e-eda7-46d5-96f3-49f03c6159cd" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b4cd9f6e-a051-64f0-1177-f109c28b4e47" executionId="0276e31c-d287-46a6-b834-236ca72358a1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9dd3d056-095a-6743-5aba-1af3ba0331fb" executionId="f35d28ca-c4c2-47a8-9644-8497c7164e5f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="26071ba6-5b36-4064-3b74-9c382b996a86" executionId="5e747596-d502-41aa-980d-4af52898a335" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="152b954a-aab7-7d1c-201f-9f37744e5a6d" executionId="e9e554bc-8c10-42f7-86c1-e437822eab55" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5752a8bd-34f2-fe24-896c-af9ad2749687" executionId="a807f5de-f54a-469e-be35-843d4b1074cd" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6f222068-a35f-6044-b6a2-af3408a15516" executionId="e3c5bf82-cab2-4ba2-9578-0ea8b5124d4a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4b338d09-2dac-7879-caee-007ebba226cb" executionId="675cd8bd-3183-4764-9882-ed3bc2f04298" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8ac17687-c11c-7a40-944f-bb3e3e610f47" executionId="f6db8d5a-c1aa-4274-baa9-6ca7e7dfc2e7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="列表中未列出的结果" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="所有已加载的结果" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="37" executed="37" passed="13" failed="24" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>NUnit Adapter 4.6.0.0: Test execution started&#xD;
+Running all tests in E:\CLionProjects\ModelDeploy\csharp\ModelDeployUnitTest\bin\Release\net9.0\ModelDeployUnitTest.dll&#xD;
+   NUnit3TestExecutor discovered 37 of 37 NUnit test cases using Current Discovery mode, Non-Explicit run&#xD;
+NUnit Adapter 4.6.0.0: Test execution complete&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

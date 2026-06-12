@@ -205,6 +205,5 @@ namespace modeldeploy {
         buf->assign((const char*)plain.data(), plain.size());
         return true;
     }
-
 } // namespace modeldeploy
 #endif // ENABLE_ENCRYPTION

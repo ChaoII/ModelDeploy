@@ -61,16 +61,17 @@ cv::Mat md_image_to_mat(const MDImage* image) {
 }
 
 
-MDImage* mat_to_md_image(const cv::Mat& mat) {
-    const auto md_image = static_cast<MDImage*>(malloc(sizeof(MDImage)));
-    md_image->width = mat.cols;
-    md_image->height = mat.rows;
-    md_image->channels = mat.channels();
+MDImage mat_to_md_image(const cv::Mat& mat) {
+    MDImage md_image{};
+    md_image.width = mat.cols;
+    md_image.height = mat.rows;
+    md_image.channels = mat.channels();
     if (mat.empty() || mat.total() == 0) {
-        md_image->data = nullptr;
-    } else {
-        md_image->data = static_cast<unsigned char*>(malloc(mat.total() * mat.elemSize()));
-        std::memcpy(md_image->data, mat.data, mat.total() * mat.elemSize());
+        md_image.data = nullptr;
+    }
+    else {
+        md_image.data = static_cast<unsigned char*>(malloc(mat.total() * mat.elemSize()));
+        std::memcpy(md_image.data, mat.data, mat.total() * mat.elemSize());
     }
     return md_image;
 }
@@ -481,15 +482,8 @@ void lpr_results_2_c_results(
     const std::vector<LprResult>& results, MDLPRResults* c_results) {
     // 针对单纯的车牌识别模型
     if (results.empty()) {
-        c_results->size = 1;
-        c_results->data = new MDLPRResult[c_results->size];
-        c_results->data[0].box = MDRect{0, 0, 0, 0};
-        c_results->data[0].car_plate_color = strdup(results[0].car_plate_color.c_str());
-        c_results->data[0].car_plate_str = strdup(results[0].car_plate_str.c_str());
-        c_results->data[0].label_id = -1;
-        c_results->data[0].score = 0.0f;
-        c_results->data[0].landmarks_size = 0;
-        c_results->data[0].landmarks = nullptr;
+        c_results->size = 0;
+        c_results->data = nullptr;
         return;
     }
 

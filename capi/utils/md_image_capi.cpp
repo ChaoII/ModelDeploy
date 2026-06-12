@@ -19,7 +19,7 @@ MDImage md_crop_image(MDImage* image, const MDRect* rect) {
     const cv::Rect roi(rect->x, rect->y, rect->width, rect->height);
     // 裁剪图像,并且让内存连续
     const cv::Mat cropped_image = cv_image(roi).clone();
-    return *mat_to_md_image(cropped_image);
+    return mat_to_md_image(cropped_image);
 }
 
 MDImage md_clone_image(const MDImage* image) {
@@ -36,7 +36,7 @@ MDImage md_clone_image(const MDImage* image) {
 MDImage md_from_compressed_bytes(const unsigned char* bytes, const int size) {
     const std::vector buffer(bytes, bytes + size);
     const cv::Mat img_decompressed = cv::imdecode(buffer, cv::IMREAD_COLOR);
-    return *mat_to_md_image(img_decompressed);
+    return mat_to_md_image(img_decompressed);
 }
 
 MDImage md_to_compressed_bytes(MDImage* image, const char* ext) {
@@ -63,47 +63,47 @@ MDImage md_to_compressed_bytes(MDImage* image, const char* ext) {
     new_image.height = image->height;
     new_image.channels = image->channels;
     new_image.data = static_cast<unsigned char*>(malloc(buffer.size()));
-    std::memcpy(new_image.data, image->data, buffer.size());
+    std::memcpy(new_image.data, buffer.data(), buffer.size());
     return new_image;
 }
 
 
 MDImage md_from_bgr24_data(const unsigned char* data, const int width, const int height) {
     const auto img_bgr = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
-    return *mat_to_md_image(img_bgr);
+    return mat_to_md_image(img_bgr);
 }
 
 MDImage md_from_rgb24_data(const unsigned char* data, const int width, const int height) {
     const auto img_rgb = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
-    return *mat_to_md_image(img_rgb);
+    return mat_to_md_image(img_rgb);
 }
 
 MDImage md_from_rgb24_data_to_bgr24(const unsigned char* data, const int width, const int height) {
     const auto img_rgb = cv::Mat(height, width, CV_8UC3, const_cast<unsigned char*>(data));
     cv::Mat img_bgr;
     cv::cvtColor(img_rgb, img_bgr, cv::COLOR_RGB2BGR);
-    return *mat_to_md_image(img_bgr);
+    return mat_to_md_image(img_bgr);
 }
 
 MDImage md_from_yuv420p_data_to_bgr24(const unsigned char* data, const int width, int height) {
     const auto img_yuv = cv::Mat(height * 3 / 2, width, CV_8UC1, const_cast<unsigned char*>(data));
     cv::Mat img_bgr;
     cv::cvtColor(img_yuv, img_bgr, cv::COLOR_YUV2BGR_I420);
-    return *mat_to_md_image(img_bgr);
+    return mat_to_md_image(img_bgr);
 }
 
 MDImage md_from_nv12_data_to_bgr24(const unsigned char* data, const int width, const int height) {
     const auto img_yuv_nv12 = cv::Mat(height * 3 / 2, width, CV_8UC1, const_cast<unsigned char*>(data));
     cv::Mat img_bgr;
     cv::cvtColor(img_yuv_nv12, img_bgr, cv::COLOR_YUV2BGR_NV12);
-    return *mat_to_md_image(img_bgr);
+    return mat_to_md_image(img_bgr);
 }
 
 MDImage md_from_nv21_data_to_bgr24(const unsigned char* data, const int width, const int height) {
     const auto img_yuv_nv21 = cv::Mat(height * 3 / 2, width, CV_8UC1, const_cast<unsigned char*>(data));
     cv::Mat img_bgr;
     cv::cvtColor(img_yuv_nv21, img_bgr, cv::COLOR_YUV2BGR_NV21);
-    return *mat_to_md_image(img_bgr);
+    return mat_to_md_image(img_bgr);
 }
 
 
@@ -116,13 +116,13 @@ MDImage md_from_base64_str(const char* base64_str) {
         return {};
     }
     // 将 cv::Mat 转换为 MDImage
-    return *mat_to_md_image(img_decode);
+    return mat_to_md_image(img_decode);
 }
 
 
 MDImage md_read_image(const char* path) {
     const cv::Mat image = cv::imread(path);
-    return *mat_to_md_image(image);
+    return mat_to_md_image(image);
 }
 
 MDImage md_read_image_from_device(int device_id, const int frame_width, const int frame_height,
@@ -162,7 +162,7 @@ MDImage md_read_image_from_device(int device_id, const int frame_width, const in
         cv::imwrite("capture.jpg", image);
         MD_LOG_INFO << "Save file to [capture.jpg]" << std::endl;
     }
-    return *mat_to_md_image(image);
+    return mat_to_md_image(image);
 }
 
 void md_save_image(MDImage* image, const char* path) {

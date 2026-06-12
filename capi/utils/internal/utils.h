@@ -40,7 +40,7 @@ MDMapData map_to_md_map(const std::unordered_map<int, std::string>& map);
 cv::Mat md_image_to_mat(const MDImage* image);
 
 
-MDImage* mat_to_md_image(const cv::Mat& mat);
+MDImage mat_to_md_image(const cv::Mat& mat);
 
 ///
 /// 在图像上绘制半透明矩形的内部函数。

@@ -97,13 +97,30 @@ MDStatusCode md_ocr_recognition_model_predict_batch(
 
 
 void md_free_ocr_recognition_result(MDOCRResult* result) {
-    // 该方法未给data分配堆内存直接赋nullptr避免野指针，悬垂指针
     if (result->box.data) {
+        free(result->box.data);
         result->box.data = nullptr;
     }
     if (result->text) {
         free(result->text);
+        result->text = nullptr;
     }
+}
+
+void md_free_ocr_recognition_results(MDOCRResults* results) {
+    if (results->data) {
+        for (int i = 0; i < results->size; i++) {
+            free(results->data[i].text);
+            results->data[i].text = nullptr;
+            free(results->data[i].box.data);
+            results->data[i].box.data = nullptr;
+        }
+        free(results->data);
+        results->data = nullptr;
+    }
+    free(results->table_html);
+    results->table_html = nullptr;
+    results->size = 0;
 }
 
 void md_free_ocr_recognition_model(MDModel* model) {

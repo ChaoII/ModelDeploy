@@ -40,10 +40,13 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_ocr_recognition_model_predict_batch(
     const MDModel* model, const MDImage* image, int batch_size, const MDPolygon* polygon, int size,
     MDOCRResults* results);
 
-/// 释放文本识别结果
-/// @param result 模型识别结果，由于在填充结构体时进行了手动内存分配，所以需要手动释放
-/// @return 无
+/// 释放单个文本识别结果
+/// @param result 由md_ocr_recognition_model_predict生成的单行识别结果
 MODELDEPLOY_CAPI_EXPORT void md_free_ocr_recognition_result(MDOCRResult* result);
+
+/// 释放批量文本识别结果（由md_ocr_recognition_model_predict_batch生成）
+/// @param results 批量识别结果，释放后内部所有 data 和 table_html 一并清理
+MODELDEPLOY_CAPI_EXPORT void md_free_ocr_recognition_results(MDOCRResults* results);
 
 /// 释放模型 由md_create_ocr_recognition_model生成的模型
 /// @param model 模型指针
