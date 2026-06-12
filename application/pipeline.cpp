@@ -42,7 +42,11 @@ bool Pipeline::start() {
 
     if (!decoder_->start()) {
         std::cerr << "[Pipeline] Decoder start failed" << std::endl;
-        stop();
+        decoder_.reset();
+        infer_group_.reset();
+        draw_engine_.reset();
+        encoder_.reset();
+        running_ = false;
         return false;
     }
 
@@ -54,19 +58,21 @@ bool Pipeline::start() {
 
 void Pipeline::stop() {
     running_ = false;
-    if (decoder_) decoder_->stop();
+    if (decoder_) {
+        decoder_->stop();
+        decoder_.reset();
+    }
     if (pipeline_thread_.joinable())
         pipeline_thread_.join();
-    if (encoder_) encoder_->stop_async();
-    if (encoder_) encoder_->close();
-
-    stats_.print();
-
-    decoder_.reset();
+    if (encoder_) {
+        encoder_->stop_async();
+        encoder_->close();
+        encoder_.reset();
+    }
     infer_group_.reset();
     draw_engine_.reset();
-    encoder_.reset();
     encoder_opened_ = false;
+    stats_.print();
 }
 
 bool Pipeline::on_decoded_frame(const DecodedFrame& frame) {
