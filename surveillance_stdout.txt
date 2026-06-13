@@ -1,0 +1,2 @@
+[HttpServer] 0.0.0.0:8080
+[Main] Surveillance platform running. Press Ctrl+C to stop.

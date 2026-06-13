@@ -1,41 +1,15 @@
 #include <catch2/catch_test_macros.hpp>
 #include "config.hpp"
 
-TEST_CASE("Config parse simple object", "[config]") {
-    auto j = parse_json(R"({"name":"test","count":3,"active":true})");
-    REQUIRE(j.is_object());
-    REQUIRE(j.as_object().get("name")->as_string() == "test");
-    REQUIRE(j.as_object().get("count")->as_int() == 3);
-    REQUIRE(j.as_object().get("active")->as_bool() == true);
-}
-
-TEST_CASE("Config parse array", "[config]") {
-    auto j = parse_json(R"([1,2,3])");
-    REQUIRE(j.is_array());
-    REQUIRE(j.as_array().size() == 3);
-    REQUIRE(j.as_array()[0].as_int() == 1);
-}
-
-TEST_CASE("Config parse nested", "[config]") {
-    auto j = parse_json(R"({"a":{"b":[1,2]}})");
-    REQUIRE(JsonValue::get_int(j, "a/b/0") == 1);
-    REQUIRE(JsonValue::get_int(j, "a/b/1") == 2);
-}
-
-TEST_CASE("Config parse with escape", "[config]") {
-    auto j = parse_json(R"({"s":"hello\nworld"})");
-    REQUIRE(j.as_object().get("s")->as_string() == "hello\nworld");
-}
-
 TEST_CASE("ModelConfig default values", "[config]") {
-    auto j = parse_json(R"({"id":"test1","name":"test task","input_url":"rtsp://input","output_url":"rtsp://output","models":[{"name":"det","path":"/m/yolo.onnx"}]})");
+    auto j = json::parse(R"({"id":"test1","name":"test task","input_url":"rtsp://input","output_url":"rtsp://output","models":[{"name":"det","path":"/m/yolo.onnx"}]})");
     auto cfg = task_config_from_json(j);
     REQUIRE(cfg.id == "test1");
     REQUIRE(cfg.input_url == "rtsp://input");
     REQUIRE(cfg.models.size() == 1);
     REQUIRE(cfg.models[0].name == "det");
-    REQUIRE(cfg.models[0].type == "detection");          // default
-    REQUIRE(cfg.models[0].confidence_threshold == 0.5f); // default
+    REQUIRE(cfg.models[0].type == "detection");
+    REQUIRE(cfg.models[0].confidence_threshold == 0.5f);
     REQUIRE(cfg.models[0].input_size[0] == 640);
     REQUIRE(cfg.models[0].input_size[1] == 640);
     REQUIRE(cfg.models[0].interval == 1);
@@ -80,8 +54,8 @@ TEST_CASE("TaskConfig roundtrip JSON", "[config]") {
     REQUIRE(cfg2.models[1].name == "face");
 }
 
-TEST_CASE("Config array of models with all fields", "[config]") {
-    auto j = parse_json(R"({"id":"full","input_url":"rtsp://in","output_url":"rtsp://out","models":[{"name":"p1","type":"detection","path":"/m/yolo.onnx","backend":"trt","device":"gpu","confidence_threshold":0.7,"input_size":[1280,1280],"roi":[100,200,500,500],"interval":3,"labels":["person","car"]}]})");
+TEST_CASE("Config all fields", "[config]") {
+    auto j = json::parse(R"({"id":"full","input_url":"rtsp://in","output_url":"rtsp://out","models":[{"name":"p1","type":"detection","path":"/m/yolo.onnx","backend":"trt","device":"gpu","confidence_threshold":0.7,"input_size":[1280,1280],"roi":[100,200,500,500],"interval":3,"labels":["person","car"]}]})");
     auto cfg = task_config_from_json(j);
     REQUIRE(cfg.models[0].backend == "trt");
     REQUIRE(cfg.models[0].confidence_threshold == 0.7f);

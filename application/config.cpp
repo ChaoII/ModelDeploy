@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cctype>
 
-// ==================== TaskConfig 验证 ====================
 bool TaskConfig::validate(std::string* err) const {
     auto fail = [&](const std::string& msg) {
         if (err) *err = msg;
@@ -41,310 +40,79 @@ void TaskConfig::print() const {
     }
 }
 
-// ==================== 最小 JSON 解析 ====================
-// 实现简易递归下降解析器
+// ── TaskConfig ←→ json ──
 
-class JsonParser {
-public:
-    explicit JsonParser(const std::string& input) : s_(input), pos_(0) {}
+json task_config_to_json(const TaskConfig& cfg) {
+    json j;
+    j["id"] = cfg.id;
+    j["name"] = cfg.name;
+    j["input_url"] = cfg.input_url;
+    j["output_url"] = cfg.output_url;
 
-    JsonValue parse() {
-        skip_ws();
-        if (pos_ >= s_.size()) return {};
-        char c = s_[pos_];
-        if (c == '{') return parse_object();
-        if (c == '[') return parse_array();
-        if (c == '"') return parse_string();
-        if (c == 't' || c == 'f') return parse_bool();
-        if (c == 'n') return parse_null();
-        return parse_number();
-    }
+    j["decoder"]["reconnect_delay_ms"] = cfg.decoder.reconnect_delay_ms;
+    j["decoder"]["max_reconnects"] = cfg.decoder.max_reconnects;
+    j["decoder"]["timeout_us"] = cfg.decoder.timeout_us;
 
-private:
-    const std::string& s_;
-    size_t pos_ = 0;
+    j["draw"]["show_label"] = cfg.draw.show_label;
+    j["draw"]["show_score"] = cfg.draw.show_score;
+    j["draw"]["font_path"] = cfg.draw.font_path;
 
-    void skip_ws() {
-        while (pos_ < s_.size() && (s_[pos_] == ' ' || s_[pos_] == '\t' ||
-               s_[pos_] == '\n' || s_[pos_] == '\r')) ++pos_;
-    }
-
-    char peek() { skip_ws(); return pos_ < s_.size() ? s_[pos_] : '\0'; }
-    char next() { return pos_ < s_.size() ? s_[pos_++] : '\0'; }
-
-    void expect(char c) {
-        if (next() != c) throw std::runtime_error(
-            std::string("expected '") + c + "' at pos " + std::to_string(pos_ - 1));
-    }
-
-    JsonObject parse_object() {
-        expect('{');
-        JsonObject obj;
-        if (peek() == '}') { next(); return obj; }
-        while (true) {
-            auto key = parse_string().as_string();
-            expect(':');
-            obj.set(key, parse());
-            if (peek() == '}') { next(); break; }
-            expect(',');
-        }
-        return obj;
-    }
-
-    JsonArray parse_array() {
-        expect('[');
-        JsonArray arr;
-        if (peek() == ']') { next(); return arr; }
-        while (true) {
-            arr.push(parse());
-            if (peek() == ']') { next(); break; }
-            expect(',');
-        }
-        return arr;
-    }
-
-    JsonValue parse_string() {
-        skip_ws();
-        expect('"');
-        std::string val;
-        while (pos_ < s_.size() && s_[pos_] != '"') {
-            if (s_[pos_] == '\\') {
-                ++pos_;
-                if (pos_ < s_.size()) {
-                    switch (s_[pos_]) {
-                        case 'n': val += '\n'; break;
-                        case 't': val += '\t'; break;
-                        case 'r': val += '\r'; break;
-                        case '\\': val += '\\'; break;
-                        case '"': val += '"'; break;
-                        default: val += s_[pos_]; break;
-                    }
-                    ++pos_;
-                }
-            } else {
-                val += s_[pos_++];
-            }
-        }
-        expect('"');
-        return JsonValue(val);
-    }
-
-    JsonValue parse_number() {
-        skip_ws();
-        size_t start = pos_;
-        if (s_[pos_] == '-') ++pos_;
-        while (pos_ < s_.size() && std::isdigit(s_[pos_])) ++pos_;
-        if (pos_ < s_.size() && s_[pos_] == '.') {
-            ++pos_;
-            while (pos_ < s_.size() && std::isdigit(s_[pos_])) ++pos_;
-        }
-        double val = std::stod(s_.substr(start, pos_ - start));
-        return JsonValue(val);
-    }
-
-    JsonValue parse_bool() {
-        if (s_.substr(pos_, 4) == "true") { pos_ += 4; return JsonValue(true); }
-        if (s_.substr(pos_, 5) == "false") { pos_ += 5; return JsonValue(false); }
-        throw std::runtime_error("invalid bool at pos " + std::to_string(pos_));
-    }
-
-    JsonValue parse_null() {
-        if (s_.substr(pos_, 4) == "null") { pos_ += 4; return {}; }
-        throw std::runtime_error("invalid null at pos " + std::to_string(pos_));
-    }
-};
-
-JsonValue parse_json(const std::string& input) {
-    JsonParser parser(input);
-    return parser.parse();
-}
-
-// ── JsonObject helpers ──
-JsonValue* JsonObject::get(const std::string& key) {
-    auto it = fields.find(key);
-    return it != fields.end() ? &it->second : nullptr;
-}
-const JsonValue* JsonObject::get(const std::string& key) const {
-    auto it = fields.find(key);
-    return it != fields.end() ? &it->second : nullptr;
-}
-bool JsonObject::has(const std::string& key) const {
-    return fields.find(key) != fields.end();
-}
-void JsonObject::set(const std::string& key, const JsonValue& v) {
-    fields[key] = v;
-}
-
-// ── 路径读取 ──
-// 路径格式: "models/0/name" 表示 root["models"][0]["name"]
-static const JsonValue* resolve_path(const JsonValue& root, const std::string& path) {
-    const JsonValue* cur = &root;
-    size_t start = 0;
-    while (start < path.size()) {
-        size_t slash = path.find('/', start);
-        std::string seg = path.substr(start, slash - start);
-        if (seg.empty()) break;
-        if (cur->is_object()) {
-            auto* f = cur->as_object().get(seg);
-            if (!f) return nullptr;
-            cur = f;
-        } else if (cur->is_array()) {
-            int idx = std::stoi(seg);
-            if (idx < 0 || (size_t)idx >= cur->as_array().size()) return nullptr;
-            cur = &cur->as_array()[idx];
-        } else {
-            return nullptr;
-        }
-        start = (slash == std::string::npos) ? path.size() : slash + 1;
-    }
-    return cur;
-}
-
-std::string JsonValue::get_string(const JsonValue& root, const std::string& path,
-                                   const std::string& def) {
-    auto* v = resolve_path(root, path);
-    if (!v || !v->is_string()) return def;
-    return v->as_string();
-}
-
-double JsonValue::get_number(const JsonValue& root, const std::string& path, double def) {
-    auto* v = resolve_path(root, path);
-    if (!v || !v->is_number()) return def;
-    return v->as_number();
-}
-
-int JsonValue::get_int(const JsonValue& root, const std::string& path, int def) {
-    auto* v = resolve_path(root, path);
-    if (!v || !v->is_number()) return def;
-    return v->as_int();
-}
-
-bool JsonValue::get_bool(const JsonValue& root, const std::string& path, bool def) {
-    auto* v = resolve_path(root, path);
-    if (!v || !v->is_bool()) return def;
-    return v->as_bool();
-}
-
-JsonArray JsonValue::get_array(const JsonValue& root, const std::string& path) {
-    auto* v = resolve_path(root, path);
-    if (!v || !v->is_array()) return {};
-    return v->as_array();
-}
-
-// ── TaskConfig ←→ JsonValue ──
-JsonValue task_config_to_json(const TaskConfig& cfg) {
-    JsonObject root;
-    root.set("id", JsonValue(cfg.id));
-    root.set("name", JsonValue(cfg.name));
-    root.set("input_url", JsonValue(cfg.input_url));
-    root.set("output_url", JsonValue(cfg.output_url));
-
-    // decoder
-    JsonObject dec;
-    dec.set("reconnect_delay_ms", JsonValue(cfg.decoder.reconnect_delay_ms));
-    dec.set("max_reconnects", JsonValue(cfg.decoder.max_reconnects));
-    dec.set("timeout_us", JsonValue(cfg.decoder.timeout_us));
-    root.set("decoder", JsonValue(dec));
-
-    // draw
-    JsonObject drw;
-    drw.set("show_label", JsonValue(cfg.draw.show_label));
-    drw.set("show_score", JsonValue(cfg.draw.show_score));
-    drw.set("font_path", JsonValue(cfg.draw.font_path));
-    root.set("draw", JsonValue(drw));
-
-    // models
-    JsonArray models_arr;
     for (const auto& m : cfg.models) {
-        JsonObject mo;
-        mo.set("name", JsonValue(m.name));
-        mo.set("type", JsonValue(m.type));
-        mo.set("path", JsonValue(m.path));
-        if (!m.rec_path.empty()) mo.set("rec_path", JsonValue(m.rec_path));
-        mo.set("backend", JsonValue(m.backend));
-        mo.set("device", JsonValue(m.device));
-        mo.set("confidence_threshold", JsonValue(m.confidence_threshold));
-        JsonArray sz;
-        sz.push(JsonValue(m.input_size[0]));
-        sz.push(JsonValue(m.input_size[1]));
-        mo.set("input_size", JsonValue(sz));
-        JsonArray roi;
-        roi.push(JsonValue(m.roi[0])); roi.push(JsonValue(m.roi[1]));
-        roi.push(JsonValue(m.roi[2])); roi.push(JsonValue(m.roi[3]));
-        mo.set("roi", JsonValue(roi));
-        mo.set("interval", JsonValue(m.interval));
-        if (!m.labels.empty()) {
-            JsonArray la;
-            for (const auto& l : m.labels) la.push(JsonValue(l));
-            mo.set("labels", JsonValue(la));
-        }
-        models_arr.push(JsonValue(mo));
+        json mo;
+        mo["name"] = m.name;
+        mo["type"] = m.type;
+        mo["path"] = m.path;
+        mo["backend"] = m.backend;
+        mo["device"] = m.device;
+        mo["confidence_threshold"] = m.confidence_threshold;
+        mo["input_size"] = {m.input_size[0], m.input_size[1]};
+        mo["roi"] = {m.roi[0], m.roi[1], m.roi[2], m.roi[3]};
+        mo["interval"] = m.interval;
+        if (!m.rec_path.empty()) mo["rec_path"] = m.rec_path;
+        if (!m.labels.empty()) mo["labels"] = m.labels;
+        j["models"].push_back(mo);
     }
-    root.set("models", JsonValue(models_arr));
-    return JsonValue(root);
+    return j;
 }
 
-static std::vector<int> json_arr_to_int_vec(const JsonArray& arr) {
-    std::vector<int> res;
-    for (size_t i = 0; i < arr.size(); ++i)
-        res.push_back(arr[i].as_int());
-    return res;
-}
-
-TaskConfig task_config_from_json(const JsonValue& j) {
+TaskConfig task_config_from_json(const json& j) {
     TaskConfig cfg;
-    auto& o = j.as_object();
-    auto gs = [&](const std::string& k) -> std::string {
-        auto* v = o.get(k);
-        return (v && v->is_string()) ? v->as_string() : "";
-    };
-    cfg.id = gs("id");
-    cfg.name = gs("name");
-    cfg.input_url = gs("input_url");
-    cfg.output_url = gs("output_url");
+    if (j.contains("id") && j["id"].is_string()) cfg.id = j["id"];
+    if (j.contains("name") && j["name"].is_string()) cfg.name = j["name"];
+    if (j.contains("input_url") && j["input_url"].is_string()) cfg.input_url = j["input_url"];
+    if (j.contains("output_url") && j["output_url"].is_string()) cfg.output_url = j["output_url"];
 
-    // decoder
-    if (auto* dec = o.get("decoder")) {
-        auto& d = dec->as_object();
-        if (auto* v = d.get("reconnect_delay_ms")) cfg.decoder.reconnect_delay_ms = v->as_int();
-        if (auto* v = d.get("max_reconnects")) cfg.decoder.max_reconnects = v->as_int();
-        if (auto* v = d.get("timeout_us")) cfg.decoder.timeout_us = v->as_int();
+    if (j.contains("decoder") && j["decoder"].is_object()) {
+        auto& d = j["decoder"];
+        if (d.contains("reconnect_delay_ms")) cfg.decoder.reconnect_delay_ms = d["reconnect_delay_ms"];
+        if (d.contains("max_reconnects")) cfg.decoder.max_reconnects = d["max_reconnects"];
+        if (d.contains("timeout_us")) cfg.decoder.timeout_us = d["timeout_us"];
     }
 
-    // draw
-    if (auto* drw = o.get("draw")) {
-        auto& d = drw->as_object();
-        if (auto* v = d.get("show_label")) cfg.draw.show_label = v->as_bool();
-        if (auto* v = d.get("show_score")) cfg.draw.show_score = v->as_bool();
-        if (auto* v = d.get("font_path")) cfg.draw.font_path = v->as_string();
+    if (j.contains("draw") && j["draw"].is_object()) {
+        auto& d = j["draw"];
+        if (d.contains("show_label")) cfg.draw.show_label = d["show_label"];
+        if (d.contains("show_score")) cfg.draw.show_score = d["show_score"];
+        if (d.contains("font_path")) cfg.draw.font_path = d["font_path"];
     }
 
-    // models
-    if (auto* marr = o.get("models")) {
-        for (size_t i = 0; i < marr->as_array().size(); ++i) {
-            auto& mo = marr->as_array()[i].as_object();
+    if (j.contains("models") && j["models"].is_array()) {
+        for (const auto& mo : j["models"]) {
             ModelConfig m;
-            auto g = [&](const std::string& k) -> std::string {
-                auto* v = mo.get(k); return (v && v->is_string()) ? v->as_string() : "";
-            };
-            auto assign_str = [&](const std::string& key, std::string& target) {
-                auto* v = mo.get(key);
-                if (v && v->is_string()) target = v->as_string();
-            };
-            assign_str("name", m.name);
-            assign_str("type", m.type);
-            assign_str("path", m.path);
-            assign_str("rec_path", m.rec_path);
-            assign_str("backend", m.backend);
-            assign_str("device", m.device);
-            if (auto* v = mo.get("confidence_threshold")) m.confidence_threshold = (float)v->as_number();
-            if (auto* v = mo.get("input_size")) m.input_size = json_arr_to_int_vec(v->as_array());
-            if (auto* v = mo.get("roi")) m.roi = json_arr_to_int_vec(v->as_array());
-            if (auto* v = mo.get("interval")) m.interval = v->as_int();
-            if (auto* v = mo.get("labels")) {
-                for (size_t j = 0; j < v->as_array().size(); ++j)
-                    m.labels.push_back(v->as_array()[j].as_string());
-            }
+            if (mo.contains("name")) m.name = mo["name"];
+            if (mo.contains("type")) m.type = mo["type"];
+            if (mo.contains("path")) m.path = mo["path"];
+            if (mo.contains("rec_path")) m.rec_path = mo["rec_path"];
+            if (mo.contains("backend")) m.backend = mo["backend"];
+            if (mo.contains("device")) m.device = mo["device"];
+            if (mo.contains("confidence_threshold")) m.confidence_threshold = mo["confidence_threshold"];
+            if (mo.contains("input_size") && mo["input_size"].is_array() && mo["input_size"].size() >= 2)
+                m.input_size = {mo["input_size"][0], mo["input_size"][1]};
+            if (mo.contains("roi") && mo["roi"].is_array() && mo["roi"].size() >= 4)
+                m.roi = {mo["roi"][0], mo["roi"][1], mo["roi"][2], mo["roi"][3]};
+            if (mo.contains("interval")) m.interval = mo["interval"];
+            if (mo.contains("labels") && mo["labels"].is_array())
+                m.labels = mo["labels"].get<std::vector<std::string>>();
             cfg.models.push_back(m);
         }
     }

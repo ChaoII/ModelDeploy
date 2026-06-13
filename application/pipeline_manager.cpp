@@ -53,7 +53,17 @@ std::vector<TaskStatus> PipelineManager::list_tasks() const {
     std::vector<TaskStatus> result;
     result.reserve(pipelines_.size());
     for (const auto& [id, pipe] : pipelines_) {
-        result.push_back({id, pipe->config().name, pipe->is_running()});
+        TaskStatus ts;
+        ts.id = id;
+        ts.name = pipe->config().name;
+        ts.running = pipe->is_running();
+        ts.input_url = pipe->config().input_url;
+        ts.output_url = pipe->config().output_url;
+        for (const auto& m : pipe->config().models) {
+            ts.model_names.push_back(m.name);
+            ts.model_types.push_back(m.type);
+        }
+        result.push_back(ts);
     }
     return result;
 }

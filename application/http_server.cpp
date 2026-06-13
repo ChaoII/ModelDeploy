@@ -57,16 +57,26 @@ std::string HttpServer::task_list_json(const std::vector<TaskStatus>& tasks) {
     for (size_t i = 0; i < tasks.size(); ++i) {
         if (i) j += ",";
         j += "{\"id\":\"" + tasks[i].id + "\",\"name\":\"" + tasks[i].name
-          + "\",\"running\":" + (tasks[i].running ? "true" : "false") + "}";
+          + "\",\"running\":" + (tasks[i].running ? "true" : "false")
+          + ",\"input_url\":\"" + tasks[i].input_url
+          + "\",\"output_url\":\"" + tasks[i].output_url + "\"";
+        if (!tasks[i].model_names.empty()) {
+            j += ",\"models\":[";
+            for (size_t k = 0; k < tasks[i].model_names.size(); ++k) {
+                if (k) j += ",";
+                j += "{\"name\":\"" + tasks[i].model_names[k]
+                  + "\",\"type\":\"" + tasks[i].model_types[k] + "\"}";
+            }
+            j += "]";
+        }
+        j += "}";
     }
     j += "]}";
     return j;
 }
 
 std::string HttpServer::task_config_json(const TaskConfig& cfg) {
-    auto jv = task_config_to_json(cfg);
-    return "{\"ok\":true,\"task\":" + jv.as_object().fields.at("id").as_string() + "}";
-    // simplified — for now just return basic info
+    return "{\"ok\":true,\"task\":" + task_config_to_json(cfg).dump() + "}";
 }
 
 // ── Route helpers ─────────────────────────────
@@ -78,24 +88,24 @@ static std::string get_id(const httplib::Request& req) {
 
 static ModelConfig parse_model_config(const std::string& body) {
     ModelConfig mcfg;
-    auto j = parse_json(body);
-    if (!j.is_object()) return mcfg;
-    mcfg.name = JsonValue::get_string(j, "name", "");
-    mcfg.path = JsonValue::get_string(j, "path", "");
-    mcfg.type = JsonValue::get_string(j, "type", "detection");
-    mcfg.backend = JsonValue::get_string(j, "backend", "ort");
-    mcfg.device = JsonValue::get_string(j, "device", "gpu");
-    mcfg.confidence_threshold = static_cast<float>(
-        JsonValue::get_number(j, "confidence_threshold", 0.5));
-    auto size = JsonValue::get_array(j, "input_size");
-    if (size.size() >= 2) {
-        mcfg.input_size = {size[0].as_int(), size[1].as_int()};
-    }
-    auto roi = JsonValue::get_array(j, "roi");
-    if (roi.size() >= 4) {
-        mcfg.roi = {roi[0].as_int(), roi[1].as_int(), roi[2].as_int(), roi[3].as_int()};
-    }
-    mcfg.interval = JsonValue::get_int(j, "interval", 1);
+    try {
+        auto j = json::parse(body);
+        if (!j.is_object()) return mcfg;
+        auto get_s = [&](const std::string& k, const std::string& d = "") -> std::string {
+            return j.contains(k) && j[k].is_string() ? j[k].get<std::string>() : d;
+        };
+        mcfg.name = get_s("name");
+        mcfg.path = get_s("path");
+        mcfg.type = get_s("type", "detection");
+        mcfg.backend = get_s("backend", "ort");
+        mcfg.device = get_s("device", "gpu");
+        if (j.contains("confidence_threshold")) mcfg.confidence_threshold = j["confidence_threshold"];
+        if (j.contains("input_size") && j["input_size"].is_array() && j["input_size"].size() >= 2)
+            mcfg.input_size = {j["input_size"][0], j["input_size"][1]};
+        if (j.contains("roi") && j["roi"].is_array() && j["roi"].size() >= 4)
+            mcfg.roi = {j["roi"][0], j["roi"][1], j["roi"][2], j["roi"][3]};
+        if (j.contains("interval")) mcfg.interval = j["interval"];
+    } catch (...) {}
     return mcfg;
 }
 
@@ -103,7 +113,17 @@ static ModelConfig parse_model_config(const std::string& body) {
 
 void HttpServer::register_routes() {
     // Web UI
-    server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
+    server_.Get("/", [](const httplib::Request&, httplib::Response& res) {
+        std::ifstream f("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
+        if (f.is_open()) {
+            std::string html((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+            res.set_content(html, "text/html; charset=utf-8");
+        } else {
+            res.set_content("<h1>Web UI not found</h1>", "text/html");
+        }
+    });
+    server_.Get("/index.html", [](const httplib::Request&, httplib::Response& res) {
         std::ifstream f("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
         if (f.is_open()) {
             std::string html((std::istreambuf_iterator<char>(f)),
@@ -122,7 +142,7 @@ void HttpServer::register_routes() {
     // POST /api/v1/tasks — create
     server_.Post("/api/v1/tasks", [this](const httplib::Request& req, httplib::Response& res) {
         try {
-            auto cfg = task_config_from_json(parse_json(req.body));
+            auto cfg = task_config_from_json(json::parse(req.body));
             if (!mgr_.create_task(cfg)) {
                 res.set_content(err_json("create failed"), "application/json");
                 return;
@@ -145,7 +165,7 @@ void HttpServer::register_routes() {
             res.set_content(err_json("not found"), "application/json");
             return;
         }
-        res.set_content(ok_json("\"task\":" + task_config_to_json(cfg).as_string()), "application/json");
+        res.set_content(ok_json("\"task\":" + task_config_to_json(cfg).dump()), "application/json");
     });
 
     // DELETE /api/v1/tasks/:id — remove

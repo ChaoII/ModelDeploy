@@ -13,6 +13,10 @@ struct TaskStatus {
     std::string id;
     std::string name;
     bool running = false;
+    std::string input_url;
+    std::string output_url;
+    std::vector<std::string> model_names;
+    std::vector<std::string> model_types;
 };
 
 /// 多任务管理器：线程安全 CRUD

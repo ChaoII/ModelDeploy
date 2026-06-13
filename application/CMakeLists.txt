@@ -21,7 +21,7 @@ if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
     message(FATAL_ERROR "FFmpeg not found at ${FFMPEG_ROOT}")
 endif ()
 
-# cpp-httplib (header-only)
+# cpp-httplib + nlohmann-json (header-only)
 set(HTTPLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 # ── 应用源文件 ──────────────────────────────
