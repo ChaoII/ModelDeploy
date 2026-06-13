@@ -4,211 +4,203 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Surveillance Platform</title>
+<link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.11.2/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-:root{--bg:#080816;--card:#10102a;--card2:#18183a;--border:#1e1e4a;--accent:#00bbff;--green:#00e676;--red:#ff1744;--amber:#ffab00;--text:#c8c8dd;--dim:#555;--radius:10px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
-::selection{background:var(--accent);color:#000}
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.nav{background:linear-gradient(135deg,#10102a 0%,#1a1a3a 100%);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:52px;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
-.nav-brand{display:flex;align-items:center;gap:10px}
-.nav-brand svg{width:22px;height:22px}
-.nav-brand h1{font-size:16px;font-weight:600;color:#fff;letter-spacing:.3px}
-.nav-brand h1 span{color:var(--accent)}
-.nav-right{display:flex;align-items:center;gap:12px}
-.conn-badge{padding:3px 12px;border-radius:12px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
-.conn-badge.on{background:#00e67620;color:var(--green);border:1px solid #00e67644}
-.conn-badge.off{background:#ff174420;color:var(--red);border:1px solid #ff174444}
-.container{max-width:1400px;margin:0 auto;padding:20px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:16px;border:1px solid var(--border);position:relative;overflow:hidden}
-.stat-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%}
-.stat-card.blue::before{background:var(--accent)}
-.stat-card.green::before{background:var(--green)}
-.stat-card.red::before{background:var(--red)}
-.stat-card .val{font-size:28px;font-weight:700;line-height:1}
-.stat-card .lbl{font-size:11px;color:var(--dim);margin-top:6px;text-transform:uppercase;letter-spacing:.5px}
-.stat-card.blue .val{color:var(--accent)}
-.stat-card.green .val{color:var(--green)}
-.stat-card.red .val{color:var(--red)}
-.actions-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.btn{height:34px;padding:0 18px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all .2s;text-transform:uppercase;letter-spacing:.3px}
-.btn:hover{transform:translateY(-1px)}
-.btn:active{transform:translateY(0)}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#0099dd);color:#000;box-shadow:0 2px 8px rgba(0,187,255,.3)}
-.btn-primary:hover{box-shadow:0 4px 14px rgba(0,187,255,.4)}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
-.btn-sm{height:28px;padding:0 12px;font-size:10px;border-radius:4px}
-.task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}
-.task-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:0;overflow:hidden;transition:border-color .3s,box-shadow .3s}
-.task-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.3)}
-.task-card.running{border-color:#00e67644}
-.task-card .card-head{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
-.task-card .card-head .title{display:flex;align-items:center;gap:8px}
-.task-card .card-head .title .id{color:var(--accent);font-weight:600;font-size:14px}
-.task-card .card-head .title .name{color:#fff;font-size:14px}
-.task-card .card-head .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.task-card .card-head .status-dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
-.task-card .card-head .status-dot.off{background:var(--dim)}
-.task-card .card-body{padding:12px 16px}
-.task-card .info-row{display:flex;font-size:11px;padding:3px 0;gap:8px}
-.task-card .info-row .label{color:var(--dim);min-width:52px;flex-shrink:0}
-.task-card .info-row .value{color:var(--text);word-break:break-all;font-family:monospace;font-size:10px}
-.task-card .card-models{padding:8px 16px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px}
-.model-chip{padding:3px 10px;border-radius:4px;font-size:10px;background:var(--bg);border:1px solid var(--border);color:var(--dim)}
-.model-chip .label{color:var(--accent);font-weight:500}
-.task-card .card-actions{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
-.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:200;justify-content:center;align-items:center;backdrop-filter:blur(4px)}
-.modal-overlay.open{display:flex}
-.modal{background:var(--card2);border-radius:12px;width:92%;max-width:680px;max-height:88vh;overflow-y:auto;border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,.5);animation:modalIn .2s ease}
-@keyframes modalIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
-.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.modal-header h2{font-size:15px;color:#fff;font-weight:600}
-.modal-close{background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;padding:4px;line-height:1;border-radius:4px;transition:all .2s}
-.modal-close:hover{color:#fff;background:rgba(255,255,255,.05)}
+:root{--sidebar-width:240px}
+body{background:#f0f2f5;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}
+.sidebar{position:fixed;top:0;left:0;width:var(--sidebar-width);height:100vh;background:linear-gradient(180deg,#1a1d3e 0%,#0d0f23 100%);color:#fff;z-index:100;padding:0;overflow-y:auto}
+.sidebar-brand{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.05)}
+.sidebar-brand .logo{font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}
+.sidebar-brand .logo i{color:#4e8cff;font-size:22px}
+.sidebar-brand .logo span{color:#4e8cff}
+.sidebar-brand small{display:block;font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;font-weight:400}
+.sidebar .nav-item{padding:8px 18px;margin:2px 8px;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.55)}
+.sidebar .nav-item:hover{background:rgba(255,255,255,.05);color:#fff}
+.sidebar .nav-item.active{background:rgba(78,140,255,.15);color:#4e8cff;font-weight:600}
+.sidebar .nav-item i{font-size:16px;width:20px;text-align:center}
+.main-content{margin-left:var(--sidebar-width);min-height:100vh}
+.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid #e8eaed;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.topbar h5{font-weight:600;color:#1a1d3e;margin:0;font-size:16px}
+.topbar .status-badge{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 14px;border-radius:20px}
+.topbar .status-badge.on{background:#e8f5e9;color:#2e7d32}
+.topbar .status-badge.off{background:#fbe9e7;color:#c62828}
+.content{padding:20px 24px}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:10px;padding:16px 18px;border:1px solid #e8eaed;transition:box-shadow .2s}
+.stat-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.stat-card .num{font-size:28px;font-weight:700;line-height:1.2}
+.stat-card .label{font-size:12px;color:#888;margin-top:2px}
+.stat-card .num.primary{color:#4e8cff}
+.stat-card .num.success{color:#4caf50}
+.stat-card .num.danger{color:#f44336}
+.toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.table-container{background:#fff;border-radius:10px;border:1px solid #e8eaed;overflow:hidden}
+.table-container .table-header{padding:14px 18px;border-bottom:1px solid #e8eaed;display:flex;justify-content:space-between;align-items:center}
+.table-container .table-header h6{margin:0;font-weight:600;color:#1a1d3e;font-size:14px}
+.table{ margin-bottom:0;font-size:13px}
+.table th{background:#f8f9fa;color:#555;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding:10px 14px;border-bottom:2px solid #e8eaed}
+.table td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #f0f0f0}
+.table tr:hover{background:#f8f9ff}
+.table tr:last-child td{border-bottom:none}
+.status-badge-sm{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500}
+.status-badge-sm.on{background:#e8f5e9;color:#2e7d32}
+.status-badge-sm.off{background:#f5f5f5;color:#999}
+.model-tags{display:flex;gap:3px;flex-wrap:wrap}
+.model-tags .tag{padding:1px 8px;border-radius:3px;font-size:10px;background:#f0f4ff;color:#4e8cff}
+.bi-dot{font-size:8px;vertical-align:middle}
+.log-panel{background:#fff;border-radius:10px;border:1px solid #e8eaed;margin-top:16px}
+.log-panel .log-header{padding:12px 18px;border-bottom:1px solid #e8eaed;display:flex;justify-content:space-between;align-items:center}
+.log-panel .log-header h6{margin:0;font-size:13px;font-weight:600;color:#1a1d3e}
+.log-panel .log-body{padding:8px 18px;max-height:120px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:11px;line-height:1.8;color:#555}
+.log-panel .log-body .time{color:#aaa}
+.log-panel .log-body .info{color:#4e8cff}
+.log-panel .log-body .ok{color:#4caf50}
+.log-panel .log-body .err{color:#f44336}
+.modal-content{border-radius:10px;border:none;box-shadow:0 10px 40px rgba(0,0,0,.15)}
+.modal-header{border-bottom:1px solid #f0f0f0;padding:16px 20px}
+.modal-header .modal-title{font-weight:600;font-size:15px}
 .modal-body{padding:20px}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.fld{margin-bottom:14px}
-.fld label{display:block;font-size:10px;color:var(--dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
-.fld input,.fld textarea,.fld select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;transition:all .2s}
-.fld input:focus,.fld textarea:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px rgba(0,187,255,.1)}
-.fld textarea{font-family:'SF Mono','Fira Code','Consolas',monospace;min-height:72px;resize:vertical;font-size:11px}
-.fld select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:32px}
-.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
-.empty-state{text-align:center;padding:60px 20px;color:var(--dim)}
-.empty-state .icon{font-size:36px;margin-bottom:12px;opacity:.3}
-.empty-state p{font-size:13px}
-.log-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-top:16px;overflow:hidden}
-.log-bar .log-header{padding:10px 14px;border-bottom:1px solid var(--border);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:600;display:flex;justify-content:space-between}
-.log-bar .log-body{padding:8px 14px;max-height:100px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:10px;line-height:1.7}
-.log-bar .log-body .t{color:var(--dim)}
-.log-bar .log-body .ok{color:var(--green)}
-.log-bar .log-body .err{color:var(--red)}
-.log-bar .log-body .info{color:var(--accent)}
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:8px;color:#fff;display:none;z-index:999;font-size:12px;font-weight:500;box-shadow:0 6px 30px rgba(0,0,0,.5);white-space:nowrap;animation:toastIn .3s ease}
-#toast.show{display:block}
-#toast.ok{background:var(--green);color:#000}
-#toast.err{background:var(--red)}
-#toast.info{background:var(--accent);color:#000}
-@keyframes toastIn{from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
-@media(max-width:640px){.form-row{grid-template-columns:1fr}.task-grid{grid-template-columns:1fr}.nav{padding:0 14px}}
+.modal-footer{border-top:1px solid #f0f0f0;padding:12px 20px}
+.form-label{font-size:12px;font-weight:500;color:#555;margin-bottom:3px}
+.form-control,.form-select{font-size:13px;border-radius:6px;border-color:#e0e0e0}
+.form-control:focus,.form-select:focus{border-color:#4e8cff;box-shadow:0 0 0 3px rgba(78,140,255,.1)}
+textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:11px}
+.empty-state{text-align:center;padding:40px 20px;color:#bbb}
+.empty-state i{font-size:40px;margin-bottom:10px;display:block}
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:9999}
+.alert-toast{padding:10px 18px;border-radius:8px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.1);margin-top:8px;animation:slideIn .3s ease}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 </style>
 </head>
 <body>
-<div class="nav">
-<div class="nav-brand">
-<svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-<h1>AI <span>Surveillance</span></h1>
+
+<div class="sidebar">
+<div class="sidebar-brand">
+<div class="logo"><i class="bi-camera-video"></i>AI <span>Surveillance</span></div>
+<small>GPU-Accelerated Video Analysis</small>
 </div>
-<div class="nav-right">
-<span class="conn-badge on" id="connBadge">Connected</span>
+<div style="padding:16px 0">
+<div class="nav-item active"><i class="bi-grid-3x3-gap-fill"></i> Dashboard</div>
+<div class="nav-item" onclick="openCreateModal()"><i class="bi-plus-circle"></i> New Task</div>
 </div>
 </div>
 
-<div class="container">
-<div class="stats">
-<div class="stat-card blue"><div class="val" id="statTotal">0</div><div class="lbl">Total Tasks</div></div>
-<div class="stat-card green"><div class="val" id="statRun">0</div><div class="lbl">Running</div></div>
-<div class="stat-card red"><div class="val" id="statStop">0</div><div class="lbl">Stopped</div></div>
+<div class="main-content">
+<div class="topbar">
+<h5><i class="bi-grid-3x3-gap-fill me-2" style="color:#4e8cff"></i>Dashboard</h5>
+<span id="connBadge" class="status-badge on"><i class="bi-check-circle-fill"></i> Connected</span>
 </div>
 
-<div class="actions-bar">
-<button class="btn btn-primary" onclick="openModal('createModal')">+ New Task</button>
-<button class="btn btn-ghost" onclick="refresh()">Refresh</button>
+<div class="content">
+<div class="stats-row" id="statsRow"></div>
+
+<div class="table-container">
+<div class="table-header">
+<h6><i class="bi-list-task me-1"></i> Tasks</h6>
+<button class="btn btn-primary btn-sm" onclick="openCreateModal()"><i class="bi-plus-lg"></i> New Task</button>
+</div>
+<div id="tableBody">
+<div class="empty-state"><i class="bi-inbox"></i><div>No tasks yet</div></div>
+</div>
 </div>
 
-<div class="task-grid" id="taskGrid"><div class="empty-state"><div class="icon">&#9679;</div><p>No tasks created yet</p></div></div>
-
-<div class="log-bar">
-<div class="log-header"><span>Activity Log</span><span id="logCount">0 events</span></div>
-<div class="log-body" id="logBody"><span class="t">System initialized. Waiting for commands...</span></div>
+<div class="log-panel">
+<div class="log-header"><h6><i class="bi-journal-text me-1"></i> Activity Log</h6><span id="logCount" style="font-size:11px;color:#aaa">0 events</span></div>
+<div class="log-body" id="logBody"><span class="time">System initialized</span></div>
+</div>
 </div>
 </div>
 
 <!-- Create Modal -->
-<div class="modal-overlay" id="createModal">
-<div class="modal">
-<div class="modal-header"><h2>Create New Task</h2><button class="modal-close" onclick="closeModal('createModal')">&times;</button></div>
+<div class="modal fade" id="createModal" tabindex="-1">
+<div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal-content">
+<div class="modal-header"><h5 class="modal-title"><i class="bi-plus-circle me-1" style="color:#4e8cff"></i> Create New Task</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
-<div class="form-row">
-<div class="fld"><label>Task ID</label><input id="f_id" placeholder="e.g. cam1"></div>
-<div class="fld"><label>Task Name</label><input id="f_name" placeholder="e.g. Main Entrance"></div>
+<div class="row g-3">
+<div class="col-md-6"><label class="form-label">Task ID</label><input class="form-control" id="f_id" placeholder="e.g. cam1"></div>
+<div class="col-md-6"><label class="form-label">Task Name</label><input class="form-control" id="f_name" placeholder="e.g. Main Entrance"></div>
+<div class="col-12"><label class="form-label">Input RTSP URL</label><input class="form-control" id="f_input" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/obs_test3"></div>
+<div class="col-md-4"><label class="form-label">Output Type</label><select class="form-select" id="f_outtype" onchange="updateOutField()"><option value="rtsp">RTSP Stream</option><option value="mp4">MP4 File</option></select></div>
+<div class="col-md-8"><label class="form-label" id="f_outlabel">Output RTSP URL</label><input class="form-control" id="f_output" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
+<div class="col-12"><label class="form-label">Model Configuration <span style="color:#999;font-weight:400">(JSON array, one or more models)</span></label><textarea class="form-control" id="f_models" rows="4">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
 </div>
-<div class="fld"><label>Input RTSP URL</label><input id="f_input" placeholder="rtsp://camera-url" value="rtsp://127.0.0.1:554/live/obs_test3"></div>
-<div class="form-row">
-<div class="fld"><label>Output Type</label><select id="f_outtype" onchange="updateOutField()"><option value="rtsp">RTSP Stream</option><option value="mp4">MP4 File</option></select></div>
-<div class="fld"><label id="f_outlabel">Output RTSP URL</label><input id="f_output" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
-</div>
-<div class="fld"><label>Model Configuration <span style="color:#555;font-weight:400;text-transform:none">(JSON array)</span></label><textarea id="f_models" rows="4">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
 </div>
 <div class="modal-footer">
-<button class="btn btn-ghost" onclick="closeModal('createModal')">Cancel</button>
-<button class="btn btn-primary" onclick="createTask()">Create &amp; Start</button>
+<button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+<button type="button" class="btn btn-primary" onclick="createTask()"><i class="bi-play-fill"></i> Create &amp; Start</button>
+</div>
 </div>
 </div>
 </div>
 
-<div id="toast"></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-var logs=[];
-function log(msg,tp){tp=tp||'info';var b=document.getElementById('logBody');var d=new Date();var ts=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');b.innerHTML+='<div><span class="t">['+ts+']</span> <span class="'+tp+'">'+esc(msg)+'</span></div>';b.scrollTop=b.scrollHeight;document.getElementById('logCount').textContent=(++logs.length)+' events'}
-function toast(m,t){var o=document.getElementById('toast');o.textContent=m;o.className='toast show '+(t||'info');setTimeout(function(){o.className='toast'},3500)}
-function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false,msg:'parse error'}}cb(r)};x.onerror=function(){cb({ok:false,msg:'network error'});document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').textContent='Disconnected'};if(b)x.send(b);else x.send()}
-function updateOutField(){var t=document.getElementById('f_outtype').value;var l=document.getElementById('f_outlabel');l.textContent=t=='mp4'?'Output File Path':'Output RTSP URL';document.getElementById('f_output').placeholder=t=='mp4'?'/path/to/output.mp4':'rtsp://destination'}
-function openModal(id){document.getElementById(id).className='modal-overlay open'}
-function closeModal(id){document.getElementById(id).className='modal-overlay'}
+var logs=[],modal=null;
+document.addEventListener('DOMContentLoaded',function(){modal=new bootstrap.Modal(document.getElementById('createModal'))});
+
+function log(msg,tp){tp=tp||'info';var b=document.getElementById('logBody');var d=new Date();var ts=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');b.innerHTML+='<div><span class="time">['+ts+']</span> <span class="'+tp+'">'+esc(msg)+'</span></div>';b.scrollTop=b.scrollHeight;document.getElementById('logCount').textContent=(++logs.length)+' events'}
+function toast(msg,t){var c=document.getElementById('toastContainer');var d=document.createElement('div');d.className='alert-toast alert alert-'+(t||'info')+' d-flex align-items-center gap-2';d.innerHTML='<i class="bi-'+(t=='danger'?'exclamation-circle':t=='success'?'check-circle':'info-circle')+'"></i>'+esc(msg);c.appendChild(d);setTimeout(function(){d.remove()},4000)}
+function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){cb({ok:false});document.getElementById('connBadge').className='status-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> Disconnected'}}
+function updateOutField(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'Output File Path':'Output RTSP URL';document.getElementById('f_output').placeholder=t=='mp4'?'/path/to/output.mp4':'rtsp://destination'}
+function openCreateModal(){if(modal)modal.show()}
 
 function render(tasks){
- document.getElementById('statTotal').textContent=tasks.length;document.getElementById('statRun').textContent=tasks.filter(function(t){return t.running}).length;document.getElementById('statStop').textContent=tasks.filter(function(t){return !t.running}).length;
- var tg=document.getElementById('taskGrid');
- if(tasks.length===0){tg.innerHTML='<div class="empty-state"><div class="icon">&#9679;</div><p>No tasks created yet</p></div>';return}
- tg.innerHTML='';
- tasks.forEach(function(t){
-  var c=document.createElement('div');c.className='task-card'+(t.running?' running':'');
-  var mh='';if(t.models){t.models.forEach(function(m){mh+='<span class="model-chip"><span class="label">'+esc(m.type)+'</span> '+esc(m.name)+'</span>'})}
-  c.innerHTML=
-   '<div class="card-head"><div class="title"><span class="status-dot '+(t.running?'on':'off')+'"></span><span class="id">'+esc(t.id)+'</span><span class="name">'+esc(t.name||'')+'</span></div><span style="font-size:10px;color:'+(t.running?'var(--green)':'var(--dim)')+';font-weight:600;letter-spacing:.3px">'+(t.running?'RUNNING':'STOPPED')+'</span></div>'+
-   '<div class="card-body"><div class="info-row"><span class="label">Input</span><span class="value">'+esc(t.input_url||'-')+'</span></div><div class="info-row"><span class="label">Output</span><span class="value">'+esc(t.output_url||'-')+'</span></div></div>'+
-   (mh?'<div class="card-models">'+mh+'</div>':'')+
-   '<div class="card-actions">'+
-    (t.running?'<button class="btn btn-sm" style="background:var(--amber);color:#000" onclick="stopTask(\''+t.id+'\')">Stop</button>':'<button class="btn btn-sm" style="background:var(--green);color:#000" onclick="startTask(\''+t.id+'\')">Start</button>')+
-    '<button class="btn btn-sm btn-ghost" onclick="deleteTask(\''+t.id+'\')">Delete</button>'+
-   '</div>';
-  tg.appendChild(c)
- })
+ var s=document.getElementById('statsRow');
+ s.innerHTML=
+  '<div class="stat-card"><div class="num primary">'+tasks.length+'</div><div class="label">Total Tasks</div></div>'+
+  '<div class="stat-card"><div class="num success">'+tasks.filter(function(t){return t.running}).length+'</div><div class="label">Running</div></div>'+
+  '<div class="stat-card"><div class="num danger">'+tasks.filter(function(t){return !t.running}).length+'</div><div class="label">Stopped</div></div>';
+ var tb=document.getElementById('tableBody');
+ if(tasks.length===0){tb.innerHTML='<div class="empty-state"><i class="bi-inbox"></i><div>No tasks yet</div></div>';return}
+ var h='<table class="table"><thead><tr><th style="width:40px">#</th><th>Task</th><th>Input</th><th>Output</th><th>Models</th><th style="width:80px">Status</th><th style="width:180px">Actions</th></tr></thead><tbody>';
+ tasks.forEach(function(t,i){
+  var mh='';if(t.models){t.models.forEach(function(m){mh+='<span class="tag">'+esc(m.name)+'</span>'})}
+  h+='<tr><td>'+(i+1)+'</td>'+
+   '<td><strong>'+esc(t.id)+'</strong>'+(t.name?'<br><small style="color:#999">'+esc(t.name)+'</small>':'')+'</td>'+
+   '<td style="font-size:11px;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(t.input_url||'-')+'</td>'+
+   '<td style="font-size:11px;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(t.output_url||'-')+'</td>'+
+   '<td><div class="model-tags">'+(mh||'<span style="color:#ccc;font-size:11px">-</span>')+'</div></td>'+
+   '<td><span class="status-badge-sm '+(t.running?'on':'off')+'"><i class="bi-circle-fill" style="font-size:6px"></i>'+(t.running?'Running':'Stopped')+'</span></td>'+
+   '<td>'+
+    (t.running?'<button class="btn btn-warning btn-sm" onclick="stopTask(\''+t.id+'\')"><i class="bi-stop-fill"></i></button> ':'<button class="btn btn-success btn-sm" onclick="startTask(\''+t.id+'\')"><i class="bi-play-fill"></i></button> ')+
+    '<button class="btn btn-outline-danger btn-sm" onclick="deleteTask(\''+t.id+'\')"><i class="bi-trash3"></i></button>'+
+   '</td></tr>';
+ });
+ h+='</tbody></table>';tb.innerHTML=h;
 }
 function refresh(){
  api('GET','/api/v1/tasks',null,function(r){
-  if(r.ok&&r.tasks){render(r.tasks);document.getElementById('connBadge').className='conn-badge on';document.getElementById('connBadge').textContent='Connected'}
-  else{document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').textContent='Disconnected'}
+  if(r.ok&&r.tasks){render(r.tasks);document.getElementById('connBadge').className='status-badge on';document.getElementById('connBadge').innerHTML='<i class="bi-check-circle-fill"></i> Connected'}
+  else{document.getElementById('connBadge').className='status-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> Disconnected'}
  })
 }
 function createTask(){
  var id=document.getElementById('f_id').value||('cam'+Date.now()),name=document.getElementById('f_name').value||id;
  var input=document.getElementById('f_input').value,output=document.getElementById('f_output').value;
  var models=document.getElementById('f_models').value;
- try{JSON.parse(models)}catch(e){toast('Invalid model JSON','err');return}
+ try{JSON.parse(models)}catch(e){toast('Invalid model JSON','danger');return}
  var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:JSON.parse(models)});
  log('Creating task: '+id,'info');
  api('POST','/api/v1/tasks',body,function(r){
   if(r.ok){
-   log('Task "'+id+'" created','ok');toast('Task created: '+id,'ok');
-   closeModal('createModal');
+   log('Task "'+id+'" created','ok');toast('Task "'+id+'" created','success');
+   if(modal)modal.hide();
    api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
-    if(r2.ok){log('Task "'+id+'" started','ok');toast('Task started: '+id,'ok')}
-    else{log('Start failed for "'+id+'"','err')}
+    if(r2.ok){log('Task "'+id+'" started','ok');toast('Task "'+id+'" started','success')}
+    else{log('Start "'+id+'" failed','err')}
     refresh()
    })
-  }else{log('Create failed for "'+id+'"','err');toast('Create failed','err')}
+  }else{log('Create "'+id+'" failed','err');toast('Create failed','danger')}
  })
 }
-function startTask(id){log('Starting: '+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('Started: '+id,'ok');toast('Started: '+id,'ok')}else{log('Start failed: '+id,'err')}refresh()})}
-function stopTask(id){log('Stopping: '+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('Stopped: '+id,'ok');toast('Stopped: '+id,'ok')}else{log('Stop failed: '+id,'err')}refresh()})}
-function deleteTask(id){if(!confirm('Delete "'+id+'"?'))return;log('Deleting: '+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('Deleted: '+id,'ok');toast('Deleted: '+id,'ok')}else{log('Delete failed: '+id,'err')}refresh()})}
+function startTask(id){log('Starting: '+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('Started: '+id,'ok');toast('Started "'+id+'"','success')}else{log('Start failed: '+id,'err')}refresh()})}
+function stopTask(id){log('Stopping: '+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('Stopped: '+id,'ok');toast('Stopped "'+id+'"','success')}else{log('Stop failed: '+id,'err')}refresh()})}
+function deleteTask(id){if(!confirm('Delete "'+id+'"?'))return;log('Deleting: '+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('Deleted: '+id,'ok');toast('Deleted "'+id+'"','success')}else{log('Delete failed: '+id,'err')}refresh()})}
 refresh();setInterval(refresh,5000);log('Web UI initialized','info')
 </script>
 </body>

@@ -121,7 +121,8 @@ static bool is_method(const httplib::Request& req, const std::string& method) {
 void HttpServer::register_routes() {
 
     // ── Web UI (served from file) ───────────────────
-    server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
+    std::string ui_html;
+    {
         // Try multiple possible locations for the HTML file
         std::vector<std::string> paths = {
             "E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html",
@@ -134,21 +135,18 @@ void HttpServer::register_routes() {
                 try {
                     std::stringstream buf;
                     buf << f.rdbuf();
-                    std::string html = buf.str();
-                    if (html.empty()) {
-                        std::cerr << "[WebUI] File " << p << " is empty" << std::endl;
-                        continue;
-                    }
-                    res.set_content(html, "text/html; charset=utf-8");
-                    return;
-                } catch (const std::exception& e) {
-                    std::cerr << "[WebUI] Error reading " << p << ": " << e.what() << std::endl;
-                    continue;
-                }
+                    ui_html = buf.str();
+                    if (!ui_html.empty()) break;
+                } catch (...) { continue; }
             }
         }
-        std::cerr << "[WebUI] Could not open web_ui.html from any path" << std::endl;
-        res.set_content("<h1>Web UI file not found</h1><p>Expected at: E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html</p>", "text/html");
+        if (ui_html.empty()) {
+            std::cerr << "[WebUI] Could not open web_ui.html" << std::endl;
+            ui_html = "<h1>Web UI file not found</h1>";
+        }
+    }
+    server_.Get("/", [ui_html](const httplib::Request&, httplib::Response& res) {
+        res.set_content(ui_html, "text/html; charset=utf-8");
     });
 
     // ── Health ──────────────────────────────────────
