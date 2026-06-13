@@ -66,7 +66,7 @@ private:
     std::queue<PendingFrame> frame_queue_;
     std::mutex queue_mtx_;
     std::condition_variable queue_cv_;
-    size_t max_queue_size_ = 10;
+    size_t max_queue_size_ = 3; // keep small to avoid stale frames
 
     /// 解码帧回调（解码线程调用）
     bool on_decoded_frame(const DecodedFrame& frame);

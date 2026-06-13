@@ -63,6 +63,15 @@ bool StreamEncoder::init_encoder(int width, int height) {
         enc_ctx_->level = 41;
     }
 
+    // Optimize for low-latency encoding
+    if (codec->id == AV_CODEC_ID_H264) {
+        // Software x264 - ultrafast preset + zerolatency
+        av_opt_set(enc_ctx_->priv_data, "preset", "ultrafast", 0);
+        av_opt_set(enc_ctx_->priv_data, "tune", "zerolatency", 0);
+        enc_ctx_->bit_rate = 6'000'000;
+        std::cout << "[Encoder] x264 ultrafast+zerolatency" << std::endl;
+    }
+
     if (avcodec_open2(enc_ctx_, codec, nullptr) < 0) {
         std::cerr << "[Encoder] Failed to open encoder" << std::endl;
         return false;
