@@ -49,8 +49,15 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     auto* cpu_buf = frame_pool_.acquire(total);
     if (!cpu_buf) return false;
 
-    cudaMemcpy2D(cpu_buf, width, y_plane, y_step, width, height, cudaMemcpyDeviceToHost);
-    cudaMemcpy2D(cpu_buf + y_size, width, uv_plane, uv_step, width, height / 2, cudaMemcpyDeviceToHost);
+    // Copy Y plane (line by line, handling stride)
+    for (int row = 0; row < height; ++row) {
+        memcpy(cpu_buf + row * width, y_plane + row * y_step, width);
+    }
+    // Copy UV plane
+    int uv_height = height / 2;
+    for (int row = 0; row < uv_height; ++row) {
+        memcpy(cpu_buf + y_size + row * width, uv_plane + row * uv_step, width);
+    }
 
     auto nv12_image = ImageData::from_raw(cpu_buf, width, height, MdImageType::NV12, true);
     frame_pool_.release(cpu_buf);

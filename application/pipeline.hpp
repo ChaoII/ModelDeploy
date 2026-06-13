@@ -18,7 +18,7 @@ public:
     explicit Pipeline(TaskConfig cfg);
     ~Pipeline();
 
-    /// 启动流水线
+    /// 启动流水线（返回后流水线在后台初始化）
     bool start();
 
     /// 停止流水线
@@ -26,6 +26,9 @@ public:
 
     /// 是否正在运行
     bool is_running() const { return running_.load(); }
+
+    /// 是否已成功初始化（模型加载、解码器连接完成）
+    bool is_initialized() const { return initialized_.load(); }
 
     /// 获取任务 ID
     const std::string& task_id() const { return cfg_.id; }
@@ -49,6 +52,8 @@ private:
     std::unique_ptr<StreamEncoder> encoder_;
     PerfStats stats_;
     std::atomic<bool> encoder_opened_{false};
+    std::atomic<bool> initialized_{false};
+    std::string init_error_;
 
     std::atomic<bool> running_{false};
     std::thread pipeline_thread_;

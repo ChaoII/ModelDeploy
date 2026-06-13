@@ -14,45 +14,11 @@ Pipeline::~Pipeline() {
 bool Pipeline::start() {
     if (running_) return true;
 
-    // 1) InferGroup
-    infer_group_ = std::make_unique<InferGroup>(cfg_);
-    if (!infer_group_->init()) {
-        std::cerr << "[Pipeline] InferGroup init failed" << std::endl;
-        return false;
-    }
-
-    // 2) DrawEngine
-    draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
-
-    // 3) StreamEncoder (deferred open until first frame provides resolution)
-    encoder_ = std::make_unique<StreamEncoder>(25);
-
-    // 4) StreamDecoder
-    decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
-    decoder_->set_callback([this](const DecodedFrame& frame) -> bool {
-        return on_decoded_frame(frame);
-    });
-    if (!decoder_->open(cfg_.input_url)) {
-        std::cerr << "[Pipeline] Decoder open failed" << std::endl;
-        return false;
-    }
-
+    // 异步初始化：在 pipeline 线程中做重量级工作（连接 RTSP、加载模型）
+    // start() 立即返回，不阻塞 HTTP handler
+    initialized_ = false;
     running_ = true;
     pipeline_thread_ = std::thread(&Pipeline::pipeline_loop, this);
-
-    if (!decoder_->start()) {
-        std::cerr << "[Pipeline] Decoder start failed" << std::endl;
-        decoder_.reset();
-        infer_group_.reset();
-        draw_engine_.reset();
-        encoder_.reset();
-        running_ = false;
-        return false;
-    }
-
-    std::cout << "[Pipeline] Started: " << cfg_.id
-              << " (" << cfg_.input_url << " \u2192 " << cfg_.output_url << ")" << std::endl;
-    stats_.start();
     return true;
 }
 
@@ -72,57 +38,122 @@ void Pipeline::stop() {
     infer_group_.reset();
     draw_engine_.reset();
     encoder_opened_ = false;
+    initialized_ = false;
     stats_.print();
+}
+
+void Pipeline::pipeline_loop() {
+    try {
+        // === 初始化阶段 ===
+
+        // 1) InferGroup
+        infer_group_ = std::make_unique<InferGroup>(cfg_);
+        if (!infer_group_->init()) {
+            init_error_ = "InferGroup init failed";
+            std::cerr << "[Pipeline] " << init_error_ << std::endl;
+            running_ = false;
+            return;
+        }
+
+        // 2) DrawEngine
+        draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
+
+        // 3) StreamEncoder (deferred open)
+        encoder_ = std::make_unique<StreamEncoder>(25);
+
+        // 4) StreamDecoder
+        decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
+        decoder_->set_callback([this](const DecodedFrame& frame) -> bool {
+            return on_decoded_frame(frame);
+        });
+
+        if (!decoder_->open(cfg_.input_url)) {
+            init_error_ = "Decoder open failed";
+            std::cerr << "[Pipeline] " << init_error_ << std::endl;
+            running_ = false;
+            return;
+        }
+
+        if (!decoder_->start()) {
+            init_error_ = "Decoder start failed";
+            std::cerr << "[Pipeline] " << init_error_ << std::endl;
+            decoder_.reset();
+            infer_group_.reset();
+            draw_engine_.reset();
+            encoder_.reset();
+            running_ = false;
+            return;
+        }
+
+        initialized_ = true;
+        std::cout << "[Pipeline] Started: " << cfg_.id
+                  << " (" << cfg_.input_url << " \u2192 " << cfg_.output_url << ")" << std::endl;
+        stats_.start();
+
+        // === 保持线程存活（解码器在自己的线程中运行） ===
+        while (running_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+
+    } catch (const std::exception& e) {
+        init_error_ = e.what();
+        std::cerr << "[Pipeline] Fatal: " << init_error_ << std::endl;
+    } catch (...) {
+        init_error_ = "unknown error";
+        std::cerr << "[Pipeline] Fatal: unknown error" << std::endl;
+    }
+
+    running_ = false;
+    if (decoder_) { decoder_->stop(); decoder_.reset(); }
+    infer_group_.reset();
+    draw_engine_.reset();
+    if (encoder_) { encoder_->stop_async(); encoder_->close(); encoder_.reset(); }
 }
 
 bool Pipeline::on_decoded_frame(const DecodedFrame& frame) {
     if (!running_) return false;
 
-    // 首次解码到帧时打开编码器（获取流的分辨率）
-    if (!encoder_opened_) {
-        if (encoder_->open(cfg_.output_url, frame.width, frame.height)) {
-            encoder_->start_async();
-            encoder_opened_ = true;
-        } else {
-            std::cerr << "[Pipeline] Encoder open failed" << std::endl;
-            return false;
+    try {
+        if (!encoder_opened_) {
+            if (encoder_->open(cfg_.output_url, frame.width, frame.height)) {
+                encoder_->start_async();
+                encoder_opened_ = true;
+            } else {
+                std::cerr << "[Pipeline] Encoder open failed" << std::endl;
+                return false;
+            }
         }
+
+        auto t0 = std::chrono::steady_clock::now();
+
+        std::vector<InferResult> results;
+        ImageData frame_bgr;
+        infer_group_->run_models(frame.y_plane, frame.uv_plane,
+                                  frame.width, frame.height,
+                                  frame.y_step, frame.uv_step,
+                                  &results, &frame_bgr);
+
+        auto t1 = std::chrono::steady_clock::now();
+
+        draw_engine_->draw(frame_bgr, results);
+
+        auto t2 = std::chrono::steady_clock::now();
+
+        encoder_->encode_async(frame_bgr);
+
+        auto t3 = std::chrono::steady_clock::now();
+
+        stats_.record_frame(0,
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count(),
+            std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(),
+            std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count());
+    } catch (const std::exception& e) {
+        std::cerr << "[Pipeline] Frame error: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[Pipeline] Frame unknown error" << std::endl;
     }
-
-    auto t0 = std::chrono::steady_clock::now();
-
-    // 1) 推理
-    std::vector<InferResult> results;
-    ImageData frame_bgr;
-    infer_group_->run_models(frame.y_plane, frame.uv_plane,
-                              frame.width, frame.height,
-                              frame.y_step, frame.uv_step,
-                              &results, &frame_bgr);
-
-    auto t1 = std::chrono::steady_clock::now();
-
-    // 2) 绘制
-    draw_engine_->draw(frame_bgr, results);
-
-    auto t2 = std::chrono::steady_clock::now();
-
-    // 3) 编码推送
-    encoder_->encode_async(frame_bgr);
-
-    auto t3 = std::chrono::steady_clock::now();
-
-    auto inf_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-    auto drw_us = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-    auto enc_us = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
-    stats_.record_frame(0, inf_us, drw_us, enc_us);
 
     return running_.load();
-}
-
-void Pipeline::pipeline_loop() {
-    while (running_) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
 }
 
 bool Pipeline::add_model(const ModelConfig& mcfg) {

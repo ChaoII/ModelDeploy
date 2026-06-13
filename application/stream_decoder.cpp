@@ -138,7 +138,7 @@ void StreamDecoder::decode_loop() {
             ret = avcodec_receive_frame(dec_ctx_, hw_frame);
             if (ret != 0) break;
 
-            // If hardware frame, transfer to CPU NV12
+            // Transfer GPU frame to CPU NV12
             AVFrame* out_frame = hw_frame;
             if (hw_frame->hw_frames_ctx) {
                 sw_frame->format = AV_PIX_FMT_NV12;
@@ -149,7 +149,6 @@ void StreamDecoder::decode_loop() {
                     out_frame = sw_frame;
             }
 
-            // Prepare decoded frame for callback
             DecodedFrame df;
             df.y_plane = out_frame->data[0];
             df.uv_plane = out_frame->data[1];
