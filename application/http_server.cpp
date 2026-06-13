@@ -1,5 +1,6 @@
 #include "http_server.hpp"
 #include <iostream>
+#include <fstream>
 
 HttpServer::HttpServer(PipelineManager& mgr, const std::string& host, int port)
     : mgr_(mgr), host_(host), port_(port) {
@@ -101,6 +102,18 @@ static ModelConfig parse_model_config(const std::string& body) {
 // ── Routes ────────────────────────────────────
 
 void HttpServer::register_routes() {
+    // Web UI
+    server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
+        std::ifstream f("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
+        if (f.is_open()) {
+            std::string html((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+            res.set_content(html, "text/html; charset=utf-8");
+        } else {
+            res.set_content("<h1>Web UI not found</h1>", "text/html");
+        }
+    });
+
     // Health
     server_.Get("/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content("{\"ok\":true}", "application/json");

@@ -46,44 +46,34 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     size_t uv_size = y_size / 2;
     size_t total = y_size + uv_size;
 
-    auto* cpu_buf = frame_pool_.acquire(total);
-    if (!cpu_buf) return false;
+    // 从解码器 CPU 帧数据创建连续 NV12 buffer
+    std::vector<uint8_t> cpu_buf(total);
+    for (int row = 0; row < height; ++row)
+        memcpy(cpu_buf.data() + row * width, y_plane + row * y_step, width);
+    int uv_h = height / 2;
+    for (int row = 0; row < uv_h; ++row)
+        memcpy(cpu_buf.data() + y_size + row * width, uv_plane + row * uv_step, width);
 
-    // Copy Y plane (line by line, handling stride)
-    for (int row = 0; row < height; ++row) {
-        memcpy(cpu_buf + row * width, y_plane + row * y_step, width);
-    }
-    // Copy UV plane
-    int uv_height = height / 2;
-    for (int row = 0; row < uv_height; ++row) {
-        memcpy(cpu_buf + y_size + row * width, uv_plane + row * uv_step, width);
-    }
+    auto nv12_image = ImageData::from_raw(cpu_buf.data(), width, height, MdImageType::NV12, true);
+    auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
 
-    auto nv12_image = ImageData::from_raw(cpu_buf, width, height, MdImageType::NV12, true);
-    frame_pool_.release(cpu_buf);
+    if (frame_out)
+        *frame_out = bgr_image.clone();
 
-    if (nv12_image.empty()) return false;
-
-    // 输出 BGR 帧（用于绘制）
-    if (frame_out) {
-        *frame_out = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
-    }
-
-    // 对每个模型执行推理
+    // 对每个模型执行推理（使用 BGR 图像）
     for (size_t i = 0; i < engines_.size(); ++i) {
         if (!should_process(i)) continue;
 
         auto& engine = engines_[i];
         const auto& mcfg = engine->config();
 
-        ImageData input_image = nv12_image;
-        bool has_roi = (mcfg.roi[2] > 0 && mcfg.roi[3] > 0);
-        if (has_roi) {
+        ImageData input_image = bgr_image;
+        if (mcfg.roi[2] > 0 && mcfg.roi[3] > 0) {
             Rect2f roi_rect = {static_cast<float>(mcfg.roi[0]),
                                static_cast<float>(mcfg.roi[1]),
                                static_cast<float>(mcfg.roi[2]),
                                static_cast<float>(mcfg.roi[3])};
-            input_image = nv12_image.crop(roi_rect);
+            input_image = bgr_image.crop(roi_rect);
             if (input_image.empty()) continue;
         }
 
@@ -93,9 +83,8 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
         auto dt = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - t0).count();
 
-        if (ok) {
+        if (ok)
             results->push_back(std::move(result));
-        }
 
         stats_.record_frame(0, dt, 0, 0);
     }

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitoring Platform</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;padding:20px}
+h1{color:#00d4ff;margin-bottom:20px}
+.card{background:#16213e;border-radius:8px;padding:20px;margin-bottom:16px;border:1px solid #0f3460}
+.card h3{color:#00d4ff;margin-bottom:12px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;margin-bottom:4px;color:#a0a0a0;font-size:13px}
+.form-group input,.form-group textarea{width:100%;padding:8px 12px;border:1px solid #0f3460;border-radius:4px;background:#1a1a2e;color:#e0e0e0;font-size:14px}
+.form-group textarea{font-family:monospace;min-height:60px}
+button{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-size:14px;transition:opacity .2s}
+button:hover{opacity:.8}
+.btn-primary{background:#00d4ff;color:#000}
+.btn-success{background:#00e676;color:#000}
+.btn-danger{background:#ff1744;color:#fff}
+.btn-warning{background:#ffab00;color:#000}
+.btn-sm{padding:4px 12px;font-size:12px;margin:2px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #0f3460}
+th{color:#00d4ff;font-size:13px;text-transform:uppercase}
+td{font-size:14px}
+.status-running{color:#00e676;font-weight:bold}
+.status-stopped{color:#ff1744}
+pre{background:#1a1a2e;padding:12px;border-radius:4px;overflow-x:auto;font-size:12px;margin-top:8px;border:1px solid #0f3460}
+a{color:#00d4ff;text-decoration:none}
+.actions{display:flex;gap:4px;flex-wrap:wrap}
+#toast{position:fixed;bottom:20px;right:20px;padding:12px 24px;border-radius:4px;color:#fff;display:none;z-index:999}
+#toast.success{background:#00e676;color:#000;display:block}
+#toast.error{background:#ff1744;display:block}
+.hidden{display:none}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:768px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>AI Surveillance Platform</h1>
+<div id="toast"></div>
+<div class="grid">
+<div class="card">
+<h3>Create Task</h3>
+<div class="form-group"><label>Task ID</label><input id="newId" value="cam1"></div>
+<div class="form-group"><label>Name</label><input id="newName" value="Camera 1"></div>
+<div class="form-group"><label>Input RTSP</label><input id="newInput" value="rtsp://127.0.0.1:554/live/obs_test3"></div>
+<div class="form-group"><label>Output (RTSP/MP4)</label><input id="newOutput" value="E:/CLionProjects/ModelDeploy/build/bin/out.mp4"></div>
+<div class="form-group"><label>Models (JSON array)</label><textarea id="newModels">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
+<button class="btn-primary" onclick="createTask()">Create</button>
+</div>
+<div class="card">
+<h3>Instructions</h3>
+<p style="font-size:13px;line-height:1.8">
+After creating a task, click Start to begin the pipeline.<br>
+Status shows running/stopped. Use Stop/Delete as needed.
+</p>
+</div>
+</div>
+<div class="card">
+<h3>Task List</h3>
+<table><thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead><tbody id="taskList"></tbody></table>
+</div>
+<script>
+function toast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className=type;setTimeout(function(){t.style.display='none'},3000)}
+function api(method,url,body,cb){var x=new XMLHttpRequest();x.open(method,url,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r,x.status)};x.onerror=function(){cb({ok:false})};if(body)x.send(body);else x.send()}
+function refresh(){api('GET','/api/v1/tasks',null,function(r){var t=document.getElementById('taskList');t.innerHTML='';if(!r.ok||!r.tasks)return;r.tasks.forEach(function(task){var tr=document.createElement('tr');var cls=task.running?'status-running':'status-stopped';var st=task.running?'Running':'Stopped';tr.innerHTML='<td>'+task.id+'</td><td>'+task.name+'</td><td class="'+cls+'">'+st+'</td><td class="actions">'+(task.running?'<button class="btn-warning btn-sm" onclick="stopTask(\''+task.id+'\')">Stop</button>':'<button class="btn-success btn-sm" onclick="startTask(\''+task.id+'\')">Start</button>')+'<button class="btn-danger btn-sm" onclick="deleteTask(\''+task.id+'\')">Delete</button></td>';t.appendChild(tr)})})}
+function createTask(){var id=document.getElementById('newId').value;var name=document.getElementById('newName').value;var input=document.getElementById('newInput').value;var output=document.getElementById('newOutput').value;var models=document.getElementById('newModels').value;try{JSON.parse(models)}catch(e){toast('Invalid model JSON','error');return}
+var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:JSON.parse(models)});api('POST','/api/v1/tasks',body,function(r){if(r.ok){toast('Task created','success');refresh()}else toast('Create failed','error')})}
+function startTask(id){api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){toast('Started','success');refresh()}else toast('Start failed','error')})}
+function stopTask(id){api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){toast('Stopped','success');refresh()}else toast('Stop failed','error')})}
+function deleteTask(id){if(!confirm('Delete task '+id+'?'))return;api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){toast('Deleted','success');refresh()}else toast('Delete failed','error')})}
+refresh();setInterval(refresh,3000)
+</script>
+</body>
+</html>

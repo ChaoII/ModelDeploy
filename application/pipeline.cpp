@@ -1,5 +1,7 @@
 #include "pipeline.hpp"
 #include <iostream>
+#include <cstring>
+#include <cuda_runtime.h>
 
 using namespace modeldeploy::vision;
 
@@ -13,9 +15,6 @@ Pipeline::~Pipeline() {
 
 bool Pipeline::start() {
     if (running_) return true;
-
-    // 异步初始化：在 pipeline 线程中做重量级工作（连接 RTSP、加载模型）
-    // start() 立即返回，不阻塞 HTTP handler
     initialized_ = false;
     running_ = true;
     pipeline_thread_ = std::thread(&Pipeline::pipeline_loop, this);
@@ -24,6 +23,7 @@ bool Pipeline::start() {
 
 void Pipeline::stop() {
     running_ = false;
+    queue_cv_.notify_all();
     if (decoder_) {
         decoder_->stop();
         decoder_.reset();
@@ -42,9 +42,54 @@ void Pipeline::stop() {
     stats_.print();
 }
 
+// ── 解码回调（解码线程） ─────────────────────
+
+bool Pipeline::on_decoded_frame(const DecodedFrame& frame) {
+    if (!running_) return false;
+
+    try {
+        // 逐行拷贝 NV12 帧数据到连续 buffer
+        PendingFrame pf;
+        pf.width = frame.width;
+        pf.height = frame.height;
+        size_t y_size = static_cast<size_t>(frame.height) * frame.width;
+        size_t uv_size = y_size / 2;
+        pf.nv12_data.resize(y_size + uv_size);
+
+        uint8_t* dst = pf.nv12_data.data();
+        for (int row = 0; row < frame.height; ++row) {
+            memcpy(dst + row * frame.width,
+                   frame.y_plane + row * frame.y_step,
+                   frame.width);
+        }
+        int uv_h = frame.height / 2;
+        for (int row = 0; row < uv_h; ++row) {
+            memcpy(dst + y_size + row * frame.width,
+                   frame.uv_plane + row * frame.uv_step,
+                   frame.width);
+        }
+
+        // 推入队列，唤醒流水线线程
+        {
+            std::lock_guard<std::mutex> lock(queue_mtx_);
+            if (frame_queue_.size() >= max_queue_size_) {
+                return running_.load(); // skip frame
+            }
+            frame_queue_.push(std::move(pf));
+        }
+        queue_cv_.notify_one();
+    } catch (const std::exception& e) {
+        std::cerr << "[Pipeline] Callback error: " << e.what() << std::endl;
+    }
+
+    return running_.load();
+}
+
+// ── 流水线主循环（流水线线程） ─────────────────
+
 void Pipeline::pipeline_loop() {
     try {
-        // === 初始化阶段 ===
+        cudaSetDevice(0);
 
         // 1) InferGroup
         infer_group_ = std::make_unique<InferGroup>(cfg_);
@@ -58,7 +103,7 @@ void Pipeline::pipeline_loop() {
         // 2) DrawEngine
         draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
 
-        // 3) StreamEncoder (deferred open)
+        // 3) StreamEncoder
         encoder_ = std::make_unique<StreamEncoder>(25);
 
         // 4) StreamDecoder
@@ -86,13 +131,23 @@ void Pipeline::pipeline_loop() {
         }
 
         initialized_ = true;
-        std::cout << "[Pipeline] Started: " << cfg_.id
-                  << " (" << cfg_.input_url << " \u2192 " << cfg_.output_url << ")" << std::endl;
+        std::cout << "[Pipeline] Running: " << cfg_.id << std::endl;
         stats_.start();
 
-        // === 保持线程存活（解码器在自己的线程中运行） ===
+        // 主循环：处理队列中的帧
         while (running_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            PendingFrame pf;
+            {
+                std::unique_lock<std::mutex> lock(queue_mtx_);
+                queue_cv_.wait_for(lock, std::chrono::milliseconds(500),
+                    [this]() { return !frame_queue_.empty() || !running_; });
+                if (!running_) break;
+                if (frame_queue_.empty()) continue;
+                pf = std::move(frame_queue_.front());
+                frame_queue_.pop();
+            }
+
+            process_frame(pf.nv12_data.data(), pf.width, pf.height);
         }
 
     } catch (const std::exception& e) {
@@ -110,50 +165,50 @@ void Pipeline::pipeline_loop() {
     if (encoder_) { encoder_->stop_async(); encoder_->close(); encoder_.reset(); }
 }
 
-bool Pipeline::on_decoded_frame(const DecodedFrame& frame) {
-    if (!running_) return false;
+// ── 单帧处理（流水线线程，有 CUDA 上下文） ─────
 
-    try {
-        if (!encoder_opened_) {
-            if (encoder_->open(cfg_.output_url, frame.width, frame.height)) {
-                encoder_->start_async();
-                encoder_opened_ = true;
-            } else {
-                std::cerr << "[Pipeline] Encoder open failed" << std::endl;
-                return false;
-            }
+bool Pipeline::process_frame(const uint8_t* nv12, int width, int height) {
+    if (!encoder_opened_) {
+        if (encoder_->open(cfg_.output_url, width, height)) {
+            encoder_->start_async();
+            encoder_opened_ = true;
+        } else {
+            std::cerr << "[Pipeline] Encoder open failed" << std::endl;
+            return false;
         }
-
-        auto t0 = std::chrono::steady_clock::now();
-
-        std::vector<InferResult> results;
-        ImageData frame_bgr;
-        infer_group_->run_models(frame.y_plane, frame.uv_plane,
-                                  frame.width, frame.height,
-                                  frame.y_step, frame.uv_step,
-                                  &results, &frame_bgr);
-
-        auto t1 = std::chrono::steady_clock::now();
-
-        draw_engine_->draw(frame_bgr, results);
-
-        auto t2 = std::chrono::steady_clock::now();
-
-        encoder_->encode_async(frame_bgr);
-
-        auto t3 = std::chrono::steady_clock::now();
-
-        stats_.record_frame(0,
-            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count(),
-            std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(),
-            std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count());
-    } catch (const std::exception& e) {
-        std::cerr << "[Pipeline] Frame error: " << e.what() << std::endl;
-    } catch (...) {
-        std::cerr << "[Pipeline] Frame unknown error" << std::endl;
     }
 
-    return running_.load();
+    auto t0 = std::chrono::steady_clock::now();
+
+    auto nv12_image = ImageData::from_raw(const_cast<uint8_t*>(nv12), width, height,
+                                           MdImageType::NV12, true);
+    auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
+
+    // 推理
+    std::vector<InferResult> results;
+    infer_group_->run_models(const_cast<uint8_t*>(nv12),
+                              const_cast<uint8_t*>(nv12 + width * height),
+                              width, height, width, width,
+                              &results, nullptr);
+
+    auto t1 = std::chrono::steady_clock::now();
+
+    // 绘制
+    draw_engine_->draw(bgr_image, results);
+
+    auto t2 = std::chrono::steady_clock::now();
+
+    // 编码
+    encoder_->encode_async(bgr_image);
+
+    auto t3 = std::chrono::steady_clock::now();
+
+    stats_.record_frame(0,
+        std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count(),
+        std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count(),
+        std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count());
+
+    return true;
 }
 
 bool Pipeline::add_model(const ModelConfig& mcfg) {
