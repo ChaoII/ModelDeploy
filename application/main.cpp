@@ -1,10 +1,10 @@
+#include "pipeline_manager.hpp"
+#include "http_server.hpp"
 #include <iostream>
 #include <csignal>
 #include <cstdlib>
 #include <thread>
-
-#include "pipeline_manager.hpp"
-#include "http_server.hpp"
+#include <cuda_runtime.h>
 
 static PipelineManager* g_mgr = nullptr;
 
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, handle_signal);
     std::signal(SIGTERM, handle_signal);
 
-    int port = 8080;
+    int port = 18080;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -30,6 +30,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    cudaSetDevice(0);
+
     PipelineManager mgr;
     g_mgr = &mgr;
 
@@ -39,7 +41,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::cout << "[Main] Surveillance platform running on port " << port << ". Press Ctrl+C to stop." << std::endl;
+    std::cout << "[Main] Running on port " << port << std::endl;
 
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstring>
 #include <cuda_runtime.h>
+#include <windows.h>
 
 using namespace modeldeploy::vision;
 
@@ -87,10 +88,13 @@ bool Pipeline::on_decoded_frame(const DecodedFrame& frame) {
 
 // ── 流水线主循环（流水线线程） ─────────────────
 
-void Pipeline::pipeline_loop() {
-    try {
-        cudaSetDevice(0);
+static void seh_translater(unsigned int, struct _EXCEPTION_POINTERS*) {
+    throw std::runtime_error("SEH exception");
+}
 
+void Pipeline::pipeline_loop() {
+    _set_se_translator(seh_translater);
+    try {
         // 1) InferGroup
         infer_group_ = std::make_unique<InferGroup>(cfg_);
         if (!infer_group_->init()) {
@@ -163,11 +167,13 @@ void Pipeline::pipeline_loop() {
     infer_group_.reset();
     draw_engine_.reset();
     if (encoder_) { encoder_->stop_async(); encoder_->close(); encoder_.reset(); }
+
 }
 
 // ── 单帧处理（流水线线程，有 CUDA 上下文） ─────
 
 bool Pipeline::process_frame(const uint8_t* nv12, int width, int height) {
+    try {
     if (!encoder_opened_) {
         if (encoder_->open(cfg_.output_url, width, height)) {
             encoder_->start_async();
@@ -209,6 +215,10 @@ bool Pipeline::process_frame(const uint8_t* nv12, int width, int height) {
         std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count());
 
     return true;
+    } catch (...) {
+        std::cerr << "[Pipeline] process_frame error" << std::endl;
+        return false;
+    }
 }
 
 bool Pipeline::add_model(const ModelConfig& mcfg) {

@@ -1,6 +1,7 @@
 #include "http_server.hpp"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 HttpServer::HttpServer(PipelineManager& mgr, const std::string& host, int port)
     : mgr_(mgr), host_(host), port_(port) {
@@ -14,22 +15,22 @@ bool HttpServer::start() {
     if (running_) return true;
     register_routes();
 
-    std::promise<void> started;
-    auto started_fut = started.get_future();
-
     running_ = true;
-    server_.set_start_handler([&started]() { started.set_value(); });
-
     server_thread_ = std::thread([this]() {
-        std::cout << "[HttpServer] " << host_ << ":" << port_ << std::endl;
+        std::cout << "[HttpServer] Starting on " << host_ << ":" << port_ << " ..." << std::endl;
         if (!server_.listen(host_.c_str(), port_)) {
-            std::cerr << "[HttpServer] listen failed" << std::endl;
+            std::cerr << "[HttpServer] FAILED to bind " << host_ << ":" << port_
+                      << " - port may be in use by another process" << std::endl;
             running_ = false;
+        } else {
+            std::cout << "[HttpServer] Listening on " << host_ << ":" << port_ << std::endl;
         }
     });
 
-    // 等待服务器开始监听
-    started_fut.wait_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    if (!running_) {
+        std::cerr << "[HttpServer] Could not start. Port " << port_ << " may be occupied." << std::endl;
+    }
     return running_.load();
 }
 
@@ -38,6 +39,7 @@ void HttpServer::stop() {
     server_.stop();
     if (server_thread_.joinable())
         server_thread_.join();
+    std::cout << "[HttpServer] Stopped" << std::endl;
 }
 
 // ── JSON helpers ──────────────────────────────
@@ -109,111 +111,153 @@ static ModelConfig parse_model_config(const std::string& body) {
     return mcfg;
 }
 
+// Check HTTP method match
+static bool is_method(const httplib::Request& req, const std::string& method) {
+    return req.method == method;
+}
+
 // ── Routes ────────────────────────────────────
 
 void HttpServer::register_routes() {
-    // Web UI
-    server_.Get("/", [](const httplib::Request&, httplib::Response& res) {
-        std::ifstream f("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
-        if (f.is_open()) {
-            std::string html((std::istreambuf_iterator<char>(f)),
-                              std::istreambuf_iterator<char>());
-            res.set_content(html, "text/html; charset=utf-8");
-        } else {
-            res.set_content("<h1>Web UI not found</h1>", "text/html");
+
+    // ── Web UI (served from file) ───────────────────
+    server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
+        // Try multiple possible locations for the HTML file
+        std::vector<std::string> paths = {
+            "E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html",
+            "web_ui.html",
+            "../application/web_ui.html"
+        };
+        for (const auto& p : paths) {
+            std::ifstream f(p);
+            if (f.is_open()) {
+                try {
+                    std::stringstream buf;
+                    buf << f.rdbuf();
+                    std::string html = buf.str();
+                    if (html.empty()) {
+                        std::cerr << "[WebUI] File " << p << " is empty" << std::endl;
+                        continue;
+                    }
+                    res.set_content(html, "text/html; charset=utf-8");
+                    return;
+                } catch (const std::exception& e) {
+                    std::cerr << "[WebUI] Error reading " << p << ": " << e.what() << std::endl;
+                    continue;
+                }
+            }
         }
-    });
-    server_.Get("/index.html", [](const httplib::Request&, httplib::Response& res) {
-        std::ifstream f("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
-        if (f.is_open()) {
-            std::string html((std::istreambuf_iterator<char>(f)),
-                              std::istreambuf_iterator<char>());
-            res.set_content(html, "text/html; charset=utf-8");
-        } else {
-            res.set_content("<h1>Web UI not found</h1>", "text/html");
-        }
+        std::cerr << "[WebUI] Could not open web_ui.html from any path" << std::endl;
+        res.set_content("<h1>Web UI file not found</h1><p>Expected at: E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html</p>", "text/html");
     });
 
-    // Health
+    // ── Health ──────────────────────────────────────
     server_.Get("/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content("{\"ok\":true}", "application/json");
     });
 
-    // POST /api/v1/tasks — create
+    // ── POST /api/v1/tasks — create ─────────────────
     server_.Post("/api/v1/tasks", [this](const httplib::Request& req, httplib::Response& res) {
         try {
             auto cfg = task_config_from_json(json::parse(req.body));
+            std::cout << "[API] POST /api/v1/tasks  id=" << cfg.id
+                      << " input=" << cfg.input_url
+                      << " output=" << cfg.output_url
+                      << " models=" << cfg.models.size() << std::endl;
             if (!mgr_.create_task(cfg)) {
-                res.set_content(err_json("create failed"), "application/json");
+                std::cerr << "[API] Create task failed: " << cfg.id << " (may already exist)" << std::endl;
+                res.set_content(err_json("create failed: task may already exist"), "application/json");
                 return;
             }
+            std::cout << "[API] Task created: " << cfg.id << std::endl;
             res.set_content(ok_json(), "application/json");
         } catch (const std::exception& e) {
+            std::cerr << "[API] Create task parse error: " << e.what() << std::endl;
             res.set_content(err_json(e.what()), "application/json");
         }
     });
 
-    // GET /api/v1/tasks — list
+    // ── GET /api/v1/tasks — list ────────────────────
     server_.Get("/api/v1/tasks", [this](const httplib::Request&, httplib::Response& res) {
-        res.set_content(task_list_json(mgr_.list_tasks()), "application/json");
+        auto tasks = mgr_.list_tasks();
+        res.set_content(task_list_json(tasks), "application/json");
     });
 
-    // GET /api/v1/tasks/:id — config
+    // ── GET /api/v1/tasks/:id — config ──────────────
     server_.Get("/api/v1/tasks/:id", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string id = get_id(req);
         TaskConfig cfg;
-        if (!mgr_.get_task_config(get_id(req), &cfg)) {
-            res.set_content(err_json("not found"), "application/json");
+        if (!mgr_.get_task_config(id, &cfg)) {
+            res.set_content(err_json("task not found: " + id), "application/json");
             return;
         }
         res.set_content(ok_json("\"task\":" + task_config_to_json(cfg).dump()), "application/json");
     });
 
-    // DELETE /api/v1/tasks/:id — remove
+    // ── DELETE /api/v1/tasks/:id — remove ───────────
     server_.Delete("/api/v1/tasks/:id", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!mgr_.remove_task(get_id(req))) {
-            res.set_content(err_json("not found"), "application/json");
+        std::string id = get_id(req);
+        std::cout << "[API] DELETE /api/v1/tasks/" << id << std::endl;
+        if (!mgr_.remove_task(id)) {
+            std::cerr << "[API] Delete failed: task not found: " << id << std::endl;
+            res.set_content(err_json("task not found"), "application/json");
             return;
         }
+        std::cout << "[API] Task deleted: " << id << std::endl;
         res.set_content(ok_json(), "application/json");
     });
 
-    // POST /api/v1/tasks/:id/start
+    // ── POST /api/v1/tasks/:id/start ────────────────
     server_.Post("/api/v1/tasks/:id/start", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!mgr_.start_task(get_id(req))) {
-            res.set_content(err_json("start failed"), "application/json");
+        std::string id = get_id(req);
+        std::cout << "[API] POST /api/v1/tasks/" << id << "/start" << std::endl;
+        if (!mgr_.start_task(id)) {
+            std::cerr << "[API] Start failed for " << id
+                      << " (pipeline init will continue in background)" << std::endl;
+            // start() now returns true even if init fails (async)
+            // So if it returns false, the task doesn't exist
+            res.set_content(err_json("task not found"), "application/json");
             return;
         }
+        std::cout << "[API] Task " << id << " starting (async initialization)" << std::endl;
         res.set_content(ok_json(), "application/json");
     });
 
-    // POST /api/v1/tasks/:id/stop
+    // ── POST /api/v1/tasks/:id/stop ─────────────────
     server_.Post("/api/v1/tasks/:id/stop", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!mgr_.stop_task(get_id(req))) {
-            res.set_content(err_json("stop failed"), "application/json");
+        std::string id = get_id(req);
+        std::cout << "[API] POST /api/v1/tasks/" << id << "/stop" << std::endl;
+        if (!mgr_.stop_task(id)) {
+            std::cerr << "[API] Stop failed: task not found: " << id << std::endl;
+            res.set_content(err_json("task not found"), "application/json");
             return;
         }
+        std::cout << "[API] Task " << id << " stopped" << std::endl;
         res.set_content(ok_json(), "application/json");
     });
 
-    // PATCH /api/v1/tasks/:id/models — add model
+    // ── PATCH /api/v1/tasks/:id/models — add model ─
     server_.Patch("/api/v1/tasks/:id/models", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string id = get_id(req);
         try {
             auto mcfg = parse_model_config(req.body);
             if (mcfg.name.empty()) {
-                res.set_content(err_json("name required"), "application/json");
+                res.set_content(err_json("model name required"), "application/json");
                 return;
             }
-            if (!mgr_.add_model(get_id(req), mcfg)) {
+            std::cout << "[API] PATCH /api/v1/tasks/" << id << "/models  add=" << mcfg.name << std::endl;
+            if (!mgr_.add_model(id, mcfg)) {
                 res.set_content(err_json("add model failed"), "application/json");
                 return;
             }
+            std::cout << "[API] Model " << mcfg.name << " added to " << id << std::endl;
             res.set_content(ok_json(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(err_json(e.what()), "application/json");
         }
     });
 
-    // DELETE /api/v1/tasks/:id/models/:name — remove model
+    // ── DELETE /api/v1/tasks/:id/models/:name ───────
     server_.Delete("/api/v1/tasks/:id/models/:name",
         [this](const httplib::Request& req, httplib::Response& res) {
         auto id = req.path_params.find("id");
@@ -222,29 +266,33 @@ void HttpServer::register_routes() {
             res.set_content(err_json("missing params"), "application/json");
             return;
         }
+        std::cout << "[API] DELETE /api/v1/tasks/" << id->second << "/models/" << name->second << std::endl;
         if (!mgr_.remove_model(id->second, name->second)) {
-            res.set_content(err_json("remove failed"), "application/json");
+            res.set_content(err_json("remove model failed"), "application/json");
             return;
         }
+        std::cout << "[API] Model " << name->second << " removed from " << id->second << std::endl;
         res.set_content(ok_json(), "application/json");
     });
 
-    // PATCH /api/v1/tasks/:id/models/:name — update model
+    // ── PATCH /api/v1/tasks/:id/models/:name ────────
     server_.Patch("/api/v1/tasks/:id/models/:name",
         [this](const httplib::Request& req, httplib::Response& res) {
+        auto id = req.path_params.find("id");
+        auto name = req.path_params.find("name");
+        if (id == req.path_params.end() || name == req.path_params.end()) {
+            res.set_content(err_json("missing params"), "application/json");
+            return;
+        }
         try {
-            auto id = req.path_params.find("id");
-            auto name = req.path_params.find("name");
-            if (id == req.path_params.end() || name == req.path_params.end()) {
-                res.set_content(err_json("missing params"), "application/json");
-                return;
-            }
             auto mcfg = parse_model_config(req.body);
             mcfg.name = name->second;
+            std::cout << "[API] PATCH /api/v1/tasks/" << id->second << "/models/" << name->second << std::endl;
             if (!mgr_.update_model(id->second, name->second, mcfg)) {
-                res.set_content(err_json("update failed"), "application/json");
+                res.set_content(err_json("update model failed"), "application/json");
                 return;
             }
+            std::cout << "[API] Model " << name->second << " updated on " << id->second << std::endl;
             res.set_content(ok_json(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(err_json(e.what()), "application/json");

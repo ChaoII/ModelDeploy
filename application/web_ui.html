@@ -3,76 +3,202 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Monitoring Platform</title>
+<title>AI Surveillance Platform</title>
 <style>
+:root{--bg:#0a0a1a;--card:#12122a;--border:#1e1e4a;--accent:#00d4ff;--green:#00e676;--red:#ff1744;--amber:#ffab00;--text:#d0d0e0;--dim:#666}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;padding:20px}
-h1{color:#00d4ff;margin-bottom:20px}
-.card{background:#16213e;border-radius:8px;padding:20px;margin-bottom:16px;border:1px solid #0f3460}
-.card h3{color:#00d4ff;margin-bottom:12px}
-.form-group{margin-bottom:12px}
-.form-group label{display:block;margin-bottom:4px;color:#a0a0a0;font-size:13px}
-.form-group input,.form-group textarea{width:100%;padding:8px 12px;border:1px solid #0f3460;border-radius:4px;background:#1a1a2e;color:#e0e0e0;font-size:14px}
-.form-group textarea{font-family:monospace;min-height:60px}
-button{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-size:14px;transition:opacity .2s}
-button:hover{opacity:.8}
-.btn-primary{background:#00d4ff;color:#000}
-.btn-success{background:#00e676;color:#000}
-.btn-danger{background:#ff1744;color:#fff}
-.btn-warning{background:#ffab00;color:#000}
-.btn-sm{padding:4px 12px;font-size:12px;margin:2px}
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #0f3460}
-th{color:#00d4ff;font-size:13px;text-transform:uppercase}
-td{font-size:14px}
-.status-running{color:#00e676;font-weight:bold}
-.status-stopped{color:#ff1744}
-pre{background:#1a1a2e;padding:12px;border-radius:4px;overflow-x:auto;font-size:12px;margin-top:8px;border:1px solid #0f3460}
-a{color:#00d4ff;text-decoration:none}
-.actions{display:flex;gap:4px;flex-wrap:wrap}
-#toast{position:fixed;bottom:20px;right:20px;padding:12px 24px;border-radius:4px;color:#fff;display:none;z-index:999}
-#toast.success{background:#00e676;color:#000;display:block}
-#toast.error{background:#ff1744;display:block}
-.hidden{display:none}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:768px){.grid{grid-template-columns:1fr}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:0;min-height:100vh}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.nav h1{font-size:18px;color:var(--accent);display:flex;align-items:center;gap:8px}
+.nav .status{font-size:11px;padding:4px 10px;border-radius:4px}
+.nav .status.on{background:#00e67620;color:var(--green);border:1px solid var(--green)}
+.nav .status.off{background:#ff174420;color:var(--red);border:1px solid var(--red)}
+.container{padding:20px;max-width:1400px;margin:0 auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.stat{background:var(--card);border-radius:8px;padding:14px;border:1px solid var(--border)}
+.stat .n{font-size:28px;font-weight:700}.stat .l{font-size:11px;color:var(--dim);margin-top:2px}
+.stat.accent .n{color:var(--accent)}.stat.green .n{color:var(--green)}.stat.red .n{color:var(--red)}
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.btn{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-green{background:var(--green);color:#000}
+.btn-red{background:var(--red);color:#fff}
+.btn-amber{background:var(--amber);color:#000}
+.btn-sm{padding:5px 12px;font-size:11px;border-radius:4px}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:12px;padding:24px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;border:1px solid var(--border)}
+.modal h2{color:var(--accent);font-size:16px;margin-bottom:16px}
+.modal .close{float:right;background:none;border:none;color:var(--dim);font-size:22px;cursor:pointer}
+.modal .close:hover{color:#fff}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fld{margin-bottom:12px}
+.fld label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.fld input,.fld textarea,.fld select{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-size:13px;transition:border .2s}
+.fld input:focus,.fld textarea:focus{border-color:var(--accent);outline:0}
+.fld textarea{font-family:'Cascadia Code','Fira Code','Consolas',monospace;min-height:70px;resize:vertical}
+.task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:10px}
+.tc{background:var(--card);border-radius:8px;padding:16px;border:1px solid var(--border);transition:border-color .3s}
+.tc.running{border-color:#1a5c3a}
+.tc .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.tc .hdr .nm{font-size:15px;font-weight:600}
+.tc .hdr .nm .id{color:var(--accent)}
+.tc .hdr .nm .na{color:var(--text);margin-left:6px}
+.tc .hdr .status-badge{padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
+.tc .hdr .status-badge.running{background:#00e67620;color:var(--green);border:1px solid var(--green)}
+.tc .hdr .status-badge.stopped{background:#ff174420;color:var(--red);border:1px solid var(--red)}
+.tc .urls{font-size:11px;color:var(--dim);margin-bottom:6px;line-height:1.6;word-break:break-all}
+.tc .urls .lbl{color:#555}
+.tc .mods{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.tc .mod-tag{padding:2px 8px;border-radius:3px;font-size:10px;background:var(--bg);border:1px solid var(--border);color:var(--dim)}
+.tc .mod-tag .ty{color:var(--accent)}
+.tc .acts{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.empty{text-align:center;padding:40px;color:#444;font-size:13px}
+.toast{position:fixed;bottom:24px;right:24px;padding:14px 28px;border-radius:8px;color:#fff;display:none;z-index:9999;font-size:13px;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.6);max-width:400px;word-break:break-word}
+.toast.show{display:block}
+.toast.ok{background:var(--green);color:#000}
+.toast.err{background:var(--red)}
+.toast.info{background:var(--accent);color:#000}
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:14px;max-height:120px;overflow-y:auto;font-family:Consolas,monospace;font-size:11px;line-height:1.6}
+.log-box .t{color:var(--dim)}.log-box .ok{color:var(--green)}.log-box .err{color:var(--red)}.log-box .info{color:var(--accent)}
+@media(max-width:600px){.form-row{grid-template-columns:1fr}.task-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="nav">
 <h1>AI Surveillance Platform</h1>
-<div id="toast"></div>
-<div class="grid">
-<div class="card">
-<h3>Create Task</h3>
-<div class="form-group"><label>Task ID</label><input id="newId" value="cam1"></div>
-<div class="form-group"><label>Name</label><input id="newName" value="Camera 1"></div>
-<div class="form-group"><label>Input RTSP</label><input id="newInput" value="rtsp://127.0.0.1:554/live/obs_test3"></div>
-<div class="form-group"><label>Output (RTSP/MP4)</label><input id="newOutput" value="E:/CLionProjects/ModelDeploy/build/bin/out.mp4"></div>
-<div class="form-group"><label>Models (JSON array)</label><textarea id="newModels">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
-<button class="btn-primary" onclick="createTask()">Create</button>
+<span class="status on" id="serverStatus">CONNECTED</span>
 </div>
-<div class="card">
-<h3>Instructions</h3>
-<p style="font-size:13px;line-height:1.8">
-After creating a task, click Start to begin the pipeline.<br>
-Status shows running/stopped. Use Stop/Delete as needed.
-</p>
+<div class="container">
+<div class="stats" id="statsBar">
+<div class="stat accent"><div class="n" id="statTotal">0</div><div class="l">TOTAL TASKS</div></div>
+<div class="stat green"><div class="n" id="statRun">0</div><div class="l">RUNNING</div></div>
+<div class="stat red"><div class="n" id="statStop">0</div><div class="l">STOPPED</div></div>
+</div>
+<div class="toolbar">
+<button class="btn btn-primary" onclick="openCreate()">+ New Task</button>
+<button class="btn btn-outline" onclick="refresh()">Refresh</button>
+</div>
+<div class="task-grid" id="taskGrid"><div class="empty">No tasks. Click "New Task" to create one.</div></div>
+<div class="log-box" id="logBox"><span class="t">System ready. Waiting for commands...</span></div>
+</div>
+
+<div class="overlay" id="createOverlay">
+<div class="modal">
+<button class="close" onclick="closeCreate()">&times;</button>
+<h2>Create New Task</h2>
+<div class="form-row">
+<div class="fld"><label>Task ID</label><input id="f_id" placeholder="e.g. cam1"></div>
+<div class="fld"><label>Task Name</label><input id="f_name" placeholder="e.g. Main Entrance"></div>
+</div>
+<div class="fld"><label>Input RTSP URL</label><input id="f_input" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/obs_test3"></div>
+<div class="form-row">
+<div class="fld"><label>Output Type</label><select id="f_outtype" onchange="updateOutputField()"><option value="rtsp">RTSP Stream</option><option value="mp4">MP4 File</option></select></div>
+<div class="fld"><label id="f_outlabel">Output RTSP URL</label><input id="f_output" placeholder="rtsp://... or /path/file.mp4" value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
+</div>
+<div class="fld"><label>Models <span style="color:#555;font-weight:400;text-transform:none">(JSON array, one or more models)</span></label><textarea id="f_models" rows="4">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
+<div style="display:flex;gap:8px;margin-top:4px">
+<button class="btn btn-primary" onclick="createTask()">Create &amp; Start</button>
+<button class="btn btn-outline" onclick="closeCreate()">Cancel</button>
 </div>
 </div>
-<div class="card">
-<h3>Task List</h3>
-<table><thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead><tbody id="taskList"></tbody></table>
 </div>
+
+<div class="toast" id="toast"></div>
 <script>
-function toast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className=type;setTimeout(function(){t.style.display='none'},3000)}
-function api(method,url,body,cb){var x=new XMLHttpRequest();x.open(method,url,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r,x.status)};x.onerror=function(){cb({ok:false})};if(body)x.send(body);else x.send()}
-function refresh(){api('GET','/api/v1/tasks',null,function(r){var t=document.getElementById('taskList');t.innerHTML='';if(!r.ok||!r.tasks)return;r.tasks.forEach(function(task){var tr=document.createElement('tr');var cls=task.running?'status-running':'status-stopped';var st=task.running?'Running':'Stopped';tr.innerHTML='<td>'+task.id+'</td><td>'+task.name+'</td><td class="'+cls+'">'+st+'</td><td class="actions">'+(task.running?'<button class="btn-warning btn-sm" onclick="stopTask(\''+task.id+'\')">Stop</button>':'<button class="btn-success btn-sm" onclick="startTask(\''+task.id+'\')">Start</button>')+'<button class="btn-danger btn-sm" onclick="deleteTask(\''+task.id+'\')">Delete</button></td>';t.appendChild(tr)})})}
-function createTask(){var id=document.getElementById('newId').value;var name=document.getElementById('newName').value;var input=document.getElementById('newInput').value;var output=document.getElementById('newOutput').value;var models=document.getElementById('newModels').value;try{JSON.parse(models)}catch(e){toast('Invalid model JSON','error');return}
-var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:JSON.parse(models)});api('POST','/api/v1/tasks',body,function(r){if(r.ok){toast('Task created','success');refresh()}else toast('Create failed','error')})}
-function startTask(id){api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){toast('Started','success');refresh()}else toast('Start failed','error')})}
-function stopTask(id){api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){toast('Stopped','success');refresh()}else toast('Stop failed','error')})}
-function deleteTask(id){if(!confirm('Delete task '+id+'?'))return;api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){toast('Deleted','success');refresh()}else toast('Delete failed','error')})}
-refresh();setInterval(refresh,3000)
+var logEl=document.getElementById('logBox');
+function log(msg,type){var d=logEl;var t=new Date().toLocaleTimeString();d.innerHTML+='<div><span class="t">['+t+']</span> <span class="'+(type||'info')+'">'+esc(msg)+'</span></div>';d.scrollTop=d.scrollHeight}
+function toast(msg,t){var o=document.getElementById('toast');o.textContent=msg;o.className='toast show '+(t||'info');setTimeout(function(){o.className='toast'},4000)}
+function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){cb({ok:false})};if(b)x.send(b);else x.send()}
+function updateOutputField(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'Output File Path':'Output RTSP URL';document.getElementById('f_output').placeholder=t=='mp4'?'E:/output.mp4':'rtsp://...'}
+function openCreate(){document.getElementById('createOverlay').className='overlay open'}
+function closeCreate(){document.getElementById('createOverlay').className='overlay'}
+
+function render(tasks){
+ document.getElementById('statTotal').textContent=tasks.length;
+ document.getElementById('statRun').textContent=tasks.filter(function(t){return t.running}).length;
+ document.getElementById('statStop').textContent=tasks.filter(function(t){return !t.running}).length;
+ var tg=document.getElementById('taskGrid');
+ if(tasks.length===0){tg.innerHTML='<div class="empty">No tasks. Click "New Task" to create one.</div>';return}
+ tg.innerHTML='';
+ tasks.forEach(function(t){
+  var c=document.createElement('div');c.className='tc'+(t.running?' running':'');
+  var mh='';
+  if(t.models){t.models.forEach(function(m){mh+='<span class="mod-tag"><span class="ty">['+m.type+']</span> '+esc(m.name)+'</span>'})}
+  var outShort=t.output_url||'';
+  c.innerHTML=
+   '<div class="hdr"><div class="nm"><span class="id">'+esc(t.id)+'</span><span class="na">'+esc(t.name||'')+'</span></div><span class="status-badge '+(t.running?'running':'stopped')+'">'+(t.running?'RUNNING':'STOPPED')+'</span></div>'+
+   '<div class="urls"><span class="lbl">IN:</span> '+esc(t.input_url)+'<br><span class="lbl">OUT:</span> '+esc(outShort)+'</div>'+
+   (mh?'<div class="mods">'+mh+'</div>':'')+
+   '<div class="acts">'+
+    (t.running?'<button class="btn btn-amber btn-sm" onclick="stopTask(\''+t.id+'\')">Stop</button>':'<button class="btn btn-green btn-sm" onclick="startTask(\''+t.id+'\')">Start</button>')+
+    '<button class="btn btn-red btn-sm" onclick="deleteTask(\''+t.id+'\')">Delete</button>'+
+   '</div>';
+  tg.appendChild(c)
+ })
+}
+function refresh(){
+ api('GET','/api/v1/tasks',null,function(r){
+  if(r.ok&&r.tasks){render(r.tasks);log('Task list refreshed: '+r.tasks.length+' tasks','info')}
+  else{log('Failed to fetch tasks','err');document.getElementById('serverStatus').className='status off';document.getElementById('serverStatus').textContent='DISCONNECTED'}
+ })
+}
+function createTask(){
+ var id=document.getElementById('f_id').value||('cam'+Date.now());
+ var name=document.getElementById('f_name').value||id;
+ var input=document.getElementById('f_input').value;
+ var outtype=document.getElementById('f_outtype').value;
+ var output=document.getElementById('f_output').value;
+ var models=document.getElementById('f_models').value;
+ try{JSON.parse(models)}catch(e){toast('Invalid model JSON format','err');return}
+ var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:JSON.parse(models)});
+ log('Creating task: '+id+' (out: '+outtype+')','info');
+ api('POST','/api/v1/tasks',body,function(r){
+  if(r.ok){
+   toast('Task "'+id+'" created','ok');
+   log('Task "'+id+'" created successfully','ok');
+   closeCreate();
+   // Auto-start
+   api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
+    if(r2.ok){log('Task "'+id+'" started','ok');toast('Task "'+id+'" started','ok')}
+    else{log('Start task "'+id+'" failed','err');toast('Start failed','err')}
+    refresh()
+   })
+  }else{
+   toast('Create failed','err');
+   log('Create task "'+id+'" failed','err');
+  }
+ })
+}
+function startTask(id){
+ log('Starting task: '+id,'info');
+ api('POST','/api/v1/tasks/'+id+'/start',null,function(r){
+  if(r.ok){log('Task "'+id+'" started','ok');toast('Started: '+id,'ok');refresh()}
+  else{log('Start task "'+id+'" failed','err');toast('Start failed','err')}
+ })
+}
+function stopTask(id){
+ log('Stopping task: '+id,'info');
+ api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+  if(r.ok){log('Task "'+id+'" stopped','ok');toast('Stopped: '+id,'ok');refresh()}
+  else{log('Stop task "'+id+'" failed','err');toast('Stop failed','err')}
+ })
+}
+function deleteTask(id){
+ if(!confirm('Delete task "'+id+'"?'))return;
+ log('Deleting task: '+id,'info');
+ api('DELETE','/api/v1/tasks/'+id,null,function(r){
+  if(r.ok){log('Task "'+id+'" deleted','ok');toast('Deleted: '+id,'ok');refresh()}
+  else{log('Delete task "'+id+'" failed','err');toast('Delete failed','err')}
+ })
+}
+refresh();setInterval(refresh,5000);
+log('Web UI loaded, monitoring system...','info');
 </script>
 </body>
 </html>
