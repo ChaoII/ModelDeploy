@@ -3,205 +3,239 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Surveillance Platform</title>
+<title>智能安防监控平台</title>
 <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.11.2/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-:root{--sidebar-width:240px}
-body{background:#f0f2f5;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}
-.sidebar{position:fixed;top:0;left:0;width:var(--sidebar-width);height:100vh;background:linear-gradient(180deg,#1a1d3e 0%,#0d0f23 100%);color:#fff;z-index:100;padding:0;overflow-y:auto}
-.sidebar-brand{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.05)}
-.sidebar-brand .logo{font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}
-.sidebar-brand .logo i{color:#4e8cff;font-size:22px}
-.sidebar-brand .logo span{color:#4e8cff}
-.sidebar-brand small{display:block;font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;font-weight:400}
-.sidebar .nav-item{padding:8px 18px;margin:2px 8px;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.55)}
-.sidebar .nav-item:hover{background:rgba(255,255,255,.05);color:#fff}
-.sidebar .nav-item.active{background:rgba(78,140,255,.15);color:#4e8cff;font-weight:600}
-.sidebar .nav-item i{font-size:16px;width:20px;text-align:center}
-.main-content{margin-left:var(--sidebar-width);min-height:100vh}
-.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid #e8eaed;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
-.topbar h5{font-weight:600;color:#1a1d3e;margin:0;font-size:16px}
-.topbar .status-badge{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 14px;border-radius:20px}
-.topbar .status-badge.on{background:#e8f5e9;color:#2e7d32}
-.topbar .status-badge.off{background:#fbe9e7;color:#c62828}
-.content{padding:20px 24px}
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
-.stat-card{background:#fff;border-radius:10px;padding:16px 18px;border:1px solid #e8eaed;transition:box-shadow .2s}
-.stat-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
-.stat-card .num{font-size:28px;font-weight:700;line-height:1.2}
-.stat-card .label{font-size:12px;color:#888;margin-top:2px}
-.stat-card .num.primary{color:#4e8cff}
-.stat-card .num.success{color:#4caf50}
-.stat-card .num.danger{color:#f44336}
-.toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.table-container{background:#fff;border-radius:10px;border:1px solid #e8eaed;overflow:hidden}
-.table-container .table-header{padding:14px 18px;border-bottom:1px solid #e8eaed;display:flex;justify-content:space-between;align-items:center}
-.table-container .table-header h6{margin:0;font-weight:600;color:#1a1d3e;font-size:14px}
-.table{ margin-bottom:0;font-size:13px}
-.table th{background:#f8f9fa;color:#555;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding:10px 14px;border-bottom:2px solid #e8eaed}
-.table td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #f0f0f0}
-.table tr:hover{background:#f8f9ff}
-.table tr:last-child td{border-bottom:none}
-.status-badge-sm{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500}
-.status-badge-sm.on{background:#e8f5e9;color:#2e7d32}
-.status-badge-sm.off{background:#f5f5f5;color:#999}
-.model-tags{display:flex;gap:3px;flex-wrap:wrap}
-.model-tags .tag{padding:1px 8px;border-radius:3px;font-size:10px;background:#f0f4ff;color:#4e8cff}
-.bi-dot{font-size:8px;vertical-align:middle}
-.log-panel{background:#fff;border-radius:10px;border:1px solid #e8eaed;margin-top:16px}
-.log-panel .log-header{padding:12px 18px;border-bottom:1px solid #e8eaed;display:flex;justify-content:space-between;align-items:center}
-.log-panel .log-header h6{margin:0;font-size:13px;font-weight:600;color:#1a1d3e}
-.log-panel .log-body{padding:8px 18px;max-height:120px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:11px;line-height:1.8;color:#555}
-.log-panel .log-body .time{color:#aaa}
-.log-panel .log-body .info{color:#4e8cff}
-.log-panel .log-body .ok{color:#4caf50}
-.log-panel .log-body .err{color:#f44336}
-.modal-content{border-radius:10px;border:none;box-shadow:0 10px 40px rgba(0,0,0,.15)}
-.modal-header{border-bottom:1px solid #f0f0f0;padding:16px 20px}
-.modal-header .modal-title{font-weight:600;font-size:15px}
-.modal-body{padding:20px}
-.modal-footer{border-top:1px solid #f0f0f0;padding:12px 20px}
-.form-label{font-size:12px;font-weight:500;color:#555;margin-bottom:3px}
-.form-control,.form-select{font-size:13px;border-radius:6px;border-color:#e0e0e0}
-.form-control:focus,.form-select:focus{border-color:#4e8cff;box-shadow:0 0 0 3px rgba(78,140,255,.1)}
+:root{--primary:#4361ee;--primary-light:#eef1ff;--success:#2ec4b6;--danger:#e71d36;--warning:#ff9f1c;--dark:#0b0b2a;--sidebar-bg:linear-gradient(180deg,#0b0b2a 0%,#1a1a4e 100%);--card-shadow:0 2px 16px rgba(0,0,0,.06);--radius:12px}
+body{background:#f5f6fa;font-family:'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#1a1a2e}
+.sidebar{position:fixed;top:0;left:0;width:260px;height:100vh;background:var(--sidebar-bg);color:#fff;z-index:100;padding:0;overflow-y:auto}
+.sidebar-brand{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sidebar-brand .logo{font-size:20px;font-weight:800;display:flex;align-items:center;gap:12px;letter-spacing:-.3px}
+.sidebar-brand .logo .icon{width:36px;height:36px;background:rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:18px}
+.sidebar-brand .logo span{color:var(--primary)}
+.sidebar-brand small{display:block;font-size:11px;color:rgba(255,255,255,.3);margin-top:6px;font-weight:400;letter-spacing:0}
+.sidebar-menu{padding:12px 10px}
+.sidebar-menu .item{padding:10px 14px;margin:2px 0;border-radius:10px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px;font-size:13px;color:rgba(255,255,255,.5);font-weight:500}
+.sidebar-menu .item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.85)}
+.sidebar-menu .item.active{background:rgba(67,97,255,.2);color:#fff;font-weight:600}
+.sidebar-menu .item i{font-size:16px;width:20px;text-align:center}
+.main-content{margin-left:260px;min-height:100vh}
+.topbar{background:#fff;padding:14px 28px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.topbar .page-title{font-weight:700;color:var(--dark);margin:0;font-size:17px;display:flex;align-items:center;gap:10px}
+.topbar .page-title i{color:var(--primary)}
+.conn-badge{display:flex;align-items:center;gap:7px;font-size:12px;padding:6px 16px;border-radius:20px;font-weight:500}
+.conn-badge.on{background:#e6f8f5;color:#0d9488}
+.conn-badge.off{background:#fde8e8;color:#dc2626}
+.content{padding:24px 28px}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border-radius:var(--radius);padding:20px;border:1px solid #eaecf0;transition:all .2s;position:relative;overflow:hidden}
+.stat-card:hover{box-shadow:var(--card-shadow);border-color:#d0d5dd}
+.stat-card .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:12px}
+.stat-card .stat-icon.blue{background:var(--primary-light);color:var(--primary)}
+.stat-card .stat-icon.green{background:#e6f8f5;color:#0d9488}
+.stat-card .stat-icon.red{background:#fde8e8;color:#dc2626}
+.stat-card .num{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.5px}
+.stat-card .num.blue{color:var(--primary)}
+.stat-card .num.green{color:#0d9488}
+.stat-card .num.red{color:#dc2626}
+.stat-card .label{font-size:12px;color:#6b7280;margin-top:4px;font-weight:500}
+.action-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.card-panel{background:#fff;border-radius:var(--radius);border:1px solid #eaecf0;overflow:hidden;box-shadow:var(--card-shadow)}
+.card-panel .panel-head{padding:16px 20px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:center}
+.card-panel .panel-head h6{margin:0;font-weight:700;color:var(--dark);font-size:14px;display:flex;align-items:center;gap:8px}
+.card-panel .panel-head h6 i{color:var(--primary)}
+.table{font-size:13px;margin-bottom:0}
+.table thead th{background:#f9fafb;color:#6b7280;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:12px 16px;border-bottom:2px solid #eaecf0}
+.table td{padding:12px 16px;vertical-align:middle;border-bottom:1px solid #f3f4f6}
+.table tbody tr{transition:background .15s}
+.table tbody tr:hover{background:#f9faff}
+.table tbody tr:last-child td{border-bottom:none}
+.badge-task{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-task.running{background:#e6f8f5;color:#0d9488}
+.badge-task.stopped{background:#f3f4f6;color:#9ca3af}
+.tag-model{display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:500;background:var(--primary-light);color:var(--primary);margin:1px 2px}
+.cell-url{font-size:11px;font-family:'SF Mono','Consolas',monospace;color:#6b7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-name{font-weight:600;color:var(--dark)}
+.cell-sub{font-size:11px;color:#9ca3af;margin-top:1px}
+.btn-icon{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:none;cursor:pointer;transition:all .15s;font-size:14px}
+.btn-icon:hover{transform:translateY(-1px)}
+.btn-icon.play{background:#e6f8f5;color:#0d9488}
+.btn-icon.play:hover{background:#0d9488;color:#fff}
+.btn-icon.stop{background:#fef3c7;color:#d97706}
+.btn-icon.stop:hover{background:#d97706;color:#fff}
+.btn-icon.del{background:#fde8e8;color:#dc2626}
+.btn-icon.del:hover{background:#dc2626;color:#fff}
+.btn-pri{height:36px;padding:0 18px;border-radius:8px;border:none;font-size:12px;font-weight:600;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:6px;transition:all .15s;cursor:pointer}
+.btn-pri:hover{background:#3651d4;transform:translateY(-1px);box-shadow:0 4px 12px rgba(67,97,255,.3)}
+.btn-ghost{height:36px;padding:0 16px;border-radius:8px;border:1px solid #d0d5dd;font-size:12px;font-weight:500;background:#fff;color:#6b7280;display:inline-flex;align-items:center;gap:6px;transition:all .15s;cursor:pointer}
+.btn-ghost:hover{background:#f9fafb;border-color:#9ca3af}
+.empty-state{text-align:center;padding:60px 20px;color:#9ca3af}
+.empty-state i{font-size:44px;display:block;margin-bottom:12px;color:#d0d5dd}
+.empty-state p{font-size:13px;margin:0}
+.log-panel{background:#fff;border-radius:var(--radius);border:1px solid #eaecf0;margin-top:20px;overflow:hidden}
+.log-panel .log-head{padding:12px 20px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:center}
+.log-panel .log-head h6{margin:0;font-size:12px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:6px}
+.log-panel .log-head h6 i{color:var(--primary)}
+.log-panel .log-body{padding:8px 20px;max-height:140px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:11px;line-height:1.9;color:#6b7280}
+.log-panel .log-body .tm{color:#bbb}
+.log-panel .log-body .info{color:var(--primary)}
+.log-panel .log-body .ok{color:#0d9488}
+.log-panel .log-body .err{color:#dc2626}
+.modal-content{border-radius:var(--radius);border:none;box-shadow:0 16px 48px rgba(0,0,0,.15)}
+.modal-header{border-bottom:1px solid #eaecf0;padding:18px 22px}
+.modal-header .modal-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;color:var(--dark)}
+.modal-header .modal-title i{color:var(--primary)}
+.modal-body{padding:22px}
+.modal-footer{border-top:1px solid #eaecf0;padding:14px 22px}
+.form-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+.form-control,.form-select{font-size:13px;border-radius:8px;border-color:#d0d5dd;padding:8px 12px}
+.form-control:focus,.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(67,97,255,.12)}
 textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:11px}
-.empty-state{text-align:center;padding:40px 20px;color:#bbb}
-.empty-state i{font-size:40px;margin-bottom:10px;display:block}
-.toast-container{position:fixed;bottom:20px;right:20px;z-index:9999}
-.alert-toast{padding:10px 18px;border-radius:8px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.1);margin-top:8px;animation:slideIn .3s ease}
-@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+#toastContainer{position:fixed;bottom:20px;right:20px;z-index:9999}
+.toast-item{display:flex;align-items:center;gap:10px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.1);margin-top:8px;animation:slideR .3s ease;color:#fff}
+.toast-item.success{background:#0d9488}
+.toast-item.danger{background:#dc2626}
+.toast-item.info{background:var(--primary)}
+@keyframes slideR{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.btn-group-action{display:flex;gap:4px}
 </style>
 </head>
 <body>
 
 <div class="sidebar">
 <div class="sidebar-brand">
-<div class="logo"><i class="bi-camera-video"></i>AI <span>Surveillance</span></div>
-<small>GPU-Accelerated Video Analysis</small>
+<div class="logo"><div class="icon"><i class="bi-camera-video-fill"></i></div>Mind<span>Vision</span></div>
+<small>GPU 加速实时视频分析平台</small>
 </div>
-<div style="padding:16px 0">
-<div class="nav-item active"><i class="bi-grid-3x3-gap-fill"></i> Dashboard</div>
-<div class="nav-item" onclick="openCreateModal()"><i class="bi-plus-circle"></i> New Task</div>
+<div class="sidebar-menu">
+<div class="item active"><i class="bi-grid-3x3-gap-fill"></i> 控制台</div>
+<div class="item" onclick="openCreate()"><i class="bi-plus-circle"></i> 新建任务</div>
 </div>
 </div>
 
 <div class="main-content">
 <div class="topbar">
-<h5><i class="bi-grid-3x3-gap-fill me-2" style="color:#4e8cff"></i>Dashboard</h5>
-<span id="connBadge" class="status-badge on"><i class="bi-check-circle-fill"></i> Connected</span>
+<h5 class="page-title"><i class="bi-grid-3x3-gap-fill"></i> 控制台</h5>
+<span id="connBadge" class="conn-badge on"><i class="bi-check-circle-fill"></i> 已连接</span>
 </div>
 
 <div class="content">
 <div class="stats-row" id="statsRow"></div>
 
-<div class="table-container">
-<div class="table-header">
-<h6><i class="bi-list-task me-1"></i> Tasks</h6>
-<button class="btn btn-primary btn-sm" onclick="openCreateModal()"><i class="bi-plus-lg"></i> New Task</button>
+<div class="action-bar">
+<button class="btn-pri" onclick="openCreate()"><i class="bi-plus-lg"></i> 新建任务</button>
+<button class="btn-ghost" onclick="refresh()"><i class="bi-arrow-clockwise"></i> 刷新</button>
 </div>
-<div id="tableBody">
-<div class="empty-state"><i class="bi-inbox"></i><div>No tasks yet</div></div>
+
+<div class="card-panel">
+<div class="panel-head">
+<h6><i class="bi-list-task"></i> 任务列表</h6>
+<span style="font-size:12px;color:#9ca3af">共 <strong id="taskCount">0</strong> 个任务</span>
+</div>
+<div id="tableContainer">
+<div class="empty-state"><i class="bi-inbox"></i><p>暂无任务，点击上方「新建任务」开始</p></div>
 </div>
 </div>
 
 <div class="log-panel">
-<div class="log-header"><h6><i class="bi-journal-text me-1"></i> Activity Log</h6><span id="logCount" style="font-size:11px;color:#aaa">0 events</span></div>
-<div class="log-body" id="logBody"><span class="time">System initialized</span></div>
+<div class="log-head"><h6><i class="bi-journal-text"></i> 操作日志</h6><span id="logCount" style="font-size:11px;color:#9ca3af">0 条</span></div>
+<div class="log-body" id="logBody"><span class="tm">系统初始化完成，等待操作...</span></div>
 </div>
 </div>
 </div>
 
-<!-- Create Modal -->
+<!-- 新建任务弹窗 -->
 <div class="modal fade" id="createModal" tabindex="-1">
 <div class="modal-dialog modal-lg modal-dialog-centered">
 <div class="modal-content">
-<div class="modal-header"><h5 class="modal-title"><i class="bi-plus-circle me-1" style="color:#4e8cff"></i> Create New Task</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title"><i class="bi-plus-circle"></i> 新建任务</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
 <div class="row g-3">
-<div class="col-md-6"><label class="form-label">Task ID</label><input class="form-control" id="f_id" placeholder="e.g. cam1"></div>
-<div class="col-md-6"><label class="form-label">Task Name</label><input class="form-control" id="f_name" placeholder="e.g. Main Entrance"></div>
-<div class="col-12"><label class="form-label">Input RTSP URL</label><input class="form-control" id="f_input" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/obs_test3"></div>
-<div class="col-md-4"><label class="form-label">Output Type</label><select class="form-select" id="f_outtype" onchange="updateOutField()"><option value="rtsp">RTSP Stream</option><option value="mp4">MP4 File</option></select></div>
-<div class="col-md-8"><label class="form-label" id="f_outlabel">Output RTSP URL</label><input class="form-control" id="f_output" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
-<div class="col-12"><label class="form-label">Model Configuration <span style="color:#999;font-weight:400">(JSON array, one or more models)</span></label><textarea class="form-control" id="f_models" rows="4">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
+<div class="col-md-6"><label class="form-label">任务 ID</label><input class="form-control" id="f_id" placeholder="例如 cam1"></div>
+<div class="col-md-6"><label class="form-label">任务名称</label><input class="form-control" id="f_name" placeholder="例如 主入口"></div>
+<div class="col-12"><label class="form-label">输入 RTSP 地址</label><input class="form-control" id="f_input" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/obs_test3"></div>
+<div class="col-md-4"><label class="form-label">输出类型</label><select class="form-select" id="f_outtype" onchange="onOutChange()"><option value="rtsp">RTSP 推流</option><option value="mp4">MP4 文件</option></select></div>
+<div class="col-md-8"><label class="form-label" id="f_outlabel">输出 RTSP 地址</label><input class="form-control" id="f_output" placeholder="rtsp://目标地址" value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
+<div class="col-12"><label class="form-label">模型配置 <span style="color:#9ca3af;font-weight:400">（JSON 数组，可配置多个模型）</span></label><textarea class="form-control" id="f_models" rows="4">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
 </div>
 </div>
 <div class="modal-footer">
-<button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-<button type="button" class="btn btn-primary" onclick="createTask()"><i class="bi-play-fill"></i> Create &amp; Start</button>
+<button type="button" class="btn-ghost" data-bs-dismiss="modal">取消</button>
+<button type="button" class="btn-pri" onclick="createTask()"><i class="bi-play-fill"></i> 创建并启动</button>
 </div>
 </div>
 </div>
 </div>
 
-<div class="toast-container" id="toastContainer"></div>
+<div id="toastContainer"></div>
 
 <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-var logs=[],modal=null;
-document.addEventListener('DOMContentLoaded',function(){modal=new bootstrap.Modal(document.getElementById('createModal'))});
+var modalIns=null;
+document.addEventListener('DOMContentLoaded',function(){modalIns=new bootstrap.Modal(document.getElementById('createModal'))});
 
-function log(msg,tp){tp=tp||'info';var b=document.getElementById('logBody');var d=new Date();var ts=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');b.innerHTML+='<div><span class="time">['+ts+']</span> <span class="'+tp+'">'+esc(msg)+'</span></div>';b.scrollTop=b.scrollHeight;document.getElementById('logCount').textContent=(++logs.length)+' events'}
-function toast(msg,t){var c=document.getElementById('toastContainer');var d=document.createElement('div');d.className='alert-toast alert alert-'+(t||'info')+' d-flex align-items-center gap-2';d.innerHTML='<i class="bi-'+(t=='danger'?'exclamation-circle':t=='success'?'check-circle':'info-circle')+'"></i>'+esc(msg);c.appendChild(d);setTimeout(function(){d.remove()},4000)}
+function log(msg,tp){tp=tp||'info';var b=document.getElementById('logBody');var d=new Date();var ts=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');b.innerHTML+='<div><span class="tm">['+ts+']</span> <span class="'+tp+'">'+esc(msg)+'</span></div>';b.scrollTop=b.scrollHeight;var c=parseInt(document.getElementById('logCount').textContent)||0;document.getElementById('logCount').textContent=(c+1)+' 条'}
+function toast(msg,t){var c=document.getElementById('toastContainer');var d=document.createElement('div');d.className='toast-item '+(t||'info');var icon=t=='danger'?'bi-exclamation-circle':t=='success'?'bi-check-circle':'bi-info-circle';d.innerHTML='<i class="'+icon+'"></i>'+esc(msg);c.appendChild(d);setTimeout(function(){d.remove()},3800)}
 function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){cb({ok:false});document.getElementById('connBadge').className='status-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> Disconnected'}}
-function updateOutField(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'Output File Path':'Output RTSP URL';document.getElementById('f_output').placeholder=t=='mp4'?'/path/to/output.mp4':'rtsp://destination'}
-function openCreateModal(){if(modal)modal.show()}
+function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){cb({ok:false});document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> 断开'}}
+function onOutChange(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'输出文件路径':'输出 RTSP 地址';document.getElementById('f_output').placeholder=t=='mp4'?'例如 E:/output.mp4':'例如 rtsp://目标地址'}
+function openCreate(){if(modalIns)modalIns.show()}
 
 function render(tasks){
  var s=document.getElementById('statsRow');
  s.innerHTML=
-  '<div class="stat-card"><div class="num primary">'+tasks.length+'</div><div class="label">Total Tasks</div></div>'+
-  '<div class="stat-card"><div class="num success">'+tasks.filter(function(t){return t.running}).length+'</div><div class="label">Running</div></div>'+
-  '<div class="stat-card"><div class="num danger">'+tasks.filter(function(t){return !t.running}).length+'</div><div class="label">Stopped</div></div>';
- var tb=document.getElementById('tableBody');
- if(tasks.length===0){tb.innerHTML='<div class="empty-state"><i class="bi-inbox"></i><div>No tasks yet</div></div>';return}
- var h='<table class="table"><thead><tr><th style="width:40px">#</th><th>Task</th><th>Input</th><th>Output</th><th>Models</th><th style="width:80px">Status</th><th style="width:180px">Actions</th></tr></thead><tbody>';
+  '<div class="stat-card"><div class="stat-icon blue"><i class="bi-camera-video"></i></div><div class="num blue">'+tasks.length+'</div><div class="label">总任务数</div></div>'+
+  '<div class="stat-card"><div class="stat-icon green"><i class="bi-play-circle"></i></div><div class="num green">'+tasks.filter(function(t){return t.running}).length+'</div><div class="label">运行中</div></div>'+
+  '<div class="stat-card"><div class="stat-icon red"><i class="bi-stop-circle"></i></div><div class="num red">'+tasks.filter(function(t){return !t.running}).length+'</div><div class="label">已停止</div></div>';
+ document.getElementById('taskCount').textContent=tasks.length;
+ var tc=document.getElementById('tableContainer');
+ if(tasks.length===0){tc.innerHTML='<div class="empty-state"><i class="bi-inbox"></i><p>暂无任务，点击上方「新建任务」开始</p></div>';return}
+ var h='<table class="table"><thead><tr><th style="width:44px">#</th><th>任务</th><th>输入地址</th><th>输出地址</th><th>模型</th><th style="width:90px">状态</th><th style="width:120px">操作</th></tr></thead><tbody>';
  tasks.forEach(function(t,i){
-  var mh='';if(t.models){t.models.forEach(function(m){mh+='<span class="tag">'+esc(m.name)+'</span>'})}
-  h+='<tr><td>'+(i+1)+'</td>'+
-   '<td><strong>'+esc(t.id)+'</strong>'+(t.name?'<br><small style="color:#999">'+esc(t.name)+'</small>':'')+'</td>'+
-   '<td style="font-size:11px;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(t.input_url||'-')+'</td>'+
-   '<td style="font-size:11px;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(t.output_url||'-')+'</td>'+
-   '<td><div class="model-tags">'+(mh||'<span style="color:#ccc;font-size:11px">-</span>')+'</div></td>'+
-   '<td><span class="status-badge-sm '+(t.running?'on':'off')+'"><i class="bi-circle-fill" style="font-size:6px"></i>'+(t.running?'Running':'Stopped')+'</span></td>'+
-   '<td>'+
-    (t.running?'<button class="btn btn-warning btn-sm" onclick="stopTask(\''+t.id+'\')"><i class="bi-stop-fill"></i></button> ':'<button class="btn btn-success btn-sm" onclick="startTask(\''+t.id+'\')"><i class="bi-play-fill"></i></button> ')+
-    '<button class="btn btn-outline-danger btn-sm" onclick="deleteTask(\''+t.id+'\')"><i class="bi-trash3"></i></button>'+
-   '</td></tr>';
+  var ms='';if(t.models){t.models.forEach(function(m){ms+='<span class="tag-model">'+esc(m.name)+'</span>'})}
+  h+='<tr><td style="color:#9ca3af;font-weight:500">'+(i+1)+'</td>'+
+   '<td><div class="cell-name">'+esc(t.id)+'</div>'+(t.name?'<div class="cell-sub">'+esc(t.name)+'</div>':'')+'</td>'+
+   '<td><div class="cell-url" title="'+esc(t.input_url)+'">'+esc(t.input_url||'-')+'</div></td>'+
+   '<td><div class="cell-url" title="'+esc(t.output_url)+'">'+esc(t.output_url||'-')+'</div></td>'+
+   '<td><div>'+(ms||'<span style="color:#d0d5dd;font-size:11px">-</span>')+'</div></td>'+
+   '<td><span class="badge-task '+(t.running?'running':'stopped')+'"><i class="bi-circle-fill" style="font-size:6px"></i>'+(t.running?'运行中':'已停止')+'</span></td>'+
+   '<td><div class="btn-group-action">'+
+    (t.running?'<button class="btn-icon stop" onclick="stopTask(\''+t.id+'\')" title="停止"><i class="bi-stop-fill"></i></button>':'<button class="btn-icon play" onclick="startTask(\''+t.id+'\')" title="启动"><i class="bi-play-fill"></i></button>')+
+    '<button class="btn-icon del" onclick="deleteTask(\''+t.id+'\')" title="删除"><i class="bi-trash3"></i></button>'+
+   '</div></td></tr>';
  });
- h+='</tbody></table>';tb.innerHTML=h;
+ h+='</tbody></table>';tc.innerHTML=h;
 }
 function refresh(){
  api('GET','/api/v1/tasks',null,function(r){
-  if(r.ok&&r.tasks){render(r.tasks);document.getElementById('connBadge').className='status-badge on';document.getElementById('connBadge').innerHTML='<i class="bi-check-circle-fill"></i> Connected'}
-  else{document.getElementById('connBadge').className='status-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> Disconnected'}
+  if(r.ok&&r.tasks){render(r.tasks);document.getElementById('connBadge').className='conn-badge on';document.getElementById('connBadge').innerHTML='<i class="bi-check-circle-fill"></i> 已连接';log('任务列表已刷新，共 '+r.tasks.length+' 个任务','info')}
+  else{document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> 断开'}
  })
 }
 function createTask(){
  var id=document.getElementById('f_id').value||('cam'+Date.now()),name=document.getElementById('f_name').value||id;
  var input=document.getElementById('f_input').value,output=document.getElementById('f_output').value;
  var models=document.getElementById('f_models').value;
- try{JSON.parse(models)}catch(e){toast('Invalid model JSON','danger');return}
+ try{JSON.parse(models)}catch(e){toast('模型 JSON 格式错误','danger');return}
  var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:JSON.parse(models)});
- log('Creating task: '+id,'info');
+ log('正在创建任务：'+id,'info');
  api('POST','/api/v1/tasks',body,function(r){
   if(r.ok){
-   log('Task "'+id+'" created','ok');toast('Task "'+id+'" created','success');
-   if(modal)modal.hide();
+   log('任务 "'+id+'" 创建成功','ok');toast('任务 "'+id+'" 创建成功','success');
+   if(modalIns)modalIns.hide();
    api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
-    if(r2.ok){log('Task "'+id+'" started','ok');toast('Task "'+id+'" started','success')}
-    else{log('Start "'+id+'" failed','err')}
+    if(r2.ok){log('任务 "'+id+'" 已启动','ok');toast('任务 "'+id+'" 已启动','success')}
+    else{log('任务 "'+id+'" 启动失败','err')}
     refresh()
    })
-  }else{log('Create "'+id+'" failed','err');toast('Create failed','danger')}
+  }else{log('创建任务 "'+id+'" 失败','err');toast('创建失败','danger')}
  })
 }
-function startTask(id){log('Starting: '+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('Started: '+id,'ok');toast('Started "'+id+'"','success')}else{log('Start failed: '+id,'err')}refresh()})}
-function stopTask(id){log('Stopping: '+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('Stopped: '+id,'ok');toast('Stopped "'+id+'"','success')}else{log('Stop failed: '+id,'err')}refresh()})}
-function deleteTask(id){if(!confirm('Delete "'+id+'"?'))return;log('Deleting: '+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('Deleted: '+id,'ok');toast('Deleted "'+id+'"','success')}else{log('Delete failed: '+id,'err')}refresh()})}
-refresh();setInterval(refresh,5000);log('Web UI initialized','info')
+function startTask(id){log('正在启动：'+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('任务 "'+id+'" 已启动','ok');toast('任务已启动','success')}else{log('启动失败：'+id,'err')}refresh()})}
+function stopTask(id){log('正在停止：'+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('任务 "'+id+'" 已停止','ok');toast('任务已停止','success')}else{log('停止失败：'+id,'err')}refresh()})}
+function deleteTask(id){if(!confirm('确认删除任务 "'+id+'" ？'))return;log('正在删除：'+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('任务 "'+id+'" 已删除','ok');toast('任务已删除','success')}else{log('删除失败：'+id,'err')}refresh()})}
+refresh();setInterval(refresh,5000);log('Web 界面加载完成','info')
 </script>
 </body>
 </html>
