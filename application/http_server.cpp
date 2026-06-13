@@ -296,4 +296,57 @@ void HttpServer::register_routes() {
             res.set_content(err_json(e.what()), "application/json");
         }
     });
+
+    // ── GET /api/v1/models — list model library ────
+    server_.Get("/api/v1/models", [this](const httplib::Request&, httplib::Response& res) {
+        auto models = mgr_.list_models();
+        std::string j = R"({"ok":true,"models":[)";
+        for (size_t i = 0; i < models.size(); ++i) {
+            if (i) j += ",";
+            auto& m = models[i];
+            j += "{\"name\":\"" + m.name + "\",\"type\":\"" + m.type
+              + "\",\"path\":\"" + m.path
+              + "\",\"backend\":\"" + m.backend
+              + "\",\"device\":\"" + m.device
+              + "\",\"confidence_threshold\":" + std::to_string(m.confidence_threshold)
+              + ",\"input_size\":[" + std::to_string(m.input_size[0]) + "," + std::to_string(m.input_size[1]) + "]"
+              + ",\"interval\":" + std::to_string(m.interval)
+              + "}";
+        }
+        j += "]}";
+        res.set_content(j, "application/json");
+    });
+
+    // ── POST /api/v1/models — add model to library ──
+    server_.Post("/api/v1/models", [this](const httplib::Request& req, httplib::Response& res) {
+        try {
+            auto mcfg = parse_model_config(req.body);
+            if (mcfg.name.empty()) {
+                res.set_content(err_json("model name required"), "application/json");
+                return;
+            }
+            std::cout << "[API] POST /api/v1/models  name=" << mcfg.name << std::endl;
+            if (!mgr_.add_model_to_library(mcfg)) {
+                res.set_content(err_json("add failed (name may exist)"), "application/json");
+                return;
+            }
+            std::cout << "[API] Model added to library: " << mcfg.name << std::endl;
+            res.set_content(ok_json(), "application/json");
+        } catch (const std::exception& e) {
+            res.set_content(err_json(e.what()), "application/json");
+        }
+    });
+
+    // ── DELETE /api/v1/models/:name — remove from library ──
+    server_.Delete("/api/v1/models/:name", [this](const httplib::Request& req, httplib::Response& res) {
+        auto it = req.path_params.find("name");
+        std::string name = (it != req.path_params.end()) ? it->second : "";
+        std::cout << "[API] DELETE /api/v1/models/" << name << std::endl;
+        if (!mgr_.remove_model_from_library(name)) {
+            res.set_content(err_json("model not found"), "application/json");
+            return;
+        }
+        std::cout << "[API] Model removed from library: " << name << std::endl;
+        res.set_content(ok_json(), "application/json");
+    });
 }

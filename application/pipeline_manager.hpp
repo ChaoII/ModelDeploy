@@ -55,7 +55,18 @@ public:
     /// 停止所有任务
     void stop_all();
 
+    // ── 模型库管理 ──
+    /// 添加模型到全局模型库
+    bool add_model_to_library(const ModelConfig& mcfg);
+    /// 从模型库删除模型
+    bool remove_model_from_library(const std::string& name);
+    /// 获取模型库列表
+    std::vector<ModelConfig> list_models() const;
+    /// 获取单个模型
+    bool get_model(const std::string& name, ModelConfig* mcfg) const;
+
 private:
     mutable std::mutex mtx_;
     std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
+    std::vector<ModelConfig> model_library_;  // 全局模型库
 };

@@ -3,144 +3,167 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>智能安防监控平台</title>
+<title>MindVision - 智能安防监控平台</title>
 <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.11.2/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-:root{--primary:#4361ee;--primary-light:#eef1ff;--success:#2ec4b6;--danger:#e71d36;--warning:#ff9f1c;--dark:#0b0b2a;--sidebar-bg:linear-gradient(180deg,#0b0b2a 0%,#1a1a4e 100%);--card-shadow:0 2px 16px rgba(0,0,0,.06);--radius:12px}
-body{background:#f5f6fa;font-family:'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#1a1a2e}
-.sidebar{position:fixed;top:0;left:0;width:260px;height:100vh;background:var(--sidebar-bg);color:#fff;z-index:100;padding:0;overflow-y:auto}
-.sidebar-brand{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
-.sidebar-brand .logo{font-size:20px;font-weight:800;display:flex;align-items:center;gap:12px;letter-spacing:-.3px}
-.sidebar-brand .logo .icon{width:36px;height:36px;background:rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:18px}
+:root{--primary:#4361ee;--primary-light:#eef1ff;--success:#2ec4b6;--danger:#e71d36;--warning:#ff9f1c;--dark:#0b0b2a;--bg:#f5f6fa;--card:#fff;--border:#eaecf0;--text:#1a1a2e;--muted:#6b7280;--radius:12px}
+body{background:var(--bg);font-family:'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:var(--text)}
+.sidebar{position:fixed;top:0;left:0;width:240px;height:100vh;background:linear-gradient(180deg,#0b0b2a 0%,#1a1a4e 100%);color:#fff;z-index:100;padding:0}
+.sidebar-brand{padding:22px 18px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sidebar-brand .logo{font-size:18px;font-weight:800;display:flex;align-items:center;gap:10px}
+.sidebar-brand .logo .ic{width:32px;height:32px;background:rgba(255,255,255,.08);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:16px}
 .sidebar-brand .logo span{color:var(--primary)}
-.sidebar-brand small{display:block;font-size:11px;color:rgba(255,255,255,.3);margin-top:6px;font-weight:400;letter-spacing:0}
-.sidebar-menu{padding:12px 10px}
-.sidebar-menu .item{padding:10px 14px;margin:2px 0;border-radius:10px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px;font-size:13px;color:rgba(255,255,255,.5);font-weight:500}
-.sidebar-menu .item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.85)}
+.sidebar-brand small{font-size:10px;color:rgba(255,255,255,.3);margin-top:4px;display:block}
+.sidebar-menu{padding:10px 8px}
+.sidebar-menu .item{padding:9px 12px;margin:2px 0;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.45);font-weight:500}
+.sidebar-menu .item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.8)}
 .sidebar-menu .item.active{background:rgba(67,97,255,.2);color:#fff;font-weight:600}
-.sidebar-menu .item i{font-size:16px;width:20px;text-align:center}
-.main-content{margin-left:260px;min-height:100vh}
-.topbar{background:#fff;padding:14px 28px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
-.topbar .page-title{font-weight:700;color:var(--dark);margin:0;font-size:17px;display:flex;align-items:center;gap:10px}
-.topbar .page-title i{color:var(--primary)}
-.conn-badge{display:flex;align-items:center;gap:7px;font-size:12px;padding:6px 16px;border-radius:20px;font-weight:500}
+.sidebar-menu .item i{font-size:15px;width:18px;text-align:center}
+.main-content{margin-left:240px;min-height:100vh}
+.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.topbar .ptitle{font-weight:700;color:var(--dark);margin:0;font-size:15px;display:flex;align-items:center;gap:8px}
+.topbar .ptitle i{color:var(--primary)}
+.conn-badge{display:flex;align-items:center;gap:6px;font-size:11px;padding:5px 14px;border-radius:20px;font-weight:500}
 .conn-badge.on{background:#e6f8f5;color:#0d9488}
 .conn-badge.off{background:#fde8e8;color:#dc2626}
-.content{padding:24px 28px}
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
-.stat-card{background:#fff;border-radius:var(--radius);padding:20px;border:1px solid #eaecf0;transition:all .2s;position:relative;overflow:hidden}
-.stat-card:hover{box-shadow:var(--card-shadow);border-color:#d0d5dd}
-.stat-card .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:12px}
-.stat-card .stat-icon.blue{background:var(--primary-light);color:var(--primary)}
-.stat-card .stat-icon.green{background:#e6f8f5;color:#0d9488}
-.stat-card .stat-icon.red{background:#fde8e8;color:#dc2626}
-.stat-card .num{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.5px}
+.content{padding:20px 24px}
+.page{display:none}.page.active{display:block}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:18px;border:1px solid var(--border);transition:all .2s}
+.stat-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.stat-card .si{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px}
+.stat-card .si.blue{background:var(--primary-light);color:var(--primary)}
+.stat-card .si.green{background:#e6f8f5;color:#0d9488}
+.stat-card .si.red{background:#fde8e8;color:#dc2626}
+.stat-card .num{font-size:26px;font-weight:800;line-height:1;letter-spacing:-.3px}
 .stat-card .num.blue{color:var(--primary)}
 .stat-card .num.green{color:#0d9488}
 .stat-card .num.red{color:#dc2626}
-.stat-card .label{font-size:12px;color:#6b7280;margin-top:4px;font-weight:500}
-.action-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-.card-panel{background:#fff;border-radius:var(--radius);border:1px solid #eaecf0;overflow:hidden;box-shadow:var(--card-shadow)}
-.card-panel .panel-head{padding:16px 20px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:center}
-.card-panel .panel-head h6{margin:0;font-weight:700;color:var(--dark);font-size:14px;display:flex;align-items:center;gap:8px}
-.card-panel .panel-head h6 i{color:var(--primary)}
-.table{font-size:13px;margin-bottom:0}
-.table thead th{background:#f9fafb;color:#6b7280;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:12px 16px;border-bottom:2px solid #eaecf0}
-.table td{padding:12px 16px;vertical-align:middle;border-bottom:1px solid #f3f4f6}
-.table tbody tr{transition:background .15s}
+.stat-card .lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:500}
+.card-panel{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:16px}
+.card-panel .ph{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.card-panel .ph h6{margin:0;font-weight:700;color:var(--dark);font-size:13px;display:flex;align-items:center;gap:6px}
+.card-panel .ph h6 i{color:var(--primary)}
+.table{font-size:12px;margin-bottom:0}
+.table thead th{background:#f9fafb;color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:10px 14px;border-bottom:2px solid var(--border)}
+.table td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #f3f4f6}
 .table tbody tr:hover{background:#f9faff}
-.table tbody tr:last-child td{border-bottom:none}
-.badge-task{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}
-.badge-task.running{background:#e6f8f5;color:#0d9488}
-.badge-task.stopped{background:#f3f4f6;color:#9ca3af}
-.tag-model{display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-weight:500;background:var(--primary-light);color:var(--primary);margin:1px 2px}
-.cell-url{font-size:11px;font-family:'SF Mono','Consolas',monospace;color:#6b7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cell-name{font-weight:600;color:var(--dark)}
-.cell-sub{font-size:11px;color:#9ca3af;margin-top:1px}
-.btn-icon{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:none;cursor:pointer;transition:all .15s;font-size:14px}
-.btn-icon:hover{transform:translateY(-1px)}
-.btn-icon.play{background:#e6f8f5;color:#0d9488}
-.btn-icon.play:hover{background:#0d9488;color:#fff}
-.btn-icon.stop{background:#fef3c7;color:#d97706}
-.btn-icon.stop:hover{background:#d97706;color:#fff}
-.btn-icon.del{background:#fde8e8;color:#dc2626}
-.btn-icon.del:hover{background:#dc2626;color:#fff}
-.btn-pri{height:36px;padding:0 18px;border-radius:8px;border:none;font-size:12px;font-weight:600;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:6px;transition:all .15s;cursor:pointer}
+.badge-task{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600}
+.badge-task.run{background:#e6f8f5;color:#0d9488}
+.badge-task.sto{background:#f3f4f6;color:#9ca3af}
+.tag-model{padding:2px 8px;border-radius:4px;font-size:10px;background:var(--primary-light);color:var(--primary);margin:1px;display:inline-block;font-weight:500}
+.cell-url{font-size:10px;font-family:'SF Mono','Consolas',monospace;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fname{font-weight:600;color:var(--dark)}
+.fsub{font-size:10px;color:#9ca3af;margin-top:1px}
+.btn-icon{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:none;cursor:pointer;transition:all .15s;font-size:13px}
+.btn-icon.play{background:#e6f8f5;color:#0d9488}.btn-icon.play:hover{background:#0d9488;color:#fff}
+.btn-icon.stop{background:#fef3c7;color:#d97706}.btn-icon.stop:hover{background:#d97706;color:#fff}
+.btn-icon.del{background:#fde8e8;color:#dc2626}.btn-icon.del:hover{background:#dc2626;color:#fff}
+.btn-icon.info{background:var(--primary-light);color:var(--primary)}.btn-icon.info:hover{background:var(--primary);color:#fff}
+.btn-pri{height:34px;padding:0 16px;border-radius:8px;border:none;font-size:11px;font-weight:600;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:5px;transition:all .15s;cursor:pointer}
 .btn-pri:hover{background:#3651d4;transform:translateY(-1px);box-shadow:0 4px 12px rgba(67,97,255,.3)}
-.btn-ghost{height:36px;padding:0 16px;border-radius:8px;border:1px solid #d0d5dd;font-size:12px;font-weight:500;background:#fff;color:#6b7280;display:inline-flex;align-items:center;gap:6px;transition:all .15s;cursor:pointer}
+.btn-ghost{height:34px;padding:0 14px;border-radius:8px;border:1px solid #d0d5dd;font-size:11px;font-weight:500;background:#fff;color:var(--muted);display:inline-flex;align-items:center;gap:5px;transition:all .15s;cursor:pointer}
 .btn-ghost:hover{background:#f9fafb;border-color:#9ca3af}
-.empty-state{text-align:center;padding:60px 20px;color:#9ca3af}
-.empty-state i{font-size:44px;display:block;margin-bottom:12px;color:#d0d5dd}
-.empty-state p{font-size:13px;margin:0}
-.log-panel{background:#fff;border-radius:var(--radius);border:1px solid #eaecf0;margin-top:20px;overflow:hidden}
-.log-panel .log-head{padding:12px 20px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:center}
-.log-panel .log-head h6{margin:0;font-size:12px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:6px}
-.log-panel .log-head h6 i{color:var(--primary)}
-.log-panel .log-body{padding:8px 20px;max-height:140px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:11px;line-height:1.9;color:#6b7280}
-.log-panel .log-body .tm{color:#bbb}
-.log-panel .log-body .info{color:var(--primary)}
-.log-panel .log-body .ok{color:#0d9488}
-.log-panel .log-body .err{color:#dc2626}
-.modal-content{border-radius:var(--radius);border:none;box-shadow:0 16px 48px rgba(0,0,0,.15)}
-.modal-header{border-bottom:1px solid #eaecf0;padding:18px 22px}
-.modal-header .modal-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;color:var(--dark)}
+.btn-sm-pri{height:28px;padding:0 12px;border-radius:6px;border:none;font-size:10px;font-weight:600;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:4px;transition:all .15s;cursor:pointer}
+.btn-sm-pri:hover{background:#3651d4}
+.btn-sm-ghost{height:28px;padding:0 10px;border-radius:6px;border:1px solid #d0d5dd;font-size:10px;font-weight:500;background:#fff;color:var(--muted);display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.btn-sm-ghost:hover{background:#f9fafb}
+.action-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.empty-state{text-align:center;padding:50px 20px;color:#9ca3af}
+.empty-state i{font-size:38px;display:block;margin-bottom:10px;color:#d0d5dd}
+.empty-state p{font-size:12px;margin:0}
+.log-panel{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-top:16px}
+.log-panel .lh{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.log-panel .lh h6{margin:0;font-size:11px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:5px}
+.log-panel .lh h6 i{color:var(--primary)}
+.log-panel .lb{padding:6px 18px;max-height:120px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:10px;line-height:1.8;color:var(--muted)}
+.log-panel .lb .tm{color:#bbb}
+.log-panel .lb .info{color:var(--primary)}
+.log-panel .lb .ok{color:#0d9488}
+.log-panel .lb .err{color:#dc2626}
+.modal-content{border-radius:var(--radius);border:none;box-shadow:0 16px 48px rgba(0,0,0,.12)}
+.modal-header{border-bottom:1px solid var(--border);padding:16px 20px}
+.modal-header .modal-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:var(--dark)}
 .modal-header .modal-title i{color:var(--primary)}
-.modal-body{padding:22px}
-.modal-footer{border-top:1px solid #eaecf0;padding:14px 22px}
-.form-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
-.form-control,.form-select{font-size:13px;border-radius:8px;border-color:#d0d5dd;padding:8px 12px}
-.form-control:focus,.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(67,97,255,.12)}
-textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:11px}
+.modal-body{padding:20px}
+.modal-footer{border-top:1px solid var(--border);padding:12px 20px}
+.form-label{font-size:11px;font-weight:600;color:#374151;margin-bottom:3px}
+.form-control,.form-select{font-size:12px;border-radius:7px;border-color:#d0d5dd;padding:7px 11px}
+.form-control:focus,.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(67,97,255,.1)}
+textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:10px;min-height:60px}
 #toastContainer{position:fixed;bottom:20px;right:20px;z-index:9999}
-.toast-item{display:flex;align-items:center;gap:10px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.1);margin-top:8px;animation:slideR .3s ease;color:#fff}
+.toast-item{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.08);margin-top:8px;animation:slideR .3s ease;color:#fff}
 .toast-item.success{background:#0d9488}
 .toast-item.danger{background:#dc2626}
 .toast-item.info{background:var(--primary)}
 @keyframes slideR{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-.btn-group-action{display:flex;gap:4px}
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.model-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;transition:all .2s}
+.model-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.model-card .mc-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.model-card .mc-hdr .mc-nm{font-weight:600;font-size:13px;color:var(--dark)}
+.model-card .mc-hdr .mc-ty{padding:1px 8px;border-radius:4px;font-size:9px;background:var(--primary-light);color:var(--primary);font-weight:600}
+.model-card .mc-body{font-size:10px;color:var(--muted);line-height:1.7}
+.model-card .mc-body .tag{display:inline-block;padding:1px 6px;border-radius:3px;background:#f3f4f6;color:var(--muted);font-size:9px;margin:1px}
+.model-card .mc-acts{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:4px}
+.select-models{border:1px solid var(--border);border-radius:7px;padding:8px;max-height:140px;overflow-y:auto}
+.select-models label{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;font-size:12px;cursor:pointer;transition:background .1s}
+.select-models label:hover{background:#f9faff}
 </style>
 </head>
 <body>
 
 <div class="sidebar">
 <div class="sidebar-brand">
-<div class="logo"><div class="icon"><i class="bi-camera-video-fill"></i></div>Mind<span>Vision</span></div>
-<small>GPU 加速实时视频分析平台</small>
+<div class="logo"><div class="ic"><i class="bi-camera-video-fill"></i></div>Mind<span>Vision</span></div>
+<small>GPU 加速视频分析平台</small>
 </div>
 <div class="sidebar-menu">
-<div class="item active"><i class="bi-grid-3x3-gap-fill"></i> 控制台</div>
-<div class="item" onclick="openCreate()"><i class="bi-plus-circle"></i> 新建任务</div>
+<div class="item active" onclick="switchPage('dashboard',this)"><i class="bi-grid-3x3-gap-fill"></i> 控制台</div>
+<div class="item" onclick="switchPage('models',this)"><i class="bi-box-seam"></i> 模型管理</div>
+<div class="item" onclick="openModelModal()"><i class="bi-plus-circle"></i> 新建模型</div>
+<div class="item" onclick="openCreate()"><i class="bi-camera-video"></i> 新建任务</div>
 </div>
 </div>
 
 <div class="main-content">
 <div class="topbar">
-<h5 class="page-title"><i class="bi-grid-3x3-gap-fill"></i> 控制台</h5>
+<h5 class="ptitle" id="pageTitle"><i class="bi-grid-3x3-gap-fill"></i> 控制台</h5>
 <span id="connBadge" class="conn-badge on"><i class="bi-check-circle-fill"></i> 已连接</span>
 </div>
 
 <div class="content">
-<div class="stats-row" id="statsRow"></div>
 
+<!-- ===== 控制台页面 ===== -->
+<div class="page active" id="pageDashboard">
+<div class="stats-row" id="statsRow"></div>
 <div class="action-bar">
 <button class="btn-pri" onclick="openCreate()"><i class="bi-plus-lg"></i> 新建任务</button>
 <button class="btn-ghost" onclick="refresh()"><i class="bi-arrow-clockwise"></i> 刷新</button>
 </div>
-
 <div class="card-panel">
-<div class="panel-head">
-<h6><i class="bi-list-task"></i> 任务列表</h6>
-<span style="font-size:12px;color:#9ca3af">共 <strong id="taskCount">0</strong> 个任务</span>
-</div>
-<div id="tableContainer">
-<div class="empty-state"><i class="bi-inbox"></i><p>暂无任务，点击上方「新建任务」开始</p></div>
+<div class="ph"><h6><i class="bi-list-task"></i> 任务列表</h6><span style="font-size:11px;color:#9ca3af">共 <strong id="taskCount">0</strong> 个任务</span></div>
+<div id="tableContainer"><div class="empty-state"><i class="bi-inbox"></i><p>暂无任务</p></div></div>
 </div>
 </div>
 
+<!-- ===== 模型管理页面 ===== -->
+<div class="page" id="pageModels">
+<div class="action-bar">
+<button class="btn-pri" onclick="openModelModal()"><i class="bi-plus-lg"></i> 添加模型</button>
+<button class="btn-ghost" onclick="loadModels()"><i class="bi-arrow-clockwise"></i> 刷新</button>
+</div>
+<div class="card-panel">
+<div class="ph"><h6><i class="bi-box-seam"></i> 模型库</h6><span style="font-size:11px;color:#9ca3af" id="modelCount">0 个模型</span></div>
+<div id="modelContainer"><div class="empty-state"><i class="bi-box"></i><p>暂无模型</p></div></div>
+</div>
+</div>
+
+<!-- ===== 日志面板 ===== -->
 <div class="log-panel">
-<div class="log-head"><h6><i class="bi-journal-text"></i> 操作日志</h6><span id="logCount" style="font-size:11px;color:#9ca3af">0 条</span></div>
-<div class="log-body" id="logBody"><span class="tm">系统初始化完成，等待操作...</span></div>
+<div class="lh"><h6><i class="bi-journal-text"></i> 操作日志</h6><span id="logCount" style="font-size:10px;color:#9ca3af">0 条</span></div>
+<div class="lb" id="logBody"><span class="tm">系统初始化完成</span></div>
 </div>
 </div>
 </div>
@@ -157,7 +180,7 @@ textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:11px}
 <div class="col-12"><label class="form-label">输入 RTSP 地址</label><input class="form-control" id="f_input" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/obs_test3"></div>
 <div class="col-md-4"><label class="form-label">输出类型</label><select class="form-select" id="f_outtype" onchange="onOutChange()"><option value="rtsp">RTSP 推流</option><option value="mp4">MP4 文件</option></select></div>
 <div class="col-md-8"><label class="form-label" id="f_outlabel">输出 RTSP 地址</label><input class="form-control" id="f_output" placeholder="rtsp://目标地址" value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
-<div class="col-12"><label class="form-label">模型配置 <span style="color:#9ca3af;font-weight:400">（JSON 数组，可配置多个模型）</span></label><textarea class="form-control" id="f_models" rows="4">[{"name":"yolo11n","type":"detection","path":"E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx","backend":"ort","device":"gpu","confidence_threshold":0.5,"input_size":[640,640],"interval":1}]</textarea></div>
+<div class="col-12"><label class="form-label">关联模型 <span style="color:#9ca3af;font-weight:400">（勾选需要使用的模型）</span></label><div class="select-models" id="modelCheckboxes"></div></div>
 </div>
 </div>
 <div class="modal-footer">
@@ -168,39 +191,106 @@ textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:11px}
 </div>
 </div>
 
+<!-- 添加模型弹窗 -->
+<div class="modal fade" id="modelModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content">
+<div class="modal-header"><h5 class="modal-title"><i class="bi-plus-circle"></i> 添加模型</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div class="row g-3">
+<div class="col-6"><label class="form-label">模型名称</label><input class="form-control" id="mf_name" placeholder="例如 yolo11n"></div>
+<div class="col-6"><label class="form-label">模型类型</label><select class="form-select" id="mf_type"><option value="detection">检测 (Detection)</option><option value="classification">分类 (Classification)</option><option value="face_detection">人脸检测</option><option value="lpr_pipeline">车牌识别</option><option value="pose">关键点</option></select></div>
+<div class="col-12"><label class="form-label">模型文件路径</label><input class="form-control" id="mf_path" placeholder="例如 /models/yolo11n.onnx" value="E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx"></div>
+<div class="col-6"><label class="form-label">推理后端</label><select class="form-select" id="mf_backend"><option value="ort">ONNX Runtime</option><option value="trt">TensorRT</option><option value="mnn">MNN</option></select></div>
+<div class="col-6"><label class="form-label">运行设备</label><select class="form-select" id="mf_device"><option value="gpu">GPU</option><option value="cpu">CPU</option></select></div>
+<div class="col-4"><label class="form-label">置信度阈值</label><input class="form-control" id="mf_threshold" value="0.5" type="number" step="0.05" min="0" max="1"></div>
+<div class="col-4"><label class="form-label">输入宽度</label><input class="form-control" id="mf_w" value="640" type="number"></div>
+<div class="col-4"><label class="form-label">输入高度</label><input class="form-control" id="mf_h" value="640" type="number"></div>
+<div class="col-6"><label class="form-label">推理间隔（帧）</label><input class="form-control" id="mf_interval" value="1" type="number" min="1"></div>
+<div class="col-6"><label class="form-label">ROI 区域 <span style="color:#9ca3af;font-weight:400">(x,y,w,h)</span></label><input class="form-control" id="mf_roi" placeholder="留空表示全图" value="0,0,0,0"></div>
+</div>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn-ghost" data-bs-dismiss="modal">取消</button>
+<button type="button" class="btn-pri" onclick="addModel()"><i class="bi-check-lg"></i> 保存模型</button>
+</div>
+</div>
+</div>
+</div>
+
 <div id="toastContainer"></div>
 
 <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-var modalIns=null;
-document.addEventListener('DOMContentLoaded',function(){modalIns=new bootstrap.Modal(document.getElementById('createModal'))});
+var createModal=null,modelModal=null,allModels=[],currentPage='dashboard';
+document.addEventListener('DOMContentLoaded',function(){createModal=new bootstrap.Modal(document.getElementById('createModal'));modelModal=new bootstrap.Modal(document.getElementById('modelModal'));loadModels()});
 
 function log(msg,tp){tp=tp||'info';var b=document.getElementById('logBody');var d=new Date();var ts=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');b.innerHTML+='<div><span class="tm">['+ts+']</span> <span class="'+tp+'">'+esc(msg)+'</span></div>';b.scrollTop=b.scrollHeight;var c=parseInt(document.getElementById('logCount').textContent)||0;document.getElementById('logCount').textContent=(c+1)+' 条'}
 function toast(msg,t){var c=document.getElementById('toastContainer');var d=document.createElement('div');d.className='toast-item '+(t||'info');var icon=t=='danger'?'bi-exclamation-circle':t=='success'?'bi-check-circle':'bi-info-circle';d.innerHTML='<i class="'+icon+'"></i>'+esc(msg);c.appendChild(d);setTimeout(function(){d.remove()},3800)}
 function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){cb({ok:false});document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> 断开'}}
-function onOutChange(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'输出文件路径':'输出 RTSP 地址';document.getElementById('f_output').placeholder=t=='mp4'?'例如 E:/output.mp4':'例如 rtsp://目标地址'}
-function openCreate(){if(modalIns)modalIns.show()}
+function switchPage(page,el){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});document.getElementById('page'+page.charAt(0).toUpperCase()+page.slice(1)).classList.add('active');document.querySelectorAll('.sidebar-menu .item').forEach(function(i){i.classList.remove('active')});if(el)el.classList.add('active');currentPage=page;document.getElementById('pageTitle').innerHTML=(page==='dashboard'?'<i class="bi-grid-3x3-gap-fill"></i> 控制台':'<i class="bi-box-seam"></i> 模型管理')}
+function onOutChange(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'输出文件路径':'输出 RTSP 地址';document.getElementById('f_output').placeholder=t=='mp4'?'E:/output.mp4':'rtsp://目标地址'}
+function openCreate(){if(createModal)createModal.show()}
 
+// ── 模型管理 ──
+function loadModels(){
+ api('GET','/api/v1/models',null,function(r){
+  allModels=r.ok&&r.models?r.models:[];
+  document.getElementById('modelCount').textContent=allModels.length+' 个模型';
+  var mc=document.getElementById('modelContainer');var mcb=document.getElementById('modelCheckboxes');
+  if(allModels.length===0){mc.innerHTML='<div class="empty-state"><i class="bi-box"></i><p>暂无模型，点击「添加模型」创建</p></div>';mcb.innerHTML='<span style="color:#9ca3af;font-size:11px">暂无模型，请先在模型管理中创建</span>';return}
+  // model cards
+  var h='<div class="model-grid">';
+  allModels.forEach(function(m){
+   h+='<div class="model-card"><div class="mc-hdr"><span class="mc-nm">'+esc(m.name)+'</span><span class="mc-ty">'+typeLabel(m.type)+'</span></div><div class="mc-body">'+
+    '<div>路径：<span class="tag">'+esc(m.path)+'</span></div><div>后端：<span class="tag">'+esc(m.backend)+'</span> | 设备：<span class="tag">'+esc(m.device)+'</span> | 输入：<span class="tag">'+m.input_size[0]+'x'+m.input_size[1]+'</span> | 阈值：<span class="tag">'+m.confidence_threshold+'</span></div>'+
+    '</div><div class="mc-acts">'+
+    '<button class="btn-sm-ghost" onclick="deleteModel(\''+esc(m.name)+'\')"><i class="bi-trash3"></i> 删除</button></div></div>';
+  });
+  h+='</div>';mc.innerHTML=h;
+  // checkboxes for task creation
+  var c='';allModels.forEach(function(m){c+='<label><input type="checkbox" class="form-check-input me-1" value=\''+esc(m.name)+'\'> <strong>'+esc(m.name)+'</strong> <span style="color:#9ca3af;font-size:10px">['+typeLabel(m.type)+']</span></label>'});
+  mcb.innerHTML=c;
+ })
+}
+function typeLabel(t){var m={detection:'检测',classification:'分类',face_detection:'人脸',lpr_pipeline:'车牌',pose:'关键点'};return m[t]||t}
+function openModelModal(){if(modelModal)modelModal.show()}
+function addModel(){
+ var name=document.getElementById('mf_name').value.trim();if(!name){toast('请输入模型名称','danger');return}
+ var type=document.getElementById('mf_type').value,path=document.getElementById('mf_path').value.trim();
+ if(!path){toast('请输入模型文件路径','danger');return}
+ var backend=document.getElementById('mf_backend').value,device=document.getElementById('mf_device').value;
+ var threshold=parseFloat(document.getElementById('mf_threshold').value)||0.5;
+ var w=parseInt(document.getElementById('mf_w').value)||640,h=parseInt(document.getElementById('mf_h').value)||640;
+ var interval=parseInt(document.getElementById('mf_interval').value)||1;
+ var roi=document.getElementById('mf_roi').value||'0,0,0,0';var rp=roi.split(',').map(function(x){return parseInt(x)||0});
+ var body=JSON.stringify({name:name,type:type,path:path,backend:backend,device:device,confidence_threshold:threshold,input_size:[w,h],interval:interval,roi:[rp[0],rp[1],rp[2],rp[3]]});
+ log('正在添加模型：'+name,'info');
+ api('POST','/api/v1/models',body,function(r){
+  if(r.ok){toast('模型 "'+name+'" 已添加','success');log('模型添加成功：'+name+' ['+type+']','ok');if(modelModal)modelModal.hide();loadModels()}
+  else{toast('添加失败：'+(r.msg||'名称可能已存在'),'danger');log('模型添加失败：'+name+' - '+(r.msg||'名称重复'),'err')}
+ })
+}
+function deleteModel(name){if(!confirm('删除模型 "'+name+'" ？'))return;api('DELETE','/api/v1/models/'+encodeURIComponent(name),null,function(r){if(r.ok){toast('模型已删除','success');log('模型删除：'+name,'ok');loadModels()}else{toast('删除失败','danger')}})}
+
+// ── 任务管理 ──
 function render(tasks){
  var s=document.getElementById('statsRow');
- s.innerHTML=
-  '<div class="stat-card"><div class="stat-icon blue"><i class="bi-camera-video"></i></div><div class="num blue">'+tasks.length+'</div><div class="label">总任务数</div></div>'+
-  '<div class="stat-card"><div class="stat-icon green"><i class="bi-play-circle"></i></div><div class="num green">'+tasks.filter(function(t){return t.running}).length+'</div><div class="label">运行中</div></div>'+
-  '<div class="stat-card"><div class="stat-icon red"><i class="bi-stop-circle"></i></div><div class="num red">'+tasks.filter(function(t){return !t.running}).length+'</div><div class="label">已停止</div></div>';
+ s.innerHTML='<div class="stat-card"><div class="si blue"><i class="bi-camera-video"></i></div><div class="num blue">'+tasks.length+'</div><div class="lbl">总任务数</div></div><div class="stat-card"><div class="si green"><i class="bi-play-circle"></i></div><div class="num green">'+tasks.filter(function(t){return t.running}).length+'</div><div class="lbl">运行中</div></div><div class="stat-card"><div class="si red"><i class="bi-stop-circle"></i></div><div class="num red">'+tasks.filter(function(t){return !t.running}).length+'</div><div class="lbl">已停止</div></div>';
  document.getElementById('taskCount').textContent=tasks.length;
  var tc=document.getElementById('tableContainer');
- if(tasks.length===0){tc.innerHTML='<div class="empty-state"><i class="bi-inbox"></i><p>暂无任务，点击上方「新建任务」开始</p></div>';return}
- var h='<table class="table"><thead><tr><th style="width:44px">#</th><th>任务</th><th>输入地址</th><th>输出地址</th><th>模型</th><th style="width:90px">状态</th><th style="width:120px">操作</th></tr></thead><tbody>';
+ if(tasks.length===0){tc.innerHTML='<div class="empty-state"><i class="bi-inbox"></i><p>暂无任务</p></div>';return}
+ var h='<table class="table"><thead><tr><th style="width:36px">#</th><th>任务</th><th>输入地址</th><th>输出地址</th><th>模型</th><th style="width:80px">状态</th><th style="width:104px">操作</th></tr></thead><tbody>';
  tasks.forEach(function(t,i){
   var ms='';if(t.models){t.models.forEach(function(m){ms+='<span class="tag-model">'+esc(m.name)+'</span>'})}
   h+='<tr><td style="color:#9ca3af;font-weight:500">'+(i+1)+'</td>'+
-   '<td><div class="cell-name">'+esc(t.id)+'</div>'+(t.name?'<div class="cell-sub">'+esc(t.name)+'</div>':'')+'</td>'+
+   '<td><div class="fname">'+esc(t.id)+'</div>'+(t.name?'<div class="fsub">'+esc(t.name)+'</div>':'')+'</td>'+
    '<td><div class="cell-url" title="'+esc(t.input_url)+'">'+esc(t.input_url||'-')+'</div></td>'+
    '<td><div class="cell-url" title="'+esc(t.output_url)+'">'+esc(t.output_url||'-')+'</div></td>'+
-   '<td><div>'+(ms||'<span style="color:#d0d5dd;font-size:11px">-</span>')+'</div></td>'+
-   '<td><span class="badge-task '+(t.running?'running':'stopped')+'"><i class="bi-circle-fill" style="font-size:6px"></i>'+(t.running?'运行中':'已停止')+'</span></td>'+
-   '<td><div class="btn-group-action">'+
+   '<td><div>'+(ms||'<span style="color:#d0d5dd;font-size:10px">-</span>')+'</div></td>'+
+   '<td><span class="badge-task '+(t.running?'run':'sto')+'"><i class="bi-circle-fill" style="font-size:5px"></i>'+(t.running?'运行中':'已停止')+'</span></td>'+
+   '<td><div style="display:flex;gap:3px">'+
     (t.running?'<button class="btn-icon stop" onclick="stopTask(\''+t.id+'\')" title="停止"><i class="bi-stop-fill"></i></button>':'<button class="btn-icon play" onclick="startTask(\''+t.id+'\')" title="启动"><i class="bi-play-fill"></i></button>')+
     '<button class="btn-icon del" onclick="deleteTask(\''+t.id+'\')" title="删除"><i class="bi-trash3"></i></button>'+
    '</div></td></tr>';
@@ -216,26 +306,31 @@ function refresh(){
 function createTask(){
  var id=document.getElementById('f_id').value||('cam'+Date.now()),name=document.getElementById('f_name').value||id;
  var input=document.getElementById('f_input').value,output=document.getElementById('f_output').value;
- var models=document.getElementById('f_models').value;
- try{JSON.parse(models)}catch(e){toast('模型 JSON 格式错误','danger');return}
- var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:JSON.parse(models)});
+ // 收集选中的模型
+ var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
+ checks.forEach(function(c){
+  var m=allModels.find(function(mm){return mm.name===c.value});
+  if(m)models.push(m);
+ });
+ if(models.length===0){toast('请至少选择一个模型','danger');return}
+ var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:models});
  log('正在创建任务：'+id,'info');
  api('POST','/api/v1/tasks',body,function(r){
   if(r.ok){
-   log('任务 "'+id+'" 创建成功','ok');toast('任务 "'+id+'" 创建成功','success');
-   if(modalIns)modalIns.hide();
+   log('任务 "'+id+'" 创建成功，模型：'+models.length+' 个','ok');toast('任务 "'+id+'" 创建成功','success');
+   if(createModal)createModal.hide();
    api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
     if(r2.ok){log('任务 "'+id+'" 已启动','ok');toast('任务 "'+id+'" 已启动','success')}
     else{log('任务 "'+id+'" 启动失败','err')}
-    refresh()
+    if(currentPage==='dashboard')refresh()
    })
   }else{log('创建任务 "'+id+'" 失败','err');toast('创建失败','danger')}
  })
 }
-function startTask(id){log('正在启动：'+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('任务 "'+id+'" 已启动','ok');toast('任务已启动','success')}else{log('启动失败：'+id,'err')}refresh()})}
-function stopTask(id){log('正在停止：'+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('任务 "'+id+'" 已停止','ok');toast('任务已停止','success')}else{log('停止失败：'+id,'err')}refresh()})}
-function deleteTask(id){if(!confirm('确认删除任务 "'+id+'" ？'))return;log('正在删除：'+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('任务 "'+id+'" 已删除','ok');toast('任务已删除','success')}else{log('删除失败：'+id,'err')}refresh()})}
-refresh();setInterval(refresh,5000);log('Web 界面加载完成','info')
+function startTask(id){log('正在启动：'+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('任务 "'+id+'" 已启动','ok');toast('任务已启动','success')}else{log('启动失败：'+id,'err')}if(currentPage==='dashboard')refresh()})}
+function stopTask(id){log('正在停止：'+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('任务 "'+id+'" 已停止','ok');toast('任务已停止','success')}else{log('停止失败：'+id,'err')}if(currentPage==='dashboard')refresh()})}
+function deleteTask(id){if(!confirm('确认删除任务 "'+id+'" ？'))return;log('正在删除：'+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('任务 "'+id+'" 已删除','ok');toast('任务已删除','success')}else{log('删除失败：'+id,'err')}if(currentPage==='dashboard')refresh()})}
+refresh();setInterval(function(){if(currentPage==='dashboard')refresh()},5000);log('Web 界面加载完成','info')
 </script>
 </body>
 </html>

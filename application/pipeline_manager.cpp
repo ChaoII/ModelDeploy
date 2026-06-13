@@ -102,3 +102,44 @@ void PipelineManager::stop_all() {
     }
     pipelines_.clear();
 }
+
+// ── 模型库管理 ──
+
+bool PipelineManager::add_model_to_library(const ModelConfig& mcfg) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (mcfg.name.empty()) return false;
+    // 检查名字是否已存在
+    for (const auto& m : model_library_)
+        if (m.name == mcfg.name) return false;
+    model_library_.push_back(mcfg);
+    std::cout << "[ModelLib] Added: " << mcfg.name << " [" << mcfg.type << "] " << mcfg.path << std::endl;
+    return true;
+}
+
+bool PipelineManager::remove_model_from_library(const std::string& name) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    for (auto it = model_library_.begin(); it != model_library_.end(); ++it) {
+        if (it->name == name) {
+            model_library_.erase(it);
+            std::cout << "[ModelLib] Removed: " << name << std::endl;
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<ModelConfig> PipelineManager::list_models() const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return model_library_;
+}
+
+bool PipelineManager::get_model(const std::string& name, ModelConfig* mcfg) const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    for (const auto& m : model_library_) {
+        if (m.name == name) {
+            if (mcfg) *mcfg = m;
+            return true;
+        }
+    }
+    return false;
+}
