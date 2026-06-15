@@ -196,67 +196,39 @@ void Pipeline::pipeline_loop() {
         // 3) StreamEncoder
         encoder_ = std::make_unique<StreamEncoder>(cfg_.encoder);
 
-        // 4) 解码器：StreamHub 优先，否则独立创建
-        if (hub_) {
-            auto src = hub_->acquire(cfg_.input_url, cfg_.decoder);
-            if (!src) {
-                init_error_ = "Shared source acquire failed: " + cfg_.input_url;
-                std::cerr << "[Pipeline] " << init_error_ << std::endl;
-                running_ = false;
-                return;
-            }
-            shared_source_ = src;
-            // subscribe 内部会触发 start()（仅首次）
-            shared_token_ = src->subscribe([this](const auto& f) { return on_shared_frame(f); });
-            // 给 SharedSource 短暂时间起来
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            if (!src->is_initialized() && !src->init_error().empty()) {
-                init_error_ = src->init_error();
-                std::cerr << "[Pipeline] " << init_error_ << std::endl;
-                running_ = false;
-                return;
-            }
-            std::cout << "[Pipeline] Using shared source: " << cfg_.id
-                      << " (subs=" << src->subscriber_count() << ")" << std::endl;
-        } else {
-            // 独占模式
-            decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
-            decoder_->set_callback([this](const DecodedFrame& frame) -> bool {
-                return on_decoded_frame(frame);
-            });
-            if (!decoder_->open(cfg_.input_url)) {
-                init_error_ = "Decoder open failed: " + cfg_.input_url;
-                std::cerr << "[Pipeline] " << init_error_ << std::endl;
-                running_ = false;
-                return;
-            }
-            if (!decoder_->start()) {
-                init_error_ = "Decoder start failed";
-                std::cerr << "[Pipeline] " << init_error_ << std::endl;
-                running_ = false;
-                return;
-            }
+        // 4) 解码器
+        decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
+        if (!decoder_->open(cfg_.input_url)) {
+            init_error_ = "Decoder open failed: " + cfg_.input_url;
+            std::cerr << "[Pipeline] " << init_error_ << std::endl;
+            running_ = false;
+            return;
         }
 
         initialized_ = true;
         std::cout << "[Pipeline] Running: " << cfg_.id << std::endl;
         stats_.start();
 
-        // 主循环：处理队列中的帧
-        while (running_.load()) {
+        // ── 同步主循环：读一帧 → 处理 → 编码 ──
+        DecodedFrame raw_frame;
+        while (running_.load() && decoder_->read_one_frame(&raw_frame)) {
+            // 从解码帧构建连续 NV12 buffer
             PendingFrame pf;
-            {
-                std::unique_lock<std::mutex> lock(queue_mtx_);
-                queue_cv_.wait_for(lock, std::chrono::milliseconds(500),
-                    [this]() { return !frame_queue_.empty() || !running_.load(); });
-                if (!running_.load()) break;
-                if (frame_queue_.empty()) continue;
-                pf = std::move(frame_queue_.front());
-                frame_queue_.pop();
-            }
-            queue_not_full_cv_.notify_one();
+            pf.width = raw_frame.width;
+            pf.height = raw_frame.height;
+            size_t y_size = static_cast<size_t>(raw_frame.height) * raw_frame.width;
+            size_t uv_size = y_size / 2;
+            pf.nv12_data.resize(y_size + uv_size);
+            uint8_t* dst = pf.nv12_data.data();
+            for (int row = 0; row < raw_frame.height; ++row)
+                memcpy(dst + row * raw_frame.width,
+                       raw_frame.y_plane + row * raw_frame.y_step, raw_frame.width);
+            int uv_h = raw_frame.height / 2;
+            for (int row = 0; row < uv_h; ++row)
+                memcpy(dst + y_size + row * raw_frame.width,
+                       raw_frame.uv_plane + row * raw_frame.uv_step, raw_frame.width);
 
-            process_frame(pf.y_ptr(), pf.width, pf.height);
+            process_frame(pf.nv12_data.data(), pf.width, pf.height);
         }
 
     } catch (const std::exception& e) {
@@ -287,7 +259,6 @@ bool Pipeline::process_frame(const uint8_t* nv12, int width, int height) {
     try {
         if (!encoder_opened_.load()) {
             if (encoder_->open(cfg_.output_url, width, height)) {
-                encoder_->start_async();
                 encoder_opened_ = true;
             } else {
                 std::cerr << "[Pipeline] Encoder open failed" << std::endl;
@@ -318,7 +289,7 @@ bool Pipeline::process_frame(const uint8_t* nv12, int width, int height) {
 
         // 编码
         if (!bgr_image.empty()) {
-            encoder_->encode_async(bgr_image);
+            encoder_->encode(bgr_image);
 
             // 缓存最新一帧供快照接口使用（ImageData 浅拷贝，shared_ptr 内部管理）
             // 不再每帧 to_mat + 全量拷贝，节省内存带宽

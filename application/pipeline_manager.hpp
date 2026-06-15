@@ -98,11 +98,13 @@ private:
     std::atomic<bool> dirty_{false};
     StreamHub stream_hub_;
 
-    // 模型 prototype 缓存：检测模型只加载一次，后续 clone
-    struct DetPrototype {
+    // 模型 prototype 缓存：只加载一次，后续 clone（共享 Runtime）
+    struct ModelPrototype {
         std::string key;
-        std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> model;
+        int type = 0; // 0=det, 1=face
+        std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> det;
+        std::unique_ptr<modeldeploy::vision::face::Scrfd> face;
     };
-    std::map<std::string, DetPrototype> det_prototypes_;
+    std::map<std::string, ModelPrototype> model_prototypes_;
     std::mutex proto_mtx_;
 };

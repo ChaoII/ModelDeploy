@@ -47,6 +47,10 @@ public:
     bool clone_detection_from(const modeldeploy::vision::detection::UltralyticsDet& proto,
                               const ModelConfig& cfg);
 
+    /// 接管一份已 clone 的 face 模型（共享 Runtime）
+    void adopt_face_model(std::unique_ptr<modeldeploy::vision::face::Scrfd> model,
+                          const ModelConfig& cfg);
+
     void unload();
     bool is_loaded() const { return loaded_; }
 

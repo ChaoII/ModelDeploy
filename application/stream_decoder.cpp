@@ -230,6 +230,79 @@ void StreamDecoder::decode_loop() {
     av_frame_free(&sw_frame);
 }
 
+// ── 同步帧读取（流水线线程直调，不经过 decode_loop） ──
+
+bool StreamDecoder::read_one_frame(DecodedFrame* out) {
+    if (!fmt_ctx_ || !out) return false;
+
+    // 延迟分配缓冲
+    if (!read_pkt_) read_pkt_ = av_packet_alloc();
+    if (!read_hw_frame_) read_hw_frame_ = av_frame_alloc();
+    if (!read_sw_frame_) read_sw_frame_ = av_frame_alloc();
+    av_frame_unref(read_hw_frame_);
+    av_frame_unref(read_sw_frame_);
+
+    while (true) {
+        // 先尝试从解码器中取出已缓存的帧
+        int ret = avcodec_receive_frame(dec_ctx_, read_hw_frame_);
+        if (ret == 0) {
+            // 成功拿到一帧
+            AVFrame* out_frame = read_hw_frame_;
+            if (read_hw_frame_->hw_frames_ctx) {
+                // GPU 帧 → 下载到 CPU
+                read_sw_frame_->format = AV_PIX_FMT_NV12;
+                read_sw_frame_->width = read_hw_frame_->width;
+                read_sw_frame_->height = read_hw_frame_->height;
+                if (av_frame_get_buffer(read_sw_frame_, 0) < 0) continue;
+                if (av_hwframe_transfer_data(read_sw_frame_, read_hw_frame_, 0) == 0)
+                    out_frame = read_sw_frame_;
+            }
+            out->y_plane = out_frame->data[0];
+            out->uv_plane = out_frame->data[1];
+            out->width = out_frame->width;
+            out->height = out_frame->height;
+            out->y_step = out_frame->linesize[0];
+            out->uv_step = out_frame->linesize[1];
+            out->pts = out_frame->pts;
+            return true;
+        }
+        if (ret == AVERROR(EAGAIN)) {
+            // 解码器需要更多数据 → 读下一个 packet
+            av_packet_unref(read_pkt_);
+            if (fmt_ctx_) {
+                fmt_ctx_->interrupt_callback.callback = &StreamDecoder::interrupt_callback;
+                fmt_ctx_->interrupt_callback.opaque = this;
+            }
+            last_read_time_ = av_gettime_relative();
+            int r = av_read_frame(fmt_ctx_, read_pkt_);
+            if (r < 0) {
+                if (r == AVERROR_EOF && !is_network_url(url_)) {
+                    return false; // 文件正常结束
+                }
+                // 网络流错误/EOF → 触发重连
+                if (is_network_url(url_) && reconnect_attempts_ < cfg_.max_reconnects) {
+                    if (reconnect()) { reconnect_attempts_ = 0; continue; }
+                    else { ++reconnect_attempts_; std::this_thread::sleep_for(
+                        std::chrono::milliseconds(cfg_.reconnect_delay_ms)); continue; }
+                }
+                return false;
+            }
+            reconnect_attempts_ = 0;
+            if (read_pkt_->stream_index != video_stream_idx_) { continue; }
+
+            std::lock_guard<std::mutex> lock(ctx_mtx_);
+            if (!dec_ctx_) return false;
+            if (avcodec_send_packet(dec_ctx_, read_pkt_) < 0) {
+                av_packet_unref(read_pkt_);
+                continue;
+            }
+            continue; // 回 loop 头尝试 receive
+        }
+        // receive 返回其他错误
+        return false;
+    }
+}
+
 bool StreamDecoder::reconnect() {
     std::lock_guard<std::mutex> lock(ctx_mtx_);
     cleanup();

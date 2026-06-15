@@ -131,6 +131,16 @@ bool InferenceEngine::clone_detection_from(
     return true;
 }
 
+void InferenceEngine::adopt_face_model(
+    std::unique_ptr<face::Scrfd> model, const ModelConfig& cfg) {
+    if (loaded_) this->unload();
+    cfg_ = cfg;
+    face_model_ = std::move(model);
+    loaded_ = true;
+    std::cout << "[InferenceEngine] Adopted face: " << cfg.name
+              << " (shared ORT session)" << std::endl;
+}
+
 void InferenceEngine::unload() {
     det_model_.reset();
     cls_model_.reset();

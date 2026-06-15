@@ -1,10 +1,16 @@
 #include "pipeline_manager.hpp"
+#include "csrc/vision/face/face_det/scrfd.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+using namespace modeldeploy;
+using namespace modeldeploy::vision;
+using modeldeploy::vision::detection::UltralyticsDet;
+using modeldeploy::vision::face::Scrfd;
 
 // ── helper: 根据 ModelConfig 创建 RuntimeOption ──
 static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
@@ -48,11 +54,11 @@ PipelineManager::~PipelineManager() {
     stop_all();
 }
 
-// ── 模型工厂（prototype 缓存 + clone 共享 ORT Session） ──
+// ── 模型工厂（prototype 缓存 + clone 共享 Runtime） ──
 
 std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfig& cfg) {
-    if (cfg.type != "detection") {
-        // 人脸/分类模型不自持 clone，直接独立加载
+    // 分类模型不支持 clone，直接独立加载
+    if (cfg.type == "classification") {
         auto eng = std::make_unique<InferenceEngine>();
         eng->load(cfg);
         return eng;
@@ -61,40 +67,71 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
     std::string key = InferenceEngine::make_cache_key(cfg);
     std::lock_guard<std::mutex> lock(proto_mtx_);
 
-    auto it = det_prototypes_.find(key);
-    if (it != det_prototypes_.end() && it->second.model && it->second.model->is_initialized()) {
-        // 从 prototype clone → 共享 ORT Session，独立 pre/post
+    // 检查是否已有 prototype
+    auto it = model_prototypes_.find(key);
+    if (it != model_prototypes_.end()) {
+        auto& proto = it->second;
         auto eng = std::make_unique<InferenceEngine>();
-        if (eng->clone_detection_from(*it->second.model, cfg)) {
-            std::cout << "[Manager] Engine cloned from prototype: " << cfg.name << std::endl;
+        if (cfg.type == "detection" && proto.det && proto.det->is_initialized()) {
+            eng->clone_detection_from(*proto.det, cfg);
+            std::cout << "[Manager] Cloned detection: " << cfg.name << std::endl;
+        } else if (cfg.type == "face_detection" && proto.face && proto.face->is_initialized()) {
+            auto cloned = proto.face->clone(); // 共享 Runtime，独立 pre/post
+            if (cloned && cloned->is_initialized()) {
+                if (cfg.input_size.size() == 2)
+                    cloned->get_preprocessor().set_size(cfg.input_size);
+                // 走 InferenceEngine 的 face 路径
+                eng->adopt_face_model(std::move(cloned), cfg);
+                std::cout << "[Manager] Cloned face: " << cfg.name << std::endl;
+            }
+        }
+        if (eng->is_loaded()) return eng;
+    }
+
+    // 首次加载
+    auto opt = build_runtime_option(cfg);
+    ModelPrototype proto;
+    proto.key = key;
+
+    if (cfg.type == "detection") {
+        proto.det = std::make_unique<detection::UltralyticsDet>(cfg.path, opt);
+        if (!proto.det->is_initialized()) {
+            std::cerr << "[Manager] Failed to load detection: " << cfg.path << std::endl;
+            auto eng = std::make_unique<InferenceEngine>(); eng->load(cfg);
             return eng;
         }
-    }
+        if (cfg.input_size.size() == 2) proto.det->get_preprocessor().set_size(cfg.input_size);
+        if (cfg.device == "gpu") proto.det->get_preprocessor().use_cuda_preproc();
 
-    // 首次加载：创建新 prototype
-    auto opt = build_runtime_option(cfg);
-    auto proto = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>(
-        cfg.path, opt);
-    if (!proto->is_initialized()) {
-        std::cerr << "[Manager] Failed to load detection prototype: " << cfg.path << std::endl;
+        model_prototypes_[key] = std::move(proto);
+        auto& lp = model_prototypes_[key].det;
         auto eng = std::make_unique<InferenceEngine>();
-        eng->load(cfg);
+        eng->clone_detection_from(*lp, cfg);
+        std::cout << "[Manager] Created detection prototype: " << cfg.name << std::endl;
         return eng;
     }
-    if (cfg.input_size.size() == 2) {
-        proto->get_preprocessor().set_size(cfg.input_size);
-    }
-    if (cfg.device == "gpu") {
-        proto->get_preprocessor().use_cuda_preproc();
+
+    if (cfg.type == "face_detection") {
+        auto face_opt = build_runtime_option(cfg);
+        using modeldeploy::vision::face::Scrfd;
+        proto.face = std::unique_ptr<Scrfd>(new Scrfd(cfg.path, face_opt));
+        if (!proto.face->is_initialized()) {
+            std::cerr << "[Manager] Failed to load face: " << cfg.path << std::endl;
+            auto eng = std::make_unique<InferenceEngine>(); eng->load(cfg);
+            return eng;
+        }
+        if (cfg.input_size.size() == 2) proto.face->get_preprocessor().set_size(cfg.input_size);
+
+        model_prototypes_[key] = std::move(proto);
+        auto& lp = model_prototypes_[key].face;
+        auto cloned = lp->clone();
+        auto eng = std::make_unique<InferenceEngine>();
+        eng->adopt_face_model(std::move(cloned), cfg);
+        std::cout << "[Manager] Created face prototype: " << cfg.name << std::endl;
+        return eng;
     }
 
-    det_prototypes_[key] = {key, std::move(proto)};
-    std::cout << "[Manager] Created detection prototype: " << cfg.name << std::endl;
-
-    // 从 prototype clone 给当前路径
-    auto& loaded_proto = det_prototypes_[key].model;
-    auto eng = std::make_unique<InferenceEngine>();
-    eng->clone_detection_from(*loaded_proto, cfg);
+    auto eng = std::make_unique<InferenceEngine>(); eng->load(cfg);
     return eng;
 }
 
