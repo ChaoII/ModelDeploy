@@ -2,42 +2,33 @@
 #include "csrc/vision/common/image_data.h"
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include <future>
+#include <cuda_runtime.h>
 
 using namespace modeldeploy::vision;
 
-InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory)
-    : cfg_(cfg), factory_(factory), frame_pool_(32) {
+InferGroup::InferGroup(const TaskConfig& cfg)
+    : cfg_(cfg), frame_pool_(32) {
 }
 
 InferGroup::~InferGroup() {
+    stop_workers();
     engines_.clear();
 }
 
 bool InferGroup::init() {
     for (const auto& mcfg : cfg_.models) {
-        std::shared_ptr<InferenceEngine> engine;
-        if (factory_) {
-            // 通过模型注册表获取（共享显存）
-            engine = factory_(mcfg);
-        } else {
-            // 没有注册表时自己加载
-            auto e = std::make_shared<InferenceEngine>();
-            if (!e->load(mcfg)) {
-                std::cerr << "[InferGroup] Failed to load model: " << mcfg.name << std::endl;
-                return false;
-            }
-            engine = e;
-        }
-        if (!engine || !engine->is_loaded()) {
-            std::cerr << "[InferGroup] Model not loaded: " << mcfg.name << std::endl;
+        auto engine = std::make_unique<InferenceEngine>();
+        if (!engine->load(mcfg)) {
+            std::cerr << "[InferGroup] Failed to load model: " << mcfg.name << std::endl;
             return false;
         }
         engines_.push_back(std::move(engine));
         frame_counters_.push_back(0);
     }
-    initialized_ = !engines_.empty();
-    return initialized_;
+    if (engines_.empty()) return false;
+    start_workers();
+    initialized_ = true;
+    return true;
 }
 
 bool InferGroup::ready() const {
@@ -48,6 +39,51 @@ bool InferGroup::should_process(size_t idx) {
     return (++frame_counters_[idx]) % engines_[idx]->config().interval == 0;
 }
 
+void InferGroup::worker_loop(Worker* w) {
+    cudaSetDevice(0); // 与主线程同 CUDA context
+    for (;;) {
+        std::function<void()> task;
+        {
+            std::unique_lock<std::mutex> lock(w->mtx);
+            w->cv_in.wait(lock, [w]() { return w->has_task || w->stop; });
+            if (w->stop && !w->has_task) return;
+            task = std::move(w->task);
+            w->has_task = false;
+        }
+        try { task(); } catch (...) {}
+        {
+            std::lock_guard<std::mutex> lock(w->mtx);
+            w->done = true;
+        }
+        w->cv_out.notify_one();
+    }
+}
+
+void InferGroup::start_workers() {
+    workers_.clear();
+    workers_.reserve(engines_.size());
+    for (size_t i = 0; i < engines_.size(); ++i) {
+        auto w = std::make_unique<Worker>();
+        Worker* wp = w.get();
+        w->thread = std::thread([this, wp]() { this->worker_loop(wp); });
+        workers_.push_back(std::move(w));
+    }
+}
+
+void InferGroup::stop_workers() {
+    for (auto& w : workers_) {
+        {
+            std::lock_guard<std::mutex> lock(w->mtx);
+            w->stop = true;
+        }
+        w->cv_in.notify_one();
+    }
+    for (auto& w : workers_) {
+        if (w->thread.joinable()) w->thread.join();
+    }
+    workers_.clear();
+}
+
 bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                              int width, int height, int y_step, int uv_step,
                              std::vector<InferResult>* results,
@@ -55,6 +91,7 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     if (!initialized_) return false;
     results->clear();
 
+    // ── NV12 → BGR（CPU 一次，所有模型复用） ──
     size_t y_size = static_cast<size_t>(height) * width;
     size_t uv_size = y_size / 2;
     size_t total = y_size + uv_size;
@@ -70,17 +107,17 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
 
     if (frame_out)
-        *frame_out = bgr_image.clone();
+        *frame_out = bgr_image; // ImageData 浅拷贝
 
-    // ── 多模型并行推理（GPU 可同时执行不同 CUDA Session） ──
+    // ── 多模型并行推理（每模型独立 worker，GPU 上的 CUDA kernel 可并发执行） ──
     struct ModelTask {
         size_t index;
         ImageData input;
         InferResult result;
         int64_t dt_us = 0;
+        bool used = false;
     };
-    std::vector<ModelTask> tasks;
-    tasks.reserve(engines_.size());
+    std::vector<ModelTask> tasks(engines_.size());
 
     for (size_t i = 0; i < engines_.size(); ++i) {
         if (!should_process(i)) continue;
@@ -95,26 +132,42 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
             input_image = bgr_image.crop(roi_rect);
             if (input_image.empty()) continue;
         }
-        tasks.push_back({i, std::move(input_image), InferResult{}, 0});
+        tasks[i].index = i;
+        tasks[i].input = std::move(input_image);
+        tasks[i].used = true;
     }
 
-    // 同时发射所有推理任务 → GPU 并发执行 CUDA kernel
-    {
-        std::vector<std::future<void>> futures;
-        futures.reserve(tasks.size());
-        for (auto& task : tasks) {
-            auto& engine = engines_[task.index];
-            futures.push_back(std::async(std::launch::async, [&engine, &task]() {
+    // 派发到 worker 池
+    for (size_t i = 0; i < tasks.size(); ++i) {
+        if (!tasks[i].used) continue;
+        auto& w = workers_[i];
+        auto& engine = engines_[i];
+        ModelTask* tp = &tasks[i];
+        {
+            std::lock_guard<std::mutex> lock(w->mtx);
+            w->done = false;
+            w->has_task = true;
+            w->task = [&engine, tp]() {
                 auto t0 = std::chrono::steady_clock::now();
-                engine->infer(task.input, &task.result);
-                task.dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                engine->infer(tp->input, &tp->result);
+                tp->dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now() - t0).count();
-            }));
+            };
         }
-        for (auto& f : futures) f.wait();
+        w->cv_in.notify_one();
     }
 
+    // 等待全部完成
+    for (size_t i = 0; i < tasks.size(); ++i) {
+        if (!tasks[i].used) continue;
+        auto& w = workers_[i];
+        std::unique_lock<std::mutex> lock(w->mtx);
+        w->cv_out.wait(lock, [&w]() { return w->done; });
+    }
+
+    // 收集结果
     for (auto& task : tasks) {
+        if (!task.used) continue;
         if (!task.result.boxes.empty())
             results->push_back(std::move(task.result));
         stats_.record_frame(0, task.dt_us, 0, 0);
@@ -124,25 +177,23 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
 }
 
 bool InferGroup::add_model(const ModelConfig& mcfg) {
-    std::shared_ptr<InferenceEngine> engine;
-    if (factory_) {
-        engine = factory_(mcfg);
-    } else {
-        auto e = std::make_shared<InferenceEngine>();
-        if (!e->load(mcfg)) return false;
-        engine = e;
-    }
-    if (!engine || !engine->is_loaded()) return false;
+    auto engine = std::make_unique<InferenceEngine>();
+    if (!engine->load(mcfg)) return false;
+    // 重启 worker 池以匹配新模型数量
+    stop_workers();
     engines_.push_back(std::move(engine));
     frame_counters_.push_back(0);
+    start_workers();
     return true;
 }
 
 bool InferGroup::remove_model(const std::string& name) {
     for (size_t i = 0; i < engines_.size(); ++i) {
         if (engines_[i]->config().name == name) {
+            stop_workers();
             engines_.erase(engines_.begin() + i);
             frame_counters_.erase(frame_counters_.begin() + i);
+            start_workers();
             return true;
         }
     }
@@ -152,20 +203,11 @@ bool InferGroup::remove_model(const std::string& name) {
 bool InferGroup::update_model(const std::string& name, const ModelConfig& mcfg) {
     for (auto& eng : engines_) {
         if (eng->config().name == name) {
-            // 重新创建：让 factory 决定是否复用
-            std::shared_ptr<InferenceEngine> new_eng;
-            if (factory_) {
-                new_eng = factory_(mcfg);
-            } else {
-                auto e = std::make_shared<InferenceEngine>();
-                e->load(mcfg);
-                new_eng = e;
-            }
-            if (new_eng && new_eng->is_loaded()) {
-                eng = std::move(new_eng);
-                return true;
-            }
-            return false;
+            stop_workers();
+            eng->unload();
+            bool ok = eng->load(mcfg);
+            start_workers();
+            return ok;
         }
     }
     return false;

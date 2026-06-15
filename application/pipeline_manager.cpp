@@ -6,35 +6,6 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-// ── 模型注册表 ──
-
-std::shared_ptr<InferenceEngine> PipelineManager::get_or_create_model(const ModelConfig& mcfg) {
-    std::string key = InferenceEngine::make_key(mcfg);
-    std::lock_guard<std::mutex> lock(registry_mtx_);
-    auto it = model_registry_.find(key);
-    if (it != model_registry_.end()) {
-        if (it->second && it->second->is_loaded()) {
-            std::cout << "[ModelRegistry] Reused: " << key << std::endl;
-            return it->second;
-        }
-        // stale entry
-        model_registry_.erase(it);
-    }
-    auto engine = std::make_shared<InferenceEngine>();
-    if (!engine->load(mcfg)) {
-        std::cerr << "[ModelRegistry] Failed to load: " << key << std::endl;
-        return nullptr;
-    }
-    model_registry_[key] = engine;
-    std::cout << "[ModelRegistry] Created: " << key << std::endl;
-    return engine;
-}
-
-void PipelineManager::clear_model_registry() {
-    std::lock_guard<std::mutex> lock(registry_mtx_);
-    model_registry_.clear();
-}
-
 PipelineManager::~PipelineManager() {
     stop_all();
 }
@@ -57,11 +28,9 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
         if (err) *err = "task already exists";
         return false;
     }
-    // 使用模型注册表工厂，同一模型在不同任务间共享显存
-    Pipeline::ModelFactory factory = [this](const ModelConfig& mcfg) -> std::shared_ptr<InferenceEngine> {
-        return this->get_or_create_model(mcfg);
-    };
-    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, std::move(factory));
+    // 每路独立加载模型实例（依赖 TRT engine cache 共享编译产物）
+    // 解码器通过 StreamHub 共享：相同 url+config 的多路任务复用同一解码器
+    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_);
     dirty_ = true;
     std::cout << "[Manager] Task created: " << cfg.id << std::endl;
     return true;
@@ -180,8 +149,6 @@ void PipelineManager::stop_all() {
     }
     pipelines_.clear();
     dirty_ = true;
-    // 清空模型注册表释放显存
-    clear_model_registry();
 }
 
 // ── 模型库管理 ──

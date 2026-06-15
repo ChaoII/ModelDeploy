@@ -8,28 +8,41 @@
 #include <mutex>
 #include <condition_variable>
 #include <vector>
-#include <functional>
 
 #include "config.hpp"
 #include "perf_stats.hpp"
 #include "stream_decoder.hpp"
+#include "stream_hub.hpp"
 #include "infer_group.hpp"
 #include "draw_engine.hpp"
 #include "stream_encoder.hpp"
 
+namespace modeldeploy { namespace vision { class ImageData; } }
+
 /// 待处理帧（解码线程→流水线线程）
+/// 优先持有 BroadcastFrame 引用避免拷贝；若来自独占解码器则用 nv12_data
 struct PendingFrame {
-    std::vector<uint8_t> nv12_data;
+    std::shared_ptr<BroadcastFrame> shared_frame; // 来自 StreamHub（零拷贝）
+    std::vector<uint8_t> nv12_data;               // 独占模式才用
     int width = 0, height = 0;
+
+    const uint8_t* y_ptr() const {
+        if (shared_frame) return shared_frame->nv12_data.data();
+        return nv12_data.data();
+    }
+    const uint8_t* uv_ptr() const {
+        size_t y_size = static_cast<size_t>(height) * width;
+        if (shared_frame) return shared_frame->nv12_data.data() + y_size;
+        return nv12_data.data() + y_size;
+    }
 };
 
 /// 单路视频流水线：decoder → infer_group → draw → encoder
 class Pipeline {
 public:
-    /// 模型工厂：给定配置，返回共享或新建的模型实例
-    using ModelFactory = std::function<std::shared_ptr<InferenceEngine>(const ModelConfig&)>;
-
-    explicit Pipeline(TaskConfig cfg, ModelFactory model_factory = nullptr);
+    /// 不传 hub 时自己创建 StreamDecoder（独占模式）
+    /// 传 hub 时通过 hub 订阅共享解码源（推荐）
+    explicit Pipeline(TaskConfig cfg, StreamHub* hub = nullptr);
     ~Pipeline();
 
     /// 启动流水线（返回后流水线在后台初始化）
@@ -60,8 +73,10 @@ public:
 
 private:
     TaskConfig cfg_;
-    ModelFactory model_factory_;
-    std::unique_ptr<StreamDecoder> decoder_;
+    StreamHub* hub_ = nullptr;                    // 流共享中心（可选）
+    std::shared_ptr<SharedSource> shared_source_; // 当前订阅的源
+    uint64_t shared_token_ = 0;                   // 订阅 token
+    std::unique_ptr<StreamDecoder> decoder_;      // 独占模式才用
     std::unique_ptr<InferGroup> infer_group_;
     std::unique_ptr<DrawEngine> draw_engine_;
     std::unique_ptr<StreamEncoder> encoder_;
@@ -70,10 +85,9 @@ private:
     std::atomic<bool> initialized_{false};
     std::string init_error_;
 
-    // 最新一帧（BGR cv::Mat 数据）用于快照
+    // 最新一帧（ImageData 浅拷贝，shared_ptr 内部管理生命周期）
     std::mutex snapshot_mtx_;
-    std::vector<uint8_t> latest_bgr_data_;
-    int latest_w_ = 0, latest_h_ = 0;
+    std::shared_ptr<modeldeploy::vision::ImageData> latest_bgr_;
 
     std::atomic<bool> running_{false};
     std::thread pipeline_thread_;
@@ -83,14 +97,17 @@ private:
     std::mutex queue_mtx_;
     std::condition_variable queue_cv_;
     std::condition_variable queue_not_full_cv_;
-    size_t max_queue_size_ = 3; // keep small to avoid stale frames
+    size_t max_queue_size_ = 3;
     bool block_on_queue_full_ = false; // 文件输入时阻塞，避免丢帧
 
     /// 计算合理的帧队列大小（按模型数量自适应）
     size_t calc_queue_size() const;
 
-    /// 解码帧回调（解码线程调用）
+    /// 解码帧回调（解码线程调用，独占模式）
     bool on_decoded_frame(const DecodedFrame& frame);
+
+    /// 共享源帧回调（StreamHub 模式）
+    bool on_shared_frame(const std::shared_ptr<BroadcastFrame>& frame);
 
     /// 流水线主循环
     void pipeline_loop();

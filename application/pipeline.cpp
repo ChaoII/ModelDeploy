@@ -15,9 +15,9 @@ static bool is_network_url(const std::string& url) {
            url.find("udp://") == 0 || url.find("tcp://") == 0;
 }
 
-Pipeline::Pipeline(TaskConfig cfg, ModelFactory model_factory)
+Pipeline::Pipeline(TaskConfig cfg, StreamHub* hub)
     : cfg_(std::move(cfg)),
-      model_factory_(std::move(model_factory)),
+      hub_(hub),
       block_on_queue_full_(!is_network_url(cfg_.input_url)) {
     // 自适应队列大小：模型越多，流水线耗时越长，需要更大的队列缓冲
     max_queue_size_ = calc_queue_size();
@@ -70,6 +70,11 @@ void Pipeline::stop() {
 
 void Pipeline::release_resources() {
     // 线程结束后才能安全释放
+    if (shared_source_ && shared_token_) {
+        shared_source_->unsubscribe(shared_token_);
+        shared_token_ = 0;
+    }
+    shared_source_.reset();
     decoder_.reset();
     infer_group_.reset();
     draw_engine_.reset();
@@ -87,6 +92,28 @@ void Pipeline::release_resources() {
         std::queue<PendingFrame> empty;
         frame_queue_.swap(empty);
     }
+}
+
+// ── 共享源帧回调（StreamHub 模式） ──
+bool Pipeline::on_shared_frame(const std::shared_ptr<BroadcastFrame>& frame) {
+    if (!running_.load() || !frame) return false;
+    try {
+        PendingFrame pf;
+        pf.width = frame->width;
+        pf.height = frame->height;
+        pf.shared_frame = frame; // 零拷贝：多订阅者共享同一份 NV12 数据
+
+        std::unique_lock<std::mutex> lock(queue_mtx_);
+        if (frame_queue_.size() >= max_queue_size_) {
+            return running_.load(); // 慢消费者：丢帧，不阻塞 SharedSource
+        }
+        frame_queue_.push(std::move(pf));
+        lock.unlock();
+        queue_cv_.notify_one();
+    } catch (const std::exception& e) {
+        std::cerr << "[Pipeline] Shared callback error: " << e.what() << std::endl;
+    }
+    return running_.load();
 }
 
 // ── 解码回调（解码线程） ─────────────────────
@@ -154,7 +181,7 @@ void Pipeline::pipeline_loop() {
 
     try {
         // 1) InferGroup
-        infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_);
+        infer_group_ = std::make_unique<InferGroup>(cfg_);
         if (!infer_group_->init()) {
             init_error_ = "InferGroup init failed";
             std::cerr << "[Pipeline] " << init_error_ << std::endl;
@@ -168,24 +195,42 @@ void Pipeline::pipeline_loop() {
         // 3) StreamEncoder
         encoder_ = std::make_unique<StreamEncoder>(cfg_.encoder);
 
-        // 4) StreamDecoder
-        decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
-        decoder_->set_callback([this](const DecodedFrame& frame) -> bool {
-            return on_decoded_frame(frame);
-        });
-
-        if (!decoder_->open(cfg_.input_url)) {
-            init_error_ = "Decoder open failed: " + cfg_.input_url;
-            std::cerr << "[Pipeline] " << init_error_ << std::endl;
-            running_ = false;
-            return;
-        }
-
-        if (!decoder_->start()) {
-            init_error_ = "Decoder start failed";
-            std::cerr << "[Pipeline] " << init_error_ << std::endl;
-            running_ = false;
-            return;
+        // 4) 解码器：StreamHub 优先，否则独立创建
+        if (hub_) {
+            auto src = hub_->acquire(cfg_.input_url, cfg_.decoder);
+            if (!src) {
+                init_error_ = "Shared source acquire failed: " + cfg_.input_url;
+                std::cerr << "[Pipeline] " << init_error_ << std::endl;
+                running_ = false;
+                return;
+            }
+            if (!src->start()) {
+                init_error_ = src->init_error();
+                std::cerr << "[Pipeline] " << init_error_ << std::endl;
+                running_ = false;
+                return;
+            }
+            shared_source_ = src;
+            shared_token_ = src->subscribe([this](const auto& f) { return on_shared_frame(f); });
+            std::cout << "[Pipeline] Using shared source: " << cfg_.id << std::endl;
+        } else {
+            // 独占模式
+            decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
+            decoder_->set_callback([this](const DecodedFrame& frame) -> bool {
+                return on_decoded_frame(frame);
+            });
+            if (!decoder_->open(cfg_.input_url)) {
+                init_error_ = "Decoder open failed: " + cfg_.input_url;
+                std::cerr << "[Pipeline] " << init_error_ << std::endl;
+                running_ = false;
+                return;
+            }
+            if (!decoder_->start()) {
+                init_error_ = "Decoder start failed";
+                std::cerr << "[Pipeline] " << init_error_ << std::endl;
+                running_ = false;
+                return;
+            }
         }
 
         initialized_ = true;
@@ -206,7 +251,7 @@ void Pipeline::pipeline_loop() {
             }
             queue_not_full_cv_.notify_one();
 
-            process_frame(pf.nv12_data.data(), pf.width, pf.height);
+            process_frame(pf.y_ptr(), pf.width, pf.height);
         }
 
     } catch (const std::exception& e) {
@@ -218,6 +263,10 @@ void Pipeline::pipeline_loop() {
     }
 
     // 流水线线程自行停止解码与编码
+    if (shared_source_ && shared_token_) {
+        shared_source_->unsubscribe(shared_token_);
+        shared_token_ = 0;
+    }
     if (decoder_) decoder_->stop();
     if (encoder_) {
         encoder_->stop_async();
@@ -266,22 +315,12 @@ bool Pipeline::process_frame(const uint8_t* nv12, int width, int height) {
         if (!bgr_image.empty()) {
             encoder_->encode_async(bgr_image);
 
-            // 缓存最新一帧供快照接口使用（仅保存 BGR 原始数据）
-            try {
-                cv::Mat mat;
-                bgr_image.to_mat(mat, true);
-                if (!mat.empty()) {
-                    cv::Mat bgr;
-                    if (mat.channels() == 4)      cv::cvtColor(mat, bgr, cv::COLOR_BGRA2BGR);
-                    else if (mat.channels() == 1) cv::cvtColor(mat, bgr, cv::COLOR_GRAY2BGR);
-                    else                           bgr = mat;
-                    std::lock_guard<std::mutex> lock(snapshot_mtx_);
-                    latest_w_ = bgr.cols;
-                    latest_h_ = bgr.rows;
-                    size_t sz = static_cast<size_t>(bgr.cols) * bgr.rows * 3;
-                    latest_bgr_data_.assign(bgr.data, bgr.data + sz);
-                }
-            } catch (...) {}
+            // 缓存最新一帧供快照接口使用（ImageData 浅拷贝，shared_ptr 内部管理）
+            // 不再每帧 to_mat + 全量拷贝，节省内存带宽
+            {
+                std::lock_guard<std::mutex> lock(snapshot_mtx_);
+                latest_bgr_ = std::make_shared<ImageData>(bgr_image);
+            }
         }
 
         auto t3 = std::chrono::steady_clock::now();
@@ -315,12 +354,19 @@ bool Pipeline::update_model(const std::string& name, const ModelConfig& mcfg) {
 
 bool Pipeline::latest_jpeg(std::vector<uint8_t>* out, int quality) {
     if (!out) return false;
-    cv::Mat bgr;
+    std::shared_ptr<ImageData> snap;
     {
         std::lock_guard<std::mutex> lock(snapshot_mtx_);
-        if (latest_bgr_data_.empty() || latest_w_ <= 0 || latest_h_ <= 0) return false;
-        bgr = cv::Mat(latest_h_, latest_w_, CV_8UC3, latest_bgr_data_.data()).clone();
+        if (!latest_bgr_ || latest_bgr_->empty()) return false;
+        snap = latest_bgr_; // 浅拷贝 shared_ptr
     }
+    cv::Mat mat;
+    snap->to_mat(mat, true); // 仅在 HTTP 请求快照时才深拷贝
+    if (mat.empty()) return false;
+    cv::Mat bgr;
+    if (mat.channels() == 4) cv::cvtColor(mat, bgr, cv::COLOR_BGRA2BGR);
+    else if (mat.channels() == 1) cv::cvtColor(mat, bgr, cv::COLOR_GRAY2BGR);
+    else bgr = mat;
     std::vector<int> params = { cv::IMWRITE_JPEG_QUALITY, quality };
     return cv::imencode(".jpg", bgr, *out, params);
 }

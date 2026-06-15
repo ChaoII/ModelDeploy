@@ -7,6 +7,7 @@
 
 #include "config.hpp"
 #include "pipeline.hpp"
+#include "stream_hub.hpp"
 
 /// 任务状态摘要
 struct TaskStatus {
@@ -87,19 +88,10 @@ public:
     bool is_dirty() const { return dirty_.load(); }
     void mark_clean() { dirty_ = false; }
 
-    // ── 模型注册表（跨任务共享同一模型实例，节省显存） ──
-    /// 根据模型配置获取或创建共享模型实例
-    std::shared_ptr<InferenceEngine> get_or_create_model(const ModelConfig& cfg);
-    /// 清空模型注册表（stop_all 时调用）
-    void clear_model_registry();
-
 private:
     mutable std::mutex mtx_;
     std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
     std::vector<ModelConfig> model_library_;  // 全局模型库
     std::atomic<bool> dirty_{false};
-
-    // 模型注册表：key = InferenceEngine::make_key(cfg) → 共享实例
-    std::map<std::string, std::shared_ptr<InferenceEngine>> model_registry_;
-    std::mutex registry_mtx_;
+    StreamHub stream_hub_;  // 流共享中心
 };

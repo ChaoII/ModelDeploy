@@ -4,7 +4,6 @@
 #include "csrc/vision/common/struct.h"
 #include <iostream>
 #include <filesystem>
-#include <mutex>
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -104,10 +103,6 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     return true;
 }
 
-std::string InferenceEngine::make_key(const ModelConfig& cfg) {
-    return cfg.path + "|" + cfg.backend + "|" + cfg.device + "|" + cfg.type;
-}
-
 void InferenceEngine::unload() {
     det_model_.reset();
     cls_model_.reset();
@@ -117,7 +112,6 @@ void InferenceEngine::unload() {
 
 bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
     if (!loaded_ || !result) return false;
-    std::lock_guard<std::mutex> lock(mtx_); // 多路共享时的线程安全
     result->model_name = cfg_.name;
     result->type = cfg_.type;
 

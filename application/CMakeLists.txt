@@ -31,6 +31,7 @@ set(APP_SOURCES
         pipeline_manager.cpp
         pipeline.cpp
         stream_decoder.cpp
+        stream_hub.cpp
         inference_engine.cpp
         infer_group.cpp
         draw_engine.cpp

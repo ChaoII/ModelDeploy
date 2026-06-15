@@ -34,8 +34,8 @@ struct DecoderConfig {
 // ==================== 编码器配置 ====================
 struct EncoderConfig {
     int fps = 25;
-    int bitrate_kbps = 4000;              // 平均码率 (kbps)
-    int gop = 50;                         // 关键帧间隔
+    int bitrate_kbps = 2500;              // 平均码率 (kbps)，预览路 2.5Mbps 足够
+    int gop = 12;                         // 关键帧间隔（约 0.5 秒/I 帧，flv.js 快速首帧）
     std::string codec = "auto";           // auto / libx264 / h264_nvenc
     std::string preset = "ultrafast";     // x264: ultrafast..veryslow ; nvenc: p1..p7
     std::string tune = "zerolatency";     // x264 only

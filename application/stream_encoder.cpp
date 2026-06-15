@@ -53,15 +53,16 @@ void StreamEncoder::close() {
 }
 
 bool StreamEncoder::init_encoder(int width, int height) {
-    // 编码器选择：cfg.codec=auto 时优先 libx264 → h264_nvenc → 默认 H264
+    // 编码器选择：cfg.codec=auto 时优先 h264_nvenc → libx264 → 默认 H264
     const AVCodec* codec = nullptr;
     if (cfg_.codec == "libx264" || cfg_.codec == "x264") {
         codec = avcodec_find_encoder_by_name("libx264");
     } else if (cfg_.codec == "h264_nvenc" || cfg_.codec == "nvenc") {
         codec = avcodec_find_encoder_by_name("h264_nvenc");
     } else {
-        codec = avcodec_find_encoder_by_name("libx264");
-        if (!codec) codec = avcodec_find_encoder_by_name("h264_nvenc");
+        // auto: 优先 NVENC（GPU 编码不占 CPU），失败回退 libx264
+        codec = avcodec_find_encoder_by_name("h264_nvenc");
+        if (!codec) codec = avcodec_find_encoder_by_name("libx264");
     }
     if (!codec) codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     if (!codec) {
