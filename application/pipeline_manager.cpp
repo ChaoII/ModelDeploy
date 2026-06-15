@@ -6,8 +6,96 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
+// ── helper: 根据 ModelConfig 创建 RuntimeOption ──
+static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
+    modeldeploy::RuntimeOption opt;
+    if (cfg.device == "gpu") opt.use_gpu(0);
+    opt.set_cpu_thread_num(4);
+    if (cfg.backend == "trt" || cfg.backend == "tensorrt") {
+        opt.use_trt_backend();
+        std::string cache_dir = "data/trt_cache";
+        try { std::filesystem::create_directories(cache_dir); } catch (...) {}
+        std::string model_name = cfg.path.substr(cfg.path.find_last_of("/\\") + 1);
+        opt.trt_option.cache_file_path = cache_dir + "/" + model_name + ".engine";
+        opt.trt_option.enable_fp16 = true;
+        opt.trt_option.max_workspace_size = 1ULL << 30;
+        if (cfg.input_size.size() == 2) {
+            std::string s = "1x3x" + std::to_string(cfg.input_size[0]) + "x" + std::to_string(cfg.input_size[1]);
+            opt.set_trt_min_shape(s); opt.set_trt_opt_shape(s); opt.set_trt_max_shape(s);
+        }
+    } else if (cfg.backend == "mnn") {
+        opt.use_mnn_backend();
+    } else {
+        opt.use_ort_backend();
+        if (cfg.device == "gpu") {
+            opt.ort_option.enable_trt = true;
+            std::string cache_dir = "data/ort_trt_cache";
+            try { std::filesystem::create_directories(cache_dir); } catch (...) {}
+            opt.ort_option.trt_engine_cache_path = cache_dir;
+            if (cfg.input_size.size() == 2) {
+                int w = cfg.input_size[0], h = cfg.input_size[1];
+                std::string shape = "1x3x" + std::to_string(h) + "x" + std::to_string(w);
+                opt.ort_option.trt_min_shape = shape;
+                opt.ort_option.trt_opt_shape = shape;
+                opt.ort_option.trt_max_shape = shape;
+            }
+        }
+    }
+    return opt;
+}
+
 PipelineManager::~PipelineManager() {
     stop_all();
+}
+
+// ── 模型工厂（prototype 缓存 + clone 共享 ORT Session） ──
+
+std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfig& cfg) {
+    if (cfg.type != "detection") {
+        // 人脸/分类模型不自持 clone，直接独立加载
+        auto eng = std::make_unique<InferenceEngine>();
+        eng->load(cfg);
+        return eng;
+    }
+
+    std::string key = InferenceEngine::make_cache_key(cfg);
+    std::lock_guard<std::mutex> lock(proto_mtx_);
+
+    auto it = det_prototypes_.find(key);
+    if (it != det_prototypes_.end() && it->second.model && it->second.model->is_initialized()) {
+        // 从 prototype clone → 共享 ORT Session，独立 pre/post
+        auto eng = std::make_unique<InferenceEngine>();
+        if (eng->clone_detection_from(*it->second.model, cfg)) {
+            std::cout << "[Manager] Engine cloned from prototype: " << cfg.name << std::endl;
+            return eng;
+        }
+    }
+
+    // 首次加载：创建新 prototype
+    auto opt = build_runtime_option(cfg);
+    auto proto = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>(
+        cfg.path, opt);
+    if (!proto->is_initialized()) {
+        std::cerr << "[Manager] Failed to load detection prototype: " << cfg.path << std::endl;
+        auto eng = std::make_unique<InferenceEngine>();
+        eng->load(cfg);
+        return eng;
+    }
+    if (cfg.input_size.size() == 2) {
+        proto->get_preprocessor().set_size(cfg.input_size);
+    }
+    if (cfg.device == "gpu") {
+        proto->get_preprocessor().use_cuda_preproc();
+    }
+
+    det_prototypes_[key] = {key, std::move(proto)};
+    std::cout << "[Manager] Created detection prototype: " << cfg.name << std::endl;
+
+    // 从 prototype clone 给当前路径
+    auto& loaded_proto = det_prototypes_[key].model;
+    auto eng = std::make_unique<InferenceEngine>();
+    eng->clone_detection_from(*loaded_proto, cfg);
+    return eng;
 }
 
 bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
@@ -28,9 +116,14 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
         if (err) *err = "task already exists";
         return false;
     }
-    // 每路独立加载模型实例（依赖 TRT engine cache 共享编译产物）
+
+    // 模型工厂：通过 prototype cache + clone 共享 ORT Session（减少显存与 GPU 上下文切换）
+    Pipeline::ModelFactory factory = [this](const ModelConfig& mcfg) {
+        return this->create_engine(mcfg);
+    };
+
     // 解码器通过 StreamHub 共享：相同 url+config 的多路任务复用同一解码器
-    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_);
+    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory));
     dirty_ = true;
     std::cout << "[Manager] Task created: " << cfg.id << std::endl;
     return true;

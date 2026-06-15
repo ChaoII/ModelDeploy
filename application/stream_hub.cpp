@@ -51,6 +51,10 @@ uint64_t SharedSource::subscribe(FrameCallback cb) {
         std::lock_guard<std::mutex> lock(subs_mtx_);
         subscribers_[token] = std::move(cb);
     }
+    // 第一个订阅者到达时才真正启动解码（避免文件源 EOF 抢跑）
+    if (!started_.load()) {
+        start();
+    }
     return token;
 }
 
@@ -103,11 +107,24 @@ bool SharedSource::on_decoded(const DecodedFrame& f) {
 
 // ── StreamHub ────────────────────────────────────────────────
 
+static bool is_network_stream(const std::string& url) {
+    return url.find("rtsp://") == 0 || url.find("rtmp://") == 0 ||
+           url.find("http://") == 0 || url.find("https://") == 0 ||
+           url.find("udp://") == 0 || url.find("tcp://") == 0;
+}
+
 std::string StreamHub::make_key(const std::string& url, const DecoderConfig& cfg) {
     return url + "|" + cfg.rtsp_transport + "|" + cfg.hw_accel;
 }
 
 std::shared_ptr<SharedSource> StreamHub::acquire(const std::string& url, const DecoderConfig& cfg) {
+    // 仅对网络流做共享；本地文件每路独立读取（避免 EOF 抢跑）
+    if (!is_network_stream(url)) {
+        auto src = std::make_shared<SharedSource>(url, cfg);
+        std::cout << "[StreamHub] File source (independent): " << url << std::endl;
+        return src;
+    }
+
     std::string key = make_key(url, cfg);
     std::lock_guard<std::mutex> lock(mtx_);
 
@@ -122,9 +139,7 @@ std::shared_ptr<SharedSource> StreamHub::acquire(const std::string& url, const D
     }
 
     auto src = std::make_shared<SharedSource>(url, cfg);
-    if (!src->start()) {
-        return nullptr;
-    }
+    // 不立即 start：等第一个 subscribe 调用时才启动解码
     sources_[key] = src;
     std::cout << "[StreamHub] New source: " << key << std::endl;
     return src;

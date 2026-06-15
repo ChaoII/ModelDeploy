@@ -88,10 +88,21 @@ public:
     bool is_dirty() const { return dirty_.load(); }
     void mark_clean() { dirty_ = false; }
 
+    /// 模型工厂：供 Pipeline 创建 InferenceEngine 时通过 prototype cache 共享 ORT Session
+    std::unique_ptr<InferenceEngine> create_engine(const ModelConfig& cfg);
+
 private:
     mutable std::mutex mtx_;
     std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
-    std::vector<ModelConfig> model_library_;  // 全局模型库
+    std::vector<ModelConfig> model_library_;
     std::atomic<bool> dirty_{false};
-    StreamHub stream_hub_;  // 流共享中心
+    StreamHub stream_hub_;
+
+    // 模型 prototype 缓存：检测模型只加载一次，后续 clone
+    struct DetPrototype {
+        std::string key;
+        std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> model;
+    };
+    std::map<std::string, DetPrototype> det_prototypes_;
+    std::mutex proto_mtx_;
 };

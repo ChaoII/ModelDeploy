@@ -6,8 +6,8 @@
 
 using namespace modeldeploy::vision;
 
-InferGroup::InferGroup(const TaskConfig& cfg)
-    : cfg_(cfg), frame_pool_(32) {
+InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory)
+    : cfg_(cfg), factory_(factory), frame_pool_(32) {
 }
 
 InferGroup::~InferGroup() {
@@ -15,11 +15,22 @@ InferGroup::~InferGroup() {
     engines_.clear();
 }
 
+static std::unique_ptr<InferenceEngine> make_engine(
+    const ModelConfig& mcfg, InferGroup::ModelFactory& factory) {
+    if (factory) {
+        auto eng = factory(mcfg);
+        if (eng && eng->is_loaded()) return eng;
+    }
+    auto eng = std::make_unique<InferenceEngine>();
+    if (eng->load(mcfg)) return eng;
+    return nullptr;
+}
+
 bool InferGroup::init() {
     for (const auto& mcfg : cfg_.models) {
-        auto engine = std::make_unique<InferenceEngine>();
-        if (!engine->load(mcfg)) {
-            std::cerr << "[InferGroup] Failed to load model: " << mcfg.name << std::endl;
+        auto engine = make_engine(mcfg, factory_);
+        if (!engine) {
+            std::cerr << "[InferGroup] Failed to init model: " << mcfg.name << std::endl;
             return false;
         }
         engines_.push_back(std::move(engine));

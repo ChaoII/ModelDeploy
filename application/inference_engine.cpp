@@ -103,6 +103,34 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     return true;
 }
 
+std::string InferenceEngine::make_cache_key(const ModelConfig& cfg) {
+    return cfg.path + "|" + cfg.backend + "|" + cfg.device + "|" + cfg.type
+           + "|" + std::to_string(cfg.input_size[0]) + "x" + std::to_string(cfg.input_size[1]);
+}
+
+bool InferenceEngine::clone_detection_from(
+    const detection::UltralyticsDet& proto, const ModelConfig& cfg) {
+    if (loaded_) this->unload();
+    cfg_ = cfg;
+
+    // clone() = 新 instance + 共享 Runtime (含 ORT Session)
+    auto cloned = proto.clone();
+    if (!cloned || !cloned->is_initialized()) {
+        std::cerr << "[InferenceEngine] Failed to clone detection model" << std::endl;
+        return false;
+    }
+    det_model_ = std::move(cloned);
+    if (cfg_.input_size.size() == 2)
+        det_model_->get_preprocessor().set_size(cfg_.input_size);
+    if (cfg.device == "gpu")
+        det_model_->get_preprocessor().use_cuda_preproc();
+
+    loaded_ = true;
+    std::cout << "[InferenceEngine] Cloned detection: " << cfg.name
+              << " (shared ORT session)" << std::endl;
+    return true;
+}
+
 void InferenceEngine::unload() {
     det_model_.reset();
     cls_model_.reset();

@@ -40,9 +40,13 @@ struct PendingFrame {
 /// 单路视频流水线：decoder → infer_group → draw → encoder
 class Pipeline {
 public:
+    /// 模型工厂：给定配置返回新实例（优先通过 prototye clone 共享 ORT Session）
+    using ModelFactory = std::function<std::unique_ptr<InferenceEngine>(const ModelConfig&)>;
+
     /// 不传 hub 时自己创建 StreamDecoder（独占模式）
     /// 传 hub 时通过 hub 订阅共享解码源（推荐）
-    explicit Pipeline(TaskConfig cfg, StreamHub* hub = nullptr);
+    explicit Pipeline(TaskConfig cfg, StreamHub* hub = nullptr,
+                      ModelFactory model_factory = nullptr);
     ~Pipeline();
 
     /// 启动流水线（返回后流水线在后台初始化）
@@ -73,8 +77,9 @@ public:
 
 private:
     TaskConfig cfg_;
-    StreamHub* hub_ = nullptr;                    // 流共享中心（可选）
-    std::shared_ptr<SharedSource> shared_source_; // 当前订阅的源
+    StreamHub* hub_ = nullptr;
+    ModelFactory model_factory_;
+    std::shared_ptr<SharedSource> shared_source_;
     uint64_t shared_token_ = 0;                   // 订阅 token
     std::unique_ptr<StreamDecoder> decoder_;      // 独占模式才用
     std::unique_ptr<InferGroup> infer_group_;

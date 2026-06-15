@@ -17,7 +17,9 @@
 /// 每模型一个常驻 worker 线程，避免 std::async 反复创建线程
 class InferGroup {
 public:
-    explicit InferGroup(const TaskConfig& cfg);
+    using ModelFactory = std::function<std::unique_ptr<InferenceEngine>(const ModelConfig&)>;
+
+    explicit InferGroup(const TaskConfig& cfg, ModelFactory factory = nullptr);
     ~InferGroup();
 
     /// 初始化所有模型 + 启动 worker 线程池
@@ -38,6 +40,7 @@ public:
 
 private:
     TaskConfig cfg_;
+    ModelFactory factory_;
     std::vector<std::unique_ptr<InferenceEngine>> engines_;
     std::vector<int> frame_counters_;
     PerfStats stats_;

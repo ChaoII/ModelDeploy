@@ -15,9 +15,10 @@ static bool is_network_url(const std::string& url) {
            url.find("udp://") == 0 || url.find("tcp://") == 0;
 }
 
-Pipeline::Pipeline(TaskConfig cfg, StreamHub* hub)
+Pipeline::Pipeline(TaskConfig cfg, StreamHub* hub, ModelFactory model_factory)
     : cfg_(std::move(cfg)),
       hub_(hub),
+      model_factory_(std::move(model_factory)),
       block_on_queue_full_(!is_network_url(cfg_.input_url)) {
     // 自适应队列大小：模型越多，流水线耗时越长，需要更大的队列缓冲
     max_queue_size_ = calc_queue_size();
@@ -181,7 +182,7 @@ void Pipeline::pipeline_loop() {
 
     try {
         // 1) InferGroup
-        infer_group_ = std::make_unique<InferGroup>(cfg_);
+        infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_);
         if (!infer_group_->init()) {
             init_error_ = "InferGroup init failed";
             std::cerr << "[Pipeline] " << init_error_ << std::endl;
@@ -204,15 +205,19 @@ void Pipeline::pipeline_loop() {
                 running_ = false;
                 return;
             }
-            if (!src->start()) {
+            shared_source_ = src;
+            // subscribe 内部会触发 start()（仅首次）
+            shared_token_ = src->subscribe([this](const auto& f) { return on_shared_frame(f); });
+            // 给 SharedSource 短暂时间起来
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            if (!src->is_initialized() && !src->init_error().empty()) {
                 init_error_ = src->init_error();
                 std::cerr << "[Pipeline] " << init_error_ << std::endl;
                 running_ = false;
                 return;
             }
-            shared_source_ = src;
-            shared_token_ = src->subscribe([this](const auto& f) { return on_shared_frame(f); });
-            std::cout << "[Pipeline] Using shared source: " << cfg_.id << std::endl;
+            std::cout << "[Pipeline] Using shared source: " << cfg_.id
+                      << " (subs=" << src->subscriber_count() << ")" << std::endl;
         } else {
             // 独占模式
             decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
