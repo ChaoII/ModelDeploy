@@ -5,6 +5,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <mutex>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -14,7 +15,7 @@ extern "C" {
 
 #include "config.hpp"
 
-/// 解码帧回调：GPU NV12 帧的 Y 和 UV 设备指针、步长、宽高
+/// 解码帧回调：NV12 帧的 Y 和 UV 指针、步长、宽高
 struct DecodedFrame {
     uint8_t* y_plane = nullptr;
     uint8_t* uv_plane = nullptr;
@@ -25,7 +26,7 @@ struct DecodedFrame {
     int64_t pts = 0;
 };
 
-/// FFmpeg CUVID 硬件解码器
+/// FFmpeg 硬件/软件解码器，支持 CUVID 回退与自动重连
 class StreamDecoder {
 public:
     explicit StreamDecoder(const DecoderConfig& cfg);
@@ -55,6 +56,7 @@ private:
     std::string url_;
     FrameCallback callback_;
 
+    mutable std::mutex ctx_mtx_;
     AVFormatContext* fmt_ctx_ = nullptr;
     AVCodecContext* dec_ctx_ = nullptr;
     AVBufferRef* hw_dev_ctx_ = nullptr;
@@ -64,8 +66,12 @@ private:
     std::thread decode_thread_;
     int fps_ = 25;
 
+    // 用于中断阻塞式 IO
+    std::atomic<int64_t> last_read_time_{0};
+    static int interrupt_callback(void* opaque);
+
     bool init_decoder();
     void decode_loop();
-    void reconnect();
+    bool reconnect();
     void cleanup();
 };

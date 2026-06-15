@@ -4,15 +4,20 @@
 #include <chrono>
 #include <mutex>
 #include <map>
+#include <deque>
 #include <cstdint>
 
 struct PerfStats {
-    // 每帧各阶段耗时（µs）
-    std::vector<int64_t> decode_us;
-    std::vector<int64_t> infer_us;
-    std::vector<int64_t> draw_us;
-    std::vector<int64_t> encode_us;
-    std::vector<int64_t> total_us;
+    // 滑动窗口（最近 N 帧），避免长期运行后 FPS 失真 / 内存暴涨
+    static constexpr size_t kWindow = 120;
+
+    std::deque<int64_t> decode_us;
+    std::deque<int64_t> infer_us;
+    std::deque<int64_t> draw_us;
+    std::deque<int64_t> encode_us;
+    std::deque<int64_t> total_us;
+    // 每帧的时间戳（用于 FPS 实时计算）
+    std::deque<std::chrono::steady_clock::time_point> stamps;
 
     int64_t frame_count = 0;
     std::chrono::steady_clock::time_point start_time;

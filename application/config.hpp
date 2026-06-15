@@ -27,6 +27,21 @@ struct DecoderConfig {
     int reconnect_delay_ms = 5000;
     int max_reconnects = 10;
     int timeout_us = 10000000;
+    std::string rtsp_transport = "tcp";   // tcp / udp
+    std::string hw_accel = "cuda";        // cuda / none
+};
+
+// ==================== 编码器配置 ====================
+struct EncoderConfig {
+    int fps = 25;
+    int bitrate_kbps = 4000;              // 平均码率 (kbps)
+    int gop = 50;                         // 关键帧间隔
+    std::string codec = "auto";           // auto / libx264 / h264_nvenc
+    std::string preset = "ultrafast";     // x264: ultrafast..veryslow ; nvenc: p1..p7
+    std::string tune = "zerolatency";     // x264 only
+    std::string format = "auto";          // auto / rtsp / rtmp / flv / mp4
+    int max_b_frames = 0;
+    bool low_latency = true;
 };
 
 // ==================== 绘制配置 ====================
@@ -42,8 +57,10 @@ struct TaskConfig {
     std::string name;
     std::string input_url;
     std::string output_url;
+    std::string preview_url;              // 浏览器拉流地址（HTTP-FLV 等）
     std::vector<ModelConfig> models;
     DecoderConfig decoder;
+    EncoderConfig encoder;
     DrawConfig draw;
 
     [[nodiscard]] bool validate(std::string* err = nullptr) const;

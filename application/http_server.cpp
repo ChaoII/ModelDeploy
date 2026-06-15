@@ -2,6 +2,12 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <ctime>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+using json = nlohmann::json;
 
 HttpServer::HttpServer(PipelineManager& mgr, const std::string& host, int port)
     : mgr_(mgr), host_(host), port_(port) {
@@ -45,40 +51,92 @@ void HttpServer::stop() {
 // ── JSON helpers ──────────────────────────────
 
 std::string HttpServer::err_json(const std::string& msg) {
-    return "{\"ok\":false,\"msg\":\"" + msg + "\"}";
+    return json{{"ok", false}, {"msg", msg}}.dump();
 }
 
-std::string HttpServer::ok_json(const std::string& data) {
-    if (data.empty() || data[0] != '{')
-        return "{\"ok\":true}";
-    return "{\"ok\":true," + data.substr(1);
-}
-
-std::string HttpServer::task_list_json(const std::vector<TaskStatus>& tasks) {
-    std::string j = "{\"ok\":true,\"tasks\":[";
-    for (size_t i = 0; i < tasks.size(); ++i) {
-        if (i) j += ",";
-        j += "{\"id\":\"" + tasks[i].id + "\",\"name\":\"" + tasks[i].name
-          + "\",\"running\":" + (tasks[i].running ? "true" : "false")
-          + ",\"input_url\":\"" + tasks[i].input_url
-          + "\",\"output_url\":\"" + tasks[i].output_url + "\"";
-        if (!tasks[i].model_names.empty()) {
-            j += ",\"models\":[";
-            for (size_t k = 0; k < tasks[i].model_names.size(); ++k) {
-                if (k) j += ",";
-                j += "{\"name\":\"" + tasks[i].model_names[k]
-                  + "\",\"type\":\"" + tasks[i].model_types[k] + "\"}";
-            }
-            j += "]";
-        }
-        j += "}";
+std::string HttpServer::ok_json(const json& data) {
+    json r{{"ok", true}};
+    if (data.is_object()) {
+        for (auto& [k, v] : data.items()) r[k] = v;
     }
-    j += "]}";
+    return r.dump();
+}
+
+json HttpServer::task_status_to_json(const TaskStatus& ts) {
+    json j;
+    j["id"] = ts.id;
+    j["name"] = ts.name;
+    j["running"] = ts.running;
+    j["initialized"] = ts.initialized;
+    j["init_error"] = ts.init_error;
+    j["input_url"] = ts.input_url;
+    j["output_url"] = ts.output_url;
+    j["preview_url"] = ts.preview_url;
+    json models = json::array();
+    for (size_t i = 0; i < ts.model_names.size(); ++i) {
+        json m{{"name", ts.model_names[i]}, {"type", i < ts.model_types.size() ? ts.model_types[i] : ""}};
+        models.push_back(m);
+    }
+    j["models"] = models;
+    try {
+        j["stats"] = json::parse(ts.stats_json);
+    } catch (...) {
+        j["stats"] = json::object();
+    }
     return j;
 }
 
-std::string HttpServer::task_config_json(const TaskConfig& cfg) {
-    return "{\"ok\":true,\"task\":" + task_config_to_json(cfg).dump() + "}";
+json HttpServer::model_config_to_json(const ModelConfig& m) {
+    json j;
+    j["name"] = m.name;
+    j["type"] = m.type;
+    j["path"] = m.path;
+    j["backend"] = m.backend;
+    j["device"] = m.device;
+    j["confidence_threshold"] = m.confidence_threshold;
+    j["input_size"] = {m.input_size[0], m.input_size[1]};
+    j["roi"] = {m.roi[0], m.roi[1], m.roi[2], m.roi[3]};
+    j["interval"] = m.interval;
+    if (!m.rec_path.empty()) j["rec_path"] = m.rec_path;
+    if (!m.labels.empty()) j["labels"] = m.labels;
+    return j;
+}
+
+static std::string get_exe_dir() {
+#ifdef _WIN32
+    char buf[MAX_PATH];
+    if (GetModuleFileNameA(nullptr, buf, MAX_PATH) > 0) {
+        std::string path(buf);
+        auto pos = path.find_last_of("\\/");
+        if (pos != std::string::npos) return path.substr(0, pos);
+    }
+#endif
+    return "";
+}
+
+std::string HttpServer::load_web_ui() const {
+    std::vector<std::string> paths;
+    auto exe_dir = get_exe_dir();
+    if (!exe_dir.empty()) {
+        paths.push_back(exe_dir + "\\web_ui.html");
+        paths.push_back(exe_dir + "\\..\\application\\web_ui.html");
+        paths.push_back(exe_dir + "\\..\\..\\application\\web_ui.html");
+    }
+    paths.push_back("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
+    paths.push_back("web_ui.html");
+    paths.push_back("../application/web_ui.html");
+    paths.push_back("application/web_ui.html");
+    for (const auto& p : paths) {
+        std::ifstream f(p, std::ios::binary);
+        if (f.is_open()) {
+            std::stringstream buf;
+            buf << f.rdbuf();
+            auto s = buf.str();
+            if (!s.empty()) return s;
+        }
+    }
+    std::cerr << "[WebUI] Could not open web_ui.html" << std::endl;
+    return "<h1>Web UI file not found</h1>";
 }
 
 // ── Route helpers ─────────────────────────────
@@ -101,57 +159,62 @@ static ModelConfig parse_model_config(const std::string& body) {
         mcfg.type = get_s("type", "detection");
         mcfg.backend = get_s("backend", "ort");
         mcfg.device = get_s("device", "gpu");
-        if (j.contains("confidence_threshold")) mcfg.confidence_threshold = j["confidence_threshold"];
+        if (j.contains("confidence_threshold") && j["confidence_threshold"].is_number())
+            mcfg.confidence_threshold = j["confidence_threshold"];
         if (j.contains("input_size") && j["input_size"].is_array() && j["input_size"].size() >= 2)
             mcfg.input_size = {j["input_size"][0], j["input_size"][1]};
         if (j.contains("roi") && j["roi"].is_array() && j["roi"].size() >= 4)
             mcfg.roi = {j["roi"][0], j["roi"][1], j["roi"][2], j["roi"][3]};
-        if (j.contains("interval")) mcfg.interval = j["interval"];
+        if (j.contains("interval") && j["interval"].is_number_integer())
+            mcfg.interval = j["interval"];
+        if (j.contains("rec_path")) mcfg.rec_path = get_s("rec_path");
+        if (j.contains("labels") && j["labels"].is_array())
+            mcfg.labels = j["labels"].get<std::vector<std::string>>();
     } catch (...) {}
     return mcfg;
-}
-
-// Check HTTP method match
-static bool is_method(const httplib::Request& req, const std::string& method) {
-    return req.method == method;
 }
 
 // ── Routes ────────────────────────────────────
 
 void HttpServer::register_routes() {
 
-    // ── Web UI (served from file) ───────────────────
-    std::string ui_html;
-    {
-        // Try multiple possible locations for the HTML file
-        std::vector<std::string> paths = {
-            "E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html",
-            "web_ui.html",
-            "../application/web_ui.html"
-        };
-        for (const auto& p : paths) {
-            std::ifstream f(p);
-            if (f.is_open()) {
-                try {
-                    std::stringstream buf;
-                    buf << f.rdbuf();
-                    ui_html = buf.str();
-                    if (!ui_html.empty()) break;
-                } catch (...) { continue; }
-            }
-        }
-        if (ui_html.empty()) {
-            std::cerr << "[WebUI] Could not open web_ui.html" << std::endl;
-            ui_html = "<h1>Web UI file not found</h1>";
-        }
-    }
+    // ── Web UI ──────────────────────────────────────
+    std::string ui_html = load_web_ui();
     server_.Get("/", [ui_html](const httplib::Request&, httplib::Response& res) {
         res.set_content(ui_html, "text/html; charset=utf-8");
     });
+    server_.Get("/index.html", [ui_html](const httplib::Request&, httplib::Response& res) {
+        res.set_content(ui_html, "text/html; charset=utf-8");
+    });
+    server_.Get("/ui", [ui_html](const httplib::Request&, httplib::Response& res) {
+        res.set_content(ui_html, "text/html; charset=utf-8");
+    });
 
-    // ── Health ──────────────────────────────────────
+    // ── Health / Metrics ─────────────────────────────
     server_.Get("/health", [](const httplib::Request&, httplib::Response& res) {
-        res.set_content("{\"ok\":true}", "application/json");
+        res.set_content(ok_json({{"status", "ok"}, {"time", std::time(nullptr)}}), "application/json");
+    });
+
+    server_.Get("/api/v1/metrics", [this](const httplib::Request&, httplib::Response& res) {
+        auto tasks = mgr_.list_tasks();
+        int running = 0, initialized = 0, error = 0;
+        for (const auto& t : tasks) {
+            if (t.running) ++running;
+            if (t.initialized) ++initialized;
+            if (!t.init_error.empty()) ++error;
+        }
+        json j;
+        j["tasks_total"] = tasks.size();
+        j["tasks_running"] = running;
+        j["tasks_initialized"] = initialized;
+        j["tasks_error"] = error;
+        j["models_total"] = mgr_.list_models().size();
+        j["time"] = std::time(nullptr);
+        res.set_content(ok_json({{"metrics", j}}), "application/json");
+    });
+
+    server_.Post("/api/v1/save", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(ok_json({{"saved", true}}), "application/json");
     });
 
     // ── POST /api/v1/tasks — create ─────────────────
@@ -162,9 +225,11 @@ void HttpServer::register_routes() {
                       << " input=" << cfg.input_url
                       << " output=" << cfg.output_url
                       << " models=" << cfg.models.size() << std::endl;
-            if (!mgr_.create_task(cfg)) {
-                std::cerr << "[API] Create task failed: " << cfg.id << " (may already exist)" << std::endl;
-                res.set_content(err_json("create failed: task may already exist"), "application/json");
+
+            std::string err;
+            if (!mgr_.create_task(cfg, &err)) {
+                std::cerr << "[API] Create task failed: " << cfg.id << " - " << err << std::endl;
+                res.set_content(err_json(err), "application/json");
                 return;
             }
             std::cout << "[API] Task created: " << cfg.id << std::endl;
@@ -178,7 +243,9 @@ void HttpServer::register_routes() {
     // ── GET /api/v1/tasks — list ────────────────────
     server_.Get("/api/v1/tasks", [this](const httplib::Request&, httplib::Response& res) {
         auto tasks = mgr_.list_tasks();
-        res.set_content(task_list_json(tasks), "application/json");
+        json arr = json::array();
+        for (const auto& t : tasks) arr.push_back(task_status_to_json(t));
+        res.set_content(ok_json({{"tasks", arr}}), "application/json");
     });
 
     // ── GET /api/v1/tasks/:id — config ──────────────
@@ -189,7 +256,40 @@ void HttpServer::register_routes() {
             res.set_content(err_json("task not found: " + id), "application/json");
             return;
         }
-        res.set_content(ok_json("\"task\":" + task_config_to_json(cfg).dump()), "application/json");
+        res.set_content(ok_json({{"task", task_config_to_json(cfg)}}), "application/json");
+    });
+
+    // ── GET /api/v1/tasks/:id/stats ─────────────────
+    server_.Get("/api/v1/tasks/:id/stats", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string id = get_id(req);
+        std::string stats_json;
+        if (!mgr_.get_task_stats(id, &stats_json)) {
+            res.set_content(err_json("task not found: " + id), "application/json");
+            return;
+        }
+        try {
+            res.set_content(ok_json({{"stats", json::parse(stats_json)}}), "application/json");
+        } catch (...) {
+            res.set_content(ok_json({{"stats", json::object()}}), "application/json");
+        }
+    });
+
+    // ── GET /api/v1/tasks/:id/snapshot.jpg — 最新一帧 JPEG ──
+    server_.Get("/api/v1/tasks/:id/snapshot.jpg", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string id = get_id(req);
+        std::vector<uint8_t> jpg;
+        int quality = 80;
+        if (req.has_param("q")) {
+            try { quality = std::stoi(req.get_param_value("q")); } catch (...) {}
+        }
+        if (!mgr_.get_task_jpeg(id, &jpg, quality) || jpg.empty()) {
+            res.status = 404;
+            res.set_content("snapshot unavailable", "text/plain");
+            return;
+        }
+        res.set_header("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.set_header("Pragma", "no-cache");
+        res.set_content(reinterpret_cast<const char*>(jpg.data()), jpg.size(), "image/jpeg");
     });
 
     // ── DELETE /api/v1/tasks/:id — remove ───────────
@@ -210,10 +310,7 @@ void HttpServer::register_routes() {
         std::string id = get_id(req);
         std::cout << "[API] POST /api/v1/tasks/" << id << "/start" << std::endl;
         if (!mgr_.start_task(id)) {
-            std::cerr << "[API] Start failed for " << id
-                      << " (pipeline init will continue in background)" << std::endl;
-            // start() now returns true even if init fails (async)
-            // So if it returns false, the task doesn't exist
+            std::cerr << "[API] Start failed for " << id << std::endl;
             res.set_content(err_json("task not found"), "application/json");
             return;
         }
@@ -300,21 +397,9 @@ void HttpServer::register_routes() {
     // ── GET /api/v1/models — list model library ────
     server_.Get("/api/v1/models", [this](const httplib::Request&, httplib::Response& res) {
         auto models = mgr_.list_models();
-        std::string j = R"({"ok":true,"models":[)";
-        for (size_t i = 0; i < models.size(); ++i) {
-            if (i) j += ",";
-            auto& m = models[i];
-            j += "{\"name\":\"" + m.name + "\",\"type\":\"" + m.type
-              + "\",\"path\":\"" + m.path
-              + "\",\"backend\":\"" + m.backend
-              + "\",\"device\":\"" + m.device
-              + "\",\"confidence_threshold\":" + std::to_string(m.confidence_threshold)
-              + ",\"input_size\":[" + std::to_string(m.input_size[0]) + "," + std::to_string(m.input_size[1]) + "]"
-              + ",\"interval\":" + std::to_string(m.interval)
-              + "}";
-        }
-        j += "]}";
-        res.set_content(j, "application/json");
+        json arr = json::array();
+        for (const auto& m : models) arr.push_back(model_config_to_json(m));
+        res.set_content(ok_json({{"models", arr}}), "application/json");
     });
 
     // ── POST /api/v1/models — add model to library ──
@@ -337,7 +422,25 @@ void HttpServer::register_routes() {
         }
     });
 
-    // ── DELETE /api/v1/models/:name — remove from library ──
+    // ── PATCH /api/v1/models/:name — update in library ──
+    server_.Patch("/api/v1/models/:name", [this](const httplib::Request& req, httplib::Response& res) {
+        auto it = req.path_params.find("name");
+        std::string name = (it != req.path_params.end()) ? it->second : "";
+        try {
+            auto mcfg = parse_model_config(req.body);
+            std::cout << "[API] PATCH /api/v1/models/" << name << std::endl;
+            if (!mgr_.update_model_in_library(name, mcfg)) {
+                res.set_content(err_json("model not found"), "application/json");
+                return;
+            }
+            std::cout << "[API] Model updated in library: " << name << std::endl;
+            res.set_content(ok_json(), "application/json");
+        } catch (const std::exception& e) {
+            res.set_content(err_json(e.what()), "application/json");
+        }
+    });
+
+    // ── DELETE /api/v1/models/:name ─ remove from library ──
     server_.Delete("/api/v1/models/:name", [this](const httplib::Request& req, httplib::Response& res) {
         auto it = req.path_params.find("name");
         std::string name = (it != req.path_params.end()) ? it->second : "";

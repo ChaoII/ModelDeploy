@@ -1,8 +1,17 @@
 #include "stream_decoder.hpp"
 #include <iostream>
 #include <cstring>
+extern "C" {
+#include <libavutil/time.h>
+}
 
 static void ff_log_callback(void*, int, const char*, va_list) {}
+
+static bool is_network_url(const std::string& url) {
+    return url.find("rtsp://") == 0 || url.find("rtmp://") == 0 ||
+           url.find("http://") == 0 || url.find("https://") == 0 ||
+           url.find("udp://") == 0 || url.find("tcp://") == 0;
+}
 
 StreamDecoder::StreamDecoder(const DecoderConfig& cfg) : cfg_(cfg) {
     av_log_set_callback(ff_log_callback);
@@ -14,14 +23,19 @@ StreamDecoder::~StreamDecoder() {
 }
 
 bool StreamDecoder::open(const std::string& url) {
+    std::lock_guard<std::mutex> lock(ctx_mtx_);
     url_ = url;
     return init_decoder();
 }
 
 bool StreamDecoder::start() {
     if (running_.load()) return true;
-    if (!fmt_ctx_) return false;
+    {
+        std::lock_guard<std::mutex> lock(ctx_mtx_);
+        if (!fmt_ctx_) return false;
+    }
     running_ = true;
+    last_read_time_ = av_gettime_relative();
     decode_thread_ = std::thread(&StreamDecoder::decode_loop, this);
     return true;
 }
@@ -32,19 +46,37 @@ void StreamDecoder::stop() {
         decode_thread_.join();
 }
 
+int StreamDecoder::interrupt_callback(void* opaque) {
+    auto* self = static_cast<StreamDecoder*>(opaque);
+    if (!self->running_.load()) return 1; // 请求中断
+    // 如果长时间没有读到数据也中断，避免永久阻塞
+    int64_t now = av_gettime_relative();
+    if (now - self->last_read_time_.load() > self->cfg_.timeout_us) {
+        return 1;
+    }
+    return 0;
+}
+
 bool StreamDecoder::init_decoder() {
     cleanup();
 
     // Open input
     AVDictionary* opts = nullptr;
-    av_dict_set(&opts, "rtsp_transport", "tcp", 0);
+    av_dict_set(&opts, "rtsp_transport",
+                cfg_.rtsp_transport.empty() ? "tcp" : cfg_.rtsp_transport.c_str(), 0);
     av_dict_set(&opts, "buffer_size", "65536", 0);
     av_dict_set(&opts, "max_delay", "500000", 0);
     av_dict_set(&opts, "stimeout", std::to_string(cfg_.timeout_us).c_str(), 0);
 
-    if (avformat_open_input(&fmt_ctx_, url_.c_str(), nullptr, &opts) != 0) {
+    fmt_ctx_ = avformat_alloc_context();
+    last_read_time_ = av_gettime_relative();
+
+    int ret = avformat_open_input(&fmt_ctx_, url_.c_str(), nullptr, &opts);
+    if (ret != 0) {
+        char errbuf[256];
+        av_strerror(ret, errbuf, sizeof(errbuf));
         av_dict_free(&opts);
-        std::cerr << "[Decoder] Failed to open: " << url_ << std::endl;
+        std::cerr << "[Decoder] Failed to open: " << url_ << " - " << errbuf << std::endl;
         return false;
     }
     av_dict_free(&opts);
@@ -71,11 +103,13 @@ bool StreamDecoder::init_decoder() {
             dec_ctx_ = avcodec_alloc_context3(dec);
             avcodec_parameters_to_context(dec_ctx_, codecpar);
 
-            // Try CUDA hw device
-            AVBufferRef* hw_ctx = nullptr;
-            if (av_hwdevice_ctx_create(&hw_ctx, AV_HWDEVICE_TYPE_CUDA, nullptr, nullptr, 0) == 0) {
-                dec_ctx_->hw_device_ctx = av_buffer_ref(hw_ctx);
-                av_buffer_unref(&hw_ctx);
+            // Try CUDA hw device (按 cfg 控制)
+            if (cfg_.hw_accel == "cuda") {
+                AVBufferRef* hw_ctx = nullptr;
+                if (av_hwdevice_ctx_create(&hw_ctx, AV_HWDEVICE_TYPE_CUDA, nullptr, nullptr, 0) == 0) {
+                    dec_ctx_->hw_device_ctx = av_buffer_ref(hw_ctx);
+                    av_buffer_unref(&hw_ctx);
+                }
             }
 
             if (avcodec_open2(dec_ctx_, dec, nullptr) < 0) {
@@ -87,6 +121,7 @@ bool StreamDecoder::init_decoder() {
             auto* st = fmt_ctx_->streams[i];
             if (st->avg_frame_rate.num > 0 && st->avg_frame_rate.den > 0)
                 fps_ = st->avg_frame_rate.num / st->avg_frame_rate.den;
+            if (fps_ <= 0) fps_ = 25;
 
             std::cout << "[Decoder] Opened " << url_
                       << " [" << codecpar->width << "x" << codecpar->height
@@ -107,23 +142,48 @@ void StreamDecoder::decode_loop() {
     int reconnect_attempts = 0;
 
     while (running_.load()) {
+        if (fmt_ctx_) {
+            fmt_ctx_->interrupt_callback.callback = &StreamDecoder::interrupt_callback;
+            fmt_ctx_->interrupt_callback.opaque = this;
+        }
+        last_read_time_ = av_gettime_relative();
         int ret = av_read_frame(fmt_ctx_, pkt);
         if (ret < 0) {
-            // Try reconnect
-            if (reconnect_attempts < cfg_.max_reconnects) {
-                std::cerr << "[Decoder] Stream error, reconnecting ("
+            if (!running_.load()) break;
+            // EOF on local files is normal termination
+            if (ret == AVERROR_EOF && !is_network_url(url_)) {
+                std::cout << "[Decoder] End of file reached: " << url_ << std::endl;
+                break;
+            }
+            // For network streams, try reconnect
+            if (is_network_url(url_) && reconnect_attempts < cfg_.max_reconnects) {
+                char errbuf[256];
+                av_strerror(ret, errbuf, sizeof(errbuf));
+                std::cerr << "[Decoder] Stream error (" << errbuf << "), reconnecting ("
                           << reconnect_attempts + 1 << "/" << cfg_.max_reconnects << ")..." << std::endl;
-                reconnect();
-                ++reconnect_attempts;
+                if (reconnect()) {
+                    reconnect_attempts = 0;
+                } else {
+                    ++reconnect_attempts;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(cfg_.reconnect_delay_ms));
+                }
                 av_packet_unref(pkt);
                 continue;
             }
-            std::cerr << "[Decoder] Max reconnects reached, stopping." << std::endl;
+            char errbuf[256];
+            av_strerror(ret, errbuf, sizeof(errbuf));
+            std::cerr << "[Decoder] Read error: " << errbuf << ", stopping." << std::endl;
             break;
         }
         reconnect_attempts = 0;
 
         if (pkt->stream_index != video_stream_idx_) {
+            av_packet_unref(pkt);
+            continue;
+        }
+
+        std::lock_guard<std::mutex> lock(ctx_mtx_);
+        if (!dec_ctx_) {
             av_packet_unref(pkt);
             continue;
         }
@@ -134,17 +194,18 @@ void StreamDecoder::decode_loop() {
         }
         av_packet_unref(pkt);
 
-        while (true) {
+        while (running_.load()) {
             ret = avcodec_receive_frame(dec_ctx_, hw_frame);
             if (ret != 0) break;
 
             // Transfer GPU frame to CPU NV12
             AVFrame* out_frame = hw_frame;
             if (hw_frame->hw_frames_ctx) {
+                av_frame_unref(sw_frame);
                 sw_frame->format = AV_PIX_FMT_NV12;
                 sw_frame->width = hw_frame->width;
                 sw_frame->height = hw_frame->height;
-                av_frame_get_buffer(sw_frame, 0);
+                if (av_frame_get_buffer(sw_frame, 0) < 0) continue;
                 if (av_hwframe_transfer_data(sw_frame, hw_frame, 0) == 0)
                     out_frame = sw_frame;
             }
@@ -161,9 +222,6 @@ void StreamDecoder::decode_loop() {
             if (callback_ && !callback_(df)) {
                 running_ = false;
             }
-
-            if (out_frame == sw_frame)
-                av_frame_unref(sw_frame);
         }
     }
 
@@ -172,9 +230,9 @@ void StreamDecoder::decode_loop() {
     av_frame_free(&sw_frame);
 }
 
-void StreamDecoder::reconnect() {
+bool StreamDecoder::reconnect() {
+    std::lock_guard<std::mutex> lock(ctx_mtx_);
     cleanup();
-    std::this_thread::sleep_for(std::chrono::milliseconds(cfg_.reconnect_delay_ms));
 
     // Re-open
     AVDictionary* opts = nullptr;
@@ -183,9 +241,15 @@ void StreamDecoder::reconnect() {
     av_dict_set(&opts, "max_delay", "500000", 0);
     av_dict_set(&opts, "stimeout", std::to_string(cfg_.timeout_us).c_str(), 0);
 
+    fmt_ctx_ = avformat_alloc_context();
+    last_read_time_ = av_gettime_relative();
+
     if (avformat_open_input(&fmt_ctx_, url_.c_str(), nullptr, &opts) == 0) {
         av_dict_free(&opts);
-        avformat_find_stream_info(fmt_ctx_, nullptr);
+        if (avformat_find_stream_info(fmt_ctx_, nullptr) < 0) {
+            cleanup();
+            return false;
+        }
         // Re-init decoder
         for (unsigned i = 0; i < fmt_ctx_->nb_streams; ++i) {
             if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -199,13 +263,18 @@ void StreamDecoder::reconnect() {
                 break;
             }
         }
-    } else {
-        av_dict_free(&opts);
+        return dec_ctx_ != nullptr;
     }
+    av_dict_free(&opts);
+    return false;
 }
 
 void StreamDecoder::cleanup() {
     if (dec_ctx_) avcodec_free_context(&dec_ctx_);
-    if (fmt_ctx_) avformat_close_input(&fmt_ctx_);
+    if (fmt_ctx_) {
+        avformat_close_input(&fmt_ctx_);
+        fmt_ctx_ = nullptr;
+    }
     if (hw_dev_ctx_) av_buffer_unref(&hw_dev_ctx_);
+    video_stream_idx_ = -1;
 }

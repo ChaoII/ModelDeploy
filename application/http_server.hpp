@@ -27,9 +27,10 @@ private:
     std::atomic<bool> running_{false};
 
     void register_routes();
+    std::string load_web_ui() const;
 
     static std::string err_json(const std::string& msg);
-    static std::string ok_json(const std::string& data = "{}");
-    static std::string task_list_json(const std::vector<TaskStatus>& tasks);
-    static std::string task_config_json(const TaskConfig& cfg);
+    static std::string ok_json(const nlohmann::json& data = {});
+    static nlohmann::json task_status_to_json(const TaskStatus& ts);
+    static nlohmann::json model_config_to_json(const ModelConfig& m);
 };

@@ -23,4 +23,6 @@ private:
 
     void draw_detection(modeldeploy::vision::ImageData& image,
                         const InferResult& result);
+    void draw_face(modeldeploy::vision::ImageData& image,
+                   const InferResult& result);
 };

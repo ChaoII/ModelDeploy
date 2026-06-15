@@ -2,335 +2,1391 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MindVision - 智能安防监控平台</title>
-<link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.11.2/font/bootstrap-icons.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS :: 智能视频分析指挥舱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
 <style>
-:root{--primary:#4361ee;--primary-light:#eef1ff;--success:#2ec4b6;--danger:#e71d36;--warning:#ff9f1c;--dark:#0b0b2a;--bg:#f5f6fa;--card:#fff;--border:#eaecf0;--text:#1a1a2e;--muted:#6b7280;--radius:12px}
-body{background:var(--bg);font-family:'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:var(--text)}
-.sidebar{position:fixed;top:0;left:0;width:240px;height:100vh;background:linear-gradient(180deg,#0b0b2a 0%,#1a1a4e 100%);color:#fff;z-index:100;padding:0}
-.sidebar-brand{padding:22px 18px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
-.sidebar-brand .logo{font-size:18px;font-weight:800;display:flex;align-items:center;gap:10px}
-.sidebar-brand .logo .ic{width:32px;height:32px;background:rgba(255,255,255,.08);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:16px}
-.sidebar-brand .logo span{color:var(--primary)}
-.sidebar-brand small{font-size:10px;color:rgba(255,255,255,.3);margin-top:4px;display:block}
-.sidebar-menu{padding:10px 8px}
-.sidebar-menu .item{padding:9px 12px;margin:2px 0;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.45);font-weight:500}
-.sidebar-menu .item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.8)}
-.sidebar-menu .item.active{background:rgba(67,97,255,.2);color:#fff;font-weight:600}
-.sidebar-menu .item i{font-size:15px;width:18px;text-align:center}
-.main-content{margin-left:240px;min-height:100vh}
-.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
-.topbar .ptitle{font-weight:700;color:var(--dark);margin:0;font-size:15px;display:flex;align-items:center;gap:8px}
-.topbar .ptitle i{color:var(--primary)}
-.conn-badge{display:flex;align-items:center;gap:6px;font-size:11px;padding:5px 14px;border-radius:20px;font-weight:500}
-.conn-badge.on{background:#e6f8f5;color:#0d9488}
-.conn-badge.off{background:#fde8e8;color:#dc2626}
-.content{padding:20px 24px}
-.page{display:none}.page.active{display:block}
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:18px;border:1px solid var(--border);transition:all .2s}
-.stat-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.04)}
-.stat-card .si{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px}
-.stat-card .si.blue{background:var(--primary-light);color:var(--primary)}
-.stat-card .si.green{background:#e6f8f5;color:#0d9488}
-.stat-card .si.red{background:#fde8e8;color:#dc2626}
-.stat-card .num{font-size:26px;font-weight:800;line-height:1;letter-spacing:-.3px}
-.stat-card .num.blue{color:var(--primary)}
-.stat-card .num.green{color:#0d9488}
-.stat-card .num.red{color:#dc2626}
-.stat-card .lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:500}
-.card-panel{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:16px}
-.card-panel .ph{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.card-panel .ph h6{margin:0;font-weight:700;color:var(--dark);font-size:13px;display:flex;align-items:center;gap:6px}
-.card-panel .ph h6 i{color:var(--primary)}
-.table{font-size:12px;margin-bottom:0}
-.table thead th{background:#f9fafb;color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:10px 14px;border-bottom:2px solid var(--border)}
-.table td{padding:10px 14px;vertical-align:middle;border-bottom:1px solid #f3f4f6}
-.table tbody tr:hover{background:#f9faff}
-.badge-task{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600}
-.badge-task.run{background:#e6f8f5;color:#0d9488}
-.badge-task.sto{background:#f3f4f6;color:#9ca3af}
-.tag-model{padding:2px 8px;border-radius:4px;font-size:10px;background:var(--primary-light);color:var(--primary);margin:1px;display:inline-block;font-weight:500}
-.cell-url{font-size:10px;font-family:'SF Mono','Consolas',monospace;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fname{font-weight:600;color:var(--dark)}
-.fsub{font-size:10px;color:#9ca3af;margin-top:1px}
-.btn-icon{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:none;cursor:pointer;transition:all .15s;font-size:13px}
-.btn-icon.play{background:#e6f8f5;color:#0d9488}.btn-icon.play:hover{background:#0d9488;color:#fff}
-.btn-icon.stop{background:#fef3c7;color:#d97706}.btn-icon.stop:hover{background:#d97706;color:#fff}
-.btn-icon.del{background:#fde8e8;color:#dc2626}.btn-icon.del:hover{background:#dc2626;color:#fff}
-.btn-icon.info{background:var(--primary-light);color:var(--primary)}.btn-icon.info:hover{background:var(--primary);color:#fff}
-.btn-pri{height:34px;padding:0 16px;border-radius:8px;border:none;font-size:11px;font-weight:600;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:5px;transition:all .15s;cursor:pointer}
-.btn-pri:hover{background:#3651d4;transform:translateY(-1px);box-shadow:0 4px 12px rgba(67,97,255,.3)}
-.btn-ghost{height:34px;padding:0 14px;border-radius:8px;border:1px solid #d0d5dd;font-size:11px;font-weight:500;background:#fff;color:var(--muted);display:inline-flex;align-items:center;gap:5px;transition:all .15s;cursor:pointer}
-.btn-ghost:hover{background:#f9fafb;border-color:#9ca3af}
-.btn-sm-pri{height:28px;padding:0 12px;border-radius:6px;border:none;font-size:10px;font-weight:600;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:4px;transition:all .15s;cursor:pointer}
-.btn-sm-pri:hover{background:#3651d4}
-.btn-sm-ghost{height:28px;padding:0 10px;border-radius:6px;border:1px solid #d0d5dd;font-size:10px;font-weight:500;background:#fff;color:var(--muted);display:inline-flex;align-items:center;gap:4px;cursor:pointer}
-.btn-sm-ghost:hover{background:#f9fafb}
-.action-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.empty-state{text-align:center;padding:50px 20px;color:#9ca3af}
-.empty-state i{font-size:38px;display:block;margin-bottom:10px;color:#d0d5dd}
-.empty-state p{font-size:12px;margin:0}
-.log-panel{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-top:16px}
-.log-panel .lh{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.log-panel .lh h6{margin:0;font-size:11px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:5px}
-.log-panel .lh h6 i{color:var(--primary)}
-.log-panel .lb{padding:6px 18px;max-height:120px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:10px;line-height:1.8;color:var(--muted)}
-.log-panel .lb .tm{color:#bbb}
-.log-panel .lb .info{color:var(--primary)}
-.log-panel .lb .ok{color:#0d9488}
-.log-panel .lb .err{color:#dc2626}
-.modal-content{border-radius:var(--radius);border:none;box-shadow:0 16px 48px rgba(0,0,0,.12)}
-.modal-header{border-bottom:1px solid var(--border);padding:16px 20px}
-.modal-header .modal-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:var(--dark)}
-.modal-header .modal-title i{color:var(--primary)}
-.modal-body{padding:20px}
-.modal-footer{border-top:1px solid var(--border);padding:12px 20px}
-.form-label{font-size:11px;font-weight:600;color:#374151;margin-bottom:3px}
-.form-control,.form-select{font-size:12px;border-radius:7px;border-color:#d0d5dd;padding:7px 11px}
-.form-control:focus,.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(67,97,255,.1)}
-textarea.form-control{font-family:'SF Mono','Consolas',monospace;font-size:10px;min-height:60px}
-#toastContainer{position:fixed;bottom:20px;right:20px;z-index:9999}
-.toast-item{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.08);margin-top:8px;animation:slideR .3s ease;color:#fff}
-.toast-item.success{background:#0d9488}
-.toast-item.danger{background:#dc2626}
-.toast-item.info{background:var(--primary)}
-@keyframes slideR{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
-.model-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;transition:all .2s}
-.model-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.04)}
-.model-card .mc-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
-.model-card .mc-hdr .mc-nm{font-weight:600;font-size:13px;color:var(--dark)}
-.model-card .mc-hdr .mc-ty{padding:1px 8px;border-radius:4px;font-size:9px;background:var(--primary-light);color:var(--primary);font-weight:600}
-.model-card .mc-body{font-size:10px;color:var(--muted);line-height:1.7}
-.model-card .mc-body .tag{display:inline-block;padding:1px 6px;border-radius:3px;background:#f3f4f6;color:var(--muted);font-size:9px;margin:1px}
-.model-card .mc-acts{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:4px}
-.select-models{border:1px solid var(--border);border-radius:7px;padding:8px;max-height:140px;overflow-y:auto}
-.select-models label{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;font-size:12px;cursor:pointer;transition:background .1s}
-.select-models label:hover{background:#f9faff}
+:root{
+  --bg:#04060f;--bg-2:#0a1024;--panel:rgba(13,19,40,.78);--panel-solid:#0d1428;
+  --primary:#00e5ff;--primary-dim:rgba(0,229,255,.14);--secondary:#a855f7;
+  --success:#26e5a4;--warning:#ffcc00;--danger:#ff4570;
+  --text:#e6f1ff;--muted:#7a8aab;--border:rgba(0,229,255,.14);--border-glow:rgba(0,229,255,.4);
+  --radius:14px;
+  --font-display:'Orbitron',sans-serif;--font-body:'Inter','PingFang SC','Microsoft YaHei',sans-serif;--font-mono:'JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;overflow:hidden;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* ── 背景 ── */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 1000px 600px at 15% 10%,rgba(0,229,255,.10),transparent 60%),
+    radial-gradient(ellipse 800px 500px at 85% 90%,rgba(168,85,247,.10),transparent 60%),
+    linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);}
+.bg::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(0,229,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.035) 1px,transparent 1px);
+  background-size:48px 48px;mask-image:radial-gradient(ellipse at center,black 0%,transparent 75%);
+  animation:gridMove 30s linear infinite}
+@keyframes gridMove{from{transform:translateY(0)}to{transform:translateY(48px)}}
+
+/* ── 布局 ── */
+.app{display:flex;height:100vh;position:relative;z-index:1}
+.sidebar{width:240px;background:rgba(7,10,24,.94);border-right:1px solid var(--border);display:flex;flex-direction:column;backdrop-filter:blur(20px);flex-shrink:0}
+.brand{padding:22px 22px 18px;border-bottom:1px solid var(--border)}
+.brand-logo{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:2px;display:flex;align-items:center;gap:10px}
+.brand-logo .hex{width:30px;height:30px;background:linear-gradient(135deg,var(--primary),var(--secondary));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(0,229,255,.5)}
+.brand-logo .hex svg{width:14px;height:14px;fill:#000}
+.brand-logo span{color:var(--primary);text-shadow:0 0 10px rgba(0,229,255,.5)}
+.brand-sub{font-size:9px;color:var(--muted);margin-top:6px;letter-spacing:1.5px;text-transform:uppercase}
+.nav{padding:14px 12px;flex:1}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;margin:3px 0;border-radius:9px;color:var(--muted);cursor:pointer;transition:all .2s;font-weight:500;border:1px solid transparent;position:relative;overflow:hidden;font-size:13px}
+.nav-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary);opacity:0;transition:opacity .2s;box-shadow:0 0 8px var(--primary)}
+.nav-item:hover{background:rgba(0,229,255,.06);color:var(--text)}
+.nav-item.active{background:linear-gradient(90deg,rgba(0,229,255,.12),transparent);color:var(--primary);border-color:rgba(0,229,255,.2)}
+.nav-item.active::before{opacity:1}
+.nav-item svg{width:16px;height:16px}
+.side-metrics{padding:14px 16px;border-top:1px solid var(--border)}
+.side-metric{display:flex;justify-content:space-between;align-items:center;margin:5px 0;font-size:11px}
+.side-metric span:first-child{color:var(--muted)}
+.side-metric-val{font-family:var(--font-display);color:var(--primary);font-weight:700;font-size:13px}
+.nav-ftr{padding:14px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);text-align:center;letter-spacing:1px}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:rgba(7,10,24,.85);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 26px;backdrop-filter:blur(20px);flex-shrink:0}
+.topbar-title{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:1px;display:flex;align-items:center;gap:10px}
+.topbar-title .line{width:4px;height:20px;background:linear-gradient(180deg,var(--primary),var(--secondary));border-radius:2px;box-shadow:0 0 8px var(--primary)}
+.topbar-actions{display:flex;align-items:center;gap:10px}
+.status-pill{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:rgba(0,229,255,.05)}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 7px var(--success);animation:pulse 2s infinite}
+.status-pill.off{border-color:rgba(255,69,112,.3);background:rgba(255,69,112,.06)}
+.status-pill.off .dot{background:var(--danger);box-shadow:0 0 7px var(--danger);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.btn-icon{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(0,229,255,.05);color:var(--primary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.btn-icon:hover{background:var(--primary);color:#000;box-shadow:0 0 12px var(--primary)}
+
+.content{flex:1;overflow-y:auto;padding:22px 26px}
+.page{display:none;animation:fadeIn .25s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── 卡片通用 ── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(14px);overflow:hidden;position:relative}
+.card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border-glow),transparent)}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-family:var(--font-display);font-size:12px;font-weight:600;letter-spacing:.8px;display:flex;align-items:center;gap:8px}
+.card-title svg{width:15px;height:15px;fill:var(--primary)}
+.card-body{padding:18px}
+
+/* ── 顶部统计 ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;transition:all .25s}
+.stat-card:hover{border-color:var(--border-glow);box-shadow:0 0 20px rgba(0,229,255,.08);transform:translateY(-2px)}
+.stat-card .glow{position:absolute;top:-30px;right:-30px;width:90px;height:90px;border-radius:50%;filter:blur(36px);opacity:.25}
+.stat-card.cyan .glow{background:var(--primary)}
+.stat-card.purple .glow{background:var(--secondary)}
+.stat-card.green .glow{background:var(--success)}
+.stat-card.red .glow{background:var(--danger)}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.stat-value{font-family:var(--font-display);font-size:28px;font-weight:700;line-height:1}
+.stat-value.cyan{color:var(--primary);text-shadow:0 0 12px rgba(0,229,255,.4)}
+.stat-value.purple{color:var(--secondary);text-shadow:0 0 12px rgba(168,85,247,.4)}
+.stat-value.green{color:var(--success);text-shadow:0 0 12px rgba(38,229,164,.4)}
+.stat-value.red{color:var(--danger);text-shadow:0 0 12px rgba(255,69,112,.4)}
+
+/* ── 操作栏 ── */
+.action-bar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid transparent;font-family:var(--font-body);white-space:nowrap}
+.btn svg{width:14px;height:14px}
+.btn-primary{background:linear-gradient(135deg,var(--primary),#00b8d4);color:#000;border-color:rgba(0,229,255,.4);box-shadow:0 0 14px rgba(0,229,255,.25)}
+.btn-primary:hover{box-shadow:0 0 22px rgba(0,229,255,.45);transform:translateY(-1px)}
+.btn-ghost{background:rgba(0,229,255,.06);color:var(--primary);border-color:var(--border)}
+.btn-ghost:hover{background:rgba(0,229,255,.12);border-color:var(--border-glow)}
+.btn-danger{background:rgba(255,69,112,.1);color:var(--danger);border-color:rgba(255,69,112,.25)}
+.btn-danger:hover{background:rgba(255,69,112,.18)}
+.btn-sm{padding:6px 11px;font-size:11px}
+
+/* ── 任务卡片（核心区） ── */
+.task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px}
+.task-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .25s;display:flex;flex-direction:column}
+.task-card:hover{border-color:var(--border-glow)}
+.task-card.running{border-color:rgba(38,229,164,.3);box-shadow:0 0 18px rgba(38,229,164,.06)}
+.task-card.error{border-color:rgba(255,69,112,.35);box-shadow:0 0 18px rgba(255,69,112,.06)}
+
+/* 卡片缩略图 */
+.task-thumb{position:relative;width:100%;padding-bottom:56.25%;background:#000;overflow:hidden;border-bottom:1px solid var(--border)}
+.task-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.task-thumb .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;background:linear-gradient(135deg,#0a1024,#04060f)}
+.task-thumb .placeholder svg{width:48px;height:48px;opacity:.3}
+.task-thumb .live-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;backdrop-filter:blur(8px)}
+.task-thumb .live-badge.off{color:var(--muted)}
+.task-thumb .live-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 5px currentColor}
+.task-thumb .live-badge.on .dot{animation:pulse 1.5s infinite}
+.task-thumb .fps-overlay{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);color:var(--primary);font-family:var(--font-display);font-size:11px;font-weight:700;backdrop-filter:blur(8px)}
+.task-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
+.task-thumb .mode-toggle{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:rgba(0,0,0,.55);padding:3px;border-radius:6px;backdrop-filter:blur(8px);border:1px solid rgba(0,229,255,.18)}
+.task-thumb .mode-toggle button{width:auto;padding:3px 9px;font-size:9px;font-weight:700;letter-spacing:.5px;border-radius:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-transform:uppercase;font-family:var(--font-display);transition:all .12s}
+.task-thumb .mode-toggle button.active{background:var(--primary);color:#000;box-shadow:0 0 8px rgba(0,229,255,.4)}
+.task-thumb .mode-toggle button:hover:not(.active){color:var(--primary);background:rgba(0,229,255,.1)}
+.task-thumb .stream-status{position:absolute;bottom:8px;left:8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);font-size:9px;font-weight:600;color:var(--muted);backdrop-filter:blur(8px);text-transform:uppercase;letter-spacing:.5px;display:none}
+.task-thumb .stream-status.show{display:inline-flex;align-items:center;gap:5px}
+.task-thumb .stream-status .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.task-thumb .stream-status.connecting{color:var(--warning)}
+.task-thumb .stream-status.playing{color:var(--success)}
+.task-thumb .stream-status.error{color:var(--danger)}
+
+/* 全局预览模式段塞 */
+.preview-mode-toggle{display:inline-flex;background:rgba(0,229,255,.06);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+.preview-mode-toggle button{padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.5px;border-radius:5px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-transform:uppercase;font-family:var(--font-display);transition:all .12s;display:inline-flex;align-items:center;gap:5px}
+.preview-mode-toggle button.active{background:var(--primary);color:#000;box-shadow:0 0 10px rgba(0,229,255,.3)}
+.preview-mode-toggle button:hover:not(.active){color:var(--primary)}
+.preview-mode-toggle button svg{width:11px;height:11px}
+
+.task-body{padding:14px;display:flex;flex-direction:column;gap:12px;flex:1}
+.task-header{display:flex;justify-content:space-between;align-items:flex-start}
+.task-id{font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--text);word-break:break-all}
+.task-name{font-size:11px;color:var(--muted);margin-top:2px}
+.task-status{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid transparent;white-space:nowrap;flex-shrink:0}
+.task-status.run{background:rgba(38,229,164,.12);color:var(--success);border-color:rgba(38,229,164,.3)}
+.task-status.sto{background:rgba(122,138,171,.12);color:var(--muted);border-color:rgba(122,138,171,.3)}
+.task-status.init{background:rgba(0,229,255,.12);color:var(--primary);border-color:rgba(0,229,255,.3)}
+.task-status.err{background:rgba(255,69,112,.12);color:var(--danger);border-color:rgba(255,69,112,.3)}
+.task-status .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.task-status.run .dot{box-shadow:0 0 5px currentColor;animation:pulse 2s infinite}
+
+/* URL 紧凑显示 */
+.url-row{display:flex;flex-direction:column;gap:6px}
+.url-line{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:7px;padding:6px 8px;min-width:0}
+.url-line .proto{flex-shrink:0;padding:1px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px}
+.url-line .proto.in{background:rgba(0,229,255,.15);color:var(--primary)}
+.url-line .proto.out{background:rgba(168,85,247,.15);color:var(--secondary)}
+.url-line .proto.preview{background:rgba(38,229,164,.15);color:var(--success)}
+.url-line .url-text{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.url-line .copy-btn{flex-shrink:0;width:22px;height:22px;border-radius:5px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.url-line .copy-btn:hover{background:rgba(0,229,255,.1);color:var(--primary)}
+.url-line .copy-btn svg{width:12px;height:12px}
+
+.task-models{display:flex;flex-wrap:wrap;gap:5px}
+.model-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(0,229,255,.08);color:var(--primary);border:1px solid rgba(0,229,255,.15)}
+
+.task-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.task-stat{text-align:center;padding:7px 4px;background:rgba(0,0,0,.2);border-radius:7px;border:1px solid var(--border)}
+.task-stat-num{font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--primary);line-height:1.2}
+.task-stat-label{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:2px;letter-spacing:.5px}
+
+.task-actions{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
+.task-actions .btn{flex:1;min-width:fit-content;justify-content:center;padding:7px 10px;font-size:11px}
+
+.task-error-msg{font-size:10px;color:var(--danger);font-family:var(--font-mono);border:1px solid rgba(255,69,112,.25);padding:7px 9px;border-radius:6px;background:rgba(255,69,112,.06);word-break:break-all}
+
+.task-empty{text-align:center;padding:60px 20px;color:var(--muted);border:1px dashed var(--border);border-radius:var(--radius)}
+.task-empty svg{width:50px;height:50px;fill:var(--muted);opacity:.4;margin-bottom:12px}
+
+/* ── 模型卡片 ── */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.model-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:all .25s}
+.model-card:hover{border-color:var(--border-glow);transform:translateY(-2px)}
+.model-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.model-name{font-family:var(--font-display);font-size:13px;font-weight:700}
+.model-type{padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:rgba(168,85,247,.12);color:var(--secondary);border:1px solid rgba(168,85,247,.25)}
+.model-path{font-family:var(--font-mono);font-size:10px;color:var(--muted);background:rgba(0,0,0,.22);padding:7px 9px;border-radius:6px;margin-bottom:12px;word-break:break-all;border:1px solid var(--border)}
+.model-props{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.model-prop{text-align:center}
+.model-prop-val{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--primary)}
+.model-prop-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px}
+.model-actions{display:flex;gap:6px}
+
+/* ── 终端日志 ── */
+.terminal{background:rgba(3,5,12,.92);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:18px}
+.terminal-header{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:rgba(0,229,255,.04)}
+.terminal-title{font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.terminal-title .indicator{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 7px var(--success);animation:pulse 2s infinite}
+.terminal-body{height:170px;overflow-y:auto;padding:10px 16px;font-family:var(--font-mono);font-size:11px;line-height:1.7}
+.log-line{display:flex;gap:10px;padding:1px 0}
+.log-time{color:#5a6685;flex-shrink:0;font-size:10px}
+.log-msg{color:var(--text)}
+.log-info .log-msg{color:var(--primary)}
+.log-ok .log-msg{color:var(--success)}
+.log-err .log-msg{color:var(--danger)}
+.log-warn .log-msg{color:var(--warning)}
+
+/* ── 弹窗 ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.active{display:flex}
+.modal{background:var(--panel-solid);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:760px;max-height:92vh;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(0,229,255,.08);animation:modalIn .25s ease;display:flex;flex-direction:column}
+.modal.large{max-width:980px}
+@keyframes modalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.modal-header{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:rgba(0,229,255,.04);flex-shrink:0}
+.modal-title{font-family:var(--font-display);font-size:14px;font-weight:700;letter-spacing:.5px}
+.modal-close{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px}
+.modal-close:hover{background:rgba(255,69,112,.1);color:var(--danger);border-color:rgba(255,69,112,.3)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0}
+
+/* 表单分组 */
+.form-section{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(0,0,0,.15)}
+.form-section-title{font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:1px;color:var(--primary);margin-bottom:12px;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.form-section-title::before{content:'';width:14px;height:2px;background:var(--primary);border-radius:1px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-row.full{grid-template-columns:1fr}
+.form-row.three{grid-template-columns:1fr 1fr 1fr}
+.form-row:last-child{margin-bottom:0}
+.form-label{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.form-input,.form-select{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:7px;padding:9px 11px;color:var(--text);font-size:12px;font-family:var(--font-body);outline:none;transition:all .15s}
+.form-input:focus,.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,229,255,.1)}
+.form-select option{background:var(--panel-solid);color:var(--text)}
+.form-input.mono{font-family:var(--font-mono);font-size:11px}
+
+.model-selector{border:1px solid var(--border);border-radius:7px;padding:8px;max-height:140px;overflow-y:auto;background:rgba(0,0,0,.22)}
+.model-selector label{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:6px;cursor:pointer;transition:background .12s;font-size:12px}
+.model-selector label:hover{background:rgba(0,229,255,.06)}
+.model-selector input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}
+
+/* 详情弹窗 */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.detail-item{background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
+.detail-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.detail-value{font-size:12px;color:var(--text);font-family:var(--font-mono);word-break:break-all}
+.detail-error{background:rgba(255,69,112,.08);border:1px solid rgba(255,69,112,.3);color:var(--danger);padding:9px 11px;border-radius:7px;font-size:11px;font-family:var(--font-mono);margin-bottom:14px}
+.detail-section-title{font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:var(--primary);margin:14px 0 8px;text-transform:uppercase}
+
+.preview-box{position:relative;width:100%;padding-bottom:56.25%;background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:14px}
+.preview-box video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.preview-box .preview-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);font-size:12px;text-align:center;padding:20px}
+.preview-controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+
+/* ── 详情弹窗双预览并排 ── */
+.detail-preview-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.detail-preview-col{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#000}
+.detail-preview-col .col-label{padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:rgba(0,229,255,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.detail-preview-col .col-label .tag{padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700}
+.detail-preview-col .col-label .tag.raw{background:rgba(255,204,0,.15);color:var(--warning)}
+.detail-preview-col .col-label .tag.ai{background:rgba(0,229,255,.15);color:var(--primary)}
+.detail-preview-col .col-video{position:relative;width:100%;padding-bottom:56.25%;background:#000}
+.detail-preview-col .col-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none}
+.detail-preview-col .col-video .col-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);font-size:11px;background:linear-gradient(135deg,#0a1024,#04060f)}
+.detail-preview-col .col-video .col-placeholder svg{width:36px;height:36px;opacity:.25}
+.detail-preview-col .col-url{font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:rgba(0,0,0,.25);border-top:1px solid var(--border);color:var(--muted);word-break:break-all;line-height:1.6;flex-shrink:0}
+.detail-preview-col .col-controls{display:flex;gap:4px;padding:6px;background:rgba(0,0,0,.15);border-top:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+.detail-preview-col .col-controls .btn{padding:4px 8px;font-size:9px;flex:1;justify-content:center}
+
+.detail-controls-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+
+.detail-chart{height:160px;margin-top:8px}
+
+/* Toast */
+#toastContainer{position:fixed;top:18px;right:18px;z-index:2000;display:flex;flex-direction:column;gap:9px}
+.toast{display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:9px;font-size:12px;font-weight:600;color:#000;box-shadow:0 8px 28px rgba(0,0,0,.4);animation:toastIn .25s ease;min-width:220px;max-width:380px;border:1px solid transparent}
+@keyframes toastIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger);color:#fff}
+.toast.info{background:var(--primary)}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.2)}
+::-webkit-scrollbar-thumb{background:rgba(0,229,255,.18);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,229,255,.32)}
+
+/* 响应式 */
+@media (max-width:1100px){.stats-grid{grid-template-columns:repeat(2,1fr)}.task-grid{grid-template-columns:1fr}}
+@media (max-width:768px){.sidebar{width:60px}.brand-logo span,.brand-sub,.nav-item span,.side-metrics{display:none}.nav-item{justify-content:center;padding:11px}.stats-grid{grid-template-columns:1fr}.form-row,.form-row.three{grid-template-columns:1fr}}
+
+.empty-title{font-family:var(--font-display);font-size:13px;color:var(--text);margin-bottom:5px;letter-spacing:.5px}
+.empty-desc{font-size:11px;color:var(--muted)}
 </style>
 </head>
 <body>
 
-<div class="sidebar">
-<div class="sidebar-brand">
-<div class="logo"><div class="ic"><i class="bi-camera-video-fill"></i></div>Mind<span>Vision</span></div>
-<small>GPU 加速视频分析平台</small>
-</div>
-<div class="sidebar-menu">
-<div class="item active" onclick="switchPage('dashboard',this)"><i class="bi-grid-3x3-gap-fill"></i> 控制台</div>
-<div class="item" onclick="switchPage('models',this)"><i class="bi-box-seam"></i> 模型管理</div>
-<div class="item" onclick="openModelModal()"><i class="bi-plus-circle"></i> 新建模型</div>
-<div class="item" onclick="openCreate()"><i class="bi-camera-video"></i> 新建任务</div>
-</div>
+<div class="bg"></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <div class="hex"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        NEXUS<span>AI</span>
+      </div>
+      <div class="brand-sub">智能视频分析指挥舱</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>指挥舱</span>
+      </div>
+      <div class="nav-item" data-page="models" onclick="switchPage('models')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>模型矩阵</span>
+      </div>
+    </nav>
+    <div class="side-metrics">
+      <div class="side-metric"><span>任务总数</span><span class="side-metric-val" id="sideTaskTotal">0</span></div>
+      <div class="side-metric"><span>运行中</span><span class="side-metric-val" id="sideTaskRun">0</span></div>
+      <div class="side-metric"><span>模型库</span><span class="side-metric-val" id="sideModelTotal">0</span></div>
+      <div class="side-metric"><span>异常</span><span class="side-metric-val" id="sideTaskErr">0</span></div>
+    </div>
+    <div class="nav-ftr">v2.1 INDUSTRIAL · GPU</div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title"><div class="line"></div><span id="pageTitle">指挥舱</span></div>
+      <div class="topbar-actions">
+        <div class="preview-mode-toggle" title="切换所有任务的预览方式">
+          <button id="modeBtnSnap" class="active" onclick="setGlobalPreviewMode('snapshot')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            缩略图
+          </button>
+          <button id="modeBtnLive" onclick="setGlobalPreviewMode('live')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            实时流
+          </button>
+        </div>
+        <button class="btn-icon" onclick="refreshAll()" title="刷新 (R)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+        <div id="connBadge" class="status-pill"><div class="dot"></div><span>已连接</span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- 指挥舱 -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card cyan"><div class="glow"></div><div class="stat-label">任务总数</div><div class="stat-value cyan" id="statTotal">0</div></div>
+          <div class="stat-card green"><div class="glow"></div><div class="stat-label">运行中</div><div class="stat-value green" id="statRunning">0</div></div>
+          <div class="stat-card purple"><div class="glow"></div><div class="stat-label">已停止</div><div class="stat-value purple" id="statStopped">0</div></div>
+          <div class="stat-card red"><div class="glow"></div><div class="stat-label">初始化失败</div><div class="stat-value red" id="statError">0</div></div>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="openTaskModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            新建任务
+          </button>
+          <button class="btn btn-ghost" onclick="stopAllTasks()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            全部停止
+          </button>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="card-header">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              实时任务监控
+            </div>
+            <span style="color:var(--muted);font-size:11px" id="taskCountLabel">0 个任务</span>
+          </div>
+          <div class="card-body">
+            <div id="taskContainer" class="task-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模型矩阵 -->
+      <div class="page" id="page-models">
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="openModelModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            部署模型
+          </button>
+          <button class="btn btn-ghost" onclick="loadModels()">刷新模型库</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              模型矩阵
+            </div>
+            <span style="color:var(--muted);font-size:11px" id="modelCountLabel">0 个模型</span>
+          </div>
+          <div class="card-body"><div id="modelContainer" class="model-grid"></div></div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-header">
+          <div class="terminal-title"><div class="indicator"></div> 系统日志 / SYSTEM LOG</div>
+          <button class="btn-icon" onclick="clearLogs()" title="清空">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+        </div>
+        <div class="terminal-body" id="logBody"></div>
+      </div>
+    </div>
+  </main>
 </div>
 
-<div class="main-content">
-<div class="topbar">
-<h5 class="ptitle" id="pageTitle"><i class="bi-grid-3x3-gap-fill"></i> 控制台</h5>
-<span id="connBadge" class="conn-badge on"><i class="bi-check-circle-fill"></i> 已连接</span>
+<!-- 新建任务 Modal -->
+<div class="modal-backdrop" id="taskModalBackdrop">
+  <div class="modal large">
+    <div class="modal-header">
+      <div class="modal-title">新建分析任务</div>
+      <button class="modal-close" onclick="closeTaskModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-section">
+        <div class="form-section-title">基础配置</div>
+        <div class="form-row">
+          <div><label class="form-label">任务 ID *</label><input class="form-input mono" id="f_id" placeholder="cam01"></div>
+          <div><label class="form-label">任务名称</label><input class="form-input" id="f_name" placeholder="主入口摄像头"></div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">输入视频源 (RTSP/RTMP/HTTP/文件) *</label>
+            <input class="form-input mono" id="f_input" placeholder="rtsp://192.168.1.100:554/stream" value="rtsp://127.0.0.1:554/live/obs_test3"></div>
+        </div>
+        <div class="form-row">
+          <div><label class="form-label">输出地址 *</label>
+            <input class="form-input mono" id="f_output" placeholder="rtsp://127.0.0.1:554/live/out" value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
+          <div><label class="form-label">浏览器预览地址 (HTTP-FLV，可选)</label>
+            <input class="form-input mono" id="f_preview" placeholder="http://127.0.0.1:80/live/cam01.flv"></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">编码器参数</div>
+        <div class="form-row three">
+          <div><label class="form-label">输出格式</label>
+            <select class="form-select" id="f_enc_format">
+              <option value="auto">自动 (按 URL)</option>
+              <option value="rtsp">RTSP</option>
+              <option value="rtmp">RTMP (FLV)</option>
+              <option value="flv">HTTP-FLV / 文件</option>
+              <option value="mp4">MP4 文件</option>
+              <option value="mpegts">MPEG-TS</option>
+              <option value="matroska">MKV</option>
+            </select></div>
+          <div><label class="form-label">编码器</label>
+            <select class="form-select" id="f_enc_codec">
+              <option value="auto">自动 (优先 x264)</option>
+              <option value="libx264">libx264 (CPU)</option>
+              <option value="h264_nvenc">h264_nvenc (NVIDIA)</option>
+            </select></div>
+          <div><label class="form-label">FPS</label>
+            <input class="form-input" id="f_enc_fps" type="number" min="1" max="120" value="25"></div>
+        </div>
+        <div class="form-row three">
+          <div><label class="form-label">码率 (kbps)</label>
+            <input class="form-input" id="f_enc_bitrate" type="number" min="100" value="4000"></div>
+          <div><label class="form-label">GOP (关键帧间隔)</label>
+            <input class="form-input" id="f_enc_gop" type="number" min="1" value="50"></div>
+          <div><label class="form-label">B 帧数</label>
+            <input class="form-input" id="f_enc_b" type="number" min="0" max="3" value="0"></div>
+        </div>
+        <div class="form-row three">
+          <div><label class="form-label">Preset</label>
+            <select class="form-select" id="f_enc_preset">
+              <option value="ultrafast">ultrafast</option>
+              <option value="superfast">superfast</option>
+              <option value="veryfast">veryfast</option>
+              <option value="faster">faster</option>
+              <option value="fast">fast</option>
+              <option value="medium">medium</option>
+              <option value="slow">slow</option>
+            </select></div>
+          <div><label class="form-label">Tune (仅 x264)</label>
+            <select class="form-select" id="f_enc_tune">
+              <option value="zerolatency">zerolatency</option>
+              <option value="film">film</option>
+              <option value="animation">animation</option>
+              <option value="">none</option>
+            </select></div>
+          <div><label class="form-label">低延迟模式</label>
+            <select class="form-select" id="f_enc_ll">
+              <option value="true">开启</option>
+              <option value="false">关闭</option>
+            </select></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">解码器参数</div>
+        <div class="form-row">
+          <div><label class="form-label">硬件加速</label>
+            <select class="form-select" id="f_dec_hw">
+              <option value="cuda">CUDA (NVIDIA)</option>
+              <option value="none">禁用 (软解)</option>
+            </select></div>
+          <div><label class="form-label">RTSP 传输</label>
+            <select class="form-select" id="f_dec_transport">
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+            </select></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">关联模型 *</div>
+        <div class="model-selector" id="modelCheckboxes"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeTaskModal()">取消</button>
+      <button class="btn btn-primary" onclick="createTask()">创建并启动</button>
+    </div>
+  </div>
 </div>
 
-<div class="content">
+<!-- 模型 Modal -->
+<div class="modal-backdrop" id="modelModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">部署推理模型</div>
+      <button class="modal-close" onclick="closeModelModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">基础信息</div>
+        <div class="form-row">
+          <div><label class="form-label">模型名称 *</label><input class="form-input mono" id="mf_name" placeholder="yolo11n"></div>
+          <div>
+            <label class="form-label">模型类型</label>
+            <select class="form-select" id="mf_type">
+              <option value="detection">目标检测</option>
+              <option value="classification">图像分类</option>
+              <option value="face_detection">人脸检测</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">模型文件路径 *</label>
+            <input class="form-input mono" id="mf_path" placeholder="/models/yolo11n.onnx" value="E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx"></div>
+        </div>
+      </div>
 
-<!-- ===== 控制台页面 ===== -->
-<div class="page active" id="pageDashboard">
-<div class="stats-row" id="statsRow"></div>
-<div class="action-bar">
-<button class="btn-pri" onclick="openCreate()"><i class="bi-plus-lg"></i> 新建任务</button>
-<button class="btn-ghost" onclick="refresh()"><i class="bi-arrow-clockwise"></i> 刷新</button>
-</div>
-<div class="card-panel">
-<div class="ph"><h6><i class="bi-list-task"></i> 任务列表</h6><span style="font-size:11px;color:#9ca3af">共 <strong id="taskCount">0</strong> 个任务</span></div>
-<div id="tableContainer"><div class="empty-state"><i class="bi-inbox"></i><p>暂无任务</p></div></div>
-</div>
-</div>
-
-<!-- ===== 模型管理页面 ===== -->
-<div class="page" id="pageModels">
-<div class="action-bar">
-<button class="btn-pri" onclick="openModelModal()"><i class="bi-plus-lg"></i> 添加模型</button>
-<button class="btn-ghost" onclick="loadModels()"><i class="bi-arrow-clockwise"></i> 刷新</button>
-</div>
-<div class="card-panel">
-<div class="ph"><h6><i class="bi-box-seam"></i> 模型库</h6><span style="font-size:11px;color:#9ca3af" id="modelCount">0 个模型</span></div>
-<div id="modelContainer"><div class="empty-state"><i class="bi-box"></i><p>暂无模型</p></div></div>
-</div>
-</div>
-
-<!-- ===== 日志面板 ===== -->
-<div class="log-panel">
-<div class="lh"><h6><i class="bi-journal-text"></i> 操作日志</h6><span id="logCount" style="font-size:10px;color:#9ca3af">0 条</span></div>
-<div class="lb" id="logBody"><span class="tm">系统初始化完成</span></div>
-</div>
-</div>
+      <div class="form-section">
+        <div class="form-section-title">推理参数</div>
+        <div class="form-row">
+          <div>
+            <label class="form-label">推理后端</label>
+            <select class="form-select" id="mf_backend"><option value="ort">ONNX Runtime</option><option value="trt">TensorRT</option><option value="mnn">MNN</option></select>
+          </div>
+          <div>
+            <label class="form-label">运行设备</label>
+            <select class="form-select" id="mf_device"><option value="gpu">GPU</option><option value="cpu">CPU</option></select>
+          </div>
+        </div>
+        <div class="form-row three">
+          <div><label class="form-label">置信度阈值</label><input class="form-input" id="mf_threshold" type="number" step="0.05" min="0" max="1" value="0.5"></div>
+          <div><label class="form-label">推理间隔 (帧)</label><input class="form-input" id="mf_interval" type="number" min="1" value="1"></div>
+          <div><label class="form-label">输入尺寸</label>
+            <div style="display:flex;gap:5px"><input class="form-input" id="mf_w" type="number" value="640"><input class="form-input" id="mf_h" type="number" value="640"></div>
+          </div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">ROI (x,y,w,h，留空 0,0,0,0 表示全图)</label><input class="form-input mono" id="mf_roi" value="0,0,0,0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModelModal()">取消</button>
+      <button class="btn btn-primary" onclick="addModel()">保存到模型库</button>
+    </div>
+  </div>
 </div>
 
-<!-- 新建任务弹窗 -->
-<div class="modal fade" id="createModal" tabindex="-1">
-<div class="modal-dialog modal-lg modal-dialog-centered">
-<div class="modal-content">
-<div class="modal-header"><h5 class="modal-title"><i class="bi-plus-circle"></i> 新建任务</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-<div class="modal-body">
-<div class="row g-3">
-<div class="col-md-6"><label class="form-label">任务 ID</label><input class="form-control" id="f_id" placeholder="例如 cam1"></div>
-<div class="col-md-6"><label class="form-label">任务名称</label><input class="form-control" id="f_name" placeholder="例如 主入口"></div>
-<div class="col-12"><label class="form-label">输入 RTSP 地址</label><input class="form-control" id="f_input" placeholder="rtsp://..." value="rtsp://127.0.0.1:554/live/obs_test3"></div>
-<div class="col-md-4"><label class="form-label">输出类型</label><select class="form-select" id="f_outtype" onchange="onOutChange()"><option value="rtsp">RTSP 推流</option><option value="mp4">MP4 文件</option></select></div>
-<div class="col-md-8"><label class="form-label" id="f_outlabel">输出 RTSP 地址</label><input class="form-control" id="f_output" placeholder="rtsp://目标地址" value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
-<div class="col-12"><label class="form-label">关联模型 <span style="color:#9ca3af;font-weight:400">（勾选需要使用的模型）</span></label><div class="select-models" id="modelCheckboxes"></div></div>
-</div>
-</div>
-<div class="modal-footer">
-<button type="button" class="btn-ghost" data-bs-dismiss="modal">取消</button>
-<button type="button" class="btn-pri" onclick="createTask()"><i class="bi-play-fill"></i> 创建并启动</button>
-</div>
-</div>
-</div>
-</div>
-
-<!-- 添加模型弹窗 -->
-<div class="modal fade" id="modelModal" tabindex="-1">
-<div class="modal-dialog modal-dialog-centered">
-<div class="modal-content">
-<div class="modal-header"><h5 class="modal-title"><i class="bi-plus-circle"></i> 添加模型</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-<div class="modal-body">
-<div class="row g-3">
-<div class="col-6"><label class="form-label">模型名称</label><input class="form-control" id="mf_name" placeholder="例如 yolo11n"></div>
-<div class="col-6"><label class="form-label">模型类型</label><select class="form-select" id="mf_type"><option value="detection">检测 (Detection)</option><option value="classification">分类 (Classification)</option><option value="face_detection">人脸检测</option><option value="lpr_pipeline">车牌识别</option><option value="pose">关键点</option></select></div>
-<div class="col-12"><label class="form-label">模型文件路径</label><input class="form-control" id="mf_path" placeholder="例如 /models/yolo11n.onnx" value="E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx"></div>
-<div class="col-6"><label class="form-label">推理后端</label><select class="form-select" id="mf_backend"><option value="ort">ONNX Runtime</option><option value="trt">TensorRT</option><option value="mnn">MNN</option></select></div>
-<div class="col-6"><label class="form-label">运行设备</label><select class="form-select" id="mf_device"><option value="gpu">GPU</option><option value="cpu">CPU</option></select></div>
-<div class="col-4"><label class="form-label">置信度阈值</label><input class="form-control" id="mf_threshold" value="0.5" type="number" step="0.05" min="0" max="1"></div>
-<div class="col-4"><label class="form-label">输入宽度</label><input class="form-control" id="mf_w" value="640" type="number"></div>
-<div class="col-4"><label class="form-label">输入高度</label><input class="form-control" id="mf_h" value="640" type="number"></div>
-<div class="col-6"><label class="form-label">推理间隔（帧）</label><input class="form-control" id="mf_interval" value="1" type="number" min="1"></div>
-<div class="col-6"><label class="form-label">ROI 区域 <span style="color:#9ca3af;font-weight:400">(x,y,w,h)</span></label><input class="form-control" id="mf_roi" placeholder="留空表示全图" value="0,0,0,0"></div>
-</div>
-</div>
-<div class="modal-footer">
-<button type="button" class="btn-ghost" data-bs-dismiss="modal">取消</button>
-<button type="button" class="btn-pri" onclick="addModel()"><i class="bi-check-lg"></i> 保存模型</button>
-</div>
-</div>
-</div>
+<!-- 任务详情 Modal -->
+<div class="modal-backdrop" id="detailModalBackdrop">
+  <div class="modal large">
+    <div class="modal-header">
+      <div class="modal-title">任务详情</div>
+      <button class="modal-close" onclick="closeDetailModal()">×</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
+    </div>
+  </div>
 </div>
 
 <div id="toastContainer"></div>
 
-<script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-var createModal=null,modelModal=null,allModels=[],currentPage='dashboard';
-document.addEventListener('DOMContentLoaded',function(){createModal=new bootstrap.Modal(document.getElementById('createModal'));modelModal=new bootstrap.Modal(document.getElementById('modelModal'));loadModels()});
+// ── 状态 ──
+var allModels=[],allTasks=[],currentPage='dashboard';
+var taskCardEls={};   // id -> DOM 节点引用
+var taskCharts={},detailChart=null,fpsHistory={};
+var refreshTimer=null;
+var flvPlayer=null;        // 详情弹窗里的 flv 播放器
+var detailTaskId=null;
+// 全局预览模式：'snapshot' 或 'live'。每个卡片可单独覆盖（cardModeOverride[id]）。
+var globalPreviewMode = (localStorage.getItem('previewMode')||'snapshot');
+var cardModeOverride={};   // id -> 'snapshot'|'live'，没设置时跟随 global
+var cardPlayers={};        // id -> flv.js Player 实例
 
-function log(msg,tp){tp=tp||'info';var b=document.getElementById('logBody');var d=new Date();var ts=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');b.innerHTML+='<div><span class="tm">['+ts+']</span> <span class="'+tp+'">'+esc(msg)+'</span></div>';b.scrollTop=b.scrollHeight;var c=parseInt(document.getElementById('logCount').textContent)||0;document.getElementById('logCount').textContent=(c+1)+' 条'}
-function toast(msg,t){var c=document.getElementById('toastContainer');var d=document.createElement('div');d.className='toast-item '+(t||'info');var icon=t=='danger'?'bi-exclamation-circle':t=='success'?'bi-check-circle':'bi-info-circle';d.innerHTML='<i class="'+icon+'"></i>'+esc(msg);c.appendChild(d);setTimeout(function(){d.remove()},3800)}
-function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function api(m,u,b,cb){var x=new XMLHttpRequest();x.open(m,u,true);x.setRequestHeader('Content-Type','application/json');x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){cb({ok:false});document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> 断开'}}
-function switchPage(page,el){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});document.getElementById('page'+page.charAt(0).toUpperCase()+page.slice(1)).classList.add('active');document.querySelectorAll('.sidebar-menu .item').forEach(function(i){i.classList.remove('active')});if(el)el.classList.add('active');currentPage=page;document.getElementById('pageTitle').innerHTML=(page==='dashboard'?'<i class="bi-grid-3x3-gap-fill"></i> 控制台':'<i class="bi-box-seam"></i> 模型管理')}
-function onOutChange(){var t=document.getElementById('f_outtype').value;document.getElementById('f_outlabel').textContent=t=='mp4'?'输出文件路径':'输出 RTSP 地址';document.getElementById('f_output').placeholder=t=='mp4'?'E:/output.mp4':'rtsp://目标地址'}
-function openCreate(){if(createModal)createModal.show()}
+var ICONS={
+  play:'<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  detail:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'
+};
 
-// ── 模型管理 ──
+// ── 初始化 ──
+document.addEventListener('DOMContentLoaded',function(){
+  // 同步全局预览模式按钮
+  $('modeBtnSnap').classList.toggle('active',globalPreviewMode==='snapshot');
+  $('modeBtnLive').classList.toggle('active',globalPreviewMode==='live');
+  loadModels();refreshAll();
+  refreshTimer=setInterval(refreshAll,2000);
+  pollThumbnails();    // 链式轮询缩略图（self-scheduling）
+  log('NEXUS 指挥舱已上线','ok');
+});
+
+function $(id){return document.getElementById(id)}
+function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function typeLabel(t){var m={detection:'检测',classification:'分类',face_detection:'人脸',lpr_pipeline:'车牌',pose:'姿态'};return m[t]||t}
+
+function api(method,url,body,cb){
+  var x=new XMLHttpRequest();x.open(method,url,true);
+  if(body)x.setRequestHeader('Content-Type','application/json');
+  x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false,msg:'invalid json'}}setConnection(true);cb(r)};
+  x.onerror=function(){setConnection(false);cb({ok:false,msg:'network error'})};
+  x.send(body||null);
+}
+function setConnection(ok){
+  var el=$('connBadge');
+  if(ok){el.className='status-pill';el.innerHTML='<div class="dot"></div><span>已连接</span>'}
+  else{el.className='status-pill off';el.innerHTML='<div class="dot"></div><span>连接中断</span>'}
+}
+function log(msg,type){
+  type=type||'info';var b=$('logBody');var d=new Date();
+  var ts=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+  var line=document.createElement('div');line.className='log-line log-'+type;
+  line.innerHTML='<span class="log-time">['+ts+']</span><span class="log-msg">'+esc(msg)+'</span>';
+  b.appendChild(line);b.scrollTop=b.scrollHeight;
+  while(b.children.length>250)b.removeChild(b.firstChild);
+}
+function clearLogs(){$('logBody').innerHTML=''}
+function toast(msg,type){
+  type=type||'info';var c=$('toastContainer');var d=document.createElement('div');
+  d.className='toast '+(type==='danger'?'error':type);d.textContent=msg;
+  c.appendChild(d);setTimeout(function(){d.remove()},4000);
+}
+function copyText(text){
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(function(){toast('已复制','success')},function(){toast('复制失败','danger')})}
+  else{var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('已复制','success')}catch(e){toast('复制失败','danger')}
+    document.body.removeChild(ta)}
+}
+
+// ── 协议识别 ──
+function urlProto(u){
+  if(!u)return '';
+  if(u.indexOf('rtsp://')===0)return 'RTSP';
+  if(u.indexOf('rtmp://')===0)return 'RTMP';
+  if(u.indexOf('http://')===0||u.indexOf('https://')===0){
+    if(/\.flv($|\?)/i.test(u))return 'FLV';
+    if(/\.m3u8($|\?)/i.test(u))return 'HLS';
+    return 'HTTP';
+  }
+  if(/\.mp4$/i.test(u))return 'MP4';
+  if(/\.flv$/i.test(u))return 'FLV';
+  if(/\.ts$/i.test(u))return 'TS';
+  if(/\.mkv$/i.test(u))return 'MKV';
+  return 'FILE';
+}
+
+// ── 导航 ──
+function switchPage(page){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  $('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});
+  var nav=document.querySelector('.nav-item[data-page="'+page+'"]');if(nav)nav.classList.add('active');
+  currentPage=page;
+  $('pageTitle').textContent=page==='dashboard'?'指挥舱':'模型矩阵';
+}
+
+// ── 模型 ──
 function loadModels(){
- api('GET','/api/v1/models',null,function(r){
-  allModels=r.ok&&r.models?r.models:[];
-  document.getElementById('modelCount').textContent=allModels.length+' 个模型';
-  var mc=document.getElementById('modelContainer');var mcb=document.getElementById('modelCheckboxes');
-  if(allModels.length===0){mc.innerHTML='<div class="empty-state"><i class="bi-box"></i><p>暂无模型，点击「添加模型」创建</p></div>';mcb.innerHTML='<span style="color:#9ca3af;font-size:11px">暂无模型，请先在模型管理中创建</span>';return}
-  // model cards
-  var h='<div class="model-grid">';
-  allModels.forEach(function(m){
-   h+='<div class="model-card"><div class="mc-hdr"><span class="mc-nm">'+esc(m.name)+'</span><span class="mc-ty">'+typeLabel(m.type)+'</span></div><div class="mc-body">'+
-    '<div>路径：<span class="tag">'+esc(m.path)+'</span></div><div>后端：<span class="tag">'+esc(m.backend)+'</span> | 设备：<span class="tag">'+esc(m.device)+'</span> | 输入：<span class="tag">'+m.input_size[0]+'x'+m.input_size[1]+'</span> | 阈值：<span class="tag">'+m.confidence_threshold+'</span></div>'+
-    '</div><div class="mc-acts">'+
-    '<button class="btn-sm-ghost" onclick="deleteModel(\''+esc(m.name)+'\')"><i class="bi-trash3"></i> 删除</button></div></div>';
+  api('GET','/api/v1/models',null,function(r){
+    if(!r.ok){return}
+    allModels=r.models||[];
+    $('modelCountLabel').textContent=allModels.length+' 个模型';
+    renderModels();renderModelSelector();
   });
-  h+='</div>';mc.innerHTML=h;
-  // checkboxes for task creation
-  var c='';allModels.forEach(function(m){c+='<label><input type="checkbox" class="form-check-input me-1" value=\''+esc(m.name)+'\'> <strong>'+esc(m.name)+'</strong> <span style="color:#9ca3af;font-size:10px">['+typeLabel(m.type)+']</span></label>'});
-  mcb.innerHTML=c;
- })
 }
-function typeLabel(t){var m={detection:'检测',classification:'分类',face_detection:'人脸',lpr_pipeline:'车牌',pose:'关键点'};return m[t]||t}
-function openModelModal(){if(modelModal)modelModal.show()}
+function renderModels(){
+  var c=$('modelContainer');
+  if(allModels.length===0){c.innerHTML='<div class="task-empty"><div class="empty-title">模型库为空</div><div class="empty-desc">点击「部署模型」添加第一个推理模型</div></div>';return}
+  var h='';
+  allModels.forEach(function(m){
+    h+='<div class="model-card">'+
+      '<div class="model-card-header"><div class="model-name">'+esc(m.name)+'</div><div class="model-type">'+typeLabel(m.type)+'</div></div>'+
+      '<div class="model-path">'+esc(m.path)+'</div>'+
+      '<div class="model-props">'+
+        '<div class="model-prop"><div class="model-prop-val">'+esc(m.backend)+'</div><div class="model-prop-lbl">后端</div></div>'+
+        '<div class="model-prop"><div class="model-prop-val">'+esc(m.device)+'</div><div class="model-prop-lbl">设备</div></div>'+
+        '<div class="model-prop"><div class="model-prop-val">'+m.input_size[0]+'×'+m.input_size[1]+'</div><div class="model-prop-lbl">输入</div></div>'+
+      '</div>'+
+      '<div class="model-actions">'+
+        '<button class="btn btn-danger btn-sm" onclick="deleteModel(\''+esc(m.name)+'\')">'+ICONS.trash+' 删除</button>'+
+      '</div></div>';
+  });
+  c.innerHTML=h;
+}
+function renderModelSelector(){
+  var c=$('modelCheckboxes');
+  if(allModels.length===0){c.innerHTML='<div style="color:var(--muted);font-size:11px;padding:6px">模型库为空，请先部署模型</div>';return}
+  var h='';allModels.forEach(function(m){h+='<label><input type="checkbox" value="'+esc(m.name)+'"> <strong>'+esc(m.name)+'</strong> <span style="color:var(--muted)">['+typeLabel(m.type)+']</span></label>'});
+  c.innerHTML=h;
+}
 function addModel(){
- var name=document.getElementById('mf_name').value.trim();if(!name){toast('请输入模型名称','danger');return}
- var type=document.getElementById('mf_type').value,path=document.getElementById('mf_path').value.trim();
- if(!path){toast('请输入模型文件路径','danger');return}
- var backend=document.getElementById('mf_backend').value,device=document.getElementById('mf_device').value;
- var threshold=parseFloat(document.getElementById('mf_threshold').value)||0.5;
- var w=parseInt(document.getElementById('mf_w').value)||640,h=parseInt(document.getElementById('mf_h').value)||640;
- var interval=parseInt(document.getElementById('mf_interval').value)||1;
- var roi=document.getElementById('mf_roi').value||'0,0,0,0';var rp=roi.split(',').map(function(x){return parseInt(x)||0});
- var body=JSON.stringify({name:name,type:type,path:path,backend:backend,device:device,confidence_threshold:threshold,input_size:[w,h],interval:interval,roi:[rp[0],rp[1],rp[2],rp[3]]});
- log('正在添加模型：'+name,'info');
- api('POST','/api/v1/models',body,function(r){
-  if(r.ok){toast('模型 "'+name+'" 已添加','success');log('模型添加成功：'+name+' ['+type+']','ok');if(modelModal)modelModal.hide();loadModels()}
-  else{toast('添加失败：'+(r.msg||'名称可能已存在'),'danger');log('模型添加失败：'+name+' - '+(r.msg||'名称重复'),'err')}
- })
+  var name=$('mf_name').value.trim();if(!name){toast('请输入模型名称','danger');return}
+  var roiStr=$('mf_roi').value||'0,0,0,0';var roi=roiStr.split(',').map(function(x){return parseInt(x)||0});
+  var body=JSON.stringify({
+    name:name,type:$('mf_type').value,path:$('mf_path').value.trim(),
+    backend:$('mf_backend').value,device:$('mf_device').value,
+    confidence_threshold:parseFloat($('mf_threshold').value)||0.5,
+    input_size:[parseInt($('mf_w').value)||640,parseInt($('mf_h').value)||640],
+    interval:parseInt($('mf_interval').value)||1,
+    roi:[roi[0]||0,roi[1]||0,roi[2]||0,roi[3]||0]
+  });
+  api('POST','/api/v1/models',body,function(r){
+    if(r.ok){toast('模型「'+name+'」已部署','success');log('模型部署成功：'+name,'ok');closeModelModal();loadModels()}
+    else{toast('部署失败：'+(r.msg||''),'danger');log('模型部署失败：'+name+' - '+(r.msg||''),'err')}
+  });
 }
-function deleteModel(name){if(!confirm('删除模型 "'+name+'" ？'))return;api('DELETE','/api/v1/models/'+encodeURIComponent(name),null,function(r){if(r.ok){toast('模型已删除','success');log('模型删除：'+name,'ok');loadModels()}else{toast('删除失败','danger')}})}
+function deleteModel(name){
+  if(!confirm('确认删除模型「'+name+'」？'))return;
+  api('DELETE','/api/v1/models/'+encodeURIComponent(name),null,function(r){
+    if(r.ok){toast('模型已删除','success');log('模型删除：'+name,'ok');loadModels()}
+    else{toast('删除失败','danger')}
+  });
+}
 
-// ── 任务管理 ──
-function render(tasks){
- var s=document.getElementById('statsRow');
- s.innerHTML='<div class="stat-card"><div class="si blue"><i class="bi-camera-video"></i></div><div class="num blue">'+tasks.length+'</div><div class="lbl">总任务数</div></div><div class="stat-card"><div class="si green"><i class="bi-play-circle"></i></div><div class="num green">'+tasks.filter(function(t){return t.running}).length+'</div><div class="lbl">运行中</div></div><div class="stat-card"><div class="si red"><i class="bi-stop-circle"></i></div><div class="num red">'+tasks.filter(function(t){return !t.running}).length+'</div><div class="lbl">已停止</div></div>';
- document.getElementById('taskCount').textContent=tasks.length;
- var tc=document.getElementById('tableContainer');
- if(tasks.length===0){tc.innerHTML='<div class="empty-state"><i class="bi-inbox"></i><p>暂无任务</p></div>';return}
- var h='<table class="table"><thead><tr><th style="width:36px">#</th><th>任务</th><th>输入地址</th><th>输出地址</th><th>模型</th><th style="width:80px">状态</th><th style="width:104px">操作</th></tr></thead><tbody>';
- tasks.forEach(function(t,i){
-  var ms='';if(t.models){t.models.forEach(function(m){ms+='<span class="tag-model">'+esc(m.name)+'</span>'})}
-  h+='<tr><td style="color:#9ca3af;font-weight:500">'+(i+1)+'</td>'+
-   '<td><div class="fname">'+esc(t.id)+'</div>'+(t.name?'<div class="fsub">'+esc(t.name)+'</div>':'')+'</td>'+
-   '<td><div class="cell-url" title="'+esc(t.input_url)+'">'+esc(t.input_url||'-')+'</div></td>'+
-   '<td><div class="cell-url" title="'+esc(t.output_url)+'">'+esc(t.output_url||'-')+'</div></td>'+
-   '<td><div>'+(ms||'<span style="color:#d0d5dd;font-size:10px">-</span>')+'</div></td>'+
-   '<td><span class="badge-task '+(t.running?'run':'sto')+'"><i class="bi-circle-fill" style="font-size:5px"></i>'+(t.running?'运行中':'已停止')+'</span></td>'+
-   '<td><div style="display:flex;gap:3px">'+
-    (t.running?'<button class="btn-icon stop" onclick="stopTask(\''+t.id+'\')" title="停止"><i class="bi-stop-fill"></i></button>':'<button class="btn-icon play" onclick="startTask(\''+t.id+'\')" title="启动"><i class="bi-play-fill"></i></button>')+
-    '<button class="btn-icon del" onclick="deleteTask(\''+t.id+'\')" title="删除"><i class="bi-trash3"></i></button>'+
-   '</div></td></tr>';
- });
- h+='</tbody></table>';tc.innerHTML=h;
+// ── 任务 ──
+function refreshAll(){
+  api('GET','/api/v1/tasks',null,function(r){
+    if(r.ok){allTasks=r.tasks||[];renderStats();renderTasks();loadMetrics()}
+  });
 }
-function refresh(){
- api('GET','/api/v1/tasks',null,function(r){
-  if(r.ok&&r.tasks){render(r.tasks);document.getElementById('connBadge').className='conn-badge on';document.getElementById('connBadge').innerHTML='<i class="bi-check-circle-fill"></i> 已连接';log('任务列表已刷新，共 '+r.tasks.length+' 个任务','info')}
-  else{document.getElementById('connBadge').className='conn-badge off';document.getElementById('connBadge').innerHTML='<i class="bi-exclamation-circle-fill"></i> 断开'}
- })
+function loadMetrics(){
+  api('GET','/api/v1/metrics',null,function(r){
+    if(!r.ok||!r.metrics)return;var m=r.metrics;
+    $('sideTaskTotal').textContent=m.tasks_total;
+    $('sideTaskRun').textContent=m.tasks_running;
+    $('sideModelTotal').textContent=m.models_total;
+    $('sideTaskErr').textContent=m.tasks_error;
+  });
 }
+function renderStats(){
+  var total=allTasks.length;
+  var running=allTasks.filter(function(t){return t.running}).length;
+  var error=allTasks.filter(function(t){return !!t.init_error}).length;
+  $('statTotal').textContent=total;$('statRunning').textContent=running;
+  $('statStopped').textContent=total-running;$('statError').textContent=error;
+  $('taskCountLabel').textContent=total+' 个任务';
+}
+
+function urlLine(label,proto,url){
+  if(!url)return '';
+  return '<div class="url-line">'+
+    '<span class="proto '+label+'">'+proto+'</span>'+
+    '<span class="url-text" title="'+esc(url)+'">'+esc(url)+'</span>'+
+    '<button class="copy-btn" title="复制" onclick="event.stopPropagation();copyText(\''+esc(url).replace(/'/g,"\\'")+'\')">'+ICONS.copy+'</button>'+
+    '</div>';
+}
+
+function renderTasks(){
+  var c=$('taskContainer');
+  if(allTasks.length===0){
+    // 无任务时清理已存在的 DOM
+    c.innerHTML='<div class="task-empty">'+ICONS.cam+'<div class="empty-title">暂无任务</div><div class="empty-desc">点击右上角「新建任务」开始多路多模型推理</div></div>';
+    Object.keys(taskCardEls).forEach(function(k){delete taskCardEls[k]});
+    return;
+  }
+  // 清理 empty 占位
+  if(c.querySelector('.task-empty'))c.innerHTML='';
+
+  var liveSet={};
+  allTasks.forEach(function(t){
+    liveSet[t.id]=true;
+    var stats=t.stats||{};
+    var fpsNum=stats.fps?parseFloat(stats.fps.toFixed(1)):0;
+    var fps=fpsNum.toFixed(1);
+    var infer=stats.avg_infer_ms?stats.avg_infer_ms.toFixed(1):'-';
+    var encMs=stats.avg_encode_ms?stats.avg_encode_ms.toFixed(1):'-';
+    var frames=stats.frames||0;
+    var liveOn=t.running&&t.initialized;
+
+    var statusCls,statusText,statusDot;
+    if(t.running&&t.initialized){statusCls='run';statusText='运行中';statusDot=true}
+    else if(t.running&&!t.initialized){statusCls='init';statusText='初始化中';statusDot=true}
+    else if(!t.running&&t.init_error){statusCls='err';statusText='失败';statusDot=false}
+    else{statusCls='sto';statusText='已停止';statusDot=false}
+
+    var modelsHtml='';
+    if(t.models&&t.models.length){
+      t.models.forEach(function(m){modelsHtml+='<span class="model-tag">'+esc(m.name)+'</span>'});
+    } else {
+      modelsHtml='<span style="color:var(--muted);font-size:10px">无模型</span>';
+    }
+
+    var entry=taskCardEls[t.id];
+    if(!entry){
+      // 首次创建：构建完整 DOM
+      var card=document.createElement('div');
+      card.className='task-card';
+      card.innerHTML=
+        '<div class="task-thumb">'+
+          '<img class="thumb-img" alt="snapshot" style="display:none">'+
+          '<video class="thumb-video" muted playsinline></video>'+
+          '<div class="placeholder">'+ICONS.cam+'<div class="placeholder-text" style="margin-top:6px;font-size:10px">未启动</div></div>'+
+          '<div class="live-badge off"><div class="dot"></div><span class="live-text">OFF</span></div>'+
+          '<div class="fps-overlay" style="display:none">0.0 FPS</div>'+
+          '<div class="stream-status"><div class="dot"></div><span class="ss-text">连接中</span></div>'+
+          '<div class="mode-toggle">'+
+            '<button data-mode="snapshot" title="JPEG 缩略图">缩略图</button>'+
+            '<button data-mode="live" title="实时流 (HTTP-FLV)">实时</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="task-body">'+
+          '<div class="task-header">'+
+            '<div><div class="task-id"></div><div class="task-name"></div></div>'+
+            '<div class="task-status sto"><div class="dot" style="display:none"></div><span class="status-text">已停止</span></div>'+
+          '</div>'+
+          '<div class="url-row"></div>'+
+          '<div class="task-models"></div>'+
+          '<div class="task-stats">'+
+            '<div class="task-stat"><div class="task-stat-num stat-fps">0.0</div><div class="task-stat-label">FPS</div></div>'+
+            '<div class="task-stat"><div class="task-stat-num stat-infer">-</div><div class="task-stat-label">推理 ms</div></div>'+
+            '<div class="task-stat"><div class="task-stat-num stat-enc">-</div><div class="task-stat-label">编码 ms</div></div>'+
+            '<div class="task-stat"><div class="task-stat-num stat-frames">0</div><div class="task-stat-label">帧数</div></div>'+
+          '</div>'+
+          '<div class="task-actions"></div>'+
+          '<div class="task-error-msg" style="display:none"></div>'+
+        '</div>';
+      c.appendChild(card);
+      entry={
+        root:card,
+        thumbWrap:card.querySelector('.task-thumb'),
+        img:card.querySelector('.thumb-img'),
+        video:card.querySelector('.thumb-video'),
+        placeholder:card.querySelector('.placeholder'),
+        placeText:card.querySelector('.placeholder-text'),
+        liveBadge:card.querySelector('.live-badge'),
+        liveText:card.querySelector('.live-text'),
+        fpsOverlay:card.querySelector('.fps-overlay'),
+        streamStatus:card.querySelector('.stream-status'),
+        ssText:card.querySelector('.ss-text'),
+        modeBtnSnap:card.querySelector('.mode-toggle button[data-mode="snapshot"]'),
+        modeBtnLive:card.querySelector('.mode-toggle button[data-mode="live"]'),
+        idEl:card.querySelector('.task-id'),
+        nameEl:card.querySelector('.task-name'),
+        statusBadge:card.querySelector('.task-status'),
+        statusText:card.querySelector('.status-text'),
+        statusDot:card.querySelector('.task-status .dot'),
+        urlRow:card.querySelector('.url-row'),
+        modelsRow:card.querySelector('.task-models'),
+        statFps:card.querySelector('.stat-fps'),
+        statInfer:card.querySelector('.stat-infer'),
+        statEnc:card.querySelector('.stat-enc'),
+        statFrames:card.querySelector('.stat-frames'),
+        actions:card.querySelector('.task-actions'),
+        errMsg:card.querySelector('.task-error-msg'),
+        thumbBusy:false,
+        prevSig:''
+      };
+      // 缩略图自动链式刷新（onload/onerror 后自动加载下一张）
+      entry.img.addEventListener('load',function(){entry.thumbBusy=false});
+      entry.img.addEventListener('error',function(){entry.thumbBusy=false;entry.img.style.display='none';entry.placeholder.style.display='flex'});
+      // 模式切换按钮（每张卡片单独）
+      (function(tid){
+        entry.modeBtnSnap.addEventListener('click',function(e){e.stopPropagation();setCardMode(tid,'snapshot')});
+        entry.modeBtnLive.addEventListener('click',function(e){e.stopPropagation();setCardMode(tid,'live')});
+      })(t.id);
+      taskCardEls[t.id]=entry;
+    }
+
+    // 更新 class
+    var cls='task-card'+(liveOn?' running':'')+(t.init_error?' error':'');
+    if(entry.root.className!==cls)entry.root.className=cls;
+
+    // 文本节点更新（仅在变化时）
+    if(entry.idEl.textContent!==t.id)entry.idEl.textContent=t.id;
+    var nm=t.name||'';
+    if(entry.nameEl.textContent!==nm)entry.nameEl.textContent=nm;
+    if(entry.statusBadge.className!=='task-status '+statusCls)entry.statusBadge.className='task-status '+statusCls;
+    if(entry.statusText.textContent!==statusText)entry.statusText.textContent=statusText;
+    entry.statusDot.style.display=statusDot?'':'none';
+
+    if(entry.statFps.textContent!==fps)entry.statFps.textContent=fps;
+    if(entry.statInfer.textContent!==infer)entry.statInfer.textContent=infer;
+    if(entry.statEnc.textContent!==encMs)entry.statEnc.textContent=encMs;
+    var fStr=String(frames);
+    if(entry.statFrames.textContent!==fStr)entry.statFrames.textContent=fStr;
+
+    // URL 行（仅当 URL 集合变化才重建）
+    var urlSig=(t.input_url||'')+'|'+(t.output_url||'')+'|'+(t.preview_url||'');
+    if(entry.urlSig!==urlSig){
+      entry.urlSig=urlSig;
+      entry.urlRow.innerHTML=
+        urlLine('in',urlProto(t.input_url),t.input_url)+
+        urlLine('out',urlProto(t.output_url),t.output_url)+
+        (t.preview_url?urlLine('preview',urlProto(t.preview_url),t.preview_url):'');
+    }
+
+    // 模型 tag
+    if(entry.modelsSig!==modelsHtml){entry.modelsSig=modelsHtml;entry.modelsRow.innerHTML=modelsHtml}
+
+    // live badge
+    var liveCls='live-badge '+(liveOn?'on':'off');
+    if(entry.liveBadge.className!==liveCls)entry.liveBadge.className=liveCls;
+    var liveTxt=liveOn?'LIVE':'OFF';
+    if(entry.liveText.textContent!==liveTxt)entry.liveText.textContent=liveTxt;
+
+    // fps overlay
+    if(liveOn){
+      entry.fpsOverlay.style.display='';
+      var fpsTxt=fps+' FPS';
+      if(entry.fpsOverlay.textContent!==fpsTxt)entry.fpsOverlay.textContent=fpsTxt;
+    }else{
+      entry.fpsOverlay.style.display='none';
+    }
+
+    // 占位文字
+    var placeTxt=t.init_error?'初始化失败':'未启动';
+    if(!liveOn){
+      entry.img.style.display='none';
+      entry.placeholder.style.display='flex';
+      if(entry.placeText.textContent!==placeTxt)entry.placeText.textContent=placeTxt;
+    }
+
+    // actions（仅在状态切换时重建）
+    var actSig=t.running?'r':'s';
+    if(entry.actSig!==actSig){
+      entry.actSig=actSig;
+      entry.actions.innerHTML=
+        (t.running
+          ? '<button class="btn btn-danger" onclick="stopTask(\''+esc(t.id)+'\')">'+ICONS.stop+' 停止</button>'
+          : '<button class="btn btn-primary" onclick="startTask(\''+esc(t.id)+'\')">'+ICONS.play+' 启动</button>')+
+        '<button class="btn btn-ghost" onclick="showDetail(\''+esc(t.id)+'\')">'+ICONS.detail+' 详情</button>'+
+        '<button class="btn btn-ghost" onclick="deleteTask(\''+esc(t.id)+'\')">'+ICONS.trash+' 删除</button>';
+    }
+
+    // error 显示
+    if(t.init_error){
+      entry.errMsg.style.display='';
+      if(entry.errMsg.textContent!==t.init_error)entry.errMsg.textContent=t.init_error;
+    }else{entry.errMsg.style.display='none'}
+
+    // FPS 历史
+    if(!fpsHistory[t.id])fpsHistory[t.id]={labels:[],fps:[]};
+    var hist=fpsHistory[t.id];
+    hist.fps.push(fpsNum);
+    var now=new Date();
+    hist.labels.push(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0'));
+    if(hist.fps.length>60){hist.fps.shift();hist.labels.shift()}
+
+    // 应用预览模式（每帧都调用，但内部会判重）
+    applyPreviewMode(t);
+  });
+
+  // 移除已被删除的任务卡片
+  Object.keys(taskCardEls).forEach(function(id){
+    if(!liveSet[id]){
+      destroyCardPlayer(id);
+      var e=taskCardEls[id];
+      if(e&&e.root&&e.root.parentNode)e.root.parentNode.removeChild(e.root);
+      delete taskCardEls[id];
+      delete fpsHistory[id];
+    }
+  });
+}
+
+// 链式拉缩略图：上一张加载完才请求下一张，避免堆积请求 / 闪烁
+function getCardMode(id){
+  return cardModeOverride[id] || globalPreviewMode;
+}
+function setGlobalPreviewMode(mode){
+  if(mode!=='snapshot'&&mode!=='live')return;
+  globalPreviewMode=mode;
+  localStorage.setItem('previewMode',mode);
+  $('modeBtnSnap').classList.toggle('active',mode==='snapshot');
+  $('modeBtnLive').classList.toggle('active',mode==='live');
+  // 清除单卡覆盖（让全局生效）
+  cardModeOverride={};
+  // 重新应用所有卡片
+  allTasks.forEach(function(t){applyPreviewMode(t)});
+  log('预览模式已切换为：'+(mode==='live'?'实时流':'缩略图'),'info');
+}
+function setCardMode(id,mode){
+  cardModeOverride[id]=mode;
+  var t=allTasks.find(function(x){return x.id===id});if(t)applyPreviewMode(t);
+}
+function setStreamStatus(entry,state,text){
+  if(!entry)return;
+  if(!state){entry.streamStatus.classList.remove('show');return}
+  entry.streamStatus.className='stream-status show '+state;
+  entry.ssText.textContent=text||state;
+}
+function destroyCardPlayer(id){
+  var p=cardPlayers[id];if(!p)return;
+  try{p.pause();p.unload();p.detachMediaElement();p.destroy()}catch(e){}
+  delete cardPlayers[id];
+  var entry=taskCardEls[id];
+  if(entry){entry.video.style.display='none';entry.video.removeAttribute('src');entry.video.load&&entry.video.load();setStreamStatus(entry,null)}
+}
+function setupCardPlayer(id,url){
+  destroyCardPlayer(id);
+  var entry=taskCardEls[id];if(!entry||!url)return;
+  if(typeof flvjs==='undefined'||!flvjs.isSupported()){
+    setStreamStatus(entry,'error','flv 不支持');
+    return;
+  }
+  setStreamStatus(entry,'connecting','连接中');
+  var player=flvjs.createPlayer(
+    {type:'flv',isLive:true,url:url,cors:true},
+    {enableStashBuffer:false,stashInitialSize:128,liveBufferLatencyChasing:true,
+     reuseRedirectedURL:true,fixAudioTimestampGap:false}
+  );
+  player.attachMediaElement(entry.video);
+  try{player.load()}catch(e){}
+  var playPromise=player.play();
+  if(playPromise&&playPromise.catch)playPromise.catch(function(){});
+  player.on(flvjs.Events.ERROR,function(type,detail){
+    setStreamStatus(entry,'error','错误:'+detail);
+  });
+  player.on(flvjs.Events.LOADING_COMPLETE,function(){setStreamStatus(entry,'playing','直播')});
+  // 当 video 真正可播放时，标记为播放中
+  entry.video.addEventListener('playing',function(){
+    entry.video.style.display='block';
+    entry.placeholder.style.display='none';
+    entry.img.style.display='none';
+    setStreamStatus(entry,'playing','直播');
+  },{once:true});
+  cardPlayers[id]=player;
+}
+function applyPreviewMode(t){
+  var entry=taskCardEls[t.id];if(!entry)return;
+  var mode=getCardMode(t.id);
+  // 高亮按钮
+  entry.modeBtnSnap.classList.toggle('active',mode==='snapshot');
+  entry.modeBtnLive.classList.toggle('active',mode==='live');
+  var liveOn=t.running&&t.initialized;
+  if(mode==='live'){
+    // 关闭 jpg 流
+    entry.img.style.display='none';
+    if(!liveOn){
+      destroyCardPlayer(t.id);
+      setStreamStatus(entry,null);
+      return;
+    }
+    if(!t.preview_url){
+      destroyCardPlayer(t.id);
+      setStreamStatus(entry,'error','未配置预览地址');
+      // 占位文本
+      entry.placeholder.style.display='flex';
+      entry.placeText.textContent='请在任务中填写 preview_url';
+      return;
+    }
+    // 已有播放器且 url 没变就跳过
+    if(cardPlayers[t.id]&&cardPlayers[t.id]._urlMark===t.preview_url)return;
+    setupCardPlayer(t.id,t.preview_url);
+    if(cardPlayers[t.id])cardPlayers[t.id]._urlMark=t.preview_url;
+  } else {
+    // snapshot 模式：销毁 player
+    destroyCardPlayer(t.id);
+    if(!liveOn){
+      entry.img.style.display='none';
+      entry.placeholder.style.display='flex';
+      return;
+    }
+    // 等待 pollThumbnails 拉 jpg；这里把 video 隐藏
+  }
+}
+
+function pollThumbnails(){
+  if(currentPage==='dashboard'){
+    allTasks.forEach(function(t){
+      var e=taskCardEls[t.id];if(!e)return;
+      if(!(t.running&&t.initialized))return;
+      if(getCardMode(t.id)!=='snapshot')return;     // 实时流模式不拉 jpg
+      if(e.thumbBusy)return;
+      e.thumbBusy=true;
+      var url='/api/v1/tasks/'+encodeURIComponent(t.id)+'/snapshot.jpg?q=70&_t='+Date.now();
+      var pre=new Image();
+      pre.onload=function(){
+        e.img.src=pre.src;
+        e.img.style.display='block';
+        e.video.style.display='none';
+        e.placeholder.style.display='none';
+        e.thumbBusy=false;
+      };
+      pre.onerror=function(){e.thumbBusy=false};
+      pre.src=url;
+    });
+  }
+  setTimeout(pollThumbnails,400);
+}
+
 function createTask(){
- var id=document.getElementById('f_id').value||('cam'+Date.now()),name=document.getElementById('f_name').value||id;
- var input=document.getElementById('f_input').value,output=document.getElementById('f_output').value;
- // 收集选中的模型
- var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
- checks.forEach(function(c){
-  var m=allModels.find(function(mm){return mm.name===c.value});
-  if(m)models.push(m);
- });
- if(models.length===0){toast('请至少选择一个模型','danger');return}
- var body=JSON.stringify({id:id,name:name,input_url:input,output_url:output,draw:{show_label:true,show_score:true},models:models});
- log('正在创建任务：'+id,'info');
- api('POST','/api/v1/tasks',body,function(r){
-  if(r.ok){
-   log('任务 "'+id+'" 创建成功，模型：'+models.length+' 个','ok');toast('任务 "'+id+'" 创建成功','success');
-   if(createModal)createModal.hide();
-   api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
-    if(r2.ok){log('任务 "'+id+'" 已启动','ok');toast('任务 "'+id+'" 已启动','success')}
-    else{log('任务 "'+id+'" 启动失败','err')}
-    if(currentPage==='dashboard')refresh()
-   })
-  }else{log('创建任务 "'+id+'" 失败','err');toast('创建失败','danger')}
- })
+  var id=$('f_id').value.trim()||('cam'+Date.now());
+  var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
+  checks.forEach(function(c){var m=allModels.find(function(mm){return mm.name===c.value});if(m)models.push(m)});
+  if(models.length===0){toast('请至少选择一个模型','danger');return}
+  var body=JSON.stringify({
+    id:id,
+    name:$('f_name').value.trim()||id,
+    input_url:$('f_input').value.trim(),
+    output_url:$('f_output').value.trim(),
+    preview_url:$('f_preview').value.trim(),
+    encoder:{
+      format:$('f_enc_format').value,
+      codec:$('f_enc_codec').value,
+      fps:parseInt($('f_enc_fps').value)||25,
+      bitrate_kbps:parseInt($('f_enc_bitrate').value)||4000,
+      gop:parseInt($('f_enc_gop').value)||50,
+      max_b_frames:parseInt($('f_enc_b').value)||0,
+      preset:$('f_enc_preset').value,
+      tune:$('f_enc_tune').value,
+      low_latency:$('f_enc_ll').value==='true'
+    },
+    decoder:{
+      hw_accel:$('f_dec_hw').value,
+      rtsp_transport:$('f_dec_transport').value
+    },
+    draw:{show_label:true,show_score:true},
+    models:models
+  });
+  log('创建任务：'+id,'info');
+  api('POST','/api/v1/tasks',body,function(r){
+    if(r.ok){
+      toast('任务「'+id+'」创建成功','success');log('任务创建成功：'+id,'ok');closeTaskModal();
+      api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
+        if(r2.ok){log('任务启动：'+id,'ok');toast('任务「'+id+'」已启动','success')}
+        else{log('任务启动失败：'+id+' - '+(r2.msg||''),'err')}
+        refreshAll();
+      });
+    }else{
+      toast('创建失败：'+(r.msg||''),'danger');log('任务创建失败：'+id+' - '+(r.msg||''),'err');
+    }
+  });
 }
-function startTask(id){log('正在启动：'+id,'info');api('POST','/api/v1/tasks/'+id+'/start',null,function(r){if(r.ok){log('任务 "'+id+'" 已启动','ok');toast('任务已启动','success')}else{log('启动失败：'+id,'err')}if(currentPage==='dashboard')refresh()})}
-function stopTask(id){log('正在停止：'+id,'info');api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){if(r.ok){log('任务 "'+id+'" 已停止','ok');toast('任务已停止','success')}else{log('停止失败：'+id,'err')}if(currentPage==='dashboard')refresh()})}
-function deleteTask(id){if(!confirm('确认删除任务 "'+id+'" ？'))return;log('正在删除：'+id,'info');api('DELETE','/api/v1/tasks/'+id,null,function(r){if(r.ok){log('任务 "'+id+'" 已删除','ok');toast('任务已删除','success')}else{log('删除失败：'+id,'err')}if(currentPage==='dashboard')refresh()})}
-refresh();setInterval(function(){if(currentPage==='dashboard')refresh()},5000);log('Web 界面加载完成','info')
+function startTask(id){
+  log('启动任务：'+id,'info');
+  api('POST','/api/v1/tasks/'+id+'/start',null,function(r){
+    if(r.ok){toast('任务已启动','success');log('任务启动：'+id,'ok')}
+    else{toast('启动失败：'+(r.msg||''),'danger');log('启动失败：'+id,'err')}refreshAll();
+  });
+}
+function stopTask(id){
+  log('停止任务：'+id,'info');
+  api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+    if(r.ok){toast('任务已停止','success');log('任务停止：'+id,'ok')}else{toast('停止失败','danger')}refreshAll();
+  });
+}
+function deleteTask(id){
+  if(!confirm('确认删除任务「'+id+'」？'))return;
+  log('删除任务：'+id,'info');
+  api('DELETE','/api/v1/tasks/'+id,null,function(r){
+    if(r.ok){toast('任务已删除','success');log('任务删除：'+id,'ok');refreshAll()}else{toast('删除失败','danger')}
+  });
+}
+function stopAllTasks(){
+  if(!confirm('确认停止所有任务？'))return;
+  allTasks.forEach(function(t){if(t.running)stopTask(t.id)});
+}
+
+// ── 根据 RTSP/RTMP URL 推导 ZLMediaKit HTTP-FLV 地址 ──
+function deriveHttpFlv(url){
+  if(!url)return '';
+  try{
+    var m=url.match(/^(?:rtsp|rtmp):\/\/([^\/:]+)(?::\d+)?\/([^\/]+)\/([^\/?#]+)/);
+    if(!m)return '';
+    var host=m[1], app=m[2], stream=m[3];
+    // 去掉点播文件后缀
+    stream=stream.replace(/\.(mp4|flv|ts|mkv)$/,'');
+    return 'http://'+host+':8080/'+app+'/'+stream+'.live.flv';
+  }catch(e){return ''}
+}
+
+var detailPlayers={}; // { 'input': Player, 'output': Player }
+
+function showDetail(id){
+  detailTaskId=id;
+  var t=allTasks.find(function(tt){return tt.id===id});if(!t)return;
+  var stats=t.stats||{};
+  var modelsHtml=(t.models||[]).map(function(m){return '<span class="model-tag">'+esc(m.name)+' ['+typeLabel(m.type)+']</span>'}).join('');
+
+  var enc=t.encoder||{},dec=t.decoder||{};
+
+  // 自动推导 HTTP-FLV（输出流预览）
+  var autoFlvOutput=deriveHttpFlv(t.output_url);
+  // 输入流预览地址（由 input_url 推导，一般输入是原始 RTSP，ZLMediaKit 也可能转出 FLV）
+  var autoFlvInput=deriveHttpFlv(t.input_url);
+  // 用户配置的 preview_url 优先用于输出
+  var outFlvUrl=t.preview_url||autoFlvOutput;
+
+  function colHtml(side,label,labelTag,flvUrl,srcUrl){
+    var idPref=side==='input'?'inp':'out';
+    return '<div class="detail-preview-col">'+
+      '<div class="col-label"><span class="tag '+labelTag+'">'+label+'</span>'+(side==='input'?'原始 RTSP 流':'AI 处理流')+'</div>'+
+      '<div class="col-video">'+
+        '<video class="col-video-el" id="colVideo'+idPref+'" muted playsinline></video>'+
+        '<div class="col-placeholder" id="colPlaceholder'+idPref+'">'+ICONS.cam+
+          '<div>'+(flvUrl?'点击播放':'无可用地址')+'</div>'+
+          (flvUrl?'<div style="font-size:10px;color:var(--muted)">HTTP-FLV</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="col-url">'+
+        (side==='input'?'输入：'+esc(srcUrl):'输出：'+esc(srcUrl))+
+        (flvUrl?'<br>HTTP-FLV：'+esc(flvUrl):'')+
+      '</div>'+
+      '<div class="col-controls">'+
+        '<button class="btn btn-primary btn-sm" onclick="startDetailPlayer(\''+side+'\')">'+ICONS.play+' 播放</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="stopDetailPlayer(\''+side+'\')">'+ICONS.stop+' 停止</button>'+
+        (flvUrl?'<button class="btn btn-ghost btn-sm" onclick="copyText(\''+esc(flvUrl).replace(/'/g,"\\'")+'\')">复制 FLV</button>':'')+
+      '</div>'+
+    '</div>';
+  }
+
+  var h=
+    '<div class="detail-preview-row">'+
+      colHtml('input','ORIG','raw',autoFlvInput,t.input_url)+
+      colHtml('output','AI','ai',outFlvUrl,t.output_url)+
+    '</div>'+
+    '<div class="detail-controls-bar">'+
+      '<button class="btn btn-ghost btn-sm" onclick="startAllDetailPlayers()">'+ICONS.play+' 同时播放</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="stopAllDetailPlayers()">'+ICONS.stop+' 全部停止</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="downloadSnapshot(\''+esc(id)+'\')">下载 AI 快照 JPEG</button>'+
+    '</div>'+
+
+    '<div class="detail-section-title">流地址</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">任务 ID</div><div class="detail-value">'+esc(t.id)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">任务名称</div><div class="detail-value">'+esc(t.name||'-')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">原始输入 RTSP</div><div class="detail-value">'+esc(t.input_url)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">AI 输出 RTSP</div><div class="detail-value">'+esc(t.output_url)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">AI 输出 HTTP-FLV</div><div class="detail-value">'+esc(outFlvUrl||'(自动推导失败或未配置)')+'</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">运行统计</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">运行状态</div><div class="detail-value">'+(t.running?'运行中':'已停止')+' / '+(t.initialized?'已初始化':'未初始化')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">已处理帧数</div><div class="detail-value">'+(stats.frames||0)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">FPS</div><div class="detail-value">'+(stats.fps?stats.fps.toFixed(2):'0.00')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">推理耗时</div><div class="detail-value">'+(stats.avg_infer_ms?stats.avg_infer_ms.toFixed(2):'-')+' ms</div></div>'+
+      '<div class="detail-item"><div class="detail-label">绘制耗时</div><div class="detail-value">'+(stats.avg_draw_ms?stats.avg_draw_ms.toFixed(2):'-')+' ms</div></div>'+
+      '<div class="detail-item"><div class="detail-label">编码耗时</div><div class="detail-value">'+(stats.avg_encode_ms?stats.avg_encode_ms.toFixed(2):'-')+' ms</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">编码器参数</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">编码器 / 格式</div><div class="detail-value">'+esc(enc.codec||'auto')+' / '+esc(enc.format||'auto')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">FPS / 码率</div><div class="detail-value">'+(enc.fps||25)+' / '+(enc.bitrate_kbps||4000)+' kbps</div></div>'+
+      '<div class="detail-item"><div class="detail-label">GOP / B 帧</div><div class="detail-value">'+(enc.gop||50)+' / '+(enc.max_b_frames||0)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">Preset / Tune / 低延迟</div><div class="detail-value">'+esc(enc.preset||'')+' / '+esc(enc.tune||'')+' / '+(enc.low_latency?'开启':'关闭')+'</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">解码器参数</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">硬件加速</div><div class="detail-value">'+esc(dec.hw_accel||'cuda')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">RTSP 传输</div><div class="detail-value">'+esc(dec.rtsp_transport||'tcp')+'</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">关联模型</div>'+
+    '<div style="margin-bottom:12px">'+(modelsHtml||'<span style="color:var(--muted)">无</span>')+'</div>'+
+
+    (t.init_error?'<div class="detail-error">初始化错误：'+esc(t.init_error)+'</div>':'')+
+
+    '<div class="detail-section-title">FPS 历史曲线</div>'+
+    '<div class="detail-chart"><canvas id="detailChart"></canvas></div>';
+
+  $('detailBody').innerHTML=h;
+  $('detailModalBackdrop').classList.add('active');
+
+  var hist=fpsHistory[id]||{labels:[],fps:[]};
+  if(detailChart)detailChart.destroy();
+  var ctx=document.getElementById('detailChart');
+  detailChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:hist.labels,datasets:[{label:'FPS',data:hist.fps,borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.18)',borderWidth:2,fill:true,tension:0.3,pointRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}},grid:{color:'rgba(0,229,255,0.05)'},border:{display:false}},
+              y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}},grid:{color:'rgba(0,229,255,0.05)'},border:{display:false},beginAtZero:true}}}
+  });
+}
+
+function closeDetailModal(){
+  stopAllDetailPlayers();
+  $('detailModalBackdrop').classList.remove('active');
+  detailTaskId=null;
+}
+
+function destroyDetailPlayer(side){
+  var p=detailPlayers[side];if(!p)return;
+  try{p.pause();p.unload();p.detachMediaElement();p.destroy()}catch(e){}
+  delete detailPlayers[side];
+  var idPref=side==='input'?'inp':'out';
+  var v=document.getElementById('colVideo'+idPref);if(v){v.style.display='none';v.removeAttribute('src');}
+  var ph=document.getElementById('colPlaceholder'+idPref);if(ph)ph.style.display='flex';
+}
+function getFlvUrl(side){
+  if(side==='input'){
+    var t=allTasks.find(function(x){return x.id===detailTaskId});
+    return t?deriveHttpFlv(t.input_url):null;
+  }
+  var t=allTasks.find(function(x){return x.id===detailTaskId});
+  if(!t)return null;
+  return t.preview_url||deriveHttpFlv(t.output_url);
+}
+function startDetailPlayer(side){
+  destroyDetailPlayer(side);
+  var url=getFlvUrl(side);
+  if(!url){toast(side==='input'?'输入源无法推导 HTTP-FLV':'输出源无可用 FLV 地址','danger');return}
+  if(typeof flvjs==='undefined'||!flvjs.isSupported()){toast('当前浏览器不支持 flv.js','danger');return}
+  var idPref=side==='input'?'inp':'out';
+  var video=document.getElementById('colVideo'+idPref);
+  var ph=document.getElementById('colPlaceholder'+idPref);
+  video.style.display='block';if(ph)ph.style.display='none';
+  var player=flvjs.createPlayer(
+    {type:'flv',isLive:true,url:url,cors:true},
+    {enableStashBuffer:false,stashInitialSize:128,liveBufferLatencyChasing:true,reuseRedirectedURL:true}
+  );
+  player.attachMediaElement(video);
+  try{player.load()}catch(e){}
+  var pp=player.play();if(pp&&pp.catch)pp.catch(function(e){toast('播放失败：'+e.message,'danger')});
+  detailPlayers[side]=player;
+  log('播放 '+(side==='input'?'原始流':'AI流')+'：'+url,'info');
+}
+function stopDetailPlayer(side){destroyDetailPlayer(side)}
+function startAllDetailPlayers(){startDetailPlayer('input');startDetailPlayer('output')}
+function stopAllDetailPlayers(){destroyDetailPlayer('input');destroyDetailPlayer('output')}
+
+function downloadSnapshot(id){
+  var url='/api/v1/tasks/'+encodeURIComponent(id)+'/snapshot.jpg?q=95&_t='+Date.now();
+  var a=document.createElement('a');a.href=url;a.download=id+'_'+Date.now()+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+// ── 弹窗 ──
+function openTaskModal(){$('taskModalBackdrop').classList.add('active');renderModelSelector()}
+function closeTaskModal(){$('taskModalBackdrop').classList.remove('active')}
+function openModelModal(){$('modelModalBackdrop').classList.add('active')}
+function closeModelModal(){$('modelModalBackdrop').classList.remove('active')}
+
+// ── 快捷键 ──
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+  if(e.key==='r'||e.key==='R')refreshAll();
+  if(e.key==='n'||e.key==='N')openTaskModal();
+  if(e.key==='m'||e.key==='M')openModelModal();
+  if(e.key==='Escape'){closeTaskModal();closeModelModal();closeDetailModal()}
+});
+$('taskModalBackdrop').addEventListener('click',function(e){if(e.target===this)closeTaskModal()});
+$('modelModalBackdrop').addEventListener('click',function(e){if(e.target===this)closeModelModal()});
+$('detailModalBackdrop').addEventListener('click',function(e){if(e.target===this)closeDetailModal()});
 </script>
 </body>
 </html>

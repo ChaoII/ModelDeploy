@@ -19,10 +19,10 @@ extern "C" {
 #include "config.hpp"
 #include "csrc/vision/common/image_data.h"
 
-/// NVENC 编码器 + RTSP 推流
+/// H.264 编码器（NVENC / x264） + RTSP/RTMP/MP4/FLV 输出
 class StreamEncoder {
 public:
-    explicit StreamEncoder(int fps = 25);
+    explicit StreamEncoder(const EncoderConfig& cfg = EncoderConfig{});
     ~StreamEncoder();
 
     /// 打开输出流（RTMP / RTSP / 本地文件）
@@ -31,7 +31,7 @@ public:
     /// 关闭输出流
     void close();
 
-    /// 编码并推送一帧（ImageData 格式，支持 BGR/NV12）
+    /// 编码并推送一帧（ImageData 格式，BGR CPU）
     bool encode(const modeldeploy::vision::ImageData& image);
 
     /// 异步编码（放入队列，编码线程处理）
@@ -40,14 +40,14 @@ public:
     /// 启动异步编码线程
     bool start_async();
 
-    /// 停止异步编码线程
+    /// 停止异步编码线程（会先排空队列）
     void stop_async();
 
     /// 是否已打开
     bool is_open() const { return opened_.load(); }
 
 private:
-    int fps_;
+    EncoderConfig cfg_;
     int width_ = 0, height_ = 0;
     std::atomic<bool> opened_{false};
 
@@ -60,6 +60,7 @@ private:
 
     // Async encoding
     std::atomic<bool> async_running_{false};
+    std::atomic<bool> async_started_{false};
     std::thread encode_thread_;
     std::queue<modeldeploy::vision::ImageData> frame_queue_;
     std::mutex queue_mtx_;
@@ -70,4 +71,5 @@ private:
     bool open_output(const std::string& url);
     bool encode_frame(AVFrame* frame);
     void encode_loop();
+    void drain_queue();
 };
