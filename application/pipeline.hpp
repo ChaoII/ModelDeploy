@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <vector>
+#include <functional>
 
 #include "config.hpp"
 #include "perf_stats.hpp"
@@ -25,7 +26,10 @@ struct PendingFrame {
 /// 单路视频流水线：decoder → infer_group → draw → encoder
 class Pipeline {
 public:
-    explicit Pipeline(TaskConfig cfg);
+    /// 模型工厂：给定配置，返回共享或新建的模型实例
+    using ModelFactory = std::function<std::shared_ptr<InferenceEngine>(const ModelConfig&)>;
+
+    explicit Pipeline(TaskConfig cfg, ModelFactory model_factory = nullptr);
     ~Pipeline();
 
     /// 启动流水线（返回后流水线在后台初始化）
@@ -56,6 +60,7 @@ public:
 
 private:
     TaskConfig cfg_;
+    ModelFactory model_factory_;
     std::unique_ptr<StreamDecoder> decoder_;
     std::unique_ptr<InferGroup> infer_group_;
     std::unique_ptr<DrawEngine> draw_engine_;
@@ -80,6 +85,9 @@ private:
     std::condition_variable queue_not_full_cv_;
     size_t max_queue_size_ = 3; // keep small to avoid stale frames
     bool block_on_queue_full_ = false; // 文件输入时阻塞，避免丢帧
+
+    /// 计算合理的帧队列大小（按模型数量自适应）
+    size_t calc_queue_size() const;
 
     /// 解码帧回调（解码线程调用）
     bool on_decoded_frame(const DecodedFrame& frame);

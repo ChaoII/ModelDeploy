@@ -621,6 +621,8 @@ var detailTaskId=null;
 var globalPreviewMode = (localStorage.getItem('previewMode')||'snapshot');
 var cardModeOverride={};   // id -> 'snapshot'|'live'，没设置时跟随 global
 var cardPlayers={};        // id -> flv.js Player 实例
+var MAX_LIVE_PLAYERS=4;    // 最大同时播放路数（浏览器同域名连接限制）
+var playerReconnect={};    // id -> {attempt, timer} 重连状态
 
 var ICONS={
   play:'<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
@@ -639,6 +641,7 @@ document.addEventListener('DOMContentLoaded',function(){
   loadModels();refreshAll();
   refreshTimer=setInterval(refreshAll,2000);
   pollThumbnails();    // 链式轮询缩略图（self-scheduling）
+  initPlayerObserver(); // FLV 播放器可见性观察
   log('NEXUS 指挥舱已上线','ok');
 });
 
@@ -1044,29 +1047,74 @@ function setupCardPlayer(id,url){
     setStreamStatus(entry,'error','flv 不支持');
     return;
   }
+  // 连接池限制
+  while(Object.keys(cardPlayers).length>=MAX_LIVE_PLAYERS){
+    var keys=Object.keys(cardPlayers);
+    if(keys.length===0)break;
+    destroyCardPlayer(keys[0]);
+  }
   setStreamStatus(entry,'connecting','连接中');
   var player=flvjs.createPlayer(
     {type:'flv',isLive:true,url:url,cors:true},
-    {enableStashBuffer:false,stashInitialSize:128,liveBufferLatencyChasing:true,
-     reuseRedirectedURL:true,fixAudioTimestampGap:false}
+    {enableStashBuffer:false,stashInitialSize:256,liveBufferLatencyChasing:true,
+     reuseRedirectedURL:true,fixAudioTimestampGap:false,
+     enableWorker:true}  // Web Worker 分离 demux，避免 UI 卡顿
   );
+  player._reconnectAttempt=0;
   player.attachMediaElement(entry.video);
   try{player.load()}catch(e){}
   var playPromise=player.play();
   if(playPromise&&playPromise.catch)playPromise.catch(function(){});
   player.on(flvjs.Events.ERROR,function(type,detail){
-    setStreamStatus(entry,'error','错误:'+detail);
+    // 区分"可恢复错误"与"致命错误"
+    if(type==='MediaError'||type==='NetworkError'){
+      // 非致命：静默重连，不显示错误状态
+      if(player._reconnectAttempt<8&&!player._destroyed){
+        player._reconnectAttempt++;
+        var delay=Math.min(500*Math.pow(1.5,player._reconnectAttempt-1),6000);
+        clearTimeout(playerReconnect[id]);
+        playerReconnect[id]=setTimeout(function(){
+          if(cardPlayers[id]===player&&!player._destroyed)setupCardPlayer(id,url);
+        },delay);
+      }
+    }else{
+      // 致命错误才显示红色状态
+      setStreamStatus(entry,'error','播放异常');
+      if(player._reconnectAttempt<5&&!player._destroyed){
+        player._reconnectAttempt++;
+        var delay=Math.min(1000*Math.pow(2,player._reconnectAttempt-1),8000);
+        clearTimeout(playerReconnect[id]);
+        playerReconnect[id]=setTimeout(function(){
+          if(cardPlayers[id]===player&&!player._destroyed)setupCardPlayer(id,url);
+        },delay);
+      }
+    }
   });
   player.on(flvjs.Events.LOADING_COMPLETE,function(){setStreamStatus(entry,'playing','直播')});
-  // 当 video 真正可播放时，标记为播放中
   entry.video.addEventListener('playing',function(){
     entry.video.style.display='block';
     entry.placeholder.style.display='none';
     entry.img.style.display='none';
     setStreamStatus(entry,'playing','直播');
+    // 注册可见性观察
+    if(playerVisibilityObs){
+      entry.video.setAttribute('data-task-id',id);
+      try{playerVisibilityObs.observe(entry.video)}catch(e){}
+    }
   },{once:true});
   cardPlayers[id]=player;
 }
+
+// 后台标签页暂停/恢复
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){
+    Object.keys(cardPlayers).forEach(function(id){try{cardPlayers[id].pause()}catch(e){}});
+    log('标签页隐藏，暂停实时流','info');
+  }else{
+    Object.keys(cardPlayers).forEach(function(id){try{cardPlayers[id].play()}catch(e){}});
+    log('标签页激活，恢复实时流','info');
+  }
+});
 function applyPreviewMode(t){
   var entry=taskCardEls[t.id];if(!entry)return;
   var mode=getCardMode(t.id);
@@ -1107,7 +1155,8 @@ function applyPreviewMode(t){
 }
 
 function pollThumbnails(){
-  if(currentPage==='dashboard'){
+  // 后台标签页跳过，节省带宽
+  if(!document.hidden&&currentPage==='dashboard'){
     allTasks.forEach(function(t){
       var e=taskCardEls[t.id];if(!e)return;
       if(!(t.running&&t.initialized))return;

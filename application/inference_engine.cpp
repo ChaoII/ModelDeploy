@@ -1,7 +1,10 @@
 #include "inference_engine.hpp"
 #include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/common/struct.h"
 #include <iostream>
+#include <filesystem>
+#include <mutex>
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -16,12 +19,46 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     }
     opt.set_cpu_thread_num(4);
 
-    if (cfg.backend == "trt") {
+    // ── TRT 后端（纯 TRT，非 ORT-TRT） ──
+    if (cfg.backend == "trt" || cfg.backend == "tensorrt") {
         opt.use_trt_backend();
-    } else if (cfg.backend == "mnn") {
+        // 设置 TRT 缓存防止重复编译
+        std::string cache_dir = "data/trt_cache";
+        try { std::filesystem::create_directories(cache_dir); } catch (...) {}
+        std::string model_name = cfg.path.substr(cfg.path.find_last_of("/\\") + 1);
+        opt.trt_option.cache_file_path = cache_dir + "/" + model_name + ".engine";
+        opt.trt_option.enable_fp16 = true;
+        opt.trt_option.max_workspace_size = 1ULL << 30; // 1GB
+        if (cfg_.input_size.size() == 2) {
+            std::string min_s = "1x3x" + std::to_string(cfg_.input_size[0]) + "x" + std::to_string(cfg_.input_size[1]);
+            opt.set_trt_min_shape(min_s);
+            opt.set_trt_opt_shape(min_s);
+            opt.set_trt_max_shape(min_s);
+        }
+    }
+    // ── MNN 后端 ──
+    else if (cfg.backend == "mnn") {
         opt.use_mnn_backend();
-    } else {
+    }
+    // ── ORT 后端（默认）—— 开启 TensorRT EP，复用缓存 ──
+    else {
         opt.use_ort_backend();
+        if (cfg.device == "gpu") {
+            // ONNX Runtime 自带的 TensorRT Execution Provider
+            opt.ort_option.enable_trt = true; // 默认已是 true，显式确认
+            std::string cache_dir = "data/ort_trt_cache";
+            try { std::filesystem::create_directories(cache_dir); } catch (...) {}
+            opt.ort_option.trt_engine_cache_path = cache_dir;
+            // 设置动态 shape
+            if (cfg_.input_size.size() == 2) {
+                int w = cfg_.input_size[0];
+                int h = cfg_.input_size[1];
+                std::string shape = "1x3x" + std::to_string(h) + "x" + std::to_string(w);
+                opt.ort_option.trt_min_shape = shape;
+                opt.ort_option.trt_opt_shape = shape;
+                opt.ort_option.trt_max_shape = shape;
+            }
+        }
     }
 
     try {
@@ -43,6 +80,8 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
                 face_model_.reset();
                 return false;
             }
+            if (cfg_.input_size.size() == 2)
+                face_model_->get_preprocessor().set_size(cfg_.input_size);
         } else if (cfg.type == "classification") {
             cls_model_ = std::make_unique<classification::Classification>(cfg.path, opt);
             if (!cls_model_->is_initialized()) {
@@ -61,8 +100,12 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
 
     loaded_ = true;
     std::cout << "[InferenceEngine] Loaded " << cfg.name << " [" << cfg.type
-              << "] " << cfg.path << std::endl;
+              << "] " << cfg.path << " backend=" << cfg.backend << std::endl;
     return true;
+}
+
+std::string InferenceEngine::make_key(const ModelConfig& cfg) {
+    return cfg.path + "|" + cfg.backend + "|" + cfg.device + "|" + cfg.type;
 }
 
 void InferenceEngine::unload() {
@@ -74,6 +117,7 @@ void InferenceEngine::unload() {
 
 bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
     if (!loaded_ || !result) return false;
+    std::lock_guard<std::mutex> lock(mtx_); // 多路共享时的线程安全
     result->model_name = cfg_.name;
     result->type = cfg_.type;
 
@@ -129,7 +173,12 @@ bool InferenceEngine::infer_face(const ImageData& image, InferResult* result) {
         result->boxes.push_back(box);
         std::vector<FaceKeypoint> kps;
         kps.reserve(f.keypoints.size());
-        for (const auto& p : f.keypoints) kps.push_back({p.x, p.y});
+        for (const auto& p : f.keypoints) {
+            FaceKeypoint kp;
+            kp.x = p.x;
+            kp.y = p.y;
+            kps.push_back(kp);
+        }
         result->keypoints.push_back(std::move(kps));
     }
     return true;

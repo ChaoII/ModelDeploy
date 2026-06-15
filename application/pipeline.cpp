@@ -15,9 +15,21 @@ static bool is_network_url(const std::string& url) {
            url.find("udp://") == 0 || url.find("tcp://") == 0;
 }
 
-Pipeline::Pipeline(TaskConfig cfg)
+Pipeline::Pipeline(TaskConfig cfg, ModelFactory model_factory)
     : cfg_(std::move(cfg)),
+      model_factory_(std::move(model_factory)),
       block_on_queue_full_(!is_network_url(cfg_.input_url)) {
+    // 自适应队列大小：模型越多，流水线耗时越长，需要更大的队列缓冲
+    max_queue_size_ = calc_queue_size();
+}
+
+size_t Pipeline::calc_queue_size() const {
+    // 基准 3，每多一个模型 +2，最大 15
+    size_t base = 3;
+    size_t extra = cfg_.models.size() * 2;
+    size_t q = base + extra;
+    if (q > 15) q = 15;
+    return q;
 }
 
 Pipeline::~Pipeline() {
@@ -142,7 +154,7 @@ void Pipeline::pipeline_loop() {
 
     try {
         // 1) InferGroup
-        infer_group_ = std::make_unique<InferGroup>(cfg_);
+        infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_);
         if (!infer_group_->init()) {
             init_error_ = "InferGroup init failed";
             std::cerr << "[Pipeline] " << init_error_ << std::endl;
