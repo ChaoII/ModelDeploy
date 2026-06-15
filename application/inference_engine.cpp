@@ -21,7 +21,7 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     // ── TRT 后端（纯 TRT，非 ORT-TRT） ──
     if (cfg.backend == "trt" || cfg.backend == "tensorrt") {
         opt.use_trt_backend();
-        // 设置 TRT 缓存防止重复编译
+        opt.enable_fp16 = true;                    // RuntimeOption 级 FP16
         std::string cache_dir = "data/trt_cache";
         try { std::filesystem::create_directories(cache_dir); } catch (...) {}
         std::string model_name = cfg.path.substr(cfg.path.find_last_of("/\\") + 1);
@@ -39,16 +39,17 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     else if (cfg.backend == "mnn") {
         opt.use_mnn_backend();
     }
-    // ── ORT 后端（默认）—— 开启 TensorRT EP，复用缓存 ──
+    // ── ORT 后端（默认）—— 开启 TensorRT EP + FP16 + 缓存 ──
     else {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
-            // ONNX Runtime 自带的 TensorRT Execution Provider
-            opt.ort_option.enable_trt = true; // 默认已是 true，显式确认
+            opt.enable_fp16 = true;                    // FP16 推理（关键性能优化）
+            opt.ort_option.enable_trt = true;           // ORT 的 TensorRT EP
+            opt.ort_option.enable_fp16 = true;          // FP16 for TRT EP
             std::string cache_dir = "data/ort_trt_cache";
             try { std::filesystem::create_directories(cache_dir); } catch (...) {}
             opt.ort_option.trt_engine_cache_path = cache_dir;
-            // 设置动态 shape
+            // 设置动态 shape（TRT 编译用）
             if (cfg_.input_size.size() == 2) {
                 int w = cfg_.input_size[0];
                 int h = cfg_.input_size[1];

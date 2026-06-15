@@ -19,6 +19,7 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
     opt.set_cpu_thread_num(4);
     if (cfg.backend == "trt" || cfg.backend == "tensorrt") {
         opt.use_trt_backend();
+        opt.enable_fp16 = true;
         std::string cache_dir = "data/trt_cache";
         try { std::filesystem::create_directories(cache_dir); } catch (...) {}
         std::string model_name = cfg.path.substr(cfg.path.find_last_of("/\\") + 1);
@@ -34,7 +35,9 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
     } else {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
+            opt.enable_fp16 = true;
             opt.ort_option.enable_trt = true;
+            opt.ort_option.enable_fp16 = true;
             std::string cache_dir = "data/ort_trt_cache";
             try { std::filesystem::create_directories(cache_dir); } catch (...) {}
             opt.ort_option.trt_engine_cache_path = cache_dir;
