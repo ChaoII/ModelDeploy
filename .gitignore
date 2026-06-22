@@ -46,6 +46,7 @@ csharp/**/*.DotSettings.user
 surveillance_stderr.txt
 surveillance_stdout.txt
 test_stress_20routes.py
+application/debug_load.cpp
 
 # Executables
 *.exe
