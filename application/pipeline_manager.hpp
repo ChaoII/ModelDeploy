@@ -8,6 +8,7 @@
 #include "config.hpp"
 #include "pipeline.hpp"
 #include "stream_hub.hpp"
+#include "batch_scheduler.hpp"
 
 /// 任务状态摘要
 struct TaskStatus {
@@ -19,6 +20,7 @@ struct TaskStatus {
     std::string input_url;
     std::string output_url;
     std::string preview_url;
+    bool enable_preview = true;
     std::vector<std::string> model_names;
     std::vector<std::string> model_types;
     std::string stats_json;
@@ -27,7 +29,7 @@ struct TaskStatus {
 /// 多任务管理器：线程安全 CRUD
 class PipelineManager {
 public:
-    PipelineManager() = default;
+    PipelineManager();
     ~PipelineManager();
 
     /// 创建并注册一个任务（不自动启动）
@@ -63,8 +65,16 @@ public:
     bool update_model(const std::string& task_id, const std::string& model_name,
                       const ModelConfig& mcfg);
 
+    /// 更新任务核心配置（需先停止任务；不修改模型列表）
+    bool update_task(const std::string& task_id, const TaskConfig& cfg, std::string* err = nullptr);
+
     /// 停止所有任务
     void stop_all();
+
+    /// 启动/停止 BatchScheduler
+    bool start_batch_scheduler();
+    void stop_batch_scheduler();
+    BatchScheduler* batch_scheduler() { return &batch_scheduler_; }
 
     // ── 持久化 ──
     /// 从目录加载模型库与任务配置
@@ -97,6 +107,7 @@ private:
     std::vector<ModelConfig> model_library_;
     std::atomic<bool> dirty_{false};
     StreamHub stream_hub_;
+    BatchScheduler batch_scheduler_;
 
     // 模型 prototype 缓存：只加载一次，后续 clone（共享 Runtime）
     struct ModelPrototype {

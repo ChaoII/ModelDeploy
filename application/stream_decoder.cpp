@@ -65,7 +65,7 @@ bool StreamDecoder::init_decoder() {
     av_dict_set(&opts, "rtsp_transport",
                 cfg_.rtsp_transport.empty() ? "tcp" : cfg_.rtsp_transport.c_str(), 0);
     av_dict_set(&opts, "buffer_size", "65536", 0);
-    av_dict_set(&opts, "max_delay", "500000", 0);
+    av_dict_set(&opts, "max_delay", "200000", 0);
     av_dict_set(&opts, "stimeout", std::to_string(cfg_.timeout_us).c_str(), 0);
 
     fmt_ctx_ = avformat_alloc_context();
@@ -311,7 +311,7 @@ bool StreamDecoder::reconnect() {
     AVDictionary* opts = nullptr;
     av_dict_set(&opts, "rtsp_transport", "tcp", 0);
     av_dict_set(&opts, "buffer_size", "65536", 0);
-    av_dict_set(&opts, "max_delay", "500000", 0);
+    av_dict_set(&opts, "max_delay", "200000", 0);
     av_dict_set(&opts, "stimeout", std::to_string(cfg_.timeout_us).c_str(), 0);
 
     fmt_ctx_ = avformat_alloc_context();

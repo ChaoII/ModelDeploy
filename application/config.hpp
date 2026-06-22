@@ -33,7 +33,7 @@ struct DecoderConfig {
 
 // ==================== 编码器配置 ====================
 struct EncoderConfig {
-    int fps = 25;
+    int fps = 0;                          // 0 = 自动匹配源帧率；非零 = 强制帧率
     int bitrate_kbps = 2500;              // 平均码率 (kbps)，预览路 2.5Mbps 足够
     int gop = 12;                         // 关键帧间隔（约 0.5 秒/I 帧，flv.js 快速首帧）
     std::string codec = "auto";           // auto / libx264 / h264_nvenc
@@ -58,6 +58,7 @@ struct TaskConfig {
     std::string input_url;
     std::string output_url;
     std::string preview_url;              // 浏览器拉流地址（HTTP-FLV 等）
+    bool enable_preview = true;           // 是否推送预览流；false = 仅报警不推流
     std::vector<ModelConfig> models;
     DecoderConfig decoder;
     EncoderConfig encoder;

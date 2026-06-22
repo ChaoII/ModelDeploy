@@ -89,7 +89,7 @@ file(GLOB_RECURSE TRT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/t
 file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
 file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
-file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu)
+file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu)
 
 list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
 

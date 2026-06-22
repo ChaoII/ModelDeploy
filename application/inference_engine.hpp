@@ -56,6 +56,13 @@ public:
 
     bool infer(const modeldeploy::vision::ImageData& image, InferResult* result);
 
+    /// 批量推理（仅 detection 模型支持真批量；其他类型逐帧 fallback）
+    bool batch_infer(const std::vector<modeldeploy::vision::ImageData>& images,
+                     std::vector<InferResult>* results);
+
+    /// 获取底层 detection 模型指针（BatchScheduler 需要直接调用 batch_predict）
+    modeldeploy::vision::detection::UltralyticsDet* det_model() { return det_model_.get(); }
+
     const ModelConfig& config() const { return cfg_; }
     std::pair<int, int> input_size() const {
         return {cfg_.input_size[0], cfg_.input_size[1]};

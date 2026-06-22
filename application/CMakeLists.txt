@@ -39,6 +39,7 @@ set(APP_SOURCES
         http_server.cpp
         perf_stats.cpp
         frame_pool.cpp
+        batch_scheduler.cpp
 )
 
 add_executable(surveillance ${APP_SOURCES})

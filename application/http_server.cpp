@@ -72,6 +72,7 @@ json HttpServer::task_status_to_json(const TaskStatus& ts) {
     j["input_url"] = ts.input_url;
     j["output_url"] = ts.output_url;
     j["preview_url"] = ts.preview_url;
+    j["enable_preview"] = ts.enable_preview;
     json models = json::array();
     for (size_t i = 0; i < ts.model_names.size(); ++i) {
         json m{{"name", ts.model_names[i]}, {"type", i < ts.model_types.size() ? ts.model_types[i] : ""}};
@@ -179,15 +180,14 @@ static ModelConfig parse_model_config(const std::string& body) {
 void HttpServer::register_routes() {
 
     // ── Web UI ──────────────────────────────────────
-    std::string ui_html = load_web_ui();
-    server_.Get("/", [ui_html](const httplib::Request&, httplib::Response& res) {
-        res.set_content(ui_html, "text/html; charset=utf-8");
+    server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(load_web_ui(), "text/html; charset=utf-8");
     });
-    server_.Get("/index.html", [ui_html](const httplib::Request&, httplib::Response& res) {
-        res.set_content(ui_html, "text/html; charset=utf-8");
+    server_.Get("/index.html", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(load_web_ui(), "text/html; charset=utf-8");
     });
-    server_.Get("/ui", [ui_html](const httplib::Request&, httplib::Response& res) {
-        res.set_content(ui_html, "text/html; charset=utf-8");
+    server_.Get("/ui", [this](const httplib::Request&, httplib::Response& res) {
+        res.set_content(load_web_ui(), "text/html; charset=utf-8");
     });
 
     // ── Health / Metrics ─────────────────────────────
@@ -289,6 +289,7 @@ void HttpServer::register_routes() {
         }
         res.set_header("Cache-Control", "no-store, no-cache, must-revalidate");
         res.set_header("Pragma", "no-cache");
+        res.set_header("X-Task-Id", id);
         res.set_content(reinterpret_cast<const char*>(jpg.data()), jpg.size(), "image/jpeg");
     });
 
@@ -329,6 +330,37 @@ void HttpServer::register_routes() {
         }
         std::cout << "[API] Task " << id << " stopped" << std::endl;
         res.set_content(ok_json(), "application/json");
+    });
+
+    // ── PUT /api/v1/tasks/:id — update config ───────
+    server_.Put("/api/v1/tasks/:id", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string id = get_id(req);
+        try {
+            auto j = json::parse(req.body);
+            auto cfg = task_config_from_json(j);
+            cfg.id = id; // 保持原有 id
+            // 若请求体包含 models 则替换模型列表；否则保留现有模型
+            TaskConfig old_cfg;
+            if (mgr_.get_task_config(id, &old_cfg)) {
+                if (!j.contains("models")) {
+                    cfg.models = old_cfg.models;
+                }
+            }
+            std::cout << "[API] PUT /api/v1/tasks/" << id
+                      << " enable_preview=" << cfg.enable_preview << std::endl;
+            if (j.contains("models")) {
+                std::cout << "  models: " << cfg.models.size() << std::endl;
+            }
+            std::string err;
+            if (!mgr_.update_task(id, cfg, &err)) {
+                res.set_content(err_json(err), "application/json");
+                return;
+            }
+            std::cout << "[API] Task config updated: " << id << std::endl;
+            res.set_content(ok_json(), "application/json");
+        } catch (const std::exception& e) {
+            res.set_content(err_json(e.what()), "application/json");
+        }
     });
 
     // ── PATCH /api/v1/tasks/:id/models — add model ─

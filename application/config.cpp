@@ -9,7 +9,7 @@ bool TaskConfig::validate(std::string* err) const {
         return false;
     };
     if (input_url.empty()) return fail("input_url is empty");
-    if (output_url.empty()) return fail("output_url is empty");
+    if (enable_preview && output_url.empty()) return fail("output_url is empty when enable_preview=true");
     if (models.empty()) return fail("at least one model required");
     for (size_t i = 0; i < models.size(); ++i) {
         const auto& m = models[i];
@@ -19,17 +19,19 @@ bool TaskConfig::validate(std::string* err) const {
         if (m.roi.size() != 4) return fail("model[" + std::to_string(i) + "].roi must be [x,y,w,h]");
         if (m.interval < 1) return fail("model[" + std::to_string(i) + "].interval must be >= 1");
     }
-    if (encoder.fps <= 0 || encoder.fps > 120) return fail("encoder.fps out of range (1-120)");
-    if (encoder.bitrate_kbps <= 0) return fail("encoder.bitrate_kbps must be > 0");
-    if (encoder.gop <= 0) return fail("encoder.gop must be > 0");
+    if (enable_preview) {
+        if (encoder.fps < 0 || encoder.fps > 120) return fail("encoder.fps out of range (0-120)");
+        if (encoder.bitrate_kbps <= 0) return fail("encoder.bitrate_kbps must be > 0");
+    }
     return true;
 }
 
 void TaskConfig::print() const {
     std::cout << "Task: " << name << " (" << id << ")\n"
               << "  input:  " << input_url << "\n"
-              << "  output: " << output_url << "\n"
+              << "  output: " << (enable_preview ? output_url : "(no preview)") << "\n"
               << "  preview: " << preview_url << "\n"
+              << "  enable_preview: " << (enable_preview ? "true" : "false") << "\n"
               << "  encoder: " << encoder.codec << "/" << encoder.format
               << " " << encoder.fps << "fps " << encoder.bitrate_kbps << "kbps gop=" << encoder.gop << "\n"
               << "  decoder: " << decoder.hw_accel << " transport=" << decoder.rtsp_transport << "\n"
@@ -56,6 +58,7 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["input_url"] = cfg.input_url;
     j["output_url"] = cfg.output_url;
     j["preview_url"] = cfg.preview_url;
+    j["enable_preview"] = cfg.enable_preview;
 
     j["decoder"]["reconnect_delay_ms"] = cfg.decoder.reconnect_delay_ms;
     j["decoder"]["max_reconnects"] = cfg.decoder.max_reconnects;
@@ -102,6 +105,8 @@ TaskConfig task_config_from_json(const json& j) {
     if (j.contains("input_url") && j["input_url"].is_string()) cfg.input_url = j["input_url"];
     if (j.contains("output_url") && j["output_url"].is_string()) cfg.output_url = j["output_url"];
     if (j.contains("preview_url") && j["preview_url"].is_string()) cfg.preview_url = j["preview_url"];
+    if (j.contains("enable_preview") && j["enable_preview"].is_boolean()) cfg.enable_preview = j["enable_preview"];
+    else if (j.contains("enable_preview") && j["enable_preview"].is_number()) cfg.enable_preview = j["enable_preview"].get<int>() != 0;
 
     if (j.contains("decoder") && j["decoder"].is_object()) {
         auto& d = j["decoder"];

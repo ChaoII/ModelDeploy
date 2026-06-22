@@ -128,7 +128,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .task-thumb .live-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 5px currentColor}
 .task-thumb .live-badge.on .dot{animation:pulse 1.5s infinite}
 .task-thumb .fps-overlay{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);color:var(--primary);font-family:var(--font-display);font-size:11px;font-weight:700;backdrop-filter:blur(8px)}
-.task-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
+.task-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
 .task-thumb .mode-toggle{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:rgba(0,0,0,.55);padding:3px;border-radius:6px;backdrop-filter:blur(8px);border:1px solid rgba(0,229,255,.18)}
 .task-thumb .mode-toggle button{width:auto;padding:3px 9px;font-size:9px;font-weight:700;letter-spacing:.5px;border-radius:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-transform:uppercase;font-family:var(--font-display);transition:all .12s}
 .task-thumb .mode-toggle button.active{background:var(--primary);color:#000;box-shadow:0 0 8px rgba(0,229,255,.4)}
@@ -317,11 +317,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <nav class="nav">
       <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        <span>指挥舱</span>
+        <span>任务管理</span>
       </div>
       <div class="nav-item" data-page="models" onclick="switchPage('models')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        <span>模型矩阵</span>
+        <span>模型管理</span>
       </div>
     </nav>
     <div class="side-metrics">
@@ -394,7 +394,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
         <div class="action-bar">
           <button class="btn btn-primary" onclick="openModelModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-            部署模型
+            新增模型
           </button>
           <button class="btn btn-ghost" onclick="loadModels()">刷新模型库</button>
         </div>
@@ -448,6 +448,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
           <div><label class="form-label">浏览器预览地址 (HTTP-FLV，可选)</label>
             <input class="form-input mono" id="f_preview" placeholder="http://127.0.0.1:80/live/cam01.flv"></div>
         </div>
+        <div class="form-row full">
+          <div><label class="form-label">预览模式</label>
+            <div style="display:flex;gap:12px;align-items:center;padding:6px 0">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="f_enable_preview" checked>
+                启用预览推流 (不勾选仅报警截图，节省 CPU/GPU)
+              </label>
+            </div></div>
+        </div>
       </div>
 
       <div class="form-section">
@@ -469,8 +478,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
               <option value="libx264">libx264 (CPU)</option>
               <option value="h264_nvenc">h264_nvenc (NVIDIA)</option>
             </select></div>
-          <div><label class="form-label">FPS</label>
-            <input class="form-input" id="f_enc_fps" type="number" min="1" max="120" value="25"></div>
+          <div><label class="form-label">FPS (0=自动匹配源帧率)</label>
+            <input class="form-input" id="f_enc_fps" type="number" min="0" max="120" value="0"></div>
         </div>
         <div class="form-row three">
           <div><label class="form-label">码率 (kbps)</label>
@@ -530,7 +539,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeTaskModal()">取消</button>
-      <button class="btn btn-primary" onclick="createTask()">创建并启动</button>
+      <button class="btn btn-primary" onclick="submitTaskForm()">创建并启动</button>
     </div>
   </div>
 </div>
@@ -539,7 +548,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 <div class="modal-backdrop" id="modelModalBackdrop">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">部署推理模型</div>
+      <div class="modal-title" id="modelModalTitle">新增模型</div>
       <button class="modal-close" onclick="closeModelModal()">×</button>
     </div>
     <div class="modal-body">
@@ -588,7 +597,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModelModal()">取消</button>
-      <button class="btn btn-primary" onclick="addModel()">保存到模型库</button>
+      <button class="btn btn-primary" onclick="submitModelForm()" id="modelModalSaveBtn">保存到模型库</button>
     </div>
   </div>
 </div>
@@ -623,6 +632,7 @@ var cardModeOverride={};   // id -> 'snapshot'|'live'，没设置时跟随 globa
 var cardPlayers={};        // id -> flv.js Player 实例
 var MAX_LIVE_PLAYERS=4;    // 最大同时播放路数（浏览器同域名连接限制）
 var playerReconnect={};    // id -> {attempt, timer} 重连状态
+var _editingTaskId=null;   // 编辑模式下的任务 ID
 
 var ICONS={
   play:'<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
@@ -635,13 +645,16 @@ var ICONS={
 
 // ── 初始化 ──
 document.addEventListener('DOMContentLoaded',function(){
+  checkPnaAccess();
   // 同步全局预览模式按钮
   $('modeBtnSnap').classList.toggle('active',globalPreviewMode==='snapshot');
   $('modeBtnLive').classList.toggle('active',globalPreviewMode==='live');
   loadModels();refreshAll();
   refreshTimer=setInterval(refreshAll,2000);
   pollThumbnails();    // 链式轮询缩略图（self-scheduling）
-  initPlayerObserver(); // FLV 播放器可见性观察
+  // 全局缓冲区追逐定时器：每 2 秒检测所有 FLV 播放器的缓冲深度
+  // 当缓冲超过 1 秒时，主动 seek 到 live edge（末尾减 0.2 秒），消除累积延迟
+  setInterval(chaseLiveLatency, 3000);
   log('NEXUS 指挥舱已上线','ok');
 });
 
@@ -652,8 +665,12 @@ function typeLabel(t){var m={detection:'检测',classification:'分类',face_det
 function api(method,url,body,cb){
   var x=new XMLHttpRequest();x.open(method,url,true);
   if(body)x.setRequestHeader('Content-Type','application/json');
-  x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false,msg:'invalid json'}}setConnection(true);cb(r)};
-  x.onerror=function(){setConnection(false);cb({ok:false,msg:'network error'})};
+  x.onload=function(){
+    var r,raw=x.responseText;
+    try{r=JSON.parse(raw)}catch(e){console.error('[API] Invalid JSON response',method,url,raw.substring(0,200));r={ok:false,msg:'invalid json',_raw:raw.substring(0,200)}}
+    setConnection(true);cb(r)
+  };
+  x.onerror=function(){console.error('[API] Network error',method,url);setConnection(false);cb({ok:false,msg:'network error'})};
   x.send(body||null);
 }
 function setConnection(ok){
@@ -706,7 +723,7 @@ function switchPage(page){
   document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});
   var nav=document.querySelector('.nav-item[data-page="'+page+'"]');if(nav)nav.classList.add('active');
   currentPage=page;
-  $('pageTitle').textContent=page==='dashboard'?'指挥舱':'模型矩阵';
+  $('pageTitle').textContent=page==='dashboard'?'任务管理':'模型管理';
 }
 
 // ── 模型 ──
@@ -732,6 +749,7 @@ function renderModels(){
         '<div class="model-prop"><div class="model-prop-val">'+m.input_size[0]+'×'+m.input_size[1]+'</div><div class="model-prop-lbl">输入</div></div>'+
       '</div>'+
       '<div class="model-actions">'+
+        '<button class="btn btn-ghost btn-sm" onclick="openEditModelModal(\''+esc(m.name)+'\')">编辑</button>'+
         '<button class="btn btn-danger btn-sm" onclick="deleteModel(\''+esc(m.name)+'\')">'+ICONS.trash+' 删除</button>'+
       '</div></div>';
   });
@@ -757,6 +775,23 @@ function addModel(){
   api('POST','/api/v1/models',body,function(r){
     if(r.ok){toast('模型「'+name+'」已部署','success');log('模型部署成功：'+name,'ok');closeModelModal();loadModels()}
     else{toast('部署失败：'+(r.msg||''),'danger');log('模型部署失败：'+name+' - '+(r.msg||''),'err')}
+  });
+}
+function updateModel(){
+  var name=_editingModelName;if(!name)return;
+  var roiStr=$('mf_roi').value||'0,0,0,0';var roi=roiStr.split(',').map(function(x){return parseInt(x)||0});
+  var body=JSON.stringify({
+    type:$('mf_type').value,path:$('mf_path').value.trim(),
+    backend:$('mf_backend').value,device:$('mf_device').value,
+    confidence_threshold:parseFloat($('mf_threshold').value)||0.5,
+    input_size:[parseInt($('mf_w').value)||640,parseInt($('mf_h').value)||640],
+    interval:parseInt($('mf_interval').value)||1,
+    roi:[roi[0]||0,roi[1]||0,roi[2]||0,roi[3]||0]
+  });
+  log('更新模型：'+name,'info');
+  api('PATCH','/api/v1/models/'+encodeURIComponent(name),body,function(r){
+    if(r.ok){toast('模型「'+name+'」已更新','success');log('模型更新成功：'+name,'ok');closeModelModal();loadModels()}
+    else{toast('更新失败：'+(r.msg||''),'danger');log('模型更新失败：'+name+' - '+(r.msg||''),'err')}
   });
 }
 function deleteModel(name){
@@ -823,9 +858,9 @@ function renderTasks(){
     var liveOn=t.running&&t.initialized;
 
     var statusCls,statusText,statusDot;
-    if(t.running&&t.initialized){statusCls='run';statusText='运行中';statusDot=true}
+    if(!t.running&&t.init_error){statusCls='err';statusText='失败';statusDot=false}
+    else if(t.running&&t.initialized){statusCls='run';statusText='运行中';statusDot=true}
     else if(t.running&&!t.initialized){statusCls='init';statusText='初始化中';statusDot=true}
-    else if(!t.running&&t.init_error){statusCls='err';statusText='失败';statusDot=false}
     else{statusCls='sto';statusText='已停止';statusDot=false}
 
     var modelsHtml='';
@@ -898,7 +933,10 @@ function renderTasks(){
         actions:card.querySelector('.task-actions'),
         errMsg:card.querySelector('.task-error-msg'),
         thumbBusy:false,
-        prevSig:''
+        prevSig:'',
+        _prevInitError:undefined,
+        _prevRunning:false,
+        _hasBeenErrored:false
       };
       // 缩略图自动链式刷新（onload/onerror 后自动加载下一张）
       entry.img.addEventListener('load',function(){entry.thumbBusy=false});
@@ -939,6 +977,33 @@ function renderTasks(){
         (t.preview_url?urlLine('preview',urlProto(t.preview_url),t.preview_url):'');
     }
 
+    // 检测任务异常 → 调用 stop 接口 + 销毁播放器（处理首次出现和重启后再次失败两种情况）
+    var prevErr=entry._prevInitError;
+    var prevRunning=entry._prevRunning;
+    entry._prevInitError=t.init_error;
+    entry._prevRunning=t.running;
+    // 触发条件：错误首次出现 / 错误变化 / 任务从运行变停止且有错误 / 任务重启后又出现错误
+    if(t.init_error){
+      var errJustAppeared=prevErr!==t.init_error;
+      var stoppedWithErr=prevRunning&&!t.running;
+      var restartedFailed=!prevRunning&&t.running&&t.init_error&&entry._hasBeenErrored;
+      if(errJustAppeared||stoppedWithErr||restartedFailed){
+        toast('任务「'+t.id+'」异常: '+t.init_error,'danger');
+        log('任务异常：'+t.id+' - '+t.init_error,'err');
+        stopTask(t.id);
+        destroyCardPlayer(t.id);
+        entry.img.style.display='none';
+        entry.video.style.display='none';
+        entry.placeholder.style.display='flex';
+        entry.placeText.textContent='推流已停止';
+        if(detailTaskId===t.id) stopAllDetailPlayers();
+        entry.actSig=''; // 强制按钮刷新
+      }
+      entry._hasBeenErrored=true;
+    } else {
+      entry._hasBeenErrored=false;
+    }
+
     // 模型 tag
     if(entry.modelsSig!==modelsHtml){entry.modelsSig=modelsHtml;entry.modelsRow.innerHTML=modelsHtml}
 
@@ -965,14 +1030,16 @@ function renderTasks(){
       if(entry.placeText.textContent!==placeTxt)entry.placeText.textContent=placeTxt;
     }
 
-    // actions（仅在状态切换时重建）
-    var actSig=t.running?'r':'s';
+    // actions（有 init_error 的任务视为已停止）
+    var effectiveRunning = t.running && !t.init_error;
+    var actSig=effectiveRunning?'r':'s';
     if(entry.actSig!==actSig){
       entry.actSig=actSig;
       entry.actions.innerHTML=
-        (t.running
+        (effectiveRunning
           ? '<button class="btn btn-danger" onclick="stopTask(\''+esc(t.id)+'\')">'+ICONS.stop+' 停止</button>'
           : '<button class="btn btn-primary" onclick="startTask(\''+esc(t.id)+'\')">'+ICONS.play+' 启动</button>')+
+        (!effectiveRunning?'<button class="btn btn-ghost" onclick="openEditTaskModal(\''+esc(t.id)+'\')">'+ICONS.detail+' 编辑</button>':'')+
         '<button class="btn btn-ghost" onclick="showDetail(\''+esc(t.id)+'\')">'+ICONS.detail+' 详情</button>'+
         '<button class="btn btn-ghost" onclick="deleteTask(\''+esc(t.id)+'\')">'+ICONS.trash+' 删除</button>';
     }
@@ -1054,55 +1121,88 @@ function setupCardPlayer(id,url){
     destroyCardPlayer(keys[0]);
   }
   setStreamStatus(entry,'connecting','连接中');
+  entry.video.style.display='block';
+  entry.placeholder.style.display='none';
+  entry.img.style.display='none';
+  entry.video.muted=true;
+  console.log('[FLV] 创建播放器',id,url);
   var player=flvjs.createPlayer(
-    {type:'flv',isLive:true,url:url,cors:true},
-    {enableStashBuffer:false,stashInitialSize:256,liveBufferLatencyChasing:true,
+    {type:'flv',isLive:true,url:url,cors:true,hasAudio:false,hasVideo:true},
+    {enableStashBuffer:true,stashInitialSize:128,liveBufferLatencyChasing:true,
      reuseRedirectedURL:true,fixAudioTimestampGap:false,
-     enableWorker:true}  // Web Worker 分离 demux，避免 UI 卡顿
+     enableWorker:false,liveSyncDurationCount:1,liveMaxLatencyDuration:2}
   );
   player._reconnectAttempt=0;
   player.attachMediaElement(entry.video);
-  try{player.load()}catch(e){}
+  try{player.load()}catch(e){console.error('[FLV] load error',id,e)}
+  // autoplay 需要 muted
+  entry.video.muted=true;
   var playPromise=player.play();
-  if(playPromise&&playPromise.catch)playPromise.catch(function(){});
-  player.on(flvjs.Events.ERROR,function(type,detail){
-    // 区分"可恢复错误"与"致命错误"
-    if(type==='MediaError'||type==='NetworkError'){
-      // 非致命：静默重连，不显示错误状态
-      if(player._reconnectAttempt<8&&!player._destroyed){
-        player._reconnectAttempt++;
-        var delay=Math.min(500*Math.pow(1.5,player._reconnectAttempt-1),6000);
-        clearTimeout(playerReconnect[id]);
-        playerReconnect[id]=setTimeout(function(){
-          if(cardPlayers[id]===player&&!player._destroyed)setupCardPlayer(id,url);
-        },delay);
-      }
-    }else{
-      // 致命错误才显示红色状态
-      setStreamStatus(entry,'error','播放异常');
-      if(player._reconnectAttempt<5&&!player._destroyed){
-        player._reconnectAttempt++;
-        var delay=Math.min(1000*Math.pow(2,player._reconnectAttempt-1),8000);
-        clearTimeout(playerReconnect[id]);
-        playerReconnect[id]=setTimeout(function(){
-          if(cardPlayers[id]===player&&!player._destroyed)setupCardPlayer(id,url);
-        },delay);
-      }
-    }
+  if(playPromise&&playPromise.catch)playPromise.catch(function(e){
+    console.warn('[FLV] autoplay blocked',id,e);
+    // autoplay 被拦截，1 秒后重试
+    setTimeout(function(){try{player.play()}catch(e2){}},1000);
   });
-  player.on(flvjs.Events.LOADING_COMPLETE,function(){setStreamStatus(entry,'playing','直播')});
+  player.on(flvjs.Events.ERROR,function(type,detail,info){
+    console.error('[FLV] error',id,type,detail,info);
+    log('FLV播放错误 '+id+': '+type,'err');
+  });
+  player.on(flvjs.Events.LOADING_COMPLETE,function(){
+    console.log('[FLV] 加载完成',id);
+    setStreamStatus(entry,'playing','直播');
+  });
   entry.video.addEventListener('playing',function(){
+    console.log('[FLV] 开始播放',id);
     entry.video.style.display='block';
     entry.placeholder.style.display='none';
     entry.img.style.display='none';
     setStreamStatus(entry,'playing','直播');
-    // 注册可见性观察
-    if(playerVisibilityObs){
-      entry.video.setAttribute('data-task-id',id);
-      try{playerVisibilityObs.observe(entry.video)}catch(e){}
-    }
-  },{once:true});
+  });
+  entry.video.addEventListener('error',function(e){
+    console.error('[FLV] video element error',id,e);
+    setStreamStatus(entry,'error','视频错误');
+  });
+  entry.video.addEventListener('pause',function(){
+    if(document.hidden) return;
+    try{player.play()}catch(e){}
+  });
   cardPlayers[id]=player;
+}
+
+// ── 全局缓冲区追逐：消除 FLV.js 累积延迟 ──
+// FLV.js 的 liveBufferLatencyChasing 追逐并不可靠，缓冲会持续增长
+// 此函数每 3 秒检测所有播放器的缓冲深度，超过 3 秒则 seek 到 live edge
+function chaseLiveLatency(){
+  var now=Date.now();
+  // 追赶详情弹窗中的播放器（原始流 + AI 流）
+  for(var key in detailPlayers){
+    var p=detailPlayers[key];
+    if(!p||!p._player||!p._player.mediaElement)continue;
+    var video=p._player.mediaElement;
+    if(video.buffered&&video.buffered.length>0){
+      var liveEnd=video.buffered.end(video.buffered.length-1);
+      var latency=liveEnd-(video.currentTime||0);
+      // 缓冲超过 3 秒 且 距上次 seek 超过 5 秒（避免频繁跳跃导致卡顿）
+      if(latency>3.0&&now-(p._lastSeekTime||0)>5000){
+        video.currentTime=Math.max(0,liveEnd-0.5);
+        p._lastSeekTime=now;
+      }
+    }
+  }
+  // 追赶首页卡片上的小窗口播放器
+  for(var id in cardPlayers){
+    var entry=taskCardEls[id];
+    if(!entry||!entry.video)continue;
+    var v=entry.video;
+    if(v.buffered&&v.buffered.length>0){
+      var liveEnd=v.buffered.end(v.buffered.length-1);
+      var latency=liveEnd-(v.currentTime||0);
+      if(latency>3.0&&now-(entry._lastSeek||0)>5000){
+        v.currentTime=Math.max(0,liveEnd-0.5);
+        entry._lastSeek=now;
+      }
+    }
+  }
 }
 
 // 后台标签页暂停/恢复
@@ -1121,27 +1221,40 @@ function applyPreviewMode(t){
   // 高亮按钮
   entry.modeBtnSnap.classList.toggle('active',mode==='snapshot');
   entry.modeBtnLive.classList.toggle('active',mode==='live');
-  var liveOn=t.running&&t.initialized;
+  var liveOn=t.running&&t.initialized&&!t.init_error;
+  if(t.init_error){
+    destroyCardPlayer(t.id);
+    entry.img.style.display='none';
+    entry.video.style.display='none';
+    entry.placeholder.style.display='flex';
+    entry.placeText.textContent='推流已停止';
+    setStreamStatus(entry,null);
+    return;
+  }
   if(mode==='live'){
     // 关闭 jpg 流
     entry.img.style.display='none';
+    entry.placeholder.style.display='none';
+    entry.video.style.display='block';
     if(!liveOn){
       destroyCardPlayer(t.id);
-      setStreamStatus(entry,null);
+      entry.video.style.display='none';
+      entry.placeholder.style.display='flex';
       return;
     }
-    if(!t.preview_url){
+    var liveUrl=t.preview_url||deriveHttpFlv(t.output_url);
+    if(!liveUrl){
       destroyCardPlayer(t.id);
-      setStreamStatus(entry,'error','未配置预览地址');
-      // 占位文本
+      setStreamStatus(entry,'error','无可用 FLV 地址');
+      entry.video.style.display='none';
       entry.placeholder.style.display='flex';
-      entry.placeText.textContent='请在任务中填写 preview_url';
+      entry.placeText.textContent='无法推导 HTTP-FLV 地址';
       return;
     }
     // 已有播放器且 url 没变就跳过
-    if(cardPlayers[t.id]&&cardPlayers[t.id]._urlMark===t.preview_url)return;
-    setupCardPlayer(t.id,t.preview_url);
-    if(cardPlayers[t.id])cardPlayers[t.id]._urlMark=t.preview_url;
+    if(cardPlayers[t.id]&&cardPlayers[t.id]._urlMark===liveUrl)return;
+    setupCardPlayer(t.id,liveUrl);
+    if(cardPlayers[t.id])cardPlayers[t.id]._urlMark=liveUrl;
   } else {
     // snapshot 模式：销毁 player
     destroyCardPlayer(t.id);
@@ -1184,16 +1297,18 @@ function createTask(){
   var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
   checks.forEach(function(c){var m=allModels.find(function(mm){return mm.name===c.value});if(m)models.push(m)});
   if(models.length===0){toast('请至少选择一个模型','danger');return}
+  var fpsVal=parseInt($('f_enc_fps').value);
   var body=JSON.stringify({
     id:id,
     name:$('f_name').value.trim()||id,
     input_url:$('f_input').value.trim(),
     output_url:$('f_output').value.trim(),
     preview_url:$('f_preview').value.trim(),
+    enable_preview:$('f_enable_preview').checked,
     encoder:{
       format:$('f_enc_format').value,
       codec:$('f_enc_codec').value,
-      fps:parseInt($('f_enc_fps').value)||25,
+      fps:fpsVal>0?fpsVal:0,
       bitrate_kbps:parseInt($('f_enc_bitrate').value)||4000,
       gop:parseInt($('f_enc_gop').value)||50,
       max_b_frames:parseInt($('f_enc_b').value)||0,
@@ -1219,6 +1334,65 @@ function createTask(){
       });
     }else{
       toast('创建失败：'+(r.msg||''),'danger');log('任务创建失败：'+id+' - '+(r.msg||''),'err');
+    }
+  });
+}
+function submitTaskForm(){
+  if(_editingTaskId){stopTaskIfRunningThenUpdate()}else{createTask()}
+}
+function stopTaskIfRunningThenUpdate(){
+  var id=_editingTaskId;
+  var task=allTasks.find(function(t){return t.id===id});
+  if(task&&task.running){
+    log('任务正在运行，先停止再编辑：'+id,'info');
+    api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+      if(r.ok){setTimeout(function(){updateTask()},300)}
+      else{toast('停止任务失败，无法编辑','danger')}
+    });
+  }else{
+    updateTask();
+  }
+}
+function updateTask(){
+  var id=_editingTaskId;if(!id)return;
+  var fpsVal=parseInt($('f_enc_fps').value);
+  var showLabel=$('f_draw_label')?$('f_draw_label').checked:true;
+  var showScore=$('f_draw_score')?$('f_draw_score').checked:true;
+  // 收集勾选的模型
+  var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
+  checks.forEach(function(c){var m=allModels.find(function(mm){return mm.name===c.value});if(m)models.push(m)});
+  var body=JSON.stringify({
+    input_url:$('f_input').value.trim(),
+    output_url:$('f_output').value.trim(),
+    preview_url:$('f_preview').value.trim(),
+    enable_preview:$('f_enable_preview').checked,
+    models:models,
+    encoder:{
+      format:$('f_enc_format').value,
+      codec:$('f_enc_codec').value,
+      fps:fpsVal>0?fpsVal:0,
+      bitrate_kbps:parseInt($('f_enc_bitrate').value)||4000,
+      gop:parseInt($('f_enc_gop').value)||50,
+      max_b_frames:parseInt($('f_enc_b').value)||0,
+      preset:$('f_enc_preset').value,
+      tune:$('f_enc_tune').value,
+      low_latency:$('f_enc_ll').value==='true'
+    },
+    decoder:{
+      hw_accel:$('f_dec_hw').value,
+      rtsp_transport:$('f_dec_transport').value
+    },
+    draw:{show_label:showLabel,show_score:showScore}
+  });
+  log('更新任务配置：'+id,'info');
+  api('PUT','/api/v1/tasks/'+encodeURIComponent(id),body,function(r){
+    if(r.ok){
+      toast('任务配置已更新','success');log('任务配置更新成功：'+id,'ok');
+      closeTaskModal();refreshAll();
+    }else{
+      var errMsg=r.msg;
+      if(r._raw)errMsg+=' (响应: '+r._raw+')';
+      toast('更新失败：'+errMsg,'danger');log('任务配置更新失败：'+id+' - '+errMsg,'err');
     }
   });
 }
@@ -1256,8 +1430,24 @@ function deriveHttpFlv(url){
     var host=m[1], app=m[2], stream=m[3];
     // 去掉点播文件后缀
     stream=stream.replace(/\.(mp4|flv|ts|mkv)$/,'');
+    // 把 127.0.0.1 转成 localhost 以避免浏览器的 Private Network Access 拦截
+    if(host==='127.0.0.1'||host==='0.0.0.0') host='localhost';
     return 'http://'+host+':8080/'+app+'/'+stream+'.live.flv';
   }catch(e){return ''}
+}
+
+// 检查是否需要提示使用 localhost 访问
+function checkPnaAccess(){
+  if(location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
+    // 页面从非 localhost 域名访问，FLV 播放器可能被浏览器的 PNA 策略拦截
+    if(!document.getElementById('pnaWarning')){
+      var div=document.createElement('div');
+      div.id='pnaWarning';
+      div.style.cssText='position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#ff4570,#ff7b50);color:#fff;padding:10px 20px;text-align:center;z-index:99999;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(255,69,112,.4);';
+      div.innerHTML='⚠️ 当前通过 <b>'+location.host+'</b> 访问，浏览器 PNA 策略会阻止 FLV 播放器访问 loopback。请点击 → <a style="color:#fff;text-decoration:underline;font-size:14px;padding:2px 8px;background:rgba(0,0,0,.2);border-radius:4px;" href="'+location.href.replace(location.host,'localhost:'+location.port)+'">http://localhost:'+location.port+'</a> ← 用此地址访问以解决 FLV 黑屏问题';
+      document.body.appendChild(div);
+    }
+  }
 }
 
 var detailPlayers={}; // { 'input': Player, 'output': Player }
@@ -1400,8 +1590,8 @@ function startDetailPlayer(side){
   var ph=document.getElementById('colPlaceholder'+idPref);
   video.style.display='block';if(ph)ph.style.display='none';
   var player=flvjs.createPlayer(
-    {type:'flv',isLive:true,url:url,cors:true},
-    {enableStashBuffer:false,stashInitialSize:128,liveBufferLatencyChasing:true,reuseRedirectedURL:true}
+    {type:'flv',isLive:true,url:url,cors:true,hasAudio:false,hasVideo:true},
+    {enableStashBuffer:false,stashInitialSize:128,liveBufferLatencyChasing:true,reuseRedirectedURL:true,liveSyncDurationCount:1,liveMaxLatencyDuration:3}
   );
   player.attachMediaElement(video);
   try{player.load()}catch(e){}
@@ -1419,11 +1609,103 @@ function downloadSnapshot(id){
   document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
+var _editingModelName=null;   // 编辑模式下的模型名称
+
 // ── 弹窗 ──
-function openTaskModal(){$('taskModalBackdrop').classList.add('active');renderModelSelector()}
-function closeTaskModal(){$('taskModalBackdrop').classList.remove('active')}
-function openModelModal(){$('modelModalBackdrop').classList.add('active')}
-function closeModelModal(){$('modelModalBackdrop').classList.remove('active')}
+function openTaskModal(){
+  _editingTaskId=null;
+  $('taskModalBackdrop').classList.add('active');
+  var title=$('taskModalBackdrop').querySelector('.modal-title');
+  var btn=$('taskModalBackdrop').querySelector('.modal-footer .btn-primary');
+  title.textContent='新建分析任务';
+  btn.textContent='创建并启动';
+  $('f_id').value='';$('f_id').disabled=false;
+  $('f_name').value='';
+  $('f_input').value='rtsp://127.0.0.1:554/live/obs_test3';
+  $('f_output').value='rtsp://127.0.0.1:554/live/surveillance_out';
+  $('f_preview').value='';
+  $('f_enable_preview').checked=true;
+  $('f_enc_format').value='auto';$('f_enc_codec').value='auto';
+  $('f_enc_fps').value='0';$('f_enc_bitrate').value='4000';
+  $('f_enc_gop').value='50';$('f_enc_b').value='0';
+  $('f_enc_preset').value='ultrafast';$('f_enc_tune').value='zerolatency';$('f_enc_ll').value='true';
+  $('f_dec_hw').value='cuda';$('f_dec_transport').value='tcp';
+  renderModelSelector();
+}
+function openEditTaskModal(id){
+  _editingTaskId=id;
+  api('GET','/api/v1/tasks/'+encodeURIComponent(id),null,function(r){
+    if(!r.ok||!r.task){toast('获取任务配置失败','danger');return}
+    var cfg=r.task;
+    $('taskModalBackdrop').classList.add('active');
+    var title=$('taskModalBackdrop').querySelector('.modal-title');
+    var btn=$('taskModalBackdrop').querySelector('.modal-footer .btn-primary');
+    title.textContent='编辑任务 — '+cfg.id;
+    btn.textContent='保存修改';
+    $('f_id').value=cfg.id;$('f_id').disabled=true;
+    $('f_name').value=cfg.name||'';
+    $('f_input').value=cfg.input_url||'';
+    $('f_output').value=cfg.output_url||'';
+    $('f_preview').value=cfg.preview_url||'';
+    $('f_enable_preview').checked=cfg.enable_preview!==false;
+    var enc=cfg.encoder||{};
+    $('f_enc_format').value=enc.format||'auto';
+    $('f_enc_codec').value=enc.codec||'auto';
+    $('f_enc_fps').value=enc.fps!=null?String(enc.fps):'0';
+    $('f_enc_bitrate').value=enc.bitrate_kbps||'4000';
+    $('f_enc_gop').value=enc.gop||'50';
+    $('f_enc_b').value=enc.max_b_frames||'0';
+    $('f_enc_preset').value=enc.preset||'ultrafast';
+    $('f_enc_tune').value=enc.tune||'zerolatency';
+    $('f_enc_ll').value=enc.low_latency?'true':'false';
+    var dec=cfg.decoder||{};
+    $('f_dec_hw').value=dec.hw_accel||'cuda';
+    $('f_dec_transport').value=dec.rtsp_transport||'tcp';
+    renderModelSelector();
+    if(cfg.models){
+      cfg.models.forEach(function(m){
+        var cb=document.querySelector('#modelCheckboxes input[value="'+esc(m.name).replace(/"/g,'&quot;')+'"]');
+        if(cb)cb.checked=true;
+      });
+    }
+    log('打开编辑：'+cfg.id,'info');
+  });
+}
+function closeTaskModal(){$('taskModalBackdrop').classList.remove('active');_editingTaskId=null}
+function openModelModal(){
+  _editingModelName=null;
+  $('modelModalTitle').textContent='新增模型';
+  $('modelModalSaveBtn').textContent='保存到模型库';
+  $('mf_name').value='';$('mf_name').disabled=false;
+  $('mf_type').value='detection';$('mf_path').value='';
+  $('mf_backend').value='ort';$('mf_device').value='gpu';
+  $('mf_threshold').value='0.5';$('mf_interval').value='1';
+  $('mf_w').value='640';$('mf_h').value='640';$('mf_roi').value='0,0,0,0';
+  $('modelModalBackdrop').classList.add('active');
+}
+function openEditModelModal(name){
+  _editingModelName=name;
+  $('modelModalTitle').textContent='编辑模型 - '+name;
+  $('modelModalSaveBtn').textContent='保存修改';
+  $('mf_name').value=name;$('mf_name').disabled=true;
+  var m=allModels.find(function(mm){return mm.name===name});
+  if(!m){toast('模型不存在','danger');return}
+  $('mf_type').value=m.type||'detection';
+  $('mf_path').value=m.path||'';
+  $('mf_backend').value=m.backend||'ort';
+  $('mf_device').value=m.device||'gpu';
+  $('mf_threshold').value=m.confidence_threshold!=null?String(m.confidence_threshold):'0.5';
+  $('mf_interval').value=m.interval!=null?String(m.interval):'1';
+  $('mf_w').value=m.input_size&&m.input_size[0]?String(m.input_size[0]):'640';
+  $('mf_h').value=m.input_size&&m.input_size[1]?String(m.input_size[1]):'640';
+  var roi=m.roi||[0,0,0,0];
+  $('mf_roi').value=roi.join(',');
+  $('modelModalBackdrop').classList.add('active');
+}
+function closeModelModal(){$('modelModalBackdrop').classList.remove('active');_editingModelName=null}
+function submitModelForm(){
+  if(_editingModelName){updateModel()}else{addModel()}
+}
 
 // ── 快捷键 ──
 document.addEventListener('keydown',function(e){

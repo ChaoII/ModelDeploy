@@ -4,6 +4,10 @@
 #include <opencv2/opencv.hpp>
 #include <cuda_runtime.h>
 
+#ifdef WITH_GPU
+#include "csrc/vision/common/processors/nv12_to_bgr.cuh"
+#endif
+
 using namespace modeldeploy::vision;
 
 InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory)
@@ -38,6 +42,28 @@ bool InferGroup::init() {
     }
     if (engines_.empty()) return false;
     start_workers();
+
+    // Warm-up: run one dummy inference per engine to trigger TRT engine compilation
+    // BEFORE the decoder starts producing frames. This avoids the scenario where
+    // the first real frame blocks for 30-60s on TRT compilation, causing all
+    // subsequent frames to be dropped as "stale".
+    std::cout << "[InferGroup] Warming up " << engines_.size() << " model(s)..." << std::endl;
+    for (size_t i = 0; i < engines_.size(); ++i) {
+        const auto& engine = engines_[i];
+        const auto& mcfg = engine->config();
+        int w = mcfg.input_size.size() == 2 ? mcfg.input_size[0] : 640;
+        int h = mcfg.input_size.size() == 2 ? mcfg.input_size[1] : 640;
+        // Create a dummy black BGR image
+        auto dummy = ImageData::from_raw(std::vector<uint8_t>(h * w * 3, 0).data(),
+                                          w, h, MdImageType::PKG_BGR_U8, true);
+        InferResult dummy_result;
+        auto t0 = std::chrono::steady_clock::now();
+        engine->infer(dummy, &dummy_result);
+        auto t1 = std::chrono::steady_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+        std::cout << "[InferGroup] Warm-up done: " << mcfg.name << " (" << ms << "ms)" << std::endl;
+    }
+
     initialized_ = true;
     return true;
 }
@@ -46,8 +72,21 @@ bool InferGroup::ready() const {
     return initialized_.load();
 }
 
-bool InferGroup::should_process(size_t idx) {
-    return (++frame_counters_[idx]) % engines_[idx]->config().interval == 0;
+bool InferGroup::all_cuda_preproc() const {
+    for (const auto& eng : engines_) {
+        const auto& type = eng->config().type;
+        if (type == "detection") {
+            // Detection models have use_cuda_preproc via UltralyticsPreprocessor
+            // Checked indirectly: if device == "gpu" and cuda_preproc was set
+            if (eng->config().device != "gpu") return false;
+        } else if (type == "face_detection") {
+            if (eng->config().device != "gpu") return false;
+        } else {
+            // Unknown model type — can't guarantee CUDA preproc
+            return false;
+        }
+    }
+    return !engines_.empty();
 }
 
 void InferGroup::worker_loop(Worker* w) {
@@ -95,32 +134,66 @@ void InferGroup::stop_workers() {
     workers_.clear();
 }
 
-bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
-                             int width, int height, int y_step, int uv_step,
-                             std::vector<InferResult>* results,
-                             ImageData* frame_out) {
-    if (!initialized_) return false;
+int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
+                              int width, int height, int y_step, int uv_step,
+                              std::vector<InferResult>* results,
+                              ImageData* frame_out) {
+    if (!initialized_) return 0;
     results->clear();
 
-    // ── NV12 → BGR（CPU 一次，所有模型复用） ──
-    size_t y_size = static_cast<size_t>(height) * width;
-    size_t uv_size = y_size / 2;
-    size_t total = y_size + uv_size;
+    const size_t y_size = static_cast<size_t>(height) * width;
+    const size_t uv_size = y_size / 2;
+    const size_t total = y_size + uv_size;
 
-    std::vector<uint8_t> cpu_buf(total);
-    for (int row = 0; row < height; ++row)
-        memcpy(cpu_buf.data() + row * width, y_plane + row * y_step, width);
-    int uv_h = height / 2;
-    for (int row = 0; row < uv_h; ++row)
-        memcpy(cpu_buf.data() + y_size + row * width, uv_plane + row * uv_step, width);
+    if (last_w_ != width || last_h_ != height || nv12_buf_.size() != total) {
+        nv12_buf_.resize(total);
+        last_w_ = width;
+        last_h_ = height;
+    }
 
-    auto nv12_image = ImageData::from_raw(cpu_buf.data(), width, height, MdImageType::NV12, true);
+    if (y_step == width && uv_step == width) {
+        std::memcpy(nv12_buf_.data(), y_plane, y_size);
+        std::memcpy(nv12_buf_.data() + y_size, uv_plane, uv_size);
+    } else {
+        for (int row = 0; row < height; ++row)
+            std::memcpy(nv12_buf_.data() + row * width, y_plane + row * y_step, width);
+        const int uv_h = height / 2;
+        for (int row = 0; row < uv_h; ++row)
+            std::memcpy(nv12_buf_.data() + y_size + row * width, uv_plane + row * uv_step, width);
+    }
+
+    // 预先判断是否有任一模型需要处理本帧（计数器 + 间隔检查）
+    // 使用临时变量记录，避免下面 dispatch 循环重复 increment
+    std::vector<bool> need_process(engines_.size(), false);
+    bool any_needs_process = false;
+    for (size_t i = 0; i < engines_.size(); ++i) {
+        bool should = (++frame_counters_[i]) % engines_[i]->config().interval == 0;
+        need_process[i] = should;
+        if (should) any_needs_process = true;
+    }
+
+    // 即使所有模型跳推理，仍需输出 BGR 图像（供预览路保持 25fps 编码 + 复用缓存绘制）
+#ifdef WITH_GPU
+    const size_t bgr_size = static_cast<size_t>(height) * width * 3;
+    if (bgr_buf_.size() < bgr_size) bgr_buf_.resize(bgr_size);
+    nv12_to_bgr_cuda(nv12_buf_.data(), nv12_buf_.data() + y_size,
+                      width, height, width, width,
+                      bgr_buf_.data());
+    auto bgr_image = ImageData::from_raw(bgr_buf_.data(), width, height,
+                                          MdImageType::PKG_BGR_U8, false);
+#else
+    auto nv12_image = ImageData::from_raw(nv12_buf_.data(), width, height, MdImageType::NV12, true);
     auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
+#endif
 
     if (frame_out)
-        *frame_out = bgr_image; // ImageData 浅拷贝
+        *frame_out = bgr_image;
 
-    // ── 多模型并行推理（每模型独立 worker，GPU 上的 CUDA kernel 可并发执行） ──
+    // 所有模型跳推理 → 输出 BGR 但不输出结果
+    if (!any_needs_process) {
+        return 0;
+    }
+
     struct ModelTask {
         size_t index;
         ImageData input;
@@ -131,7 +204,7 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     std::vector<ModelTask> tasks(engines_.size());
 
     for (size_t i = 0; i < engines_.size(); ++i) {
-        if (!should_process(i)) continue;
+        if (!need_process[i]) continue;
         auto& engine = engines_[i];
         const auto& mcfg = engine->config();
         ImageData input_image = bgr_image;
@@ -148,7 +221,6 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
         tasks[i].used = true;
     }
 
-    // 派发到 worker 池
     for (size_t i = 0; i < tasks.size(); ++i) {
         if (!tasks[i].used) continue;
         auto& w = workers_[i];
@@ -168,7 +240,6 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
         w->cv_in.notify_one();
     }
 
-    // 等待全部完成
     for (size_t i = 0; i < tasks.size(); ++i) {
         if (!tasks[i].used) continue;
         auto& w = workers_[i];
@@ -176,15 +247,16 @@ bool InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
         w->cv_out.wait(lock, [&w]() { return w->done; });
     }
 
-    // 收集结果
+    int ran_count = 0;
     for (auto& task : tasks) {
         if (!task.used) continue;
+        ++ran_count;
         if (!task.result.boxes.empty())
             results->push_back(std::move(task.result));
         stats_.record_frame(0, task.dt_us, 0, 0);
     }
 
-    return !results->empty();
+    return ran_count;
 }
 
 bool InferGroup::add_model(const ModelConfig& mcfg) {

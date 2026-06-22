@@ -16,10 +16,15 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     if (cfg.device == "gpu") {
         opt.use_gpu(0);
     }
-    opt.set_cpu_thread_num(4);
+    opt.set_cpu_thread_num(1);
+
+    // 自动识别 .engine 文件 → 走 TRT 后端
+    bool is_engine_file = (cfg.path.size() > 7 &&
+        (cfg.path.substr(cfg.path.size() - 7) == ".engine" ||
+         cfg.path.substr(cfg.path.size() - 7) == ".Engine"));
 
     // ── TRT 后端（纯 TRT，非 ORT-TRT） ──
-    if (cfg.backend == "trt" || cfg.backend == "tensorrt") {
+    if (is_engine_file || cfg.backend == "trt" || cfg.backend == "tensorrt") {
         opt.use_trt_backend();
         opt.enable_fp16 = true;                    // RuntimeOption 级 FP16
         std::string cache_dir = "data/trt_cache";
@@ -44,8 +49,7 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
             opt.enable_fp16 = true;                    // FP16 推理（关键性能优化）
-            opt.ort_option.enable_trt = true;           // ORT 的 TensorRT EP
-            opt.ort_option.enable_fp16 = true;          // FP16 for TRT EP
+            opt.enable_trt = true;           // ORT 的 TensorRT EP// FP16 for TRT EP
             std::string cache_dir = "data/ort_trt_cache";
             try { std::filesystem::create_directories(cache_dir); } catch (...) {}
             opt.ort_option.trt_engine_cache_path = cache_dir;
@@ -53,7 +57,7 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             if (cfg_.input_size.size() == 2) {
                 int w = cfg_.input_size[0];
                 int h = cfg_.input_size[1];
-                std::string shape = "1x3x" + std::to_string(h) + "x" + std::to_string(w);
+                std::string shape = "images:1x3x" + std::to_string(h) + "x" + std::to_string(w);
                 opt.ort_option.trt_min_shape = shape;
                 opt.ort_option.trt_opt_shape = shape;
                 opt.ort_option.trt_max_shape = shape;
@@ -93,6 +97,14 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
             return false;
         }
+
+        // 将配置中的置信度阈值传递到模型后处理
+        if (det_model_) {
+            det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        }
+        if (face_model_) {
+            face_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        }
     } catch (const std::exception& e) {
         std::cerr << "[InferenceEngine] Exception loading model: " << e.what() << std::endl;
         return false;
@@ -125,6 +137,7 @@ bool InferenceEngine::clone_detection_from(
         det_model_->get_preprocessor().set_size(cfg_.input_size);
     if (cfg.device == "gpu")
         det_model_->get_preprocessor().use_cuda_preproc();
+    det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
 
     loaded_ = true;
     std::cout << "[InferenceEngine] Cloned detection: " << cfg.name
@@ -137,6 +150,7 @@ void InferenceEngine::adopt_face_model(
     if (loaded_) this->unload();
     cfg_ = cfg;
     face_model_ = std::move(model);
+    face_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
     loaded_ = true;
     std::cout << "[InferenceEngine] Adopted face: " << cfg.name
               << " (shared ORT session)" << std::endl;
@@ -161,6 +175,41 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
     if (cfg_.type == "classification")
         return infer_classification(image, result);
     return false;
+}
+
+bool InferenceEngine::batch_infer(const std::vector<ImageData>& images,
+                                   std::vector<InferResult>* results) {
+    if (!loaded_ || !results) return false;
+    results->clear();
+
+    if (cfg_.type == "detection" && det_model_) {
+        std::vector<std::vector<DetectionResult>> det_results;
+        if (!det_model_->batch_predict(images, &det_results))
+            return false;
+        results->resize(det_results.size());
+        for (size_t i = 0; i < det_results.size(); ++i) {
+            (*results)[i].model_name = cfg_.name;
+            (*results)[i].type = "detection";
+            for (auto& d : det_results[i]) {
+                DetectionBox box;
+                box.x = d.box.x; box.y = d.box.y;
+                box.w = d.box.width; box.h = d.box.height;
+                box.score = d.score;
+                box.label_id = d.label_id;
+                (*results)[i].boxes.push_back(box);
+            }
+        }
+        return true;
+    }
+
+    // 非 detection 模型（face / classification）：逐帧 fallback
+    results->resize(images.size());
+    for (size_t i = 0; i < images.size(); ++i) {
+        if (!infer(images[i], &(*results)[i])) {
+            (*results)[i] = InferResult{}; // 空结果
+        }
+    }
+    return true;
 }
 
 bool InferenceEngine::infer_detection(const ImageData& image, InferResult* result) {

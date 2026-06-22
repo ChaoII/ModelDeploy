@@ -48,6 +48,9 @@ public:
     int width() const { return width_; }
     int height() const { return height_; }
 
+    /// 源流帧率
+    int fps() const { return decoder_ ? decoder_->fps() : 25; }
+
 private:
     bool on_decoded(const DecodedFrame& f);
 

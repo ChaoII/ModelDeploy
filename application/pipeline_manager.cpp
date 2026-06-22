@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <set>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -16,8 +17,11 @@ using modeldeploy::vision::face::Scrfd;
 static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
     modeldeploy::RuntimeOption opt;
     if (cfg.device == "gpu") opt.use_gpu(0);
-    opt.set_cpu_thread_num(4);
-    if (cfg.backend == "trt" || cfg.backend == "tensorrt") {
+    opt.set_cpu_thread_num(1);
+    bool is_engine_file = (cfg.path.size() > 7 &&
+        (cfg.path.substr(cfg.path.size() - 7) == ".engine" ||
+         cfg.path.substr(cfg.path.size() - 7) == ".Engine"));
+    if (is_engine_file || cfg.backend == "trt" || cfg.backend == "tensorrt") {
         opt.use_trt_backend();
         opt.enable_fp16 = true;
         std::string cache_dir = "data/trt_cache";
@@ -36,6 +40,7 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
             opt.enable_fp16 = true;
+            opt.enable_trt = true;
             opt.ort_option.enable_trt = true;
             opt.ort_option.enable_fp16 = true;
             std::string cache_dir = "data/ort_trt_cache";
@@ -43,7 +48,7 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
             opt.ort_option.trt_engine_cache_path = cache_dir;
             if (cfg.input_size.size() == 2) {
                 int w = cfg.input_size[0], h = cfg.input_size[1];
-                std::string shape = "1x3x" + std::to_string(h) + "x" + std::to_string(w);
+                std::string shape = "images:1x3x" + std::to_string(h) + "x" + std::to_string(w);
                 opt.ort_option.trt_min_shape = shape;
                 opt.ort_option.trt_opt_shape = shape;
                 opt.ort_option.trt_max_shape = shape;
@@ -53,8 +58,13 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
     return opt;
 }
 
+PipelineManager::PipelineManager() {
+    // BatchScheduler 不自动启动，需要时手动调用 start_batch_scheduler()
+}
+
 PipelineManager::~PipelineManager() {
     stop_all();
+    stop_batch_scheduler();
 }
 
 // ── 模型工厂（prototype 缓存 + clone 共享 Runtime） ──
@@ -83,7 +93,8 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
             if (cloned && cloned->is_initialized()) {
                 if (cfg.input_size.size() == 2)
                     cloned->get_preprocessor().set_size(cfg.input_size);
-                // 走 InferenceEngine 的 face 路径
+                if (cfg.device == "gpu")
+                    cloned->get_preprocessor().use_cuda_preproc();
                 eng->adopt_face_model(std::move(cloned), cfg);
                 std::cout << "[Manager] Cloned face: " << cfg.name << std::endl;
             }
@@ -124,6 +135,7 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
             return eng;
         }
         if (cfg.input_size.size() == 2) proto.face->get_preprocessor().set_size(cfg.input_size);
+        if (cfg.device == "gpu") proto.face->get_preprocessor().use_cuda_preproc();
 
         model_prototypes_[key] = std::move(proto);
         auto& lp = model_prototypes_[key].face;
@@ -163,9 +175,10 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
     };
 
     // 解码器通过 StreamHub 共享：相同 url+config 的多路任务复用同一解码器
-    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory));
+    // 推理走独立 InferGroup 路径（不经过 BatchScheduler）
+    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory), nullptr);
     dirty_ = true;
-    std::cout << "[Manager] Task created: " << cfg.id << std::endl;
+    std::cout << "[Manager] Task created: " << cfg.id << " (no batch)" << std::endl;
     return true;
 }
 
@@ -232,6 +245,7 @@ std::vector<TaskStatus> PipelineManager::list_tasks() const {
         ts.input_url = pipe->config().input_url;
         ts.output_url = pipe->config().output_url;
         ts.preview_url = pipe->config().preview_url;
+        ts.enable_preview = pipe->config().enable_preview;
         for (const auto& m : pipe->config().models) {
             ts.model_names.push_back(m.name);
             ts.model_types.push_back(m.type);
@@ -275,6 +289,41 @@ bool PipelineManager::update_model(const std::string& task_id, const std::string
     return ok;
 }
 
+bool PipelineManager::update_task(const std::string& task_id, const TaskConfig& cfg, std::string* err) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = pipelines_.find(task_id);
+    if (it == pipelines_.end()) {
+        if (err) *err = "task not found";
+        return false;
+    }
+    // 需要先停止才能修改配置
+    if (it->second->is_running()) {
+        if (err) *err = "task must be stopped before updating config";
+        return false;
+    }
+
+    // Diff 模型列表：移除旧有的、添加新增的
+    TaskConfig old_cfg = it->second->config();
+    std::set<std::string> old_names, new_names;
+    for (const auto& m : old_cfg.models) old_names.insert(m.name);
+    for (const auto& m : cfg.models) new_names.insert(m.name);
+
+    for (const auto& m : old_cfg.models) {
+        if (!new_names.count(m.name)) {
+            it->second->remove_model(m.name);
+        }
+    }
+    for (const auto& m : cfg.models) {
+        if (!old_names.count(m.name)) {
+            it->second->add_model(m);
+        }
+    }
+
+    bool ok = it->second->update_config(cfg);
+    if (ok) dirty_ = true;
+    return ok;
+}
+
 void PipelineManager::stop_all() {
     std::lock_guard<std::mutex> lock(mtx_);
     for (auto& [id, pipe] : pipelines_) {
@@ -282,6 +331,21 @@ void PipelineManager::stop_all() {
     }
     pipelines_.clear();
     dirty_ = true;
+}
+
+bool PipelineManager::start_batch_scheduler() {
+    bool ok = batch_scheduler_.start();
+    if (ok) {
+        // Register all models from the library
+        for (const auto& m : model_library_) {
+            batch_scheduler_.register_model(m);
+        }
+    }
+    return ok;
+}
+
+void PipelineManager::stop_batch_scheduler() {
+    batch_scheduler_.stop();
 }
 
 // ── 模型库管理 ──
@@ -392,7 +456,10 @@ bool PipelineManager::load_from_directory(const std::string& dir) {
                     for (const auto& t : j["tasks"]) {
                         auto cfg = task_config_from_json(t);
                         if (cfg.validate()) {
-                            pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg);
+                            Pipeline::ModelFactory factory = [this](const ModelConfig& mcfg) {
+                                return this->create_engine(mcfg);
+                            };
+                            pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory), nullptr);
                             ++count;
                         }
                     }

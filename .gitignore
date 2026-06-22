@@ -42,6 +42,11 @@ csharp/**/*.DotSettings.user
 *.a
 *.lib
 
+# Surveillance runtime temp files
+surveillance_stderr.txt
+surveillance_stdout.txt
+test_stress_20routes.py
+
 # Executables
 *.exe
 *.out

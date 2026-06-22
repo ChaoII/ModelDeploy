@@ -44,21 +44,17 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] bool get_stride() const { return stride_; }
 
+        void use_cuda_preproc() { use_cuda_preproc_ = true; }
+
     protected:
         bool preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
+        bool use_cuda_preproc_ = false;
         std::vector<int> size_{640, 640};
-        /// padding value, size should be the same as channels
         std::vector<float> padding_value_{0.0, 0.0, 0.0};
-        /// only pad to the minimum rectangle which height and width is times of stride
         bool is_mini_pad_ = false;
-        /// while is_mini_pad = false and is_no_pad = true,
-        /// will resize the image to the set size
         bool is_no_pad_ = false;
-        /// if is_scale_up is false, the input image only can be zoom out,
-        /// the maximum resize scale cannot exceed 1.0
         bool is_scale_up_ = true;
-        /// padding stride, for is_mini_pad
         int stride_ = 32;
     };
-} // namespace detection
+} // namespace face
