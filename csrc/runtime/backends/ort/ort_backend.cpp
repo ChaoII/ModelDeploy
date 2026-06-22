@@ -158,8 +158,8 @@ namespace modeldeploy {
         option_ = option.ort_option;
         option_.device_id = option.device_id;
         option_.device = option.device;
-        option_.enable_trt = option.enable_trt;
-        option_.enable_fp16 = option.enable_fp16;
+        option_.enable_trt = option.enable_trt || option_.enable_trt;
+        option_.enable_fp16 = option.enable_fp16 || option_.enable_fp16;
         option_.model_filepath = option.model_file;
 
         // 读取 model_from_memory 时优先用主 RuntimeOption 的字段（与 TRT/MNN 后端保持一致）

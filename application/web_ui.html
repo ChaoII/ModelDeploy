@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS :: 智能视频分析指挥舱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+<style>
+:root{
+  --bg:#04060f;--bg-2:#0a1024;--panel:rgba(13,19,40,.78);--panel-solid:#0d1428;
+  --primary:#00e5ff;--primary-dim:rgba(0,229,255,.14);--secondary:#a855f7;
+  --success:#26e5a4;--warning:#ffcc00;--danger:#ff4570;
+  --text:#e6f1ff;--muted:#7a8aab;--border:rgba(0,229,255,.14);--border-glow:rgba(0,229,255,.4);
+  --radius:14px;
+  --font-display:'Orbitron',sans-serif;--font-body:'Inter','PingFang SC','Microsoft YaHei',sans-serif;--font-mono:'JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;overflow:hidden;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* ── 背景 ── */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 1000px 600px at 15% 10%,rgba(0,229,255,.10),transparent 60%),
+    radial-gradient(ellipse 800px 500px at 85% 90%,rgba(168,85,247,.10),transparent 60%),
+    linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);}
+.bg::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(0,229,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.035) 1px,transparent 1px);
+  background-size:48px 48px;mask-image:radial-gradient(ellipse at center,black 0%,transparent 75%);
+  animation:gridMove 30s linear infinite}
+@keyframes gridMove{from{transform:translateY(0)}to{transform:translateY(48px)}}
+
+/* ── 布局 ── */
+.app{display:flex;height:100vh;position:relative;z-index:1}
+.sidebar{width:240px;background:rgba(7,10,24,.94);border-right:1px solid var(--border);display:flex;flex-direction:column;backdrop-filter:blur(20px);flex-shrink:0}
+.brand{padding:22px 22px 18px;border-bottom:1px solid var(--border)}
+.brand-logo{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:2px;display:flex;align-items:center;gap:10px}
+.brand-logo .hex{width:30px;height:30px;background:linear-gradient(135deg,var(--primary),var(--secondary));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(0,229,255,.5)}
+.brand-logo .hex svg{width:14px;height:14px;fill:#000}
+.brand-logo span{color:var(--primary);text-shadow:0 0 10px rgba(0,229,255,.5)}
+.brand-sub{font-size:9px;color:var(--muted);margin-top:6px;letter-spacing:1.5px;text-transform:uppercase}
+.nav{padding:14px 12px;flex:1}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;margin:3px 0;border-radius:9px;color:var(--muted);cursor:pointer;transition:all .2s;font-weight:500;border:1px solid transparent;position:relative;overflow:hidden;font-size:13px}
+.nav-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary);opacity:0;transition:opacity .2s;box-shadow:0 0 8px var(--primary)}
+.nav-item:hover{background:rgba(0,229,255,.06);color:var(--text)}
+.nav-item.active{background:linear-gradient(90deg,rgba(0,229,255,.12),transparent);color:var(--primary);border-color:rgba(0,229,255,.2)}
+.nav-item.active::before{opacity:1}
+.nav-item svg{width:16px;height:16px}
+.side-metrics{padding:14px 16px;border-top:1px solid var(--border)}
+.side-metric{display:flex;justify-content:space-between;align-items:center;margin:5px 0;font-size:11px}
+.side-metric span:first-child{color:var(--muted)}
+.side-metric-val{font-family:var(--font-display);color:var(--primary);font-weight:700;font-size:13px}
+.nav-ftr{padding:14px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);text-align:center;letter-spacing:1px}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:rgba(7,10,24,.85);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 26px;backdrop-filter:blur(20px);flex-shrink:0}
+.topbar-title{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:1px;display:flex;align-items:center;gap:10px}
+.topbar-title .line{width:4px;height:20px;background:linear-gradient(180deg,var(--primary),var(--secondary));border-radius:2px;box-shadow:0 0 8px var(--primary)}
+.topbar-actions{display:flex;align-items:center;gap:10px}
+.status-pill{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:rgba(0,229,255,.05)}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 7px var(--success);animation:pulse 2s infinite}
+.status-pill.off{border-color:rgba(255,69,112,.3);background:rgba(255,69,112,.06)}
+.status-pill.off .dot{background:var(--danger);box-shadow:0 0 7px var(--danger);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.btn-icon{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(0,229,255,.05);color:var(--primary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.btn-icon:hover{background:var(--primary);color:#000;box-shadow:0 0 12px var(--primary)}
+
+.content{flex:1;overflow-y:auto;padding:22px 26px}
+.page{display:none;animation:fadeIn .25s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── 卡片通用 ── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(14px);overflow:hidden;position:relative}
+.card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border-glow),transparent)}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-family:var(--font-display);font-size:12px;font-weight:600;letter-spacing:.8px;display:flex;align-items:center;gap:8px}
+.card-title svg{width:15px;height:15px;fill:var(--primary)}
+.card-body{padding:18px}
+
+/* ── 顶部统计 ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;transition:all .25s}
+.stat-card:hover{border-color:var(--border-glow);box-shadow:0 0 20px rgba(0,229,255,.08);transform:translateY(-2px)}
+.stat-card .glow{position:absolute;top:-30px;right:-30px;width:90px;height:90px;border-radius:50%;filter:blur(36px);opacity:.25}
+.stat-card.cyan .glow{background:var(--primary)}
+.stat-card.purple .glow{background:var(--secondary)}
+.stat-card.green .glow{background:var(--success)}
+.stat-card.red .glow{background:var(--danger)}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.stat-value{font-family:var(--font-display);font-size:28px;font-weight:700;line-height:1}
+.stat-value.cyan{color:var(--primary);text-shadow:0 0 12px rgba(0,229,255,.4)}
+.stat-value.purple{color:var(--secondary);text-shadow:0 0 12px rgba(168,85,247,.4)}
+.stat-value.green{color:var(--success);text-shadow:0 0 12px rgba(38,229,164,.4)}
+.stat-value.red{color:var(--danger);text-shadow:0 0 12px rgba(255,69,112,.4)}
+
+/* ── 操作栏 ── */
+.action-bar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid transparent;font-family:var(--font-body);white-space:nowrap}
+.btn svg{width:14px;height:14px}
+.btn-primary{background:linear-gradient(135deg,var(--primary),#00b8d4);color:#000;border-color:rgba(0,229,255,.4);box-shadow:0 0 14px rgba(0,229,255,.25)}
+.btn-primary:hover{box-shadow:0 0 22px rgba(0,229,255,.45);transform:translateY(-1px)}
+.btn-ghost{background:rgba(0,229,255,.06);color:var(--primary);border-color:var(--border)}
+.btn-ghost:hover{background:rgba(0,229,255,.12);border-color:var(--border-glow)}
+.btn-danger{background:rgba(255,69,112,.1);color:var(--danger);border-color:rgba(255,69,112,.25)}
+.btn-danger:hover{background:rgba(255,69,112,.18)}
+.btn-sm{padding:6px 11px;font-size:11px}
+
+/* ── 任务卡片（核心区） ── */
+.task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px}
+.task-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .25s;display:flex;flex-direction:column}
+.task-card:hover{border-color:var(--border-glow)}
+.task-card.running{border-color:rgba(38,229,164,.3);box-shadow:0 0 18px rgba(38,229,164,.06)}
+.task-card.error{border-color:rgba(255,69,112,.35);box-shadow:0 0 18px rgba(255,69,112,.06)}
+
+/* 卡片缩略图 */
+.task-thumb{position:relative;width:100%;padding-bottom:56.25%;background:#000;overflow:hidden;border-bottom:1px solid var(--border)}
+.task-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.task-thumb .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;background:linear-gradient(135deg,#0a1024,#04060f)}
+.task-thumb .placeholder svg{width:48px;height:48px;opacity:.3}
+.task-thumb .live-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;backdrop-filter:blur(8px)}
+.task-thumb .live-badge.off{color:var(--muted)}
+.task-thumb .live-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 5px currentColor}
+.task-thumb .live-badge.on .dot{animation:pulse 1.5s infinite}
+.task-thumb .fps-overlay{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);color:var(--primary);font-family:var(--font-display);font-size:11px;font-weight:700;backdrop-filter:blur(8px)}
+.task-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.task-thumb .mode-toggle{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:rgba(0,0,0,.55);padding:3px;border-radius:6px;backdrop-filter:blur(8px);border:1px solid rgba(0,229,255,.18)}
+.task-thumb .mode-toggle button{width:auto;padding:3px 9px;font-size:9px;font-weight:700;letter-spacing:.5px;border-radius:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-transform:uppercase;font-family:var(--font-display);transition:all .12s}
+.task-thumb .mode-toggle button.active{background:var(--primary);color:#000;box-shadow:0 0 8px rgba(0,229,255,.4)}
+.task-thumb .mode-toggle button:hover:not(.active){color:var(--primary);background:rgba(0,229,255,.1)}
+.task-thumb .stream-status{position:absolute;bottom:8px;left:8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.6);font-size:9px;font-weight:600;color:var(--muted);backdrop-filter:blur(8px);text-transform:uppercase;letter-spacing:.5px;display:none}
+.task-thumb .stream-status.show{display:inline-flex;align-items:center;gap:5px}
+.task-thumb .stream-status .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.task-thumb .stream-status.connecting{color:var(--warning)}
+.task-thumb .stream-status.playing{color:var(--success)}
+.task-thumb .stream-status.error{color:var(--danger)}
+
+/* 全局预览模式段塞 */
+.preview-mode-toggle{display:inline-flex;background:rgba(0,229,255,.06);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+.preview-mode-toggle button{padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.5px;border-radius:5px;border:none;background:transparent;color:var(--muted);cursor:pointer;text-transform:uppercase;font-family:var(--font-display);transition:all .12s;display:inline-flex;align-items:center;gap:5px}
+.preview-mode-toggle button.active{background:var(--primary);color:#000;box-shadow:0 0 10px rgba(0,229,255,.3)}
+.preview-mode-toggle button:hover:not(.active){color:var(--primary)}
+.preview-mode-toggle button svg{width:11px;height:11px}
+
+.task-body{padding:14px;display:flex;flex-direction:column;gap:12px;flex:1}
+.task-header{display:flex;justify-content:space-between;align-items:flex-start}
+.task-id{font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--text);word-break:break-all}
+.task-name{font-size:11px;color:var(--muted);margin-top:2px}
+.task-status{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid transparent;white-space:nowrap;flex-shrink:0}
+.task-status.run{background:rgba(38,229,164,.12);color:var(--success);border-color:rgba(38,229,164,.3)}
+.task-status.sto{background:rgba(122,138,171,.12);color:var(--muted);border-color:rgba(122,138,171,.3)}
+.task-status.init{background:rgba(0,229,255,.12);color:var(--primary);border-color:rgba(0,229,255,.3)}
+.task-status.err{background:rgba(255,69,112,.12);color:var(--danger);border-color:rgba(255,69,112,.3)}
+.task-status .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.task-status.run .dot{box-shadow:0 0 5px currentColor;animation:pulse 2s infinite}
+
+/* URL 紧凑显示 */
+.url-row{display:flex;flex-direction:column;gap:6px}
+.url-line{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:7px;padding:6px 8px;min-width:0}
+.url-line .proto{flex-shrink:0;padding:1px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px}
+.url-line .proto.in{background:rgba(0,229,255,.15);color:var(--primary)}
+.url-line .proto.out{background:rgba(168,85,247,.15);color:var(--secondary)}
+.url-line .proto.preview{background:rgba(38,229,164,.15);color:var(--success)}
+.url-line .url-text{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.url-line .copy-btn{flex-shrink:0;width:22px;height:22px;border-radius:5px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.url-line .copy-btn:hover{background:rgba(0,229,255,.1);color:var(--primary)}
+.url-line .copy-btn svg{width:12px;height:12px}
+
+.task-models{display:flex;flex-wrap:wrap;gap:5px}
+.model-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(0,229,255,.08);color:var(--primary);border:1px solid rgba(0,229,255,.15)}
+
+.task-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.task-stat{text-align:center;padding:7px 4px;background:rgba(0,0,0,.2);border-radius:7px;border:1px solid var(--border)}
+.task-stat-num{font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--primary);line-height:1.2}
+.task-stat-label{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:2px;letter-spacing:.5px}
+
+.task-actions{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
+.task-actions .btn{flex:1;min-width:fit-content;justify-content:center;padding:7px 10px;font-size:11px}
+
+.task-error-msg{font-size:10px;color:var(--danger);font-family:var(--font-mono);border:1px solid rgba(255,69,112,.25);padding:7px 9px;border-radius:6px;background:rgba(255,69,112,.06);word-break:break-all}
+
+.task-empty{text-align:center;padding:60px 20px;color:var(--muted);border:1px dashed var(--border);border-radius:var(--radius)}
+.task-empty svg{width:50px;height:50px;fill:var(--muted);opacity:.4;margin-bottom:12px}
+
+/* ── 模型卡片 ── */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.model-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:all .25s}
+.model-card:hover{border-color:var(--border-glow);transform:translateY(-2px)}
+.model-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.model-name{font-family:var(--font-display);font-size:13px;font-weight:700}
+.model-type{padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:rgba(168,85,247,.12);color:var(--secondary);border:1px solid rgba(168,85,247,.25)}
+.model-path{font-family:var(--font-mono);font-size:10px;color:var(--muted);background:rgba(0,0,0,.22);padding:7px 9px;border-radius:6px;margin-bottom:12px;word-break:break-all;border:1px solid var(--border)}
+.model-props{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.model-prop{text-align:center}
+.model-prop-val{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--primary)}
+.model-prop-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px}
+.model-actions{display:flex;gap:6px}
+
+/* ── 终端日志 ── */
+.terminal{background:rgba(3,5,12,.92);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:18px}
+.terminal-header{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:rgba(0,229,255,.04)}
+.terminal-title{font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.terminal-title .indicator{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 7px var(--success);animation:pulse 2s infinite}
+.terminal-body{height:170px;overflow-y:auto;padding:10px 16px;font-family:var(--font-mono);font-size:11px;line-height:1.7}
+.log-line{display:flex;gap:10px;padding:1px 0}
+.log-time{color:#5a6685;flex-shrink:0;font-size:10px}
+.log-msg{color:var(--text)}
+.log-info .log-msg{color:var(--primary)}
+.log-ok .log-msg{color:var(--success)}
+.log-err .log-msg{color:var(--danger)}
+.log-warn .log-msg{color:var(--warning)}
+
+/* ── 弹窗 ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.active{display:flex}
+.modal{background:var(--panel-solid);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:760px;max-height:92vh;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(0,229,255,.08);animation:modalIn .25s ease;display:flex;flex-direction:column}
+.modal.large{max-width:980px}
+@keyframes modalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.modal-header{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:rgba(0,229,255,.04);flex-shrink:0}
+.modal-title{font-family:var(--font-display);font-size:14px;font-weight:700;letter-spacing:.5px}
+.modal-close{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px}
+.modal-close:hover{background:rgba(255,69,112,.1);color:var(--danger);border-color:rgba(255,69,112,.3)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0}
+
+/* 表单分组 */
+.form-section{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(0,0,0,.15)}
+.form-section-title{font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:1px;color:var(--primary);margin-bottom:12px;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.form-section-title::before{content:'';width:14px;height:2px;background:var(--primary);border-radius:1px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-row.full{grid-template-columns:1fr}
+.form-row.three{grid-template-columns:1fr 1fr 1fr}
+.form-row:last-child{margin-bottom:0}
+.form-label{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.form-input,.form-select{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:7px;padding:9px 11px;color:var(--text);font-size:12px;font-family:var(--font-body);outline:none;transition:all .15s}
+.form-input:focus,.form-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,229,255,.1)}
+.form-select option{background:var(--panel-solid);color:var(--text)}
+.form-input.mono{font-family:var(--font-mono);font-size:11px}
+
+.model-selector{border:1px solid var(--border);border-radius:7px;padding:8px;max-height:140px;overflow-y:auto;background:rgba(0,0,0,.22)}
+.model-selector label{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:6px;cursor:pointer;transition:background .12s;font-size:12px}
+.model-selector label:hover{background:rgba(0,229,255,.06)}
+.model-selector input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}
+
+/* 详情弹窗 */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.detail-item{background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
+.detail-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.detail-value{font-size:12px;color:var(--text);font-family:var(--font-mono);word-break:break-all}
+.detail-error{background:rgba(255,69,112,.08);border:1px solid rgba(255,69,112,.3);color:var(--danger);padding:9px 11px;border-radius:7px;font-size:11px;font-family:var(--font-mono);margin-bottom:14px}
+.detail-section-title{font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:var(--primary);margin:14px 0 8px;text-transform:uppercase}
+
+.preview-box{position:relative;width:100%;padding-bottom:56.25%;background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:14px}
+.preview-box video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.preview-box .preview-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);font-size:12px;text-align:center;padding:20px}
+.preview-controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+
+/* ── 详情弹窗双预览并排 ── */
+.detail-preview-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.detail-preview-col{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#000}
+.detail-preview-col .col-label{padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:rgba(0,229,255,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.detail-preview-col .col-label .tag{padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700}
+.detail-preview-col .col-label .tag.raw{background:rgba(255,204,0,.15);color:var(--warning)}
+.detail-preview-col .col-label .tag.ai{background:rgba(0,229,255,.15);color:var(--primary)}
+.detail-preview-col .col-video{position:relative;width:100%;padding-bottom:56.25%;background:#000}
+.detail-preview-col .col-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none}
+.detail-preview-col .col-video .col-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);font-size:11px;background:linear-gradient(135deg,#0a1024,#04060f)}
+.detail-preview-col .col-video .col-placeholder svg{width:36px;height:36px;opacity:.25}
+.detail-preview-col .col-url{font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:rgba(0,0,0,.25);border-top:1px solid var(--border);color:var(--muted);word-break:break-all;line-height:1.6;flex-shrink:0}
+.detail-preview-col .col-controls{display:flex;gap:4px;padding:6px;background:rgba(0,0,0,.15);border-top:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+.detail-preview-col .col-controls .btn{padding:4px 8px;font-size:9px;flex:1;justify-content:center}
+
+.detail-controls-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+
+.detail-chart{height:160px;margin-top:8px}
+
+/* Toast */
+#toastContainer{position:fixed;top:18px;right:18px;z-index:2000;display:flex;flex-direction:column;gap:9px}
+.toast{display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:9px;font-size:12px;font-weight:600;color:#000;box-shadow:0 8px 28px rgba(0,0,0,.4);animation:toastIn .25s ease;min-width:220px;max-width:380px;border:1px solid transparent}
+@keyframes toastIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger);color:#fff}
+.toast.info{background:var(--primary)}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.2)}
+::-webkit-scrollbar-thumb{background:rgba(0,229,255,.18);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,229,255,.32)}
+
+/* 响应式 */
+@media (max-width:1100px){.stats-grid{grid-template-columns:repeat(2,1fr)}.task-grid{grid-template-columns:1fr}}
+@media (max-width:768px){.sidebar{width:60px}.brand-logo span,.brand-sub,.nav-item span,.side-metrics{display:none}.nav-item{justify-content:center;padding:11px}.stats-grid{grid-template-columns:1fr}.form-row,.form-row.three{grid-template-columns:1fr}}
+
+.empty-title{font-family:var(--font-display);font-size:13px;color:var(--text);margin-bottom:5px;letter-spacing:.5px}
+.empty-desc{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <div class="hex"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        NEXUS<span>AI</span>
+      </div>
+      <div class="brand-sub">智能视频分析指挥舱</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>任务管理</span>
+      </div>
+      <div class="nav-item" data-page="models" onclick="switchPage('models')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>模型管理</span>
+      </div>
+    </nav>
+    <div class="side-metrics">
+      <div class="side-metric"><span>任务总数</span><span class="side-metric-val" id="sideTaskTotal">0</span></div>
+      <div class="side-metric"><span>运行中</span><span class="side-metric-val" id="sideTaskRun">0</span></div>
+      <div class="side-metric"><span>模型库</span><span class="side-metric-val" id="sideModelTotal">0</span></div>
+      <div class="side-metric"><span>异常</span><span class="side-metric-val" id="sideTaskErr">0</span></div>
+    </div>
+    <div class="nav-ftr">v2.1 INDUSTRIAL · GPU</div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title"><div class="line"></div><span id="pageTitle">指挥舱</span></div>
+      <div class="topbar-actions">
+        <div class="preview-mode-toggle" title="切换所有任务的预览方式">
+          <button id="modeBtnSnap" class="active" onclick="setGlobalPreviewMode('snapshot')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            缩略图
+          </button>
+          <button id="modeBtnLive" onclick="setGlobalPreviewMode('live')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            实时流
+          </button>
+        </div>
+        <button class="btn-icon" onclick="refreshAll()" title="刷新 (R)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+        <div id="connBadge" class="status-pill"><div class="dot"></div><span>已连接</span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- 指挥舱 -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card cyan"><div class="glow"></div><div class="stat-label">任务总数</div><div class="stat-value cyan" id="statTotal">0</div></div>
+          <div class="stat-card green"><div class="glow"></div><div class="stat-label">运行中</div><div class="stat-value green" id="statRunning">0</div></div>
+          <div class="stat-card purple"><div class="glow"></div><div class="stat-label">已停止</div><div class="stat-value purple" id="statStopped">0</div></div>
+          <div class="stat-card red"><div class="glow"></div><div class="stat-label">初始化失败</div><div class="stat-value red" id="statError">0</div></div>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="openTaskModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            新建任务
+          </button>
+          <button class="btn btn-ghost" onclick="stopAllTasks()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            全部停止
+          </button>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="card-header">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              实时任务监控
+            </div>
+            <span style="color:var(--muted);font-size:11px" id="taskCountLabel">0 个任务</span>
+          </div>
+          <div class="card-body">
+            <div id="taskContainer" class="task-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模型矩阵 -->
+      <div class="page" id="page-models">
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="openModelModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            新增模型
+          </button>
+          <button class="btn btn-ghost" onclick="loadModels()">刷新模型库</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              模型矩阵
+            </div>
+            <span style="color:var(--muted);font-size:11px" id="modelCountLabel">0 个模型</span>
+          </div>
+          <div class="card-body"><div id="modelContainer" class="model-grid"></div></div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-header">
+          <div class="terminal-title"><div class="indicator"></div> 系统日志 / SYSTEM LOG</div>
+          <button class="btn-icon" onclick="clearLogs()" title="清空">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+        </div>
+        <div class="terminal-body" id="logBody"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 新建任务 Modal -->
+<div class="modal-backdrop" id="taskModalBackdrop">
+  <div class="modal large">
+    <div class="modal-header">
+      <div class="modal-title">新建分析任务</div>
+      <button class="modal-close" onclick="closeTaskModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-section">
+        <div class="form-section-title">基础配置</div>
+        <div class="form-row">
+          <div><label class="form-label">任务 ID *</label><input class="form-input mono" id="f_id" placeholder="cam01"></div>
+          <div><label class="form-label">任务名称</label><input class="form-input" id="f_name" placeholder="主入口摄像头"></div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">输入视频源 (RTSP/RTMP/HTTP/文件) *</label>
+            <input class="form-input mono" id="f_input" placeholder="rtsp://192.168.1.100:554/stream" value="rtsp://127.0.0.1:554/live/obs_test3"></div>
+        </div>
+        <div class="form-row">
+          <div><label class="form-label">输出地址 *</label>
+            <input class="form-input mono" id="f_output" placeholder="rtsp://127.0.0.1:554/live/out" value="rtsp://127.0.0.1:554/live/surveillance_out"></div>
+          <div><label class="form-label">浏览器预览地址 (HTTP-FLV，可选)</label>
+            <input class="form-input mono" id="f_preview" placeholder="http://127.0.0.1:80/live/cam01.flv"></div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">预览模式</label>
+            <div style="display:flex;gap:12px;align-items:center;padding:6px 0">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="f_enable_preview" checked>
+                启用预览推流 (不勾选仅报警截图，节省 CPU/GPU)
+              </label>
+            </div></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">编码器参数</div>
+        <div class="form-row three">
+          <div><label class="form-label">输出格式</label>
+            <select class="form-select" id="f_enc_format">
+              <option value="auto">自动 (按 URL)</option>
+              <option value="rtsp">RTSP</option>
+              <option value="rtmp">RTMP (FLV)</option>
+              <option value="flv">HTTP-FLV / 文件</option>
+              <option value="mp4">MP4 文件</option>
+              <option value="mpegts">MPEG-TS</option>
+              <option value="matroska">MKV</option>
+            </select></div>
+          <div><label class="form-label">编码器</label>
+            <select class="form-select" id="f_enc_codec">
+              <option value="auto">自动 (优先 x264)</option>
+              <option value="libx264">libx264 (CPU)</option>
+              <option value="h264_nvenc">h264_nvenc (NVIDIA)</option>
+            </select></div>
+          <div><label class="form-label">FPS (0=自动匹配源帧率)</label>
+            <input class="form-input" id="f_enc_fps" type="number" min="0" max="120" value="0"></div>
+        </div>
+        <div class="form-row three">
+          <div><label class="form-label">码率 (kbps)</label>
+            <input class="form-input" id="f_enc_bitrate" type="number" min="100" value="4000"></div>
+          <div><label class="form-label">GOP (关键帧间隔)</label>
+            <input class="form-input" id="f_enc_gop" type="number" min="1" value="50"></div>
+          <div><label class="form-label">B 帧数</label>
+            <input class="form-input" id="f_enc_b" type="number" min="0" max="3" value="0"></div>
+        </div>
+        <div class="form-row three">
+          <div><label class="form-label">Preset</label>
+            <select class="form-select" id="f_enc_preset">
+              <option value="ultrafast">ultrafast</option>
+              <option value="superfast">superfast</option>
+              <option value="veryfast">veryfast</option>
+              <option value="faster">faster</option>
+              <option value="fast">fast</option>
+              <option value="medium">medium</option>
+              <option value="slow">slow</option>
+            </select></div>
+          <div><label class="form-label">Tune (仅 x264)</label>
+            <select class="form-select" id="f_enc_tune">
+              <option value="zerolatency">zerolatency</option>
+              <option value="film">film</option>
+              <option value="animation">animation</option>
+              <option value="">none</option>
+            </select></div>
+          <div><label class="form-label">低延迟模式</label>
+            <select class="form-select" id="f_enc_ll">
+              <option value="true">开启</option>
+              <option value="false">关闭</option>
+            </select></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">解码器参数</div>
+        <div class="form-row">
+          <div><label class="form-label">硬件加速</label>
+            <select class="form-select" id="f_dec_hw">
+              <option value="cuda">CUDA (NVIDIA)</option>
+              <option value="none">禁用 (软解)</option>
+            </select></div>
+          <div><label class="form-label">RTSP 传输</label>
+            <select class="form-select" id="f_dec_transport">
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+            </select></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">关联模型 *</div>
+        <div class="model-selector" id="modelCheckboxes"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeTaskModal()">取消</button>
+      <button class="btn btn-primary" onclick="submitTaskForm()">创建并启动</button>
+    </div>
+  </div>
+</div>
+
+<!-- 模型 Modal -->
+<div class="modal-backdrop" id="modelModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modelModalTitle">新增模型</div>
+      <button class="modal-close" onclick="closeModelModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">基础信息</div>
+        <div class="form-row">
+          <div><label class="form-label">模型名称 *</label><input class="form-input mono" id="mf_name" placeholder="yolo11n"></div>
+          <div>
+            <label class="form-label">模型类型</label>
+            <select class="form-select" id="mf_type">
+              <option value="detection">目标检测</option>
+              <option value="classification">图像分类</option>
+              <option value="face_detection">人脸检测</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">模型文件路径 *</label>
+            <input class="form-input mono" id="mf_path" placeholder="/models/yolo11n.onnx" value="E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx"></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">推理参数</div>
+        <div class="form-row">
+          <div>
+            <label class="form-label">推理后端</label>
+            <select class="form-select" id="mf_backend"><option value="ort">ONNX Runtime</option><option value="trt">TensorRT</option><option value="mnn">MNN</option></select>
+          </div>
+          <div>
+            <label class="form-label">运行设备</label>
+            <select class="form-select" id="mf_device"><option value="gpu">GPU</option><option value="cpu">CPU</option></select>
+          </div>
+        </div>
+        <div class="form-row three">
+          <div><label class="form-label">置信度阈值</label><input class="form-input" id="mf_threshold" type="number" step="0.05" min="0" max="1" value="0.5"></div>
+          <div><label class="form-label">推理间隔 (帧)</label><input class="form-input" id="mf_interval" type="number" min="1" value="1"></div>
+          <div><label class="form-label">输入尺寸</label>
+            <div style="display:flex;gap:5px"><input class="form-input" id="mf_w" type="number" value="640"><input class="form-input" id="mf_h" type="number" value="640"></div>
+          </div>
+        </div>
+        <div class="form-row full">
+          <div><label class="form-label">ROI (x,y,w,h，留空 0,0,0,0 表示全图)</label><input class="form-input mono" id="mf_roi" value="0,0,0,0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModelModal()">取消</button>
+      <button class="btn btn-primary" onclick="submitModelForm()" id="modelModalSaveBtn">保存到模型库</button>
+    </div>
+  </div>
+</div>
+
+<!-- 任务详情 Modal -->
+<div class="modal-backdrop" id="detailModalBackdrop">
+  <div class="modal large">
+    <div class="modal-header">
+      <div class="modal-title">任务详情</div>
+      <button class="modal-close" onclick="closeDetailModal()">×</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDetailModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+// ── 状态 ──
+var allModels=[],allTasks=[],currentPage='dashboard';
+var taskCardEls={};   // id -> DOM 节点引用
+var taskCharts={},detailChart=null,fpsHistory={};
+var refreshTimer=null;
+var flvPlayer=null;        // 详情弹窗里的 flv 播放器
+var detailTaskId=null;
+// 全局预览模式：'snapshot' 或 'live'。每个卡片可单独覆盖（cardModeOverride[id]）。
+var globalPreviewMode = (localStorage.getItem('previewMode')||'snapshot');
+var cardModeOverride={};   // id -> 'snapshot'|'live'，没设置时跟随 global
+var cardPlayers={};        // id -> flv.js Player 实例
+var MAX_LIVE_PLAYERS=4;    // 最大同时播放路数（浏览器同域名连接限制）
+var playerReconnect={};    // id -> {attempt, timer} 重连状态
+var _editingTaskId=null;   // 编辑模式下的任务 ID
+
+var ICONS={
+  play:'<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  detail:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'
+};
+
+// ── 初始化 ──
+document.addEventListener('DOMContentLoaded',function(){
+  checkPnaAccess();
+  // 同步全局预览模式按钮
+  $('modeBtnSnap').classList.toggle('active',globalPreviewMode==='snapshot');
+  $('modeBtnLive').classList.toggle('active',globalPreviewMode==='live');
+  loadModels();refreshAll();
+  refreshTimer=setInterval(refreshAll,2000);
+  pollThumbnails();    // 链式轮询缩略图（self-scheduling）
+  // 全局缓冲区追逐定时器：每 2 秒检测所有 FLV 播放器的缓冲深度
+  // 当缓冲超过 1 秒时，主动 seek 到 live edge（末尾减 0.2 秒），消除累积延迟
+  setInterval(chaseLiveLatency, 3000);
+  log('NEXUS 指挥舱已上线','ok');
+});
+
+function $(id){return document.getElementById(id)}
+function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function typeLabel(t){var m={detection:'检测',classification:'分类',face_detection:'人脸',lpr_pipeline:'车牌',pose:'姿态'};return m[t]||t}
+
+function api(method,url,body,cb){
+  var x=new XMLHttpRequest();x.open(method,url,true);
+  if(body)x.setRequestHeader('Content-Type','application/json');
+  x.onload=function(){
+    var r,raw=x.responseText;
+    try{r=JSON.parse(raw)}catch(e){console.error('[API] Invalid JSON response',method,url,raw.substring(0,200));r={ok:false,msg:'invalid json',_raw:raw.substring(0,200)}}
+    setConnection(true);cb(r)
+  };
+  x.onerror=function(){console.error('[API] Network error',method,url);setConnection(false);cb({ok:false,msg:'network error'})};
+  x.send(body||null);
+}
+function setConnection(ok){
+  var el=$('connBadge');
+  if(ok){el.className='status-pill';el.innerHTML='<div class="dot"></div><span>已连接</span>'}
+  else{el.className='status-pill off';el.innerHTML='<div class="dot"></div><span>连接中断</span>'}
+}
+function log(msg,type){
+  type=type||'info';var b=$('logBody');var d=new Date();
+  var ts=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+  var line=document.createElement('div');line.className='log-line log-'+type;
+  line.innerHTML='<span class="log-time">['+ts+']</span><span class="log-msg">'+esc(msg)+'</span>';
+  b.appendChild(line);b.scrollTop=b.scrollHeight;
+  while(b.children.length>250)b.removeChild(b.firstChild);
+}
+function clearLogs(){$('logBody').innerHTML=''}
+function toast(msg,type){
+  type=type||'info';var c=$('toastContainer');var d=document.createElement('div');
+  d.className='toast '+(type==='danger'?'error':type);d.textContent=msg;
+  c.appendChild(d);setTimeout(function(){d.remove()},4000);
+}
+function copyText(text){
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(function(){toast('已复制','success')},function(){toast('复制失败','danger')})}
+  else{var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('已复制','success')}catch(e){toast('复制失败','danger')}
+    document.body.removeChild(ta)}
+}
+
+// ── 协议识别 ──
+function urlProto(u){
+  if(!u)return '';
+  if(u.indexOf('rtsp://')===0)return 'RTSP';
+  if(u.indexOf('rtmp://')===0)return 'RTMP';
+  if(u.indexOf('http://')===0||u.indexOf('https://')===0){
+    if(/\.flv($|\?)/i.test(u))return 'FLV';
+    if(/\.m3u8($|\?)/i.test(u))return 'HLS';
+    return 'HTTP';
+  }
+  if(/\.mp4$/i.test(u))return 'MP4';
+  if(/\.flv$/i.test(u))return 'FLV';
+  if(/\.ts$/i.test(u))return 'TS';
+  if(/\.mkv$/i.test(u))return 'MKV';
+  return 'FILE';
+}
+
+// ── 导航 ──
+function switchPage(page){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  $('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});
+  var nav=document.querySelector('.nav-item[data-page="'+page+'"]');if(nav)nav.classList.add('active');
+  currentPage=page;
+  $('pageTitle').textContent=page==='dashboard'?'任务管理':'模型管理';
+}
+
+// ── 模型 ──
+function loadModels(){
+  api('GET','/api/v1/models',null,function(r){
+    if(!r.ok){return}
+    allModels=r.models||[];
+    $('modelCountLabel').textContent=allModels.length+' 个模型';
+    renderModels();renderModelSelector();
+  });
+}
+function renderModels(){
+  var c=$('modelContainer');
+  if(allModels.length===0){c.innerHTML='<div class="task-empty"><div class="empty-title">模型库为空</div><div class="empty-desc">点击「部署模型」添加第一个推理模型</div></div>';return}
+  var h='';
+  allModels.forEach(function(m){
+    h+='<div class="model-card">'+
+      '<div class="model-card-header"><div class="model-name">'+esc(m.name)+'</div><div class="model-type">'+typeLabel(m.type)+'</div></div>'+
+      '<div class="model-path">'+esc(m.path)+'</div>'+
+      '<div class="model-props">'+
+        '<div class="model-prop"><div class="model-prop-val">'+esc(m.backend)+'</div><div class="model-prop-lbl">后端</div></div>'+
+        '<div class="model-prop"><div class="model-prop-val">'+esc(m.device)+'</div><div class="model-prop-lbl">设备</div></div>'+
+        '<div class="model-prop"><div class="model-prop-val">'+m.input_size[0]+'×'+m.input_size[1]+'</div><div class="model-prop-lbl">输入</div></div>'+
+      '</div>'+
+      '<div class="model-actions">'+
+        '<button class="btn btn-ghost btn-sm" onclick="openEditModelModal(\''+esc(m.name)+'\')">编辑</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="deleteModel(\''+esc(m.name)+'\')">'+ICONS.trash+' 删除</button>'+
+      '</div></div>';
+  });
+  c.innerHTML=h;
+}
+function renderModelSelector(){
+  var c=$('modelCheckboxes');
+  if(allModels.length===0){c.innerHTML='<div style="color:var(--muted);font-size:11px;padding:6px">模型库为空，请先部署模型</div>';return}
+  var h='';allModels.forEach(function(m){h+='<label><input type="checkbox" value="'+esc(m.name)+'"> <strong>'+esc(m.name)+'</strong> <span style="color:var(--muted)">['+typeLabel(m.type)+']</span></label>'});
+  c.innerHTML=h;
+}
+function addModel(){
+  var name=$('mf_name').value.trim();if(!name){toast('请输入模型名称','danger');return}
+  var roiStr=$('mf_roi').value||'0,0,0,0';var roi=roiStr.split(',').map(function(x){return parseInt(x)||0});
+  var body=JSON.stringify({
+    name:name,type:$('mf_type').value,path:$('mf_path').value.trim(),
+    backend:$('mf_backend').value,device:$('mf_device').value,
+    confidence_threshold:parseFloat($('mf_threshold').value)||0.5,
+    input_size:[parseInt($('mf_w').value)||640,parseInt($('mf_h').value)||640],
+    interval:parseInt($('mf_interval').value)||1,
+    roi:[roi[0]||0,roi[1]||0,roi[2]||0,roi[3]||0]
+  });
+  api('POST','/api/v1/models',body,function(r){
+    if(r.ok){toast('模型「'+name+'」已部署','success');log('模型部署成功：'+name,'ok');closeModelModal();loadModels()}
+    else{toast('部署失败：'+(r.msg||''),'danger');log('模型部署失败：'+name+' - '+(r.msg||''),'err')}
+  });
+}
+function updateModel(){
+  var name=_editingModelName;if(!name)return;
+  var roiStr=$('mf_roi').value||'0,0,0,0';var roi=roiStr.split(',').map(function(x){return parseInt(x)||0});
+  var body=JSON.stringify({
+    type:$('mf_type').value,path:$('mf_path').value.trim(),
+    backend:$('mf_backend').value,device:$('mf_device').value,
+    confidence_threshold:parseFloat($('mf_threshold').value)||0.5,
+    input_size:[parseInt($('mf_w').value)||640,parseInt($('mf_h').value)||640],
+    interval:parseInt($('mf_interval').value)||1,
+    roi:[roi[0]||0,roi[1]||0,roi[2]||0,roi[3]||0]
+  });
+  log('更新模型：'+name,'info');
+  api('PATCH','/api/v1/models/'+encodeURIComponent(name),body,function(r){
+    if(r.ok){toast('模型「'+name+'」已更新','success');log('模型更新成功：'+name,'ok');closeModelModal();loadModels()}
+    else{toast('更新失败：'+(r.msg||''),'danger');log('模型更新失败：'+name+' - '+(r.msg||''),'err')}
+  });
+}
+function deleteModel(name){
+  if(!confirm('确认删除模型「'+name+'」？'))return;
+  api('DELETE','/api/v1/models/'+encodeURIComponent(name),null,function(r){
+    if(r.ok){toast('模型已删除','success');log('模型删除：'+name,'ok');loadModels()}
+    else{toast('删除失败','danger')}
+  });
+}
+
+// ── 任务 ──
+function refreshAll(){
+  api('GET','/api/v1/tasks',null,function(r){
+    if(r.ok){allTasks=r.tasks||[];renderStats();renderTasks();loadMetrics()}
+  });
+}
+function loadMetrics(){
+  api('GET','/api/v1/metrics',null,function(r){
+    if(!r.ok||!r.metrics)return;var m=r.metrics;
+    $('sideTaskTotal').textContent=m.tasks_total;
+    $('sideTaskRun').textContent=m.tasks_running;
+    $('sideModelTotal').textContent=m.models_total;
+    $('sideTaskErr').textContent=m.tasks_error;
+  });
+}
+function renderStats(){
+  var total=allTasks.length;
+  var running=allTasks.filter(function(t){return t.running}).length;
+  var error=allTasks.filter(function(t){return !!t.init_error}).length;
+  $('statTotal').textContent=total;$('statRunning').textContent=running;
+  $('statStopped').textContent=total-running;$('statError').textContent=error;
+  $('taskCountLabel').textContent=total+' 个任务';
+}
+
+function urlLine(label,proto,url){
+  if(!url)return '';
+  return '<div class="url-line">'+
+    '<span class="proto '+label+'">'+proto+'</span>'+
+    '<span class="url-text" title="'+esc(url)+'">'+esc(url)+'</span>'+
+    '<button class="copy-btn" title="复制" onclick="event.stopPropagation();copyText(\''+esc(url).replace(/'/g,"\\'")+'\')">'+ICONS.copy+'</button>'+
+    '</div>';
+}
+
+function renderTasks(){
+  var c=$('taskContainer');
+  if(allTasks.length===0){
+    // 无任务时清理已存在的 DOM
+    c.innerHTML='<div class="task-empty">'+ICONS.cam+'<div class="empty-title">暂无任务</div><div class="empty-desc">点击右上角「新建任务」开始多路多模型推理</div></div>';
+    Object.keys(taskCardEls).forEach(function(k){delete taskCardEls[k]});
+    return;
+  }
+  // 清理 empty 占位
+  if(c.querySelector('.task-empty'))c.innerHTML='';
+
+  var liveSet={};
+  allTasks.forEach(function(t){
+    liveSet[t.id]=true;
+    var stats=t.stats||{};
+    var fpsNum=stats.fps?parseFloat(stats.fps.toFixed(1)):0;
+    var fps=fpsNum.toFixed(1);
+    var infer=stats.avg_infer_ms?stats.avg_infer_ms.toFixed(1):'-';
+    var encMs=stats.avg_encode_ms?stats.avg_encode_ms.toFixed(1):'-';
+    var frames=stats.frames||0;
+    var liveOn=t.running&&t.initialized;
+
+    var statusCls,statusText,statusDot;
+    if(!t.running&&t.init_error){statusCls='err';statusText='失败';statusDot=false}
+    else if(t.running&&t.initialized){statusCls='run';statusText='运行中';statusDot=true}
+    else if(t.running&&!t.initialized){statusCls='init';statusText='初始化中';statusDot=true}
+    else{statusCls='sto';statusText='已停止';statusDot=false}
+
+    var modelsHtml='';
+    if(t.models&&t.models.length){
+      t.models.forEach(function(m){modelsHtml+='<span class="model-tag">'+esc(m.name)+'</span>'});
+    } else {
+      modelsHtml='<span style="color:var(--muted);font-size:10px">无模型</span>';
+    }
+
+    var entry=taskCardEls[t.id];
+    if(!entry){
+      // 首次创建：构建完整 DOM
+      var card=document.createElement('div');
+      card.className='task-card';
+      card.innerHTML=
+        '<div class="task-thumb">'+
+          '<img class="thumb-img" alt="snapshot" style="display:none">'+
+          '<video class="thumb-video" muted playsinline></video>'+
+          '<div class="placeholder">'+ICONS.cam+'<div class="placeholder-text" style="margin-top:6px;font-size:10px">未启动</div></div>'+
+          '<div class="live-badge off"><div class="dot"></div><span class="live-text">OFF</span></div>'+
+          '<div class="fps-overlay" style="display:none">0.0 FPS</div>'+
+          '<div class="stream-status"><div class="dot"></div><span class="ss-text">连接中</span></div>'+
+          '<div class="mode-toggle">'+
+            '<button data-mode="snapshot" title="JPEG 缩略图">缩略图</button>'+
+            '<button data-mode="live" title="实时流 (HTTP-FLV)">实时</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="task-body">'+
+          '<div class="task-header">'+
+            '<div><div class="task-id"></div><div class="task-name"></div></div>'+
+            '<div class="task-status sto"><div class="dot" style="display:none"></div><span class="status-text">已停止</span></div>'+
+          '</div>'+
+          '<div class="url-row"></div>'+
+          '<div class="task-models"></div>'+
+          '<div class="task-stats">'+
+            '<div class="task-stat"><div class="task-stat-num stat-fps">0.0</div><div class="task-stat-label">FPS</div></div>'+
+            '<div class="task-stat"><div class="task-stat-num stat-infer">-</div><div class="task-stat-label">推理 ms</div></div>'+
+            '<div class="task-stat"><div class="task-stat-num stat-enc">-</div><div class="task-stat-label">编码 ms</div></div>'+
+            '<div class="task-stat"><div class="task-stat-num stat-frames">0</div><div class="task-stat-label">帧数</div></div>'+
+          '</div>'+
+          '<div class="task-actions"></div>'+
+          '<div class="task-error-msg" style="display:none"></div>'+
+        '</div>';
+      c.appendChild(card);
+      entry={
+        root:card,
+        thumbWrap:card.querySelector('.task-thumb'),
+        img:card.querySelector('.thumb-img'),
+        video:card.querySelector('.thumb-video'),
+        placeholder:card.querySelector('.placeholder'),
+        placeText:card.querySelector('.placeholder-text'),
+        liveBadge:card.querySelector('.live-badge'),
+        liveText:card.querySelector('.live-text'),
+        fpsOverlay:card.querySelector('.fps-overlay'),
+        streamStatus:card.querySelector('.stream-status'),
+        ssText:card.querySelector('.ss-text'),
+        modeBtnSnap:card.querySelector('.mode-toggle button[data-mode="snapshot"]'),
+        modeBtnLive:card.querySelector('.mode-toggle button[data-mode="live"]'),
+        idEl:card.querySelector('.task-id'),
+        nameEl:card.querySelector('.task-name'),
+        statusBadge:card.querySelector('.task-status'),
+        statusText:card.querySelector('.status-text'),
+        statusDot:card.querySelector('.task-status .dot'),
+        urlRow:card.querySelector('.url-row'),
+        modelsRow:card.querySelector('.task-models'),
+        statFps:card.querySelector('.stat-fps'),
+        statInfer:card.querySelector('.stat-infer'),
+        statEnc:card.querySelector('.stat-enc'),
+        statFrames:card.querySelector('.stat-frames'),
+        actions:card.querySelector('.task-actions'),
+        errMsg:card.querySelector('.task-error-msg'),
+        thumbBusy:false,
+        prevSig:'',
+        _prevInitError:undefined,
+        _prevRunning:false,
+        _hasBeenErrored:false
+      };
+      // 缩略图自动链式刷新（onload/onerror 后自动加载下一张）
+      entry.img.addEventListener('load',function(){entry.thumbBusy=false});
+      entry.img.addEventListener('error',function(){entry.thumbBusy=false;entry.img.style.display='none';entry.placeholder.style.display='flex'});
+      // 模式切换按钮（每张卡片单独）
+      (function(tid){
+        entry.modeBtnSnap.addEventListener('click',function(e){e.stopPropagation();setCardMode(tid,'snapshot')});
+        entry.modeBtnLive.addEventListener('click',function(e){e.stopPropagation();setCardMode(tid,'live')});
+      })(t.id);
+      taskCardEls[t.id]=entry;
+    }
+
+    // 更新 class
+    var cls='task-card'+(liveOn?' running':'')+(t.init_error?' error':'');
+    if(entry.root.className!==cls)entry.root.className=cls;
+
+    // 文本节点更新（仅在变化时）
+    if(entry.idEl.textContent!==t.id)entry.idEl.textContent=t.id;
+    var nm=t.name||'';
+    if(entry.nameEl.textContent!==nm)entry.nameEl.textContent=nm;
+    if(entry.statusBadge.className!=='task-status '+statusCls)entry.statusBadge.className='task-status '+statusCls;
+    if(entry.statusText.textContent!==statusText)entry.statusText.textContent=statusText;
+    entry.statusDot.style.display=statusDot?'':'none';
+
+    if(entry.statFps.textContent!==fps)entry.statFps.textContent=fps;
+    if(entry.statInfer.textContent!==infer)entry.statInfer.textContent=infer;
+    if(entry.statEnc.textContent!==encMs)entry.statEnc.textContent=encMs;
+    var fStr=String(frames);
+    if(entry.statFrames.textContent!==fStr)entry.statFrames.textContent=fStr;
+
+    // URL 行（仅当 URL 集合变化才重建）
+    var urlSig=(t.input_url||'')+'|'+(t.output_url||'')+'|'+(t.preview_url||'');
+    if(entry.urlSig!==urlSig){
+      entry.urlSig=urlSig;
+      entry.urlRow.innerHTML=
+        urlLine('in',urlProto(t.input_url),t.input_url)+
+        urlLine('out',urlProto(t.output_url),t.output_url)+
+        (t.preview_url?urlLine('preview',urlProto(t.preview_url),t.preview_url):'');
+    }
+
+    // 检测任务异常 → 调用 stop 接口 + 销毁播放器（处理首次出现和重启后再次失败两种情况）
+    var prevErr=entry._prevInitError;
+    var prevRunning=entry._prevRunning;
+    entry._prevInitError=t.init_error;
+    entry._prevRunning=t.running;
+    // 触发条件：错误首次出现 / 错误变化 / 任务从运行变停止且有错误 / 任务重启后又出现错误
+    if(t.init_error){
+      var errJustAppeared=prevErr!==t.init_error;
+      var stoppedWithErr=prevRunning&&!t.running;
+      var restartedFailed=!prevRunning&&t.running&&t.init_error&&entry._hasBeenErrored;
+      if(errJustAppeared||stoppedWithErr||restartedFailed){
+        toast('任务「'+t.id+'」异常: '+t.init_error,'danger');
+        log('任务异常：'+t.id+' - '+t.init_error,'err');
+        stopTask(t.id);
+        destroyCardPlayer(t.id);
+        entry.img.style.display='none';
+        entry.video.style.display='none';
+        entry.placeholder.style.display='flex';
+        entry.placeText.textContent='推流已停止';
+        if(detailTaskId===t.id) stopAllDetailPlayers();
+        entry.actSig=''; // 强制按钮刷新
+      }
+      entry._hasBeenErrored=true;
+    } else {
+      entry._hasBeenErrored=false;
+    }
+
+    // 模型 tag
+    if(entry.modelsSig!==modelsHtml){entry.modelsSig=modelsHtml;entry.modelsRow.innerHTML=modelsHtml}
+
+    // live badge
+    var liveCls='live-badge '+(liveOn?'on':'off');
+    if(entry.liveBadge.className!==liveCls)entry.liveBadge.className=liveCls;
+    var liveTxt=liveOn?'LIVE':'OFF';
+    if(entry.liveText.textContent!==liveTxt)entry.liveText.textContent=liveTxt;
+
+    // fps overlay
+    if(liveOn){
+      entry.fpsOverlay.style.display='';
+      var fpsTxt=fps+' FPS';
+      if(entry.fpsOverlay.textContent!==fpsTxt)entry.fpsOverlay.textContent=fpsTxt;
+    }else{
+      entry.fpsOverlay.style.display='none';
+    }
+
+    // 占位文字
+    var placeTxt=t.init_error?'初始化失败':'未启动';
+    if(!liveOn){
+      entry.img.style.display='none';
+      entry.placeholder.style.display='flex';
+      if(entry.placeText.textContent!==placeTxt)entry.placeText.textContent=placeTxt;
+    }
+
+    // actions（有 init_error 的任务视为已停止）
+    var effectiveRunning = t.running && !t.init_error;
+    var actSig=effectiveRunning?'r':'s';
+    if(entry.actSig!==actSig){
+      entry.actSig=actSig;
+      entry.actions.innerHTML=
+        (effectiveRunning
+          ? '<button class="btn btn-danger" onclick="stopTask(\''+esc(t.id)+'\')">'+ICONS.stop+' 停止</button>'
+          : '<button class="btn btn-primary" onclick="startTask(\''+esc(t.id)+'\')">'+ICONS.play+' 启动</button>')+
+        (!effectiveRunning?'<button class="btn btn-ghost" onclick="openEditTaskModal(\''+esc(t.id)+'\')">'+ICONS.detail+' 编辑</button>':'')+
+        '<button class="btn btn-ghost" onclick="showDetail(\''+esc(t.id)+'\')">'+ICONS.detail+' 详情</button>'+
+        '<button class="btn btn-ghost" onclick="deleteTask(\''+esc(t.id)+'\')">'+ICONS.trash+' 删除</button>';
+    }
+
+    // error 显示
+    if(t.init_error){
+      entry.errMsg.style.display='';
+      if(entry.errMsg.textContent!==t.init_error)entry.errMsg.textContent=t.init_error;
+    }else{entry.errMsg.style.display='none'}
+
+    // FPS 历史
+    if(!fpsHistory[t.id])fpsHistory[t.id]={labels:[],fps:[]};
+    var hist=fpsHistory[t.id];
+    hist.fps.push(fpsNum);
+    var now=new Date();
+    hist.labels.push(String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0'));
+    if(hist.fps.length>60){hist.fps.shift();hist.labels.shift()}
+
+    // 应用预览模式（每帧都调用，但内部会判重）
+    applyPreviewMode(t);
+  });
+
+  // 移除已被删除的任务卡片
+  Object.keys(taskCardEls).forEach(function(id){
+    if(!liveSet[id]){
+      destroyCardPlayer(id);
+      var e=taskCardEls[id];
+      if(e&&e.root&&e.root.parentNode)e.root.parentNode.removeChild(e.root);
+      delete taskCardEls[id];
+      delete fpsHistory[id];
+    }
+  });
+}
+
+// 链式拉缩略图：上一张加载完才请求下一张，避免堆积请求 / 闪烁
+function getCardMode(id){
+  return cardModeOverride[id] || globalPreviewMode;
+}
+function setGlobalPreviewMode(mode){
+  if(mode!=='snapshot'&&mode!=='live')return;
+  globalPreviewMode=mode;
+  localStorage.setItem('previewMode',mode);
+  $('modeBtnSnap').classList.toggle('active',mode==='snapshot');
+  $('modeBtnLive').classList.toggle('active',mode==='live');
+  // 清除单卡覆盖（让全局生效）
+  cardModeOverride={};
+  // 重新应用所有卡片
+  allTasks.forEach(function(t){applyPreviewMode(t)});
+  log('预览模式已切换为：'+(mode==='live'?'实时流':'缩略图'),'info');
+}
+function setCardMode(id,mode){
+  cardModeOverride[id]=mode;
+  var t=allTasks.find(function(x){return x.id===id});if(t)applyPreviewMode(t);
+}
+function setStreamStatus(entry,state,text){
+  if(!entry)return;
+  if(!state){entry.streamStatus.classList.remove('show');return}
+  entry.streamStatus.className='stream-status show '+state;
+  entry.ssText.textContent=text||state;
+}
+function destroyCardPlayer(id){
+  var p=cardPlayers[id];if(!p)return;
+  try{p.pause();p.unload();p.detachMediaElement();p.destroy()}catch(e){}
+  delete cardPlayers[id];
+  var entry=taskCardEls[id];
+  if(entry){entry.video.style.display='none';entry.video.removeAttribute('src');entry.video.load&&entry.video.load();setStreamStatus(entry,null)}
+}
+function setupCardPlayer(id,url){
+  destroyCardPlayer(id);
+  var entry=taskCardEls[id];if(!entry||!url)return;
+  if(typeof flvjs==='undefined'||!flvjs.isSupported()){
+    setStreamStatus(entry,'error','flv 不支持');
+    return;
+  }
+  // 连接池限制
+  while(Object.keys(cardPlayers).length>=MAX_LIVE_PLAYERS){
+    var keys=Object.keys(cardPlayers);
+    if(keys.length===0)break;
+    destroyCardPlayer(keys[0]);
+  }
+  setStreamStatus(entry,'connecting','连接中');
+  entry.video.style.display='block';
+  entry.placeholder.style.display='none';
+  entry.img.style.display='none';
+  entry.video.muted=true;
+  console.log('[FLV] 创建播放器',id,url);
+  var player=flvjs.createPlayer(
+    {type:'flv',isLive:true,url:url,cors:true,hasAudio:false,hasVideo:true},
+    {enableStashBuffer:true,stashInitialSize:128,liveBufferLatencyChasing:true,
+     reuseRedirectedURL:true,fixAudioTimestampGap:false,
+     enableWorker:false,liveSyncDurationCount:1,liveMaxLatencyDuration:2}
+  );
+  player._reconnectAttempt=0;
+  player.attachMediaElement(entry.video);
+  try{player.load()}catch(e){console.error('[FLV] load error',id,e)}
+  // autoplay 需要 muted
+  entry.video.muted=true;
+  var playPromise=player.play();
+  if(playPromise&&playPromise.catch)playPromise.catch(function(e){
+    console.warn('[FLV] autoplay blocked',id,e);
+    // autoplay 被拦截，1 秒后重试
+    setTimeout(function(){try{player.play()}catch(e2){}},1000);
+  });
+  player.on(flvjs.Events.ERROR,function(type,detail,info){
+    console.error('[FLV] error',id,type,detail,info);
+    log('FLV播放错误 '+id+': '+type,'err');
+  });
+  player.on(flvjs.Events.LOADING_COMPLETE,function(){
+    console.log('[FLV] 加载完成',id);
+    setStreamStatus(entry,'playing','直播');
+  });
+  entry.video.addEventListener('playing',function(){
+    console.log('[FLV] 开始播放',id);
+    entry.video.style.display='block';
+    entry.placeholder.style.display='none';
+    entry.img.style.display='none';
+    setStreamStatus(entry,'playing','直播');
+  });
+  entry.video.addEventListener('error',function(e){
+    console.error('[FLV] video element error',id,e);
+    setStreamStatus(entry,'error','视频错误');
+  });
+  entry.video.addEventListener('pause',function(){
+    if(document.hidden) return;
+    try{player.play()}catch(e){}
+  });
+  cardPlayers[id]=player;
+}
+
+// ── 全局缓冲区追逐：消除 FLV.js 累积延迟 ──
+// FLV.js 的 liveBufferLatencyChasing 追逐并不可靠，缓冲会持续增长
+// 此函数每 3 秒检测所有播放器的缓冲深度，超过 3 秒则 seek 到 live edge
+function chaseLiveLatency(){
+  var now=Date.now();
+  // 追赶详情弹窗中的播放器（原始流 + AI 流）
+  for(var key in detailPlayers){
+    var p=detailPlayers[key];
+    if(!p||!p._player||!p._player.mediaElement)continue;
+    var video=p._player.mediaElement;
+    if(video.buffered&&video.buffered.length>0){
+      var liveEnd=video.buffered.end(video.buffered.length-1);
+      var latency=liveEnd-(video.currentTime||0);
+      // 缓冲超过 3 秒 且 距上次 seek 超过 5 秒（避免频繁跳跃导致卡顿）
+      if(latency>3.0&&now-(p._lastSeekTime||0)>5000){
+        video.currentTime=Math.max(0,liveEnd-0.5);
+        p._lastSeekTime=now;
+      }
+    }
+  }
+  // 追赶首页卡片上的小窗口播放器
+  for(var id in cardPlayers){
+    var entry=taskCardEls[id];
+    if(!entry||!entry.video)continue;
+    var v=entry.video;
+    if(v.buffered&&v.buffered.length>0){
+      var liveEnd=v.buffered.end(v.buffered.length-1);
+      var latency=liveEnd-(v.currentTime||0);
+      if(latency>3.0&&now-(entry._lastSeek||0)>5000){
+        v.currentTime=Math.max(0,liveEnd-0.5);
+        entry._lastSeek=now;
+      }
+    }
+  }
+}
+
+// 后台标签页暂停/恢复
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){
+    Object.keys(cardPlayers).forEach(function(id){try{cardPlayers[id].pause()}catch(e){}});
+    log('标签页隐藏，暂停实时流','info');
+  }else{
+    Object.keys(cardPlayers).forEach(function(id){try{cardPlayers[id].play()}catch(e){}});
+    log('标签页激活，恢复实时流','info');
+  }
+});
+function applyPreviewMode(t){
+  var entry=taskCardEls[t.id];if(!entry)return;
+  var mode=getCardMode(t.id);
+  // 高亮按钮
+  entry.modeBtnSnap.classList.toggle('active',mode==='snapshot');
+  entry.modeBtnLive.classList.toggle('active',mode==='live');
+  var liveOn=t.running&&t.initialized&&!t.init_error;
+  if(t.init_error){
+    destroyCardPlayer(t.id);
+    entry.img.style.display='none';
+    entry.video.style.display='none';
+    entry.placeholder.style.display='flex';
+    entry.placeText.textContent='推流已停止';
+    setStreamStatus(entry,null);
+    return;
+  }
+  if(mode==='live'){
+    // 关闭 jpg 流
+    entry.img.style.display='none';
+    entry.placeholder.style.display='none';
+    entry.video.style.display='block';
+    if(!liveOn){
+      destroyCardPlayer(t.id);
+      entry.video.style.display='none';
+      entry.placeholder.style.display='flex';
+      return;
+    }
+    var liveUrl=t.preview_url||deriveHttpFlv(t.output_url);
+    if(!liveUrl){
+      destroyCardPlayer(t.id);
+      setStreamStatus(entry,'error','无可用 FLV 地址');
+      entry.video.style.display='none';
+      entry.placeholder.style.display='flex';
+      entry.placeText.textContent='无法推导 HTTP-FLV 地址';
+      return;
+    }
+    // 已有播放器且 url 没变就跳过
+    if(cardPlayers[t.id]&&cardPlayers[t.id]._urlMark===liveUrl)return;
+    setupCardPlayer(t.id,liveUrl);
+    if(cardPlayers[t.id])cardPlayers[t.id]._urlMark=liveUrl;
+  } else {
+    // snapshot 模式：销毁 player
+    destroyCardPlayer(t.id);
+    if(!liveOn){
+      entry.img.style.display='none';
+      entry.placeholder.style.display='flex';
+      return;
+    }
+    // 等待 pollThumbnails 拉 jpg；这里把 video 隐藏
+  }
+}
+
+function pollThumbnails(){
+  // 后台标签页跳过，节省带宽
+  if(!document.hidden&&currentPage==='dashboard'){
+    allTasks.forEach(function(t){
+      var e=taskCardEls[t.id];if(!e)return;
+      if(!(t.running&&t.initialized))return;
+      if(getCardMode(t.id)!=='snapshot')return;     // 实时流模式不拉 jpg
+      if(e.thumbBusy)return;
+      e.thumbBusy=true;
+      var url='/api/v1/tasks/'+encodeURIComponent(t.id)+'/snapshot.jpg?q=70&_t='+Date.now();
+      var pre=new Image();
+      pre.onload=function(){
+        e.img.src=pre.src;
+        e.img.style.display='block';
+        e.video.style.display='none';
+        e.placeholder.style.display='none';
+        e.thumbBusy=false;
+      };
+      pre.onerror=function(){e.thumbBusy=false};
+      pre.src=url;
+    });
+  }
+  setTimeout(pollThumbnails,400);
+}
+
+function createTask(){
+  var id=$('f_id').value.trim()||('cam'+Date.now());
+  var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
+  checks.forEach(function(c){var m=allModels.find(function(mm){return mm.name===c.value});if(m)models.push(m)});
+  if(models.length===0){toast('请至少选择一个模型','danger');return}
+  var fpsVal=parseInt($('f_enc_fps').value);
+  var body=JSON.stringify({
+    id:id,
+    name:$('f_name').value.trim()||id,
+    input_url:$('f_input').value.trim(),
+    output_url:$('f_output').value.trim(),
+    preview_url:$('f_preview').value.trim(),
+    enable_preview:$('f_enable_preview').checked,
+    encoder:{
+      format:$('f_enc_format').value,
+      codec:$('f_enc_codec').value,
+      fps:fpsVal>0?fpsVal:0,
+      bitrate_kbps:parseInt($('f_enc_bitrate').value)||4000,
+      gop:parseInt($('f_enc_gop').value)||50,
+      max_b_frames:parseInt($('f_enc_b').value)||0,
+      preset:$('f_enc_preset').value,
+      tune:$('f_enc_tune').value,
+      low_latency:$('f_enc_ll').value==='true'
+    },
+    decoder:{
+      hw_accel:$('f_dec_hw').value,
+      rtsp_transport:$('f_dec_transport').value
+    },
+    draw:{show_label:true,show_score:true},
+    models:models
+  });
+  log('创建任务：'+id,'info');
+  api('POST','/api/v1/tasks',body,function(r){
+    if(r.ok){
+      toast('任务「'+id+'」创建成功','success');log('任务创建成功：'+id,'ok');closeTaskModal();
+      api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
+        if(r2.ok){log('任务启动：'+id,'ok');toast('任务「'+id+'」已启动','success')}
+        else{log('任务启动失败：'+id+' - '+(r2.msg||''),'err')}
+        refreshAll();
+      });
+    }else{
+      toast('创建失败：'+(r.msg||''),'danger');log('任务创建失败：'+id+' - '+(r.msg||''),'err');
+    }
+  });
+}
+function submitTaskForm(){
+  if(_editingTaskId){stopTaskIfRunningThenUpdate()}else{createTask()}
+}
+function stopTaskIfRunningThenUpdate(){
+  var id=_editingTaskId;
+  var task=allTasks.find(function(t){return t.id===id});
+  if(task&&task.running){
+    log('任务正在运行，先停止再编辑：'+id,'info');
+    api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+      if(r.ok){setTimeout(function(){updateTask()},300)}
+      else{toast('停止任务失败，无法编辑','danger')}
+    });
+  }else{
+    updateTask();
+  }
+}
+function updateTask(){
+  var id=_editingTaskId;if(!id)return;
+  var fpsVal=parseInt($('f_enc_fps').value);
+  var showLabel=$('f_draw_label')?$('f_draw_label').checked:true;
+  var showScore=$('f_draw_score')?$('f_draw_score').checked:true;
+  // 收集勾选的模型
+  var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
+  checks.forEach(function(c){var m=allModels.find(function(mm){return mm.name===c.value});if(m)models.push(m)});
+  var body=JSON.stringify({
+    input_url:$('f_input').value.trim(),
+    output_url:$('f_output').value.trim(),
+    preview_url:$('f_preview').value.trim(),
+    enable_preview:$('f_enable_preview').checked,
+    models:models,
+    encoder:{
+      format:$('f_enc_format').value,
+      codec:$('f_enc_codec').value,
+      fps:fpsVal>0?fpsVal:0,
+      bitrate_kbps:parseInt($('f_enc_bitrate').value)||4000,
+      gop:parseInt($('f_enc_gop').value)||50,
+      max_b_frames:parseInt($('f_enc_b').value)||0,
+      preset:$('f_enc_preset').value,
+      tune:$('f_enc_tune').value,
+      low_latency:$('f_enc_ll').value==='true'
+    },
+    decoder:{
+      hw_accel:$('f_dec_hw').value,
+      rtsp_transport:$('f_dec_transport').value
+    },
+    draw:{show_label:showLabel,show_score:showScore}
+  });
+  log('更新任务配置：'+id,'info');
+  api('PUT','/api/v1/tasks/'+encodeURIComponent(id),body,function(r){
+    if(r.ok){
+      toast('任务配置已更新','success');log('任务配置更新成功：'+id,'ok');
+      closeTaskModal();refreshAll();
+    }else{
+      var errMsg=r.msg;
+      if(r._raw)errMsg+=' (响应: '+r._raw+')';
+      toast('更新失败：'+errMsg,'danger');log('任务配置更新失败：'+id+' - '+errMsg,'err');
+    }
+  });
+}
+function startTask(id){
+  log('启动任务：'+id,'info');
+  api('POST','/api/v1/tasks/'+id+'/start',null,function(r){
+    if(r.ok){toast('任务已启动','success');log('任务启动：'+id,'ok')}
+    else{toast('启动失败：'+(r.msg||''),'danger');log('启动失败：'+id,'err')}refreshAll();
+  });
+}
+function stopTask(id){
+  log('停止任务：'+id,'info');
+  api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+    if(r.ok){toast('任务已停止','success');log('任务停止：'+id,'ok')}else{toast('停止失败','danger')}refreshAll();
+  });
+}
+function deleteTask(id){
+  if(!confirm('确认删除任务「'+id+'」？'))return;
+  log('删除任务：'+id,'info');
+  api('DELETE','/api/v1/tasks/'+id,null,function(r){
+    if(r.ok){toast('任务已删除','success');log('任务删除：'+id,'ok');refreshAll()}else{toast('删除失败','danger')}
+  });
+}
+function stopAllTasks(){
+  if(!confirm('确认停止所有任务？'))return;
+  allTasks.forEach(function(t){if(t.running)stopTask(t.id)});
+}
+
+// ── 根据 RTSP/RTMP URL 推导 ZLMediaKit HTTP-FLV 地址 ──
+function deriveHttpFlv(url){
+  if(!url)return '';
+  try{
+    var m=url.match(/^(?:rtsp|rtmp):\/\/([^\/:]+)(?::\d+)?\/([^\/]+)\/([^\/?#]+)/);
+    if(!m)return '';
+    var host=m[1], app=m[2], stream=m[3];
+    // 去掉点播文件后缀
+    stream=stream.replace(/\.(mp4|flv|ts|mkv)$/,'');
+    // 把 127.0.0.1 转成 localhost 以避免浏览器的 Private Network Access 拦截
+    if(host==='127.0.0.1'||host==='0.0.0.0') host='localhost';
+    return 'http://'+host+':8080/'+app+'/'+stream+'.live.flv';
+  }catch(e){return ''}
+}
+
+// 检查是否需要提示使用 localhost 访问
+function checkPnaAccess(){
+  if(location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
+    // 页面从非 localhost 域名访问，FLV 播放器可能被浏览器的 PNA 策略拦截
+    if(!document.getElementById('pnaWarning')){
+      var div=document.createElement('div');
+      div.id='pnaWarning';
+      div.style.cssText='position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#ff4570,#ff7b50);color:#fff;padding:10px 20px;text-align:center;z-index:99999;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(255,69,112,.4);';
+      div.innerHTML='⚠️ 当前通过 <b>'+location.host+'</b> 访问，浏览器 PNA 策略会阻止 FLV 播放器访问 loopback。请点击 → <a style="color:#fff;text-decoration:underline;font-size:14px;padding:2px 8px;background:rgba(0,0,0,.2);border-radius:4px;" href="'+location.href.replace(location.host,'localhost:'+location.port)+'">http://localhost:'+location.port+'</a> ← 用此地址访问以解决 FLV 黑屏问题';
+      document.body.appendChild(div);
+    }
+  }
+}
+
+var detailPlayers={}; // { 'input': Player, 'output': Player }
+
+function showDetail(id){
+  detailTaskId=id;
+  var t=allTasks.find(function(tt){return tt.id===id});if(!t)return;
+  var stats=t.stats||{};
+  var modelsHtml=(t.models||[]).map(function(m){return '<span class="model-tag">'+esc(m.name)+' ['+typeLabel(m.type)+']</span>'}).join('');
+
+  var enc=t.encoder||{},dec=t.decoder||{};
+
+  // 自动推导 HTTP-FLV（输出流预览）
+  var autoFlvOutput=deriveHttpFlv(t.output_url);
+  // 输入流预览地址（由 input_url 推导，一般输入是原始 RTSP，ZLMediaKit 也可能转出 FLV）
+  var autoFlvInput=deriveHttpFlv(t.input_url);
+  // 用户配置的 preview_url 优先用于输出
+  var outFlvUrl=t.preview_url||autoFlvOutput;
+
+  function colHtml(side,label,labelTag,flvUrl,srcUrl){
+    var idPref=side==='input'?'inp':'out';
+    return '<div class="detail-preview-col">'+
+      '<div class="col-label"><span class="tag '+labelTag+'">'+label+'</span>'+(side==='input'?'原始 RTSP 流':'AI 处理流')+'</div>'+
+      '<div class="col-video">'+
+        '<video class="col-video-el" id="colVideo'+idPref+'" muted playsinline></video>'+
+        '<div class="col-placeholder" id="colPlaceholder'+idPref+'">'+ICONS.cam+
+          '<div>'+(flvUrl?'点击播放':'无可用地址')+'</div>'+
+          (flvUrl?'<div style="font-size:10px;color:var(--muted)">HTTP-FLV</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="col-url">'+
+        (side==='input'?'输入：'+esc(srcUrl):'输出：'+esc(srcUrl))+
+        (flvUrl?'<br>HTTP-FLV：'+esc(flvUrl):'')+
+      '</div>'+
+      '<div class="col-controls">'+
+        '<button class="btn btn-primary btn-sm" onclick="startDetailPlayer(\''+side+'\')">'+ICONS.play+' 播放</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="stopDetailPlayer(\''+side+'\')">'+ICONS.stop+' 停止</button>'+
+        (flvUrl?'<button class="btn btn-ghost btn-sm" onclick="copyText(\''+esc(flvUrl).replace(/'/g,"\\'")+'\')">复制 FLV</button>':'')+
+      '</div>'+
+    '</div>';
+  }
+
+  var h=
+    '<div class="detail-preview-row">'+
+      colHtml('input','ORIG','raw',autoFlvInput,t.input_url)+
+      colHtml('output','AI','ai',outFlvUrl,t.output_url)+
+    '</div>'+
+    '<div class="detail-controls-bar">'+
+      '<button class="btn btn-ghost btn-sm" onclick="startAllDetailPlayers()">'+ICONS.play+' 同时播放</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="stopAllDetailPlayers()">'+ICONS.stop+' 全部停止</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="downloadSnapshot(\''+esc(id)+'\')">下载 AI 快照 JPEG</button>'+
+    '</div>'+
+
+    '<div class="detail-section-title">流地址</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">任务 ID</div><div class="detail-value">'+esc(t.id)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">任务名称</div><div class="detail-value">'+esc(t.name||'-')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">原始输入 RTSP</div><div class="detail-value">'+esc(t.input_url)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">AI 输出 RTSP</div><div class="detail-value">'+esc(t.output_url)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">AI 输出 HTTP-FLV</div><div class="detail-value">'+esc(outFlvUrl||'(自动推导失败或未配置)')+'</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">运行统计</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">运行状态</div><div class="detail-value">'+(t.running?'运行中':'已停止')+' / '+(t.initialized?'已初始化':'未初始化')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">已处理帧数</div><div class="detail-value">'+(stats.frames||0)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">FPS</div><div class="detail-value">'+(stats.fps?stats.fps.toFixed(2):'0.00')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">推理耗时</div><div class="detail-value">'+(stats.avg_infer_ms?stats.avg_infer_ms.toFixed(2):'-')+' ms</div></div>'+
+      '<div class="detail-item"><div class="detail-label">绘制耗时</div><div class="detail-value">'+(stats.avg_draw_ms?stats.avg_draw_ms.toFixed(2):'-')+' ms</div></div>'+
+      '<div class="detail-item"><div class="detail-label">编码耗时</div><div class="detail-value">'+(stats.avg_encode_ms?stats.avg_encode_ms.toFixed(2):'-')+' ms</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">编码器参数</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">编码器 / 格式</div><div class="detail-value">'+esc(enc.codec||'auto')+' / '+esc(enc.format||'auto')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">FPS / 码率</div><div class="detail-value">'+(enc.fps||25)+' / '+(enc.bitrate_kbps||4000)+' kbps</div></div>'+
+      '<div class="detail-item"><div class="detail-label">GOP / B 帧</div><div class="detail-value">'+(enc.gop||50)+' / '+(enc.max_b_frames||0)+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">Preset / Tune / 低延迟</div><div class="detail-value">'+esc(enc.preset||'')+' / '+esc(enc.tune||'')+' / '+(enc.low_latency?'开启':'关闭')+'</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">解码器参数</div>'+
+    '<div class="detail-grid">'+
+      '<div class="detail-item"><div class="detail-label">硬件加速</div><div class="detail-value">'+esc(dec.hw_accel||'cuda')+'</div></div>'+
+      '<div class="detail-item"><div class="detail-label">RTSP 传输</div><div class="detail-value">'+esc(dec.rtsp_transport||'tcp')+'</div></div>'+
+    '</div>'+
+
+    '<div class="detail-section-title">关联模型</div>'+
+    '<div style="margin-bottom:12px">'+(modelsHtml||'<span style="color:var(--muted)">无</span>')+'</div>'+
+
+    (t.init_error?'<div class="detail-error">初始化错误：'+esc(t.init_error)+'</div>':'')+
+
+    '<div class="detail-section-title">FPS 历史曲线</div>'+
+    '<div class="detail-chart"><canvas id="detailChart"></canvas></div>';
+
+  $('detailBody').innerHTML=h;
+  $('detailModalBackdrop').classList.add('active');
+
+  var hist=fpsHistory[id]||{labels:[],fps:[]};
+  if(detailChart)detailChart.destroy();
+  var ctx=document.getElementById('detailChart');
+  detailChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:hist.labels,datasets:[{label:'FPS',data:hist.fps,borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.18)',borderWidth:2,fill:true,tension:0.3,pointRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}},grid:{color:'rgba(0,229,255,0.05)'},border:{display:false}},
+              y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}},grid:{color:'rgba(0,229,255,0.05)'},border:{display:false},beginAtZero:true}}}
+  });
+}
+
+function closeDetailModal(){
+  stopAllDetailPlayers();
+  $('detailModalBackdrop').classList.remove('active');
+  detailTaskId=null;
+}
+
+function destroyDetailPlayer(side){
+  var p=detailPlayers[side];if(!p)return;
+  try{p.pause();p.unload();p.detachMediaElement();p.destroy()}catch(e){}
+  delete detailPlayers[side];
+  var idPref=side==='input'?'inp':'out';
+  var v=document.getElementById('colVideo'+idPref);if(v){v.style.display='none';v.removeAttribute('src');}
+  var ph=document.getElementById('colPlaceholder'+idPref);if(ph)ph.style.display='flex';
+}
+function getFlvUrl(side){
+  if(side==='input'){
+    var t=allTasks.find(function(x){return x.id===detailTaskId});
+    return t?deriveHttpFlv(t.input_url):null;
+  }
+  var t=allTasks.find(function(x){return x.id===detailTaskId});
+  if(!t)return null;
+  return t.preview_url||deriveHttpFlv(t.output_url);
+}
+function startDetailPlayer(side){
+  destroyDetailPlayer(side);
+  var url=getFlvUrl(side);
+  if(!url){toast(side==='input'?'输入源无法推导 HTTP-FLV':'输出源无可用 FLV 地址','danger');return}
+  if(typeof flvjs==='undefined'||!flvjs.isSupported()){toast('当前浏览器不支持 flv.js','danger');return}
+  var idPref=side==='input'?'inp':'out';
+  var video=document.getElementById('colVideo'+idPref);
+  var ph=document.getElementById('colPlaceholder'+idPref);
+  video.style.display='block';if(ph)ph.style.display='none';
+  var player=flvjs.createPlayer(
+    {type:'flv',isLive:true,url:url,cors:true,hasAudio:false,hasVideo:true},
+    {enableStashBuffer:false,stashInitialSize:128,liveBufferLatencyChasing:true,reuseRedirectedURL:true,liveSyncDurationCount:1,liveMaxLatencyDuration:3}
+  );
+  player.attachMediaElement(video);
+  try{player.load()}catch(e){}
+  var pp=player.play();if(pp&&pp.catch)pp.catch(function(e){toast('播放失败：'+e.message,'danger')});
+  detailPlayers[side]=player;
+  log('播放 '+(side==='input'?'原始流':'AI流')+'：'+url,'info');
+}
+function stopDetailPlayer(side){destroyDetailPlayer(side)}
+function startAllDetailPlayers(){startDetailPlayer('input');startDetailPlayer('output')}
+function stopAllDetailPlayers(){destroyDetailPlayer('input');destroyDetailPlayer('output')}
+
+function downloadSnapshot(id){
+  var url='/api/v1/tasks/'+encodeURIComponent(id)+'/snapshot.jpg?q=95&_t='+Date.now();
+  var a=document.createElement('a');a.href=url;a.download=id+'_'+Date.now()+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+var _editingModelName=null;   // 编辑模式下的模型名称
+
+// ── 弹窗 ──
+function openTaskModal(){
+  _editingTaskId=null;
+  $('taskModalBackdrop').classList.add('active');
+  var title=$('taskModalBackdrop').querySelector('.modal-title');
+  var btn=$('taskModalBackdrop').querySelector('.modal-footer .btn-primary');
+  title.textContent='新建分析任务';
+  btn.textContent='创建并启动';
+  $('f_id').value='';$('f_id').disabled=false;
+  $('f_name').value='';
+  $('f_input').value='rtsp://127.0.0.1:554/live/obs_test3';
+  $('f_output').value='rtsp://127.0.0.1:554/live/surveillance_out';
+  $('f_preview').value='';
+  $('f_enable_preview').checked=true;
+  $('f_enc_format').value='auto';$('f_enc_codec').value='auto';
+  $('f_enc_fps').value='0';$('f_enc_bitrate').value='4000';
+  $('f_enc_gop').value='50';$('f_enc_b').value='0';
+  $('f_enc_preset').value='ultrafast';$('f_enc_tune').value='zerolatency';$('f_enc_ll').value='true';
+  $('f_dec_hw').value='cuda';$('f_dec_transport').value='tcp';
+  renderModelSelector();
+}
+function openEditTaskModal(id){
+  _editingTaskId=id;
+  api('GET','/api/v1/tasks/'+encodeURIComponent(id),null,function(r){
+    if(!r.ok||!r.task){toast('获取任务配置失败','danger');return}
+    var cfg=r.task;
+    $('taskModalBackdrop').classList.add('active');
+    var title=$('taskModalBackdrop').querySelector('.modal-title');
+    var btn=$('taskModalBackdrop').querySelector('.modal-footer .btn-primary');
+    title.textContent='编辑任务 — '+cfg.id;
+    btn.textContent='保存修改';
+    $('f_id').value=cfg.id;$('f_id').disabled=true;
+    $('f_name').value=cfg.name||'';
+    $('f_input').value=cfg.input_url||'';
+    $('f_output').value=cfg.output_url||'';
+    $('f_preview').value=cfg.preview_url||'';
+    $('f_enable_preview').checked=cfg.enable_preview!==false;
+    var enc=cfg.encoder||{};
+    $('f_enc_format').value=enc.format||'auto';
+    $('f_enc_codec').value=enc.codec||'auto';
+    $('f_enc_fps').value=enc.fps!=null?String(enc.fps):'0';
+    $('f_enc_bitrate').value=enc.bitrate_kbps||'4000';
+    $('f_enc_gop').value=enc.gop||'50';
+    $('f_enc_b').value=enc.max_b_frames||'0';
+    $('f_enc_preset').value=enc.preset||'ultrafast';
+    $('f_enc_tune').value=enc.tune||'zerolatency';
+    $('f_enc_ll').value=enc.low_latency?'true':'false';
+    var dec=cfg.decoder||{};
+    $('f_dec_hw').value=dec.hw_accel||'cuda';
+    $('f_dec_transport').value=dec.rtsp_transport||'tcp';
+    renderModelSelector();
+    if(cfg.models){
+      cfg.models.forEach(function(m){
+        var cb=document.querySelector('#modelCheckboxes input[value="'+esc(m.name).replace(/"/g,'&quot;')+'"]');
+        if(cb)cb.checked=true;
+      });
+    }
+    log('打开编辑：'+cfg.id,'info');
+  });
+}
+function closeTaskModal(){$('taskModalBackdrop').classList.remove('active');_editingTaskId=null}
+function openModelModal(){
+  _editingModelName=null;
+  $('modelModalTitle').textContent='新增模型';
+  $('modelModalSaveBtn').textContent='保存到模型库';
+  $('mf_name').value='';$('mf_name').disabled=false;
+  $('mf_type').value='detection';$('mf_path').value='';
+  $('mf_backend').value='ort';$('mf_device').value='gpu';
+  $('mf_threshold').value='0.5';$('mf_interval').value='1';
+  $('mf_w').value='640';$('mf_h').value='640';$('mf_roi').value='0,0,0,0';
+  $('modelModalBackdrop').classList.add('active');
+}
+function openEditModelModal(name){
+  _editingModelName=name;
+  $('modelModalTitle').textContent='编辑模型 - '+name;
+  $('modelModalSaveBtn').textContent='保存修改';
+  $('mf_name').value=name;$('mf_name').disabled=true;
+  var m=allModels.find(function(mm){return mm.name===name});
+  if(!m){toast('模型不存在','danger');return}
+  $('mf_type').value=m.type||'detection';
+  $('mf_path').value=m.path||'';
+  $('mf_backend').value=m.backend||'ort';
+  $('mf_device').value=m.device||'gpu';
+  $('mf_threshold').value=m.confidence_threshold!=null?String(m.confidence_threshold):'0.5';
+  $('mf_interval').value=m.interval!=null?String(m.interval):'1';
+  $('mf_w').value=m.input_size&&m.input_size[0]?String(m.input_size[0]):'640';
+  $('mf_h').value=m.input_size&&m.input_size[1]?String(m.input_size[1]):'640';
+  var roi=m.roi||[0,0,0,0];
+  $('mf_roi').value=roi.join(',');
+  $('modelModalBackdrop').classList.add('active');
+}
+function closeModelModal(){$('modelModalBackdrop').classList.remove('active');_editingModelName=null}
+function submitModelForm(){
+  if(_editingModelName){updateModel()}else{addModel()}
+}
+
+// ── 快捷键 ──
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+  if(e.key==='r'||e.key==='R')refreshAll();
+  if(e.key==='n'||e.key==='N')openTaskModal();
+  if(e.key==='m'||e.key==='M')openModelModal();
+  if(e.key==='Escape'){closeTaskModal();closeModelModal();closeDetailModal()}
+});
+$('taskModalBackdrop').addEventListener('click',function(e){if(e.target===this)closeTaskModal()});
+$('modelModalBackdrop').addEventListener('click',function(e){if(e.target===this)closeModelModal()});
+$('detailModalBackdrop').addEventListener('click',function(e){if(e.target===this)closeDetailModal()});
+</script>
+</body>
+</html>

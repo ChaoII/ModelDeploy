@@ -17,6 +17,7 @@ option(BUILD_PYTHON "build with python" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(BUILD_BENCHMARK "build benchmarks" OFF)
+option(BUILD_SURVEILLANCE "build AI surveillance application" OFF)
 option(BUILD_ENCRYPTION "enable model encryption/decryption (requires OpenSSL)" ON)
 option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
@@ -88,7 +89,7 @@ file(GLOB_RECURSE TRT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/t
 file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
 file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
-file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu)
+file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu)
 
 list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
 
@@ -252,6 +253,8 @@ if (BUILD_BENCHMARK)
     enable_testing()
     add_subdirectory(benchmark)
 endif ()
+
+add_subdirectory(application)
 
 
 include(GNUInstallDirs)

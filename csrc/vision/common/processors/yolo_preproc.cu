@@ -290,7 +290,6 @@ namespace modeldeploy::vision {
         // 3 letterbox（host 计算）
         *letter_box_record = utils::cal_letter_box_param({src_w, src_h}, {dst_w, dst_h});
         // NV12
-        // 使用 step_y 计算实际占用字节更稳妥，或者 src_h * src_w
         const size_t src_y_bytes = static_cast<size_t>(src_h) * step_y;
         const size_t src_uv_bytes = static_cast<size_t>(src_h / 2) * step_uv;
         const uint8_t* d_src_y = nullptr;

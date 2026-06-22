@@ -457,7 +457,7 @@ static class Program
         // TestOcrRecognition();
         // TestOcrRecognitionBatch();
         // TestStructureTable();
-        // TestPedestrianAttribute();
+        TestPedestrianAttribute();
         // 测试GC
         // GC.Collect();
         // GC.WaitForPendingFinalizers();

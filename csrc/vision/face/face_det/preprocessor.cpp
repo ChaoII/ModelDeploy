@@ -9,6 +9,10 @@
 #include <vision/common/processors/color_space_convert.h>
 #include <vision/common/processors/convert.h>
 #include <vision/common/processors/hwc2chw.h>
+#ifdef WITH_GPU
+#include "vision/face/face_det/scrfd_preproc.cuh"
+#endif
+#include "vision/face/face_det/scrfd_preproc.h"
 
 namespace modeldeploy::vision::face {
     ScrfdPreprocessor::ScrfdPreprocessor() {
@@ -22,21 +26,14 @@ namespace modeldeploy::vision::face {
 
 
     bool ScrfdPreprocessor::preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const {
-        // scrfd's preprocess steps
-        // 1. letterbox
-        // 2. BGR->RGB
-        // 2. Convert
-        // 4. HWC->CHW
-
-        const std::vector alpha = {1.f / 128.f, 1.f / 128.f, 1.f / 128.f};
-        const std::vector beta = {-127.5f / 128.f, -127.5f / 128.f, -127.5f / 128.f};
-        *letter_box_record = utils::cal_letter_box_param({image->width(), image->height()}, size_);
-        image->letter_box(size_, 0.0f)
-             .fuse_convert_and_permute(alpha, beta)
-             .to_tensor(output);
-        output->expand_dim(0); // reshape to n, c, h, w
-
-        return true;
+        if (use_cuda_preproc_) {
+#ifdef WITH_GPU
+            return scrfd_preprocess_cuda(*image, output, size_, static_cast<float>(padding_value_[0]), letter_box_record);
+#else
+            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
+#endif
+        }
+        return scrfd_preprocess_cpu(*image, output, size_, static_cast<float>(padding_value_[0]), letter_box_record);
     }
 
     bool ScrfdPreprocessor::run(

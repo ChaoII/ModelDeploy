@@ -24,6 +24,8 @@ namespace modeldeploy::vision::face {
                                    std::vector<std::vector<KeyPointsResult>>* results,
                                    TimerArray* timers = nullptr);
 
+        [[nodiscard]] std::unique_ptr<Scrfd> clone() const;
+
         virtual ScrfdPreprocessor& get_preprocessor() {
             return preprocessor_;
         }
