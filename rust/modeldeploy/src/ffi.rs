@@ -436,12 +436,25 @@ extern "C" {
     // ── Image ──
 
     pub fn md_read_image(path: *const c_char) -> MDImage;
-    pub fn md_clone_image(src: *const MDImage) -> MDImage;
-    pub fn md_save_image(image: *const MDImage, path: *const c_char);
-    pub fn md_free_image(image: *mut MDImage);
-    pub fn md_from_nv12_data_to_bgr24(
-        data: *const u8, width: c_int, height: c_int,
+    pub fn md_read_image_from_device(
+        device_id: c_int, frame_width: c_int, frame_height: c_int, is_save_file: bool,
     ) -> MDImage;
+    pub fn md_save_image(image: *const MDImage, path: *const c_char);
+    pub fn md_clone_image(src: *const MDImage) -> MDImage;
+    pub fn md_crop_image(src: *mut MDImage, rect: *const MDRect) -> MDImage;
+    pub fn md_free_image(image: *mut MDImage);
+    pub fn md_show_image(image: *const MDImage);
+
+    // 格式转换
+    pub fn md_from_compressed_bytes(bytes: *const u8, size: c_int) -> MDImage;
+    pub fn md_to_compressed_bytes(image: *const MDImage, ext: *const c_char) -> MDImage;
+    pub fn md_from_bgr24_data(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_rgb24_data(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_rgb24_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_yuv420p_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_nv12_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_nv21_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_base64_str(base64_str: *const c_char) -> MDImage;
 
     // ── 工具 ──
 
