@@ -11,39 +11,21 @@ fn main() -> Result<()> {
     let image_path = std::env::args().nth(2).unwrap_or_else(|| {
         "../../test_data/test_images/test_detection0.jpg".to_string()
     });
+    if !Path::new(&model_path).exists() { eprintln!("模型不存在: {}", model_path); return Ok(()); }
+    if !Path::new(&image_path).exists() { eprintln!("图片不存在: {}", image_path); return Ok(()); }
 
-    if !Path::new(&model_path).exists() {
-        eprintln!("模型文件不存在: {}", model_path);
-        return Ok(());
-    }
-    if !Path::new(&image_path).exists() {
-        eprintln!("图片文件不存在: {}", image_path);
-        return Ok(());
-    }
-
-    // ── GPU + FP16 + TensorRT EP（与 C++ demo_detection_cxx 一致的配置） ──
+    // GPU + enable_trt = false
     let opt = RuntimeOption::new()
         .gpu(0)
         .fp16(true)
-        .enable_trt(true)
-        .trt_cache("./trt_engine")
+        .enable_trt(false)
         .ort_backend();
 
-    // CPU 模式:
-    // let opt = RuntimeOption::new().cpu(4).enable_trt(false).ort_backend();
-
+    println!("enable_trt = false");
     let model = UltralyticsDet::new(&model_path, &opt)?;
-    println!("模型加载成功: {}", model_path);
-
+    println!("模型加载成功");
     let img = Image::read(&image_path)?;
-    println!("图像: {}x{} {}通道", img.width(), img.height(), img.channels());
-
     let results = model.predict(&img)?;
-    println!("检测到 {} 个目标:", results.len());
-    for (i, r) in results.iter().enumerate() {
-        println!("  [{}/{}] label={} score={:.4} rect=[{}x{} {}x{}]",
-                 i+1, results.len(), r.label_id, r.score,
-                 r.rect.x, r.rect.y, r.rect.width, r.rect.height);
-    }
+    println!("检测到 {} 个目标", results.len());
     Ok(())
 }
