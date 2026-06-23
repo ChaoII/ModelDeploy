@@ -2,7 +2,6 @@ use anyhow::Result;
 use modeldeploy::image::Image;
 use modeldeploy::runtime::RuntimeOption;
 use modeldeploy::types::*;
-use modeldeploy::vision::detection::UltralyticsDet;
 
 // ════════════════════════════════════════════════════════════════
 // Image 函数全覆盖测试
@@ -182,4 +181,51 @@ fn test_error_conversion() {
 
     assert!(check_status(MDStatusCode_Success).is_ok());
     assert!(check_status(MDStatusCode_PathNotFound).is_err());
+}
+
+// ════════════════════════════════════════════════════════════════
+// 内存泄漏压力测试
+// ════════════════════════════════════════════════════════════════
+// 反复分配/释放，如果内存持续增长说明有泄漏。
+// 这些测试不是精确的泄漏检测（需要 valgrind/asan），
+// 但可以作为 CI 上的快速检查。
+
+/// Image 反复创建释放 1000 次
+#[test]
+fn test_image_repeated_alloc_free() {
+    let data = vec![0u8; 640 * 480 * 3];
+    for _ in 0..1000 {
+        // from_bgr24（零拷贝，不分配）
+        let img = Image::from_bgr24(&data, 640, 480);
+        drop(img);
+    }
+    println!("Image repeated alloc/free 1000x OK");
+}
+
+/// Image read + drop 反复 100 次（每次分配 CAPI 内存）
+#[test]
+fn test_image_repeated_read_drop() -> Result<()> {
+    for i in 0..100 {
+        let img = Image::read("../../test_data/test_images/test_detection0.jpg")?;
+        assert!(img.width() > 0);
+        drop(img); // 显式释放 CAPI 内存
+        if i == 0 { println!("First iteration OK"); }
+    }
+    println!("Image read/drop 100x OK");
+    Ok(())
+}
+
+/// clone + crop 反复 100 次
+#[test]
+fn test_image_repeated_clone_crop() -> Result<()> {
+    let img = Image::read("../../test_data/test_images/test_detection0.jpg")?;
+    for _ in 0..100 {
+        let cloned = img.clone_image()?;
+        let cropped = cloned.crop(0, 0, 100, 100)?;
+        assert_eq!(cropped.width(), 100);
+        drop(cropped);
+        drop(cloned);
+    }
+    println!("Image clone/crop 100x OK");
+    Ok(())
 }
