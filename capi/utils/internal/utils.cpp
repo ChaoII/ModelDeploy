@@ -625,7 +625,6 @@ void c_runtime_option_2_runtime_option(
     option->ort_option.trt_engine_cache_path = c_option->trt_engine_cache_path;
     option->enable_fp16 = c_option->enable_fp16;
     option->enable_trt = c_option->enable_trt;
-    option->ort_option.enable_trt = c_option->enable_trt;
     option->device_id = c_option->device_id;
     option->device = static_cast<modeldeploy::Device>(c_option->device);
     option->backend = static_cast<modeldeploy::Backend>(c_option->backend);

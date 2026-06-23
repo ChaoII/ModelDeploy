@@ -27,5 +27,6 @@ fn main() -> Result<()> {
     let img = Image::read(&image_path)?;
     let results = model.predict(&img)?;
     println!("检测到 {} 个目标", results.len());
+    println!("检测到 {:?} 个目标", results);
     Ok(())
 }
