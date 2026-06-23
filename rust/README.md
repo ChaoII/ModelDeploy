@@ -65,14 +65,83 @@ cargo run --release --example detection
 
 ## 使用方式
 
-### 作为依赖引入
+### 作为依赖引入（本地路径）
 
-在 `Cargo.toml` 中添加：
+在你的 Rust 项目的 `Cargo.toml` 中添加：
+
+```toml
+[dependencies.modeldeploy]
+git = "https://github.com/ChaoII/ModelDeploy.git"
+branch = "feature/rust-bindings"
+```
+
+或者在项目目录结构关系如下时用本地路径：
+
+```
+my_project/
+├── Cargo.toml
+├── src/
+└── vendor/ModelDeploy/
+    ├── rust/modeldeploy/      ← crate 在这里
+    ├── build/bin/             ← SDK DLL 在这里
+    └── csrc/
+```
 
 ```toml
 [dependencies]
-modeldeploy = { path = "path/to/modeldeploy/rust/modeldeploy" }
+modeldeploy = { path = "vendor/ModelDeploy/rust/modeldeploy" }
 ```
+
+### 运行时依赖
+
+`modeldeploy` crate 本身是纯 Rust 代码，编译不需要 C++ 编译器。但**运行时**需要 `ModelDeploySDK.dll` 及其依赖 DLL 在：
+
+1. **exe 同目录**（推荐）—— `build.rs` 会自动从 `../../build/bin/` 拷贝
+2. **系统 PATH** —— 或手动设置 `%PATH%`
+
+如果你的其他 Rust 项目引用此 crate，`build.rs` 会从 `ModelDeploy/rust/modeldeploy/../../build/bin/` 向上搜索 SDK DLL。如果项目结构不同，可以通过环境变量指定路径：
+
+```bash
+export MODELDEPLOY_LIB_DIR=/absolute/path/to/build/bin
+cargo build
+```
+
+### 完整项目结构示例
+
+```
+my_app/
+├── Cargo.toml
+│   [dependencies]
+│   modeldeploy = { path = "../ModelDeploy/rust/modeldeploy" }
+├── src/
+│   └── main.rs
+│       use modeldeploy::vision::detection::UltralyticsDet;
+│       use modeldeploy::runtime::RuntimeOption;
+│       use modeldeploy::image::Image;
+└── test_data/             ← 模型文件放这里
+    └── models/
+        └── yolo11n.onnx
+```
+
+编译时 `build.rs` 会自动搜索 `../ModelDeploy/build/bin/`，找到正确的 DLL 并拷贝到你的 `target/debug/` 目录。
+
+### 发布到 crates.io
+
+当此 crate 稳定后可以发布到 crates.io：
+
+```bash
+cd rust/modeldeploy
+cargo publish
+```
+
+使用方只需：
+
+```toml
+[dependencies]
+modeldeploy = "0.1"
+```
+
+> 注意：crates.io 的 crate 不包含 SDK DLL。用户仍需自行编译 `ModelDeploySDK.dll` 并通过 `MODELDEPLOY_LIB_DIR` 指定路径。
 
 ### 最小检测示例
 
