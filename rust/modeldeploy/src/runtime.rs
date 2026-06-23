@@ -133,6 +133,20 @@ impl RuntimeOption {
         self.raw.ort_log_severity = level;
         self
     }
+    /// 获取设备 ID
+    pub fn get_device_id(&self) -> i32 {
+        self.raw.device_id
+    }
+
+    /// 获取启用 FP16 状态
+    pub fn is_fp16(&self) -> bool {
+        self.raw.enable_fp16 != 0
+    }
+
+    /// 获取后端类型值
+    pub fn get_backend_value(&self) -> i32 {
+        self.raw.backend.0
+    }
 }
 
 impl Drop for RuntimeOption {

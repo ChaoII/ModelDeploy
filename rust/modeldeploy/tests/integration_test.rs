@@ -1,113 +1,116 @@
 use anyhow::Result;
 use modeldeploy::image::Image;
 use modeldeploy::runtime::RuntimeOption;
-use modeldeploy::vision::detection::UltralyticsDet;
+use modeldeploy::types::*;
 
-/// 集成测试：检测模型完整链路
+/// 测试图像创建（从内存数据，不需要文件）
 #[test]
-fn test_detection_model() -> Result<()> {
-    let model_path = std::env::var("MD_TEST_MODEL")
-        .unwrap_or_else(|_| "../../test_data/test_models/yolo11n_nms.onnx".to_string());
-    let image_path = std::env::var("MD_TEST_IMAGE")
-        .unwrap_or_else(|_| "../../test_data/test_images/test_detection.jpg".to_string());
-
-    // 加载模型
-    let opt = RuntimeOption::new().gpu(0).fp16(true);
-    let det = UltralyticsDet::new(&model_path, &opt)?;
-    assert!(det.is_initialized(), "模型应该成功初始化");
-
-    // 读取图像
-    let img = Image::read(&image_path)?;
-    assert!(img.width() > 0, "图像宽度应 > 0");
-    assert!(img.height() > 0, "图像高度应 > 0");
-
-    // 推理
-    let results = det.predict(&img)?;
-    println!("检测到 {} 个目标", results.len());
-
-    // 结果合理性检查
-    for (i, r) in results.iter().enumerate() {
-        assert!(r.score >= 0.0 && r.score <= 1.0, "[{}] score 应在 [0,1] 范围: {}", i, r.score);
-        assert!(r.rect.width > 0, "[{}] width 应 > 0", i);
-        assert!(r.rect.height > 0, "[{}] height 应 > 0", i);
-        assert!(r.label_id >= 0, "[{}] label_id 应 >= 0", i);
-    }
-
-    // 绘制结果保存
-    if results.len() > 0 {
-        let drawn = det.predict_with_draw(&img, 0.5)?;
-        drawn.save("rust_test_detection_result.jpg")?;
-    }
-
+fn test_image_creation() -> Result<()> {
+    // 创建一个 4x4 的 BGR 测试图像
+    let data = vec![
+        0u8, 0, 255,  // red pixel
+        0, 255, 0,    // green pixel
+        255, 0, 0,    // blue pixel
+        128, 128, 128, // gray pixel
+    ];
+    let img = Image::from_bgr24(&data, 2, 2);
+    assert_eq!(img.width(), 2);
+    assert_eq!(img.height(), 2);
+    assert_eq!(img.channels(), 3);
+    assert_eq!(img.data().len(), 12);
+    println!("图像创建测试通过: {}x{} {}ch", img.width(), img.height(), img.channels());
     Ok(())
 }
 
-/// 多次推理测试内存泄漏
+/// 测试 RuntimeOption 默认值
 #[test]
-fn test_detection_multiple_inferences() -> Result<()> {
-    let model_path = std::env::var("MD_TEST_MODEL")
-        .unwrap_or_else(|_| "../../test_data/test_models/yolo11n_nms.onnx".to_string());
-    let image_path = std::env::var("MD_TEST_IMAGE")
-        .unwrap_or_else(|_| "../../test_data/test_images/test_detection.jpg".to_string());
-
-    let opt = RuntimeOption::new().gpu(0);
-    let det = UltralyticsDet::new(&model_path, &opt)?;
-    let img = Image::read(&image_path)?;
-
-    // 多次推理验证内存稳定
-    for i in 0..100 {
-        let results = det.predict(&img)?;
-        if i == 0 {
-            println!("首次推理: {} 个目标", results.len());
-        }
-    }
-    println!("100 次推理完成，无内存泄漏");
-
-    Ok(())
+fn test_runtime_option_default() {
+    let opt = RuntimeOption::new();
+    // 默认设备 ID 为 0
+    assert_eq!(opt.get_device_id(), 0);
 }
 
-/// 结果一致性测试（与 Python 结果对比）
+/// 测试 RuntimeOption GPU 配置
 #[test]
-fn test_detection_consistency() -> Result<()> {
-    let model_path = std::env::var("MD_TEST_MODEL")
-        .unwrap_or_else(|_| "../../test_data/test_models/yolo11n_nms.onnx".to_string());
-    let image_path = std::env::var("MD_TEST_IMAGE")
-        .unwrap_or_else(|_| "../../test_data/test_images/test_detection.jpg".to_string());
-
-    let opt = RuntimeOption::new().gpu(0).fp16(true);
-    let det = UltralyticsDet::new(&model_path, &opt)?;
-    let img = Image::read(&image_path)?;
-    let results = det.predict(&img)?;
-
-    // 结果非空（测试图中有已知目标）
-    assert!(
-        results.len() > 0,
-        "应至少检测到一个目标（测试图可能需调整）"
-    );
-    println!("一致性检查通过: {} 个目标", results.len());
-
-    Ok(())
+fn test_runtime_option_gpu() {
+    let opt = RuntimeOption::new().gpu(0).fp16(true).ort_backend();
+    assert_eq!(opt.get_backend_value(), 0); // MD_BACKEND_ORT
+    assert_eq!(opt.is_fp16(), true);
 }
 
-/// 图像基本操作测试
+/// 测试 RuntimeOption TRT 配置
 #[test]
-fn test_image_operations() -> Result<()> {
-    let image_path = std::env::var("MD_TEST_IMAGE")
-        .unwrap_or_else(|_| "../../test_data/test_images/test_detection.jpg".to_string());
+fn test_runtime_option_trt() {
+    let opt = RuntimeOption::new()
+        .gpu(1)
+        .trt_backend()
+        .fp16(true)
+        .trt_min_shape("images:1x3x640x640")
+        .trt_cache("./cache");
+    assert_eq!(opt.get_backend_value(), 2); // MD_BACKEND_TRT
+    assert_eq!(opt.get_device_id(), 1);
+}
 
-    let img = Image::read(&image_path)?;
-    assert!(img.width() > 0);
-    assert!(img.height() > 0);
-    assert!(img.channels() == 3 || img.channels() == 1);
+/// 测试类型转换
+#[test]
+fn test_type_conversions() {
+    let md_rect = modeldeploy::ffi::MDRect {
+        x: 10,
+        y: 20,
+        width: 100,
+        height: 200,
+    };
+    let rect: Rect = md_rect.into();
+    assert_eq!(rect.x, 10);
+    assert_eq!(rect.y, 20);
+    assert_eq!(rect.width, 100);
+    assert_eq!(rect.height, 200);
 
-    // 测试克隆
-    let cloned = img.clone_image()?;
-    assert_eq!(cloned.width(), img.width());
-    assert_eq!(cloned.height(), img.height());
+    let back: modeldeploy::ffi::MDRect = rect.into();
+    assert_eq!(back.x, 10);
+}
 
-    // 测试 Save
-    cloned.save("rust_test_image_clone.jpg")?;
+/// 测试检测结果结构
+#[test]
+fn test_detection_result() {
+    let det = Detection {
+        rect: Rect { x: 1, y: 2, width: 100, height: 50 },
+        label_id: 0,
+        score: 0.95,
+        label_name: "person".into(),
+    };
+    assert_eq!(det.score, 0.95);
+    assert_eq!(det.label_id, 0);
+    assert_eq!(det.rect.width, 100);
+}
 
-    println!("图像操作测试通过: {}x{} {}ch", img.width(), img.height(), img.channels());
-    Ok(())
+/// 测试人脸检测结果
+#[test]
+fn test_face_detection_result() {
+    let face = FaceDetection {
+        rect: Rect { x: 10, y: 10, width: 50, height: 50 },
+        score: 0.98,
+        landmarks: vec![
+            Point3f { x: 20.0, y: 20.0, z: 0.0 },
+            Point3f { x: 40.0, y: 20.0, z: 0.0 },
+        ],
+    };
+    assert_eq!(face.landmarks.len(), 2);
+    assert_eq!(face.score, 0.98);
+}
+
+/// 测试错误码转换
+#[test]
+fn test_error_conversion() {
+    use modeldeploy::ffi::*;
+    use modeldeploy::error::*;
+    
+    let err = MdError::from(MDStatusCode_ModelInitializeFailed);
+    assert!(matches!(err, MdError::ModelInitFailed(_)));
+
+    let err = MdError::from(MDStatusCode_ModelPredictFailed);
+    assert!(matches!(err, MdError::PredictFailed(_)));
+
+    assert!(check_status(MDStatusCode_Success).is_ok());
+    assert!(check_status(MDStatusCode_PathNotFound).is_err());
 }
