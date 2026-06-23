@@ -1,4 +1,4 @@
-use crate::error::{check_status, MdError};
+use crate::error::MdError;
 use crate::ffi;
 use std::ffi::CString;
 use std::ptr;
@@ -7,7 +7,6 @@ use std::ptr;
 #[derive(Debug)]
 pub struct Image {
     pub(crate) raw: ffi::MDImage,
-    // 标记是否为 CAPI 分配的内存（需要 free）
     owned: bool,
 }
 
@@ -18,14 +17,7 @@ impl Image {
     /// 从文件读取图像
     pub fn read(path: &str) -> Result<Self, MdError> {
         let cpath = CString::new(path).map_err(|_| MdError::ImageReadFailed(path.into()))?;
-        let mut raw = ffi::MDImage {
-            width: 0,
-            height: 0,
-            channels: 0,
-            data: ptr::null_mut(),
-        };
-        let status = unsafe { ffi::md_read_image(cpath.as_ptr(), &mut raw) };
-        check_status(status)?;
+        let raw = unsafe { ffi::md_read_image(cpath.as_ptr()) };
         if raw.data.is_null() || raw.width == 0 || raw.height == 0 {
             return Err(MdError::ImageReadFailed(path.into()));
         }
@@ -41,6 +33,15 @@ impl Image {
             data: data.as_ptr() as *mut u8,
         };
         Self { raw, owned: false }
+    }
+
+    /// 从 NV12 数据创建图像
+    pub fn from_nv12(data: &[u8], width: i32, height: i32) -> Result<Self, MdError> {
+        let raw = unsafe { ffi::md_from_nv12_data_to_bgr24(data.as_ptr(), width, height) };
+        if raw.data.is_null() || raw.width == 0 {
+            return Err(MdError::ImageReadFailed("nv12_to_bgr24".into()));
+        }
+        Ok(Self { raw, owned: true })
     }
 
     /// 从 CAPI 分配的原始 MDImage 创建（标记为 owned）
@@ -75,24 +76,19 @@ impl Image {
     /// 保存图像到文件
     pub fn save(&self, path: &str) -> Result<(), MdError> {
         let cpath = CString::new(path).map_err(|_| MdError::FileOpenFailed(path.into()))?;
-        let status = unsafe { ffi::md_save_image(&self.raw, cpath.as_ptr()) };
-        check_status(status)
+        unsafe { ffi::md_save_image(&self.raw, cpath.as_ptr()) };
+        Ok(())
     }
 
     /// 克隆图像（深拷贝）
     pub fn clone_image(&self) -> Result<Self, MdError> {
-        let mut raw = ffi::MDImage {
-            width: 0,
-            height: 0,
-            channels: 0,
-            data: ptr::null_mut(),
-        };
-        let status = unsafe { ffi::md_clone_image(&self.raw, &mut raw) };
-        check_status(status)?;
+        let raw = unsafe { ffi::md_clone_image(&self.raw) };
+        if raw.data.is_null() {
+            return Err(MdError::OutOfMemory);
+        }
         Ok(Self { raw, owned: true })
     }
 
-    /// 检查 CAPI 是否需要释放
     pub(crate) fn is_owned(&self) -> bool {
         self.owned
     }
@@ -116,5 +112,25 @@ impl Clone for Image {
                 owned: false,
             }
         }
+    }
+}
+
+pub mod nv12 {
+    use crate::error::MdError;
+    use crate::image::Image;
+
+    pub fn to_bgr(
+        y_plane: &[u8],
+        uv_plane: &[u8],
+        width: i32,
+        height: i32,
+    ) -> Result<Image, MdError> {
+        // 合并 NV12 Y + UV 平面为连续 buffer
+        let y_size = (width * height) as usize;
+        let uv_size = y_size / 2;
+        let mut nv12 = Vec::with_capacity(y_size + uv_size);
+        nv12.extend_from_slice(y_plane);
+        nv12.extend_from_slice(uv_plane);
+        Image::from_nv12(&nv12, width, height)
     }
 }

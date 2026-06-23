@@ -435,19 +435,13 @@ extern "C" {
 
     // ── Image ──
 
-    pub fn md_read_image(path: *const c_char, image: *mut MDImage) -> MDStatusCode;
-    pub fn md_save_image(image: *const MDImage, path: *const c_char) -> MDStatusCode;
-    pub fn md_clone_image(src: *const MDImage, dst: *mut MDImage) -> MDStatusCode;
+    pub fn md_read_image(path: *const c_char) -> MDImage;
+    pub fn md_clone_image(src: *const MDImage) -> MDImage;
+    pub fn md_save_image(image: *const MDImage, path: *const c_char);
     pub fn md_free_image(image: *mut MDImage);
-    pub fn md_nv12_to_bgr24(
-        y_plane: *const u8,
-        uv_plane: *const u8,
-        width: c_int,
-        height: c_int,
-        y_step: c_int,
-        uv_step: c_int,
-        image: *mut MDImage,
-    ) -> MDStatusCode;
+    pub fn md_from_nv12_data_to_bgr24(
+        data: *const u8, width: c_int, height: c_int,
+    ) -> MDImage;
 
     // ── 工具 ──
 
@@ -474,7 +468,7 @@ extern "C" {
         threshold: f64,
         font_path: *const c_char,
         out: *mut MDImage,
-    ) -> MDStatusCode;
+    );
 
     // ── 分类（Classification） ──
 
