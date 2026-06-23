@@ -21,7 +21,17 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let opt = RuntimeOption::new().gpu(0).ort_backend();
+    // ── GPU + FP16 + TensorRT EP（与 C++ demo_detection_cxx 一致的配置） ──
+    let opt = RuntimeOption::new()
+        .gpu(0)                    // 使用 GPU 设备 0
+        .fp16(true)                // 启用 FP16 推理
+        .enable_trt(true)          // 启用 ORT TensorRT ExecutionProvider
+        .trt_cache("./trt_engine") // TRT engine 缓存路径
+        .ort_backend();            // 使用 ONNX Runtime 后端
+
+    // 如果不想用 GPU，改为:
+    // let opt = RuntimeOption::new().cpu(4).ort_backend();
+
     let model = UltralyticsDet::new(&model_path, &opt)?;
     println!("模型加载成功: {}", model_path);
 
