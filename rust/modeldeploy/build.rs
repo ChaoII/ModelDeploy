@@ -52,7 +52,7 @@ fn main() {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Some(ext) = path.extension() {
-                        if ext == "dll" || ext == "pdb" {
+                        if ext == "dll" {
                             for dest_dir in &copy_dirs {
                                 if dest_dir.exists() {
                                     let dest = dest_dir.join(path.file_name().unwrap());
