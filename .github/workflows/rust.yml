@@ -2,7 +2,7 @@ name: Rust Bindings
 
 on:
   push:
-    branches: [ "feature/rust-bindings" ]
+    branches: [ "main" ]
     paths:
       - "rust/**"
       - "capi/**"
