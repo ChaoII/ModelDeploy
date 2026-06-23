@@ -19,7 +19,7 @@ python -m build
 
 #### 2.模型加密
 
-ModelDeploy采用XOR实现了简单的模型加密功能
+ModelDeploy采用AES-256-CBC实现模型加密功能（基于 OpenSSL / BCrypt）
 
 ##### 2.1 模型加密文件格式：
 
@@ -29,7 +29,7 @@ ModelDeploy采用XOR实现了简单的模型加密功能
 - [N字节] 模型格式字符串 (如 "onnx", "mnn", "engine")
 - [4字节] 模型原始字节的CRC32校验和
 - [4字节] 加密数据长度
-- [N字节] 加密后的模型数据(XOR)
+- [N字节] 加密后的模型数据(AES-256-CBC + SHA-256 密钥派生)
 
 ##### 2.2 模型加密方法：
 
