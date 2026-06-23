@@ -29,24 +29,24 @@ path = "examples/face_detection.rs"
 
 [[example]]
 name = "obb"
-path = "examples/obb_iseg_pose.rs"
+path = "examples/obb.rs"
 
 [[example]]
 name = "seg"
-path = "examples/obb_iseg_pose.rs"
+path = "examples/seg.rs"
 
 [[example]]
 name = "pose"
-path = "examples/obb_iseg_pose.rs"
+path = "examples/pose.rs"
 
 [[example]]
 name = "face_age"
-path = "examples/face_extra.rs"
+path = "examples/face_age.rs"
 
 [[example]]
 name = "face_gender"
-path = "examples/face_extra.rs"
+path = "examples/face_gender.rs"
 
 [[example]]
 name = "face_rec"
-path = "examples/face_extra.rs"
+path = "examples/face_rec.rs"
