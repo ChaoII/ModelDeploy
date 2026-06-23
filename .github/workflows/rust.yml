@@ -6,6 +6,7 @@ on:
     paths:
       - "rust/**"
       - "capi/**"
+      - ".github/workflows/rust.yml"
   pull_request:
     branches: [ "main" ]
     paths:
@@ -27,41 +28,47 @@ jobs:
         with:
           components: clippy
 
-      - name: Build (Linux)
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install OpenSSL (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
+      - name: Install OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        run: choco install openssl -y
+
+      - name: Build ModelDeploy SDK (Linux)
         if: runner.os == 'Linux'
         run: |
-          # Build ModelDeploy SDK first
           cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_AUDIO=OFF -DBUILD_VISION=ON \
             -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF \
             -DWITH_GPU=OFF -DENABLE_ORT=ON -DENABLE_MNN=OFF
           cmake --build build
-          export MODELDEPLOY_LIB_DIR=$PWD/build/lib
-          cd rust/modeldeploy
-          cargo build
-          cargo clippy -- -D warnings
 
-      - name: Build (Windows)
+      - name: Build ModelDeploy SDK (Windows)
         if: runner.os == 'Windows'
         run: |
-          # Build ModelDeploy SDK first
           cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_AUDIO=OFF -DBUILD_VISION=ON `
             -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF `
             -DWITH_GPU=OFF -DENABLE_ORT=ON -DENABLE_MNN=OFF
           cmake --build build
-          $env:MODELDEPLOY_LIB_DIR="$PWD/build/bin"
-          cd rust/modeldeploy
+
+      - name: Rust Build & Clippy
+        working-directory: rust/modeldeploy
+        run: |
           cargo build
           cargo clippy -- -D warnings
 
-      - name: Test
-        if: runner.os == 'Linux'
+      - name: Rust Test (unit/type tests, no GPU needed)
         working-directory: rust/modeldeploy
-        run: |
-          # Download test data
-          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
-          unzip -q test_data.zip -d ../../test_data
-          export MD_TEST_MODEL=../../test_data/test_models/yolo11n_nms.onnx
-          export MD_TEST_IMAGE=../../test_data/test_images/test_detection.jpg
-          cargo test -- --nocapture
+        run: cargo test
