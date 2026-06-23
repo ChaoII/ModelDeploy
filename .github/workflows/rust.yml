@@ -1,0 +1,74 @@
+name: Rust Bindings
+
+on:
+  push:
+    branches: [ "feature/rust-bindings" ]
+    paths:
+      - "rust/**"
+      - "capi/**"
+      - ".github/workflows/rust.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "rust/**"
+      - "capi/**"
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install OpenSSL (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
+      - name: Install OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        run: choco install openssl -y
+
+      - name: Build ModelDeploy SDK (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_AUDIO=OFF -DBUILD_VISION=ON \
+            -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF \
+            -DWITH_GPU=OFF -DENABLE_ORT=ON -DENABLE_MNN=OFF
+          cmake --build build
+
+      - name: Build ModelDeploy SDK (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_AUDIO=OFF -DBUILD_VISION=ON `
+            -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF `
+            -DWITH_GPU=OFF -DENABLE_ORT=ON -DENABLE_MNN=OFF
+          cmake --build build
+
+      - name: Rust Build & Clippy
+        working-directory: rust/modeldeploy
+        run: |
+          cargo build
+          cargo clippy -- -D warnings
+
+      - name: Rust Test (unit/type tests, no GPU needed)
+        working-directory: rust/modeldeploy
+        run: cargo test

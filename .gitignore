@@ -42,6 +42,13 @@ csharp/**/*.DotSettings.user
 *.a
 *.lib
 
+# Runtime / build output
+*.pyc
+__pycache__/
+
+# Rust
+target/
+
 # Surveillance runtime temp files
 surveillance_stderr.txt
 surveillance_stdout.txt
