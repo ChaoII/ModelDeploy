@@ -1,7 +1,6 @@
 use crate::error::MdError;
 use crate::ffi;
 use std::ffi::CString;
-use std::ptr;
 
 /// 安全封装的图像对象，RAII 管理 MDImage 生命周期
 #[derive(Debug)]
@@ -89,6 +88,7 @@ impl Image {
         Ok(Self { raw, owned: true })
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_owned(&self) -> bool {
         self.owned
     }

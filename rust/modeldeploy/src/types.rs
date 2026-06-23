@@ -140,6 +140,7 @@ impl From<ffi::MDModelType> for ModelType {
 }
 
 /// 将 C 字符串指针转为 Rust String
+#[allow(dead_code)]
 pub(crate) unsafe fn c_str_to_string(s: *const libc::c_char) -> String {
     if s.is_null() {
         String::new()
@@ -149,6 +150,7 @@ pub(crate) unsafe fn c_str_to_string(s: *const libc::c_char) -> String {
 }
 
 /// 将 Rust 字符串转为 C 字符串指针（使用时需确保生命周期）
+#[allow(dead_code)]
 pub(crate) fn string_to_c_str(s: &str) -> Vec<u8> {
     let mut bytes = s.as_bytes().to_vec();
     bytes.push(0);
