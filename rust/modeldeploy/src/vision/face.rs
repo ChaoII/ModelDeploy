@@ -34,13 +34,6 @@ impl Scrfd {
         Ok(Self { model })
     }
 
-    /// 设置输入尺寸
-    pub fn set_input_size(&mut self, width: i32, height: i32) -> Result<(), MdError> {
-        let size = ffi::MDSize { width, height };
-        let status = unsafe { ffi::md_set_face_det_input_size(&self.model, size) };
-        check_status(status)
-    }
-
     /// 推理
     pub fn predict(&self, image: &Image) -> Result<Vec<FaceDetection>, MdError> {
         let mut results = ffi::MDKeyPointResults {

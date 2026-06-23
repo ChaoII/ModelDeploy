@@ -500,7 +500,6 @@ extern "C" {
     ) -> MDStatusCode;
     pub fn md_free_face_det_result(results: *mut MDKeyPointResults);
     pub fn md_free_face_det_model(model: *mut MDModel);
-    pub fn md_set_face_det_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
 
     // ── TTS（Kokoro） ──
 
