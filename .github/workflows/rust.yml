@@ -1,0 +1,67 @@
+name: Rust Bindings
+
+on:
+  push:
+    branches: [ "feature/rust-bindings" ]
+    paths:
+      - "rust/**"
+      - "capi/**"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "rust/**"
+      - "capi/**"
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          # Build ModelDeploy SDK first
+          cmake -S . -B build -G Ninja \
+            -DBUILD_AUDIO=OFF -DBUILD_VISION=ON \
+            -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF \
+            -DWITH_GPU=OFF -DENABLE_ORT=ON -DENABLE_MNN=OFF
+          cmake --build build
+          export MODELDEPLOY_LIB_DIR=$PWD/build/lib
+          cd rust/modeldeploy
+          cargo build
+          cargo clippy -- -D warnings
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Build ModelDeploy SDK first
+          cmake -S . -B build -G Ninja `
+            -DBUILD_AUDIO=OFF -DBUILD_VISION=ON `
+            -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF `
+            -DWITH_GPU=OFF -DENABLE_ORT=ON -DENABLE_MNN=OFF
+          cmake --build build
+          $env:MODELDEPLOY_LIB_DIR="$PWD/build/bin"
+          cd rust/modeldeploy
+          cargo build
+          cargo clippy -- -D warnings
+
+      - name: Test
+        if: runner.os == 'Linux'
+        working-directory: rust/modeldeploy
+        run: |
+          # Download test data
+          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
+          unzip -q test_data.zip -d ../../test_data
+          export MD_TEST_MODEL=../../test_data/test_models/yolo11n_nms.onnx
+          export MD_TEST_IMAGE=../../test_data/test_images/test_detection.jpg
+          cargo test -- --nocapture
