@@ -435,19 +435,26 @@ extern "C" {
 
     // ── Image ──
 
-    pub fn md_read_image(path: *const c_char, image: *mut MDImage) -> MDStatusCode;
-    pub fn md_save_image(image: *const MDImage, path: *const c_char) -> MDStatusCode;
-    pub fn md_clone_image(src: *const MDImage, dst: *mut MDImage) -> MDStatusCode;
+    pub fn md_read_image(path: *const c_char) -> MDImage;
+    pub fn md_read_image_from_device(
+        device_id: c_int, frame_width: c_int, frame_height: c_int, is_save_file: bool,
+    ) -> MDImage;
+    pub fn md_save_image(image: *const MDImage, path: *const c_char);
+    pub fn md_clone_image(src: *const MDImage) -> MDImage;
+    pub fn md_crop_image(src: *mut MDImage, rect: *const MDRect) -> MDImage;
     pub fn md_free_image(image: *mut MDImage);
-    pub fn md_nv12_to_bgr24(
-        y_plane: *const u8,
-        uv_plane: *const u8,
-        width: c_int,
-        height: c_int,
-        y_step: c_int,
-        uv_step: c_int,
-        image: *mut MDImage,
-    ) -> MDStatusCode;
+    pub fn md_show_image(image: *const MDImage);
+
+    // 格式转换
+    pub fn md_from_compressed_bytes(bytes: *const u8, size: c_int) -> MDImage;
+    pub fn md_to_compressed_bytes(image: *const MDImage, ext: *const c_char) -> MDImage;
+    pub fn md_from_bgr24_data(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_rgb24_data(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_rgb24_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_yuv420p_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_nv12_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_nv21_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
+    pub fn md_from_base64_str(base64_str: *const c_char) -> MDImage;
 
     // ── 工具 ──
 
@@ -474,7 +481,7 @@ extern "C" {
         threshold: f64,
         font_path: *const c_char,
         out: *mut MDImage,
-    ) -> MDStatusCode;
+    );
 
     // ── 分类（Classification） ──
 
@@ -506,7 +513,6 @@ extern "C" {
     ) -> MDStatusCode;
     pub fn md_free_face_det_result(results: *mut MDKeyPointResults);
     pub fn md_free_face_det_model(model: *mut MDModel);
-    pub fn md_set_face_det_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
 
     // ── TTS（Kokoro） ──
 

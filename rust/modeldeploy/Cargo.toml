@@ -18,4 +18,35 @@ anyhow = "1"
 [[example]]
 name = "detection"
 path = "examples/detection.rs"
-required-features = []
+
+[[example]]
+name = "classification"
+path = "examples/classification.rs"
+
+[[example]]
+name = "face_detection"
+path = "examples/face_detection.rs"
+
+[[example]]
+name = "obb"
+path = "examples/obb.rs"
+
+[[example]]
+name = "seg"
+path = "examples/seg.rs"
+
+[[example]]
+name = "pose"
+path = "examples/pose.rs"
+
+[[example]]
+name = "face_age"
+path = "examples/face_age.rs"
+
+[[example]]
+name = "face_gender"
+path = "examples/face_gender.rs"
+
+[[example]]
+name = "face_rec"
+path = "examples/face_rec.rs"

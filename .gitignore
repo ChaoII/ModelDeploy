@@ -60,3 +60,7 @@ application/debug_load.cpp
 *.out
 *.app
 
+test.jpg
+rust/modeldeploy/test.jpg
+rust/modeldeploy/trt_engine/
+rust_test_*.jpg

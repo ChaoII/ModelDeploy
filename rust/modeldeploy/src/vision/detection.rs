@@ -93,7 +93,7 @@ impl UltralyticsDet {
             channels: 0,
             data: ptr::null_mut(),
         };
-        let status = unsafe {
+        unsafe {
             ffi::md_draw_detection_result(
                 &image.raw,
                 &mut results,
@@ -103,7 +103,6 @@ impl UltralyticsDet {
             )
         };
         unsafe { ffi::md_free_detection_result(&mut results) };
-        check_status(status)?;
 
         Ok(Image::from_raw(drawn))
     }
