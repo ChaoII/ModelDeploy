@@ -1,8 +1,6 @@
 use crate::error::MdError;
 use crate::ffi;
-use crate::types::Rect;
 use std::ffi::CString;
-use std::ptr;
 
 /// 安全封装的图像对象，RAII 管理 MDImage 生命周期
 #[derive(Debug)]

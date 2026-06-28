@@ -24,7 +24,6 @@ fn find_sdk_root() -> Option<PathBuf> {
 
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let project_root = manifest_dir.parent().unwrap().parent().unwrap();
 
     // ── 1. 链接 ModelDeploySDK ──
     if let Some(sdk_root) = find_sdk_root() {

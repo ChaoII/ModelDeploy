@@ -37,21 +37,16 @@ pub enum MdError {
 
 impl From<MDStatusCode> for MdError {
     fn from(code: MDStatusCode) -> Self {
-        if code.0 == MDStatusCode_Success.0 {
-            unreachable!()
-        }
-        match code {
-            MDStatusCode_PathNotFound => MdError::PathNotFound("".into()),
-            MDStatusCode_FileOpenFailed => MdError::FileOpenFailed("".into()),
-            MDStatusCode_CallError => MdError::CallError,
-            MDStatusCode_ModelInitializeFailed => MdError::ModelInitFailed("".into()),
-            MDStatusCode_ModelPredictFailed => MdError::PredictFailed("".into()),
-            MDStatusCode_MemoryAllocatedFailed => MdError::OutOfMemory,
-            MDStatusCode_ModelTypeError => MdError::TypeMismatch {
-                expected: MDModelType_Classification,
-                actual: MDModelType_Classification,
-            },
-            MDStatusCode_WriteWaveFailed => MdError::WriteWaveFailed,
+        match code.0 {
+            0x00 => unreachable!(),                                      // Success
+            0x01 => MdError::PathNotFound("".into()),                    // PathNotFound
+            0x02 => MdError::FileOpenFailed("".into()),                  // FileOpenFailed
+            0x03 => MdError::CallError,                                  // CallError
+            0x04 => MdError::ModelInitFailed("".into()),                 // ModelInitializeFailed
+            0x05 => MdError::PredictFailed("".into()),                   // ModelPredictFailed
+            0x06 => MdError::OutOfMemory,                                // MemoryAllocatedFailed
+            0x07 => MdError::TypeMismatch { expected: MDModelType_Classification, actual: MDModelType_Classification },
+            0x08 => MdError::WriteWaveFailed,                            // WriteWaveFailed
             _ => MdError::Unknown(code.0),
         }
     }
@@ -59,7 +54,7 @@ impl From<MDStatusCode> for MdError {
 
 /// 检查 C API 返回值，非 Success 则返回 Err
 pub fn check_status(code: MDStatusCode) -> Result<(), MdError> {
-    if code.0 == MDStatusCode_Success.0 {
+    if code.0 == 0x00 {
         Ok(())
     } else {
         Err(MdError::from(code))
