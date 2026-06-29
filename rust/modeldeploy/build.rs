@@ -2,11 +2,17 @@ use std::env;
 use std::path::PathBuf;
 use std::fs;
 
+fn sdk_file_exists(dir: &PathBuf, name: &str) -> bool {
+    dir.join(&format!("{}.dll", name)).exists()
+        || dir.join(&format!("{}.lib", name)).exists()
+        || dir.join(&format!("lib{}.so", name)).exists()
+        || dir.join(&format!("lib{}.dylib", name)).exists()
+}
+
 fn find_sdk_root() -> Option<PathBuf> {
     if let Ok(dir) = env::var("MODELDEPLOY_LIB_DIR") {
-        // 用户指定了路径，从该目录找 SDK
         let p = PathBuf::from(&dir);
-        if p.join("ModelDeploySDK.lib").exists() || p.join("ModelDeploySDK.dll").exists() {
+        if sdk_file_exists(&p, "ModelDeploySDK") {
             return Some(p.parent()?.to_path_buf());
         }
         return Some(p.parent()?.to_path_buf());
@@ -15,7 +21,9 @@ fn find_sdk_root() -> Option<PathBuf> {
     let project_root = manifest_dir.parent().unwrap().parent().unwrap();
     for rel in &["build", "build_debug"] {
         let dir = project_root.join(rel);
-        if dir.join("bin").join("ModelDeploySDK.dll").exists() || dir.join("lib").join("ModelDeploySDK.lib").exists() {
+        if sdk_file_exists(&dir.join("bin"), "ModelDeploySDK")
+            || sdk_file_exists(&dir.join("lib"), "ModelDeploySDK")
+        {
             return Some(dir);
         }
     }
@@ -25,7 +33,6 @@ fn find_sdk_root() -> Option<PathBuf> {
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-    // ── 1. 链接 ModelDeploySDK ──
     if let Some(sdk_root) = find_sdk_root() {
         for lib_dir in &[sdk_root.join("bin"), sdk_root.join("lib")] {
             if lib_dir.exists() {
@@ -34,8 +41,7 @@ fn main() {
         }
         println!("cargo:rustc-link-lib=ModelDeploySDK");
 
-        // ── 2. 拷贝运行时 DLL 到输出目录 ──
-        // 避免系统 PATH 里的旧版 onnxruntime 干扰
+        // 拷贝运行时库到输出目录
         let bin_dir = sdk_root.join("bin");
         if bin_dir.exists() {
             let out_dir = PathBuf::from(env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| {
@@ -51,7 +57,7 @@ fn main() {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Some(ext) = path.extension() {
-                        if ext == "dll" {
+                        if ext == "dll" || ext == "so" || ext == "dylib" {
                             for dest_dir in &copy_dirs {
                                 if dest_dir.exists() {
                                     let dest = dest_dir.join(path.file_name().unwrap());

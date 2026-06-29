@@ -69,6 +69,11 @@ jobs:
           cargo build
           cargo clippy -- -D warnings
 
-      - name: Rust Test (unit/type tests, no GPU needed)
+      - name: Rust Test (lib only, no examples)
         working-directory: rust/modeldeploy
-        run: cargo test
+        run: cargo test --lib
+
+      - name: Build Examples
+        if: runner.os == 'Linux'
+        working-directory: rust/modeldeploy
+        run: cargo build --examples

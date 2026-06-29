@@ -37,16 +37,19 @@ pub enum MdError {
 
 impl From<MDStatusCode> for MdError {
     fn from(code: MDStatusCode) -> Self {
-        match code.0 {
-            0x00 => unreachable!(),                                      // Success
-            0x01 => MdError::PathNotFound("".into()),                    // PathNotFound
-            0x02 => MdError::FileOpenFailed("".into()),                  // FileOpenFailed
-            0x03 => MdError::CallError,                                  // CallError
-            0x04 => MdError::ModelInitFailed("".into()),                 // ModelInitializeFailed
-            0x05 => MdError::PredictFailed("".into()),                   // ModelPredictFailed
-            0x06 => MdError::OutOfMemory,                                // MemoryAllocatedFailed
-            0x07 => MdError::TypeMismatch { expected: MDModelType_Classification, actual: MDModelType_Classification },
-            0x08 => MdError::WriteWaveFailed,                            // WriteWaveFailed
+        #[allow(non_upper_case_globals)]
+        match code {
+            MDStatusCode_PathNotFound => MdError::PathNotFound("".into()),
+            MDStatusCode_FileOpenFailed => MdError::FileOpenFailed("".into()),
+            MDStatusCode_CallError => MdError::CallError,
+            MDStatusCode_ModelInitializeFailed => MdError::ModelInitFailed("".into()),
+            MDStatusCode_ModelPredictFailed => MdError::PredictFailed("".into()),
+            MDStatusCode_MemoryAllocatedFailed => MdError::OutOfMemory,
+            MDStatusCode_ModelTypeError => MdError::TypeMismatch {
+                expected: MDModelType_Classification,
+                actual: MDModelType_Classification,
+            },
+            MDStatusCode_WriteWaveFailed => MdError::WriteWaveFailed,
             _ => MdError::Unknown(code.0),
         }
     }
@@ -54,7 +57,8 @@ impl From<MDStatusCode> for MdError {
 
 /// 检查 C API 返回值，非 Success 则返回 Err
 pub fn check_status(code: MDStatusCode) -> Result<(), MdError> {
-    if code.0 == 0x00 {
+    #[allow(non_upper_case_globals)]
+    if code == MDStatusCode_Success {
         Ok(())
     } else {
         Err(MdError::from(code))
