@@ -64,3 +64,4 @@ test.jpg
 rust/modeldeploy/test.jpg
 rust/modeldeploy/trt_engine/
 rust_test_*.jpg
+identifier.sqlite
