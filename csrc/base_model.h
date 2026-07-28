@@ -17,7 +17,17 @@
 namespace modeldeploy {
     class MODELDEPLOY_CXX_EXPORT BaseModel {
     public:
+        BaseModel() = default;
         virtual ~BaseModel() = default;
+
+        // 复制构造：跳过 mutex/flag（新实例各自持有新锁），其他值拷贝
+        BaseModel(const BaseModel& other)
+            : runtime_option(other.runtime_option),
+              initialized_(other.initialized_),
+              reused_input_tensors_(other.reused_input_tensors_),
+              reused_output_tensors_(other.reused_output_tensors_),
+              runtime_(other.runtime_),              // 共享同一个 Runtime
+              runtime_initialized_(other.runtime_initialized_) {}
 
         [[nodiscard]] virtual std::string name() const { return "NameUndefined"; }
 

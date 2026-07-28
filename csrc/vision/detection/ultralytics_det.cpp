@@ -58,13 +58,8 @@ namespace modeldeploy::vision::detection {
     }
 
     std::unique_ptr<UltralyticsDet> UltralyticsDet::clone() const {
-        // 用原实例的完整参数构造，然后替换 runtime 为克隆对象
-        auto clone_model = std::make_unique<UltralyticsDet>(
-            runtime_option.model_file, runtime_option);
+        auto clone_model = std::make_unique<UltralyticsDet>(*this);
         clone_model->set_runtime(clone_model->clone_runtime());
-        clone_model->preprocessor_ = preprocessor_;
-        clone_model->postprocessor_ = postprocessor_;
-        clone_model->initialized_ = initialized_;
         return clone_model;
     }
 }
