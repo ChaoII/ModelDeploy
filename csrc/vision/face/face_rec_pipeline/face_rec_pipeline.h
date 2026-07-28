@@ -29,7 +29,7 @@ namespace modeldeploy::vision::face {
 
 
     protected:
-        std::unique_ptr<Scrfd> detector_ = nullptr;
-        std::unique_ptr<SeetaFaceID> recognizer_ = nullptr;
+        std::shared_ptr<Scrfd> detector_ = nullptr;
+        std::shared_ptr<SeetaFaceID> recognizer_ = nullptr;
     };
 }

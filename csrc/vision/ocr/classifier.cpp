@@ -86,7 +86,5 @@ namespace modeldeploy::vision::ocr {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-
-        return clone();
-    }
 } // namespace ocr
+

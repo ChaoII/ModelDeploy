@@ -28,11 +28,7 @@ namespace modeldeploy::vision::face {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-
-        return clone();
-    }
-
-    bool SeetaFaceID::predict(const ImageData& image, FaceRecognitionResult* result, TimerArray* timers) {
+bool SeetaFaceID::predict(const ImageData& image, FaceRecognitionResult* result, TimerArray* timers) {
         std::vector<FaceRecognitionResult> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
@@ -68,3 +64,4 @@ namespace modeldeploy::vision::face {
         return true;
     }
 }
+

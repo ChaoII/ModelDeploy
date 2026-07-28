@@ -27,11 +27,7 @@ namespace modeldeploy::vision::face {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-
-        return clone();
-    }
-
-    bool SeetaFaceGender::predict(const ImageData& image, int* age) {
+bool SeetaFaceGender::predict(const ImageData& image, int* age) {
         std::vector<int> ages;
         if (!batch_predict({image}, &ages)) {
             return false;
@@ -61,3 +57,4 @@ namespace modeldeploy::vision::face {
         return true;
     }
 }
+

@@ -41,11 +41,7 @@ namespace modeldeploy::vision::face {
         clone_model->initialized_ = initialized_;
         return clone_model;
     }
-
-        return clone();
-    }
-
-    bool Scrfd::batch_predict(const std::vector<ImageData>& images,
+bool Scrfd::batch_predict(const std::vector<ImageData>& images,
                               std::vector<std::vector<KeyPointsResult>>* results,
                               TimerArray* timers) {
         std::vector<LetterBoxRecord> letter_box_records;
@@ -72,3 +68,4 @@ namespace modeldeploy::vision::face {
         return true;
     }
 }
+

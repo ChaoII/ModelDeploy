@@ -169,7 +169,5 @@ namespace modeldeploy::vision::ocr {
         if (recognizer_) clone_model->recognizer_.reset(recognizer_->clone().release());
         return clone_model;
     }
-
-        return clone();
-    }
 }
+

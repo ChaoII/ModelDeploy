@@ -168,7 +168,5 @@ namespace modeldeploy::vision::face {
         if (face_as_second_) clone_model->face_as_second_ = face_as_second_->clone();
         return clone_model;
     }
-
-        return clone();
-    }
 }
+

@@ -27,11 +27,7 @@ namespace modeldeploy::vision::lpr {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-
-        return clone();
-    }
-
-    bool LprDetection::predict(const ImageData& image, std::vector<KeyPointsResult>* result,
+bool LprDetection::predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                                TimerArray* timers) {
         std::vector<std::vector<KeyPointsResult>> results;
         if (!batch_predict({image}, &results, timers)) {
@@ -68,3 +64,4 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 }
+

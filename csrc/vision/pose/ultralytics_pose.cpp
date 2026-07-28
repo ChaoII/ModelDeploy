@@ -62,7 +62,5 @@ namespace modeldeploy::vision::detection {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-
-        return clone();
-    }
 }
+

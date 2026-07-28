@@ -56,7 +56,5 @@ namespace modeldeploy::vision::classification {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-
-        return clone();
-    }
 } // namespace classification
+

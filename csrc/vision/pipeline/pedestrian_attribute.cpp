@@ -147,7 +147,5 @@ namespace modeldeploy::vision::pipeline {
         if (classifier_) clone_model->classifier_.reset(classifier_->clone().release());
         return clone_model;
     }
-
-        return clone();
-    }
 }
+

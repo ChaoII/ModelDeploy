@@ -237,7 +237,5 @@ namespace modeldeploy::vision::ocr {
         if (table_) clone_model->table_ = table_->clone();
         return clone_model;
     }
-
-        return clone();
-    }
 }
+

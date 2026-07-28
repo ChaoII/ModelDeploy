@@ -27,7 +27,7 @@ namespace modeldeploy::vision::lpr {
 
 
     protected:
-        std::unique_ptr<LprDetection> detector_ = nullptr;
-        std::unique_ptr<LprRecognizer> recognizer_ = nullptr;
+        std::shared_ptr<LprDetection> detector_ = nullptr;
+        std::shared_ptr<LprRecognizer> recognizer_ = nullptr;
     };
 }

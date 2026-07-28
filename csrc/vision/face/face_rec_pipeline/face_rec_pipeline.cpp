@@ -60,7 +60,5 @@ namespace modeldeploy::vision::face {
         if (recognizer_) clone_model->recognizer_ = recognizer_->clone();
         return clone_model;
     }
-
-        return clone();
-    }
 }
+
