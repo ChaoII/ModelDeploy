@@ -10,7 +10,6 @@
 #include <vector>
 #include <chrono>
 #include <iostream>
-#include <cuda_runtime.h>
 
 using namespace modeldeploy::vision;
 
@@ -80,16 +79,15 @@ constexpr int LOOP_A_PER_THREAD = 1;      // 方案A仅做演示，避免CUDA竞
               << "  总推理: " << THREAD_COUNT * LOOP_PER_THREAD << " 帧"
               << "  等效 FPS: " << fps_b << std::endl;
 
-    // 等待 CUDA 完成，隔离两组测试
-    cudaDeviceSynchronize();
+    // 隔离两组测试
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // ════════════════════════════════════════════════════════
     // 方案A：同一实例多线程并发（错误用法）
-    // 互斥锁保护了 binding_，但 CUDA kernel 仍可能因上下文切换而崩溃
+    // 同一 OrtBackend 实例的 binding_ 被多线程同时改写 = 数据竞争
     // ════════════════════════════════════════════════════════
     std::cout << "\n===== 方案A: 同一实例多线程并发（错误用法）=====" << std::endl;
-    std::cout << "  仅演示并发检测警告，CUDA 共享同一 Session 不安全，不会计时。" << std::endl;
+    std::cout << "  直接跑同一实例多线程会因 binding_ 竞争而崩溃。" << std::endl;
 
     std::vector<std::thread> threads_a;
     for (int t = 0; t < 2; ++t) {
@@ -106,7 +104,7 @@ constexpr int LOOP_A_PER_THREAD = 1;      // 方案A仅做演示，避免CUDA竞
     }
     for (auto& th : threads_a) th.join();
 
-    std::cout << "  警告已触发，方案A结束（安全通过 mutex 保护）" << std::endl;
+    std::cout << "  方案A结束（如果程序到达这里，说明本次运行没有触发崩溃，但这是未定义行为）" << std::endl;
 
     // ════════════════════════════════════════════════════════
     // 对比
