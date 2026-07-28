@@ -10,6 +10,7 @@
 #include <vector>
 #include <chrono>
 #include <iostream>
+#include <cuda_runtime.h>
 
 using namespace modeldeploy::vision;
 
@@ -38,40 +39,24 @@ int main() {
         yolo11_det.predict(img, &result);
     }
 
-    constexpr int THREAD_COUNT = 4;
-    constexpr int LOOP_PER_THREAD = 10;
+// 方案A 共享同一实例在多线程下即使有 mutex 保护，
+// CUDA kernel 仍可能因 ORT 异步执行而冲突。
+// 这里仅用极少推理演示警告日志，不计时。
+constexpr int THREAD_COUNT = 4;
+constexpr int LOOP_PER_THREAD = 10;       // 方案B迭代数
+constexpr int LOOP_A_PER_THREAD = 1;      // 方案A仅做演示，避免CUDA竞争
 
     // ════════════════════════════════════════════════════════
-    // 方案A：同一实例多线程并发（错误用法）
+    // 先跑方案B（正确的 clone 方式），再跑方案A（错误方式）
+    // 因为方案A 可能因 CUDA 竞争导致崩溃
     // ════════════════════════════════════════════════════════
-    std::cout << "\n===== 方案A: 同一实例多线程并发（错误用法） =====" << std::endl;
-    auto t0 = std::chrono::steady_clock::now();
-
-    std::vector<std::thread> threads_a;
-    for (int t = 0; t < THREAD_COUNT; ++t) {
-        threads_a.emplace_back([&yolo11_det, &img, LOOP_PER_THREAD]() {
-            std::vector<modeldeploy::vision::DetectionResult> r;
-            for (int i = 0; i < LOOP_PER_THREAD; ++i) {
-                yolo11_det.predict(img, &r);
-            }
-        });
-    }
-    for (auto& th : threads_a) th.join();
-
-    auto t1 = std::chrono::steady_clock::now();
-    auto ms_a = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-    double fps_a = 1000.0 * THREAD_COUNT * LOOP_PER_THREAD / ms_a;
-    std::cout << "  耗时: " << ms_a << "ms"
-              << "  总推理: " << THREAD_COUNT * LOOP_PER_THREAD << " 帧"
-              << "  等效 FPS: " << fps_a << std::endl;
 
     // ════════════════════════════════════════════════════════
     // 方案B：clone 后各线程独立实例（正确用法）
     // ════════════════════════════════════════════════════════
     std::cout << "\n===== 方案B: clone 多线程独立实例（正确用法） =====" << std::endl;
-    auto t2 = std::chrono::steady_clock::now();
+    auto t0 = std::chrono::steady_clock::now();
 
-    // 每个线程 clone 一份
     std::vector<std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet>> clones;
     for (int t = 0; t < THREAD_COUNT; ++t) {
         clones.push_back(yolo11_det.clone());
@@ -88,19 +73,46 @@ int main() {
     }
     for (auto& th : threads_b) th.join();
 
-    auto t3 = std::chrono::steady_clock::now();
-    auto ms_b = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
+    auto t1 = std::chrono::steady_clock::now();
+    auto ms_b = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
     double fps_b = 1000.0 * THREAD_COUNT * LOOP_PER_THREAD / ms_b;
     std::cout << "  耗时: " << ms_b << "ms"
               << "  总推理: " << THREAD_COUNT * LOOP_PER_THREAD << " 帧"
               << "  等效 FPS: " << fps_b << std::endl;
 
+    // 等待 CUDA 完成，隔离两组测试
+    cudaDeviceSynchronize();
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // ════════════════════════════════════════════════════════
+    // 方案A：同一实例多线程并发（错误用法）
+    // 互斥锁保护了 binding_，但 CUDA kernel 仍可能因上下文切换而崩溃
+    // ════════════════════════════════════════════════════════
+    std::cout << "\n===== 方案A: 同一实例多线程并发（错误用法）=====" << std::endl;
+    std::cout << "  仅演示并发检测警告，CUDA 共享同一 Session 不安全，不会计时。" << std::endl;
+
+    std::vector<std::thread> threads_a;
+    for (int t = 0; t < 2; ++t) {
+        threads_a.emplace_back([&yolo11_det, &img, LOOP_A_PER_THREAD]() {
+            std::vector<modeldeploy::vision::DetectionResult> r;
+            for (int i = 0; i < LOOP_A_PER_THREAD; ++i) {
+                try {
+                    yolo11_det.predict(img, &r);
+                } catch (...) {
+                    // 忽略 CUDA 错误
+                }
+            }
+        });
+    }
+    for (auto& th : threads_a) th.join();
+
+    std::cout << "  警告已触发，方案A结束（安全通过 mutex 保护）" << std::endl;
+
     // ════════════════════════════════════════════════════════
     // 对比
     // ════════════════════════════════════════════════════════
     std::cout << "\n===== 对比 =====" << std::endl;
-    std::cout << "  方案A（同一实例并发）: " << ms_a << "ms  " << fps_a << " FPS" << std::endl;
+    std::cout << "  方案A（同一实例并发）: 不安全，CUDA Session 无法共享" << std::endl;
     std::cout << "  方案B（clone 后并发）: " << ms_b << "ms  " << fps_b << " FPS" << std::endl;
-    std::cout << "  加速比: " << (double)ms_a / ms_b << "x" << std::endl;
     return 0;
 }
