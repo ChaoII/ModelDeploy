@@ -67,6 +67,8 @@ namespace modeldeploy::vision::ocr {
                                    std::vector<vision::OCRResult>* ocr_results,
                                    TimerArray* timers = nullptr);
 
+        [[nodiscard]] std::unique_ptr<DBDetector> clone() const;
+
         /// Get preprocessor reference of DBDetectorPreprocessor
         virtual DBDetectorPreprocessor& get_preprocessor() {
             return preprocessor_;

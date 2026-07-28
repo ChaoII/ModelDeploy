@@ -41,7 +41,9 @@ namespace modeldeploy::vision::detection {
         * \return true if the prediction successed, otherwise false
         */
         bool batch_predict(const std::vector<ImageData>& images,
-                           std::vector<std::vector<ObbResult>>* results, TimerArray* timers = nullptr);
+                            std::vector<std::vector<ObbResult>>* results, TimerArray* timers = nullptr);
+
+        [[nodiscard]] std::unique_ptr<UltralyticsObb> clone() const;
 
         /// Get preprocessor reference of YOLOv5Seg
         UltralyticsObbPreprocessor& get_preprocessor() {

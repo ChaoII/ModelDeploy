@@ -16,6 +16,8 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::string name() const override { return "LprRecognizer"; }
 
+        [[nodiscard]] std::unique_ptr<LprRecognizer> clone() const;
+
         virtual bool predict(const ImageData& image, LprResult* result,
                              TimerArray* timers = nullptr);
 

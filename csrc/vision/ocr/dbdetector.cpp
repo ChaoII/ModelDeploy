@@ -87,4 +87,10 @@ namespace modeldeploy::vision::ocr {
         if (timers) timers->post_timer.stop();
         return true;
     }
+
+    std::unique_ptr<DBDetector> DBDetector::clone() const {
+        auto clone_model = std::make_unique<DBDetector>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 }

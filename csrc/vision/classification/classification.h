@@ -39,7 +39,9 @@ namespace modeldeploy::vision::classification {
          * \return true if the prediction successed, otherwise false
          */
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<ClassifyResult>* results);
+                                    std::vector<ClassifyResult>* results);
+
+        [[nodiscard]] std::unique_ptr<Classification> clone() const;
 
         /// Get preprocessor reference of YOLOv5Cls
         virtual ClassificationPreprocessor& get_preprocessor() {

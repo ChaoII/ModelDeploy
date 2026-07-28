@@ -24,6 +24,8 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::string name() const override { return "SeetaFaceID"; }
 
+        [[nodiscard]] std::unique_ptr<SeetaFaceID> clone() const;
+
         /** \brief Predict the detection result for an input image
          *
          * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format

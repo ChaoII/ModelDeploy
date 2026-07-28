@@ -56,4 +56,10 @@ namespace modeldeploy::vision::detection {
         if (timers) timers->post_timer.stop();
         return true;
     }
+
+    std::unique_ptr<UltralyticsPose> UltralyticsPose::clone() const {
+        auto clone_model = std::make_unique<UltralyticsPose>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 }

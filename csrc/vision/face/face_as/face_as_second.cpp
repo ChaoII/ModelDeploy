@@ -91,4 +91,10 @@ namespace modeldeploy::vision::face {
         postprocess(output_tensors, result);
         return true;
     }
+
+    std::unique_ptr<SeetaFaceAsSecond> SeetaFaceAsSecond::clone() const {
+        auto clone_model = std::make_unique<SeetaFaceAsSecond>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 }

@@ -66,6 +66,8 @@ namespace modeldeploy::vision::ocr {
                                    std::vector<float>* cls_scores,
                                    size_t start_index, size_t end_index);
 
+        [[nodiscard]] std::unique_ptr<Classifier> clone() const;
+
         /// Get preprocessor reference of ClassifierPreprocessor
         virtual ClassifierPreprocessor& get_preprocessor() {
             return preprocessor_;
