@@ -79,6 +79,19 @@ impl Kokoro {
         })
     }
 
+    /// 克隆模型，创建独立的推理副本
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
+
     pub fn is_initialized(&self) -> bool {
         !self.model.model_content.is_null()
     }

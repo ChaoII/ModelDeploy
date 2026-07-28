@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.obb
         private MDModel _model;
         private bool _disposed;
 
+        internal UltralyticsObb(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public UltralyticsObb(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
@@ -67,6 +72,13 @@ namespace ModelDeploy.vision.obb
             }
         }
 
+        public UltralyticsObb Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone OBB model");
+            return new UltralyticsObb(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -103,6 +115,9 @@ namespace ModelDeploy.vision.obb
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_obb_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }

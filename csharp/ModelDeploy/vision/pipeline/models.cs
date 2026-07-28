@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.pipeline
         private MDModel _model;
         private bool _disposed;
 
+        internal PedestrianAttribute(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public PedestrianAttribute(string detModelPath, string clsModelPath, RuntimeOption option)
         {
             _model = new MDModel();
@@ -91,6 +96,13 @@ namespace ModelDeploy.vision.pipeline
             }
         }
 
+        public PedestrianAttribute Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone PedestrianAttribute model");
+            return new PedestrianAttribute(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -141,6 +153,9 @@ namespace ModelDeploy.vision.pipeline
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_attr_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }

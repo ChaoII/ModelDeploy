@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.detection
         private MDModel _model;
         private bool _disposed;
 
+        internal UltralyticsDet(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public UltralyticsDet(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
@@ -69,6 +74,13 @@ namespace ModelDeploy.vision.detection
             }
         }
 
+        public UltralyticsDet Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone detection model");
+            return new UltralyticsDet(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -106,6 +118,9 @@ namespace ModelDeploy.vision.detection
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_detection_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }

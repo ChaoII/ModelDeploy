@@ -10,6 +10,11 @@ namespace ModelDeploy.audio.tts
         private MDModel _model;
         private bool _disposed;
 
+        internal Kokoro(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public Kokoro(MDKokoroParameters parameters, RuntimeOption option)
         {
             _model = new MDModel();
@@ -44,6 +49,13 @@ namespace ModelDeploy.audio.tts
             }
         }
 
+        public Kokoro Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone Kokoro model");
+            return new Kokoro(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -72,5 +84,8 @@ namespace ModelDeploy.audio.tts
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_kokoro_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
     }
 }

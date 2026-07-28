@@ -84,6 +84,9 @@ namespace modeldeploy::vision {
             .def_property_readonly("preprocessor",
                                    &classification::Classification::get_preprocessor)
             .def_property_readonly("postprocessor",
-                                   &classification::Classification::get_postprocessor);
+                                    &classification::Classification::get_postprocessor)
+            .def("clone", [](const classification::Classification& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

@@ -41,6 +41,9 @@ namespace modeldeploy::vision {
                           &pipeline::PedestrianAttribute::set_cls_input_size)
             .def("set_det_threshold", &pipeline::PedestrianAttribute::set_det_threshold)
             .def("get_detector", &pipeline::PedestrianAttribute::get_detector)
-            .def("get_classifier", &pipeline::PedestrianAttribute::get_classifier);
+            .def("get_classifier", &pipeline::PedestrianAttribute::get_classifier)
+            .def("clone", [](const pipeline::PedestrianAttribute& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

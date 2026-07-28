@@ -81,6 +81,9 @@ namespace modeldeploy::vision {
             .def_property_readonly("preprocessor",
                                    &face::SeetaFaceGender::get_preprocessor)
             .def_property_readonly("postprocessor",
-                                   &face::SeetaFaceGender::get_postprocessor);
+                                    &face::SeetaFaceGender::get_postprocessor)
+            .def("clone", [](const face::SeetaFaceGender& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

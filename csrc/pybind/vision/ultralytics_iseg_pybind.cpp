@@ -92,6 +92,9 @@ namespace modeldeploy::vision {
             .def_property_readonly("preprocessor",
                                    &detection::UltralyticsSeg::get_preprocessor)
             .def_property_readonly("postprocessor",
-                                   &detection::UltralyticsSeg::get_postprocessor);
+                                    &detection::UltralyticsSeg::get_postprocessor)
+            .def("clone", [](const detection::UltralyticsSeg& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

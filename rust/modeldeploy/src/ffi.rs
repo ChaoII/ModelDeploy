@@ -709,4 +709,7 @@ extern "C" {
     ) -> MDStatusCode;
     pub fn md_free_face_rec_pipeline_result(results: *mut MDFaceRecognizerResults);
     pub fn md_free_face_rec_pipeline_model(model: *mut MDModel);
+
+    // ── 通用克隆 ──
+    pub fn md_clone_model(model: *mut MDModel, from: *const MDModel) -> MDStatusCode;
 }

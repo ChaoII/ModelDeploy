@@ -65,6 +65,17 @@ impl PaddleOcr {
         unsafe { ffi::md_free_ocr_result(&mut results) };
         Ok(out)
     }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
 }
 impl Drop for PaddleOcr {
     fn drop(&mut self) { if !self.model.model_content.is_null() { unsafe { ffi::md_free_ocr_model(&mut self.model) }; } }
@@ -106,6 +117,17 @@ impl OcrRecognition {
         let out = OcrResult { text, score: result.score, points: Vec::new() };
         unsafe { ffi::md_free_ocr_recognition_result(&mut result) };
         Ok(out)
+    }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
     }
 }
 impl Drop for OcrRecognition {
@@ -163,6 +185,17 @@ impl LprPipeline {
         unsafe { ffi::md_free_lpr_pipeline_result(&mut results) };
         Ok(out)
     }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
 }
 impl Drop for LprPipeline {
     fn drop(&mut self) { if !self.model.model_content.is_null() { unsafe { ffi::md_free_lpr_pipeline_model(&mut self.model) }; } }
@@ -213,6 +246,17 @@ impl PedestrianAttribute {
         } else { Vec::new() };
         unsafe { ffi::md_free_attr_result(&mut results) };
         Ok(out)
+    }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
     }
 }
 impl Drop for PedestrianAttribute {

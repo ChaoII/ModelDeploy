@@ -11,11 +11,14 @@ namespace modeldeploy::vision {
         pybind11::class_<face::FaceRecognizerPipeline, BaseModel>(m, "FaceRecognizerPipeline")
             .def(pybind11::init<std::string, std::string, RuntimeOption>())
             .def("predict",
-                 [](face::FaceRecognizerPipeline& self, pybind11::array& image) {
-                     const auto mat = pyarray_to_cv_mat(image);
-                     std::vector<FaceRecognitionResult> result;
-                     self.predict(ImageData(std::move(mat)), &result);
-                     return result;
-                 }, pybind11::arg("image"));
+                  [](face::FaceRecognizerPipeline& self, pybind11::array& image) {
+                      const auto mat = pyarray_to_cv_mat(image);
+                      std::vector<FaceRecognitionResult> result;
+                      self.predict(ImageData(std::move(mat)), &result);
+                      return result;
+                  }, pybind11::arg("image"))
+            .def("clone", [](const face::FaceRecognizerPipeline& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

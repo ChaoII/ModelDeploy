@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
+        internal Scrfd(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public Scrfd(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
@@ -48,6 +53,13 @@ namespace ModelDeploy.vision.face
             }
         }
 
+        public Scrfd Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face detection model");
+            return new Scrfd(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -82,6 +94,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_det_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -89,6 +104,11 @@ namespace ModelDeploy.vision.face
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal SeetaFaceId(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public SeetaFaceId(string modelPath, RuntimeOption option)
         {
@@ -125,6 +145,13 @@ namespace ModelDeploy.vision.face
             }
         }
 
+        public SeetaFaceId Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face recognition model");
+            return new SeetaFaceId(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -156,6 +183,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_rec_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -164,6 +194,11 @@ namespace ModelDeploy.vision.face
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal SeetaFaceAge(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public SeetaFaceAge(string modelDir, RuntimeOption option)
         {
@@ -180,6 +215,13 @@ namespace ModelDeploy.vision.face
             return age;
         }
 
+
+        public SeetaFaceAge Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face age model");
+            return new SeetaFaceAge(clone);
+        }
 
         public void Dispose()
         {
@@ -206,6 +248,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_age_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -218,6 +263,11 @@ namespace ModelDeploy.vision.face
         {
             Female,
             Male
+        }
+
+        internal SeetaFaceGender(MDModel existing)
+        {
+            _model = existing;
         }
 
         public SeetaFaceGender(string modelDir, RuntimeOption option)
@@ -235,6 +285,13 @@ namespace ModelDeploy.vision.face
             return (Gender)gender;
         }
 
+
+        public SeetaFaceGender Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face gender model");
+            return new SeetaFaceGender(clone);
+        }
 
         public void Dispose()
         {
@@ -261,6 +318,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_gender_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -268,6 +328,11 @@ namespace ModelDeploy.vision.face
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal SeetaFaceAsFirst(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public SeetaFaceAsFirst(string modelDir, RuntimeOption option)
         {
@@ -285,6 +350,13 @@ namespace ModelDeploy.vision.face
             return score;
         }
 
+
+        public SeetaFaceAsFirst Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face AS first model");
+            return new SeetaFaceAsFirst(clone);
+        }
 
         public void Dispose()
         {
@@ -310,6 +382,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_first_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -317,6 +392,11 @@ namespace ModelDeploy.vision.face
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal SeetaFaceAsSecond(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public SeetaFaceAsSecond(string modelPath, RuntimeOption option)
         {
@@ -341,6 +421,13 @@ namespace ModelDeploy.vision.face
             }
         }
 
+
+        public SeetaFaceAsSecond Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face AS second model");
+            return new SeetaFaceAsSecond(clone);
+        }
 
         public void Dispose()
         {
@@ -370,6 +457,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_second_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -378,6 +468,11 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
+
+        internal SeetaFaceAntiSpoof(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public SeetaFaceAntiSpoof(string faceDetModelFile, string firstModelFile, string secondModelFile,
             RuntimeOption option)
@@ -411,6 +506,13 @@ namespace ModelDeploy.vision.face
         }
 
 
+        public SeetaFaceAntiSpoof Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face anti-spoof model");
+            return new SeetaFaceAntiSpoof(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -440,6 +542,9 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_as_pipeline_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -448,6 +553,11 @@ namespace ModelDeploy.vision.face
         private MDModel _model;
         private bool _disposed;
 
+
+        internal FaceRecognizerPipeline(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public FaceRecognizerPipeline(string faceDetModelFile, string faceRecModelFile, RuntimeOption option)
         {
@@ -488,6 +598,13 @@ namespace ModelDeploy.vision.face
         }
 
 
+        public FaceRecognizerPipeline Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone face recognition pipeline model");
+            return new FaceRecognizerPipeline(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -520,6 +637,9 @@ namespace ModelDeploy.vision.face
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_face_rec_pipeline_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }

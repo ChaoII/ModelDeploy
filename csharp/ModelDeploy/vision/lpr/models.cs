@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.lpr
         private MDModel _model;
         private bool _disposed;
 
+        internal LprDetection(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public LprDetection(string modelDir, RuntimeOption option)
         {
             _model = new MDModel();
@@ -61,6 +66,13 @@ namespace ModelDeploy.vision.lpr
             }
         }
 
+        public LprDetection Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone LPR detection model");
+            return new LprDetection(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -97,6 +109,9 @@ namespace ModelDeploy.vision.lpr
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_lpr_det_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -104,6 +119,11 @@ namespace ModelDeploy.vision.lpr
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal LprRecognizer(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public LprRecognizer(string modelDir, RuntimeOption option)
         {
@@ -141,6 +161,13 @@ namespace ModelDeploy.vision.lpr
         }
 
 
+        public LprRecognizer Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone LPR recognition model");
+            return new LprRecognizer(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -173,6 +200,9 @@ namespace ModelDeploy.vision.lpr
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_lpr_rec_model(ref MDModel model);
 
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
         #endregion
     }
 
@@ -180,6 +210,11 @@ namespace ModelDeploy.vision.lpr
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal LprPipeline(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public LprPipeline(string lprDetModelFile, string lprRecModelFile, RuntimeOption option)
         {
@@ -232,6 +267,13 @@ namespace ModelDeploy.vision.lpr
             }
         }
 
+        public LprPipeline Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone LPR pipeline model");
+            return new LprPipeline(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -268,6 +310,9 @@ namespace ModelDeploy.vision.lpr
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_lpr_pipeline_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }
