@@ -81,6 +81,9 @@ namespace modeldeploy::vision {
             .def_property_readonly("preprocessor",
                                    &lpr::LprRecognizer::get_preprocessor)
             .def_property_readonly("postprocessor",
-                                   &lpr::LprRecognizer::get_postprocessor);
+                                    &lpr::LprRecognizer::get_postprocessor)
+            .def("clone", [](const lpr::LprRecognizer& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

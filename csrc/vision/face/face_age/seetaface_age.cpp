@@ -22,7 +22,12 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceAge::predict(const ImageData& image, int* age) {
+    std::unique_ptr<SeetaFaceAge> SeetaFaceAge::clone() const {
+        auto clone_model = std::make_unique<SeetaFaceAge>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
+bool SeetaFaceAge::predict(const ImageData& image, int* age) {
         std::vector<int> ages;
         if (!batch_predict({image}, &ages)) {
             return false;
@@ -51,3 +56,4 @@ namespace modeldeploy::vision::face {
         return true;
     }
 }
+

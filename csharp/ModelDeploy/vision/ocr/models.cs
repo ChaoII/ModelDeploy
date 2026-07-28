@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.ocr
         private MDModel _model;
         private bool _disposed;
 
+        internal PaddleOcr(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public PaddleOcr(MDOCRModelParameters parameters, RuntimeOption option)
         {
             _model = new MDModel();
@@ -67,6 +72,15 @@ namespace ModelDeploy.vision.ocr
             md_free_ocr_result(ref nativeResults);
         }
 
+        public PaddleOcr Clone()
+        {
+            var clone = new MDModel();
+            var ret = md_clone_model(ref clone, ref _model);
+            if (ret != 0)
+                throw new InvalidOperationException($"Clone OCR model failed (error code: {ret})");
+            return new PaddleOcr(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -114,12 +128,20 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_ocr_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
     }
 
     public class OcrRecognition : IDisposable
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal OcrRecognition(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public OcrRecognition(string modelPath, string dictPath, RuntimeOption option)
         {
@@ -173,6 +195,15 @@ namespace ModelDeploy.vision.ocr
             }
         }
 
+        public OcrRecognition Clone()
+        {
+            var clone = new MDModel();
+            var ret = md_clone_model(ref clone, ref _model);
+            if (ret != 0)
+                throw new InvalidOperationException($"Clone OCR recognition model failed (error code: {ret})");
+            return new OcrRecognition(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -204,6 +235,9 @@ namespace ModelDeploy.vision.ocr
         private static extern void md_free_ocr_recognition_model(ref MDModel model);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_ocr_result(ref MDOCRResults results);
     }
 
@@ -211,6 +245,11 @@ namespace ModelDeploy.vision.ocr
     {
         private MDModel _model;
         private bool _disposed;
+
+        internal PaddleStructureTable(MDModel existing)
+        {
+            _model = existing;
+        }
 
         public PaddleStructureTable(MDStructureTableModelParameters parameters, RuntimeOption option)
         {
@@ -238,6 +277,15 @@ namespace ModelDeploy.vision.ocr
             md_draw_structure_table_result(ref image.RawImage, ref nativeResults, fontPath, fontSize, alpha,
                 saveResult);
             md_free_structure_table_result(ref nativeResults);
+        }
+
+        public PaddleStructureTable Clone()
+        {
+            var clone = new MDModel();
+            var ret = md_clone_model(ref clone, ref _model);
+            if (ret != 0)
+                throw new InvalidOperationException($"Clone structure table model failed (error code: {ret})");
+            return new PaddleStructureTable(clone);
         }
 
         public void Dispose()
@@ -274,5 +322,8 @@ namespace ModelDeploy.vision.ocr
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_structure_table_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
     }
 }

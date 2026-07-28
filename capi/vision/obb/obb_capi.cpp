@@ -21,7 +21,7 @@ MDStatusCode md_create_obb_model(MDModel* model, const char* model_path,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(obb_model->name().c_str());
     model->model_content = obb_model;
-    model->type = MDModelType::Detection;
+    model->type = MDModelType::OBB;
     if (!obb_model->is_initialized()) {
         MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
         return MDStatusCode::ModelInitializeFailed;

@@ -23,7 +23,12 @@ namespace modeldeploy::vision::face {
         return true;
     }
 
-    bool SeetaFaceID::predict(const ImageData& image, FaceRecognitionResult* result, TimerArray* timers) {
+    std::unique_ptr<SeetaFaceID> SeetaFaceID::clone() const {
+        auto clone_model = std::make_unique<SeetaFaceID>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
+bool SeetaFaceID::predict(const ImageData& image, FaceRecognitionResult* result, TimerArray* timers) {
         std::vector<FaceRecognitionResult> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
@@ -59,3 +64,4 @@ namespace modeldeploy::vision::face {
         return true;
     }
 }
+

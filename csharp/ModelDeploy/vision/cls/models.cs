@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.classification
         private MDModel _model;
         private bool _disposed;
 
+        internal UltralyticsCls(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public UltralyticsCls(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
@@ -66,6 +71,13 @@ namespace ModelDeploy.vision.classification
             }
         }
 
+        public UltralyticsCls Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone classification model");
+            return new UltralyticsCls(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -105,6 +117,9 @@ namespace ModelDeploy.vision.classification
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_classification_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }

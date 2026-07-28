@@ -140,4 +140,12 @@ namespace modeldeploy::vision::pipeline {
         if (timers) timers->infer_timer.stop();
         return true;
     }
+
+    std::unique_ptr<PedestrianAttribute> PedestrianAttribute::clone() const {
+        auto clone_model = std::make_unique<PedestrianAttribute>(*this);
+        if (detector_) clone_model->detector_.reset(detector_->clone().release());
+        if (classifier_) clone_model->classifier_.reset(classifier_->clone().release());
+        return clone_model;
+    }
 }
+

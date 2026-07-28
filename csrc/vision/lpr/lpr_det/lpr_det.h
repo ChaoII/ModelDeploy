@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/6/10.
 //
 #pragma once
@@ -16,6 +16,9 @@ namespace modeldeploy::vision::lpr {
                               const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "LprDetection"; }
+
+        [[nodiscard]] std::unique_ptr<LprDetection> clone() const;
+
 
         virtual bool predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                              TimerArray* timers = nullptr);

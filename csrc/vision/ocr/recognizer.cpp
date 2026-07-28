@@ -99,4 +99,11 @@ namespace modeldeploy::vision::ocr {
         if (timers) timers->post_timer.stop();
         return true;
     }
+
+    std::unique_ptr<Recognizer> Recognizer::clone() const {
+        auto clone_model = std::make_unique<Recognizer>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 }
+

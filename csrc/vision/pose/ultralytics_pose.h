@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/06/2.
 //
 #pragma once
@@ -20,7 +20,10 @@ namespace modeldeploy::vision::detection {
         bool predict(const ImageData& image, std::vector<KeyPointsResult>* result, TimerArray* timers = nullptr);
 
         bool batch_predict(const std::vector<ImageData>& images,
-                           std::vector<std::vector<KeyPointsResult>>* results, TimerArray* timers = nullptr);
+                            std::vector<std::vector<KeyPointsResult>>* results, TimerArray* timers = nullptr);
+
+        [[nodiscard]] std::unique_ptr<UltralyticsPose> clone() const;
+
 
         UltralyticsPosePreprocessor& get_preprocessor() {
             return preprocessor_;

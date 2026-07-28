@@ -19,3 +19,9 @@ target_link_libraries(demo_detection_multi_thread_trt PUBLIC ${LIBRARY_NAME})
 
 add_executable(demo_multi_thread_compare demo_multi_thread_compare.cpp)
 target_link_libraries(demo_multi_thread_compare PUBLIC ${LIBRARY_NAME})
+
+add_executable(demo_benchmark demo_benchmark.cpp)
+target_link_libraries(demo_benchmark PUBLIC ${LIBRARY_NAME})
+
+add_executable(demo_profile demo_profile.cpp)
+target_link_libraries(demo_profile PUBLIC ${LIBRARY_NAME})

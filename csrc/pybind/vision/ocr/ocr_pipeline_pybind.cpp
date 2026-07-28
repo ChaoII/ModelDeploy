@@ -41,6 +41,9 @@ namespace modeldeploy::vision {
                           &ocr::PaddleOCR::set_rec_batch_size)
             .def("get_detector", &ocr::PaddleOCR::get_detector)
             .def("get_classifier", &ocr::PaddleOCR::get_classifier)
-            .def("get_recognizer", &ocr::PaddleOCR::get_recognizer);
+            .def("get_recognizer", &ocr::PaddleOCR::get_recognizer)
+            .def("clone", [](const ocr::PaddleOCR& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

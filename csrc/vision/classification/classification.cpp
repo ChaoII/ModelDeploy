@@ -50,4 +50,11 @@ namespace modeldeploy::vision::classification {
         }
         return true;
     }
+
+    std::unique_ptr<Classification> Classification::clone() const {
+        auto clone_model = std::make_unique<Classification>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 } // namespace classification
+

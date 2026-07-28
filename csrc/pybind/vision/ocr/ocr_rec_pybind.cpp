@@ -85,15 +85,18 @@ namespace modeldeploy::vision {
                      return ocr_result;
                  }, pybind11::arg("image"))
             .def("batch_predict", [](ocr::Recognizer& self,
-                                     std::vector<pybind11::array>& images) {
-                std::vector<ImageData> _images;
-                for (auto& image : images) {
-                    auto cv_image = pyarray_to_cv_mat(image);
-                    _images.push_back(ImageData(std::move(cv_image)));
-                }
-                OCRResult ocr_result;
-                self.batch_predict(_images, &ocr_result);
-                return ocr_result;
-            }, pybind11::arg("images"));
+                                      std::vector<pybind11::array>& images) {
+                 std::vector<ImageData> _images;
+                 for (auto& image : images) {
+                     auto cv_image = pyarray_to_cv_mat(image);
+                     _images.push_back(ImageData(std::move(cv_image)));
+                 }
+                 OCRResult ocr_result;
+                 self.batch_predict(_images, &ocr_result);
+                 return ocr_result;
+             }, pybind11::arg("images"))
+            .def("clone", [](const ocr::Recognizer& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

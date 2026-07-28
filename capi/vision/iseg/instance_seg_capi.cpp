@@ -18,7 +18,7 @@ MDStatusCode md_create_instance_seg_model(MDModel* model, const char* model_path
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(instance_seg_model->name().c_str());
     model->model_content = instance_seg_model;
-    model->type = MDModelType::Detection;
+    model->type = MDModelType::InstanceSeg;
     if (!instance_seg_model->is_initialized()) {
         MD_LOG_ERROR << "Instance segmentation model initial failed!" << std::endl;
         return MDStatusCode::ModelInitializeFailed;

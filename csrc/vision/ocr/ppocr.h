@@ -56,6 +56,9 @@ namespace modeldeploy::vision::ocr {
 
         std::shared_ptr<Recognizer> get_recognizer();
 
+        [[nodiscard]] std::unique_ptr<PaddleOCR> clone() const;
+
+
     protected:
         std::shared_ptr<DBDetector> detector_ = nullptr;
         std::shared_ptr<Classifier> classifier_ = nullptr;

@@ -30,6 +30,9 @@ namespace modeldeploy::vision::face {
          */
         bool predict(const ImageData& image, float* result);
 
+        [[nodiscard]] std::unique_ptr<SeetaFaceAsFirst> clone() const;
+
+
         /// Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default (640, 640)
         std::vector<int> size_{224, 224};
 

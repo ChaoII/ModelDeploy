@@ -21,7 +21,7 @@ MDStatusCode md_create_face_as_pipeline_model(MDModel* model,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_as_pipeline_model->name().c_str());
     model->model_content = face_as_pipeline_model;
-    model->type = MDModelType::FACE;
+    model->type = MDModelType::FaceASPipeline;
     if (!face_as_pipeline_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -31,7 +31,7 @@ MDStatusCode md_create_face_as_pipeline_model(MDModel* model,
 
 MDStatusCode md_face_as_pipeline_predict(const MDModel* model, MDImage* image, MDFaceAsResults* c_results,
                                          const float fuse_threshold, const float clarity_threshold) {
-    if (model->type != MDModelType::FACE) {
+    if (model->type != MDModelType::FaceASPipeline) {
         return MDStatusCode::ModelTypeError;
     }
     auto image_data = md_image_to_image_data(image);

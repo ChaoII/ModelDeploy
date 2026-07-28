@@ -22,7 +22,12 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 
-    bool LprRecognizer::predict(const ImageData& image, LprResult* result, TimerArray* timers) {
+    std::unique_ptr<LprRecognizer> LprRecognizer::clone() const {
+        auto clone_model = std::make_unique<LprRecognizer>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
+bool LprRecognizer::predict(const ImageData& image, LprResult* result, TimerArray* timers) {
         std::vector<LprResult> results;
         if (!batch_predict({image}, &results, timers)) {
             return false;
@@ -57,3 +62,4 @@ namespace modeldeploy::vision::lpr {
         return true;
     }
 }
+

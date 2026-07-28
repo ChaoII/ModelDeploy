@@ -103,6 +103,9 @@ namespace modeldeploy::vision {
             .def_property_readonly("preprocessor",
                                    &face::Scrfd::get_preprocessor)
             .def_property_readonly("postprocessor",
-                                   &face::Scrfd::get_postprocessor);
+                                    &face::Scrfd::get_postprocessor)
+            .def("clone", [](const face::Scrfd& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

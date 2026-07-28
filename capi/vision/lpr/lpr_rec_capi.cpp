@@ -17,7 +17,7 @@ MDStatusCode md_create_lpr_rec_model(MDModel* model, const char* model_path,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(lpr_rec_model->name().c_str());
     model->model_content = lpr_rec_model;
-    model->type = MDModelType::LPR;
+    model->type = MDModelType::LPRRec;
     if (!lpr_rec_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -26,7 +26,7 @@ MDStatusCode md_create_lpr_rec_model(MDModel* model, const char* model_path,
 
 
 MDStatusCode md_lpr_rec_predict(const MDModel* model, MDImage* image, MDLPRResults* c_result) {
-    if (model->type != MDModelType::LPR) {
+    if (model->type != MDModelType::LPRRec) {
         return MDStatusCode::ModelTypeError;
     }
     auto image_data = md_image_to_image_data(image);

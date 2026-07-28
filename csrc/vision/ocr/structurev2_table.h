@@ -83,6 +83,9 @@ namespace modeldeploy::vision::ocr {
             return postprocessor_;
         }
 
+        [[nodiscard]] std::unique_ptr<StructureV2Table> clone() const;
+
+
     private:
         bool initialize();
 

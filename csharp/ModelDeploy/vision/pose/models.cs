@@ -12,6 +12,11 @@ namespace ModelDeploy.vision.pose
         private MDModel _model;
         private bool _disposed;
 
+        internal UltralyticsPose(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public UltralyticsPose(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
@@ -69,6 +74,13 @@ namespace ModelDeploy.vision.pose
             }
         }
 
+        public UltralyticsPose Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone keypoint model");
+            return new UltralyticsPose(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -105,6 +117,9 @@ namespace ModelDeploy.vision.pose
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_keypoint_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }

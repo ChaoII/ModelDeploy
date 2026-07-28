@@ -57,7 +57,10 @@ namespace modeldeploy::vision {
                      return results;
                  }, pybind11::arg("images"))
             .def_property("rec_batch_size",
-                          &ocr::PPStructureV2Table::get_rec_batch_size,
-                          &ocr::PPStructureV2Table::set_rec_batch_size);
+                           &ocr::PPStructureV2Table::get_rec_batch_size,
+                           &ocr::PPStructureV2Table::set_rec_batch_size)
+            .def("clone", [](const ocr::PPStructureV2Table& self) {
+                return self.clone();
+            });
     }
 } // namespace modeldeploy

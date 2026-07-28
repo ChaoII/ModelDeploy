@@ -19,7 +19,7 @@ MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_p
     model->format = MDModelFormat::ONNX;
     model->model_content = ocr_rec_model;
     model->model_name = strdup(ocr_rec_model->name().c_str());
-    model->type = MDModelType::OCR;
+    model->type = MDModelType::OCRRec;
     if (!ocr_rec_model->is_initialized()) {
         MD_LOG_ERROR << "Detection model initial failed!" << std::endl;
         return MDStatusCode::ModelInitializeFailed;
@@ -29,7 +29,7 @@ MDStatusCode md_create_ocr_recognition_model(MDModel* model, const char* model_p
 
 
 MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImage* image, MDOCRResult* result) {
-    if (model->type != MDModelType::OCR) {
+    if (model->type != MDModelType::OCRRec) {
         MD_LOG_ERROR << "Model type is not OCR" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
@@ -53,7 +53,7 @@ MDStatusCode md_ocr_recognition_model_predict(const MDModel* model, const MDImag
 MDStatusCode md_ocr_recognition_model_predict_batch(
     const MDModel* model, const MDImage* image, const int batch_size,
     const MDPolygon* polygon, const int size, MDOCRResults* results) {
-    if (model->type != MDModelType::OCR) {
+    if (model->type != MDModelType::OCRRec) {
         MD_LOG_ERROR << "Model type is not OCR" << std::endl;
         return MDStatusCode::ModelTypeError;
     }

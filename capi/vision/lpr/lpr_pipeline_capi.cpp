@@ -23,7 +23,7 @@ MDStatusCode md_create_lpr_pipeline_model(MDModel* model,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(lpr_pipeline_model->name().c_str());
     model->model_content = lpr_pipeline_model;
-    model->type = MDModelType::LPR;
+    model->type = MDModelType::LPRPipeline;
     if (!lpr_pipeline_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -33,7 +33,7 @@ MDStatusCode md_create_lpr_pipeline_model(MDModel* model,
 
 MDStatusCode md_lpr_pipeline_predict(const MDModel* model, MDImage* image,
                                      MDLPRResults* c_results) {
-    if (model->type != MDModelType::LPR) {
+    if (model->type != MDModelType::LPRPipeline) {
         return MDStatusCode::ModelTypeError;
     }
     const auto image_data = md_image_to_image_data(image);

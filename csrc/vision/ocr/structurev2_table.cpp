@@ -91,4 +91,11 @@ namespace modeldeploy::vision::ocr {
         }
         return true;
     }
+
+    std::unique_ptr<StructureV2Table> StructureV2Table::clone() const {
+        auto clone_model = std::make_unique<StructureV2Table>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 } // namespace modeldeploy::vision::ocr
+

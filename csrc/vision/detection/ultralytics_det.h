@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/2/20.
 //
 #pragma once
@@ -24,6 +24,7 @@ namespace modeldeploy::vision::detection {
                            TimerArray* timers = nullptr);
 
         [[nodiscard]] std::unique_ptr<UltralyticsDet> clone() const;
+
 
         virtual UltralyticsPreprocessor& get_preprocessor() {
             return preprocessor_;

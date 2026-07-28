@@ -80,4 +80,11 @@ namespace modeldeploy::vision::ocr {
         }
         return true;
     }
+
+    std::unique_ptr<Classifier> Classifier::clone() const {
+        auto clone_model = std::make_unique<Classifier>(*this);
+        clone_model->set_runtime(clone_model->clone_runtime());
+        return clone_model;
+    }
 } // namespace ocr
+

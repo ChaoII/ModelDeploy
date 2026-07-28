@@ -41,6 +41,17 @@ impl FaceRec {
         unsafe { ffi::md_free_face_rec_result(&mut result) };
         Ok(FaceRecResult { embedding: embed })
     }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
 }
 impl Drop for FaceRec {
     fn drop(&mut self) { if !self.model.model_content.is_null() { unsafe { ffi::md_free_face_rec_model(&mut self.model) }; } }
@@ -71,6 +82,17 @@ impl FaceAge {
         let status = unsafe { ffi::md_face_age_predict(&self.model, &image.raw, &mut result) };
         check_status(status)?;
         Ok(result)
+    }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
     }
 }
 impl Drop for FaceAge {
@@ -106,6 +128,17 @@ impl FaceGender {
         let status = unsafe { ffi::md_face_gender_predict(&self.model, &image.raw, &mut result) };
         check_status(status)?;
         Ok(if result.0 == 1 { Gender::Male } else { Gender::Female })
+    }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
     }
 }
 impl Drop for FaceGender {
@@ -151,6 +184,17 @@ impl FaceAntiSpoofPipeline {
         unsafe { ffi::md_free_face_as_pipeline_result(&mut results) };
         Ok(out)
     }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
 }
 impl Drop for FaceAntiSpoofPipeline {
     fn drop(&mut self) { if !self.model.model_content.is_null() { unsafe { ffi::md_free_face_as_pipeline_model(&mut self.model) }; } }
@@ -192,6 +236,17 @@ impl FaceRecPipeline {
         } else { Vec::new() };
         unsafe { ffi::md_free_face_rec_pipeline_result(&mut results) };
         Ok(out)
+    }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
     }
 }
 impl Drop for FaceRecPipeline {

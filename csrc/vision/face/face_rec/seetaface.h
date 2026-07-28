@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/3/24.
 //
 
@@ -23,6 +23,9 @@ namespace modeldeploy::vision::face {
         explicit SeetaFaceID(const std::string& model_file, const RuntimeOption& custom_option = RuntimeOption());
 
         [[nodiscard]] std::string name() const override { return "SeetaFaceID"; }
+
+        [[nodiscard]] std::unique_ptr<SeetaFaceID> clone() const;
+
 
         /** \brief Predict the detection result for an input image
          *

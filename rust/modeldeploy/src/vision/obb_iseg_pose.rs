@@ -48,6 +48,17 @@ impl UltralyticsObb {
         unsafe { ffi::md_free_obb_result(&mut results) };
         Ok(out)
     }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
 }
 impl Drop for UltralyticsObb {
     fn drop(&mut self) { if !self.model.model_content.is_null() { unsafe { ffi::md_free_obb_model(&mut self.model) }; } }
@@ -102,6 +113,17 @@ impl UltralyticsSeg {
         unsafe { ffi::md_free_instance_seg_result(&mut results) };
         Ok(out)
     }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
+    }
 }
 impl Drop for UltralyticsSeg {
     fn drop(&mut self) { if !self.model.model_content.is_null() { unsafe { ffi::md_free_instance_seg_model(&mut self.model) }; } }
@@ -152,6 +174,17 @@ impl UltralyticsPose {
         } else { Vec::new() };
         unsafe { ffi::md_free_keypoint_result(&mut results) };
         Ok(out)
+    }
+    pub fn try_clone(&self) -> Result<Self, MdError> {
+        let mut raw = ffi::MDModel {
+            model_name: std::ptr::null_mut(),
+            type_: self.model.type_,
+            format: self.model.format,
+            model_content: std::ptr::null_mut(),
+        };
+        let status = unsafe { ffi::md_clone_model(&mut raw, &self.model) };
+        check_status(status)?;
+        Ok(Self { model: raw })
     }
 }
 impl Drop for UltralyticsPose {

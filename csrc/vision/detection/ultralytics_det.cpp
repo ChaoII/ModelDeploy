@@ -63,3 +63,4 @@ namespace modeldeploy::vision::detection {
         return clone_model;
     }
 }
+

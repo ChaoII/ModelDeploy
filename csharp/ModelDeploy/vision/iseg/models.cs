@@ -11,6 +11,11 @@ namespace ModelDeploy.vision.iseg
         private MDModel _model;
         private bool _disposed;
 
+        internal UltralyticsSeg(MDModel existing)
+        {
+            _model = existing;
+        }
+
         public UltralyticsSeg(string modelPath, RuntimeOption option)
         {
             _model = new MDModel();
@@ -66,6 +71,13 @@ namespace ModelDeploy.vision.iseg
             }
         }
 
+        public UltralyticsSeg Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone instance segmentation model");
+            return new UltralyticsSeg(clone);
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -103,6 +115,9 @@ namespace ModelDeploy.vision.iseg
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern void md_free_instance_seg_model(ref MDModel model);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
 
         #endregion
     }
