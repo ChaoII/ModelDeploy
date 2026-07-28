@@ -1,6 +1,0 @@
-Task 1: complete (13 simple C++ models)
-Task 2: complete (8 pipeline models + 2 sub-models)
-Task 3: complete (CAPI md_clone_model with dynamic_cast dispatch)
-Task 4: complete (pybind clone for 23 model classes)
-Task 5: complete (C# Clone for 11 files)
-Task 6: complete (Rust try_clone for 16 structs)
