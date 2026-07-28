@@ -1,8 +1,6 @@
 //
 // Created by aichao on 2025/2/24.
-// 多线程并发推理对比 demo：
-//   方案A（错误）: 同一实例多线程并发 → 触发锁，串行
-//   方案B（正确）: clone 后各线程独立实例 → 真正并行
+// 多线程/单线程推理性能对比 demo
 //
 
 #include "csrc/vision.h"
@@ -28,89 +26,79 @@ int main() {
     yolo11_det.get_preprocessor().use_cuda_preproc();
     yolo11_det.get_preprocessor().set_size({640, 640});
 
-    // 读取图像
+    // 读取图像（只读一次，所有线程共享图像数据）
     auto img = modeldeploy::vision::ImageData::imread(
         "../../test_data/test_images/test_detection0.jpg");
 
-    // Warm-up
-    std::vector<modeldeploy::vision::DetectionResult> result;
-    for (int i = 0; i < 3; ++i) {
-        yolo11_det.predict(img, &result);
+    // ── 预热 ──
+    std::vector<modeldeploy::vision::DetectionResult> warmup_result;
+    std::cout << "Warming up ..." << std::endl;
+    for (int i = 0; i < 20; ++i) {
+        yolo11_det.predict(img, &warmup_result);
     }
+    std::cout << "Warm-up done." << std::endl;
 
-// 方案A 共享同一实例在多线程下即使有 mutex 保护，
-// CUDA kernel 仍可能因 ORT 异步执行而冲突。
-// 这里仅用极少推理演示警告日志，不计时。
-constexpr int THREAD_COUNT = 4;
-constexpr int LOOP_PER_THREAD = 10;       // 方案B迭代数
-constexpr int LOOP_A_PER_THREAD = 1;      // 方案A仅做演示，避免CUDA竞争
+    constexpr int LOOP_COUNT = 100;
+    constexpr int THREAD_COUNT = 4;
 
     // ════════════════════════════════════════════════════════
-    // 先跑方案B（正确的 clone 方式），再跑方案A（错误方式）
-    // 因为方案A 可能因 CUDA 竞争导致崩溃
+    // 单线程推理
     // ════════════════════════════════════════════════════════
-
-    // ════════════════════════════════════════════════════════
-    // 方案B：clone 后各线程独立实例（正确用法）
-    // ════════════════════════════════════════════════════════
-    std::cout << "\n===== 方案B: clone 多线程独立实例（正确用法） =====" << std::endl;
+    std::cout << "\n===== 单线程推理 =====" << std::endl;
     auto t0 = std::chrono::steady_clock::now();
 
+    for (int i = 0; i < LOOP_COUNT; ++i) {
+        yolo11_det.predict(img, &warmup_result);
+    }
+
+    auto t1 = std::chrono::steady_clock::now();
+    auto ms_single = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    double fps_single = 1000.0 * LOOP_COUNT / ms_single;
+    std::cout << "  推理 " << LOOP_COUNT << " 帧"
+              << "  耗时 " << ms_single << "ms"
+              << "  平均 " << (double)ms_single / LOOP_COUNT << "ms/帧"
+              << "  " << fps_single << " FPS" << std::endl;
+
+    // ════════════════════════════════════════════════════════
+    // 多线程推理（clone 后各线程独立实例）
+    // ════════════════════════════════════════════════════════
+    std::cout << "\n===== 多线程推理 (" << THREAD_COUNT << " 线程, clone) =====" << std::endl;
+
+    // 提前 clone
     std::vector<std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet>> clones;
     for (int t = 0; t < THREAD_COUNT; ++t) {
         clones.push_back(yolo11_det.clone());
     }
 
-    std::vector<std::thread> threads_b;
+    auto t2 = std::chrono::steady_clock::now();
+
+    std::vector<std::thread> threads;
     for (int t = 0; t < THREAD_COUNT; ++t) {
-        threads_b.emplace_back([&clones, t, &img, LOOP_PER_THREAD]() {
+        threads.emplace_back([&clones, t, &img, LOOP_COUNT]() {
             std::vector<modeldeploy::vision::DetectionResult> r;
-            for (int i = 0; i < LOOP_PER_THREAD; ++i) {
+            for (int i = 0; i < LOOP_COUNT; ++i) {
                 clones[t]->predict(img, &r);
             }
         });
     }
-    for (auto& th : threads_b) th.join();
+    for (auto& th : threads) th.join();
 
-    auto t1 = std::chrono::steady_clock::now();
-    auto ms_b = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-    double fps_b = 1000.0 * THREAD_COUNT * LOOP_PER_THREAD / ms_b;
-    std::cout << "  耗时: " << ms_b << "ms"
-              << "  总推理: " << THREAD_COUNT * LOOP_PER_THREAD << " 帧"
-              << "  等效 FPS: " << fps_b << std::endl;
-
-    // 隔离两组测试
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-    // ════════════════════════════════════════════════════════
-    // 方案A：同一实例多线程并发（错误用法）
-    // 同一 OrtBackend 实例的 binding_ 被多线程同时改写 = 数据竞争
-    // ════════════════════════════════════════════════════════
-    std::cout << "\n===== 方案A: 同一实例多线程并发（错误用法）=====" << std::endl;
-    std::cout << "  直接跑同一实例多线程会因 binding_ 竞争而崩溃。" << std::endl;
-
-    std::vector<std::thread> threads_a;
-    for (int t = 0; t < 2; ++t) {
-        threads_a.emplace_back([&yolo11_det, &img, LOOP_A_PER_THREAD]() {
-            std::vector<modeldeploy::vision::DetectionResult> r;
-            for (int i = 0; i < LOOP_A_PER_THREAD; ++i) {
-                try {
-                    yolo11_det.predict(img, &r);
-                } catch (...) {
-                    // 忽略 CUDA 错误
-                }
-            }
-        });
-    }
-    for (auto& th : threads_a) th.join();
-
-    std::cout << "  方案A结束（如果程序到达这里，说明本次运行没有触发崩溃，但这是未定义行为）" << std::endl;
+    auto t3 = std::chrono::steady_clock::now();
+    auto ms_mt = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
+    int total_frames_mt = THREAD_COUNT * LOOP_COUNT;
+    double fps_mt = 1000.0 * total_frames_mt / ms_mt;
+    std::cout << "  推理 " << total_frames_mt << " 帧 (" << THREAD_COUNT
+              << " 线程 × " << LOOP_COUNT << " 帧/线程)"
+              << "  耗时 " << ms_mt << "ms"
+              << "  等效 " << fps_mt << " FPS" << std::endl;
 
     // ════════════════════════════════════════════════════════
     // 对比
     // ════════════════════════════════════════════════════════
     std::cout << "\n===== 对比 =====" << std::endl;
-    std::cout << "  方案A（同一实例并发）: 不安全，CUDA Session 无法共享" << std::endl;
-    std::cout << "  方案B（clone 后并发）: " << ms_b << "ms  " << fps_b << " FPS" << std::endl;
+    std::cout << "  单线程:            " << fps_single << " FPS" << std::endl;
+    std::cout << "  多线程 (" << THREAD_COUNT << " clone): " << fps_mt << " FPS"
+              << "  (加速比 " << fps_mt / fps_single << "x)" << std::endl;
+    std::cout << "  每线程吞吐:        " << fps_mt / THREAD_COUNT << " FPS/线程" << std::endl;
     return 0;
 }
