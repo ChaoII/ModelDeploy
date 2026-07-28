@@ -124,4 +124,8 @@ namespace modeldeploy::vision::lpr {
         if (recognizer_) clone_model->recognizer_ = recognizer_->clone();
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> LprPipeline::clone_base() const {
+        return clone();
+    }
 }

@@ -24,6 +24,8 @@ namespace modeldeploy {
 
         virtual bool infer();
 
+        [[nodiscard]] virtual std::unique_ptr<BaseModel> clone_base() const { return nullptr; }
+
         virtual std::unique_ptr<Runtime> clone_runtime() { return runtime_->clone(); }
 
         virtual bool set_runtime(std::unique_ptr<Runtime> clone_runtime);

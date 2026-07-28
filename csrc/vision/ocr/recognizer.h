@@ -94,6 +94,8 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] std::unique_ptr<Recognizer> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
     private:
         bool initialize();
         RecognizerPreprocessor preprocessor_;

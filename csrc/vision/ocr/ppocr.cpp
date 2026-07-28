@@ -169,4 +169,8 @@ namespace modeldeploy::vision::ocr {
         if (recognizer_) clone_model->recognizer_.reset(recognizer_->clone().release());
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> PaddleOCR::clone_base() const {
+        return clone();
+    }
 }

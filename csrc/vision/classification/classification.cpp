@@ -56,4 +56,8 @@ namespace modeldeploy::vision::classification {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> Classification::clone_base() const {
+        return clone();
+    }
 } // namespace classification

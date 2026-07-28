@@ -61,4 +61,8 @@ namespace modeldeploy::vision::detection {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> UltralyticsObb::clone_base() const {
+        return clone();
+    }
 } // namespace modeldeploy::vision::detection

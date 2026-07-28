@@ -29,6 +29,10 @@ namespace modeldeploy::vision::face {
         return clone_model;
     }
 
+    std::unique_ptr<BaseModel> SeetaFaceID::clone_base() const {
+        return clone();
+    }
+
     bool SeetaFaceID::predict(const ImageData& image, FaceRecognitionResult* result, TimerArray* timers) {
         std::vector<FaceRecognitionResult> results;
         if (!batch_predict({image}, &results, timers)) {

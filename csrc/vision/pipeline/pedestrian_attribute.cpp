@@ -147,4 +147,8 @@ namespace modeldeploy::vision::pipeline {
         if (classifier_) clone_model->classifier_.reset(classifier_->clone().release());
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> PedestrianAttribute::clone_base() const {
+        return clone();
+    }
 }

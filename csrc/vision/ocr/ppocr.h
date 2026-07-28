@@ -58,6 +58,8 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] std::unique_ptr<PaddleOCR> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
     protected:
         std::shared_ptr<DBDetector> detector_ = nullptr;
         std::shared_ptr<Classifier> classifier_ = nullptr;

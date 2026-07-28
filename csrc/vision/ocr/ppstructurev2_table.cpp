@@ -237,4 +237,8 @@ namespace modeldeploy::vision::ocr {
         if (table_) clone_model->table_ = table_->clone();
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> PPStructureV2Table::clone_base() const {
+        return clone();
+    }
 }

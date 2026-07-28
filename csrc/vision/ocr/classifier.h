@@ -68,6 +68,8 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] std::unique_ptr<Classifier> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
         /// Get preprocessor reference of ClassifierPreprocessor
         virtual ClassifierPreprocessor& get_preprocessor() {
             return preprocessor_;

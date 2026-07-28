@@ -26,6 +26,8 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::unique_ptr<Scrfd> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
         virtual ScrfdPreprocessor& get_preprocessor() {
             return preprocessor_;
         }

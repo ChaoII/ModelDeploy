@@ -28,6 +28,10 @@ namespace modeldeploy::vision::lpr {
         return clone_model;
     }
 
+    std::unique_ptr<BaseModel> LprDetection::clone_base() const {
+        return clone();
+    }
+
     bool LprDetection::predict(const ImageData& image, std::vector<KeyPointsResult>* result,
                                TimerArray* timers) {
         std::vector<std::vector<KeyPointsResult>> results;

@@ -28,6 +28,10 @@ namespace modeldeploy::vision::face {
         return clone_model;
     }
 
+    std::unique_ptr<BaseModel> SeetaFaceAge::clone_base() const {
+        return clone();
+    }
+
     bool SeetaFaceAge::predict(const ImageData& image, int* age) {
         std::vector<int> ages;
         if (!batch_predict({image}, &ages)) {

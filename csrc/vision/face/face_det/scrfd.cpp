@@ -42,6 +42,10 @@ namespace modeldeploy::vision::face {
         return clone_model;
     }
 
+    std::unique_ptr<BaseModel> Scrfd::clone_base() const {
+        return clone();
+    }
+
     bool Scrfd::batch_predict(const std::vector<ImageData>& images,
                               std::vector<std::vector<KeyPointsResult>>* results,
                               TimerArray* timers) {

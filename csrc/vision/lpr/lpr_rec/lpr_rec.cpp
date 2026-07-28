@@ -28,6 +28,10 @@ namespace modeldeploy::vision::lpr {
         return clone_model;
     }
 
+    std::unique_ptr<BaseModel> LprRecognizer::clone_base() const {
+        return clone();
+    }
+
     bool LprRecognizer::predict(const ImageData& image, LprResult* result, TimerArray* timers) {
         std::vector<LprResult> results;
         if (!batch_predict({image}, &results, timers)) {

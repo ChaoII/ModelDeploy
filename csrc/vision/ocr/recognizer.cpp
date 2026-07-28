@@ -105,4 +105,8 @@ namespace modeldeploy::vision::ocr {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
+
+    std::unique_ptr<BaseModel> Recognizer::clone_base() const {
+        return clone();
+    }
 }

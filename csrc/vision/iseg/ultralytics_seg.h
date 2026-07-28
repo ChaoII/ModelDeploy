@@ -48,6 +48,8 @@ namespace modeldeploy::vision::detection {
 
         [[nodiscard]] std::unique_ptr<UltralyticsSeg> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
         /// Get preprocessor reference of YOLOv5Seg
         UltralyticsSegPreprocessor& get_preprocessor() {
             return preprocessor_;

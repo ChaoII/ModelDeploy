@@ -24,6 +24,8 @@ namespace modeldeploy::vision::detection {
 
         [[nodiscard]] std::unique_ptr<UltralyticsPose> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
         UltralyticsPosePreprocessor& get_preprocessor() {
             return preprocessor_;
         }

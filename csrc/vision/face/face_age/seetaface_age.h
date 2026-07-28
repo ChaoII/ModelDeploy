@@ -26,6 +26,8 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::unique_ptr<SeetaFaceAge> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
         /** \brief Predict the detection result for an input image
          *
          * \param[in] image The input image data, comes from cv::imread(), is a 3-D array with layout HWC, BGR format

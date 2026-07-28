@@ -70,6 +70,8 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] std::unique_ptr<PPStructureV2Table> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
     protected:
         std::unique_ptr<DBDetector> detector_ = nullptr;
         std::unique_ptr<Recognizer> recognizer_ = nullptr;

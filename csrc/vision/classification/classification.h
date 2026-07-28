@@ -43,6 +43,8 @@ namespace modeldeploy::vision::classification {
 
         [[nodiscard]] std::unique_ptr<Classification> clone() const;
 
+        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
+
         /// Get preprocessor reference of YOLOv5Cls
         virtual ClassificationPreprocessor& get_preprocessor() {
             return preprocessor_;
