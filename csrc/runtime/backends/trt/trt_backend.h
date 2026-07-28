@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <mutex>
-#include <atomic>
 #include <cuda_runtime_api.h>
 #include <map>
 #include <string>
@@ -62,10 +60,6 @@ namespace modeldeploy {
         std::string model_buffer_;
         std::vector<nvinfer1::Dims> last_input_shapes_;       // 缓存上次输入 shape，避免重复 setInputShape
         std::vector<CudaBufferPrt> cached_output_buffers_;    // 复用输出 buffer，避免每次 cudaMalloc
-
-        // 同一实例并发 infer 防护
-        mutable std::mutex infer_mtx_;
-        mutable std::atomic_flag infer_busy_{false};
 
         bool load_trt_cache(const std::string& engine_buffer);
         [[nodiscard]] bool shape_within_profile(const nvinfer1::Dims& dims, int input_idx) const;

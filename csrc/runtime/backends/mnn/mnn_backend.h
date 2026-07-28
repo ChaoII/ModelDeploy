@@ -6,8 +6,6 @@
 
 #include <memory>
 #include <vector>
-#include <mutex>
-#include <atomic>
 #include <MNN/expr/Module.hpp>
 #include "core/tensor.h"
 #include "runtime/backends/backend.h"
@@ -42,12 +40,10 @@ namespace modeldeploy {
         std::shared_ptr<MNN::Express::Executor::RuntimeManager> rtmgr_;
         MnnBackendOption option_;
         std::string model_buffer_;
-        std::shared_ptr<MNN::Express::Module> net_;
+                std::shared_ptr<MNN::Express::Module> net_;
         std::vector<TensorInfo> inputs_desc_;
         std::vector<TensorInfo> outputs_desc_;
-
-        // 同一实例并发 infer 防护
-        mutable std::mutex infer_mtx_;
-        mutable std::atomic_flag infer_busy_{false};
     };
+
+
 } // namespace modeldeploy
