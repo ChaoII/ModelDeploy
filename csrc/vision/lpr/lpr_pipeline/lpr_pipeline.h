@@ -23,6 +23,8 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] bool is_initialized() const override;
 
+        [[nodiscard]] std::unique_ptr<LprPipeline> clone() const;
+
     protected:
         std::unique_ptr<LprDetection> detector_ = nullptr;
         std::unique_ptr<LprRecognizer> recognizer_ = nullptr;

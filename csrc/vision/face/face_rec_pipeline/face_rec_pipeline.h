@@ -25,6 +25,8 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] bool is_initialized() const override;
 
+        [[nodiscard]] std::unique_ptr<FaceRecognizerPipeline> clone() const;
+
     protected:
         std::unique_ptr<Scrfd> detector_ = nullptr;
         std::unique_ptr<SeetaFaceID> recognizer_ = nullptr;

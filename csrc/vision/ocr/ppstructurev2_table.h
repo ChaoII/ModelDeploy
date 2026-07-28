@@ -68,6 +68,8 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] int get_rec_batch_size() const;
 
+        [[nodiscard]] std::unique_ptr<PPStructureV2Table> clone() const;
+
     protected:
         std::unique_ptr<DBDetector> detector_ = nullptr;
         std::unique_ptr<Recognizer> recognizer_ = nullptr;

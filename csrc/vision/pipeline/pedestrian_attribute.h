@@ -54,6 +54,8 @@ namespace modeldeploy::vision::pipeline {
 
         std::shared_ptr<classification::Classification> get_classifier();
 
+        [[nodiscard]] std::unique_ptr<PedestrianAttribute> clone() const;
+
     protected:
         std::shared_ptr<detection::UltralyticsDet> detector_ = nullptr;
         std::shared_ptr<classification::Classification> classifier_ = nullptr;

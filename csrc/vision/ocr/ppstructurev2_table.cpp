@@ -229,4 +229,12 @@ namespace modeldeploy::vision::ocr {
         }
         return true;
     }
+
+    std::unique_ptr<PPStructureV2Table> PPStructureV2Table::clone() const {
+        auto clone_model = std::make_unique<PPStructureV2Table>(*this);
+        if (detector_) clone_model->detector_ = detector_->clone();
+        if (recognizer_) clone_model->recognizer_ = recognizer_->clone();
+        if (table_) clone_model->table_ = table_->clone();
+        return clone_model;
+    }
 }

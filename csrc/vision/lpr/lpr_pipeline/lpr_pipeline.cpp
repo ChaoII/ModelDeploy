@@ -117,4 +117,11 @@ namespace modeldeploy::vision::lpr {
         }
         return true;
     }
+
+    std::unique_ptr<LprPipeline> LprPipeline::clone() const {
+        auto clone_model = std::make_unique<LprPipeline>(*this);
+        if (detector_) clone_model->detector_ = detector_->clone();
+        if (recognizer_) clone_model->recognizer_ = recognizer_->clone();
+        return clone_model;
+    }
 }

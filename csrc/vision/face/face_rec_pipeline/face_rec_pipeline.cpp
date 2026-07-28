@@ -53,4 +53,11 @@ namespace modeldeploy::vision::face {
         if (timers)timers->infer_timer.stop();
         return true;
     }
+
+    std::unique_ptr<FaceRecognizerPipeline> FaceRecognizerPipeline::clone() const {
+        auto clone_model = std::make_unique<FaceRecognizerPipeline>(*this);
+        if (detector_) clone_model->detector_ = detector_->clone();
+        if (recognizer_) clone_model->recognizer_ = recognizer_->clone();
+        return clone_model;
+    }
 }

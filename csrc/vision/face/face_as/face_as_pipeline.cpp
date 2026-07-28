@@ -160,4 +160,12 @@ namespace modeldeploy::vision::face {
         }
         return true;
     }
+
+    std::unique_ptr<SeetaFaceAsPipeline> SeetaFaceAsPipeline::clone() const {
+        auto clone_model = std::make_unique<SeetaFaceAsPipeline>(*this);
+        if (face_det_) clone_model->face_det_ = face_det_->clone();
+        if (face_as_first_) clone_model->face_as_first_ = face_as_first_->clone();
+        if (face_as_second_) clone_model->face_as_second_ = face_as_second_->clone();
+        return clone_model;
+    }
 }

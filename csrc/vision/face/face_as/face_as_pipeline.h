@@ -43,6 +43,8 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] bool is_initialized() const override;
 
+        [[nodiscard]] std::unique_ptr<SeetaFaceAsPipeline> clone() const;
+
     private:
         std::unique_ptr<Scrfd> face_det_ = nullptr;
         std::unique_ptr<SeetaFaceAsFirst> face_as_first_ = nullptr;
