@@ -17,7 +17,7 @@ MDStatusCode md_create_face_gender_model(MDModel* model, const char* model_path,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_gender_model->name().c_str());
     model->model_content = face_gender_model;
-    model->type = MDModelType::FACE;
+    model->type = MDModelType::FaceGender;
     if (!face_gender_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -26,7 +26,7 @@ MDStatusCode md_create_face_gender_model(MDModel* model, const char* model_path,
 
 
 MDStatusCode md_face_gender_predict(const MDModel* model, MDImage* image, MDFaceGenderResult* c_result) {
-    if (model->type != MDModelType::FACE) {
+    if (model->type != MDModelType::FaceGender) {
         return MDStatusCode::ModelTypeError;
     }
     const auto image_data = md_image_to_image_data(image);

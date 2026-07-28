@@ -21,7 +21,7 @@ MDStatusCode md_create_face_rec_pipeline_model(MDModel* model,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_rec_pipeline_model->name().c_str());
     model->model_content = face_rec_pipeline_model;
-    model->type = MDModelType::FACE;
+    model->type = MDModelType::FaceRecPipeline;
     if (!face_rec_pipeline_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -30,7 +30,7 @@ MDStatusCode md_create_face_rec_pipeline_model(MDModel* model,
 
 
 MDStatusCode md_face_rec_pipeline_predict(const MDModel* model, MDImage* image, MDFaceRecognizerResults* c_results) {
-    if (model->type != MDModelType::FACE) {
+    if (model->type != MDModelType::FaceRecPipeline) {
         return MDStatusCode::ModelTypeError;
     }
     const auto image_data = md_image_to_image_data(image);

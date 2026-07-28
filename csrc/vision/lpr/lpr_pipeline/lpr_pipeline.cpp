@@ -125,7 +125,6 @@ namespace modeldeploy::vision::lpr {
         return clone_model;
     }
 
-    std::unique_ptr<BaseModel> LprPipeline::clone_base() const {
         return clone();
     }
 }

@@ -56,7 +56,6 @@ namespace modeldeploy::vision::pipeline {
 
         [[nodiscard]] std::unique_ptr<PedestrianAttribute> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
     protected:
         std::shared_ptr<detection::UltralyticsDet> detector_ = nullptr;

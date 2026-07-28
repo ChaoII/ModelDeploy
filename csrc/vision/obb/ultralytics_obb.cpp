@@ -62,7 +62,6 @@ namespace modeldeploy::vision::detection {
         return clone_model;
     }
 
-    std::unique_ptr<BaseModel> UltralyticsObb::clone_base() const {
         return clone();
     }
 } // namespace modeldeploy::vision::detection

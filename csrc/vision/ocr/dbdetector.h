@@ -69,7 +69,6 @@ namespace modeldeploy::vision::ocr {
 
         [[nodiscard]] std::unique_ptr<DBDetector> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
         /// Get preprocessor reference of DBDetectorPreprocessor
         virtual DBDetectorPreprocessor& get_preprocessor() {

@@ -170,7 +170,6 @@ namespace modeldeploy::vision::ocr {
         return clone_model;
     }
 
-    std::unique_ptr<BaseModel> PaddleOCR::clone_base() const {
         return clone();
     }
 }

@@ -25,7 +25,6 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::unique_ptr<LprPipeline> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
     protected:
         std::unique_ptr<LprDetection> detector_ = nullptr;

@@ -61,7 +61,6 @@ namespace modeldeploy::vision::face {
         return clone_model;
     }
 
-    std::unique_ptr<BaseModel> FaceRecognizerPipeline::clone_base() const {
         return clone();
     }
 }

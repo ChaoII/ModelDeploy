@@ -36,6 +36,20 @@ pub const MDModelType_LPR: MDModelType = MDModelType(5);
 pub const MDModelType_PIPELINE: MDModelType = MDModelType(6);
 pub const MDModelType_ASR: MDModelType = MDModelType(7);
 pub const MDModelType_TTS: MDModelType = MDModelType(8);
+pub const MDModelType_InstanceSeg: MDModelType = MDModelType(9);
+pub const MDModelType_OBB: MDModelType = MDModelType(10);
+pub const MDModelType_FaceDet: MDModelType = MDModelType(11);
+pub const MDModelType_FaceRec: MDModelType = MDModelType(12);
+pub const MDModelType_FaceAge: MDModelType = MDModelType(13);
+pub const MDModelType_FaceGender: MDModelType = MDModelType(14);
+pub const MDModelType_FaceASFirst: MDModelType = MDModelType(15);
+pub const MDModelType_FaceASSecond: MDModelType = MDModelType(16);
+pub const MDModelType_FaceASPipeline: MDModelType = MDModelType(17);
+pub const MDModelType_FaceRecPipeline: MDModelType = MDModelType(18);
+pub const MDModelType_LPRRec: MDModelType = MDModelType(19);
+pub const MDModelType_LPRPipeline: MDModelType = MDModelType(20);
+pub const MDModelType_OCRPipeline: MDModelType = MDModelType(21);
+pub const MDModelType_OCRRec: MDModelType = MDModelType(22);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

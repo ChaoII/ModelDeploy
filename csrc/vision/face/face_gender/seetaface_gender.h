@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/3/24.
 //
 
@@ -26,7 +26,6 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::unique_ptr<SeetaFaceGender> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
         /** \brief Predict the detection result for an input image
          *

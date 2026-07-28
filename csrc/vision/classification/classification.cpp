@@ -57,7 +57,6 @@ namespace modeldeploy::vision::classification {
         return clone_model;
     }
 
-    std::unique_ptr<BaseModel> Classification::clone_base() const {
         return clone();
     }
 } // namespace classification

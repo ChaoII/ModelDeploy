@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/2/20.
 //
 #pragma once
@@ -26,7 +26,6 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::unique_ptr<Scrfd> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
         virtual ScrfdPreprocessor& get_preprocessor() {
             return preprocessor_;

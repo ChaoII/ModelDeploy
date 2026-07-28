@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by aichao on 2025/6/10.
 //
 #pragma once
@@ -18,7 +18,6 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::unique_ptr<LprRecognizer> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
         virtual bool predict(const ImageData& image, LprResult* result,
                              TimerArray* timers = nullptr);

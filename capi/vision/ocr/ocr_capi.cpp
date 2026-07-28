@@ -39,7 +39,7 @@ MDStatusCode md_create_ocr_model(MDModel* model,
     ocr_model->set_rec_batch_size(parameters->rec_batch_size);
     ocr_model->set_cls_batch_size(parameters->rec_batch_size);
 
-    model->type = MDModelType::OCR;
+    model->type = MDModelType::OCRPipeline;
     model->format = MDModelFormat::ONNX;
     model->model_content = ocr_model;
     model->model_name = strdup(ocr_model->name().c_str());

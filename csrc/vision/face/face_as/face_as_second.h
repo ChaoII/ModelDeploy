@@ -31,7 +31,6 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::unique_ptr<SeetaFaceAsSecond> clone() const;
 
-        [[nodiscard]] std::unique_ptr<BaseModel> clone_base() const override;
 
         /// Argument for image preprocessing step, tuple of (width, height), decide the target size after resize, default (640, 640)
         std::vector<int> size_{300, 300};

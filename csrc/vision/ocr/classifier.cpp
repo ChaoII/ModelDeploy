@@ -87,7 +87,6 @@ namespace modeldeploy::vision::ocr {
         return clone_model;
     }
 
-    std::unique_ptr<BaseModel> Classifier::clone_base() const {
         return clone();
     }
 } // namespace ocr

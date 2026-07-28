@@ -17,7 +17,7 @@ MDStatusCode md_create_face_as_first_model(MDModel* model, const char* model_pat
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_as_first_model->name().c_str());
     model->model_content = face_as_first_model;
-    model->type = MDModelType::FACE;
+    model->type = MDModelType::FaceASFirst;
     if (!face_as_first_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -26,7 +26,7 @@ MDStatusCode md_create_face_as_first_model(MDModel* model, const char* model_pat
 
 
 MDStatusCode md_face_as_first_predict(const MDModel* model, MDImage* image, float* c_result) {
-    if (model->type != MDModelType::FACE) {
+    if (model->type != MDModelType::FaceASFirst) {
         return MDStatusCode::ModelTypeError;
     }
     auto image_data = md_image_to_image_data(image);

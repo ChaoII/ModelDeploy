@@ -18,7 +18,21 @@ enum MDModelType {
     LPR,
     PIPELINE,
     ASR,
-    TTS
+    TTS,
+    InstanceSeg,
+    OBB,
+    FaceDet,
+    FaceRec,
+    FaceAge,
+    FaceGender,
+    FaceASFirst,
+    FaceASSecond,
+    FaceASPipeline,
+    FaceRecPipeline,
+    LPRRec,
+    LPRPipeline,
+    OCRPipeline,
+    OCRRec,
 };
 
 enum MDStatusCode {

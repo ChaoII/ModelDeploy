@@ -19,7 +19,7 @@ MDStatusCode md_create_face_rec_model(MDModel* model, const char* model_path,
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup(face_rec_model->name().c_str());
     model->model_content = face_rec_model;
-    model->type = MDModelType::FACE;
+    model->type = MDModelType::FaceRec;
     if (!face_rec_model->is_initialized()) {
         return MDStatusCode::ModelInitializeFailed;
     }
@@ -28,7 +28,7 @@ MDStatusCode md_create_face_rec_model(MDModel* model, const char* model_path,
 
 
 MDStatusCode md_face_rec_predict(const MDModel* model, MDImage* image, MDFaceRecognizerResult* c_result) {
-    if (model->type != MDModelType::FACE) {
+    if (model->type != MDModelType::FaceRec) {
         return MDStatusCode::ModelTypeError;
     }
     const auto image_data = md_image_to_image_data(image);
