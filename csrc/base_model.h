@@ -6,6 +6,8 @@
 
 #include <string>
 #include <map>
+#include <mutex>
+#include <atomic>
 #include "core/tensor.h"
 #include "core/md_decl.h"
 #include "runtime/runtime.h"
@@ -54,6 +56,10 @@ namespace modeldeploy {
         bool initialized_ = false;
         std::vector<Tensor> reused_input_tensors_;
         std::vector<Tensor> reused_output_tensors_;
+
+        // 同一实例并发 infer 防护（无参 infer 使用 reused_tensors_）
+        mutable std::mutex infer_mtx_;
+        mutable std::atomic_flag infer_busy_{false};
 
     private:
         std::shared_ptr<Runtime> runtime_;

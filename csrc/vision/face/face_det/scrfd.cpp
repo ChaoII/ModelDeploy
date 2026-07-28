@@ -33,8 +33,12 @@ namespace modeldeploy::vision::face {
     }
 
     std::unique_ptr<Scrfd> Scrfd::clone() const {
-        auto clone_model = std::make_unique<Scrfd>(*this);
+        auto clone_model = std::make_unique<Scrfd>(
+            runtime_option.model_file, runtime_option);
         clone_model->set_runtime(clone_model->clone_runtime());
+        clone_model->preprocessor_ = preprocessor_;
+        clone_model->postprocessor_ = postprocessor_;
+        clone_model->initialized_ = initialized_;
         return clone_model;
     }
 

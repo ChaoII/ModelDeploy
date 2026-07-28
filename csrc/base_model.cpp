@@ -26,6 +26,18 @@ namespace modeldeploy {
     }
 
     bool BaseModel::infer() {
+        // 同一实例并发推理检测 + 警告（无参 infer 使用 reused_tensors_，非线程安全）
+        if (infer_busy_.test_and_set()) {
+            static std::once_flag flag;
+            std::call_once(flag, []() {
+                MD_LOG_WARN << "检测到同一 BaseModel 实例并发 infer()！"
+                            << "这是假并发，不会提升性能。"
+                            << "请使用 clone() 为每个线程创建独立实例。"
+                            << std::endl;
+            });
+        }
+        std::lock_guard<std::mutex> lock(infer_mtx_);
+        struct BusyGuard { std::atomic_flag& f; ~BusyGuard() { f.clear(); } } bg{infer_busy_};
         return infer(reused_input_tensors_, &reused_output_tensors_);
     }
 

@@ -7,6 +7,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <mutex>
+#include <atomic>
 #include "onnxruntime_cxx_api.h"
 #include "runtime/backends/backend.h"
 #include "runtime/backends/ort/option.h"
@@ -46,6 +48,10 @@ namespace modeldeploy {
     private:
         bool init_from_onnx(const std::string& model_buffer,
                             const OrtBackendOption& option = OrtBackendOption());
+
+        // 同一实例并发 infer 防护
+        mutable std::mutex infer_mtx_;
+        mutable std::atomic_flag infer_busy_{false};
 
         Ort::Env env_{ORT_LOGGING_LEVEL_WARNING, "MD"};
         std::shared_ptr<Ort::Session> shared_session_{nullptr};

@@ -326,6 +326,19 @@ namespace modeldeploy {
     }
 
     bool TrtBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
+        // 同一实例并发推理检测 + 警告
+        if (infer_busy_.test_and_set()) {
+            static std::once_flag flag;
+            std::call_once(flag, []() {
+                MD_LOG_WARN << "检测到同一 TrtBackend 实例并发 infer()！"
+                            << "这是假并发，不会提升性能。"
+                            << "请使用 clone() 为每个线程创建独立实例。"
+                            << std::endl;
+            });
+        }
+        std::lock_guard<std::mutex> lock(infer_mtx_);
+        struct BusyGuard { std::atomic_flag& f; ~BusyGuard() { f.clear(); } } bg{infer_busy_};
+
         if (inputs.size() != num_inputs()) {
             MD_LOG_ERROR << "Require " << num_inputs() << " inputs, but got " << inputs.size() << "." << std::endl;
             return false;
