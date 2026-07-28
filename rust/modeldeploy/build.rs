@@ -2,11 +2,11 @@ use std::env;
 use std::path::PathBuf;
 use std::fs;
 
-fn sdk_file_exists(dir: &PathBuf, name: &str) -> bool {
-    dir.join(&format!("{}.dll", name)).exists()
-        || dir.join(&format!("{}.lib", name)).exists()
-        || dir.join(&format!("lib{}.so", name)).exists()
-        || dir.join(&format!("lib{}.dylib", name)).exists()
+fn sdk_file_exists(dir: &std::path::Path, name: &str) -> bool {
+    dir.join(format!("{}.dll", name)).exists()
+        || dir.join(format!("{}.lib", name)).exists()
+        || dir.join(format!("lib{}.so", name)).exists()
+        || dir.join(format!("lib{}.dylib", name)).exists()
 }
 
 fn find_sdk_root() -> Option<PathBuf> {
