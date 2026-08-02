@@ -16,6 +16,7 @@ InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory)
 
 InferGroup::~InferGroup() {
     stop_workers();
+    if (warmup_thread_.joinable()) warmup_thread_.join();
     engines_.clear();
 }
 
@@ -43,29 +44,36 @@ bool InferGroup::init() {
     if (engines_.empty()) return false;
     start_workers();
 
-    // Warm-up: run one dummy inference per engine to trigger TRT engine compilation
-    // BEFORE the decoder starts producing frames. This avoids the scenario where
-    // the first real frame blocks for 30-60s on TRT compilation, causing all
-    // subsequent frames to be dropped as "stale".
-    std::cout << "[InferGroup] Warming up " << engines_.size() << " model(s)..." << std::endl;
-    for (size_t i = 0; i < engines_.size(); ++i) {
-        const auto& engine = engines_[i];
-        const auto& mcfg = engine->config();
-        int w = mcfg.input_size.size() == 2 ? mcfg.input_size[0] : 640;
-        int h = mcfg.input_size.size() == 2 ? mcfg.input_size[1] : 640;
-        // Create a dummy black BGR image
-        auto dummy = ImageData::from_raw(std::vector<uint8_t>(h * w * 3, 0).data(),
-                                          w, h, MdImageType::PKG_BGR_U8, true);
-        InferResult dummy_result;
-        auto t0 = std::chrono::steady_clock::now();
-        engine->infer(dummy, &dummy_result);
-        auto t1 = std::chrono::steady_clock::now();
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-        std::cout << "[InferGroup] Warm-up done: " << mcfg.name << " (" << ms << "ms)" << std::endl;
-    }
+    // Warm-up 移入后台线程：TRT 首次编译可耗时 30-60s，若在解码线程同步执行，
+    // stop() join 解码线程会阻塞数十秒（任务停止/删除时 HTTP 全卡）。
+    std::cout << "[InferGroup] Warming up " << engines_.size() << " model(s) in background..."
+              << std::endl;
+    start_warmup();
 
     initialized_ = true;
     return true;
+}
+
+void InferGroup::start_warmup() {
+    if (warmup_thread_.joinable()) return;
+    warmup_thread_ = std::thread([this]() {
+        cudaSetDevice(0);
+        std::lock_guard<std::mutex> lock(models_mtx_);
+        for (size_t i = 0; i < engines_.size(); ++i) {
+            const auto& engine = engines_[i];
+            const auto& mcfg = engine->config();
+            int w = mcfg.input_size.size() == 2 ? mcfg.input_size[0] : 640;
+            int h = mcfg.input_size.size() == 2 ? mcfg.input_size[1] : 640;
+            auto dummy = ImageData::from_raw(std::vector<uint8_t>(h * w * 3, 0).data(),
+                                              w, h, MdImageType::PKG_BGR_U8, true);
+            InferResult dummy_result;
+            auto t0 = std::chrono::steady_clock::now();
+            engine->infer(dummy, &dummy_result);
+            auto t1 = std::chrono::steady_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+            std::cout << "[InferGroup] Warm-up done: " << mcfg.name << " (" << ms << "ms)" << std::endl;
+        }
+    });
 }
 
 bool InferGroup::ready() const {
@@ -139,27 +147,27 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                               std::vector<InferResult>* results,
                               ImageData* frame_out) {
     if (!initialized_) return 0;
+    // 全程持模型锁：与 add/remove/update_model 串行化，防止遍历 engines_/workers_ 时被改写
+    std::lock_guard<std::mutex> lock(models_mtx_);
     results->clear();
 
     const size_t y_size = static_cast<size_t>(height) * width;
     const size_t uv_size = y_size / 2;
     const size_t total = y_size + uv_size;
 
-    if (last_w_ != width || last_h_ != height || nv12_buf_.size() != total) {
-        nv12_buf_.resize(total);
-        last_w_ = width;
-        last_h_ = height;
-    }
-
-    if (y_step == width && uv_step == width) {
+    // 紧凑连续 NV12 直接使用（零拷贝），仅在非紧凑行距时才落到本地缓冲
+    const uint8_t* y_src = y_plane;
+    const uint8_t* uv_src = uv_plane;
+    if (!(y_step == width && uv_step == width && y_plane && uv_plane)) {
+        if (last_w_ != width || last_h_ != height || nv12_buf_.size() != total) {
+            nv12_buf_.resize(total);
+            last_w_ = width;
+            last_h_ = height;
+        }
         std::memcpy(nv12_buf_.data(), y_plane, y_size);
         std::memcpy(nv12_buf_.data() + y_size, uv_plane, uv_size);
-    } else {
-        for (int row = 0; row < height; ++row)
-            std::memcpy(nv12_buf_.data() + row * width, y_plane + row * y_step, width);
-        const int uv_h = height / 2;
-        for (int row = 0; row < uv_h; ++row)
-            std::memcpy(nv12_buf_.data() + y_size + row * width, uv_plane + row * uv_step, width);
+        y_src = nv12_buf_.data();
+        uv_src = nv12_buf_.data() + y_size;
     }
 
     // 预先判断是否有任一模型需要处理本帧（计数器 + 间隔检查）
@@ -176,13 +184,13 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
 #ifdef WITH_GPU
     const size_t bgr_size = static_cast<size_t>(height) * width * 3;
     if (bgr_buf_.size() < bgr_size) bgr_buf_.resize(bgr_size);
-    nv12_to_bgr_cuda(nv12_buf_.data(), nv12_buf_.data() + y_size,
+    nv12_to_bgr_cuda(y_src, uv_src,
                       width, height, width, width,
                       bgr_buf_.data());
     auto bgr_image = ImageData::from_raw(bgr_buf_.data(), width, height,
-                                          MdImageType::PKG_BGR_U8, false);
+                                          MdImageType::PKG_BGR_U8, true); // copy=true：独立所有权，防跨队列缓冲别名竞争
 #else
-    auto nv12_image = ImageData::from_raw(nv12_buf_.data(), width, height, MdImageType::NV12, true);
+    auto nv12_image = ImageData::from_raw(y_src, width, height, MdImageType::NV12, true);
     auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
 #endif
 
@@ -260,6 +268,7 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
 }
 
 bool InferGroup::add_model(const ModelConfig& mcfg) {
+    std::lock_guard<std::mutex> lock(models_mtx_);
     auto engine = std::make_unique<InferenceEngine>();
     if (!engine->load(mcfg)) return false;
     // 重启 worker 池以匹配新模型数量
@@ -271,6 +280,7 @@ bool InferGroup::add_model(const ModelConfig& mcfg) {
 }
 
 bool InferGroup::remove_model(const std::string& name) {
+    std::lock_guard<std::mutex> lock(models_mtx_);
     for (size_t i = 0; i < engines_.size(); ++i) {
         if (engines_[i]->config().name == name) {
             stop_workers();
@@ -284,6 +294,7 @@ bool InferGroup::remove_model(const std::string& name) {
 }
 
 bool InferGroup::update_model(const std::string& name, const ModelConfig& mcfg) {
+    std::lock_guard<std::mutex> lock(models_mtx_);
     for (auto& eng : engines_) {
         if (eng->config().name == name) {
             stop_workers();

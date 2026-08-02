@@ -45,6 +45,8 @@ public:
 private:
     TaskConfig cfg_;
     ModelFactory factory_;
+    // 模型列表互斥：run_models 与 add/remove/update_model 串行化，防止遍历期间 engines_ 被改写
+    std::mutex models_mtx_;
     std::vector<std::unique_ptr<InferenceEngine>> engines_;
     std::vector<int> frame_counters_;
     PerfStats stats_;
@@ -72,4 +74,8 @@ private:
     void worker_loop(Worker* w);
     void start_workers();
     void stop_workers();
+
+    // 后台 warm-up 线程：TRT 首次编译可耗时数十秒，移到后台避免阻塞解码/停止
+    std::thread warmup_thread_;
+    void start_warmup();
 };

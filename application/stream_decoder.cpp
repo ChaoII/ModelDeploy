@@ -83,6 +83,7 @@ bool StreamDecoder::init_decoder() {
 
     if (avformat_find_stream_info(fmt_ctx_, nullptr) < 0) {
         std::cerr << "[Decoder] Failed to find stream info" << std::endl;
+        cleanup();
         return false;
     }
 
@@ -97,6 +98,7 @@ bool StreamDecoder::init_decoder() {
             if (!dec) dec = avcodec_find_decoder(codecpar->codec_id);
             if (!dec) {
                 std::cerr << "[Decoder] No decoder for stream" << std::endl;
+                cleanup();
                 return false;
             }
 
@@ -114,6 +116,7 @@ bool StreamDecoder::init_decoder() {
 
             if (avcodec_open2(dec_ctx_, dec, nullptr) < 0) {
                 std::cerr << "[Decoder] Failed to open decoder" << std::endl;
+                cleanup();
                 return false;
             }
 
@@ -132,6 +135,7 @@ bool StreamDecoder::init_decoder() {
         }
     }
     std::cerr << "[Decoder] No video stream found" << std::endl;
+    cleanup();
     return false;
 }
 
@@ -339,6 +343,7 @@ bool StreamDecoder::reconnect() {
         return dec_ctx_ != nullptr;
     }
     av_dict_free(&opts);
+    cleanup();  // fmt_ctx_ 已分配，释放避免重连失败时泄漏
     return false;
 }
 

@@ -38,12 +38,9 @@ static void save_state() {
 }
 
 static void handle_signal(int sig) {
+    // 信号处理器中不得加锁/IO/join（可能死锁）；只置退出标志，由主循环执行清理
     std::cout << "\n[Main] Signal " << sig << ", shutting down..." << std::endl;
     g_running = false;
-    // 先保存，再停止（stop_all 会清空 pipelines_）
-    save_state();
-    if (g_mgr) g_mgr->stop_all();
-    std::exit(0);
 }
 
 int main(int argc, char* argv[]) {
@@ -88,6 +85,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // 信号触发退出：主循环内执行清理（避免信号处理器内加锁/join 死锁）
     save_state();
+    if (g_mgr) g_mgr->stop_all();
     return 0;
 }

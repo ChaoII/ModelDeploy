@@ -34,26 +34,45 @@ size_t Pipeline::calc_in_queue_size() const {
     return 8;
 }
 
+std::string Pipeline::init_error() const {
+    std::lock_guard<std::mutex> lock(init_error_mtx_);
+    return init_error_;
+}
+
+void Pipeline::set_init_error(const std::string& msg) {
+    std::lock_guard<std::mutex> lock(init_error_mtx_);
+    init_error_ = msg;
+}
+
 Pipeline::~Pipeline() {
     stop();
 }
 
 bool Pipeline::start() {
-    if (running_.load()) return true;
+    // 生命周期锁：防止 stop 在线程创建完成前 join（未 join 的 thread 析构会 std::terminate）
+    std::lock_guard<std::mutex> lock(lifecycle_mtx_);
+    // CAS：并发 start 只允许一个进入，避免重复创建 decode 线程
+    bool expected = false;
+    if (!running_.compare_exchange_strong(expected, true)) return true;
+    // 上一轮线程已结束（否则 running_ 为 true，CAS 不会成功）；join 清理残留句柄，
+    // 否则覆盖 joinable 的 thread 会 std::terminate（并发 start 排队场景）
+    if (decode_thread_.joinable())  decode_thread_.join();
+    if (process_thread_.joinable()) process_thread_.join();
+    if (encode_thread_.joinable())  encode_thread_.join();
     stopped_ = false;
     initialized_ = false;
-    init_error_.clear();
-    running_ = true;
+    alive_token_ = std::make_shared<std::atomic<bool>>(true);
+    set_init_error("");
 
     // 三段流水线主线程
     decode_thread_ = std::thread([this]() {
         try {
             decode_loop();
         } catch (const std::exception& e) {
-            init_error_ = e.what();
+            set_init_error(e.what());
             std::cerr << "[Pipeline-decode] Fatal: " << e.what() << std::endl;
         } catch (...) {
-            init_error_ = "decode unknown error";
+            set_init_error("decode unknown error");
             std::cerr << "[Pipeline-decode] Fatal: unknown" << std::endl;
         }
         running_ = false;
@@ -64,12 +83,11 @@ bool Pipeline::start() {
 }
 
 void Pipeline::stop() {
+    // 生命周期锁：与 start 串行化，保证线程已创建后再 join
+    std::lock_guard<std::mutex> lock(lifecycle_mtx_);
+    if (stopped_.load()) return;
+    stopped_ = true;
     bool expected = true;
-    if (!stopped_.load()) {
-        stopped_ = true;
-    } else {
-        return;
-    }
     if (!running_.compare_exchange_strong(expected, false)) {
         running_ = false;
     }
@@ -83,6 +101,8 @@ void Pipeline::stop() {
 }
 
 void Pipeline::release_resources() {
+    // 先失效生命周期令牌：此后任何在途的共享源回调都会跳过，不再触碰 this
+    if (alive_token_) *alive_token_ = false;
     if (shared_source_ && shared_token_) {
         shared_source_->unsubscribe(shared_token_);
         shared_token_ = 0;
@@ -157,8 +177,8 @@ void Pipeline::decode_loop() {
     // ── 1) 初始化推理组 + 绘制 ──
     infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_);
     if (!infer_group_->init()) {
-        init_error_ = "InferGroup init failed";
-        std::cerr << "[Pipeline] " << init_error_ << std::endl;
+        set_init_error("InferGroup init failed");
+        std::cerr << "[Pipeline] " << init_error() << std::endl;
         running_ = false;
         return;
     }
@@ -189,16 +209,20 @@ void Pipeline::decode_loop() {
     if (hub_ && is_network_url(cfg_.input_url)) {
         shared_source_ = hub_->acquire(cfg_.input_url, cfg_.decoder);
         if (!shared_source_) {
-            init_error_ = "StreamHub acquire failed";
+            set_init_error("StreamHub acquire failed");
             running_ = false;
             return;
         }
         shared_token_ = shared_source_->subscribe(
-            [this](const std::shared_ptr<BroadcastFrame>& f) { this->on_shared_frame(f); }
+            [this, alive = alive_token_](const std::shared_ptr<BroadcastFrame>& f) {
+                // 任务已销毁/停止：跳过（解码线程可能在任务析构后在途调用此回调）
+                if (!alive || !alive->load()) return false;
+                return this->on_shared_frame(f);
+            }
         );
         if (!shared_source_->is_initialized()) {
-            init_error_ = shared_source_->init_error();
-            std::cerr << "[Pipeline] " << init_error_ << std::endl;
+            set_init_error(shared_source_->init_error());
+            std::cerr << "[Pipeline] " << init_error() << std::endl;
             running_ = false;
             return;
         }
@@ -214,8 +238,8 @@ void Pipeline::decode_loop() {
     } else {
         decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
         if (!decoder_->open(cfg_.input_url)) {
-            init_error_ = "Decoder open failed: " + cfg_.input_url;
-            std::cerr << "[Pipeline] " << init_error_ << std::endl;
+            set_init_error("Decoder open failed: " + cfg_.input_url);
+            std::cerr << "[Pipeline] " << init_error() << std::endl;
             running_ = false;
             return;
         }
@@ -390,7 +414,7 @@ void Pipeline::encode_loop() {
         // 推流永久失败（地址被占用等）→ 仅设置错误信息，不改 running_
         // 由前端检测 init_error 后调用 /stop 接口统一停止
         if (encoder_ && encoder_->has_permanently_failed()) {
-            init_error_ = encoder_->last_error();
+            set_init_error(encoder_->last_error());
             std::cerr << "[Pipeline:" << cfg_.id << "] Encoder permanently failed: "
                       << encoder_->last_error() << std::endl;
             break;
@@ -412,8 +436,8 @@ void Pipeline::encode_loop() {
         if (!encoder_opened_.load()) {
             if (!encoder_->open(cfg_.output_url, ef.width, ef.height, source_fps_)) {
                 if (encoder_->has_permanently_failed()) {
-                    init_error_ = encoder_->last_error();
-                    std::cerr << "[Pipeline:" << cfg_.id << "] " << init_error_ << std::endl;
+                    set_init_error(encoder_->last_error());
+                    std::cerr << "[Pipeline:" << cfg_.id << "] " << init_error() << std::endl;
                     break;
                 }
                 static auto last_enc_err_ = std::chrono::steady_clock::now();
@@ -465,14 +489,17 @@ bool Pipeline::update_model(const std::string& name, const ModelConfig& mcfg) {
     return infer_group_->update_model(name, mcfg);
 }
 
-bool Pipeline::latest_jpeg(std::vector<uint8_t>* out, int quality) {
+bool Pipeline::latest_bgr_snapshot(std::shared_ptr<ImageData>* out) const {
     if (!out) return false;
-    std::shared_ptr<ImageData> snap;
-    {
-        std::lock_guard<std::mutex> lock(snapshot_mtx_);
-        if (!latest_bgr_ || latest_bgr_->empty()) return false;
-        snap = latest_bgr_;
-    }
+    std::lock_guard<std::mutex> lock(snapshot_mtx_);
+    if (!latest_bgr_ || latest_bgr_->empty()) return false;
+    *out = latest_bgr_;   // shared_ptr 拷贝：快照独立于 pipeline 生命周期
+    return true;
+}
+
+bool Pipeline::encode_jpeg(const std::shared_ptr<ImageData>& snap,
+                           std::vector<uint8_t>* out, int quality) {
+    if (!out || !snap) return false;
     cv::Mat mat;
     snap->to_mat(mat, true);
     if (mat.empty()) return false;
@@ -482,4 +509,10 @@ bool Pipeline::latest_jpeg(std::vector<uint8_t>* out, int quality) {
     else bgr = mat;
     std::vector<int> params = { cv::IMWRITE_JPEG_QUALITY, quality };
     return cv::imencode(".jpg", bgr, *out, params);
+}
+
+bool Pipeline::latest_jpeg(std::vector<uint8_t>* out, int quality) {
+    std::shared_ptr<ImageData> snap;
+    if (!latest_bgr_snapshot(&snap)) return false;
+    return encode_jpeg(snap, out, quality);
 }

@@ -63,7 +63,9 @@ public:
     void stop();
     bool is_running() const { return running_.load(); }
     bool is_initialized() const { return initialized_.load(); }
-    const std::string& init_error() const { return init_error_; }
+    // 线程安全：多线程读写 init_error_（decode/encode/HTTP）
+    std::string init_error() const;
+    void set_init_error(const std::string& msg);
 
     const std::string& task_id() const { return cfg_.id; }
     const PerfStats& stats() const { return stats_; }
@@ -79,6 +81,13 @@ public:
 
     /// 获取最新一帧 BGR JPEG（线程安全）
     bool latest_jpeg(std::vector<uint8_t>* out, int quality = 80);
+
+    /// 仅取最新帧快照（shared_ptr 拷贝，快；可在全局锁内调用）
+    bool latest_bgr_snapshot(std::shared_ptr<modeldeploy::vision::ImageData>* out) const;
+
+    /// 对快照编码 JPEG（无锁，可在全局锁外调用；5-15ms 级）
+    static bool encode_jpeg(const std::shared_ptr<modeldeploy::vision::ImageData>& snap,
+                            std::vector<uint8_t>* out, int quality);
 
     /// 是否启用预览编码
     bool is_preview_enabled() const { return cfg_.enable_preview; }
@@ -97,10 +106,11 @@ private:
     PerfStats stats_;
     std::atomic<bool> encoder_opened_{false};
     std::atomic<bool> initialized_{false};
+    mutable std::mutex init_error_mtx_;
     std::string init_error_;
 
     // 最新一帧（用于 HTTP 快照）
-    std::mutex snapshot_mtx_;
+    mutable std::mutex snapshot_mtx_;
     std::shared_ptr<modeldeploy::vision::ImageData> latest_bgr_;
     int snapshot_interval_ = 2;
 
@@ -112,9 +122,15 @@ private:
 
     std::atomic<bool> running_{false};
     std::atomic<bool> stopped_{true};       // 防止重复 stop
+    // start/stop 生命周期互斥：防止 stop 在线程创建完成前 join（未 join 的 thread 析构会 std::terminate）
+    std::mutex lifecycle_mtx_;
     std::thread decode_thread_;
     std::thread process_thread_;
     std::thread encode_thread_;
+
+    // 生命周期令牌：SharedSource 在途回调持有其强引用；release_resources 时置 false，
+    // 保证任务析构后解码线程的快照回调不再触碰 this（防 use-after-free）
+    std::shared_ptr<std::atomic<bool>> alive_token_;
 
     // ── 解码段 → 推理段 ──
     std::queue<PendingFrame> in_queue_;

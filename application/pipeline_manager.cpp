@@ -225,10 +225,15 @@ bool PipelineManager::get_task_stats(const std::string& task_id, std::string* st
 }
 
 bool PipelineManager::get_task_jpeg(const std::string& task_id, std::vector<uint8_t>* jpeg, int quality) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end() || !jpeg) return false;
-    return it->second->latest_jpeg(jpeg, quality);
+    std::shared_ptr<modeldeploy::vision::ImageData> snap;
+    {
+        // 全局锁内只做 shared_ptr 快照拷贝（微秒级），JPEG 编码在锁外（5-15ms）
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = pipelines_.find(task_id);
+        if (it == pipelines_.end() || !jpeg) return false;
+        if (!it->second->latest_bgr_snapshot(&snap)) return false;
+    }
+    return Pipeline::encode_jpeg(snap, jpeg, quality);
 }
 
 std::vector<TaskStatus> PipelineManager::list_tasks() const {

@@ -1,6 +1,7 @@
 
 .superpowers/
 build
+build_app
 build_msvc
 build_linux
 build_debug

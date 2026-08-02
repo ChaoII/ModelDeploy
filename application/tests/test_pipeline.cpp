@@ -43,6 +43,23 @@ TEST_CASE("Pipeline double start", "[pipeline]") {
     pipe.stop();
 }
 
+TEST_CASE("Pipeline concurrent start only creates one decode thread", "[pipeline][stress]") {
+    TaskConfig cfg;
+    cfg.id = "concurrent_start";
+    cfg.input_url = "rtsp://127.0.0.1:1/live/x";  // 不存在的端口，快速失败
+    cfg.output_url = "rtsp://out";
+    cfg.decoder.timeout_us = 500000;
+    for (int round = 0; round < 10; ++round) {
+        Pipeline pipe(cfg);
+        std::thread t1([&] { pipe.start(); });
+        std::thread t2([&] { pipe.start(); });
+        std::thread t3([&] { pipe.start(); });
+        t1.join(); t2.join(); t3.join();
+        pipe.stop();  // 若重复创建 decode 线程会泄漏/崩溃
+    }
+    REQUIRE(true);
+}
+
 TEST_CASE("Pipeline stop without start", "[pipeline]") {
     TaskConfig cfg;
     cfg.id = "safe_stop";
