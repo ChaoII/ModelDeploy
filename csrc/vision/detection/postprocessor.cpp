@@ -16,18 +16,34 @@ namespace modeldeploy::vision::detection {
         const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
-        // transpose(1,84,8400)->(1,8400,84) 84 = 4(xc,yc,w,h)+80(coco 80 classes)
-        // 此处有一次数据拷贝
-        Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
+        // 原始布局 [B, 84, 8400]：84 = 4(xc,yc,w,h) + 80(coco 80 classes)
+        const size_t dim1 = tensors[0].shape()[1]; // 8400 (anchors)
+        const size_t dim2 = tensors[0].shape()[2]; // 84
+        if (tensors[0].dtype() != DataType::FP32) {
+            MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
+            return false;
+        }
         results->resize(batch);
-        for (size_t bs = 0; bs < batch; ++bs) {
-            if (tensor_transpose.dtype() != DataType::FP32) {
-                MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
-                return false;
+
+        // 高效转置 [B,84,N] -> [B,N,84]：用普通双层循环（编译器向量化），避免递归逐元素拷贝
+        static thread_local std::vector<float> buf;
+        const size_t plane = dim1 * dim2;
+        buf.resize(batch * plane);
+        const float* src = static_cast<const float*>(tensors[0].data());
+        for (size_t b = 0; b < batch; ++b) {
+            const float* src_b = src + b * plane;
+            float* dst_b = buf.data() + b * plane;
+            // dst[(i*84)+c] = src[c*8400+i]，内层按 i 连续，编译器可向量化
+            for (size_t c = 0; c < dim2; ++c) {
+                const float* srow = src_b + c * dim1;
+                for (size_t i = 0; i < dim1; ++i) {
+                    dst_b[i * dim2 + c] = srow[i];
+                }
             }
-            const size_t dim1 = tensor_transpose.shape()[1]; //8400
-            const size_t dim2 = tensor_transpose.shape()[2]; //84
-            const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * dim1 * dim2;
+        }
+
+        for (size_t bs = 0; bs < batch; ++bs) {
+            const float* data = buf.data() + bs * plane;
             std::vector<DetectionResult> _results;
             _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
