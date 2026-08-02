@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <array>
+#include <vector>
 #include "core/tensor.h"
 #include "core/md_decl.h"
 #include "vision/common/image_data.h"
