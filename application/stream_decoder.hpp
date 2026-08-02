@@ -24,6 +24,8 @@ struct DecodedFrame {
     int y_step = 0;
     int uv_step = 0;
     int64_t pts = 0;
+    // 设备侧图像句柄（Sophgo 硬解码为 sail::BMImage*），非 0 走零拷贝路径
+    void* device_image = nullptr;
 };
 
 /// FFmpeg 硬件/软件解码器，支持 CUVID 回退与自动重连
