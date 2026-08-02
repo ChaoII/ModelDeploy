@@ -222,3 +222,28 @@ TEST_CASE("Processor accuracy: yolo_preprocess_batch CPU vs CUDA", "[processor_a
     REQUIRE(nd <= 24);
 #endif
 }
+
+// ==================== scrfd_preprocess：CPU(SIMD) vs CUDA ====================
+TEST_CASE("Processor accuracy: scrfd_preprocess CPU vs CUDA", "[processor_accuracy][gpu]") {
+#ifdef WITH_GPU
+    const int src_w = 256, src_h = 256;
+    auto img = make_test_image(src_w, src_h);
+    const std::vector<int> dst{248, 248};
+    const float pad = 114.0f;
+
+    auto cpu_backend = create_processor_backend(Device::CPU, Backend::ORT, 0);
+    auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
+    Tensor cpu_t, cuda_t;
+    LetterBoxRecord r1, r2;
+    REQUIRE(cpu_backend->scrfd_preprocess(img, &cpu_t, dst, pad, &r1));
+    REQUIRE(cuda_backend->scrfd_preprocess(img, &cuda_t, dst, pad, &r2));
+
+    std::vector<float> host(cuda_t.byte_size() / sizeof(float));
+    cudaMemcpy(host.data(), cuda_t.data(), cuda_t.byte_size(), cudaMemcpyDeviceToHost);
+    Tensor cuda_host(host.data(), cuda_t.shape(), DataType::FP32, Device::CPU);
+    size_t nd = 0;
+    const double md = tensor_maxdiff(cpu_t, cuda_host, &nd);
+    REQUIRE(md < 1e-4);
+    REQUIRE(nd <= 16);
+#endif
+}

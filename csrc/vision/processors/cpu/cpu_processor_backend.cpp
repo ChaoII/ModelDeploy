@@ -18,7 +18,16 @@ namespace modeldeploy::vision {
 bool CpuProcessorBackend::yolo_preprocess(const ImageData& image, Tensor* out,
                                           const std::vector<int>& dst_size,
                                           float pad_val, LetterBoxRecord* record) {
-    return yolo_preprocess_cpu(image, out, dst_size, pad_val, record);
+    // 走 fused SIMD 通道（标量参考 yolo_preprocess_cpu 仍保留）
+    *record = utils::cal_letter_box_param({image.width(), image.height()}, dst_size);
+    float ox, oy, sx, sy;
+    utils::letter_box_to_fused_params(*record, &ox, &oy, &sx, &sy);
+    const float alpha[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+    const float beta[3] = {0.0f, 0.0f, 0.0f};
+    return fused_preprocess(image, out, dst_size, ox, oy, sx, sy,
+                            std::vector<float>(alpha, alpha + 3),
+                            std::vector<float>(beta, beta + 3),
+                            true, pad_val / 255.0f);
 }
 
 bool CpuProcessorBackend::yolo_preprocess_nv12(const uint8_t* src_y, const uint8_t* src_uv,
@@ -44,7 +53,16 @@ bool CpuProcessorBackend::letterbox(const ImageData& image, ImageData* out,
 bool CpuProcessorBackend::scrfd_preprocess(const ImageData& image, Tensor* out,
                                            const std::vector<int>& dst_size,
                                            float pad_val, LetterBoxRecord* record) {
-    return scrfd_preprocess_cpu(image, out, dst_size, pad_val, record);
+    // 走 fused SIMD 通道（scrfd 归一化 (x-127.5)/128）
+    *record = utils::cal_letter_box_param({image.width(), image.height()}, dst_size);
+    float ox, oy, sx, sy;
+    utils::letter_box_to_fused_params(*record, &ox, &oy, &sx, &sy);
+    const float alpha[3] = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
+    const float beta[3] = {-127.5f / 128.0f, -127.5f / 128.0f, -127.5f / 128.0f};
+    return fused_preprocess(image, out, dst_size, ox, oy, sx, sy,
+                            std::vector<float>(alpha, alpha + 3),
+                            std::vector<float>(beta, beta + 3),
+                            true, pad_val / 128.0f - 127.5f / 128.0f);
 }
 
 bool CpuProcessorBackend::resize(const ImageData& image, ImageData* out,
