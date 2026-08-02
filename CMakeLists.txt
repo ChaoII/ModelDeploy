@@ -239,6 +239,14 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
         VERSION ${MD_VERSION}
         SOVERSION ${MD_VERSION_MAJOR})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS} PRIVATE ${PRIVATE_DEPENDS})
+if (MSVC AND ENABLE_ORT)
+    # delay-load onnxruntime：首次调用时才加载，此时 win_dll_path.cpp 的静态初始化
+    # 已用 SetDllDirectory 指向 SDK 同目录，避免被 System32 的旧版 onnxruntime(1.17) 抢占
+    target_link_options(${LIBRARY_NAME} PRIVATE
+            "/DELAYLOAD:onnxruntime.dll"
+            "/DELAYLOAD:onnxruntime_providers_cuda.dll")
+    target_link_libraries(${LIBRARY_NAME} PRIVATE delayimp)
+endif ()
 if (MSVC)
     target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
 endif ()
