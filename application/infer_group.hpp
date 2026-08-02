@@ -26,17 +26,23 @@ public:
     bool init();
 
     /// 对一帧执行所有模型的推理（多模型并行）— BGR 路径
+    /// @param frame_out 输出的 BGR 图（供绘制/快照；need_bgr=false 时可为空）
+    /// @param need_bgr 是否需要生成 BGR 图（非预览路可跳过，GPU 直通时省一次 GPU 往返）
     /// @return 0=无模型需要处理（全部跳帧），>0=有模型实际执行了推理
     int run_models(uint8_t* y_plane, uint8_t* uv_plane,
                     int width, int height, int y_step, int uv_step,
                     std::vector<InferResult>* results,
-                    modeldeploy::vision::ImageData* frame_out = nullptr);
+                    modeldeploy::vision::ImageData* frame_out = nullptr,
+                    bool need_bgr = true);
 
     /// 检查是否所有模型都支持 CUDA NV12 预处理（用于 GPU 快速路径判断）
     bool all_cuda_preproc() const;
 
     PerfStats& stats() { return stats_; }
     bool ready() const;
+
+    /// 是否可走 GPU NV12 直通（所有模型为 detection + device=gpu + 无 ROI）
+    bool gpu_nv12_ready() const { return gpu_nv12_ready_; }
 
     bool add_model(const ModelConfig& cfg);
     bool remove_model(const std::string& name);
@@ -49,6 +55,8 @@ private:
     std::mutex models_mtx_;
     std::vector<std::unique_ptr<InferenceEngine>> engines_;
     std::vector<int> frame_counters_;
+    // GPU NV12 直通可用（detection + gpu + 无 ROI）：推理跳过 host BGR 转换
+    bool gpu_nv12_ready_ = false;
     PerfStats stats_;
     FramePool frame_pool_;
     std::atomic<bool> initialized_{false};

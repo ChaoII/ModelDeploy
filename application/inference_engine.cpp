@@ -168,6 +168,31 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
     return false;
 }
 
+bool InferenceEngine::infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane,
+                                 int width, int height, int y_step, int uv_step,
+                                 InferResult* result) {
+    if (!loaded_ || !result) return false;
+    result->model_name = cfg_.name;
+    result->type = cfg_.type;
+    if (cfg_.type != "detection" || !det_model_) return false;
+
+    modeldeploy::vision::LetterBoxRecord record;
+    std::vector<modeldeploy::vision::DetectionResult> det_results;
+    if (!det_model_->predict_nv12(y_plane, uv_plane, width, height,
+                                  y_step, uv_step, &det_results, &record)) {
+        return false;
+    }
+    for (auto& d : det_results) {
+        DetectionBox box;
+        box.x = d.box.x; box.y = d.box.y;
+        box.w = d.box.width; box.h = d.box.height;
+        box.score = d.score;
+        box.label_id = d.label_id;
+        result->boxes.push_back(box);
+    }
+    return true;
+}
+
 bool InferenceEngine::batch_infer(const std::vector<ImageData>& images,
                                    std::vector<InferResult>* results) {
     if (!loaded_ || !results) return false;

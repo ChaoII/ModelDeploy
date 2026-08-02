@@ -19,6 +19,14 @@ namespace modeldeploy::vision::detection {
         bool predict(const ImageData& image, std::vector<DetectionResult>* result,
                      TimerArray* timers = nullptr);
 
+        /// GPU 直通：NV12 输入（host 或 device 指针）→ GPU letterbox/normalize → 推理 → 后处理。
+        /// 跳过 nv12→BGR→host 的中间转换，前处理全程在 GPU（配合 use_cuda_preproc）。
+        bool predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
+                          int width, int height, int step_y, int step_uv,
+                          std::vector<DetectionResult>* result,
+                          LetterBoxRecord* letter_box_record,
+                          TimerArray* timers = nullptr);
+
         bool batch_predict(const std::vector<ImageData>& images,
                            std::vector<std::vector<DetectionResult>>* results,
                            TimerArray* timers = nullptr);

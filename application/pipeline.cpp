@@ -343,7 +343,7 @@ void Pipeline::process_loop() {
                 const_cast<uint8_t*>(pf.y_ptr()),
                 const_cast<uint8_t*>(pf.uv_ptr()),
                 pf.width, pf.height, pf.width, pf.width,
-                &results, &bgr_image);
+                &results, &bgr_image, cfg_.enable_preview);
             ran_inference = models_ran > 0;
         }
         auto t1 = std::chrono::steady_clock::now();

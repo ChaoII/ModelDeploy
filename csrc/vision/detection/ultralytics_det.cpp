@@ -60,6 +60,38 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
+    bool UltralyticsDet::predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
+                                      int width, int height, int step_y, int step_uv,
+                                      std::vector<DetectionResult>* result,
+                                      LetterBoxRecord* letter_box_record,
+                                      TimerArray* timers) {
+        if (!src_y || !src_uv || !result) return false;
+        // NV12 → GPU letterbox/normalize → GPU tensor（backend_ 为 CUDA 时全程在 GPU）
+        if (timers) timers->pre_timer.start();
+        if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
+                               &reused_input_tensors_[0], letter_box_record)) {
+            MD_LOG_ERROR << "Failed to preprocess the NV12 input." << std::endl;
+            return false;
+        }
+        if (timers) timers->pre_timer.stop();
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
+        if (timers) timers->infer_timer.start();
+        if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
+        std::vector<std::vector<DetectionResult>> results;
+        if (!postprocessor_.run(reused_output_tensors_, &results, {*letter_box_record})) {
+            MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->post_timer.stop();
+        if (!results.empty()) *result = std::move(results[0]);
+        return true;
+    }
+
     std::unique_ptr<UltralyticsDet> UltralyticsDet::clone() const {
         auto clone_model = std::make_unique<UltralyticsDet>(*this);
         clone_model->set_runtime(clone_model->clone_runtime());

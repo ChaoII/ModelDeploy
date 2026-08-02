@@ -42,6 +42,16 @@ bool InferGroup::init() {
         frame_counters_.push_back(0);
     }
     if (engines_.empty()) return false;
+    // GPU NV12 直通：所有模型 detection + gpu + 无 ROI
+    gpu_nv12_ready_ = true;
+    for (const auto& eng : engines_) {
+        const auto& mcfg = eng->config();
+        if (mcfg.type != "detection" || mcfg.device != "gpu" ||
+            mcfg.roi[2] > 0 || mcfg.roi[3] > 0) {
+            gpu_nv12_ready_ = false;
+            break;
+        }
+    }
     start_workers();
 
     // Warm-up 移入后台线程：TRT 首次编译可耗时 30-60s，若在解码线程同步执行，
@@ -145,7 +155,7 @@ void InferGroup::stop_workers() {
 int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                               int width, int height, int y_step, int uv_step,
                               std::vector<InferResult>* results,
-                              ImageData* frame_out) {
+                              ImageData* frame_out, bool need_bgr) {
     if (!initialized_) return 0;
     // 全程持模型锁：与 add/remove/update_model 串行化，防止遍历 engines_/workers_ 时被改写
     std::lock_guard<std::mutex> lock(models_mtx_);
@@ -180,26 +190,79 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
         if (should) any_needs_process = true;
     }
 
-    // 即使所有模型跳推理，仍需输出 BGR 图像（供预览路保持 25fps 编码 + 复用缓存绘制）
+    // BGR 生成：预览路/CPU 推理需要；GPU 直通 + 非预览路可跳过（省一次 GPU 往返 + host 拷贝）
+    ImageData bgr_image;
+    const bool need_bgr_img = need_bgr || !gpu_nv12_ready_;
+    if (need_bgr_img) {
 #ifdef WITH_GPU
-    const size_t bgr_size = static_cast<size_t>(height) * width * 3;
-    if (bgr_buf_.size() < bgr_size) bgr_buf_.resize(bgr_size);
-    nv12_to_bgr_cuda(y_src, uv_src,
-                      width, height, width, width,
-                      bgr_buf_.data());
-    auto bgr_image = ImageData::from_raw(bgr_buf_.data(), width, height,
-                                          MdImageType::PKG_BGR_U8, true); // copy=true：独立所有权，防跨队列缓冲别名竞争
+        const size_t bgr_size = static_cast<size_t>(height) * width * 3;
+        if (bgr_buf_.size() < bgr_size) bgr_buf_.resize(bgr_size);
+        nv12_to_bgr_cuda(y_src, uv_src,
+                          width, height, width, width,
+                          bgr_buf_.data());
+        bgr_image = ImageData::from_raw(bgr_buf_.data(), width, height,
+                                              MdImageType::PKG_BGR_U8, true); // copy=true：独立所有权，防跨队列缓冲别名竞争
 #else
-    auto nv12_image = ImageData::from_raw(y_src, width, height, MdImageType::NV12, true);
-    auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
+        auto nv12_image = ImageData::from_raw(y_src, width, height, MdImageType::NV12, true);
+        bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
 #endif
-
-    if (frame_out)
-        *frame_out = bgr_image;
+        if (frame_out)
+            *frame_out = bgr_image;
+    }
 
     // 所有模型跳推理 → 输出 BGR 但不输出结果
     if (!any_needs_process) {
         return 0;
+    }
+
+    // ── GPU NV12 直通：NV12 → GPU letterbox/normalize → 推理 → 后处理，全程不落 host BGR ──
+    if (gpu_nv12_ready_ && y_src && uv_src) {
+        struct GpuTask {
+            size_t index;
+            InferResult result;
+            int64_t dt_us = 0;
+            bool used = false;
+        };
+        std::vector<GpuTask> tasks(engines_.size());
+        for (size_t i = 0; i < engines_.size(); ++i) {
+            if (!need_process[i]) continue;
+            tasks[i].index = i;
+            tasks[i].used = true;
+        }
+        const int sw = width, sh = height, sy = y_step, suv = uv_step;
+        for (size_t i = 0; i < tasks.size(); ++i) {
+            if (!tasks[i].used) continue;
+            auto& w = workers_[i];
+            auto& engine = engines_[i];
+            GpuTask* tp = &tasks[i];
+            {
+                std::lock_guard<std::mutex> lock(w->mtx);
+                w->done = false;
+                w->has_task = true;
+                w->task = [&engine, tp, y_src, uv_src, sw, sh, sy, suv]() {
+                    auto t0 = std::chrono::steady_clock::now();
+                    engine->infer_nv12(y_src, uv_src, sw, sh, sy, suv, &tp->result);
+                    tp->dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now() - t0).count();
+                };
+            }
+            w->cv_in.notify_one();
+        }
+        for (size_t i = 0; i < tasks.size(); ++i) {
+            if (!tasks[i].used) continue;
+            auto& w = workers_[i];
+            std::unique_lock<std::mutex> lock(w->mtx);
+            w->cv_out.wait(lock, [&w]() { return w->done; });
+        }
+        int ran_count = 0;
+        for (auto& task : tasks) {
+            if (!task.used) continue;
+            ++ran_count;
+            if (!task.result.boxes.empty())
+                results->push_back(std::move(task.result));
+            stats_.record_frame(0, task.dt_us, 0, 0);
+        }
+        return ran_count;
     }
 
     struct ModelTask {

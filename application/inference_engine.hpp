@@ -56,6 +56,11 @@ public:
 
     bool infer(const modeldeploy::vision::ImageData& image, InferResult* result);
 
+    /// GPU 直通：NV12 输入 → GPU 预处理 → 推理 → 后处理（跳过 host BGR 转换）
+    bool infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane,
+                    int width, int height, int y_step, int uv_step,
+                    InferResult* result);
+
     /// 批量推理（仅 detection 模型支持真批量；其他类型逐帧 fallback）
     bool batch_infer(const std::vector<modeldeploy::vision::ImageData>& images,
                      std::vector<InferResult>* results);
