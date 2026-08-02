@@ -63,19 +63,25 @@ namespace modeldeploy::vision::face {
             }
             return true;
         }
-        // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images.size());
-        for (size_t i = 0; i < images.size(); ++i) {
-            if (!preprocess(images[i], &tensors[i])) {
-                MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
-                return false;
+        // 整批一次 fused kernel（resize-to-256 + center_crop 248 合并为单步映射）
+        const int n = static_cast<int>(images.size());
+        std::vector<float> origins(n), scales(n);
+        for (int i = 0; i < n; ++i) {
+            const int w = images[i].width();
+            if (w == size_[1] && images[i].height() == size_[0]) {
+                origins[i] = 0.0f;   // 已 248：恒等
+                scales[i] = 1.0f;
+            } else {
+                origins[i] = -4.0f;  // center_crop 248 from 256
+                scales[i] = 256.0f / w;
             }
         }
-        if (tensors.size() == 1) {
-            (*outputs)[0] = std::move(tensors[0]);
-        }
-        else {
-            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        if (!backend_->fused_preprocess_batch(images, &(*outputs)[0], size_,
+                                              origins, origins, scales, scales,
+                                              {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+                                              false, 0.0f)) {
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
+            return false;
         }
         return true;
     }

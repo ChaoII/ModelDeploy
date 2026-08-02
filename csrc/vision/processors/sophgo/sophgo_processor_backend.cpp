@@ -95,6 +95,27 @@ namespace modeldeploy::vision {
         return cpu_fallback_->yolo_preprocess(image, out, dst_size, pad_val, record);
     }
 
+    bool SophgoProcessorBackend::yolo_preprocess_batch(
+        const std::vector<ImageData>& images, Tensor* out,
+        const std::vector<int>& dst_size,
+        float pad_val, std::vector<LetterBoxRecord>* records) {
+        // VERIFY: TPU 批量 path（BMCV crop + TPU 通道），当前先 CPU 兜底
+        return cpu_fallback_->yolo_preprocess_batch(images, out, dst_size, pad_val, records);
+    }
+
+    bool SophgoProcessorBackend::fused_preprocess_batch(
+        const std::vector<ImageData>& images, Tensor* out,
+        const std::vector<int>& dst_size,
+        const std::vector<float>& origins_x, const std::vector<float>& origins_y,
+        const std::vector<float>& scales_x, const std::vector<float>& scales_y,
+        const std::vector<float>& alpha, const std::vector<float>& beta,
+        bool swap_rb, float pad_value) {
+        // VERIFY: TPU 批量 path，当前先 CPU 兜底
+        return cpu_fallback_->fused_preprocess_batch(
+            images, out, dst_size, origins_x, origins_y, scales_x, scales_y,
+            alpha, beta, swap_rb, pad_value);
+    }
+
     bool SophgoProcessorBackend::yolo_preprocess_nv12(
         const uint8_t* src_y, const uint8_t* src_uv,
         const std::vector<int>& src_size,

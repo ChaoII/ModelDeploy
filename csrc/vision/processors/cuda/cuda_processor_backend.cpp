@@ -82,4 +82,22 @@ bool CudaProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& i
 #endif
 }
 
+bool CudaProcessorBackend::fused_preprocess_batch(
+    const std::vector<ImageData>& images, Tensor* out,
+    const std::vector<int>& dst_size,
+    const std::vector<float>& origins_x, const std::vector<float>& origins_y,
+    const std::vector<float>& scales_x, const std::vector<float>& scales_y,
+    const std::vector<float>& alpha, const std::vector<float>& beta,
+    bool swap_rb, float pad_value) {
+#ifdef WITH_GPU
+    return fused_preprocess_batch_cuda(images, out, dst_size, origins_x, origins_y,
+                                       scales_x, scales_y, alpha, beta, swap_rb, pad_value);
+#else
+    MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
+    return CpuProcessorBackend::fused_preprocess_batch(
+        images, out, dst_size, origins_x, origins_y, scales_x, scales_y,
+        alpha, beta, swap_rb, pad_value);
+#endif
+}
+
 } // namespace modeldeploy::vision

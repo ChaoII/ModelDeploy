@@ -38,16 +38,19 @@ namespace modeldeploy::vision::lpr {
             preprocess(&(*images)[0], &(*outputs)[0]);
             return true;
         }
-        // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images->size());
-        for (size_t i = 0; i < images->size(); ++i) {
-            preprocess(&(*images)[i], &tensors[i]);
+        // 整批一次 fused kernel
+        const int n = static_cast<int>(images->size());
+        std::vector<float> oxs(n, 0.0f), oys(n, 0.0f), sxs(n), sys(n);
+        for (int i = 0; i < n; ++i) {
+            sxs[i] = static_cast<float>(size_[0]) / (*images)[i].width();
+            sys[i] = static_cast<float>(size_[1]) / (*images)[i].height();
         }
-        if (tensors.size() == 1) {
-            (*outputs)[0] = std::move(tensors[0]);
-        }
-        else {
-            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+                                              oxs, oys, sxs, sys,
+                                              {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f},
+                                              {-0.588f, -0.588f, -0.588f}, true, 0.0f)) {
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
+            return false;
         }
         return true;
     }

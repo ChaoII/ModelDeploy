@@ -51,17 +51,22 @@ namespace modeldeploy::vision::lpr {
             preprocess(&(*images)[0], &(*outputs)[0], &(*letter_box_records)[0]);
             return true;
         }
-        // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images->size());
-        for (size_t i = 0; i < images->size(); ++i) {
-            // 修改了数据，并生成一个tensor,并记录预处理的一些参数，便于在后处理中还原
-            preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
+        // 整批一次 fused kernel（每图独立 letterbox 映射）
+        const int n = static_cast<int>(images->size());
+        std::vector<float> oxs(n), oys(n), sxs(n), sys(n);
+        for (int i = 0; i < n; ++i) {
+            (*letter_box_records)[i] = utils::cal_letter_box_param(
+                {(*images)[i].width(), (*images)[i].height()}, size_);
+            utils::letter_box_to_fused_params((*letter_box_records)[i],
+                                              &oxs[i], &oys[i], &sxs[i], &sys[i]);
         }
-        if (tensors.size() == 1) {
-            (*outputs)[0] = std::move(tensors[0]);
-        }
-        else {
-            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        const float pad_norm = padding_value_[0] / 255.0f;
+        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+                                              oxs, oys, sxs, sys,
+                                              {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f},
+                                              {0.0f, 0.0f, 0.0f}, true, pad_norm)) {
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
+            return false;
         }
         return true;
     }

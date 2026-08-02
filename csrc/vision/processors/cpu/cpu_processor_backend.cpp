@@ -182,6 +182,30 @@ bool CpuProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& im
     return true;
 }
 
+bool CpuProcessorBackend::fused_preprocess_batch(
+    const std::vector<ImageData>& images, Tensor* out,
+    const std::vector<int>& dst_size,
+    const std::vector<float>& origins_x, const std::vector<float>& origins_y,
+    const std::vector<float>& scales_x, const std::vector<float>& scales_y,
+    const std::vector<float>& alpha, const std::vector<float>& beta,
+    bool swap_rb, float pad_value) {
+    if (images.empty() || dst_size.size() != 2) return false;
+    const int batch = static_cast<int>(images.size());
+    const int dst_w = dst_size[0];
+    const int dst_h = dst_size[1];
+    const int plane = 3 * dst_h * dst_w;
+    out->allocate({batch, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+    float* dst = out->data_ptr<float>();
+    const auto kernel = get_fused_preproc_kernel();
+    for (int b = 0; b < batch; ++b) {
+        kernel(images[b].data(), images[b].width(), images[b].height(),
+               dst + static_cast<size_t>(b) * plane, dst_w, dst_h,
+               origins_x[b], origins_y[b], scales_x[b], scales_y[b],
+               alpha.data(), beta.data(), swap_rb, pad_value);
+    }
+    return true;
+}
+
 bool CpuProcessorBackend::fused_preprocess(
     const ImageData& image, Tensor* out,
     const std::vector<int>& dst_size,

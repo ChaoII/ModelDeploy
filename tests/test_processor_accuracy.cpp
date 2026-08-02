@@ -247,3 +247,51 @@ TEST_CASE("Processor accuracy: scrfd_preprocess CPU vs CUDA", "[processor_accura
     REQUIRE(nd <= 16);
 #endif
 }
+
+// ============ fused_preprocess_batch：CPU(SIMD) vs 逐图 与 CUDA(3D grid) ============
+TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA", "[processor_accuracy][gpu]") {
+    std::vector<ImageData> imgs = {
+        make_test_image(160, 100),
+        make_test_image(240, 120),
+        make_test_image(96, 160),
+    };
+    const std::vector<int> dst{224, 224};
+    const std::vector<float> alpha = {1.0f / (255.0f * 0.229f), 1.0f / (255.0f * 0.224f), 1.0f / (255.0f * 0.225f)};
+    const std::vector<float> beta = {-0.485f / 0.229f, -0.456f / 0.224f, -0.406f / 0.225f};
+
+    std::vector<float> oxs(3), oys(3, 0.0f), sxs(3), sys(3);
+    for (int i = 0; i < 3; ++i) {
+        sxs[i] = static_cast<float>(dst[0]) / imgs[i].width();
+        sys[i] = static_cast<float>(dst[1]) / imgs[i].height();
+        oxs[i] = 0.0f;
+    }
+
+    auto cpu_backend = create_processor_backend(Device::CPU, Backend::ORT, 0);
+    Tensor batch_cpu;
+    REQUIRE(cpu_backend->fused_preprocess_batch(imgs, &batch_cpu, dst, oxs, oys, sxs, sys,
+                                                alpha, beta, true, 0.0f));
+
+    // batch == 逐图 concat（正确性）
+    std::vector<Tensor> singles(3);
+    for (int i = 0; i < 3; ++i) {
+        REQUIRE(cpu_backend->fused_preprocess(imgs[i], &singles[i], dst, oxs[i], oys[i], sxs[i], sys[i],
+                                              alpha, beta, true, 0.0f));
+    }
+    Tensor concat_ref = Tensor::concat(singles, 0);
+    size_t nd = 0;
+    REQUIRE(tensor_maxdiff(batch_cpu, concat_ref, &nd) < 1e-5);
+    REQUIRE(nd == 0);
+
+#ifdef WITH_GPU
+    // CPU(SIMD) vs CUDA(3D grid)
+    auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
+    Tensor batch_cuda;
+    REQUIRE(cuda_backend->fused_preprocess_batch(imgs, &batch_cuda, dst, oxs, oys, sxs, sys,
+                                                 alpha, beta, true, 0.0f));
+    std::vector<float> host(batch_cuda.byte_size() / sizeof(float));
+    cudaMemcpy(host.data(), batch_cuda.data(), batch_cuda.byte_size(), cudaMemcpyDeviceToHost);
+    Tensor cuda_host(host.data(), batch_cuda.shape(), DataType::FP32, Device::CPU);
+    REQUIRE(tensor_maxdiff(batch_cpu, cuda_host, &nd) < 1e-4);
+    REQUIRE(nd <= 24);
+#endif
+}

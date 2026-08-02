@@ -44,11 +44,19 @@ namespace modeldeploy::vision::ocr {
         const int batch_max_w = static_shape_infer_
             ? img_w
             : static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
-        std::vector<Tensor> tensors;
-        tensors.reserve(image_batch.size());
-        for (auto& image : image_batch) {
-            const int src_w = image.width();
-            const int src_h = image.height();
+        // alpha/beta 由模型配置决定，batch 内共享，仅算一次
+        const float s = is_scale_ ? 255.0f : 1.0f;
+        std::vector<float> alpha(3), beta(3);
+        for (int c = 0; c < 3; ++c) {
+            alpha[c] = 1.0f / (s * std_[c]);
+            beta[c] = -mean_[c] / std_[c];
+        }
+        // pad 127 在归一化后的值（旧：resize->pad(127 raw)->fuse_normalize）
+        const float pad_norm = pad_value_[0] * alpha[0] + beta[0];
+
+        const int n = static_cast<int>(image_batch.size());
+        if (n == 1) {
+            const ImageData& image = image_batch[0];
             int resize_w;
             if (!static_shape_infer_) {
                 const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
@@ -57,26 +65,33 @@ namespace modeldeploy::vision::ocr {
             } else {
                 resize_w = img_w;
             }
-            // dst 宽固定 batch_max_w；内容缩到 resize_w，右侧 [resize_w, batch_max_w) 为 pad
-            const float scale_x = static_cast<float>(resize_w) / src_w;
-            const float scale_y = static_cast<float>(img_h) / src_h;
-            Tensor tensor;
-            std::vector<float> alpha(3), beta(3);
-            for (int c = 0; c < 3; ++c) {
-                const float s = is_scale_ ? 255.0f : 1.0f;
-                alpha[c] = 1.0f / (s * std_[c]);
-                beta[c] = -mean_[c] / std_[c];
-            }
-            // pad 127 在归一化后的值（旧：resize->pad(127 raw)->fuse_normalize）
-            const float pad_norm = pad_value_[0] * alpha[0] + beta[0];
-            if (!backend_->fused_preprocess(image, &tensor, {batch_max_w, img_h},
+            const float scale_x = static_cast<float>(resize_w) / image.width();
+            const float scale_y = static_cast<float>(img_h) / image.height();
+            if (!backend_->fused_preprocess(image, &(*outputs)[0], {batch_max_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, true, pad_norm)) return false;
-            tensors.emplace_back(std::move(tensor));
+            return true;
+        }
+        // 整批一次 fused kernel（每图独立 resize_w -> scale_x，右侧 pad）
+        std::vector<float> oxs(n, 0.0f), oys(n, 0.0f), sxs(n), sys(n);
+        for (int i = 0; i < n; ++i) {
+            const ImageData& image = image_batch[i];
+            int resize_w;
+            if (!static_shape_infer_) {
+                const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
+                if (std::ceil(img_h * ratio) > batch_max_w) resize_w = batch_max_w;
+                else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
+            } else {
+                resize_w = img_w;
+            }
+            sxs[i] = static_cast<float>(resize_w) / image.width();
+            sys[i] = static_cast<float>(img_h) / image.height();
         }
         // Only have 1 output Tensor.
         outputs->resize(1);
-        (*outputs)[0] = Tensor::concat(tensors, 0);
+        if (!backend_->fused_preprocess_batch(image_batch, &(*outputs)[0], {batch_max_w, img_h},
+                                              oxs, oys, sxs, sys,
+                                              alpha, beta, true, pad_norm)) return false;
         return true;
     }
 }

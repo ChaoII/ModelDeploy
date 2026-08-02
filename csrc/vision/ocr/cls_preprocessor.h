@@ -69,6 +69,15 @@ namespace modeldeploy::vision::ocr {
         }
 
     private:
+        // alpha/beta 由 mean/std/is_scale 决定（模型配置，batch 内共享）
+        [[nodiscard]] std::vector<float> alpha() const {
+            const float s = is_scale_ ? 255.0f : 1.0f;
+            return {1.0f / (s * std_[0]), 1.0f / (s * std_[1]), 1.0f / (s * std_[2])};
+        }
+        [[nodiscard]] std::vector<float> beta() const {
+            return {-mean_[0] / std_[0], -mean_[1] / std_[1], -mean_[2] / std_[2]};
+        }
+
         std::vector<int> cls_image_shape_ = {3, 48, 192};
         std::vector<float> mean_{0.5f, 0.5f, 0.5f};
         std::vector<float> std_{0.5f, 0.5f, 0.5f};

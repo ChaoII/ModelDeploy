@@ -31,6 +31,17 @@ namespace modeldeploy::vision {
                                   int step_y, int step_uv, Tensor* out,
                                   const std::vector<int>& dst_size,
                                   float pad_val, LetterBoxRecord* record) override;
+        bool yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                   const std::vector<int>& dst_size,
+                                   float pad_val,
+                                   std::vector<LetterBoxRecord>* records) override;
+        bool fused_preprocess_batch(
+            const std::vector<ImageData>& images, Tensor* out,
+            const std::vector<int>& dst_size,
+            const std::vector<float>& origins_x, const std::vector<float>& origins_y,
+            const std::vector<float>& scales_x, const std::vector<float>& scales_y,
+            const std::vector<float>& alpha, const std::vector<float>& beta,
+            bool swap_rb, float pad_value) override;
         bool letterbox(const ImageData& image, ImageData* out,
                        const std::vector<int>& dst_size,
                        const std::vector<float>& padding_value,

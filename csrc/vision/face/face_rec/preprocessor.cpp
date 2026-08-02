@@ -45,17 +45,16 @@ namespace modeldeploy::vision::face {
             preprocess(&(*images)[0], &(*outputs)[0]);
             return true;
         }
-        // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images->size());
-        for (size_t i = 0; i < images->size(); ++i) {
-            // 修改了数据，并生成一个tensor,并记录预处理的一些参数，便于在后处理中还原
-            preprocess(&(*images)[i], &tensors[i]);
-        }
-        if (tensors.size() == 1) {
-            (*outputs)[0] = std::move(tensors[0]);
-        }
-        else {
-            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+        // 整批一次 fused kernel（resize-to-256 + center_crop 248 合并为单步映射）
+        const int n = static_cast<int>(images->size());
+        std::vector<float> origins(n, -4.0f), scales(n);
+        for (int i = 0; i < n; ++i) scales[i] = 256.0f / (*images)[i].width();
+        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+                                              origins, origins, scales, scales,
+                                              {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+                                              true, 0.0f)) {
+            MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
+            return false;
         }
         return true;
     }

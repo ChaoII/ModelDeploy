@@ -28,35 +28,41 @@ namespace modeldeploy::vision::ocr {
 
     bool ClassifierPreprocessor::apply(const std::vector<ImageData>& image_batch,
                                        std::vector<Tensor>* outputs) {
-        std::vector<Tensor> tensors;
-        tensors.reserve(image_batch.size());
-        for (auto& image : image_batch) {
-            const int img_h = cls_image_shape_[1];
-            const int img_w = cls_image_shape_[2];
+        outputs->resize(1);
+        const int img_h = cls_image_shape_[1];
+        const int img_w = cls_image_shape_[2];
+        const int n = static_cast<int>(image_batch.size());
+        if (n == 1) {
+            const ImageData& image = image_batch[0];
             const int src_w = image.width();
             const int src_h = image.height();
             const float ratio = static_cast<float>(src_w) / static_cast<float>(src_h);
             int resize_w;
             if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w)) resize_w = img_w;
             else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
-            // dst 宽固定 img_w；内容缩到 resize_w，右侧 pad(0)
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(img_h) / src_h;
-            Tensor t;
-            std::vector<float> alpha(3), beta(3);
-            for (int c = 0; c < 3; ++c) {
-                const float s = is_scale_ ? 255.0f : 1.0f;
-                alpha[c] = 1.0f / (s * std_[c]);
-                beta[c] = -mean_[c] / std_[c];
-            }
-            if (!backend_->fused_preprocess(image, &t, {img_w, img_h},
+            if (!backend_->fused_preprocess(image, &(*outputs)[0], {img_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
-                                            alpha, beta, false, 0.0f)) return false;
-            tensors.emplace_back(std::move(t));
+                                            alpha(), beta(), false, 0.0f)) return false;
+            return true;
         }
-        // Only have 1 output tensor.
-        outputs->resize(1);
-        (*outputs)[0] = Tensor::concat(tensors, 0);
+        // 整批一次 fused kernel（每图独立 resize_w -> scale_x，右侧 pad）
+        std::vector<float> oxs(n, 0.0f), oys(n, 0.0f), sxs(n), sys(n);
+        for (int i = 0; i < n; ++i) {
+            const ImageData& image = image_batch[i];
+            const int src_w = image.width();
+            const int src_h = image.height();
+            const float ratio = static_cast<float>(src_w) / static_cast<float>(src_h);
+            int resize_w;
+            if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w)) resize_w = img_w;
+            else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
+            sxs[i] = static_cast<float>(resize_w) / src_w;
+            sys[i] = static_cast<float>(img_h) / src_h;
+        }
+        if (!backend_->fused_preprocess_batch(image_batch, &(*outputs)[0], {img_w, img_h},
+                                              oxs, oys, sxs, sys,
+                                              alpha(), beta(), false, 0.0f)) return false;
         return true;
     }
 }

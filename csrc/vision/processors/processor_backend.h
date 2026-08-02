@@ -42,6 +42,16 @@ public:
                                        float pad_val,
                                        std::vector<LetterBoxRecord>* records) = 0;
 
+    // 整批通用融合预处理（batch>1 一次 kernel）：每图独立 origin/scale，共享 alpha/beta/swap_rb/pad
+    // 输出 [batch, 3, dst_h, dst_w]（dst 尺寸 batch 内统一）
+    virtual bool fused_preprocess_batch(
+        const std::vector<ImageData>& images, Tensor* out,
+        const std::vector<int>& dst_size,
+        const std::vector<float>& origins_x, const std::vector<float>& origins_y,
+        const std::vector<float>& scales_x, const std::vector<float>& scales_y,
+        const std::vector<float>& alpha, const std::vector<float>& beta,
+        bool swap_rb, float pad_value) = 0;
+
     // SCRFD 人脸检测专用（letterbox + resize + normalize + hwc2chw，归一化为 (x-127.5)/128）
     virtual bool scrfd_preprocess(const ImageData& image, Tensor* out,
                                   const std::vector<int>& dst_size,

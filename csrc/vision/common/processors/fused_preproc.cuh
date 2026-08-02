@@ -37,4 +37,18 @@ bool fused_preprocess_cuda(const uint8_t* src,
                            float pad_value,
                            cudaStream_t stream = nullptr);
 
+// 整批通用融合预处理（3D grid 一次 launch）：每图独立 origin/scale，共享 alpha/beta/swap/pad
+// 输出 [batch, 3, dst_h, dst_w] FP32 GPU，dst 尺寸 batch 内统一
+bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
+                                 Tensor* out,
+                                 const std::vector<int>& dst_size,
+                                 const std::vector<float>& origins_x,
+                                 const std::vector<float>& origins_y,
+                                 const std::vector<float>& scales_x,
+                                 const std::vector<float>& scales_y,
+                                 const std::vector<float>& alpha,
+                                 const std::vector<float>& beta,
+                                 bool swap_rb, float pad_value,
+                                 cudaStream_t stream = nullptr);
+
 } // namespace modeldeploy::vision
