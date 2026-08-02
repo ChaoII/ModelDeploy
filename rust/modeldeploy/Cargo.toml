@@ -1,6 +1,6 @@
 [package]
 name = "modeldeploy"
-version = "0.1.0"
+version = "1.8.0"
 edition = "2021"
 description = "Rust bindings for ModelDeploy C++ inference SDK"
 license = "MIT"
