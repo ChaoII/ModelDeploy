@@ -46,7 +46,7 @@ bool CpuProcessorBackend::normalize(const ImageData& image, ImageData* out,
 
 bool CpuProcessorBackend::convert_to(const ImageData& image, ImageData* out,
                                      const std::string& dst_format) {
-    ColorConvertType type = ColorConvertType::CVT_PA_BGR2PA_RGB;
+    ColorConvertType type;
     if (dst_format == "RGB") {
         type = ColorConvertType::CVT_PA_BGR2PA_RGB;
     } else if (dst_format == "GRAY") {
@@ -54,6 +54,9 @@ bool CpuProcessorBackend::convert_to(const ImageData& image, ImageData* out,
     } else if (dst_format == "BGR") {
         *out = image.clone();
         return !out->empty();
+    } else {
+        MD_LOG_ERROR << "Unsupported convert format: " << dst_format << std::endl;
+        return false;
     }
     *out = ImageData::cvt_color(image, type);
     return !out->empty();
@@ -75,7 +78,7 @@ bool CpuProcessorBackend::pad(const ImageData& image, ImageData* out,
 bool CpuProcessorBackend::hwc2chw(const ImageData& image, Tensor* out) {
     ImageData tmp = image;
     tmp.to_tensor(out);
-    return true;
+    return !tmp.empty();
 }
 
 bool CpuProcessorBackend::normalize_and_permute(const ImageData& image, Tensor* out,
