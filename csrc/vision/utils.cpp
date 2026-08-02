@@ -288,19 +288,26 @@ namespace modeldeploy::vision::utils {
 
     void nms(std::vector<DetectionResult>* result, const float iou_threshold, std::vector<int>* index) {
         const size_t N = result->size();
+        if (N <= 1) return;
+        // 复用临时缓冲，避免每帧堆分配
+        static thread_local std::vector<int> sorted_indices;
+        static thread_local std::vector<uint8_t> suppressed;
+        static thread_local std::vector<int> keep_indices;
+        static thread_local std::vector<DetectionResult> new_result;
+        sorted_indices.resize(N);
+        suppressed.assign(N, 0);
+        keep_indices.clear();
+        new_result.clear();
+        new_result.reserve(N);
         // Step 1: 根据分数排序得到索引
-        std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
         std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int a, const int b) {
             return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 
-        // Step 2: NMS 主逻辑
-        std::vector suppressed(N, false);
-        std::vector<int> keep_indices;
-
+        // Step 2: NMS 主逻辑（沿用原 rect_iou 保证数值一致）
         for (size_t m = 0; m < N; ++m) {
-            int i = sorted_indices[m];
+            const int i = sorted_indices[m];
             if (suppressed[i]) continue;
             keep_indices.push_back(i); // 保留当前框
             const auto& box_i = (*result)[i].box;
@@ -310,13 +317,11 @@ namespace modeldeploy::vision::utils {
                 const auto& box_j = (*result)[j].box;
                 const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
                 if (iou > iou_threshold) {
-                    suppressed[j] = true;
+                    suppressed[j] = 1;
                 }
             }
         }
         // Step 3: 根据 keep_indices 重建结果
-        std::vector<DetectionResult> new_result;
-        new_result.reserve(keep_indices.size());
         for (const auto idx : keep_indices) {
             new_result.push_back(std::move((*result)[idx])); // 移动语义
             if (index) {
