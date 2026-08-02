@@ -26,9 +26,25 @@ public:
                           float pad_val, LetterBoxRecord* record) override;
     bool resize(const ImageData& image, ImageData* out,
                 int width, int height) override;
+    bool convert(const ImageData& image, ImageData* out,
+                 const std::vector<float>& alpha,
+                 const std::vector<float>& beta) override;
+    bool cast(const ImageData& image, ImageData* out,
+              const std::string& dtype) override;
+    bool convert_and_permute(const ImageData& image, Tensor* out,
+                             const std::vector<float>& alpha,
+                             const std::vector<float>& beta,
+                             bool swap_rb) override;
+    bool fusion_resize_pad_normalize_permute(
+        const std::vector<ImageData>& images, Tensor* out,
+        const std::vector<std::array<int, 2>>& resize_sizes,
+        const std::vector<int>& dst_size,
+        const std::vector<float>& mean, const std::vector<float>& std,
+        float pad_value) override;
     bool normalize(const ImageData& image, ImageData* out,
                    const std::vector<float>& mean,
-                   const std::vector<float>& std) override;
+                   const std::vector<float>& std,
+                   bool scale, bool swap_rb) override;
     bool convert_to(const ImageData& image, ImageData* out,
                     const std::string& dst_format) override;
     bool center_crop(const ImageData& image, ImageData* out,

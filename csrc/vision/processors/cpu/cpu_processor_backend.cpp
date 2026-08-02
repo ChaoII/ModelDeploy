@@ -6,6 +6,9 @@
 #include "vision/processors/cpu/cpu_processor_backend.h"
 #include "vision/common/processors/yolo_preproc.h"
 #include "vision/common/processors/nv12_to_bgr.h"
+#include "vision/common/processors/convert_and_permute.h"
+#include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
+#include "vision/utils.h"
 #include "vision/face/face_det/scrfd_preproc.h"
 
 namespace modeldeploy::vision {
@@ -37,10 +40,45 @@ bool CpuProcessorBackend::resize(const ImageData& image, ImageData* out,
     return !out->empty();
 }
 
+bool CpuProcessorBackend::convert(const ImageData& image, ImageData* out,
+                                  const std::vector<float>& alpha,
+                                  const std::vector<float>& beta) {
+    *out = image.convert(alpha, beta);
+    return !out->empty();
+}
+
+bool CpuProcessorBackend::cast(const ImageData& image, ImageData* out,
+                               const std::string& dtype) {
+    *out = image.cast(dtype);
+    return !out->empty();
+}
+
+bool CpuProcessorBackend::convert_and_permute(const ImageData& image, Tensor* out,
+                                              const std::vector<float>& alpha,
+                                              const std::vector<float>& beta,
+                                              bool swap_rb) {
+    cv::Mat mat;
+    image.to_mat(mat);
+    if (!ConvertAndPermute::apply(&mat, alpha, beta, swap_rb)) return false;
+    utils::mat_to_tensor(mat, out);
+    return true;
+}
+
+bool CpuProcessorBackend::fusion_resize_pad_normalize_permute(
+    const std::vector<ImageData>& images, Tensor* out,
+    const std::vector<std::array<int, 2>>& resize_sizes,
+    const std::vector<int>& dst_size,
+    const std::vector<float>& mean, const std::vector<float>& std,
+    float pad_value) {
+    return fusion_resize_pad_normalize_permute_cpu(
+        images, out, resize_sizes, dst_size, mean, std, pad_value);
+}
+
 bool CpuProcessorBackend::normalize(const ImageData& image, ImageData* out,
                                     const std::vector<float>& mean,
-                                    const std::vector<float>& std) {
-    *out = image.normalize(mean, std);
+                                    const std::vector<float>& std,
+                                    bool scale, bool swap_rb) {
+    *out = image.normalize(mean, std, scale, swap_rb);
     return !out->empty();
 }
 
