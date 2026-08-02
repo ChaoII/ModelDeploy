@@ -13,18 +13,14 @@
 namespace modeldeploy::vision::face {
     bool SeetaFaceGenderPreprocessor::preprocess(ImageData* image, Tensor* output) const {
         // 1. Resize
-        // 2. HWC2CHW
-        // 3. Cast
-        cv::Mat mat;
-        image->to_mat(mat);
-        Resize::apply(&mat, size_[0], size_[1]);
+        // 2. Cast (uint8->float, 不缩放)
+        // 3. HWC2CHW
+        ImageData resized;
+        if (!backend_->resize(*image, &resized, size_[0], size_[1])) return false;
         // BGR2RGB::Run(mat); 前处理不需要转换为RGB
-        HWC2CHW::apply(&mat);
-        Cast::apply(&mat, "float");
-        if (!utils::mat_to_tensor(mat, output)) {
-            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
-            return false;
-        }
+        ImageData casted;
+        if (!backend_->cast(resized, &casted, "float", false)) return false;
+        if (!backend_->hwc2chw(casted, output)) return false;
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }

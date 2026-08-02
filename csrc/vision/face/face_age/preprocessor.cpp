@@ -16,16 +16,15 @@ namespace modeldeploy::vision::face {
     bool SeetaFaceAgePreprocessor::preprocess(const ImageData& image, Tensor* output) const {
         // 经过人脸对齐后[256, 256]的图像,不需要BGR2RGB，不需要Normalize
         // 1. CenterCrop [256,256]->[248,248]
-        // 2. HWC2CHW
-        // 3. Cast
+        // 2. Cast (uint8->float, 不缩放)
+        // 3. HWC2CHW
         if (image.empty() || image.channels() != 3) {
             MD_LOG_ERROR << "The input image must be a color image." << std::endl;
             return false;
         }
         ImageData dst_image;
         if (image.height() == 256 && image.width() == 256) {
-            dst_image = image.center_crop(size_);
-            // CenterCrop::apply(&mat, size_[0], size_[1]);
+            if (!backend_->center_crop(image, &dst_image, size_[0], size_[1])) return false;
         }
         else if (image.height() == size_[0] && image.width() == size_[1]) {
             dst_image = image;
@@ -34,12 +33,14 @@ namespace modeldeploy::vision::face {
         else {
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss predict precision." << std::endl;
-            dst_image = image.resize(256, 256).center_crop(size_);
-            // Resize::apply(&mat, 256, 256);
-            // CenterCrop::apply(&mat, size_[0], size_[1]);
+            ImageData resized;
+            if (!backend_->resize(image, &resized, 256, 256)) return false;
+            if (!backend_->center_crop(resized, &dst_image, size_[0], size_[1])) return false;
         }
         // BGR2RGB::Run(mat); 前处理不需要转换为RGB
-        dst_image.cast("float", false).permute().to_tensor(output);
+        ImageData casted;
+        if (!backend_->cast(dst_image, &casted, "float", false)) return false;
+        if (!backend_->hwc2chw(casted, output)) return false;
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
