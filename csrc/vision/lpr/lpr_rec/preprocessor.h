@@ -5,6 +5,8 @@
 #include "core/md_decl.h"
 #include "core/tensor.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprRecPreprocessor {
@@ -17,9 +19,23 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
+
     protected:
         bool preprocess(ImageData* image, Tensor* output) const;
 
         std::vector<int> size_;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 } // namespace detection

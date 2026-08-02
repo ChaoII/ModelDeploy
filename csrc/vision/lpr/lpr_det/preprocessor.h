@@ -7,6 +7,8 @@
 #include "core/tensor.h"
 #include "vision/common/struct.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprDetPreprocessor {
@@ -44,6 +46,18 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] bool get_stride() const { return stride_; }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
+
     protected:
         bool preprocess(const ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
@@ -58,5 +72,7 @@ namespace modeldeploy::vision::lpr {
         bool is_scale_up_;
         // padding stride, for is_mini_pad
         int stride_;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 } // namespace detection

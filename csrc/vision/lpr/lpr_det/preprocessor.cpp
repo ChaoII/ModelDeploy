@@ -24,13 +24,11 @@ namespace modeldeploy::vision::lpr {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        cv::Mat mat;
-        image->to_mat(mat);
-        utils::letter_box(&mat, size_, padding_value_, letter_box_record);
+        ImageData boxed;
+        if (!backend_->letterbox(*image, &boxed, size_, padding_value_, letter_box_record)) return false;
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        ConvertAndPermute::apply(&mat, alpha, beta, true);
-        utils::mat_to_tensor(mat, output);
+        if (!backend_->convert_and_permute(boxed, output, alpha, beta, true)) return false;
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }

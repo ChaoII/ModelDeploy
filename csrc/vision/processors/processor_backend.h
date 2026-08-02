@@ -30,6 +30,12 @@ public:
                                       const std::vector<int>& dst_size,
                                       float pad_val, LetterBoxRecord* record) = 0;
 
+    // 纯 letterbox（不归一化不重排），输出 HWC 图像 + 记录（LPR det 用）
+    virtual bool letterbox(const ImageData& image, ImageData* out,
+                           const std::vector<int>& dst_size,
+                           const std::vector<float>& padding_value,
+                           LetterBoxRecord* record) = 0;
+
     // SCRFD 人脸检测专用（letterbox + resize + normalize + hwc2chw，归一化为 (x-127.5)/128）
     virtual bool scrfd_preprocess(const ImageData& image, Tensor* out,
                                   const std::vector<int>& dst_size,

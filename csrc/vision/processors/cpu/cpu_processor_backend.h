@@ -21,6 +21,10 @@ public:
                               int step_y, int step_uv, Tensor* out,
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
+    bool letterbox(const ImageData& image, ImageData* out,
+                   const std::vector<int>& dst_size,
+                   const std::vector<float>& padding_value,
+                   LetterBoxRecord* record) override;
     bool scrfd_preprocess(const ImageData& image, Tensor* out,
                           const std::vector<int>& dst_size,
                           float pad_val, LetterBoxRecord* record) override;

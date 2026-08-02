@@ -18,13 +18,11 @@ namespace modeldeploy::vision::lpr {
         // preprocess steps
         // 1. Resize
         // 2. convert_and_permute(swap_rb=true)
-        cv::Mat mat;
-        image->to_mat(mat);
-        Resize::apply(&mat, size_[0], size_[1]);
+        ImageData resized;
+        if (!backend_->resize(*image, &resized, size_[0], size_[1])) return false;
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {-0.588f, -0.588f, -0.588f};
-        ConvertAndPermute::apply(&mat, alpha, beta, true);
-        utils::mat_to_tensor(mat, output);
+        if (!backend_->convert_and_permute(resized, output, alpha, beta, true)) return false;
         output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }

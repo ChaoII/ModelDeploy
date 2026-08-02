@@ -29,6 +29,17 @@ bool CpuProcessorBackend::yolo_preprocess_nv12(const uint8_t* src_y, const uint8
                                     out, dst_size, pad_val, record);
 }
 
+bool CpuProcessorBackend::letterbox(const ImageData& image, ImageData* out,
+                                    const std::vector<int>& dst_size,
+                                    const std::vector<float>& padding_value,
+                                    LetterBoxRecord* record) {
+    cv::Mat mat;
+    image.to_mat(mat);
+    utils::letter_box(&mat, dst_size, padding_value, record);
+    *out = ImageData(std::move(mat));
+    return !out->empty();
+}
+
 bool CpuProcessorBackend::scrfd_preprocess(const ImageData& image, Tensor* out,
                                            const std::vector<int>& dst_size,
                                            float pad_val, LetterBoxRecord* record) {
