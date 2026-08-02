@@ -55,7 +55,8 @@ public:
     bool hwc2chw(const ImageData& image, Tensor* out) override;
     bool normalize_and_permute(const ImageData& image, Tensor* out,
                                const std::vector<float>& mean,
-                               const std::vector<float>& std) override;
+                               const std::vector<float>& std,
+                               bool scale = true) override;
     bool nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
                      int width, int height, ImageData* out) override;
 };

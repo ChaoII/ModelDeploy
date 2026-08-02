@@ -68,12 +68,14 @@ public:
     virtual bool hwc2chw(const ImageData& image, Tensor* out) = 0;
     virtual bool normalize_and_permute(const ImageData& image, Tensor* out,
                                        const std::vector<float>& mean,
-                                       const std::vector<float>& std) = 0;
+                                       const std::vector<float>& std,
+                                       bool scale = true) = 0;
 
     // 整批融合算子（OCR det 用：resize+pad+normalize+permute，batch 内统一 pad）
     virtual bool fusion_resize_pad_normalize_permute(
         const std::vector<ImageData>& images, Tensor* out,
-        const std::vector<int>& resize_size, const std::vector<int>& dst_size,
+        const std::vector<std::array<int, 2>>& resize_sizes,
+        const std::vector<int>& dst_size,
         const std::vector<float>& mean, const std::vector<float>& std,
         float pad_value) = 0;
     virtual bool nv12_to_bgr(const uint8_t* y, const uint8_t* uv,

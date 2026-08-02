@@ -121,8 +121,9 @@ bool CpuProcessorBackend::hwc2chw(const ImageData& image, Tensor* out) {
 
 bool CpuProcessorBackend::normalize_and_permute(const ImageData& image, Tensor* out,
                                                 const std::vector<float>& mean,
-                                                const std::vector<float>& std) {
-    auto tmp = image.fuse_normalize_and_permute(mean, std);
+                                                const std::vector<float>& std,
+                                                bool scale) {
+    auto tmp = image.fuse_normalize_and_permute(mean, std, scale);
     tmp.to_tensor(out);
     return true;
 }
