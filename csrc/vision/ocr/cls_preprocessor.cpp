@@ -39,12 +39,13 @@ namespace modeldeploy::vision::ocr {
             int resize_w;
             if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w)) resize_w = img_w;
             else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
+            // dst 宽固定 img_w；内容缩到 resize_w，右侧 pad(0)
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(img_h) / src_h;
             Tensor t;
             const std::vector<float> alpha = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};
             const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};
-            if (!backend_->fused_preprocess(image, &t, {resize_w, img_h},
+            if (!backend_->fused_preprocess(image, &t, {img_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, false, 0.0f)) return false;
             tensors.emplace_back(std::move(t));

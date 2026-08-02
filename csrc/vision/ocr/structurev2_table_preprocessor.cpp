@@ -47,6 +47,7 @@ namespace modeldeploy::vision::ocr {
             const float ratio = max_len / (std::max(static_cast<float>(src_h), static_cast<float>(src_w)) * 1.0f);
             const int resize_h = static_cast<int>(static_cast<float>(src_h) * ratio);
             const int resize_w = static_cast<int>(static_cast<float>(src_w) * ratio);
+            // dst 固定 max_len×max_len；内容缩到 resize_w×resize_h，右侧/下侧 pad
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(resize_h) / src_h;
             std::vector<float> alpha(3), beta(3);
@@ -55,7 +56,7 @@ namespace modeldeploy::vision::ocr {
                 beta[c] = -mean_[c] / std_[c];
             }
             Tensor t;
-            if (!backend_->fused_preprocess(image, &t, {resize_w, resize_h},
+            if (!backend_->fused_preprocess(image, &t, {max_len, max_len},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, false, pad_value_[0])) return false;
             tensors.emplace_back(std::move(t));

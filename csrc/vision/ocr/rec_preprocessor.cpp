@@ -40,6 +40,10 @@ namespace modeldeploy::vision::ocr {
             float ori_wh_ratio = static_cast<float>(image.width()) * 1.0f / static_cast<float>(image.height());
             max_wh_ratio = std::max(max_wh_ratio, ori_wh_ratio);
         }
+        // batch 统一输出宽：所有图 pad 到同一 max_w，保证 concat 时 shape 一致
+        const int batch_max_w = static_shape_infer_
+            ? img_w
+            : static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
         std::vector<Tensor> tensors;
         tensors.reserve(image_batch.size());
         for (auto& image : image_batch) {
@@ -47,19 +51,19 @@ namespace modeldeploy::vision::ocr {
             const int src_h = image.height();
             int resize_w;
             if (!static_shape_infer_) {
-                const auto max_w = static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
                 const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
-                if (std::ceil(img_h * ratio) > max_w) resize_w = max_w;
+                if (std::ceil(img_h * ratio) > batch_max_w) resize_w = batch_max_w;
                 else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
             } else {
                 resize_w = img_w;
             }
+            // dst 宽固定 batch_max_w；内容缩到 resize_w，右侧 [resize_w, batch_max_w) 为 pad(127)
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(img_h) / src_h;
             Tensor tensor;
             const std::vector<float> alpha = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};  // 1/(255*0.5)
             const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};  // -0.5/0.5
-            if (!backend_->fused_preprocess(image, &tensor, {resize_w, img_h},
+            if (!backend_->fused_preprocess(image, &tensor, {batch_max_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, true, 127.0f)) return false;
             tensors.emplace_back(std::move(tensor));
