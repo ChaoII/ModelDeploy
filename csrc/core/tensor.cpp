@@ -10,6 +10,9 @@
 #include "md_log.h"
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
+#endif
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
 // CUDA错误检查宏
 #define CUDA_CHECK(call) \
     do { \
@@ -717,8 +720,9 @@ namespace modeldeploy {
         // 计算新的形状
         std::vector<int64_t> new_shape = first_shape;
         new_shape[axis] = concat_size;
-        // 创建结果张量
-        Tensor result(new_shape, tensors[0].dtype(), Device::CPU, "concat_result");
+        // 创建结果张量（与输入同设备，GPU 用 cudaMemcpy D2D）
+        Tensor result;
+        result.allocate(new_shape, tensors[0].dtype(), tensors[0].device(), "concat_result");
         // 计算每个张量的元素大小
         const size_t element_size = tensors[0].element_size_;
         // 计算轴步长
@@ -735,12 +739,27 @@ namespace modeldeploy {
         }
         // 复制数据
         auto dest_ptr = static_cast<char*>(result.data());
-        for (size_t i = 0; i < outer_iterations; ++i) {
-            for (const auto& tensor : tensors) {
-                const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] * slice_size;
-                const size_t copy_size = tensor.shape()[axis] * slice_size;
-                std::memcpy(dest_ptr, src_ptr, copy_size);
-                dest_ptr += copy_size;
+        if (tensors[0].device() == Device::GPU) {
+#ifdef WITH_GPU
+            for (size_t i = 0; i < outer_iterations; ++i) {
+                for (const auto& tensor : tensors) {
+                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] * slice_size;
+                    const size_t copy_size = tensor.shape()[axis] * slice_size;
+                    cudaMemcpy(dest_ptr, src_ptr, copy_size, cudaMemcpyDeviceToDevice);
+                    dest_ptr += copy_size;
+                }
+            }
+#else
+            MD_LOG_ERROR << "concat on GPU but WITH_GPU not enabled." << std::endl;
+#endif
+        } else {
+            for (size_t i = 0; i < outer_iterations; ++i) {
+                for (const auto& tensor : tensors) {
+                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] * slice_size;
+                    const size_t copy_size = tensor.shape()[axis] * slice_size;
+                    std::memcpy(dest_ptr, src_ptr, copy_size);
+                    dest_ptr += copy_size;
+                }
             }
         }
         return result;
