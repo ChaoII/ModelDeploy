@@ -18,6 +18,9 @@ namespace modeldeploy::vision::detection {
             MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
+        preprocessor_.set_processor_backend(
+            create_processor_backend(runtime_option.device, runtime_option.backend,
+                                     runtime_option.device_id));
         return true;
     }
 

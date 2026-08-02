@@ -17,6 +17,9 @@ namespace modeldeploy::vision::detection {
         if (!init_runtime()) {
             return false;
         }
+        preprocessor_.set_processor_backend(
+            create_processor_backend(runtime_option.device, runtime_option.backend,
+                                     runtime_option.device_id));
         return true;
     }
 
