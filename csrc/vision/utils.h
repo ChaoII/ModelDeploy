@@ -54,6 +54,18 @@ namespace modeldeploy::vision::utils {
     void letter_box(cv::Mat* mat, const std::vector<int>& size,
                     const std::vector<float>& padding_value, LetterBoxRecord* letter_box_record);
 
+    // LetterBoxRecord -> fused_preprocess 映射参数。
+    // fused 约定 src = (dst - origin)/scale；letterbox 中 src = (dst - pad)/scale，
+    // 故 origin = (pad_w, pad_h)，scale 各轴取 letterbox scale。
+    inline void letter_box_to_fused_params(const LetterBoxRecord& record,
+                                           float* origin_x, float* origin_y,
+                                           float* scale_x, float* scale_y) {
+        *origin_x = record.pad_w;
+        *origin_y = record.pad_h;
+        *scale_x = record.scale;
+        *scale_y = record.scale;
+    }
+
     void print_mat_type(const cv::Mat& mat);
 
     std::vector<float> compute_sqrt(const std::vector<float>& vec);

@@ -24,15 +24,15 @@ namespace modeldeploy::vision::lpr {
         const int src_w = image->width();
         const int src_h = image->height();
         *letter_box_record = utils::cal_letter_box_param({src_w, src_h}, size_);
-        const float pad_x = static_cast<float>(letter_box_record->pad_w);
-        const float pad_y = static_cast<float>(letter_box_record->pad_h);
-        const float scale = letter_box_record->scale;
+        float origin_x, origin_y, scale_x, scale_y;
+        utils::letter_box_to_fused_params(*letter_box_record,
+                                          &origin_x, &origin_y, &scale_x, &scale_y);
         const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
         // pad 114 在仿射后空间（归一化）：114/255
         const float pad_norm = padding_value_[0] / 255.0f;
         if (!backend_->fused_preprocess(*image, output, size_,
-                                        pad_x, pad_y, scale, scale,
+                                        origin_x, origin_y, scale_x, scale_y,
                                         alpha, beta, true, pad_norm)) return false;
         return true;
     }

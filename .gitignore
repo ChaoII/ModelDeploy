@@ -6,6 +6,9 @@ build_linux
 build_debug
 build_linux_trt
 build2
+build_old
+build_linux_debug
+build_win
 python/modeldeploy/__init__.py
 dist
 .idea

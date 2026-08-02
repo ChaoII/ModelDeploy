@@ -109,7 +109,7 @@ namespace modeldeploy {
         }
         if (!is_exist) {
             Tensor new_tensor(output.data(), output.shape(), output.dtype(), Device::CPU);
-            input_tensors_.emplace_back(std::move(new_tensor));
+            output_tensors_.emplace_back(std::move(new_tensor));
         }
     }
 

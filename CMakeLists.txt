@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(LIBRARY_NAME "ModelDeploySDK")
 set(SOURCE "")
 set(DEPENDS "")
+set(PRIVATE_DEPENDS "")
 
 message("==================${CMAKE_BUILD_TYPE}===================")
 option(ENABLE_ORT "enable ort backend" ON)
@@ -47,6 +48,21 @@ endif ()
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" MD_VERSION)
 string(STRIP ${MD_VERSION} MD_VERSION)
 
+# 解析主/次/补丁版本（用于 SOVERSION 与 ABI 策略）
+string(REPLACE "." ";" MD_VERSION_PARTS ${MD_VERSION})
+list(GET MD_VERSION_PARTS 0 MD_VERSION_MAJOR)
+list(LENGTH MD_VERSION_PARTS MD_VERSION_PARTS_LEN)
+if (MD_VERSION_PARTS_LEN GREATER 1)
+    list(GET MD_VERSION_PARTS 1 MD_VERSION_MINOR)
+else ()
+    set(MD_VERSION_MINOR 0)
+endif ()
+if (MD_VERSION_PARTS_LEN GREATER 2)
+    list(GET MD_VERSION_PARTS 2 MD_VERSION_PATCH)
+else ()
+    set(MD_VERSION_PATCH 0)
+endif ()
+
 add_definitions(-DMD_VERSION="${MD_VERSION}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -55,7 +71,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(TRT_DIR "" CACHE PATH "TRT_DIR")
-message(STATUS ${TRT_DIR})
+message(STATUS "TRT_DIR=${TRT_DIR}")
 
 if (POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
@@ -71,11 +87,18 @@ if (MSVC)
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4251>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+            "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/W3>")
     add_definitions(-DMD_CXX_EXPORT)
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
     endif ()
+else ()
+    # GCC/Clang：开启常用警告（不含 -Werror，避免存量代码直接失败）
+    add_compile_options(
+            "$<$<COMPILE_LANGUAGE:CXX>:-Wall>"
+            "$<$<COMPILE_LANGUAGE:CXX>:-Wextra>"
+            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif ()
 
 include_directories(${CMAKE_SOURCE_DIR})
@@ -83,22 +106,26 @@ include_directories(${CMAKE_SOURCE_DIR}/csrc)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
 
-file(GLOB_RECURSE ALL_SOURCE ${CMAKE_SOURCE_DIR}/csrc/*.cpp)
-file(GLOB_RECURSE ORT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/ort/*.cpp)
-file(GLOB_RECURSE MNN_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/mnn/*.cpp)
-file(GLOB_RECURSE TRT_BACKEND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/trt/*.cpp)
-file(GLOB_RECURSE VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
-file(GLOB_RECURSE AUDIO_SOURCE ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
-file(GLOB_RECURSE PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
-file(GLOB_RECURSE CUDA_SOURCE ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu)
+file(GLOB_RECURSE ALL_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/*.cpp)
+file(GLOB_RECURSE ORT_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/ort/*.cpp)
+file(GLOB_RECURSE MNN_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/mnn/*.cpp)
+file(GLOB_RECURSE TRT_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/trt/*.cpp)
+file(GLOB_RECURSE VISION_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
+file(GLOB_RECURSE AUDIO_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
+file(GLOB_RECURSE PYBIND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
+file(GLOB_RECURSE CUDA_SOURCE CONFIGURE_DEPENDS
+        ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu
+        ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu)
 
 list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE})
 
 if (WITH_GPU)
     add_definitions(-DWITH_GPU)
     enable_language(CUDA)
-    # https://developer.nvidia.com/cuda-gpus
-    set(CMAKE_CUDA_ARCHITECTURES 86)   # RTX 40 系列示例
+    # CUDA 架构：默认 native（自动探测本机 GPU），可用 -DCMAKE_CUDA_ARCHITECTURES=xx 覆盖
+    if (NOT CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES native)
+    endif ()
     # for cudaMalloc()
     find_package(CUDAToolkit REQUIRED)
     set(CMAKE_CUDA_STANDARD 17)
@@ -174,7 +201,8 @@ if (BUILD_AUDIO)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
     list(APPEND ALL_SOURCE ${AUDIO_SOURCE})
-    list(APPEND DEPENDS samplerate kaldi-native-fbank-core cppjieba)
+    # 音频静态依赖 PRIVATE 链接（打进共享库，导出时无需第三方 target）
+    list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core cppjieba)
 endif ()
 
 if (BUILD_CAPI)
@@ -207,8 +235,10 @@ if (BUILD_ENCRYPTION)
 endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
-set_target_properties(${LIBRARY_NAME} PROPERTIES VERSION ${MD_VERSION})
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS})
+set_target_properties(${LIBRARY_NAME} PROPERTIES
+        VERSION ${MD_VERSION}
+        SOVERSION ${MD_VERSION_MAJOR})
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS} PRIVATE ${PRIVATE_DEPENDS})
 if (MSVC)
     target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
 endif ()
@@ -292,5 +322,24 @@ if (NOT BUILD_PYTHON)
             "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dylib"
     )
     install(FILES ${THIRD_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    # CMake package config：支持 find_package(ModelDeploySDK)
+    install(EXPORT ModelDeploySDKTargets
+            FILE ModelDeploySDKTargets.cmake
+            NAMESPACE ModelDeploySDK::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ModelDeploySDK)
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(
+            "${CMAKE_SOURCE_DIR}/cmake/ModelDeploySDKConfig.cmake.in"
+            "${CMAKE_BINARY_DIR}/ModelDeploySDKConfig.cmake"
+            INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ModelDeploySDK)
+    write_basic_package_version_file(
+            "${CMAKE_BINARY_DIR}/ModelDeploySDKConfigVersion.cmake"
+            VERSION ${MD_VERSION}
+            COMPATIBILITY SameMajorVersion)
+    install(FILES
+            "${CMAKE_BINARY_DIR}/ModelDeploySDKConfig.cmake"
+            "${CMAKE_BINARY_DIR}/ModelDeploySDKConfigVersion.cmake"
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ModelDeploySDK)
 endif ()
 

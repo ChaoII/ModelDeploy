@@ -68,11 +68,12 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME})
 endif ()
 
-# for debug
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(OpenCV_DIR "E:/develop/opencv/build/x64/vc16/lib")
+# for debug（移除硬编码本机路径，Debug 也走 FetchContent 拉取的预编译库）
+if (NOT DEFINED OpenCV_DIR)
+    find_package(OpenCV CONFIG REQUIRED)
+else ()
+    find_package(OpenCV CONFIG REQUIRED)
 endif ()
-find_package(OpenCV CONFIG REQUIRED)
 if (NOT OpenCV_FOUND)
     message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")
 endif ()
