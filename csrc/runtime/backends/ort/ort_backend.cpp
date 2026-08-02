@@ -9,7 +9,6 @@
 #include "utils/utils.h"
 #include "core/md_log.h"
 
-
 namespace modeldeploy {
     void OrtBackend::build_option(const OrtBackendOption& option) {
         option_ = option;
@@ -256,10 +255,19 @@ namespace modeldeploy {
                 ") should keep same with the inputs of this model(" << inputs_desc_.size() << ")" << std::endl;
             return false;
         }
-        const Ort::MemoryInfo input_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+        // 输入：若已在 GPU 则用 CUDA memory info 零拷贝（避免 ORT 冗余 H2D）
         for (size_t i = 0; i < inputs.size(); ++i) {
-            auto ort_value = create_ort_value(inputs[i], input_memory_info);
-            binding_->BindInput(inputs_desc_[i].name.c_str(), ort_value);
+            if (inputs[i].device() == Device::GPU && option_.device == Device::GPU) {
+                const Ort::MemoryInfo mem_info("Cuda", OrtArenaAllocator, option_.device_id,
+                                               OrtMemTypeDefault);
+                auto ort_value = create_ort_value(inputs[i], mem_info);
+                binding_->BindInput(inputs_desc_[i].name.c_str(), ort_value);
+            } else {
+                const Ort::MemoryInfo mem_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator,
+                                                                            OrtMemTypeDefault);
+                auto ort_value = create_ort_value(inputs[i], mem_info);
+                binding_->BindInput(inputs_desc_[i].name.c_str(), ort_value);
+            }
         }
         const Ort::MemoryInfo output_memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         for (auto& output_info : outputs_desc_) {
