@@ -51,8 +51,9 @@ public:
                          const std::vector<float>& beta) = 0;
 
     // 数据类型转换（如 uint8 -> float），dtype 与 Cast::apply 语义一致
+    // scale=true 时乘以 1/255（与 ImageData::cast 默认一致），false 时纯类型转换
     virtual bool cast(const ImageData& image, ImageData* out,
-                      const std::string& dtype) = 0;
+                      const std::string& dtype, bool scale = true) = 0;
 
     // 缩放 + 通道重排（LPR 用：alpha=1/255, beta 可选, swap_rb）
     virtual bool convert_and_permute(const ImageData& image, Tensor* out,

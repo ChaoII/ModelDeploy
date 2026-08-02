@@ -8,6 +8,7 @@
 #include "vision/common/processors/nv12_to_bgr.h"
 #include "vision/common/processors/convert_and_permute.h"
 #include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
+#include "vision/common/processors/hwc2chw.h"
 #include "vision/utils.h"
 #include "vision/face/face_det/scrfd_preproc.h"
 
@@ -48,8 +49,8 @@ bool CpuProcessorBackend::convert(const ImageData& image, ImageData* out,
 }
 
 bool CpuProcessorBackend::cast(const ImageData& image, ImageData* out,
-                               const std::string& dtype) {
-    *out = image.cast(dtype);
+                               const std::string& dtype, bool scale) {
+    *out = image.cast(dtype, scale);
     return !out->empty();
 }
 
@@ -114,9 +115,11 @@ bool CpuProcessorBackend::pad(const ImageData& image, ImageData* out,
 }
 
 bool CpuProcessorBackend::hwc2chw(const ImageData& image, Tensor* out) {
-    ImageData tmp = image;
-    tmp.to_tensor(out);
-    return !tmp.empty();
+    cv::Mat mat;
+    image.to_mat(mat);
+    if (!HWC2CHW::apply(&mat)) return false;
+    utils::mat_to_tensor(mat, out);
+    return true;
 }
 
 bool CpuProcessorBackend::normalize_and_permute(const ImageData& image, Tensor* out,

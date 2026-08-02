@@ -30,7 +30,7 @@ public:
                  const std::vector<float>& alpha,
                  const std::vector<float>& beta) override;
     bool cast(const ImageData& image, ImageData* out,
-              const std::string& dtype) override;
+              const std::string& dtype, bool scale = true) override;
     bool convert_and_permute(const ImageData& image, Tensor* out,
                              const std::vector<float>& alpha,
                              const std::vector<float>& beta,
