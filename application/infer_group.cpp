@@ -52,6 +52,8 @@ bool InferGroup::init() {
             break;
         }
     }
+    std::cout << "[InferGroup] gpu_nv12_ready_=" << (gpu_nv12_ready_ ? "true" : "false")
+              << " engines=" << engines_.size() << std::endl;
     start_workers();
 
     // Warm-up 移入后台线程：TRT 首次编译可耗时 30-60s，若在解码线程同步执行，
@@ -242,15 +244,23 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
             auto& w = workers_[i];
             auto& engine = engines_[i];
             GpuTask* tp = &tasks[i];
+            Worker* wp = w.get();
             {
                 std::lock_guard<std::mutex> lock(w->mtx);
                 w->done = false;
                 w->has_task = true;
-                w->task = [&engine, tp, gy, guv, sw, sh, sy, suv]() {
+                w->task = [&engine, tp, gy, guv, sw, sh, sy, suv, wp]() {
                     auto t0 = std::chrono::steady_clock::now();
                     engine->infer_nv12(gy, guv, sw, sh, sy, suv, &tp->result);
                     tp->dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
                         std::chrono::steady_clock::now() - t0).count();
+                    wp->infer_acc_us += tp->dt_us;
+                    if (++wp->infer_cnt % 50 == 0) {
+                        printf("[GPU-DIRECT] avg_infer=%6.2fms (50 frames)\n",
+                               static_cast<double>(wp->infer_acc_us) / wp->infer_cnt / 1000.0);
+                        fflush(stdout);
+                        wp->infer_acc_us = 0; wp->infer_cnt = 0;
+                    }
                 };
             }
             w->cv_in.notify_one();

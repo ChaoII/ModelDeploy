@@ -78,6 +78,9 @@ private:
         bool has_task = false;
         bool done = true;
         bool stop = false;
+        // GPU 直通 infer 耗时累计（worker 常驻，跨帧持久，避免悬垂）
+        int64_t infer_acc_us = 0;
+        size_t infer_cnt = 0;
     };
     std::vector<std::unique_ptr<Worker>> workers_;
 

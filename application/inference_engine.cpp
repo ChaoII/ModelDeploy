@@ -170,7 +170,7 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
 
 bool InferenceEngine::infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane,
                                  int width, int height, int y_step, int uv_step,
-                                 InferResult* result) {
+                                 InferResult* result, TimerArray* timers) {
     if (!loaded_ || !result) return false;
     result->model_name = cfg_.name;
     result->type = cfg_.type;
@@ -179,7 +179,7 @@ bool InferenceEngine::infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane
     modeldeploy::vision::LetterBoxRecord record;
     std::vector<modeldeploy::vision::DetectionResult> det_results;
     if (!det_model_->predict_nv12(y_plane, uv_plane, width, height,
-                                  y_step, uv_step, &det_results, &record)) {
+                                  y_step, uv_step, &det_results, &record, timers)) {
         return false;
     }
     for (auto& d : det_results) {

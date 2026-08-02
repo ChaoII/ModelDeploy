@@ -66,7 +66,6 @@ namespace modeldeploy::vision::detection {
                                       LetterBoxRecord* letter_box_record,
                                       TimerArray* timers) {
         if (!src_y || !src_uv || !result) return false;
-        // NV12 → GPU letterbox/normalize → GPU tensor（backend_ 为 CUDA 时全程在 GPU）
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
                                &reused_input_tensors_[0], letter_box_record)) {
