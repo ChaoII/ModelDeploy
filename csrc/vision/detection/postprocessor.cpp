@@ -16,32 +16,34 @@ namespace modeldeploy::vision::detection {
         const std::vector<Tensor>& tensors, std::vector<std::vector<DetectionResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
-        // 原始布局 [B, 84, 8400]：84 = 4(xc,yc,w,h) + 80(coco 80 classes)
-        const size_t dim1 = tensors[0].shape()[1]; // 8400 (anchors)
-        const size_t dim2 = tensors[0].shape()[2]; // 84
         if (tensors[0].dtype() != DataType::FP32) {
             MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
             return false;
         }
+        // 原始布局 [B, C, N]：C=84 (4(xc,yc,w,h)+80 classes)，N=8400 (anchors)
+        const size_t num_classes = tensors[0].shape()[1]; // 84
+        const size_t num_anchors = tensors[0].shape()[2]; // 8400
         results->resize(batch);
 
-        // 高效转置 [B,84,N] -> [B,N,84]：用普通双层循环（编译器向量化），避免递归逐元素拷贝
+        // 高效转置 [B,84,N] -> [B,N,84]：普通双层循环（编译器向量化），避免递归逐元素拷贝
         static thread_local std::vector<float> buf;
-        const size_t plane = dim1 * dim2;
+        const size_t plane = num_anchors * num_classes;
         buf.resize(batch * plane);
         const float* src = static_cast<const float*>(tensors[0].data());
         for (size_t b = 0; b < batch; ++b) {
             const float* src_b = src + b * plane;
             float* dst_b = buf.data() + b * plane;
-            // dst[(i*84)+c] = src[c*8400+i]，内层按 i 连续，编译器可向量化
-            for (size_t c = 0; c < dim2; ++c) {
-                const float* srow = src_b + c * dim1;
-                for (size_t i = 0; i < dim1; ++i) {
-                    dst_b[i * dim2 + c] = srow[i];
+            // dst[anchor*84 + class] = src[class*8400 + anchor]
+            for (size_t c = 0; c < num_classes; ++c) {
+                const float* srow = src_b + c * num_anchors;
+                for (size_t i = 0; i < num_anchors; ++i) {
+                    dst_b[i * num_classes + c] = srow[i];
                 }
             }
         }
 
+        const size_t dim1 = num_anchors; // 8400
+        const size_t dim2 = num_classes; // 84
         for (size_t bs = 0; bs < batch; ++bs) {
             const float* data = buf.data() + bs * plane;
             std::vector<DetectionResult> _results;
