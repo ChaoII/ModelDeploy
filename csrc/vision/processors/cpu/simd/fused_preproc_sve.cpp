@@ -5,6 +5,7 @@
 //
 
 #include <cstdint>
+#include <algorithm>
 #if defined(__ARM_FEATURE_SVE)
 #include <arm_sve.h>
 #define MD_HAS_SVE 1
@@ -107,5 +108,36 @@ MD_TARGET_SVE void fused_preproc_sve(const uint8_t* src, int src_w, int src_h,
     }
 }
 
+
+void fusion_rpnp_sve(const uint8_t* src, int src_w, int src_h,
+                     float* dst, int dst_w, int dst_h,
+                     int resize_w, int resize_h,
+                     const float* alpha, const float* beta,
+                     const float* pad) {
+    const float kx = static_cast<float>(src_w) / resize_w;
+    const float ky = static_cast<float>(src_h) / resize_h;
+    const int last_sx = src_w - 1;
+    const int last_sy = src_h - 1;
+    const int plane = dst_h * dst_w;
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        const bool row_pad = y >= resize_h;
+        for (int x = 0; x < dst_w; ++x) {
+            const int idx = base + x;
+            if (row_pad || x >= resize_w) {
+                dst[0 * plane + idx] = pad[0];
+                dst[1 * plane + idx] = pad[1];
+                dst[2 * plane + idx] = pad[2];
+                continue;
+            }
+            const int sx = std::min(static_cast<int>(x * kx), last_sx);
+            const int sy = std::min(static_cast<int>(y * ky), last_sy);
+            const uint8_t* p = src + (sy * src_w + sx) * 3;
+            dst[0 * plane + idx] = p[2] * alpha[0] + beta[0];
+            dst[1 * plane + idx] = p[1] * alpha[1] + beta[1];
+            dst[2 * plane + idx] = p[0] * alpha[2] + beta[2];
+        }
+    }
+}
 } // namespace modeldeploy::vision
 #endif // MD_HAS_SVE

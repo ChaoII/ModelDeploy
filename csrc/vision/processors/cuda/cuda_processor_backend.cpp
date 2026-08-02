@@ -100,4 +100,30 @@ bool CudaProcessorBackend::fused_preprocess_batch(
 #endif
 }
 
+bool CudaProcessorBackend::fusion_resize_pad_normalize_permute(
+    const std::vector<ImageData>& images, Tensor* out,
+    const std::vector<std::array<int, 2>>& resize_sizes,
+    const std::vector<int>& dst_size,
+    const std::vector<float>& mean, const std::vector<float>& std,
+    float pad_value) {
+#ifdef WITH_GPU
+    const float alpha[3] = {1.0f / 255.0f / std[0],
+                            1.0f / 255.0f / std[1],
+                            1.0f / 255.0f / std[2]};
+    const float beta[3] = {-mean[0] / std[0],
+                           -mean[1] / std[1],
+                           -mean[2] / std[2]};
+    const float pad[3] = {pad_value * alpha[0] + beta[0],
+                          pad_value * alpha[1] + beta[1],
+                          pad_value * alpha[2] + beta[2]};
+    return fusion_rpnp_cuda(images, out, resize_sizes, dst_size,
+                            std::vector<float>(alpha, alpha + 3),
+                            std::vector<float>(beta, beta + 3), pad);
+#else
+    MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
+    return CpuProcessorBackend::fusion_resize_pad_normalize_permute(
+        images, out, resize_sizes, dst_size, mean, std, pad_value);
+#endif
+}
+
 } // namespace modeldeploy::vision

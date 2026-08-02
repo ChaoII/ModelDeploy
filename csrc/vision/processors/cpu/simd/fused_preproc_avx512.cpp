@@ -4,6 +4,7 @@
 //
 
 #include <cstdint>
+#include <algorithm>
 #if defined(__x86_64__) || defined(_M_X64)
 #include <immintrin.h>
 #define MD_X86_SIMD 1
@@ -110,5 +111,82 @@ MD_TARGET_AVX512 void fused_preproc_avx512(const uint8_t* src, int src_w, int sr
     }
 }
 
+
+MD_TARGET_AVX512 void fusion_rpnp_avx512(const uint8_t* src, int src_w, int src_h,
+                                         float* dst, int dst_w, int dst_h,
+                                         int resize_w, int resize_h,
+                                         const float* alpha, const float* beta,
+                                         const float* pad) {
+    const float kx = static_cast<float>(src_w) / resize_w;
+    const float ky = static_cast<float>(src_h) / resize_h;
+    const int last_sx = src_w - 1;
+    const int plane = dst_h * dst_w;
+
+    const __m512 a0 = _mm512_set1_ps(alpha[0]);
+    const __m512 b0 = _mm512_set1_ps(beta[0]);
+    const __m512 a1 = _mm512_set1_ps(alpha[1]);
+    const __m512 b1 = _mm512_set1_ps(beta[1]);
+    const __m512 a2 = _mm512_set1_ps(alpha[2]);
+    const __m512 b2 = _mm512_set1_ps(beta[2]);
+    const __m512 pv0 = _mm512_set1_ps(pad[0]);
+    const __m512 pv1 = _mm512_set1_ps(pad[1]);
+    const __m512 pv2 = _mm512_set1_ps(pad[2]);
+    const __m512 kxv = _mm512_set1_ps(kx);
+    const __m512 lastv = _mm512_set1_ps(static_cast<float>(last_sx));
+
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        if (y >= resize_h) {
+            int x = 0;
+            for (; x + 16 <= dst_w; x += 16) {
+                _mm512_storeu_ps(dst + 0 * plane + base + x, pv0);
+                _mm512_storeu_ps(dst + 1 * plane + base + x, pv1);
+                _mm512_storeu_ps(dst + 2 * plane + base + x, pv2);
+            }
+            for (; x < dst_w; ++x) {
+                dst[0 * plane + base + x] = pad[0];
+                dst[1 * plane + base + x] = pad[1];
+                dst[2 * plane + base + x] = pad[2];
+            }
+            continue;
+        }
+        const int sy = std::min(static_cast<int>(y * ky), src_h - 1);
+        const uint8_t* src_row = src + sy * src_w * 3;
+
+        int x = 0;
+        for (; x + 16 <= resize_w; x += 16) {
+            __m512 xi;
+            for (int i = 0; i < 16; ++i) {
+                reinterpret_cast<float*>(&xi)[i] = static_cast<float>(x + i);
+            }
+            const __m512 sxf = _mm512_min_ps(_mm512_mul_ps(xi, kxv), lastv);
+            float sxf_arr[16];
+            _mm512_storeu_ps(sxf_arr, sxf);
+            float r[16], g[16], b[16];
+            for (int i = 0; i < 16; ++i) {
+                const int sx = static_cast<int>(sxf_arr[i]);
+                const uint8_t* p = src_row + sx * 3;
+                b[i] = p[0];
+                g[i] = p[1];
+                r[i] = p[2];
+            }
+            _mm512_storeu_ps(dst + 0 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(r), a0, b0));
+            _mm512_storeu_ps(dst + 1 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(g), a1, b1));
+            _mm512_storeu_ps(dst + 2 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(b), a2, b2));
+        }
+        for (; x < resize_w; ++x) {
+            const int sx = std::min(static_cast<int>(x * kx), last_sx);
+            const uint8_t* p = src_row + sx * 3;
+            dst[0 * plane + base + x] = p[2] * alpha[0] + beta[0];
+            dst[1 * plane + base + x] = p[1] * alpha[1] + beta[1];
+            dst[2 * plane + base + x] = p[0] * alpha[2] + beta[2];
+        }
+        for (; x < dst_w; ++x) {
+            dst[0 * plane + base + x] = pad[0];
+            dst[1 * plane + base + x] = pad[1];
+            dst[2 * plane + base + x] = pad[2];
+        }
+    }
+}
 } // namespace modeldeploy::vision
 #endif // MD_X86_SIMD

@@ -25,4 +25,17 @@ using FusedPreprocKernel = void (*)(
 // 保证非空：总有一个可用的实现（scalar/AVX2/AVX512/NEON/SVE）。
 MODELDEPLOY_CXX_EXPORT FusedPreprocKernel get_fused_preproc_kernel();
 
+// OCR det per-channel-pad kernel (resize then pad right/bottom).
+// src: BGR uint8; sx = dx*src_w/resize_w, sy = dy*src_h/resize_h;
+// pad zone (dy>=resize_h || dx>=resize_w) writes pad[c] per channel.
+// swap_rb=true -> C0=R; pad already in affine space.
+using FusedPreprocPadKernel = void (*)(
+    const uint8_t* src, int src_w, int src_h,
+    float* dst, int dst_w, int dst_h,
+    int resize_w, int resize_h,
+    const float* alpha, const float* beta,
+    const float* pad);
+
+MODELDEPLOY_CXX_EXPORT FusedPreprocPadKernel get_fusion_rpnp_kernel();
+
 } // namespace modeldeploy::vision

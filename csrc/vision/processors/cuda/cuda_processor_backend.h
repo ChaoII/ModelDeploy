@@ -43,6 +43,12 @@ public:
     bool scrfd_preprocess(const ImageData& image, Tensor* out,
                           const std::vector<int>& dst_size,
                           float pad_val, LetterBoxRecord* record) override;
+    bool fusion_resize_pad_normalize_permute(
+        const std::vector<ImageData>& images, Tensor* out,
+        const std::vector<std::array<int, 2>>& resize_sizes,
+        const std::vector<int>& dst_size,
+        const std::vector<float>& mean, const std::vector<float>& std,
+        float pad_value) override;
 };
 
 } // namespace modeldeploy::vision

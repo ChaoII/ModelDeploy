@@ -10,6 +10,7 @@
 
 #include "csrc/vision.h"
 #include "csrc/vision/processors/processor_factory.h"
+#include "csrc/vision/common/processors/fusion_resize_pad_normalize_permute.h"
 #include "csrc/vision/processors/cpu/cpu_processor_backend.h"
 #include "csrc/vision/processors/cpu/simd/fused_preproc_simd.h"
 #ifdef WITH_GPU
@@ -293,5 +294,43 @@ TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA",
     Tensor cuda_host(host.data(), batch_cuda.shape(), DataType::FP32, Device::CPU);
     REQUIRE(tensor_maxdiff(batch_cpu, cuda_host, &nd) < 1e-4);
     REQUIRE(nd <= 24);
+#endif
+}
+
+// ============ OCR det fusion_resize_pad_normalize_permute：CPU(SIMD) vs CUDA ============
+TEST_CASE("Processor accuracy: ocr det fusion_resize_pad_normalize_permute CPU vs CUDA", "[processor_accuracy][gpu]") {
+    std::vector<ImageData> imgs = {
+        make_test_image(320, 160),
+        make_test_image(200, 240),
+        make_test_image(400, 300),
+    };
+    std::vector<std::array<int, 2>> resize_sizes(3);
+    int max_w = 0, max_h = 0;
+    for (int i = 0; i < 3; ++i) {
+        const int w = imgs[i].width(), h = imgs[i].height();
+        const float ratio = 960.0f / std::max(w, h);
+        const int rw = std::max(static_cast<int>(std::round(w * ratio / 32) * 32), 32);
+        const int rh = std::max(static_cast<int>(std::round(h * ratio / 32) * 32), 32);
+        resize_sizes[i] = {rw, rh};
+        max_w = std::max(max_w, rw);
+        max_h = std::max(max_h, rh);
+    }
+    const std::vector<int> dst{max_w, max_h};
+    const std::vector<float> mean = {0.485f, 0.456f, 0.406f};
+    const std::vector<float> std_v = {0.229f, 0.224f, 0.225f};
+
+    Tensor cpu_t;
+    REQUIRE(fusion_resize_pad_normalize_permute_cpu(imgs, &cpu_t, resize_sizes, dst, mean, std_v, 0.0f));
+
+#ifdef WITH_GPU
+    auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
+    Tensor cuda_t;
+    REQUIRE(cuda_backend->fusion_resize_pad_normalize_permute(imgs, &cuda_t, resize_sizes, dst, mean, std_v, 0.0f));
+    std::vector<float> host(cuda_t.byte_size() / sizeof(float));
+    cudaMemcpy(host.data(), cuda_t.data(), cuda_t.byte_size(), cudaMemcpyDeviceToHost);
+    Tensor cuda_host(host.data(), cuda_t.shape(), DataType::FP32, Device::CPU);
+    size_t nd = 0;
+    REQUIRE(tensor_maxdiff(cpu_t, cuda_host, &nd) < 1e-4);
+    REQUIRE(nd <= 16);
 #endif
 }

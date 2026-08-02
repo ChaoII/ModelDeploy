@@ -5,11 +5,12 @@
 #pragma once
 
 #include "core/tensor.h"
+#include "core/md_decl.h"
 #include "vision/common/image_data.h"
 
 
 namespace modeldeploy::vision {
-    bool fusion_resize_pad_normalize_permute_cpu(
+    MODELDEPLOY_CXX_EXPORT bool fusion_resize_pad_normalize_permute_cpu(
         const std::vector<ImageData>&, Tensor* output,
         const std::vector<std::array<int, 2>>& resize_sizes,
         const std::vector<int>& dst_size,

@@ -4,6 +4,7 @@
 //
 
 #include <cstdint>
+#include <algorithm>
 #include "fused_preproc_simd.h"
 
 #if defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER)
@@ -70,6 +71,39 @@ void fused_preproc_scalar(const uint8_t* src, int src_w, int src_h,
     }
 }
 
+// OCR det per-channel-pad scalar kernel（resize + pad right/bottom + swap + affine）
+void fusion_rpnp_scalar(const uint8_t* src, int src_w, int src_h,
+                        float* dst, int dst_w, int dst_h,
+                        int resize_w, int resize_h,
+                        const float* alpha, const float* beta,
+                        const float* pad) {
+    const float kx = static_cast<float>(src_w) / resize_w;
+    const float ky = static_cast<float>(src_h) / resize_h;
+    const int last_sx = src_w - 1;
+    const int last_sy = src_h - 1;
+    const int plane = dst_h * dst_w;
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        const bool row_pad = y >= resize_h;
+        for (int x = 0; x < dst_w; ++x) {
+            const int idx = base + x;
+            if (row_pad || x >= resize_w) {
+                dst[0 * plane + idx] = pad[0];
+                dst[1 * plane + idx] = pad[1];
+                dst[2 * plane + idx] = pad[2];
+                continue;
+            }
+            const int sx = std::min(static_cast<int>(x * kx), last_sx);
+            const int sy = std::min(static_cast<int>(y * ky), last_sy);
+            const uint8_t* p = src + (sy * src_w + sx) * 3;
+            const float pb = p[0], pg = p[1], pr = p[2];
+            dst[0 * plane + idx] = pr * alpha[0] + beta[0];
+            dst[1 * plane + idx] = pg * alpha[1] + beta[1];
+            dst[2 * plane + idx] = pb * alpha[2] + beta[2];
+        }
+    }
+}
+
 } // namespace
 
 // 外部内核声明（modeldeploy::vision 作用域，各 ISA 实现文件按编译平台定义）
@@ -85,6 +119,16 @@ void fused_preproc_neon(const uint8_t*, int, int, float*, int, int,
 void fused_preproc_sve(const uint8_t*, int, int, float*, int, int,
                        float, float, float, float,
                        const float*, const float*, bool, float);
+
+// OCR det per-channel-pad kernels（外部 ISA 实现）
+void fusion_rpnp_avx2(const uint8_t*, int, int, float*, int, int, int, int,
+                      const float*, const float*, const float*);
+void fusion_rpnp_avx512(const uint8_t*, int, int, float*, int, int, int, int,
+                        const float*, const float*, const float*);
+void fusion_rpnp_neon(const uint8_t*, int, int, float*, int, int, int, int,
+                      const float*, const float*, const float*);
+void fusion_rpnp_sve(const uint8_t*, int, int, float*, int, int, int, int,
+                     const float*, const float*, const float*);
 
 FusedPreprocKernel get_fused_preproc_kernel() {
 #if defined(MD_ARM64)
@@ -126,6 +170,46 @@ FusedPreprocKernel get_fused_preproc_kernel() {
 #endif
 #else
     return fused_preproc_scalar;
+#endif
+}
+
+FusedPreprocPadKernel get_fusion_rpnp_kernel() {
+#if defined(MD_ARM64)
+#if defined(__ARM_FEATURE_SVE)
+#if defined(__linux__)
+    if (getauxval(AT_HWCAP) & HWCAP_SVE) {
+        return fusion_rpnp_sve;
+    }
+#else
+    return fusion_rpnp_sve;
+#endif
+#endif
+    return fusion_rpnp_neon;
+#elif defined(MD_X86)
+#if defined(_MSC_VER)
+    {
+        int cpu_info[4] = {0};
+        __cpuidex(cpu_info, 1, 0);
+        const bool osxsave = (cpu_info[2] & (1u << 27)) != 0;
+        const uint64_t xcr0 = _xgetbv(0);
+        const bool os_ymm = osxsave && (xcr0 & 0x6) == 0x6;
+        const bool os_zmm = osxsave && (xcr0 & 0xE6) == 0xE6;
+        __cpuidex(cpu_info, 7, 0);
+        const bool has_avx2 = (cpu_info[1] & (1u << 5)) != 0;
+        const bool has_avx512f = (cpu_info[1] & (1u << 16)) != 0;
+        if (has_avx512f && os_zmm) return fusion_rpnp_avx512;
+        if (has_avx2 && os_ymm) return fusion_rpnp_avx2;
+        return fusion_rpnp_scalar;
+    }
+#elif defined(__GNUC__) || defined(__clang__)
+    if (__builtin_cpu_supports("avx512f")) return fusion_rpnp_avx512;
+    if (__builtin_cpu_supports("avx2")) return fusion_rpnp_avx2;
+    return fusion_rpnp_scalar;
+#else
+    return fusion_rpnp_scalar;
+#endif
+#else
+    return fusion_rpnp_scalar;
 #endif
 }
 

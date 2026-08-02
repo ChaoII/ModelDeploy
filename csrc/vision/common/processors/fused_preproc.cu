@@ -303,4 +303,137 @@ cleanup:
     return ok;
 }
 
+__global__ void kernel_fusion_rpnp_batch(
+    const uint8_t* __restrict__ src,
+    const int* __restrict__ src_ws,
+    const int* __restrict__ src_hs,
+    const size_t* __restrict__ src_offsets,
+    const int* __restrict__ resize_ws,
+    const int* __restrict__ resize_hs,
+    float* __restrict__ dst,
+    const int dst_h,
+    const int dst_w,
+    const float alpha0, const float beta0,
+    const float alpha1, const float beta1,
+    const float alpha2, const float beta2,
+    const float pad0, const float pad1, const float pad2) {
+    const int b = blockIdx.z;
+    const size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= dst_w || y >= dst_h) return;
+
+    const int src_w = src_ws[b];
+    const int src_h = src_hs[b];
+    const int resize_w = resize_ws[b];
+    const int resize_h = resize_hs[b];
+    const uint8_t* src_b = src + src_offsets[b];
+    float* dst_b = dst + static_cast<size_t>(b) * 3 * dst_h * dst_w;
+    const int plane = dst_h * dst_w;
+    const int idx = y * dst_w + x;
+
+    // pad（右 & 下），逐通道仿射后空间
+    if (y >= resize_h || x >= resize_w) {
+        dst_b[0 * plane + idx] = pad0;
+        dst_b[1 * plane + idx] = pad1;
+        dst_b[2 * plane + idx] = pad2;
+        return;
+    }
+    // 预计算 dst->src 映射系数（乘替代除）
+    const float kx = static_cast<float>(src_w) / resize_w;
+    const float ky = static_cast<float>(src_h) / resize_h;
+    const int sx_v = static_cast<int>(static_cast<float>(x) * kx);
+    const int sy_v = static_cast<int>(static_cast<float>(y) * ky);
+    const int sx = sx_v < src_w - 1 ? sx_v : (src_w - 1);
+    const int sy = sy_v < src_h - 1 ? sy_v : (src_h - 1);
+    const uint8_t* p = src_b + (sy * src_w + sx) * 3;
+    const float bb = p[0];
+    const float g = p[1];
+    const float r = p[2];
+    // swap BGR->RGB：C0=R, C1=G, C2=B
+    dst_b[0 * plane + idx] = r * alpha0 + beta0;
+    dst_b[1 * plane + idx] = g * alpha1 + beta1;
+    dst_b[2 * plane + idx] = bb * alpha2 + beta2;
+}
+
+bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
+                      Tensor* out,
+                      const std::vector<std::array<int, 2>>& resize_sizes,
+                      const std::vector<int>& dst_size,
+                      const std::vector<float>& alpha,
+                      const std::vector<float>& beta,
+                      const float pad[3],
+                      cudaStream_t stream) {
+    if (images.empty() || dst_size.size() != 2) return false;
+    const int batch = static_cast<int>(images.size());
+    const int dst_w = dst_size[0];
+    const int dst_h = dst_size[1];
+    out->allocate({batch, 3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+
+    bool is_internal_stream = false;
+    if (stream == nullptr) {
+        if (cudaStreamCreate(&stream) != cudaSuccess) return false;
+        is_internal_stream = true;
+    }
+
+    std::vector<size_t> offsets(batch);
+    std::vector<int> ws(batch), hs(batch), rws(batch), rhs(batch);
+    size_t total = 0;
+    for (int b = 0; b < batch; ++b) {
+        offsets[b] = total;
+        ws[b] = images[b].width();
+        hs[b] = images[b].height();
+        rws[b] = resize_sizes[b][0];
+        rhs[b] = resize_sizes[b][1];
+        total += static_cast<size_t>(hs[b]) * ws[b] * 3;
+    }
+
+    uint8_t* d_src = nullptr;
+    int* d_ws = nullptr;
+    int* d_hs = nullptr;
+    size_t* d_offsets = nullptr;
+    int* d_rws = nullptr;
+    int* d_rhs = nullptr;
+    bool ok = false;
+    if (cudaMalloc(&d_src, total) != cudaSuccess) goto cleanup;
+    for (int b = 0; b < batch; ++b) {
+        if (cudaMemcpyAsync(d_src + offsets[b], images[b].data(),
+                            static_cast<size_t>(hs[b]) * ws[b] * 3,
+                            cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    }
+    auto upload_array = [&](auto** dev_ptr, const auto& host_vec) -> bool {
+        if (host_vec.empty()) return true;
+        if (cudaMalloc(dev_ptr, host_vec.size() * sizeof(host_vec[0])) != cudaSuccess) return false;
+        return cudaMemcpyAsync(*dev_ptr, host_vec.data(),
+                               host_vec.size() * sizeof(host_vec[0]),
+                               cudaMemcpyHostToDevice, stream) == cudaSuccess;
+    };
+    if (!upload_array(&d_ws, ws)) goto cleanup;
+    if (!upload_array(&d_hs, hs)) goto cleanup;
+    if (!upload_array(&d_offsets, offsets)) goto cleanup;
+    if (!upload_array(&d_rws, rws)) goto cleanup;
+    if (!upload_array(&d_rhs, rhs)) goto cleanup;
+
+    {
+        dim3 block(16, 16);
+        dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
+        kernel_fusion_rpnp_batch<<<grid, block, 0, stream>>>(
+            d_src, d_ws, d_hs, d_offsets, d_rws, d_rhs,
+            out->data_ptr<float>(), dst_h, dst_w,
+            alpha[0], beta[0], alpha[1], beta[1], alpha[2], beta[2],
+            pad[0], pad[1], pad[2]);
+        ok = cudaGetLastError() == cudaSuccess;
+    }
+
+cleanup:
+    cudaStreamSynchronize(stream);
+    if (is_internal_stream) cudaStreamDestroy(stream);
+    cudaFree(d_src);
+    cudaFree(d_ws);
+    cudaFree(d_hs);
+    cudaFree(d_offsets);
+    cudaFree(d_rws);
+    cudaFree(d_rhs);
+    return ok;
+}
+
 } // namespace modeldeploy::vision

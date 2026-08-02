@@ -6,6 +6,8 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <array>
+#include <vector>
 #include "core/tensor.h"
 #include "vision/common/image_data.h"
 
@@ -50,5 +52,15 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
                                  const std::vector<float>& beta,
                                  bool swap_rb, float pad_value,
                                  cudaStream_t stream = nullptr);
+
+// OCR det：resize + pad(right/bottom) + swap + affine，pad 逐通道（仿射后空间）
+bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
+                      Tensor* out,
+                      const std::vector<std::array<int, 2>>& resize_sizes,
+                      const std::vector<int>& dst_size,
+                      const std::vector<float>& alpha,
+                      const std::vector<float>& beta,
+                      const float pad[3],
+                      cudaStream_t stream = nullptr);
 
 } // namespace modeldeploy::vision
