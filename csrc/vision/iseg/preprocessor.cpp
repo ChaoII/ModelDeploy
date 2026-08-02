@@ -5,12 +5,6 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/iseg/preprocessor.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
-#ifdef WITH_GPU
-#include "vision/common/processors/yolo_preproc.cuh"
-#endif
-#include "vision/common/processors/yolo_preproc.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsSegPreprocessor::UltralyticsSegPreprocessor() {
@@ -21,14 +15,7 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsSegPreprocessor::preprocess(const ImageData& image, Tensor* output,
                                                 LetterBoxRecord* letter_box_record) const {
-        if (use_cuda_preproc_) {
-#ifdef WITH_GPU
-            return yolo_preprocess_cuda(image, output, size_, padding_value_[0], letter_box_record);
-#else
-            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
-#endif
-        }
-        return yolo_preprocess_cpu(image, output, size_, padding_value_[0], letter_box_record);
+        return backend_->yolo_preprocess(image, output, size_, padding_value_[0], letter_box_record);
     }
 
     bool UltralyticsSegPreprocessor::run(

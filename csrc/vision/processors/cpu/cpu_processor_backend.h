@@ -4,10 +4,11 @@
 #pragma once
 
 #include "vision/processors/processor_backend.h"
+#include "core/md_decl.h"
 
 namespace modeldeploy::vision {
 
-class CpuProcessorBackend : public VisionProcessorBackend {
+class MODELDEPLOY_CXX_EXPORT CpuProcessorBackend : public VisionProcessorBackend {
 public:
     CpuProcessorBackend() = default;
     ~CpuProcessorBackend() override = default;
@@ -20,6 +21,9 @@ public:
                               int step_y, int step_uv, Tensor* out,
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
+    bool scrfd_preprocess(const ImageData& image, Tensor* out,
+                          const std::vector<int>& dst_size,
+                          float pad_val, LetterBoxRecord* record) override;
     bool resize(const ImageData& image, ImageData* out,
                 int width, int height) override;
     bool normalize(const ImageData& image, ImageData* out,

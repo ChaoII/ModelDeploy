@@ -9,9 +9,6 @@
 #include <vision/common/processors/color_space_convert.h>
 #include <vision/common/processors/convert.h>
 #include <vision/common/processors/hwc2chw.h>
-#ifdef WITH_GPU
-#include "vision/face/face_det/scrfd_preproc.cuh"
-#endif
 #include "vision/face/face_det/scrfd_preproc.h"
 
 namespace modeldeploy::vision::face {
@@ -26,14 +23,9 @@ namespace modeldeploy::vision::face {
 
 
     bool ScrfdPreprocessor::preprocess(ImageData* image, Tensor* output, LetterBoxRecord* letter_box_record) const {
-        if (use_cuda_preproc_) {
-#ifdef WITH_GPU
-            return scrfd_preprocess_cuda(*image, output, size_, static_cast<float>(padding_value_[0]), letter_box_record);
-#else
-            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
-#endif
-        }
-        return scrfd_preprocess_cpu(*image, output, size_, static_cast<float>(padding_value_[0]), letter_box_record);
+        return backend_->scrfd_preprocess(*image, output, size_,
+                                          static_cast<float>(padding_value_[0]),
+                                          letter_box_record);
     }
 
     bool ScrfdPreprocessor::run(

@@ -8,6 +8,8 @@
 #include "core/md_decl.h"
 #include "vision/common/struct.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPreprocessor {
@@ -35,14 +37,25 @@ namespace modeldeploy::vision::detection {
             padding_value_ = padding_value;
         }
 
-        void use_cuda_preproc() { use_cuda_preproc_ = true; }
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
 
         [[nodiscard]] std::vector<float> get_padding_value() const { return padding_value_; }
 
     protected:
         bool preprocess(const ImageData& image, Tensor* output, LetterBoxRecord* letter_box_record) const;
 
-        bool use_cuda_preproc_ = false;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
         std::vector<int> size_;
         std::vector<float> padding_value_;
     };

@@ -6,6 +6,7 @@
 #include "vision/processors/cpu/cpu_processor_backend.h"
 #include "vision/common/processors/yolo_preproc.h"
 #include "vision/common/processors/nv12_to_bgr.h"
+#include "vision/face/face_det/scrfd_preproc.h"
 
 namespace modeldeploy::vision {
 
@@ -22,6 +23,12 @@ bool CpuProcessorBackend::yolo_preprocess_nv12(const uint8_t* src_y, const uint8
                                                float pad_val, LetterBoxRecord* record) {
     return yolo_preprocess_nv12_cpu(src_y, src_uv, src_size, step_y, step_uv,
                                     out, dst_size, pad_val, record);
+}
+
+bool CpuProcessorBackend::scrfd_preprocess(const ImageData& image, Tensor* out,
+                                           const std::vector<int>& dst_size,
+                                           float pad_val, LetterBoxRecord* record) {
+    return scrfd_preprocess_cpu(image, out, dst_size, pad_val, record);
 }
 
 bool CpuProcessorBackend::resize(const ImageData& image, ImageData* out,

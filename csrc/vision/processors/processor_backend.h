@@ -7,13 +7,14 @@
 #include <vector>
 #include "core/tensor.h"
 #include "core/enum_variables.h"
+#include "core/md_decl.h"
 #include "vision/common/image_data.h"
 #include "vision/common/result.h"
 #include "vision/common/struct.h"
 
 namespace modeldeploy::vision {
 
-class VisionProcessorBackend {
+class MODELDEPLOY_CXX_EXPORT VisionProcessorBackend {
 public:
     virtual ~VisionProcessorBackend() = default;
 
@@ -28,6 +29,11 @@ public:
                                       int step_y, int step_uv, Tensor* out,
                                       const std::vector<int>& dst_size,
                                       float pad_val, LetterBoxRecord* record) = 0;
+
+    // SCRFD 人脸检测专用（letterbox + resize + normalize + hwc2chw，归一化为 (x-127.5)/128）
+    virtual bool scrfd_preprocess(const ImageData& image, Tensor* out,
+                                  const std::vector<int>& dst_size,
+                                  float pad_val, LetterBoxRecord* record) = 0;
 
     // 通用算子（输出中间图像，供多算子 pipeline 串联）
     virtual bool resize(const ImageData& image, ImageData* out,

@@ -8,7 +8,7 @@
 namespace modeldeploy::vision {
 
 // CUDA backend 继承 CPU 实现，仅覆写 yolo 系算子为 CUDA kernel
-class CudaProcessorBackend : public CpuProcessorBackend {
+class MODELDEPLOY_CXX_EXPORT CudaProcessorBackend : public CpuProcessorBackend {
 public:
     CudaProcessorBackend() = default;
     ~CudaProcessorBackend() override = default;
@@ -21,6 +21,9 @@ public:
                               int step_y, int step_uv, Tensor* out,
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
+    bool scrfd_preprocess(const ImageData& image, Tensor* out,
+                          const std::vector<int>& dst_size,
+                          float pad_val, LetterBoxRecord* record) override;
 };
 
 } // namespace modeldeploy::vision
