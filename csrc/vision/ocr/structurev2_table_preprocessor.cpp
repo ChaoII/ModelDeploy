@@ -43,30 +43,34 @@ namespace modeldeploy::vision::ocr {
                                            std::vector<Tensor>* outputs) {
         batch_det_img_info_.clear();
         batch_det_img_info_.resize(image_batch->size());
-        std::vector<cv::Mat> _images;
+        std::vector<Tensor> tensors;
+        tensors.reserve(image_batch->size());
         for (size_t i = 0; i < image_batch->size(); ++i) {
-            cv::Mat mat;
-            image_batch->at(i).to_mat(mat);
-            const auto width = static_cast<float>(mat.cols);
-            const auto height = static_cast<float>(mat.rows);
-            const float ratio = max_len / (std::max(height, width) * 1.0);
+            const auto& image = image_batch->at(i);
+            const auto width = static_cast<float>(image.width());
+            const auto height = static_cast<float>(image.height());
+            const float ratio = max_len / (std::max(height, width) * 1.0f);
             const int resize_h = static_cast<int>(height * ratio);
             const int resize_w = static_cast<int>(width * ratio);
-            Resize::apply(&mat, resize_w, resize_h);
-            Normalize::apply(&mat, mean_, std_,is_scale_);
-            Pad::apply(&mat,0, max_len - resize_h, 0, max_len - resize_w,pad_value_);
-            HWC2CHW::apply(&mat);
+            ImageData resized;
+            if (!backend_->resize(image, &resized, resize_w, resize_h)) return false;
+            ImageData normed;
+            if (!backend_->normalize(resized, &normed, mean_, std_, is_scale_, false)) return false;
+            ImageData padded;
+            if (!backend_->pad(normed, &padded, 0, max_len - resize_h, 0, max_len - resize_w, pad_value_[0])) return false;
+            Tensor t;
+            if (!backend_->hwc2chw(padded, &t)) return false;
+            t.expand_dim(0);
+            tensors.emplace_back(std::move(t));
             batch_det_img_info_[i] = {
                 static_cast<int>(width), static_cast<int>(height), resize_w,
                 resize_h
             };
-            _images.push_back(mat);
         }
 
         // Only have 1 output Tensor.
         outputs->resize(1);
-        // Get the NCHW tensor
-        utils::mats_to_tensor(_images, &(*outputs)[0]);
+        (*outputs)[0] = Tensor::concat(tensors, 0);
         return true;
     }
 } // namespace modeldeploy::vision::ocr

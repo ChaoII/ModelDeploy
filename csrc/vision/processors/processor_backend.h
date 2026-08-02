@@ -69,9 +69,10 @@ public:
 
     virtual bool center_crop(const ImageData& image, ImageData* out,
                              int width, int height) = 0;
+    // 四边填充，value 为填充值（OCR rec/cls/table 用）
     virtual bool pad(const ImageData& image, ImageData* out,
-                     const std::vector<int>& top,
-                     const std::vector<int>& bottom) = 0;
+                     int top, int bottom, int left, int right,
+                     float value = 0.0f) = 0;
     virtual bool hwc2chw(const ImageData& image, Tensor* out) = 0;
     virtual bool normalize_and_permute(const ImageData& image, Tensor* out,
                                        const std::vector<float>& mean,

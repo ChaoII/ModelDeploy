@@ -36,31 +36,33 @@ namespace modeldeploy::vision::ocr {
 
     bool ClassifierPreprocessor::apply(const std::vector<ImageData>& image_batch,
                                        std::vector<Tensor>* outputs) {
-        std::vector<cv::Mat> _images;
+        std::vector<Tensor> tensors;
+        tensors.reserve(image_batch.size());
         for (auto& image : image_batch) {
-            cv::Mat mat;
-            image.to_mat(mat);
             const int img_h = cls_image_shape_[1];
             const int img_w = cls_image_shape_[2];
-            const float ratio = static_cast<float>(mat.cols) / static_cast<float>(mat.rows);
+            const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
             int resize_w;
             if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w))
                 resize_w = img_w;
             else
                 resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
-            Resize::apply(&mat, resize_w, img_h);
-            Normalize::apply(&mat, mean_, std_, is_scale_);
-            std::vector<float> value = {0, 0, 0};
-            if (mat.cols < cls_image_shape_[2]) {
-                Pad::apply(&mat, 0, 0, 0, cls_image_shape_[2] - mat.cols, value);
+            ImageData resized;
+            if (!backend_->resize(image, &resized, resize_w, img_h)) return false;
+            ImageData normed;
+            if (!backend_->normalize(resized, &normed, mean_, std_, is_scale_, false)) return false;
+            ImageData padded = normed;
+            if (normed.width() < cls_image_shape_[2]) {
+                if (!backend_->pad(normed, &padded, 0, 0, 0, cls_image_shape_[2] - normed.width(), 0.0f)) return false;
             }
-            HWC2CHW::apply(&mat);
-            _images.push_back(mat);
+            Tensor t;
+            if (!backend_->hwc2chw(padded, &t)) return false;
+            t.expand_dim(0);
+            tensors.emplace_back(std::move(t));
         }
         // Only have 1 output tensor.
         outputs->resize(1);
-        // Get the NCHW tensor
-        utils::mats_to_tensor(_images, &(*outputs)[0]);
+        (*outputs)[0] = Tensor::concat(tensors, 0);
         return true;
     }
 }

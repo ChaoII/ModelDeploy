@@ -54,8 +54,8 @@ public:
     bool center_crop(const ImageData& image, ImageData* out,
                      int width, int height) override;
     bool pad(const ImageData& image, ImageData* out,
-             const std::vector<int>& top,
-             const std::vector<int>& bottom) override;
+             int top, int bottom, int left, int right,
+             float value = 0.0f) override;
     bool hwc2chw(const ImageData& image, Tensor* out) override;
     bool normalize_and_permute(const ImageData& image, Tensor* out,
                                const std::vector<float>& mean,

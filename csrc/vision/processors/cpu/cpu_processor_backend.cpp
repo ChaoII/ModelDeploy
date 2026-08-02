@@ -119,9 +119,9 @@ bool CpuProcessorBackend::center_crop(const ImageData& image, ImageData* out,
 }
 
 bool CpuProcessorBackend::pad(const ImageData& image, ImageData* out,
-                              const std::vector<int>& top,
-                              const std::vector<int>& bottom) {
-    *out = image.pad(top[0], bottom[0], top[1], bottom[1], 0.0f);
+                              int top, int bottom, int left, int right,
+                              float value) {
+    *out = image.pad(top, bottom, left, right, value);
     return !out->empty();
 }
 

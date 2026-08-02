@@ -4,6 +4,11 @@
 
 #pragma once
 
+#include "core/tensor.h"
+#include "core/md_decl.h"
+#include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT ClassifierPreprocessor {
@@ -51,10 +56,24 @@ namespace modeldeploy::vision::ocr {
         /// Get cls_image_shape for the classification preprocess
         [[nodiscard]] std::vector<int> get_cls_image_shape() const { return cls_image_shape_; }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
+
     private:
         std::vector<int> cls_image_shape_ = {3, 48, 192};
         std::vector<float> mean_{0.5f, 0.5f, 0.5f};
         std::vector<float> std_{0.5f, 0.5f, 0.5f};
         bool is_scale_ = true;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 } // namespace ocr

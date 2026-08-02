@@ -5,6 +5,9 @@
 
 #pragma once
 #include "core/tensor.h"
+#include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT RecognizerPreprocessor final {
@@ -64,6 +67,18 @@ namespace modeldeploy::vision::ocr {
         /// Get rec_image_shape for the recognition preprocess
         std::vector<int> get_rec_image_shape() { return rec_image_shape_; }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
+
     private:
         std::vector<int> rec_image_shape_ = {3, 48, 320};
         bool static_shape_infer_ = false;
@@ -71,5 +86,7 @@ namespace modeldeploy::vision::ocr {
         std::vector<float> std_ = {0.5f, 0.5f, 0.5f};
         bool is_scale_ = true;
         std::vector<float> pad_value_ = {127, 127, 127};
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 } // namespace ocr

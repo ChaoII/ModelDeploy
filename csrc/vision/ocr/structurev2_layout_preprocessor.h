@@ -4,6 +4,10 @@
 #pragma once
 
 #include "core/tensor.h"
+#include "core/md_decl.h"
+#include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 
 
@@ -60,6 +64,18 @@ namespace modeldeploy::vision::ocr {
         /// Get static_shape_infer of the recognition preprocess
         bool get_static_shape_infer() const { return static_shape_infer_; }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
+
     private:
         std::array<int, 4> get_layout_image_info(ImageData* image);
 
@@ -71,5 +87,7 @@ namespace modeldeploy::vision::ocr {
 
         // default true for pp-structurev2-layout model, backbone picodet.
         bool static_shape_infer_ = true;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 } // namespace modeldeploy::vision::ocr

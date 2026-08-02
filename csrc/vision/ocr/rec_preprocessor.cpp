@@ -43,8 +43,8 @@ namespace modeldeploy::vision::ocr {
             float ori_wh_ratio = static_cast<float>(image.width()) * 1.0f / static_cast<float>(image.height());
             max_wh_ratio = std::max(max_wh_ratio, ori_wh_ratio);
         }
-        std::vector<ImageData> images;
-        images.reserve(image_batch.size());
+        std::vector<Tensor> tensors;
+        tensors.reserve(image_batch.size());
         for (auto& image : image_batch) {
             ImageData processed_image;
             if (!static_shape_infer_) {
@@ -58,18 +58,21 @@ namespace modeldeploy::vision::ocr {
                 else {
                     resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
                 }
-                processed_image = image.resize(resize_w, img_h)
-                                       .pad(0, 0, 0, max_w - resize_w, 127.0f);
+                ImageData resized;
+                if (!backend_->resize(image, &resized, resize_w, img_h)) return false;
+                if (!backend_->pad(resized, &processed_image, 0, 0, 0, max_w - resize_w, 127.0f)) return false;
             }
             else {
-                processed_image = image.resize(img_w, img_h);
+                if (!backend_->resize(image, &processed_image, img_w, img_h)) return false;
             }
-            processed_image = processed_image.fuse_normalize_and_permute(mean_, std_, is_scale_);
-            images.emplace_back(processed_image);
+            Tensor tensor;
+            if (!backend_->normalize_and_permute(processed_image, &tensor, mean_, std_, is_scale_)) return false;
+            tensor.expand_dim(0);
+            tensors.emplace_back(std::move(tensor));
         }
         // Only have 1 output Tensor.
         outputs->resize(1);
-        ImageData::images_to_tensor(images, &(*outputs)[0]);
+        (*outputs)[0] = Tensor::concat(tensors, 0);
         return true;
     }
 }

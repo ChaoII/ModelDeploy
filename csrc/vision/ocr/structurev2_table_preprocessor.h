@@ -4,7 +4,11 @@
 
 #pragma once
 
-
+#include "core/md_decl.h"
+#include "core/tensor.h"
+#include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::ocr {
     /*! @brief Preprocessor object for table model.
@@ -41,6 +45,18 @@ namespace modeldeploy::vision::ocr {
             return &batch_det_img_info_;
         }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
+
     private:
         // for SLANet or SLANet_Plus max_len = 484, for SLANeXt_wired max_len = 512
         int max_len = 512;
@@ -51,5 +67,7 @@ namespace modeldeploy::vision::ocr {
         std::vector<float> pad_value_ = {0.0f, 0.0f, 0.0f};
         bool is_scale_ = true;
         std::vector<std::array<int, 4>> batch_det_img_info_;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 } // namespace modeldeploy::vision::ocr
