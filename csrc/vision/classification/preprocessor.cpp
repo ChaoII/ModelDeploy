@@ -35,8 +35,11 @@ namespace modeldeploy::vision::classification {
         if (!backend_->convert(rgb, &scaled, alpha, beta)) return false;
         const std::vector mean = {0.485f, 0.456f, 0.406f};
         const std::vector std = {0.229f, 0.224f, 0.225f};
-        // scale=false：convert 已做过 1/255，normalize 不再缩放（与原 NormalizeAndPermute scale=false 一致）
-        if (!backend_->normalize_and_permute(scaled, output, mean, std, false)) return false;
+        // scale=false：convert 已做过 1/255，normalize 不再缩放
+        // swap_rb=false：图像已是 RGB，不能再 swap（fuse_normalize_and_permute 会无条件 swap，故改用 normalize+hwc2chw）
+        ImageData normed;
+        if (!backend_->normalize(scaled, &normed, mean, std, false, false)) return false;
+        if (!backend_->hwc2chw(normed, output)) return false;
         output->expand_dim(0);
         return true;
     }
