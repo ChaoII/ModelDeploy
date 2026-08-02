@@ -7,6 +7,8 @@
 #include "core/md_decl.h"
 #include "core/tensor.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::classification {
     /*! @brief Preprocessor object for YOLOv5Cls serials model.
@@ -37,6 +39,17 @@ namespace modeldeploy::vision::classification {
 
         void disable_center_crop() { enable_center_crop_ = false; }
 
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
+
+        void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
+            backend_ = std::move(backend);
+        }
+
+        [[nodiscard]] std::shared_ptr<VisionProcessorBackend> get_processor_backend() const {
+            return backend_;
+        }
 
     protected:
         bool preprocess(ImageData* image, Tensor* output) const;
@@ -46,5 +59,7 @@ namespace modeldeploy::vision::classification {
         std::vector<int> size_;
         // default true, for cls...
         bool enable_center_crop_ = true;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
     };
 }

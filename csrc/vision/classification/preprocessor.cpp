@@ -3,13 +3,7 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
 #include "vision/classification/preprocessor.h"
-#include "vision/common/processors/center_crop.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/convert.h"
-#include "vision/common/processors/color_space_convert.h"
-#include "vision/common/processors/normalize_and_permute.h"
 
 namespace modeldeploy::vision::classification {
     ClassificationPreprocessor::ClassificationPreprocessor() {
@@ -24,23 +18,26 @@ namespace modeldeploy::vision::classification {
         if (image->width() <= 0 || image->height() <= 0) {
             return false;
         }
-        cv::Mat mat;
-        image->to_mat(mat);
+        ImageData tmp;
         if (enable_center_crop_) {
-            const int crop_size = std::min(mat.rows, mat.cols);
-            CenterCrop::apply(&mat, crop_size, crop_size);
+            const int crop_size = std::min(image->height(), image->width());
+            if (!backend_->center_crop(*image, &tmp, crop_size, crop_size)) return false;
+        } else {
+            tmp = *image;
         }
-        Resize::apply(&mat, size_[0], size_[1]);
-        // Normalize
-        BGR2RGB::apply(&mat);
+        ImageData resized;
+        if (!backend_->resize(tmp, &resized, size_[0], size_[1])) return false;
+        ImageData rgb;
+        if (!backend_->convert_to(resized, &rgb, "RGB")) return false;
+        ImageData scaled;
         const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector beta = {0.0f, 0.0f, 0.0f};
-        Convert::apply(&mat, alpha, beta);
+        if (!backend_->convert(rgb, &scaled, alpha, beta)) return false;
         const std::vector mean = {0.485f, 0.456f, 0.406f};
         const std::vector std = {0.229f, 0.224f, 0.225f};
-        NormalizeAndPermute::apply(&mat, mean, std, false);
-        utils::mat_to_tensor(mat, output);
-        output->expand_dim(0); // reshape to n, c, h, w
+        // scale=false：convert 已做过 1/255，normalize 不再缩放（与原 NormalizeAndPermute scale=false 一致）
+        if (!backend_->normalize_and_permute(scaled, output, mean, std, false)) return false;
+        output->expand_dim(0);
         return true;
     }
 
