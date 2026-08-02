@@ -26,10 +26,12 @@ public:
     bool init();
 
     /// 对一帧执行所有模型的推理（多模型并行）— BGR 路径
+    /// @param y_device/uv_device CUVID 硬解 GPU NV12 指针（GPU 直通零拷贝，可为 null）
     /// @param frame_out 输出的 BGR 图（供绘制/快照；need_bgr=false 时可为空）
     /// @param need_bgr 是否需要生成 BGR 图（非预览路可跳过，GPU 直通时省一次 GPU 往返）
     /// @return 0=无模型需要处理（全部跳帧），>0=有模型实际执行了推理
     int run_models(uint8_t* y_plane, uint8_t* uv_plane,
+                    const uint8_t* y_device, const uint8_t* uv_device,
                     int width, int height, int y_step, int uv_step,
                     std::vector<InferResult>* results,
                     modeldeploy::vision::ImageData* frame_out = nullptr,

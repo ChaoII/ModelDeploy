@@ -28,6 +28,11 @@ struct PendingFrame {
     int width = 0, height = 0;
     int64_t pts = 0;
     double wall_time_sec = 0.0; // 帧到达解码段的墙钟时刻（用于实时丢帧判断）
+    // CUVID 硬解 GPU 帧（零拷贝直通 GPU 预处理）
+    // gpu_nv12 持 GPU buffer 所有权（D2D copy 自 cuvid 复用帧，析构自动 cudaFree）
+    std::shared_ptr<uint8_t> gpu_nv12;
+    const uint8_t* y_plane_device = nullptr;
+    const uint8_t* uv_plane_device = nullptr;
 
     const uint8_t* y_ptr() const {
         if (shared_frame) return shared_frame->nv12_data.data();

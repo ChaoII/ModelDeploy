@@ -258,6 +258,10 @@ void Pipeline::decode_loop() {
             pf.pts = raw.pts;
             pf.wall_time_sec = std::chrono::duration<double>(
                 dec_t0.time_since_epoch()).count();
+            pf.y_plane_device = raw.y_plane_device;
+            pf.uv_plane_device = raw.uv_plane_device;
+            // 硬解帧仍需落 host NV12（供预览/快照/非 GPU 路径）；
+            // GPU 直通推理段由 InferGroup 用 host NV12 → GPU 预处理（yolo_preprocess_nv12_cuda 自动 H2D）
             const size_t y_size = static_cast<size_t>(raw.height) * raw.width;
             const size_t uv_size = y_size / 2;
             pf.nv12_data.resize(y_size + uv_size);
@@ -342,6 +346,7 @@ void Pipeline::process_loop() {
             models_ran = infer_group_->run_models(
                 const_cast<uint8_t*>(pf.y_ptr()),
                 const_cast<uint8_t*>(pf.uv_ptr()),
+                nullptr, nullptr,
                 pf.width, pf.height, pf.width, pf.width,
                 &results, &bgr_image, cfg_.enable_preview);
             ran_inference = models_ran > 0;

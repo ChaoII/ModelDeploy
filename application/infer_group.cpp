@@ -153,6 +153,7 @@ void InferGroup::stop_workers() {
 }
 
 int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
+                              const uint8_t* y_device, const uint8_t* uv_device,
                               int width, int height, int y_step, int uv_step,
                               std::vector<InferResult>* results,
                               ImageData* frame_out, bool need_bgr) {
@@ -165,10 +166,13 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     const size_t uv_size = y_size / 2;
     const size_t total = y_size + uv_size;
 
-    // 紧凑连续 NV12 直接使用（零拷贝），仅在非紧凑行距时才落到本地缓冲
+    // 紧凑连续 NV12 直接使用（零拷贝），仅在非紧凑行距时才落到本地缓冲。
+    // GPU 直通（device NV12 已提供）：完全跳过 host NV12 处理
     const uint8_t* y_src = y_plane;
     const uint8_t* uv_src = uv_plane;
-    if (!(y_step == width && uv_step == width && y_plane && uv_plane)) {
+    const bool gpu_direct = gpu_nv12_ready_ && y_device && uv_device;
+    if (!gpu_direct &&
+        !(y_step == width && uv_step == width && y_plane && uv_plane)) {
         if (last_w_ != width || last_h_ != height || nv12_buf_.size() != total) {
             nv12_buf_.resize(total);
             last_w_ = width;
@@ -216,7 +220,10 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
     }
 
     // ── GPU NV12 直通：NV12 → GPU letterbox/normalize → 推理 → 后处理，全程不落 host BGR ──
-    if (gpu_nv12_ready_ && y_src && uv_src) {
+    // device 指针优先（零拷贝），否则 host NV12（yolo_preprocess_nv12_cuda 自动上传）
+    const uint8_t* gy = y_device ? y_device : y_src;
+    const uint8_t* guv = uv_device ? uv_device : uv_src;
+    if (gpu_nv12_ready_ && gy && guv) {
         struct GpuTask {
             size_t index;
             InferResult result;
@@ -239,9 +246,9 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                 std::lock_guard<std::mutex> lock(w->mtx);
                 w->done = false;
                 w->has_task = true;
-                w->task = [&engine, tp, y_src, uv_src, sw, sh, sy, suv]() {
+                w->task = [&engine, tp, gy, guv, sw, sh, sy, suv]() {
                     auto t0 = std::chrono::steady_clock::now();
-                    engine->infer_nv12(y_src, uv_src, sw, sh, sy, suv, &tp->result);
+                    engine->infer_nv12(gy, guv, sw, sh, sy, suv, &tp->result);
                     tp->dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
                         std::chrono::steady_clock::now() - t0).count();
                 };

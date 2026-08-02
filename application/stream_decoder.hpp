@@ -26,6 +26,9 @@ struct DecodedFrame {
     int64_t pts = 0;
     // 设备侧图像句柄（Sophgo 硬解码为 sail::BMImage*），非 0 走零拷贝路径
     void* device_image = nullptr;
+    // CUVID 硬解：NV12 帧的 GPU 指针（Y/UV 平面），直接喂 GPU 预处理（零 host 往返）
+    uint8_t* y_plane_device = nullptr;
+    uint8_t* uv_plane_device = nullptr;
 };
 
 /// FFmpeg 硬件/软件解码器，支持 CUVID 回退与自动重连
