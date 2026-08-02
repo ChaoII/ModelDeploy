@@ -52,6 +52,11 @@ namespace modeldeploy {
             const bool has_trt = std::find(all_providers.begin(), all_providers.end(),
                                            "TensorrtExecutionProvider") != all_providers.end();
             const std::string device_id_str = std::to_string(option.device_id);
+            // stream_str 需存活到 UpdateCUDAProviderOptions 调用（原 if 块内声明会悬垂）
+            std::string stream_str;
+            if (option.external_stream) {
+                stream_str = std::to_string(reinterpret_cast<uintptr_t>(option.external_stream));
+            }
             // ==== 1. 尝试启用 TensorRT（优先） ====
             if (option.enable_trt) {
                 if (has_trt) {
@@ -126,8 +131,6 @@ namespace modeldeploy {
                 values_cuda.push_back(device_id_str.c_str());
 
                 if (option.external_stream) {
-                    const std::string stream_str = std::to_string(
-                        reinterpret_cast<uintptr_t>(option.external_stream));
                     keys_cuda.push_back("user_compute_stream");
                     values_cuda.push_back(stream_str.c_str());
                 }
