@@ -25,6 +25,10 @@ public:
                    const std::vector<int>& dst_size,
                    const std::vector<float>& padding_value,
                    LetterBoxRecord* record) override;
+    bool yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                               const std::vector<int>& dst_size,
+                               float pad_val,
+                               std::vector<LetterBoxRecord>* records) override;
     bool scrfd_preprocess(const ImageData& image, Tensor* out,
                           const std::vector<int>& dst_size,
                           float pad_val, LetterBoxRecord* record) override;

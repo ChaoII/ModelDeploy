@@ -150,6 +150,20 @@ bool CpuProcessorBackend::nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
     return nv12_to_bgr_cpu(y, uv, width, height, width, width, out->data());
 }
 
+bool CpuProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                                const std::vector<int>& dst_size,
+                                                float pad_val,
+                                                std::vector<LetterBoxRecord>* records) {
+    if (images.empty() || dst_size.size() != 2) return false;
+    records->resize(images.size());
+    std::vector<Tensor> tensors(images.size());
+    for (size_t i = 0; i < images.size(); ++i) {
+        if (!yolo_preprocess(images[i], &tensors[i], dst_size, pad_val, &(*records)[i])) return false;
+    }
+    *out = Tensor::concat(tensors, 0);
+    return true;
+}
+
 bool CpuProcessorBackend::fused_preprocess(
     const ImageData& image, Tensor* out,
     const std::vector<int>& dst_size,

@@ -36,6 +36,12 @@ public:
                            const std::vector<float>& padding_value,
                            LetterBoxRecord* record) = 0;
 
+    // 整批 yolo 预处理（batch>1 时一次 kernel 完成，避免 N 次 launch + concat）
+    virtual bool yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                       const std::vector<int>& dst_size,
+                                       float pad_val,
+                                       std::vector<LetterBoxRecord>* records) = 0;
+
     // SCRFD 人脸检测专用（letterbox + resize + normalize + hwc2chw，归一化为 (x-127.5)/128）
     virtual bool scrfd_preprocess(const ImageData& image, Tensor* out,
                                   const std::vector<int>& dst_size,

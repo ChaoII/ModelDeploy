@@ -70,4 +70,16 @@ bool CudaProcessorBackend::fused_preprocess(
 #endif
 }
 
+bool CudaProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                                 const std::vector<int>& dst_size,
+                                                 float pad_val,
+                                                 std::vector<LetterBoxRecord>* records) {
+#ifdef WITH_GPU
+    return yolo_preprocess_batch_cuda(images, out, dst_size, pad_val, records);
+#else
+    MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
+    return CpuProcessorBackend::yolo_preprocess_batch(images, out, dst_size, pad_val, records);
+#endif
+}
+
 } // namespace modeldeploy::vision

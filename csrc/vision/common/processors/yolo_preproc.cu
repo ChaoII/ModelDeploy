@@ -1,6 +1,7 @@
 #include "vision/common/processors/yolo_preproc.cuh"
 #include <cuda_runtime.h>
 #include <vision/utils.h>
+#include "core/md_log.h"
 
 // RGB 三通道归一化均值和标准差
 __constant__ float k_mean[3] = {0.f, 0.f, 0.f};
@@ -344,6 +345,133 @@ namespace modeldeploy::vision {
         }
         // 6 增加batch维
         output->expand_dim(0);
+        return true;
+    }
+
+    // ==================== batch fused preprocessing (3D grid) ====================
+    __global__ void kernel_bgr_fusion_batch(
+        const uint8_t* __restrict__ src,
+        const int* __restrict__ src_ws,
+        const int* __restrict__ src_hs,
+        const size_t* __restrict__ src_offsets,
+        const float* __restrict__ scales,
+        const float* __restrict__ pad_ws,
+        const float* __restrict__ pad_hs,
+        float* __restrict__ dst,
+        const int dst_h,
+        const int dst_w,
+        const float pad_value) {
+        const int b = blockIdx.z;
+        const size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+        const size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+        if (x >= dst_w || y >= dst_h) return;
+        const int src_w = src_ws[b];
+        const int src_h = src_hs[b];
+        const float scale = scales[b];
+        const float pad_w = pad_ws[b];
+        const float pad_h = pad_hs[b];
+        const uint8_t* src_b = src + src_offsets[b];
+        float* dst_b = dst + static_cast<size_t>(b) * 3 * dst_h * dst_w;
+        const int plane = dst_h * dst_w;
+        const float src_xf = (static_cast<float>(x) - pad_w) / scale;
+        const float src_yf = (static_cast<float>(y) - pad_h) / scale;
+        if (src_xf < 0.0f || src_xf >= static_cast<float>(src_w) ||
+            src_yf < 0.0f || src_yf >= static_cast<float>(src_h)) {
+            const float v = pad_value * (1.0f / 255.0f);
+            dst_b[0 * plane + y * dst_w + x] = v;
+            dst_b[1 * plane + y * dst_w + x] = v;
+            dst_b[2 * plane + y * dst_w + x] = v;
+            return;
+        }
+        const int src_x = static_cast<int>(src_xf);
+        const int src_y = static_cast<int>(src_yf);
+        const int idx = (src_y * src_w + src_x) * 3;
+        const float b0 = src_b[idx + 0];
+        const float g = src_b[idx + 1];
+        const float r = src_b[idx + 2];
+        dst_b[0 * plane + y * dst_w + x] = r * (1.0f / 255.0f);  // R
+        dst_b[1 * plane + y * dst_w + x] = g * (1.0f / 255.0f);  // G
+        dst_b[2 * plane + y * dst_w + x] = b0 * (1.0f / 255.0f); // B
+    }
+
+    bool yolo_preprocess_batch_cuda(const std::vector<ImageData>& images,
+                                    Tensor* output,
+                                    const std::vector<int>& dst_size,
+                                    float pad_value,
+                                    std::vector<LetterBoxRecord>* letter_box_records,
+                                    cudaStream_t stream) {
+        if (images.empty() || dst_size.size() != 2) return false;
+        const int batch = static_cast<int>(images.size());
+        const int dst_w = dst_size[0];
+        const int dst_h = dst_size[1];
+
+        output->allocate({batch, 3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+
+        bool is_internal_stream = false;
+        if (stream == nullptr) {
+            if (cudaStreamCreate(&stream) != cudaSuccess) return false;
+            is_internal_stream = true;
+        }
+
+        std::vector<int> src_ws(batch), src_hs(batch);
+        std::vector<size_t> src_offsets(batch);
+        std::vector<float> scales(batch), pad_ws(batch), pad_hs(batch);
+        letter_box_records->resize(batch);
+        size_t total_src_bytes = 0;
+        for (int i = 0; i < batch; ++i) {
+            const int sw = images[i].width(), sh = images[i].height();
+            src_ws[i] = sw; src_hs[i] = sh;
+            const LetterBoxRecord r = utils::cal_letter_box_param({sw, sh}, dst_size);
+            (*letter_box_records)[i] = r;
+            scales[i] = r.scale; pad_ws[i] = r.pad_w; pad_hs[i] = r.pad_h;
+            src_offsets[i] = total_src_bytes;
+            total_src_bytes += static_cast<size_t>(sh) * sw * 3;
+        }
+
+        if (ws0.capacity < total_src_bytes) {
+            if (ws0.d_src) cudaFree(ws0.d_src);
+            cudaMalloc(&ws0.d_src, total_src_bytes);
+            ws0.capacity = total_src_bytes;
+        }
+        uint8_t* dst_ptr = ws0.d_src;
+        for (int i = 0; i < batch; ++i) {
+            const size_t bytes = static_cast<size_t>(images[i].height()) * images[i].width() * 3;
+            cudaMemcpyAsync(dst_ptr, images[i].data(), bytes, cudaMemcpyHostToDevice, stream);
+            dst_ptr += bytes;
+        }
+        const uint8_t* d_src = ws0.d_src;
+
+        int* d_src_ws; int* d_src_hs;
+        size_t* d_src_offsets;
+        float* d_scales_p; float* d_pad_ws_p; float* d_pad_hs_p;
+        cudaMalloc(&d_src_ws, sizeof(int) * batch);
+        cudaMalloc(&d_src_hs, sizeof(int) * batch);
+        cudaMalloc(&d_scales_p, sizeof(float) * batch);
+        cudaMalloc(&d_pad_ws_p, sizeof(float) * batch);
+        cudaMalloc(&d_pad_hs_p, sizeof(float) * batch);
+        cudaMalloc(&d_src_offsets, sizeof(size_t) * batch);
+        cudaMemcpyAsync(d_src_ws, src_ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(d_src_hs, src_hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(d_scales_p, scales.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(d_pad_ws_p, pad_ws.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(d_pad_hs_p, pad_hs.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(d_src_offsets, src_offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream);
+
+        dim3 block(16, 16);
+        dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
+        kernel_bgr_fusion_batch<<<grid, block, 0, stream>>>(
+            d_src, d_src_ws, d_src_hs, d_src_offsets, d_scales_p, d_pad_ws_p, d_pad_hs_p,
+            output->data_ptr<float>(), dst_h, dst_w, pad_value);
+
+        const cudaError_t err = cudaGetLastError();
+        cudaStreamSynchronize(stream);
+        if (is_internal_stream) cudaStreamDestroy(stream);
+        cudaFree(d_src_ws); cudaFree(d_src_hs);
+        cudaFree(d_scales_p); cudaFree(d_pad_ws_p); cudaFree(d_pad_hs_p);
+        if (err != cudaSuccess) {
+            MD_LOG_ERROR << "batch kernel launch failed: " << cudaGetErrorString(err) << std::endl;
+            return false;
+        }
         return true;
     }
 } // namespace modeldeploy::vision
