@@ -3,11 +3,8 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
 #include "vision/ocr/utils/ocr_utils.h"
 #include "vision/ocr/rec_preprocessor.h"
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/cast.h"
 
 namespace modeldeploy::vision::ocr {
     RecognizerPreprocessor::RecognizerPreprocessor() {
@@ -46,28 +43,25 @@ namespace modeldeploy::vision::ocr {
         std::vector<Tensor> tensors;
         tensors.reserve(image_batch.size());
         for (auto& image : image_batch) {
-            ImageData processed_image;
+            const int src_w = image.width();
+            const int src_h = image.height();
+            int resize_w;
             if (!static_shape_infer_) {
-                // 单个batch中的最大
                 const auto max_w = static_cast<int>(static_cast<float>(img_h) * max_wh_ratio);
                 const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
-                int resize_w;
-                if (std::ceil(img_h * ratio) > max_w) {
-                    resize_w = max_w;
-                }
-                else {
-                    resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
-                }
-                ImageData resized;
-                if (!backend_->resize(image, &resized, resize_w, img_h)) return false;
-                if (!backend_->pad(resized, &processed_image, 0, 0, 0, max_w - resize_w, 127.0f)) return false;
+                if (std::ceil(img_h * ratio) > max_w) resize_w = max_w;
+                else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
+            } else {
+                resize_w = img_w;
             }
-            else {
-                if (!backend_->resize(image, &processed_image, img_w, img_h)) return false;
-            }
+            const float scale_x = static_cast<float>(resize_w) / src_w;
+            const float scale_y = static_cast<float>(img_h) / src_h;
             Tensor tensor;
-            if (!backend_->normalize_and_permute(processed_image, &tensor, mean_, std_, is_scale_)) return false;
-            tensor.expand_dim(0);
+            const std::vector<float> alpha = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};  // 1/(255*0.5)
+            const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};  // -0.5/0.5
+            if (!backend_->fused_preprocess(image, &tensor, {resize_w, img_h},
+                                            0.0f, 0.0f, scale_x, scale_y,
+                                            alpha, beta, true, 127.0f)) return false;
             tensors.emplace_back(std::move(tensor));
         }
         // Only have 1 output Tensor.

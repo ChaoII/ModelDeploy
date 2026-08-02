@@ -3,12 +3,6 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/color_space_convert.h"
-#include "vision/common/processors/hwc2chw.h"
-#include "vision/common/processors/cast.h"
-#include "vision/common/processors/center_crop.h"
 #include "vision/face/face_age/preprocessor.h"
 
 
@@ -22,26 +16,28 @@ namespace modeldeploy::vision::face {
             MD_LOG_ERROR << "The input image must be a color image." << std::endl;
             return false;
         }
-        ImageData dst_image;
+        const ImageData* in = &image;
+        ImageData resized_buf;
         if (image.height() == 256 && image.width() == 256) {
-            if (!backend_->center_crop(image, &dst_image, size_[0], size_[1])) return false;
-        }
-        else if (image.height() == size_[0] && image.width() == size_[1]) {
-            dst_image = image;
+            // 直接用
+        } else if (image.height() == size_[0] && image.width() == size_[1]) {
+            // 已 248
             MD_LOG_WARN << "the width and height is already to " << size_[0] << " and  " << size_[1] << std::endl;
-        }
-        else {
+        } else {
+            // resize 到 256
             MD_LOG_WARN << "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss predict precision." << std::endl;
-            ImageData resized;
-            if (!backend_->resize(image, &resized, 256, 256)) return false;
-            if (!backend_->center_crop(resized, &dst_image, size_[0], size_[1])) return false;
+            if (!backend_->resize(image, &resized_buf, 256, 256)) return false;
+            in = &resized_buf;
         }
-        // BGR2RGB::Run(mat); 前处理不需要转换为RGB
-        ImageData casted;
-        if (!backend_->cast(dst_image, &casted, "float", false)) return false;
-        if (!backend_->hwc2chw(casted, output)) return false;
-        output->expand_dim(0); // reshape to n, c, h, w
+        const int src2_w = in->width();
+        // center_crop 248 from 256：dst -> src = (dst + 4) * (src_dim/256)
+        const float scale = 256.0f / src2_w;  // 若 src 是 256 则 scale=1
+        const float origin = -4.0f;
+        if (!backend_->fused_preprocess(*in, output, size_,
+                                        origin, origin, scale, scale,
+                                        {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+                                        false, 0.0f)) return false;
         return true;
     }
 

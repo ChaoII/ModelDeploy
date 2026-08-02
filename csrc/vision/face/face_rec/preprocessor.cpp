@@ -3,12 +3,6 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/color_space_convert.h"
-#include "vision/common/processors/hwc2chw.h"
-#include "vision/common/processors/cast.h"
-#include "vision/common/processors/center_crop.h"
 #include "vision/face/face_rec/preprocessor.h"
 
 
@@ -20,23 +14,22 @@ namespace modeldeploy::vision::face {
         // 3. BGR2RGB
         // 4. Cast (uint8->float, 不缩放)
         // 5. HWC2CHW
-        ImageData resized;
+        const ImageData* in = image;
+        ImageData resized_buf;
         if (image->width() != 256 || image->height() != 256) {
             MD_LOG_WARN <<
                 "the size of shape must be 256, ensure use face alignment? "
                 "now, resize to 256 and may loss precision" << std::endl;
-            if (!backend_->resize(*image, &resized, 256, 256)) return false;
-        } else {
-            resized = *image;
+            if (!backend_->resize(*image, &resized_buf, 256, 256)) return false;
+            in = &resized_buf;
         }
-        ImageData cropped;
-        if (!backend_->center_crop(resized, &cropped, size_[0], size_[1])) return false;
-        ImageData rgb;
-        if (!backend_->convert_to(cropped, &rgb, "RGB")) return false;
-        ImageData casted;
-        if (!backend_->cast(rgb, &casted, "float", false)) return false;
-        if (!backend_->hwc2chw(casted, output)) return false;
-        output->expand_dim(0); // reshape to n, c, h, w
+        const int src2_w = in->width();
+        const float scale = 256.0f / src2_w;
+        const float origin = -4.0f;
+        if (!backend_->fused_preprocess(*in, output, size_,  // {248, 248}
+                                        origin, origin, scale, scale,
+                                        {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+                                        true, 0.0f)) return false;  // swap_rb=true (BGR2RGB)
         return true;
     }
 

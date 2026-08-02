@@ -2,12 +2,8 @@
 // Created by aichao on 2025/3/24.
 //
 
-#include "vision/face/face_gender/preprocessor.h"
 #include "core/md_log.h"
-#include "vision/utils.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/hwc2chw.h"
-#include "vision/common/processors/cast.h"
+#include "vision/face/face_gender/preprocessor.h"
 
 
 namespace modeldeploy::vision::face {
@@ -15,13 +11,14 @@ namespace modeldeploy::vision::face {
         // 1. Resize
         // 2. Cast (uint8->float, 不缩放)
         // 3. HWC2CHW
-        ImageData resized;
-        if (!backend_->resize(*image, &resized, size_[0], size_[1])) return false;
-        // BGR2RGB::Run(mat); 前处理不需要转换为RGB
-        ImageData casted;
-        if (!backend_->cast(resized, &casted, "float", false)) return false;
-        if (!backend_->hwc2chw(casted, output)) return false;
-        output->expand_dim(0); // reshape to n, c, h, w
+        const int src_w = image->width();
+        const int src_h = image->height();
+        const float scale_x = static_cast<float>(size_[0]) / src_w;  // 112/src_w
+        const float scale_y = static_cast<float>(size_[1]) / src_h;
+        if (!backend_->fused_preprocess(*image, output, size_,
+                                        0.0f, 0.0f, scale_x, scale_y,
+                                        {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
+                                        false, 0.0f)) return false;
         return true;
     }
 

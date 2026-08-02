@@ -5,9 +5,6 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/lpr/lpr_det/preprocessor.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::lpr {
     LprDetPreprocessor::LprDetPreprocessor() {
@@ -24,12 +21,17 @@ namespace modeldeploy::vision::lpr {
         // yolov8's preprocess steps
         // 1. letterbox
         // 2. convert_and_permute(swap_rb=true)
-        ImageData boxed;
-        if (!backend_->letterbox(*image, &boxed, size_, padding_value_, letter_box_record)) return false;
-        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        const std::vector beta = {0.0f, 0.0f, 0.0f};
-        if (!backend_->convert_and_permute(boxed, output, alpha, beta, true)) return false;
-        output->expand_dim(0); // reshape to n, c, h, w
+        const int src_w = image->width();
+        const int src_h = image->height();
+        *letter_box_record = utils::cal_letter_box_param({src_w, src_h}, size_);
+        const float pad_x = static_cast<float>(letter_box_record->pad_w);
+        const float pad_y = static_cast<float>(letter_box_record->pad_h);
+        const float scale = letter_box_record->scale;
+        const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+        const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
+        if (!backend_->fused_preprocess(*image, output, size_,
+                                        pad_x, pad_y, scale, scale,
+                                        alpha, beta, true, padding_value_[0])) return false;
         return true;
     }
 

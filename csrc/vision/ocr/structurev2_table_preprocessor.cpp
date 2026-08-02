@@ -3,12 +3,7 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
 #include "vision/ocr/utils/ocr_utils.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/normalize.h"
-#include "vision/common/processors/hwc2chw.h"
 #include "vision/ocr/structurev2_table_preprocessor.h"
 
 
@@ -47,25 +42,24 @@ namespace modeldeploy::vision::ocr {
         tensors.reserve(image_batch->size());
         for (size_t i = 0; i < image_batch->size(); ++i) {
             const auto& image = image_batch->at(i);
-            const auto width = static_cast<float>(image.width());
-            const auto height = static_cast<float>(image.height());
-            const float ratio = max_len / (std::max(height, width) * 1.0f);
-            const int resize_h = static_cast<int>(height * ratio);
-            const int resize_w = static_cast<int>(width * ratio);
-            ImageData resized;
-            if (!backend_->resize(image, &resized, resize_w, resize_h)) return false;
-            ImageData normed;
-            if (!backend_->normalize(resized, &normed, mean_, std_, is_scale_, false)) return false;
-            ImageData padded;
-            if (!backend_->pad(normed, &padded, 0, max_len - resize_h, 0, max_len - resize_w, pad_value_[0])) return false;
+            const int src_w = image.width();
+            const int src_h = image.height();
+            const float ratio = max_len / (std::max(static_cast<float>(src_h), static_cast<float>(src_w)) * 1.0f);
+            const int resize_h = static_cast<int>(static_cast<float>(src_h) * ratio);
+            const int resize_w = static_cast<int>(static_cast<float>(src_w) * ratio);
+            const float scale_x = static_cast<float>(resize_w) / src_w;
+            const float scale_y = static_cast<float>(resize_h) / src_h;
+            std::vector<float> alpha(3), beta(3);
+            for (int c = 0; c < 3; ++c) {
+                alpha[c] = 1.0f / (255.0f * std_[c]);
+                beta[c] = -mean_[c] / std_[c];
+            }
             Tensor t;
-            if (!backend_->hwc2chw(padded, &t)) return false;
-            t.expand_dim(0);
+            if (!backend_->fused_preprocess(image, &t, {resize_w, resize_h},
+                                            0.0f, 0.0f, scale_x, scale_y,
+                                            alpha, beta, false, pad_value_[0])) return false;
             tensors.emplace_back(std::move(t));
-            batch_det_img_info_[i] = {
-                static_cast<int>(width), static_cast<int>(height), resize_w,
-                resize_h
-            };
+            batch_det_img_info_[i] = {src_w, src_h, resize_w, resize_h};
         }
 
         // Only have 1 output Tensor.

@@ -3,15 +3,7 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
 #include "vision/ocr/cls_preprocessor.h"
-
-#include <vision/common/processors/normalize_and_permute.h>
-
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/normalize.h"
-#include "vision/common/processors/hwc2chw.h"
 #include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
@@ -41,23 +33,20 @@ namespace modeldeploy::vision::ocr {
         for (auto& image : image_batch) {
             const int img_h = cls_image_shape_[1];
             const int img_w = cls_image_shape_[2];
-            const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
+            const int src_w = image.width();
+            const int src_h = image.height();
+            const float ratio = static_cast<float>(src_w) / static_cast<float>(src_h);
             int resize_w;
-            if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w))
-                resize_w = img_w;
-            else
-                resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
-            ImageData resized;
-            if (!backend_->resize(image, &resized, resize_w, img_h)) return false;
-            ImageData normed;
-            if (!backend_->normalize(resized, &normed, mean_, std_, is_scale_, false)) return false;
-            ImageData padded = normed;
-            if (normed.width() < cls_image_shape_[2]) {
-                if (!backend_->pad(normed, &padded, 0, 0, 0, cls_image_shape_[2] - normed.width(), 0.0f)) return false;
-            }
+            if (ceilf(static_cast<float>(img_h) * ratio) > static_cast<float>(img_w)) resize_w = img_w;
+            else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
+            const float scale_x = static_cast<float>(resize_w) / src_w;
+            const float scale_y = static_cast<float>(img_h) / src_h;
             Tensor t;
-            if (!backend_->hwc2chw(padded, &t)) return false;
-            t.expand_dim(0);
+            const std::vector<float> alpha = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};
+            const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};
+            if (!backend_->fused_preprocess(image, &t, {resize_w, img_h},
+                                            0.0f, 0.0f, scale_x, scale_y,
+                                            alpha, beta, false, 0.0f)) return false;
             tensors.emplace_back(std::move(t));
         }
         // Only have 1 output tensor.

@@ -3,11 +3,7 @@
 //
 
 #include "core/md_log.h"
-#include "vision/utils.h"
 #include "vision/lpr/lpr_rec/preprocessor.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/pad.h"
-#include "vision/common/processors/convert_and_permute.h"
 
 namespace modeldeploy::vision::lpr {
     LprRecPreprocessor::LprRecPreprocessor() {
@@ -18,12 +14,15 @@ namespace modeldeploy::vision::lpr {
         // preprocess steps
         // 1. Resize
         // 2. convert_and_permute(swap_rb=true)
-        ImageData resized;
-        if (!backend_->resize(*image, &resized, size_[0], size_[1])) return false;
-        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        const std::vector beta = {-0.588f, -0.588f, -0.588f};
-        if (!backend_->convert_and_permute(resized, output, alpha, beta, true)) return false;
-        output->expand_dim(0); // reshape to n, c, h, w
+        const int src_w = image->width();
+        const int src_h = image->height();
+        const float scale_x = static_cast<float>(size_[0]) / src_w;  // 168/src_w
+        const float scale_y = static_cast<float>(size_[1]) / src_h;  // 48/src_h
+        const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+        const std::vector<float> beta = {-0.588f, -0.588f, -0.588f};
+        if (!backend_->fused_preprocess(*image, output, size_,
+                                        0.0f, 0.0f, scale_x, scale_y,
+                                        alpha, beta, true, 0.0f)) return false;
         return true;
     }
 

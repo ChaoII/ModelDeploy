@@ -18,29 +18,33 @@ namespace modeldeploy::vision::classification {
         if (image->width() <= 0 || image->height() <= 0) {
             return false;
         }
-        ImageData tmp;
+        const int src_w = image->width();
+        const int src_h = image->height();
+        const int dst_w = size_[0];  // 224
+        const int dst_h = size_[1];  // 224
+        float origin_x = 0.0f, origin_y = 0.0f;
+        float scale_x, scale_y;
         if (enable_center_crop_) {
-            const int crop_size = std::min(image->height(), image->width());
-            if (!backend_->center_crop(*image, &tmp, crop_size, crop_size)) return false;
+            const int crop = std::min(src_w, src_h);
+            const float scale = static_cast<float>(dst_w) / crop;
+            // center_crop 映射 src = (dst - origin)/scale，crop 区域在 src 中偏移 offset，故 origin = -offset*scale（负数）
+            origin_x = -static_cast<float>(src_w - crop) / 2.0f * scale;
+            origin_y = -static_cast<float>(src_h - crop) / 2.0f * scale;
+            scale_x = scale_y = scale;
         } else {
-            tmp = *image;
+            scale_x = static_cast<float>(dst_w) / src_w;
+            scale_y = static_cast<float>(dst_h) / src_h;
         }
-        ImageData resized;
-        if (!backend_->resize(tmp, &resized, size_[0], size_[1])) return false;
-        ImageData rgb;
-        if (!backend_->convert_to(resized, &rgb, "RGB")) return false;
-        ImageData scaled;
-        const std::vector alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
-        const std::vector beta = {0.0f, 0.0f, 0.0f};
-        if (!backend_->convert(rgb, &scaled, alpha, beta)) return false;
-        const std::vector mean = {0.485f, 0.456f, 0.406f};
-        const std::vector std = {0.229f, 0.224f, 0.225f};
-        // scale=false：convert 已做过 1/255，normalize 不再缩放
-        // swap_rb=false：图像已是 RGB，不能再 swap（fuse_normalize_and_permute 会无条件 swap，故改用 normalize+hwc2chw）
-        ImageData normed;
-        if (!backend_->normalize(scaled, &normed, mean, std, false, false)) return false;
-        if (!backend_->hwc2chw(normed, output)) return false;
-        output->expand_dim(0);
+        const std::vector<float> mean = {0.485f, 0.456f, 0.406f};
+        const std::vector<float> std = {0.229f, 0.224f, 0.225f};
+        std::vector<float> alpha(3), beta(3);
+        for (int c = 0; c < 3; ++c) {
+            alpha[c] = 1.0f / (255.0f * std[c]);  // convert(1/255) + normalize(scale=false)
+            beta[c] = -mean[c] / std[c];
+        }
+        if (!backend_->fused_preprocess(*image, output, {dst_w, dst_h},
+                                        origin_x, origin_y, scale_x, scale_y,
+                                        alpha, beta, true, 0.0f)) return false;
         return true;
     }
 
