@@ -57,6 +57,14 @@ namespace modeldeploy::vision::classification {
             return false;
         }
         outputs->resize(1);
+        if (images->size() == 1) {
+            // 单图：直接写进持久 outputs[0]，其 allocate 跨帧复用显存 buffer
+            if (!preprocess(&(*images)[0], &(*outputs)[0])) {
+                MD_LOG_ERROR << "Failed to preprocess input image." << std::endl;
+                return false;
+            }
+            return true;
+        }
         // Concat all the preprocessed data to a batch tensor
         std::vector<Tensor> tensors(images->size());
         for (size_t i = 0; i < images->size(); ++i) {
