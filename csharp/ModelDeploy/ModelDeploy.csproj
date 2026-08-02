@@ -2,6 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>ModelDeploySDK</PackageId>
+    <Version>1.8.0</Version>
+    <Authors>ModelDeploy Contributors</Authors>
+    <Description>C# bindings for the ModelDeploy cross-platform inference SDK</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
 </Project>
