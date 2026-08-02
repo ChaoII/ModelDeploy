@@ -149,4 +149,50 @@ bool CpuProcessorBackend::nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
     return nv12_to_bgr_cpu(y, uv, width, height, width, width, out->data());
 }
 
+bool CpuProcessorBackend::fused_preprocess(
+    const ImageData& image, Tensor* out,
+    const std::vector<int>& dst_size,
+    float origin_x, float origin_y,
+    float scale_x, float scale_y,
+    const std::vector<float>& alpha,
+    const std::vector<float>& beta,
+    bool swap_rb, float pad_value) {
+    if (dst_size.size() != 2 || alpha.size() != 3 || beta.size() != 3) return false;
+    const int src_w = image.width();
+    const int src_h = image.height();
+    const int dst_w = dst_size[0];
+    const int dst_h = dst_size[1];
+    const uint8_t* src = image.data();
+
+    out->allocate({3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+    float* dst = out->data_ptr<float>();
+    const int plane = dst_h * dst_w;
+
+    for (int y = 0; y < dst_h; ++y) {
+        const float src_yf = (static_cast<float>(y) - origin_y) / scale_y;
+        const int src_y = static_cast<int>(src_yf);
+        for (int x = 0; x < dst_w; ++x) {
+            const float src_xf = (static_cast<float>(x) - origin_x) / scale_x;
+            const int src_x = static_cast<int>(src_xf);
+            float v0, v1, v2;
+            if (src_x < 0 || src_x >= src_w || src_y < 0 || src_y >= src_h) {
+                v0 = v1 = v2 = pad_value;
+            } else {
+                const int idx = (src_y * src_w + src_x) * 3;
+                const float b = src[idx + 0];
+                const float g = src[idx + 1];
+                const float r = src[idx + 2];
+                if (swap_rb) { v0 = r; v1 = g; v2 = b; }
+                else { v0 = b; v1 = g; v2 = r; }
+            }
+            const int didx = y * dst_w + x;
+            dst[0 * plane + didx] = v0 * alpha[0] + beta[0];
+            dst[1 * plane + didx] = v1 * alpha[1] + beta[1];
+            dst[2 * plane + didx] = v2 * alpha[2] + beta[2];
+        }
+    }
+    out->expand_dim(0);
+    return true;
+}
+
 } // namespace modeldeploy::vision

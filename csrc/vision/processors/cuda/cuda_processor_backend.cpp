@@ -6,6 +6,7 @@
 #include "vision/processors/cuda/cuda_processor_backend.h"
 #ifdef WITH_GPU
 #include "vision/common/processors/yolo_preproc.cuh"
+#include "vision/common/processors/fused_preproc.cuh"
 #include "vision/face/face_det/scrfd_preproc.cuh"
 #endif
 
@@ -45,6 +46,27 @@ bool CudaProcessorBackend::scrfd_preprocess(const ImageData& image, Tensor* out,
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::scrfd_preprocess(image, out, dst_size, pad_val, record);
+#endif
+}
+
+bool CudaProcessorBackend::fused_preprocess(
+    const ImageData& image, Tensor* out,
+    const std::vector<int>& dst_size,
+    float origin_x, float origin_y,
+    float scale_x, float scale_y,
+    const std::vector<float>& alpha,
+    const std::vector<float>& beta,
+    bool swap_rb, float pad_value) {
+#ifdef WITH_GPU
+    return fused_preprocess_cuda(image.data(), {image.width(), image.height()},
+                                 out, dst_size,
+                                 origin_x, origin_y, scale_x, scale_y,
+                                 alpha, beta, swap_rb, pad_value);
+#else
+    MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
+    return CpuProcessorBackend::fused_preprocess(
+        image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
+        alpha, beta, swap_rb, pad_value);
 #endif
 }
 

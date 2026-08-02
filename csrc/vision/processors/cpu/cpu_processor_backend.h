@@ -63,6 +63,14 @@ public:
                                bool scale = true) override;
     bool nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
                      int width, int height, ImageData* out) override;
+    bool fused_preprocess(
+        const ImageData& image, Tensor* out,
+        const std::vector<int>& dst_size,
+        float origin_x, float origin_y,
+        float scale_x, float scale_y,
+        const std::vector<float>& alpha,
+        const std::vector<float>& beta,
+        bool swap_rb, float pad_value) override;
 };
 
 } // namespace modeldeploy::vision

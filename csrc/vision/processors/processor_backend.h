@@ -95,6 +95,22 @@ public:
         (void)device_image; (void)width; (void)height; (void)out; (void)record;
         return false;
     }
+
+    // 通用融合预处理：crop/letterbox/resize -> bgr2rgb(可选) -> 仿射(alpha,beta) -> HWC2CHW
+    // 一次完成，无中间缓冲（高效路径）。
+    // 映射：src = (dst - origin) / scale；src 越界写 pad_value。
+    //   - plain resize: origin=0, scale = dst/src
+    //   - letterbox: origin = pad offset, scale = letterbox scale
+    //   - center_crop: origin = crop origin, scale = dst/crop
+    // alpha/beta 已合并 1/255 与 normalize：out_c = src_c * alpha[c] + beta[c]
+    virtual bool fused_preprocess(
+        const ImageData& image, Tensor* out,
+        const std::vector<int>& dst_size,
+        float origin_x, float origin_y,
+        float scale_x, float scale_y,
+        const std::vector<float>& alpha,
+        const std::vector<float>& beta,
+        bool swap_rb, float pad_value) = 0;
 };
 
 } // namespace modeldeploy::vision

@@ -21,6 +21,14 @@ public:
                               int step_y, int step_uv, Tensor* out,
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
+    bool fused_preprocess(
+        const ImageData& image, Tensor* out,
+        const std::vector<int>& dst_size,
+        float origin_x, float origin_y,
+        float scale_x, float scale_y,
+        const std::vector<float>& alpha,
+        const std::vector<float>& beta,
+        bool swap_rb, float pad_value) override;
     bool scrfd_preprocess(const ImageData& image, Tensor* out,
                           const std::vector<int>& dst_size,
                           float pad_val, LetterBoxRecord* record) override;
