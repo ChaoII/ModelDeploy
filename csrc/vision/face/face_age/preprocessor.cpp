@@ -18,10 +18,12 @@ namespace modeldeploy::vision::face {
         }
         const ImageData* in = &image;
         ImageData resized_buf;
+        bool already_target = false;
         if (image.height() == 256 && image.width() == 256) {
-            // 直接用
+            // 直接用，下一步 center_crop 248
         } else if (image.height() == size_[0] && image.width() == size_[1]) {
-            // 已 248
+            // 已 248：恒等直通（仅 cast + hwc2chw）
+            already_target = true;
             MD_LOG_WARN << "the width and height is already to " << size_[0] << " and  " << size_[1] << std::endl;
         } else {
             // resize 到 256
@@ -30,10 +32,15 @@ namespace modeldeploy::vision::face {
             if (!backend_->resize(image, &resized_buf, 256, 256)) return false;
             in = &resized_buf;
         }
-        const int src2_w = in->width();
-        // center_crop 248 from 256：dst -> src = (dst + 4) * (src_dim/256)
-        const float scale = 256.0f / src2_w;  // 若 src 是 256 则 scale=1
-        const float origin = -4.0f;
+        float origin, scale;
+        if (already_target) {
+            origin = 0.0f;
+            scale = 1.0f;
+        } else {
+            // center_crop 248 from 256：dst -> src = (dst + 4) * (src_dim/256)
+            scale = 256.0f / in->width();
+            origin = -4.0f;
+        }
         if (!backend_->fused_preprocess(*in, output, size_,
                                         origin, origin, scale, scale,
                                         {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},

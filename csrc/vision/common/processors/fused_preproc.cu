@@ -39,39 +39,40 @@ __global__ void kernel_fused_preproc(
     const size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= dst_w || y >= dst_h) return;
 
-    // 反推源坐标（最近邻）
+    // 反推源坐标（最近邻）；越界判断用浮点，避免负小数截断漏判
     const float src_xf = (static_cast<float>(x) - origin_x) / scale_x;
     const float src_yf = (static_cast<float>(y) - origin_y) / scale_y;
-    const int src_x = static_cast<int>(src_xf);
-    const int src_y = static_cast<int>(src_yf);
 
     const int dst_idx = y * dst_w + x;
     const int plane_size = dst_h * dst_w;
 
+    if (src_xf < 0.0f || src_xf >= static_cast<float>(src_w) ||
+        src_yf < 0.0f || src_yf >= static_cast<float>(src_h)) {
+        // 越界填充区（letterbox / OCR 右/下 pad），pad_value 已是仿射后（归一化）空间
+        dst[0 * plane_size + dst_idx] = pad_value;
+        dst[1 * plane_size + dst_idx] = pad_value;
+        dst[2 * plane_size + dst_idx] = pad_value;
+        return;
+    }
+
+    // BGR 打包: [B0G0R0 B1G1R1 ...]
+    const int src_x = static_cast<int>(src_xf);
+    const int src_y = static_cast<int>(src_yf);
+    const int src_idx = (src_y * src_w + src_x) * 3;
+    const float b = src[src_idx + 0];
+    const float g = src[src_idx + 1];
+    const float r = src[src_idx + 2];
     float v0, v1, v2;
-    if (src_x < 0 || src_x >= src_w || src_y < 0 || src_y >= src_h) {
-        // 越界填充区（letterbox / OCR 右/下 pad）
-        v0 = pad_value;
-        v1 = pad_value;
-        v2 = pad_value;
+    if (swap_rb) {
+        // BGR -> RGB：输出 C0=R, C1=G, C2=B
+        v0 = r;
+        v1 = g;
+        v2 = b;
     }
     else {
-        // BGR 打包: [B0G0R0 B1G1R1 ...]
-        const int src_idx = (src_y * src_w + src_x) * 3;
-        const float b = src[src_idx + 0];
-        const float g = src[src_idx + 1];
-        const float r = src[src_idx + 2];
-        if (swap_rb) {
-            // BGR -> RGB：输出 C0=R, C1=G, C2=B
-            v0 = r;
-            v1 = g;
-            v2 = b;
-        }
-        else {
-            v0 = b;
-            v1 = g;
-            v2 = r;
-        }
+        v0 = b;
+        v1 = g;
+        v2 = r;
     }
 
     // 仿射 + 写入 CHW（C0,R / C1,G / C2,B）

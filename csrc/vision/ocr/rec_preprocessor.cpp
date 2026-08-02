@@ -57,15 +57,21 @@ namespace modeldeploy::vision::ocr {
             } else {
                 resize_w = img_w;
             }
-            // dst 宽固定 batch_max_w；内容缩到 resize_w，右侧 [resize_w, batch_max_w) 为 pad(127)
+            // dst 宽固定 batch_max_w；内容缩到 resize_w，右侧 [resize_w, batch_max_w) 为 pad
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(img_h) / src_h;
             Tensor tensor;
-            const std::vector<float> alpha = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};  // 1/(255*0.5)
-            const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};  // -0.5/0.5
+            std::vector<float> alpha(3), beta(3);
+            for (int c = 0; c < 3; ++c) {
+                const float s = is_scale_ ? 255.0f : 1.0f;
+                alpha[c] = 1.0f / (s * std_[c]);
+                beta[c] = -mean_[c] / std_[c];
+            }
+            // pad 127 在归一化后的值（旧：resize->pad(127 raw)->fuse_normalize）
+            const float pad_norm = pad_value_[0] * alpha[0] + beta[0];
             if (!backend_->fused_preprocess(image, &tensor, {batch_max_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
-                                            alpha, beta, true, 127.0f)) return false;
+                                            alpha, beta, true, pad_norm)) return false;
             tensors.emplace_back(std::move(tensor));
         }
         // Only have 1 output Tensor.

@@ -29,9 +29,11 @@ namespace modeldeploy::vision::lpr {
         const float scale = letter_box_record->scale;
         const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
+        // pad 114 在仿射后空间（归一化）：114/255
+        const float pad_norm = padding_value_[0] / 255.0f;
         if (!backend_->fused_preprocess(*image, output, size_,
                                         pad_x, pad_y, scale, scale,
-                                        alpha, beta, true, padding_value_[0])) return false;
+                                        alpha, beta, true, pad_norm)) return false;
         return true;
     }
 

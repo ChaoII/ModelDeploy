@@ -43,8 +43,12 @@ namespace modeldeploy::vision::ocr {
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(img_h) / src_h;
             Tensor t;
-            const std::vector<float> alpha = {1.0f / 127.5f, 1.0f / 127.5f, 1.0f / 127.5f};
-            const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};
+            std::vector<float> alpha(3), beta(3);
+            for (int c = 0; c < 3; ++c) {
+                const float s = is_scale_ ? 255.0f : 1.0f;
+                alpha[c] = 1.0f / (s * std_[c]);
+                beta[c] = -mean_[c] / std_[c];
+            }
             if (!backend_->fused_preprocess(image, &t, {img_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, false, 0.0f)) return false;

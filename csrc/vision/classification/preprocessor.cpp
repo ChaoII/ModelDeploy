@@ -26,11 +26,12 @@ namespace modeldeploy::vision::classification {
         float scale_x, scale_y;
         if (enable_center_crop_) {
             const int crop = std::min(src_w, src_h);
-            const float scale = static_cast<float>(dst_w) / crop;
+            // 各轴独立 scale：crop 正方形 -> 非均匀 resize 到 {dst_w, dst_h}
+            const float scale_x = static_cast<float>(dst_w) / crop;
+            const float scale_y = static_cast<float>(dst_h) / crop;
             // center_crop 映射 src = (dst - origin)/scale，crop 区域在 src 中偏移 offset，故 origin = -offset*scale（负数）
-            origin_x = -static_cast<float>(src_w - crop) / 2.0f * scale;
-            origin_y = -static_cast<float>(src_h - crop) / 2.0f * scale;
-            scale_x = scale_y = scale;
+            origin_x = -static_cast<float>(src_w - crop) / 2.0f * scale_x;
+            origin_y = -static_cast<float>(src_h - crop) / 2.0f * scale_y;
         } else {
             scale_x = static_cast<float>(dst_w) / src_w;
             scale_y = static_cast<float>(dst_h) / src_h;
