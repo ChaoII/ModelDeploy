@@ -11,7 +11,6 @@ namespace modeldeploy::vision {
 class MODELDEPLOY_CXX_EXPORT CudaProcessorBackend : public CpuProcessorBackend {
 public:
     CudaProcessorBackend() = default;
-    ~CudaProcessorBackend() override = default;
 
     bool yolo_preprocess(const ImageData& image, Tensor* out,
                          const std::vector<int>& dst_size,
@@ -49,6 +48,11 @@ public:
         const std::vector<int>& dst_size,
         const std::vector<float>& mean, const std::vector<float>& std,
         float pad_value) override;
+    ~CudaProcessorBackend() override;
+
+private:
+    // 持久 CUDA stream（避免每帧 create/destroy；.cpp 中惰性创建）
+    void* stream_ = nullptr;
 };
 
 } // namespace modeldeploy::vision

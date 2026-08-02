@@ -17,6 +17,17 @@ struct FusedPreprocWorkspace {
 
 static thread_local FusedPreprocWorkspace fused_ws;
 
+// batch/rpnp 参数数组池：一次 cudaMalloc 打包全部 kernel 参数，跨调用复用
+struct BatchParamWorkspace {
+    uint8_t* d_ptr = nullptr;
+    size_t capacity = 0;
+
+    ~BatchParamWorkspace() {
+        if (d_ptr) cudaFree(d_ptr);
+    }
+};
+static thread_local BatchParamWorkspace param_ws;
+
 namespace modeldeploy::vision {
 
 __global__ void kernel_fused_preproc(
@@ -263,20 +274,31 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
                             static_cast<size_t>(hs[b]) * ws[b] * 3,
                             cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
     }
-    auto upload_array = [&](auto** dev_ptr, const auto& host_vec) -> bool {
-        if (host_vec.empty()) return true;
-        if (cudaMalloc(dev_ptr, host_vec.size() * sizeof(host_vec[0])) != cudaSuccess) return false;
-        return cudaMemcpyAsync(*dev_ptr, host_vec.data(),
-                               host_vec.size() * sizeof(host_vec[0]),
-                               cudaMemcpyHostToDevice, stream) == cudaSuccess;
-    };
-    if (!upload_array(&d_ws, ws)) goto cleanup;
-    if (!upload_array(&d_hs, hs)) goto cleanup;
-    if (!upload_array(&d_offsets, offsets)) goto cleanup;
-    if (!upload_array(&d_ox, origins_x)) goto cleanup;
-    if (!upload_array(&d_oy, origins_y)) goto cleanup;
-    if (!upload_array(&d_sx, scales_x)) goto cleanup;
-    if (!upload_array(&d_sy, scales_y)) goto cleanup;
+    // 参数数组单块打包 + 线程局部池复用（避免每帧多次 cudaMalloc/cudaFree）
+    const size_t need = sizeof(int) * batch * 2 + sizeof(size_t) * batch + sizeof(float) * batch * 4;
+    if (param_ws.capacity < need) {
+        if (param_ws.d_ptr) cudaFree(param_ws.d_ptr);
+        cudaMalloc(&param_ws.d_ptr, need);
+        param_ws.capacity = need;
+    }
+    {
+        uint8_t* pbase = param_ws.d_ptr;
+        d_ws = reinterpret_cast<int*>(pbase);
+        d_hs = reinterpret_cast<int*>(pbase + sizeof(int) * batch);
+        d_offsets = reinterpret_cast<size_t*>(pbase + sizeof(int) * batch * 2);
+        float* pox = reinterpret_cast<float*>(pbase + sizeof(int) * batch * 2 + sizeof(size_t) * batch);
+        float* poy = pox + batch;
+        float* psx = poy + batch;
+        float* psy = psx + batch;
+        d_ox = pox; d_oy = poy; d_sx = psx; d_sy = psy;
+    }
+    if (cudaMemcpyAsync(d_ws, ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_hs, hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_offsets, offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_ox, origins_x.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_oy, origins_y.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_sx, scales_x.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_sy, scales_y.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
 
     {
         dim3 block(16, 16);
@@ -293,13 +315,6 @@ cleanup:
     cudaStreamSynchronize(stream);
     if (is_internal_stream) cudaStreamDestroy(stream);
     cudaFree(d_src);
-    cudaFree(d_ws);
-    cudaFree(d_hs);
-    cudaFree(d_offsets);
-    cudaFree(d_ox);
-    cudaFree(d_oy);
-    cudaFree(d_sx);
-    cudaFree(d_sy);
     return ok;
 }
 
@@ -400,18 +415,26 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
                             static_cast<size_t>(hs[b]) * ws[b] * 3,
                             cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
     }
-    auto upload_array = [&](auto** dev_ptr, const auto& host_vec) -> bool {
-        if (host_vec.empty()) return true;
-        if (cudaMalloc(dev_ptr, host_vec.size() * sizeof(host_vec[0])) != cudaSuccess) return false;
-        return cudaMemcpyAsync(*dev_ptr, host_vec.data(),
-                               host_vec.size() * sizeof(host_vec[0]),
-                               cudaMemcpyHostToDevice, stream) == cudaSuccess;
-    };
-    if (!upload_array(&d_ws, ws)) goto cleanup;
-    if (!upload_array(&d_hs, hs)) goto cleanup;
-    if (!upload_array(&d_offsets, offsets)) goto cleanup;
-    if (!upload_array(&d_rws, rws)) goto cleanup;
-    if (!upload_array(&d_rhs, rhs)) goto cleanup;
+    // 参数数组单块打包 + 线程局部池复用
+    const size_t need = sizeof(int) * batch * 4 + sizeof(size_t) * batch;
+    if (param_ws.capacity < need) {
+        if (param_ws.d_ptr) cudaFree(param_ws.d_ptr);
+        cudaMalloc(&param_ws.d_ptr, need);
+        param_ws.capacity = need;
+    }
+    {
+        uint8_t* pbase = param_ws.d_ptr;
+        d_ws = reinterpret_cast<int*>(pbase);
+        d_hs = reinterpret_cast<int*>(pbase + sizeof(int) * batch);
+        d_rws = reinterpret_cast<int*>(pbase + sizeof(int) * batch * 2);
+        d_rhs = reinterpret_cast<int*>(pbase + sizeof(int) * batch * 3);
+        d_offsets = reinterpret_cast<size_t*>(pbase + sizeof(int) * batch * 4);
+    }
+    if (cudaMemcpyAsync(d_ws, ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_hs, hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_rws, rws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_rhs, rhs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_offsets, offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
 
     {
         dim3 block(16, 16);
@@ -428,11 +451,6 @@ cleanup:
     cudaStreamSynchronize(stream);
     if (is_internal_stream) cudaStreamDestroy(stream);
     cudaFree(d_src);
-    cudaFree(d_ws);
-    cudaFree(d_hs);
-    cudaFree(d_offsets);
-    cudaFree(d_rws);
-    cudaFree(d_rhs);
     return ok;
 }
 

@@ -12,11 +12,33 @@
 
 namespace modeldeploy::vision {
 
+#ifdef WITH_GPU
+// 惰性创建并返回持久 CUDA stream（backend 生命周期内复用）
+static cudaStream_t get_persistent_stream(void** slot) {
+    cudaStream_t s = static_cast<cudaStream_t>(*slot);
+    if (!s) {
+        cudaStreamCreate(&s);
+        *slot = s;
+    }
+    return s;
+}
+#endif
+
+CudaProcessorBackend::~CudaProcessorBackend() {
+#ifdef WITH_GPU
+    if (stream_) {
+        cudaStreamDestroy(static_cast<cudaStream_t>(stream_));
+        stream_ = nullptr;
+    }
+#endif
+}
+
 bool CudaProcessorBackend::yolo_preprocess(const ImageData& image, Tensor* out,
                                            const std::vector<int>& dst_size,
                                            float pad_val, LetterBoxRecord* record) {
 #ifdef WITH_GPU
-    return yolo_preprocess_cuda(image, out, dst_size, pad_val, record);
+    return yolo_preprocess_cuda(image, out, dst_size, pad_val, record,
+                                get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::yolo_preprocess(image, out, dst_size, pad_val, record);
@@ -30,7 +52,8 @@ bool CudaProcessorBackend::yolo_preprocess_nv12(const uint8_t* src_y, const uint
                                                 float pad_val, LetterBoxRecord* record) {
 #ifdef WITH_GPU
     return yolo_preprocess_nv12_cuda(src_y, src_uv, src_size, step_y, step_uv,
-                                     out, dst_size, pad_val, record);
+                                     out, dst_size, pad_val, record,
+                                     get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::yolo_preprocess_nv12(src_y, src_uv, src_size, step_y, step_uv,
@@ -42,7 +65,8 @@ bool CudaProcessorBackend::scrfd_preprocess(const ImageData& image, Tensor* out,
                                             const std::vector<int>& dst_size,
                                             float pad_val, LetterBoxRecord* record) {
 #ifdef WITH_GPU
-    return scrfd_preprocess_cuda(image, out, dst_size, pad_val, record);
+    return scrfd_preprocess_cuda(image, out, dst_size, pad_val, record,
+                                 get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::scrfd_preprocess(image, out, dst_size, pad_val, record);
@@ -61,7 +85,8 @@ bool CudaProcessorBackend::fused_preprocess(
     return fused_preprocess_cuda(image.data(), {image.width(), image.height()},
                                  out, dst_size,
                                  origin_x, origin_y, scale_x, scale_y,
-                                 alpha, beta, swap_rb, pad_value);
+                                 alpha, beta, swap_rb, pad_value,
+                                 get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::fused_preprocess(
@@ -75,7 +100,8 @@ bool CudaProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& i
                                                  float pad_val,
                                                  std::vector<LetterBoxRecord>* records) {
 #ifdef WITH_GPU
-    return yolo_preprocess_batch_cuda(images, out, dst_size, pad_val, records);
+    return yolo_preprocess_batch_cuda(images, out, dst_size, pad_val, records,
+                                      get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::yolo_preprocess_batch(images, out, dst_size, pad_val, records);
@@ -91,7 +117,8 @@ bool CudaProcessorBackend::fused_preprocess_batch(
     bool swap_rb, float pad_value) {
 #ifdef WITH_GPU
     return fused_preprocess_batch_cuda(images, out, dst_size, origins_x, origins_y,
-                                       scales_x, scales_y, alpha, beta, swap_rb, pad_value);
+                                       scales_x, scales_y, alpha, beta, swap_rb, pad_value,
+                                       get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::fused_preprocess_batch(
@@ -118,7 +145,8 @@ bool CudaProcessorBackend::fusion_resize_pad_normalize_permute(
                           pad_value * alpha[2] + beta[2]};
     return fusion_rpnp_cuda(images, out, resize_sizes, dst_size,
                             std::vector<float>(alpha, alpha + 3),
-                            std::vector<float>(beta, beta + 3), pad);
+                            std::vector<float>(beta, beta + 3), pad,
+                            get_persistent_stream(&stream_));
 #else
     MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, fallback to cpu" << std::endl;
     return CpuProcessorBackend::fusion_resize_pad_normalize_permute(

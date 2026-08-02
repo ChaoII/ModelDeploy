@@ -174,6 +174,17 @@ struct PreprocWorkspace {
 static thread_local PreprocWorkspace ws0;
 static thread_local PreprocWorkspace ws1;
 
+// batch 参数数组池：一次 cudaMalloc 打包全部 kernel 参数，跨调用复用
+struct BatchParamWorkspace {
+    uint8_t* d_ptr = nullptr;
+    size_t capacity = 0;
+
+    ~BatchParamWorkspace() {
+        if (d_ptr) cudaFree(d_ptr);
+    }
+};
+static thread_local BatchParamWorkspace param_ws;
+
 namespace modeldeploy::vision {
     bool yolo_preprocess_cuda(
         const ImageData& image,
@@ -441,21 +452,27 @@ namespace modeldeploy::vision {
         }
         const uint8_t* d_src = ws0.d_src;
 
-        int* d_src_ws; int* d_src_hs;
-        size_t* d_src_offsets;
-        float* d_scales_p; float* d_pad_ws_p; float* d_pad_hs_p;
-        cudaMalloc(&d_src_ws, sizeof(int) * batch);
-        cudaMalloc(&d_src_hs, sizeof(int) * batch);
-        cudaMalloc(&d_scales_p, sizeof(float) * batch);
-        cudaMalloc(&d_pad_ws_p, sizeof(float) * batch);
-        cudaMalloc(&d_pad_hs_p, sizeof(float) * batch);
-        cudaMalloc(&d_src_offsets, sizeof(size_t) * batch);
+        // 参数数组单块打包 + 线程局部池复用（避免每帧 6 次 cudaMalloc/cudaFree）
+        // 布局：size_t offsets 放最前保证 8 字节对齐
+        const size_t need = sizeof(size_t) * batch + sizeof(int) * batch * 2 + sizeof(float) * batch * 3;
+        if (param_ws.capacity < need) {
+            if (param_ws.d_ptr) cudaFree(param_ws.d_ptr);
+            cudaMalloc(&param_ws.d_ptr, need);
+            param_ws.capacity = need;
+        }
+        uint8_t* base = param_ws.d_ptr;
+        size_t* d_src_offsets = reinterpret_cast<size_t*>(base);
+        int* d_src_ws = reinterpret_cast<int*>(base + sizeof(size_t) * batch);
+        int* d_src_hs = reinterpret_cast<int*>(base + sizeof(size_t) * batch + sizeof(int) * batch);
+        float* d_scales_p = reinterpret_cast<float*>(base + sizeof(size_t) * batch + sizeof(int) * batch * 2);
+        float* d_pad_ws_p = reinterpret_cast<float*>(base + sizeof(size_t) * batch + sizeof(int) * batch * 2 + sizeof(float) * batch);
+        float* d_pad_hs_p = reinterpret_cast<float*>(base + sizeof(size_t) * batch + sizeof(int) * batch * 2 + sizeof(float) * batch * 2);
+        cudaMemcpyAsync(d_src_offsets, src_offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream);
         cudaMemcpyAsync(d_src_ws, src_ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream);
         cudaMemcpyAsync(d_src_hs, src_hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream);
         cudaMemcpyAsync(d_scales_p, scales.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream);
         cudaMemcpyAsync(d_pad_ws_p, pad_ws.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream);
         cudaMemcpyAsync(d_pad_hs_p, pad_hs.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream);
-        cudaMemcpyAsync(d_src_offsets, src_offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream);
 
         dim3 block(16, 16);
         dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
@@ -466,8 +483,6 @@ namespace modeldeploy::vision {
         const cudaError_t err = cudaGetLastError();
         cudaStreamSynchronize(stream);
         if (is_internal_stream) cudaStreamDestroy(stream);
-        cudaFree(d_src_ws); cudaFree(d_src_hs);
-        cudaFree(d_scales_p); cudaFree(d_pad_ws_p); cudaFree(d_pad_hs_p);
         if (err != cudaSuccess) {
             MD_LOG_ERROR << "batch kernel launch failed: " << cudaGetErrorString(err) << std::endl;
             return false;
