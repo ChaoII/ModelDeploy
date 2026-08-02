@@ -2,6 +2,7 @@
 .superpowers/
 build
 build_app
+build_trt
 build_msvc
 build_linux
 build_debug
