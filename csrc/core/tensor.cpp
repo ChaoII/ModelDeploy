@@ -510,12 +510,19 @@ namespace modeldeploy {
                           const std::string& name) {
         validate_shape(shape);
         name_ = name;
+        // shape/dtype/device 均不变时复用已有 buffer（避免每帧 cudaMalloc/cudaFree）
+        const bool reuseable = (shape_ == shape) && (dtype_ == dtype) && (device_ == device);
         shape_ = shape;
         dtype_ = dtype;
         element_size_ = get_element_size(dtype);
         device_ = device;
         calculate_strides();
-        size_t total_size = calculate_total_size();
+        const size_t total_size = calculate_total_size();
+        if (reuseable && memory_ && memory_->size() == total_size) {
+            data_ptr_ = memory_->data();
+            owns_data_ = true;
+            return;
+        }
         memory_ = std::make_shared<MemoryBlock>(total_size, device);
         data_ptr_ = memory_->data();
         owns_data_ = true;
