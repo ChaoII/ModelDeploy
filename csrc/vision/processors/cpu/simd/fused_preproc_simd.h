@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include "core/md_decl.h"
 
 namespace modeldeploy::vision {
 
@@ -22,6 +23,6 @@ using FusedPreprocKernel = void (*)(
 
 // 选择当前 CPU 上最快的融合预处理 SIMD 内核（运行时 ISA 探测）。
 // 保证非空：总有一个可用的实现（scalar/AVX2/AVX512/NEON/SVE）。
-FusedPreprocKernel get_fused_preproc_kernel();
+MODELDEPLOY_CXX_EXPORT FusedPreprocKernel get_fused_preproc_kernel();
 
 } // namespace modeldeploy::vision

@@ -71,15 +71,17 @@ MD_TARGET_AVX2 void fused_preproc_avx2(const uint8_t* src, int src_w, int src_h,
         const int src_y = static_cast<int>(src_yf);
         const uint8_t* src_row = src + src_y * src_w * 3;
 
-        float sx = -origin_shift_x;
         int x = 0;
         // 主体：8 像素一组
         for (; x + 8 <= dst_w; x += 8) {
             float r[8], g[8], b[8];
             for (int i = 0; i < 8; ++i) {
-                const int sxi = static_cast<int>(sx);
-                sx += inv_scale_x;
-                if (sxi >= 0 && sxi < src_w) {
+                const int xx = x + i;
+                // 每像素精确计算（避免增量累加浮点漂移）
+                const float src_xf = static_cast<float>(xx) * inv_scale_x - origin_shift_x;
+                // 浮点越界判断（避免负小数截断漏判）
+                if (src_xf >= 0.0f && src_xf < src_w_f) {
+                    const int sxi = static_cast<int>(src_xf);
                     const uint8_t* p = src_row + sxi * 3;
                     const float pb = p[0], pg = p[1], pr = p[2];
                     if (swap_rb) { r[i] = pr; g[i] = pg; b[i] = pb; }
@@ -94,10 +96,10 @@ MD_TARGET_AVX2 void fused_preproc_avx2(const uint8_t* src, int src_w, int src_h,
         }
         // 尾部标量
         for (; x < dst_w; ++x) {
-            const int sxi = static_cast<int>(sx);
-            sx += inv_scale_x;
+            const float src_xf = static_cast<float>(x) * inv_scale_x - origin_shift_x;
             float rv, gv, bv;
-            if (sxi >= 0 && sxi < src_w) {
+            if (src_xf >= 0.0f && src_xf < src_w_f) {
+                const int sxi = static_cast<int>(src_xf);
                 const uint8_t* p = src_row + sxi * 3;
                 const float pb = p[0], pg = p[1], pr = p[2];
                 if (swap_rb) { rv = pr; gv = pg; bv = pb; }

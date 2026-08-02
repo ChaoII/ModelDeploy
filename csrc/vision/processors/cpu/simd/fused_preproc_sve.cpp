@@ -67,14 +67,14 @@ MD_TARGET_SVE void fused_preproc_sve(const uint8_t* src, int src_w, int src_h,
         const int src_y = static_cast<int>(src_yf);
         const uint8_t* src_row = src + src_y * src_w * 3;
 
-        float sx = -origin_shift_x;
         int x = 0;
         for (; x + static_cast<int>(lanes) <= n; x += static_cast<int>(lanes)) {
             float r[max_lanes], g[max_lanes], b[max_lanes];
             for (uint64_t i = 0; i < lanes; ++i) {
-                const int sxi = static_cast<int>(sx);
-                sx += inv_scale_x;
-                if (sxi >= 0 && sxi < src_w) {
+                const int xx = x + static_cast<int>(i);
+                const float src_xf = static_cast<float>(xx) * inv_scale_x - origin_shift_x;
+                if (src_xf >= 0.0f && src_xf < src_w_f) {
+                    const int sxi = static_cast<int>(src_xf);
                     const uint8_t* p = src_row + sxi * 3;
                     const float pb = p[0], pg = p[1], pr = p[2];
                     if (swap_rb) { r[i] = pr; g[i] = pg; b[i] = pb; }
@@ -89,10 +89,10 @@ MD_TARGET_SVE void fused_preproc_sve(const uint8_t* src, int src_w, int src_h,
             svst1_f32(pg, dst + 2 * plane + base + x, svmla_f32(b2, svld1_f32(pg, b), a2));
         }
         for (; x < n; ++x) {
-            const int sxi = static_cast<int>(sx);
-            sx += inv_scale_x;
+            const float src_xf = static_cast<float>(x) * inv_scale_x - origin_shift_x;
             float rv, gv, bv;
-            if (sxi >= 0 && sxi < src_w) {
+            if (src_xf >= 0.0f && src_xf < src_w_f) {
+                const int sxi = static_cast<int>(src_xf);
                 const uint8_t* p = src_row + sxi * 3;
                 const float pb = p[0], pg = p[1], pr = p[2];
                 if (swap_rb) { rv = pr; gv = pg; bv = pb; }
