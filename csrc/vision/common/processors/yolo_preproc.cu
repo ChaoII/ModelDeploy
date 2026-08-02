@@ -27,14 +27,12 @@ __global__ void kernel_bgr_fusion(
     const float src_xf = (x - pad_w) / scale;
     const float src_yf = (y - pad_h) / scale;
 
-    const int src_x = static_cast<int>(src_xf);
-    const int src_y = static_cast<int>(src_yf);
-
     const int dst_idx = y * dst_w + x;
     const int plane_size = dst_h * dst_w;
 
-    // 这个范围内的像素都padding值
-    if (src_x < 0 || src_x >= src_w || src_y < 0 || src_y >= src_h) {
+    // 越界用浮点判断（负小数坐标截断成 int 会漏判 pad 区，如 src_yf=-0.75 -> (int)=0）
+    if (src_xf < 0.0f || src_xf >= static_cast<float>(src_w) ||
+        src_yf < 0.0f || src_yf >= static_cast<float>(src_h)) {
         const float v0 = (pad_value - k_mean[0]) * k_std[0];
         const float v1 = (pad_value - k_mean[1]) * k_std[1];
         const float v2 = (pad_value - k_mean[2]) * k_std[2];
@@ -43,6 +41,8 @@ __global__ void kernel_bgr_fusion(
         dst[2 * plane_size + dst_idx] = v2;
     }
     else {
+        const int src_x = static_cast<int>(src_xf);
+        const int src_y = static_cast<int>(src_yf);
         // [B0G0R0 B1G1R1 B2G2R2 B3G3R3]
         // [B4G4R4 B5G5R5 B6G6R6 B7G7R7]
         // [B8G8R8 B9G9R9 ...... ......]
@@ -101,15 +101,15 @@ __global__ void kernel_nv12_fusion(
     // dst_coord = pad + src_coord * scale  =>  src_coord = (dst_coord - pad) / scale
     const float src_xf = (x - pad_w) / scale;
     const float src_yf = (y - pad_h) / scale;
-
     const int src_x = static_cast<int>(src_xf);
     const int src_y = static_cast<int>(src_yf);
 
     const int dst_idx = y * dst_w + x;
     const int plane_size = dst_h * dst_w;
 
-    // 判断是否在有效图像区域内 (Letterbox 逻辑)
-    if (src_x < 0 || src_x >= src_w || src_y < 0 || src_y >= src_h) {
+    // 判断是否在有效图像区域内 (Letterbox 逻辑，浮点判断避免负小数截断漏判)
+    if (src_xf < 0.0f || src_xf >= static_cast<float>(src_w) ||
+        src_yf < 0.0f || src_yf >= static_cast<float>(src_h)) {
         // --- 填充区域 ---
         const float v0 = (pad_value - k_mean[0]) * k_std[0];
         const float v1 = (pad_value - k_mean[1]) * k_std[1];
