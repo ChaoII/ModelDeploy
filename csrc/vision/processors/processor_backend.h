@@ -40,9 +40,26 @@ public:
                         int width, int height) = 0;
     virtual bool normalize(const ImageData& image, ImageData* out,
                            const std::vector<float>& mean,
-                           const std::vector<float>& std) = 0;
+                           const std::vector<float>& std,
+                           bool scale = true, bool swap_rb = true) = 0;
     virtual bool convert_to(const ImageData& image, ImageData* out,
                             const std::string& dst_format) = 0;
+
+    // 数值缩放（如 /255），alpha/beta 与 Convert::apply 语义一致
+    virtual bool convert(const ImageData& image, ImageData* out,
+                         const std::vector<float>& alpha,
+                         const std::vector<float>& beta) = 0;
+
+    // 数据类型转换（如 uint8 -> float），dtype 与 Cast::apply 语义一致
+    virtual bool cast(const ImageData& image, ImageData* out,
+                      const std::string& dtype) = 0;
+
+    // 缩放 + 通道重排（LPR 用：alpha=1/255, beta 可选, swap_rb）
+    virtual bool convert_and_permute(const ImageData& image, Tensor* out,
+                                     const std::vector<float>& alpha,
+                                     const std::vector<float>& beta,
+                                     bool swap_rb) = 0;
+
     virtual bool center_crop(const ImageData& image, ImageData* out,
                              int width, int height) = 0;
     virtual bool pad(const ImageData& image, ImageData* out,
@@ -52,6 +69,13 @@ public:
     virtual bool normalize_and_permute(const ImageData& image, Tensor* out,
                                        const std::vector<float>& mean,
                                        const std::vector<float>& std) = 0;
+
+    // 整批融合算子（OCR det 用：resize+pad+normalize+permute，batch 内统一 pad）
+    virtual bool fusion_resize_pad_normalize_permute(
+        const std::vector<ImageData>& images, Tensor* out,
+        const std::vector<int>& resize_size, const std::vector<int>& dst_size,
+        const std::vector<float>& mean, const std::vector<float>& std,
+        float pad_value) = 0;
     virtual bool nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
                              int width, int height, ImageData* out) = 0;
 
