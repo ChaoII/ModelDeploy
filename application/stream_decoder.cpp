@@ -92,9 +92,14 @@ bool StreamDecoder::init_decoder() {
         if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             video_stream_idx_ = i;
             auto* codecpar = fmt_ctx_->streams[i]->codecpar;
-            // Try CUVID first, fallback to software
-            const AVCodec* dec = avcodec_find_decoder_by_name("h264_cuvid");
-            if (!dec) dec = avcodec_find_decoder_by_name("hevc_cuvid");
+            // 仅 hw_accel=="cuda" 时尝试 CUVID 硬解；否则一律软解。
+            // 之前无条件先选 cuvid：hw_accel=none 时无 CUDA hw context，cuvid 解码帧
+            // 仍在 GPU 内存，后续 host 侧 memcpy 读 GPU 指针 → ACCESS_VIOLATION
+            const AVCodec* dec = nullptr;
+            if (cfg_.hw_accel == "cuda") {
+                dec = avcodec_find_decoder_by_name("h264_cuvid");
+                if (!dec) dec = avcodec_find_decoder_by_name("hevc_cuvid");
+            }
             if (!dec) dec = avcodec_find_decoder(codecpar->codec_id);
             if (!dec) {
                 std::cerr << "[Decoder] No decoder for stream" << std::endl;
