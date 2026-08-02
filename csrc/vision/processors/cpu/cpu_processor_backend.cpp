@@ -4,6 +4,7 @@
 
 #include "core/md_log.h"
 #include "vision/processors/cpu/cpu_processor_backend.h"
+#include "vision/processors/cpu/simd/fused_preproc_simd.h"
 #include "vision/common/processors/yolo_preproc.h"
 #include "vision/common/processors/nv12_to_bgr.h"
 #include "vision/common/processors/convert_and_permute.h"
@@ -166,35 +167,12 @@ bool CpuProcessorBackend::fused_preprocess(
 
     out->allocate({3, dst_h, dst_w}, DataType::FP32, Device::CPU);
     float* dst = out->data_ptr<float>();
-    const int plane = dst_h * dst_w;
 
-    for (int y = 0; y < dst_h; ++y) {
-        const float src_yf = (static_cast<float>(y) - origin_y) / scale_y;
-        for (int x = 0; x < dst_w; ++x) {
-            const float src_xf = (static_cast<float>(x) - origin_x) / scale_x;
-            const int didx = y * dst_w + x;
-            if (src_xf < 0.0f || src_xf >= static_cast<float>(src_w) ||
-                src_yf < 0.0f || src_yf >= static_cast<float>(src_h)) {
-                // pad_value 已是仿射后（归一化）空间
-                dst[0 * plane + didx] = pad_value;
-                dst[1 * plane + didx] = pad_value;
-                dst[2 * plane + didx] = pad_value;
-                continue;
-            }
-            const int src_x = static_cast<int>(src_xf);
-            const int src_y = static_cast<int>(src_yf);
-            const int idx = (src_y * src_w + src_x) * 3;
-            const float b = src[idx + 0];
-            const float g = src[idx + 1];
-            const float r = src[idx + 2];
-            float v0, v1, v2;
-            if (swap_rb) { v0 = r; v1 = g; v2 = b; }
-            else { v0 = b; v1 = g; v2 = r; }
-            dst[0 * plane + didx] = v0 * alpha[0] + beta[0];
-            dst[1 * plane + didx] = v1 * alpha[1] + beta[1];
-            dst[2 * plane + didx] = v2 * alpha[2] + beta[2];
-        }
-    }
+    // 运行时 ISA 派发（AVX512/AVX2/NEON/SVE/标量），一次遍历完成，无中间缓冲
+    const auto kernel = get_fused_preproc_kernel();
+    kernel(src, src_w, src_h, dst, dst_w, dst_h,
+           origin_x, origin_y, scale_x, scale_y,
+           alpha.data(), beta.data(), swap_rb, pad_value);
     out->expand_dim(0);
     return true;
 }
