@@ -7,6 +7,7 @@
 #include "backends/trt/option.h"
 #include "runtime/backends/mnn/option.h"
 #include "runtime/backends/ort/option.h"
+#include "runtime/backends/sophgo/option.h"
 #include "core/enum_variables.h"
 
 
@@ -30,6 +31,9 @@ namespace modeldeploy {
 
         void use_trt_backend();
 
+        // Sophgo 算能 TPU 后端（SE9/BM1688/CV186AH），需 ENABLE_SOPHGO 编译
+        void use_sophgo_backend(int device_id = 0);
+
         //images:1x3x224x224
         void set_trt_min_shape(const std::string& trt_min_shape);
         //images:4x3x640x640
@@ -40,6 +44,7 @@ namespace modeldeploy {
         OrtBackendOption ort_option;
         MnnBackendOption mnn_option;
         TrtBackendOption trt_option;
+        SophgoBackendOption sophgo_option;
         std::string password;
         bool enable_fp16 = false;
         bool enable_trt = false;

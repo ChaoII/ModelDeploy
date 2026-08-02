@@ -8,13 +8,22 @@
 #ifdef WITH_GPU
 #include "vision/processors/cuda/cuda_processor_backend.h"
 #endif
+#ifdef ENABLE_SOPHGO
+#include "vision/processors/sophgo/sophgo_processor_backend.h"
+#endif
 
 namespace modeldeploy::vision {
 
 std::unique_ptr<VisionProcessorBackend> create_processor_backend(
     Device device, Backend backend, int device_id) {
-    (void)backend;
-    (void)device_id;
+    if (device == Device::TPU && backend == Backend::SOPHGO) {
+#ifdef ENABLE_SOPHGO
+        return std::make_unique<SophgoProcessorBackend>(device_id);
+#else
+        MD_LOG_WARN << "SOPHGO not enabled, fallback to CPU processor backend." << std::endl;
+        return std::make_unique<CpuProcessorBackend>();
+#endif
+    }
     switch (device) {
     case Device::GPU:
 #ifdef WITH_GPU

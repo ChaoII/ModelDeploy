@@ -9,6 +9,7 @@ namespace modeldeploy {
         ORT,
         MNN,
         TRT,
+        SOPHGO,
         NONE
     };
 
@@ -17,6 +18,7 @@ namespace modeldeploy {
         GPU,
         OPENCL,
         VULKAN,
+        TPU,
     };
 
    enum class DataType {
@@ -49,6 +51,7 @@ namespace modeldeploy {
         case Device::GPU: return "GPU";
         case Device::OPENCL: return "OPENCL";
         case Device::VULKAN: return "VULKAN";
+        case Device::TPU: return "TPU";
         default: return "Unknown";
         }
     }
@@ -58,6 +61,7 @@ namespace modeldeploy {
         case Backend::ORT: return "ORT";
         case Backend::MNN: return "MNN";
         case Backend::TRT: return "TRT";
+        case Backend::SOPHGO: return "SOPHGO";
         case Backend::NONE: return "NONE";
         default: return "Unknown";
         }

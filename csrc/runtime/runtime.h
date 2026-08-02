@@ -50,6 +50,8 @@ namespace modeldeploy {
 
         bool create_trt_backend();
 
+        bool create_sophgo_backend();
+
         std::unique_ptr<BaseBackend> backend_;
         std::vector<Tensor> input_tensors_;
         std::vector<Tensor> output_tensors_;

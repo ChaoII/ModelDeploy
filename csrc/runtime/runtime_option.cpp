@@ -15,6 +15,7 @@ namespace modeldeploy {
         if (fmt == "onnx")  return Backend::ORT;
         if (fmt == "mnn")   return Backend::MNN;
         if (fmt == "engine") return Backend::TRT;
+        if (fmt == "bmodel") return Backend::SOPHGO;
         return Backend::NONE;
     }
 
@@ -24,6 +25,7 @@ namespace modeldeploy {
             case Backend::ORT: return ext == ".onnx";
             case Backend::MNN: return ext == ".mnn";
             case Backend::TRT: return ext == ".onnx" || ext == ".engine";
+            case Backend::SOPHGO: return ext == ".bmodel";
             default: return false;
         }
     }
@@ -106,6 +108,11 @@ namespace modeldeploy {
                 backend = Backend::TRT;
 #endif
             }
+            else if (ext == ".bmodel") {
+#ifdef ENABLE_SOPHGO
+                backend = Backend::SOPHGO;
+#endif
+            }
         }
     }
 
@@ -155,6 +162,17 @@ namespace modeldeploy {
         backend = Backend::TRT;
 #else
         MD_LOG_FATAL << "The ModelDeploy didn't compile with TRT backend." << std::endl;
+#endif
+    }
+
+    void RuntimeOption::use_sophgo_backend(const int device_id) {
+#ifdef ENABLE_SOPHGO
+        backend = Backend::SOPHGO;
+        device = Device::TPU;
+        this->device_id = device_id;
+        sophgo_option.device_id = device_id;
+#else
+        MD_LOG_FATAL << "The ModelDeploy didn't compile with SOPHGO backend." << std::endl;
 #endif
     }
 
