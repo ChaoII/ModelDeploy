@@ -87,6 +87,7 @@ namespace modeldeploy {
             .def("use_ort_backend", &RuntimeOption::use_ort_backend)
             .def("use_mnn_backend", &RuntimeOption::use_mnn_backend)
             .def("use_trt_backend", &RuntimeOption::use_trt_backend)
+            .def("use_sophgo_backend", &RuntimeOption::use_sophgo_backend, pybind11::arg("device_id") = 0)
             // 不暴露给python
             // .def_readwrite("ort_option", &RuntimeOption::ort_option)
             // .def("set_external_stream", &RuntimeOption::set_external_stream,

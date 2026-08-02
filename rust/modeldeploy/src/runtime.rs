@@ -71,6 +71,14 @@ impl RuntimeOption {
         self
     }
 
+    /// 启用 Sophgo 算能 TPU 后端（需 ENABLE_SOPHGO 编译）
+    pub fn sophgo_backend(mut self, device_id: i32) -> Self {
+        self.raw.backend = ffi::MD_BACKEND_SOPHGO;
+        self.raw.device = ffi::MD_DEVICE_TPU;
+        self.raw.device_id = device_id;
+        self
+    }
+
     /// 启用 FP16
     pub fn fp16(mut self, enable: bool) -> Self {
         self.raw.enable_fp16 = if enable { 1 } else { 0 };

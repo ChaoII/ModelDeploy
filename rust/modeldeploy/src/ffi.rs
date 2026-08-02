@@ -64,6 +64,7 @@ pub const MD_DEVICE_CPU: MDDevice = MDDevice(0);
 pub const MD_DEVICE_GPU: MDDevice = MDDevice(1);
 pub const MD_DEVICE_OPENCL: MDDevice = MDDevice(2);
 pub const MD_DEVICE_VULKAN: MDDevice = MDDevice(3);
+pub const MD_DEVICE_TPU: MDDevice = MDDevice(4);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,7 +72,8 @@ pub struct MDBackend(pub i32);
 pub const MD_BACKEND_ORT: MDBackend = MDBackend(0);
 pub const MD_BACKEND_MNN: MDBackend = MDBackend(1);
 pub const MD_BACKEND_TRT: MDBackend = MDBackend(2);
-pub const MD_BACKEND_NONE: MDBackend = MDBackend(3);
+pub const MD_BACKEND_SOPHGO: MDBackend = MDBackend(3);
+pub const MD_BACKEND_NONE: MDBackend = MDBackend(4);
 
 // ════════════════════════════════════════════════════════════════
 // 结构体

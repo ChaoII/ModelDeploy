@@ -46,7 +46,8 @@
         CPU = 0,
         GPU = 1,
         OPENCL = 2,
-        VULKAN = 3
+        VULKAN = 3,
+        TPU = 4
     }
 
     public enum Backend
@@ -54,6 +55,7 @@
         ORT = 0,
         MNN = 1,
         TRT = 2,
-        NONE = 3
+        SOPHGO = 3,
+        NONE = 4
     }
 }

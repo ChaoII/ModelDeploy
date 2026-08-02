@@ -363,7 +363,8 @@ enum MDDevice {
     MD_DEVICE_CPU = 0,
     MD_DEVICE_GPU = 1,
     MD_DEVICE_OPENCL = 2,
-    MD_DEVICE_VULKAN = 3
+    MD_DEVICE_VULKAN = 3,
+    MD_DEVICE_TPU = 4
 };
 
 
@@ -371,7 +372,8 @@ enum MDBackend {
     MD_BACKEND_ORT = 0,
     MD_BACKEND_MNN = 1,
     MD_BACKEND_TRT = 2,
-    MD_BACKEND_NONE = 3
+    MD_BACKEND_SOPHGO = 3,
+    MD_BACKEND_NONE = 4
 };
 
 typedef struct {
