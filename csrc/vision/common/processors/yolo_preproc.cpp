@@ -314,11 +314,11 @@ namespace modeldeploy::vision {
             const int src_h = images[i].height();
             const int src_w = images[i].width();
             letter_box_record->at(i) = utils::cal_letter_box_param({src_w, src_h}, {dst_w, dst_h});
-            scales.push_back(letter_box_record->at(i).scale);
-            pad_ws.push_back(letter_box_record->at(i).pad_w);
-            pad_hs.push_back(letter_box_record->at(i).pad_h);
-            src_ws.push_back(src_w);
-            src_hs.push_back(src_h);
+            scales[i] = letter_box_record->at(i).scale;
+            pad_ws[i] = letter_box_record->at(i).pad_w;
+            pad_hs[i] = letter_box_record->at(i).pad_h;
+            src_ws[i] = src_w;
+            src_hs[i] = src_h;
             std::memcpy(batch_image_buffer.data() + offset, images[i].data(), images[i].bytes());
             offset += images[i].bytes();
         }

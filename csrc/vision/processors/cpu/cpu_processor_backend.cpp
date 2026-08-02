@@ -173,13 +173,24 @@ bool CpuProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& im
                                                 float pad_val,
                                                 std::vector<LetterBoxRecord>* records) {
     if (images.empty() || dst_size.size() != 2) return false;
-    records->resize(images.size());
-    std::vector<Tensor> tensors(images.size());
-    for (size_t i = 0; i < images.size(); ++i) {
-        if (!yolo_preprocess(images[i], &tensors[i], dst_size, pad_val, &(*records)[i])) return false;
+    const int batch = static_cast<int>(images.size());
+    const int dst_w = dst_size[0];
+    const int dst_h = dst_size[1];
+    records->resize(batch);
+    // 整批一次遍历：每图独立 letterbox 映射，统一经 fused SIMD kernel 写入 batch 输出
+    std::vector<float> oxs(batch), oys(batch), sxs(batch), sys(batch);
+    for (int i = 0; i < batch; ++i) {
+        (*records)[i] = utils::cal_letter_box_param(
+            {images[i].width(), images[i].height()}, {dst_w, dst_h});
+        utils::letter_box_to_fused_params((*records)[i], &oxs[i], &oys[i], &sxs[i], &sys[i]);
     }
-    *out = Tensor::concat(tensors, 0);
-    return true;
+    const float alpha[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+    const float beta[3] = {0.0f, 0.0f, 0.0f};
+    return fused_preprocess_batch(images, out, dst_size,
+                                  oxs, oys, sxs, sys,
+                                  std::vector<float>(alpha, alpha + 3),
+                                  std::vector<float>(beta, beta + 3),
+                                  true, pad_val / 255.0f);
 }
 
 bool CpuProcessorBackend::fused_preprocess_batch(
