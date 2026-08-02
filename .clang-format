@@ -1,0 +1,13 @@
+# ModelDeploy 代码风格（clang-format）
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 120
+ContinuationIndentWidth: 4
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+DerivePointerAlignment: false
+PointerAlignment: Right
+SortIncludes: CaseSensitive
+SpaceAfterTemplateKeyword: true
+Standard: c++17

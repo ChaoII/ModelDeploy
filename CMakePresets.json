@@ -1,0 +1,65 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "cpu-ninja",
+      "displayName": "CPU Build (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_AUDIO": "ON",
+        "BUILD_VISION": "ON",
+        "BUILD_CAPI": "ON",
+        "BUILD_PYTHON": "OFF",
+        "BUILD_TESTS": "ON",
+        "ENABLE_ORT": "ON",
+        "ENABLE_MNN": "ON",
+        "ENABLE_TRT": "OFF",
+        "ENABLE_SOPHGO": "OFF",
+        "WITH_GPU": "OFF"
+      }
+    },
+    {
+      "name": "gpu-ninja",
+      "displayName": "GPU Build (Ninja, CUDA)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_AUDIO": "ON",
+        "BUILD_VISION": "ON",
+        "BUILD_CAPI": "ON",
+        "BUILD_PYTHON": "OFF",
+        "BUILD_TESTS": "ON",
+        "ENABLE_ORT": "ON",
+        "ENABLE_MNN": "ON",
+        "ENABLE_TRT": "OFF",
+        "WITH_GPU": "ON"
+      }
+    },
+    {
+      "name": "sophgo",
+      "displayName": "Sophgo TPU Build (Linux + SOPHON-Sail)",
+      "binaryDir": "${sourceDir}/build_sophgo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_AUDIO": "OFF",
+        "BUILD_VISION": "ON",
+        "BUILD_CAPI": "ON",
+        "BUILD_PYTHON": "OFF",
+        "BUILD_TESTS": "ON",
+        "ENABLE_ORT": "OFF",
+        "ENABLE_MNN": "OFF",
+        "ENABLE_TRT": "OFF",
+        "ENABLE_SOPHGO": "ON",
+        "WITH_GPU": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "cpu-ninja", "configurePreset": "cpu-ninja" },
+    { "name": "gpu-ninja", "configurePreset": "gpu-ninja" },
+    { "name": "sophgo", "configurePreset": "sophgo" }
+  ]
+}
