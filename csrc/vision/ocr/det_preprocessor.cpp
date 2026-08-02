@@ -5,12 +5,8 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/ocr/det_preprocessor.h"
-#ifdef WITH_GPU
-#include "vision/common/processors/fusion_resize_pad_normalize_permute.cuh"
-#endif
 #include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
 #include "vision/ocr/utils/ocr_utils.h"
-#include "vision/common/processors/resize.h"
 
 namespace modeldeploy::vision::ocr {
     std::array<int, 4> DBDetectorPreprocessor::ocr_detector_get_info(
@@ -40,25 +36,7 @@ namespace modeldeploy::vision::ocr {
     bool DBDetectorPreprocessor::preprocess(const ImageData& image, Tensor* output,
                                             const std::vector<int>& resize_size,
                                             const std::vector<int>& dst_size) const {
-        if (use_cuda_preproc_) {
-#ifdef WITH_GPU
-            //
-            // return fusion_resize_pad_normalize_permute_cuda(image, output,
-            //                                                 resize_size,
-            //                                                 dst_size,
-            //                                                 mean_,
-            //                                                 std_,
-            //                                                 pad_value_);
-#else
-            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
-#endif
-        }
-        // return fusion_resize_pad_normalize_permute_cpu(image, output,
-        //                                                resize_size,
-        //                                                dst_size,
-        //                                                mean_,
-        //                                                std_,
-        //                                                pad_value_);
+        (void)image; (void)output; (void)resize_size; (void)dst_size;
         return true;
     }
 
@@ -81,27 +59,8 @@ namespace modeldeploy::vision::ocr {
         }
         outputs->resize(1);
 
-
-        if (use_cuda_preproc_) {
-#ifdef WITH_GPU
-
-            return fusion_resize_pad_normalize_permute_cuda(image_batch, &(*outputs)[0],
-                                                            resize_sizes,
-                                                            {max_resize_w, max_resize_h},
-                                                            mean_,
-                                                            std_,
-                                                            pad_value_);
-#else
-            MD_LOG_WARN << "GPU is not enabled, please compile with WITH_GPU=ON, rollback to cpu" << std::endl;
-#endif
-        }
-
-
-        return fusion_resize_pad_normalize_permute_cpu(image_batch, &(*outputs)[0],
-                                                       resize_sizes,
-                                                       {max_resize_w, max_resize_h},
-                                                       mean_,
-                                                       std_,
-                                                       pad_value_);
+        return backend_->fusion_resize_pad_normalize_permute(
+            image_batch, &(*outputs)[0], resize_sizes,
+            {max_resize_w, max_resize_h}, mean_, std_, pad_value_);
     }
 }

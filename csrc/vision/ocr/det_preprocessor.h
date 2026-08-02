@@ -3,6 +3,11 @@
 //
 #pragma once
 
+#include "vision/common/image_data.h"
+#include "core/tensor.h"
+#include "core/md_decl.h"
+#include "vision/processors/processor_factory.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 
 namespace modeldeploy::vision::ocr {
     class MODELDEPLOY_CXX_EXPORT DBDetectorPreprocessor {
@@ -14,7 +19,9 @@ namespace modeldeploy::vision::ocr {
                            std::vector<Tensor>* outputs);
 
 
-        void use_cuda_preproc() { use_cuda_preproc_ = true; }
+        void use_cuda_preproc() {
+            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
+        }
 
         void set_max_side_len(const int max_side_len) { max_side_len_ = max_side_len; }
 
@@ -42,7 +49,8 @@ namespace modeldeploy::vision::ocr {
 
 
         std::array<int, 4> ocr_detector_get_info(const ImageData* image, int max_size_len) const;
-        bool use_cuda_preproc_ = false;
+        std::shared_ptr<VisionProcessorBackend> backend_ =
+            std::make_shared<CpuProcessorBackend>();
         // for recording the switch of hwc2chw
         int max_side_len_ = 960;
         std::vector<int> static_img_size_ = {};
