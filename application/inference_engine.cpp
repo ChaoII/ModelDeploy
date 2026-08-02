@@ -44,24 +44,15 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     else if (cfg.backend == "mnn") {
         opt.use_mnn_backend();
     }
-    // ── ORT 后端（默认）—— 开启 TensorRT EP + FP16 + 缓存 ──
+    // ── ORT 后端（默认）—— GPU 走 CUDA EP（首次即快速可用）；TRT EP 在线构建需数分钟，
+    // 需要时显式用 backend="trt" + .engine 文件走纯 TRT 后端（见上） ──
     else {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
             opt.enable_fp16 = true;                    // FP16 推理（关键性能优化）
-            opt.enable_trt = true;           // ORT 的 TensorRT EP// FP16 for TRT EP
             std::string cache_dir = "data/ort_trt_cache";
             try { std::filesystem::create_directories(cache_dir); } catch (...) {}
             opt.ort_option.trt_engine_cache_path = cache_dir;
-            // 设置动态 shape（TRT 编译用）
-            if (cfg_.input_size.size() == 2) {
-                int w = cfg_.input_size[0];
-                int h = cfg_.input_size[1];
-                std::string shape = "images:1x3x" + std::to_string(h) + "x" + std::to_string(w);
-                opt.ort_option.trt_min_shape = shape;
-                opt.ort_option.trt_opt_shape = shape;
-                opt.ort_option.trt_max_shape = shape;
-            }
         }
     }
 

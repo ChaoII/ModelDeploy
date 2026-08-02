@@ -40,19 +40,11 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
             opt.enable_fp16 = true;
-            opt.enable_trt = true;
-            opt.ort_option.enable_trt = true;
+            // GPU 默认 CUDA EP（首次即快速可用）；TRT EP 在线构建需数分钟，需要时用 backend="trt"
             opt.ort_option.enable_fp16 = true;
             std::string cache_dir = "data/ort_trt_cache";
             try { std::filesystem::create_directories(cache_dir); } catch (...) {}
             opt.ort_option.trt_engine_cache_path = cache_dir;
-            if (cfg.input_size.size() == 2) {
-                int w = cfg.input_size[0], h = cfg.input_size[1];
-                std::string shape = "images:1x3x" + std::to_string(h) + "x" + std::to_string(w);
-                opt.ort_option.trt_min_shape = shape;
-                opt.ort_option.trt_opt_shape = shape;
-                opt.ort_option.trt_max_shape = shape;
-            }
         }
     }
     return opt;
