@@ -4,6 +4,7 @@
 
 #include "core/md_log.h"
 #include "vision/detection/preprocessor.h"
+#include "vision/utils.h"
 
 namespace modeldeploy::vision::detection {
     UltralyticsPreprocessor::UltralyticsPreprocessor() {
@@ -14,6 +15,18 @@ namespace modeldeploy::vision::detection {
 
     bool UltralyticsPreprocessor::preprocess(const ImageData& image, Tensor* output,
                                              LetterBoxRecord* letter_box_record) const {
+        if (!normalize_) {
+            // 无归一化路径：letterbox 后保持 [0,255]，alpha=1（部分导出模型期望原始像素）
+            *letter_box_record = utils::cal_letter_box_param(
+                {image.width(), image.height()}, size_);
+            float ox, oy, sx, sy;
+            utils::letter_box_to_fused_params(*letter_box_record, &ox, &oy, &sx, &sy);
+            const std::vector<float> alpha = {1.0f, 1.0f, 1.0f};
+            const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
+            return backend_->fused_preprocess(image, output, size_,
+                                              ox, oy, sx, sy, alpha, beta,
+                                              true, padding_value_[0]);
+        }
         return backend_->yolo_preprocess(image, output, size_, padding_value_[0], letter_box_record);
     }
 
