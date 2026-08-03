@@ -114,7 +114,7 @@ namespace {
             st->sync_s2d();
         }
 
-        engine->process(graph_name_);
+        engine->process(graph_name_, input_map, output_map);
 
         // 读输出（sail::Tensor sys_data <- sync_d2s -> host Tensor）
         outputs->resize(outputs_desc_.size());

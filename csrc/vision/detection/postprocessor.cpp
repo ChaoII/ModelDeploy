@@ -5,6 +5,7 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/detection/postprocessor.h"
+#include <cmath>
 
 namespace modeldeploy::vision::detection {
     UltralyticsPostprocessor::UltralyticsPostprocessor() {
@@ -51,7 +52,8 @@ namespace modeldeploy::vision::detection {
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
                 const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
-                float confidence = *max_class_score;
+                // yolo 无 NMS 模型的 class 通道为 raw logits，需 sigmoid 转概率
+                const float confidence = 1.0f / (1.0f + std::exp(-(*max_class_score)));
                 // filter boxes by conf_threshold
                 if (confidence <= conf_threshold_) {
                     continue;
