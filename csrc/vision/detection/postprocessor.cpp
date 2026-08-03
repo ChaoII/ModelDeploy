@@ -5,6 +5,7 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/detection/postprocessor.h"
+#include <algorithm>
 #include <cmath>
 
 namespace modeldeploy::vision::detection {
@@ -66,6 +67,10 @@ namespace modeldeploy::vision::detection {
                     attr_ptr[2],
                     attr_ptr[3]
                 };
+                // 过滤无效框（低置信假阳性常产生非正宽高）
+                if (box.width <= 0 || box.height <= 0) {
+                    continue;
+                }
                 _results.push_back({box, label_id, confidence});
             }
             if (_results.empty()) {
@@ -101,6 +106,10 @@ namespace modeldeploy::vision::detection {
                 box.width = std::roundf(x2 - x1 - 0.5f);
                 box.height = std::roundf(y2 - y1 - 0.5f);
             }
+            // 缩放后窄框可能产生非正宽高，统一过滤
+            _results.erase(std::remove_if(_results.begin(), _results.end(),
+                [](const DetectionResult& r) { return r.box.width <= 0 || r.box.height <= 0; }),
+                _results.end());
             (*results)[bs] = std::move(_results);
         }
         return true;
