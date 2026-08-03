@@ -5,11 +5,20 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 
+// OpenCV 5 用 cv::FontFace（可从字体文件构造）；OpenCV 4 用 int 字体枚举
+#if defined(CV_VERSION_MAJOR) && CV_VERSION_MAJOR >= 5
+#define MD_FONT_OBJ cv::FontFace
+#define MD_FONT_SIMPLEX cv::FontFace::HersheySimplex
+#else
+#define MD_FONT_OBJ int
+#define MD_FONT_SIMPLEX cv::FONT_HERSHEY_SIMPLEX
+#endif
+
 namespace modeldeploy::vision {
     cv::Scalar get_random_color();
 
     void draw_rectangle_and_text(cv::Mat& image, cv::Rect2f box, const std::string& text,
-                                 const cv::Scalar& color, cv::FontFace font, int font_size,
+                                 const cv::Scalar& color, MD_FONT_OBJ font, int font_size,
                                  int thickness, bool draw_text = false);
 
     void draw_landmarks(cv::Mat& cv_image,

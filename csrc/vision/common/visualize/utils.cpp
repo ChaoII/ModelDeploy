@@ -17,7 +17,7 @@ namespace modeldeploy::vision {
     }
 
     void draw_rectangle_and_text(cv::Mat& image, const cv::Rect2f box, const std::string& text,
-                                 const cv::Scalar& color, cv::FontFace font, const int font_size,
+                                 const cv::Scalar& color, MD_FONT_OBJ font, const int font_size,
                                  const int thickness, const bool draw_text) {
         // 绘制对象矩形框
         cv::rectangle(image, box, color, thickness);

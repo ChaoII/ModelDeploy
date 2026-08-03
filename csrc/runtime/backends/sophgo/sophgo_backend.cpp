@@ -1,14 +1,17 @@
 //
 // Created by aichao on 2025/8/2.
-// Sophgo 算能 TPU 推理后端：sail::Engine 加载 .bmodel，host Tensor <-> sail::Tensor。
-// 仅在 ENABLE_SOPHGO 编译（Linux + 安装 SOPHON-Sail）。
+// Sophgo 算能 TPU 推理后端：sail::Engine（SYSIO 模式）加载 .bmodel。
+// 适配 sail 3.11（BM1688 SOC）：Engine(bmodel, tpu_id, IOMode) 构造、
+// create_input/output_tensors_map + process(graph_name) 推理。
 //
 
 #include "core/md_log.h"
 #include "runtime/backends/sophgo/sophgo_backend.h"
 
 #ifdef ENABLE_SOPHGO
-#include "sail/sail.h"
+#include "sail/engine.h"
+#include "sail/tensor.h"
+#include <cstring>
 
 namespace modeldeploy {
 namespace {
@@ -17,21 +20,22 @@ namespace {
         switch (t) {
             case BM_FLOAT32: return DataType::FP32;
             case BM_FLOAT16: return DataType::FP32; // 统一转 FP32 推理结果
+            case BM_BFLOAT16: return DataType::FP32;
             case BM_INT32: return DataType::INT32;
-            case BM_INT64: return DataType::INT64;
+            case BM_UINT32: return DataType::INT32;
+            case BM_INT16: return DataType::INT32;
+            case BM_UINT16: return DataType::INT32;
             case BM_UINT8: return DataType::UINT8;
             case BM_INT8: return DataType::INT8;
-            case BM_UINT32: return DataType::INT32;
             default: return DataType::UNKNOWN;
         }
     }
 } // namespace
 
     SophgoBackend::~SophgoBackend() {
-        if (handle_) delete static_cast<sail::Handle*>(handle_);
         if (engine_) delete static_cast<sail::Engine*>(engine_);
-        handle_ = nullptr;
         engine_ = nullptr;
+        handle_ = nullptr;
     }
 
     bool SophgoBackend::init(const RuntimeOption& option) {
@@ -43,7 +47,8 @@ namespace {
             ? option.model_file : option.sophgo_option.bmodel_path;
         const int device_id = option.sophgo_option.device_id;
 
-        auto* engine = new sail::Engine(bmodel_path_);
+        // sail 3.11：Engine(bmodel_path, tpu_id, IOMode)；SYSIO = 输入/输出均在系统内存
+        auto* engine = new sail::Engine(bmodel_path_, device_id, sail::IOMode::SYSIO);
         const auto graphs = engine->get_graph_names();
         if (graphs.empty()) {
             MD_LOG_ERROR << "No graph found in bmodel: " << bmodel_path_ << std::endl;
@@ -51,7 +56,6 @@ namespace {
             return false;
         }
         graph_name_ = graphs[0];
-        auto* handle = new sail::Handle(graph_name_, device_id);
 
         // 输入输出描述
         const auto input_names = engine->get_input_names(graph_name_);
@@ -72,7 +76,6 @@ namespace {
         }
 
         engine_ = engine;
-        handle_ = handle;
         initialized_ = true;
         MD_LOG_INFO << "SophgoBackend loaded " << bmodel_path_
             << " graph[" << graph_name_ << "] inputs=" << inputs_desc_.size()
@@ -81,9 +84,8 @@ namespace {
     }
 
     bool SophgoBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
-        if (!initialized_ || !engine_ || !handle_) return false;
+        if (!initialized_ || !engine_) return false;
         auto* engine = static_cast<sail::Engine*>(engine_);
-        auto* handle = static_cast<sail::Handle*>(handle_);
 
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR << "[SophgoBackend] inputs size mismatch: " << inputs.size()
@@ -91,45 +93,45 @@ namespace {
             return false;
         }
 
-        auto input_map = engine->get_input_tensor_map(graph_name_, *handle);
-        auto output_map = engine->get_output_tensor_map(graph_name_, *handle);
+        // sail 3.11：创建内置输入/输出 tensor map（SYSIO 模式，sys_data 可直接 memcpy）
+        auto input_map = engine->create_input_tensors_map(graph_name_);
+        auto output_map = engine->create_output_tensors_map(graph_name_);
 
-        // 写输入（host Tensor -> sail::Tensor）
+        // 写输入（host Tensor -> sail::Tensor sys_data -> sync_s2d）
         for (size_t i = 0; i < inputs.size(); ++i) {
             auto it = input_map.find(inputs_desc_[i].name);
-            if (it == input_map.end()) {
+            if (it == input_map.end() || it->second == nullptr) {
                 MD_LOG_ERROR << "[SophgoBackend] input not found: " << inputs_desc_[i].name << std::endl;
                 return false;
             }
-            auto& st = it->second;
-            if (st->write(inputs[i].data(), inputs[i].byte_size()) != 0) {
-                MD_LOG_ERROR << "[SophgoBackend] write input failed: " << inputs_desc_[i].name << std::endl;
+            sail::Tensor* st = it->second;
+            const size_t bytes = inputs[i].byte_size();
+            if (bytes > static_cast<size_t>(st->size() * st->element_size())) {
+                MD_LOG_ERROR << "[SophgoBackend] input size too large: " << inputs_desc_[i].name << std::endl;
                 return false;
             }
+            std::memcpy(st->sys_data(), inputs[i].data(), bytes);
+            st->sync_s2d();
         }
 
-        if (!engine->process(graph_name_, input_map, output_map)) {
-            MD_LOG_ERROR << "[SophgoBackend] process failed on graph " << graph_name_ << std::endl;
-            return false;
-        }
+        engine->process(graph_name_);
 
-        // 读输出（sail::Tensor -> host Tensor）
+        // 读输出（sail::Tensor sys_data <- sync_d2s -> host Tensor）
         outputs->resize(outputs_desc_.size());
         for (size_t i = 0; i < outputs_desc_.size(); ++i) {
             auto it = output_map.find(outputs_desc_[i].name);
-            if (it == output_map.end()) {
+            if (it == output_map.end() || it->second == nullptr) {
                 MD_LOG_ERROR << "[SophgoBackend] output not found: " << outputs_desc_[i].name << std::endl;
                 return false;
             }
-            auto& st = it->second;
-            const auto shape = st->get_shape();
+            sail::Tensor* st = it->second;
+            st->sync_d2s();
+            const auto shape = st->shape();  // vector<int>
+            const std::vector<int64_t> shape64(shape.begin(), shape.end());
             outputs_desc_[i].shape = shape;
-            outputs_desc_[i].dtype = sail_dtype_to_md(st->get_dtype());
-            (*outputs)[i].allocate(shape, outputs_desc_[i].dtype, Device::CPU, outputs_desc_[i].name);
-            if (st->read((*outputs)[i].data(), (*outputs)[i].byte_size()) != 0) {
-                MD_LOG_ERROR << "[SophgoBackend] read output failed: " << outputs_desc_[i].name << std::endl;
-                return false;
-            }
+            outputs_desc_[i].dtype = sail_dtype_to_md(st->dtype());
+            (*outputs)[i].allocate(shape64, outputs_desc_[i].dtype, Device::CPU, outputs_desc_[i].name);
+            std::memcpy((*outputs)[i].data(), st->sys_data(), (*outputs)[i].byte_size());
         }
         return true;
     }

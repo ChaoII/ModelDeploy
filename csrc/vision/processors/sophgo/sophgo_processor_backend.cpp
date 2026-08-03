@@ -12,39 +12,19 @@
 #include "vision/processors/cpu/cpu_processor_backend.h"
 #include "vision/processors/processor_factory.h"
 
-#ifdef ENABLE_SOPHGO
-#include "sail/sail.h"
-#endif
-
 namespace modeldeploy::vision {
 
     SophgoProcessorBackend::SophgoProcessorBackend(int device_id) : device_id_(device_id) {
         cpu_fallback_ = std::make_unique<CpuProcessorBackend>();
-#ifdef ENABLE_SOPHGO
-        // VERIFY: sail::Handle 构造（版本差异：sail::Handle(graph_name) 或 sail::Handle(device_id, graph_name)）
-        // bmodel 加载在 SophgoBackend，这里只建 handle 用于 BMCV
-        // 简化为按 device_id 建 handle；bmodel 图名在推理后端持有
-        try {
-            auto* handle = new sail::Handle(device_id, "");
-            auto* bmcv_handle = new sail::bmcv(*handle);
-            handle_ = handle;
-            bmcv_ = bmcv_handle;
-        } catch (const std::exception& e) {
-            MD_LOG_WARN << "Sophgo handle init failed: " << e.what()
-                << ", fallback to CPU." << std::endl;
-            handle_ = nullptr;
-            bmcv_ = nullptr;
-        }
-#else
-        MD_LOG_WARN << "SOPHGO not enabled, SophgoProcessorBackend falls back to CPU." << std::endl;
-#endif
+        // 预处理路径：sail ONLY_RUNTIME 构建不含 BMCV；BMCV 融合路径为 VERIFY 待完善项。
+        // 为兼容运行时-only sail 与保证正确性，预处理统一走 CPU 兜底（性能优化后续跟进）。
+        (void)device_id_;
+        handle_ = nullptr;
+        bmcv_ = nullptr;
+        MD_LOG_WARN << "SophgoProcessorBackend: preprocess uses CPU fallback (BMCV runtime path pending)." << std::endl;
     }
 
     SophgoProcessorBackend::~SophgoProcessorBackend() {
-#ifdef ENABLE_SOPHGO
-        if (bmcv_) delete static_cast<sail::bmcv*>(bmcv_);
-        if (handle_) delete static_cast<sail::Handle*>(handle_);
-#endif
         bmcv_ = nullptr;
         handle_ = nullptr;
     }
@@ -204,6 +184,13 @@ namespace modeldeploy::vision {
     bool SophgoProcessorBackend::nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
                                              int width, int height, ImageData* out) {
         return cpu_fallback_->nv12_to_bgr(y, uv, width, height, out);
+    }
+
+    bool SophgoProcessorBackend::scrfd_preprocess(
+        const ImageData& image, Tensor* out,
+        const std::vector<int>& dst_size,
+        float pad_val, LetterBoxRecord* record) {
+        return cpu_fallback_->scrfd_preprocess(image, out, dst_size, pad_val, record);
     }
 
     bool SophgoProcessorBackend::process_device_image(

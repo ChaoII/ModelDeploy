@@ -83,6 +83,9 @@ namespace modeldeploy::vision {
                          int width, int height, ImageData* out) override;
         bool process_device_image(void* device_image, int width, int height,
                                   Tensor* out, LetterBoxRecord* record) override;
+        bool scrfd_preprocess(const ImageData& image, Tensor* out,
+                              const std::vector<int>& dst_size,
+                              float pad_val, LetterBoxRecord* record) override;
 
     private:
         int device_id_ = 0;
