@@ -7,7 +7,7 @@
 #include "core/md_decl.h"
 
 namespace modeldeploy::vision {
-    // Sophgo 算能 TPU 前后处理后端：BMCV（resize/letterbox/仿射/通道重排）+ sail::BMImage。
+    // Sophgo 算能 TPU 前后处理后端：BMCV（resize/letterbox/仿射/通道重排）+ bm_image。
     // 仅在 ENABLE_SOPHGO 编译（Linux + SOPHON-Sail）。
     class MODELDEPLOY_CXX_EXPORT SophgoProcessorBackend : public VisionProcessorBackend {
     public:
@@ -100,16 +100,16 @@ namespace modeldeploy::vision {
                                      const std::vector<float>& beta,
                                      bool swap_rb, float pad_value);
 
-        // 使用外部 bm_handle（sail::Engine 的 handle），保证 D2D 零拷贝在同一设备上下文。
+        // 使用外部 bm_handle（SophgoBackend 的 bmrt handle），保证 D2D 零拷贝在同一设备上下文。
         // 替代构造时自行 bm_dev_request 的 handle。
         void use_external_handle(void* handle);
 
     private:
         int device_id_ = 0;
-        // 不透明句柄：实际为 sail::Handle / sail::bmcv（见 .cpp，避免头文件引入 sail）
+        // 不透明句柄：实际为 bm_handle_t（见 .cpp，避免头文件引入 libsophon）
         void* handle_ = nullptr;
         void* bmcv_ = nullptr;
-        // 是否为外部共享 handle（sail::Engine 的），析构时不释放
+        // 是否为外部共享 handle（SophgoBackend 的），析构时不释放
         bool external_handle_ = false;
         // CPU 兜底
         std::unique_ptr<VisionProcessorBackend> cpu_fallback_;

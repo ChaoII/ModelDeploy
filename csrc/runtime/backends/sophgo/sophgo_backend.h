@@ -36,7 +36,7 @@ namespace modeldeploy {
         // 供 SOC mmap 零拷贝读取。未初始化时为 nullptr；首次调用 lazily 分配。
         void* get_output_device_mem();
 
-        // 返回 sail::Engine 内部 bm_handle_t（供 SophgoProcessorBackend 共享，D2D 零拷贝需要同一 handle）
+        // 返回 bmrt 内部 bm_handle_t（供 SophgoProcessorBackend 共享，D2D 零拷贝需要同一 handle）
         [[nodiscard]] void* get_bm_handle();
 
         std::unique_ptr<BaseBackend> clone(const RuntimeOption& runtime_option,

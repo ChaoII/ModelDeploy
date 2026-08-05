@@ -24,7 +24,7 @@ namespace modeldeploy::vision {
     SophgoProcessorBackend::SophgoProcessorBackend(int device_id) : device_id_(device_id) {
         cpu_fallback_ = std::make_unique<CpuProcessorBackend>();
         // handle 延迟初始化：不主动 bm_dev_request（避免与 bmrt 的 handle 冲突）。
-        // 零拷贝路径由 UltralyticsDet 调用 use_external_handle(sail/bmrt handle) 注入。
+        // 零拷贝路径由 UltralyticsDet 调用 use_external_handle(bmrt handle) 注入。
         // 普通 fused_preprocess（BMCV）在 handle 未设置时回退 CPU。
         handle_ = nullptr;
         MD_LOG_INFO << "SophgoProcessorBackend: BMCV handle deferred (set via use_external_handle)." << std::endl;
@@ -49,7 +49,7 @@ namespace modeldeploy::vision {
         }
         handle_ = handle;
         external_handle_ = true;
-        MD_LOG_INFO << "SophgoProcessorBackend: using external bm_handle (shared with sail engine)." << std::endl;
+        MD_LOG_INFO << "SophgoProcessorBackend: using external bm_handle (shared with bmrt backend)." << std::endl;
 #else
         (void)handle;
 #endif
