@@ -46,5 +46,7 @@ namespace modeldeploy::vision::detection {
         bool initialize();
         UltralyticsPreprocessor preprocessor_;
         UltralyticsPostprocessor postprocessor_;
+        // Sophgo 零拷贝路径持有的输出 bm_image（attach 到输入设备内存），用 md_bmcv_image_destroy 释放
+        void* out_img_ = nullptr;
     };
 } // namespace detection

@@ -3,40 +3,61 @@
 // Sophgo BMCV 融合预处理。
 //
 // 说明：SOPHON-Sail / BMCV 的 API 随 SDK 版本有差异，下列调用基于 BM1688/CV186AH
-// 的 sail v2.x 文档编写，真机联调时需按实际 SDK 头文件核对（文件内已标注 VERIFY 点）。
-// 未安装 SDK 时（ENABLE_SOPHGO off）此类退化为 CPU 兜底。
+// 的 libsophon 0.4.x 编写。未安装 SDK 时（ENABLE_SOPHGO off）此类退化为 CPU 兜底。
 //
 
 #include "core/md_log.h"
 #include "vision/processors/sophgo/sophgo_processor_backend.h"
+#include "vision/processors/sophgo/bmcv_bridge.h"
 #include "vision/processors/cpu/cpu_processor_backend.h"
 #include "vision/processors/processor_factory.h"
+#include "vision/utils.h"
+#include <algorithm>
+#include <cmath>
+
+#ifdef ENABLE_SOPHGO
+#include "bmlib_runtime.h"
+#endif
 
 namespace modeldeploy::vision {
 
     SophgoProcessorBackend::SophgoProcessorBackend(int device_id) : device_id_(device_id) {
         cpu_fallback_ = std::make_unique<CpuProcessorBackend>();
-        // 预处理路径：sail ONLY_RUNTIME 构建不含 BMCV；BMCV 融合路径为 VERIFY 待完善项。
-        // 为兼容运行时-only sail 与保证正确性，预处理统一走 CPU 兜底（性能优化后续跟进）。
-        (void)device_id_;
+        // handle 延迟初始化：不主动 bm_dev_request（避免与 bmrt 的 handle 冲突）。
+        // 零拷贝路径由 UltralyticsDet 调用 use_external_handle(sail/bmrt handle) 注入。
+        // 普通 fused_preprocess（BMCV）在 handle 未设置时回退 CPU。
         handle_ = nullptr;
-        bmcv_ = nullptr;
-        MD_LOG_WARN << "SophgoProcessorBackend: preprocess uses CPU fallback (BMCV runtime path pending)." << std::endl;
+        MD_LOG_INFO << "SophgoProcessorBackend: BMCV handle deferred (set via use_external_handle)." << std::endl;
     }
 
     SophgoProcessorBackend::~SophgoProcessorBackend() {
-        bmcv_ = nullptr;
+#ifdef ENABLE_SOPHGO
+        if (handle_ && !external_handle_) {
+            bm_dev_free(static_cast<bm_handle_t>(handle_));
+        }
         handle_ = nullptr;
+#endif
     }
 
-    // ==================== TPU 融合路径 ====================
-    // 思路（VERIFY: BMCV 调用签名）：
-    //   1. ImageData(CPU BGR) -> sail::BMImage（上传）
-    //   2. bmcv.vpp_convert：resize/letterbox/crop 到 dst_size（可用 vpp_crop_attr 表达 pad）
-    //   3. bmcv.convert_to：BGR->RGB(swap) + 仿射(alpha,beta)
-    //   4. bm_image_to_tensor：BMImage -> sail::Tensor（CHW）
-    //   5. 拷贝到输出 CPU Tensor
-    // 若某步 API 不确定，回退 CPU，保证正确性优先。
+    void SophgoProcessorBackend::use_external_handle(void* handle) {
+#ifdef ENABLE_SOPHGO
+        if (handle_) {
+            if (!external_handle_) {
+                bm_dev_free(static_cast<bm_handle_t>(handle_));
+            }
+            handle_ = nullptr;
+        }
+        handle_ = handle;
+        external_handle_ = true;
+        MD_LOG_INFO << "SophgoProcessorBackend: using external bm_handle (shared with sail engine)." << std::endl;
+#else
+        (void)handle;
+#endif
+    }
+
+    // ==================== TPU(BMCV) 融合路径 ====================
+    // ImageData(BGR/RGB, HWC, uint8) -> 上传 bm_image -> vpp_convert_padding(letterbox/resize+pad)
+    //   -> convert_to(BGR->RGB + alpha/beta 仿射, FP32) -> 读回 CPU Tensor(CHW)
 
     bool SophgoProcessorBackend::fused_preprocess(
         const ImageData& image, Tensor* out,
@@ -46,33 +67,73 @@ namespace modeldeploy::vision {
         const std::vector<float>& alpha,
         const std::vector<float>& beta,
         bool swap_rb, float pad_value) {
-        (void)origin_x; (void)origin_y; (void)scale_x; (void)scale_y;
-        (void)swap_rb; (void)pad_value;
 #ifdef ENABLE_SOPHGO
-        if (!handle_ || !bmcv_) {
-            return cpu_fallback_->fused_preprocess(
-                image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
-                alpha, beta, swap_rb, pad_value);
+        if (handle_ && dst_size.size() == 2 && alpha.size() == 3 && beta.size() == 3) {
+            const int src_w = image.width();
+            const int src_h = image.height();
+            const int dst_w = dst_size[0];
+            const int dst_h = dst_size[1];
+            if (src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0) {
+                return cpu_fallback_->fused_preprocess(
+                    image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
+                    alpha, beta, swap_rb, pad_value);
+            }
+
+            // letterbox: src 全图 resize 到 (resize_w, resize_h)，放置于 dst 的 (pad_w, pad_h)
+            int resize_w = static_cast<int>(std::lround(src_w * scale_x));
+            int resize_h = static_cast<int>(std::lround(src_h * scale_y));
+            int pad_w = static_cast<int>(std::lround(origin_x));
+            int pad_h = static_cast<int>(std::lround(origin_y));
+            resize_w = std::max(1, std::min(resize_w, dst_w));
+            resize_h = std::max(1, std::min(resize_h, dst_h));
+            pad_w = std::max(0, std::min(pad_w, dst_w - 1));
+            pad_h = std::max(0, std::min(pad_h, dst_h - 1));
+
+            // BMCV padding 是输入空间(0-255)；CPU fused 的 pad_value 是输出空间，按 alpha 还原
+            const float scale0 = std::fabs(alpha[0]) > 1e-6f ? alpha[0] : 1.0f;
+            int pad_raw = static_cast<int>(std::lround(pad_value / scale0));
+            pad_raw = std::max(0, std::min(pad_raw, 255));
+            const unsigned char p = static_cast<unsigned char>(pad_raw);
+
+            out->allocate({3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+            const int st = md_bmcv_letterbox_normalize(
+                handle_, image.data(), src_w, src_h,
+                out->data_ptr<float>(), dst_w, dst_h,
+                pad_w, pad_h, resize_w, resize_h,
+                alpha[0], alpha[1], alpha[2], p, swap_rb ? 1 : 0);
+            if (st == 0) {
+                out->expand_dim(0);
+                return true;
+            }
+            MD_LOG_ERROR << "SophgoProcessorBackend: BMCV fused_preprocess failed (st="
+                         << st << "), fallback to CPU." << std::endl;
         }
-        // VERIFY: sail::bmcv 的 vpp_convert / convert_to / bm_image_to_tensor 调用
-        // 此处需按实际 SDK 补全；当前回退 CPU，保证正确。
-        return cpu_fallback_->fused_preprocess(
-            image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
-            alpha, beta, swap_rb, pad_value);
-#else
-        return cpu_fallback_->fused_preprocess(
-            image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
-            alpha, beta, swap_rb, pad_value);
 #endif
+        return cpu_fallback_->fused_preprocess(
+            image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
+            alpha, beta, swap_rb, pad_value);
     }
 
     bool SophgoProcessorBackend::yolo_preprocess(
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,
         float pad_val, LetterBoxRecord* record) {
-        // letterbox 参数在 host 计算，映射到 fused_preprocess 的 origin/scale
-        // VERIFY: 复用 utils::cal_letter_box_param 得到 scale/pad，然后走 fused TPU 路径
-        return cpu_fallback_->yolo_preprocess(image, out, dst_size, pad_val, record);
+        // letterbox 参数在 host 计算，映射到 fused_preprocess 的 origin/scale，走 BMCV 融合路径
+        const float src_w = static_cast<float>(image.width());
+        const float src_h = static_cast<float>(image.height());
+        const float dst_w = static_cast<float>(dst_size[0]);
+        const float dst_h = static_cast<float>(dst_size[1]);
+        const float scale = std::min(dst_h / src_h, dst_w / src_w);
+        const float resize_w = src_w * scale;
+        const float resize_h = src_h * scale;
+        const float pad_w = (dst_w - resize_w) * 0.5f;
+        const float pad_h = (dst_h - resize_h) * 0.5f;
+        *record = {src_w, src_h, dst_w, dst_h, pad_w, pad_h, scale};
+        const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
+        const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
+        // CPU fused 的 pad_value 是输出空间(归一化后)；fused_preprocess 会按 alpha 还原
+        return fused_preprocess(image, out, dst_size, pad_w, pad_h, scale, scale,
+                                alpha, beta, true, pad_val / 255.0f);
     }
 
     bool SophgoProcessorBackend::yolo_preprocess_batch(
@@ -81,6 +142,51 @@ namespace modeldeploy::vision {
         float pad_val, std::vector<LetterBoxRecord>* records) {
         // VERIFY: TPU 批量 path（BMCV crop + TPU 通道），当前先 CPU 兜底
         return cpu_fallback_->yolo_preprocess_batch(images, out, dst_size, pad_val, records);
+    }
+
+    bool SophgoProcessorBackend::fused_preprocess_device(
+        const ImageData& image, void** out_img, void* input_mem,
+        int* dst_w, int* dst_h,
+        float origin_x, float origin_y,
+        float scale_x, float scale_y,
+        const std::vector<float>& alpha,
+        const std::vector<float>& beta,
+        bool swap_rb, float pad_value) {
+#ifdef ENABLE_SOPHGO
+        if (handle_ && out_img && input_mem && dst_w && dst_h &&
+            alpha.size() == 3 && beta.size() == 3 && *dst_w > 0 && *dst_h > 0) {
+            const int src_w = image.width();
+            const int src_h = image.height();
+            int resize_w = static_cast<int>(std::lround(src_w * scale_x));
+            int resize_h = static_cast<int>(std::lround(src_h * scale_y));
+            int pad_w = static_cast<int>(std::lround(origin_x));
+            int pad_h = static_cast<int>(std::lround(origin_y));
+            resize_w = std::max(1, std::min(resize_w, *dst_w));
+            resize_h = std::max(1, std::min(resize_h, *dst_h));
+            pad_w = std::max(0, std::min(pad_w, *dst_w - 1));
+            pad_h = std::max(0, std::min(pad_h, *dst_h - 1));
+            const float scale0 = std::fabs(alpha[0]) > 1e-6f ? alpha[0] : 1.0f;
+            int pad_raw = static_cast<int>(std::lround(pad_value / scale0));
+            pad_raw = std::max(0, std::min(pad_raw, 255));
+            // 输出 bm_image（FP32 RGB_PLANAR），attach 到 input_mem（bmrt_tensor 分配的输入设备内存）
+            void* oi = md_bmcv_image_create(handle_, *dst_w, *dst_h);
+            if (!oi) {
+                return false;
+            }
+            if (md_bmcv_letterbox_normalize_attach(
+                    handle_, image.data(), src_w, src_h, oi, input_mem,
+                    *dst_w, *dst_h, pad_w, pad_h, resize_w, resize_h,
+                    alpha[0], alpha[1], alpha[2],
+                    static_cast<unsigned char>(pad_raw), swap_rb ? 1 : 0) != 0) {
+                md_bmcv_image_destroy(oi);
+                MD_LOG_ERROR << "SophgoProcessorBackend: BMCV attach preprocess failed, fallback." << std::endl;
+                return false;
+            }
+            *out_img = oi;
+            return true;
+        }
+#endif
+        return false;
     }
 
     bool SophgoProcessorBackend::fused_preprocess_batch(
@@ -196,7 +302,7 @@ namespace modeldeploy::vision {
     bool SophgoProcessorBackend::process_device_image(
         void* device_image, int width, int height,
         Tensor* out, LetterBoxRecord* record) {
-        // VERIFY: 硬解码路径，device_image 为 sail::BMImage*（或 bm_image*），直接 BMCV 处理
+        // VERIFY: 硬解码路径，device_image 为 bm_image*，直接 BMCV 处理（后续实现）
         (void)device_image; (void)width; (void)height; (void)out; (void)record;
         return false;
     }

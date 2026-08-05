@@ -209,7 +209,40 @@ trtexec --onnx=yolo11n_nms.onnx ^
         --maxShapes=images:4x3x1280x1280
 ```
 
-#### 6. 路线图
+#### 6. bmodel生成(算能 Sophgo TPU)
+
+Sophgo 后端(`ENABLE_SOPHGO=ON`)加载的是 `.bmodel` 文件(基于 tpu-mlir 从 ONNX 转换)，已在 BM1688 SOC 上验证通过。转换工具见 [`tools/docker/sophgo/`](./tools/docker/sophgo)，步骤如下：
+
+```bash
+# 1. 准备 tpu-mlir 1.27 转换环境(Docker)
+cd tools/docker/sophgo
+#    先将 tpu_mlir-1.27-py3-none-any.whl 与 tpu-mlir-resource.tar 放入该目录(从算能官方 SDK 获取)
+./build_docker.sh                      # 构建镜像 tpuc_dev:1.27
+docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
+    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
+    --chip bm1688 --quantize F16 --out yolo11n_bm1688.bmodel
+```
+
+`convert.sh` 内部等价于：
+
+**注意：**
+
+1. `tpu-mlir 1.27` 对带 NMS 的 ONNX 有 Gather 算子转换 bug，**务必先把 NMS 从图中去掉**(用 onnxsim 或脚本裁剪为原始 8400×84 输出)，NMS 由 SDK 侧 `run_without_nms`(含 sigmoid + 无效框过滤)完成
+2. bmodel 输入为 `FLOAT32`、无 scale，该无 NMS 模型期望原始 `[0,255]` 像素输入，SDK 端需 `preprocessor.set_normalize(false)`，否则归一化后 logits 全 0 导致检测为 0
+3. `--shapes` 需与模型实际输入一致
+4. `--quantize` 支持 `F16`(默认推荐)/`BF16`/`INT8`(需 cali_table)；`--chip` 支持 `bm1688`/`cv186x`
+
+验证与精度：服务器上 `bmrt_test --bmodel yolo11n_bm1688.bmodel` 可跑通；本仓库实测 yolo11n F16(111.jpg, 阈值0.7) TPU 120 框 vs ORT FP32 118 框，IoU≥0.5 匹配率 98.3%、平均 IoU 0.927。
+
+```c++
+modeldeploy::RuntimeOption option;
+option.use_sophgo_backend(0);
+option.sophgo_option.bmodel_path = "./yolo11n_bm1688.bmodel";
+modeldeploy::vision::detection::UltralyticsDet yolo11_det(option.sophgo_option.bmodel_path, option);
+yolo11_det.get_preprocessor().set_normalize(false);  // [0,255] 输入模型必须关闭归一化
+```
+
+#### 7. 路线图
 
 - [x] 重构`Tensor`支持`CUDA`
 - [x] 添加`ModelDeploy`的`Python`接口
@@ -217,10 +250,10 @@ trtexec --onnx=yolo11n_nms.onnx ^
 - [x] 重构`ImageData`为`MdImage`, 支持常用的预处理比如`BGR->RGB`, `Cast` ,`HWC->CHW`, `Resize`, `Normalize`, `LetterBox`
 - [ ] 添加更多的`cuda`预处理函数
 
-#### 7. 模型配置
-##### 7.1 通用配置
-##### 7.2 模型输入配置
-##### 7.3 模型输出配置
+#### 8. 模型配置
+##### 8.1 通用配置
+##### 8.2 模型输入配置
+##### 8.3 模型输出配置
 
 
 

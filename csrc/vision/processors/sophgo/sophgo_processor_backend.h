@@ -87,11 +87,30 @@ namespace modeldeploy::vision {
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
 
+        // 设备内存融合预处理（零拷贝，参考官方 SOPHON-DEMO）：BMCV 结果直接写入 bmrt_tensor
+        // 分配的输入设备内存（input_mem = bm_device_mem_t*），跳过 D2H/H2D。
+        // out_img: 输出 bm_image*（FP32 RGB_PLANAR，已 attach 到 input_mem，由本函数创建，
+        //          调用方用完需 md_bmcv_image_destroy 释放；其设备内存即 input_mem 由 backend 管理）。
+        // 返回 true 成功（后续调用方直接用 input_mem + shape 调 infer_device 推理）
+        bool fused_preprocess_device(const ImageData& image, void** out_img, void* input_mem,
+                                     int* dst_w, int* dst_h,
+                                     float origin_x, float origin_y,
+                                     float scale_x, float scale_y,
+                                     const std::vector<float>& alpha,
+                                     const std::vector<float>& beta,
+                                     bool swap_rb, float pad_value);
+
+        // 使用外部 bm_handle（sail::Engine 的 handle），保证 D2D 零拷贝在同一设备上下文。
+        // 替代构造时自行 bm_dev_request 的 handle。
+        void use_external_handle(void* handle);
+
     private:
         int device_id_ = 0;
         // 不透明句柄：实际为 sail::Handle / sail::bmcv（见 .cpp，避免头文件引入 sail）
         void* handle_ = nullptr;
         void* bmcv_ = nullptr;
+        // 是否为外部共享 handle（sail::Engine 的），析构时不释放
+        bool external_handle_ = false;
         // CPU 兜底
         std::unique_ptr<VisionProcessorBackend> cpu_fallback_;
     };

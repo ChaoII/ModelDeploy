@@ -52,14 +52,22 @@ namespace modeldeploy::vision::detection {
             _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
-                const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
-                // yolo 无 NMS 模型的 class 通道为 raw logits，需 sigmoid 转概率
-                const float confidence = 1.0f / (1.0f + std::exp(-(*max_class_score)));
+                // 单类无NMS输出 [B,5,N]（xywh + conf，conf 已概率激活）：直接用 conf，不做 sigmoid
+                float confidence;
+                int32_t label_id;
+                if (dim2 == 5) {
+                    confidence = attr_ptr[4];
+                    label_id = 0;
+                } else {
+                    const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
+                    // yolo 无 NMS 模型的 class 通道为 raw logits，需 sigmoid 转概率
+                    confidence = 1.0f / (1.0f + std::exp(-(*max_class_score)));
+                    label_id = std::distance(attr_ptr + 4, max_class_score);
+                }
                 // filter boxes by conf_threshold
                 if (confidence <= conf_threshold_) {
                     continue;
                 }
-                int32_t label_id = std::distance(attr_ptr + 4, max_class_score);
                 // convert from [xc, yc, w, h] to [x, y, width, height]
                 Rect2f box = {
                     attr_ptr[0] - attr_ptr[2] / 2.0f,

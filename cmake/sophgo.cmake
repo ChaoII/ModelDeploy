@@ -6,6 +6,15 @@ if (NOT DEFINED SOPHGO_SDK_DIR)
     set(SOPHGO_SDK_DIR "$ENV{SOPHGO_SDK_DIR}")
 endif ()
 
+# 优先 libsophon-current（与设备驱动匹配的版本），其次官方 0.5.3（需配套 0.5.3 驱动）
+set(SOPHON_LIBSOPHON_SEARCH_HINTS "/opt/sophon/libsophon-current" "/opt/sophon/libsophon-0.5.3")
+set(SOPHON_LIBSOPHON_LIB_SEARCH_HINTS "")
+foreach (_h ${SOPHON_LIBSOPHON_SEARCH_HINTS})
+    if (EXISTS "${_h}/lib")
+        list(APPEND SOPHON_LIBSOPHON_LIB_SEARCH_HINTS "${_h}/lib")
+    endif ()
+endforeach ()
+
 set(SOPHGO_FOUND OFF)
 
 if (SOPHGO_SDK_DIR)
@@ -21,16 +30,16 @@ if (SOPHGO_SDK_DIR)
         include_directories(${SOPHON_SAIL_INCLUDE_DIR})
         # sail 头文件依赖 libsophon（bmlib_runtime.h / bmruntime_interface.h）
         find_path(SOPHON_LIBSOPHON_INCLUDE_DIR bmlib_runtime.h
-            HINTS "${SOPHGO_SDK_DIR}" "/opt/sophon" "/opt/sophon/libsophon-current"
+            HINTS "${SOPHON_LIBSOPHON_SEARCH_HINTS}" "${SOPHGO_SDK_DIR}" "/opt/sophon"
             PATH_SUFFIXES include libsophon-current/include ../include)
         if (SOPHON_LIBSOPHON_INCLUDE_DIR)
             include_directories(${SOPHON_LIBSOPHON_INCLUDE_DIR})
             message(STATUS "libsophon include: ${SOPHON_LIBSOPHON_INCLUDE_DIR}")
         endif ()
-        # sail 依赖 sophon bmrt/libbmcv/libbmlib，链接时一并带上
-        find_library(SOPHON_BMRT_LIB NAMES bmrt HINTS "${SOPHGO_SDK_DIR}" PATH_SUFFIXES lib ../lib)
-        find_library(SOPHON_BMCV_LIB NAMES bmcv HINTS "${SOPHGO_SDK_DIR}" PATH_SUFFIXES lib ../lib)
-        find_library(SOPHON_BMLIB_LIB NAMES bmlib HINTS "${SOPHGO_SDK_DIR}" PATH_SUFFIXES lib ../lib)
+        # sail 依赖 sophon bmrt/libbmcv/libbmlib，链接时一并带上（从 libsophon 目录查找）
+        find_library(SOPHON_BMRT_LIB NAMES bmrt HINTS ${SOPHON_LIBSOPHON_LIB_SEARCH_HINTS} "${SOPHGO_SDK_DIR}" PATH_SUFFIXES lib ../lib)
+        find_library(SOPHON_BMCV_LIB NAMES bmcv HINTS ${SOPHON_LIBSOPHON_LIB_SEARCH_HINTS} "${SOPHGO_SDK_DIR}" PATH_SUFFIXES lib ../lib)
+        find_library(SOPHON_BMLIB_LIB NAMES bmlib HINTS ${SOPHON_LIBSOPHON_LIB_SEARCH_HINTS} "${SOPHGO_SDK_DIR}" PATH_SUFFIXES lib ../lib)
         set(SOPHGO_LIBS ${SOPHON_SAIL_LIB})
         if (SOPHON_BMRT_LIB)
             list(APPEND SOPHGO_LIBS ${SOPHON_BMRT_LIB})
