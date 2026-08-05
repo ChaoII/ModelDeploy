@@ -82,17 +82,3 @@ if (NOT OpenCV_FOUND)
     message(FATAL_ERROR "build BUILD_VISION depends on opencv,please specifier OpenCV_DIR")
 endif ()
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
-
-# OpenCV 5 静态库包含 oneTBB 并行后端（parallel_tbb.cpp.o），链接期需要 libtbb 提供其符号。
-# 动态 OpenCV 由系统运行时提供 TBB，无需显式链接。仅静态 OpenCV 5 需要补链。
-if (OpenCV_VERSION VERSION_GREATER_EQUAL "5.0")
-    if (OpenCV_STATIC OR (DEFINED OpenCV_SHARED AND NOT OpenCV_SHARED))
-        find_package(TBB QUIET)
-        if (TBB_FOUND)
-            list(APPEND DEPENDS TBB::tbb)
-            message(STATUS "OpenCV 5 static: linking oneTBB (${TBB_VERSION})")
-        else ()
-            message(WARNING "OpenCV 5 static requires oneTBB symbols; TBB not found, link may fail")
-        endif ()
-    endif ()
-endif ()

@@ -3,11 +3,11 @@
 //
 
 
-#include <execution>
 #include "vision/utils.h"
 #include "core/md_log.h"
 #include "vision/common/processors/pad.h"
 #include "vision/common/processors/resize.h"
+#include <numeric>
 
 namespace modeldeploy::vision::utils {
     LetterBoxRecord cal_letter_box_param(const std::vector<int>& src_size, const std::vector<int>& dst_size) {
@@ -497,7 +497,9 @@ namespace modeldeploy::vision::utils {
 
     std::vector<float> compute_sqrt(const std::vector<float>& vec) {
         std::vector<float> result(vec.size());
-        std::transform(std::execution::par, vec.begin(), vec.end(), result.begin(),
+        // 普通串行 transform：sqrt 是逐元素内存带宽受限操作，std::execution::par (GCC PSTL)
+        // 依赖 oneTBB，且并行几乎无收益（与内存带宽瓶颈同理）。串行避免引入 TBB 链接依赖。
+        std::transform(vec.begin(), vec.end(), result.begin(),
                        [](const float x) {
                            return std::sqrt(x);
                        });
