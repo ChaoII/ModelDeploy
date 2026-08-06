@@ -537,6 +537,7 @@ namespace modeldeploy {
         shape_ = shape,
             dtype_ = dtype,
             element_size_ = get_element_size(dtype);
+        device_ = device;
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         if (deleter) {

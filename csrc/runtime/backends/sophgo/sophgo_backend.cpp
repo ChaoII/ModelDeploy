@@ -1,8 +1,9 @@
 //
 // Created by aichao on 2025/8/2.
 // Sophgo 算能 TPU 推理后端：libsophon bmrt 直接推理（替代 sail）。
-// 用 bmrt 是为了支持设备内存（bm_device_mem_t）输入零拷贝推理（infer_device），
-// 配合 SophgoProcessorBackend 的 BMCV 设备预处理，跳过 CPU 往返拷贝。
+// 零拷贝：BMCV 预处理结果写入 bmrt_tensor 分配的输入设备内存，调用方用
+// Tensor::from_external_memory(..., Device::TPU) 包装后走统一 infer()，
+// infer() 识别 TPU 输入跳过 s2d 直接 launch，配合 BMCV 设备预处理，跳过 CPU 往返拷贝。
 //
 
 #include "core/md_log.h"
@@ -153,11 +154,6 @@ namespace {
         }
         bm_device_mem_t* ins = static_cast<bm_device_mem_t*>(cached_in_mems_);
         bm_device_mem_t* outs = static_cast<bm_device_mem_t*>(cached_out_mems_);
-        for (size_t i = 0; i < ni; ++i) {
-            in_t[i].device_mem = ins[i];
-            in_t[i].dtype = info->input_dtypes[i];
-            in_t[i].shape = info->stages[0].input_shapes[i];
-        }
         for (size_t i = 0; i < no; ++i) {
             out_t[i].device_mem = outs[i];
             out_t[i].dtype = info->output_dtypes[i];
@@ -165,9 +161,25 @@ namespace {
         }
 
         for (size_t i = 0; i < ni; ++i) {
-            if (bm_memcpy_s2d(h, in_t[i].device_mem, inputs[i].data()) != BM_SUCCESS) {
-                MD_LOG_ERROR << "[SophgoBackend] bm_memcpy_s2d(input) failed." << std::endl;
-                return false;
+            in_t[i].dtype = info->input_dtypes[i];
+            in_t[i].shape = info->stages[0].input_shapes[i];
+            if (inputs[i].device() == Device::TPU && !inputs[i].get_owns_data()) {
+                // 零拷贝输入：Tensor 持有 BMCV 写入的设备内存（bm_device_mem_t*），
+                // 直接作为输入内存 launch，跳过 s2d 上传。
+                const bm_device_mem_t* dev =
+                    static_cast<const bm_device_mem_t*>(inputs[i].data());
+                if (!dev) {
+                    MD_LOG_ERROR << "[SophgoBackend] TPU input tensor data is null." << std::endl;
+                    return false;
+                }
+                in_t[i].device_mem = *dev;
+            } else {
+                // 常规路径：上传到缓存的输入设备内存
+                in_t[i].device_mem = ins[i];
+                if (bm_memcpy_s2d(h, in_t[i].device_mem, inputs[i].data()) != BM_SUCCESS) {
+                    MD_LOG_ERROR << "[SophgoBackend] bm_memcpy_s2d(input) failed." << std::endl;
+                    return false;
+                }
             }
         }
 
@@ -180,62 +192,13 @@ namespace {
         bm_thread_sync(h);
 
         outputs->resize(no);
-        for (size_t i = 0; i < no; ++i) {
-            // 输出 shape/dtype 以 bmodel 静态信息为准（bmrt_launch_tensor 可能改写 out_t[i]）
-            const auto os = info->stages[0].output_shapes[i];
-            std::vector<int64_t> shape64(os.dims, os.dims + os.num_dims);
-            outputs_desc_[i].dtype = bm_dtype_to_md(info->output_dtypes[i]);
-            (*outputs)[i].allocate(shape64, outputs_desc_[i].dtype, Device::CPU, outputs_desc_[i].name);
-            if (bm_memcpy_d2s(h, (*outputs)[i].data(), out_t[i].device_mem) != BM_SUCCESS) {
-                MD_LOG_ERROR << "[SophgoBackend] bm_memcpy_d2s(output) failed." << std::endl;
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool SophgoBackend::infer_device(void* device_input, const std::vector<int64_t>& shape,
-                                     std::vector<Tensor>* outputs) {
-        if (!initialized_ || !bmrt_ || !net_info_ || !device_input) return false;
-        bm_handle_t h = static_cast<bm_handle_t>(handle_);
-        const bm_net_info_t* info = static_cast<const bm_net_info_t*>(net_info_);
-        const size_t no = outputs_desc_.size();
-
-        // 零拷贝输入：device_input 为 BMCV 预处理 attach 写入的输入设备内存（bmrt_tensor 分配）
-        bm_shape_t shp;
-        std::vector<int> dims_int(shape.begin(), shape.end());
-        bmrt_shape(&shp, dims_int.data(), static_cast<int>(dims_int.size()));
-        bm_tensor_t in_t;
-        bmrt_tensor_with_device(&in_t, *static_cast<bm_device_mem_t*>(device_input),
-                                info->input_dtypes[0], shp);
-
-        std::vector<bm_tensor_t> out_t(no);
-        // 使用缓存的输出设备内存（避免每帧 bm_free_device_mem 导致 bmrt 状态异常/段错误）
-        if (!io_cached_ || !cached_out_mems_) {
-            if (!ensure_io_cache()) return false;
-        }
-        bm_device_mem_t* outs = static_cast<bm_device_mem_t*>(cached_out_mems_);
-        for (size_t i = 0; i < no; ++i) {
-            out_t[i].device_mem = outs[i];
-            out_t[i].dtype = info->output_dtypes[i];
-            out_t[i].shape = info->stages[0].output_shapes[i];
-        }
-        if (!bmrt_launch_tensor_ex(bmrt_, graph_name_.c_str(), &in_t, 1,
-                                   out_t.data(), static_cast<int>(no),
-                                   /*user_mem*/true, /*user_stmode*/false)) {
-            MD_LOG_ERROR << "[SophgoBackend] bmrt_launch_tensor(device) failed." << std::endl;
-            return false;
-        }
-        bm_thread_sync(h);
-
-        outputs->resize(no);
         // SOC 模式用 mmap 零拷贝读输出，PCIe 用 d2s 拷贝
         const bm_misc_info* mi = static_cast<const bm_misc_info*>(misc_info_);
         const bool is_soc = mi && mi->pcie_soc_mode == 1;
         for (size_t i = 0; i < no; ++i) {
-            // 输出 shape/dtype 以 bmodel 静态信息为准（bmrt_launch_tensor 会改写 out_t 的 shape 为非法值）
+            // 输出 shape/dtype 以 bmodel 静态信息为准（bmrt_launch_tensor 可能改写 out_t[i]）
             const auto os = info->stages[0].output_shapes[i];
-            const std::vector<int64_t> shape64(os.dims, os.dims + os.num_dims);
+            std::vector<int64_t> shape64(os.dims, os.dims + os.num_dims);
             outputs_desc_[i].dtype = bm_dtype_to_md(info->output_dtypes[i]);
             (*outputs)[i].allocate(shape64, outputs_desc_[i].dtype, Device::CPU, outputs_desc_[i].name);
             if (is_soc && out_t[i].dtype == BM_FLOAT32) {
@@ -265,14 +228,6 @@ namespace {
             if (!ensure_io_cache()) return nullptr;
         }
         return cached_in_mems_;
-    }
-
-    void* SophgoBackend::get_output_device_mem() {
-        if (!initialized_ || !bmrt_ || !net_info_) return nullptr;
-        if (!io_cached_ || !cached_out_mems_) {
-            if (!ensure_io_cache()) return nullptr;
-        }
-        return cached_out_mems_;
     }
 
     bool SophgoBackend::ensure_io_cache() {
@@ -354,9 +309,7 @@ namespace modeldeploy {
         return false;
     }
     bool SophgoBackend::infer(std::vector<Tensor>&, std::vector<Tensor>*) { return false; }
-    bool SophgoBackend::infer_device(void*, const std::vector<int64_t>&, std::vector<Tensor>*) { return false; }
     void* SophgoBackend::get_input_device_mem() { return nullptr; }
-    void* SophgoBackend::get_output_device_mem() { return nullptr; }
     void* SophgoBackend::get_bm_handle() { return nullptr; }
     std::unique_ptr<BaseBackend> SophgoBackend::clone(const RuntimeOption&, void*, int) {
         return nullptr;

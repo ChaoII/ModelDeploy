@@ -91,7 +91,7 @@ namespace modeldeploy::vision {
         // 分配的输入设备内存（input_mem = bm_device_mem_t*），跳过 D2H/H2D。
         // out_img: 输出 bm_image*（FP32 RGB_PLANAR，已 attach 到 input_mem，由本函数创建，
         //          调用方用完需 md_bmcv_image_destroy 释放；其设备内存即 input_mem 由 backend 管理）。
-        // 返回 true 成功（后续调用方直接用 input_mem + shape 调 infer_device 推理）
+        // 返回 true 成功（后续调用方把 input_mem + shape 包装为 Device::TPU Tensor 走统一 infer()）
         bool fused_preprocess_device(const ImageData& image, void** out_img, void* input_mem,
                                      int* dst_w, int* dst_h,
                                      float origin_x, float origin_y,

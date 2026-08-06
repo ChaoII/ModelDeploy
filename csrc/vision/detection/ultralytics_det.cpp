@@ -97,7 +97,16 @@ namespace modeldeploy::vision::detection {
                     const std::vector<int64_t> shape = {1, 3, dh, dw};
                     if (timers) timers->infer_timer.start();
                     try {
-                        ok = sop_back->infer_device(input_mem, shape, &reused_output_tensors_);
+                        // BMCV 结果已写入 input_mem（bm_device_mem_t*，bmrt_tensor 分配）。
+                        // 用 from_external_memory 包装为 Device::TPU Tensor（不拷贝、不拥有），
+                        // 统一走 infer()，其识别 TPU 输入跳过 s2d 直接 launch（零拷贝）。
+                        reused_input_tensors_.clear();
+                        reused_input_tensors_.resize(1);
+                        reused_input_tensors_[0].from_external_memory(
+                            input_mem, shape, DataType::FP32,
+                            [](void*) {} /*deleter: 设备内存由 backend 管理*/, Device::TPU,
+                            get_input_info(0).name);
+                        ok = infer(reused_input_tensors_, &reused_output_tensors_);
                     } catch (const std::exception& e) {
                         MD_LOG_ERROR << "Sophgo zero-copy infer threw: " << e.what() << std::endl;
                         ok = false;

@@ -19,22 +19,12 @@ namespace modeldeploy {
 
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
-        // 设备内存输入直通推理（DEVIO 零拷贝）：device_input 为 bm_device_mem_t*，
-        // 由 SophgoProcessorBackend 的 BMCV 预处理产生（数据留在 TPU 设备内存），
-        // 跳过 SYSIO 的 D2H 读回 + 推理 H2D 上传。
-        // 输入设备内存须为 bmrt_tensor 分配（见 get_input_device_mem），BMCV 预处理
-        // attach 到该内存后推理，避免 bm_image 自有内存被 launch 直接引用导致 TPU hang。
-        bool infer_device(void* device_input, const std::vector<int64_t>& shape,
-                          std::vector<Tensor>* outputs);
-
         // 返回缓存的输入设备内存（bm_device_mem_t*，bmrt_tensor 分配并缓存复用），
         // 供 SophgoProcessorBackend 的 BMCV 预处理 attach 写入（零拷贝输入）。
         // 未初始化时为 nullptr；首次调用 lazily 分配。生命周期由 backend 管理。
+        // 零拷贝输入经 Tensor::from_external_memory(..., Device::TPU) 包装后走统一 infer()，
+        // infer() 识别 Device::TPU 输入跳过 s2d 上传直接 launch。
         void* get_input_device_mem();
-
-        // 返回缓存的输出设备内存（bm_device_mem_t*，bmrt_tensor 分配并缓存复用），
-        // 供 SOC mmap 零拷贝读取。未初始化时为 nullptr；首次调用 lazily 分配。
-        void* get_output_device_mem();
 
         // 返回 bmrt 内部 bm_handle_t（供 SophgoProcessorBackend 共享，D2D 零拷贝需要同一 handle）
         [[nodiscard]] void* get_bm_handle();
