@@ -3,6 +3,7 @@
 //
 
 #include <numeric> // 需要包含此头文件
+#include <algorithm>
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/iseg/postprocessor.h"
@@ -137,16 +138,36 @@ namespace modeldeploy::vision::detection {
                 // 使用更高效的sigmoid实现
                 cv::exp(-mask_channels[i], dest);
                 dest = 1.0 / (1.0 + dest);
-                // crop mask for feature map
+                // crop mask for feature map（去掉 letterbox padding）
+                const int feat_w = static_cast<int>(tensors[1].shape()[3]);
+                const int feat_h = static_cast<int>(tensors[1].shape()[2]);
                 int _x1 = static_cast<int>(pad_w_mask);
                 int _y1 = static_cast<int>(pad_h_mask);
-                int _x2 = static_cast<int>(tensors[1].shape()[3] - pad_w_mask);
-                int _y2 = static_cast<int>(tensors[1].shape()[2] - pad_h_mask);
-                cv::Rect roi(_x1, _y1, _x2 - _x1, _y2 - _y1);
-                dest = dest(roi);
-                cv::resize(dest, mask, cv::Size2f{ipt_w, ipt_h}, 0, 0, cv::INTER_LINEAR);
-                mask = mask(utils::rect2f_to_cv_type(box));
-                mask = mask > mask_threshold_;
+                int _x2 = static_cast<int>(feat_w - pad_w_mask);
+                int _y2 = static_cast<int>(feat_h - pad_h_mask);
+                // 特征图有效区 [pad, feat-pad] 对应原图 [0, ipt_w]x[0, ipt_h]
+                // 把 box（原图坐标）映射回特征图坐标，只对 box 区域 resize 到 box 尺寸，
+                // 避免整图 resize 到 ipt 尺寸（慢 50-100 倍）
+                const float fw = static_cast<float>(_x2 - _x1);
+                const float fh = static_cast<float>(_y2 - _y1);
+                const float bx1 = std::clamp(box.x, 0.0f, ipt_w);
+                const float by1 = std::clamp(box.y, 0.0f, ipt_h);
+                const float bx2 = std::clamp(box.x + box.width, 0.0f, ipt_w);
+                const float by2 = std::clamp(box.y + box.height, 0.0f, ipt_h);
+                const int mx1 = static_cast<int>(_x1 + bx1 / ipt_w * fw);
+                const int my1 = static_cast<int>(_y1 + by1 / ipt_h * fh);
+                const int mx2 = static_cast<int>(_x1 + bx2 / ipt_w * fw);
+                const int my2 = static_cast<int>(_y1 + by2 / ipt_h * fh);
+                if (mx2 > mx1 && my2 > my1) {
+                    cv::Rect box_roi(mx1, my1, mx2 - mx1, my2 - my1);
+                    cv::resize(dest(box_roi), mask,
+                               cv::Size(static_cast<int>(box.width), static_cast<int>(box.height)),
+                               0, 0, cv::INTER_LINEAR);
+                    mask = mask > mask_threshold_;
+                } else {
+                    mask = cv::Mat::zeros(static_cast<int>(box.height),
+                                          static_cast<int>(box.width), CV_8UC1);
+                }
                 // save mask in DetectionResult
                 int keep_mask_h = static_cast<int>(box.height);
                 int keep_mask_w = static_cast<int>(box.width);
@@ -282,16 +303,36 @@ namespace modeldeploy::vision::detection {
                 // 使用更高效的sigmoid实现
                 cv::exp(-mask_channels[i], dest);
                 dest = 1.0 / (1.0 + dest);
-                // crop mask for feature map
+                // crop mask for feature map（去掉 letterbox padding）
+                const int feat_w = static_cast<int>(tensors[1].shape()[3]);
+                const int feat_h = static_cast<int>(tensors[1].shape()[2]);
                 int _x1 = static_cast<int>(pad_w_mask);
                 int _y1 = static_cast<int>(pad_h_mask);
-                int _x2 = static_cast<int>(tensors[1].shape()[3] - pad_w_mask);
-                int _y2 = static_cast<int>(tensors[1].shape()[2] - pad_h_mask);
-                cv::Rect roi(_x1, _y1, _x2 - _x1, _y2 - _y1);
-                dest = dest(roi);
-                cv::resize(dest, mask, cv::Size2f{ipt_w, ipt_h}, 0, 0, cv::INTER_LINEAR);
-                mask = mask(utils::rect2f_to_cv_type(box));
-                mask = mask > mask_threshold_;
+                int _x2 = static_cast<int>(feat_w - pad_w_mask);
+                int _y2 = static_cast<int>(feat_h - pad_h_mask);
+                // 特征图有效区 [pad, feat-pad] 对应原图 [0, ipt_w]x[0, ipt_h]
+                // 把 box（原图坐标）映射回特征图坐标，只对 box 区域 resize 到 box 尺寸，
+                // 避免整图 resize 到 ipt 尺寸（慢 50-100 倍）
+                const float fw = static_cast<float>(_x2 - _x1);
+                const float fh = static_cast<float>(_y2 - _y1);
+                const float bx1 = std::clamp(box.x, 0.0f, ipt_w);
+                const float by1 = std::clamp(box.y, 0.0f, ipt_h);
+                const float bx2 = std::clamp(box.x + box.width, 0.0f, ipt_w);
+                const float by2 = std::clamp(box.y + box.height, 0.0f, ipt_h);
+                const int mx1 = static_cast<int>(_x1 + bx1 / ipt_w * fw);
+                const int my1 = static_cast<int>(_y1 + by1 / ipt_h * fh);
+                const int mx2 = static_cast<int>(_x1 + bx2 / ipt_w * fw);
+                const int my2 = static_cast<int>(_y1 + by2 / ipt_h * fh);
+                if (mx2 > mx1 && my2 > my1) {
+                    cv::Rect box_roi(mx1, my1, mx2 - mx1, my2 - my1);
+                    cv::resize(dest(box_roi), mask,
+                               cv::Size(static_cast<int>(box.width), static_cast<int>(box.height)),
+                               0, 0, cv::INTER_LINEAR);
+                    mask = mask > mask_threshold_;
+                } else {
+                    mask = cv::Mat::zeros(static_cast<int>(box.height),
+                                          static_cast<int>(box.width), CV_8UC1);
+                }
                 // save mask in DetectionResult
                 int keep_mask_h = static_cast<int>(box.height);
                 int keep_mask_w = static_cast<int>(box.width);
