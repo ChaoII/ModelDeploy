@@ -152,6 +152,7 @@ namespace modeldeploy {
         memory_ = std::make_shared<MemoryBlock>(total_size, device);
         data_ptr_ = memory_->data();
         calculate_strides();
+        refresh_cache();
     }
 
     Tensor::Tensor(void* data,
@@ -182,80 +183,7 @@ namespace modeldeploy {
         }
         data_ptr_ = memory_->data();
         calculate_strides();
-    }
-
-    Tensor::Tensor(const Tensor& other): name_(other.name_),
-                                         shape_(other.shape_),
-                                         strides_(other.strides_),
-                                         dtype_(other.dtype_),
-                                         device_(other.device_),
-                                         element_size_(other.element_size_) {
-        if (other.owns_data_) {
-            // 如果原始张量拥有数据，需要复制数据
-            memory_ = std::make_shared<MemoryBlock>(other.data_ptr_, other.byte_size(), other.device_);
-            data_ptr_ = memory_->data();
-            owns_data_ = true;
-        }
-        else {
-            // 如果原始张量不拥有数据，我们共享同一个内存块
-            memory_ = other.memory_;
-            data_ptr_ = other.data_ptr_;
-            owns_data_ = false;
-        }
-    }
-
-    Tensor::Tensor(Tensor&& other) noexcept: name_(std::move(other.name_)),
-                                             shape_(std::move(other.shape_)),
-                                             strides_(std::move(other.strides_)),
-                                             dtype_(other.dtype_),
-                                             memory_(std::move(other.memory_)),
-                                             device_(other.device_),
-                                             element_size_(other.element_size_),
-                                             data_ptr_(other.data_ptr_),
-                                             owns_data_(other.owns_data_) {
-        other.data_ptr_ = nullptr;
-        other.owns_data_ = false;
-    }
-
-    Tensor& Tensor::operator=(const Tensor& other) {
-        if (this != &other) {
-            name_ = other.name_;
-            shape_ = other.shape_;
-            strides_ = other.strides_;
-            dtype_ = other.dtype_;
-            element_size_ = other.element_size_;
-            device_ = other.device_;
-            if (other.owns_data_) {
-                // 如果原始张量拥有数据，需要复制数据
-                memory_ = std::make_shared<MemoryBlock>(other.data_ptr_, other.byte_size(), other.device_);
-                data_ptr_ = memory_->data();
-                owns_data_ = true;
-            }
-            else {
-                // 共享内存
-                memory_ = other.memory_;
-                data_ptr_ = other.data_ptr_;
-                owns_data_ = false;
-            }
-        }
-        return *this;
-    }
-
-    Tensor& Tensor::operator=(Tensor&& other) noexcept {
-        if (this != &other) {
-            name_ = std::move(other.name_);
-            shape_ = std::move(other.shape_);
-            strides_ = std::move(other.strides_);
-            dtype_ = other.dtype_;
-            element_size_ = other.element_size_;
-            memory_ = std::move(other.memory_);
-            device_ = other.device_;
-            data_ptr_ = other.data_ptr_;
-            owns_data_ = other.owns_data_;
-            other.data_ptr_ = nullptr;
-            other.owns_data_ = false;
-        }
-        return *this;
+        refresh_cache();
     }
 
     void* Tensor::data() {
@@ -267,12 +195,11 @@ namespace modeldeploy {
     }
 
     size_t Tensor::size() const {
-        return std::accumulate(shape_.begin(), shape_.end(),
-                               1LL, std::multiplies());
+        return numel_;
     }
 
     size_t Tensor::byte_size() const {
-        return size() * element_size_;
+        return total_bytes_;
     }
 
     const std::vector<int64_t>& Tensor::shape() const {
@@ -378,11 +305,12 @@ namespace modeldeploy {
         }
     }
 
-    TensorView Tensor::view() const {
-        return TensorView(*this);
+    Tensor Tensor::view() const {
+        // 视图 = 与 *this 共享 memory_ 的 Tensor（浅拷贝）
+        return *this;
     }
 
-    TensorView Tensor::reshape(const std::vector<int64_t>& new_shape) const {
+    Tensor Tensor::reshape(const std::vector<int64_t>& new_shape) const {
         // 验证新形状是否与当前元素数量匹配
         const size_t new_size = std::accumulate(new_shape.begin(), new_shape.end(),
                                                 1LL, std::multiplies());
@@ -392,6 +320,10 @@ namespace modeldeploy {
                 << new_size << ", tensor size: " << size();
             throw std::runtime_error(oss.str());
         }
+        // 仅连续内存可安全 reshape（非连续需先 contiguous）
+        if (!is_contiguous()) {
+            throw std::runtime_error("Cannot reshape a non-contiguous tensor, call contiguous() first");
+        }
         std::vector<int64_t> new_strides(new_shape.size());
         if (!new_strides.empty()) {
             new_strides.back() = 1;
@@ -399,10 +331,15 @@ namespace modeldeploy {
                 new_strides[i] = new_strides[i + 1] * new_shape[i + 1];
             }
         }
-        return TensorView{*this, new_shape, new_strides, data_ptr_};
+        Tensor result = *this; // 浅拷贝，共享 memory_
+        result.shape_ = new_shape;
+        result.strides_ = new_strides;
+        result.data_ptr_ = data_ptr_;
+        result.refresh_cache();
+        return result;
     }
 
-    TensorView Tensor::transpose(const std::vector<int64_t>& axes) const {
+    Tensor Tensor::transpose(const std::vector<int64_t>& axes) const {
         if (axes.size() != shape_.size()) {
             std::ostringstream oss;
             oss << "Error: Number of axes doesn't match tensor rank, "
@@ -425,17 +362,22 @@ namespace modeldeploy {
             }
             used[axe] = true;
         }
-        // 创建新的形状和步长
+        // 创建新的形状和步长（仅重排，数据内存不变）
         std::vector<int64_t> new_shape(shape_.size());
         std::vector<int64_t> new_strides(shape_.size());
         for (size_t i = 0; i < axes.size(); ++i) {
             new_shape[i] = shape_[axes[i]];
             new_strides[i] = strides_[axes[i]];
         }
-        return TensorView{*this, new_shape, new_strides, data_ptr_};
+        Tensor result = *this; // 浅拷贝，共享 memory_
+        result.shape_ = new_shape;
+        result.strides_ = new_strides;
+        result.data_ptr_ = data_ptr_;
+        result.refresh_cache();
+        return result;
     }
 
-    TensorView Tensor::slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const {
+    Tensor Tensor::slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const {
         if (starts.size() != shape_.size() || ends.size() != shape_.size()) {
             std::ostringstream oss;
             oss << "Error: Number of axes doesn't match tensor rank, starts size = "
@@ -455,17 +397,81 @@ namespace modeldeploy {
             }
             new_shape[i] = ends[i] - starts[i];
         }
-        // 计算新的起始数据指针
+        // 计算新的起始数据指针（按 strides 偏移）
         size_t offset = 0;
         for (size_t i = 0; i < shape_.size(); ++i) {
             offset += starts[i] * strides_[i];
         }
         char* new_data_ptr = static_cast<char*>(data_ptr_) + offset * element_size_;
-        return TensorView{*this, new_shape, strides_, new_data_ptr};
+        Tensor result = *this; // 浅拷贝，共享 memory_
+        result.shape_ = new_shape;
+        result.strides_ = strides_;
+        result.data_ptr_ = new_data_ptr;
+        result.refresh_cache();
+        return result;
     }
 
-    Tensor Tensor::materialize() const {
-        return *this;
+    bool Tensor::is_contiguous() const {
+        // 行优先连续：strides 从后往前依次为 1, shape[-1], shape[-1]*shape[-2], ...
+        int64_t expected_stride = 1;
+        for (int i = static_cast<int>(shape_.size()) - 1; i >= 0; --i) {
+            if (strides_[i] != expected_stride) {
+                return false;
+            }
+            expected_stride *= shape_[i];
+        }
+        return true;
+    }
+
+    Tensor Tensor::contiguous() const {
+        if (is_contiguous()) {
+            return *this;
+        }
+        // 非连续：按行优先复制为连续内存
+        Tensor result(shape_, dtype_, device_, name_);
+        const size_t elem = element_size_;
+        // 对 transpose([0,2,1]) 这类常见情况，最内维仍连续，可批量 memcpy
+        // 通用实现：迭代最内维（最后两维之间可能不连续，退化为逐元素）
+        std::vector<int64_t> indices(shape_.size(), 0);
+        char* dst = static_cast<char*>(result.data());
+        // 判断最内维是否连续（stride 为 1 即可整行拷贝）
+        const bool last_contiguous = (strides_.back() == 1);
+        if (last_contiguous) {
+            const size_t last_dim = static_cast<size_t>(shape_.back());
+            const size_t row_bytes = last_dim * elem;
+            // 迭代除最后一维外的所有索引，整行 memcpy
+            std::function<void(size_t)> copy_rows = [&](size_t dim) {
+                if (dim == shape_.size() - 1) {
+                    size_t src_offset = 0;
+                    for (size_t i = 0; i < indices.size(); ++i) src_offset += indices[i] * strides_[i];
+                    const char* src = static_cast<char*>(data_ptr_) + src_offset * elem;
+                    std::memcpy(dst, src, row_bytes);
+                    dst += row_bytes;
+                    return;
+                }
+                for (indices[dim] = 0; indices[dim] < shape_[dim]; ++indices[dim]) {
+                    copy_rows(dim + 1);
+                }
+            };
+            copy_rows(0);
+        } else {
+            // 全非连续：逐元素复制
+            std::function<void(size_t)> copy_elems = [&](size_t dim) {
+                if (dim == shape_.size()) {
+                    size_t src_offset = 0;
+                    for (size_t i = 0; i < indices.size(); ++i) src_offset += indices[i] * strides_[i];
+                    const char* src = static_cast<char*>(data_ptr_) + src_offset * elem;
+                    std::memcpy(dst, src, elem);
+                    dst += elem;
+                    return;
+                }
+                for (indices[dim] = 0; indices[dim] < shape_[dim]; ++indices[dim]) {
+                    copy_elems(dim + 1);
+                }
+            };
+            copy_elems(0);
+        }
+        return result;
     }
 
     Tensor Tensor::clone() const {
@@ -490,8 +496,9 @@ namespace modeldeploy {
         element_size_ = get_element_size(dtype);
         // 重新计算步长
         calculate_strides();
+        refresh_cache();
         // 计算新的总大小
-        size_t new_size = calculate_total_size();
+        size_t new_size = total_bytes_;
         // 如果数据类型和大小都没变，不需要重新分配
         if (old_dtype == dtype && old_total_size == new_size) {
             return;
@@ -520,7 +527,8 @@ namespace modeldeploy {
         element_size_ = get_element_size(dtype);
         device_ = device;
         calculate_strides();
-        const size_t total_size = calculate_total_size();
+        refresh_cache();
+        const size_t total_size = total_bytes_;
         if (reuseable && memory_ && memory_->size() == total_size) {
             data_ptr_ = memory_->data();
             owns_data_ = true;
@@ -552,6 +560,7 @@ namespace modeldeploy {
         }
         data_ptr_ = memory_->data();
         calculate_strides();
+        refresh_cache();
     }
 
     bool Tensor::copy_from_extern_memory(void* data, const size_t byte_size, const Device extern_device) {
@@ -830,6 +839,7 @@ namespace modeldeploy {
         }
         shape_.insert(shape_.begin() + axis, 1);
         calculate_strides();
+        refresh_cache();
     }
 
     bool Tensor::is_same_shape(const Tensor& other) const {
@@ -877,8 +887,14 @@ namespace modeldeploy {
     }
 
     size_t Tensor::calculate_total_size() const {
+        // 直接计算（不依赖缓存），供分配内存等场景使用
         return std::accumulate(shape_.begin(), shape_.end(),
                                1LL, std::multiplies()) * element_size_;
+    }
+
+    void Tensor::refresh_cache() {
+        numel_ = std::accumulate(shape_.begin(), shape_.end(), 1LL, std::multiplies());
+        total_bytes_ = numel_ * element_size_;
     }
 
     // 计算轴之前的维度乘积
@@ -891,205 +907,11 @@ namespace modeldeploy {
     }
 
 
-    // TensorView实现
-    TensorView::TensorView(const Tensor& tensor)
-        : base_tensor_(std::make_shared<const Tensor>(tensor)),
-          shape_(tensor.shape_),
-          strides_(tensor.strides_),
-          data_ptr_(tensor.data_ptr_) {
-    }
-
-    TensorView::TensorView(const Tensor& tensor,
-                           const std::vector<int64_t>& shape,
-                           const std::vector<int64_t>& strides,
-                           void* data_ptr)
-        : base_tensor_(std::make_shared<const Tensor>(tensor)),
-          shape_(shape),
-          strides_(strides),
-          data_ptr_(data_ptr) {
-    }
-
-    size_t TensorView::size() const {
-        return std::accumulate(shape_.begin(), shape_.end(),
-                               1LL, std::multiplies());
-    }
-
-    size_t TensorView::byte_size() const {
-        return size() * get_element_size();
-    }
-
-    size_t TensorView::get_element_size() const {
-        return base_tensor_->element_size_;
-    }
-
-    Tensor TensorView::to_tensor() const {
-        // 创建新的张量，复制视图中的数据
-        Tensor result(shape_, base_tensor_->dtype(), Device::CPU, base_tensor_->get_name() + "_from_view");
-        // 如果数据在内存中是连续的，可以一次性复制
-        if (is_contiguous()) {
-            std::memcpy(result.data(), data_ptr_, byte_size());
-            return result;
-        }
-        // 否则需要逐元素复制
-        const size_t element_size = get_element_size();
-        std::vector<int64_t> indices(shape_.size(), 0);
-        std::function<void(size_t)> copy_recursively = [&](const size_t dim) {
-            if (dim == shape_.size()) {
-                // 计算源偏移量
-                size_t src_offset = 0;
-                for (size_t i = 0; i < indices.size(); ++i) {
-                    src_offset += indices[i] * strides_[i];
-                }
-                src_offset *= element_size;
-                // 计算目标偏移量
-                size_t dest_offset = 0;
-                size_t dest_stride = 1;
-                for (int i = static_cast<int>(shape_.size()) - 1; i >= 0; --i) {
-                    dest_offset += indices[i] * dest_stride;
-                    dest_stride *= shape_[i];
-                }
-                dest_offset *= element_size;
-                // 复制单个元素
-                std::memcpy(
-                    static_cast<char*>(result.data()) + dest_offset,
-                    static_cast<char*>(data_ptr_) + src_offset,
-                    element_size
-                );
-                return;
-            }
-            for (indices[dim] = 0; indices[dim] < shape_[dim]; ++indices[dim]) {
-                copy_recursively(dim + 1);
-            }
-        };
-        copy_recursively(0);
-        return result;
-    }
-
-    TensorView TensorView::reshape(const std::vector<int64_t>& new_shape) const {
-        // 验证元素数量是否匹配
-        const size_t new_size = std::accumulate(new_shape.begin(), new_shape.end(),
-                                                1LL, std::multiplies());
-        if (new_size != size()) {
-            throw std::runtime_error("Cannot reshape, total elements count mismatch");
-        }
-        // 如果当前视图是连续的，可以直接创建新形状的视图
-        if (is_contiguous()) {
-            std::vector<int64_t> new_strides(new_shape.size());
-            if (!new_strides.empty()) {
-                new_strides.back() = 1;
-                for (int i = static_cast<int>(new_shape.size()) - 2; i >= 0; --i) {
-                    new_strides[i] = new_strides[i + 1] * new_shape[i + 1];
-                }
-            }
-            return TensorView{*base_tensor_, new_shape, new_strides, data_ptr_};
-        }
-        // 如果不连续，需要先物化然后再创建视图
-        return to_tensor().view().reshape(new_shape);
-    }
-
-    // TensorView::transpose方法的实现
-    TensorView TensorView::transpose(const std::vector<int64_t>& axes) const {
-        if (axes.size() != shape_.size()) {
-            throw std::runtime_error("Number of transpose axes does not match tensor rank");
-        }
-        // 检查轴是否有效
-        std::vector used(shape_.size(), false);
-        for (auto& axe : axes) {
-            if (axe < 0 || axe >= static_cast<int64_t>(shape_.size())) {
-                throw std::runtime_error("Number of axes for transpose does not match view dimensions");
-            }
-            if (used[axe]) {
-                throw std::runtime_error("Duplicate axis in transpose");
-            }
-            used[axe] = true;
-        }
-        // 创建新的形状和步长
-        std::vector<int64_t> new_shape(shape_.size());
-        std::vector<int64_t> new_strides(shape_.size());
-        for (size_t i = 0; i < axes.size(); ++i) {
-            new_shape[i] = shape_[axes[i]];
-            new_strides[i] = strides_[axes[i]];
-        }
-        return TensorView{*base_tensor_, new_shape, new_strides, data_ptr_};
-    }
-
-    TensorView TensorView::slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const {
-        if (starts.size() != shape_.size() || ends.size() != shape_.size()) {
-            throw std::runtime_error("Slice indices must match view dimensions");
-        }
-        // 验证切片范围
-        std::vector<int64_t> new_shape(shape_.size());
-        for (size_t i = 0; i < shape_.size(); ++i) {
-            if (starts[i] < 0 || starts[i] >= shape_[i] || ends[i] > shape_[i] || starts[i] >= ends[i]) {
-                throw std::runtime_error("Invalid slicing bounds");
-            }
-            new_shape[i] = ends[i] - starts[i];
-        }
-        // 计算新的起始数据指针
-        size_t offset = 0;
-        for (size_t i = 0; i < shape_.size(); ++i) {
-            offset += starts[i] * strides_[i];
-        }
-        char* new_data_ptr = static_cast<char*>(data_ptr_) + offset * get_element_size();
-
-        return TensorView{*base_tensor_, new_shape, strides_, static_cast<void*>(new_data_ptr)};
-    }
-
-    bool TensorView::is_contiguous() const {
-        // 检查步长是否表示连续内存
-        int64_t expected_stride = 1;
-        for (int i = static_cast<int>(shape_.size()) - 1; i >= 0; --i) {
-            if (strides_[i] != expected_stride) {
-                return false;
-            }
-            expected_stride *= shape_[i];
-        }
-        return true;
-    }
-
-    template <typename T>
-    T& TensorView::at(const std::vector<int64_t>& indices) {
-        if (indices.size() != shape_.size()) {
-            throw std::runtime_error("Indices rank mismatch");
-        }
-        // 验证索引范围
-        for (size_t i = 0; i < indices.size(); ++i) {
-            if (indices[i] < 0 || indices[i] >= shape_[i]) {
-                throw std::runtime_error("Indices out of range");
-            }
-        }
-        // 计算偏移量
-        size_t offset = 0;
-        for (size_t i = 0; i < indices.size(); ++i) {
-            offset += indices[i] * strides_[i];
-        }
-        return *static_cast<T*>(static_cast<void*>(static_cast<char*>(data_ptr_) + offset * get_element_size()));
-    }
-
-    template <typename T>
-    const T& TensorView::at(const std::vector<int64_t>& indices) const {
-        return const_cast<TensorView*>(this)->at<T>(indices);
-    }
-
-    // 不进行模板特化那么模板的定义必须在头文件中
-    // 显式实例化TensorView的常用类型
-    template float& TensorView::at<float>(const std::vector<int64_t>&);
-    template int32_t& TensorView::at<int32_t>(const std::vector<int64_t>&);
-    template int64_t& TensorView::at<int64_t>(const std::vector<int64_t>&);
-    template uint8_t& TensorView::at<uint8_t>(const std::vector<int64_t>&);
-    template int8_t& TensorView::at<int8_t>(const std::vector<int64_t>&);
-
-    template const float& TensorView::at<float>(const std::vector<int64_t>&) const;
-    template const int32_t& TensorView::at<int32_t>(const std::vector<int64_t>&) const;
-    template const int64_t& TensorView::at<int64_t>(const std::vector<int64_t>&) const;
-    template const uint8_t& TensorView::at<uint8_t>(const std::vector<int64_t>&) const;
-    template const int8_t& TensorView::at<int8_t>(const std::vector<int64_t>&) const;
-
     // 这里添加了Tensor类中的数据操作接口的显式实例化
     template const double* Tensor::data_ptr<double>() const;
     template float* Tensor::data_ptr<float>();
 
-    // 显式实例化TensorView的常用类型
+    // 显式实例化Tensor::at的常用类型
     template float& Tensor::at<float>(const std::vector<int64_t>&);
     template int32_t& Tensor::at<int32_t>(const std::vector<int64_t>&);
     template int64_t& Tensor::at<int64_t>(const std::vector<int64_t>&);

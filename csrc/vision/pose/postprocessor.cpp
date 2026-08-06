@@ -18,7 +18,7 @@ namespace modeldeploy::vision::detection {
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
         //  4(xc,yc,w,h)+1(conf)+17(keypoints)*3(x,y,conf)=56
-        Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
+        Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).contiguous();
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             int64_t keypoints_num_by_output = (tensor_transpose.shape()[2] - 5) / 3;

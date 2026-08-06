@@ -31,6 +31,12 @@ namespace modeldeploy {
         UNKNOWN
     };
 
+    enum class DataLayout {
+        NCHW,
+        NHWC,
+        UNDEFINED
+    };
+
     // 辅助函数实现
     inline std::string datatype_to_string(const DataType dtype) {
         switch (dtype) {
@@ -63,6 +69,15 @@ namespace modeldeploy {
         case Backend::TRT: return "TRT";
         case Backend::SOPHGO: return "SOPHGO";
         case Backend::NONE: return "NONE";
+        default: return "Unknown";
+        }
+    }
+
+    inline std::string data_layout_to_string(const DataLayout layout) {
+        switch (layout) {
+        case DataLayout::NCHW: return "NCHW";
+        case DataLayout::NHWC: return "NHWC";
+        case DataLayout::UNDEFINED: return "UNDEFINED";
         default: return "Unknown";
         }
     }

@@ -19,7 +19,7 @@ namespace modeldeploy::vision::detection {
         std::vector<Tensor>& tensors, std::vector<std::vector<InstanceSegResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         //(1,116,8400)->(1,8400,116)  116=4(xc,yc,w,h)+80(coco 80 classes)+32(mask coefficient)
-        tensors[0] = tensors[0].transpose({0, 2, 1}).to_tensor();
+        tensors[0] = tensors[0].transpose({0, 2, 1}).contiguous();
         auto mask_nums = tensors[1].shape()[1];
         size_t batch = tensors[0].shape()[0];
         results->resize(batch);

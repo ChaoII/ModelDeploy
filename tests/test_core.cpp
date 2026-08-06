@@ -92,15 +92,16 @@ TEST_CASE("Tensor copy constructor", "[core]") {
     auto* da = static_cast<float*>(a.data());
     for (int i = 0; i < 6; ++i) da[i] = static_cast<float>(i);
 
-    Tensor b(a);
+    Tensor b(a);  // 浅拷贝：共享 MemoryBlock
     REQUIRE(b.shape() == a.shape());
     REQUIRE(b.dtype() == a.dtype());
+    REQUIRE(b.data() == a.data());
     auto* db = static_cast<float*>(b.data());
     for (int i = 0; i < 6; ++i) REQUIRE(db[i] == static_cast<float>(i));
 
-    // Modify original — copy should be independent
+    // 浅拷贝共享底层数据，修改对两端可见
     da[0] = 999.0f;
-    REQUIRE(db[0] == 0.0f);
+    REQUIRE(db[0] == 999.0f);
 }
 
 TEST_CASE("Tensor move constructor", "[core]") {
@@ -118,11 +119,11 @@ TEST_CASE("Tensor move constructor", "[core]") {
 TEST_CASE("Tensor copy assignment", "[core]") {
     Tensor a({4, 4}, DataType::FP32);
     Tensor b;
-    b = a;
+    b = a;  // 浅拷贝：共享底层内存
     REQUIRE(b.shape() == a.shape());
     REQUIRE(b.dtype() == a.dtype());
     REQUIRE(b.data() != nullptr);
-    REQUIRE(b.data() != a.data());
+    REQUIRE(b.data() == a.data());
 }
 
 TEST_CASE("Tensor move assignment", "[core]") {
@@ -163,14 +164,15 @@ TEST_CASE("Tensor slice view", "[core]") {
     REQUIRE(v.shape() == std::vector<int64_t>({2, 2}));
 }
 
-TEST_CASE("Tensor view to_tensor", "[core]") {
+TEST_CASE("Tensor transpose contiguous", "[core]") {
     Tensor t({3, 4}, DataType::FP32);
     auto* d = static_cast<float*>(t.data());
     for (int i = 0; i < 12; ++i) d[i] = static_cast<float>(i);
 
     auto v = t.transpose({1, 0});  // now 4x3
-    auto m = v.to_tensor();
+    auto m = v.contiguous();
     REQUIRE(m.shape() == std::vector<int64_t>({4, 3}));
+    REQUIRE(m.is_contiguous());
     REQUIRE(m.at({1, 2}) == 9.0f); // t[2][1] = 2*4+1 = 9
 }
 
@@ -252,9 +254,9 @@ TEST_CASE("Tensor concat", "[core]") {
     REQUIRE(c.at({3, 2}) == 105.0f);
 }
 
-// ============ TensorView tests ============
+// ============ Tensor view (merged from TensorView) tests ============
 
-TEST_CASE("TensorView from tensor", "[core]") {
+TEST_CASE("Tensor view shares memory", "[core]") {
     Tensor t({2, 3, 4}, DataType::FP32);
     auto v = t.view();
     REQUIRE(v.shape() == t.shape());
@@ -262,20 +264,31 @@ TEST_CASE("TensorView from tensor", "[core]") {
     REQUIRE(v.size() == 24);
 }
 
-TEST_CASE("TensorView is_contiguous", "[core]") {
+TEST_CASE("Tensor view is_contiguous", "[core]") {
     Tensor t({3, 4}, DataType::FP32);
     REQUIRE(t.view().is_contiguous());
     auto v = t.transpose({1, 0});
     REQUIRE_FALSE(v.is_contiguous());
 }
 
-TEST_CASE("TensorView to_tensor", "[core]") {
+TEST_CASE("Tensor view contiguous materialize", "[core]") {
     Tensor t({2, 2}, DataType::FP32);
     static_cast<float*>(t.data())[0] = 42.0f;
     auto v = t.view();
-    auto c = v.to_tensor();
+    auto c = v.contiguous();
     REQUIRE(c.at({0, 0}) == 42.0f);
-    REQUIRE(c.data() != t.data());  // to_tensor should materialize
+    REQUIRE(c.data() == t.data());  // contiguous view of contiguous tensor shares memory
+}
+
+TEST_CASE("Tensor copy is shallow", "[core]") {
+    Tensor t({2, 2}, DataType::FP32);
+    static_cast<float*>(t.data())[0] = 7.0f;
+    Tensor c = t;  // 浅拷贝，共享 MemoryBlock
+    REQUIRE(c.data() == t.data());
+    REQUIRE(c.at({0, 0}) == 7.0f);
+    // 修改共享数据，两边都可见
+    static_cast<float*>(t.data())[0] = 9.0f;
+    REQUIRE(c.at({0, 0}) == 9.0f);
 }
 
 // ============ GPU core tests ============

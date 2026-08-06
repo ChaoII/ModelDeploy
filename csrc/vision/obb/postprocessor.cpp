@@ -20,7 +20,7 @@ namespace modeldeploy::vision::detection {
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
         // transpose(1,20,21504)->(1,21504,20) 20 = 4(xc,yc,w,h)+classes_num(15)+1(angle)
-        Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).to_tensor();
+        Tensor tensor_transpose = tensors[0].transpose({0, 2, 1}).contiguous();
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             if (tensor_transpose.dtype() != DataType::FP32) {

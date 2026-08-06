@@ -32,8 +32,6 @@ namespace modeldeploy {
         std::function<void(void*)> deleter_;
     };
 
-    class TensorView;
-
     class MODELDEPLOY_CXX_EXPORT Tensor {
     public:
         // 构造函数
@@ -41,20 +39,22 @@ namespace modeldeploy {
         Tensor(const std::vector<int64_t>& shape, DataType dtype, Device device = Device::CPU, std::string name = "");
         Tensor(void* data, const std::vector<int64_t>& shape, DataType dtype, Device device,
                std::function<void(void*)> deleter = nullptr, std::string name = "");
-        Tensor(const Tensor& other);
-        Tensor(Tensor&& other) noexcept;
+        // 浅拷贝：共享 MemoryBlock（引用计数管理），深拷贝请用 clone()
+        Tensor(const Tensor& other) = default;
+        Tensor(Tensor&& other) noexcept = default;
         ~Tensor() = default;
 
-        // 运算符重载
-        Tensor& operator=(const Tensor& other);
-        Tensor& operator=(Tensor&& other) noexcept;
+        // 运算符重载（浅拷贝，共享底层内存）
+        Tensor& operator=(const Tensor& other) = default;
+        Tensor& operator=(Tensor&& other) noexcept = default;
 
         // 基本属性
         void* data();
         [[nodiscard]] const void* data() const;
-        [[nodiscard]] size_t size() const; // 返回元素总数
-        [[nodiscard]] size_t byte_size() const; // 返回字节大小
+        [[nodiscard]] size_t size() const; // 返回元素总数（缓存，O(1)）
+        [[nodiscard]] size_t byte_size() const; // 返回字节大小（缓存，O(1)）
         [[nodiscard]] const std::vector<int64_t>& shape() const;
+        [[nodiscard]] const std::vector<int64_t>& strides() const { return strides_; }
         [[nodiscard]] DataType dtype() const;
         [[nodiscard]] Device device() const;
         [[nodiscard]] const std::string& get_name() const;
@@ -64,6 +64,10 @@ namespace modeldeploy {
         [[nodiscard]] bool get_owns_data() const;
         void set_owns_data(bool owns_data);
 
+        // DataLayout（NCHW/NHWC 等）
+        void set_layout(DataLayout layout) { layout_ = layout; }
+        [[nodiscard]] DataLayout layout() const { return layout_; }
+
         // 数据操作接口 - 优化版本
         template <typename T>
         void set_data(const T* data, size_t size, Device device, bool copy);
@@ -72,7 +76,7 @@ namespace modeldeploy {
         template <typename T>
         T* data_ptr(); // 返回指针而非复制
 
-        // 索引操作
+        // 索引操作（基于 strides，支持非连续视图）
         template <typename T>
         T& at(const std::vector<int64_t>& indices);
 
@@ -81,14 +85,17 @@ namespace modeldeploy {
 
         [[nodiscard]] float at(const std::vector<int64_t>& indices) const;
 
-        // 惰性Tensor操作
-        [[nodiscard]] TensorView view() const;
-        [[nodiscard]] TensorView reshape(const std::vector<int64_t>& new_shape) const;
-        [[nodiscard]] TensorView transpose(const std::vector<int64_t>& axes) const;
-        [[nodiscard]] TensorView slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const;
+        // 视图操作（返回共享内存的 Tensor，非连续视图通过 strides 表达）
+        // 这些方法返回 Tensor，共享底层 memory_，仅调整 shape/strides/data_ptr_
+        [[nodiscard]] Tensor view() const;
+        [[nodiscard]] Tensor reshape(const std::vector<int64_t>& new_shape) const;
+        [[nodiscard]] Tensor transpose(const std::vector<int64_t>& axes) const;
+        [[nodiscard]] Tensor slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const;
 
-        // 强制具体化操作
-        [[nodiscard]] Tensor materialize() const;
+        // 检查内存是否连续（行优先，按 strides 判定）
+        [[nodiscard]] bool is_contiguous() const;
+        // 物化：非连续时复制为连续内存并返回新 Tensor；连续时返回 *this
+        [[nodiscard]] Tensor contiguous() const;
 
         // 原地操作
         [[nodiscard]] Tensor clone() const;
@@ -125,56 +132,20 @@ namespace modeldeploy {
         std::vector<int64_t> shape_{0};
         std::vector<int64_t> strides_{};
         DataType dtype_{DataType::FP32};
-        std::shared_ptr<MemoryBlock> memory_{}; // 替代原来的data_buffer_
+        DataLayout layout_{DataLayout::UNDEFINED};
+        std::shared_ptr<MemoryBlock> memory_{}; // 引用计数内存块，可被多个 Tensor 共享
         Device device_{Device::CPU};
         size_t element_size_{0};
+        size_t numel_{0}; // 元素总数缓存（O(1) 访问）
+        size_t total_bytes_{0}; // 字节数缓存（O(1) 访问）
         void* data_ptr_{nullptr}; // 指向实际数据的指针，可能是memory_内部的数据或外部数据
-        bool owns_data_{true}; // 是否拥有数据所有权
+        bool owns_data_{true}; // 是否拥有数据所有权（外部内存时 false，仅供语义标记）
 
         // 辅助函数
         static void validate_shape(const std::vector<int64_t>& shape);
         [[nodiscard]] size_t calculate_total_size() const;
         void calculate_strides();
-        friend class TensorView;
-    };
-
-    // TensorView类 - 提供无复制的视图
-    class MODELDEPLOY_CXX_EXPORT TensorView {
-    public:
-        explicit TensorView(const Tensor& tensor);
-        TensorView(const Tensor& tensor,
-                   const std::vector<int64_t>& shape,
-                   const std::vector<int64_t>& strides,
-                   void* data_ptr);
-
-        // TensorView接口
-        [[nodiscard]] const std::vector<int64_t>& shape() const { return shape_; }
-        [[nodiscard]] const std::vector<int64_t>& strides() const { return strides_; }
-        void* data() { return data_ptr_; }
-        [[nodiscard]] const void* data() const { return data_ptr_; }
-        [[nodiscard]] DataType dtype() const { return base_tensor_->dtype(); }
-        [[nodiscard]] size_t size() const;
-        [[nodiscard]] size_t byte_size() const;
-        [[nodiscard]] size_t get_element_size() const;
-        [[nodiscard]] bool is_contiguous() const;
-        // 转换为具体Tensor
-        [[nodiscard]] Tensor to_tensor() const;
-
-        // 视图操作
-        [[nodiscard]] TensorView reshape(const std::vector<int64_t>& new_shape) const;
-        [[nodiscard]] TensorView transpose(const std::vector<int64_t>& axes) const;
-        [[nodiscard]] TensorView slice(const std::vector<int64_t>& starts, const std::vector<int64_t>& ends) const;
-
-        // 索引操作
-        template <typename T>
-        T& at(const std::vector<int64_t>& indices);
-        template <typename T>
-        const T& at(const std::vector<int64_t>& indices) const;
-
-    private:
-        std::shared_ptr<const Tensor> base_tensor_; // 持有基础张量的引用
-        std::vector<int64_t> shape_;
-        std::vector<int64_t> strides_;
-        void* data_ptr_;
+        // 重算 numel_/total_bytes_ 缓存（shape_/dtype_ 变化后调用）
+        void refresh_cache();
     };
 } // namespace modeldeploy

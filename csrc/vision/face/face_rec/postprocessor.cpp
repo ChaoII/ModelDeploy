@@ -16,7 +16,7 @@ namespace modeldeploy::vision::face {
             return false;
         }
         // (-1,1024,1,1) -> (-1,1,1,1024)
-        Tensor tensor_transpose = tensors[0].transpose({0, 2, 3, 1}).to_tensor();
+        Tensor tensor_transpose = tensors[0].transpose({0, 2, 3, 1}).contiguous();
         const int batch = tensor_transpose.shape()[0];
         const size_t dim3 = tensor_transpose.shape()[3];
         results->clear();
