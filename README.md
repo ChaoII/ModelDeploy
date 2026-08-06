@@ -1,3 +1,9 @@
+# ModelDeploy
+
+多后端推理 SDK（OnnxRuntime / TensorRT / MNN / Sophgo TPU），支持检测/分割/姿态/人脸/OCR/车牌/行人属性/语音 等模型，提供 C++ / Python / C / C# / Rust 绑定。
+
+> **文档中心**：[docs/README.md](./docs/README.md) — 快速开始 / 架构 / 后端 / 模型 / 预处理 / 性能优化 / 多语言 API
+
 #### 1.编译
 
 ```bash
@@ -227,19 +233,21 @@ docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
 
 **注意：**
 
-1. `tpu-mlir 1.27` 对带 NMS 的 ONNX 有 Gather 算子转换 bug，**务必先把 NMS 从图中去掉**(用 onnxsim 或脚本裁剪为原始 8400×84 输出)，NMS 由 SDK 侧 `run_without_nms`(含 sigmoid + 无效框过滤)完成
-2. bmodel 输入为 `FLOAT32`、无 scale，该无 NMS 模型期望原始 `[0,255]` 像素输入，SDK 端需 `preprocessor.set_normalize(false)`，否则归一化后 logits 全 0 导致检测为 0
-3. `--shapes` 需与模型实际输入一致
+1. `tpu-mlir 1.27` 对带 NMS 的 ONNX 有 Gather 算子转换 bug，**务必先把 NMS 从图中去掉**(用 onnxsim 或脚本裁剪为原始检测头输出)，NMS 由 SDK 侧 `run_without_nms`(含 sigmoid + 无效框过滤)完成
+2. 无 NMS 模型输出原始检测头，**需用 SDK 默认预处理(letterbox + `/255` 归一化到 `[0,1]`)**，无需也不应调用 `set_normalize(false)`；无 NMS 模型建议置信度阈值取 0.5 以上，0.25 会带出大量低分候选
+3. bmodel 输入尺寸在转换时由 `--shapes` 固定(如 `[[1,3,1280,1280]]`)，SDK 端需 `preprocessor.set_size(...)` 与之匹配
 4. `--quantize` 支持 `F16`(默认推荐)/`BF16`/`INT8`(需 cali_table)；`--chip` 支持 `bm1688`/`cv186x`
 
-验证与精度：服务器上 `bmrt_test --bmodel yolo11n_bm1688.bmodel` 可跑通；本仓库实测 yolo11n F16(111.jpg, 阈值0.7) TPU 120 框 vs ORT FP32 118 框，IoU≥0.5 匹配率 98.3%、平均 IoU 0.927。
+验证与精度：服务器上 `bmrt_test --bmodel yolo11n_bm1688.bmodel` 可跑通；本仓库实测 BM1688 上 yolo11n(无 NMS, 1280 输入, 行人图, 阈值 0.6) TPU 3 框(label=person, score≈0.70) 与 ORT 一致。
 
 ```c++
 modeldeploy::RuntimeOption option;
 option.use_sophgo_backend(0);
-option.sophgo_option.bmodel_path = "./yolo11n_bm1688.bmodel";
+option.sophgo_option.bmodel_path = "./yolo11n_without_nms_bm1688.bmodel";
 modeldeploy::vision::detection::UltralyticsDet yolo11_det(option.sophgo_option.bmodel_path, option);
-yolo11_det.get_preprocessor().set_normalize(false);  // [0,255] 输入模型必须关闭归一化
+yolo11_det.get_preprocessor().set_size({1280, 1280});  // 与 bmodel 输入尺寸一致
+yolo11_det.get_postprocessor().set_conf_threshold(0.6f);
+// 预处理保持 SDK 默认(letterbox + /255)，无需 set_normalize(false)
 ```
 
 #### 7. 路线图
