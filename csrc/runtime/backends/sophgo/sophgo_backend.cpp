@@ -39,20 +39,18 @@ namespace {
 
     SophgoBackend::~SophgoBackend() {
 #ifdef ENABLE_SOPHGO
-        if (bmrt_ && io_cached_) {
-            bm_handle_t h = static_cast<bm_handle_t>(handle_);
-            bm_device_mem_t* ins = static_cast<bm_device_mem_t*>(cached_in_mems_);
-            for (size_t i = 0; i < inputs_desc_.size(); ++i)
-                bm_free_device_mem(h, ins[i].u.device.device_addr);
-            bm_device_mem_t* outs = static_cast<bm_device_mem_t*>(cached_out_mems_);
-            for (size_t i = 0; i < outputs_desc_.size(); ++i)
-                bm_free_device_mem(h, outs[i].u.device.device_addr);
-            delete[] ins;
-            delete[] outs;
+        // 缓存的 input/output 设备内存由 bmrt_tensor 分配，bmrt_destroy 统一释放。
+        // 这里手动 bm_free_device_mem 会导致 double-free 段错误（与官方 SOPHON-DEMO
+        // 只调 bmrt_destroy + bm_dev_free 的行为一致）。
+        if (cached_in_mems_) {
+            delete[] static_cast<bm_device_mem_t*>(cached_in_mems_);
             cached_in_mems_ = nullptr;
-            cached_out_mems_ = nullptr;
-            io_cached_ = false;
         }
+        if (cached_out_mems_) {
+            delete[] static_cast<bm_device_mem_t*>(cached_out_mems_);
+            cached_out_mems_ = nullptr;
+        }
+        io_cached_ = false;
         if (bmrt_) {
             bmrt_destroy(static_cast<void*>(bmrt_));
             bmrt_ = nullptr;
