@@ -18,11 +18,35 @@ namespace modeldeploy::vision {
         ImageDataImpl(ImageDataImpl&& other) noexcept = default;
         ImageDataImpl& operator=(ImageDataImpl&& other) noexcept = default;
 
+        // 统一在 mat 被替换后刷新元数据与缓存
+        void refresh_meta() {
+            if (mat.empty()) {
+                width = height = channels = 0;
+                element_count_ = element_bytes_ = bytes_ = 0;
+                return;
+            }
+            if (is_planar_type(type) && mat.dims >= 3) {
+                // Planar CHW 3D Mat: size[0]=C, size[1]=H, size[2]=W
+                channels = static_cast<int>(mat.size[0]);
+                height = static_cast<int>(mat.size[1]);
+                width = static_cast<int>(mat.size[2]);
+            } else {
+                // Packed HWC 或 2D Planar Mat
+                width = mat.cols;
+                height = mat.rows;
+                channels = is_planar_type(type)
+                               ? static_cast<int>(mat.size[0])
+                               : mat.channels();
+            }
+            element_count_ = mat.total();
+            element_bytes_ = mat.elemSize();
+            bytes_ = element_count_ * element_bytes_;
+        }
 
         bool empty() const { return mat.empty(); }
-        size_t element_count() const { return mat.total(); }
-        size_t element_bytes() const { return mat.elemSize(); }
-        size_t bytes() const { return element_count() * element_bytes(); }
+        size_t element_count() const { return element_count_; }
+        size_t element_bytes() const { return element_bytes_; }
+        size_t bytes() const { return bytes_; }
         const uint8_t* data() const { return mat.data; }
         uint8_t* data() { return mat.data; }
 
@@ -31,35 +55,34 @@ namespace modeldeploy::vision {
         int height = 0;
         int channels = 0;
         MdImageType type = MdImageType::PKG_BGR_U8;
+
+    private:
+        size_t element_count_ = 0;
+        size_t element_bytes_ = 0;
+        size_t bytes_ = 0;
     };
 
     ImageData::ImageData(const int width, const int height, const MdImageType type)
         : impl_(std::make_shared<ImageDataImpl>()) {
-        impl_->width = width;
-        impl_->height = height;
         impl_->type = type;
         const int ocv_type = md_image_type_to_ocv_type(type);
         impl_->mat = cv::Mat(height, width, ocv_type);
-        impl_->channels = impl_->mat.channels();
+        impl_->refresh_meta();
     }
 
 
     ImageData::ImageData(const cv::Mat& mat):
         impl_(std::make_shared<ImageDataImpl>()) {
         impl_->mat = mat;
-        impl_->width = mat.cols;
-        impl_->height = mat.rows;
-        impl_->channels = mat.channels();
         impl_->type = md_image_type_from_ocv_type(mat.type());
+        impl_->refresh_meta();
     }
 
     ImageData::ImageData(cv::Mat&& mat):
         impl_(std::make_shared<ImageDataImpl>()) {
         impl_->mat = std::move(mat);
-        impl_->width = impl_->mat.cols;
-        impl_->height = impl_->mat.rows;
-        impl_->channels = impl_->mat.channels();
         impl_->type = md_image_type_from_ocv_type(impl_->mat.type());
+        impl_->refresh_meta();
     }
 
     ImageData ImageData::clone() const {
@@ -67,10 +90,8 @@ namespace modeldeploy::vision {
         if (impl_) {
             result.impl_ = std::make_shared<ImageDataImpl>();
             result.impl_->mat = impl_->mat.clone();
-            result.impl_->width = impl_->width;
-            result.impl_->height = impl_->height;
-            result.impl_->channels = impl_->channels;
             result.impl_->type = impl_->type;
+            result.impl_->refresh_meta();
         }
         return result;
     }
@@ -126,8 +147,7 @@ namespace modeldeploy::vision {
             return *this;
         }
         cv::rotate(impl_->mat, impl_->mat, flag);
-        impl_->width = impl_->mat.cols;
-        impl_->height = impl_->mat.rows;
+        impl_->refresh_meta();
         return *this;
     }
 
@@ -394,10 +414,8 @@ namespace modeldeploy::vision {
         ImageData dst_image;
         dst_image.impl_ = std::make_shared<ImageDataImpl>();
         dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
-        dst_image.impl_->width = width();
-        dst_image.impl_->height = height();
-        dst_image.impl_->channels = channels();
         dst_image.impl_->type = MdImageType::PLA_RGB_F32;
+        dst_image.impl_->refresh_meta();
         return dst_image;
     }
 
@@ -420,10 +438,8 @@ namespace modeldeploy::vision {
         ImageData dst_image;
         dst_image.impl_ = std::make_shared<ImageDataImpl>();
         dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
-        dst_image.impl_->width = width();
-        dst_image.impl_->height = height();
-        dst_image.impl_->channels = 3;
         dst_image.impl_->type = MdImageType::PLA_RGB_F32;
+        dst_image.impl_->refresh_meta();
         return dst_image;
     }
 
@@ -458,12 +474,10 @@ namespace modeldeploy::vision {
                 split_image[i].copyTo(chw_image.row(i));
             }
             dst_image.impl_->mat = chw_image.reshape(1, {image.channels(), image.height(), image.width()});
-            dst_image.impl_->width = image.width();
-            dst_image.impl_->height = image.height();
-            dst_image.impl_->channels = image.channels();
             dst_image.impl_->type = image.impl_->mat.depth() == CV_8U
                                         ? MdImageType::PLA_BGR_U8
                                         : MdImageType::PLA_BGR_F32;
+            dst_image.impl_->refresh_meta();
             return dst_image;
         }
         if (type == ColorConvertType::CVT_PL_BGR2PA_BGR || type == ColorConvertType::CVT_PL_RGB2PA_RGB) {
@@ -487,26 +501,23 @@ namespace modeldeploy::vision {
             cv::merge(split_images, hwc_image);
 
             dst_image.impl_->mat = hwc_image;
-            dst_image.impl_->width = image.width();
-            dst_image.impl_->height = image.height();
-            dst_image.impl_->channels = image.channels();
             dst_image.impl_->type = hwc_image.depth() == CV_8U
                                         ? MdImageType::PKG_BGR_U8
                                         : hwc_image.depth() == CV_32F
                                         ? MdImageType::PKG_BGR_F32
                                         : MdImageType::PKG_BGR_F64;
+            dst_image.impl_->refresh_meta();
             return dst_image;
         }
         throw std::runtime_error("Unsupported color conversion type");
     }
 
-    void ImageData::images_to_tensor(std::vector<ImageData> images, Tensor* tensor) {
-        if (images.empty()) {
-            MD_LOG_ERROR << "images is empty" << std::endl;
+    void ImageData::images_to_tensor(const std::vector<ImageData>& images, Tensor* tensor) {
+        if (images.empty() || !tensor) {
+            MD_LOG_ERROR << "images is empty or tensor is null" << std::endl;
             return;
         }
-
-        const int n = images.size();
+        const int n = static_cast<int>(images.size());
         const int c = images[0].channels();
         const int h = images[0].height();
         const int w = images[0].width();
@@ -520,10 +531,14 @@ namespace modeldeploy::vision {
         const size_t bytes = images[0].bytes();
         const std::vector<int64_t> shape = {n, c, h, w};
         const auto dtype = utils::md_image_dtype_to_md_dtype(images[0].type());
+        // allocate 复用逻辑：shape/dtype/device 不变时复用已有 MemoryBlock，避免每帧重新分配
         tensor->allocate(shape, dtype);
+        uint8_t* base = static_cast<uint8_t*>(tensor->data());
         for (size_t i = 0; i < images.size(); ++i) {
-            auto* p = static_cast<uint8_t*>(tensor->data());
-            std::memcpy(p + i * bytes, images[i].data(), bytes);
+            const uint8_t* src = images[i].data();
+            if (src) {
+                std::memcpy(base + i * bytes, src, bytes);
+            }
         }
     }
 
@@ -532,19 +547,28 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "Image is empty" << std::endl;
             return;
         }
+        if (!tensor) {
+            MD_LOG_ERROR << "Tensor pointer is null" << std::endl;
+            return;
+        }
         const auto dtype = utils::md_image_dtype_to_md_dtype(type());
         const std::vector<int64_t> shape = {channels(), height(), width()};
         if (copy) {
             const size_t num_bytes = bytes();
+            // allocate 复用逻辑：shape/dtype/device 不变时复用已有 MemoryBlock
             tensor->allocate(shape, dtype);
             if (num_bytes != tensor->byte_size()) {
                 MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
                     "but now size of Tensor = " << tensor->byte_size()
                     << ", size of Mat = " << num_bytes << "." << std::endl;
+                return;
             }
-            memcpy(tensor->data(), data(), num_bytes);
+            if (data() && tensor->data()) {
+                memcpy(tensor->data(), data(), num_bytes);
+            }
         }
         else {
+            // 零拷贝：共享外部内存，不复制
             tensor->from_external_memory(data(), shape, dtype);
         }
     }
@@ -554,19 +578,24 @@ namespace modeldeploy::vision {
             return;
         }
         if (copy) {
-            // Shallow copy: share underlying data
+            // Deep copy: clone the underlying data
             mat = impl_->mat.clone();
         }
         else {
+            // Shallow copy: share underlying data
             mat = impl_->mat;
         }
     }
 
 
 
-    std::vector<uint8_t> ImageData::imencode(const ImageData& image,const std::string & ext){
+    std::vector<uint8_t> ImageData::imencode(const ImageData& image, const std::string& ext) {
         std::vector<uint8_t> buf;
-        cv::imencode(ext, image.impl_->mat,buf );
+        if (image.empty()) {
+            MD_LOG_ERROR << "Cannot encode empty image" << std::endl;
+            return buf;
+        }
+        cv::imencode(ext, image.impl_->mat, buf);
         return buf;
     }
 

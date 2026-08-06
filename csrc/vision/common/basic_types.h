@@ -39,6 +39,23 @@ enum class MdImageType {
     UNKNOWN
 };
 
+// 判断是否为 Planar（CHW 平面）布局：仅 PLA_ 前缀类型
+inline bool is_planar_type(const MdImageType type) {
+    switch (type) {
+    case MdImageType::PLA_BGR_U8:
+    case MdImageType::PLA_RGB_U8:
+    case MdImageType::PLA_BGRA_U8:
+    case MdImageType::PLA_RGBA_U8:
+    case MdImageType::PLA_BGR_F32:
+    case MdImageType::PLA_RGB_F32:
+    case MdImageType::PLA_BGRA_F32:
+    case MdImageType::PLA_RGBA_F32:
+        return true;
+    default:
+        return false;
+    }
+}
+
 enum class ColorConvertType {
     CVT_PA_BGR2GRAY = 0,
     CVT_PA_RGB2GRAY,

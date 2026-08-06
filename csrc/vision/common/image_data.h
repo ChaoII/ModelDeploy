@@ -54,7 +54,7 @@ namespace modeldeploy::vision {
         static ImageData cvt_color(const ImageData& image, ColorConvertType type);
         // Caller must guarantee data lifetime >= ImageData lifetime
         static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false);
-        static void images_to_tensor(std::vector<ImageData> images, Tensor* tensor);
+        static void images_to_tensor(const std::vector<ImageData>& images, Tensor* tensor);
         void to_mat(cv::Mat& mat, bool copy = false) const;
         void to_tensor(Tensor* tensor, bool copy = false);
         static std::vector<uint8_t> imencode(const ImageData& image, const std::string& ext);
