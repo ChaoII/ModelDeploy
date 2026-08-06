@@ -96,13 +96,8 @@ namespace modeldeploy::vision::detection {
             // 使用更高效的矩阵乘法
             cv::Mat matmul_result;
             cv::gemm(mask_proposals, mask_proto, 1.0, cv::Mat(), 0.0, matmul_result);
-            // (n,160,160)
-            cv::Mat masks = matmul_result.t();
-            masks = masks.reshape(static_cast<int>(_results.size()), {mask_w, mask_h});
-            // split for boxes nums
-            std::vector<cv::Mat> mask_channels;
-            mask_channels.reserve(_results.size());
-            cv::split(masks, mask_channels);
+            // matmul_result: (n, 160*160)，第 i 行即实例 i 的 mask（行连续，无需 transpose/reshape/split）
+
             // scale the boxes to the origin image shape
             const float ipt_h = letter_box_records[bs].ipt_h;
             const float ipt_w = letter_box_records[bs].ipt_w;
@@ -133,11 +128,9 @@ namespace modeldeploy::vision::detection {
                 box.y = std::round(y1);
                 box.width = std::round(x2 - x1);
                 box.height = std::round(y2 - y1);
-                // deal with mask
-                cv::Mat dest, mask;
-                // 使用更高效的sigmoid实现
-                cv::exp(-mask_channels[i], dest);
-                dest = 1.0 / (1.0 + dest);
+                // 从 gemm 结果直接取第 i 行（1 x 160*160），reshape 为 (160,160)，零拷贝视图
+                const cv::Mat mask_channel = matmul_result.row(static_cast<int>(i))
+                                                 .reshape(1, static_cast<int>(tensors[1].shape()[2]));
                 // crop mask for feature map（去掉 letterbox padding）
                 const int feat_w = static_cast<int>(tensors[1].shape()[3]);
                 const int feat_h = static_cast<int>(tensors[1].shape()[2]);
@@ -146,8 +139,8 @@ namespace modeldeploy::vision::detection {
                 int _x2 = static_cast<int>(feat_w - pad_w_mask);
                 int _y2 = static_cast<int>(feat_h - pad_h_mask);
                 // 特征图有效区 [pad, feat-pad] 对应原图 [0, ipt_w]x[0, ipt_h]
-                // 把 box（原图坐标）映射回特征图坐标，只对 box 区域 resize 到 box 尺寸，
-                // 避免整图 resize 到 ipt 尺寸（慢 50-100 倍）
+                // 把 box（原图坐标）映射回特征图坐标，只对 box 区域做 sigmoid+resize，
+                // 避免整图 sigmoid/resize（慢 50-100 倍）
                 const float fw = static_cast<float>(_x2 - _x1);
                 const float fh = static_cast<float>(_y2 - _y1);
                 const float bx1 = std::clamp(box.x, 0.0f, ipt_w);
@@ -158,9 +151,15 @@ namespace modeldeploy::vision::detection {
                 const int my1 = static_cast<int>(_y1 + by1 / ipt_h * fh);
                 const int mx2 = static_cast<int>(_x1 + bx2 / ipt_w * fw);
                 const int my2 = static_cast<int>(_y1 + by2 / ipt_h * fh);
+                cv::Mat dest, mask;
                 if (mx2 > mx1 && my2 > my1) {
                     cv::Rect box_roi(mx1, my1, mx2 - mx1, my2 - my1);
-                    cv::resize(dest(box_roi), mask,
+                    // 先裁剪 box 区域，再对该小块做 sigmoid（避免整图 25600 元素 sigmoid）
+                    dest = mask_channel(box_roi);
+                    // 使用更高效的sigmoid实现
+                    cv::exp(-dest, dest);
+                    dest = 1.0 / (1.0 + dest);
+                    cv::resize(dest, mask,
                                cv::Size(static_cast<int>(box.width), static_cast<int>(box.height)),
                                0, 0, cv::INTER_LINEAR);
                     mask = mask > mask_threshold_;
@@ -205,17 +204,17 @@ namespace modeldeploy::vision::detection {
             mask_embeddings.reserve(dim1); // 预分配空间
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
-                float cls_conf = attr_ptr[4];
+                float score = attr_ptr[4];
+                // 先过滤，低置信候选不构建 mask embedding（避免无效计算）
+                if (score <= conf_threshold_) {
+                    continue;
+                }
+                float cls_conf = score;
                 // 使用引用避免拷贝
                 const std::vector<float> mask_embedding(attr_ptr + dim2 - mask_nums, attr_ptr + dim2);
                 // 直接在原vector上操作，避免创建临时变量
                 for (size_t j = 0; j < mask_embedding.size(); ++j) {
                     const_cast<std::vector<float>&>(mask_embedding)[j] *= cls_conf;
-                }
-                float score = attr_ptr[4];
-                // filter boxes by conf_threshold
-                if (score <= conf_threshold_) {
-                    continue;
                 }
                 int32_t label_id = attr_ptr[5];
                 // convert from [x1, y1, x2, y2] to [w, y, w, h]
@@ -259,14 +258,7 @@ namespace modeldeploy::vision::detection {
             // 使用更高效的矩阵乘法
             cv::Mat matmul_result;
             cv::gemm(mask_proposals, mask_proto, 1.0, cv::Mat(), 0.0, matmul_result);
-            // (n,160,160)
-            cv::Mat masks = matmul_result.t();
-            masks = masks.reshape(static_cast<int>(_results.size()), {mask_w, mask_h});
-
-            //split for boxes nums
-            std::vector<cv::Mat> mask_channels;
-            mask_channels.reserve(_results.size());
-            cv::split(masks, mask_channels);
+            // matmul_result: (n, 160*160)，第 i 行即实例 i 的 mask（行连续，无需 transpose/reshape/split）
 
             // scale the boxes to the origin image shape
             const float ipt_h = letter_box_records[bs].ipt_h;
@@ -298,11 +290,9 @@ namespace modeldeploy::vision::detection {
                 box.y = std::round(y1);
                 box.width = std::round(x2 - x1);
                 box.height = std::round(y2 - y1);
-                // deal with mask
-                cv::Mat dest, mask;
-                // 使用更高效的sigmoid实现
-                cv::exp(-mask_channels[i], dest);
-                dest = 1.0 / (1.0 + dest);
+                // 从 gemm 结果直接取第 i 行（1 x 160*160），reshape 为 (160,160)，零拷贝视图
+                const cv::Mat mask_channel = matmul_result.row(static_cast<int>(i))
+                                                 .reshape(1, static_cast<int>(tensors[1].shape()[2]));
                 // crop mask for feature map（去掉 letterbox padding）
                 const int feat_w = static_cast<int>(tensors[1].shape()[3]);
                 const int feat_h = static_cast<int>(tensors[1].shape()[2]);
@@ -311,8 +301,8 @@ namespace modeldeploy::vision::detection {
                 int _x2 = static_cast<int>(feat_w - pad_w_mask);
                 int _y2 = static_cast<int>(feat_h - pad_h_mask);
                 // 特征图有效区 [pad, feat-pad] 对应原图 [0, ipt_w]x[0, ipt_h]
-                // 把 box（原图坐标）映射回特征图坐标，只对 box 区域 resize 到 box 尺寸，
-                // 避免整图 resize 到 ipt 尺寸（慢 50-100 倍）
+                // 把 box（原图坐标）映射回特征图坐标，只对 box 区域做 sigmoid+resize，
+                // 避免整图 sigmoid/resize（慢 50-100 倍）
                 const float fw = static_cast<float>(_x2 - _x1);
                 const float fh = static_cast<float>(_y2 - _y1);
                 const float bx1 = std::clamp(box.x, 0.0f, ipt_w);
@@ -323,9 +313,15 @@ namespace modeldeploy::vision::detection {
                 const int my1 = static_cast<int>(_y1 + by1 / ipt_h * fh);
                 const int mx2 = static_cast<int>(_x1 + bx2 / ipt_w * fw);
                 const int my2 = static_cast<int>(_y1 + by2 / ipt_h * fh);
+                cv::Mat dest, mask;
                 if (mx2 > mx1 && my2 > my1) {
                     cv::Rect box_roi(mx1, my1, mx2 - mx1, my2 - my1);
-                    cv::resize(dest(box_roi), mask,
+                    // 先裁剪 box 区域，再对该小块做 sigmoid（避免整图 25600 元素 sigmoid）
+                    dest = mask_channel(box_roi);
+                    // 使用更高效的sigmoid实现
+                    cv::exp(-dest, dest);
+                    dest = 1.0 / (1.0 + dest);
+                    cv::resize(dest, mask,
                                cv::Size(static_cast<int>(box.width), static_cast<int>(box.height)),
                                0, 0, cv::INTER_LINEAR);
                     mask = mask > mask_threshold_;
