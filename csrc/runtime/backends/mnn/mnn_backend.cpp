@@ -150,7 +150,7 @@ namespace modeldeploy {
     }
 
     TensorInfo MnnBackend::get_input_info(int index) {
-        if (index > num_inputs()) {
+        if (index < 0 || index >= num_inputs()) {
             MD_LOG_FATAL <<
                 "The index: " << index << " should less than the number of inputs: "
                 << num_inputs() << "." << std::endl;
@@ -161,7 +161,7 @@ namespace modeldeploy {
     std::vector<TensorInfo> MnnBackend::get_input_infos() { return inputs_desc_; }
 
     TensorInfo MnnBackend::get_output_info(const int index) {
-        if (index > num_outputs()) {
+        if (index < 0 || index >= num_outputs()) {
             MD_LOG_FATAL <<
                 "The index: " << index << " should less than the number of outputs: "
                 << num_outputs() << "." << std::endl;

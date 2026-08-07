@@ -47,7 +47,8 @@ namespace modeldeploy {
             auto name = pybind11::cast<std::string>(tensor_name);
             auto& t = pybind11::cast<Tensor&>(tensor); // 引用，不复制
             t.set_name(name);
-            _inputs.push_back(std::move(t)); // 这里要看 Tensor 是否支持共享或 move
+            // 拷贝而非 move：t 是 Python 对象内部的 Tensor，move 会搬空 Python 侧对象
+            _inputs.push_back(t);
         }
         std::vector<Tensor> outputs;
         if (!self.infer(_inputs, &outputs)) {
@@ -68,13 +69,15 @@ namespace modeldeploy {
             .value("CPU", Device::CPU)
             .value("GPU", Device::GPU)
             .value("OPENCL", Device::OPENCL)
-            .value("VULKAN", Device::VULKAN);
+            .value("VULKAN", Device::VULKAN)
+            .value("TPU", Device::TPU);
 
         pybind11::enum_<Backend>(m, "Backend")
             .value("NONE", NONE)
             .value("ORT", ORT)
-            .value("TRT", ORT)
-            .value("MNN", MNN);
+            .value("TRT", TRT)
+            .value("MNN", MNN)
+            .value("SOPHGO", SOPHGO);
 
 
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")

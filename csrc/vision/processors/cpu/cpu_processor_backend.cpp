@@ -232,7 +232,8 @@ bool CpuProcessorBackend::fused_preprocess(
     const int dst_h = dst_size[1];
     const uint8_t* src = image.data();
 
-    out->allocate({3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+    // 直接 allocate 带 batch 维的 shape，避免 expand_dim 导致 shape 与下一帧不匹配而每帧重分配
+    out->allocate({1, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
     float* dst = out->data_ptr<float>();
 
     // 运行时 ISA 派发（AVX512/AVX2/NEON/SVE/标量），一次遍历完成，无中间缓冲
@@ -240,7 +241,6 @@ bool CpuProcessorBackend::fused_preprocess(
     kernel(src, src_w, src_h, dst, dst_w, dst_h,
            origin_x, origin_y, scale_x, scale_y,
            alpha.data(), beta.data(), swap_rb, pad_value);
-    out->expand_dim(0);
     return true;
 }
 

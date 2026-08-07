@@ -100,12 +100,13 @@ namespace modeldeploy::vision::detection {
                     continue;
                 }
                 auto label_id = static_cast<int32_t>(attr_ptr[6]);
-                // convert from [xc, yc, w, h, a]
-                // 其中a为angle矩形框的旋转角度, 默认为弧度制(但是OpenCV的RotatedRect的旋转角度，默认为角度制)
+                // convert from [xc, yc, w, h, angle, score, label_id]
+                // 带 NMS 输出布局 (dim2=7)：angle 在索引 4（弧度制）
+                // OpenCV 的 RotatedRect 旋转角度默认角度制
                 RotatedRect rotated_boxes = {
                     attr_ptr[0], attr_ptr[1],
                     attr_ptr[2], attr_ptr[3],
-                    attr_ptr[dim2 - 1] * 180 / 3.141592653f
+                    attr_ptr[4] * 180 / 3.141592653f
                 };
                 _results.push_back({rotated_boxes, label_id, score});
             }

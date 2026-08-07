@@ -41,7 +41,7 @@ namespace modeldeploy::vision::ocr {
         offset.Execute(soln, distance);
         std::vector<cv::Point2f> points;
         for (int j = 0; j < soln.size(); j++) {
-            for (int i = 0; i < soln[soln.size() - 1].size(); i++) {
+            for (int i = 0; i < soln[j].size(); i++) {
                 points.emplace_back(soln[j][i].X, soln[j][i].Y);
             }
         }

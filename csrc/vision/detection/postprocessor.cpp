@@ -108,11 +108,11 @@ namespace modeldeploy::vision::detection {
                 x2 = std::clamp(x2, 0.0f, ipt_w);
                 y2 = std::clamp(y2, 0.0f, ipt_h);
 
-                // 重新赋值到 box
+                // 重新赋值到 box（与 iseg/pose 保持一致，不额外 -0.5）
                 box.x = std::roundf(x1);
                 box.y = std::roundf(y1);
-                box.width = std::roundf(x2 - x1 - 0.5f);
-                box.height = std::roundf(y2 - y1 - 0.5f);
+                box.width = std::roundf(x2 - x1);
+                box.height = std::roundf(y2 - y1);
             }
             // 缩放后窄框可能产生非正宽高，统一过滤
             _results.erase(std::remove_if(_results.begin(), _results.end(),
@@ -182,11 +182,11 @@ namespace modeldeploy::vision::detection {
                 x2 = std::clamp(x2, 0.0f, ipt_w);
                 y2 = std::clamp(y2, 0.0f, ipt_h);
 
-                // 重新赋值到 box
+                // 重新赋值到 box（与 iseg/pose 保持一致，不额外 -0.5）
                 box.x = std::roundf(x1);
                 box.y = std::roundf(y1);
-                box.width = std::roundf(x2 - x1 - 0.5f);
-                box.height = std::roundf(y2 - y1 - 0.5f);
+                box.width = std::roundf(x2 - x1);
+                box.height = std::roundf(y2 - y1);
             }
             (*results)[bs] = std::move(_results);
         }

@@ -88,12 +88,16 @@ namespace modeldeploy {
         for (auto& t : input_tensors_) {
             if (t.get_name() == name) {
                 is_exist = true;
-                t.from_external_memory(input.data(), input.shape(), input.dtype());
+                t.from_external_memory(input.data(), input.shape(), input.dtype(),
+                                       nullptr, input.device(), name);
                 break;
             }
         }
         if (!is_exist) {
-            Tensor new_tensor(input.data(), input.shape(), input.dtype(), Device::CPU);
+            // 与重复 bind 语义一致：共享外部内存（零拷贝），不拷贝
+            Tensor new_tensor;
+            new_tensor.from_external_memory(input.data(), input.shape(), input.dtype(),
+                                            nullptr, input.device(), name);
             input_tensors_.emplace_back(std::move(new_tensor));
         }
     }
@@ -103,12 +107,16 @@ namespace modeldeploy {
         for (auto& t : output_tensors_) {
             if (t.get_name() == name) {
                 is_exist = true;
-                t.from_external_memory(output.data(), output.shape(), output.dtype());
+                t.from_external_memory(output.data(), output.shape(), output.dtype(),
+                                       nullptr, output.device(), name);
                 break;
             }
         }
         if (!is_exist) {
-            Tensor new_tensor(output.data(), output.shape(), output.dtype(), Device::CPU);
+            // 与重复 bind 语义一致：共享外部内存（零拷贝），不拷贝
+            Tensor new_tensor;
+            new_tensor.from_external_memory(output.data(), output.shape(), output.dtype(),
+                                            nullptr, output.device(), name);
             output_tensors_.emplace_back(std::move(new_tensor));
         }
     }

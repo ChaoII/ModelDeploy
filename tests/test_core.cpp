@@ -332,3 +332,33 @@ TEST_CASE("Tensor to_string", "[core]") {
     auto s = t.to_string();
     REQUIRE_FALSE(s.empty());
 }
+
+// ============ buffer reuse (Bug 9: shape 变化不应破坏复用) ============
+
+TEST_CASE("Tensor allocate buffer reuse", "[core]") {
+    Tensor t;
+    // 第一次 allocate
+    t.allocate({3, 64, 64}, DataType::FP32);
+    void* p1 = t.data();
+    // 带 batch 维，与 {3,64,64} 不同（模拟 fused_preprocess 修复前 expand_dim 场景）
+    t.allocate({1, 3, 64, 64}, DataType::FP32);
+    void* p2 = t.data();
+    // 再次 allocate 相同 shape {1,3,64,64}，应复用 buffer（指针不变）
+    t.allocate({1, 3, 64, 64}, DataType::FP32);
+    void* p3 = t.data();
+    REQUIRE(p3 == p2);  // 相同 shape 必须复用，避免每帧 malloc
+}
+
+// ============ from_external_memory 共享语义 (Bug 8 相关) ============
+
+TEST_CASE("Tensor from_external_memory shares buffer", "[core]") {
+    std::vector<float> buf(16, 1.0f);
+    Tensor t;
+    t.from_external_memory(buf.data(), {4, 4}, DataType::FP32);
+    // 零拷贝：Tensor 应指向外部 buffer
+    REQUIRE(t.data() == buf.data());
+    REQUIRE_FALSE(t.get_owns_data());
+    // 外部修改应反映到 Tensor
+    buf[0] = 99.0f;
+    REQUIRE(static_cast<float*>(t.data())[0] == 99.0f);
+}
