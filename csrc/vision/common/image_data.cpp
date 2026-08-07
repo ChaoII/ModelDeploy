@@ -5,7 +5,6 @@
 #include "vision/utils.h"
 #include "core/md_log.h"
 #include "vision/common/convert.h"
-#include "vision/common/image_codec.h"
 #include "vision/common/image_data.h"
 #include <opencv2/opencv.hpp>
 
@@ -596,68 +595,18 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "Cannot encode empty image" << std::endl;
             return buf;
         }
-        if (!image.data() || image.width() <= 0 || image.height() <= 0) {
-            MD_LOG_ERROR << "Cannot encode invalid image" << std::endl;
-            return buf;
-        }
-        // 优先 stb_image（JPEG/PNG/BMP），不支持格式回退 OpenCV
-        if (encode_image_memory(image.data(), image.width(), image.height(),
-                                image.channels(), ext, buf)) {
-            return buf;
-        }
-        // fallback OpenCV
         cv::imencode(ext, image.impl_->mat, buf);
         return buf;
     }
 
-    ImageData ImageData::imdecode(const std::vector<uint8_t>& buf) {
-        if (buf.empty()) {
-            MD_LOG_ERROR << "Cannot decode empty buffer" << std::endl;
-            return ImageData();
-        }
-        std::vector<uint8_t> pixels;
-        int w = 0, h = 0, c = 0;
-        // 优先 stb_image，失败回退 OpenCV
-        if (!decode_image_memory(buf, pixels, w, h, c)) {
-            cv::Mat mat = cv::imdecode(buf, cv::IMREAD_UNCHANGED);
-            if (mat.empty()) return ImageData();
-            return ImageData(std::move(mat));
-        }
-        if (pixels.empty() || w <= 0 || h <= 0) return ImageData();
-        ImageData result;
-        result.impl_ = std::make_shared<ImageDataImpl>();
-        result.impl_->type = md_image_type_from_ocv_type(
-            c == 1 ? CV_8UC1 : c == 3 ? CV_8UC3 : CV_8UC4);
-        result.impl_->mat = cv::Mat(h, w, c == 1 ? CV_8UC1 : c == 3 ? CV_8UC3 : CV_8UC4,
-                                    pixels.data());
-        result.impl_->refresh_meta();
-        // 注意：这里 Mat 包装 pixels.data()，但 pixels 是局部变量会析构！
-        // 需要复制像素到 Mat 自己的内存
-        result.impl_->mat = result.impl_->mat.clone();
-        return result;
+    ImageData ImageData::imdecode(const std::vector<uint8_t>& buf){
+        cv::Mat mat = cv::imdecode(buf, cv::IMREAD_UNCHANGED);
+        if(mat.empty()) return ImageData();
+        return ImageData(std::move(mat));
     }
 
 
     ImageData ImageData::imread(const std::string& filename) {
-        std::vector<uint8_t> pixels;
-        int w = 0, h = 0, c = 0;
-        // 优先 stb_image（JPEG/PNG/BMP），失败回退 OpenCV
-        if (decode_image_file(filename, pixels, w, h, c)) {
-            if (pixels.empty() || w <= 0 || h <= 0) {
-                MD_LOG_ERROR << "Failed to read image: " << filename << std::endl;
-                return ImageData();
-            }
-            ImageData result;
-            result.impl_ = std::make_shared<ImageDataImpl>();
-            result.impl_->type = md_image_type_from_ocv_type(
-                c == 1 ? CV_8UC1 : c == 3 ? CV_8UC3 : CV_8UC4);
-            const int cv_type = c == 1 ? CV_8UC1 : c == 3 ? CV_8UC3 : CV_8UC4;
-            cv::Mat mat(h, w, cv_type, pixels.data());
-            // stb 解码结果为 BGR（已在 codec 内转换），直接包 Mat
-            result.impl_->mat = mat.clone(); // 复制到 Mat 自有内存，pixels 即将析构
-            result.impl_->refresh_meta();
-            return result;
-        }
         cv::Mat mat = cv::imread(filename);
         if (mat.empty()) {
             MD_LOG_ERROR << "Failed to read image: " << filename << std::endl;
@@ -670,12 +619,6 @@ namespace modeldeploy::vision {
         if (!impl_ || impl_->empty()) {
             MD_LOG_ERROR << "Cannot write empty image" << std::endl;
             return false;
-        }
-        // 根据扩展名选择编码，优先 stb_image，回退 OpenCV
-        const size_t dot = filename.rfind('.');
-        const std::string ext = (dot == std::string::npos) ? "jpg" : filename.substr(dot + 1);
-        if (encode_image_file(data(), width(), height(), channels(), ext, filename)) {
-            return true;
         }
         return cv::imwrite(filename, impl_->mat);
     }
