@@ -47,6 +47,11 @@ namespace modeldeploy {
 
         virtual std::unordered_map<int, std::string> get_label_map(const std::string& label_map_key);
 
+        // 暴露底层推理后端（设备直通路径用，如 Sophgo 零拷贝）
+        [[nodiscard]] BaseBackend* get_backend() {
+            return runtime_ ? runtime_->get_backend() : nullptr;
+        }
+
         RuntimeOption runtime_option{};
 
     protected:

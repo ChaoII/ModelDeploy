@@ -41,6 +41,9 @@ namespace modeldeploy {
 
         [[nodiscard]] bool is_initialized() const { return backend_->is_initialized(); }
 
+        // 暴露底层后端（设备直通路径用，如 Sophgo 零拷贝）
+        [[nodiscard]] BaseBackend* get_backend() const { return backend_.get(); }
+
         RuntimeOption option;
 
     private:
