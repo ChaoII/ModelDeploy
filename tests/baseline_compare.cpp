@@ -86,10 +86,10 @@ TEST_CASE("Regression: yolo11n detection + pre/raw", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<DetectionResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -109,10 +109,10 @@ TEST_CASE("Regression: yolo11n_nms detection", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<DetectionResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -128,10 +128,10 @@ TEST_CASE("Regression: yolo11n-seg segmentation", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     UltralyticsSeg model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<InstanceSegResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -147,10 +147,10 @@ TEST_CASE("Regression: yolo11n-pose pose estimation", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     UltralyticsPose model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<KeyPointsResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -166,10 +166,10 @@ TEST_CASE("Regression: yolo11n-obb obb detection", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<ObbResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -185,10 +185,10 @@ TEST_CASE("Regression: yolo11n-obb_nms obb detection", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<ObbResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -204,10 +204,10 @@ TEST_CASE("Regression: yolo11n-cls classification", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     Classification model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     ClassifyResult result;
     REQUIRE(model.predict(img, &result));
@@ -223,10 +223,10 @@ TEST_CASE("Regression: scrfd face detection", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     Scrfd model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<KeyPointsResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
@@ -242,10 +242,10 @@ TEST_CASE("Regression: ppocrv4 det + pre/raw", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     DBDetector model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::vector<std::array<int, 8>> boxes;
     REQUIRE(model.predict(img, &boxes, nullptr));
@@ -275,10 +275,10 @@ TEST_CASE("Regression: ppocrv4 rec", "[regression]") {
     if (!fs::exists(dict)) return;
 
     Recognizer model(modelfile.string(), dict.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     std::string text;
     float score = 0;
@@ -295,10 +295,10 @@ TEST_CASE("Regression: ppocrv4 cls", "[regression]") {
     if (!fs::exists(base_file)) return;
 
     Classifier model(modelfile.string(), cpu_option());
-    if (!model.is_initialized()) return;
+    REQUIRE(model.is_initialized());
 
     auto img = ImageData::imread(imgf.string());
-    if (img.empty()) return;
+    REQUIRE_FALSE(img.empty());
 
     int32_t label = -1;
     float score = 0;

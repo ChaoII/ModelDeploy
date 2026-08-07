@@ -220,6 +220,10 @@ namespace modeldeploy::vision::baseline {
             check_score("score", b["score"], rs[i].score, &diffs);
             if (b["mask"].contains("nonzero_ratio") && rs[i].mask.shape.size() == 2) {
                 float base_ratio = b["mask"]["nonzero_ratio"];
+                if (rs[i].mask.buffer.empty()) {
+                    diffs.push_back(fmt("instance[%zu] mask buffer empty", i));
+                    continue;
+                }
                 size_t npix = (size_t)rs[i].mask.shape[0] * (size_t)rs[i].mask.shape[1];
                 size_t cnt = 0;
                 for (size_t k = 0; k < npix; ++k) if (rs[i].mask.buffer[k] > 0) ++cnt;
