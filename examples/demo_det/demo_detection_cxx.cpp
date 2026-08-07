@@ -12,7 +12,7 @@ int main() {
     option.use_gpu(0);
     option.password = "123456";
     option.enable_fp16 = true;
-    option.enable_trt = false;
+    option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx", option);
     const auto label_map = yolo11_det.get_label_map("names");

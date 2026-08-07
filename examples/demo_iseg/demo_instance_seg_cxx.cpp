@@ -12,7 +12,7 @@
 int main(int argc, char** argv) {
     modeldeploy::RuntimeOption option;
     option.use_gpu();
-    option.use_ort_backend();
+    option.use_trt_backend();
     option.enable_fp16 = true;
     option.enable_trt = true;
     const std::string model_file = "../../test_data/test_models/yolo11n-seg_nms.onnx";

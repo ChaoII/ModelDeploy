@@ -3,6 +3,11 @@
 add_executable(demo_detection_cxx demo_detection_cxx.cpp)
 target_link_libraries(demo_detection_cxx PUBLIC ${LIBRARY_NAME})
 
+if(ENABLE_SOPHGO)
+add_executable(demo_detection_sophgo demo_detection_sophgo.cpp)
+target_link_libraries(demo_detection_sophgo PUBLIC ${LIBRARY_NAME})
+endif()
+
 add_executable(demo_detection_batch demo_detection_batch.cpp)
 target_link_libraries(demo_detection_batch PUBLIC ${LIBRARY_NAME})
 
