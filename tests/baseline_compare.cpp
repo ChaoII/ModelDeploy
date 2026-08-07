@@ -257,6 +257,150 @@ TEST_CASE("Regression: yolo11n-seg_nms segmentation TRT", "[regression][backend:
     warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.engine vs ORT baseline");
 }
 
+TEST_CASE("Regression: yolo11n-cls classification TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-cls.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-cls.onnx.cls.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-cls.engine.cls.json";
+    if (!fs::exists(ort_file)) return;
+
+    Classification model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    ClassifyResult result;
+    REQUIRE(model.predict(img, &result));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_cls(load_json(self_file)["results"], result));
+    }
+    warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.engine vs ORT baseline");
+}
+
+TEST_CASE("Regression: yolo11n-obb obb detection TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-obb.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_obb1.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-obb.onnx.obb.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-obb.engine.obb.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsObb model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<ObbResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_obb(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.engine vs ORT baseline");
+}
+
+TEST_CASE("Regression: yolo11n-obb_nms obb detection TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-obb_nms.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_obb1.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-obb_nms.onnx.obb.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-obb_nms.engine.obb.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsObb model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<ObbResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_obb(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb_nms.engine vs ORT baseline");
+}
+
+TEST_CASE("Regression: yolo11n-pose pose estimation TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-pose.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-pose.onnx.pose.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-pose.engine.pose.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsPose model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<KeyPointsResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_pose(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.engine vs ORT baseline");
+}
+
+TEST_CASE("Regression: yolo11n-pose_nms pose estimation TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-pose_nms.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-pose_nms.onnx.pose.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-pose_nms.engine.pose.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsPose model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<KeyPointsResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_pose(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.engine vs ORT baseline");
+}
+
+TEST_CASE("Regression: yolo11n-seg segmentation TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-seg.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-seg.onnx.seg.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-seg.engine.seg.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsSeg model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<InstanceSegResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_seg(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.engine vs ORT baseline");
+}
+
 TEST_CASE("Regression: yolo11n-seg segmentation", "[regression]") {
     auto modelfile = model_path("yolo11n-seg.onnx");
     if (!fs::exists(modelfile)) return;
