@@ -17,6 +17,8 @@ set(TEST_SOURCES
     test_vision_models.cpp
     test_processor_accuracy.cpp
     test_encryption.cpp
+    baseline_compare.cpp
+    baseline_utils.cpp
     utils.cpp
 )
 
@@ -25,7 +27,18 @@ target_link_libraries(test_modeldeploy PRIVATE
     ${LIBRARY_NAME}
     Catch2::Catch2WithMain
     ${OpenCV_LIBS})
-target_include_directories(test_modeldeploy PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(test_modeldeploy PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/application/third_party)   # nlohmann json
+
+# === 回归基线收集工具 ===
+add_executable(baseline_collect baseline_collect.cpp baseline_utils.cpp)
+target_link_libraries(baseline_collect PRIVATE
+    ${LIBRARY_NAME}
+    ${OpenCV_LIBS})
+target_include_directories(baseline_collect PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/application/third_party)
 
 add_test(NAME test_modeldeploy COMMAND test_modeldeploy)
 set_tests_properties(test_modeldeploy PROPERTIES
