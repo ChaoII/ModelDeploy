@@ -61,6 +61,7 @@ MD_TARGET_AVX512 void fused_preproc_avx512(const uint8_t* src, int src_w, int sr
     const __m512 b2 = _mm512_set1_ps(beta[2]);
     const __m512 padv = _mm512_set1_ps(pad_value);
 
+    #pragma omp parallel for schedule(static)
     for (int y = 0; y < dst_h; ++y) {
         const int base = y * dst_w;
         const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;

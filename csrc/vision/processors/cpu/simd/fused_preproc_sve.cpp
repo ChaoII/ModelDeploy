@@ -48,6 +48,7 @@ MD_TARGET_SVE void fused_preproc_sve(const uint8_t* src, int src_w, int src_h,
     const svfloat32_t b2 = svdup_f32(beta[2]);
     const svfloat32_t padv = svdup_f32(pad_value);
 
+    #pragma omp parallel for schedule(static)
     for (int y = 0; y < dst_h; ++y) {
         const int base = y * dst_w;
         const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;

@@ -56,6 +56,7 @@ void fused_preproc_neon(const uint8_t* src, int src_w, int src_h,
     const float32x4_t a2 = vdupq_n_f32(alpha[2]);
     const float32x4_t b2 = vdupq_n_f32(beta[2]);
 
+#pragma omp parallel for schedule(static)
     for (int y = 0; y < dst_h; ++y) {
         const int base = y * dst_w;
         const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;
