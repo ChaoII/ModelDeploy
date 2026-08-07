@@ -14,7 +14,7 @@
 基线覆盖三类输出：
 1. **预处理输出张量**（`preprocessor.run()` 之后的输入 Tensor）
 2. **模型原始推理输出**（`infer()` 之后的输出 Tensor，不经过后处理）
-3. **后处理结果**（`predict()` 后的结构化结果：Detection/Obb/Seg/Pose/Cls）
+3. **后处理结果**（`predict()` 后的结构化结果：Detection/Obb/Seg/Pose/Cls/OCR det/rec/cls）
 
 明确**不包含**：图像可视化结果对比（像素级）。
 
@@ -70,6 +70,9 @@ JSON 顶层结构：
 | Seg | `box`, `score`, `label_id`, `mask: {w,h,data}`（数据为 float32） |
 | Pose | `box`, `keypoints: [[x,y,score]...]`, `scores` |
 | Cls | `label_ids`, `scores` |
+| OCR det | `boxes: [[x1,y1,...,x4,y4]...]`（4 角点 8 值） |
+| OCR rec | `text`（字符串）, `rec_score` |
+| OCR cls | `cls_label`, `cls_score` |
 
 ## 对比阈值（浮动）
 
@@ -83,6 +86,9 @@ JSON 顶层结构：
 | Pose keypoints | ±1px |
 | Seg mask | 像素值差异 < 0.1%（计算不相等的像素比例） |
 | Cls | label 严格相等，top1 score ±0.01 |
+| OCR det 角点 | ±1px |
+| OCR rec text | 字符串严格相等 |
+| OCR rec/cls score | ±0.01 |
 | Tensor / 预处理数值 | ±1e-5 |
 | Tensor shape | 必须严格相等 |
 
@@ -92,7 +98,7 @@ JSON 顶层结构：
 
 ### baseline_utils.h / baseline_utils.cpp
 - `serialize_tensor(const Tensor&) -> json` / `deserialize_tensor(...)`
-- `serialize_xxx_result(...) -> json` / `deserialize_xxx_result(...)`（Detection/Obb/Seg/Pose/Cls）
+- `serialize_xxx_result(...) -> json` / `deserialize_xxx_result(...)`（Detection/Obb/Seg/Pose/Cls/OCR det/OCR rec/OCR cls）
 - `compare_results(基线, 当前) -> vector<string>`（返回差异描述，空则通过）
 - `compare_tensors(基线, 当前) -> vector<string>`
 - `load_baseline(path) / save_baseline(path, json)`
@@ -105,7 +111,7 @@ baseline_collect.exe --model <path> --image <path> --out <dir>
 - 加载模型（CPU ORT）
 - 跑 preprocess → 存 *.pre.json
 - 跑 infer → 存 *.raw.json
-- 跑 predict → 存 *.det/obb/seg/pose/cls.json
+- 跑 predict → 存 *.det/obb/seg/pose/cls/ocr-det/ocr-rec/ocr-cls.json
 - 输出提示已生成的基线文件
 
 ### baseline_compare.cpp（Catch2 测试，标签 `[regression]`）
@@ -138,8 +144,12 @@ baseline_collect.exe --model <path> --image <path> --out <dir>
 | yolo11n-obb_nms.onnx | test_obb1.jpg | obb |
 | yolo11n-cls.onnx | test_person.jpg | cls |
 | face/scrfd_*.onnx | test_face_detection.jpg | face det |
+| ocr/ppocrv4_mobile/det_infer.onnx | test_ocr.png | ocr det + pre + raw |
+| ocr/ppocrv4_mobile/rec_infer.onnx | test_ocr.png | ocr rec |
+| ocr/ppocrv4_mobile/cls_infer.onnx | test_ocr.png | ocr cls |
 
-OCR 模型（det/cls/rec）输出文本/四点多边形，阈值语义不同，本版本暂不纳入（可在后续扩展）。
+OCR 模型选择 ppocrv4_mobile 作为默认基线模型（v5/v6 可后续补充）。
+OCR 的 pre/raw 基线由 det_infer 模型产生。
 
 ## 错误处理
 
