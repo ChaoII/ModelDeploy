@@ -17,6 +17,7 @@ namespace modeldeploy::vision::baseline {
             case DataType::INT32: return "INT32";
             case DataType::INT64: return "INT64";
             case DataType::UINT8: return "UINT8";
+            case DataType::INT8: return "INT8";
             default: return "UNKNOWN";
         }
     }
@@ -36,18 +37,25 @@ namespace modeldeploy::vision::baseline {
         j["shape"] = t.shape();
         j["dtype"] = dtype_to_str(t.dtype());
         const size_t n = t.size();
+        j["numel"] = n;
+        if (n == 0) {
+            j["values"] = json::array();
+            j["stats"] = { {"min", 0}, {"max", 0}, {"mean", 0} };
+            return j;
+        }
+        const bool float_dtype = (t.dtype() == DataType::FP32 || t.dtype() == DataType::FP64);
+        if (!float_dtype) {
+            j["stats"] = { {"min", 0}, {"max", 0}, {"mean", 0} };
+            return j;
+        }
         const float* d = static_cast<const float*>(t.data());
         std::vector<float> vals;
         vals.reserve(std::min(n, MAX_TENSOR_ELEMS));
-        float mn = 0, mx = 0, sum = 0;
-        if (n > 0) { mn = mx = d[0]; }
         for (size_t i = 0; i < n && i < MAX_TENSOR_ELEMS; ++i) {
             float v = d[i];
             vals.push_back(std::roundf(v * 1e6f) / 1e6f);
-            if (i < n) { if (v < mn) mn = v; if (v > mx) mx = v; sum += v; }
         }
-        // 统计遍历全部
-        mn = d[0]; mx = d[0]; sum = 0;
+        float mn = d[0], mx = d[0], sum = 0;
         for (size_t i = 0; i < n; ++i) {
             float v = d[i];
             if (v < mn) mn = v;
@@ -58,7 +66,6 @@ namespace modeldeploy::vision::baseline {
         j["stats"] = { {"min", std::roundf(mn * 1e6f) / 1e6f},
                        {"max", std::roundf(mx * 1e6f) / 1e6f},
                        {"mean", std::roundf((sum / n) * 1e6f) / 1e6f} };
-        j["numel"] = n;
         return j;
     }
 
@@ -242,6 +249,8 @@ namespace modeldeploy::vision::baseline {
                 for (size_t k = 0; k < rs[i].keypoints.size(); ++k) {
                     check_coord("kp_x", b["keypoints"][k][0], rs[i].keypoints[k].x, &diffs);
                     check_coord("kp_y", b["keypoints"][k][1], rs[i].keypoints[k].y, &diffs);
+                    if (b["keypoints"][k].size() > 2)
+                        check_coord("kp_z", b["keypoints"][k][2], rs[i].keypoints[k].z, &diffs);
                 }
             }
         }
@@ -252,6 +261,8 @@ namespace modeldeploy::vision::baseline {
         std::vector<std::string> diffs;
         if (base["label_ids"].size() != r.label_ids.size())
             return {"label count mismatch"};
+        if (base["scores"].size() != r.scores.size())
+            return {"score count mismatch"};
         for (size_t i = 0; i < r.label_ids.size(); ++i) {
             if ((int)base["label_ids"][i] != r.label_ids[i])
                 diffs.push_back(fmt("label_ids[%zu] mismatch: base=%d cur=%d", i, (int)base["label_ids"][i], r.label_ids[i]));
@@ -296,9 +307,14 @@ namespace modeldeploy::vision::baseline {
         if (base["dtype"].get<std::string>() != dtype_to_str(cur.dtype()))
             return {"tensor dtype mismatch"};
         const size_t n = cur.size();
-        const float* d = static_cast<const float*>(cur.data());
         if (base["numel"].get<size_t>() != n)
             return {"tensor numel mismatch"};
+        if (n == 0)
+            return diffs;
+        const bool float_dtype = (cur.dtype() == DataType::FP32 || cur.dtype() == DataType::FP64);
+        if (!float_dtype)
+            return {"tensor dtype not supported for value comparison"};
+        const float* d = static_cast<const float*>(cur.data());
         // 统计比较
         float mn = d[0], mx = d[0], sum = 0;
         for (size_t i = 0; i < n; ++i) { if (d[i] < mn) mn = d[i]; if (d[i] > mx) mx = d[i]; sum += d[i]; }
@@ -307,6 +323,8 @@ namespace modeldeploy::vision::baseline {
         if (std::fabs((float)base["stats"]["mean"] - sum / n) > TENSOR_TOL) diffs.push_back("tensor mean mismatch");
         // 抽样比较
         size_t m = std::min(n, MAX_TENSOR_ELEMS);
+        if (!base.contains("values") || base["values"].size() != m)
+            return {"tensor values array mismatch"};
         for (size_t i = 0; i < m; ++i) {
             float bv = base["values"][i];
             if (std::fabs(bv - d[i]) > TENSOR_TOL) {
