@@ -52,6 +52,13 @@ static RuntimeOption cpu_option() {
     return opt;
 }
 
+static RuntimeOption trt_option() {
+    RuntimeOption opt;
+    opt.use_gpu(0);
+    opt.use_trt_backend();
+    return opt;
+}
+
 static void require_no_diff(const std::vector<std::string>& diffs) {
     for (const auto& d : diffs) FAIL_CHECK(d);
 }
@@ -121,6 +128,126 @@ TEST_CASE("Regression: yolo11n_nms detection", "[regression]") {
     std::vector<DetectionResult> results;
     REQUIRE(model.predict(img, &results, nullptr));
     require_no_diff(compare_detection(load_json(base_file)["results"], results));
+}
+
+TEST_CASE("Regression: yolo11n detection MNN", "[regression][backend:mnn]") {
+    auto modelfile = model_path("yolo11n.mnn", "mnn");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_detection0.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
+    auto self_file = baseline_dir("mnn") / "yolo11n.mnn.det.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsDet model(modelfile.string(), cpu_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<DetectionResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_detection(load_json(self_file)["results"], results));
+    }
+    require_no_diff(compare_detection(load_json(ort_file)["results"], results));
+}
+
+TEST_CASE("Regression: yolo11n_nms detection MNN", "[regression][backend:mnn]") {
+    auto modelfile = model_path("yolo11n_nms.mnn", "mnn");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_detection0.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n_nms.onnx.det.json";
+    auto self_file = baseline_dir("mnn") / "yolo11n_nms.mnn.det.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsDet model(modelfile.string(), cpu_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<DetectionResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_detection(load_json(self_file)["results"], results));
+    }
+    require_no_diff(compare_detection(load_json(ort_file)["results"], results));
+}
+
+TEST_CASE("Regression: yolo11n detection TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_detection0.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
+    auto self_file = baseline_dir("trt") / "yolo11n.engine.det.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsDet model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<DetectionResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_detection(load_json(self_file)["results"], results));
+    }
+    require_no_diff(compare_detection(load_json(ort_file)["results"], results));
+}
+
+TEST_CASE("Regression: yolo11n_nms detection TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n_nms.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_detection0.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n_nms.onnx.det.json";
+    auto self_file = baseline_dir("trt") / "yolo11n_nms.engine.det.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsDet model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<DetectionResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_detection(load_json(self_file)["results"], results));
+    }
+    require_no_diff(compare_detection(load_json(ort_file)["results"], results));
+}
+
+TEST_CASE("Regression: yolo11n-seg_nms segmentation TRT", "[regression][backend:trt]") {
+    auto modelfile = model_path("yolo11n-seg_nms.engine", "trt");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.jpg");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-seg_nms.onnx.seg.json";
+    auto self_file = baseline_dir("trt") / "yolo11n-seg_nms.engine.seg.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsSeg model(modelfile.string(), trt_option());
+    REQUIRE(model.is_initialized());
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<InstanceSegResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_seg(load_json(self_file)["results"], results));
+    }
+    require_no_diff(compare_seg(load_json(ort_file)["results"], results));
 }
 
 TEST_CASE("Regression: yolo11n-seg segmentation", "[regression]") {
