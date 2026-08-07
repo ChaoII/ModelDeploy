@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cctype>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -43,6 +44,7 @@ namespace {
         std::string out;
         std::string type;
         std::string family;
+        std::string backend = "ort";
     };
 
     Args parse_args(int argc, char** argv) {
@@ -54,6 +56,7 @@ namespace {
             else if (k == "--out" && i + 1 < argc) a.out = argv[++i];
             else if (k == "--type" && i + 1 < argc) a.type = argv[++i];
             else if (k == "--family" && i + 1 < argc) a.family = argv[++i];
+            else if (k == "--backend" && i + 1 < argc) a.backend = argv[++i];
         }
         return a;
     }
@@ -62,7 +65,44 @@ namespace {
         std::cerr
             << "usage: baseline_collect --model <path> --image <path> --out <dir>"
             << " --type <det|obb|seg|pose|cls|face_det|ocr_det|ocr_rec|ocr_cls|pre|raw>"
-            << " [--family <det|obb|seg|pose|cls|face_det|ocr_det|ocr_rec|ocr_cls>]\n";
+            << " [--family <det|obb|seg|pose|cls|face_det|ocr_det|ocr_rec|ocr_cls>]"
+            << " [--backend <ort|mnn|trt|sophgo>]\n";
+    }
+
+    fs::path get_test_data() {
+        const char* env = std::getenv("TEST_DATA_DIR");
+        if (env && *env) return fs::path(env) / "test_data";
+        return fs::path("test_data");
+    }
+
+    std::string backend_to_ext(const std::string& backend) {
+        if (backend == "mnn") return ".mnn";
+        if (backend == "trt") return ".engine";
+        if (backend == "sophgo") return ".bmodel";
+        return ".onnx"; // ort 默认
+    }
+
+    // test_models 目录按模型格式命名，ort 后端对应 onnx 目录
+    std::string backend_to_model_dir(const std::string& backend) {
+        if (backend == "ort") return "onnx";
+        return backend;
+    }
+
+    // --model 若给的是相对文件名，则按 test_models/<backend>/ 补全
+    void resolve_model_path(Args& args) {
+        if (args.model.empty() || fs::exists(args.model)) {
+            return;
+        }
+        fs::path name(args.model);
+        if (name.extension().empty()) {
+            name += backend_to_ext(args.backend);
+        }
+        const fs::path guess =
+            get_test_data() / "test_models" / backend_to_model_dir(args.backend) / name;
+        if (fs::exists(guess)) {
+            std::cerr << "resolved model: " << guess.string() << std::endl;
+            args.model = guess.string();
+        }
     }
 
     std::string to_lower(std::string s) {
@@ -488,7 +528,9 @@ namespace {
 
 int main(int argc, char** argv) {
     try {
-        return run(parse_args(argc, argv));
+        Args args = parse_args(argc, argv);
+        resolve_model_path(args);
+        return run(args);
     } catch (const std::exception& e) {
         std::cerr << "error: " << e.what() << std::endl;
         return 1;
