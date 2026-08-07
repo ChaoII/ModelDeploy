@@ -24,10 +24,14 @@ static fs::path get_test_data() {
     return fs::current_path() / "test_data";
 }
 
-static fs::path baseline_dir() { return get_test_data().parent_path() / "tests" / "baselines"; }
+static fs::path baseline_root() { return get_test_data().parent_path() / "tests" / "baselines"; }
 
-static fs::path model_path(const std::string& rel) {
-    return get_test_data() / "test_models" / rel;
+static fs::path baseline_dir(const std::string& backend) {
+    return baseline_root() / backend;
+}
+
+static fs::path model_path(const std::string& rel, const std::string& backend = "onnx") {
+    return get_test_data() / "test_models" / backend / rel;
 }
 
 static fs::path image_path(const std::string& name) {
@@ -82,7 +86,7 @@ TEST_CASE("Regression: yolo11n detection + pre/raw", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_detection0.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n.onnx.det.json";
+    auto base_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
     if (!fs::exists(base_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
@@ -96,8 +100,8 @@ TEST_CASE("Regression: yolo11n detection + pre/raw", "[regression]") {
     require_no_diff(compare_detection(load_json(base_file)["results"], results));
 
     compare_yolo_pre_raw(model, img,
-                         baseline_dir() / "yolo11n.onnx.pre.json",
-                         baseline_dir() / "yolo11n.onnx.raw.json");
+                         baseline_dir("ort") / "yolo11n.onnx.pre.json",
+                         baseline_dir("ort") / "yolo11n.onnx.raw.json");
 }
 
 TEST_CASE("Regression: yolo11n_nms detection", "[regression]") {
@@ -105,7 +109,7 @@ TEST_CASE("Regression: yolo11n_nms detection", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_detection0.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n_nms.onnx.det.json";
+    auto base_file = baseline_dir("ort") / "yolo11n_nms.onnx.det.json";
     if (!fs::exists(base_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
@@ -124,7 +128,7 @@ TEST_CASE("Regression: yolo11n-seg segmentation", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_person.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n-seg.onnx.seg.json";
+    auto base_file = baseline_dir("ort") / "yolo11n-seg.onnx.seg.json";
     if (!fs::exists(base_file)) return;
 
     UltralyticsSeg model(modelfile.string(), cpu_option());
@@ -143,7 +147,7 @@ TEST_CASE("Regression: yolo11n-pose pose estimation", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_person.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n-pose.onnx.pose.json";
+    auto base_file = baseline_dir("ort") / "yolo11n-pose.onnx.pose.json";
     if (!fs::exists(base_file)) return;
 
     UltralyticsPose model(modelfile.string(), cpu_option());
@@ -162,7 +166,7 @@ TEST_CASE("Regression: yolo11n-obb obb detection", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_obb1.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n-obb.onnx.obb.json";
+    auto base_file = baseline_dir("ort") / "yolo11n-obb.onnx.obb.json";
     if (!fs::exists(base_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
@@ -181,7 +185,7 @@ TEST_CASE("Regression: yolo11n-obb_nms obb detection", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_obb1.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n-obb_nms.onnx.obb.json";
+    auto base_file = baseline_dir("ort") / "yolo11n-obb_nms.onnx.obb.json";
     if (!fs::exists(base_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
@@ -200,7 +204,7 @@ TEST_CASE("Regression: yolo11n-cls classification", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_person.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "yolo11n-cls.onnx.cls.json";
+    auto base_file = baseline_dir("ort") / "yolo11n-cls.onnx.cls.json";
     if (!fs::exists(base_file)) return;
 
     Classification model(modelfile.string(), cpu_option());
@@ -219,7 +223,7 @@ TEST_CASE("Regression: scrfd face detection", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_face_detection.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "scrfd_2.5g_bnkps_shape640x640.onnx.face_det.json";
+    auto base_file = baseline_dir("ort") / "scrfd_2.5g_bnkps_shape640x640.onnx.face_det.json";
     if (!fs::exists(base_file)) return;
 
     Scrfd model(modelfile.string(), cpu_option());
@@ -238,7 +242,7 @@ TEST_CASE("Regression: ppocrv4 det + pre/raw", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_ocr.png");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "det_infer.onnx.ocr_det.json";
+    auto base_file = baseline_dir("ort") / "det_infer.onnx.ocr_det.json";
     if (!fs::exists(base_file)) return;
 
     DBDetector model(modelfile.string(), cpu_option());
@@ -258,8 +262,8 @@ TEST_CASE("Regression: ppocrv4 det + pre/raw", "[regression]") {
     REQUIRE(model.infer(inputs, &outputs));
     REQUIRE_FALSE(inputs.empty());
     REQUIRE_FALSE(outputs.empty());
-    check_tensors({baseline_dir() / "det_infer.onnx.pre.json",
-                   baseline_dir() / "det_infer.onnx.raw.json"},
+    check_tensors({baseline_dir("ort") / "det_infer.onnx.pre.json",
+                   baseline_dir("ort") / "det_infer.onnx.raw.json"},
                   {inputs[0], outputs[0]});
 }
 
@@ -269,7 +273,7 @@ TEST_CASE("Regression: ppocrv4 rec", "[regression]") {
     // rec 模型输入为单行文本裁剪图，整图（test_ocr.png）会因输出空容器崩溃/失败
     auto imgf = image_path("test_ocr_recognition.jpg");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "rec_infer.onnx.ocr_rec.json";
+    auto base_file = baseline_dir("ort") / "rec_infer.onnx.ocr_rec.json";
     if (!fs::exists(base_file)) return;
     auto dict = get_test_data() / "ppocrv4_dict.txt";
     if (!fs::exists(dict)) return;
@@ -291,7 +295,7 @@ TEST_CASE("Regression: ppocrv4 cls", "[regression]") {
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_ocr.png");
     if (!fs::exists(imgf)) return;
-    auto base_file = baseline_dir() / "cls_infer.onnx.ocr_cls.json";
+    auto base_file = baseline_dir("ort") / "cls_infer.onnx.ocr_cls.json";
     if (!fs::exists(base_file)) return;
 
     Classifier model(modelfile.string(), cpu_option());
