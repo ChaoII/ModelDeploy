@@ -86,7 +86,8 @@ namespace {
     }
 
     // pre/raw 模式下根据模型文件名/路径推断模型族（best-effort，建议显式传 --family）
-    std::string auto_detect_family(const std::string& model_file) {
+    std::string auto_detect_family(const std::string& model_file, bool* defaulted = nullptr) {
+        if (defaulted) *defaulted = false;
         const std::string path = to_lower(fs::absolute(model_file).string());
         const std::string name = to_lower(fs::path(model_file).filename().string());
         if (path.find("scrfd") != std::string::npos) return "face_det";
@@ -100,6 +101,7 @@ namespace {
         if (name.find("seg") != std::string::npos) return "seg";
         if (name.find("obb") != std::string::npos) return "obb";
         if (name.find("cls") != std::string::npos) return "cls";
+        if (defaulted) *defaulted = true;
         return "det";
     }
 
@@ -146,6 +148,11 @@ namespace {
             return false;
         }
         ofs << j.dump(2);
+        ofs.flush();
+        if (!ofs.good()) {
+            std::cerr << "error: failed writing " << out << std::endl;
+            return false;
+        }
         if (out_path) *out_path = out.string();
         return true;
     }
@@ -414,9 +421,22 @@ namespace {
 
         const std::string& type = args.type;
         const bool is_tensor_mode = (type == "pre" || type == "raw");
+        if (!args.family.empty() && !is_tensor_mode) {
+            std::cerr << "warning: --family is ignored for --type " << type << "\n";
+        }
         std::string family;
         if (is_tensor_mode) {
-            family = args.family.empty() ? auto_detect_family(args.model) : args.family;
+            if (!args.family.empty()) {
+                family = args.family;
+            } else {
+                bool defaulted = false;
+                family = auto_detect_family(args.model, &defaulted);
+                if (defaulted) {
+                    std::cerr << "auto-detected family: " << family << " (default)\n";
+                } else {
+                    std::cerr << "auto-detected family: " << family << "\n";
+                }
+            }
         } else {
             family = type;
         }
