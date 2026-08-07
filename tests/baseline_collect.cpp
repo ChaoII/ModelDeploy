@@ -167,12 +167,20 @@ namespace {
         return opt;
     }
 
-    json make_meta(const std::string& model_file, const std::string& image_file) {
+    static std::string backend_device_label(const std::string& backend) {
+        if (backend == "trt") return "trt-gpu";
+        if (backend == "sophgo") return "sophgo-tpu";
+        if (backend == "mnn") return "mnn-cpu";
+        return "ort-cpu";
+    }
+
+    json make_meta(const std::string& model_file, const std::string& image_file,
+                   const std::string& backend) {
         return json{
             {"model", fs::path(model_file).filename().string()},
             {"image", fs::path(image_file).filename().string()},
             {"date", current_date()},
-            {"backend", "ort-cpu"},
+            {"backend", backend_device_label(backend)},
         };
     }
 
@@ -483,7 +491,7 @@ namespace {
         const std::string mode = is_tensor_mode ? type : "result";
 
         json j;
-        j["meta"] = make_meta(args.model, args.image);
+        j["meta"] = make_meta(args.model, args.image, args.backend);
 
         bool ok = false;
         if (family == "det") {
