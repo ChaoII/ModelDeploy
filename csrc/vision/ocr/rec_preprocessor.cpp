@@ -57,6 +57,7 @@ namespace modeldeploy::vision::ocr {
         const int n = static_cast<int>(image_batch.size());
         if (n == 1) {
             const ImageData& image = image_batch[0];
+            outputs->resize(1);
             int resize_w;
             if (!static_shape_infer_) {
                 const float ratio = static_cast<float>(image.width()) / static_cast<float>(image.height());
