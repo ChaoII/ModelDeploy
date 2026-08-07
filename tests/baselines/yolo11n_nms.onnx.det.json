@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "backend": "ort-cpu",
+    "date": "2026-08-07",
+    "image": "test_detection0.jpg",
+    "model": "yolo11n_nms.onnx"
+  },
+  "results": [
+    {
+      "box": {
+        "height": 319.0,
+        "width": 178.0,
+        "x": 133.0,
+        "y": 222.0
+      },
+      "label_id": 16,
+      "score": 0.9466860294342041
+    },
+    {
+      "box": {
+        "height": 286.0,
+        "width": 438.0,
+        "x": 129.0,
+        "y": 133.0
+      },
+      "label_id": 1,
+      "score": 0.9278979897499084
+    },
+    {
+      "box": {
+        "height": 98.0,
+        "width": 218.0,
+        "x": 471.0,
+        "y": 74.0
+      },
+      "label_id": 2,
+      "score": 0.5422760248184204
+    },
+    {
+      "box": {
+        "height": 99.0,
+        "width": 218.0,
+        "x": 470.0,
+        "y": 75.0
+      },
+      "label_id": 7,
+      "score": 0.5094239711761475
+    }
+  ]
+}

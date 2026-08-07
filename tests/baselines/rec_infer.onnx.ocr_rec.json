@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "backend": "ort-cpu",
+    "date": "2026-08-07",
+    "image": "test_ocr_recognition.jpg",
+    "model": "rec_infer.onnx"
+  },
+  "results": {
+    "score": 0.9978910088539124,
+    "text": "力鸿检验集团有限公司山东分公司"
+  }
+}

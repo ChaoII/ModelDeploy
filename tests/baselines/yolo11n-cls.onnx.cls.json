@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "backend": "ort-cpu",
+    "date": "2026-08-07",
+    "image": "test_person.jpg",
+    "model": "yolo11n-cls.onnx"
+  },
+  "results": {
+    "label_ids": [
+      840
+    ],
+    "scores": [
+      1.0
+    ]
+  }
+}

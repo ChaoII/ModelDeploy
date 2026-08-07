@@ -7,7 +7,7 @@ namespace modeldeploy::vision::baseline {
     static constexpr float COORD_TOL = 1.0f;   // px
     static constexpr float ANGLE_TOL = 0.5f;   // degrees
     static constexpr float SCORE_TOL = 0.01f;
-    static constexpr float TENSOR_TOL = 1e-5f;
+    static constexpr float TENSOR_TOL = 1e-4f;  // 容忍预处理并行 reduce 的微小数值抖动
     static constexpr size_t MAX_TENSOR_ELEMS = 10000;
 
     std::string dtype_to_str(DataType dtype) {

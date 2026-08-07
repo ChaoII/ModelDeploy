@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "backend": "ort-cpu",
+    "date": "2026-08-07",
+    "image": "test_ocr.png",
+    "model": "cls_infer.onnx"
+  },
+  "results": {
+    "label": 0,
+    "score": 0.7426720261573792
+  }
+}

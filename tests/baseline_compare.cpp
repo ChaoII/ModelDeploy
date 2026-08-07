@@ -266,7 +266,8 @@ TEST_CASE("Regression: ppocrv4 det + pre/raw", "[regression]") {
 TEST_CASE("Regression: ppocrv4 rec", "[regression]") {
     auto modelfile = model_path("ocr/ppocrv4_mobile/rec_infer.onnx");
     if (!fs::exists(modelfile)) return;
-    auto imgf = image_path("test_ocr.png");
+    // rec 模型输入为单行文本裁剪图，整图（test_ocr.png）会因输出空容器崩溃/失败
+    auto imgf = image_path("test_ocr_recognition.jpg");
     if (!fs::exists(imgf)) return;
     auto base_file = baseline_dir() / "rec_infer.onnx.ocr_rec.json";
     if (!fs::exists(base_file)) return;
