@@ -160,10 +160,14 @@ namespace {
         return "test_data/ppocrv4_dict.txt";
     }
 
-    modeldeploy::RuntimeOption make_option() {
+    modeldeploy::RuntimeOption make_option(const std::string& backend) {
         modeldeploy::RuntimeOption opt;
-        opt.use_cpu();
-        opt.set_cpu_thread_num(4);
+        if (backend == "trt") {
+            opt.use_gpu(0);
+        } else {
+            opt.use_cpu();
+            opt.set_cpu_thread_num(4);
+        }
         return opt;
     }
 
@@ -341,7 +345,7 @@ namespace {
     template <typename Model, typename Result>
     bool collect_yolo(const Args& args, const ImageData& img, json* j, const std::string& mode,
                       json (*ser)(const std::vector<Result>&)) {
-        Model model(args.model, make_option());
+        Model model(args.model, make_option(args.backend));
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
@@ -360,7 +364,7 @@ namespace {
     }
 
     bool collect_cls(const Args& args, const ImageData& img, json* j, const std::string& mode) {
-        modeldeploy::vision::classification::Classification model(args.model, make_option());
+        modeldeploy::vision::classification::Classification model(args.model, make_option(args.backend));
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
@@ -379,7 +383,7 @@ namespace {
     }
 
     bool collect_face(const Args& args, const ImageData& img, json* j, const std::string& mode) {
-        modeldeploy::vision::face::Scrfd model(args.model, make_option());
+        modeldeploy::vision::face::Scrfd model(args.model, make_option(args.backend));
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
@@ -398,7 +402,7 @@ namespace {
     }
 
     bool collect_ocr_det(const Args& args, const ImageData& img, json* j, const std::string& mode) {
-        modeldeploy::vision::ocr::DBDetector model(args.model, make_option());
+        modeldeploy::vision::ocr::DBDetector model(args.model, make_option(args.backend));
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
@@ -417,7 +421,7 @@ namespace {
     }
 
     bool collect_ocr_rec(const Args& args, const ImageData& img, json* j, const std::string& mode) {
-        modeldeploy::vision::ocr::Recognizer model(args.model, find_rec_dict(args.model), make_option());
+        modeldeploy::vision::ocr::Recognizer model(args.model, find_rec_dict(args.model), make_option(args.backend));
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
@@ -437,7 +441,7 @@ namespace {
     }
 
     bool collect_ocr_cls(const Args& args, const ImageData& img, json* j, const std::string& mode) {
-        modeldeploy::vision::ocr::Classifier model(args.model, make_option());
+        modeldeploy::vision::ocr::Classifier model(args.model, make_option(args.backend));
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
