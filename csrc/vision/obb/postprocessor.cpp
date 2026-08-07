@@ -78,7 +78,7 @@ namespace modeldeploy::vision::detection {
         const std::vector<Tensor>& tensors, std::vector<std::vector<ObbResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         const size_t batch = tensors[0].shape()[0];
-        // transpose(1,300,7)(xc, yc, w, h angle,score label_id)
+        // transpose(1,300,7)(xc, yc, w, h, score, label_id, angle)
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             if (tensors[0].dtype() != DataType::FP32) {
@@ -87,26 +87,26 @@ namespace modeldeploy::vision::detection {
             }
             // 官方模型为300
             const auto dim1 = tensors[0].shape()[1];
-            // 官方模型为7 (xc, yc, w, h angle,score label_id)
+            // 官方模型为7 (xc, yc, w, h, score, label_id, angle)
             const auto dim2 = tensors[0].shape()[2];
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<ObbResult> _results;
             _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 const auto attr_ptr = data + i * dim2;
-                float score = attr_ptr[5];
+                float score = attr_ptr[4];
                 // filter boxes by conf_threshold
                 if (score <= conf_threshold_) {
                     continue;
                 }
-                auto label_id = static_cast<int32_t>(attr_ptr[6]);
-                // convert from [xc, yc, w, h, angle, score, label_id]
-                // 带 NMS 输出布局 (dim2=7)：angle 在索引 4（弧度制）
+                auto label_id = static_cast<int32_t>(attr_ptr[5]);
+                // convert from [xc, yc, w, h, score, label_id, angle]
+                // 带 NMS 输出布局 (dim2=7)：angle 在索引 6（弧度制）
                 // OpenCV 的 RotatedRect 旋转角度默认角度制
                 RotatedRect rotated_boxes = {
                     attr_ptr[0], attr_ptr[1],
                     attr_ptr[2], attr_ptr[3],
-                    attr_ptr[4] * 180 / 3.141592653f
+                    attr_ptr[6] * 180 / 3.141592653f
                 };
                 _results.push_back({rotated_boxes, label_id, score});
             }

@@ -22,7 +22,7 @@ using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::detection;
 
 // ============ Bug1: OBB 带 NMS 角度取错索引 ============
-// 输出布局 (dim2=7): [xc, yc, w, h, angle(弧度), score, label_id]
+// 输出布局 (dim2=7): [xc, yc, w, h, score, label_id, angle(弧度)]
 TEST_CASE("OBB with NMS uses correct angle index", "[bugfix]") {
     UltralyticsObbPostprocessor post;
     post.set_conf_threshold(0.25f);
@@ -35,9 +35,9 @@ TEST_CASE("OBB with NMS uses correct angle index", "[bugfix]") {
     data[1] = 100.0f;  // yc
     data[2] = 50.0f;   // w
     data[3] = 30.0f;   // h
-    data[4] = 0.5f;    // angle = 0.5 rad（正确索引）
-    data[5] = 0.9f;    // score
-    data[6] = 3.0f;    // label_id（若被误当 angle，结果会异常）
+    data[4] = 0.9f;    // score（正确索引）
+    data[5] = 3.0f;    // label_id
+    data[6] = 0.5f;    // angle = 0.5 rad（若被误当 angle，结果会异常）
 
     Tensor t;
     t.allocate({1, 1, dim2}, DataType::FP32);
@@ -80,3 +80,4 @@ TEST_CASE("Runtime bind output shares external buffer", "[bugfix]") {
     out_buf[0] = 55.0f;
     REQUIRE(static_cast<float*>(bound->data())[0] == 55.0f);
 }
+
