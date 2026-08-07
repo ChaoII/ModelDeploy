@@ -549,14 +549,16 @@ namespace modeldeploy {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         if (deleter) {
-            // 使用外部内存和自定义删除器
+            // 使用外部内存和自定义删除器（析构时调用 deleter 释放）
             memory_ = std::make_shared<MemoryBlock>(data, total_size, device, std::move(deleter));
             owns_data_ = false;
         }
         else {
-            // 复制外部数据
-            memory_ = std::make_shared<MemoryBlock>(data, total_size, device);
-            owns_data_ = true;
+            // 共享外部内存：不拷贝、不拥有，内存生命周期由调用方管理（符合头文件注释语义）。
+            // deleter 为空时传入空 lambda 以走共享分支（MemoryBlock 仅存指针，析构不 free）。
+            memory_ = std::make_shared<MemoryBlock>(data, total_size, device,
+                                                    [](void*) {});
+            owns_data_ = false;
         }
         data_ptr_ = memory_->data();
         calculate_strides();

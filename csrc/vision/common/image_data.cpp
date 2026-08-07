@@ -238,33 +238,32 @@ namespace modeldeploy::vision {
         }
         const float scale_factor = scale ? 1.0f / 255.0f : 1.0f;
         cv::Mat converted;
+        bool need_convert = false;
         if (dtype == "float" || dtype == "float32" || dtype == "fp32") {
-            if (impl_->mat.type() != CV_32FC(impl_->channels)) {
+            if (impl_->mat.type() != CV_32FC(impl_->channels) || scale) {
                 impl_->mat.convertTo(converted, CV_32FC(impl_->channels), scale_factor);
-            }
-            else {
-                converted = impl_->mat.clone();
+                need_convert = true;
             }
         }
         else if (dtype == "float16" || dtype == "fp16") {
-            if (impl_->mat.type() != CV_16FC(impl_->channels)) {
+            if (impl_->mat.type() != CV_16FC(impl_->channels) || scale) {
                 impl_->mat.convertTo(converted, CV_16FC(impl_->channels), scale_factor);
-            }
-            else {
-                converted = impl_->mat.clone();
+                need_convert = true;
             }
         }
         else if (dtype == "double" || dtype == "float64" || dtype == "fp64") {
-            if (impl_->mat.type() != CV_64FC(impl_->channels)) {
+            if (impl_->mat.type() != CV_64FC(impl_->channels) || scale) {
                 impl_->mat.convertTo(converted, CV_64FC(impl_->channels), scale_factor);
-            }
-            else {
-                converted = impl_->mat.clone();
+                need_convert = true;
             }
         }
         else {
             MD_LOG_WARN << "Cast not supported for " << dtype << ", returning original image." << std::endl;
             return clone();
+        }
+        if (!need_convert) {
+            // 类型已匹配且无需缩放：浅拷贝共享底层数据（零拷贝）
+            return *this;
         }
         return ImageData(std::move(converted));
     }
@@ -403,12 +402,8 @@ namespace modeldeploy::vision {
         cv::split(impl_->mat, split_image);
         std::swap(split_image[0], split_image[2]);
         for (int c = 0; c < channels(); ++c) {
-            // 转换为浮点并归一化
-            cv::Mat channel_float;
-            split_image[c].convertTo(channel_float, CV_32FC1, alpha[c], beta[c]);
-            // 展平为一行
-            channel_float = channel_float.reshape(1, 1);
-            channel_float.copyTo(chw_image.row(c));
+            // 转换为浮点并归一化，直接写入 chw_image 的对应行（避免中间 channel_float 分配+拷贝）
+            split_image[c].reshape(1, 1).convertTo(chw_image.row(c), CV_32FC1, alpha[c], beta[c]);
         }
 
         ImageData dst_image;
@@ -425,15 +420,13 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "channels must be 3 and alpha/beta size must be 3" << std::endl;
             return ImageData();
         }
-        const cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
+        cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
         std::vector<cv::Mat> split_image;
         cv::split(impl_->mat, split_image);
         std::swap(split_image[0], split_image[2]);
         for (int c = 0; c < channels(); ++c) {
-            cv::Mat channel_float;
-            split_image[c].convertTo(channel_float, CV_32FC1, alpha[c], beta[c]);
-            channel_float = channel_float.reshape(1, 1);
-            channel_float.copyTo(chw_image.row(c));
+            // 直接写入 chw_image 对应行（避免中间 channel_float 分配+拷贝）
+            split_image[c].reshape(1, 1).convertTo(chw_image.row(c), CV_32FC1, alpha[c], beta[c]);
         }
         ImageData dst_image;
         dst_image.impl_ = std::make_shared<ImageDataImpl>();
