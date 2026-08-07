@@ -8,9 +8,9 @@
 现有回归基线测试系统（`docs/superpowers/specs/2026-08-07-regression-baseline-design.md`）已覆盖 11 个 ORT 模型。但项目支持多种推理后端（ORT/MNN/TRT/SOPHGO），各后端用不同模型格式（onnx/mnn/engine/bmodel）。
 
 需求：
-1. 为 5 个关键模型（yolo11n、yolo11n_nms、yolo11n-seg_nms、yolo11n-obb_nms、yolo11n-pose_nms）在**各后端**建立基线，"应转尽转"（onnx/mnn/engine/bmodel）
+1. **全覆盖迁移**：所有视觉模型（yolo 系、plate、zhgd、face、ocr 结构等）的 onnx 移入 `onnx/` 分目录，音频模型保持原位
 2. 按**后端分目录**组织模型文件和基线
-3. 跨后端对比验证精度一致性——特别是 **int8 量化模型**的精度损失对比（用户明确视为价值）
+3. **yolo 系优先**转换多后端格式（mnn/engine/bmodel），验证跨后端精度一致性——特别是 **int8 量化模型**的精度损失对比（用户明确视为价值）
 4. 后续新加后端可无缝扩展测试
 
 ## 目录结构
@@ -18,14 +18,21 @@
 ### 模型文件
 ```
 test_data/test_models/
-├── onnx/   yolo11n.onnx, yolo11n_nms.onnx, yolo11n-seg_nms.onnx, yolo11n-obb_nms.onnx, yolo11n-pose_nms.onnx
-├── mnn/    yolo11n.mnn, yolo11n_nms.mnn, yolo11n-seg_nms.mnn, yolo11n-obb_nms.mnn, yolo11n-pose_nms.mnn
-├── trt/    yolo11n.engine, yolo11n_nms.engine, yolo11n-seg_nms.engine, yolo11n-obb_nms.engine, yolo11n-pose_nms.engine
-└── sophgo/ yolo11n.bmodel, yolo11n_nms.bmodel, yolo11n-seg_nms.bmodel, yolo11n-obb_nms.bmodel, yolo11n-pose_nms.bmodel
+├── onnx/   yolo11n.onnx, yolo11n_nms.onnx, yolo11n-cls.onnx, yolo11n-obb.onnx, yolo11n-obb_nms.onnx,
+│           yolo11n-pose.onnx, yolo11n-pose_nms.onnx, yolo11n-seg.onnx, yolo11n-seg_nms.onnx,
+│           yolo11n_without_nms.onnx, yolov5plate.onnx, plate_recognition_color.onnx,
+│           zhgd_det.onnx, zhgd_det_20251219.onnx, zhgd_ml.onnx, zhgd_ml_20251219.onnx,
+│           zc.onnx, best.onnx, line_edit.onnx, model.onnx
+│           face/（scrfd、age、gender、recognition、fas 等全部移入）
+│           ocr/（SLANet、SLANeXt 结构分析等全部移入）
+├── mnn/    yolo11n.mnn, yolo11n_nms.mnn, ...（yolo 系转换）
+├── trt/    yolo11n.engine, yolo11n_nms.engine, ...（yolo 系转换）
+└── sophgo/ yolo11n.bmodel, ...（yolo 系转换）
 ```
-- ORT 模型从 `test_data/test_models/*.onnx` 迁入 `test_data/test_models/onnx/`
-- 现有 face/ocr 等子目录保持原位（不在本设计范围）
-- 其他散落的 onnx（zhgd、line_edit、best 等）**不迁移**，仅迁移 5 个关键模型
+- **全覆盖迁移**：所有根目录 onnx + face/ + ocr/ 结构模型移入 `onnx/`
+- **音频保持原位**：sense_voice/、kokoro_v1_1/ 不迁移（音频不走 vision 后端路径）
+- **杂项归类**：`model.engine`、`model.mdenc`、加密模型（yolo11n_nms_encrypted.mdenc 等）归入对应后端目录或 `misc/`
+- 原 `face/`、`ocr/` 子目录在 onnx/ 下**保留子目录结构**（onnx/face/、onnx/ocr/），避免与根目录 onnx 冲突
 
 ### 基线文件
 ```
@@ -38,17 +45,27 @@ tests/baselines/
 - 基线文件名沿用 `<模型文件名>.<type>.json` 约定
 - 迁移：`tests/baselines/*.json` → `tests/baselines/ort/`
 
-## 关键模型清单
+## 模型清单
 
+### 全覆盖迁移（onnx/）
+所有视觉模型 onnx 移入 `onnx/`，包括：yolo11n 全家、yolov5plate、plate_recognition_color、zhgd_det/zhgd_ml（含 20251219 版）、zc、best、line_edit、model、face/ 全部、ocr/ 结构模型全部。
+
+### 多后端转换（yolo 系优先）
 | 模型 | onnx | mnn | trt | bmodel |
 |------|------|-----|-----|--------|
-| yolo11n | 迁移 | 需转换 | 已有(移入) | 需转换 |
-| yolo11n_nms | 迁移 | 已有(移入) | 已有(移入) | 需转换 |
-| yolo11n-seg_nms | 迁移 | 需转换 | 已有(移入) | 需转换 |
-| yolo11n-obb_nms | 迁移 | 需转换 | 需转换 | 需转换 |
-| yolo11n-pose_nms | 迁移 | 需转换 | 需转换 | 需转换 |
+| yolo11n | ✓ | 转换 | 已有(移入) | 转换 |
+| yolo11n_nms | ✓ | 已有(移入) | 已有(移入) | 转换 |
+| yolo11n-seg | ✓ | 转换 | 转换 | 转换 |
+| yolo11n-seg_nms | ✓ | 转换 | 已有(移入) | 转换 |
+| yolo11n-obb | ✓ | 转换 | 转换 | 转换 |
+| yolo11n-obb_nms | ✓ | 转换 | 转换 | 转换 |
+| yolo11n-pose | ✓ | 转换 | 转换 | 转换 |
+| yolo11n-pose_nms | ✓ | 转换 | 转换 | 转换 |
+| yolo11n-cls | ✓ | 转换 | 转换 | 转换 |
 
-"应转尽转"：每个后端尽量齐 5 个模型。转换工具：
+yolo 系优先全后端转换（含多分类 yolo11n-cls）；其余模型（plate/zhgd/结构等）只保留 onnx，按需后续转换。
+
+"应转尽转"：yolo 系尽量齐全 4 后端。转换工具：
 - TRT：`trtexec --onnx=... --saveEngine=...`（本机 TensorRT 10.9）
 - MNN：MNNConvert（Linux 或 pip 安装）
 - bmodel：Sophgo 服务器 docker + tpu-mlir（`tools/docker/sophgo/convert.sh`）
@@ -73,9 +90,10 @@ tests/baselines/
 
 ## 测试策略
 
-- ORT 全模型 → 标签 `[regression]`
+- ORT 全模型 → 标签 `[regression]`（覆盖所有已迁移 onnx 模型）
 - 各后端 → 标签 `[regression]` + `[backend:ort/mnn/trt/sophgo]`，可按后端单独运行
 - 例如跑 MNN 全部：`test_modeldeploy "[backend:mnn]"`
+- 多分类模型（yolo11n-cls）→ `compare_cls` 严格对比 topN label/scores
 
 ## 对比标准（严格阈值）
 
@@ -95,9 +113,9 @@ tests/baselines/
 ## 迁移步骤
 
 1. 建目录 `test_data/test_models/{onnx,mnn,trt,sophgo}/`、`tests/baselines/{ort,mnn,trt,sophgo}/`
-2. 5 个关键模型 onnx 移入 `onnx/`；现有 mnn/engine 移入对应目录
+2. **全覆盖迁移**：所有根目录 onnx + face/ + ocr/ 结构模型移入 `onnx/`（保留子目录结构）；现有 mnn/engine 移入对应目录；杂项（加密/engine/mdenc）归类
 3. 现有 15 个基线移入 `tests/baselines/ort/`
-4. 转换缺失的 mnn/engine/bmodel 模型
+4. **yolo 系优先转换**：缺失的 mnn/engine/bmodel 模型（trtexec/MNNConvert/tpu-mlir）
 5. 各后端跑 collect 生成基线
 6. 对比器按后端加载基线，验证自洽 + 跨后端
 
