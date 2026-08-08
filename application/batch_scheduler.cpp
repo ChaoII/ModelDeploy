@@ -70,10 +70,18 @@ void BatchScheduler::scheduler_loop() {
 
         {
             std::unique_lock<std::mutex> lock(req_mtx_);
-            req_cv_.wait_for(lock, std::chrono::milliseconds(batch_timeout_ms_),
-                [this]() { return !pending_.empty() || !running_.load(); });
-
+            // Phase 1: wait for first request (or shutdown)
+            req_cv_.wait(lock, [this]() { return !pending_.empty() || !running_.load(); });
             if (!running_.load() && pending_.empty()) break;
+
+            // Phase 2: collect more frames for up to batch_timeout_ms_
+            const auto deadline = std::chrono::steady_clock::now() +
+                std::chrono::milliseconds(batch_timeout_ms_);
+            while (std::chrono::steady_clock::now() < deadline &&
+                   static_cast<int>(pending_.size()) < max_batch_size_) {
+                req_cv_.wait_until(lock, deadline);
+                // re-check pending size each wake
+            }
 
             int count = std::min(static_cast<int>(pending_.size()), max_batch_size_);
             if (count > 0) {
@@ -83,6 +91,8 @@ void BatchScheduler::scheduler_loop() {
         }
 
         if (!batch.empty()) {
+            total_batched_frames_.fetch_add(batch.size());
+            total_batches_.fetch_add(1);
             process_batch(batch);
         }
     }
