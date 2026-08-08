@@ -119,8 +119,10 @@ void BatchScheduler::process_batch(
         nv12_to_bgr_cuda(nv12_buf_.data(), nv12_buf_.data() + y_size,
                           req.width, req.height, req.width, req.width,
                           bgr_buf_.data());
+        // copy=true：bgr_buf_ 为跨批复用的成员缓冲，必须深拷贝，否则
+        // bgr_image 别名同一缓冲，下一帧/下一批会覆盖已返回给 pipeline 的数据
         auto bgr_image = ImageData::from_raw(bgr_buf_.data(), req.width, req.height,
-                                               MdImageType::PKG_BGR_U8, false);
+                                               MdImageType::PKG_BGR_U8, true);
 #else
         auto nv12_image = ImageData::from_raw(nv12_buf_.data(), req.width, req.height,
                                                 MdImageType::NV12, true);

@@ -336,8 +336,9 @@ void Pipeline::process_loop() {
             req.width = pf.width;
             req.height = pf.height;
             auto future = batch_scheduler_->submit(req);
+            // 轮询等结果：sleep 而非 yield，避免空转打满单核 CPU
             while (!future->ready) {
-                std::this_thread::yield();
+                std::this_thread::sleep_for(std::chrono::microseconds(200));
             }
             results = std::move(future->results);
             bgr_image = std::move(future->bgr_image);

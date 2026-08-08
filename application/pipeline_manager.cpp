@@ -167,10 +167,10 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
     };
 
     // 解码器通过 StreamHub 共享：相同 url+config 的多路任务复用同一解码器
-    // 推理走独立 InferGroup 路径（不经过 BatchScheduler）
-    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory), nullptr);
+    // 推理走 BatchScheduler 批量路径（start_batch_scheduler 启动后生效）
+    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory), &batch_scheduler_);
     dirty_ = true;
-    std::cout << "[Manager] Task created: " << cfg.id << " (no batch)" << std::endl;
+    std::cout << "[Manager] Task created: " << cfg.id << std::endl;
     return true;
 }
 
@@ -456,7 +456,7 @@ bool PipelineManager::load_from_directory(const std::string& dir) {
                             Pipeline::ModelFactory factory = [this](const ModelConfig& mcfg) {
                                 return this->create_engine(mcfg);
                             };
-                            pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory), nullptr);
+                            pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, &stream_hub_, std::move(factory), &batch_scheduler_);
                             ++count;
                         }
                     }

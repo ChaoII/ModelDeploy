@@ -193,3 +193,24 @@ TEST_CASE("Manager model library CRUD", "[manager]") {
     REQUIRE(mgr.remove_model_from_library("yolo11n"));
     REQUIRE(mgr.list_models().empty());
 }
+
+TEST_CASE("create_task wires batch scheduler", "[manager]") {
+    PipelineManager mgr;
+    // 注册一个模型（指向不存在的文件也 OK，只测接线不测加载）
+    TaskConfig cfg;
+    cfg.id = "t_batch";
+    cfg.name = "batch";
+    cfg.input_url = "E:/videos/nonexistent.mp4";  // file source
+    cfg.enable_preview = false;
+    ModelConfig mc;
+    mc.name = "det";
+    mc.path = "test_data/test_models/trt/yolo11n_nms.engine";
+    mc.backend = "trt";
+    mc.device = "gpu";
+    cfg.models.push_back(mc);
+    std::string err;
+    // 不实际启动（无 GPU 文件也能构造），只验证接线后 create_task 不崩溃且不传 nullptr
+    REQUIRE(mgr.create_task(cfg, &err));
+    REQUIRE(mgr.batch_scheduler() != nullptr);
+    REQUIRE(mgr.task_count() == 1);
+}
