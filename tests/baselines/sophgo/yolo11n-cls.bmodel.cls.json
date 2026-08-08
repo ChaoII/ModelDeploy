@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "backend": "sophgo-tpu",
+    "date": "2026-08-08",
+    "image": "test_person.png",
+    "model": "yolo11n-cls.bmodel"
+  },
+  "results": {
+    "label_ids": [
+      840
+    ],
+    "scores": [
+      1.0
+    ]
+  }
+}
