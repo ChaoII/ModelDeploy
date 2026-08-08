@@ -755,3 +755,171 @@ TEST_CASE("Regression: ppocrv4 cls", "[regression]") {
     REQUIRE(model.predict(img, &label, &score));
     require_no_diff(compare_ocr_cls(load_json(base_file)["results"], label, score));
 }
+
+TEST_CASE("yolo11n detection Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_detection0.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n.bmodel.det.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsDet model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<DetectionResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_detection(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.bmodel vs ORT baseline");
+}
+
+TEST_CASE("yolo11n-cls classification Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n-cls.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-cls.onnx.cls.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n-cls.bmodel.cls.json";
+    if (!fs::exists(ort_file)) return;
+
+    Classification model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    ClassifyResult result;
+    REQUIRE(model.predict(img, &result));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_cls(load_json(self_file)["results"], result));
+    }
+    warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.bmodel vs ORT baseline");
+}
+
+TEST_CASE("yolo11n-obb obb detection Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n-obb.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_obb1.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-obb.onnx.obb.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n-obb.bmodel.obb.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsObb model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<ObbResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_obb(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.bmodel vs ORT baseline");
+}
+
+TEST_CASE("yolo11n-pose pose estimation Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n-pose.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-pose.onnx.pose.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n-pose.bmodel.pose.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsPose model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<KeyPointsResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_pose(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.bmodel vs ORT baseline");
+}
+
+TEST_CASE("yolo11n-pose_nms pose estimation Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n-pose_nms.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-pose_nms.onnx.pose.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n-pose_nms.bmodel.pose.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsPose model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<KeyPointsResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_pose(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.bmodel vs ORT baseline");
+}
+
+TEST_CASE("yolo11n-seg segmentation Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n-seg.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-seg.onnx.seg.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n-seg.bmodel.seg.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsSeg model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<InstanceSegResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_seg(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.bmodel vs ORT baseline");
+}
+
+TEST_CASE("yolo11n-seg_nms segmentation Sophgo", "[backend:sophgo]") {
+    auto modelfile = model_path("yolo11n-seg_nms.bmodel", "sophgo");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_person.png");
+    if (!fs::exists(imgf)) return;
+    auto ort_file = baseline_dir("ort") / "yolo11n-seg_nms.onnx.seg.json";
+    auto self_file = baseline_dir("sophgo") / "yolo11n-seg_nms.bmodel.seg.json";
+    if (!fs::exists(ort_file)) return;
+
+    UltralyticsSeg model(modelfile.string(), cpu_option());
+    if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
+
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<InstanceSegResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+
+    if (fs::exists(self_file)) {
+        require_no_diff(compare_seg(load_json(self_file)["results"], results));
+    }
+    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.bmodel vs ORT baseline");
+}
