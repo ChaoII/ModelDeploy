@@ -35,6 +35,9 @@ public:
     /// 编码并推送一帧（ImageData 格式，BGR CPU）
     bool encode(const modeldeploy::vision::ImageData& image);
 
+    /// 编码并推送一帧 GPU BGR（设备指针，BGR24 连续内存），内部 BGR→NV12 走 GPU 内核（BT.709 limited）
+    bool encode_from_gpu(const uint8_t* gpu_bgr, int width, int height);
+
     /// 同步编码，返回编码耗时(us)
     int64_t encode_timed(const modeldeploy::vision::ImageData& image);
 
@@ -83,6 +86,10 @@ private:
 
     int sws_src_stride_ = 0;           // 缓存上次 sws 的 src stride，stride 变化时重建
 
+    // GPU 编码：复用 device NV12 缓冲（懒分配，close 时释放）
+    uint8_t* gpu_nv12_buf_ = nullptr;
+    size_t gpu_nv12_capacity_ = 0;
+
     // 推流重试跟踪：地址被占用时停止重试
     std::atomic<bool> open_permanently_failed_{false};
     int open_retries_ = 0;
@@ -101,4 +108,7 @@ private:
     bool open_output(const std::string& url);
     void encode_loop();
     void drain_queue();
+
+    /// 帧率限速：返回 true 接受本帧编码，false 丢弃（首帧无条件接受）
+    bool accept_frame_rate_limit();
 };

@@ -3,6 +3,10 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 #include <cstring>
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#include "csrc/vision/common/processors/bgr_to_nv12.cuh"
+#endif
 
 StreamEncoder::StreamEncoder(const EncoderConfig& cfg) : cfg_(cfg) {
     if (cfg_.bitrate_kbps <= 0) cfg_.bitrate_kbps = 4000;
@@ -54,6 +58,11 @@ void StreamEncoder::close() {
         av_packet_free(&pkt);
     }
     if (sws_ctx_) sws_freeContext(sws_ctx_);
+#ifdef WITH_GPU
+    if (gpu_nv12_buf_) cudaFree(gpu_nv12_buf_);
+    gpu_nv12_buf_ = nullptr;
+    gpu_nv12_capacity_ = 0;
+#endif
     if (enc_frame_) av_frame_free(&enc_frame_);
     if (enc_pkt_) av_packet_free(&enc_pkt_);
     if (fmt_ctx_) {
@@ -288,19 +297,7 @@ bool StreamEncoder::encode(const modeldeploy::vision::ImageData& image) {
 
     // PTS = 帧序号，同时限速到目标帧率
     // 首帧无条件编码（避免初始化后无数据导致连接超时），后续限速
-    if (encode_frame_count_ == 0) {
-        encode_start_time_ = std::chrono::steady_clock::now();
-    } else {
-        const double fps = (cfg_.fps > 0) ? cfg_.fps : 25.0;
-        const double frame_interval_us = 1000000.0 / fps;
-        const double elapsed_us = std::chrono::duration<double, std::micro>(
-            std::chrono::steady_clock::now() - encode_start_time_).count();
-        const int64_t expected_count = static_cast<int64_t>(elapsed_us / frame_interval_us);
-        // 已达到或超过预期帧数 → 丢弃本帧（限速到目标帧率）
-        if (encode_frame_count_ >= expected_count) {
-            return true;
-        }
-    }
+    if (!accept_frame_rate_limit()) return true;
     enc_frame_->pts = encode_frame_count_;
     ++encode_frame_count_;
 
@@ -315,6 +312,75 @@ bool StreamEncoder::encode(const modeldeploy::vision::ImageData& image) {
         av_packet_unref(enc_pkt_);
     }
     return true;
+}
+
+bool StreamEncoder::accept_frame_rate_limit() {
+    if (encode_frame_count_ == 0) {
+        encode_start_time_ = std::chrono::steady_clock::now();
+        return true;
+    }
+    const double fps = (cfg_.fps > 0) ? cfg_.fps : 25.0;
+    const double frame_interval_us = 1000000.0 / fps;
+    const double elapsed_us = std::chrono::duration<double, std::micro>(
+        std::chrono::steady_clock::now() - encode_start_time_).count();
+    const int64_t expected_count = static_cast<int64_t>(elapsed_us / frame_interval_us);
+    // 已达到或超过预期帧数 → 丢弃本帧（限速到目标帧率）
+    return encode_frame_count_ < expected_count;
+}
+
+bool StreamEncoder::encode_from_gpu(const uint8_t* gpu_bgr, int width, int height) {
+#ifdef WITH_GPU
+    if (!opened_ || !enc_frame_ || open_permanently_failed_.load()) return false;
+    if (!gpu_bgr || width <= 0 || height <= 0) return false;
+
+    if (av_frame_make_writable(enc_frame_) < 0) {
+        return false;
+    }
+
+    // 限速（与 encode() 一致）
+    if (!accept_frame_rate_limit()) return true;
+    enc_frame_->pts = encode_frame_count_;
+    ++encode_frame_count_;
+
+    const size_t y_bytes = static_cast<size_t>(height) * width;
+    const size_t nv12_bytes = y_bytes * 3 / 2;
+
+    // 复用 device NV12 缓冲
+    if (gpu_nv12_capacity_ < nv12_bytes) {
+        uint8_t* new_buf = nullptr;
+        if (cudaMalloc(&new_buf, nv12_bytes) != cudaSuccess) return false;
+        if (gpu_nv12_buf_) cudaFree(gpu_nv12_buf_);
+        gpu_nv12_buf_ = new_buf;
+        gpu_nv12_capacity_ = nv12_bytes;
+    }
+
+    // BGR → NV12（BT.709 limited），gpu_bgr 可为 device 或 host
+    if (!modeldeploy::vision::bgr_to_nv12_cuda(gpu_bgr, width, height, gpu_nv12_buf_)) return false;
+
+    // NV12 → enc_frame_：逐平面拷贝，兼容对齐后的 linesize
+    cudaError_t c1 = cudaMemcpy2D(enc_frame_->data[0], enc_frame_->linesize[0],
+                                  gpu_nv12_buf_, width,
+                                  width, height, cudaMemcpyDeviceToHost);
+    cudaError_t c2 = cudaMemcpy2D(enc_frame_->data[1], enc_frame_->linesize[1],
+                                  gpu_nv12_buf_ + y_bytes, width,
+                                  width, height / 2, cudaMemcpyDeviceToHost);
+    if (c1 != cudaSuccess || c2 != cudaSuccess) return false;
+
+    if (avcodec_send_frame(enc_ctx_, enc_frame_) < 0) {
+        return false;
+    }
+
+    while (avcodec_receive_packet(enc_ctx_, enc_pkt_) == 0) {
+        av_packet_rescale_ts(enc_pkt_, enc_ctx_->time_base, stream_->time_base);
+        enc_pkt_->stream_index = stream_->index;
+        av_interleaved_write_frame(fmt_ctx_, enc_pkt_);
+        av_packet_unref(enc_pkt_);
+    }
+    return true;
+#else
+    (void)gpu_bgr; (void)width; (void)height;
+    return false;
+#endif
 }
 
 

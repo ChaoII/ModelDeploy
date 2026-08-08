@@ -50,6 +50,9 @@ struct EncodedFrame {
     modeldeploy::vision::ImageData bgr_image;
     int width = 0, height = 0;
     int64_t pts = 0;
+    // P3 GPU 编码：上游若已产生 GPU BGR（设备指针）则编码段走 encode_from_gpu。
+    // 调用方必须保证 device buffer 生命周期覆盖编码线程消费完成
+    const uint8_t* gpu_bgr = nullptr;
 };
 
 /// 单路视频流水线：三段异步流水线

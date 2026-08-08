@@ -467,7 +467,18 @@ void Pipeline::encode_loop() {
             encoder_opened_ = true;
         }
 
-        int64_t enc_us = encoder_->encode_timed(ef.bgr_image);
+        int64_t enc_us;
+#ifdef WITH_GPU
+        if (ef.gpu_bgr) {
+            auto e0 = std::chrono::steady_clock::now();
+            encoder_->encode_from_gpu(ef.gpu_bgr, ef.width, ef.height);
+            auto e1 = std::chrono::steady_clock::now();
+            enc_us = std::chrono::duration_cast<std::chrono::microseconds>(e1 - e0).count();
+        } else
+#endif
+        {
+            enc_us = encoder_->encode_timed(ef.bgr_image);
+        }
         last_encode_us_ = enc_us;
     }
 }
