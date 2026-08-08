@@ -56,7 +56,6 @@ static RuntimeOption cpu_option() {
 static RuntimeOption trt_option() {
     RuntimeOption opt;
     opt.use_gpu(0);
-    opt.use_trt_backend();
     return opt;
 }
 
@@ -144,7 +143,6 @@ TEST_CASE("Regression: yolo11n detection MNN", "[regression][backend:mnn]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
     auto self_file = baseline_dir("mnn") / "yolo11n.mnn.det.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -158,7 +156,9 @@ TEST_CASE("Regression: yolo11n detection MNN", "[regression][backend:mnn]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_detection(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n_nms detection MNN", "[regression][backend:mnn]") {
@@ -168,7 +168,6 @@ TEST_CASE("Regression: yolo11n_nms detection MNN", "[regression][backend:mnn]") 
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n_nms.onnx.det.json";
     auto self_file = baseline_dir("mnn") / "yolo11n_nms.mnn.det.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -182,7 +181,9 @@ TEST_CASE("Regression: yolo11n_nms detection MNN", "[regression][backend:mnn]") 
     if (fs::exists(self_file)) {
         require_no_diff(compare_detection(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n_nms.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n_nms.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-cls classification MNN", "[regression][backend:mnn]") {
@@ -192,7 +193,6 @@ TEST_CASE("Regression: yolo11n-cls classification MNN", "[regression][backend:mn
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-cls.onnx.cls.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-cls.mnn.cls.json";
-    if (!fs::exists(ort_file)) return;
 
     Classification model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -206,7 +206,9 @@ TEST_CASE("Regression: yolo11n-cls classification MNN", "[regression][backend:mn
     if (fs::exists(self_file)) {
         require_no_diff(compare_cls(load_json(self_file)["results"], result));
     }
-    warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-obb obb detection MNN", "[regression][backend:mnn]") {
@@ -216,7 +218,6 @@ TEST_CASE("Regression: yolo11n-obb obb detection MNN", "[regression][backend:mnn
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-obb.onnx.obb.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-obb.mnn.obb.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -230,7 +231,9 @@ TEST_CASE("Regression: yolo11n-obb obb detection MNN", "[regression][backend:mnn
     if (fs::exists(self_file)) {
         require_no_diff(compare_obb(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-obb_nms obb detection MNN", "[regression][backend:mnn]") {
@@ -240,7 +243,6 @@ TEST_CASE("Regression: yolo11n-obb_nms obb detection MNN", "[regression][backend
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-obb_nms.onnx.obb.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-obb_nms.mnn.obb.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -254,7 +256,9 @@ TEST_CASE("Regression: yolo11n-obb_nms obb detection MNN", "[regression][backend
     if (fs::exists(self_file)) {
         require_no_diff(compare_obb(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb_nms.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb_nms.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-pose pose estimation MNN", "[regression][backend:mnn]") {
@@ -264,7 +268,6 @@ TEST_CASE("Regression: yolo11n-pose pose estimation MNN", "[regression][backend:
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-pose.onnx.pose.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-pose.mnn.pose.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsPose model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -278,7 +281,9 @@ TEST_CASE("Regression: yolo11n-pose pose estimation MNN", "[regression][backend:
     if (fs::exists(self_file)) {
         require_no_diff(compare_pose(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-pose_nms pose estimation MNN", "[regression][backend:mnn]") {
@@ -288,7 +293,6 @@ TEST_CASE("Regression: yolo11n-pose_nms pose estimation MNN", "[regression][back
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-pose_nms.onnx.pose.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-pose_nms.mnn.pose.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsPose model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -302,7 +306,9 @@ TEST_CASE("Regression: yolo11n-pose_nms pose estimation MNN", "[regression][back
     if (fs::exists(self_file)) {
         require_no_diff(compare_pose(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-seg segmentation MNN", "[regression][backend:mnn]") {
@@ -312,7 +318,6 @@ TEST_CASE("Regression: yolo11n-seg segmentation MNN", "[regression][backend:mnn]
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-seg.onnx.seg.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-seg.mnn.seg.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsSeg model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -326,7 +331,9 @@ TEST_CASE("Regression: yolo11n-seg segmentation MNN", "[regression][backend:mnn]
     if (fs::exists(self_file)) {
         require_no_diff(compare_seg(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-seg_nms segmentation MNN", "[regression][backend:mnn]") {
@@ -336,7 +343,6 @@ TEST_CASE("Regression: yolo11n-seg_nms segmentation MNN", "[regression][backend:
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-seg_nms.onnx.seg.json";
     auto self_file = baseline_dir("mnn") / "yolo11n-seg_nms.mnn.seg.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsSeg model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
@@ -350,7 +356,9 @@ TEST_CASE("Regression: yolo11n-seg_nms segmentation MNN", "[regression][backend:
     if (fs::exists(self_file)) {
         require_no_diff(compare_seg(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.mnn vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.mnn vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n detection TRT", "[regression][backend:trt]") {
@@ -360,10 +368,9 @@ TEST_CASE("Regression: yolo11n detection TRT", "[regression][backend:trt]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
     auto self_file = baseline_dir("trt") / "yolo11n.engine.det.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsDet model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -374,7 +381,9 @@ TEST_CASE("Regression: yolo11n detection TRT", "[regression][backend:trt]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_detection(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n_nms detection TRT", "[regression][backend:trt]") {
@@ -384,10 +393,9 @@ TEST_CASE("Regression: yolo11n_nms detection TRT", "[regression][backend:trt]") 
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n_nms.onnx.det.json";
     auto self_file = baseline_dir("trt") / "yolo11n_nms.engine.det.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsDet model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -398,7 +406,9 @@ TEST_CASE("Regression: yolo11n_nms detection TRT", "[regression][backend:trt]") 
     if (fs::exists(self_file)) {
         require_no_diff(compare_detection(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n_nms.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n_nms.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-seg_nms segmentation TRT", "[regression][backend:trt]") {
@@ -408,10 +418,9 @@ TEST_CASE("Regression: yolo11n-seg_nms segmentation TRT", "[regression][backend:
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-seg_nms.onnx.seg.json";
     auto self_file = baseline_dir("trt") / "yolo11n-seg_nms.engine.seg.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsSeg model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -422,7 +431,9 @@ TEST_CASE("Regression: yolo11n-seg_nms segmentation TRT", "[regression][backend:
     if (fs::exists(self_file)) {
         require_no_diff(compare_seg(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-cls classification TRT", "[regression][backend:trt]") {
@@ -432,10 +443,9 @@ TEST_CASE("Regression: yolo11n-cls classification TRT", "[regression][backend:tr
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-cls.onnx.cls.json";
     auto self_file = baseline_dir("trt") / "yolo11n-cls.engine.cls.json";
-    if (!fs::exists(ort_file)) return;
 
     Classification model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -446,7 +456,9 @@ TEST_CASE("Regression: yolo11n-cls classification TRT", "[regression][backend:tr
     if (fs::exists(self_file)) {
         require_no_diff(compare_cls(load_json(self_file)["results"], result));
     }
-    warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-obb obb detection TRT", "[regression][backend:trt]") {
@@ -456,10 +468,9 @@ TEST_CASE("Regression: yolo11n-obb obb detection TRT", "[regression][backend:trt
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-obb.onnx.obb.json";
     auto self_file = baseline_dir("trt") / "yolo11n-obb.engine.obb.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsObb model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -470,7 +481,9 @@ TEST_CASE("Regression: yolo11n-obb obb detection TRT", "[regression][backend:trt
     if (fs::exists(self_file)) {
         require_no_diff(compare_obb(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-obb_nms obb detection TRT", "[regression][backend:trt]") {
@@ -480,10 +493,9 @@ TEST_CASE("Regression: yolo11n-obb_nms obb detection TRT", "[regression][backend
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-obb_nms.onnx.obb.json";
     auto self_file = baseline_dir("trt") / "yolo11n-obb_nms.engine.obb.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsObb model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -494,7 +506,9 @@ TEST_CASE("Regression: yolo11n-obb_nms obb detection TRT", "[regression][backend
     if (fs::exists(self_file)) {
         require_no_diff(compare_obb(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb_nms.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb_nms.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-pose pose estimation TRT", "[regression][backend:trt]") {
@@ -504,10 +518,9 @@ TEST_CASE("Regression: yolo11n-pose pose estimation TRT", "[regression][backend:
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-pose.onnx.pose.json";
     auto self_file = baseline_dir("trt") / "yolo11n-pose.engine.pose.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsPose model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -518,7 +531,9 @@ TEST_CASE("Regression: yolo11n-pose pose estimation TRT", "[regression][backend:
     if (fs::exists(self_file)) {
         require_no_diff(compare_pose(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-pose_nms pose estimation TRT", "[regression][backend:trt]") {
@@ -528,10 +543,9 @@ TEST_CASE("Regression: yolo11n-pose_nms pose estimation TRT", "[regression][back
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-pose_nms.onnx.pose.json";
     auto self_file = baseline_dir("trt") / "yolo11n-pose_nms.engine.pose.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsPose model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -542,7 +556,9 @@ TEST_CASE("Regression: yolo11n-pose_nms pose estimation TRT", "[regression][back
     if (fs::exists(self_file)) {
         require_no_diff(compare_pose(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-seg segmentation TRT", "[regression][backend:trt]") {
@@ -552,10 +568,9 @@ TEST_CASE("Regression: yolo11n-seg segmentation TRT", "[regression][backend:trt]
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-seg.onnx.seg.json";
     auto self_file = baseline_dir("trt") / "yolo11n-seg.engine.seg.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsSeg model(modelfile.string(), trt_option());
-    REQUIRE(model.is_initialized());
+    if (!model.is_initialized()) return;   // TRT backend not built -> skip
 
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -566,7 +581,9 @@ TEST_CASE("Regression: yolo11n-seg segmentation TRT", "[regression][backend:trt]
     if (fs::exists(self_file)) {
         require_no_diff(compare_seg(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.engine vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.engine vs ORT baseline");
+    }
 }
 
 TEST_CASE("Regression: yolo11n-seg segmentation", "[regression]") {
@@ -763,7 +780,6 @@ TEST_CASE("yolo11n detection Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n.onnx.det.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n.bmodel.det.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsDet model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -777,7 +793,9 @@ TEST_CASE("yolo11n detection Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_detection(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_detection(load_json(ort_file)["results"], results), "yolo11n.bmodel vs ORT baseline");
+    }
 }
 
 TEST_CASE("yolo11n-cls classification Sophgo", "[backend:sophgo]") {
@@ -787,7 +805,6 @@ TEST_CASE("yolo11n-cls classification Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-cls.onnx.cls.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n-cls.bmodel.cls.json";
-    if (!fs::exists(ort_file)) return;
 
     Classification model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -801,7 +818,9 @@ TEST_CASE("yolo11n-cls classification Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_cls(load_json(self_file)["results"], result));
     }
-    warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_cls(load_json(ort_file)["results"], result), "yolo11n-cls.bmodel vs ORT baseline");
+    }
 }
 
 TEST_CASE("yolo11n-obb obb detection Sophgo", "[backend:sophgo]") {
@@ -811,7 +830,6 @@ TEST_CASE("yolo11n-obb obb detection Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-obb.onnx.obb.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n-obb.bmodel.obb.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsObb model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -825,7 +843,9 @@ TEST_CASE("yolo11n-obb obb detection Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_obb(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_obb(load_json(ort_file)["results"], results), "yolo11n-obb.bmodel vs ORT baseline");
+    }
 }
 
 TEST_CASE("yolo11n-pose pose estimation Sophgo", "[backend:sophgo]") {
@@ -835,7 +855,6 @@ TEST_CASE("yolo11n-pose pose estimation Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-pose.onnx.pose.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n-pose.bmodel.pose.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsPose model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -849,7 +868,9 @@ TEST_CASE("yolo11n-pose pose estimation Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_pose(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose.bmodel vs ORT baseline");
+    }
 }
 
 TEST_CASE("yolo11n-pose_nms pose estimation Sophgo", "[backend:sophgo]") {
@@ -859,7 +880,6 @@ TEST_CASE("yolo11n-pose_nms pose estimation Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-pose_nms.onnx.pose.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n-pose_nms.bmodel.pose.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsPose model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -873,7 +893,9 @@ TEST_CASE("yolo11n-pose_nms pose estimation Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_pose(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_pose(load_json(ort_file)["results"], results), "yolo11n-pose_nms.bmodel vs ORT baseline");
+    }
 }
 
 TEST_CASE("yolo11n-seg segmentation Sophgo", "[backend:sophgo]") {
@@ -883,7 +905,6 @@ TEST_CASE("yolo11n-seg segmentation Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-seg.onnx.seg.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n-seg.bmodel.seg.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsSeg model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -897,7 +918,9 @@ TEST_CASE("yolo11n-seg segmentation Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_seg(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.bmodel vs ORT baseline");
+    }
 }
 
 TEST_CASE("yolo11n-seg_nms segmentation Sophgo", "[backend:sophgo]") {
@@ -907,7 +930,6 @@ TEST_CASE("yolo11n-seg_nms segmentation Sophgo", "[backend:sophgo]") {
     if (!fs::exists(imgf)) return;
     auto ort_file = baseline_dir("ort") / "yolo11n-seg_nms.onnx.seg.json";
     auto self_file = baseline_dir("sophgo") / "yolo11n-seg_nms.bmodel.seg.json";
-    if (!fs::exists(ort_file)) return;
 
     UltralyticsSeg model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend not built -> skip
@@ -921,5 +943,7 @@ TEST_CASE("yolo11n-seg_nms segmentation Sophgo", "[backend:sophgo]") {
     if (fs::exists(self_file)) {
         require_no_diff(compare_seg(load_json(self_file)["results"], results));
     }
-    warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.bmodel vs ORT baseline");
+    if (fs::exists(ort_file)) {
+        warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.bmodel vs ORT baseline");
+    }
 }
