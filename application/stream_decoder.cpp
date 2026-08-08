@@ -261,6 +261,8 @@ bool StreamDecoder::read_one_frame(DecodedFrame* out) {
                 // GPU 帧：记录 device 指针供 GPU 预处理零拷贝；同时下载到 CPU 供预览/快照
                 out->y_plane_device = read_hw_frame_->data[0];
                 out->uv_plane_device = read_hw_frame_->data[1];
+                out->y_step_device = read_hw_frame_->linesize[0];
+                out->uv_step_device = read_hw_frame_->linesize[1];
                 read_sw_frame_->format = AV_PIX_FMT_NV12;
                 read_sw_frame_->width = read_hw_frame_->width;
                 read_sw_frame_->height = read_hw_frame_->height;

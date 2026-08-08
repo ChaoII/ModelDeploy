@@ -9,6 +9,18 @@
 
 using namespace modeldeploy::vision;
 
+#ifdef WITH_GPU
+namespace {
+/// 分配设备缓冲并以 shared_ptr 持有（析构自动 cudaFree）。失败返回 nullptr。
+/// 供 PendingFrame::gpu_nv12 使用：D2D 拷贝自 CUVID 复用帧，跨 read_one_frame 持久有效。
+std::shared_ptr<uint8_t> alloc_device_buffer(size_t bytes) {
+    uint8_t* p = nullptr;
+    if (bytes == 0 || cudaMalloc(&p, bytes) != cudaSuccess) return nullptr;
+    return std::shared_ptr<uint8_t>(p, [](uint8_t* q) { cudaFree(q); });
+}
+} // namespace
+#endif
+
 static bool is_network_url(const std::string& url) {
     return url.find("rtsp://") == 0 || url.find("rtmp://") == 0 ||
            url.find("http://") == 0 || url.find("https://") == 0 ||
@@ -258,24 +270,62 @@ void Pipeline::decode_loop() {
             pf.pts = raw.pts;
             pf.wall_time_sec = std::chrono::duration<double>(
                 dec_t0.time_since_epoch()).count();
-            pf.y_plane_device = raw.y_plane_device;
-            pf.uv_plane_device = raw.uv_plane_device;
-            // 硬解帧仍需落 host NV12（供预览/快照/非 GPU 路径）；
-            // GPU 直通推理段由 InferGroup 用 host NV12 → GPU 预处理（yolo_preprocess_nv12_cuda 自动 H2D）
             const size_t y_size = static_cast<size_t>(raw.height) * raw.width;
             const size_t uv_size = y_size / 2;
-            pf.nv12_data.resize(y_size + uv_size);
-            uint8_t* dst = pf.nv12_data.data();
-            if (raw.y_step == raw.width && raw.uv_step == raw.width) {
-                std::memcpy(dst, raw.y_plane, y_size + uv_size);
-            } else {
-                for (int row = 0; row < raw.height; ++row)
-                    std::memcpy(dst + row * raw.width,
-                                raw.y_plane + row * raw.y_step, raw.width);
-                const int uv_h = raw.height / 2;
-                for (int row = 0; row < uv_h; ++row)
-                    std::memcpy(dst + y_size + row * raw.width,
-                                raw.uv_plane + row * raw.uv_step, raw.width);
+
+#ifdef WITH_GPU
+            // CUVID 硬解 GPU 帧 → PendingFrame 持久设备缓冲（D2D 拷贝，零 PCIe 往返）。
+            // 设备指针仅当下有效（read_hw_frame_ 下次 read_one_frame 即被 unref 复用），
+            // 拷贝到 pf.gpu_nv12 后指针跨队列/pipeline 生命周期安全。
+            // 仅当 InferGroup 可走 GPU-direct（全 detection+gpu+无 ROI）且未用 batch
+            // （batch submit 只收 host NV12 指针）时启用；否则保留 host NV12 拷贝作回退。
+            const bool gpu_path = infer_group_->gpu_nv12_ready() &&
+                                  raw.y_plane_device && raw.uv_plane_device &&
+                                  !batch_scheduler_;
+            if (gpu_path) {
+                auto dbuf = alloc_device_buffer(y_size + uv_size);
+                bool ok = dbuf && raw.y_step_device >= raw.width &&
+                          raw.uv_step_device >= raw.width;
+                if (ok) {
+                    const cudaError_t ey = cudaMemcpy2D(
+                        dbuf.get(), raw.width,
+                        raw.y_plane_device, raw.y_step_device,
+                        raw.width, raw.height, cudaMemcpyDeviceToDevice);
+                    const cudaError_t euv = cudaMemcpy2D(
+                        dbuf.get() + y_size, raw.width,
+                        raw.uv_plane_device, raw.uv_step_device,
+                        raw.width, raw.height / 2, cudaMemcpyDeviceToDevice);
+                    ok = (ey == cudaSuccess && euv == cudaSuccess);
+                    if (!ok) {
+                        std::cerr << "[Pipeline] D2D NV12 copy failed: Y="
+                                  << cudaGetErrorString(ey) << " UV="
+                                  << cudaGetErrorString(euv)
+                                  << " (falling back to host NV12)" << std::endl;
+                    }
+                }
+                if (ok) {
+                    pf.gpu_nv12 = std::move(dbuf);
+                    pf.y_plane_device = pf.gpu_nv12.get();
+                    pf.uv_plane_device = pf.gpu_nv12.get() + y_size;
+                }
+            }
+#endif
+            // 硬解帧仍需落 host NV12（供预览/快照/非 GPU 路径回退）；
+            // GPU-direct 路径（gpu_path 已填充 gpu_nv12）跳过，实现全 GPU 零拷贝
+            if (!pf.gpu_nv12) {
+                pf.nv12_data.resize(y_size + uv_size);
+                uint8_t* dst = pf.nv12_data.data();
+                if (raw.y_step == raw.width && raw.uv_step == raw.width) {
+                    std::memcpy(dst, raw.y_plane, y_size + uv_size);
+                } else {
+                    for (int row = 0; row < raw.height; ++row)
+                        std::memcpy(dst + row * raw.width,
+                                    raw.y_plane + row * raw.y_step, raw.width);
+                    const int uv_h = raw.height / 2;
+                    for (int row = 0; row < uv_h; ++row)
+                        std::memcpy(dst + y_size + row * raw.width,
+                                    raw.uv_plane + row * raw.uv_step, raw.width);
+                }
             }
             auto dec_t1 = std::chrono::steady_clock::now();
             last_decode_us_ = std::chrono::duration_cast<std::chrono::microseconds>(dec_t1 - dec_t0).count();
@@ -347,7 +397,7 @@ void Pipeline::process_loop() {
             models_ran = infer_group_->run_models(
                 const_cast<uint8_t*>(pf.y_ptr()),
                 const_cast<uint8_t*>(pf.uv_ptr()),
-                nullptr, nullptr,
+                pf.y_plane_device, pf.uv_plane_device,   // P4: CUVID 持久设备缓冲指针
                 pf.width, pf.height, pf.width, pf.width,
                 &results, &bgr_image, cfg_.enable_preview);
             ran_inference = models_ran > 0;

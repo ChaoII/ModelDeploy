@@ -203,8 +203,14 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
 #ifdef WITH_GPU
         const size_t bgr_size = static_cast<size_t>(height) * width * 3;
         if (bgr_buf_.size() < bgr_size) bgr_buf_.resize(bgr_size);
-        nv12_to_bgr_cuda(y_src, uv_src,
-                          width, height, width, width,
+        // GPU-direct 路径：BGR 直接从设备 NV12 生成，避免 host NV12 → GPU 的 H2D 上传
+        const bool dev_nv12 = y_device && uv_device;
+        const uint8_t* bgr_y = dev_nv12 ? y_device : y_src;
+        const uint8_t* bgr_uv = dev_nv12 ? uv_device : uv_src;
+        const int bgr_step_y = dev_nv12 ? y_step : width;
+        const int bgr_step_uv = dev_nv12 ? uv_step : width;
+        nv12_to_bgr_cuda(bgr_y, bgr_uv,
+                          width, height, bgr_step_y, bgr_step_uv,
                           bgr_buf_.data());
         bgr_image = ImageData::from_raw(bgr_buf_.data(), width, height,
                                               MdImageType::PKG_BGR_U8, true); // copy=true：独立所有权，防跨队列缓冲别名竞争

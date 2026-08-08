@@ -29,6 +29,9 @@ struct DecodedFrame {
     // CUVID 硬解：NV12 帧的 GPU 指针（Y/UV 平面），直接喂 GPU 预处理（零 host 往返）
     uint8_t* y_plane_device = nullptr;
     uint8_t* uv_plane_device = nullptr;
+    // CUVID 硬解：设备帧实际行步长（cuvid 帧按对齐填充，通常 > width，D2D 拷贝时作 spitch）
+    int y_step_device = 0;
+    int uv_step_device = 0;
 };
 
 /// FFmpeg 硬件/软件解码器，支持 CUVID 回退与自动重连
