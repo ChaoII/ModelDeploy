@@ -376,10 +376,20 @@ void Pipeline::process_loop() {
 
         // 预览路：始终绘制（首次推理前无缓存也不画框，首次推理后有缓存则复用）
         if (!bgr_image.empty()) {
+            // GPU 绘制：任一模型配置 device=gpu 且 use_gpu_draw 时启用；CUDA 不可用自动回退 CPU
+            bool use_gpu_draw = false;
+            for (const auto& m : cfg_.models) {
+                if (m.device == "gpu" && m.use_gpu_draw) { use_gpu_draw = true; break; }
+            }
+            const auto draw = [this, use_gpu_draw](ImageData& img,
+                                                   const std::vector<InferResult>& res) {
+                if (use_gpu_draw && draw_engine_->draw_gpu(img, res)) return;
+                draw_engine_->draw(img, res);
+            };
             if (!results.empty()) {
-                draw_engine_->draw(bgr_image, results);
+                draw(bgr_image, results);
             } else if (has_cached_results) {
-                draw_engine_->draw(bgr_image, cached_results_);
+                draw(bgr_image, cached_results_);
             }
         }
         auto t2 = std::chrono::steady_clock::now();

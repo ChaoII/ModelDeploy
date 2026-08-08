@@ -19,6 +19,7 @@ struct ModelConfig {
     std::vector<int> input_size = {640, 640};
     std::vector<int> roi = {0, 0, 0, 0};
     int interval = 1;
+    bool use_gpu_draw = false;    // GPU 绘制（device=gpu 时启用）
     std::vector<std::string> labels;
 };
 

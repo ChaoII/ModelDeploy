@@ -18,6 +18,11 @@ public:
     void draw(modeldeploy::vision::ImageData& image,
               const std::vector<InferResult>& results);
 
+    /// GPU 绘制：CUDA 不可用时返回 false（调用方回退 CPU draw）
+    bool draw_gpu(modeldeploy::vision::ImageData& image,
+                  const std::vector<InferResult>& results,
+                  bool show_label = true, bool show_score = true);
+
 private:
     DrawConfig cfg_;
 
