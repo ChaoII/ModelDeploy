@@ -96,9 +96,14 @@ bool DrawEngine::draw_gpu(ImageData& image,
     const int width = image.width();
     const int height = image.height();
 
+    for (const auto& r : results) {
+        // face_detection 关键点尚无 GPU 绘制实现：任一此类结果回退 CPU 路径（vis_keypoints）
+        if (r.type == "face_detection") return false;
+    }
+
     std::vector<GpuDrawBox> boxes;
     for (const auto& r : results) {
-        if (r.type != "detection" && r.type != "face_detection") continue;
+        if (r.type != "detection") continue;
         for (const auto& b : r.boxes) {
             GpuDrawBox gb{};
             gb.x1 = static_cast<int>(b.x);

@@ -351,11 +351,22 @@ namespace modeldeploy::vision {
             d_boxes_ptr = d_boxes;
         } else {
             if (draw_gpu_ws.boxes_capacity < boxes_bytes) {
+                GpuDrawBox* new_buf = nullptr;
+                if (cudaMalloc(&new_buf, boxes_bytes) != cudaSuccess) {
+                    // 分配失败：旧缓冲区仍有效，保持原状态，交由调用方回退 CPU 绘制
+                    if (is_internal_stream) cudaStreamDestroy(stream);
+                    return false;
+                }
                 if (draw_gpu_ws.d_boxes) cudaFree(draw_gpu_ws.d_boxes);
-                cudaMalloc(&draw_gpu_ws.d_boxes, boxes_bytes);
+                draw_gpu_ws.d_boxes = new_buf;
                 draw_gpu_ws.boxes_capacity = boxes_bytes;
             }
-            cudaMemcpyAsync(draw_gpu_ws.d_boxes, d_boxes, boxes_bytes, cudaMemcpyHostToDevice, stream);
+            cudaError_t upload_err =
+                cudaMemcpyAsync(draw_gpu_ws.d_boxes, d_boxes, boxes_bytes, cudaMemcpyHostToDevice, stream);
+            if (upload_err != cudaSuccess) {
+                if (is_internal_stream) cudaStreamDestroy(stream);
+                return false;
+            }
             d_boxes_ptr = draw_gpu_ws.d_boxes;
         }
 
@@ -370,11 +381,21 @@ namespace modeldeploy::vision {
             d_bgr_ptr = bgr;
         } else {
             if (draw_gpu_ws.bgr_capacity < bgr_bytes) {
+                uint8_t* new_buf = nullptr;
+                if (cudaMalloc(&new_buf, bgr_bytes) != cudaSuccess) {
+                    if (is_internal_stream) cudaStreamDestroy(stream);
+                    return false;
+                }
                 if (draw_gpu_ws.d_bgr) cudaFree(draw_gpu_ws.d_bgr);
-                cudaMalloc(&draw_gpu_ws.d_bgr, bgr_bytes);
+                draw_gpu_ws.d_bgr = new_buf;
                 draw_gpu_ws.bgr_capacity = bgr_bytes;
             }
-            cudaMemcpyAsync(draw_gpu_ws.d_bgr, bgr, bgr_bytes, cudaMemcpyHostToDevice, stream);
+            cudaError_t upload_err =
+                cudaMemcpyAsync(draw_gpu_ws.d_bgr, bgr, bgr_bytes, cudaMemcpyHostToDevice, stream);
+            if (upload_err != cudaSuccess) {
+                if (is_internal_stream) cudaStreamDestroy(stream);
+                return false;
+            }
             d_bgr_ptr = draw_gpu_ws.d_bgr;
         }
 
@@ -384,11 +405,12 @@ namespace modeldeploy::vision {
             d_bgr_ptr, width, height, d_boxes_ptr, num_boxes, alpha);
 
         cudaError_t launch_err = cudaGetLastError();
+        cudaError_t copy_err = cudaSuccess;
         if (!bgr_on_device) {
-            cudaMemcpyAsync(bgr, d_bgr_ptr, bgr_bytes, cudaMemcpyDeviceToHost, stream);
+            copy_err = cudaMemcpyAsync(bgr, d_bgr_ptr, bgr_bytes, cudaMemcpyDeviceToHost, stream);
         }
         cudaError_t sync_err = cudaStreamSynchronize(stream);
         if (is_internal_stream) cudaStreamDestroy(stream);
-        return launch_err == cudaSuccess && sync_err == cudaSuccess;
+        return launch_err == cudaSuccess && copy_err == cudaSuccess && sync_err == cudaSuccess;
     }
 }
