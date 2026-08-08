@@ -88,6 +88,9 @@ private:
     void start_workers();
     void stop_workers();
 
+    /// 依据当前 engines_ 重新计算 gpu_nv12_ready_（detection + gpu + 无 ROI）
+    void recompute_gpu_ready();
+
     // 后台 warm-up 线程：TRT 首次编译可耗时数十秒，移到后台避免阻塞解码/停止
     std::thread warmup_thread_;
     void start_warmup();

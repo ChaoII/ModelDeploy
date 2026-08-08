@@ -43,15 +43,7 @@ bool InferGroup::init() {
     }
     if (engines_.empty()) return false;
     // GPU NV12 直通：所有模型 detection + gpu + 无 ROI
-    gpu_nv12_ready_ = true;
-    for (const auto& eng : engines_) {
-        const auto& mcfg = eng->config();
-        if (mcfg.type != "detection" || mcfg.device != "gpu" ||
-            mcfg.roi[2] > 0 || mcfg.roi[3] > 0) {
-            gpu_nv12_ready_ = false;
-            break;
-        }
-    }
+    recompute_gpu_ready();
     std::cout << "[InferGroup] gpu_nv12_ready_=" << (gpu_nv12_ready_ ? "true" : "false")
               << " engines=" << engines_.size() << std::endl;
     start_workers();
@@ -362,6 +354,7 @@ bool InferGroup::add_model(const ModelConfig& mcfg) {
     engines_.push_back(std::move(engine));
     frame_counters_.push_back(0);
     start_workers();
+    recompute_gpu_ready();
     return true;
 }
 
@@ -373,6 +366,7 @@ bool InferGroup::remove_model(const std::string& name) {
             engines_.erase(engines_.begin() + i);
             frame_counters_.erase(frame_counters_.begin() + i);
             start_workers();
+            recompute_gpu_ready();
             return true;
         }
     }
@@ -387,8 +381,22 @@ bool InferGroup::update_model(const std::string& name, const ModelConfig& mcfg) 
             eng->unload();
             bool ok = eng->load(mcfg);
             start_workers();
+            recompute_gpu_ready();
             return ok;
         }
     }
     return false;
+}
+
+void InferGroup::recompute_gpu_ready() {
+    // GPU NV12 直通：所有模型 detection + gpu + 无 ROI
+    gpu_nv12_ready_ = !engines_.empty();
+    for (const auto& eng : engines_) {
+        const auto& mcfg = eng->config();
+        if (mcfg.type != "detection" || mcfg.device != "gpu" ||
+            mcfg.roi[2] > 0 || mcfg.roi[3] > 0) {
+            gpu_nv12_ready_ = false;
+            break;
+        }
+    }
 }

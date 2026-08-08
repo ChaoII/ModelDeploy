@@ -286,6 +286,11 @@ void Pipeline::decode_loop() {
                 auto dbuf = alloc_device_buffer(y_size + uv_size);
                 bool ok = dbuf && raw.y_step_device >= raw.width &&
                           raw.uv_step_device >= raw.width;
+                if (!dbuf) {
+                    // cudaMalloc 失败会使 CUDA 运行时错误粘滞，后续分配全部失败；
+                    // 回退 host 路径前清掉，避免 GPU 路径被永久降级。
+                    cudaGetLastError();
+                }
                 if (ok) {
                     const cudaError_t ey = cudaMemcpy2D(
                         dbuf.get(), raw.width,
@@ -297,6 +302,8 @@ void Pipeline::decode_loop() {
                         raw.width, raw.height / 2, cudaMemcpyDeviceToDevice);
                     ok = (ey == cudaSuccess && euv == cudaSuccess);
                     if (!ok) {
+                        // D2D 失败同样会留下粘滞错误，先清除再回退 host 路径
+                        cudaGetLastError();
                         std::cerr << "[Pipeline] D2D NV12 copy failed: Y="
                                   << cudaGetErrorString(ey) << " UV="
                                   << cudaGetErrorString(euv)
