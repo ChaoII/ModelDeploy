@@ -103,11 +103,11 @@ public:
 
 private:
     mutable std::mutex mtx_;
+    BatchScheduler batch_scheduler_;
     std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
     std::vector<ModelConfig> model_library_;
     std::atomic<bool> dirty_{false};
     StreamHub stream_hub_;
-    BatchScheduler batch_scheduler_;
 
     // 模型 prototype 缓存：只加载一次，后续 clone（共享 Runtime）
     struct ModelPrototype {
