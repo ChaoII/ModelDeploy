@@ -17,6 +17,7 @@
 /// Batch request: one pipeline submits a frame for batched inference
 struct BatchRequest {
     std::string pipeline_id;
+    std::vector<std::string> model_names;  // models this pipeline needs for this frame (empty = all)
     uint8_t* y_plane = nullptr;
     uint8_t* uv_plane = nullptr;
     int width = 0;

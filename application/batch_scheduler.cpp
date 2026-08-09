@@ -142,27 +142,49 @@ void BatchScheduler::process_batch(
     }
 
     // 检查 batch 内所有帧尺寸是否一致；不一致则回退逐帧
-    bool uniform_size = true;
-    int ref_w = batch[0].first.width, ref_h = batch[0].first.height;
-    for (size_t i = 1; i < batch.size(); ++i) {
-        if (batch[i].first.width != ref_w || batch[i].first.height != ref_h) {
-            uniform_size = false;
-            break;
-        }
-    }
-
     std::lock_guard<std::mutex> lock(models_mtx_);
 
     for (auto& [key, entry] : models_) {
-        if (entry.prototype->config().type == "detection" && uniform_size && batch.size() > 1) {
+        // 仅处理请求了本模型（或 model_names 为空 = 全部）的帧，避免把
+        // 本模型结果塞给不相关的 pipeline（多模型部署正确性）。
+        std::vector<size_t> want;
+        want.reserve(batch.size());
+        for (size_t i = 0; i < batch.size(); ++i) {
+            const auto& req = batch[i].first;
+            if (req.model_names.empty() ||
+                std::find(req.model_names.begin(), req.model_names.end(),
+                          entry.cfg.name) != req.model_names.end()) {
+                want.push_back(i);
+            }
+        }
+        if (want.empty()) continue;
+
+        // Batch 推理要求该模型命中的帧尺寸一致；不一致则回退逐帧
+        bool subset_uniform = want.size() > 1;
+        if (subset_uniform) {
+            const int ref_w = batch[want[0]].first.width;
+            const int ref_h = batch[want[0]].first.height;
+            for (size_t k = 1; k < want.size(); ++k) {
+                if (batch[want[k]].first.width != ref_w ||
+                    batch[want[k]].first.height != ref_h) {
+                    subset_uniform = false;
+                    break;
+                }
+            }
+        }
+
+        if (entry.prototype->config().type == "detection" && subset_uniform) {
             // True batch inference for detection models
+            std::vector<ImageData> sub_images;
+            sub_images.reserve(want.size());
+            for (size_t k : want) sub_images.push_back(bgr_images[k]);
             auto* det = entry.prototype->det_model();
             if (det && det->is_initialized()) {
                 std::vector<std::vector<DetectionResult>> all_results;
-                if (det->batch_predict(bgr_images, &all_results)) {
-                    for (size_t i = 0; i < batch.size() && i < all_results.size(); ++i) {
-                        auto& [req, res] = batch[i];
-                        for (auto& d : all_results[i]) {
+                if (det->batch_predict(sub_images, &all_results)) {
+                    for (size_t k = 0; k < want.size() && k < all_results.size(); ++k) {
+                        auto& [req, res] = batch[want[k]];
+                        for (auto& d : all_results[k]) {
                             InferResult r;
                             r.model_name = entry.cfg.name;
                             r.type = "detection";
@@ -181,10 +203,10 @@ void BatchScheduler::process_batch(
         }
 
         // Fallback: sequential per-frame inference
-        for (size_t i = 0; i < batch.size(); ++i) {
-            auto& [req, res] = batch[i];
+        for (size_t k : want) {
+            auto& [req, res] = batch[k];
             InferResult result;
-            if (entry.prototype->infer(bgr_images[i], &result)) {
+            if (entry.prototype->infer(bgr_images[k], &result)) {
                 if (!result.boxes.empty()) {
                     res->results.push_back(std::move(result));
                 }

@@ -392,6 +392,10 @@ void Pipeline::process_loop() {
             req.uv_plane = const_cast<uint8_t*>(pf.uv_ptr());
             req.width = pf.width;
             req.height = pf.height;
+            req.model_names.reserve(cfg_.models.size());
+            for (const auto& m : cfg_.models) {
+                req.model_names.push_back(m.name);
+            }
             auto future = batch_scheduler_->submit(req);
             // 轮询等结果：sleep 而非 yield，避免空转打满单核 CPU
             while (!future->ready) {
