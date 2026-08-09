@@ -400,6 +400,7 @@ void Pipeline::process_loop() {
             results = std::move(future->results);
             bgr_image = std::move(future->bgr_image);
             ran_inference = !results.empty();
+            last_infer_us_ = future->infer_us;
         } else {
             models_ran = infer_group_->run_models(
                 const_cast<uint8_t*>(pf.y_ptr()),
@@ -408,6 +409,8 @@ void Pipeline::process_loop() {
                 pf.width, pf.height, pf.width, pf.width,
                 &results, &bgr_image, cfg_.enable_preview);
             ran_inference = models_ran > 0;
+            auto t1_local = std::chrono::steady_clock::now();
+            last_infer_us_ = std::chrono::duration_cast<std::chrono::microseconds>(t1_local - t0).count();
         }
         auto t1 = std::chrono::steady_clock::now();
 
@@ -427,7 +430,9 @@ void Pipeline::process_loop() {
                 std::lock_guard<std::mutex> lock(snapshot_mtx_);
                 latest_bgr_ = std::make_shared<ImageData>(bgr_image);
             }
-            stats_.record_frame(last_decode_us_.load(), 0, 0, 0);
+            int64_t infer_us = last_infer_us_.load();
+            if (infer_us <= 0) infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+            stats_.record_frame(last_decode_us_.load(), infer_us, 0, 0);
             continue;
         }
 

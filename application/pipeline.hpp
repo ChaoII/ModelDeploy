@@ -155,6 +155,7 @@ private:
 
     // ── 解码段统计 ──
     std::atomic<int64_t> last_decode_us_{0};
+    std::atomic<int64_t> last_infer_us_{0};
     std::atomic<int64_t> last_encode_us_{0};
     std::atomic<int64_t> last_frame_pts_{0};
 

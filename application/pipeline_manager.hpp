@@ -103,7 +103,7 @@ public:
 
 private:
     mutable std::mutex mtx_;
-    BatchScheduler batch_scheduler_;
+    BatchScheduler batch_scheduler_{4, 4};
     std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
     std::vector<ModelConfig> model_library_;
     std::atomic<bool> dirty_{false};
