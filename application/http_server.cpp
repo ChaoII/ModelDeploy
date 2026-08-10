@@ -191,9 +191,9 @@ static ModelConfig parse_model_config(const std::string& body) {
 void HttpServer::register_routes() {
 
     // ── Web UI ──────────────────────────────────────
-    server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
-        auto html = load_web_ui();
-        // 注入媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 读取，替换默认 8080）
+    // 注入媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 读取），三个入口统一注入
+    auto serve_ui = [this](httplib::Response& res) {
+        std::string html = load_web_ui();
         const std::string token = "/*__MEDIA_SERVER_PORT__*/";
         const auto pos = html.find(token);
         if (pos != std::string::npos) {
@@ -201,13 +201,10 @@ void HttpServer::register_routes() {
                          "window.MEDIA_SERVER_PORT=" + std::to_string(media_server_port_) + ";");
         }
         res.set_content(html, "text/html; charset=utf-8");
-    });
-    server_.Get("/index.html", [this](const httplib::Request&, httplib::Response& res) {
-        res.set_content(load_web_ui(), "text/html; charset=utf-8");
-    });
-    server_.Get("/ui", [this](const httplib::Request&, httplib::Response& res) {
-        res.set_content(load_web_ui(), "text/html; charset=utf-8");
-    });
+    };
+    server_.Get("/", [this, serve_ui](const httplib::Request&, httplib::Response& res) { serve_ui(res); });
+    server_.Get("/index.html", [this, serve_ui](const httplib::Request&, httplib::Response& res) { serve_ui(res); });
+    server_.Get("/ui", [this, serve_ui](const httplib::Request&, httplib::Response& res) { serve_ui(res); });
 
     // ── Health / Metrics ─────────────────────────────
     server_.Get("/health", [](const httplib::Request&, httplib::Response& res) {

@@ -18,6 +18,8 @@ public:
     bool start();
     void stop();
     bool is_running() const { return running_.load(); }
+    // 设置媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 用它；默认 8080）
+    void set_media_server_port(int port) { media_server_port_ = port; }
 
 private:
     PipelineManager& mgr_;
