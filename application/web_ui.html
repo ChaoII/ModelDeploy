@@ -662,6 +662,10 @@ document.addEventListener('DOMContentLoaded',function(){
 function $(id){return document.getElementById(id)}
 /*__MEDIA_SERVER_PORT__*/
 function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// JS 层字符串转义（用于内联 onclick 参数）：转义反斜杠与单引号。
+// 内联属性里 HTML 会先解码字符实体，故不能用 esc()（&#39; 会被解码回 ' 重新注入）；
+// 必须用反斜杠转义（HTML 不处理反斜杠），JS 解析后才是安全字符串。
+function jsStr(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 function typeLabel(t){var m={detection:'检测',classification:'分类',face_detection:'人脸',lpr_pipeline:'车牌',pose:'姿态'};return m[t]||t}
 
 function api(method,url,body,cb){
@@ -753,8 +757,8 @@ function renderModels(){
         '<div class="model-prop"><div class="model-prop-val">'+(m.input_size&&m.input_size[0]?m.input_size[0]+'×'+m.input_size[1]:'?')+'</div><div class="model-prop-lbl">输入</div></div>'+
       '</div>'+
       '<div class="model-actions">'+
-        '<button class="btn btn-ghost btn-sm" onclick="openEditModelModal(\''+esc(m.name)+'\')">编辑</button>'+
-        '<button class="btn btn-danger btn-sm" onclick="deleteModel(\''+esc(m.name)+'\')">'+ICONS.trash+' 删除</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openEditModelModal(\''+jsStr(m.name)+'\')">编辑</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="deleteModel(\''+jsStr(m.name)+'\')">'+ICONS.trash+' 删除</button>'+
       '</div></div>';
   });
   c.innerHTML=h;
@@ -809,7 +813,7 @@ function deleteModel(name){
 // ── 任务 ──
 function refreshAll(){
   api('GET','/api/v1/tasks',null,function(r){
-    if(r.ok){allTasks=r.tasks||[];renderStats();renderTasks();refreshDetailChart()}
+    if(r.ok){allTasks=r.tasks||[];renderStats();renderTasks();loadMetrics();refreshDetailChart()}
   });
 }
 // 细节弹窗打开时，每个 poll tick 更新 FPS 图表（实时）
@@ -830,14 +834,14 @@ function loadMetrics(){
   $('sideTaskTotal').textContent=total;
   $('sideTaskRun').textContent=running;
   $('sideTaskErr').textContent=err;
-  $('sideModelTotal').textContent=(allModels?allModels.length:0);
+  $('sideModelTotal').textContent=(allModels&&allModels.length?allModels.length:0);
 }
 function renderStats(){
   var total=allTasks.length;
   var running=allTasks.filter(function(t){return t.running}).length;
   var error=allTasks.filter(function(t){return !!t.init_error}).length;
   $('statTotal').textContent=total;$('statRunning').textContent=running;
-  $('statStopped').textContent=total-running-error;$('statError').textContent=error;
+  $('statStopped').textContent=Math.max(0,total-running-error);$('statError').textContent=error;
   $('taskCountLabel').textContent=total+' 个任务';
 }
 
@@ -846,7 +850,7 @@ function urlLine(label,proto,url){
   return '<div class="url-line">'+
     '<span class="proto '+label+'">'+proto+'</span>'+
     '<span class="url-text" title="'+esc(url)+'">'+esc(url)+'</span>'+
-    '<button class="copy-btn" title="复制" onclick="event.stopPropagation();copyText(\''+esc(url).replace(/'/g,"\\'")+'\')">'+ICONS.copy+'</button>'+
+    '<button class="copy-btn" title="复制" onclick="event.stopPropagation();copyText(\''+jsStr(url)+'\')">'+ICONS.copy+'</button>'+
     '</div>';
 }
 
@@ -1052,11 +1056,11 @@ function renderTasks(){
       entry.actSig=actSig;
       entry.actions.innerHTML=
         (effectiveRunning
-          ? '<button class="btn btn-danger" onclick="stopTask(\''+esc(t.id)+'\')">'+ICONS.stop+' 停止</button>'
-          : '<button class="btn btn-primary" onclick="startTask(\''+esc(t.id)+'\')">'+ICONS.play+' 启动</button>')+
-        (!effectiveRunning?'<button class="btn btn-ghost" onclick="openEditTaskModal(\''+esc(t.id)+'\')">'+ICONS.detail+' 编辑</button>':'')+
-        '<button class="btn btn-ghost" onclick="showDetail(\''+esc(t.id)+'\')">'+ICONS.detail+' 详情</button>'+
-        '<button class="btn btn-ghost" onclick="deleteTask(\''+esc(t.id)+'\')">'+ICONS.trash+' 删除</button>';
+          ? '<button class="btn btn-danger" onclick="stopTask(\''+jsStr(t.id)+'\')">'+ICONS.stop+' 停止</button>'
+          : '<button class="btn btn-primary" onclick="startTask(\''+jsStr(t.id)+'\')">'+ICONS.play+' 启动</button>')+
+        (!effectiveRunning?'<button class="btn btn-ghost" onclick="openEditTaskModal(\''+jsStr(t.id)+'\')">'+ICONS.detail+' 编辑</button>':'')+
+        '<button class="btn btn-ghost" onclick="showDetail(\''+jsStr(t.id)+'\')">'+ICONS.detail+' 详情</button>'+
+        '<button class="btn btn-ghost" onclick="deleteTask(\''+jsStr(t.id)+'\')">'+ICONS.trash+' 删除</button>';
     }
 
     // error 显示
@@ -1288,6 +1292,7 @@ function pollThumbnails(){
     allTasks.forEach(function(t){
       var e=taskCardEls[t.id];if(!e)return;
       if(!(t.running&&t.initialized))return;
+      if(t.enable_preview===false)return;   // 预览禁用：不请求缩略图
       if(getCardMode(t.id)!=='snapshot')return;     // 实时流模式不拉 jpg
       if(e.thumbBusy)return;
       e.thumbBusy=true;
@@ -1474,10 +1479,10 @@ function showDetail(id){
   detailTaskId=id;
   var t=allTasks.find(function(tt){return tt.id===id});if(!t)return;
   var stats=t.stats||{};
-  var modelsHtml=(t.models||[]).map(function(m){return '<span class="model-tag">'+esc(m.name)+' ['+typeLabel(m.type)+'] <a href="javascript:void(0)" onclick="removeDetailModel(\''+esc(t.id)+'\',\''+esc(m.name)+'\')" style="color:#ff6b6b;margin-left:4px" title="移除">&times;</a></span>'}).join('');
+  var modelsHtml=(t.models||[]).map(function(m){return '<span class="model-tag">'+esc(m.name)+' ['+typeLabel(m.type)+'] <a href="javascript:void(0)" onclick="removeDetailModel(\''+jsStr(t.id)+'\',\''+jsStr(m.name)+'\')" style="color:#ff6b6b;margin-left:4px" title="移除">&times;</a></span>'}).join('');
   var availModels=(allModels||[]).filter(function(am){return !(t.models||[]).some(function(m){return m.name===am.name})});
   var addOpts=availModels.map(function(am){return '<option value="'+esc(am.name)+'">'+esc(am.name)+'</option>'}).join('');
-  modelsHtml+='<div class="detail-add-model" style="margin-top:6px"><select id="detailModelSelect">'+(addOpts||'<option value="">(无可用模型)</option>')+'</select> <button class="btn btn-primary btn-sm" onclick="addDetailModel(\''+esc(t.id)+'\')">添加模型</button></div>';
+  modelsHtml+='<div class="detail-add-model" style="margin-top:6px"><select id="detailModelSelect">'+(addOpts||'<option value="">(无可用模型)</option>')+'</select> <button class="btn btn-primary btn-sm" onclick="addDetailModel(\''+jsStr(t.id)+'\')">添加模型</button></div>';
 
   var enc=t.encoder||{},dec=t.decoder||{};
 
@@ -1506,7 +1511,7 @@ function showDetail(id){
       '<div class="col-controls">'+
         '<button class="btn btn-primary btn-sm" onclick="startDetailPlayer(\''+side+'\')">'+ICONS.play+' 播放</button>'+
         '<button class="btn btn-ghost btn-sm" onclick="stopDetailPlayer(\''+side+'\')">'+ICONS.stop+' 停止</button>'+
-        (flvUrl?'<button class="btn btn-ghost btn-sm" onclick="copyText(\''+esc(flvUrl).replace(/'/g,"\\'")+'\')">复制 FLV</button>':'')+
+        (flvUrl?'<button class="btn btn-ghost btn-sm" onclick="copyText(\''+jsStr(flvUrl).replace(/'/g,"\\'")+'\')">复制 FLV</button>':'')+
       '</div>'+
     '</div>';
   }
@@ -1519,7 +1524,7 @@ function showDetail(id){
     '<div class="detail-controls-bar">'+
       '<button class="btn btn-ghost btn-sm" onclick="startAllDetailPlayers()">'+ICONS.play+' 同时播放</button>'+
       '<button class="btn btn-ghost btn-sm" onclick="stopAllDetailPlayers()">'+ICONS.stop+' 全部停止</button>'+
-      '<button class="btn btn-ghost btn-sm" onclick="downloadSnapshot(\''+esc(id)+'\')">下载 AI 快照 JPEG</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="downloadSnapshot(\''+jsStr(id)+'\')">下载 AI 快照 JPEG</button>'+
     '</div>'+
 
     '<div class="detail-section-title">流地址</div>'+
@@ -1589,12 +1594,12 @@ function addDetailModel(id){
   var sel=$('detailModelSelect');if(!sel||!sel.value)return;
   var name=sel.value;var m=allModels.find(function(mm){return mm.name===name});if(!m)return;
   api('PATCH','/api/v1/tasks/'+encodeURIComponent(id)+'/models',JSON.stringify({name:m.name,type:m.type,path:m.path,backend:m.backend,device:m.device,confidence_threshold:m.confidence_threshold,input_size:m.input_size,interval:m.interval}),function(r){
-    if(r.ok){toast('模型已添加','success');refreshAll();}else{toast('添加失败：'+(r.msg||''),'danger')}
+    if(r.ok){toast('模型已添加','success');refreshAll();if(_detailTaskId)showDetail(_detailTaskId);}else{toast('添加失败：'+(r.msg||''),'danger')}
   });
 }
 function removeDetailModel(id,name){
   api('DELETE','/api/v1/tasks/'+encodeURIComponent(id)+'/models/'+encodeURIComponent(name),null,function(r){
-    if(r.ok){toast('模型已移除','success');refreshAll();}else{toast('移除失败：'+(r.msg||''),'danger')}
+    if(r.ok){toast('模型已移除','success');refreshAll();if(_detailTaskId)showDetail(_detailTaskId);}else{toast('移除失败：'+(r.msg||''),'danger')}
   });
 }
 function closeDetailModal(){
