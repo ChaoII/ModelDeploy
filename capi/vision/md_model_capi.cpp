@@ -1,8 +1,8 @@
+#include <cstring>
 #include "capi/vision/md_model_capi.h"
 #include "csrc/vision.h"
 
-MDStatusCode md_clone_model(MDModel* model, const MDModel* from) {
-    if (!model || !from || !from->model_content)
+MDStatusCode md_clone_model(MDModel* model, const MDModel* from) {    if (!model || !from || !from->model_content)
         return CallError;
 
     model->type = from->type;
@@ -77,4 +77,17 @@ MDStatusCode md_clone_model(MDModel* model, const MDModel* from) {
     if (!model->model_content)
         return MemoryAllocatedFailed;
     return Success;
+}
+
+int md_model_is_initialized(const MDModel* model) {
+    if (!model || !model->model_content) return 0;
+    const auto* base = static_cast<const modeldeploy::BaseModel*>(model->model_content);
+    return base->is_initialized() ? 1 : 0;
+}
+
+char* md_model_name(const MDModel* model) {
+    if (!model || !model->model_content) return nullptr;
+    const auto* base = static_cast<const modeldeploy::BaseModel*>(model->model_content);
+    const auto name = base->name();
+    return strdup(name.c_str());
 }
