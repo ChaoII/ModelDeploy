@@ -83,3 +83,7 @@
 
 结论：320 分辨率显著提升 20 路吞吐（+50%），GPU 53% 仍有空间。
 batch4 仍优于 batch8（320：1488 vs 611 fps）。配置：max_batch=4 + 320 engine + stream 复用。
+
+## NV12→BGR 批处理实验（2026-08-10，回退）
+
+新增 SDK nv12_to_bgr_batch_cuda（一次上传/一次 kernel/一次下载/一次同步，消除逐帧 cudaStreamSynchronize），process_batch 用它。实测 process_ms 14.7→31ms（fps 13.5→6.6），收益为负：多一次 bgr_flat→逐帧 memcpy + 3D 网格 kernel 效率抵消 sync 节省。已回退，逐帧 + stream 复用仍最优。
