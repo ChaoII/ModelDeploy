@@ -51,6 +51,11 @@ bool BatchScheduler::start() {
     bool expected = false;
     if (!started_.compare_exchange_strong(expected, true)) return true;
     running_ = true;
+#ifdef WITH_GPU
+    if (cudaStreamCreate(&nv12_stream_) != cudaSuccess) {
+        nv12_stream_ = nullptr;
+    }
+#endif
     sched_thread_ = std::thread(&BatchScheduler::scheduler_loop, this);
     std::cout << "[BatchScheduler] Started (batch_size=" << max_batch_size_
               << " timeout=" << batch_timeout_ms_ << "ms)" << std::endl;
@@ -61,6 +66,12 @@ void BatchScheduler::stop() {
     running_ = false;
     req_cv_.notify_all();
     if (sched_thread_.joinable()) sched_thread_.join();
+#ifdef WITH_GPU
+    if (nv12_stream_) {
+        cudaStreamDestroy(nv12_stream_);
+        nv12_stream_ = nullptr;
+    }
+#endif
     started_ = false;
 }
 
@@ -136,7 +147,7 @@ void BatchScheduler::process_batch(
 #ifdef WITH_GPU
         nv12_to_bgr_cuda(nv12_buf_.data(), nv12_buf_.data() + y_size,
                           req.width, req.height, req.width, req.width,
-                          bgr_own.data());
+                          bgr_own.data(), nv12_stream_);
         auto bgr_image = ImageData::from_raw(bgr_own.data(), req.width, req.height,
                                                MdImageType::PKG_BGR_U8, false);
 #else

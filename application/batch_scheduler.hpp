@@ -13,6 +13,9 @@
 #include "inference_engine.hpp"
 #include "perf_stats.hpp"
 #include "csrc/vision/common/image_data.h"
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#endif
 
 /// Batch request: one pipeline submits a frame for batched inference
 struct BatchRequest {
@@ -102,6 +105,10 @@ private:
     // NV12 buf for BGR conversion (reused across batches)
     std::vector<uint8_t> nv12_buf_;
     int last_w_ = 0, last_h_ = 0;
+
+#ifdef WITH_GPU
+    cudaStream_t nv12_stream_ = nullptr;  // 复用 CUDA 流，避免每批 create/destroy + 隐式同步
+#endif
 
     PerfStats stats_;
 
