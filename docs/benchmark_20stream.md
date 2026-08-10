@@ -61,3 +61,13 @@
 3. **decode 限速匹配处理率**（file 源 decode 0.8ms 超快，浪费 CPU）
 4. **P4 batch GPU 零拷贝**：设备 NV12 → GPU BGR → batch_predict 设备输入（消除双重 PCIe）
 5. **减少每路内存**：GPU workspace 池化（FramePool 未用）
+
+## P4 零拷贝 / 异步推理实验（2026-08-10，均回退）
+
+| 实验 | 结果 | 结论 |
+|------|------|------|
+| SDK batch 设备 BGR 输入检测 | 提交保留（b158dc4）| host 输入无副作用，为后续增强能力 |
+| process_batch 设备零拷贝（nv12→GPU BGR→batch 设备输入）| fps 6.8 vs host 11 | D2D 拷贝 + 系统内存压力抵消 PCIe 节省，收益为负 |
+| 异步批量推理（process 不阻塞等结果）| fps 3-7 或统计失真 | req 自持拷贝开销 + batch 队列积压，收益为负 |
+
+结论：当前环境（RTX 4060 Ti + 32GB + 内存压力 FreeGB≈5GB）下，同步 host BGR 批处理 + stream 复用是最优实现，20 路稳定 7-11fps/路。
