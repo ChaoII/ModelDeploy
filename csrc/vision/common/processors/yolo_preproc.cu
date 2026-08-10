@@ -439,18 +439,32 @@ namespace modeldeploy::vision {
             total_src_bytes += static_cast<size_t>(sh) * sw * 3;
         }
 
-        if (ws0.capacity < total_src_bytes) {
-            if (ws0.d_src) cudaFree(ws0.d_src);
-            cudaMalloc(&ws0.d_src, total_src_bytes);
-            ws0.capacity = total_src_bytes;
+        // 设备输入检测：若全部帧已是设备 BGR（如 process_batch 的 GPU 零拷贝路径），
+        // 跳过 H2D 上传，kernel 直接用设备指针（消除双重 PCIe 往返）。
+        // 要求各帧设备缓冲连续（src_offsets 线性索引），由调用方保证（见 batch_scheduler）。
+        bool all_device = true;
+        if (images[0].data()) {
+            cudaPointerAttributes attr{};
+            all_device = cudaPointerGetAttributes(&attr, images[0].data()) == cudaSuccess &&
+                         attr.type == cudaMemoryTypeDevice;
         }
-        uint8_t* dst_ptr = ws0.d_src;
-        for (int i = 0; i < batch; ++i) {
-            const size_t bytes = static_cast<size_t>(images[i].height()) * images[i].width() * 3;
-            cudaMemcpyAsync(dst_ptr, images[i].data(), bytes, cudaMemcpyHostToDevice, stream);
-            dst_ptr += bytes;
+        const uint8_t* d_src = nullptr;
+        if (all_device) {
+            d_src = images[0].data();
+        } else {
+            if (ws0.capacity < total_src_bytes) {
+                if (ws0.d_src) cudaFree(ws0.d_src);
+                cudaMalloc(&ws0.d_src, total_src_bytes);
+                ws0.capacity = total_src_bytes;
+            }
+            uint8_t* dst_ptr = ws0.d_src;
+            for (int i = 0; i < batch; ++i) {
+                const size_t bytes = static_cast<size_t>(images[i].height()) * images[i].width() * 3;
+                cudaMemcpyAsync(dst_ptr, images[i].data(), bytes, cudaMemcpyHostToDevice, stream);
+                dst_ptr += bytes;
+            }
+            d_src = ws0.d_src;
         }
-        const uint8_t* d_src = ws0.d_src;
 
         // 参数数组单块打包 + 线程局部池复用（避免每帧 6 次 cudaMalloc/cudaFree）
         // 布局：size_t offsets 放最前保证 8 字节对齐

@@ -122,7 +122,7 @@ void BatchScheduler::scheduler_loop() {
 void BatchScheduler::process_batch(
     std::vector<std::pair<BatchRequest, std::shared_ptr<BatchResult>>>& batch) {
     // P3.2: True batch inference via batch_predict
-    // Preprocess all frames to BGR
+    // Preprocess all frames to BGR (host 缓冲；设备零拷贝路径经实测在当前环境收益为负，已回退)
     std::vector<ImageData> bgr_images;
     bgr_images.reserve(batch.size());
     // 每帧独立 BGR 缓冲，生命周期贯穿本批（bgr_images 的 copy=false view 指向它们）
