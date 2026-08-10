@@ -567,7 +567,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
         </div>
         <div class="form-row full">
           <div><label class="form-label">模型文件路径 *</label>
-            <input class="form-input mono" id="mf_path" placeholder="/models/yolo11n.onnx" value="E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx"></div>
+            <input class="form-input mono" id="mf_path" placeholder="/models/yolo11n.onnx" value=""></div>
         </div>
       </div>
 
@@ -623,6 +623,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 var allModels=[],allTasks=[],currentPage='dashboard';
 var taskCardEls={};   // id -> DOM 节点引用
 var taskCharts={},detailChart=null,fpsHistory={};
+var _detailTaskId='';  // 当前打开的详情任务 id
 var refreshTimer=null;
 var flvPlayer=null;        // 详情弹窗里的 flv 播放器
 var detailTaskId=null;
@@ -650,7 +651,7 @@ document.addEventListener('DOMContentLoaded',function(){
   $('modeBtnSnap').classList.toggle('active',globalPreviewMode==='snapshot');
   $('modeBtnLive').classList.toggle('active',globalPreviewMode==='live');
   loadModels();refreshAll();
-  refreshTimer=setInterval(refreshAll,2000);
+  refreshTimer=setInterval(refreshAll,3000);
   pollThumbnails();    // 链式轮询缩略图（self-scheduling）
   // 全局缓冲区追逐定时器：每 2 秒检测所有 FLV 播放器的缓冲深度
   // 当缓冲超过 1 秒时，主动 seek 到 live edge（末尾减 0.2 秒），消除累积延迟
@@ -659,12 +660,15 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 function $(id){return document.getElementById(id)}
-function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+/*__MEDIA_SERVER_PORT__*/
+function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function typeLabel(t){var m={detection:'检测',classification:'分类',face_detection:'人脸',lpr_pipeline:'车牌',pose:'姿态'};return m[t]||t}
 
 function api(method,url,body,cb){
   var x=new XMLHttpRequest();x.open(method,url,true);
   if(body)x.setRequestHeader('Content-Type','application/json');
+  x.timeout=10000;  // 10s 超时，防挂起
+  x.ontimeout=function(){console.error('[API] Timeout',method,url);setConnection(false);cb({ok:false,msg:'timeout'})};
   x.onload=function(){
     var r,raw=x.responseText;
     try{r=JSON.parse(raw)}catch(e){console.error('[API] Invalid JSON response',method,url,raw.substring(0,200));r={ok:false,msg:'invalid json',_raw:raw.substring(0,200)}}
@@ -746,7 +750,7 @@ function renderModels(){
       '<div class="model-props">'+
         '<div class="model-prop"><div class="model-prop-val">'+esc(m.backend)+'</div><div class="model-prop-lbl">后端</div></div>'+
         '<div class="model-prop"><div class="model-prop-val">'+esc(m.device)+'</div><div class="model-prop-lbl">设备</div></div>'+
-        '<div class="model-prop"><div class="model-prop-val">'+m.input_size[0]+'×'+m.input_size[1]+'</div><div class="model-prop-lbl">输入</div></div>'+
+        '<div class="model-prop"><div class="model-prop-val">'+(m.input_size&&m.input_size[0]?m.input_size[0]+'×'+m.input_size[1]:'?')+'</div><div class="model-prop-lbl">输入</div></div>'+
       '</div>'+
       '<div class="model-actions">'+
         '<button class="btn btn-ghost btn-sm" onclick="openEditModelModal(\''+esc(m.name)+'\')">编辑</button>'+
@@ -805,24 +809,35 @@ function deleteModel(name){
 // ── 任务 ──
 function refreshAll(){
   api('GET','/api/v1/tasks',null,function(r){
-    if(r.ok){allTasks=r.tasks||[];renderStats();renderTasks();loadMetrics()}
+    if(r.ok){allTasks=r.tasks||[];renderStats();renderTasks();refreshDetailChart()}
   });
 }
+// 细节弹窗打开时，每个 poll tick 更新 FPS 图表（实时）
+function refreshDetailChart(){
+  if(!detailChart||!$('detailModalBackdrop')||!$('detailModalBackdrop').classList.contains('active'))return;
+  var id=_detailTaskId;if(!id)return;
+  var hist=fpsHistory[id];if(!hist)return;
+  detailChart.data.labels=hist.labels;
+  detailChart.data.datasets[0].data=hist.fps;
+  detailChart.update();
+}
 function loadMetrics(){
-  api('GET','/api/v1/metrics',null,function(r){
-    if(!r.ok||!r.metrics)return;var m=r.metrics;
-    $('sideTaskTotal').textContent=m.tasks_total;
-    $('sideTaskRun').textContent=m.tasks_running;
-    $('sideModelTotal').textContent=m.models_total;
-    $('sideTaskErr').textContent=m.tasks_error;
-  });
+  // 从 allTasks 推导（前端无需额外 /metrics 请求）
+  if(!allTasks)return;
+  var total=allTasks.length;
+  var running=allTasks.filter(function(t){return t.running}).length;
+  var err=allTasks.filter(function(t){return t.init_error&&t.init_error!==''}).length;
+  $('sideTaskTotal').textContent=total;
+  $('sideTaskRun').textContent=running;
+  $('sideTaskErr').textContent=err;
+  $('sideModelTotal').textContent=(allModels?allModels.length:0);
 }
 function renderStats(){
   var total=allTasks.length;
   var running=allTasks.filter(function(t){return t.running}).length;
   var error=allTasks.filter(function(t){return !!t.init_error}).length;
   $('statTotal').textContent=total;$('statRunning').textContent=running;
-  $('statStopped').textContent=total-running;$('statError').textContent=error;
+  $('statStopped').textContent=total-running-error;$('statError').textContent=error;
   $('taskCountLabel').textContent=total+' 个任务';
 }
 
@@ -1177,8 +1192,8 @@ function chaseLiveLatency(){
   // 追赶详情弹窗中的播放器（原始流 + AI 流）
   for(var key in detailPlayers){
     var p=detailPlayers[key];
-    if(!p||!p._player||!p._player.mediaElement)continue;
-    var video=p._player.mediaElement;
+    if(!p||!p.mediaElement)continue;
+    var video=p.mediaElement;
     if(video.buffered&&video.buffered.length>0){
       var liveEnd=video.buffered.end(video.buffered.length-1);
       var latency=liveEnd-(video.currentTime||0);
@@ -1221,7 +1236,7 @@ function applyPreviewMode(t){
   // 高亮按钮
   entry.modeBtnSnap.classList.toggle('active',mode==='snapshot');
   entry.modeBtnLive.classList.toggle('active',mode==='live');
-  var liveOn=t.running&&t.initialized&&!t.init_error;
+  var liveOn=t.running&&t.initialized&&!t.init_error&&t.enable_preview!==false;
   if(t.init_error){
     destroyCardPlayer(t.id);
     entry.img.style.display='none';
@@ -1289,7 +1304,7 @@ function pollThumbnails(){
       pre.src=url;
     });
   }
-  setTimeout(pollThumbnails,400);
+  setTimeout(pollThumbnails,1500);
 }
 
 function createTask(){
@@ -1327,7 +1342,7 @@ function createTask(){
   api('POST','/api/v1/tasks',body,function(r){
     if(r.ok){
       toast('任务「'+id+'」创建成功','success');log('任务创建成功：'+id,'ok');closeTaskModal();
-      api('POST','/api/v1/tasks/'+id+'/start',null,function(r2){
+      api('POST','/api/v1/tasks/'+encodeURIComponent(id)+'/start',null,function(r2){
         if(r2.ok){log('任务启动：'+id,'ok');toast('任务「'+id+'」已启动','success')}
         else{log('任务启动失败：'+id+' - '+(r2.msg||''),'err')}
         refreshAll();
@@ -1345,7 +1360,7 @@ function stopTaskIfRunningThenUpdate(){
   var task=allTasks.find(function(t){return t.id===id});
   if(task&&task.running){
     log('任务正在运行，先停止再编辑：'+id,'info');
-    api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+    api('POST','/api/v1/tasks/'+encodeURIComponent(id)+'/stop',null,function(r){
       if(r.ok){setTimeout(function(){updateTask()},300)}
       else{toast('停止任务失败，无法编辑','danger')}
     });
@@ -1361,6 +1376,7 @@ function updateTask(){
   // 收集勾选的模型
   var checks=document.querySelectorAll('#modelCheckboxes input:checked');var models=[];
   checks.forEach(function(c){var m=allModels.find(function(mm){return mm.name===c.value});if(m)models.push(m)});
+  if(models.length===0){toast('请至少勾选一个模型','danger');return;}
   var body=JSON.stringify({
     input_url:$('f_input').value.trim(),
     output_url:$('f_output').value.trim(),
@@ -1398,21 +1414,21 @@ function updateTask(){
 }
 function startTask(id){
   log('启动任务：'+id,'info');
-  api('POST','/api/v1/tasks/'+id+'/start',null,function(r){
+  api('POST','/api/v1/tasks/'+encodeURIComponent(id)+'/start',null,function(r){
     if(r.ok){toast('任务已启动','success');log('任务启动：'+id,'ok')}
     else{toast('启动失败：'+(r.msg||''),'danger');log('启动失败：'+id,'err')}refreshAll();
   });
 }
 function stopTask(id){
   log('停止任务：'+id,'info');
-  api('POST','/api/v1/tasks/'+id+'/stop',null,function(r){
+  api('POST','/api/v1/tasks/'+encodeURIComponent(id)+'/stop',null,function(r){
     if(r.ok){toast('任务已停止','success');log('任务停止：'+id,'ok')}else{toast('停止失败','danger')}refreshAll();
   });
 }
 function deleteTask(id){
   if(!confirm('确认删除任务「'+id+'」？'))return;
   log('删除任务：'+id,'info');
-  api('DELETE','/api/v1/tasks/'+id,null,function(r){
+  api('DELETE','/api/v1/tasks/'+encodeURIComponent(id),null,function(r){
     if(r.ok){toast('任务已删除','success');log('任务删除：'+id,'ok');refreshAll()}else{toast('删除失败','danger')}
   });
 }
@@ -1432,7 +1448,8 @@ function deriveHttpFlv(url){
     stream=stream.replace(/\.(mp4|flv|ts|mkv)$/,'');
     // 把 127.0.0.1 转成 localhost 以避免浏览器的 Private Network Access 拦截
     if(host==='127.0.0.1'||host==='0.0.0.0') host='localhost';
-    return 'http://'+host+':8080/'+app+'/'+stream+'.live.flv';
+    var mp=window.MEDIA_SERVER_PORT||8080;
+    return 'http://'+host+':'+mp+'/'+app+'/'+stream+'.live.flv';
   }catch(e){return ''}
 }
 
@@ -1453,10 +1470,14 @@ function checkPnaAccess(){
 var detailPlayers={}; // { 'input': Player, 'output': Player }
 
 function showDetail(id){
+  _detailTaskId=id;
   detailTaskId=id;
   var t=allTasks.find(function(tt){return tt.id===id});if(!t)return;
   var stats=t.stats||{};
-  var modelsHtml=(t.models||[]).map(function(m){return '<span class="model-tag">'+esc(m.name)+' ['+typeLabel(m.type)+']</span>'}).join('');
+  var modelsHtml=(t.models||[]).map(function(m){return '<span class="model-tag">'+esc(m.name)+' ['+typeLabel(m.type)+'] <a href="javascript:void(0)" onclick="removeDetailModel(\''+esc(t.id)+'\',\''+esc(m.name)+'\')" style="color:#ff6b6b;margin-left:4px" title="移除">&times;</a></span>'}).join('');
+  var availModels=(allModels||[]).filter(function(am){return !(t.models||[]).some(function(m){return m.name===am.name})});
+  var addOpts=availModels.map(function(am){return '<option value="'+esc(am.name)+'">'+esc(am.name)+'</option>'}).join('');
+  modelsHtml+='<div class="detail-add-model" style="margin-top:6px"><select id="detailModelSelect">'+(addOpts||'<option value="">(无可用模型)</option>')+'</select> <button class="btn btn-primary btn-sm" onclick="addDetailModel(\''+esc(t.id)+'\')">添加模型</button></div>';
 
   var enc=t.encoder||{},dec=t.decoder||{};
 
@@ -1518,6 +1539,8 @@ function showDetail(id){
       '<div class="detail-item"><div class="detail-label">推理耗时</div><div class="detail-value">'+(stats.avg_infer_ms?stats.avg_infer_ms.toFixed(2):'-')+' ms</div></div>'+
       '<div class="detail-item"><div class="detail-label">绘制耗时</div><div class="detail-value">'+(stats.avg_draw_ms?stats.avg_draw_ms.toFixed(2):'-')+' ms</div></div>'+
       '<div class="detail-item"><div class="detail-label">编码耗时</div><div class="detail-value">'+(stats.avg_encode_ms?stats.avg_encode_ms.toFixed(2):'-')+' ms</div></div>'+
+      '<div class="detail-item"><div class="detail-label">解码耗时</div><div class="detail-value">'+(stats.avg_decode_ms?stats.avg_decode_ms.toFixed(2):'-')+' ms</div></div>'+
+      '<div class="detail-item"><div class="detail-label">总耗时</div><div class="detail-value">'+(stats.avg_total_ms?stats.avg_total_ms.toFixed(2):'-')+' ms</div></div>'+
     '</div>'+
 
     '<div class="detail-section-title">编码器参数</div>'+
@@ -1548,6 +1571,11 @@ function showDetail(id){
   var hist=fpsHistory[id]||{labels:[],fps:[]};
   if(detailChart)detailChart.destroy();
   var ctx=document.getElementById('detailChart');
+  if(typeof Chart==='undefined'){
+    // CDN 不可用（离线/内网）：显示纯文本替代
+    if(ctx){ctx.parentNode.innerHTML='<div class="detail-value" style="color:rgba(255,255,255,0.5)">图表库未加载（Chart.js CDN 不可用）</div>';}
+    return;
+  }
   detailChart=new Chart(ctx,{
     type:'line',
     data:{labels:hist.labels,datasets:[{label:'FPS',data:hist.fps,borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.18)',borderWidth:2,fill:true,tension:0.3,pointRadius:2}]},
@@ -1557,6 +1585,18 @@ function showDetail(id){
   });
 }
 
+function addDetailModel(id){
+  var sel=$('detailModelSelect');if(!sel||!sel.value)return;
+  var name=sel.value;var m=allModels.find(function(mm){return mm.name===name});if(!m)return;
+  api('PATCH','/api/v1/tasks/'+encodeURIComponent(id)+'/models',JSON.stringify({name:m.name,type:m.type,path:m.path,backend:m.backend,device:m.device,confidence_threshold:m.confidence_threshold,input_size:m.input_size,interval:m.interval}),function(r){
+    if(r.ok){toast('模型已添加','success');refreshAll();}else{toast('添加失败：'+(r.msg||''),'danger')}
+  });
+}
+function removeDetailModel(id,name){
+  api('DELETE','/api/v1/tasks/'+encodeURIComponent(id)+'/models/'+encodeURIComponent(name),null,function(r){
+    if(r.ok){toast('模型已移除','success');refreshAll();}else{toast('移除失败：'+(r.msg||''),'danger')}
+  });
+}
 function closeDetailModal(){
   stopAllDetailPlayers();
   $('detailModalBackdrop').classList.remove('active');
@@ -1621,8 +1661,8 @@ function openTaskModal(){
   btn.textContent='创建并启动';
   $('f_id').value='';$('f_id').disabled=false;
   $('f_name').value='';
-  $('f_input').value='rtsp://127.0.0.1:554/live/obs_test3';
-  $('f_output').value='rtsp://127.0.0.1:554/live/surveillance_out';
+  $('f_input').value='';
+  $('f_output').value='';
   $('f_preview').value='';
   $('f_enable_preview').checked=true;
   $('f_enc_format').value='auto';$('f_enc_codec').value='auto';
@@ -1663,9 +1703,11 @@ function openEditTaskModal(id){
     $('f_dec_transport').value=dec.rtsp_transport||'tcp';
     renderModelSelector();
     if(cfg.models){
+      var allCbs=document.querySelectorAll('#modelCheckboxes input');
       cfg.models.forEach(function(m){
-        var cb=document.querySelector('#modelCheckboxes input[value="'+esc(m.name).replace(/"/g,'&quot;')+'"]');
-        if(cb)cb.checked=true;
+        for(var i=0;i<allCbs.length;i++){
+          if(allCbs[i].value===m.name){allCbs[i].checked=true;break;}
+        }
       });
     }
     log('打开编辑：'+cfg.id,'info');

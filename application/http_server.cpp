@@ -116,6 +116,11 @@ static std::string get_exe_dir() {
 }
 
 std::string HttpServer::load_web_ui() const {
+    // 缓存：只读盘一次（启动首个请求），避免每次 / 请求重新查找+读取
+    {
+        std::lock_guard<std::mutex> lock(web_ui_mtx_);
+        if (web_ui_loaded_) return web_ui_cache_;
+    }
     std::vector<std::string> paths;
     auto exe_dir = get_exe_dir();
     if (!exe_dir.empty()) {
@@ -123,21 +128,27 @@ std::string HttpServer::load_web_ui() const {
         paths.push_back(exe_dir + "\\..\\application\\web_ui.html");
         paths.push_back(exe_dir + "\\..\\..\\application\\web_ui.html");
     }
-    paths.push_back("E:\\CLionProjects\\ModelDeploy\\application\\web_ui.html");
     paths.push_back("web_ui.html");
     paths.push_back("../application/web_ui.html");
     paths.push_back("application/web_ui.html");
+    std::string result = "<h1>Web UI file not found</h1>";
     for (const auto& p : paths) {
         std::ifstream f(p, std::ios::binary);
         if (f.is_open()) {
             std::stringstream buf;
             buf << f.rdbuf();
             auto s = buf.str();
-            if (!s.empty()) return s;
+            if (!s.empty()) { result = s; break; }
         }
     }
-    std::cerr << "[WebUI] Could not open web_ui.html" << std::endl;
-    return "<h1>Web UI file not found</h1>";
+    if (result.find("Web UI file not found") != std::string::npos)
+        std::cerr << "[WebUI] Could not open web_ui.html" << std::endl;
+    {
+        std::lock_guard<std::mutex> lock(web_ui_mtx_);
+        web_ui_cache_ = result;
+        web_ui_loaded_ = true;
+    }
+    return result;
 }
 
 // ── Route helpers ─────────────────────────────
@@ -181,7 +192,15 @@ void HttpServer::register_routes() {
 
     // ── Web UI ──────────────────────────────────────
     server_.Get("/", [this](const httplib::Request&, httplib::Response& res) {
-        res.set_content(load_web_ui(), "text/html; charset=utf-8");
+        auto html = load_web_ui();
+        // 注入媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 读取，替换默认 8080）
+        const std::string token = "/*__MEDIA_SERVER_PORT__*/";
+        const auto pos = html.find(token);
+        if (pos != std::string::npos) {
+            html.replace(pos, token.size(),
+                         "window.MEDIA_SERVER_PORT=" + std::to_string(media_server_port_) + ";");
+        }
+        res.set_content(html, "text/html; charset=utf-8");
     });
     server_.Get("/index.html", [this](const httplib::Request&, httplib::Response& res) {
         res.set_content(load_web_ui(), "text/html; charset=utf-8");
