@@ -62,7 +62,7 @@ namespace ModelDeploy
 
     public class Polygon
     {
-        private List<Point> Points { get; set; } = new List<Point>();
+        public List<Point> Points { get; set; } = new List<Point>();
 
         public override string ToString() => $"{{ {string.Join(",", Points)} }}";
 

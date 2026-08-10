@@ -7,10 +7,10 @@ namespace ModelDeploy.vision.pipeline
 {
     public class AttributeResult
     {
-        private Rect Box { get; set; }
-        private int BoxLabelId { get; set; }
-        private float BoxScore { get; set; }
-        private List<float> AttrScores { get; set; }
+        public Rect Box { get; set; }
+        public int BoxLabelId { get; set; }
+        public float BoxScore { get; set; }
+        public List<float> AttrScores { get; set; }
 
         private static readonly int NativeSize = Marshal.SizeOf<MDAttributeResult>();
 

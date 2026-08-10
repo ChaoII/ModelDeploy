@@ -7,9 +7,9 @@ namespace ModelDeploy.vision.detection
 {
     public class DetectionResult
     {
-        private Rect Box { get; set; }
-        private int LabelId { get; set; }
-        private float Score { get; set; }
+        public Rect Box { get; set; }
+        public int LabelId { get; set; }
+        public float Score { get; set; }
 
         private static readonly int NativeSize = Marshal.SizeOf<MDDetectionResult>();
 

@@ -7,8 +7,8 @@ namespace ModelDeploy.vision.classification
 {
     public class ClassificationResult
     {
-        private int LabelId { get; set; }
-        private float Score { get; set; }
+        public int LabelId { get; set; }
+        public float Score { get; set; }
 
         public override string ToString() => $"LabelId: {LabelId}, Score: {Score}";
 

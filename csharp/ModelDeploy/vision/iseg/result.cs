@@ -7,8 +7,8 @@ namespace ModelDeploy.vision.iseg
 {
     public class Mask
     {
-        private List<byte> Buffer { get; set; }
-        private List<int> Shape { get; set; }
+        public List<byte> Buffer { get; set; }
+        public List<int> Shape { get; set; }
 
         public static Mask FromNative(MDMask cResult)
         {
@@ -60,10 +60,10 @@ namespace ModelDeploy.vision.iseg
 
     public class ISegResult
     {
-        private Rect Box { get; set; }
-        private Mask Mask { get; set; }
-        private int LabelId { get; set; }
-        private float Score { get; set; }
+        public Rect Box { get; set; }
+        public Mask Mask { get; set; }
+        public int LabelId { get; set; }
+        public float Score { get; set; }
 
         private static readonly int NativeSize = Marshal.SizeOf<MDISegResult>();
 

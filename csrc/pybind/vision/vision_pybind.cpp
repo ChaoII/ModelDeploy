@@ -44,6 +44,7 @@ namespace modeldeploy::vision {
         bind_lpr_det(m);
         bind_lpr_rec(m);
         bind_lpr_pipeline(m);
+        bind_face_det(m);
         bind_face_rec(m);
         bind_face_age(m);
         bind_face_gender(m);

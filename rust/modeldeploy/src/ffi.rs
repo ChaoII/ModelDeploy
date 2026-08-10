@@ -493,10 +493,12 @@ extern "C" {
     pub fn md_set_detection_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
     pub fn md_draw_detection_result(
         image: *const MDImage,
-        results: *mut MDDetectionResults,
+        results: *const MDDetectionResults,
         threshold: f64,
         font_path: *const c_char,
-        out: *mut MDImage,
+        font_size: i32,
+        alpha: f64,
+        save_result: i32,
     );
 
     // ── 分类（Classification） ──

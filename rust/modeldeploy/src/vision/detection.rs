@@ -87,19 +87,17 @@ impl UltralyticsDet {
         let status = unsafe { ffi::md_detection_predict(&self.model, &image.raw, &mut results) };
         check_status(status)?;
 
-        let mut drawn = ffi::MDImage {
-            width: 0,
-            height: 0,
-            channels: 0,
-            data: ptr::null_mut(),
-        };
+        // C API 的 md_draw_detection_result 是就地绘制（void）：先克隆，再在副本上绘制
+        let drawn = unsafe { ffi::md_clone_image(&image.raw) };
         unsafe {
             ffi::md_draw_detection_result(
-                &image.raw,
-                &mut results,
+                &drawn,
+                &results,
                 threshold,
                 ptr::null(),
-                &mut drawn,
+                14,     // font_size
+                0.15,   // alpha
+                0,      // save_result
             )
         };
         unsafe { ffi::md_free_detection_result(&mut results) };

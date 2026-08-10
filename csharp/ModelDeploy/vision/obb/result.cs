@@ -7,9 +7,9 @@ namespace ModelDeploy.vision.obb
 {
     public class ObbResult
     {
-        private RotatedRect Box { get; set; }
-        private int LabelId { get; set; }
-        private float Score { get; set; }
+        public RotatedRect Box { get; set; }
+        public int LabelId { get; set; }
+        public float Score { get; set; }
 
         private static readonly int NativeSize = Marshal.SizeOf<MDObbResult>();
 
