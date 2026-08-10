@@ -59,7 +59,7 @@ cargo build --release
 cargo run --release --example detection
 ```
 
-第一次运行会自动下载依赖并编译。检测示例默认使用 `../../test_data/test_models/yolo11n_nms.onnx` 模型和 `../../test_data/test_images/test_detection0.jpg` 图片，可直接运行。
+第一次运行会自动下载依赖并编译。检测示例默认使用 `../../test_data/test_models/onnx/yolo11n_nms.onnx` 模型和 `../../test_data/test_images/test_detection0.jpg` 图片，可直接运行。
 
 ---
 
