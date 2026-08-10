@@ -11,8 +11,8 @@ int main() {
     MDModel model;
     const MDRuntimeOption option = md_create_default_runtime_option();
     md_create_lpr_pipeline_model(&model,
-                                 "../../test_data/test_models/yolov5plate.onnx",
-                                 "../../test_data/test_models/plate_recognition_color.onnx", &option);
+                                 "../../test_data/test_models/onnx/yolov5plate.onnx",
+                                 "../../test_data/test_models/onnx/plate_recognition_color.onnx", &option);
     MDImage image = md_read_image("../../test_data/test_images/test_lpr_pipeline2.jpg");
     MDLPRResults c_results;
     md_lpr_pipeline_predict(&model, &image, &c_results);

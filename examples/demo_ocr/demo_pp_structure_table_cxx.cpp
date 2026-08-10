@@ -17,9 +17,9 @@ int main() {
     // The rec model can inference a batch of images now.
     // User could initialize the inference batch size and set them after create
     // PP-OCR model.
-    const std::string& det_model_file = "../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx";
-    const std::string& rec_model_file = "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx";
-    const std::string& table_model_file = "../../test_data/test_models/ocr/SLANeXt_wired.onnx";
+    const std::string& det_model_file = "../../test_data/test_models/onnx/ocr/repsvtr_mobile/det_infer.onnx";
+    const std::string& rec_model_file = "../../test_data/test_models/onnx/ocr/repsvtr_mobile/rec_infer.onnx";
+    const std::string& table_model_file = "../../test_data/test_models/onnx/ocr/SLANeXt_wired.onnx";
     const std::string& rec_label_file = "../../test_data/ppocrv4_dict.txt";
     const std::string& table_char_dict_path = "../../test_data/table_structure_dict_ch.txt";
     const std::string& image_file = "C:/Users/aichao/Desktop/stock/0003.jpg";

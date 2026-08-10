@@ -11,7 +11,7 @@ int main() {
     option.use_gpu();
     option.enable_trt = true;
     option.enable_fp16 = true;
-    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/zc.onnx", option);
+    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/onnx/zc.onnx", option);
     yolov8.get_postprocessor().set_keypoints_num(2);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_zc0.jpg");
     std::vector<modeldeploy::vision::KeyPointsResult> result;
@@ -28,7 +28,7 @@ int main() {
     timers.print_benchmark();
     // result.display();
     const auto vis_image =
-        modeldeploy::vision::vis_keypoints(img, result, "../../test_data/test_models/msyh.ttc", 12, 10, 0.4, true,
+        modeldeploy::vision::vis_keypoints(img, result, "../../test_data/msyh.ttc", 12, 10, 0.4, true,
                                            true);
     vis_image.imshow("result");
 }

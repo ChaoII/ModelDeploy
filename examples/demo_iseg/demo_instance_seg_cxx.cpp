@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     option.use_trt_backend();
     option.enable_fp16 = true;
     option.enable_trt = true;
-    const std::string model_file = "../../test_data/test_models/yolo11n-seg_nms.onnx";
+    const std::string model_file = "../../test_data/test_models/onnx/yolo11n-seg_nms.onnx";
     const std::string image_file = "../../test_data/test_images/test_person.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file, option);
     model.get_preprocessor().use_cuda_preproc();
@@ -28,6 +28,6 @@ int main(int argc, char** argv) {
     }
     times.print_benchmark();
     // res.display();
-    auto vis_im = modeldeploy::vision::vis_iseg(im, res, 0.2, "../../test_data/test_models/font.ttf", 14, 0.5, false);
+    auto vis_im = modeldeploy::vision::vis_iseg(im, res, 0.2, "../../test_data/msyh.ttc", 14, 0.5, false);
     vis_im.imshow("result");
 }

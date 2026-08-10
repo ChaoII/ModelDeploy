@@ -29,10 +29,10 @@ int main() {
 #endif
     try {
         // 初始化推理引擎
-        std::string asr_onnx = "../../test_data/test_models/sense_voice/model.int8.onnx";
-        std::string tokens = "../../test_data/test_models/sense_voice/tokens.txt";
-        std::string vad_onnx = "../../test_data/test_models/sense_voice/silero_vad.onnx";
-        const std::string wav = "../../test_data/test_models/sense_voice/test_wavs/zh.wav";
+        std::string asr_onnx = "../../test_data/test_models/onnx/sense_voice/model.int8.onnx";
+        std::string tokens = "../../test_data/test_models/onnx/sense_voice/tokens.txt";
+        std::string vad_onnx = "../../test_data/test_models/onnx/sense_voice/silero_vad.onnx";
+        const std::string wav = "../../test_data/test_models/onnx/sense_voice/test_wavs/zh.wav";
 
         const auto asr = std::make_unique<modeldeploy::audio::AAsr>(asr_onnx, tokens, vad_onnx);
         asr->on_asr_ = onAsr;

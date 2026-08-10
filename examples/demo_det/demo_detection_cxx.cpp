@@ -14,7 +14,7 @@ int main() {
     option.enable_fp16 = true;
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n_nms.onnx", option);
+    modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute1.jpg");
@@ -52,7 +52,7 @@ int main() {
     // modeldeploy::RuntimeOption option;
     // option.use_gpu();
     // option.enable_trt = true;
-    // modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/yolo11n.onnx", option);
+    // modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/onnx/yolo11n.onnx", option);
     // std::vector<modeldeploy::vision::DetectionResult> result;
     // // yolov8.get_preprocessor().set_size({1440, 1440});
     // yolo11_det.get_preprocessor().set_mini_pad(true);
@@ -81,7 +81,7 @@ int main() {
 //     option.enable_fp16 = true;
 //     // option.enable_trt = true;
 //     option.ort_option.trt_engine_cache_path = "./trt_engine";
-//     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/best.onnx",
+//     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/onnx/best.onnx",
 //                                                               option);
 //     const auto label_map = yolo11_det.get_label_map("names");
 //     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");

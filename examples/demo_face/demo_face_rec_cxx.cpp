@@ -10,7 +10,7 @@
 
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceID(
-        "../../test_data/test_models/face/face_recognizer_fp16.onnx");
+        "../../test_data/test_models/onnx/face/face_recognizer_fp16.onnx");
     assert(faceid_model.is_initialized());
     auto im0 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_id1.jpg");
     auto im1 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_id4.jpg");

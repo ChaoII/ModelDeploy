@@ -7,9 +7,9 @@
 
 int main() {
     auto face_as_pipeline_model = modeldeploy::vision::face::SeetaFaceAsPipeline(
-        "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx",
-        "../../test_data/test_models/face/fas_first.onnx",
-        "../../test_data/test_models/face/fas_second.onnx");
+        "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx",
+        "../../test_data/test_models/onnx/face/fas_first.onnx",
+        "../../test_data/test_models/onnx/face/fas_second.onnx");
     auto im0 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");
     std::vector<modeldeploy::vision::FaceAntiSpoofResult> results;
     if (!face_as_pipeline_model.predict(im0, &results, 0.3)) {

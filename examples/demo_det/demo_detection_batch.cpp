@@ -76,7 +76,7 @@ int main() {
     option.ort_option.trt_max_shape = "images:16x3x1280x1280";
     option.ort_option.trt_engine_cache_path = "./trt_engine";
     modeldeploy::vision::detection::UltralyticsDet model(
-        "../../test_data/test_models/helmet.onnx", option);
+        "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
     const std::string image_file_path = "F:/ultralytics_workspace/dataset/D000007/split/images/train";
     constexpr int batch_size = 1;
     const auto image_lists = get_image_list(image_file_path, batch_size);

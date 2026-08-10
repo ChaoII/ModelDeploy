@@ -13,7 +13,7 @@ int main() {
     option.use_gpu();
     option.enable_trt = false;
     option.enable_fp16 = true;
-    modeldeploy::vision::ocr::DBDetector db_detector("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer2.onnx",
+    modeldeploy::vision::ocr::DBDetector db_detector("../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx",
                                                      option);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
     // auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0003.jpg");

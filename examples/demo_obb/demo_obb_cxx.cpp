@@ -10,7 +10,7 @@ int main() {
     option.use_gpu();
     // option.enable_trt = true;
 
-    modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/yolo11n-obb_nms.onnx", option);
+    modeldeploy::vision::detection::UltralyticsObb yolov8("../../test_data/test_models/onnx/yolo11n-obb_nms.onnx", option);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
     std::vector<modeldeploy::vision::ObbResult> result;
     TimerArray timers;
@@ -19,6 +19,6 @@ int main() {
     }
     timers.print_benchmark();
     const auto vis_image =
-        modeldeploy::vision::vis_obb(img, result, 0.2, "../../test_data/test_models/msyh.ttc", 12, 0.3, 0);
+        modeldeploy::vision::vis_obb(img, result, 0.2, "../../test_data/msyh.ttc", 12, 0.3, 0);
     vis_image.imshow("test");
 }

@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     MDModel model;
     const MDRuntimeOption option = md_create_default_runtime_option();
     if ((ret = md_create_ocr_recognition_model(&model,
-                                               "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
+                                               "../../test_data/test_models/onnx/ocr/repsvtr_mobile/rec_infer.onnx",
                                                "../../test_data/ppocrv4_dict.txt", &option)) != 0) {
         md_free_ocr_recognition_model(&model);
         std::cout << ret << std::endl;

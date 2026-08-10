@@ -20,9 +20,9 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     MDOCRModelParameters ocr_parameters = {
-        "../../test_data/test_models/ocr/ppocrv5_mobile/det_infer2.onnx",
-        "../../test_data/test_models/ocr/ppocrv5_mobile/cls_infer.onnx",
-        "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer1.onnx",
+        "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx",
+        "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/cls_infer.onnx",
+        "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx",
         "../../test_data/dict.txt",
         1440,
         0.3,

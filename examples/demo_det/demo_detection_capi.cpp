@@ -18,7 +18,7 @@ int main() {
     runtime_option.device_id = 0;
     runtime_option.enable_fp16 = 1;
     runtime_option.enable_trt = 0;
-    if (ret = md_create_detection_model(&model, "../../test_data/test_models/yolo11n_nms.onnx", &runtime_option); ret) {
+    if (ret = md_create_detection_model(&model, "../../test_data/test_models/onnx/yolo11n_nms.onnx", &runtime_option); ret) {
         std::cout << ret << std::endl;
         return ret;
     }

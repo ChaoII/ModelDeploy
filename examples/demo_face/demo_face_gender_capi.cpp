@@ -9,7 +9,7 @@
 int main() {
     MDModel model;
     const MDRuntimeOption option = md_create_default_runtime_option();
-    md_create_face_gender_model(&model, "../../test_data/test_models/face/gender_predictor.onnx", &option);
+    md_create_face_gender_model(&model, "../../test_data/test_models/onnx/face/gender_predictor.onnx", &option);
     MDImage image = md_read_image("../../test_data/test_images/test_face_gender.jpg");
     MDFaceGenderResult c_result;
     md_face_gender_predict(&model, &image, &c_result);

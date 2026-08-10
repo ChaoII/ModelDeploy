@@ -17,12 +17,12 @@ int main() {
 #endif
     MDModel model;
     MDKokoroParameters params;
-    params.model_path = "../../test_data/test_models/kokoro_v1_1/model.onnx";
-    params.tokens_path = "../../test_data/test_models/kokoro_v1_1/tokens.txt";
-    params.lexicons_en_path = "../../test_data/test_models/kokoro_v1_1/lexicon-us-en.txt";
-    params.lexicons_zh_path = "../../test_data/test_models/kokoro_v1_1/lexicon-zh.txt";
-    params.voice_bin_path = "../../test_data/test_models/kokoro_v1_1/voices.bin";
-    params.jieba_dir = "../../test_data/test_models/kokoro_v1_1/dict/";
+    params.model_path = "../../test_data/test_models/onnx/kokoro_v1_1/model.onnx";
+    params.tokens_path = "../../test_data/test_models/onnx/kokoro_v1_1/tokens.txt";
+    params.lexicons_en_path = "../../test_data/test_models/onnx/kokoro_v1_1/lexicon-us-en.txt";
+    params.lexicons_zh_path = "../../test_data/test_models/onnx/kokoro_v1_1/lexicon-zh.txt";
+    params.voice_bin_path = "../../test_data/test_models/onnx/kokoro_v1_1/voices.bin";
+    params.jieba_dir = "../../test_data/test_models/onnx/kokoro_v1_1/dict/";
     params.text_normalization_dir = "../../test_data/";
     auto option = md_create_default_runtime_option();
     auto kokoro = md_create_kokoro_model(&model, &params, &option);

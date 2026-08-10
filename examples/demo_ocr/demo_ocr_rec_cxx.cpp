@@ -22,7 +22,7 @@ int main() {
     option.set_trt_min_shape("x:1x3x48x48");
     option.set_trt_opt_shape("x:8x3x48x320");
     option.set_trt_max_shape("x:64x3x48x640");
-    modeldeploy::vision::ocr::Recognizer ocr_recognizer("../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer1.onnx",
+    modeldeploy::vision::ocr::Recognizer ocr_recognizer("../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx",
                                                         "../../test_data/dict.txt",
                                                         option);
     // ocr_recognizer.get_preprocessor().set_static_shape_infer(true);

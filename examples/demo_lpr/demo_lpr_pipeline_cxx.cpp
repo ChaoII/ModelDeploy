@@ -15,8 +15,8 @@ int main() {
     SetConsoleOutputCP(CP_UTF8);
 #endif
     auto model = modeldeploy::vision::lpr::LprPipeline(
-        "../../test_data/test_models/yolov5plate.onnx",
-        "../../test_data/test_models/plate_recognition_color.onnx");
+        "../../test_data/test_models/onnx/yolov5plate.onnx",
+        "../../test_data/test_models/onnx/plate_recognition_color.onnx");
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_lpr_detection.jpg");
     auto im_bak = im.clone();
     std::vector<modeldeploy::vision::LprResult> res;

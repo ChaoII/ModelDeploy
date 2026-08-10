@@ -143,8 +143,8 @@ runtime_option = modeldeploy.RuntimeOption()
 runtime_option.use_gpu()
 runtime_option.use_trt_backend()
 model = modeldeploy.vision.PedestrianAttribute(
-    "../test_data/test_models/zhgd_det_20251219.engine",
-    "../test_data/test_models/zhgd_ml.engine", runtime_option)
+    "../test_data/test_models/trt/zhgd_det_20251219.engine",
+    "../test_data/test_models/trt/zhgd_ml.engine", runtime_option)
 model.cls_batch_size = 8
 model.det_input_size = [1280, 1280]
 model.set_det_threshold(0.5)

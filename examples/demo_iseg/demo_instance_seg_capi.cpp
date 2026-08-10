@@ -13,7 +13,7 @@ int main() {
     MDStatusCode ret;
     MDModel model;
     const MDRuntimeOption option = md_create_default_runtime_option();
-    if (ret = md_create_instance_seg_model(&model, "../../test_data/test_models/yolo11n-seg.onnx", &option); ret) {
+    if (ret = md_create_instance_seg_model(&model, "../../test_data/test_models/onnx/yolo11n-seg.onnx", &option); ret) {
         std::cout << ret << std::endl;
         return ret;
     }

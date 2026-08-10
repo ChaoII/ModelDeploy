@@ -13,9 +13,9 @@ int main() {
     MDModel model;
     const MDRuntimeOption option = md_create_default_runtime_option();
     md_create_face_as_pipeline_model(&model,
-                                     "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx",
-                                     "../../test_data/test_models/face/fas_first.onnx",
-                                     "../../test_data/test_models/face/fas_second.onnx", &option);
+                                     "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx",
+                                     "../../test_data/test_models/onnx/face/fas_first.onnx",
+                                     "../../test_data/test_models/onnx/face/fas_second.onnx", &option);
     MDImage image = md_read_image("../../test_data/test_images/test_face_detection4.jpg");
     MDFaceAsResults c_results;
     md_face_as_pipeline_predict(&model, &image, &c_results);

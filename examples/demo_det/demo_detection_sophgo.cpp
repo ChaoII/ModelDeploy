@@ -45,8 +45,6 @@ int main(int argc, char** argv) {
         option.use_sophgo_backend(0);
         option.sophgo_option.bmodel_path = model;
         printf("[backend] Sophgo TPU, bmodel = %s\n", model.c_str());
-        // bmodel 输入尺寸固定(转换时 --input_shapes 指定)，需与预处理输出一致
-        det_size = {1280, 1280};
     } else {
         option.use_ort_backend();
         option.use_cpu();
@@ -59,6 +57,13 @@ int main(int argc, char** argv) {
         printf("model init failed: %s\n", model.c_str());
         return 1;
     }
+
+    // 输入尺寸从模型元数据获取，自动匹配 bmodel/onnx 实际输入（避免硬编码 640/1280 不匹配）
+    const auto input_shape = det->get_input_info(0).shape;
+    if (input_shape.size() >= 4 && input_shape[2] > 0 && input_shape[3] > 0) {
+        det_size = {static_cast<int>(input_shape[3]), static_cast<int>(input_shape[2])};
+    }
+    printf("[input] model input size: %dx%d\n", det_size[0], det_size[1]);
 
     // SDK 默认预处理即 letterbox + /255 归一化到 [0,1]，符合 Ultralytics 训练约定。
     // 无 NMS 模型建议阈值取 0.5 以上(0.25 会带出大量低分候选)。

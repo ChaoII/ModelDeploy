@@ -20,9 +20,9 @@ int main(int argc, char** argv) {
     //简单百宝箱
     MDModel model;
     const MDStructureTableModelParameters ocr_parameters = {
-        "../../test_data/test_models/ocr/repsvtr_mobile/det_infer.onnx",
-        "../../test_data/test_models/ocr/repsvtr_mobile/rec_infer.onnx",
-        "../../test_data/test_models/ocr/SLANeXt_wired.onnx",
+        "../../test_data/test_models/onnx/ocr/repsvtr_mobile/det_infer.onnx",
+        "../../test_data/test_models/onnx/ocr/repsvtr_mobile/rec_infer.onnx",
+        "../../test_data/test_models/onnx/ocr/SLANeXt_wired.onnx",
         "../../test_data/ppocrv4_dict.txt",
         "../../test_data/table_structure_dict_ch.txt",
         1920,

@@ -11,7 +11,7 @@ int main() {
     std::string image_file = "../../test_data/test_images/test_face_detection4.jpg";
     auto model =
         modeldeploy::vision::face::Scrfd(
-            "../../test_data/test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx");
+            "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx");
     auto im = modeldeploy::vision::ImageData::imread(image_file);
     auto im_bak = im.clone();
     std::vector<modeldeploy::vision::KeyPointsResult> res;

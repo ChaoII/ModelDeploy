@@ -24,7 +24,7 @@ int main() {
 
     // 加载模型
     modeldeploy::vision::detection::UltralyticsDet yolo11_det(
-        "../../test_data/test_models/yolo11n_nms.onnx", option);
+        "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
     yolo11_det.get_preprocessor().use_cuda_preproc();
     yolo11_det.get_preprocessor().set_size({640, 640});
 

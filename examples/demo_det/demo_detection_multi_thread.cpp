@@ -65,7 +65,7 @@ int main() {
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";
     const modeldeploy::vision::detection::UltralyticsDet model(
-        "../../test_data/test_models/yolo11n.onnx", option);
+        "../../test_data/test_models/onnx/yolo11n.onnx", option);
     if (!model.is_initialized()) {
         std::cerr << "Failed to initialize model." << std::endl;
         return -1;

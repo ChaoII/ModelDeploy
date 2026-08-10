@@ -19,8 +19,8 @@ int main(int argc, char** argv) {
     option.backend = MD_BACKEND_TRT;
     option.enable_trt = 1;
     option.enable_fp16 = 1;
-    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/zhgd_det_20251219.engine",
-                                    "../../test_data/test_models/zhgd_ml.engine", &option)) != 0) {
+    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/trt/zhgd_det_20251219.engine",
+                                    "../../test_data/test_models/trt/zhgd_ml.engine", &option)) != 0) {
         std::cout << ret << std::endl;
         return ret;
     }

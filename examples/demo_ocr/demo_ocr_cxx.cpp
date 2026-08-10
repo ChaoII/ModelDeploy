@@ -19,9 +19,9 @@ int main() {
     option.use_gpu();
     option.enable_trt = false;
     option.enable_fp16 = true;
-    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/ocr/ppocrv5_mobile/det_infer2.onnx",
-                                            "../../test_data/test_models/ocr/ppocrv4_mobile/cls_infer.onnx",
-                                            "../../test_data/test_models/ocr/ppocrv5_mobile/rec_infer1.onnx",
+    modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx",
+                                            "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/cls_infer.onnx",
+                                            "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx",
                                             "../../test_data/dict.txt",
                                             option);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");

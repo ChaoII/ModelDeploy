@@ -62,7 +62,7 @@ int main() {
     option.enable_fp16 = true;
     option.enable_trt = true;
     const modeldeploy::vision::detection::UltralyticsDet model(
-        "../../test_data/test_models/yolo11n.engine", option);
+        "../../test_data/test_models/trt/yolo11n.engine", option);
     if (!model.is_initialized()) {
         std::cerr << "Failed to initialize model." << std::endl;
         return -1;

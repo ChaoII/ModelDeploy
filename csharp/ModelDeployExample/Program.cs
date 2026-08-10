@@ -23,7 +23,7 @@ static class Program
     static void TestClassification()
     {
         RuntimeOption option = new RuntimeOption();
-        using var yolov5 = new UltralyticsCls(Path.Combine(TestDataPath, "test_models/yolo11n-cls.onnx"), option);
+        using var yolov5 = new UltralyticsCls(Path.Combine(TestDataPath, "test_models/onnx/yolo11n-cls.onnx"), option);
         yolov5.SetInputSize(224, 224);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_face.jpg"));
         var results = yolov5.Predict(image);
@@ -39,12 +39,12 @@ static class Program
     {
         var parameters = new MDKokoroParameters
         {
-            model_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/model.onnx"),
-            tokens_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/tokens.txt"),
-            lexicons_en_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/lexicon-us-en.txt"),
-            lexicons_zh_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/lexicon-zh.txt"),
-            voice_bin_path = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/voices.bin"),
-            jieba_dir = Path.Combine(TestDataPath, "test_models/kokoro_v1_1/dict/"),
+            model_path = Path.Combine(TestDataPath, "test_models/onnx/kokoro_v1_1/model.onnx"),
+            tokens_path = Path.Combine(TestDataPath, "test_models/onnx/kokoro_v1_1/tokens.txt"),
+            lexicons_en_path = Path.Combine(TestDataPath, "test_models/onnx/kokoro_v1_1/lexicon-us-en.txt"),
+            lexicons_zh_path = Path.Combine(TestDataPath, "test_models/onnx/kokoro_v1_1/lexicon-zh.txt"),
+            voice_bin_path = Path.Combine(TestDataPath, "test_models/onnx/kokoro_v1_1/voices.bin"),
+            jieba_dir = Path.Combine(TestDataPath, "test_models/onnx/kokoro_v1_1/dict/"),
             text_normalization_dir = Path.Combine(TestDataPath, ""),
         };
 
@@ -79,7 +79,7 @@ static class Program
             TrtMaxShape = "images:1x3x1280x1280",
         };
         using var yolov8 =
-            new UltralyticsDet(Path.Combine(TestDataPath, "test_models/yolo11n.onnx"), option);
+            new UltralyticsDet(Path.Combine(TestDataPath, "test_models/onnx/yolo11n.onnx"), option);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_detection0.jpg"));
         // yolov8.SetInputSize(1440, 1440);
         var results = yolov8.Predict(image);
@@ -91,7 +91,7 @@ static class Program
     static void TestInstanceSeg()
     {
         RuntimeOption option = new RuntimeOption();
-        using var yolo11n_seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/yolo11n-seg.onnx"), option);
+        using var yolo11n_seg = new UltralyticsSeg(Path.Combine(TestDataPath, "test_models/onnx/yolo11n-seg.onnx"), option);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_person.jpg"));
         var results = yolo11n_seg.Predict(image);
         yolo11n_seg.DrawIsegResult(image, results, 0.5, Path.Combine(TestDataPath, "msyh.ttc"));
@@ -102,7 +102,7 @@ static class Program
     static void TestObb()
     {
         RuntimeOption option = new RuntimeOption();
-        using var yolo11n_obb = new UltralyticsObb(Path.Combine(TestDataPath, "test_models/yolo11n-obb.onnx"), option);
+        using var yolo11n_obb = new UltralyticsObb(Path.Combine(TestDataPath, "test_models/onnx/yolo11n-obb.onnx"), option);
         yolo11n_obb.SetInputSize(1024, 1024);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_obb1.jpg"));
         var results = yolo11n_obb.Predict(image);
@@ -115,7 +115,7 @@ static class Program
     {
         RuntimeOption option = new RuntimeOption();
         using var yolo11n_pose =
-            new UltralyticsPose(Path.Combine(TestDataPath, "test_models/yolo11n-pose.onnx"), option);
+            new UltralyticsPose(Path.Combine(TestDataPath, "test_models/onnx/yolo11n-pose.onnx"), option);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_person.jpg"));
         var results = yolo11n_pose.Predict(image);
         yolo11n_pose.DrawPoseResult(image, results, Path.Combine(TestDataPath, "msyh.ttc"), 12, 4, 0.5, true);
@@ -150,9 +150,9 @@ static class Program
         MDOCRModelParameters parameters = new MDOCRModelParameters
         {
             // 最后注意必须加斜杠
-            det_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/det_infer2.onnx"),
-            cls_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv4_mobile/cls_infer.onnx"),
-            rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/rec_infer1.onnx"),
+            det_model_file = Path.Combine(TestDataPath, "test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx"),
+            cls_model_file = Path.Combine(TestDataPath, "test_models/onnx/ocr/ppocrv4_mobile/cls_infer.onnx"),
+            rec_model_file = Path.Combine(TestDataPath, "test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx"),
             dict_path = Path.Combine(TestDataPath, "dict.txt"),
             max_side_len = 1440,
             det_db_thresh = 0.3,
@@ -197,7 +197,7 @@ static class Program
 
         // 人脸检测
         var image0 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face.jpg"));
-        var scrfd = new Scrfd(Path.Combine(TestDataPath, "test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx"),
+        var scrfd = new Scrfd(Path.Combine(TestDataPath, "test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx"),
             option);
         var result = scrfd.Predict(image0);
         scrfd.DrawFaceResult(image0, result, Path.Combine(TestDataPath, "msyh.ttc"), 15, 10, 0.3, true);
@@ -205,42 +205,42 @@ static class Program
 
         // 人脸识别
         var image1 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_id4.jpg"));
-        var seetaFaceId = new SeetaFaceId(Path.Combine(TestDataPath, "test_models/face/face_recognizer.onnx"), option);
+        var seetaFaceId = new SeetaFaceId(Path.Combine(TestDataPath, "test_models/onnx/face/face_recognizer.onnx"), option);
         var recResult = seetaFaceId.Predict(image1);
         seetaFaceId.Display(recResult);
 
         // 年龄预测
         var image2 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_id1.jpg"));
-        var agePredict = new SeetaFaceAge(Path.Combine(TestDataPath, "test_models/face/age_predictor.onnx"), option);
+        var agePredict = new SeetaFaceAge(Path.Combine(TestDataPath, "test_models/onnx/face/age_predictor.onnx"), option);
         var age = agePredict.Predict(image2);
         Console.WriteLine($"Age is: {age}");
 
         //  性别预测
         var image3 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_gender.jpg"));
         var genderPredict =
-            new SeetaFaceGender(Path.Combine(TestDataPath, "test_models/face/gender_predictor.onnx"), option);
+            new SeetaFaceGender(Path.Combine(TestDataPath, "test_models/onnx/face/gender_predictor.onnx"), option);
         var gender = genderPredict.Predict(image3);
         Console.WriteLine($"gender is: {gender}");
 
         // 人脸活体检测1
         var image4 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_id3.jpg"));
-        var asFirst = new SeetaFaceAsFirst(Path.Combine(TestDataPath, "test_models/face/fas_first.onnx"), option);
+        var asFirst = new SeetaFaceAsFirst(Path.Combine(TestDataPath, "test_models/onnx/face/fas_first.onnx"), option);
         var score = asFirst.Predict(image4);
         Console.WriteLine(score > 0.8 ? "REAL" : "SPOOF");
 
 
         // 人脸活体检测2
         var image5 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_as_second2.jpg"));
-        var asSecond = new SeetaFaceAsSecond(Path.Combine(TestDataPath, "test_models/face/fas_second.onnx"), option);
+        var asSecond = new SeetaFaceAsSecond(Path.Combine(TestDataPath, "test_models/onnx/face/fas_second.onnx"), option);
         var asSecondResults = asSecond.Predict(image5);
         Console.WriteLine(asSecondResults.Count > 0 ? "SPOOF" : "REAL");
 
         // 人脸活体检测pipeline
         var image6 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_detection4.jpg"));
         var antiSpoof = new SeetaFaceAntiSpoof(
-            Path.Combine(TestDataPath, "test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx"),
-            Path.Combine(TestDataPath, "test_models/face/fas_first.onnx"),
-            Path.Combine(TestDataPath, "test_models/face/fas_second.onnx"), option);
+            Path.Combine(TestDataPath, "test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx"),
+            Path.Combine(TestDataPath, "test_models/onnx/face/fas_first.onnx"),
+            Path.Combine(TestDataPath, "test_models/onnx/face/fas_second.onnx"), option);
         var asResults = antiSpoof.Predict(image6);
         // REAL = 0, FUZZY = 1, SPOOF = 2
         foreach (var asResult in asResults)
@@ -251,8 +251,8 @@ static class Program
         // 人脸识别pipeline （人脸检测+人脸裁剪+人脸矫正+人脸特征提取）
         var image7 = Image.Read(Path.Combine(TestDataPath, "test_images/test_face_detection4.jpg"));
         var faceRecognizerPipeline = new FaceRecognizerPipeline(
-            Path.Combine(TestDataPath, "test_models/face/scrfd_2.5g_bnkps_shape640x640.onnx"),
-            Path.Combine(TestDataPath, "test_models/face/face_recognizer.onnx"), option);
+            Path.Combine(TestDataPath, "test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx"),
+            Path.Combine(TestDataPath, "test_models/onnx/face/face_recognizer.onnx"), option);
         var results = faceRecognizerPipeline.Predict(image7);
         faceRecognizerPipeline.Display(results);
     }
@@ -266,7 +266,7 @@ static class Program
 
         var image0 = Image.Read(Path.Combine(TestDataPath, "test_images/test_lpr_pipeline2.jpg"));
         var lprDetection =
-            new LprDetection(Path.Combine(TestDataPath, "test_models/yolov5plate.onnx"), option);
+            new LprDetection(Path.Combine(TestDataPath, "test_models/onnx/yolov5plate.onnx"), option);
         var detResults = lprDetection.Predict(image0);
         lprDetection.Display(detResults);
         lprDetection.DrawDetectionResult(image0, detResults, Path.Combine(TestDataPath, "msyh.ttc"), 15, 4, 0.3, 1);
@@ -276,14 +276,14 @@ static class Program
         // 车牌识别
         var image1 = Image.Read(Path.Combine(TestDataPath, "test_images/test_lpr_recognizer.jpg"));
         var lprRecognizer =
-            new LprRecognizer(Path.Combine(TestDataPath, "test_models/plate_recognition_color.onnx"), option);
+            new LprRecognizer(Path.Combine(TestDataPath, "test_models/onnx/plate_recognition_color.onnx"), option);
         var recResults = lprRecognizer.Predict(image1);
         lprRecognizer.Display(recResults);
 
         // 车牌识别pipeline （车牌检测+车牌矫正+双层车牌拼接+车牌号识别）
         var image2 = Image.Read(Path.Combine(TestDataPath, "test_images/test_lpr_pipeline2.jpg"));
-        var lprPipeline = new LprPipeline(Path.Combine(TestDataPath, "test_models/yolov5plate.onnx"),
-            Path.Combine(TestDataPath, "test_models/plate_recognition_color.onnx"), option
+        var lprPipeline = new LprPipeline(Path.Combine(TestDataPath, "test_models/onnx/yolov5plate.onnx"),
+            Path.Combine(TestDataPath, "test_models/onnx/plate_recognition_color.onnx"), option
         );
         var lprResults = lprPipeline.Predict(image2);
         lprPipeline.Display(lprResults);
@@ -295,7 +295,7 @@ static class Program
     {
         RuntimeOption option = new RuntimeOption();
         OcrRecognition ocrRecognition =
-            new OcrRecognition(Path.Combine(TestDataPath, "test_models/ocr/ppocrv5_mobile/rec_infer.onnx"),
+            new OcrRecognition(Path.Combine(TestDataPath, "test_models/onnx/ocr/ppocrv5_mobile/rec_infer.onnx"),
                 Path.Combine(TestDataPath, "ppocrv5_dict.txt"), option);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_lpr_recognizer.jpg"));
         var result = ocrRecognition.Predict(image);
@@ -306,7 +306,7 @@ static class Program
     {
         RuntimeOption option = new RuntimeOption();
         OcrRecognition ocrRecognition =
-            new OcrRecognition(Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/rec_infer.onnx"),
+            new OcrRecognition(Path.Combine(TestDataPath, "test_models/onnx/ocr/repsvtr_mobile/rec_infer.onnx"),
                 Path.Combine(TestDataPath, "ppocrv4_dict.txt"), option);
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/ocr_check_report.png"));
 
@@ -379,8 +379,8 @@ static class Program
         RuntimeOption option = new RuntimeOption();
         option.Device = Device.GPU;
         Image image = Image.Read(Path.Combine(TestDataPath, "test_images/test_pedestrian_attribute1.jpg"));
-        var detModelPath = Path.Combine(TestDataPath, "test_models/zhgd_det_20251219.engine");
-        var clsModelPath = Path.Combine(TestDataPath, "test_models/zhgd_ml.engine");
+        var detModelPath = Path.Combine(TestDataPath, "test_models/trt/zhgd_det_20251219.engine");
+        var clsModelPath = Path.Combine(TestDataPath, "test_models/trt/zhgd_ml.engine");
         using PedestrianAttribute pedestrianAttribute = new PedestrianAttribute(detModelPath, clsModelPath, option);
         pedestrianAttribute.SetDetInputSize(1280, 1280);
         pedestrianAttribute.SetClsInputSize(192, 256);
@@ -407,9 +407,9 @@ static class Program
         MDStructureTableModelParameters parameters = new MDStructureTableModelParameters
         {
             // 最后注意必须加斜杠
-            det_model_file = Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/det_infer.onnx"),
-            rec_model_file = Path.Combine(TestDataPath, "test_models/ocr/repsvtr_mobile/rec_infer.onnx"),
-            table_model_file = Path.Combine(TestDataPath, "test_models/ocr/SLANeXt_wired.onnx"),
+            det_model_file = Path.Combine(TestDataPath, "test_models/onnx/ocr/repsvtr_mobile/det_infer.onnx"),
+            rec_model_file = Path.Combine(TestDataPath, "test_models/onnx/ocr/repsvtr_mobile/rec_infer.onnx"),
+            table_model_file = Path.Combine(TestDataPath, "test_models/onnx/ocr/SLANeXt_wired.onnx"),
             rec_label_file = Path.Combine(TestDataPath, "ppocrv4_dict.txt"),
             table_char_dict_path = Path.Combine(TestDataPath, "table_structure_dict_ch.txt"),
             max_side_len = 1920,
