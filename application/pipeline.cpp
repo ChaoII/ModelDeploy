@@ -392,6 +392,7 @@ void Pipeline::process_loop() {
             req.uv_plane = const_cast<uint8_t*>(pf.uv_ptr());
             req.width = pf.width;
             req.height = pf.height;
+            req.need_bgr = cfg_.enable_preview;
             req.model_names.reserve(cfg_.models.size());
             for (const auto& m : cfg_.models) {
                 req.model_names.push_back(m.name);

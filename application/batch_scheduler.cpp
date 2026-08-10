@@ -93,7 +93,11 @@ void BatchScheduler::scheduler_loop() {
         if (!batch.empty()) {
             total_batched_frames_.fetch_add(batch.size());
             total_batches_.fetch_add(1);
+            auto t0 = std::chrono::steady_clock::now();
             process_batch(batch);
+            auto t1 = std::chrono::steady_clock::now();
+            total_batch_process_us_.fetch_add(
+                std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
         }
     }
 
@@ -110,6 +114,9 @@ void BatchScheduler::process_batch(
     // Preprocess all frames to BGR
     std::vector<ImageData> bgr_images;
     bgr_images.reserve(batch.size());
+    // 每帧独立 BGR 缓冲，生命周期贯穿本批（bgr_images 的 copy=false view 指向它们）
+    std::vector<std::vector<uint8_t>> bgr_owns;
+    bgr_owns.reserve(batch.size());
 
     for (auto& [req, res] : batch) {
         const size_t y_size = static_cast<size_t>(req.height) * req.width;
@@ -117,7 +124,6 @@ void BatchScheduler::process_batch(
 
         if (last_w_ != req.width || last_h_ != req.height || nv12_buf_.size() != y_size + uv_size) {
             nv12_buf_.resize(y_size + uv_size);
-            bgr_buf_.resize(req.width * req.height * 3);
             last_w_ = req.width;
             last_h_ = req.height;
         }
@@ -125,19 +131,25 @@ void BatchScheduler::process_batch(
         std::memcpy(nv12_buf_.data(), req.y_plane, y_size);
         std::memcpy(nv12_buf_.data() + y_size, req.uv_plane, uv_size);
 
+        bgr_owns.emplace_back(static_cast<size_t>(req.width) * req.height * 3);
+        auto& bgr_own = bgr_owns.back();
 #ifdef WITH_GPU
         nv12_to_bgr_cuda(nv12_buf_.data(), nv12_buf_.data() + y_size,
                           req.width, req.height, req.width, req.width,
-                          bgr_buf_.data());
-        // copy=true：bgr_buf_ 为跨批复用的成员缓冲，必须深拷贝，否则
-        // bgr_image 别名同一缓冲，下一帧/下一批会覆盖已返回给 pipeline 的数据
-        auto bgr_image = ImageData::from_raw(bgr_buf_.data(), req.width, req.height,
-                                               MdImageType::PKG_BGR_U8, true);
+                          bgr_own.data());
+        auto bgr_image = ImageData::from_raw(bgr_own.data(), req.width, req.height,
+                                               MdImageType::PKG_BGR_U8, false);
 #else
         auto nv12_image = ImageData::from_raw(nv12_buf_.data(), req.width, req.height,
                                                 MdImageType::NV12, true);
         auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
 #endif
+        // 非预览路：推理结果已足够，无需把 BGR 传回 pipeline（省一次深拷贝）
+        if (req.need_bgr) {
+            auto bgr_copy = ImageData::from_raw(bgr_own.data(), req.width, req.height,
+                                                MdImageType::PKG_BGR_U8, true);
+            res->bgr_image = std::move(bgr_copy);
+        }
         bgr_images.push_back(std::move(bgr_image));
     }
 
@@ -218,7 +230,9 @@ void BatchScheduler::process_batch(
     for (size_t i = 0; i < batch.size(); ++i) {
         auto& [req, res] = batch[i];
         auto t0 = std::chrono::steady_clock::now();
-        res->bgr_image = bgr_images[i];
+        // bgr_image 已在循环内按 need_bgr 深拷贝到 res->bgr_image；此处不覆盖。
+        // 非预览路（need_bgr=false）res->bgr_image 为空，pipeline 跳过绘制。
+
         res->ready = true;
         auto t1 = std::chrono::steady_clock::now();
         res->infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();

@@ -22,6 +22,7 @@ struct BatchRequest {
     uint8_t* uv_plane = nullptr;
     int width = 0;
     int height = 0;
+    bool need_bgr = false;  // 是否需要 BGR 结果（预览/绘制路径；非预览路省去拷贝）
 };
 
 /// Batch result: returned to the pipeline after inference
@@ -72,6 +73,12 @@ public:
         return n ? static_cast<double>(total_batched_frames_.load()) / n : 0.0;
     }
 
+    /// Average process_batch wall time in microseconds
+    double avg_batch_process_us() const {
+        uint64_t n = total_batches_.load();
+        return n ? static_cast<double>(total_batch_process_us_.load()) / n : 0.0;
+    }
+
 private:
     int max_batch_size_;
     int batch_timeout_ms_;
@@ -94,7 +101,6 @@ private:
 
     // NV12 buf for BGR conversion (reused across batches)
     std::vector<uint8_t> nv12_buf_;
-    std::vector<uint8_t> bgr_buf_;
     int last_w_ = 0, last_h_ = 0;
 
     PerfStats stats_;
@@ -102,6 +108,7 @@ private:
     // Batch statistics
     std::atomic<uint64_t> total_batches_{0};
     std::atomic<uint64_t> total_batched_frames_{0};
+    std::atomic<uint64_t> total_batch_process_us_{0};
 
     void scheduler_loop();
     void process_batch(std::vector<std::pair<BatchRequest, std::shared_ptr<BatchResult>>>& batch);
