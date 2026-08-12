@@ -1,0 +1,21 @@
+# tpu-mlir 混合精度量化表（INT8 时可选）
+#
+# 用途：检测模型输出形如 [B,5,N] = [cx,cy,w,h,score] 时，坐标通道（0~640）与
+# 置信度通道（sigmoid 概率 0~1）动态范围相差数百倍。纯 INT8 对称量化对整个
+# 输出张量用同一个 scale（被坐标通道主导），会把置信度通道压成全 0，导致
+# 无任何检出。将这些与置信度相关的尾部算子改为 F16（其余保持 INT8）即可保留
+# 置信度精度，体积与速度仍接近纯 INT8。
+#
+# 用法（convert.sh 传 --qtable <本文件>）：
+#   --quantize INT8 --cali_images <目录> --qtable /conv/qtable_f16.txt
+#
+# op_name 需与 model_transform 生成的 .mlir 中算子 loc 名精确一致，可先转换一次
+# 后用 `grep 'loc(' *.mlir` 确认。F16 模式让对应层保持半精度浮点。
+# op_name   quantize_mode
+output0_Concat F16
+/model.23/Concat_2_output_0_Concat F16
+/model.23/Mul_2_output_0_Mul F16
+/model.23/Sigmoid_output_0_Sigmoid F16
+/model.23/Div_1_output_0_Div F16
+/model.23/Sub_1_output_0_Sub F16
+/model.23/Add_2_output_0_Add F16
