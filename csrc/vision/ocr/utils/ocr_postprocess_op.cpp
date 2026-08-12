@@ -6,6 +6,7 @@
 #include <utility>
 #include "vision/ocr/utils/clipper.h"
 #include "vision/ocr/utils/ocr_postprocess_op.h"
+#include <opencv2/geometry/2d.hpp>
 
 
 namespace modeldeploy::vision::ocr {

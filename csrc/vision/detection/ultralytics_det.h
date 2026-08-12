@@ -19,8 +19,8 @@ namespace modeldeploy::vision::detection {
         bool predict(const ImageData& image, std::vector<DetectionResult>* result,
                      TimerArray* timers = nullptr);
 
-        /// GPU 直通：NV12 输入（host 或 device 指针）→ GPU letterbox/normalize → 推理 → 后处理。
-        /// 跳过 nv12→BGR→host 的中间转换，前处理全程在 GPU（配合 use_cuda_preproc）。
+        /// NV12 输入（host Y/UV 平面）→ letterbox/normalize → 推理 → 后处理。
+        /// 预处理走当前 processor backend（CPU/CUDA/Sophgo-BMCV），由 runtime_option 决定。
         bool predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                           int width, int height, int step_y, int step_uv,
                           std::vector<DetectionResult>* result,
@@ -46,7 +46,5 @@ namespace modeldeploy::vision::detection {
         bool initialize();
         UltralyticsPreprocessor preprocessor_;
         UltralyticsPostprocessor postprocessor_;
-        // Sophgo 零拷贝路径持有的输出 bm_image（attach 到输入设备内存），用 md_bmcv_image_destroy 释放
-        void* out_img_ = nullptr;
     };
 } // namespace detection

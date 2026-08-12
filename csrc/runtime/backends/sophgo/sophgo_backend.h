@@ -19,16 +19,6 @@ namespace modeldeploy {
 
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
 
-        // 返回缓存的输入设备内存（bm_device_mem_t*，bmrt_tensor 分配并缓存复用），
-        // 供 SophgoProcessorBackend 的 BMCV 预处理 attach 写入（零拷贝输入）。
-        // 未初始化时为 nullptr；首次调用 lazily 分配。生命周期由 backend 管理。
-        // 零拷贝输入经 Tensor::from_external_memory(..., Device::TPU) 包装后走统一 infer()，
-        // infer() 识别 Device::TPU 输入跳过 s2d 上传直接 launch。
-        void* get_input_device_mem();
-
-        // 返回 bmrt 内部 bm_handle_t（供 SophgoProcessorBackend 共享，D2D 零拷贝需要同一 handle）
-        [[nodiscard]] void* get_bm_handle();
-
         std::unique_ptr<BaseBackend> clone(const RuntimeOption& runtime_option,
                                            void* stream = nullptr,
                                            int device_id = -1) override;

@@ -4,6 +4,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "vision/ocr/utils/ocr_utils.h"
+#include <opencv2/geometry/2d.hpp>
 
 
 namespace modeldeploy::vision::ocr {

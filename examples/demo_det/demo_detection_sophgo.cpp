@@ -33,8 +33,8 @@ static bool ends_with(const std::string& s, const std::string& suffix) {
 }
 
 int main(int argc, char** argv) {
-    const std::string model = argc > 1 ? argv[1] : "yolo11n_bm1688.bmodel";
-    const std::string image = argc > 2 ? argv[2] : "test.jpg";
+    const std::string model = argc > 1 ? argv[1] : "../../test_data/test_models/sophgo/zhgd_without_nms_640_int8.bmodel";
+    const std::string image = argc > 2 ? argv[2] : "../../test_data/test_images/test_pedestrian_attribute_scale.png";
     const float conf_threshold = argc > 3 ? static_cast<float>(atof(argv[3])) : 0.5f;
     const int loop_count = argc > 4 ? atoi(argv[4]) : 100;
     const std::string font_path = argc > 5 ? argv[5] : "";

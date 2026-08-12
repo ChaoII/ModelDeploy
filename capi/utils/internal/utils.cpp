@@ -8,6 +8,10 @@
 #include "capi/utils/internal/utils.h"
 #include "csrc/vision/utils.h"
 
+#ifdef HAVE_OPENCV_GEOMETRY
+#include <opencv2/geometry/2d.hpp>
+#endif
+
 #include <capi/utils/md_utils_capi.h>
 
 #include "csrc/core/md_log.h"

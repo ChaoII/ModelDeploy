@@ -127,6 +127,7 @@ MDImage md_read_image(const char* path) {
 
 MDImage md_read_image_from_device(int device_id, const int frame_width, const int frame_height,
                                   const bool is_save_file) {
+#ifdef HAVE_OPENCV_VIDEOIO
 #ifdef _WIN32
     cv::VideoCapture cap(device_id, cv::CAP_DSHOW);
 #else
@@ -163,6 +164,10 @@ MDImage md_read_image_from_device(int device_id, const int frame_width, const in
         MD_LOG_INFO << "Save file to [capture.jpg]" << std::endl;
     }
     return mat_to_md_image(image);
+#else
+    MD_LOG_WARN << "OpenCV built without videoio module, camera capture unavailable" << std::endl;
+    return {};
+#endif
 }
 
 void md_save_image(MDImage* image, const char* path) {

@@ -5,6 +5,7 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/lpr/lpr_pipeline/lpr_pipeline.h"
+#include <opencv2/geometry/2d.hpp>
 
 namespace modeldeploy::vision::lpr {
     LprPipeline::LprPipeline(const std::string& det_model_path,

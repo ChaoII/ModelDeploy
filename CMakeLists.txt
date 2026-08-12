@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.27)
 project(ModelDeploySDK)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -92,7 +92,10 @@ else ()
     add_compile_options(
             "$<$<COMPILE_LANGUAGE:CXX>:-Wall>"
             "$<$<COMPILE_LANGUAGE:CXX>:-Wextra>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>"
+            # 添加 SIMD 优化选项
+            "$<$<COMPILE_LANGUAGE:CXX>:-mavx2>"
+            "$<$<COMPILE_LANGUAGE:CXX>:-mfma>")
 endif ()
 
 include_directories(${CMAKE_SOURCE_DIR})
@@ -220,17 +223,17 @@ if (BUILD_ENCRYPTION)
         include_directories(${OPENSSL_INCLUDE_DIR})
         list(APPEND DEPENDS OpenSSL::SSL OpenSSL::Crypto)
         message(STATUS "OpenSSL found: ${OPENSSL_VERSION}")
-    else()
+    else ()
         message(WARNING "BUILD_ENCRYPTION=ON but OpenSSL not found. "
-            "Model encryption will be disabled.\n"
-            "  Windows: Download from https://slproweb.com/products/Win32OpenSSL.html\n"
-            "           Install the Win64 OpenSSL Light version (e.g. Win64 OpenSSL v3.x.x)\n"
-            "           Then set: cmake -DOPENSSL_ROOT_DIR=\"C:/Program Files/OpenSSL-Win64\"\n"
-            "  Linux:   sudo apt install libssl-dev  (Debian/Ubuntu)\n"
-            "           sudo dnf install openssl-devel  (Fedora/RHEL)\n"
-            "           sudo pacman -S openssl  (Arch)\n"
-            "  macOS:   brew install openssl")
-    endif()
+                "Model encryption will be disabled.\n"
+                "  Windows: Download from https://slproweb.com/products/Win32OpenSSL.html\n"
+                "           Install the Win64 OpenSSL Light version (e.g. Win64 OpenSSL v3.x.x)\n"
+                "           Then set: cmake -DOPENSSL_ROOT_DIR=\"C:/Program Files/OpenSSL-Win64\"\n"
+                "  Linux:   sudo apt install libssl-dev  (Debian/Ubuntu)\n"
+                "           sudo dnf install openssl-devel  (Fedora/RHEL)\n"
+                "           sudo pacman -S openssl  (Arch)\n"
+                "  macOS:   brew install openssl")
+    endif ()
 endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
@@ -238,6 +241,10 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
         VERSION ${MD_VERSION}
         SOVERSION ${MD_VERSION_MAJOR})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS} PRIVATE ${PRIVATE_DEPENDS})
+# Sophgo 平台 jpg 变暗修复：whole-archive 逻辑定义在 cmake/opencv.cmake（MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE）
+if (NOT "${MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE}" STREQUAL "")
+    target_link_options(${LIBRARY_NAME} PRIVATE ${MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE})
+endif ()
 if (MSVC AND ENABLE_ORT)
     # delay-load onnxruntime：首次调用时才加载，此时 win_dll_path.cpp 的静态初始化
     # 已用 SetDllDirectory 指向 SDK 同目录，避免被 System32 的旧版 onnxruntime(1.17) 抢占

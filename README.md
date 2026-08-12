@@ -224,9 +224,29 @@ Sophgo 后端(`ENABLE_SOPHGO=ON`)加载的是 `.bmodel` 文件(基于 tpu-mlir �
 cd tools/docker/sophgo
 #    先将 tpu_mlir-1.27-py3-none-any.whl 与 tpu-mlir-resource.tar 放入该目录(从算能官方 SDK 获取)
 ./build_docker.sh                      # 构建镜像 tpuc_dev:1.27
+
+# F16（精度无损，简单，体积 ~10MB）
 docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
     --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
     --chip bm1688 --quantize F16 --out yolo11n_bm1688.bmodel
+
+# INT8（体积 ~25% 更小，TPU 上快 3~5 倍，需校准；可先用 F16 跑通再接 INT8）
+docker run --rm -it \
+    -v <onnx目录>:/conv -v <校准图片目录>:/cali_img \
+    tpuc_dev:1.27 bash /conv/convert.sh \
+    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
+    --chip bm1688 --quantize INT8 --cali_images /cali_img --cali_num 100 \
+    --out yolo11n_bm1688_int8.bmodel
+
+# INT8 + 混合精度量化表（检测头输出 [B,5,N]=[cx,cy,w,h,score] 时推荐：
+#   纯 INT8 会把 score 通道压成全 0 导致无检出，用 qtable 让 score 尾部算子保持 F16）
+docker run --rm -it \
+    -v <onnx目录>:/conv -v <校准图片目录>:/cali_img -v tools/docker/sophgo:/tpuconf \
+    tpuc_dev:1.27 bash /conv/convert.sh \
+    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
+    --chip bm1688 --quantize INT8 --cali_images /cali_img --cali_num 100 \
+    --qtable /tpuconf/qtable_f16.txt \
+    --out yolo11n_bm1688_int8.bmodel
 ```
 
 `convert.sh` 内部等价于：
@@ -236,9 +256,11 @@ docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
 1. `tpu-mlir 1.27` 对带 NMS 的 ONNX 有 Gather 算子转换 bug，**务必先把 NMS 从图中去掉**(用 onnxsim 或脚本裁剪为原始检测头输出)，NMS 由 SDK 侧 `run_without_nms`(含 sigmoid + 无效框过滤)完成
 2. 无 NMS 模型输出原始检测头，**需用 SDK 默认预处理(letterbox + `/255` 归一化到 `[0,1]`)**，无需也不应调用 `set_normalize(false)`；无 NMS 模型建议置信度阈值取 0.5 以上，0.25 会带出大量低分候选
 3. bmodel 输入尺寸在转换时由 `--shapes` 固定(如 `[[1,3,1280,1280]]`)，SDK 端需 `preprocessor.set_size(...)` 与之匹配
-4. `--quantize` 支持 `F16`(默认推荐)/`BF16`/`INT8`(需 cali_table)；`--chip` 支持 `bm1688`/`cv186x`
+4. `--quantize` 支持 `F16`(默认推荐)/`BF16`/`INT8`(需校准，见 `--cali_*` 参数)；`--chip` 支持 `bm1688`/`cv186x`
+5. **INT8 校准**：`convert.sh` 支持从图片目录自动生成校准数据(`--cali_images`)或直接给预处理 npy 列表(`--cali_data_list`)，内部依次执行 `model_transform → run_calibration → model_deploy`；校准需 50~200 张有代表性的图
+6. **检测头置信度通道被量化压死**：单类无 NMS 模型输出 `[B,5,N]`，坐标(0~640)与 score(0~1) 动态范围差数百倍，纯 INT8 会共用输出张量尺度把 score 压成全 0 → 无检出。用 `--qtable qtable_f16.txt`(混合精度) 解决，体积/速度仍接近纯 INT8
 
-验证与精度：服务器上 `bmrt_test --bmodel yolo11n_bm1688.bmodel` 可跑通；本仓库实测 BM1688 上 yolo11n(无 NMS, 1280 输入, 行人图, 阈值 0.6) TPU 3 框(label=person, score≈0.70) 与 ORT 一致。
+验证与精度：服务器上 `bmrt_test --bmodel yolo11n_bm1688.bmodel` 可跑通；本仓库实测 BM1688 上 yolo11n(无 NMS, 1280 输入, 行人图, 阈值 0.6) TPU 3 框(label=person, score≈0.70) 与 ORT 一致。INT8+混合精度(zhgd_without_nms_640)在 BM1688 上推理 **3.7ms**(F16 15.7ms，提速约 4.3×)，检测框与 F16 基本一致；已提供 INT8 示例 `test_data/test_models/sophgo/zhgd_without_nms_640_int8.bmodel`。
 
 ```c++
 modeldeploy::RuntimeOption option;

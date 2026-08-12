@@ -222,14 +222,6 @@ namespace {
         return true;
     }
 
-    void* SophgoBackend::get_input_device_mem() {
-        if (!initialized_ || !bmrt_ || !net_info_) return nullptr;
-        if (!io_cached_ || !cached_in_mems_) {
-            if (!ensure_io_cache()) return nullptr;
-        }
-        return cached_in_mems_;
-    }
-
     bool SophgoBackend::ensure_io_cache() {
         if (io_cached_ && cached_in_mems_ && cached_out_mems_) return true;
         if (!bmrt_ || !net_info_) return false;
@@ -262,10 +254,6 @@ namespace {
         cached_out_mems_ = outs;
         io_cached_ = true;
         return true;
-    }
-
-    void* SophgoBackend::get_bm_handle() {
-        return handle_;
     }
 
     std::unique_ptr<BaseBackend> SophgoBackend::clone(const RuntimeOption& runtime_option,
@@ -309,8 +297,6 @@ namespace modeldeploy {
         return false;
     }
     bool SophgoBackend::infer(std::vector<Tensor>&, std::vector<Tensor>*) { return false; }
-    void* SophgoBackend::get_input_device_mem() { return nullptr; }
-    void* SophgoBackend::get_bm_handle() { return nullptr; }
     std::unique_ptr<BaseBackend> SophgoBackend::clone(const RuntimeOption&, void*, int) {
         return nullptr;
     }

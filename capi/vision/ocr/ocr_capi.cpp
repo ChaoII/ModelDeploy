@@ -13,6 +13,7 @@
 #include "capi/utils/internal/utils.h"
 #include "csrc/vision/common/display/display.h"
 #include "csrc/vision/common/visualize/visualize.h"
+#include <opencv2/geometry/2d.hpp>
 
 namespace fs = std::filesystem;
 

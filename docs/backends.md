@@ -183,12 +183,24 @@ bmodel 由 ONNX 经 tpu-mlir 转换，见 [README](../../README.md#6-bmodel生�
 ```bash
 cd tools/docker/sophgo
 ./build_docker.sh
+
+# F16（精度无损，简单）
 docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
     --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
     --chip bm1688 --quantize F16 --out yolo11n_bm1688.bmodel
+
+# INT8（体积小、TPU 上快 3~5 倍，需校准）
+docker run --rm -it \
+    -v <onnx目录>:/conv -v <校准图片目录>:/cali_img \
+    tpuc_dev:1.27 bash /conv/convert.sh \
+    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
+    --chip bm1688 --quantize INT8 --cali_images /cali_img --cali_num 100 \
+    --out yolo11n_bm1688_int8.bmodel
 ```
 
 > **注意**：tpu-mlir 对带 NMS 的 ONNX 有转换 bug，**转换前先把 NMS 从图中去掉**，NMS 由 SDK 后处理完成。模型输入需保持 SDK 默认的 letterbox + `/255` 归一化（即 `[0,1]`），**不要** `set_normalize(false)`。
+
+INT8 量化精度：输出 cosine 相似度 ~0.9999（vs ONNX F32），NMS 后检测框与 ORT 一致；校准数据建议 50~200 张训练集/现场抽样图（`--cali_method` 可选 kl/mse/max 等）。转换与校准的完整参数见 [`tools/docker/sophgo/README.md`](../../tools/docker/sophgo/README.md)。
 
 ### 5.5 零拷贝推理（BMCV）
 

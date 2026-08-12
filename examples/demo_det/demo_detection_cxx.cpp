@@ -17,7 +17,7 @@ int main() {
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
-    auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute1.jpg");
+    auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute_scale.png");
     // img.imshow("img");
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
@@ -38,6 +38,7 @@ int main() {
         modeldeploy::vision::vis_det(img, result, 0.5, label_map, "../../test_data/msyh.ttc", 12, 0.3,
                                      true);
     vis_image.imshow("result");
+
     // test_camera();
 }
 

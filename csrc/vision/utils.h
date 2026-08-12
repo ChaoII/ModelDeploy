@@ -9,6 +9,7 @@
 #include "core/tensor.h"
 #include "vision/common/result.h"
 #include <opencv2/opencv.hpp>
+#include <opencv2/geometry/2d.hpp>
 
 
 namespace modeldeploy::vision::utils {
