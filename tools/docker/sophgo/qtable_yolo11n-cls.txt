@@ -1,0 +1,20 @@
+# model.0-3 F16
+# op_name   quantize_mode
+/model.0/act/Mul_output_0_Mul F16
+/model.0/conv/Conv_output_0_Conv F16
+/model.1/act/Mul_output_0_Mul F16
+/model.1/conv/Conv_output_0_Conv F16
+/model.2/Concat_output_0_Concat F16
+/model.2/Split_output_0_Split F16
+/model.2/Split_output_1_Split F16
+/model.2/cv1/act/Mul_output_0_Mul F16
+/model.2/cv1/conv/Conv_output_0_Conv F16
+/model.2/cv2/act/Mul_output_0_Mul F16
+/model.2/cv2/conv/Conv_output_0_Conv F16
+/model.2/m.0/Add_output_0_Add F16
+/model.2/m.0/cv1/act/Mul_output_0_Mul F16
+/model.2/m.0/cv1/conv/Conv_output_0_Conv F16
+/model.2/m.0/cv2/act/Mul_output_0_Mul F16
+/model.2/m.0/cv2/conv/Conv_output_0_Conv F16
+/model.3/act/Mul_output_0_Mul F16
+/model.3/conv/Conv_output_0_Conv F16
