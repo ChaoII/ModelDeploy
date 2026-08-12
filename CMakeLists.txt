@@ -92,10 +92,13 @@ else ()
     add_compile_options(
             "$<$<COMPILE_LANGUAGE:CXX>:-Wall>"
             "$<$<COMPILE_LANGUAGE:CXX>:-Wextra>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>"
-            # 添加 SIMD 优化选项
-            "$<$<COMPILE_LANGUAGE:CXX>:-mavx2>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-mfma>")
+            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
+    # SIMD 优化（仅 x86_64；aarch64 用 NEON/SVE，编译器自动启用，-mavx2 不适用）
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+        add_compile_options(
+                "$<$<COMPILE_LANGUAGE:CXX>:-mavx2>"
+                "$<$<COMPILE_LANGUAGE:CXX>:-mfma>")
+    endif ()
 endif ()
 
 include_directories(${CMAKE_SOURCE_DIR})
