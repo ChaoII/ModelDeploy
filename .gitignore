@@ -10,7 +10,9 @@ build_linux_trt
 build2
 build_old
 build_linux_debug
+build_sophgo
 build_win
+build_linux1
 python/modeldeploy/__init__.py
 dist
 .idea
@@ -52,6 +54,10 @@ csharp/**/*.DotSettings.user
 # Runtime / build output
 *.pyc
 __pycache__/
+
+# Sophgo 交叉编译镜像的大二进制包（从官方 SDK 生成，见 tools/docker/sophgo/arm64/README.md）
+tools/docker/sophgo/arm64/*-clean-*.tar.gz
+tools/docker/sophgo/arm64/libsophon-clean.tar.gz
 
 # Rust
 target/

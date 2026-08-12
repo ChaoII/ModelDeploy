@@ -1,0 +1,60 @@
+# Sophgo BM1688/CV186X aarch64 交叉编译环境（Docker + QEMU arm64 模拟）
+#
+# 用途：在 x86 主机上用 QEMU 模拟 arm64 的 Ubuntu 22.04，配合算能官方 aarch64 预编译
+# libsophon（bmrt/bmcv/bmlib，SophonSDK 2.2 / libsophon 0.4.14）编译 ModelDeploy 的
+# Sophgo 后端，产出原生 aarch64 二进制直接拷贝到 BM1688 板子运行。
+#
+# 基于 tpuc_dev:arm64-sophgo-0411 升级而来：
+#   libsophon 0.4.11 -> 0.4.14，sophon-media 1.9.0 -> 2.2.0
+# 并固定升级 CMake >= 3.27（项目 cmake_minimum_required 3.27，22.04 自带 3.22 不满足）。
+#
+# 前置：libsophon-clean.tar.gz / sophon-media-clean.tar.gz 用 amd64 容器重新打包
+#   （保持原始结构，QEMU arm64 下 GNU tar 解包报 Invalid argument，须用 python3 tarfile）。
+#   docker build --platform linux/arm64 -t tpuc_dev:arm64-sophgo-0414 .
+#
+# 编译用法（OpenCV 由 opencv.cmake 自动从 modelscope 下载 aarch64 静态库）：
+#   docker run --rm --platform linux/arm64 \
+#       -v <源码根目录>:/workspace -w /workspace \
+#       tpuc_dev:arm64-sophgo-0414 bash -c "
+#         cmake -S /workspace -B /workspace/build_sophgo -G Ninja \
+#           -DCMAKE_BUILD_TYPE=Release \
+#           -DENABLE_SOPHGO=ON -DENABLE_ORT=OFF -DENABLE_MNN=OFF -DENABLE_TRT=OFF \
+#           -DWITH_GPU=OFF -DBUILD_AUDIO=OFF -DBUILD_VISION=ON \
+#           -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=ON \
+#           -DBUILD_ENCRYPTION=OFF && \
+#         cmake --build /workspace/build_sophgo -j \$(nproc)"
+#   产物 /workspace/build_sophgo/bin/demo_detection_sophgo 为 aarch64 原生二进制。
+
+FROM dockerproxy.net/library/ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ninja-build pkg-config \
+    gcc g++ g++-aarch64-linux-gnu \
+    libgomp1 python3 python3-pip wget ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 升级 CMake：Ubuntu 22.04 自带 3.22，项目要求 cmake_minimum_required 3.27
+# （FetchContent+DOWNLOAD_EXTRACT_TIMESTAMP 在 3.22 有解析 bug）。用清华源避免 pypi 超时。
+RUN pip3 install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple cmake && \
+    cmake --version | head -1
+
+# 算能 aarch64 预编译 libsophon 0.4.14 + sophon-media 2.2.0（clean 重打包版）
+COPY libsophon-clean-0.4.14.tar.gz /opt/
+COPY sophon-media-clean-2.2.0.tar.gz /opt/
+RUN python3 -c "import tarfile; tarfile.open('/opt/libsophon-clean-0.4.14.tar.gz').extractall('/opt')" && \
+    python3 -c "import tarfile; tarfile.open('/opt/sophon-media-clean-2.2.0.tar.gz').extractall('/opt')" && \
+    rm -f /opt/*.tar.gz && \
+    mv /opt/libsophon_soc_0.4.14_aarch64/opt/sophon /opt/sophon && \
+    mv /opt/sophon-media-soc_2.2.0_aarch64/opt/sophon/* /opt/sophon/ && \
+    rm -rf /opt/libsophon_soc_0.4.14_aarch64 /opt/sophon-media-soc_2.2.0_aarch64
+
+# libsophon-current 符号链接（sophgo.cmake 自动探测路径）
+RUN ln -sf /opt/sophon/libsophon-0.4.14 /opt/sophon/libsophon-current
+
+# 运行时库路径（OpenCV 用户自行挂载）
+ENV LD_LIBRARY_PATH="/opt/sophon/libsophon-current/lib:/opt/sophon/sophon-opencv_2.2.0/lib:/opt/sophon/sophon-ffmpeg_2.2.0/lib"
+ENV SOPHGO_SDK_DIR=/opt/sophon/libsophon-current
+ENV C_INCLUDE_PATH=/opt/sophon/sophon-ffmpeg_2.2.0/include
+ENV CPLUS_INCLUDE_PATH=/opt/sophon/sophon-ffmpeg_2.2.0/include:/opt/sophon/sophon-opencv_2.2.0/include/opencv4
+
+WORKDIR /workspace

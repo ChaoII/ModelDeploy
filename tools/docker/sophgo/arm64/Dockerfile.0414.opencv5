@@ -1,0 +1,35 @@
+# 基于 tpuc_dev:arm64-sophgo-0414 的 OpenCV5 静态库编译镜像
+#
+# 用途：固定编译环境，解决 modelscope OpenCV5 aarch64 静态包的两个坑：
+#   1. 该包由 gcc 7.3（Ubuntu 18.04）构建，CMake 配置硬编码
+#      /usr/lib/gcc/aarch64-linux-gnu/7.3.0/libgomp.so 与 /usr/lib64/libpthread.so，
+#      而本镜像 gcc 11 没有这些路径 → 建兼容符号链接。
+#   2. modelscope 上 opencv_5_x_linux_aarch64_static.zip 会更新，geometry/videoio
+#      模块布局可能变化 → 源码用 HAVE_OPENCV_GEOMETRY / HAVE_OPENCV_VIDEOIO 守卫兼容。
+#
+# 构建：
+#   docker build --platform linux/arm64 -f Dockerfile.0414.opencv5 -t tpuc_dev:arm64-sophgo-0414-opencv5 .
+#
+# 编译用法（OpenCV 由 opencv.cmake 自动从 modelscope 下载静态库，无需手动挂载）：
+#   docker run --rm --platform linux/arm64 \
+#       -v <源码根目录>:/workspace -w /workspace \
+#       tpuc_dev:arm64-sophgo-0414-opencv5 bash -c "
+#         cmake -S /workspace -B /workspace/build_sophgo -G Ninja \
+#           -DCMAKE_BUILD_TYPE=Release \
+#           -DENABLE_SOPHGO=ON -DENABLE_ORT=OFF -DENABLE_MNN=OFF -DENABLE_TRT=OFF \
+#           -DWITH_GPU=OFF -DBUILD_AUDIO=OFF -DBUILD_VISION=ON \
+#           -DBUILD_CAPI=ON -DBUILD_PYTHON=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=ON \
+#           -DBUILD_ENCRYPTION=OFF && \
+#         cmake --build /workspace/build_sophgo -j \$(nproc)"
+#   产物在 /workspace/build_sophgo/bin（demo_detection_sophgo 为 aarch64 原生二进制）。
+
+FROM tpuc_dev:arm64-sophgo-0414
+
+# modelscope OpenCV5 静态包是 gcc 7.3 构建的，硬编码了旧编译器路径
+RUN mkdir -p /usr/lib/gcc/aarch64-linux-gnu/7.3.0 \
+    && ln -sf /usr/lib/gcc/aarch64-linux-gnu/11/libgomp.so \
+        /usr/lib/gcc/aarch64-linux-gnu/7.3.0/libgomp.so \
+    && ln -sf /usr/lib/aarch64-linux-gnu /usr/lib64 \
+    && ln -sf libpthread.so.0 /usr/lib64/libpthread.so
+
+WORKDIR /workspace
