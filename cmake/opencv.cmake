@@ -73,13 +73,11 @@ message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 # Sophgo 平台：OpenCV 捆绑的 libjpeg-turbo 的 jsimd(SIMD) 符号默认未被链接器拉入，
 # 运行时被 libbmcv.so 导出的 jsimd 符号劫持，导致保存 .jpg 整体变暗。
 # 用 --whole-archive 强制把捆绑 libjpeg-turbo 的 jsimd 静态编入 SDK，使其不再走全局符号解析。
-# 该变量供顶层 CMakeLists.txt 在 target_link_libraries 后消费（target 此时尚未创建）。
+# 通过 OpenCV imported target "libjpeg-turbo" 取静态库路径（$<TARGET_FILE> 在链接期求值），
+# 不依赖硬编码 _deps 路径。该变量供顶层 CMakeLists.txt 在 target_link_libraries 后消费。
 set(MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE "")
-if (ENABLE_SOPHGO AND UNIX AND NOT APPLE)
-    set(_ocv_jpeg_turbo "${CMAKE_BINARY_DIR}/_deps/opencv-src/lib64/opencv5/3rdparty/liblibjpeg-turbo.a")
-    if (EXISTS "${_ocv_jpeg_turbo}")
-        set(MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE
-            "-Wl,--whole-archive,${_ocv_jpeg_turbo},--no-whole-archive")
-        message(STATUS "Sophgo: force-link bundled libjpeg-turbo (whole-archive) to fix jsimd symbol hijack")
-    endif ()
+if (ENABLE_SOPHGO AND UNIX AND NOT APPLE AND TARGET libjpeg-turbo)
+    set(MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE
+        "-Wl,--whole-archive,$<TARGET_FILE:libjpeg-turbo>,--no-whole-archive")
+    message(STATUS "Sophgo: force-link bundled libjpeg-turbo (whole-archive) to fix jsimd symbol hijack")
 endif ()
