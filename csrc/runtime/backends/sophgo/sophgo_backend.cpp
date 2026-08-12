@@ -9,7 +9,6 @@
 #include "core/md_log.h"
 #include "runtime/backends/sophgo/sophgo_backend.h"
 
-#ifdef ENABLE_SOPHGO
 #include "bmlib_runtime.h"
 #include "bmdef.h"
 #include "bmruntime_interface.h"
@@ -39,7 +38,6 @@ namespace {
 } // namespace
 
     SophgoBackend::~SophgoBackend() {
-#ifdef ENABLE_SOPHGO
         // 缓存的 input/output 设备内存由 bmrt_tensor 分配，bmrt_destroy 统一释放。
         // 这里手动 bm_free_device_mem 会导致 double-free 段错误（与官方 SOPHON-DEMO
         // 只调 bmrt_destroy + bm_dev_free 的行为一致）。
@@ -61,7 +59,6 @@ namespace {
             handle_ = nullptr;
         }
         net_info_ = nullptr;
-#endif
     }
 
     bool SophgoBackend::init(const RuntimeOption& option) {
@@ -285,26 +282,3 @@ namespace {
         return {};
     }
 } // namespace modeldeploy
-
-#else // !ENABLE_SOPHGO
-
-namespace modeldeploy {
-    SophgoBackend::~SophgoBackend() = default;
-    bool SophgoBackend::init(const RuntimeOption& option) {
-        (void)option;
-        MD_LOG_FATAL << "SophgoBackend is not available, please compiled with ENABLE_SOPHGO=ON."
-            << std::endl;
-        return false;
-    }
-    bool SophgoBackend::infer(std::vector<Tensor>&, std::vector<Tensor>*) { return false; }
-    std::unique_ptr<BaseBackend> SophgoBackend::clone(const RuntimeOption&, void*, int) {
-        return nullptr;
-    }
-    TensorInfo SophgoBackend::get_input_info(const int index) { return inputs_desc_[index]; }
-    TensorInfo SophgoBackend::get_output_info(const int index) { return outputs_desc_[index]; }
-    std::vector<TensorInfo> SophgoBackend::get_input_infos() { return inputs_desc_; }
-    std::vector<TensorInfo> SophgoBackend::get_output_infos() { return outputs_desc_; }
-    std::map<std::string, std::string> SophgoBackend::get_custom_meta_data() const { return {}; }
-} // namespace modeldeploy
-
-#endif // ENABLE_SOPHGO

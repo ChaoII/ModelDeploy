@@ -8,15 +8,12 @@
 #include <cstring>
 #include <vector>
 
-#ifdef ENABLE_SOPHGO
 #include "bmlib_runtime.h"
 #include "bmcv_api.h"
 #include "bmcv_api_ext.h"
-#endif
 
 namespace modeldeploy::vision {
 
-#ifdef ENABLE_SOPHGO
     int md_bmcv_letterbox_normalize_to_devmem(void* handle,
                                               const uint8_t* bgr, int src_w, int src_h,
                                               void* dev_mem, int dst_w, int dst_h,
@@ -169,34 +166,5 @@ namespace modeldeploy::vision {
         bm_image_destroy(out_img);
         return st == BM_SUCCESS ? 0 : -1;
     }
-#else
-    int md_bmcv_letterbox_normalize_to_devmem(void* handle,
-                                              const uint8_t* bgr, int src_w, int src_h,
-                                              void* dev_mem, int dst_w, int dst_h,
-                                              int pad_w, int pad_h, int resize_w, int resize_h,
-                                              float alpha0, float alpha1, float alpha2,
-                                              unsigned char pad_val, int swap_rb) {
-        (void)handle; (void)bgr; (void)src_w; (void)src_h;
-        (void)dev_mem; (void)dst_w; (void)dst_h;
-        (void)pad_w; (void)pad_h; (void)resize_w; (void)resize_h;
-        (void)alpha0; (void)alpha1; (void)alpha2;
-        (void)pad_val; (void)swap_rb;
-        return -1;
-    }
-
-    int md_bmcv_nv12_letterbox_normalize_to_devmem(void* handle,
-                                                   const uint8_t* src_y, const uint8_t* src_uv,
-                                                   int src_w, int src_h,
-                                                   int step_y, int step_uv,
-                                                   void* dev_mem, int dst_w, int dst_h,
-                                                   float alpha0, float alpha1, float alpha2,
-                                                   unsigned char pad_val) {
-        (void)handle; (void)src_y; (void)src_uv;
-        (void)src_w; (void)src_h; (void)step_y; (void)step_uv;
-        (void)dev_mem; (void)dst_w; (void)dst_h;
-        (void)alpha0; (void)alpha1; (void)alpha2; (void)pad_val;
-        return -1;
-    }
-#endif
 
 } // namespace modeldeploy::vision

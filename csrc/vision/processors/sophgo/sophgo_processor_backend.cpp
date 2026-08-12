@@ -16,14 +16,11 @@
 #include <algorithm>
 #include <cmath>
 
-#ifdef ENABLE_SOPHGO
 #include "bmlib_runtime.h"
-#endif
 
 namespace modeldeploy::vision {
 
     SophgoProcessorBackend::SophgoProcessorBackend(const int device_id) : device_id_(device_id) {
-#ifdef ENABLE_SOPHGO
         bm_handle_t h = nullptr;
         if (bm_dev_request(&h, device_id_) == BM_SUCCESS) {
             handle_ = static_cast<void*>(h);
@@ -32,11 +29,9 @@ namespace modeldeploy::vision {
             MD_LOG_WARN << "SophgoProcessorBackend: bm_dev_request failed, BMCV disabled (CPU fallback)." << std::endl;
             handle_ = nullptr;
         }
-#endif
     }
 
     SophgoProcessorBackend::~SophgoProcessorBackend() {
-#ifdef ENABLE_SOPHGO
         if (handle_) {
             if (in_mem_) {
                 bm_free_device(static_cast<bm_handle_t>(handle_),
@@ -47,11 +42,9 @@ namespace modeldeploy::vision {
             bm_dev_free(static_cast<bm_handle_t>(handle_));
             handle_ = nullptr;
         }
-#endif
     }
 
     void* SophgoProcessorBackend::ensure_input_mem(const int dst_w, const int dst_h) {
-#ifdef ENABLE_SOPHGO
         if (!handle_ || dst_w <= 0 || dst_h <= 0) return nullptr;
         if (in_mem_ && cached_w_ == dst_w && cached_h_ == dst_h) {
             return in_mem_;
@@ -77,10 +70,6 @@ namespace modeldeploy::vision {
         cached_w_ = dst_w;
         cached_h_ = dst_h;
         return in_mem_;
-#else
-        (void)dst_w; (void)dst_h;
-        return nullptr;
-#endif
     }
 
     bool SophgoProcessorBackend::finish_tpu_tensor(Tensor* out, const int dst_w, const int dst_h,
@@ -102,7 +91,6 @@ namespace modeldeploy::vision {
         const std::vector<float>& alpha,
         const std::vector<float>& beta,
         bool swap_rb, float pad_value) {
-#ifdef ENABLE_SOPHGO
         if (handle_ && dst_size.size() == 2 && alpha.size() == 3 && beta.size() == 3) {
             const int src_w = image.width();
             const int src_h = image.height();
@@ -137,7 +125,6 @@ namespace modeldeploy::vision {
                 }
             }
         }
-#endif
         return CpuProcessorBackend::fused_preprocess(
             image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
             alpha, beta, swap_rb, pad_value);
@@ -171,7 +158,6 @@ namespace modeldeploy::vision {
         int step_y, int step_uv, Tensor* out,
         const std::vector<int>& dst_size,
         float pad_val, LetterBoxRecord* record) {
-#ifdef ENABLE_SOPHGO
         if (handle_ && src_y && src_uv && src_size.size() == 2 && dst_size.size() == 2) {
             const int src_w = src_size[0];
             const int src_h = src_size[1];
@@ -197,7 +183,6 @@ namespace modeldeploy::vision {
                 }
             }
         }
-#endif
         return CpuProcessorBackend::yolo_preprocess_nv12(
             src_y, src_uv, src_size, step_y, step_uv, out, dst_size, pad_val, record);
     }
