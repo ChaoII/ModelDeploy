@@ -27,7 +27,7 @@ MDStatusCode md_create_instance_seg_model(MDModel* model, const char* model_path
 }
 
 MDStatusCode md_set_instance_seg_input_size(const MDModel* model, const MDSize size) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::InstanceSeg) {
         MD_LOG_ERROR << "Model type is not instance_seg!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
@@ -37,7 +37,7 @@ MDStatusCode md_set_instance_seg_input_size(const MDModel* model, const MDSize s
 }
 
 MDStatusCode md_instance_seg_predict(const MDModel* model, MDImage* image, MDIsegResults* c_results) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::InstanceSeg) {
         MD_LOG_ERROR << "Model type is not instance_seg!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }

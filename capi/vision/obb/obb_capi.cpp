@@ -30,7 +30,7 @@ MDStatusCode md_create_obb_model(MDModel* model, const char* model_path,
 }
 
 MDStatusCode md_set_obb_input_size(const MDModel* model, const MDSize size) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::OBB) {
         MD_LOG_ERROR << "Model type is not obb!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }
@@ -40,7 +40,7 @@ MDStatusCode md_set_obb_input_size(const MDModel* model, const MDSize size) {
 }
 
 MDStatusCode md_obb_predict(const MDModel* model, MDImage* image, MDObbResults* c_results) {
-    if (model->type != MDModelType::Detection) {
+    if (model->type != MDModelType::OBB) {
         MD_LOG_ERROR << "Model type is not obb!" << std::endl;
         return MDStatusCode::ModelTypeError;
     }

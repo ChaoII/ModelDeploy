@@ -202,6 +202,37 @@ docker run --rm -it \
 
 INT8 量化精度：输出 cosine 相似度 ~0.9999（vs ONNX F32），NMS 后检测框与 ORT 一致；校准数据建议 50~200 张训练集/现场抽样图（`--cali_method` 可选 kl/mse/max 等）。转换与校准的完整参数见 [`tools/docker/sophgo/README.md`](../../tools/docker/sophgo/README.md)。
 
+#### 5.4.1 各任务模型转换命令（fp16 + int8）
+
+| 任务 | ONNX | 输入 shape | fp16 bmodel | int8 bmodel |
+|------|------|-----------|-------------|-------------|
+| 检测 det | `yolo11n_without_nms.onnx` | `[[1,3,640,640]]` | `yolo11n_det_f16.bmodel` | `yolo11n_det_int8.bmodel` |
+| 分类 cls | `yolo11n-cls.onnx` | `[[1,3,224,224]]` | `yolo11n-cls_f16.bmodel` | `yolo11n-cls_int8.bmodel` |
+| 多标签分类 mlcls | `zhgd_ml.onnx` | `[[1,3,256,192]]` | `zhgd_ml_f16.bmodel` | `zhgd_ml_int8.bmodel` |
+| 旋转框 OBB | `yolo11n-obb.onnx` | `[[1,3,1024,1024]]` | `yolo11n-obb_f16.bmodel` | `yolo11n-obb_int8.bmodel` |
+| 实例分割 iseg | `yolo11n-seg.onnx` | `[[1,3,640,640]]` | `yolo11n-seg_f16.bmodel` | `yolo11n-seg_int8.bmodel` |
+| 姿态 pose | `yolo11n-pose.onnx` | `[[1,3,640,640]]` | `yolo11n-pose_f16.bmodel` | `yolo11n-pose_int8.bmodel` |
+
+```bash
+# 以检测为例（其余任务替换 --onnx/--name/--shapes 即可）：
+# F16
+docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
+    --onnx yolo11n_without_nms.onnx --name yolo11n_det \
+    --shapes "[[1,3,640,640]]" --chip bm1688 --quantize F16 \
+    --out yolo11n_det_f16.bmodel
+
+# INT8（需校准图目录；检测/obb/seg/pose 建议用混合精度表保持 score 通道精度）
+docker run --rm -it -v <onnx目录>:/conv -v <校准图目录>:/cali_img \
+    tpuc_dev:1.27 bash /conv/convert.sh \
+    --onnx yolo11n_without_nms.onnx --name yolo11n_det \
+    --shapes "[[1,3,640,640]]" --chip bm1688 --quantize INT8 \
+    --cali_images /cali_img --cali_num 100 \
+    --qtable /conv/qtable_f16.txt \
+    --out yolo11n_det_int8.bmodel
+```
+
+> 各任务对应 demo：`examples/demo_det/demo_detection_sophgo.cpp`、`examples/demo_cls/demo_classification_sophgo.cpp`（含多标签）、`examples/demo_obb/demo_obb_sophgo.cpp`、`examples/demo_iseg/demo_iseg_sophgo.cpp`、`examples/demo_kps/demo_pose_sophgo.cpp`。`qtable_f16.txt`（检测头 score 尾层保持 F16）见 `tools/docker/sophgo/`。
+
 ### 5.5 零拷贝推理（BMCV）
 
 Sophgo 后端支持 BMCV 设备端预处理零拷贝：
