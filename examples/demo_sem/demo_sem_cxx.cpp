@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     const std::string model_file = argc > 1 ? argv[1]
         : "../../test_data/test_models/onnx/yolo26n/yolo26n-sem.onnx";
     const std::string image_file = argc > 2 ? argv[2]
-        : "../../test_data/test_images/111.jpg";
+        : "../../test_data/test_images/2341.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSem(model_file, option);
     model.get_preprocessor().use_cuda_preproc();
     auto im = modeldeploy::vision::ImageData::imread(image_file);

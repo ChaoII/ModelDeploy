@@ -60,17 +60,21 @@ namespace modeldeploy::vision::detection {
             (*results)[bs].labels.assign(static_cast<size_t>(orig_h) * orig_w, 0);
             (*results)[bs].shape = {orig_h, orig_w};
             auto& labels = (*results)[bs].labels;
-            // 逐像素 argmax（在裁剪区上）
+            // 逐像素 argmax（在裁剪区上），先写入独立 crop 缓冲
+            // tensor 为 NCHW 布局 [1, C, H, W]：通道 c 的平面偏移为 c*H*W
+            const int64_t hw = height * width;
+            std::vector<uint8_t> crop_buf(static_cast<size_t>(crop_h) * crop_w);
             for (int64_t y = 0; y < crop_h; ++y) {
-                const float* row_base = plane + (y1 + y) * width * channels + x1 * channels;
-                uint8_t* dst_row = labels.data() + static_cast<size_t>(y) * orig_w;
+                const int64_t gy = y1 + y;
+                uint8_t* dst_row = crop_buf.data() + static_cast<size_t>(y) * crop_w;
                 for (int64_t x = 0; x < crop_w; ++x) {
-                    const float* px = row_base + x * channels;
+                    const int64_t gx = x1 + x;
                     int32_t best = 0;
-                    float best_val = px[0];
+                    float best_val = plane[0 * hw + gy * width + gx];
                     for (int64_t c = 1; c < channels; ++c) {
-                        if (px[c] > best_val) {
-                            best_val = px[c];
+                        const float v = plane[c * hw + gy * width + gx];
+                        if (v > best_val) {
+                            best_val = v;
                             best = static_cast<int32_t>(c);
                         }
                     }
@@ -80,17 +84,18 @@ namespace modeldeploy::vision::detection {
             // 裁剪区经 scale 还原到原图坐标；由于是 letterbox 缩放，有效区正好对应原图整幅
             // （有效区尺寸 crop_w/crop_h 与 orig_w/orig_h 可能因取整差 1，做 resize 对齐）
             if (crop_w != orig_w || crop_h != orig_h) {
-                std::vector<uint8_t> resized(static_cast<size_t>(orig_h) * orig_w);
                 // 用最近邻缩放（保持类别边界清晰）
                 for (int64_t y = 0; y < orig_h; ++y) {
                     int64_t sy = std::min<int64_t>(crop_h - 1, static_cast<int64_t>(y * crop_h / orig_h));
-                    const uint8_t* srow = labels.data() + static_cast<size_t>(sy) * orig_w;
+                    const uint8_t* srow = crop_buf.data() + static_cast<size_t>(sy) * crop_w;
+                    uint8_t* drow = labels.data() + static_cast<size_t>(y) * orig_w;
                     for (int64_t x = 0; x < orig_w; ++x) {
                         int64_t sx = std::min<int64_t>(crop_w - 1, static_cast<int64_t>(x * crop_w / orig_w));
-                        resized[static_cast<size_t>(y) * orig_w + x] = srow[x];
+                        drow[x] = srow[sx];
                     }
                 }
-                labels.swap(resized);
+            } else {
+                labels.swap(crop_buf);
             }
         }
         return true;

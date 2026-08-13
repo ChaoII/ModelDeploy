@@ -6,7 +6,7 @@
 #include "vision/depth/postprocessor.h"
 
 #include <algorithm>
-#include <cmath>
+#include <cstring>
 
 namespace modeldeploy::vision::detection {
     UltralyticsDepthPostprocessor::UltralyticsDepthPostprocessor() = default;
@@ -50,25 +50,27 @@ namespace modeldeploy::vision::detection {
             (*results)[bs].depth.assign(static_cast<size_t>(orig_h) * orig_w, 0.0f);
             (*results)[bs].shape = {orig_h, orig_w};
             auto& depth = (*results)[bs].depth;
-            // log 空间深度 -> exp 还原为米
+            // onnx 输出已是绝对深度（米）：模型内部已做 log->exp + 校准，直接拷贝到 crop 缓冲
+            std::vector<float> crop_buf(static_cast<size_t>(crop_h) * crop_w);
             for (int64_t y = 0; y < crop_h; ++y) {
                 const float* srow = plane + (y1 + y) * width + x1;
-                float* drow = depth.data() + static_cast<size_t>(y) * orig_w;
-                for (int64_t x = 0; x < crop_w; ++x) {
-                    drow[x] = std::exp(srow[x]);
-                }
+                float* drow = crop_buf.data() + static_cast<size_t>(y) * crop_w;
+                std::memcpy(drow, srow, static_cast<size_t>(crop_w) * sizeof(float));
             }
             if (crop_w != orig_w || crop_h != orig_h) {
                 std::vector<float> resized(static_cast<size_t>(orig_h) * orig_w, 0.0f);
                 for (int64_t y = 0; y < orig_h; ++y) {
                     int64_t sy = std::min<int64_t>(crop_h - 1, static_cast<int64_t>(y * crop_h / orig_h));
-                    const float* srow = depth.data() + static_cast<size_t>(sy) * orig_w;
+                    const float* srow = crop_buf.data() + static_cast<size_t>(sy) * crop_w;
+                    float* drow = resized.data() + static_cast<size_t>(y) * orig_w;
                     for (int64_t x = 0; x < orig_w; ++x) {
                         int64_t sx = std::min<int64_t>(crop_w - 1, static_cast<int64_t>(x * crop_w / orig_w));
-                        resized[static_cast<size_t>(y) * orig_w + x] = srow[x];
+                        drow[x] = srow[sx];
                     }
                 }
                 depth.swap(resized);
+            } else {
+                depth.swap(crop_buf);
             }
         }
         return true;
