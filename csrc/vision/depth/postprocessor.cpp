@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <opencv2/opencv.hpp>
 
 namespace modeldeploy::vision::detection {
     UltralyticsDepthPostprocessor::UltralyticsDepthPostprocessor() = default;
@@ -47,31 +48,21 @@ namespace modeldeploy::vision::detection {
             }
             const int64_t orig_w = static_cast<int64_t>(rec.ipt_w);
             const int64_t orig_h = static_cast<int64_t>(rec.ipt_h);
-            (*results)[bs].depth.assign(static_cast<size_t>(orig_h) * orig_w, 0.0f);
+            // 整幅深度图（含 padding）包成 Mat 视图
+            cv::Mat full(static_cast<int>(height), static_cast<int>(width), CV_32FC1,
+                         const_cast<float*>(plane));
+            // 裁剪去 letterbox padding
+            const cv::Rect crop_roi(static_cast<int>(x1), static_cast<int>(y1),
+                                    static_cast<int>(crop_w), static_cast<int>(crop_h));
+            const cv::Mat crop_mat = full(crop_roi).clone();
+            // 双线性缩放到原图尺寸（OpenCV SIMD，与 ultralytics scale_masks 一致）
+            cv::Mat resized;
+            cv::resize(crop_mat, resized, cv::Size(static_cast<int>(orig_w), static_cast<int>(orig_h)),
+                       0, 0, cv::INTER_LINEAR);
+            (*results)[bs].depth.assign(
+                reinterpret_cast<const float*>(resized.data),
+                reinterpret_cast<const float*>(resized.data) + resized.total());
             (*results)[bs].shape = {orig_h, orig_w};
-            auto& depth = (*results)[bs].depth;
-            // onnx 输出已是绝对深度（米）：模型内部已做 log->exp + 校准，直接拷贝到 crop 缓冲
-            std::vector<float> crop_buf(static_cast<size_t>(crop_h) * crop_w);
-            for (int64_t y = 0; y < crop_h; ++y) {
-                const float* srow = plane + (y1 + y) * width + x1;
-                float* drow = crop_buf.data() + static_cast<size_t>(y) * crop_w;
-                std::memcpy(drow, srow, static_cast<size_t>(crop_w) * sizeof(float));
-            }
-            if (crop_w != orig_w || crop_h != orig_h) {
-                std::vector<float> resized(static_cast<size_t>(orig_h) * orig_w, 0.0f);
-                for (int64_t y = 0; y < orig_h; ++y) {
-                    int64_t sy = std::min<int64_t>(crop_h - 1, static_cast<int64_t>(y * crop_h / orig_h));
-                    const float* srow = crop_buf.data() + static_cast<size_t>(sy) * crop_w;
-                    float* drow = resized.data() + static_cast<size_t>(y) * orig_w;
-                    for (int64_t x = 0; x < orig_w; ++x) {
-                        int64_t sx = std::min<int64_t>(crop_w - 1, static_cast<int64_t>(x * crop_w / orig_w));
-                        drow[x] = srow[sx];
-                    }
-                }
-                depth.swap(resized);
-            } else {
-                depth.swap(crop_buf);
-            }
         }
         return true;
     }
