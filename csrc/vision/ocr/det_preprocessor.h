@@ -19,10 +19,6 @@ namespace modeldeploy::vision::ocr {
                            std::vector<Tensor>* outputs);
 
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_max_side_len(const int max_side_len) { max_side_len_ = max_side_len; }
 
         [[nodiscard]] int get_max_side_len() const { return max_side_len_; }

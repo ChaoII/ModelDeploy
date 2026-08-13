@@ -22,7 +22,6 @@ int main(int argc, char** argv) {
     const std::string image_file = argc > 2 ? argv[2]
         : "../../test_data/test_images/2341.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSem(model_file, option);
-    model.get_preprocessor().use_cuda_preproc();
     auto im = modeldeploy::vision::ImageData::imread(image_file);
     modeldeploy::vision::SemSegResult res;
     constexpr int loop = 20;

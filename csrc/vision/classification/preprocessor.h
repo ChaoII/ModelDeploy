@@ -39,10 +39,6 @@ namespace modeldeploy::vision::classification {
 
         void disable_center_crop() { enable_center_crop_ = false; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }

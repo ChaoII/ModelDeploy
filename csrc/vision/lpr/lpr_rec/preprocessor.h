@@ -19,10 +19,6 @@ namespace modeldeploy::vision::lpr {
 
         [[nodiscard]] std::vector<int> get_size() const { return size_; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }

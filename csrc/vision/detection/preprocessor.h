@@ -42,10 +42,6 @@ namespace modeldeploy::vision::detection {
         void set_normalize(bool normalize) { normalize_ = normalize; }
         [[nodiscard]] bool is_normalize() const { return normalize_; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }

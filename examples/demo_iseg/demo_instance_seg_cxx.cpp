@@ -18,7 +18,6 @@ int main(int argc, char** argv) {
     const std::string model_file = "../../test_data/test_models/onnx/yolo11n-seg_nms.onnx";
     const std::string image_file = "../../test_data/test_images/test_person.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file, option);
-    model.get_preprocessor().use_cuda_preproc();
     auto im = modeldeploy::vision::ImageData::imread(image_file);
     TimerArray times;
     int loop = 100;

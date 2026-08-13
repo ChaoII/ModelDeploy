@@ -18,7 +18,6 @@ int main() {
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
     // auto img = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0003.jpg");
     db_detector.get_preprocessor().set_max_side_len(1280);
-    db_detector.get_preprocessor().use_cuda_preproc();
     db_detector.get_postprocessor().set_det_db_thresh(0.3);
     db_detector.get_postprocessor().set_det_db_box_thresh(0.5);
     db_detector.get_postprocessor().set_det_db_unclip_ratio(1.5);

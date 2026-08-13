@@ -16,7 +16,6 @@ int main() {
 
     auto det = modeldeploy::vision::detection::UltralyticsDet(
         "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
-    det.get_preprocessor().use_cuda_preproc();
     det.get_preprocessor().set_size({640, 640});
 
     auto img = ImageData::imread("../../test_data/test_images/test_detection0.jpg");

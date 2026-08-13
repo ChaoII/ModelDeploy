@@ -56,10 +56,6 @@ namespace modeldeploy::vision::ocr {
         /// Get cls_image_shape for the classification preprocess
         [[nodiscard]] std::vector<int> get_cls_image_shape() const { return cls_image_shape_; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }

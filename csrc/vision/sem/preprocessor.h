@@ -29,10 +29,6 @@ namespace modeldeploy::vision::detection {
 
         [[nodiscard]] std::vector<float> get_padding_value() const { return padding_value_; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }

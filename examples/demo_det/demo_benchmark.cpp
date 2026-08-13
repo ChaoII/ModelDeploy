@@ -20,7 +20,6 @@ int main() {
 
     auto det = modeldeploy::vision::detection::UltralyticsDet(
         "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
-    det.get_preprocessor().use_cuda_preproc();
     det.get_preprocessor().set_size({640, 640});
 
     // 使用多张不同图片（避免缓存）

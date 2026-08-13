@@ -22,7 +22,6 @@ int main(int argc, char** argv) {
     const std::string image_file = argc > 2 ? argv[2]
         : "../../test_data/test_images/2341.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsDepth(model_file, option);
-    model.get_preprocessor().use_cuda_preproc();
     auto im = modeldeploy::vision::ImageData::imread(image_file);
     modeldeploy::vision::DepthResult res;
     constexpr int loop = 20;
@@ -33,6 +32,7 @@ int main(int argc, char** argv) {
     times.print_benchmark();
     std::cout << "depth result: shape=[" << res.shape[0] << " " << res.shape[1] << "]" << std::endl;
     auto vis_im = modeldeploy::vision::vis_depth(im, res, true, true);
+    vis_im.imshow("depth");
     std::cout << "saved vis_depth.jpg" << std::endl;
     return 0;
 }

@@ -64,10 +64,6 @@ namespace modeldeploy::vision::ocr {
         /// Get static_shape_infer of the recognition preprocess
         bool get_static_shape_infer() const { return static_shape_infer_; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }

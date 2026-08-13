@@ -36,10 +36,6 @@ namespace modeldeploy::vision::face {
         /// Set size.
         void set_size(const std::vector<int>& size) { size_ = size; }
 
-        void use_cuda_preproc() {
-            backend_ = create_processor_backend(Device::GPU, Backend::ORT, 0);
-        }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }
