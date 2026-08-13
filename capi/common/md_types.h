@@ -33,6 +33,8 @@ enum MDModelType {
     LPRPipeline,
     OCRPipeline,
     OCRRec,
+    SemSeg,
+    Depth,
 };
 
 enum MDStatusCode {
@@ -243,6 +245,20 @@ typedef struct {
     MDKeyPointResult* data;
     int size;
 } MDKeyPointResults;
+
+
+typedef struct {
+    unsigned char* labels;
+    int* shape;
+    int shape_size;
+    int num_classes;
+} MDSemSegResult;
+
+typedef struct {
+    float* depth;
+    int* shape;
+    int shape_size;
+} MDDepthResult;
 
 
 typedef struct {

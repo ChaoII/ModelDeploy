@@ -255,6 +255,23 @@ namespace ModelDeploy
             public int size;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDSemSegResult
+        {
+            public IntPtr labels;
+            public IntPtr shape;
+            public int shape_size;
+            public int num_classes;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDDepthResult
+        {
+            public IntPtr depth;
+            public IntPtr shape;
+            public int shape_size;
+        }
+
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDKeyPointResult
@@ -387,6 +404,51 @@ namespace ModelDeploy
             public int graph_opt_level;
             public string password;
             public int ort_log_severity;
+        }
+
+        internal static class NativeBindings
+        {
+            #region Semantic segmentation
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_create_sem_model(ref MDModel model, string modelPath,
+                ref MDRuntimeOption option);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_set_sem_input_size(ref MDModel model, MDSize size);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_sem_predict(ref MDModel model, ref MDImage image,
+                ref MDSemSegResult result);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern void md_free_sem_result(ref MDSemSegResult result);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern void md_free_sem_model(ref MDModel model);
+
+            #endregion
+
+            #region Depth estimation
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_create_depth_model(ref MDModel model, string modelPath,
+                ref MDRuntimeOption option);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_set_depth_input_size(ref MDModel model, MDSize size);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_depth_predict(ref MDModel model, ref MDImage image,
+                ref MDDepthResult result);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern void md_free_depth_result(ref MDDepthResult result);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern void md_free_depth_model(ref MDModel model);
+
+            #endregion
         }
     }
 }

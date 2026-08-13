@@ -14,7 +14,9 @@
         FACE,
         LPR,
         ASR,
-        TTS
+        TTS,
+        SemSeg = 23,
+        Depth = 24
     }
 
     public enum MDStatusCode

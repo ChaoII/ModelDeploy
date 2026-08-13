@@ -1,0 +1,70 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using ModelDeploy.types_internal_c;
+using ModelDeploy.utils;
+
+namespace ModelDeploy.vision.sem
+{
+    public sealed class UltralyticsSem : IDisposable
+    {
+        private MDModel _model;
+        private bool _disposed;
+
+        internal UltralyticsSem(MDModel existing)
+        {
+            _model = existing;
+        }
+
+        public UltralyticsSem(string modelPath, RuntimeOption option)
+        {
+            _model = new MDModel();
+            var nativeOption = option.ToNative();
+            Utils.Check(NativeBindings.md_create_sem_model(ref _model, modelPath, ref nativeOption),
+                "Create semantic segmentation model");
+        }
+
+        public void SetInputSize(int width, int height)
+        {
+            var size = new MDSize { width = width, height = height };
+            Utils.Check(NativeBindings.md_set_sem_input_size(ref _model, size), "Set semantic segmentation input size");
+        }
+
+        public SemSegResult Predict(Image image)
+        {
+            var cResult = new MDSemSegResult();
+            Utils.Check(NativeBindings.md_sem_predict(ref _model, ref image.RawImage, ref cResult),
+                "Semantic segmentation predict");
+            try
+            {
+                return SemSegResult.FromNative(cResult);
+            }
+            finally
+            {
+                NativeBindings.md_free_sem_result(ref cResult);
+            }
+        }
+
+        public UltralyticsSem Clone()
+        {
+            var clone = new MDModel();
+            Utils.Check(md_clone_model(ref clone, ref _model), "Clone semantic segmentation model");
+            return new UltralyticsSem(clone);
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                NativeBindings.md_free_sem_model(ref _model);
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        ~UltralyticsSem() => Dispose();
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
+    }
+}

@@ -22,6 +22,12 @@ MDStatusCode md_clone_model(MDModel* model, const MDModel* from) {    if (!model
     case Keypoint:
         model->model_content = static_cast<modeldeploy::vision::detection::UltralyticsPose*>(from->model_content)->clone().release();
         break;
+    case SemSeg:
+        model->model_content = static_cast<modeldeploy::vision::detection::UltralyticsSem*>(from->model_content)->clone().release();
+        break;
+    case Depth:
+        model->model_content = static_cast<modeldeploy::vision::detection::UltralyticsDepth*>(from->model_content)->clone().release();
+        break;
     case Classification:
         model->model_content = static_cast<modeldeploy::vision::classification::Classification*>(from->model_content)->clone().release();
         break;

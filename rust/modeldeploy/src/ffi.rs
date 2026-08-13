@@ -50,6 +50,8 @@ pub const MDModelType_LPRRec: MDModelType = MDModelType(19);
 pub const MDModelType_LPRPipeline: MDModelType = MDModelType(20);
 pub const MDModelType_OCRPipeline: MDModelType = MDModelType(21);
 pub const MDModelType_OCRRec: MDModelType = MDModelType(22);
+pub const MDModelType_SemSeg: MDModelType = MDModelType(23);
+pub const MDModelType_Depth: MDModelType = MDModelType(24);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -295,6 +297,25 @@ pub struct MDIsegResult {
 pub struct MDIsegResults {
     pub data: *mut MDIsegResult,
     pub size: c_int,
+}
+
+// ── 语义分割（Semantic Segmentation） ──
+#[repr(C)]
+#[derive(Debug)]
+pub struct MDSemSegResult {
+    pub labels: *mut u8,
+    pub shape: *mut c_int,
+    pub shape_size: c_int,
+    pub num_classes: c_int,
+}
+
+// ── 深度估计（Depth Estimation） ──
+#[repr(C)]
+#[derive(Debug)]
+pub struct MDDepthResult {
+    pub depth: *mut c_float,
+    pub shape: *mut c_int,
+    pub shape_size: c_int,
 }
 
 // ── OCR ──
@@ -569,6 +590,28 @@ extern "C" {
     ) -> MDStatusCode;
     pub fn md_free_instance_seg_result(results: *mut MDIsegResults);
     pub fn md_free_instance_seg_model(model: *mut MDModel);
+
+    // ── 语义分割（Semantic Segmentation） ──
+    pub fn md_create_sem_model(
+        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
+    ) -> MDStatusCode;
+    pub fn md_set_sem_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
+    pub fn md_sem_predict(
+        model: *const MDModel, image: *const MDImage, result: *mut MDSemSegResult,
+    ) -> MDStatusCode;
+    pub fn md_free_sem_result(result: *mut MDSemSegResult);
+    pub fn md_free_sem_model(model: *mut MDModel);
+
+    // ── 深度估计（Depth Estimation） ──
+    pub fn md_create_depth_model(
+        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
+    ) -> MDStatusCode;
+    pub fn md_set_depth_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
+    pub fn md_depth_predict(
+        model: *const MDModel, image: *const MDImage, result: *mut MDDepthResult,
+    ) -> MDStatusCode;
+    pub fn md_free_depth_result(result: *mut MDDepthResult);
+    pub fn md_free_depth_model(model: *mut MDModel);
 
     // ── OCR ──
     pub fn md_create_ocr_model(

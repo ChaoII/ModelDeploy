@@ -40,6 +40,14 @@ name = "pose"
 path = "examples/pose.rs"
 
 [[example]]
+name = "sem"
+path = "examples/sem.rs"
+
+[[example]]
+name = "depth"
+path = "examples/depth.rs"
+
+[[example]]
 name = "face_age"
 path = "examples/face_age.rs"
 

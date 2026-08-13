@@ -104,6 +104,8 @@ pub enum ModelType {
     Pipeline,
     Asr,
     Tts,
+    SemSeg,
+    Depth,
 }
 
 impl fmt::Display for ModelType {
@@ -118,6 +120,8 @@ impl fmt::Display for ModelType {
             ModelType::Pipeline => write!(f, "Pipeline"),
             ModelType::Asr => write!(f, "ASR"),
             ModelType::Tts => write!(f, "TTS"),
+            ModelType::SemSeg => write!(f, "SemSeg"),
+            ModelType::Depth => write!(f, "Depth"),
         }
     }
 }
@@ -134,6 +138,8 @@ impl From<ffi::MDModelType> for ModelType {
             6 => ModelType::Pipeline,
             7 => ModelType::Asr,
             8 => ModelType::Tts,
+            23 => ModelType::SemSeg,
+            24 => ModelType::Depth,
             _ => ModelType::Detection,
         }
     }
