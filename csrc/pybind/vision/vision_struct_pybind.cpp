@@ -284,6 +284,43 @@ namespace modeldeploy::vision {
                 return r;
             });
 
+        pybind11::class_<SemSegResult>(m, "SemSegResult")
+            .def(pybind11::init())
+            .def_readwrite("labels", &SemSegResult::labels)
+            .def_readwrite("shape", &SemSegResult::shape)
+            .def_readwrite("num_classes", &SemSegResult::num_classes)
+            .def("to_dict", [](const SemSegResult& r) {
+                pybind11::dict d;
+                d["labels"] = r.labels;
+                d["shape"] = r.shape;
+                d["num_classes"] = r.num_classes;
+                return d;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                SemSegResult r;
+                if (d.contains("labels")) r.labels = d["labels"].cast<std::vector<uint8_t>>();
+                if (d.contains("shape")) r.shape = d["shape"].cast<std::vector<int64_t>>();
+                if (d.contains("num_classes")) r.num_classes = d["num_classes"].cast<int32_t>();
+                return r;
+            });
+
+        pybind11::class_<DepthResult>(m, "DepthResult")
+            .def(pybind11::init())
+            .def_readwrite("depth", &DepthResult::depth)
+            .def_readwrite("shape", &DepthResult::shape)
+            .def("to_dict", [](const DepthResult& r) {
+                pybind11::dict d;
+                d["depth"] = r.depth;
+                d["shape"] = r.shape;
+                return d;
+            })
+            .def_static("from_dict", [](const pybind11::dict& d) {
+                DepthResult r;
+                if (d.contains("depth")) r.depth = d["depth"].cast<std::vector<float>>();
+                if (d.contains("shape")) r.shape = d["shape"].cast<std::vector<int64_t>>();
+                return r;
+            });
+
 
         pybind11::class_<ObbResult>(m, "ObbResult")
             .def(pybind11::init())

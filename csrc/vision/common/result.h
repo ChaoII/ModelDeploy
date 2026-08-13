@@ -17,6 +17,8 @@ namespace modeldeploy::vision {
         FACE_DETECTION,
         FACE_RECOGNITION,
         MASK,
+        SEM_SEG,
+        DEPTH,
     };
 
     enum class FaceAntiSpoofResult:std::uint8_t {
@@ -71,6 +73,25 @@ namespace modeldeploy::vision {
         int32_t label_id{};
         float score{};
         ResultType type = ResultType::DETECTION;
+    };
+
+    /*! @brief Semantic segmentation result structure for yolo26n-sem (cityscapes 19 classes)
+     * 每像素类别索引 [0, num_classes)，shape 为 (H, W)
+     */
+    struct MODELDEPLOY_CXX_EXPORT SemSegResult {
+        std::vector<uint8_t> labels;
+        std::vector<int64_t> shape; // (H, W)
+        int32_t num_classes{};
+        ResultType type = ResultType::SEM_SEG;
+    };
+
+    /*! @brief Depth estimation result structure for yolo26n-depth (log-depth 模型输出经 exp 还原)
+     * 每像素深度值（米），shape 为 (H, W)
+     */
+    struct MODELDEPLOY_CXX_EXPORT DepthResult {
+        std::vector<float> depth;
+        std::vector<int64_t> shape; // (H, W)
+        ResultType type = ResultType::DEPTH;
     };
 
     struct MODELDEPLOY_CXX_EXPORT ObbResult {

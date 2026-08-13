@@ -65,4 +65,13 @@ namespace modeldeploy::vision {
         const std::string& font_path = "", int font_size = 14,
         double alpha = 0.15, bool save_result = false,
         const std::vector<int>& abnormal_ids = {}, bool show_attr = true);
+
+    MODELDEPLOY_CXX_EXPORT ImageData vis_sem(
+        ImageData& image, const SemSegResult& result,
+        const std::unordered_map<int, std::string>& label_map = {},
+        double alpha = 0.5, bool save_result = false);
+
+    MODELDEPLOY_CXX_EXPORT ImageData vis_depth(
+        ImageData& image, const DepthResult& result,
+        bool colorize = true, bool save_result = false);
 }

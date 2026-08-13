@@ -239,6 +239,36 @@ docker run --rm -it -v <onnx目录>:/conv -v <校准图目录>:/cali_img \
 
 > 各任务对应 demo：`examples/demo_det/demo_detection_sophgo.cpp`、`examples/demo_cls/demo_classification_sophgo.cpp`（含多标签）、`examples/demo_obb/demo_obb_sophgo.cpp`、`examples/demo_iseg/demo_iseg_sophgo.cpp`、`examples/demo_kps/demo_pose_sophgo.cpp`。`qtable_f16.txt`（检测头 score 尾层保持 F16）见 `tools/docker/sophgo/`。
 
+#### 5.4.2 yolo26n 系列模型适配
+
+yolo26n 全系 7 个任务（det/cls/obb/pose/seg/sem/depth）均固定 `[1,3,640,640]` 输入，已适配：
+
+| 模型 | 输出 | SDK 类 | demo |
+|------|------|--------|------|
+| `yolo26n.onnx` (det) | `[1,300,6]` end2end | `UltralyticsDet` (run_with_nms) | `demo_detection_sophgo` |
+| `yolo26n-cls.onnx` | `[1,1000]` | `Classification` | `demo_classification_sophgo` |
+| `yolo26n-obb.onnx` | `[1,20,8400]` | `UltralyticsObb` | `demo_obb_sophgo` |
+| `yolo26n-pose.onnx` | `[1,300,57]` end2end | `UltralyticsPose` (run_with_nms) | `demo_pose_sophgo` |
+| `yolo26n-seg.onnx` | `[1,300,38]`+mask end2end | `UltralyticsSeg` (run_with_nms) | `demo_iseg_sophgo` |
+| `yolo26n-sem.onnx` | `[1,19,640,640]` cityscapes 19 类 | **`UltralyticsSem`（新增）** | `demo_sem` |
+| `yolo26n-depth.onnx` | `[1,1,640,640]` log 深度 | **`UltralyticsDepth`（新增）** | `demo_depth` |
+
+- **sem**：输出 19 类 raw logits → `argmax` 得每像素类别 → 去除 letterbox padding，`SemSegResult{labels,shape,num_classes}`，`vis_sem()` 用 Cityscapes 调色板叠加
+- **depth**：`depth-log` 模型输出 log 空间深度 → `exp` 还原为米 → 去除 padding，`DepthResult{depth,shape}`，`vis_depth()` 用 JET 伪彩色
+- 两者 preprocessor 复用 yolo letterbox + `/255`（与检测/分割/姿态一致）
+
+**yolo26n 的 INT8 量化实测结论**（BM1688）：
+
+| 模型 | 类型 | INT8 可用性 |
+|------|------|------------|
+| det / pose / seg | **end2end（内置 NMS）** | ❌ 不可用：内置 NMS 算子被量化破坏，输出 conf 全 0 |
+| obb | 无 NMS 检测头 | ⚠️ box 坐标量化后失真（ch0-3 变常量），检测框错误；qtable 检测头/前段 F16 均无法恢复，**建议用 F16** |
+| cls | 全卷积 | ✅ top1 与 F16 一致 |
+| sem | 全卷积 | ✅ 主类别一致（小类别有偏差） |
+| depth | 全卷积 | ✅ 深度量级正确（有偏差） |
+
+> 结论：**end2end 模型（det/pose/seg）和 obb 的 INT8 不可用，用 F16**；**cls/sem/depth 的 INT8 可用**（精度有少量偏差）。转换命令同 5.4.1，onnx 在 `test_data/test_models/onnx/yolo26n/`，bmodel 在 `test_data/test_models/sophgo/yolo26n/`。
+
 ### 5.5 零拷贝推理（BMCV）
 
 Sophgo 后端支持 BMCV 设备端预处理零拷贝：

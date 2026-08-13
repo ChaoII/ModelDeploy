@@ -11,6 +11,8 @@ namespace modeldeploy::vision {
     void bind_ultralytics_iseg(const pybind11::module&);
     void bind_ultralytics_obb(const pybind11::module&);
     void bind_ultralytics_pose(const pybind11::module&);
+    void bind_ultralytics_sem(const pybind11::module&);
+    void bind_ultralytics_depth(const pybind11::module&);
     void bind_lpr_det(const pybind11::module&);
     void bind_lpr_rec(const pybind11::module&);
     void bind_lpr_pipeline(const pybind11::module&);
@@ -41,6 +43,8 @@ namespace modeldeploy::vision {
         bind_ultralytics_iseg(m);
         bind_ultralytics_obb(m);
         bind_ultralytics_pose(m);
+        bind_ultralytics_sem(m);
+        bind_ultralytics_depth(m);
         bind_lpr_det(m);
         bind_lpr_rec(m);
         bind_lpr_pipeline(m);
