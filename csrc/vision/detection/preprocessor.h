@@ -37,11 +37,6 @@ namespace modeldeploy::vision::detection {
             padding_value_ = padding_value;
         }
 
-        /// 输入归一化开关：默认 true（/255 → [0,1]）。
-        /// 部分导出模型（如旧版无 NMS onnx）期望 [0,255] 原始输入，需设为 false。
-        void set_normalize(bool normalize) { normalize_ = normalize; }
-        [[nodiscard]] bool is_normalize() const { return normalize_; }
-
         void set_processor_backend(std::shared_ptr<VisionProcessorBackend> backend) {
             backend_ = std::move(backend);
         }
@@ -59,6 +54,5 @@ namespace modeldeploy::vision::detection {
             std::make_shared<CpuProcessorBackend>();
         std::vector<int> size_;
         std::vector<float> padding_value_;
-        bool normalize_ = true;
     };
 } // namespace detection
