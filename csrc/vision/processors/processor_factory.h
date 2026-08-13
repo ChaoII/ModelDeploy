@@ -9,9 +9,7 @@
 #include "vision/processors/processor_backend.h"
 
 namespace modeldeploy::vision {
-
-// 根据设备与后端创建对应的前后处理 backend
-MODELDEPLOY_CXX_EXPORT std::unique_ptr<VisionProcessorBackend> create_processor_backend(
-    Device device, Backend backend, int device_id = -1);
-
+    // 根据设备与后端创建对应的前后处理 backend
+    MODELDEPLOY_CXX_EXPORT std::unique_ptr<VisionProcessorBackend> create_processor_backend(
+        Device device, Backend backend, int device_id = -1);
 } // namespace modeldeploy::vision

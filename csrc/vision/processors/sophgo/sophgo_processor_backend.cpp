@@ -19,13 +19,13 @@
 #include "bmlib_runtime.h"
 
 namespace modeldeploy::vision {
-
     SophgoProcessorBackend::SophgoProcessorBackend(const int device_id) : device_id_(device_id) {
         bm_handle_t h = nullptr;
         if (bm_dev_request(&h, device_id_) == BM_SUCCESS) {
             handle_ = static_cast<void*>(h);
             MD_LOG_INFO << "SophgoProcessorBackend: BMCV handle ready (device " << device_id_ << ")." << std::endl;
-        } else {
+        }
+        else {
             MD_LOG_WARN << "SophgoProcessorBackend: bm_dev_request failed, BMCV disabled (CPU fallback)." << std::endl;
             handle_ = nullptr;
         }
@@ -61,7 +61,8 @@ namespace modeldeploy::vision {
         auto* mem = new bm_device_mem_t{};
         if (bm_malloc_device_byte(static_cast<bm_handle_t>(handle_), mem,
                                   static_cast<unsigned int>(bytes)) != BM_SUCCESS) {
-            MD_LOG_ERROR << "SophgoProcessorBackend: bm_malloc_device_byte failed (" << bytes << " bytes)." << std::endl;
+            MD_LOG_ERROR << "SophgoProcessorBackend: bm_malloc_device_byte failed (" << bytes << " bytes)." <<
+                std::endl;
             delete mem;
             return nullptr;
         }
@@ -79,7 +80,8 @@ namespace modeldeploy::vision {
         // data() 返回 bm_device_mem_t*，SophgoBackend::infer 识别 Device::TPU 输入直接 launch。
         // deleter 为空：设备内存由本 backend 持有并复用，Tensor 不拥有。
         out->from_external_memory(in_mem_, shape, DataType::FP32,
-                                  [](void*) {}, Device::TPU, name);
+                                  [](void*) {
+                                  }, Device::TPU, name);
         return true;
     }
 
@@ -121,7 +123,7 @@ namespace modeldeploy::vision {
                         return true;
                     }
                     MD_LOG_ERROR << "SophgoProcessorBackend: BMCV fused_preprocess failed (st="
-                                 << st << "), fallback to CPU." << std::endl;
+                        << st << "), fallback to CPU." << std::endl;
                 }
             }
         }
@@ -179,12 +181,11 @@ namespace modeldeploy::vision {
                         return true;
                     }
                     MD_LOG_ERROR << "SophgoProcessorBackend: BMCV NV12 preprocess failed (st="
-                                 << st << "), fallback to CPU." << std::endl;
+                        << st << "), fallback to CPU." << std::endl;
                 }
             }
         }
         return CpuProcessorBackend::yolo_preprocess_nv12(
             src_y, src_uv, src_size, step_y, step_uv, out, dst_size, pad_val, record);
     }
-
 } // namespace modeldeploy::vision

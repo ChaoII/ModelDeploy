@@ -13,7 +13,6 @@
 #include "bmcv_api_ext.h"
 
 namespace modeldeploy::vision {
-
     int md_bmcv_letterbox_normalize_to_devmem(void* handle,
                                               const uint8_t* bgr, int src_w, int src_h,
                                               void* dev_mem, int dst_w, int dst_h,
@@ -65,7 +64,8 @@ namespace modeldeploy::vision {
             if (st != BM_SUCCESS) break;
             bmcv_convert_to_attr ct = {alpha0, 0.0f, alpha1, 0.0f, alpha2, 0.0f};
             st = bmcv_image_convert_to(h, 1, ct, &letter_img, &out_img);
-        } while (false);
+        }
+        while (false);
 
         bm_image_destroy(src_img);
         bm_image_destroy(letter_img);
@@ -90,7 +90,7 @@ namespace modeldeploy::vision {
 
         // 若 Y/UV 平面行步长与尺寸不一致（带 stride），整理为连续平面后再上传
         const bool contiguous = (step_y <= 0 || step_y == src_w) &&
-                                (step_uv <= 0 || step_uv == src_w);
+            (step_uv <= 0 || step_uv == src_w);
         std::vector<uint8_t> y_buf, uv_buf;
         const uint8_t* y_data = src_y;
         const uint8_t* uv_data = src_uv;
@@ -135,9 +135,9 @@ namespace modeldeploy::vision {
             st = bm_image_alloc_dev_mem(letter_img, 0);
             if (st != BM_SUCCESS) break;
             const float scale = (static_cast<float>(dst_w) / src_w <
-                                 static_cast<float>(dst_h) / src_h)
-                ? static_cast<float>(dst_w) / src_w
-                : static_cast<float>(dst_h) / src_h;
+                                    static_cast<float>(dst_h) / src_h)
+                                    ? static_cast<float>(dst_w) / src_w
+                                    : static_cast<float>(dst_h) / src_h;
             int rw = static_cast<int>(src_w * scale);
             int rh = static_cast<int>(src_h * scale);
             if (rw > dst_w) rw = dst_w;
@@ -159,12 +159,12 @@ namespace modeldeploy::vision {
             if (st != BM_SUCCESS) break;
             bmcv_convert_to_attr ct = {alpha0, 0.0f, alpha1, 0.0f, alpha2, 0.0f};
             st = bmcv_image_convert_to(h, 1, ct, &letter_img, &out_img);
-        } while (false);
+        }
+        while (false);
 
         bm_image_destroy(nv12_img);
         bm_image_destroy(letter_img);
         bm_image_destroy(out_img);
         return st == BM_SUCCESS ? 0 : -1;
     }
-
 } // namespace modeldeploy::vision

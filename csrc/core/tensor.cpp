@@ -50,7 +50,7 @@ namespace modeldeploy {
         }
     }
 
-    MemoryBlock::MemoryBlock(const void* data, const size_t size, const Device device): size_(size), device_(device) {
+    MemoryBlock::MemoryBlock(const void* data, const size_t size, const Device device) : size_(size), device_(device) {
         if (device == Device::CPU) {
             data_ = std::malloc(size);
             if (!data_) {
@@ -142,11 +142,11 @@ namespace modeldeploy {
     Tensor::Tensor(const std::vector<int64_t>& shape,
                    const DataType dtype,
                    Device device,
-                   std::string name): name_(std::move(name)),
-                                      shape_(shape),
-                                      dtype_(dtype),
-                                      device_(device),
-                                      element_size_(get_element_size(dtype)) {
+                   std::string name) : name_(std::move(name)),
+                                       shape_(shape),
+                                       dtype_(dtype),
+                                       device_(device),
+                                       element_size_(get_element_size(dtype)) {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         memory_ = std::make_shared<MemoryBlock>(total_size, device);
@@ -160,11 +160,11 @@ namespace modeldeploy {
                    const DataType dtype,
                    Device device,
                    std::function<void(void*)> deleter,
-                   std::string name): name_(std::move(name)),
-                                      shape_(shape),
-                                      dtype_(dtype),
-                                      device_(device),
-                                      element_size_(get_element_size(dtype)) {
+                   std::string name) : name_(std::move(name)),
+                                       shape_(shape),
+                                       dtype_(dtype),
+                                       device_(device),
+                                       element_size_(get_element_size(dtype)) {
         validate_shape(shape);
         size_t total_size = calculate_total_size();
         if (deleter) {
@@ -454,7 +454,8 @@ namespace modeldeploy {
                 }
             };
             copy_rows(0);
-        } else {
+        }
+        else {
             // 全非连续：逐元素复制
             std::function<void(size_t)> copy_elems = [&](size_t dim) {
                 if (dim == shape_.size()) {
@@ -557,7 +558,8 @@ namespace modeldeploy {
             // 共享外部内存：不拷贝、不拥有，内存生命周期由调用方管理（符合头文件注释语义）。
             // deleter 为空时传入空 lambda 以走共享分支（MemoryBlock 仅存指针，析构不 free）。
             memory_ = std::make_shared<MemoryBlock>(data, total_size, device,
-                                                    [](void*) {});
+                                                    [](void*) {
+                                                    });
             owns_data_ = false;
         }
         data_ptr_ = memory_->data();
@@ -755,7 +757,8 @@ namespace modeldeploy {
 #ifdef WITH_GPU
             for (size_t i = 0; i < outer_iterations; ++i) {
                 for (const auto& tensor : tensors) {
-                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] * slice_size;
+                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] *
+                        slice_size;
                     const size_t copy_size = tensor.shape()[axis] * slice_size;
                     cudaMemcpy(dest_ptr, src_ptr, copy_size, cudaMemcpyDeviceToDevice);
                     dest_ptr += copy_size;
@@ -764,10 +767,12 @@ namespace modeldeploy {
 #else
             MD_LOG_ERROR << "concat on GPU but WITH_GPU not enabled." << std::endl;
 #endif
-        } else {
+        }
+        else {
             for (size_t i = 0; i < outer_iterations; ++i) {
                 for (const auto& tensor : tensors) {
-                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] * slice_size;
+                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] *
+                        slice_size;
                     const size_t copy_size = tensor.shape()[axis] * slice_size;
                     std::memcpy(dest_ptr, src_ptr, copy_size);
                     dest_ptr += copy_size;

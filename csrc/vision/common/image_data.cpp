@@ -30,7 +30,8 @@ namespace modeldeploy::vision {
                 channels = static_cast<int>(mat.size[0]);
                 height = static_cast<int>(mat.size[1]);
                 width = static_cast<int>(mat.size[2]);
-            } else {
+            }
+            else {
                 // Packed HWC 或 2D Planar Mat
                 width = mat.cols;
                 height = mat.rows;
@@ -71,14 +72,14 @@ namespace modeldeploy::vision {
     }
 
 
-    ImageData::ImageData(const cv::Mat& mat):
+    ImageData::ImageData(const cv::Mat& mat) :
         impl_(std::make_shared<ImageDataImpl>()) {
         impl_->mat = mat;
         impl_->type = md_image_type_from_ocv_type(mat.type());
         impl_->refresh_meta();
     }
 
-    ImageData::ImageData(cv::Mat&& mat):
+    ImageData::ImageData(cv::Mat&& mat) :
         impl_(std::make_shared<ImageDataImpl>()) {
         impl_->mat = std::move(mat);
         impl_->type = md_image_type_from_ocv_type(impl_->mat.type());
@@ -581,7 +582,6 @@ namespace modeldeploy::vision {
     }
 
 
-
     std::vector<uint8_t> ImageData::imencode(const ImageData& image, const std::string& ext) {
         std::vector<uint8_t> buf;
         if (image.empty()) {
@@ -592,9 +592,9 @@ namespace modeldeploy::vision {
         return buf;
     }
 
-    ImageData ImageData::imdecode(const std::vector<uint8_t>& buf){
+    ImageData ImageData::imdecode(const std::vector<uint8_t>& buf) {
         cv::Mat mat = cv::imdecode(buf, cv::IMREAD_UNCHANGED);
-        if(mat.empty()) return ImageData();
+        if (mat.empty()) return ImageData();
         return ImageData(std::move(mat));
     }
 

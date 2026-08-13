@@ -23,7 +23,11 @@ namespace modeldeploy {
         // SetDllDirectory 使该目录在 System32 之前被搜索
         SetDllDirectoryW(path);
     }
+
     // 静态初始化（main 之前执行，确保 onnxruntime 按正确版本加载）
-    static const bool g_ort_dll_init = [] { init_ort_dll_search_path(); return true; }();
+    static const bool g_ort_dll_init = [] {
+        init_ort_dll_search_path();
+        return true;
+    }();
 } // namespace modeldeploy
 #endif // _WIN32

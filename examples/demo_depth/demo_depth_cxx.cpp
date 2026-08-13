@@ -17,16 +17,23 @@ int main(int argc, char** argv) {
     option.use_gpu();
     option.use_ort_backend();
     option.enable_fp16 = true;
-    const std::string model_file = argc > 1 ? argv[1]
-        : "../../test_data/test_models/onnx/yolo26n/yolo26n-depth.onnx";
-    const std::string image_file = argc > 2 ? argv[2]
-        : "../../test_data/test_images/2341.jpg";
+    option.enable_trt = true;
+    const std::string model_file = argc > 1
+                                       ? argv[1]
+                                       : "../../test_data/test_models/onnx/yolo26n/yolo26n-depth.onnx";
+    const std::string image_file = argc > 2
+                                       ? argv[2]
+                                       : "../../test_data/test_images/test_depth_540.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsDepth(model_file, option);
     auto im = modeldeploy::vision::ImageData::imread(image_file);
     modeldeploy::vision::DepthResult res;
-    constexpr int loop = 20;
+    constexpr int warming_up_count = 20;
+    for (int i = 0; i < warming_up_count; ++i) {
+        model.predict(im, &res);
+    }
+    constexpr int loop_count = 100;
     TimerArray times;
-    for (int i = 0; i < loop; ++i) {
+    for (int i = 0; i < loop_count; ++i) {
         model.predict(im, &res, &times);
     }
     times.print_benchmark();

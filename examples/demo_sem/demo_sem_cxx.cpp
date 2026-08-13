@@ -17,23 +17,32 @@ int main(int argc, char** argv) {
     option.use_gpu();
     option.use_ort_backend();
     option.enable_fp16 = true;
-    const std::string model_file = argc > 1 ? argv[1]
-        : "../../test_data/test_models/onnx/yolo26n/yolo26n-sem.onnx";
-    const std::string image_file = argc > 2 ? argv[2]
-        : "../../test_data/test_images/2341.jpg";
+    option.enable_trt = true;
+    const std::string model_file = argc > 1
+                                       ? argv[1]
+                                       : "../../test_data/test_models/onnx/yolo26n/yolo26n-sem.onnx";
+    const std::string image_file = argc > 2
+                                       ? argv[2]
+                                       : "../../test_data/test_images/test_sem_540.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSem(model_file, option);
     auto im = modeldeploy::vision::ImageData::imread(image_file);
     modeldeploy::vision::SemSegResult res;
-    constexpr int loop = 20;
+    constexpr int warming_up_count = 20;
+    for (int i = 0; i < warming_up_count; ++i) {
+        model.predict(im, &res);
+    }
+
+    constexpr int loop_count = 100;
     TimerArray times;
-    for (int i = 0; i < loop; ++i) {
+    for (int i = 0; i < loop_count; ++i) {
         model.predict(im, &res, &times);
     }
     times.print_benchmark();
     std::cout << "sem result: shape=[" << res.shape[0] << " " << res.shape[1]
-              << "] num_classes=" << res.num_classes << std::endl;
+        << "] num_classes=" << res.num_classes << std::endl;
     const auto label_map = model.get_label_map("names");
     auto vis_im = modeldeploy::vision::vis_sem(im, res, label_map, 0.5, true);
+    vis_im.imshow("depth");
     std::cout << "saved vis_sem.jpg" << std::endl;
     return 0;
 }
