@@ -20,6 +20,10 @@ namespace modeldeploy::vision {
         bool yolo_preprocess(const ImageData& image, Tensor* out,
                              const std::vector<int>& dst_size,
                              float pad_val, LetterBoxRecord* record) override;
+        bool yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                   const std::vector<int>& dst_size,
+                                   float pad_val,
+                                   std::vector<LetterBoxRecord>* records) override;
         bool fused_preprocess(const ImageData& image, Tensor* out,
                               const std::vector<int>& dst_size,
                               float origin_x, float origin_y,
@@ -34,9 +38,9 @@ namespace modeldeploy::vision {
                                   float pad_val, LetterBoxRecord* record) override;
 
     private:
-        // 确保已分配缓存输入设备内存（按 dst_h*dst_w*3*4 字节），返回 bm_device_mem_t* 或 nullptr
+        // 确保已分配可容纳单张 dst 尺寸图像的设备内存（bm_device_mem_t* 或 nullptr）
         void* ensure_input_mem(int dst_w, int dst_h);
-        // 内部：把 BMCV 结果写入 in_mem_ 后包装为 Device::TPU Tensor
+        // 内部将 BMCV 写入的 in_mem_ 包装为 Device::TPU Tensor
         bool finish_tpu_tensor(Tensor* out, int dst_w, int dst_h,
                                const std::string& name = "");
 
