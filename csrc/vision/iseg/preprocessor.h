@@ -23,8 +23,19 @@ namespace modeldeploy::vision::detection {
         * \param[in]  letter_box_records The shape info list, record input_shape and output_shape
         * \return true if the preprocess successed, otherwise false
         */
-        bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
+
+        bool run(const std::vector<ImageData>& images,
+                 std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
+
+        bool run(const uint8_t* src_y,
+                 const uint8_t* src_uv,
+                 const std::vector<int>& src_size,
+                 int step_y,
+                 int step_uv,
+                 Tensor* output,
+                 LetterBoxRecord* letter_box_record) const;
+
 
         /// Set target size, tuple of (width, height), default size = {640, 640}
         void set_size(const std::vector<int>& size) { size_ = size; }

@@ -45,6 +45,11 @@ namespace modeldeploy::vision::detection {
         bool batch_predict(const std::vector<ImageData>& images,
                             std::vector<std::vector<InstanceSegResult>>* results,
                             TimerArray* timers = nullptr);
+        bool predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
+                          int width, int height, int step_y, int step_uv,
+                          std::vector<InstanceSegResult>* result, LetterBoxRecord* letter_box_record = nullptr,
+                          TimerArray* timers = nullptr);
+
 
         [[nodiscard]] std::unique_ptr<UltralyticsSeg> clone() const;
 

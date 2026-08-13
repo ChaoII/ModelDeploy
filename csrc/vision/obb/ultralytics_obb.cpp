@@ -64,5 +64,40 @@ namespace modeldeploy::vision::detection {
         clone_model->set_runtime(clone_model->clone_runtime());
         return clone_model;
     }
-} // namespace modeldeploy::vision::detection
 
+    bool UltralyticsObb::predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
+                             int width, int height, int step_y, int step_uv,
+                             std::vector<ObbResult>* result, LetterBoxRecord* letter_box_record,
+                             TimerArray* timers) {
+        if (!src_y || !src_uv || !result) return false;
+        std::vector<LetterBoxRecord> lbr(1);
+        if (timers) timers->pre_timer.start();
+        if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
+                               &reused_input_tensors_[0], &lbr[0])) {
+            MD_LOG_ERROR << "Failed to preprocess the NV12 input." << std::endl;
+            return false;
+        }
+        if (timers) timers->pre_timer.stop();
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
+        if (timers) timers->infer_timer.start();
+        if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
+        std::vector<std::vector<ObbResult>> batch_results;
+        if (!postprocessor_.run(reused_output_tensors_, &batch_results, lbr)) {
+            MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->post_timer.stop();
+        if (!batch_results.empty()) {
+            *result = std::move(batch_results[0]);
+        }
+        if (letter_box_record) {
+            *letter_box_record = lbr[0];
+        }
+        return true;
+    }
+} // namespace modeldeploy::vision::detection

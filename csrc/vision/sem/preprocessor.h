@@ -16,8 +16,19 @@ namespace modeldeploy::vision::detection {
     public:
         UltralyticsSemPreprocessor();
 
-        bool run(const std::vector<ImageData>& images, std::vector<Tensor>* outputs,
+
+        bool run(const std::vector<ImageData>& images,
+                 std::vector<Tensor>* outputs,
                  std::vector<LetterBoxRecord>* letter_box_records) const;
+
+        bool run(const uint8_t* src_y,
+                 const uint8_t* src_uv,
+                 const std::vector<int>& src_size,
+                 int step_y,
+                 int step_uv,
+                 Tensor* output,
+                 LetterBoxRecord* letter_box_record) const;
+
 
         void set_size(const std::vector<int>& size) { size_ = size; }
 
