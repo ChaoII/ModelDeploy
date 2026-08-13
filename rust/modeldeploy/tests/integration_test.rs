@@ -7,7 +7,18 @@ use modeldeploy::types::*;
 // Image 函数全覆盖测试
 // ════════════════════════════════════════════════════════════════
 
-const TEST_IMG: &str = "../../test_data/test_images/test_detection0.jpg";
+/// 基于 CARGO_MANIFEST_DIR 构造 test_data 绝对路径
+fn test_data(rel: &str) -> String {
+    let root = env!("CARGO_MANIFEST_DIR");
+    // CARGO_MANIFEST_DIR = .../rust/modeldeploy，仓库根在其上两级
+    format!("{}/../../test_data/{}", root, rel)
+}
+
+/// 基于仓库根的测试图绝对路径
+fn test_img(rel: &str) -> String {
+    let root = env!("CARGO_MANIFEST_DIR");
+    format!("{}/../../test_data/test_images/{}", root, rel)
+}
 
 /// from_bgr24 + 属性
 #[test]
@@ -24,7 +35,7 @@ fn test_image_from_bgr24() {
 /// read + save + clone + crop
 #[test]
 fn test_image_read_save_clone_crop() -> Result<()> {
-    let img = Image::read(TEST_IMG)?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
     assert!(img.width() > 0);
     assert!(img.height() > 0);
     assert!(img.channels() == 3 || img.channels() == 1);
@@ -84,9 +95,9 @@ fn test_image_from_yuv420p() -> Result<()> {
 #[test]
 fn test_image_from_compressed() -> Result<()> {
     // 从文件读图，压缩后解码验证
-    let img = Image::read(TEST_IMG)?;
+    let _img = Image::read(&test_img("test_detection0.jpg"))?;
     // 先验证 from_compressed: 从已存在的 jpg 读取
-    let jpg_bytes = std::fs::read(TEST_IMG).unwrap_or_default();
+    let jpg_bytes = std::fs::read(&test_img("test_detection0.jpg")).unwrap_or_default();
     if !jpg_bytes.is_empty() {
         let decoded = Image::from_compressed(&jpg_bytes)?;
         assert!(decoded.width() > 0);
@@ -206,7 +217,7 @@ fn test_image_repeated_alloc_free() {
 #[test]
 fn test_image_repeated_read_drop() -> Result<()> {
     for i in 0..100 {
-        let img = Image::read("../../test_data/test_images/test_detection0.jpg")?;
+        let img = Image::read(&test_img("test_detection0.jpg"))?;
         assert!(img.width() > 0);
         drop(img); // 显式释放 CAPI 内存
         if i == 0 { println!("First iteration OK"); }
@@ -218,7 +229,7 @@ fn test_image_repeated_read_drop() -> Result<()> {
 /// clone + crop 反复 100 次
 #[test]
 fn test_image_repeated_clone_crop() -> Result<()> {
-    let img = Image::read("../../test_data/test_images/test_detection0.jpg")?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
     for _ in 0..100 {
         let cloned = img.clone_image()?;
         let cropped = cloned.crop(0, 0, 100, 100)?;
@@ -228,4 +239,78 @@ fn test_image_repeated_clone_crop() -> Result<()> {
     }
     println!("Image clone/crop 100x OK");
     Ok(())
+}
+
+// ════════════════════════════════════════════════════════════════
+// 检测模型 predict + predict_nv12
+// ════════════════════════════════════════════════════════════════
+
+/// 检测模型 predict（BGR 图输入）
+#[test]
+fn test_detection_predict() -> Result<()> {
+    let opt = RuntimeOption::default();
+    let det = modeldeploy::vision::detection::UltralyticsDet::new(&test_data("test_models/onnx/yolo26n/yolo26n.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
+    let results = det.predict(&img)?;
+    println!("detection predict got {} results", results.len());
+    for r in results.iter().take(3) {
+        println!(
+            "  box=[{} {} {} {}] score={}",
+            r.rect.x, r.rect.y, r.rect.width, r.rect.height, r.score
+        );
+    }
+    Ok(())
+}
+
+/// 检测模型 predict_nv12（YUV 输入），不应崩溃且结果长度合法
+#[test]
+fn test_detection_predict_nv12() -> Result<()> {
+    use modeldeploy::image::Image;
+    let opt = RuntimeOption::default();
+    let det = modeldeploy::vision::detection::UltralyticsDet::new(&test_data("test_models/onnx/yolo26n/yolo26n.onnx"), &opt)?;
+
+    // 从测试图构建 NV12
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
+    let w = img.width();
+    let h = img.height();
+    // 偶数对齐
+    let w = w - w % 2;
+    let h = h - h % 2;
+    let bgr = img.data();
+    let (y, uv) = rgb_to_nv12(&bgr, w, h);
+    let results = det.predict_nv12(&y, &uv, w, h, w, w, 0)?;
+    println!("detection predict_nv12 got {} results", results.len());
+    Ok(())
+}
+
+/// 内存泄漏压力：检测模型反复 predict
+#[test]
+fn test_detection_repeated_predict() -> Result<()> {
+    let opt = RuntimeOption::default();
+    let det = modeldeploy::vision::detection::UltralyticsDet::new(&test_data("test_models/onnx/yolo26n/yolo26n.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
+    for _ in 0..10 {
+        let results = det.predict(&img)?;
+        let _ = results;
+    }
+    println!("detection repeated predict 10x OK");
+    Ok(())
+}
+
+/// 辅助：BGR → NV12（Y 平面 + 交错 UV）
+fn rgb_to_nv12(bgr: &[u8], w: i32, h: i32) -> (Vec<u8>, Vec<u8>) {
+    let w = w as usize;
+    let h = h as usize;
+    let mut y = vec![0u8; w * h];
+    let uv = vec![128u8; w * h / 2]; // 中性灰 UV
+    for row in 0..h {
+        for col in 0..w {
+            let idx = (row * w + col) * 3;
+            let b = bgr[idx] as f32;
+            let g = bgr[idx + 1] as f32;
+            let r = bgr[idx + 2] as f32;
+            y[row * w + col] = ((0.257 * r + 0.504 * g + 0.098 * b) + 16.0) as u8;
+        }
+    }
+    (y, uv)
 }

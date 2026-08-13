@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using ModelDeploy;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using ModelDeploy.vision.detection;
 
 namespace ModelDeployUnitTest;
 
@@ -415,7 +416,8 @@ public class ModelDeployTests
             Assert.That((int)Backend.ORT, Is.EqualTo(0));
             Assert.That((int)Backend.MNN, Is.EqualTo(1));
             Assert.That((int)Backend.TRT, Is.EqualTo(2));
-            Assert.That((int)Backend.NONE, Is.EqualTo(3));
+            Assert.That((int)Backend.SOPHGO, Is.EqualTo(3));
+            Assert.That((int)Backend.NONE, Is.EqualTo(4));
         });
     }
 
@@ -473,6 +475,88 @@ public class ModelDeployTests
             Assert.That(decoded.Height, Is.EqualTo(675));
             Assert.That(decoded.Channels, Is.EqualTo(3));
         });
+    }
+
+    // ==================== Detection model predict ====================
+
+    private static string TestModelPath => Path.Combine(GetTestDataDir(), "test_data", "test_models", "onnx", "yolo26n", "yolo26n.onnx");
+
+    private static bool HasTestModel => File.Exists(TestModelPath);
+
+    [Test]
+    public void Detect_Predict_ReturnsDetections()
+    {
+        if (!HasTestModel) Assert.Ignore("Detection model not found");
+        if (!HasTestImage) Assert.Ignore("Test image not found");
+
+        using var img = Image.Read(TestImagePath);
+        var opt = new RuntimeOption();
+        using var det = new UltralyticsDet(TestModelPath, opt);
+        var results = det.Predict(img);
+
+        Assert.That(results, Is.Not.Empty, "Detection model should find objects in test_person.jpg");
+        foreach (var r in results)
+        {
+            Assert.That(r.Score, Is.GreaterThan(0f).And.LessThanOrEqualTo(1f));
+            Assert.That(r.Box.Width, Is.GreaterThan(0));
+            Assert.That(r.Box.Height, Is.GreaterThan(0));
+        }
+    }
+
+    [Test]
+    public void Detect_PredictNv12_ReturnsDetections()
+    {
+        if (!HasTestModel) Assert.Ignore("Detection model not found");
+        if (!HasTestImage) Assert.Ignore("Test image not found");
+
+        using var img = Image.Read(TestImagePath);
+        var w = img.Width;
+        var h = img.Height;
+        var we = w - w % 2;
+        var he = h - h % 2;
+
+        // Convert BGR to NV12 (Y plane + neutral UV)
+        var bgr = img.ToByteArray();
+        var srcY = new byte[we * he];
+        var srcUV = new byte[we * he / 2];
+        for (var y = 0; y < he; y++)
+            for (var x = 0; x < we; x++)
+            {
+                var idx = (y * w + x) * 3;
+                var b = bgr[idx];
+                var g = bgr[idx + 1];
+                var r = bgr[idx + 2];
+                srcY[y * we + x] = (byte)((0.257f * r + 0.504f * g + 0.098f * b) + 16.0f);
+            }
+        for (var i = 0; i < srcUV.Length; i++) srcUV[i] = 128;
+
+        var opt = new RuntimeOption();
+        using var det = new UltralyticsDet(TestModelPath, opt);
+        var results = det.PredictNv12(srcY, srcUV, we, he, we, we);
+
+        Assert.That(results, Is.Not.Null);
+        // NV12 neutral UV may reduce detections, but should not crash
+    }
+
+    [Test]
+    public void Detect_NonExistentModel_Throws()
+    {
+        var opt = new RuntimeOption();
+        Assert.Throws<InvalidOperationException>(() => _ = new UltralyticsDet("/nonexistent/model.onnx", opt));
+    }
+
+    [Test]
+    public void Detect_SetInputSize_ThenPredict()
+    {
+        if (!HasTestModel) Assert.Ignore("Detection model not found");
+        if (!HasTestImage) Assert.Ignore("Test image not found");
+
+        using var img = Image.Read(TestImagePath);
+        var opt = new RuntimeOption();
+        using var det = new UltralyticsDet(TestModelPath, opt);
+        det.SetInputSize(640, 640);
+        var results = det.Predict(img);
+        Assert.That(results, Is.Not.Empty);
     }
 
     // ==================== Helpers ====================

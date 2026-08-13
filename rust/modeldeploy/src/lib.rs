@@ -5,6 +5,7 @@ pub mod runtime;
 pub mod ffi;
 
 pub mod vision;
+#[cfg(feature = "audio")]
 pub mod audio;
 
 // 重新导出常用类型

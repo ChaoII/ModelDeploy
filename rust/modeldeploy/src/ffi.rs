@@ -237,6 +237,7 @@ pub struct MDKeyPointResults {
 
 #[repr(C)]
 #[derive(Debug)]
+#[cfg(feature = "audio")]
 pub struct MDTTSResult {
     pub data: *mut c_float,
     pub size: c_int,
@@ -260,6 +261,7 @@ pub struct MDMapNode {
 // ── Kokoro TTS 参数 ──
 #[repr(C)]
 #[derive(Debug)]
+#[cfg(feature = "audio")]
 pub struct MDKokoroParameters {
     pub model: *mut c_char,
     pub tokens: *mut c_char,
@@ -566,18 +568,23 @@ extern "C" {
 
     // ── TTS（Kokoro） ──
 
+    #[cfg(feature = "audio")]
     pub fn md_create_kokoro_model(
         model: *mut MDModel,
         params: *const MDKokoroParameters,
         option: *const MDRuntimeOption,
     ) -> MDStatusCode;
+    #[cfg(feature = "audio")]
     pub fn md_kokoro_model_predict(
         model: *const MDModel,
         text: *const c_char,
         result: *mut MDTTSResult,
     ) -> MDStatusCode;
+    #[cfg(feature = "audio")]
     pub fn md_free_kokoro_result(result: *mut MDTTSResult);
+    #[cfg(feature = "audio")]
     pub fn md_free_kokoro_model(model: *mut MDModel);
+    #[cfg(feature = "audio")]
     pub fn md_write_wav(result: *const MDTTSResult, path: *const c_char) -> MDStatusCode;
 
     // ── OBB ──
