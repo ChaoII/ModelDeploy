@@ -18,6 +18,7 @@ namespace modeldeploy::vision {
 
     // NV12(host Y/UV 平面) letterbox + 归一化，FP32 CHW 结果写入 dev_mem（bm_device_mem_t*）。
     // step_y/step_uv 为平面行步长（通常等于 width；非连续时内部整理拷贝）。
+    // src_is_device=true 时 src_y/src_uv 为 TPU 设备地址（Y 与 UV 连续），跳过 H2D 直接 attach。
     // 返回 0 成功；非 0 失败。
     int md_bmcv_nv12_letterbox_normalize_to_devmem(void* handle,
                                                    const uint8_t* src_y, const uint8_t* src_uv,
@@ -25,5 +26,6 @@ namespace modeldeploy::vision {
                                                    int step_y, int step_uv,
                                                    void* dev_mem, int dst_w, int dst_h,
                                                    float alpha0, float alpha1, float alpha2,
-                                                   unsigned char pad_val);
+                                                   unsigned char pad_val,
+                                                   bool src_is_device = false);
 } // namespace modeldeploy::vision

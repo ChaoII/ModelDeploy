@@ -45,9 +45,11 @@ namespace modeldeploy::vision::detection {
                                           const int step_y,
                                           const int step_uv,
                                           Tensor* output,
-                                          LetterBoxRecord* letter_box_record) const {
+                                          LetterBoxRecord* letter_box_record,
+                                          Device src_device) const {
         return backend_->yolo_preprocess_nv12(src_y, src_uv, src_size,
                                               step_y, step_uv, output, size_,
-                                              padding_value_, letter_box_record);
+                                              padding_value_, letter_box_record,
+                                              src_device);
     }
 }

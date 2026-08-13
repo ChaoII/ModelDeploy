@@ -67,12 +67,13 @@ namespace modeldeploy::vision::detection {
                                       int width, int height, int step_y, int step_uv,
                                       std::vector<DetectionResult>* result,
                                       LetterBoxRecord* letter_box_record,
-                                      TimerArray* timers) {
+                                      Device src_device, TimerArray* timers) {
         if (!src_y || !src_uv || !result) return false;
         reused_input_tensors_.resize(1);
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
-                               &reused_input_tensors_[0], letter_box_record)) {
+                               &reused_input_tensors_[0], letter_box_record,
+                               src_device)) {
             MD_LOG_ERROR << "Failed to preprocess the NV12 input." << std::endl;
             return false;
         }

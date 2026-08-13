@@ -33,7 +33,13 @@ namespace modeldeploy::vision {
                                                    const std::vector<int>& src_size,
                                                    int step_y, int step_uv, Tensor* out,
                                                    const std::vector<int>& dst_size,
-                                                   float pad_val, LetterBoxRecord* record) {
+                                                   float pad_val, LetterBoxRecord* record,
+                                                   Device src_device) {
+        if (src_device != Device::CPU) {
+            MD_LOG_ERROR << "CpuProcessorBackend: NV12 src_device must be CPU, got "
+                         << device_to_string(src_device) << "." << std::endl;
+            return false;
+        }
         return yolo_preprocess_nv12_cpu(src_y, src_uv, src_size, step_y, step_uv,
                                         out, dst_size, pad_val, record);
     }

@@ -23,11 +23,13 @@ namespace modeldeploy::vision {
                                      float pad_val, LetterBoxRecord* record) = 0;
 
         // NV12 直接输入（硬解码/摄像头常见格式）
+        // src_device 指明 src_y/src_uv 所在内存的设备：CPU(默认)/GPU/TPU。
         virtual bool yolo_preprocess_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                                           const std::vector<int>& src_size,
                                           int step_y, int step_uv, Tensor* out,
                                           const std::vector<int>& dst_size,
-                                          float pad_val, LetterBoxRecord* record) = 0;
+                                          float pad_val, LetterBoxRecord* record,
+                                          Device src_device = Device::CPU) = 0;
 
         // 纯 letterbox（不归一化不重排），输出 HWC 图像 + 记录（LPR det 用）
         virtual bool letterbox(const ImageData& image, ImageData* out,

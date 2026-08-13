@@ -33,7 +33,8 @@ namespace modeldeploy::vision::detection {
                  int step_y,
                  int step_uv,
                  Tensor* output,
-                 LetterBoxRecord* letter_box_record) const;
+                 LetterBoxRecord* letter_box_record,
+                 Device src_device = Device::CPU) const;
 
 
         /// Set target size, tuple of (width, height), default size = {640, 640}

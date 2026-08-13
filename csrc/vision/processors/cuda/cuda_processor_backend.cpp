@@ -37,7 +37,13 @@ namespace modeldeploy::vision {
                                                     const std::vector<int>& src_size,
                                                     int step_y, int step_uv, Tensor* out,
                                                     const std::vector<int>& dst_size,
-                                                    float pad_val, LetterBoxRecord* record) {
+                                                    float pad_val, LetterBoxRecord* record,
+                                                    Device src_device) {
+        if (src_device == Device::TPU) {
+            MD_LOG_ERROR << "CudaProcessorBackend: NV12 src_device TPU not supported." << std::endl;
+            return false;
+        }
+        // 内部用 cudaPointerGetAttributes 校验：CPU 走 H2D，GPU 内存零拷贝直接使用
         return yolo_preprocess_nv12_cuda(src_y, src_uv, src_size, step_y, step_uv,
                                          out, dst_size, pad_val, record,
                                          get_persistent_stream(&stream_));

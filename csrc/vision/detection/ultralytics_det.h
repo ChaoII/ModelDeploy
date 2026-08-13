@@ -25,6 +25,7 @@ namespace modeldeploy::vision::detection {
                           int width, int height, int step_y, int step_uv,
                           std::vector<DetectionResult>* result,
                           LetterBoxRecord* letter_box_record,
+                          Device src_device = Device::CPU,
                           TimerArray* timers = nullptr);
 
         bool batch_predict(const std::vector<ImageData>& images,

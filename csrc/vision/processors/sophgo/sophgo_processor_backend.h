@@ -35,7 +35,8 @@ namespace modeldeploy::vision {
                                   const std::vector<int>& src_size,
                                   int step_y, int step_uv, Tensor* out,
                                   const std::vector<int>& dst_size,
-                                  float pad_val, LetterBoxRecord* record) override;
+                                  float pad_val, LetterBoxRecord* record,
+                                  Device src_device = Device::CPU) override;
 
     private:
         // 确保已分配可容纳单张 dst 尺寸图像的设备内存（bm_device_mem_t* 或 nullptr）

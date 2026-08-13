@@ -69,12 +69,13 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsPose::predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                              int width, int height, int step_y, int step_uv,
                              std::vector<KeyPointsResult>* result, LetterBoxRecord* letter_box_record,
-                             TimerArray* timers) {
+                             Device src_device, TimerArray* timers) {
         if (!src_y || !src_uv || !result) return false;
         std::vector<LetterBoxRecord> lbr(1);
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
-                               &reused_input_tensors_[0], &lbr[0])) {
+                               &reused_input_tensors_[0], &lbr[0],
+                               src_device)) {
             MD_LOG_ERROR << "Failed to preprocess the NV12 input." << std::endl;
             return false;
         }

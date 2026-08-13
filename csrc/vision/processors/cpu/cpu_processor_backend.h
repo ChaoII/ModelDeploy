@@ -19,7 +19,8 @@ namespace modeldeploy::vision {
                                   const std::vector<int>& src_size,
                                   int step_y, int step_uv, Tensor* out,
                                   const std::vector<int>& dst_size,
-                                  float pad_val, LetterBoxRecord* record) override;
+                                  float pad_val, LetterBoxRecord* record,
+                                  Device src_device = Device::CPU) override;
         bool letterbox(const ImageData& image, ImageData* out,
                        const std::vector<int>& dst_size,
                        const std::vector<float>& padding_value,

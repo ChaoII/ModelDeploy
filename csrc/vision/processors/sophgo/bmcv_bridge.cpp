@@ -79,7 +79,8 @@ namespace modeldeploy::vision {
                                                    int step_y, int step_uv,
                                                    void* dev_mem, int dst_w, int dst_h,
                                                    float alpha0, float alpha1, float alpha2,
-                                                   unsigned char pad_val) {
+                                                   unsigned char pad_val,
+                                                   bool src_is_device) {
         if (!handle || !src_y || !src_uv || !dev_mem ||
             src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0) {
             return -1;
@@ -88,13 +89,14 @@ namespace modeldeploy::vision {
         const bm_image_format_ext rgb_planar = FORMAT_RGB_PLANAR;
         const bm_image_data_format_ext f32 = DATA_TYPE_EXT_FLOAT32;
 
-        // 若 Y/UV 平面行步长与尺寸不一致（带 stride），整理为连续平面后再上传
+        // 若 Y/UV 平面行步长与尺寸不一致（带 stride），整理为连续平面后再上传。
+        // 设备源时不做整理（要求 Y/UV 已连续）。
         const bool contiguous = (step_y <= 0 || step_y == src_w) &&
             (step_uv <= 0 || step_uv == src_w);
         std::vector<uint8_t> y_buf, uv_buf;
         const uint8_t* y_data = src_y;
         const uint8_t* uv_data = src_uv;
-        if (!contiguous) {
+        if (!contiguous && !src_is_device) {
             const int sy = step_y > 0 ? step_y : src_w;
             const int suv = step_uv > 0 ? step_uv : src_w;
             y_buf.resize(static_cast<size_t>(src_h) * src_w);
@@ -121,11 +123,23 @@ namespace modeldeploy::vision {
             st = bm_image_create(h, src_h, src_w, FORMAT_NV12, DATA_TYPE_EXT_1N_BYTE,
                                  &nv12_img, nullptr);
             if (st != BM_SUCCESS) break;
-            st = bm_image_alloc_dev_mem(nv12_img, 0);
-            if (st != BM_SUCCESS) break;
-            void* host_planes[] = {const_cast<uint8_t*>(y_data), const_cast<uint8_t*>(uv_data)};
-            st = bm_image_copy_host_to_device(nv12_img, host_planes);
-            if (st != BM_SUCCESS) break;
+            if (src_is_device) {
+                // 设备源：src_y/src_uv 是 TPU 设备地址（Y 后紧跟 UV 的连续 NV12），
+                // 直接 attach 到 src 内存，跳过 alloc + H2D。
+                const size_t y_bytes = static_cast<size_t>(src_h) * src_w;
+                const size_t uv_bytes = static_cast<size_t>(src_h / 2) * src_w;
+                bm_device_mem_t src_mem{};
+                bm_mem_set_device_addr(&src_mem, reinterpret_cast<unsigned long long>(src_y));
+                bm_mem_set_device_size(&src_mem, static_cast<unsigned int>(y_bytes + uv_bytes));
+                st = bm_image_attach(nv12_img, &src_mem);
+                if (st != BM_SUCCESS) break;
+            } else {
+                st = bm_image_alloc_dev_mem(nv12_img, 0);
+                if (st != BM_SUCCESS) break;
+                void* host_planes[] = {const_cast<uint8_t*>(y_data), const_cast<uint8_t*>(uv_data)};
+                st = bm_image_copy_host_to_device(nv12_img, host_planes);
+                if (st != BM_SUCCESS) break;
+            }
 
             const int aligned_w = (dst_w + 63) / 64 * 64;
             int letter_strides[3] = {aligned_w, aligned_w, aligned_w};

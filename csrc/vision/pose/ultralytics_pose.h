@@ -24,6 +24,7 @@ namespace modeldeploy::vision::detection {
         bool predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                           int width, int height, int step_y, int step_uv,
                           std::vector<KeyPointsResult>* result, LetterBoxRecord* letter_box_record = nullptr,
+                          Device src_device = Device::CPU,
                           TimerArray* timers = nullptr);
 
 

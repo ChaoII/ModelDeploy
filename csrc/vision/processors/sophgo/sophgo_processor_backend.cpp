@@ -242,7 +242,12 @@ namespace modeldeploy::vision {
         const std::vector<int>& src_size,
         int step_y, int step_uv, Tensor* out,
         const std::vector<int>& dst_size,
-        float pad_val, LetterBoxRecord* record) {
+        float pad_val, LetterBoxRecord* record,
+        Device src_device) {
+        if (src_device == Device::GPU) {
+            MD_LOG_ERROR << "SophgoProcessorBackend: NV12 src_device GPU not supported." << std::endl;
+            return false;
+        }
         if (handle_ && src_y && src_uv && src_size.size() == 2 && dst_size.size() == 2) {
             const int src_w = src_size[0];
             const int src_h = src_size[1];
@@ -259,7 +264,8 @@ namespace modeldeploy::vision {
                     const int st = md_bmcv_nv12_letterbox_normalize_to_devmem(
                         handle_, src_y, src_uv, src_w, src_h,
                         step_y, step_uv, dev_mem, dst_w, dst_h,
-                        scale0, scale0, scale0, p);
+                        scale0, scale0, scale0, p,
+                        src_device == Device::TPU);
                     if (st == 0 && finish_tpu_tensor(out, dst_w, dst_h)) {
                         return true;
                     }
@@ -269,6 +275,6 @@ namespace modeldeploy::vision {
             }
         }
         return CpuProcessorBackend::yolo_preprocess_nv12(
-            src_y, src_uv, src_size, step_y, step_uv, out, dst_size, pad_val, record);
+            src_y, src_uv, src_size, step_y, step_uv, out, dst_size, pad_val, record, src_device);
     }
 } // namespace modeldeploy::vision

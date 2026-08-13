@@ -14,11 +14,12 @@ namespace modeldeploy::vision {
         bool yolo_preprocess(const ImageData& image, Tensor* out,
                              const std::vector<int>& dst_size,
                              float pad_val, LetterBoxRecord* record) override;
-        bool yolo_preprocess_nv12(const uint8_t* src_y, const uint8_t* src_uv,
-                                  const std::vector<int>& src_size,
-                                  int step_y, int step_uv, Tensor* out,
-                                  const std::vector<int>& dst_size,
-                                  float pad_val, LetterBoxRecord* record) override;
+    bool yolo_preprocess_nv12(const uint8_t* src_y, const uint8_t* src_uv,
+                              const std::vector<int>& src_size,
+                              int step_y, int step_uv, Tensor* out,
+                              const std::vector<int>& dst_size,
+                              float pad_val, LetterBoxRecord* record,
+                              Device src_device = Device::CPU) override;
         bool fused_preprocess(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,
