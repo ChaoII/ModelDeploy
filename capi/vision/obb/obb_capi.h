@@ -34,6 +34,14 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_obb_predict(
     const MDModel* model,
     MDImage* image,
     MDObbResults* c_results);
+/// NV12 直接输入预测（硬解码/摄像头直通，省去 BGR 转换）。
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_obb_predict_nv12(
+    const MDModel* model,
+    const unsigned char* src_y, const unsigned char* src_uv,
+    int width, int height, int step_y, int step_uv,
+    MDDevice src_device,
+    MDObbResults* c_results);
+
 
 /// 打印检测结果
 MODELDEPLOY_CAPI_EXPORT void md_print_obb_result(

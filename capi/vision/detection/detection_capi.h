@@ -36,6 +36,20 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_detection_predict(
     MDImage* image,
     MDDetectionResults* c_results);
 
+/// NV12 直接输入预测（硬解码/摄像头直通，省去 BGR 转换）。
+/// \param model 由 create_detection_model 创建的模型
+/// \param src_y / src_uv NV12 Y/UV 平面
+/// \param width height 图像宽高
+/// \param step_y step_uv 平面行步长（通常 = width，0 表示 = width）
+/// \param src_device Y/UV 所在设备（CPU/GPU/TPU）
+/// \param c_results 检测结果
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_detection_predict_nv12(
+    const MDModel* model,
+    const unsigned char* src_y, const unsigned char* src_uv,
+    int width, int height, int step_y, int step_uv,
+    MDDevice src_device,
+    MDDetectionResults* c_results);
+
 /// 打印检测结果
 MODELDEPLOY_CAPI_EXPORT void md_print_detection_result(
     const MDDetectionResults* c_results);

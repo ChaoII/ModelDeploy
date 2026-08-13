@@ -53,6 +53,7 @@ MDStatusCode md_detection_predict(const MDModel* model, MDImage* image, MDDetect
 }
 
 
+
 void md_print_detection_result(const MDDetectionResults* c_results) {
     std::vector<modeldeploy::vision::DetectionResult> results;
     c_results_2_detection_results(c_results, &results);
@@ -87,4 +88,32 @@ void md_free_detection_model(MDModel* model) {
         free(model->model_name);
         model->model_name = nullptr;
     }
+}
+
+MDStatusCode md_detection_predict_nv12(
+    const MDModel* model,
+    const unsigned char* src_y, const unsigned char* src_uv,
+    int width, int height, int step_y, int step_uv,
+    MDDevice src_device,
+    MDDetectionResults* c_results) {
+    if (model->type != MDModelType::Detection) {
+        MD_LOG_ERROR << "Model type is not detection!" << std::endl;
+        return MDStatusCode::ModelTypeError;
+    }
+    const auto detection_model = static_cast<modeldeploy::vision::detection::UltralyticsDet*>(model->model_content);
+    modeldeploy::Device dev = modeldeploy::Device::CPU;
+    switch (src_device) {
+    case MD_DEVICE_GPU: dev = modeldeploy::Device::GPU; break;
+    case MD_DEVICE_TPU: dev = modeldeploy::Device::TPU; break;
+    case MD_DEVICE_CPU:
+    default: dev = modeldeploy::Device::CPU; break;
+    }
+    modeldeploy::vision::LetterBoxRecord lbr{};
+        std::vector<modeldeploy::vision::DetectionResult> results;
+    if (!detection_model->predict_nv12(src_y, src_uv, width, height, step_y, step_uv,
+                                       &results, &lbr, dev, nullptr)) {
+        return MDStatusCode::ModelPredictFailed;
+    }
+    detection_results_2_c_results(results, c_results);
+    return MDStatusCode::Success;
 }

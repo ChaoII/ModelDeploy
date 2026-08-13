@@ -126,3 +126,30 @@ void md_free_keypoint_model(MDModel* model) {
         model->model_name = nullptr;
     }
 }
+
+MDStatusCode md_pose_predict_nv12(
+    const MDModel* model,
+    const unsigned char* src_y, const unsigned char* src_uv,
+    int width, int height, int step_y, int step_uv,
+    MDDevice src_device,
+    MDKeyPointResults* c_results) {
+    if (model->type != MDModelType::Keypoint) {
+        MD_LOG_ERROR << "Model type is not Keypoint!" << std::endl;
+        return MDStatusCode::ModelTypeError;
+    }
+    const auto model_ptr = static_cast<modeldeploy::vision::detection::UltralyticsPose*>(model->model_content);
+    modeldeploy::Device dev = modeldeploy::Device::CPU;
+    switch (src_device) {
+    case MD_DEVICE_GPU: dev = modeldeploy::Device::GPU; break;
+    case MD_DEVICE_TPU: dev = modeldeploy::Device::TPU; break;
+    default: dev = modeldeploy::Device::CPU; break;
+    }
+    modeldeploy::vision::LetterBoxRecord lbr{};
+        std::vector<modeldeploy::vision::KeyPointsResult> results;
+    if (!model_ptr->predict_nv12(src_y, src_uv, width, height, step_y, step_uv,
+                                 &results, &lbr, dev, nullptr)) {
+        return MDStatusCode::ModelPredictFailed;
+    }
+    keypoint_results_2_c_results(results, c_results);
+    return MDStatusCode::Success;
+}

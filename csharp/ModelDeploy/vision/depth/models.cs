@@ -45,6 +45,27 @@ namespace ModelDeploy.vision.depth
             }
         }
 
+        public DepthResult PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
+            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+        {
+            var cResult = new MDDepthResult();
+            var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);
+            var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
+            try
+            {
+                Utils.Check(NativeBindings.md_depth_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                        uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResult),
+                    "Depth estimation predict NV12");
+                return DepthResult.FromNative(cResult);
+            }
+            finally
+            {
+                yPinned.Free();
+                uvPinned.Free();
+                NativeBindings.md_free_depth_result(ref cResult);
+            }
+        }
+
         public UltralyticsDepth Clone()
         {
             var clone = new MDModel();

@@ -45,6 +45,27 @@ namespace ModelDeploy.vision.pose
         }
 
 
+        public List<KeyPointResult> PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
+            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+        {
+            var cResults = new MDKeyPointResults();
+            var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);
+            var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
+            try
+            {
+                Utils.Check(md_pose_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                        uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResults),
+                    "Pose predict NV12");
+                return new List<KeyPointResult>(KeyPointResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                yPinned.Free();
+                uvPinned.Free();
+                md_free_keypoint_result(ref cResults);
+            }
+        }
+
         public void Display(List<KeyPointResult> results)
         {
             var cResults = KeyPointResult.ToNativeArray(results);
@@ -103,6 +124,11 @@ namespace ModelDeploy.vision.pose
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_keypoint_predict(ref MDModel model, ref MDImage image,
+            ref MDKeyPointResults results);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_pose_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
+            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
             ref MDKeyPointResults results);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]

@@ -45,6 +45,27 @@ namespace ModelDeploy.vision.detection
         }
 
 
+        public List<DetectionResult> PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
+            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+        {
+            var cResults = new MDDetectionResults();
+            var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);
+            var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
+            try
+            {
+                Utils.Check(md_detection_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                        uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResults),
+                    "Detection predict NV12");
+                return new List<DetectionResult>(DetectionResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                yPinned.Free();
+                uvPinned.Free();
+                md_free_detection_result(ref cResults);
+            }
+        }
+
         public void Display(List<DetectionResult> results)
         {
             var cResults = DetectionResult.ToNativeArray(results);
@@ -104,6 +125,11 @@ namespace ModelDeploy.vision.detection
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_detection_predict(ref MDModel model, ref MDImage image,
+            ref MDDetectionResults results);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_detection_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
+            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
             ref MDDetectionResults results);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]

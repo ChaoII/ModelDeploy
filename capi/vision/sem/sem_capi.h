@@ -22,6 +22,14 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_set_sem_input_size(
 /// 执行预测
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_sem_predict(
     const MDModel* model, MDImage* image, MDSemSegResult* c_result);
+/// NV12 直接输入预测（硬解码/摄像头直通，省去 BGR 转换）。
+MODELDEPLOY_CAPI_EXPORT MDStatusCode md_sem_predict_nv12(
+    const MDModel* model,
+    const unsigned char* src_y, const unsigned char* src_uv,
+    int width, int height, int step_y, int step_uv,
+    MDDevice src_device,
+    MDSemSegResult* c_results);
+
 
 /// 释放结果
 MODELDEPLOY_CAPI_EXPORT void md_free_sem_result(MDSemSegResult* c_result);

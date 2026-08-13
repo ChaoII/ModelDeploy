@@ -5,9 +5,22 @@
 #include "pybind/utils/utils.h"
 #include "pybind/utils/result_convert.h"
 #include "vision/common/visualize/visualize.h"
+#include "capi/common/md_types.h"
 
 namespace modeldeploy::vision {
     void bind_vision_struct(const pybind11::module& m) {
+        pybind11::enum_<MDDevice>(m, "MDDevice")
+            .value("CPU", MD_DEVICE_CPU)
+            .value("GPU", MD_DEVICE_GPU)
+            .value("OPENCL", MD_DEVICE_OPENCL)
+            .value("VULKAN", MD_DEVICE_VULKAN)
+            .value("TPU", MD_DEVICE_TPU);
+        m.attr("MD_DEVICE_CPU") = static_cast<int>(MD_DEVICE_CPU);
+        m.attr("MD_DEVICE_GPU") = static_cast<int>(MD_DEVICE_GPU);
+        m.attr("MD_DEVICE_OPENCL") = static_cast<int>(MD_DEVICE_OPENCL);
+        m.attr("MD_DEVICE_VULKAN") = static_cast<int>(MD_DEVICE_VULKAN);
+        m.attr("MD_DEVICE_TPU") = static_cast<int>(MD_DEVICE_TPU);
+
         pybind11::class_<Point2f>(m, "Point2f")
             .def(pybind11::init())
             .def_readwrite("x", &Point2f::x)

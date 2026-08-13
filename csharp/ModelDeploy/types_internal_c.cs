@@ -422,6 +422,11 @@ namespace ModelDeploy
                 ref MDSemSegResult result);
 
             [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_sem_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
+                int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+                ref MDSemSegResult result);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
             internal static extern void md_free_sem_result(ref MDSemSegResult result);
 
             [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
@@ -440,6 +445,11 @@ namespace ModelDeploy
 
             [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
             internal static extern int md_depth_predict(ref MDModel model, ref MDImage image,
+                ref MDDepthResult result);
+
+            [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+            internal static extern int md_depth_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
+                int width, int height, int stepY, int stepUV, MDDevice srcDevice,
                 ref MDDepthResult result);
 
             [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]

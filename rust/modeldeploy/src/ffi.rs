@@ -509,6 +509,17 @@ extern "C" {
         image: *const MDImage,
         results: *mut MDDetectionResults,
     ) -> MDStatusCode;
+    pub fn md_detection_predict_nv12(
+        model: *const MDModel,
+        src_y: *const u8,
+        src_uv: *const u8,
+        width: c_int,
+        height: c_int,
+        step_y: c_int,
+        step_uv: c_int,
+        src_device: MDDevice,
+        results: *mut MDDetectionResults,
+    ) -> MDStatusCode;
     pub fn md_free_detection_result(results: *mut MDDetectionResults);
     pub fn md_free_detection_model(model: *mut MDModel);
     pub fn md_set_detection_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;

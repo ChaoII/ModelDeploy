@@ -44,6 +44,27 @@ namespace ModelDeploy.vision.obb
         }
 
 
+        public List<ObbResult> PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
+            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+        {
+            var cResults = new MDObbResults();
+            var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);
+            var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
+            try
+            {
+                Utils.Check(md_obb_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                        uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResults),
+                    "OBB predict NV12");
+                return new List<ObbResult>(ObbResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                yPinned.Free();
+                uvPinned.Free();
+                md_free_obb_result(ref cResults);
+            }
+        }
+
         public void Display(List<ObbResult> results)
         {
             var cResults = ObbResult.ToNativeArray(results);
@@ -101,6 +122,11 @@ namespace ModelDeploy.vision.obb
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_obb_predict(ref MDModel model, ref MDImage image,
+            ref MDObbResults results);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_obb_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
+            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
             ref MDObbResults results);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]

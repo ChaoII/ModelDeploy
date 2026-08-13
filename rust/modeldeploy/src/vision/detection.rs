@@ -74,6 +74,60 @@ impl UltralyticsDet {
         Ok(detections)
     }
 
+    /// NV12 直接输入推理（Y/UV 平面，省去 BGR 转换）
+    pub fn predict_nv12(
+        &self,
+        src_y: &[u8],
+        src_uv: &[u8],
+        width: i32,
+        height: i32,
+        step_y: i32,
+        step_uv: i32,
+        src_device: i32,
+    ) -> Result<Vec<Detection>, MdError> {
+        let mut results = ffi::MDDetectionResults {
+            data: ptr::null_mut(),
+            size: 0,
+        };
+        let status = unsafe {
+            ffi::md_detection_predict_nv12(
+                &self.model,
+                src_y.as_ptr(),
+                src_uv.as_ptr(),
+                width,
+                height,
+                step_y,
+                step_uv,
+                ffi::MDDevice(src_device),
+                &mut results,
+            )
+        };
+        check_status(status)?;
+
+        // 先将 C 分配的结果整体拷贝为 Rust 拥有的数据，再释放 C 内存
+        let detections = if results.size > 0 && !results.data.is_null() {
+            let slice = unsafe { std::slice::from_raw_parts(results.data, results.size as usize) };
+            let converted = slice.iter().map(|r| Detection {
+                        rect: Rect {
+                            x: r.box_.x,
+                            y: r.box_.y,
+                            width: r.box_.width,
+                            height: r.box_.height,
+                        },
+                        label_id: r.label_id,
+                        score: r.score,
+                        label_name: String::new(),
+                    }).collect::<Vec<_>>();
+            unsafe { ffi::md_free_detection_result(&mut results) };
+            converted
+        } else {
+            unsafe { ffi::md_free_detection_result(&mut results) };
+            Vec::new()
+        };
+
+        Ok(detections)
+    }
+
     /// 推理并在图像上绘制结果，返回绘制后的图像
     pub fn predict_with_draw(
         &self,

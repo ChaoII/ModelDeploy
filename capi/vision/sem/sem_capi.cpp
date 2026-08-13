@@ -84,3 +84,38 @@ void md_free_sem_model(MDModel* model) {
         model->model_name = nullptr;
     }
 }
+
+MDStatusCode md_sem_predict_nv12(
+    const MDModel* model,
+    const unsigned char* src_y, const unsigned char* src_uv,
+    int width, int height, int step_y, int step_uv,
+    MDDevice src_device,
+    MDSemSegResult* c_result) {
+    if (model->type != MDModelType::SemSeg) {
+        MD_LOG_ERROR << "Model type is not SemSeg!" << std::endl;
+        return MDStatusCode::ModelTypeError;
+    }
+    const auto model_ptr = static_cast<modeldeploy::vision::detection::UltralyticsSem*>(model->model_content);
+    modeldeploy::Device dev = modeldeploy::Device::CPU;
+    switch (src_device) {
+    case MD_DEVICE_GPU: dev = modeldeploy::Device::GPU; break;
+    case MD_DEVICE_TPU: dev = modeldeploy::Device::TPU; break;
+    default: dev = modeldeploy::Device::CPU; break;
+    }
+    modeldeploy::vision::LetterBoxRecord lbr{};
+        modeldeploy::vision::SemSegResult result;
+    if (!model_ptr->predict_nv12(src_y, src_uv, width, height, step_y, step_uv,
+                                 &result, &lbr, dev, nullptr)) {
+        return MDStatusCode::ModelPredictFailed;
+    }
+    c_result->num_classes = result.num_classes;
+    c_result->shape_size = static_cast<int>(result.shape.size());
+    c_result->shape = new int[c_result->shape_size];
+    for (int i = 0; i < c_result->shape_size; ++i) {
+        c_result->shape[i] = static_cast<int>(result.shape[i]);
+    }
+    const size_t num = result.labels.size();
+    c_result->labels = new unsigned char[num];
+    std::memcpy(c_result->labels, result.labels.data(), num);
+    return MDStatusCode::Success;
+}

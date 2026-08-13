@@ -43,6 +43,27 @@ namespace ModelDeploy.vision.iseg
             }
         }
 
+        public List<ISegResult> PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
+            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+        {
+            var cResults = new MDISegResults();
+            var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);
+            var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
+            try
+            {
+                Utils.Check(md_iseg_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                        uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResults),
+                    "Instance segmentation predict NV12");
+                return new List<ISegResult>(ISegResult.FromNativeArray(cResults));
+            }
+            finally
+            {
+                yPinned.Free();
+                uvPinned.Free();
+                md_free_instance_seg_result(ref cResults);
+            }
+        }
+
         public void Display(List<ISegResult> results)
         {
             var cResults = ISegResult.ToNativeArray(results);
@@ -101,6 +122,11 @@ namespace ModelDeploy.vision.iseg
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_instance_seg_predict(ref MDModel model, ref MDImage image,
+            ref MDISegResults results);
+
+        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int md_iseg_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
+            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
             ref MDISegResults results);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]

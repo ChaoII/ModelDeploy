@@ -45,6 +45,27 @@ namespace ModelDeploy.vision.sem
             }
         }
 
+        public SemSegResult PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
+            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+        {
+            var cResult = new MDSemSegResult();
+            var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);
+            var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
+            try
+            {
+                Utils.Check(NativeBindings.md_sem_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                        uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResult),
+                    "Semantic segmentation predict NV12");
+                return SemSegResult.FromNative(cResult);
+            }
+            finally
+            {
+                yPinned.Free();
+                uvPinned.Free();
+                NativeBindings.md_free_sem_result(ref cResult);
+            }
+        }
+
         public UltralyticsSem Clone()
         {
             var clone = new MDModel();
