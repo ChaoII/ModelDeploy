@@ -204,6 +204,8 @@ INT8 量化精度：输出 cosine 相似度 ~0.9999（vs ONNX F32），NMS 后�
 
 > **分类模型 INT8 量化注意**（实测 yolo11n-cls，BM1688）：纯 INT8 量化的 1000 类分类会出现 **top-1 漂移**（如 111.jpg 上 top1 从 769→662，test_obb1.jpg 477→705），原因是 **backbone 前段（model.0~model.2 的 stem conv + C3 block）量化误差被后层放大**，与分类头（Gemm/Softmax）无关（头层设 F16 无改善）。**用混合量化把 `model.0~model.2` 保持 F16 即可完全恢复 top-1 精度**（代价：推理 ~0.45ms→1.07ms）。qtable 见 `tools/docker/sophgo/qtable_yolo11n-cls.txt`，本地已生成 `yolo11n-cls_int8.bmodel` 即混合量化版本。
 >
+> **检测类（det/obb/seg/pose）INT8 量化精度正常**（实测多张图 vs fp16，检测框数量/坐标/分数一致，OBB 偶有 ±1 边界框属阈值敏感的正常量化误差）。原因：转换时用 `qtable_f16.txt`（`model.23` 检测头 score/坐标尾层保持 F16，见 `tools/docker/sophgo/qtable_f16.txt`）保护了检测头，且检测框是连续回归目标 + NMS，对微小量化误差鲁棒。**与分类模型不同，无需额外的前段混合量化。**
+>
 > **带 NMS 的 ONNX 无法 INT8 量化**：tpu-mlir 1.27 在校准表导入阶段（`ImportCalibration.cpp`）对 `NonMaxSuppression/ScatterND/NonZero/GatherND` 等 NMS 后处理算子崩溃（UNREACHABLE），**qtable 混合量化也无法绕过**（崩溃早于 qtable 生效阶段）。结论：**带 NMS 的 ONNX 只能转 F16 bmodel**（可用，见 5.4.1），要 INT8 量化必须用**去 NMS 的 ONNX**（NMS 由 SDK 后处理完成）。
 
 #### 5.4.1 各任务模型转换命令（fp16 + int8）
