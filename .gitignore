@@ -29,6 +29,7 @@ memory.md
 *.obj
 tests/test_models
 test_data
+insightface_models
 .Testing
 # Precompiled Headers
 *.gch

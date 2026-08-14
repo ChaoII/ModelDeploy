@@ -51,3 +51,6 @@ target_link_libraries(demo_face_as_pipeline_cxx PUBLIC ${LIBRARY_NAME})
 
 add_executable(demo_face_as_pipeline_capi demo_face_as_pipeline_capi.cpp)
 target_link_libraries(demo_face_as_pipeline_capi PUBLIC ${LIBRARY_NAME})
+
+add_executable(demo_insightface_cxx demo_insightface_cxx.cpp)
+target_link_libraries(demo_insightface_cxx PUBLIC ${LIBRARY_NAME} ${OpenCV_LIBS})
