@@ -6,7 +6,7 @@
 #include "vision/processors/cuda/cuda_processor_backend.h"
 #include "vision/processors/cuda/yolo_preproc.cuh"
 #include "vision/processors/cuda/fused_preproc.cuh"
-#include "vision/face/face_det/scrfd_preproc.cuh"
+#include "vision/processors/cuda/scrfd_preproc.cuh"
 
 namespace modeldeploy::vision {
     // 惰性创建并返回持久 CUDA stream（backend 生命周期内复用）

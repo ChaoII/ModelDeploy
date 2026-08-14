@@ -1,4 +1,4 @@
-#include "vision/face/face_det/scrfd_preproc.cuh"
+#include "vision/processors/cuda/scrfd_preproc.cuh"
 #include <cuda_runtime.h>
 #include <vision/utils.h>
 

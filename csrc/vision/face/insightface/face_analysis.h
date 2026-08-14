@@ -9,9 +9,9 @@
 #include <memory>
 #include "base_model.h"
 #include "vision/common/image_data.h"
-#include "vision/face/insightface/insightface_scrfd.h"
-#include "vision/face/insightface/insightface_landmark.h"
-#include "vision/face/insightface/insightface_recognition.h"
+#include "vision/face/insightface/scrfd/insightface_scrfd.h"
+#include "vision/face/insightface/landmark/insightface_landmark.h"
+#include "vision/face/insightface/recognition/insightface_recognition.h"
 #include "vision/face/insightface/insightface_types.h"
 
 namespace modeldeploy::vision::face {

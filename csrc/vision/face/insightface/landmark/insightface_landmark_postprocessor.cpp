@@ -1,13 +1,12 @@
 //
-// insightface buffalo_l landmark 实现：2d106det + 1k3d68。
-// 前处理 fused_preprocess center-crop；后处理逆仿射 + 3D 姿态。
+// insightface buffalo_l landmark 后处理实现：逆仿射 + 3D 姿态。
 // 与 python insightface.model_zoo.landmark.Landmark 逐值对齐。
 //
-#include "core/md_log.h"
-#include "vision/face/insightface/insightface_landmark.h"
+#include "vision/face/insightface/landmark/insightface_landmark_postprocessor.h"
+#include "vision/face/insightface/face_align_utils.h"
 #include "core/tensor.h"
 #include <cmath>
-#include <cstring>
+#include <algorithm>
 
 namespace modeldeploy::vision::face {
 
@@ -115,49 +114,6 @@ namespace modeldeploy::vision::face {
         }
     } // namespace
 
-    // ==================== Preprocessor ====================
-
-    InsightFaceLandmarkPreprocessor::InsightFaceLandmarkPreprocessor() {
-        size_ = {192, 192};
-    }
-
-    bool InsightFaceLandmarkPreprocessor::run(const ImageData& image, const std::array<float, 4>& bbox,
-                                              cv::Mat* M, Tensor* output) const {
-        const int dst = size_[0];
-        const float w = bbox[2] - bbox[0];
-        const float h = bbox[3] - bbox[1];
-        const float cx = (bbox[2] + bbox[0]) / 2.0f;
-        const float cy = (bbox[3] + bbox[1]) / 2.0f;
-        const float scale = static_cast<float>(dst) / (std::max(w, h) * 1.5f);
-        // python transform（rotation=0）: dst = (src - center)*scale + dst/2
-        // 2x3 仿射矩阵：x' = scale*x + t
-        cv::Mat M2x3 = cv::Mat::zeros(2, 3, CV_64F);
-        M2x3.at<double>(0, 0) = scale;
-        M2x3.at<double>(1, 1) = scale;
-        M2x3.at<double>(0, 2) = (dst / 2.0) - cx * scale;
-        M2x3.at<double>(1, 2) = (dst / 2.0) - cy * scale;
-        // 双线性 warpAffine（与 python cv2.warpAffine INTER_LINEAR 一致）
-        cv::Mat src_mat;
-        image.to_mat(src_mat);
-        cv::Mat warped;
-        cv::warpAffine(src_mat, warped, M2x3, cv::Size(dst, dst),
-                       cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
-        // 模型输入 0-255 RGB（内部归一化），仅 swapRB；pad=0
-        std::vector<float> blob(static_cast<size_t>(3) * dst * dst);
-        const uint8_t* src = warped.data;
-        for (int c = 0; c < 3; ++c) {
-            const int src_c = 2 - c; // swapRB
-            float* plane = blob.data() + static_cast<size_t>(c) * dst * dst;
-            for (int i = 0; i < dst * dst; ++i) plane[i] = static_cast<float>(src[i * 3 + src_c]);
-        }
-        output->allocate({1, 3, dst, dst}, DataType::FP32, Device::CPU);
-        std::memcpy(output->data(), blob.data(), blob.size() * sizeof(float));
-        if (M) *M = M2x3;
-        return true;
-    }
-
-    // ==================== Postprocessor ====================
-
     bool InsightFaceLandmarkPostprocessor::run_2d(const std::vector<Tensor>& infer_results,
                                                   const cv::Mat& inv_M, const int input_size,
                                                   std::vector<std::array<float, 2>>* landmarks) {
@@ -197,11 +153,9 @@ namespace modeldeploy::vision::face {
             pred_pts[i] = p;
             pts[i] = p;
         }
-        // 逆仿射回原图（3D：z 乘 scale）
         trans_points3d(&pts, inv_M);
         *landmarks = std::move(pts);
         if (pose) {
-            // 姿态用 transform 前 pred（与 python 一致）
             float P[3][4];
             float X[68][3], Y[68][3];
             for (int i = 0; i < 68; ++i) {
@@ -216,77 +170,6 @@ namespace modeldeploy::vision::face {
             (*pose)[0] = pose_out[0]; (*pose)[1] = pose_out[1]; (*pose)[2] = pose_out[2];
         }
         return true;
-    }
-
-    // ==================== Model ====================
-
-    InsightFaceLandmark::InsightFaceLandmark(const std::string& model_file,
-                                             const RuntimeOption& custom_option) {
-        runtime_option = custom_option;
-        runtime_option.set_model_path(model_file);
-        initialized_ = Initialize();
-    }
-
-    bool InsightFaceLandmark::Initialize() {
-        if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
-            return false;
-        }
-        preprocessor_.set_processor_backend(
-            create_processor_backend(runtime_option.device, runtime_option.backend,
-                                     runtime_option.device_id));
-        return true;
-    }
-
-    bool InsightFaceLandmark::predict_2d106(const ImageData& image, const std::array<float, 4>& bbox,
-                                            std::vector<std::array<float, 2>>* landmarks,
-                                            TimerArray* timers) {
-        if (!landmarks) return false;
-        cv::Mat M;
-        reused_input_tensors_.resize(1);
-        if (timers) timers->pre_timer.start();
-        if (!preprocessor_.run(image, bbox, &M, &reused_input_tensors_[0])) return false;
-        if (timers) timers->pre_timer.stop();
-        reused_input_tensors_[0].set_name(get_input_info(0).name);
-        if (timers) timers->infer_timer.start();
-        if (!infer(reused_input_tensors_, &reused_output_tensors_)) return false;
-        if (timers) timers->infer_timer.stop();
-        if (timers) timers->post_timer.start();
-        const cv::Mat inv_M = invert_affine_transform(M);
-        if (!postprocessor_.run_2d(reused_output_tensors_, inv_M, input_size_[0], landmarks)) return false;
-        if (timers) timers->post_timer.stop();
-        return true;
-    }
-
-    bool InsightFaceLandmark::predict_3d68(const ImageData& image, const std::array<float, 4>& bbox,
-                                           std::vector<std::array<float, 3>>* landmarks,
-                                           std::array<float, 3>* pose,
-                                           TimerArray* timers) {
-        if (!landmarks) return false;
-        cv::Mat M;
-        reused_input_tensors_.resize(1);
-        if (timers) timers->pre_timer.start();
-        if (!preprocessor_.run(image, bbox, &M, &reused_input_tensors_[0])) return false;
-        if (timers) timers->pre_timer.stop();
-        reused_input_tensors_[0].set_name(get_input_info(0).name);
-        if (timers) timers->infer_timer.start();
-        if (!infer(reused_input_tensors_, &reused_output_tensors_)) return false;
-        if (timers) timers->infer_timer.stop();
-        if (timers) timers->post_timer.start();
-        const cv::Mat inv_M = invert_affine_transform(M);
-        if (!postprocessor_.run_3d(reused_output_tensors_, inv_M, input_size_[0], landmarks, pose)) return false;
-        if (timers) timers->post_timer.stop();
-        return true;
-    }
-
-    std::unique_ptr<InsightFaceLandmark> InsightFaceLandmark::clone() const {
-        auto clone_model = std::make_unique<InsightFaceLandmark>(
-            runtime_option.model_file, runtime_option);
-        clone_model->set_runtime(clone_model->clone_runtime());
-        clone_model->preprocessor_ = preprocessor_;
-        clone_model->postprocessor_ = postprocessor_;
-        clone_model->initialized_ = initialized_;
-        return clone_model;
     }
 
 } // namespace modeldeploy::vision::face

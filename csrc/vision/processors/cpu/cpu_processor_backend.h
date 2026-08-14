@@ -57,6 +57,14 @@ namespace modeldeploy::vision {
             const std::vector<float>& alpha,
             const std::vector<float>& beta,
             bool swap_rb, float pad_value) override;
+        bool fused_preprocess_bilinear(
+            const ImageData& image, Tensor* out,
+            const std::vector<int>& dst_size,
+            float origin_x, float origin_y,
+            float scale_x, float scale_y,
+            const std::vector<float>& alpha,
+            const std::vector<float>& beta,
+            bool swap_rb, float pad_value) override;
         bool fused_color_matrix_preprocess(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,

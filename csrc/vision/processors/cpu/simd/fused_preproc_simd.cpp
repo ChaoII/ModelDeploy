@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <algorithm>
+#include <cmath>
 #include "fused_preproc_simd.h"
 
 #if defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER)
@@ -67,6 +68,67 @@ void fused_preproc_scalar(const uint8_t* src, int src_w, int src_h,
             dst[0 * plane + base + x] = rv * alpha[0] + beta[0];
             dst[1 * plane + base + x] = gv * alpha[1] + beta[1];
             dst[2 * plane + base + x] = bv * alpha[2] + beta[2];
+        }
+    }
+}
+
+// 双线性插值标量内核：映射 src=(dst-origin)/scale，4 邻加权插值。
+// 整点越界（src 完全超出）写 pad_value；边界像素 clamp。
+void fused_bilinear_preproc_scalar(const uint8_t* src, int src_w, int src_h,
+                                   float* dst, int dst_w, int dst_h,
+                                   float origin_x, float origin_y,
+                                   float scale_x, float scale_y,
+                                   const float* alpha, const float* beta,
+                                   bool swap_rb, float pad_value) {
+    const float inv_scale_x = 1.0f / scale_x;
+    const float inv_scale_y = 1.0f / scale_y;
+    const float origin_shift_x = origin_x / scale_x;
+    const float origin_shift_y = origin_y / scale_y;
+    const float src_w_f = static_cast<float>(src_w);
+    const float src_h_f = static_cast<float>(src_h);
+    const int last_sx = src_w - 1;
+    const int last_sy = src_h - 1;
+    const int plane = dst_h * dst_w;
+
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;
+        // 整行越界（dst 映射的 src 整行超出图范围）：写 pad_value
+        if (src_yf < 0.0f || src_yf >= src_h_f) {
+            for (int x = 0; x < dst_w; ++x) {
+                dst[0 * plane + base + x] = pad_value;
+                dst[1 * plane + base + x] = pad_value;
+                dst[2 * plane + base + x] = pad_value;
+            }
+            continue;
+        }
+        const int y0 = std::max(0, static_cast<int>(std::floor(src_yf)));
+        const int y1 = std::min(last_sy, y0 + 1);
+        const float wy = src_yf - y0;
+        for (int x = 0; x < dst_w; ++x) {
+            const float src_xf = static_cast<float>(x) * inv_scale_x - origin_shift_x;
+            if (src_xf < 0.0f || src_xf >= src_w_f) {
+                dst[0 * plane + base + x] = pad_value;
+                dst[1 * plane + base + x] = pad_value;
+                dst[2 * plane + base + x] = pad_value;
+                continue;
+            }
+            const int x0 = std::max(0, static_cast<int>(std::floor(src_xf)));
+            const int x1 = std::min(last_sx, x0 + 1);
+            const float wx = src_xf - x0;
+            const uint8_t* p00 = src + (y0 * src_w + x0) * 3;
+            const uint8_t* p10 = src + (y0 * src_w + x1) * 3;
+            const uint8_t* p01 = src + (y1 * src_w + x0) * 3;
+            const uint8_t* p11 = src + (y1 * src_w + x1) * 3;
+            // 逐通道双线性 + swap + 仿射
+            for (int c = 0; c < 3; ++c) {
+                const int sc = swap_rb ? (2 - c) : c;
+                const float v00 = p00[sc], v10 = p10[sc], v01 = p01[sc], v11 = p11[sc];
+                const float top = v00 + (v10 - v00) * wx;
+                const float bot = v01 + (v11 - v01) * wx;
+                const float v = top + (bot - top) * wy;
+                dst[c * plane + base + x] = v * alpha[c] + beta[c];
+            }
         }
     }
 }
@@ -220,6 +282,11 @@ FusedPreprocKernel get_fused_preproc_kernel() {
 #else
     return fused_preproc_scalar;
 #endif
+}
+
+// 双线性融合预处理派发：目前标量实现（后续可加 AVX2/AVX512/NEON/SVE 优化）。
+FusedBilinearPreprocKernel get_fused_bilinear_preproc_kernel() {
+    return fused_bilinear_preproc_scalar;
 }
 
 FusedPreprocPadKernel get_fusion_rpnp_kernel() {

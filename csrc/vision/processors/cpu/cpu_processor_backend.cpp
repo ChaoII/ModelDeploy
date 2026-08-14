@@ -180,6 +180,31 @@ namespace modeldeploy::vision {
         return true;
     }
 
+    bool CpuProcessorBackend::fused_preprocess_bilinear(
+        const ImageData& image, Tensor* out,
+        const std::vector<int>& dst_size,
+        float origin_x, float origin_y,
+        float scale_x, float scale_y,
+        const std::vector<float>& alpha,
+        const std::vector<float>& beta,
+        bool swap_rb, float pad_value) {
+        if (dst_size.size() != 2 || alpha.size() != 3 || beta.size() != 3) return false;
+        const int src_w = image.width();
+        const int src_h = image.height();
+        const int dst_w = dst_size[0];
+        const int dst_h = dst_size[1];
+        const uint8_t* src = image.data();
+
+        out->allocate({1, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+        float* dst = out->data_ptr<float>();
+
+        const auto kernel = get_fused_bilinear_preproc_kernel();
+        kernel(src, src_w, src_h, dst, dst_w, dst_h,
+               origin_x, origin_y, scale_x, scale_y,
+               alpha.data(), beta.data(), swap_rb, pad_value);
+        return true;
+    }
+
     bool CpuProcessorBackend::fused_color_matrix_preprocess(
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,

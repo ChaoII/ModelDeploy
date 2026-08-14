@@ -99,6 +99,22 @@ namespace modeldeploy::vision {
             const std::vector<float>& beta,
             bool swap_rb, float pad_value) = 0;
 
+        // 双线性插值融合预处理：与 fused_preprocess 同映射，但采样用双线性插值。
+        // 用于需要与 python cv2 INTER_LINEAR 对齐的场景（如 insightface）。
+        virtual bool fused_preprocess_bilinear(
+            const ImageData& image, Tensor* out,
+            const std::vector<int>& dst_size,
+            float origin_x, float origin_y,
+            float scale_x, float scale_y,
+            const std::vector<float>& alpha,
+            const std::vector<float>& beta,
+            bool swap_rb, float pad_value) {
+            (void)image; (void)out; (void)dst_size;
+            (void)origin_x; (void)origin_y; (void)scale_x; (void)scale_y;
+            (void)alpha; (void)beta; (void)swap_rb; (void)pad_value;
+            return false; // 默认不支持，由具体后端实现或走 CPU
+        }
+
         // 通用融合预处理（颜色矩阵版）：采样/裁剪 + 3x3 颜色矩阵 + 偏置 + 写 CHW FP32。
         // 可表达 BGR2YCrCb / BGR2RGB 等任意 3x3 线性颜色变换 + 每通道偏置。
         // 默认返回 false（未实现后端可覆盖或走 CPU 兜底）。

@@ -25,6 +25,19 @@ using FusedPreprocKernel = void (*)(
 // 保证非空：总有一个可用的实现（scalar/AVX2/AVX512/NEON/SVE）。
 MODELDEPLOY_CXX_EXPORT FusedPreprocKernel get_fused_preproc_kernel();
 
+// 双线性插值融合预处理内核。与 FusedPreprocKernel 同签名，但采样用双线性（4 邻加权）。
+// 边界：src 坐标 clamp 到 [0, src_w-1]/[0, src_h-1]；整点越界（dst 映射的 src 完全超出）写 pad_value。
+using FusedBilinearPreprocKernel = void (*)(
+    const uint8_t* src, int src_w, int src_h,
+    float* dst, int dst_w, int dst_h,
+    float origin_x, float origin_y,
+    float scale_x, float scale_y,
+    const float* alpha, const float* beta,
+    bool swap_rb, float pad_value);
+
+// 选择当前 CPU 上最快的双线性融合预处理内核（运行时 ISA 探测，保证非空）。
+MODELDEPLOY_CXX_EXPORT FusedBilinearPreprocKernel get_fused_bilinear_preproc_kernel();
+
 // 颜色矩阵融合内核：采样/裁剪（origin/scale 映射）→ 3x3 颜色矩阵 + 偏置 → 写 CHW FP32。
 // src: BGR 打包 uint8；采样出 (r,g,b)（swap 语义已在矩阵中体现）。
 // 输出 dst_c = Σ_j mat[c][j]*ch_j + bias[c]，其中 ch_0=R, ch_1=G, ch_2=B。
