@@ -1,4 +1,4 @@
-#include "vision/common/processors/nv12_to_bgr.cuh"
+#include "vision/processors/cuda/nv12_to_bgr.cuh"
 #include <cuda_runtime.h>
 
 namespace modeldeploy::vision {

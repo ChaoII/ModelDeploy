@@ -2,7 +2,7 @@
 // Created by aichao on 2025/7/22.
 //
 
-#include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
+#include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
 #include "vision/processors/cpu/simd/fused_preproc_simd.h"
 
 

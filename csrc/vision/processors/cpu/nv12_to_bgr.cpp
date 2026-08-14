@@ -1,4 +1,4 @@
-#include "vision/common/processors/nv12_to_bgr.h"
+#include "vision/processors/cpu/nv12_to_bgr.h"
 #include <cstdint>
 #include <algorithm>
 

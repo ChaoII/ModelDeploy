@@ -1,4 +1,4 @@
-#include "vision/common/processors/bgr_to_nv12.cuh"
+#include "vision/processors/cuda/bgr_to_nv12.cuh"
 
 namespace modeldeploy::vision {
     // BT.709 limited range：Y = (66R + 129G + 25B + 128)>>8 + 16

@@ -4,7 +4,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "vision/utils.h"
-#include "vision/common/processors/fusion_resize_pad_normalize_permute.cuh"
+#include "vision/processors/cuda/fusion_resize_pad_normalize_permute.cuh"
 
 namespace modeldeploy::vision {
     __constant__ float c_alpha[3];

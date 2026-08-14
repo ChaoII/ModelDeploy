@@ -1,4 +1,4 @@
-#include "vision/common/processors/draw_gpu.cuh"
+#include "vision/processors/cuda/draw_gpu.cuh"
 #include <cuda_runtime.h>
 
 namespace modeldeploy::vision {

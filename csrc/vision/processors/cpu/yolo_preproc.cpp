@@ -5,7 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include "vision/utils.h"
 #include "vision/common/struct.h"
-#include "vision/common/processors/yolo_preproc.h"
+#include "vision/processors/cpu/yolo_preproc.h"
 
 
 namespace modeldeploy::vision {

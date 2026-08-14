@@ -85,8 +85,6 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
             if (cloned && cloned->is_initialized()) {
                 if (cfg.input_size.size() == 2)
                     cloned->get_preprocessor().set_size(cfg.input_size);
-                if (cfg.device == "gpu")
-                    cloned->get_preprocessor().use_cuda_preproc();
                 eng->adopt_face_model(std::move(cloned), cfg);
                 std::cout << "[Manager] Cloned face: " << cfg.name << std::endl;
             }
@@ -107,7 +105,6 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
             return eng;
         }
         if (cfg.input_size.size() == 2) proto.det->get_preprocessor().set_size(cfg.input_size);
-        if (cfg.device == "gpu") proto.det->get_preprocessor().use_cuda_preproc();
 
         model_prototypes_[key] = std::move(proto);
         auto& lp = model_prototypes_[key].det;
@@ -127,7 +124,6 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
             return eng;
         }
         if (cfg.input_size.size() == 2) proto.face->get_preprocessor().set_size(cfg.input_size);
-        if (cfg.device == "gpu") proto.face->get_preprocessor().use_cuda_preproc();
 
         model_prototypes_[key] = std::move(proto);
         auto& lp = model_prototypes_[key].face;

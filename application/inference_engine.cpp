@@ -66,8 +66,6 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             }
             if (cfg_.input_size.size() == 2)
                 det_model_->get_preprocessor().set_size(cfg_.input_size);
-            if (cfg.device == "gpu")
-                det_model_->get_preprocessor().use_cuda_preproc();
         } else if (cfg.type == "face_detection") {
             face_model_ = std::make_unique<face::Scrfd>(cfg.path, opt);
             if (!face_model_->is_initialized()) {
@@ -126,8 +124,6 @@ bool InferenceEngine::clone_detection_from(
     det_model_ = std::move(cloned);
     if (cfg_.input_size.size() == 2)
         det_model_->get_preprocessor().set_size(cfg_.input_size);
-    if (cfg.device == "gpu")
-        det_model_->get_preprocessor().use_cuda_preproc();
     det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
 
     loaded_ = true;
@@ -179,7 +175,8 @@ bool InferenceEngine::infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane
     modeldeploy::vision::LetterBoxRecord record;
     std::vector<modeldeploy::vision::DetectionResult> det_results;
     if (!det_model_->predict_nv12(y_plane, uv_plane, width, height,
-                                  y_step, uv_step, &det_results, &record, timers)) {
+                                  y_step, uv_step, &det_results, &record,
+                                  Device::CPU, timers)) {
         return false;
     }
     for (auto& d : det_results) {

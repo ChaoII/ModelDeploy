@@ -1,4 +1,4 @@
-#include "vision/common/processors/yolo_preproc.cuh"
+#include "vision/processors/cuda/yolo_preproc.cuh"
 #include <cuda_runtime.h>
 #include <vision/utils.h>
 #include "core/md_log.h"

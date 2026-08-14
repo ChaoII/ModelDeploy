@@ -3,7 +3,7 @@
 // 通用融合预处理 CUDA kernel，范式对齐 yolo_preproc.cu：thread_local workspace 池 + 单次 launch。
 //
 
-#include "vision/common/processors/fused_preproc.cuh"
+#include "vision/processors/cuda/fused_preproc.cuh"
 
 // 源图像上传 workspace（线程局部，容量不足时扩容，避免每次调用 cudaMalloc）
 struct FusedPreprocWorkspace {
