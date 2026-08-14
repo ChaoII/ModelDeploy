@@ -1,83 +1,111 @@
 //
-// insightface buffalo_l det_10g SCRFD 实现。
-// 与 python insightface.model_zoo.scrfd.SCRFD 逐值对齐：
-//   - 预处理：blobFromImage(img, 1/128, input_size, mean=127.5, swapRB=True)
-//   - 解码：distance2bbox / distance2kps，anchor centers = mgrid * stride
-//   - 后处理：score 阈值过滤 + 缩放回原图 + NMS
+// insightface buffalo_l det_10g：SCRFD 人脸检测实现。
+// 前处理用 fused_preprocess（CPU SIMD/CUDA/BMCV 多后端），推理走 Runtime，解码为独立 postprocessor。
 //
 #include "core/md_log.h"
 #include "vision/face/insightface/insightface_scrfd.h"
-#include "vision/face/insightface/face_align_utils.h"
-#include "core/tensor.h"
 #include "vision/utils.h"
+#include "core/tensor.h"
+#include <algorithm>
+#include <cstring>
 
 namespace modeldeploy::vision::face {
+
+    // ==================== Preprocessor ====================
+
+    InsightFaceDetPreprocessor::InsightFaceDetPreprocessor() {
+        size_ = {640, 640};
+    }
+
+    bool InsightFaceDetPreprocessor::run(const ImageData& image, Tensor* output,
+                                         LetterBoxRecord* letter_box_record) const {
+        // 与 python SCRFD._detect_candidates 一致：等比例双线性 resize + 左上放置 + pad 0
+        const int src_w = image.width();
+        const int src_h = image.height();
+        const int dst_w = size_[0];
+        const int dst_h = size_[1];
+        const float im_ratio = static_cast<float>(src_h) / src_w;
+        const float model_ratio = static_cast<float>(dst_h) / dst_w;
+        int new_w, new_h;
+        if (im_ratio > model_ratio) {
+            new_h = dst_h;
+            new_w = static_cast<int>(std::round(new_h / im_ratio));
+        } else {
+            new_w = dst_w;
+            new_h = static_cast<int>(std::round(new_w * im_ratio));
+        }
+        // 双线性 resize + 左上放置（python cv2.resize INTER_LINEAR + det_img 左上）
+        cv::Mat src_mat;
+        image.to_mat(src_mat);
+        cv::Mat resized;
+        cv::resize(src_mat, resized, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
+        cv::Mat det_img(dst_h, dst_w, CV_8UC3, cv::Scalar(0, 0, 0));
+        resized.copyTo(det_img(cv::Rect(0, 0, new_w, new_h)));
+        // 记录 det_scale（后处理缩放回原图）
+        letter_box_record->ipt_w = static_cast<float>(src_w);
+        letter_box_record->ipt_h = static_cast<float>(src_h);
+        letter_box_record->scale = static_cast<float>(new_h) / src_h;
+        letter_box_record->pad_w = 0.0f;
+        letter_box_record->pad_h = 0.0f;
+        letter_box_record->out_w = static_cast<float>(dst_w);
+        letter_box_record->out_h = static_cast<float>(dst_h);
+        // blob：(x-127.5)/128 + BGR2RGB，与 cv2.dnn.blobFromImage 一致
+        // 手写 blob（OpenCV 5 预编译包无 dnn 模块）
+        std::vector<float> blob(static_cast<size_t>(3) * dst_h * dst_w);
+        const uint8_t* src = det_img.data;
+        for (int c = 0; c < 3; ++c) {
+            const int src_c = 2 - c; // swapRB: 输出通道0=R(原[2])
+            float* plane = blob.data() + static_cast<size_t>(c) * dst_h * dst_w;
+            for (int i = 0; i < dst_h * dst_w; ++i) {
+                plane[i] = (static_cast<float>(src[i * 3 + src_c]) - 127.5f) * (1.0f / 128.0f);
+            }
+        }
+        // 拷贝进 tensor（不共享局部 blob 生命周期）
+        output->allocate({1, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+        std::memcpy(output->data(), blob.data(), blob.size() * sizeof(float));
+        return true;
+    }
+
+    bool InsightFaceDetPreprocessor::run(const std::vector<ImageData>& images, Tensor* output,
+                                         std::vector<LetterBoxRecord>* letter_box_records) const {
+        if (images.empty()) return false;
+        letter_box_records->resize(images.size());
+        if (images.size() == 1) {
+            return run(images[0], output, &(*letter_box_records)[0]);
+        }
+        // 整批：逐图双线性预处理 + 拼接 batch tensor
+        const int n = static_cast<int>(images.size());
+        const int dst_w = size_[0];
+        const int dst_h = size_[1];
+        std::vector<float> batch_blob(static_cast<size_t>(n) * 3 * dst_h * dst_w);
+        for (int i = 0; i < n; ++i) {
+            Tensor single;
+            if (!run(images[i], &single, &(*letter_box_records)[i])) return false;
+            std::memcpy(batch_blob.data() + static_cast<size_t>(i) * 3 * dst_h * dst_w,
+                        single.data(), static_cast<size_t>(3) * dst_h * dst_w * sizeof(float));
+        }
+        output->allocate({n, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+        std::memcpy(output->data(), batch_blob.data(), batch_blob.size() * sizeof(float));
+        return true;
+    }
+
+    // ==================== Postprocessor ====================
 
     namespace {
         constexpr int kFmc = 3;
         constexpr int kFeatStrideFpn[3] = {8, 16, 32};
         constexpr int kNumAnchors = 2;
-        constexpr float kInputMean = 127.5f;
-        constexpr float kInputStd = 128.0f;
-    } // namespace
 
-    InsightFaceDet::InsightFaceDet(const std::string& model_file,
-                                   const RuntimeOption& custom_option) {
-        runtime_option = custom_option;
-        runtime_option.set_model_path(model_file);
-        initialized_ = Initialize();
-    }
-
-    bool InsightFaceDet::Initialize() {
-        if (!init_runtime()) {
-            MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
-            return false;
-        }
-        return true;
-    }
-
-    namespace {
-        // 距离转 bbox（与 python distance2bbox 一致）
-        inline void distance2bbox(const float* centers, const float* dist,
-                                  const int n, float* boxes) {
-            for (int i = 0; i < n; ++i) {
-                const float cx = centers[i * 2];
-                const float cy = centers[i * 2 + 1];
-                boxes[i * 4 + 0] = cx - dist[i * 4 + 0];
-                boxes[i * 4 + 1] = cy - dist[i * 4 + 1];
-                boxes[i * 4 + 2] = cx + dist[i * 4 + 2];
-                boxes[i * 4 + 3] = cy + dist[i * 4 + 3];
-            }
-        }
-
-        // 距离转 kps（与 python distance2kps 一致）
-        inline void distance2kps(const float* centers, const float* dist,
-                                 const int n, const int kps_dim, float* kpss) {
-            // centers: n x 2, dist: n x 10, kpss: n x 10
-            for (int i = 0; i < n; ++i) {
-                const float cx = centers[i * 2];
-                const float cy = centers[i * 2 + 1];
-                for (int j = 0; j < kps_dim; j += 2) {
-                    kpss[i * kps_dim + j] = cx + dist[i * kps_dim + j];
-                    kpss[i * kps_dim + j + 1] = cy + dist[i * kps_dim + j + 1];
-                }
-            }
-        }
-
-        // 生成 anchor centers（与 python mgrid + anchor stack 一致）
-        // python: centers = mgrid...reshape(-1,2); 然后 stack([centers]*num_anchors, axis=1).reshape(-1,2)
-        // => 交错：pos 0,1 同 center0; pos 2,3 同 center1...
-        // 返回 height*width*num_anchors x 2
+        // 生成 anchor centers：交错布局（python np.stack([centers]*2, axis=1).reshape(-1,2)）
         std::vector<float> gen_anchor_centers(int height, int width, int stride) {
             const int K = height * width;
             std::vector<float> base(static_cast<size_t>(K) * 2);
-            for (int y = 0; y < height; ++y) {
+            for (int y = 0; y < height; ++y)
                 for (int x = 0; x < width; ++x) {
                     const int idx = y * width + x;
                     base[idx * 2] = static_cast<float>(x * stride);
                     base[idx * 2 + 1] = static_cast<float>(y * stride);
                 }
-            }
             std::vector<float> dup(static_cast<size_t>(K) * kNumAnchors * 2);
             for (int i = 0; i < K; ++i)
                 for (int a = 0; a < kNumAnchors; ++a) {
@@ -87,7 +115,7 @@ namespace modeldeploy::vision::face {
             return dup;
         }
 
-        // 标准 NMS（与 python nms 一致，IoU <= thresh 保留）
+        // 标准 NMS（与 python 一致，IoU <= thresh 保留）
         std::vector<int> nms(const std::vector<std::array<float, 4>>& boxes,
                              const std::vector<float>& scores, float thresh) {
             const int n = static_cast<int>(boxes.size());
@@ -120,153 +148,166 @@ namespace modeldeploy::vision::face {
         }
     } // namespace
 
-    bool InsightFaceDet::predict(const ImageData& image, std::vector<InsightFaceBox>* boxes,
-                                 TimerArray* timers) {
-        if (!image.data() || !boxes) return false;
-        boxes->clear();
+    bool InsightFaceDetPostprocessor::run(const std::vector<Tensor>& infer_results,
+                                          const std::vector<LetterBoxRecord>& letter_box_records,
+                                          const std::vector<float>& det_scales,
+                                          std::vector<std::vector<InsightFaceBox>>* results) {
+        results->resize(letter_box_records.size());
+        // 输入尺寸（640x640）从输出 shape 推导
+        // 每个 batch 的图共享输入尺寸
+        // 输出顺序：3 score, 3 bbox, 3 kps
+        const size_t batch = letter_box_records.size();
+        // 单图 batch=1
+        for (size_t b = 0; b < batch; ++b) {
+            const float det_scale = det_scales[b];
+            const int dst_h = 640;
+            const int dst_w = 640;
+            auto& out = (*results)[b];
+            out.clear();
 
-        const int src_w = image.width();
-        const int src_h = image.height();
-        const int dst_w = input_size_[0];
-        const int dst_h = input_size_[1];
+            std::vector<float> scores_list, bboxes_list, kpss_list;
+            for (int idx = 0; idx < kFmc; ++idx) {
+                const int stride = kFeatStrideFpn[idx];
+                const float* scores_ptr = static_cast<const float*>(infer_results[idx].data());
+                const float* bbox_ptr = static_cast<const float*>(infer_results[idx + kFmc].data());
+                const float* kps_ptr = static_cast<const float*>(infer_results[idx + kFmc * 2].data());
+                const int H = dst_h / stride;
+                const int W = dst_w / stride;
+                const int K = H * W;
+                const int total = K * kNumAnchors;
 
-        // 与 python _detect_candidates 一致：等比例缩放 + 右下填充
-        // im_ratio = h/w, model_ratio = dst_h/dst_w
-        const float im_ratio = static_cast<float>(src_h) / src_w;
-        const float model_ratio = static_cast<float>(dst_h) / dst_w;
-        int new_h, new_w;
-        if (im_ratio > model_ratio) {
-            new_h = dst_h;
-            new_w = static_cast<int>(std::round(new_h / im_ratio));
-        } else {
-            new_w = dst_w;
-            new_h = static_cast<int>(std::round(new_w * im_ratio));
-        }
-        const float det_scale = static_cast<float>(new_h) / src_h;
+                // bbox/kps 乘 stride
+                std::vector<float> bbox_scaled(static_cast<size_t>(total) * 4);
+                std::vector<float> kps_scaled(static_cast<size_t>(total) * 10);
+                for (int i = 0; i < total; ++i) {
+                    for (int j = 0; j < 4; ++j) bbox_scaled[i * 4 + j] = bbox_ptr[i * 4 + j] * stride;
+                    for (int j = 0; j < 10; ++j) kps_scaled[i * 10 + j] = kps_ptr[i * 10 + j] * stride;
+                }
+                const auto centers = gen_anchor_centers(H, W, stride);
+                const int n_centers = static_cast<int>(centers.size() / 2);
 
-        // 缩放 + 填充到 (dst_h, dst_w)
-        cv::Mat src_mat;
-        image.to_mat(src_mat);
-        cv::Mat resized;
-        cv::resize(src_mat, resized, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
-        cv::Mat det_img(dst_h, dst_w, CV_8UC3, cv::Scalar(0, 0, 0));
-        resized.copyTo(det_img(cv::Rect(0, 0, new_w, new_h)));
+                std::vector<int> pos_inds;
+                for (int i = 0; i < total; ++i)
+                    if (scores_ptr[i] >= 0.5f) pos_inds.push_back(i);
 
-        // 预处理：blobFromImage(1/128, mean=127.5, swapRB=True)
-        // (input - 127.5) / 128, BGR->RGB
-        cv::Mat blob = make_blob_from_image(det_img, 1.0f / kInputStd,
-                                            cv::Scalar(kInputMean, kInputMean, kInputMean),
-                                            true /*swapRB*/);
-
-        // 推理
-        std::vector<Tensor> input_tensors(1);
-        // blob 是 NCHW float32，包成 Tensor（零拷贝共享）
-        input_tensors[0].from_external_memory(blob.data, {1, 3, dst_h, dst_w},
-                                              DataType::FP32, nullptr, Device::CPU,
-                                              get_input_info(0).name);
-        std::vector<Tensor> output_tensors;
-        if (timers) timers->infer_timer.start();
-        if (!infer(input_tensors, &output_tensors)) {
-            MD_LOG_ERROR << "Failed to inference." << std::endl;
-            return false;
-        }
-        if (timers) timers->infer_timer.stop();
-
-        // 解码（与 python forward 一致）
-        // net_outs: [score(3), bbox(3), kps(3)]，按 stride 顺序
-        std::vector<float> all_scores, all_boxes, all_kpss;
-        std::vector<int> all_inds;
-        // 各 stride 位置：scores_list, bboxes_list, kpss_list
-        std::vector<float> scores_list, bboxes_list, kpss_list;
-        std::vector<int> scores_cnt_list, bboxes_cnt_list, kpss_cnt_list;
-
-        for (int idx = 0; idx < kFmc; ++idx) {
-            const int stride = kFeatStrideFpn[idx];
-            const float* scores_ptr = static_cast<const float*>(output_tensors[idx].data());
-            const float* bbox_ptr = static_cast<const float*>(output_tensors[idx + kFmc].data());
-            const float* kps_ptr = static_cast<const float*>(output_tensors[idx + kFmc * 2].data());
-            const int H = dst_h / stride;
-            const int W = dst_w / stride;
-            const int K = H * W;
-            const int total = K * kNumAnchors;
-
-            // bbox/kps 乘 stride
-            std::vector<float> bbox_scaled(static_cast<size_t>(total) * 4);
-            std::vector<float> kps_scaled(static_cast<size_t>(total) * 10);
-            for (int i = 0; i < total; ++i) {
-                bbox_scaled[i * 4 + 0] = bbox_ptr[i * 4 + 0] * stride;
-                bbox_scaled[i * 4 + 1] = bbox_ptr[i * 4 + 1] * stride;
-                bbox_scaled[i * 4 + 2] = bbox_ptr[i * 4 + 2] * stride;
-                bbox_scaled[i * 4 + 3] = bbox_ptr[i * 4 + 3] * stride;
-                for (int j = 0; j < 10; ++j) kps_scaled[i * 10 + j] = kps_ptr[i * 10 + j] * stride;
+                // distance2bbox
+                std::vector<float> bboxes(static_cast<size_t>(total) * 4);
+                for (int i = 0; i < n_centers; ++i) {
+                    const float cx = centers[i * 2], cy = centers[i * 2 + 1];
+                    bboxes[i * 4 + 0] = cx - bbox_scaled[i * 4 + 0];
+                    bboxes[i * 4 + 1] = cy - bbox_scaled[i * 4 + 1];
+                    bboxes[i * 4 + 2] = cx + bbox_scaled[i * 4 + 2];
+                    bboxes[i * 4 + 3] = cy + bbox_scaled[i * 4 + 3];
+                }
+                // distance2kps
+                std::vector<float> kpss(static_cast<size_t>(total) * 10);
+                for (int i = 0; i < n_centers; ++i) {
+                    const float cx = centers[i * 2], cy = centers[i * 2 + 1];
+                    for (int j = 0; j < 10; j += 2) {
+                        kpss[i * 10 + j] = cx + kps_scaled[i * 10 + j];
+                        kpss[i * 10 + j + 1] = cy + kps_scaled[i * 10 + j + 1];
+                    }
+                }
+                for (int p : pos_inds) {
+                    scores_list.push_back(scores_ptr[p]);
+                    bboxes_list.insert(bboxes_list.end(), bboxes.begin() + p * 4, bboxes.begin() + p * 4 + 4);
+                    kpss_list.insert(kpss_list.end(), kpss.begin() + p * 10, kpss.begin() + p * 10 + 10);
+                }
             }
 
-            const auto centers = gen_anchor_centers(H, W, stride);
-            const int n_centers = static_cast<int>(centers.size() / 2);
+            if (scores_list.empty()) continue;
+            // 排序 + 缩放回原图 + NMS
+            const int n_det = static_cast<int>(scores_list.size());
+            std::vector<int> order(n_det);
+            for (int i = 0; i < n_det; ++i) order[i] = i;
+            std::sort(order.begin(), order.end(), [&](int a, int b) { return scores_list[a] > scores_list[b]; });
 
-            // score >= thresh 的索引
-            std::vector<int> pos_inds;
-            for (int i = 0; i < total; ++i) {
-                if (scores_ptr[i] >= det_thresh_) pos_inds.push_back(i);
+            std::vector<std::array<float, 4>> boxes_in;
+            std::vector<float> scores_in;
+            std::vector<float> kpss_in(static_cast<size_t>(n_det) * 10);
+            for (int i = 0; i < n_det; ++i) {
+                const int o = order[i];
+                boxes_in.push_back({bboxes_list[o * 4] / det_scale, bboxes_list[o * 4 + 1] / det_scale,
+                                    bboxes_list[o * 4 + 2] / det_scale, bboxes_list[o * 4 + 3] / det_scale});
+                scores_in.push_back(scores_list[o]);
+                for (int j = 0; j < 10; ++j) kpss_in[i * 10 + j] = kpss_list[o * 10 + j] / det_scale;
             }
-            // bboxes = distance2bbox(centers, bbox_scaled)
-            std::vector<float> bboxes(static_cast<size_t>(total) * 4);
-            distance2bbox(centers.data(), bbox_scaled.data(), n_centers, bboxes.data());
-            // kpss = distance2kps
-            std::vector<float> kpss(static_cast<size_t>(total) * 10);
-            distance2kps(centers.data(), kps_scaled.data(), n_centers, 10, kpss.data());
-
-            // 收集 pos 索引
-            for (int p : pos_inds) {
-                scores_list.push_back(scores_ptr[p]);
-                bboxes_list.insert(bboxes_list.end(), bboxes.begin() + p * 4, bboxes.begin() + p * 4 + 4);
-                kpss_list.insert(kpss_list.end(), kpss.begin() + p * 10, kpss.begin() + p * 10 + 10);
+            const auto keep = nms(boxes_in, scores_in, nms_thresh_);
+            out.reserve(keep.size());
+            for (int idx : keep) {
+                InsightFaceBox bb;
+                bb.bbox = boxes_in[idx];
+                bb.score = scores_in[idx];
+                for (int j = 0; j < 5; ++j) bb.kps.push_back({kpss_in[idx * 10 + j * 2], kpss_in[idx * 10 + j * 2 + 1]});
+                out.push_back(std::move(bb));
             }
-            scores_cnt_list.push_back(static_cast<int>(pos_inds.size()));
-            bboxes_cnt_list.push_back(static_cast<int>(pos_inds.size()));
-            kpss_cnt_list.push_back(static_cast<int>(pos_inds.size()));
-        }
-
-        if (scores_list.empty()) return true;
-
-        // 排序（score 降序）
-        const int n_det = static_cast<int>(scores_list.size());
-        std::vector<int> order(n_det);
-        for (int i = 0; i < n_det; ++i) order[i] = i;
-        std::sort(order.begin(), order.end(), [&](int a, int b) { return scores_list[a] > scores_list[b]; });
-
-        // 缩放回原图：/ det_scale
-        // 注意：bboxes 的坐标是输入图（dst_w x dst_h）坐标，除 det_scale 得原图坐标
-        std::vector<std::array<float, 4>> boxes_in;
-        std::vector<float> scores_in;
-        std::vector<float> kpss_in(static_cast<size_t>(n_det) * 10);
-        for (int i = 0; i < n_det; ++i) {
-            const int o = order[i];
-            boxes_in.push_back({bboxes_list[o * 4] / det_scale, bboxes_list[o * 4 + 1] / det_scale,
-                                bboxes_list[o * 4 + 2] / det_scale, bboxes_list[o * 4 + 3] / det_scale});
-            scores_in.push_back(scores_list[o]);
-            for (int j = 0; j < 10; ++j) kpss_in[i * 10 + j] = kpss_list[o * 10 + j] / det_scale;
-        }
-
-        // NMS
-        const auto keep = nms(boxes_in, scores_in, nms_thresh_);
-
-        boxes->reserve(keep.size());
-        for (int idx : keep) {
-            InsightFaceBox b;
-            b.bbox = boxes_in[idx];
-            b.score = scores_in[idx];
-            for (int j = 0; j < 5; ++j) {
-                b.kps.push_back({kpss_in[idx * 10 + j * 2], kpss_in[idx * 10 + j * 2 + 1]});
-            }
-            boxes->push_back(std::move(b));
         }
         return true;
     }
 
+    // ==================== Model ====================
+
+    InsightFaceDet::InsightFaceDet(const std::string& model_file,
+                                   const RuntimeOption& custom_option) {
+        runtime_option = custom_option;
+        runtime_option.set_model_path(model_file);
+        initialized_ = initialize();
+    }
+
+    bool InsightFaceDet::initialize() {
+        if (!init_runtime()) {
+            MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
+            return false;
+        }
+        preprocessor_.set_processor_backend(
+            create_processor_backend(runtime_option.device, runtime_option.backend,
+                                     runtime_option.device_id));
+        return true;
+    }
+
+    bool InsightFaceDet::predict(const ImageData& image, std::vector<InsightFaceBox>* boxes,
+                                 TimerArray* timers) {
+        std::vector<std::vector<InsightFaceBox>> results;
+        if (!batch_predict({image}, &results, timers)) return false;
+        *boxes = std::move(results[0]);
+        return true;
+    }
+
+    bool InsightFaceDet::batch_predict(const std::vector<ImageData>& images,
+                                       std::vector<std::vector<InsightFaceBox>>* boxes,
+                                       TimerArray* timers) {
+        std::vector<ImageData> _images = images;
+        std::vector<LetterBoxRecord> lbrs;
+        std::vector<float> det_scales;
+        if (timers) timers->pre_timer.start();
+        reused_input_tensors_.resize(1);
+        if (!preprocessor_.run(_images, &reused_input_tensors_[0], &lbrs)) {
+            MD_LOG_ERROR << "Failed to preprocess." << std::endl;
+            return false;
+        }
+        if (timers) timers->pre_timer.stop();
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
+        if (timers) timers->infer_timer.start();
+        if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
+            MD_LOG_ERROR << "Failed to inference." << std::endl;
+            return false;
+        }
+        if (timers) timers->infer_timer.stop();
+        // det_scale 从 preprocessor 记录
+        for (const auto& l : lbrs) det_scales.push_back(l.scale);
+        if (timers) timers->post_timer.start();
+        if (!postprocessor_.run(reused_output_tensors_, lbrs, det_scales, boxes)) return false;
+        if (timers) timers->post_timer.stop();
+        return true;
+    }
+
     std::unique_ptr<InsightFaceDet> InsightFaceDet::clone() const {
-        auto clone_model = std::make_unique<InsightFaceDet>(*this);
+        auto clone_model = std::make_unique<InsightFaceDet>(
+            runtime_option.model_file, runtime_option);
         clone_model->set_runtime(clone_model->clone_runtime());
+        clone_model->preprocessor_ = preprocessor_;
+        clone_model->postprocessor_ = postprocessor_;
+        clone_model->initialized_ = initialized_;
         return clone_model;
     }
 

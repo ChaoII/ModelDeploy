@@ -118,41 +118,6 @@ namespace modeldeploy::vision::face {
         }
     } // namespace
 
-    cv::Mat make_blob_from_image(const cv::Mat& img, double scale, const cv::Scalar& mean,
-                                 bool swap_rb) {
-        // 输出 [1, 3, H, W] float32，与 cv::dnn::blobFromImage 语义一致
-        // out[c][y][x] = (pixel_c - mean[c]) * scale；swap_rb 时 BGR<->RGB
-        const int h = img.rows, w = img.cols;
-        cv::Mat blob(1, 3 * h * w, CV_32F);
-        float* dst = blob.ptr<float>();
-        const int ch = img.channels();
-        if (img.isContinuous() && ch == 3) {
-            const uint8_t* src = img.ptr<uint8_t>();
-            // 按 NCHW 填充
-            for (int c = 0; c < 3; ++c) {
-                const int src_c = swap_rb ? (2 - c) : c;
-                const double m = mean[src_c];
-                float* plane = dst + static_cast<size_t>(c) * h * w;
-                for (int i = 0; i < h * w; ++i) {
-                    plane[i] = static_cast<float>((static_cast<double>(src[i * 3 + src_c]) - m) * scale);
-                }
-            }
-        } else {
-            // 通用路径
-            for (int c = 0; c < 3; ++c) {
-                const int src_c = swap_rb ? (2 - c) : c;
-                const double m = mean[src_c];
-                float* plane = dst + static_cast<size_t>(c) * h * w;
-                for (int y = 0; y < h; ++y)
-                    for (int x = 0; x < w; ++x) {
-                        const uint8_t* p = img.ptr<uint8_t>(y) + x * ch;
-                        plane[y * w + x] = static_cast<float>((static_cast<double>(p[src_c]) - m) * scale);
-                    }
-            }
-        }
-        return blob;
-    }
-
     cv::Mat invert_affine_transform(const cv::Mat& M) {
         // M 为 2x3: [a b c; d e f]，逆为:
         // det = a*e - b*d; inv = [e/det, -b/det, (b*f - c*e)/det; -d/det, a/det, (c*d - a*f)/det]
@@ -194,39 +159,6 @@ namespace modeldeploy::vision::face {
         cv::warpAffine(img, warped, M, cv::Size(image_size, image_size), cv::INTER_LINEAR,
                        cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
         return warped;
-    }
-
-    cv::Mat transform(const cv::Mat& data, const std::array<float, 2>& center,
-                      int output_size, float scale, float rotation, cv::Mat* M_out) {
-        // skimage: t = t1+t2+t3+t4 (SimilarityTransform 组合 = 矩阵乘)
-        // t1 scale, t2 trans(-cx,-cy), t3 rot, t4 trans(out/2,out/2)
-        const double rot = static_cast<double>(rotation) * CV_PI / 180.0;
-        const double cx = center[0] * scale;
-        const double cy = center[1] * scale;
-        const double co = output_size / 2.0;
-        // 组合矩阵 M = T4 * R * T2 * T1
-        // 逐点: 先 scale(1), 再 trans(-cx,-cy), 再 rot, 再 trans(co,co)
-        cv::Mat M = cv::Mat::eye(3, 3, CV_64F);
-        // T1 = scale
-        cv::Mat T1 = cv::Mat::eye(3, 3, CV_64F);
-        T1.at<double>(0, 0) = scale; T1.at<double>(1, 1) = scale;
-        // T2 = translate(-cx,-cy)
-        cv::Mat T2 = cv::Mat::eye(3, 3, CV_64F);
-        T2.at<double>(0, 2) = -cx; T2.at<double>(1, 2) = -cy;
-        // T3 = rotate(rot)
-        cv::Mat T3 = cv::Mat::eye(3, 3, CV_64F);
-        T3.at<double>(0, 0) = std::cos(rot); T3.at<double>(0, 1) = -std::sin(rot);
-        T3.at<double>(1, 0) = std::sin(rot); T3.at<double>(1, 1) = std::cos(rot);
-        // T4 = translate(co,co)
-        cv::Mat T4 = cv::Mat::eye(3, 3, CV_64F);
-        T4.at<double>(0, 2) = co; T4.at<double>(1, 2) = co;
-        M = T4 * T3 * T2 * T1;
-        const cv::Mat M2x3 = M(cv::Rect(0, 0, 3, 2)).clone();
-        cv::Mat cropped;
-        cv::warpAffine(data, cropped, M2x3, cv::Size(output_size, output_size),
-                       cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
-        if (M_out) *M_out = M2x3;
-        return cropped;
     }
 
     void trans_points2d(std::vector<std::array<float, 2>>* pts, const cv::Mat& inv_M) {

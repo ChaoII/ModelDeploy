@@ -1,6 +1,6 @@
 //
 // insightface FaceAnalysis 综合 pipeline：det -> landmark(2d/3d) -> recognition。
-// 对齐 python insightface.app.FaceAnalysis。
+// 组合多个标准子模型（每个都是 BaseModel + pre/post），多推理后端天然支持。
 //
 #pragma once
 
@@ -29,30 +29,33 @@ namespace modeldeploy::vision::face {
 
     class MODELDEPLOY_CXX_EXPORT InsightFaceAnalysis {
     public:
-        // 传入各模型路径 + runtime option（可共享）
         InsightFaceAnalysis(const std::string& det_model,
                             const std::string& rec_model,
                             const std::string& lmk2d_model,
                             const std::string& lmk3d_model,
                             const RuntimeOption& option = RuntimeOption());
 
-        // 单图全流程分析
         bool analyze(const ImageData& image, std::vector<InsightFaceResult>* results,
                      bool with_2d106 = true, bool with_3d68 = true,
                      bool with_recognition = true,
                      TimerArray* timers = nullptr);
 
-        // 仅检测
         bool detect(const ImageData& image, std::vector<InsightFaceBox>* boxes,
                     TimerArray* timers = nullptr);
 
         [[nodiscard]] bool is_initialized() const;
 
-        float det_thresh = 0.5f;
+        // 检测阈值（透传给 det preprocessor）
+        void set_det_thresh(float thresh);
 
-        // 便捷构造：从 buffalo_l 目录加载全部
         static std::unique_ptr<InsightFaceAnalysis> create_from_dir(
             const std::string& model_dir, const RuntimeOption& option = RuntimeOption());
+
+        // 访问子模型（供高级用法）
+        [[nodiscard]] InsightFaceDet* det() { return det_.get(); }
+        [[nodiscard]] InsightFaceRecognition* rec() { return rec_.get(); }
+        [[nodiscard]] InsightFaceLandmark* lmk_2d() { return lmk_2d_.get(); }
+        [[nodiscard]] InsightFaceLandmark* lmk_3d() { return lmk_3d_.get(); }
 
     private:
         std::unique_ptr<InsightFaceDet> det_;

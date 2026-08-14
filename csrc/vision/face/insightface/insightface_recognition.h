@@ -1,6 +1,7 @@
 //
 // insightface buffalo_l w600k_r50：ArcFace 人脸识别。
-// 与 python insightface.model_zoo.arcface_onnx.ArcFaceONNX 逐值对齐。
+// 标准架构：Preprocessor（norm_crop 5 点对齐）→ Runtime → Postprocessor。
+// norm_crop 是含旋转的相似变换（Umeyama），架构无此 fused 算子，preprocessor 内用 OpenCV warpAffine。
 //
 #pragma once
 
@@ -14,6 +15,27 @@
 
 namespace modeldeploy::vision::face {
 
+    // 前处理：norm_crop（estimate_norm 相似变换 + warpAffine 到 112）+ (x-127.5)/127.5 + swapRB
+    class MODELDEPLOY_CXX_EXPORT InsightFaceRecPreprocessor {
+    public:
+        InsightFaceRecPreprocessor();
+
+        bool run(const ImageData& image, const std::vector<std::array<float, 2>>& kps,
+                 Tensor* output) const;
+
+        int input_size_ = 112;
+
+    private:
+        // 手写 blob（OpenCV 5 无 dnn 模块）
+        void make_blob(const cv::Mat& warped, float* dst) const;
+    };
+
+    // 后处理：直接取输出向量为 embedding
+    class MODELDEPLOY_CXX_EXPORT InsightFaceRecPostprocessor {
+    public:
+        bool run(const std::vector<Tensor>& infer_results, std::vector<float>* embedding);
+    };
+
     class MODELDEPLOY_CXX_EXPORT InsightFaceRecognition : public BaseModel {
     public:
         explicit InsightFaceRecognition(const std::string& model_file,
@@ -21,7 +43,6 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::string name() const override { return "InsightFaceRecognition"; }
 
-        // 计算 embedding：输入 BGR 原图 + 5 个关键点（人脸对齐后裁剪到 112）
         bool predict(const ImageData& image,
                      const std::vector<std::array<float, 2>>& kps,
                      std::vector<float>* embedding,
@@ -29,10 +50,13 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] std::unique_ptr<InsightFaceRecognition> clone() const;
 
-        int input_size_ = 112;
+        virtual InsightFaceRecPreprocessor& get_preprocessor() { return preprocessor_; }
+        virtual InsightFaceRecPostprocessor& get_postprocessor() { return postprocessor_; }
 
     protected:
         bool Initialize();
+        InsightFaceRecPreprocessor preprocessor_;
+        InsightFaceRecPostprocessor postprocessor_;
     };
 
 } // namespace modeldeploy::vision::face

@@ -25,10 +25,13 @@ namespace modeldeploy::vision::face {
 
     bool InsightFaceAnalysis::is_initialized() const { return initialized_; }
 
+    void InsightFaceAnalysis::set_det_thresh(float thresh) {
+        if (det_) det_->get_preprocessor().det_thresh = thresh;
+    }
+
     bool InsightFaceAnalysis::detect(const ImageData& image, std::vector<InsightFaceBox>* boxes,
                                      TimerArray* timers) {
         if (!det_) return false;
-        det_->det_thresh_ = det_thresh;
         return det_->predict(image, boxes, timers);
     }
 
@@ -48,12 +51,12 @@ namespace modeldeploy::vision::face {
             r.kps = b.kps;
             if (with_2d106 && lmk_2d_) {
                 std::vector<std::array<float, 2>> lmk;
-                if (lmk_2d_->predict_2d106(image, b.bbox, &lmk)) r.landmark_2d_106 = std::move(lmk);
+                if (lmk_2d_->predict_2d106(image, b.bbox, &lmk, timers)) r.landmark_2d_106 = std::move(lmk);
             }
             if (with_3d68 && lmk_3d_) {
                 std::vector<std::array<float, 3>> lmk;
                 std::array<float, 3> pose{0, 0, 0};
-                if (lmk_3d_->predict_3d68(image, b.bbox, &lmk, &pose)) {
+                if (lmk_3d_->predict_3d68(image, b.bbox, &lmk, &pose, timers)) {
                     r.landmark_3d_68 = std::move(lmk);
                     r.pose = pose;
                 }
@@ -69,12 +72,9 @@ namespace modeldeploy::vision::face {
 
     std::unique_ptr<InsightFaceAnalysis> InsightFaceAnalysis::create_from_dir(
         const std::string& model_dir, const RuntimeOption& option) {
-        const auto det_path = model_dir + "/det_10g.onnx";
-        const auto rec_path = model_dir + "/w600k_r50.onnx";
-        const auto lmk2d_path = model_dir + "/2d106det.onnx";
-        const auto lmk3d_path = model_dir + "/1k3d68.onnx";
-        return std::make_unique<InsightFaceAnalysis>(det_path, rec_path, lmk2d_path,
-                                                     lmk3d_path, option);
+        return std::make_unique<InsightFaceAnalysis>(
+            model_dir + "/det_10g.onnx", model_dir + "/w600k_r50.onnx",
+            model_dir + "/2d106det.onnx", model_dir + "/1k3d68.onnx", option);
     }
 
 } // namespace modeldeploy::vision::face
