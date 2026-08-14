@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 
 #ifdef WITH_GPU
-#include "csrc/vision/common/processors/nv12_to_bgr.cuh"
+#include "csrc/vision/processors/cuda/nv12_to_bgr.cuh"
 #endif
 
 using namespace modeldeploy::vision;

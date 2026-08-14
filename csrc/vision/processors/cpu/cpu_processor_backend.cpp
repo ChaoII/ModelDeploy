@@ -5,9 +5,9 @@
 #include "core/md_log.h"
 #include "vision/processors/cpu/cpu_processor_backend.h"
 #include "vision/processors/cpu/simd/fused_preproc_simd.h"
-#include "vision/common/processors/yolo_preproc.h"
-#include "vision/common/processors/nv12_to_bgr.h"
-#include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
+#include "vision/processors/cpu/yolo_preproc.h"
+#include "vision/processors/cpu/nv12_to_bgr.h"
+#include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
 #include "vision/utils.h"
 #include "vision/face/face_det/scrfd_preproc.h"
 

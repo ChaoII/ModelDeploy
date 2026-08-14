@@ -4,8 +4,8 @@
 
 #include "core/md_log.h"
 #include "vision/processors/cuda/cuda_processor_backend.h"
-#include "vision/common/processors/yolo_preproc.cuh"
-#include "vision/common/processors/fused_preproc.cuh"
+#include "vision/processors/cuda/yolo_preproc.cuh"
+#include "vision/processors/cuda/fused_preproc.cuh"
 #include "vision/face/face_det/scrfd_preproc.cuh"
 
 namespace modeldeploy::vision {

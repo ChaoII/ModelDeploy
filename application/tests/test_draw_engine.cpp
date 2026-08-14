@@ -4,7 +4,7 @@
 #include <cstdio>
 #include "draw_engine.hpp"
 #include "csrc/vision/common/image_data.h"
-#include "csrc/vision/common/processors/draw_gpu.cuh"
+#include "csrc/vision/processors/cuda/draw_gpu.cuh"
 
 using namespace modeldeploy::vision;
 

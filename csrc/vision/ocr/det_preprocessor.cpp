@@ -5,7 +5,7 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/ocr/det_preprocessor.h"
-#include "vision/common/processors/fusion_resize_pad_normalize_permute.h"
+#include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
 #include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {

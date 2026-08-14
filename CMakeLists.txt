@@ -116,7 +116,7 @@ file(GLOB_RECURSE VISION_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/visio
 file(GLOB_RECURSE AUDIO_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
 file(GLOB_RECURSE PYBIND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
 file(GLOB_RECURSE CUDA_SOURCE CONFIGURE_DEPENDS
-        ${CMAKE_SOURCE_DIR}/csrc/vision/common/processors/*.cu
+        ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cpp)
 

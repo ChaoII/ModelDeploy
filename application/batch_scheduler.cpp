@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #ifdef WITH_GPU
-#include "csrc/vision/common/processors/nv12_to_bgr.cuh"
+#include "csrc/vision/processors/cuda/nv12_to_bgr.cuh"
 #endif
 #include "csrc/vision/common/image_data.h"
 

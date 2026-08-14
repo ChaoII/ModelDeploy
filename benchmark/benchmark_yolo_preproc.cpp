@@ -1,12 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include "vision/common/image_data.h"
-#include "vision/common/processors/yolo_preproc.h"
+#include "vision/processors/cpu/yolo_preproc.h"
 #include "core/tensor.h"
 
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
-#include "vision/common/processors/yolo_preproc.cuh"
+#include "vision/processors/cuda/yolo_preproc.cuh"
 #endif
 
 using namespace modeldeploy::vision;

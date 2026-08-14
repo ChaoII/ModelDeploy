@@ -12,7 +12,7 @@
 
 #include "csrc/vision.h"
 #include "csrc/vision/processors/processor_factory.h"
-#include "csrc/vision/common/processors/fusion_resize_pad_normalize_permute.h"
+#include "csrc/vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
 #include "csrc/vision/processors/cpu/cpu_processor_backend.h"
 #include "csrc/vision/processors/cpu/simd/fused_preproc_simd.h"
 #ifdef WITH_GPU
