@@ -10,7 +10,9 @@
 #include "core/enum_variables.h"
 
 namespace modeldeploy {
-    // 内存块封装，支持引用计数
+    // 内存块封装，支持引用计数。
+    // 注意：Tensor/MemoryBlock 仅分配 CPU 内存。设备侧（GPU/TPU）内存
+    // 由各后端自持，通过 Tensor::from_external_memory(..., device=GPU/TPU) 零拷贝包装。
     class MemoryBlock {
     public:
         explicit MemoryBlock(size_t size, Device device);
@@ -76,6 +78,9 @@ namespace modeldeploy {
         template <typename T>
         T* data_ptr(); // 返回指针而非复制
 
+        // 设备侧（GPU/TPU）数据不支持直接 CPU 解引用（at/print/data_ptr 等），
+        // 请先由后端回拷到 CPU Tensor 或走零拷贝推理路径。
+
         // 索引操作（基于 strides，支持非连续视图）
         template <typename T>
         T& at(const std::vector<int64_t>& indices);
@@ -100,10 +105,12 @@ namespace modeldeploy {
         // 原地操作
         [[nodiscard]] Tensor clone() const;
         void resize(const std::vector<int64_t>& shape, const DataType& dtype, const std::string& name = "");
+        // 仅分配 CPU 内存；Device::GPU/TPU 会抛异常（设备内存由后端自持，见 from_external_memory）
         void allocate(const std::vector<int64_t>& shape,
                       const DataType& dtype,
                       Device device = Device::CPU,
                       const std::string& name = "");
+        // 零拷贝包装外部内存（不拥有）。device 可传 Device::GPU/TPU，data 指向后端自持的设备内存。
         void from_external_memory(void* data,
                                   const std::vector<int64_t>& shape, DataType dtype,
                                   std::function<void(void*)> deleter = nullptr,

@@ -13,6 +13,8 @@ build_linux_debug
 build_sophgo
 build_win
 build_linux1
+build_tdc
+build_tdc_gpu
 python/modeldeploy/__init__.py
 dist
 .idea

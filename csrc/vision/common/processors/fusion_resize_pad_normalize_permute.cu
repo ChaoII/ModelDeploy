@@ -88,7 +88,8 @@ namespace modeldeploy::vision {
         const std::vector<int>& dst_size,
         const std::vector<float>& mean,
         const std::vector<float>& std,
-        const float pad_value) {
+        const float pad_value,
+        CudaOutputBufferPool* dst_pool) {
         const int batch_size = images.size();
         if (batch_size == 0) return false;
 
@@ -146,8 +147,13 @@ namespace modeldeploy::vision {
         cudaMemcpy(d_resize_h, resize_h.data(), batch_size * sizeof(int), cudaMemcpyHostToDevice);
 
 
-        // 5. 分配输出tensor
-        output->allocate({batch_size, 3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+        // 5. 分配输出tensor（从缓冲池获取，零拷贝包装；必须有池，GPU 输出不直接分配）
+        if (!dst_pool) return false;
+        const size_t bytes = static_cast<size_t>(batch_size) * 3 * dst_h * dst_w * sizeof(float);
+        float* dst_ptr = dst_pool->acquire(bytes);
+        if (!dst_ptr) return false;
+        output->from_external_memory(dst_ptr, {batch_size, 3, dst_h, dst_w}, DataType::FP32,
+                                     [](void*) {}, Device::GPU, output->get_name());
 
         // 6. 处理输入数据
         Tensor input_tensor;
@@ -189,7 +195,7 @@ namespace modeldeploy::vision {
             batch_size,
             d_src_w,
             d_src_h,
-            static_cast<float*>(output->data()),
+            dst_ptr,
             dst_w,
             dst_h,
             d_resize_w,

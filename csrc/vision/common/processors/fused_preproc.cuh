@@ -10,6 +10,7 @@
 #include <vector>
 #include "core/tensor.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/cuda/cuda_output_pool.h"
 
 namespace modeldeploy::vision {
 
@@ -37,10 +38,11 @@ bool fused_preprocess_cuda(const uint8_t* src,
                            const std::vector<float>& beta,
                            bool swap_rb,
                            float pad_value,
-                           cudaStream_t stream = nullptr);
+                           cudaStream_t stream = nullptr,
+                           CudaOutputBufferPool* dst_pool = nullptr);
 
-// 整批通用融合预处理（3D grid 一次 launch）：每图独立 origin/scale，共享 alpha/beta/swap/pad
-// 输出 [batch, 3, dst_h, dst_w] FP32 GPU，dst 尺寸 batch 内统一
+// ����ͨ���ں�Ԥ������3D grid һ�� launch����ÿͼ���� origin/scale������ alpha/beta/swap/pad
+// ��� [batch, 3, dst_h, dst_w] FP32 GPU��dst �ߴ� batch ��ͳһ
 bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
                                  Tensor* out,
                                  const std::vector<int>& dst_size,
@@ -51,9 +53,10 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
                                  const std::vector<float>& alpha,
                                  const std::vector<float>& beta,
                                  bool swap_rb, float pad_value,
-                                 cudaStream_t stream = nullptr);
+                                 cudaStream_t stream = nullptr,
+                                 CudaOutputBufferPool* dst_pool = nullptr);
 
-// OCR det：resize + pad(right/bottom) + swap + affine，pad 逐通道（仿射后空间）
+// OCR det��resize + pad(right/bottom) + swap + affine��pad ��ͨ���������ռ䣩
 bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
                       Tensor* out,
                       const std::vector<std::array<int, 2>>& resize_sizes,
@@ -61,6 +64,7 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
                       const std::vector<float>& alpha,
                       const std::vector<float>& beta,
                       const float pad[3],
-                      cudaStream_t stream = nullptr);
+                      cudaStream_t stream = nullptr,
+                      CudaOutputBufferPool* dst_pool = nullptr);
 
 } // namespace modeldeploy::vision

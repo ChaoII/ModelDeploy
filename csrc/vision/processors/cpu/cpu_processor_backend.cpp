@@ -70,6 +70,30 @@ namespace modeldeploy::vision {
                                 true, pad_val / 128.0f - 127.5f / 128.0f);
     }
 
+    bool CpuProcessorBackend::scrfd_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                                     const std::vector<int>& dst_size,
+                                                     float pad_val,
+                                                     std::vector<LetterBoxRecord>* records) {
+        if (images.empty() || dst_size.size() != 2) return false;
+        const int batch = static_cast<int>(images.size());
+        const int dst_w = dst_size[0];
+        const int dst_h = dst_size[1];
+        records->resize(batch);
+        std::vector<float> oxs(batch), oys(batch), sxs(batch), sys(batch);
+        for (int i = 0; i < batch; ++i) {
+            (*records)[i] = utils::cal_letter_box_param(
+                {images[i].width(), images[i].height()}, {dst_w, dst_h});
+            utils::letter_box_to_fused_params((*records)[i], &oxs[i], &oys[i], &sxs[i], &sys[i]);
+        }
+        const float alpha[3] = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
+        const float beta[3] = {-127.5f / 128.0f, -127.5f / 128.0f, -127.5f / 128.0f};
+        return fused_preprocess_batch(images, out, dst_size,
+                                      oxs, oys, sxs, sys,
+                                      std::vector<float>(alpha, alpha + 3),
+                                      std::vector<float>(beta, beta + 3),
+                                      true, pad_val / 128.0f - 127.5f / 128.0f);
+    }
+
     bool CpuProcessorBackend::resize(const ImageData& image, ImageData* out,
                                      int width, int height) {
         *out = image.resize(width, height);

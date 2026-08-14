@@ -58,6 +58,12 @@ namespace modeldeploy::vision {
                                       const std::vector<int>& dst_size,
                                       float pad_val, LetterBoxRecord* record) = 0;
 
+        // 整批 SCRFD 预处理（batch>1 一次 kernel 完成，避免 N 次 launch + concat）
+        virtual bool scrfd_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                            const std::vector<int>& dst_size,
+                                            float pad_val,
+                                            std::vector<LetterBoxRecord>* records) = 0;
+
         // 通用算子（输出中间图像，供多算子 pipeline 串联）
         virtual bool resize(const ImageData& image, ImageData* out,
                             int width, int height) = 0;

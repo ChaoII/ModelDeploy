@@ -8,24 +8,6 @@
 #include <cmath>
 #include <iomanip>
 #include "md_log.h"
-#ifdef WITH_GPU
-#include <cuda_runtime.h>
-#endif
-#ifdef WITH_GPU
-#include <cuda_runtime.h>
-// CUDA错误检查宏
-#define CUDA_CHECK(call) \
-    do { \
-    cudaError_t error = (call); \
-    if (error != cudaSuccess) { \
-    std::ostringstream oss; \
-    oss << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " \
-    << cudaGetErrorString(error); \
-    throw std::runtime_error(oss.str()); \
-    } \
-    } while(0)
-#endif
-
 
 namespace modeldeploy {
     // MemoryBlock实现
@@ -35,14 +17,10 @@ namespace modeldeploy {
             data_ = std::malloc(size);
             deleter_ = [](void* ptr) { free(ptr); };
         }
-#ifdef WITH_GPU
-        else if (device == Device::GPU) {
-            CUDA_CHECK(cudaMalloc(&data_, size));
-            deleter_ = [](void* ptr) { cudaFree(ptr); };
-        }
-#endif
         else {
-            throw std::runtime_error("Unsupported device type");
+            throw std::runtime_error(
+                "Tensor memory allocation only supports CPU; device memory must be provided externally "
+                "(use from_external_memory)");
         }
 
         if (!data_) {
@@ -60,14 +38,10 @@ namespace modeldeploy {
             std::memcpy(data_, data, size);
             deleter_ = [](void* ptr) { free(ptr); };
         }
-        else if (device == Device::GPU) {
-#ifdef WITH_GPU
-            CUDA_CHECK(cudaMalloc(&data_, size));
-            CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToDevice));
-            deleter_ = [](void* ptr) { cudaFree(ptr); };
-#else
-            throw std::runtime_error("Unsupported device type");
-#endif
+        else {
+            throw std::runtime_error(
+                "Tensor memory allocation only supports CPU; device memory must be provided externally "
+                "(use from_external_memory)");
         }
     }
 
@@ -81,30 +55,16 @@ namespace modeldeploy {
             MD_LOG_ERROR << "Failed to allocate memory";
             return false;
         }
-        if (extern_device == Device::CPU && device_ == Device::CPU) {
-            std::memcpy(data_, data, size);
-            if (!data_) {
-                MD_LOG_ERROR << "Failed to allocate memory";
-                return false;
-            }
-        }
-#ifdef WITH_GPU
-        try {
-            if (extern_device == Device::GPU && device_ == Device::GPU) {
-                CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToDevice));
-            }
-            if (extern_device == Device::CPU && device_ == Device::GPU) {
-                CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyHostToDevice));
-            }
-            if (extern_device == Device::GPU && device_ == Device::CPU) {
-                CUDA_CHECK(cudaMemcpy(data_, data, size, cudaMemcpyDeviceToHost));
-            }
-        }
-        catch (const std::exception& e) {
-            MD_LOG_ERROR << "CUDA error: " << e.what();
+        if (extern_device != Device::CPU) {
+            MD_LOG_ERROR << "copy_from_extern_buffer only supports CPU source; "
+                << "device-to-host copies must be handled by the backend." << std::endl;
             return false;
         }
-#endif
+        std::memcpy(data_, data, size);
+        if (!data_) {
+            MD_LOG_ERROR << "Failed to allocate memory";
+            return false;
+        }
         return true;
     }
 
@@ -521,7 +481,7 @@ namespace modeldeploy {
                           const std::string& name) {
         validate_shape(shape);
         name_ = name;
-        // shape/dtype/device 均不变时复用已有 buffer（避免每帧 cudaMalloc/cudaFree）
+        // shape/dtype/device 均不变时复用已有 buffer（避免每帧重新分配）
         const bool reuseable = (shape_ == shape) && (dtype_ == dtype) && (device_ == device);
         shape_ = shape;
         dtype_ = dtype;
@@ -734,7 +694,7 @@ namespace modeldeploy {
         // 计算新的形状
         std::vector<int64_t> new_shape = first_shape;
         new_shape[axis] = concat_size;
-        // 创建结果张量（与输入同设备，GPU 用 cudaMemcpy D2D）
+        // 创建结果张量（仅支持 CPU 输入；设备侧张量由后端处理，如 CUDA batch kernel）
         Tensor result;
         result.allocate(new_shape, tensors[0].dtype(), tensors[0].device(), "concat_result");
         // 计算每个张量的元素大小
@@ -751,32 +711,15 @@ namespace modeldeploy {
         for (size_t i = 0; i < axis; ++i) {
             outer_iterations *= first_shape[i];
         }
-        // 复制数据
+        // 复制数据（CPU memcpy；设备侧张量不支持，由后端负责）
         auto dest_ptr = static_cast<char*>(result.data());
-        if (tensors[0].device() == Device::GPU) {
-#ifdef WITH_GPU
-            for (size_t i = 0; i < outer_iterations; ++i) {
-                for (const auto& tensor : tensors) {
-                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] *
-                        slice_size;
-                    const size_t copy_size = tensor.shape()[axis] * slice_size;
-                    cudaMemcpy(dest_ptr, src_ptr, copy_size, cudaMemcpyDeviceToDevice);
-                    dest_ptr += copy_size;
-                }
-            }
-#else
-            MD_LOG_ERROR << "concat on GPU but WITH_GPU not enabled." << std::endl;
-#endif
-        }
-        else {
-            for (size_t i = 0; i < outer_iterations; ++i) {
-                for (const auto& tensor : tensors) {
-                    const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] *
-                        slice_size;
-                    const size_t copy_size = tensor.shape()[axis] * slice_size;
-                    std::memcpy(dest_ptr, src_ptr, copy_size);
-                    dest_ptr += copy_size;
-                }
+        for (size_t i = 0; i < outer_iterations; ++i) {
+            for (const auto& tensor : tensors) {
+                const char* src_ptr = static_cast<const char*>(tensor.data()) + i * tensor.shape()[axis] *
+                    slice_size;
+                const size_t copy_size = tensor.shape()[axis] * slice_size;
+                std::memcpy(dest_ptr, src_ptr, copy_size);
+                dest_ptr += copy_size;
             }
         }
         return result;

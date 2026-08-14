@@ -30,6 +30,20 @@ static thread_local BatchParamWorkspace param_ws;
 
 namespace modeldeploy::vision {
 
+    // 从后端缓冲池获取输出缓冲并零拷贝包装为 GPU Tensor（Tensor 不拥有设备内存）。
+    static float* wrap_output_tensor(Tensor* output, CudaOutputBufferPool* pool,
+                                     const std::vector<int64_t>& shape, DataType dtype,
+                                     const std::string& name) {
+        if (!pool) return nullptr;
+        size_t numel = 1;
+        for (int64_t d : shape) numel *= static_cast<size_t>(d);
+        const size_t bytes = numel * Tensor::get_element_size(dtype);
+        float* dst = pool->acquire(bytes);
+        if (!dst) return nullptr;
+        output->from_external_memory(dst, shape, dtype, [](void*) {}, Device::GPU, name);
+        return dst;
+    }
+
 __global__ void kernel_fused_preproc(
     const uint8_t* __restrict__ src,
     const int src_h,
@@ -102,7 +116,8 @@ bool fused_preprocess_cuda(const uint8_t* src,
                            const std::vector<float>& beta,
                            bool swap_rb,
                            float pad_value,
-                           cudaStream_t stream) {
+                           cudaStream_t stream,
+                           CudaOutputBufferPool* dst_pool) {
     if (!out || src_size.size() != 2 || dst_size.size() != 2 ||
         alpha.size() != 3 || beta.size() != 3) {
         return false;
@@ -112,8 +127,10 @@ bool fused_preprocess_cuda(const uint8_t* src,
     const int dst_w = dst_size[0];
     const int dst_h = dst_size[1];
 
-    // 1 output: GPU, FP32, CHW
-    out->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+    // 1 output: GPU, FP32, CHW（从缓冲池获取，零拷贝包装）
+    float* dst_ptr = wrap_output_tensor(out, dst_pool, {3, dst_h, dst_w},
+                                        DataType::FP32, out->get_name());
+    if (!dst_ptr) return false;
 
     // 2 CUDA stream
     bool is_internal_stream = false;
@@ -146,7 +163,7 @@ bool fused_preprocess_cuda(const uint8_t* src,
     dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y);
     kernel_fused_preproc<<<grid, block, 0, stream>>>(
         d_src, src_h, src_w,
-        out->data_ptr<float>(),
+        dst_ptr,
         dst_h, dst_w,
         origin_x, origin_y, scale_x, scale_y,
         alpha[0], beta[0], alpha[1], beta[1], alpha[2], beta[2],
@@ -236,12 +253,16 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
                                  const std::vector<float>& alpha,
                                  const std::vector<float>& beta,
                                  bool swap_rb, float pad_value,
-                                 cudaStream_t stream) {
+                                 cudaStream_t stream,
+                                 CudaOutputBufferPool* dst_pool) {
     if (images.empty() || dst_size.size() != 2) return false;
     const int batch = static_cast<int>(images.size());
     const int dst_w = dst_size[0];
     const int dst_h = dst_size[1];
-    out->allocate({batch, 3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+    // 整批输出：从缓冲池获取（复用），零拷贝包装
+    float* dst_ptr = wrap_output_tensor(out, dst_pool, {batch, 3, dst_h, dst_w},
+                                        DataType::FP32, out->get_name());
+    if (!dst_ptr) return false;
 
     bool is_internal_stream = false;
     if (stream == nullptr) {
@@ -305,7 +326,7 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
         dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
         kernel_fused_preproc_batch<<<grid, block, 0, stream>>>(
             d_src, d_ws, d_hs, d_offsets, d_ox, d_oy, d_sx, d_sy,
-            out->data_ptr<float>(), dst_h, dst_w,
+            dst_ptr, dst_h, dst_w,
             alpha[0], beta[0], alpha[1], beta[1], alpha[2], beta[2],
             swap_rb, pad_value);
         ok = cudaGetLastError() == cudaSuccess;
@@ -377,12 +398,16 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
                       const std::vector<float>& alpha,
                       const std::vector<float>& beta,
                       const float pad[3],
-                      cudaStream_t stream) {
+                      cudaStream_t stream,
+                      CudaOutputBufferPool* dst_pool) {
     if (images.empty() || dst_size.size() != 2) return false;
     const int batch = static_cast<int>(images.size());
     const int dst_w = dst_size[0];
     const int dst_h = dst_size[1];
-    out->allocate({batch, 3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+    // 整批输出：从缓冲池获取（复用），零拷贝包装
+    float* dst_ptr = wrap_output_tensor(out, dst_pool, {batch, 3, dst_h, dst_w},
+                                        DataType::FP32, out->get_name());
+    if (!dst_ptr) return false;
 
     bool is_internal_stream = false;
     if (stream == nullptr) {
@@ -441,7 +466,7 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
         dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
         kernel_fusion_rpnp_batch<<<grid, block, 0, stream>>>(
             d_src, d_ws, d_hs, d_offsets, d_rws, d_rhs,
-            out->data_ptr<float>(), dst_h, dst_w,
+            dst_ptr, dst_h, dst_w,
             alpha[0], beta[0], alpha[1], beta[1], alpha[2], beta[2],
             pad[0], pad[1], pad[2]);
         ok = cudaGetLastError() == cudaSuccess;

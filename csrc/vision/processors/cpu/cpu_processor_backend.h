@@ -39,6 +39,10 @@ namespace modeldeploy::vision {
         bool scrfd_preprocess(const ImageData& image, Tensor* out,
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
+        bool scrfd_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                    const std::vector<int>& dst_size,
+                                    float pad_val,
+                                    std::vector<LetterBoxRecord>* records) override;
         bool resize(const ImageData& image, ImageData* out,
                     int width, int height) override;
         bool convert(const ImageData& image, ImageData* out,

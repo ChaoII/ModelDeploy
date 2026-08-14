@@ -6,6 +6,7 @@
 
 #include "core/tensor.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/cuda/cuda_output_pool.h"
 
 
 namespace modeldeploy::vision {
@@ -15,5 +16,6 @@ namespace modeldeploy::vision {
         const std::vector<int>& dst_size,
         const std::vector<float>& mean,
         const std::vector<float>& std,
-        float pad_value);
+        float pad_value,
+        CudaOutputBufferPool* dst_pool = nullptr);
 }

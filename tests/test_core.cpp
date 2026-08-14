@@ -5,6 +5,9 @@
 #include <cstring>
 #include "core/tensor.h"
 #include "core/enum_variables.h"
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#endif
 
 using namespace modeldeploy;
 
@@ -292,33 +295,47 @@ TEST_CASE("Tensor copy is shallow", "[core]") {
 }
 
 // ============ GPU core tests ============
+// 架构说明：Tensor 不分配 GPU 内存；设备内存由后端（CudaProcessorBackend 池）自持，
+// 通过 from_external_memory(..., Device::GPU) 零拷贝包装。allocate(Device::GPU) 应抛异常。
 
 #ifdef WITH_GPU
-TEST_CASE("Tensor GPU allocation", "[core][gpu]") {
-    Tensor t({16, 16}, DataType::FP32, Device::GPU);
-    REQUIRE(t.device() == Device::GPU);
-    REQUIRE_FALSE(t.is_empty());
-    REQUIRE(t.size() == 256);
-    REQUIRE(t.byte_size() == 256 * 4);
+TEST_CASE("Tensor GPU allocation is unsupported", "[core][gpu]") {
+    // allocate 设备内存已被移除：Tensor 只分配 CPU 内存
+    REQUIRE_THROWS(Tensor({16, 16}, DataType::FP32, Device::GPU));
+    {
+        Tensor t;
+        REQUIRE_THROWS(t.allocate({4}, DataType::FP32, Device::GPU));
+    }
 }
 
-TEST_CASE("Tensor GPU CPU transfer", "[core][gpu]") {
+TEST_CASE("Tensor GPU external memory wrap", "[core][gpu]") {
+    // GPU tensor 通过 from_external_memory 零拷贝包装（不拥有设备内存）
+    float* gpu_buf = nullptr;
+    cudaMalloc(&gpu_buf, 4 * sizeof(float));
+    REQUIRE(gpu_buf != nullptr);
+    {
+        Tensor gpu;
+        gpu.from_external_memory(gpu_buf, {4}, DataType::FP32, [](void*) {}, Device::GPU);
+        REQUIRE(gpu.device() == Device::GPU);
+        REQUIRE_FALSE(gpu.is_empty());
+        REQUIRE(gpu.size() == 4);
+        REQUIRE(gpu.byte_size() == 4 * sizeof(float));
+        REQUIRE(gpu.data() == gpu_buf);  // 零拷贝：data() 指向外部设备内存
+    }  // 析构不 free（空 deleter），内存仍由调用方/后端持有
+    cudaFree(gpu_buf);
+}
+
+TEST_CASE("Tensor GPU copy_from_extern rejects device source", "[core][gpu]") {
+    // 设备源拷贝由后端处理；Tensor::copy_from_extern_buffer 仅支持 CPU 源
     Tensor cpu({4}, DataType::FP32);
-    static_cast<float*>(cpu.data())[0] = 42.0f;
-
-    Tensor gpu({4}, DataType::FP32, Device::GPU);
-    REQUIRE(gpu.device() == Device::GPU);
-}
-
-TEST_CASE("Tensor GPU multiple dtypes", "[core][gpu]") {
-    auto check = [](DataType dt, size_t elem_size) {
-        Tensor t({8}, dt, Device::GPU);
-        REQUIRE(t.device() == Device::GPU);
-        REQUIRE(t.byte_size() == 8 * elem_size);
-    };
-    check(DataType::FP32, 4);
-    check(DataType::INT32, 4);
-    check(DataType::UINT8, 1);
+    REQUIRE(cpu.copy_from_extern_memory(
+        static_cast<void*>(cpu.data()), cpu.byte_size(), Device::CPU));
+    // GPU 源应被拒绝
+    float* gpu_buf = nullptr;
+    cudaMalloc(&gpu_buf, 4 * sizeof(float));
+    REQUIRE(gpu_buf != nullptr);
+    REQUIRE_FALSE(cpu.copy_from_extern_memory(gpu_buf, cpu.byte_size(), Device::GPU));
+    cudaFree(gpu_buf);
 }
 #endif
 

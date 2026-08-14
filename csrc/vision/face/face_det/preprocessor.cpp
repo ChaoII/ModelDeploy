@@ -37,17 +37,15 @@ namespace modeldeploy::vision::face {
         }
         letter_box_records->resize(1);
         outputs->resize(1);
-        // Concat all the preprocessed data to a batch tensor
-        std::vector<Tensor> tensors(images->size());
-        for (size_t i = 0; i < images->size(); ++i) {
-            // 修改了数据，并生成一个tensor,并记录预处理的一些参数，便于在后处理中还原
-            preprocess(&(*images)[i], &tensors[i], &(*letter_box_records)[i]);
-        }
-        if (tensors.size() == 1) {
-            (*outputs)[0] = std::move(tensors[0]);
+        if (images->size() == 1) {
+            // 单图直接写到持久 outputs[0]（复用已有 buffer）
+            preprocess(&(*images)[0], &(*outputs)[0], &(*letter_box_records)[0]);
         }
         else {
-            (*outputs)[0] = std::move(Tensor::concat(tensors, 0));
+            // 多图整批一次 kernel（CPU/CUDA/Sophgo 各自实现），避免 N 次 launch + concat
+            backend_->scrfd_preprocess_batch(*images, &(*outputs)[0], size_,
+                                             static_cast<float>(padding_value_[0]),
+                                             letter_box_records);
         }
         return true;
     }

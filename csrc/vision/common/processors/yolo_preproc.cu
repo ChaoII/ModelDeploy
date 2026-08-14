@@ -186,20 +186,38 @@ struct BatchParamWorkspace {
 static thread_local BatchParamWorkspace param_ws;
 
 namespace modeldeploy::vision {
+
+    // 从后端缓冲池获取输出缓冲并零拷贝包装为 GPU Tensor（Tensor 不拥有设备内存）。
+    // 返回指向设备缓冲的指针，kernel 直接写入。
+    static float* wrap_output_tensor(Tensor* output, CudaOutputBufferPool* pool,
+                                     const std::vector<int64_t>& shape, DataType dtype,
+                                     const std::string& name) {
+        if (!pool) return nullptr;
+        size_t numel = 1;
+        for (int64_t d : shape) numel *= static_cast<size_t>(d);
+        const size_t bytes = numel * Tensor::get_element_size(dtype);
+        float* dst = pool->acquire(bytes);
+        if (!dst) return nullptr;
+        output->from_external_memory(dst, shape, dtype, [](void*) {}, Device::GPU, name);
+        return dst;
+    }
+
     bool yolo_preprocess_cuda(
         const ImageData& image,
         Tensor* output,
         const std::vector<int>& dst_size,
         const float pad_val,
         LetterBoxRecord* letter_box_record,
-        cudaStream_t stream) {
+        cudaStream_t stream,
+        CudaOutputBufferPool* dst_pool) {
         return yolo_preprocess_bgr_cuda(image.data(),
                                         {image.width(), image.height()},
                                         output,
                                         dst_size,
                                         pad_val,
                                         letter_box_record,
-                                        stream);
+                                        stream,
+                                        dst_pool);
     }
 
     bool yolo_preprocess_bgr_cuda(const uint8_t* src,
@@ -208,7 +226,8 @@ namespace modeldeploy::vision {
                                   const std::vector<int>& dst_size,
                                   const float pad_val,
                                   LetterBoxRecord* letter_box_record,
-                                  cudaStream_t stream) {
+                                  cudaStream_t stream,
+                                  CudaOutputBufferPool* dst_pool) {
         if (!output || dst_size.size() != 2) {
             return false;
         }
@@ -217,8 +236,10 @@ namespace modeldeploy::vision {
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
 
-        // 1 output: GPU, FP32, CHW
-        output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+        // 1 output: GPU, FP32, CHW（从缓冲池获取，零拷贝包装）
+        float* dst_ptr = wrap_output_tensor(output, dst_pool, {3, dst_h, dst_w},
+                                            DataType::FP32, output->get_name());
+        if (!dst_ptr) return false;
 
         // 2 CUDA stream
         bool is_internal_stream = false;
@@ -254,7 +275,7 @@ namespace modeldeploy::vision {
             d_src,
             src_h,
             src_w,
-            output->data_ptr<float>(),
+            dst_ptr,
             dst_h,
             dst_w,
             letter_box_record->scale,
@@ -281,7 +302,8 @@ namespace modeldeploy::vision {
                                    const std::vector<int>& dst_size,
                                    const float pad_value,
                                    LetterBoxRecord* letter_box_record,
-                                   cudaStream_t stream) {
+                                   cudaStream_t stream,
+                                   CudaOutputBufferPool* dst_pool) {
         if (!output || dst_size.size() != 2) {
             return false;
         }
@@ -290,8 +312,10 @@ namespace modeldeploy::vision {
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
 
-        // 1 output: GPU, FP32, CHW
-        output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+        // 1 output: GPU, FP32, CHW（从缓冲池获取，零拷贝包装）
+        float* dst_ptr = wrap_output_tensor(output, dst_pool, {3, dst_h, dst_w},
+                                            DataType::FP32, output->get_name());
+        if (!dst_ptr) return false;
 
         // 2 CUDA stream
         bool is_internal_stream = false;
@@ -341,7 +365,7 @@ namespace modeldeploy::vision {
             src_w,
             step_y,
             step_uv,
-            output->data_ptr<float>(),
+            dst_ptr,
             dst_h,
             dst_w,
             letter_box_record->scale,
@@ -410,13 +434,17 @@ namespace modeldeploy::vision {
                                     const std::vector<int>& dst_size,
                                     float pad_value,
                                     std::vector<LetterBoxRecord>* letter_box_records,
-                                    cudaStream_t stream) {
+                                    cudaStream_t stream,
+                                    CudaOutputBufferPool* dst_pool) {
         if (images.empty() || dst_size.size() != 2) return false;
         const int batch = static_cast<int>(images.size());
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
 
-        output->allocate({batch, 3, dst_h, dst_w}, DataType::FP32, Device::GPU);
+        // 整批输出：从缓冲池获取（复用），零拷贝包装
+        float* dst_ptr = wrap_output_tensor(output, dst_pool, {batch, 3, dst_h, dst_w},
+                                            DataType::FP32, output->get_name());
+        if (!dst_ptr) return false;
 
         bool is_internal_stream = false;
         if (stream == nullptr) {
@@ -492,7 +520,7 @@ namespace modeldeploy::vision {
         dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
         kernel_bgr_fusion_batch<<<grid, block, 0, stream>>>(
             d_src, d_src_ws, d_src_hs, d_src_offsets, d_scales_p, d_pad_ws_p, d_pad_hs_p,
-            output->data_ptr<float>(), dst_h, dst_w, pad_value);
+            dst_ptr, dst_h, dst_w, pad_value);
 
         const cudaError_t err = cudaGetLastError();
         cudaStreamSynchronize(stream);

@@ -30,7 +30,7 @@ namespace modeldeploy::vision {
                                                const std::vector<int>& dst_size,
                                                float pad_val, LetterBoxRecord* record) {
         return yolo_preprocess_cuda(image, out, dst_size, pad_val, record,
-                                    get_persistent_stream(&stream_));
+                                    get_persistent_stream(&stream_), &out_pool_);
     }
 
     bool CudaProcessorBackend::yolo_preprocess_nv12(const uint8_t* src_y, const uint8_t* src_uv,
@@ -46,14 +46,22 @@ namespace modeldeploy::vision {
         // 内部用 cudaPointerGetAttributes 校验：CPU 走 H2D，GPU 内存零拷贝直接使用
         return yolo_preprocess_nv12_cuda(src_y, src_uv, src_size, step_y, step_uv,
                                          out, dst_size, pad_val, record,
-                                         get_persistent_stream(&stream_));
+                                         get_persistent_stream(&stream_), &out_pool_);
     }
 
     bool CudaProcessorBackend::scrfd_preprocess(const ImageData& image, Tensor* out,
                                                 const std::vector<int>& dst_size,
                                                 float pad_val, LetterBoxRecord* record) {
         return scrfd_preprocess_cuda(image, out, dst_size, pad_val, record,
-                                     get_persistent_stream(&stream_));
+                                     get_persistent_stream(&stream_), &out_pool_);
+    }
+
+    bool CudaProcessorBackend::scrfd_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                                      const std::vector<int>& dst_size,
+                                                      float pad_val,
+                                                      std::vector<LetterBoxRecord>* records) {
+        return scrfd_preprocess_batch_cuda(images, out, dst_size, pad_val, records,
+                                           &out_pool_, get_persistent_stream(&stream_));
     }
 
     bool CudaProcessorBackend::fused_preprocess(
@@ -68,7 +76,7 @@ namespace modeldeploy::vision {
                                      out, dst_size,
                                      origin_x, origin_y, scale_x, scale_y,
                                      alpha, beta, swap_rb, pad_value,
-                                     get_persistent_stream(&stream_));
+                                     get_persistent_stream(&stream_), &out_pool_);
     }
 
     bool CudaProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
@@ -76,7 +84,7 @@ namespace modeldeploy::vision {
                                                      float pad_val,
                                                      std::vector<LetterBoxRecord>* records) {
         return yolo_preprocess_batch_cuda(images, out, dst_size, pad_val, records,
-                                          get_persistent_stream(&stream_));
+                                          get_persistent_stream(&stream_), &out_pool_);
     }
 
     bool CudaProcessorBackend::fused_preprocess_batch(
@@ -88,7 +96,7 @@ namespace modeldeploy::vision {
         bool swap_rb, float pad_value) {
         return fused_preprocess_batch_cuda(images, out, dst_size, origins_x, origins_y,
                                            scales_x, scales_y, alpha, beta, swap_rb, pad_value,
-                                           get_persistent_stream(&stream_));
+                                           get_persistent_stream(&stream_), &out_pool_);
     }
 
     bool CudaProcessorBackend::fusion_resize_pad_normalize_permute(
@@ -115,6 +123,6 @@ namespace modeldeploy::vision {
         return fusion_rpnp_cuda(images, out, resize_sizes, dst_size,
                                 std::vector<float>(alpha, alpha + 3),
                                 std::vector<float>(beta, beta + 3), pad,
-                                get_persistent_stream(&stream_));
+                                get_persistent_stream(&stream_), &out_pool_);
     }
 } // namespace modeldeploy::vision

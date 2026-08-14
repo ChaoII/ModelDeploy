@@ -4,6 +4,7 @@
 #pragma once
 
 #include "vision/processors/cpu/cpu_processor_backend.h"
+#include "vision/processors/cuda/cuda_output_pool.h"
 
 namespace modeldeploy::vision {
     // CUDA backend 继承 CPU 实现，仅覆写 yolo 系算子为 CUDA kernel
@@ -42,6 +43,10 @@ namespace modeldeploy::vision {
         bool scrfd_preprocess(const ImageData& image, Tensor* out,
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record) override;
+        bool scrfd_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
+                                    const std::vector<int>& dst_size,
+                                    float pad_val,
+                                    std::vector<LetterBoxRecord>* records) override;
         bool fusion_resize_pad_normalize_permute(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<std::array<int, 2>>& resize_sizes,
@@ -53,5 +58,7 @@ namespace modeldeploy::vision {
     private:
         // 持久 CUDA stream（避免每帧 create/destroy；.cpp 中惰性创建）
         void* stream_ = nullptr;
+        // 预处理输出设备缓冲池（与 stream 同生命周期，析构自动释放）
+        CudaOutputBufferPool out_pool_;
     };
 } // namespace modeldeploy::vision
