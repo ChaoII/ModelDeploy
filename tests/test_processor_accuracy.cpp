@@ -7,6 +7,8 @@
 #include <cmath>
 #include <vector>
 #include <cstdint>
+#include <cstring>
+#include <opencv2/opencv.hpp>
 
 #include "csrc/vision.h"
 #include "csrc/vision/processors/processor_factory.h"
@@ -339,4 +341,54 @@ TEST_CASE("Processor accuracy: ocr det fusion_resize_pad_normalize_permute CPU v
     REQUIRE(tensor_maxdiff(cpu_t, cuda_host, &nd) < 1e-4);
     REQUIRE(nd <= 16);
 #endif
+}
+
+// ==================== fused_color_matrix：BGR2YCrCb 对齐 ====================
+// 验证颜色矩阵融合 kernel 输出与 cv::cvtColor(BGR2YCrCb) + cast + HWC2CHW 原链路一致。
+TEST_CASE("Processor accuracy: fused_color_matrix BGR2YCrCb vs OpenCV", "[processor_accuracy]") {
+    auto backend = create_processor_backend(Device::CPU, Backend::ORT, 0);
+
+    // 原链路参考：center_crop(224 from 256) + cvtColor(BGR2YCrCb) + cast(float) + HWC2CHW
+    auto ref_image = make_test_image(256, 256);
+    cv::Mat ref_mat;
+    ref_image.to_mat(ref_mat);
+    const cv::Rect roi(16, 16, 224, 224);
+    cv::Mat crop_mat = ref_mat(roi).clone();
+    cv::Mat ycrcb_mat;
+    cv::cvtColor(crop_mat, ycrcb_mat, cv::COLOR_BGR2YCrCb);
+    ycrcb_mat.convertTo(ycrcb_mat, CV_32FC3);
+    // HWC(FP32) -> CHW(FP32)
+    std::vector<float> ref(static_cast<size_t>(3) * 224 * 224);
+    std::vector<cv::Mat> channels;
+    cv::split(ycrcb_mat, channels);
+    for (int c = 0; c < 3; ++c) {
+        std::memcpy(ref.data() + static_cast<size_t>(c) * 224 * 224,
+                    channels[c].ptr<float>(), static_cast<size_t>(224) * 224 * sizeof(float));
+    }
+
+    // fused kernel：BT.601 YCrCb 矩阵（对采样出的 r,g,b）
+    const float mat[3][3] = {
+        { 0.299f, 0.587f, 0.114f },
+        { 0.499813f, -0.418531f, -0.081282f },
+        { -0.168636f, -0.331068f, 0.498636f },
+    };
+    const float bias[3] = { 0.0f, 128.0f, 128.0f };
+    Tensor out;
+    // center_crop 224 from 256：scale=1, origin=-16
+    REQUIRE(backend->fused_color_matrix_preprocess(ref_image, &out, {224, 224},
+                                                   -16.0f, -16.0f, 1.0f, 1.0f,
+                                                   mat, bias, 0.0f));
+    REQUIRE(out.shape() == std::vector<int64_t>({1, 3, 224, 224}));
+    const float* got = static_cast<const float*>(out.data());
+    double max_diff = 0.0;
+    size_t diff_count = 0;
+    // OpenCV cvtColor 输出 uint8（截断），fused 输出 float（保留小数）。
+    // 允许 ±1 的 uint8 舍入差异。
+    for (size_t i = 0; i < ref.size(); ++i) {
+        const double d = std::fabs(static_cast<double>(got[i]) - ref[i]);
+        if (d > 1.5) ++diff_count;
+        max_diff = std::max(max_diff, d);
+    }
+    INFO("BGR2YCrCb fused vs OpenCV max_diff=" << max_diff << " count=" << diff_count);
+    REQUIRE(max_diff < 1.5);
 }

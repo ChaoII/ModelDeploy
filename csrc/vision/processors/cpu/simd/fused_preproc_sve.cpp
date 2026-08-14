@@ -140,5 +140,100 @@ void fusion_rpnp_sve(const uint8_t* src, int src_w, int src_h,
         }
     }
 }
+
+MD_TARGET_SVE void fused_color_matrix_sve(const uint8_t* src, int src_w, int src_h,
+                                          float* dst, int dst_w, int dst_h,
+                                          float origin_x, float origin_y,
+                                          float scale_x, float scale_y,
+                                          const float mat[3][3], const float bias[3],
+                                          float pad_value) {
+    const float inv_scale_x = 1.0f / scale_x;
+    const float inv_scale_y = 1.0f / scale_y;
+    const float origin_shift_x = origin_x / scale_x;
+    const float origin_shift_y = origin_y / scale_y;
+    const float src_w_f = static_cast<float>(src_w);
+    const float src_h_f = static_cast<float>(src_h);
+    const int plane = dst_h * dst_w;
+    const int n = dst_w;
+    const uint64_t lanes = svcntw();
+    const int max_lanes = 64;
+
+    const svfloat32_t b0 = svdup_f32(bias[0]);
+    const svfloat32_t b1 = svdup_f32(bias[1]);
+    const svfloat32_t b2 = svdup_f32(bias[2]);
+    const svfloat32_t padv = svdup_f32(pad_value);
+
+    #pragma omp parallel for schedule(static)
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;
+        if (src_yf < 0.0f || src_yf >= src_h_f) {
+            int x = 0;
+            for (; x + static_cast<int>(lanes) <= n; x += static_cast<int>(lanes)) {
+                svst1_f32(svptrue_b32(), dst + 0 * plane + base + x, padv);
+                svst1_f32(svptrue_b32(), dst + 1 * plane + base + x, padv);
+                svst1_f32(svptrue_b32(), dst + 2 * plane + base + x, padv);
+            }
+            for (; x < n; ++x) {
+                dst[0 * plane + base + x] = pad_value;
+                dst[1 * plane + base + x] = pad_value;
+                dst[2 * plane + base + x] = pad_value;
+            }
+            continue;
+        }
+        const int src_y = static_cast<int>(src_yf);
+        const uint8_t* src_row = src + src_y * src_w * 3;
+
+        int x = 0;
+        for (; x + static_cast<int>(lanes) <= n; x += static_cast<int>(lanes)) {
+            float r[max_lanes], g[max_lanes], b[max_lanes];
+            for (uint64_t i = 0; i < lanes; ++i) {
+                const int xx = x + static_cast<int>(i);
+                const float src_xf = static_cast<float>(xx) * inv_scale_x - origin_shift_x;
+                if (src_xf >= 0.0f && src_xf < src_w_f) {
+                    const int sxi = static_cast<int>(src_xf);
+                    const uint8_t* p = src_row + sxi * 3;
+                    r[i] = p[2];
+                    g[i] = p[1];
+                    b[i] = p[0];
+                } else {
+                    r[i] = g[i] = b[i] = pad_value;
+                }
+            }
+            const svbool_t pg = svptrue_b32();
+            const svfloat32_t rv = svld1_f32(pg, r);
+            const svfloat32_t gv = svld1_f32(pg, g);
+            const svfloat32_t bv = svld1_f32(pg, b);
+            svst1_f32(pg, dst + 0 * plane + base + x,
+                      svmla_f32(svmla_f32(svmla_f32(b0, rv, svdup_f32(mat[0][0])),
+                                          gv, svdup_f32(mat[0][1])),
+                                bv, svdup_f32(mat[0][2])));
+            svst1_f32(pg, dst + 1 * plane + base + x,
+                      svmla_f32(svmla_f32(svmla_f32(b1, rv, svdup_f32(mat[1][0])),
+                                          gv, svdup_f32(mat[1][1])),
+                                bv, svdup_f32(mat[1][2])));
+            svst1_f32(pg, dst + 2 * plane + base + x,
+                      svmla_f32(svmla_f32(svmla_f32(b2, rv, svdup_f32(mat[2][0])),
+                                          gv, svdup_f32(mat[2][1])),
+                                bv, svdup_f32(mat[2][2])));
+        }
+        for (; x < n; ++x) {
+            const float src_xf = static_cast<float>(x) * inv_scale_x - origin_shift_x;
+            float rv, gv, bv;
+            if (src_xf >= 0.0f && src_xf < src_w_f) {
+                const int sxi = static_cast<int>(src_xf);
+                const uint8_t* p = src_row + sxi * 3;
+                rv = p[2];
+                gv = p[1];
+                bv = p[0];
+            } else {
+                rv = gv = bv = pad_value;
+            }
+            dst[0 * plane + base + x] = mat[0][0] * rv + mat[0][1] * gv + mat[0][2] * bv + bias[0];
+            dst[1 * plane + base + x] = mat[1][0] * rv + mat[1][1] * gv + mat[1][2] * bv + bias[1];
+            dst[2 * plane + base + x] = mat[2][0] * rv + mat[2][1] * gv + mat[2][2] * bv + bias[2];
+        }
+    }
+}
 } // namespace modeldeploy::vision
 #endif // MD_HAS_SVE

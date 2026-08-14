@@ -106,6 +106,87 @@ void fused_preproc_neon(const uint8_t* src, int src_w, int src_h,
     }
 }
 
+void fused_color_matrix_neon(const uint8_t* src, int src_w, int src_h,
+                             float* dst, int dst_w, int dst_h,
+                             float origin_x, float origin_y,
+                             float scale_x, float scale_y,
+                             const float mat[3][3], const float bias[3],
+                             float pad_value) {
+    const float inv_scale_x = 1.0f / scale_x;
+    const float inv_scale_y = 1.0f / scale_y;
+    const float origin_shift_x = origin_x / scale_x;
+    const float origin_shift_y = origin_y / scale_y;
+    const float src_w_f = static_cast<float>(src_w);
+    const float src_h_f = static_cast<float>(src_h);
+    const int plane = dst_h * dst_w;
+    const int n = dst_w;
+
+    const float32x4_t b0 = vdupq_n_f32(bias[0]);
+    const float32x4_t b1 = vdupq_n_f32(bias[1]);
+    const float32x4_t b2 = vdupq_n_f32(bias[2]);
+
+#pragma omp parallel for schedule(static)
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;
+        if (src_yf < 0.0f || src_yf >= src_h_f) {
+            store_row_pad_neon(dst, plane, base, n, pad_value);
+            continue;
+        }
+        const int src_y = static_cast<int>(src_yf);
+        const uint8_t* src_row = src + src_y * src_w * 3;
+
+        int x = 0;
+        for (; x + 4 <= dst_w; x += 4) {
+            float r[4], g[4], b[4];
+            for (int i = 0; i < 4; ++i) {
+                const int xx = x + i;
+                const float src_xf = static_cast<float>(xx) * inv_scale_x - origin_shift_x;
+                if (src_xf >= 0.0f && src_xf < src_w_f) {
+                    const int sxi = static_cast<int>(src_xf);
+                    const uint8_t* p = src_row + sxi * 3;
+                    r[i] = p[2];
+                    g[i] = p[1];
+                    b[i] = p[0];
+                } else {
+                    r[i] = g[i] = b[i] = pad_value;
+                }
+            }
+            const float32x4_t rv = vld1q_f32(r);
+            const float32x4_t gv = vld1q_f32(g);
+            const float32x4_t bv = vld1q_f32(b);
+            vst1q_f32(dst + 0 * plane + base + x,
+                vfmaq_f32(vfmaq_f32(vfmaq_f32(b0, rv, vdupq_n_f32(mat[0][0])),
+                                    gv, vdupq_n_f32(mat[0][1])),
+                          bv, vdupq_n_f32(mat[0][2])));
+            vst1q_f32(dst + 1 * plane + base + x,
+                vfmaq_f32(vfmaq_f32(vfmaq_f32(b1, rv, vdupq_n_f32(mat[1][0])),
+                                    gv, vdupq_n_f32(mat[1][1])),
+                          bv, vdupq_n_f32(mat[1][2])));
+            vst1q_f32(dst + 2 * plane + base + x,
+                vfmaq_f32(vfmaq_f32(vfmaq_f32(b2, rv, vdupq_n_f32(mat[2][0])),
+                                    gv, vdupq_n_f32(mat[2][1])),
+                          bv, vdupq_n_f32(mat[2][2])));
+        }
+        for (; x < dst_w; ++x) {
+            const float src_xf = static_cast<float>(x) * inv_scale_x - origin_shift_x;
+            float rv, gv, bv;
+            if (src_xf >= 0.0f && src_xf < src_w_f) {
+                const int sxi = static_cast<int>(src_xf);
+                const uint8_t* p = src_row + sxi * 3;
+                rv = p[2];
+                gv = p[1];
+                bv = p[0];
+            } else {
+                rv = gv = bv = pad_value;
+            }
+            dst[0 * plane + base + x] = mat[0][0] * rv + mat[0][1] * gv + mat[0][2] * bv + bias[0];
+            dst[1 * plane + base + x] = mat[1][0] * rv + mat[1][1] * gv + mat[1][2] * bv + bias[1];
+            dst[2 * plane + base + x] = mat[2][0] * rv + mat[2][1] * gv + mat[2][2] * bv + bias[2];
+        }
+    }
+}
+
 
 void fusion_rpnp_neon(const uint8_t* src, int src_w, int src_h,
                       float* dst, int dst_w, int dst_h,

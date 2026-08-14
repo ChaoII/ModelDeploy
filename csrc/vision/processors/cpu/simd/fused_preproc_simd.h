@@ -25,6 +25,21 @@ using FusedPreprocKernel = void (*)(
 // 保证非空：总有一个可用的实现（scalar/AVX2/AVX512/NEON/SVE）。
 MODELDEPLOY_CXX_EXPORT FusedPreprocKernel get_fused_preproc_kernel();
 
+// 颜色矩阵融合内核：采样/裁剪（origin/scale 映射）→ 3x3 颜色矩阵 + 偏置 → 写 CHW FP32。
+// src: BGR 打包 uint8；采样出 (r,g,b)（swap 语义已在矩阵中体现）。
+// 输出 dst_c = Σ_j mat[c][j]*ch_j + bias[c]，其中 ch_0=R, ch_1=G, ch_2=B。
+// 可表达 BGR2YCrCb / BGR2RGB / 任意 3x3 线性颜色变换 + 每通道偏置。
+using FusedColorMatrixKernel = void (*)(
+    const uint8_t* src, int src_w, int src_h,
+    float* dst, int dst_w, int dst_h,
+    float origin_x, float origin_y,
+    float scale_x, float scale_y,
+    const float mat[3][3], const float bias[3],
+    float pad_value);
+
+// 选择当前 CPU 上最快的颜色矩阵融合内核（运行时 ISA 探测，保证非空）。
+MODELDEPLOY_CXX_EXPORT FusedColorMatrixKernel get_fused_color_matrix_kernel();
+
 // OCR det per-channel-pad kernel (resize then pad right/bottom).
 // src: BGR uint8; sx = dx*src_w/resize_w, sy = dy*src_h/resize_h;
 // pad zone (dy>=resize_h || dx>=resize_w) writes pad[c] per channel.

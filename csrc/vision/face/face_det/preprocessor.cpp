@@ -5,10 +5,6 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/face/face_det/preprocessor.h"
-#include <vision/common/processors/cast.h>
-#include <vision/common/processors/color_space_convert.h>
-#include <vision/common/processors/convert.h>
-#include <vision/common/processors/hwc2chw.h>
 #include "vision/face/face_det/scrfd_preproc.h"
 
 namespace modeldeploy::vision::face {

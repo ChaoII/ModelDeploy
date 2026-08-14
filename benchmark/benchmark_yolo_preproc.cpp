@@ -124,10 +124,12 @@ TEST_CASE("Full pipeline benchmarks (CPU)", "[benchmark][yolo]") {
         return r.channels();
     };
 
-    BENCHMARK("yolo_preprocess_cpu (letterbox + norm + CHW)") {
+    BENCHMARK("fused_preprocess SIMD (letterbox + norm + CHW, production path)") {
+        // 生产路径：CpuProcessorBackend 内部走 fused SIMD kernel
+        auto backend = vision::create_processor_backend(Device::CPU, Backend::ORT, 0);
         Tensor output;
         LetterBoxRecord record;
-        yolo_preprocess_cpu(img, &output, {640, 640}, kPadVal, &record);
+        backend->yolo_preprocess(img, &output, {640, 640}, kPadVal, &record);
         return output.size();
     };
 }

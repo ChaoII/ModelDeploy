@@ -6,60 +6,10 @@
 #include "vision/utils.h"
 #include "vision/common/struct.h"
 #include "vision/common/processors/yolo_preproc.h"
-#include "vision/common/processors/convert_and_permute.h"
 
 
 namespace modeldeploy::vision {
     constexpr float inv_255 = 1.0f / 255.0f;
-
-    static void yolo_preprocess_bgr_cpu_inner(
-        const uint8_t* src,
-        const int src_w,
-        const int src_h,
-        float* dst,
-        const int dst_w,
-        const int dst_h,
-        const float scale,
-        const float pad_w,
-        const float pad_h,
-        const float pad_value
-    ) {
-        const int plane_size = dst_w * dst_h;
-
-
-        const float pad_x_end = pad_w + static_cast<float>(src_w) * scale;
-        const float pad_y_end = pad_h + static_cast<float>(src_h) * scale;
-        const float pad_f = pad_value * inv_255;
-
-        for (int dy = 0; dy < dst_h; ++dy) {
-            for (int dx = 0; dx < dst_w; ++dx) {
-                const int out_idx = dy * dst_w + dx;
-                // padding
-                if (dx < pad_w || dx >= pad_x_end ||
-                    dy < pad_h || dy >= pad_y_end) {
-                    dst[0 * plane_size + out_idx] = pad_f;
-                    dst[1 * plane_size + out_idx] = pad_f;
-                    dst[2 * plane_size + out_idx] = pad_f;
-                    continue;
-                }
-
-                const int sx = static_cast<int>((dx - pad_w) / scale);
-                const int sy = static_cast<int>((dy - pad_h) / scale);
-
-                const int src_idx = (sy * src_w + sx) * 3;
-                float c0 = src[src_idx + 0] * inv_255;
-                float c1 = src[src_idx + 1] * inv_255;
-                float c2 = src[src_idx + 2] * inv_255;
-
-                std::swap(c0, c2);
-
-                dst[0 * plane_size + out_idx] = c0;
-                dst[1 * plane_size + out_idx] = c1;
-                dst[2 * plane_size + out_idx] = c2;
-            }
-        }
-    }
-
 
     static void yolo_preprocess_nv12_cpu_inner(
         const uint8_t* src_y,
@@ -143,44 +93,6 @@ namespace modeldeploy::vision {
 
 
 
-
-    bool yolo_preprocess_cpu(const ImageData& image,
-                             Tensor* output,
-                             const std::vector<int>& dst_size,
-                             const float pad_val,
-                             LetterBoxRecord* letter_box_record) {
-        return yolo_preprocess_bgr_cpu(image.data(),
-                                       {image.width(), image.height()},
-                                       output,
-                                       dst_size,
-                                       pad_val,
-                                       letter_box_record);
-    }
-
-
-    bool yolo_preprocess_bgr_cpu(const uint8_t* src,
-                                 const std::vector<int>& src_size,
-                                 Tensor* output,
-                                 const std::vector<int>& dst_size,
-                                 float pad_val,
-                                 LetterBoxRecord* letter_box_record) {
-        if (src == nullptr) return false;
-
-        const int src_w = src_size[0];
-        const int src_h = src_size[1];
-        const int dst_w = dst_size[0];
-        const int dst_h = dst_size[1];
-
-        output->allocate({3, dst_h, dst_w}, DataType::FP32, Device::CPU);
-        *letter_box_record = utils::cal_letter_box_param({src_w, src_h}, {dst_w, dst_h});
-        const float scale = letter_box_record->scale;
-        const float pad_w = letter_box_record->pad_w;
-        const float pad_h = letter_box_record->pad_h;
-        auto* dst = output->data_ptr<float>();
-        yolo_preprocess_bgr_cpu_inner(src, src_w, src_h, dst, dst_w, dst_h, scale, pad_w, pad_h, pad_val);
-        output->expand_dim(0);
-        return true;
-    }
 
     bool yolo_preprocess_nv12_cpu(const uint8_t* src_y,
                                   const uint8_t* src_uv,

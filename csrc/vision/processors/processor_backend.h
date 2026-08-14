@@ -31,12 +31,6 @@ namespace modeldeploy::vision {
                                           float pad_val, LetterBoxRecord* record,
                                           Device src_device = Device::CPU) = 0;
 
-        // 纯 letterbox（不归一化不重排），输出 HWC 图像 + 记录（LPR det 用）
-        virtual bool letterbox(const ImageData& image, ImageData* out,
-                               const std::vector<int>& dst_size,
-                               const std::vector<float>& padding_value,
-                               LetterBoxRecord* record) = 0;
-
         // 整批 yolo 预处理（batch>1 时一次 kernel 完成，避免 N 次 launch + concat）
         virtual bool yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
                                            const std::vector<int>& dst_size,
@@ -67,40 +61,6 @@ namespace modeldeploy::vision {
         // 通用算子（输出中间图像，供多算子 pipeline 串联）
         virtual bool resize(const ImageData& image, ImageData* out,
                             int width, int height) = 0;
-        virtual bool normalize(const ImageData& image, ImageData* out,
-                               const std::vector<float>& mean,
-                               const std::vector<float>& std,
-                               bool scale = true, bool swap_rb = true) = 0;
-        virtual bool convert_to(const ImageData& image, ImageData* out,
-                                const std::string& dst_format) = 0;
-
-        // 数值缩放（如 /255），alpha/beta 与 Convert::apply 语义一致
-        virtual bool convert(const ImageData& image, ImageData* out,
-                             const std::vector<float>& alpha,
-                             const std::vector<float>& beta) = 0;
-
-        // 数据类型转换（如 uint8 -> float），dtype 与 Cast::apply 语义一致
-        // scale=true 时乘以 1/255（与 ImageData::cast 默认一致），false 时纯类型转换
-        virtual bool cast(const ImageData& image, ImageData* out,
-                          const std::string& dtype, bool scale = true) = 0;
-
-        // 缩放 + 通道重排（LPR 用：alpha=1/255, beta 可选, swap_rb）
-        virtual bool convert_and_permute(const ImageData& image, Tensor* out,
-                                         const std::vector<float>& alpha,
-                                         const std::vector<float>& beta,
-                                         bool swap_rb) = 0;
-
-        virtual bool center_crop(const ImageData& image, ImageData* out,
-                                 int width, int height) = 0;
-        // 四边填充，value 为填充值（OCR rec/cls/table 用）
-        virtual bool pad(const ImageData& image, ImageData* out,
-                         int top, int bottom, int left, int right,
-                         float value = 0.0f) = 0;
-        virtual bool hwc2chw(const ImageData& image, Tensor* out) = 0;
-        virtual bool normalize_and_permute(const ImageData& image, Tensor* out,
-                                           const std::vector<float>& mean,
-                                           const std::vector<float>& std,
-                                           bool scale = true) = 0;
 
         // 整批融合算子（OCR det 用：resize+pad+normalize+permute，batch 内统一 pad）
         virtual bool fusion_resize_pad_normalize_permute(
@@ -138,5 +98,21 @@ namespace modeldeploy::vision {
             const std::vector<float>& alpha,
             const std::vector<float>& beta,
             bool swap_rb, float pad_value) = 0;
+
+        // 通用融合预处理（颜色矩阵版）：采样/裁剪 + 3x3 颜色矩阵 + 偏置 + 写 CHW FP32。
+        // 可表达 BGR2YCrCb / BGR2RGB 等任意 3x3 线性颜色变换 + 每通道偏置。
+        // 默认返回 false（未实现后端可覆盖或走 CPU 兜底）。
+        virtual bool fused_color_matrix_preprocess(
+            const ImageData& image, Tensor* out,
+            const std::vector<int>& dst_size,
+            float origin_x, float origin_y,
+            float scale_x, float scale_y,
+            const float mat[3][3], const float bias[3],
+            float pad_value) {
+            (void)image; (void)out; (void)dst_size;
+            (void)origin_x; (void)origin_y; (void)scale_x; (void)scale_y;
+            (void)mat; (void)bias; (void)pad_value;
+            return false;
+        }
     };
 } // namespace modeldeploy::vision

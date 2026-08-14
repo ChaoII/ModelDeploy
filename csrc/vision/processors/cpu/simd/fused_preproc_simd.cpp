@@ -93,13 +93,52 @@ void fusion_rpnp_scalar(const uint8_t* src, int src_w, int src_h,
                 dst[2 * plane + idx] = pad[2];
                 continue;
             }
-            const int sx = std::min(static_cast<int>(x * kx), last_sx);
-            const int sy = std::min(static_cast<int>(y * ky), last_sy);
-            const uint8_t* p = src + (sy * src_w + sx) * 3;
-            const float pb = p[0], pg = p[1], pr = p[2];
-            dst[0 * plane + idx] = pr * alpha[0] + beta[0];
-            dst[1 * plane + idx] = pg * alpha[1] + beta[1];
-            dst[2 * plane + idx] = pb * alpha[2] + beta[2];
+    const int sx = std::min(static_cast<int>(x * kx), last_sx);
+    const int sy = std::min(static_cast<int>(y * ky), last_sy);
+    const uint8_t* p = src + (sy * src_w + sx) * 3;
+    const float pb = p[0], pg = p[1], pr = p[2];
+    dst[0 * plane + idx] = pr * alpha[0] + beta[0];
+    dst[1 * plane + idx] = pg * alpha[1] + beta[1];
+    dst[2 * plane + idx] = pb * alpha[2] + beta[2];
+        }
+    }
+}
+
+// 颜色矩阵融合标量内核：采样（origin/scale 映射）→ 3x3 矩阵 → 写 CHW FP32
+void fused_color_matrix_scalar(const uint8_t* src, int src_w, int src_h,
+                               float* dst, int dst_w, int dst_h,
+                               float origin_x, float origin_y,
+                               float scale_x, float scale_y,
+                               const float mat[3][3], const float bias[3],
+                               float pad_value) {
+    const float inv_scale_x = 1.0f / scale_x;
+    const float inv_scale_y = 1.0f / scale_y;
+    const float origin_shift_x = origin_x / scale_x;
+    const float origin_shift_y = origin_y / scale_y;
+    const float src_w_f = static_cast<float>(src_w);
+    const float src_h_f = static_cast<float>(src_h);
+    const int plane = dst_h * dst_w;
+
+    for (int y = 0; y < dst_h; ++y) {
+        const int base = y * dst_w;
+        const float src_yf = static_cast<float>(y) * inv_scale_y - origin_shift_y;
+        const int src_y = static_cast<int>(src_yf);
+        const uint8_t* src_row = src + src_y * src_w * 3;
+        const bool y_ok = src_yf >= 0.0f && src_yf < src_h_f;
+        for (int x = 0; x < dst_w; ++x) {
+            const float src_xf = static_cast<float>(x) * inv_scale_x - origin_shift_x;
+            if (!y_ok || src_xf < 0.0f || src_xf >= src_w_f) {
+                dst[0 * plane + base + x] = pad_value;
+                dst[1 * plane + base + x] = pad_value;
+                dst[2 * plane + base + x] = pad_value;
+                continue;
+            }
+            const int sx = static_cast<int>(src_xf);
+            const uint8_t* p = src_row + sx * 3;
+            const float b = p[0], g = p[1], r = p[2];
+            dst[0 * plane + base + x] = mat[0][0] * r + mat[0][1] * g + mat[0][2] * b + bias[0];
+            dst[1 * plane + base + x] = mat[1][0] * r + mat[1][1] * g + mat[1][2] * b + bias[1];
+            dst[2 * plane + base + x] = mat[2][0] * r + mat[2][1] * g + mat[2][2] * b + bias[2];
         }
     }
 }
@@ -129,6 +168,16 @@ void fusion_rpnp_neon(const uint8_t*, int, int, float*, int, int, int, int,
                       const float*, const float*, const float*);
 void fusion_rpnp_sve(const uint8_t*, int, int, float*, int, int, int, int,
                      const float*, const float*, const float*);
+
+// 颜色矩阵融合内核（外部 ISA 实现）
+void fused_color_matrix_avx2(const uint8_t*, int, int, float*, int, int, float, float, float, float,
+                             const float[3][3], const float[3], float);
+void fused_color_matrix_avx512(const uint8_t*, int, int, float*, int, int, float, float, float, float,
+                               const float[3][3], const float[3], float);
+void fused_color_matrix_neon(const uint8_t*, int, int, float*, int, int, float, float, float, float,
+                             const float[3][3], const float[3], float);
+void fused_color_matrix_sve(const uint8_t*, int, int, float*, int, int, float, float, float, float,
+                            const float[3][3], const float[3], float);
 
 FusedPreprocKernel get_fused_preproc_kernel() {
 #if defined(MD_ARM64)
@@ -210,6 +259,46 @@ FusedPreprocPadKernel get_fusion_rpnp_kernel() {
 #endif
 #else
     return fusion_rpnp_scalar;
+#endif
+}
+
+FusedColorMatrixKernel get_fused_color_matrix_kernel() {
+#if defined(MD_ARM64)
+#if defined(__ARM_FEATURE_SVE)
+#if defined(__linux__)
+    if (getauxval(AT_HWCAP) & HWCAP_SVE) {
+        return fused_color_matrix_sve;
+    }
+#else
+    return fused_color_matrix_sve;
+#endif
+#endif
+    return fused_color_matrix_neon;
+#elif defined(MD_X86)
+#if defined(_MSC_VER)
+    {
+        int cpu_info[4] = {0};
+        __cpuidex(cpu_info, 1, 0);
+        const bool osxsave = (cpu_info[2] & (1u << 27)) != 0;
+        const uint64_t xcr0 = _xgetbv(0);
+        const bool os_ymm = osxsave && (xcr0 & 0x6) == 0x6;
+        const bool os_zmm = osxsave && (xcr0 & 0xE6) == 0xE6;
+        __cpuidex(cpu_info, 7, 0);
+        const bool has_avx2 = (cpu_info[1] & (1u << 5)) != 0;
+        const bool has_avx512f = (cpu_info[1] & (1u << 16)) != 0;
+        if (has_avx512f && os_zmm) return fused_color_matrix_avx512;
+        if (has_avx2 && os_ymm) return fused_color_matrix_avx2;
+        return fused_color_matrix_scalar;
+    }
+#elif defined(__GNUC__) || defined(__clang__)
+    if (__builtin_cpu_supports("avx512f")) return fused_color_matrix_avx512;
+    if (__builtin_cpu_supports("avx2")) return fused_color_matrix_avx2;
+    return fused_color_matrix_scalar;
+#else
+    return fused_color_matrix_scalar;
+#endif
+#else
+    return fused_color_matrix_scalar;
 #endif
 }
 

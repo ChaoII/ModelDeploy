@@ -5,6 +5,7 @@
 
 #include "base_model.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
 
 namespace modeldeploy::vision::face {
     /*! @brief SCRFD model object used when to load a SCRFD model exported by SCRFD.
@@ -41,5 +42,7 @@ namespace modeldeploy::vision::face {
         bool preprocess(ImageData* image, Tensor* output);
 
         bool postprocess(const std::vector<Tensor>& infer_result, std::vector<std::tuple<int, float>>* result);
+
+        std::shared_ptr<VisionProcessorBackend> backend_;
     };
 }

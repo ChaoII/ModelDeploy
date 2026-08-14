@@ -4,13 +4,6 @@
 
 #include <core/md_log.h>
 
-#include "vision/utils.h"
-#include "utils/utils.h"
-#include "vision/common/processors/resize.h"
-#include "vision/common/processors/color_space_convert.h"
-#include "vision/common/processors/hwc2chw.h"
-#include "vision/common/processors/cast.h"
-#include "vision/common/processors/convert.h"
 #include "vision/face/face_as/face_as_second.h"
 
 
@@ -27,28 +20,26 @@ namespace modeldeploy::vision::face {
             MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
+        backend_ = create_processor_backend(runtime_option.device, runtime_option.backend,
+                                            runtime_option.device_id);
         return true;
     }
 
     bool SeetaFaceAsSecond::preprocess(ImageData* image, Tensor* output) {
-        const std::vector alpha_ = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
-        const std::vector beta_ = {-1.0f, -1.0f, -1.0f};
-
-
-        cv::Mat mat;
-        image->to_mat(mat);
-
-
-        Resize::apply(&mat, size_[0], size_[1]);
-        Convert::apply(&mat, alpha_, beta_);
-        HWC2CHW::apply(&mat);
-        Cast::apply(&mat, "float");
-
-        if (!utils::mat_to_tensor(mat, output)) {
-            MD_LOG_ERROR << "Failed to binding mat to tensor." << std::endl;
+        // Resize(直接拉伸到 size_) + Convert(alpha=1/128, beta=-1) + HWC2CHW + Cast(float)
+        // 全融合为单步 SIMD kernel。映射 src=(dst-origin)/scale，拉伸时 scale=src/dst。
+        const int src_w = image->width();
+        const int src_h = image->height();
+        const float scale_x = static_cast<float>(src_w) / size_[0];
+        const float scale_y = static_cast<float>(src_h) / size_[1];
+        const std::vector<float> alpha = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
+        const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};
+        if (!backend_->fused_preprocess(*image, output, size_,
+                                        0.0f, 0.0f, scale_x, scale_y,
+                                        alpha, beta, false, 0.0f)) {
+            MD_LOG_ERROR << "Failed to fused preprocess." << std::endl;
             return false;
         }
-        output->expand_dim(0); // reshape to n, c, h, w
         return true;
     }
 
