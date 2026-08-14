@@ -122,8 +122,6 @@ namespace modeldeploy {
         void print(std::ostream& os = std::cout) const;
         [[nodiscard]] std::string to_string() const;
         friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
-        static Tensor concat(const std::vector<Tensor>& tensors, int axis);
-        [[nodiscard]] Tensor softmax(int axis = -1) const;
         void expand_dim(int64_t axis);
 
         // 工具函数

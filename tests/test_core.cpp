@@ -244,19 +244,6 @@ TEST_CASE("Tensor rank and dim helpers", "[core]") {
 
 // ============ Tensor edge cases ============
 
-TEST_CASE("Tensor concat", "[core]") {
-    Tensor a({2, 3}, DataType::FP32);
-    Tensor b({2, 3}, DataType::FP32);
-    auto* da = static_cast<float*>(a.data());
-    auto* db = static_cast<float*>(b.data());
-    for (int i = 0; i < 6; ++i) { da[i] = static_cast<float>(i); db[i] = static_cast<float>(i + 100); }
-
-    auto c = Tensor::concat({a, b}, 0);
-    REQUIRE(c.shape() == std::vector<int64_t>({4, 3}));
-    REQUIRE(c.at({0, 0}) == 0.0f);
-    REQUIRE(c.at({3, 2}) == 105.0f);
-}
-
 // ============ Tensor view (merged from TensorView) tests ============
 
 TEST_CASE("Tensor view shares memory", "[core]") {

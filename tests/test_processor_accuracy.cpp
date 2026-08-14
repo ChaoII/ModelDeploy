@@ -272,13 +272,19 @@ TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA",
     REQUIRE(cpu_backend->fused_preprocess_batch(imgs, &batch_cpu, dst, oxs, oys, sxs, sys,
                                                 alpha, beta, true, 0.0f));
 
-    // batch == 逐图 concat（正确性）
+    // batch == 逐图拼接（正确性）：手写拼接参考（concat 已从 core 移除）
     std::vector<Tensor> singles(3);
     for (int i = 0; i < 3; ++i) {
         REQUIRE(cpu_backend->fused_preprocess(imgs[i], &singles[i], dst, oxs[i], oys[i], sxs[i], sys[i],
                                               alpha, beta, true, 0.0f));
     }
-    Tensor concat_ref = Tensor::concat(singles, 0);
+    // 手工拼接 singles 到 [3,3,h,w]
+    Tensor concat_ref({3, 3, dst[1], dst[0]}, DataType::FP32);
+    const size_t img_bytes = static_cast<size_t>(3) * dst[1] * dst[0] * sizeof(float);
+    auto* dest = static_cast<char*>(concat_ref.data());
+    for (int i = 0; i < 3; ++i) {
+        std::memcpy(dest + i * img_bytes, singles[i].data(), img_bytes);
+    }
     size_t nd = 0;
     REQUIRE(tensor_maxdiff(batch_cpu, concat_ref, &nd) < 1e-5);
     REQUIRE(nd == 0);
