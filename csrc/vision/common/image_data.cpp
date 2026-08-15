@@ -171,8 +171,6 @@ namespace modeldeploy::vision {
         if (!impl_ || impl_->empty()) {
             return ImageData();
         }
-        cv::Mat image;
-        impl_->mat.copyTo(image);
         std::vector<std::vector<float>> points;
         for (int i = 0; i < 4; ++i) {
             std::vector<float> tmp;
@@ -186,8 +184,11 @@ namespace modeldeploy::vision {
         float right = *std::max_element(x_collect, x_collect + 4);
         float top = *std::min_element(y_collect, y_collect + 4);
         float bottom = *std::max_element(y_collect, y_collect + 4);
+        // 直接在原图上取 ROI，避免整图拷贝（密集文本页每行一次整图 copy 开销很大）
+        cv::Rect roi(std::max(0, static_cast<int>(left)), std::max(0, static_cast<int>(top)),
+                     std::max(1, static_cast<int>(right - left)), std::max(1, static_cast<int>(bottom - top)));
         cv::Mat img_crop;
-        image(cv::Rect2f(left, top, right - left, bottom - top)).copyTo(img_crop);
+        impl_->mat(roi & cv::Rect(0, 0, impl_->mat.cols, impl_->mat.rows)).copyTo(img_crop);
         for (auto& point : points) {
             point[0] -= left;
             point[1] -= top;

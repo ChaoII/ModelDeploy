@@ -33,7 +33,7 @@ namespace modeldeploy::vision::face {
          * \param[in] age The output age will be writen to this structure
          * \return true if the prediction successed, otherwise false
          */
-        virtual bool predict(const ImageData& image, int* age);
+        virtual bool predict(const ImageData& image, int* age, TimerArray* timers = nullptr);
 
         /** \brief Predict the detection results for a batch of input images
          *
@@ -42,7 +42,7 @@ namespace modeldeploy::vision::face {
          * \return true if the prediction successed, otherwise false
          */
         virtual bool batch_predict(const std::vector<ImageData>& images,
-                                   std::vector<int>* ages);
+                                   std::vector<int>* ages, TimerArray* timers = nullptr);
 
         /// Get preprocessor reference of AdaFace
         virtual SeetaFaceAgePreprocessor& get_preprocessor() {

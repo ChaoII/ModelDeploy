@@ -60,8 +60,10 @@ namespace modeldeploy::vision::detection {
                     label_id = 0;
                 } else {
                     const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
-                    // yolo 无 NMS 模型的 class 通道为 raw logits，需 sigmoid 转概率
-                    confidence = 1.0f / (1.0f + std::exp(-(*max_class_score)));
+                    // Ultralytics 端到端导出（无内嵌 NMS）的 class 通道已含 Sigmoid，输出即概率 [0,1]，
+                    // 不能再做 sigmoid（二次 sigmoid 会把分数推向 1，导致全部 anchor 过阈值、NMS 退化
+                    // 为 O(n^2) 全量比较，实测 det post 463ms 的根因）。
+                    confidence = *max_class_score;
                     label_id = std::distance(attr_ptr + 4, max_class_score);
                 }
                 // filter boxes by conf_threshold

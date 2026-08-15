@@ -62,7 +62,7 @@ namespace modeldeploy::vision::lpr {
 
         const cv::Mat M = cv::getPerspectiveTransform(pts_ori, pts_std);
         cv::Mat dst_image;
-        cv::warpPerspective(src_image, dst_image, M, cv::Size2f(max_width, max_height));
+        cv::warpPerspective(src_image, dst_image, M, cv::Size(static_cast<int>(max_width), static_cast<int>(max_height)));
         return dst_image;
     }
 
@@ -88,33 +88,35 @@ namespace modeldeploy::vision::lpr {
             return false;
         }
         const size_t lp_num = det_result.size();
-        results->resize(lp_num);
+        results->clear();
+        results->reserve(lp_num);
+        // 整图只拷贝一次（原来在循环内每辆车重复拷贝）
+        cv::Mat _image;
+        image.to_mat(_image);
 
-        for (int i = 0; i < lp_num; ++i) {
-            (*results)[i].box = det_result[i].box;
-            (*results)[i].score = det_result[i].score;
-            (*results)[i].label_id = det_result[i].label_id;
-            (*results)[i].keypoints = det_result[i].keypoints;
+        for (int i = 0; i < static_cast<int>(lp_num); ++i) {
+            LprResult r;
+            r.box = det_result[i].box;
+            r.score = det_result[i].score;
+            r.label_id = det_result[i].label_id;
+            r.keypoints = det_result[i].keypoints;
 
-            std::array<cv::Point2f, 4> points;
+            // 关键点数量不匹配时跳过该车，不整帧失败
             if (det_result[i].keypoints.size() != 4) {
-                MD_LOG_ERROR << "detector predict failed" << std::endl;
-                return false;
+                MD_LOG_WARN << "skip plate with invalid keypoints count=" << det_result[i].keypoints.size() << std::endl;
+                continue;
             }
+            std::array<cv::Point2f, 4> points;
             for (int j = 0; j < 4; ++j) {
                 points[j] = utils::point2f_to_cv_type(Point2f(det_result[i].keypoints[j].x, det_result[i].keypoints[j].y));
             }
-            cv::Mat _image;
-            image.to_mat(_image);
             cv::Mat transform_image = transform_from_4points(_image, points);
             // 如果是双层车牌 0 单层车牌 1 双层车牌
             if (det_result[i].label_id) {
                 transform_image = get_split_merge(transform_image);
             }
-            LprResult tmp_result;
-            recognizer_->predict(ImageData(std::move(transform_image)), &tmp_result);
-            (*results)[i].car_plate_color = tmp_result.car_plate_color;
-            (*results)[i].car_plate_str = tmp_result.car_plate_str;
+            recognizer_->predict(ImageData(std::move(transform_image)), &r);
+            results->push_back(std::move(r));
         }
         return true;
     }

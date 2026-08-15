@@ -136,6 +136,7 @@ TEST_CASE("Regression: yolo11n_nms detection", "[regression]") {
     require_no_diff(compare_detection(load_json(base_file)["results"], results));
 }
 
+#ifdef ENABLE_MNN
 TEST_CASE("Regression: yolo11n detection MNN", "[regression][backend:mnn]") {
     auto modelfile = model_path("yolo11n.mnn", "mnn");
     if (!fs::exists(modelfile)) return;
@@ -360,7 +361,9 @@ TEST_CASE("Regression: yolo11n-seg_nms segmentation MNN", "[regression][backend:
         warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg_nms.mnn vs ORT baseline");
     }
 }
+#endif // ENABLE_MNN
 
+#ifdef ENABLE_TRT
 TEST_CASE("Regression: yolo11n detection TRT", "[regression][backend:trt]") {
     auto modelfile = model_path("yolo11n.engine", "trt");
     if (!fs::exists(modelfile)) return;
@@ -585,6 +588,7 @@ TEST_CASE("Regression: yolo11n-seg segmentation TRT", "[regression][backend:trt]
         warn_diff(compare_seg(load_json(ort_file)["results"], results), "yolo11n-seg.engine vs ORT baseline");
     }
 }
+#endif // ENABLE_TRT
 
 TEST_CASE("Regression: yolo11n-seg segmentation", "[regression]") {
     auto modelfile = model_path("yolo11n-seg.onnx");

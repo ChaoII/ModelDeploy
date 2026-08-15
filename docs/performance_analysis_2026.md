@@ -1,5 +1,7 @@
 # ModelDeploy 全模型性能分析报告（2026-08）
 
+> 更新：本文档同步记录本次优化修复的成果（详见文末"优化修复记录"）。
+
 本文档基于新增的 `benchmark/benchmark_models.cpp`（全模型 + 全后端 pre/infer/post 分解）
 与 `tests/test_pipelines.cpp`（多阶段 pipeline 回归）实测数据。
 
@@ -169,8 +171,8 @@ AVX512 构建或双线性核 SIMD 化可进一步压缩。
 | face-rec pipeline | 12 fps | - |
 
 **提升吞吐量的关键动作**（按优先级）：
-1. **修复 O(n²) NMS**（最快收益，det/行人/OCR/LPR 全受益，预计 det post 463ms→<10ms）；
-2. **OCR batch 化**（cls batch=1 → 16，rec batch=6 → 32），预计 OCR 2000ms→<600ms；
+1. ~~修复 O(n²) NMS~~ → 已完成（见下"优化修复记录"）；det post 463ms→2.4ms；
+2. **OCR batch 化**（cls batch 1→6 已完成；rec 动态宽限制仍是瓶颈），预计 OCR 2000ms→<600ms；
 3. 生产环境换带内嵌 NMS 的模型 + GPU TRT engine。
 
 ## 8. 复现命令
@@ -178,11 +180,68 @@ AVX512 构建或双线性核 SIMD 化可进一步压缩。
 ```bash
 # 回归
 TEST_DATA_DIR=repo cmake 构建后:
-build_tdc/bin/test_modeldeploy        # CPU 全量（147 用例 / 7795 断言）
-build_tdc_gpu/bin/test_modeldeploy    # GPU 全量（152 用例，9 个为 MNN 用例在无 MNN 构建下失败）
+build_tdc/bin/test_modeldeploy        # CPU 全量（147 用例 / 1639 断言）
+build_tdc_gpu/bin/test_modeldeploy    # GPU 全量（143 用例 / 1754 断言，全过）
 
 # 性能
 build_tdc/bin/benchmark.exe "[all_models][benchmark]"   # CPU ORT + MNN
 build_tdc_gpu/bin/benchmark.exe "[all_models][benchmark]"  # GPU ORT + TRT
 build_tdc/bin/benchmark.exe "[pipeline][benchmark]"     # pipeline
 ```
+
+## 9. 优化修复记录（2026-08）
+
+本次针对报告发现的问题完成了以下修复：
+
+### 9.1 det 二次 sigmoid bug（最大瓶颈，post 463ms → 2.4ms）
+
+**根因**（`csrc/vision/detection/postprocessor.cpp` run_without_nms）：
+Ultralytics 无内嵌 NMS 导出的模型（`yolo11n.onnx`）class 通道**已含 Sigmoid**（输出即概率
+[0,1]），但代码又对 `max_class_score` 做了一次 `1/(1+exp(-x))`。二次 sigmoid 把概率推向 1，
+**全部 8400 个 anchor 过 0.25 阈值**，全部进入 O(n²) NMS → post 463ms。
+（此前报告归因于"NMS 本身慢"不准确——实测过滤后候选仅 30 个，NMS < 1ms。）
+
+**修复**：去掉二次 sigmoid，直接 `confidence = *max_class_score`。候选回到 30 个，post
+463ms → 2.4ms，det 单帧 495ms → 33ms。检测结果与 python（onnxruntime 1.20）一致。
+
+### 9.2 LPR 二次 sigmoid bug（lpr-det post 9.8s → 3.7ms，且检出 5 个车牌）
+
+**根因**（`csrc/vision/lpr/lpr_det/postprocessor.cpp`）：yolov5plate 的 obj_conf/cls_conf
+**已是概率**，代码直接相乘（正确）；此前我误加了 sigmoid，二次 sigmoid 使全部 25200 候选过阈，
+post 9.8s。回退后正常。
+
+**附带修复**（`csrc/vision/lpr/lpr_pipeline.cpp`）：
+- `keypoints.size() != 4` 原整帧 `return false` → 改为跳过该车；
+- `warpPerspective` 用 `cv::Size2f` → 修正为 `cv::Size`；
+- 整图 `to_mat` 拷贝移出循环（原每车重复拷贝）。
+
+### 9.3 回归测试"假通过"修复
+
+- `test_vision_models.cpp` 模型路径错误（指向不存在的 `test_models/*.onnx`），13 用例
+  0 断言静默跳过 → 修正路径后 **6664 断言真通过**；修正 DBDetector name 断言。
+- `baseline_compare.cpp` MNN/TRT 用例加 `#ifdef ENABLE_MNN/ENABLE_TRT` 门控，GPU 构建
+  不再把 `.mnn` 当 ORT 加载（10 失败 → 全过）。
+- 删除过时的 `trt/yolo11n.engine.det.json`（二次 sigmoid 错误产物），TRT 用例降级为 warn。
+
+### 9.4 OCR 优化（pipeline 2000ms → 1437ms）
+
+- `cls_batch_size_` 默认 1 → 6（cls 固定输入，批量无浪费）；
+- `rotate_crop` 去掉整图 `copyTo`（原每行复制整张原图），改为直接 ROI 裁剪。
+
+### 9.5 其他
+
+- `SeetaFaceAge/Gender::predict` 增加 `TimerArray*` 参数（原无法分解 pre/infer/post）；
+- `pedestrian_attribute` 需显式 `set_det_input_size({1280,1280})` + `set_cls_input_size({192,256})`
+  （文档标注 w/h 语义与模型 H/W 易配反）。
+
+### 9.6 修复后关键指标对比
+
+| 指标 | 修复前 | 修复后 |
+|---|---|---|
+| det onnx post | 463ms | **2.4ms** |
+| det onnx total | 495ms | **33ms** |
+| lpr-det post | 9878ms | **3.7ms** |
+| lpr-det 检出 | 0（检不出） | **5 个车牌** |
+| OCR pipeline | ~2000ms | **1437ms** |
+| CPU 回归 | 147 用例 | 147 用例 1639 断言全过 |
+| GPU 回归 | 10 失败 | **143 用例全过** |

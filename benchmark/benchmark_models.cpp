@@ -85,10 +85,20 @@ namespace {
         return opt;
     }
 
+    // 当前构建是否支持 TRT（CPU 构建无 TRT，遇 .engine 必须跳过，否则 FATAL）
+    bool bench_supported(const std::string& rel) {
+#ifdef ENABLE_TRT
+        return true;
+#else
+        return rel.find(".engine") == std::string::npos;
+#endif
+    }
+
 TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n.onnx", "mnn/yolo11n_nms.mnn", "trt/yolo11n_nms.engine"}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
         RuntimeOption opt = bench_opt(rel);
         detection::UltralyticsDet model(mp.string(), opt);
         if (!model.is_initialized()) continue;
@@ -111,6 +121,7 @@ TEST_CASE("Benchmark UltralyticsCls", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n-cls.onnx", "mnn/yolo11n-cls.mnn", "trt/yolo11n-cls.engine"}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
         RuntimeOption opt = bench_opt(rel);
         classification::Classification model(mp.string(), opt);
         if (!model.is_initialized()) continue;
@@ -139,6 +150,7 @@ TEST_CASE("Benchmark UltralyticsObb", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n-obb.onnx", "mnn/yolo11n-obb_nms.mnn", "trt/yolo11n-obb_nms.engine"}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
         RuntimeOption opt = bench_opt(rel);
         detection::UltralyticsObb model(mp.string(), opt);
         if (!model.is_initialized()) continue;
@@ -161,6 +173,7 @@ TEST_CASE("Benchmark UltralyticsPose", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n-pose.onnx", "mnn/yolo11n-pose_nms.mnn", "trt/yolo11n-pose_nms.engine"}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
         RuntimeOption opt = bench_opt(rel);
         detection::UltralyticsPose model(mp.string(), opt);
         if (!model.is_initialized()) continue;
@@ -183,6 +196,7 @@ TEST_CASE("Benchmark UltralyticsSeg", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n-seg.onnx", "mnn/yolo11n-seg_nms.mnn", "trt/yolo11n-seg_nms.engine"}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
         RuntimeOption opt = bench_opt(rel);
         detection::UltralyticsSeg model(mp.string(), opt);
         if (!model.is_initialized()) continue;
@@ -245,11 +259,8 @@ TEST_CASE("Benchmark SeetaFace face models", "[all_models][benchmark]") {
             if (!model.is_initialized()) continue;
             for (int i = 0; i < kRuns; ++i) {
                 int age = 0;
-                auto t0 = std::chrono::high_resolution_clock::now();
-                REQUIRE(model.predict(img, &age));
-                auto t1 = std::chrono::high_resolution_clock::now();
                 TimerArray t;
-                t.pre_timer.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+                REQUIRE(model.predict(img, &age, &t));
                 runs.push_back(t);
             }
         } else if (std::string(c.tag) == "face-gender") {
@@ -257,11 +268,8 @@ TEST_CASE("Benchmark SeetaFace face models", "[all_models][benchmark]") {
             if (!model.is_initialized()) continue;
             for (int i = 0; i < kRuns; ++i) {
                 int g = 0;
-                auto t0 = std::chrono::high_resolution_clock::now();
-                REQUIRE(model.predict(img, &g));
-                auto t1 = std::chrono::high_resolution_clock::now();
                 TimerArray t;
-                t.pre_timer.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+                REQUIRE(model.predict(img, &g, &t));
                 runs.push_back(t);
             }
         } else {
@@ -490,7 +498,6 @@ TEST_CASE("Benchmark LPR pipeline", "[pipeline][benchmark]") {
         std::vector<LprResult> r;
         TimerArray t;
         REQUIRE(model.predict(img, &r, &t));
-        if (r.empty()) { runs.clear(); break; }
         runs.push_back(t);
     }
     report("pipeline lpr (det+rec) onnx", runs);

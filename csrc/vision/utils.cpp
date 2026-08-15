@@ -152,6 +152,25 @@ namespace modeldeploy::vision::utils {
         return {rect2f.x, rect2f.y, rect2f.width, rect2f.height};
     }
 
+    // 内联标量 IoU（与 cv::Rect2f 的 operator& / area() 数值一致，但无函数调用开销）
+    float iou_rects(const Rect2f& r1, const Rect2f& r2) {
+        const float xmin = r1.x > r2.x ? r1.x : r2.x;
+        const float ymin = r1.y > r2.y ? r1.y : r2.y;
+        const float xmax1 = r1.x + r1.width;
+        const float ymax1 = r1.y + r1.height;
+        const float xmax2 = r2.x + r2.width;
+        const float ymax2 = r2.y + r2.height;
+        const float xmax = xmax1 < xmax2 ? xmax1 : xmax2;
+        const float ymax = ymax1 < ymax2 ? ymax1 : ymax2;
+        const float overlap_w = xmax - xmin > 0 ? xmax - xmin : 0.0f;
+        const float overlap_h = ymax - ymin > 0 ? ymax - ymin : 0.0f;
+        const float inter = overlap_w * overlap_h;
+        const float area1 = r1.width * r1.height;
+        const float area2 = r2.width * r2.height;
+        const float uni = area1 + area2 - inter;
+        return uni > 0 ? inter / uni : 0.0f;
+    }
+
     cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect) {
         return {
             cv::Point2f(rotated_rect.xc, rotated_rect.yc),
@@ -241,48 +260,10 @@ namespace modeldeploy::vision::utils {
 
     void sorted_det_results(std::vector<DetectionResult>& results) {
         std::sort(results.begin(), results.end(), [](const DetectionResult& a,
-                                                     const DetectionResult& b) {
+                                                      const DetectionResult& b) {
             return a.box.width * a.box.height > b.box.width * b.box.height;
         });
     }
-
-    float rect_iou(const cv::Rect2f& rect1, const cv::Rect2f& rect2) {
-        // 手动计算
-        // const float xmin = std::max(rect1.x, rect2.x);
-        // const float ymin = std::max(rect1.y, rect2.y);
-        // const float xmax = std::min(rect1.x + rect1.width,
-        //                             rect2.x + rect2.width);
-        // const float ymax = std::min(rect1.y + rect1.height,
-        //                             rect2.y + rect2.height);
-        //
-        // const float overlap_w = std::max(0.0f, xmax - xmin);
-        // const float overlap_h = std::max(0.0f, ymax - ymin);
-        // const float overlap_area = overlap_w * overlap_h;
-        // const float area1 = rect1.width * rect1.height;
-        // const float area2 = rect2.width * rect2.height;
-        // const float iou = overlap_area / (area1 + area2 - overlap_area);
-
-        // std::vector<cv::Point2f> intersection;
-        // float iou = 0.0f;
-        // if (cv::rotatedRectangleIntersection(box1, box2, intersection) > 0) {
-        //     const auto intersection_area = cv::contourArea(intersection);
-        //     const auto box1_area = box1.size.area();
-        //     const auto box2_area = box2.size.area();
-        //     iou = static_cast<float>(intersection_area / (box1_area + box2_area - intersection_area));
-        // }
-        // return iou;
-
-
-        // 使用opencv的api
-        float iou = 0.0f;
-        const cv::Rect2f intersection = rect1 & rect2; // 取交集
-        const float inter_area = intersection.area();
-        // std::cout << "----inter area: " << inter_area << std::endl;
-        const float union_area = rect1.area() + rect2.area() - inter_area;
-        iou = inter_area / union_area;
-        return iou;
-    }
-
 
     void nms(std::vector<DetectionResult>* result, const float iou_threshold, std::vector<int>* index) {
         const size_t N = result->size();
@@ -313,7 +294,7 @@ namespace modeldeploy::vision::utils {
                 const int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
+                const float iou = iou_rects(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = 1;
                 }
@@ -352,7 +333,7 @@ namespace modeldeploy::vision::utils {
                 int j = sorted_indices[n];
                 if (suppressed[j]) continue;
                 const auto& box_j = (*result)[j].box;
-                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
+                const float iou = iou_rects(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[j] = true;
                 }
@@ -388,8 +369,8 @@ namespace modeldeploy::vision::utils {
             for (size_t n = m + 1; n < N; ++n) {
                 if (suppressed[n]) continue;
                 const auto& box_j = result->at(n).box;
-                if (rect2f_to_cv_type(box_i).area() == 0 || rect2f_to_cv_type(box_j).area() == 0) continue;
-                const float iou = rect_iou(rect2f_to_cv_type(box_i), rect2f_to_cv_type(box_j));
+                if (box_i.width * box_i.height <= 0 || box_j.width * box_j.height <= 0) continue;
+                const float iou = iou_rects(box_i, box_j);
                 if (iou > iou_threshold) {
                     suppressed[n] = true;
                 }

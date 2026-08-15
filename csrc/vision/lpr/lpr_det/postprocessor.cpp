@@ -40,6 +40,8 @@ namespace modeldeploy::vision::lpr {
                 std::vector<float> cls_confs = {attr_ptr + 13, attr_ptr + dim2};
                 const int class_id = argmax(cls_confs);
                 const auto cls_conf = *std::max_element(cls_confs.begin(), cls_confs.end());
+                // yolov5plate 输出的 obj_conf / cls_conf 已是 sigmoid 概率（[0,1]），
+                // 不能再二次 sigmoid（会把低分框推向 0.5+，导致全部候选过阈、NMS 退化）
                 float confidence = obj_conf * cls_conf;
                 // filter boxes by conf_threshold
                 if (confidence <= conf_threshold_) {

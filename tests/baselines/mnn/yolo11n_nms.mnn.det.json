@@ -1,7 +1,7 @@
 {
   "meta": {
-    "backend": "mnn-cpu",
-    "date": "2026-08-07",
+    "backend": "ort-cpu",
+    "date": "2026-08-15",
     "image": "test_detection0.jpg",
     "model": "yolo11n_nms.mnn"
   },

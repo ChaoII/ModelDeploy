@@ -65,7 +65,9 @@ namespace modeldeploy::vision::ocr {
         std::shared_ptr<Recognizer> recognizer_ = nullptr;
 
     private:
-        int cls_batch_size_ = 1;
+        // cls 输入固定尺寸，批量推理无 pad 浪费；默认 6（原 1 逐行推理在密集文本页极慢）
+        int cls_batch_size_ = 6;
+        // rec 动态宽（batch 内 pad 到最宽行），batch 过大 pad 浪费；6 为折中
         int rec_batch_size_ = 6;
     };
 }
