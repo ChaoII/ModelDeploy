@@ -288,12 +288,18 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
     float* d_oy = nullptr;
     float* d_sx = nullptr;
     float* d_sy = nullptr;
-    bool ok = false;
-    if (cudaMalloc(&d_src, total) != cudaSuccess) goto cleanup;
+    // 出错统一清理并返回失败（避免 goto）
+    auto fail = [&]() -> bool {
+        cudaStreamSynchronize(stream);
+        if (is_internal_stream) cudaStreamDestroy(stream);
+        cudaFree(d_src);
+        return false;
+    };
+    if (cudaMalloc(&d_src, total) != cudaSuccess) return fail();
     for (int b = 0; b < batch; ++b) {
         if (cudaMemcpyAsync(d_src + offsets[b], images[b].data(),
                             static_cast<size_t>(hs[b]) * ws[b] * 3,
-                            cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+                            cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
     }
     // 参数数组单块打包 + 线程局部池复用（避免每帧多次 cudaMalloc/cudaFree）
     const size_t need = sizeof(int) * batch * 2 + sizeof(size_t) * batch + sizeof(float) * batch * 4;
@@ -313,13 +319,13 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
         float* psy = psx + batch;
         d_ox = pox; d_oy = poy; d_sx = psx; d_sy = psy;
     }
-    if (cudaMemcpyAsync(d_ws, ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_hs, hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_offsets, offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_ox, origins_x.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_oy, origins_y.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_sx, scales_x.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_sy, scales_y.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_ws, ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_hs, hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_offsets, offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_ox, origins_x.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_oy, origins_y.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_sx, scales_x.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_sy, scales_y.data(), sizeof(float) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
 
     {
         dim3 block(16, 16);
@@ -329,14 +335,13 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
             dst_ptr, dst_h, dst_w,
             alpha[0], beta[0], alpha[1], beta[1], alpha[2], beta[2],
             swap_rb, pad_value);
-        ok = cudaGetLastError() == cudaSuccess;
+        if (cudaGetLastError() != cudaSuccess) return fail();
     }
 
-cleanup:
     cudaStreamSynchronize(stream);
     if (is_internal_stream) cudaStreamDestroy(stream);
     cudaFree(d_src);
-    return ok;
+    return true;
 }
 
 __global__ void kernel_fusion_rpnp_batch(
@@ -433,12 +438,18 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
     size_t* d_offsets = nullptr;
     int* d_rws = nullptr;
     int* d_rhs = nullptr;
-    bool ok = false;
-    if (cudaMalloc(&d_src, total) != cudaSuccess) goto cleanup;
+    // 出错统一清理并返回失败（避免 goto）
+    auto fail = [&]() -> bool {
+        cudaStreamSynchronize(stream);
+        if (is_internal_stream) cudaStreamDestroy(stream);
+        cudaFree(d_src);
+        return false;
+    };
+    if (cudaMalloc(&d_src, total) != cudaSuccess) return fail();
     for (int b = 0; b < batch; ++b) {
         if (cudaMemcpyAsync(d_src + offsets[b], images[b].data(),
                             static_cast<size_t>(hs[b]) * ws[b] * 3,
-                            cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+                            cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
     }
     // 参数数组单块打包 + 线程局部池复用
     const size_t need = sizeof(int) * batch * 4 + sizeof(size_t) * batch;
@@ -455,11 +466,11 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
         d_rhs = reinterpret_cast<int*>(pbase + sizeof(int) * batch * 3);
         d_offsets = reinterpret_cast<size_t*>(pbase + sizeof(int) * batch * 4);
     }
-    if (cudaMemcpyAsync(d_ws, ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_hs, hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_rws, rws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_rhs, rhs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
-    if (cudaMemcpyAsync(d_offsets, offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) goto cleanup;
+    if (cudaMemcpyAsync(d_ws, ws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_hs, hs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_rws, rws.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_rhs, rhs.data(), sizeof(int) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
+    if (cudaMemcpyAsync(d_offsets, offsets.data(), sizeof(size_t) * batch, cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
 
     {
         dim3 block(16, 16);
@@ -469,14 +480,13 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
             dst_ptr, dst_h, dst_w,
             alpha[0], beta[0], alpha[1], beta[1], alpha[2], beta[2],
             pad[0], pad[1], pad[2]);
-        ok = cudaGetLastError() == cudaSuccess;
+        if (cudaGetLastError() != cudaSuccess) return fail();
     }
 
-cleanup:
     cudaStreamSynchronize(stream);
     if (is_internal_stream) cudaStreamDestroy(stream);
     cudaFree(d_src);
-    return ok;
+    return true;
 }
 
 } // namespace modeldeploy::vision

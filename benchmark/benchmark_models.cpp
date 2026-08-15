@@ -77,11 +77,30 @@ namespace {
 
 // ==================== 单模型 ====================
 
-    // 后端选择：.engine → GPU TRT，否则 CPU（ORT/MNN 由扩展名自动）
+    // 后端选择：
+    //  - .engine          → 纯 TRT engine（GPU，最快）
+    //  - .mnn             → MNN（CPU）
+    //  - .onnx（GPU 构建）→ ORT backend + CUDA EP + FP16（examples/demo_benchmark 生产配置；
+    //                       所有模型都快。注：enable_trt=true(TRT EP) 对无内嵌 NMS 的模型极慢，
+    //                       故 onnx 默认走 CUDA EP，TRT EP 仅对 det 单独测）
+    //  - .onnx（CPU 构建）→ ORT CPU
     RuntimeOption bench_opt(const std::string& rel) {
         RuntimeOption opt;
-        if (rel.find(".engine") != std::string::npos) { opt.use_gpu(0); opt.use_trt_backend(); }
-        else opt.use_cpu();
+        if (rel.find(".engine") != std::string::npos) {
+            opt.use_gpu(0);
+            opt.use_trt_backend();
+        } else if (rel.find(".onnx") != std::string::npos) {
+#ifdef WITH_GPU
+            opt.use_ort_backend();
+            opt.use_gpu(0);
+            opt.enable_fp16 = true;
+            opt.enable_trt = false;  // ORT CUDA EP（生产配置，快且所有模型可用）
+#else
+            opt.use_cpu();
+#endif
+        } else {
+            opt.use_cpu();
+        }
         return opt;
     }
 
@@ -94,8 +113,28 @@ namespace {
 #endif
     }
 
+    // onnx 模型的生产配置：GPU 构建 → ORT CUDA EP + FP16（demo_benchmark 配置），CPU → ORT CPU
+    RuntimeOption bench_opt_onnx() {
+        RuntimeOption opt;
+#ifdef WITH_GPU
+        opt.use_ort_backend();
+        opt.use_gpu(0);
+        opt.enable_fp16 = true;
+        opt.enable_trt = false;  // CUDA EP（所有模型可用且快；TRT EP 仅对 det 单独测）
+#else
+        opt.use_cpu();
+#endif
+        return opt;
+    }
+
 TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
-    for (const auto& rel : {"onnx/yolo11n/yolo11n.onnx", "mnn/yolo11n_nms.mnn", "trt/yolo11n_nms.engine"}) {
+    // det 特殊：GPU(ORT TRT EP) 用内嵌 NMS 版（生产配置，~5ms）；
+    // CPU ORT 用非 NMS 版（SDK 静态 ORT 加载 NMS onnx 报 protobuf 失败）
+#ifdef WITH_GPU
+    for (const auto& rel : {"onnx/yolo11n/yolo11n_nms.onnx", "trt/yolo11n_nms.engine"}) {
+#else
+    for (const auto& rel : {"onnx/yolo11n/yolo11n.onnx", "mnn/yolo11n_nms.mnn"}) {
+#endif
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
         if (!bench_supported(rel)) continue;
@@ -116,6 +155,36 @@ TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
         report(std::string("det ") + rel, runs);
     }
 }
+
+#ifdef WITH_GPU
+// det 的 ORT TRT EP 生产配置（examples/demo_detection_cxx：enable_trt=true，engine 缓存到 ./trt_engine）。
+// 仅 det 测 TRT EP：它对内嵌 NMS 模型快，但对无 NMS 模型（obb/pose/seg onnx）极慢。
+TEST_CASE("Benchmark det ORT TRT-EP", "[all_models][benchmark][orttrt]") {
+    const auto rel = "onnx/yolo11n/yolo11n_nms.onnx";
+    auto mp = bench_data_dir() / "test_models" / rel;
+    if (!has_file(mp)) return;
+    RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_gpu(0);
+    opt.enable_fp16 = true;
+    opt.enable_trt = true;  // ORT TRT EP（生产配置，engine 已缓存）
+    opt.ort_option.trt_engine_cache_path = "./trt_engine";
+    detection::UltralyticsDet model(mp.string(), opt);
+    if (!model.is_initialized()) return;
+    auto img = load_img("test_detection0.jpg");
+    if (img.empty()) return;
+    constexpr int kRuns = 20;
+    std::vector<TimerArray> runs;
+    for (int i = 0; i < kRuns; ++i) {
+        std::vector<DetectionResult> r;
+        TimerArray t;
+        REQUIRE(model.predict(img, &r, &t));
+        if (r.empty()) { runs.clear(); break; }
+        runs.push_back(t);
+    }
+    report("det ORT TRT-EP (yolo11n_nms.onnx)", runs);
+}
+#endif
 
 TEST_CASE("Benchmark UltralyticsCls", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n-cls.onnx", "mnn/yolo11n-cls.mnn", "trt/yolo11n-cls.engine"}) {
@@ -220,8 +289,7 @@ TEST_CASE("Benchmark UltralyticsSeg", "[all_models][benchmark]") {
 TEST_CASE("Benchmark Scrfd face det", "[all_models][benchmark]") {
     auto mp = bench_data_dir() / "test_models" / "onnx" / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx";
     if (!has_file(mp)) return;
-    RuntimeOption opt;
-    opt.use_cpu();
+    RuntimeOption opt = bench_opt_onnx();
     face::Scrfd model(mp.string(), opt);
     if (!model.is_initialized()) return;
     auto img = load_img("test_face_detection.jpg");
@@ -248,8 +316,7 @@ TEST_CASE("Benchmark SeetaFace face models", "[all_models][benchmark]") {
     for (const auto& c : cfgs) {
         auto mp = bench_data_dir() / "test_models" / "onnx" / "face" / c.file;
         if (!has_file(mp)) continue;
-        RuntimeOption opt;
-        opt.use_cpu();
+        RuntimeOption opt = bench_opt_onnx();
         std::vector<TimerArray> runs;
         auto img = load_img(c.img);
         if (img.empty()) continue;
@@ -293,7 +360,7 @@ TEST_CASE("Benchmark LPR", "[all_models][benchmark]") {
     {
         auto mp = bench_data_dir() / "test_models" / "onnx" / "yolov5plate.onnx";
         if (has_file(mp)) {
-            RuntimeOption opt; opt.use_cpu();
+            RuntimeOption opt = bench_opt_onnx();
             lpr::LprDetection model(mp.string(), opt);
             if (model.is_initialized()) {
                 auto img = load_img("test_lpr_detection.jpg");
@@ -316,7 +383,7 @@ TEST_CASE("Benchmark LPR", "[all_models][benchmark]") {
     {
         auto mp = bench_data_dir() / "test_models" / "onnx" / "plate_recognition_color.onnx";
         if (has_file(mp)) {
-            RuntimeOption opt; opt.use_cpu();
+            RuntimeOption opt = bench_opt_onnx();
             lpr::LprRecognizer model(mp.string(), opt);
             if (model.is_initialized()) {
                 auto img = load_img("test_lpr_recognizer.jpg");
@@ -344,7 +411,7 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
     // det
     auto det = find_ocr_model("det", ".onnx");
     if (has_file(det)) {
-        RuntimeOption opt; opt.use_cpu();
+        RuntimeOption opt = bench_opt_onnx();
         ocr::DBDetector model(det.string(), opt);
         if (model.is_initialized()) {
             constexpr int kRuns = 20;
@@ -362,7 +429,7 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
     // rec
     auto rec = find_ocr_model("rec", ".onnx");
     if (has_file(rec)) {
-        RuntimeOption opt; opt.use_cpu();
+        RuntimeOption opt = bench_opt_onnx();
         ocr::Recognizer model(rec.string(), dict.string(), opt);
         if (model.is_initialized()) {
             constexpr int kRuns = 20;
@@ -380,7 +447,7 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
     // cls
     auto cls = find_ocr_model("cls", ".onnx");
     if (has_file(cls)) {
-        RuntimeOption opt; opt.use_cpu();
+        RuntimeOption opt = bench_opt_onnx();
         ocr::Classifier model(cls.string(), opt);
         if (model.is_initialized()) {
             constexpr int kRuns = 20;
@@ -423,8 +490,7 @@ TEST_CASE("Benchmark insightface single models", "[all_models][benchmark]") {
         for (const auto& be : {std::string("onnx"), std::string("mnn"), std::string("trt")}) {
             auto mp = bench_data_dir() / subdir / be / "insightface" / "buffalo_l" / c.file;
             if (!has_file(mp)) continue;
-            RuntimeOption opt;
-            opt.use_cpu();
+            RuntimeOption opt = bench_opt_onnx();
             std::vector<TimerArray> runs;
             constexpr int kRuns = 10;
             if (std::string(c.tag) == "det") {
@@ -487,7 +553,7 @@ TEST_CASE("Benchmark LPR pipeline", "[pipeline][benchmark]") {
     auto det = bench_data_dir() / "test_models" / "onnx" / "yolov5plate.onnx";
     auto rec = bench_data_dir() / "test_models" / "onnx" / "plate_recognition_color.onnx";
     if (!has_file(det) || !has_file(rec)) return;
-    RuntimeOption opt; opt.use_cpu();
+    RuntimeOption opt = bench_opt_onnx();
     lpr::LprPipeline model(det.string(), rec.string(), opt);
     if (!model.is_initialized()) return;
     auto img = load_img("test_lpr_pipeline.jpg");
@@ -507,7 +573,7 @@ TEST_CASE("Benchmark face recognition pipeline", "[pipeline][benchmark]") {
     auto det = bench_data_dir() / "test_models" / "onnx" / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx";
     auto rec = bench_data_dir() / "test_models" / "onnx" / "face" / "face_recognizer.onnx";
     if (!has_file(det) || !has_file(rec)) return;
-    RuntimeOption opt; opt.use_cpu();
+    RuntimeOption opt = bench_opt_onnx();
     face::FaceRecognizerPipeline model(det.string(), rec.string(), opt);
     if (!model.is_initialized()) return;
     auto img = load_img("test_face_detection.jpg");
@@ -529,7 +595,7 @@ TEST_CASE("Benchmark face anti-spoof pipeline", "[pipeline][benchmark]") {
     auto first = bench_data_dir() / "test_models" / "onnx" / "face" / "fas_first.onnx";
     auto second = bench_data_dir() / "test_models" / "onnx" / "face" / "fas_second.onnx";
     if (!has_file(det) || !has_file(first) || !has_file(second)) return;
-    RuntimeOption opt; opt.use_cpu();
+    RuntimeOption opt = bench_opt_onnx();
     face::SeetaFaceAsPipeline model(det.string(), first.string(), second.string(), opt);
     if (!model.is_initialized()) return;
     auto img = load_img("test_face_detection.jpg");
@@ -555,7 +621,7 @@ TEST_CASE("Benchmark pedestrian attribute pipeline", "[pipeline][benchmark]") {
     auto det = bench_data_dir() / "test_models" / "onnx" / "zhgd_det.onnx";
     auto ml = bench_data_dir() / "test_models" / "onnx" / "zhgd_ml.onnx";
     if (!has_file(det) || !has_file(ml)) return;
-    RuntimeOption opt; opt.use_cpu();
+    RuntimeOption opt = bench_opt_onnx();
     pipeline::PedestrianAttribute model(det.string(), ml.string(), opt);
     if (!model.is_initialized()) return;
     model.set_det_input_size({1280, 1280});
@@ -580,7 +646,7 @@ TEST_CASE("Benchmark OCR pipeline", "[pipeline][benchmark]") {
     auto rec = find_ocr_model("rec", ".onnx");
     auto dict = ocr_dict();
     if (!has_file(det) || !has_file(cls) || !has_file(rec) || dict.empty()) return;
-    RuntimeOption opt; opt.use_cpu();
+    RuntimeOption opt = bench_opt_onnx();
     ocr::PaddleOCR model(det.string(), cls.string(), rec.string(), dict.string(), opt);
     if (!model.is_initialized()) return;
     auto img = load_img("test_ocr.png");
@@ -610,6 +676,7 @@ TEST_CASE("Benchmark insightface pipeline", "[pipeline][benchmark]") {
         if (!has_file(det)) continue;
         RuntimeOption opt;
         if (be == "trt") { opt.use_gpu(0); opt.use_trt_backend(); }
+        else if (be == "onnx") { opt = bench_opt_onnx(); }
         else opt.use_cpu();
         auto analysis = std::make_unique<face::InsightFaceAnalysis>(
             (dir / d10).string(), (dir / w6).string(),

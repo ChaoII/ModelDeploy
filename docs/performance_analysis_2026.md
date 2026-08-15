@@ -10,13 +10,20 @@
 | 项 | CPU 构建 | GPU 构建 |
 |---|---|---|
 | 构建目录 | build_tdc | build_tdc_gpu |
-| 后端 | ORT + MNN | ORT + TRT |
-| 设备 | CPU（ORT CPU EP / MNN CPU） | GPU RTX 4060 Ti（TRT FP16） |
+| 后端 | ORT CPU + MNN | ORT CUDA-EP/TRT-EP + TRT engine |
+| 设备 | CPU | GPU RTX 4060 Ti（FP16） |
 | 图片 | test_data/test_images/* | 同左 |
+
+**GPU 生产配置**（与 examples/demo_* 一致）：
+- `ORT + CUDA EP + FP16`（demo_benchmark 配置，enable_trt=false）：所有模型可用且快
+- `ORT + TRT EP + FP16`（demo_detection_cxx 配置，enable_trt=true，engine 缓存 ./trt_engine）：
+  仅对**内嵌 NMS 模型**快（如 yolo11n_nms.onnx ≈7ms）；对无 NMS 模型（obb/pose/seg onnx）极慢，故生产推荐 TRT engine 文件
+- `TRT engine`（trtexec 预编译 .engine）：最快
 
 - 单模型跑 20 次（insightface 10 次）取平均，`pre/infer/post` 用 `TimerArray` 分解。
 - 后端由模型文件后缀自动推断：`.onnx`→ORT、`.mnn`→MNN、`.engine`→TRT。
 - 运行：`build_tdc/bin/benchmark.exe "[all_models][benchmark]"`、`"[pipeline][benchmark]"`。
+- **注意**：GPU benchmark 需在构建目录根运行（`build_tdc_gpu`），使 `./trt_engine` 命中已缓存 engine。
 
 ## 2. 单模型耗时（CPU ORT vs MNN，修复后实测）
 
@@ -44,29 +51,48 @@
 
 > 注：det onnx post 修复前 463ms → 现 2.16ms（二次 sigmoid bug，见 §9.1）。
 
-## 3. 单模型耗时（GPU：ORT-onnx vs TRT-engine，修复后实测）
+## 3. 单模型耗时（GPU 生产配置，RTX 4060 Ti FP16，最新实测）
 
-| 模型 | ORT total | TRT total | 加速 |
+| 模型 | ORT CUDA-EP | TRT engine | 加速 |
 |---|---|---|---|
-| det yolo11n | 22.72 | **5.79** | 3.9x |
-| cls yolo11n-cls | 2.02 | **0.80** | 2.5x |
-| obb yolo11n-obb | 31.59 | **2.86** | 11x |
-| pose yolo11n-pose | 26.19 | **2.41** | 11x |
-| seg yolo11n-seg | 41.79 | **11.70** | 3.6x |
+| det yolo11n_nms | 23.14 | **5.81** | 4.0x |
+| det ORT TRT-EP（yolo11n_nms.onnx，enable_trt=true） | **7.04** | - | - |
+| cls yolo11n-cls | 9.65 | **0.83** | 11.7x |
+| obb yolo11n-obb | 26.71 | **2.75** | 9.7x |
+| pose yolo11n-pose | 20.69 | **2.37** | 8.7x |
+| seg yolo11n-seg | 28.67 | **11.92** | 2.4x |
+| face-det scrfd | 11.72 | - | - |
+| face-age | 7.77 | - | - |
+| face-gender | 3.39 | - | - |
+| face-rec | 7.37 | - | - |
+| lpr-det | 13.88 | - | - |
+| lpr-rec | 1.65 | - | - |
+| ocr-det | 18.82 | - | - |
+| ocr-rec | 9.82 | - | - |
+| ocr-cls | 6.89 | - | - |
+| insightface det | 22.11 | - | - |
+| insightface 2d106 | 10.54 | - | - |
+| insightface 1k3d68 | 7.72 | - | - |
+| insightface w600k | 12.90 | - | - |
+| insightface genderage | 8.24 | - | - |
 
-> 注：修复二次 sigmoid 后，GPU 构建下 onnx 模型的 ORT CUDA EP 推理恢复正常
-> （此前 post 600-800ms 的异常已消失）。TRT engine 仍提供 3.6-11x 加速。
+> **生产推荐**：det 用 TRT engine（5.8ms）或 ORT TRT-EP（7.0ms，yolo11n_nms.onnx）；
+> cls/obb/pose/seg 用 TRT engine（0.8-11.9ms）。
+> ORT CUDA-EP 对所有模型可用，是通用兜底。
 
-## 4. Pipeline 耗时（CPU ORT，单图，修复后实测）
+## 4. Pipeline 耗时（CPU vs GPU 生产配置，单图，最新实测）
 
-| Pipeline | total | 说明 |
-|---|---|---|
-| insightface（det+2d106+3d68+rec+genderage） | 44.68 | MNN 版 17.65ms（2.5x 于 ORT） |
-| face-rec（scrfd + seetaface rec） | 59.31 | det + rec batch |
-| face-as（scrfd + fas_first + fas_second） | 106.15 | fas_second 整图推理 + first 已 batch |
-| pedestrian-attr（zhgd_det + zhgd_ml） | 183.81 | 1280 大图 det + 每行人 cls |
-| **OCR（det+cls+rec）** | **1302.71** | **218 行密集文本（test_ocr.png 1996x1108），rec 逐行推理主导** |
-| LPR（det+rec） | 需复测 | 已检出行车，计时待补（pipeline 未实现 TimerArray） |
+| Pipeline | CPU ORT | CPU MNN | GPU CUDA-EP | GPU TRT | 说明 |
+|---|---|---|---|---|---|
+| insightface（det+2d106+3d68+rec+genderage） | 46.16 | 18.26 | **2.81** | **1.23** | GPU 37x 于 CPU |
+| face-rec（scrfd + seetaface rec） | 75.42 | - | **15.91** | - | det + rec batch |
+| face-as（scrfd + fas_first + fas_second） | 132.35 | - | **19.23** | - | 19ms 于 132ms，6.9x |
+| pedestrian-attr（zhgd_det + zhgd_ml） | 264.15 | - | **74.55** | - | 1280 大图 det |
+| **OCR（det+cls+rec）** | **1365.80** | - | **507.77** | - | 218 行密集文本，GPU 2.7x |
+| LPR（det+rec） | 需复测 | - | - | - | 已检出行车，计时待补 |
+
+> **生产要点**：insightface 全流程 GPU 仅 1.2-2.8ms（>350 fps）；OCR 密集页 GPU 507ms
+> （CPU 2.7x 提升，rec 仍是主要成本）。
 
 ## 5. 瓶颈分析（耗时点 / 堵点 / 影响吞吐量的点）
 
@@ -163,22 +189,23 @@ det pre 8ms / ocr-det pre 17ms 走融合核，MSVC x64 默认 AVX2。标量兜�
 - 融合预处理（fused_preprocess）+ 运行时 ISA 派发设计良好；
 - 设备内存与 Tensor 解耦（B 方案）、CAPI/pybind/Rust/C# 绑定齐全。
 
-## 7. 吞吐量结论（修复后实测）
+## 7. 吞吐量结论（CPU vs GPU 生产配置，最新实测）
 
-| 场景 | CPU 单线程 | GPU TRT |
-|---|---|---|
-| det 单帧 | 30.9 fps | 172.7 fps |
-| insightface 全流程 | 22.4 fps（MNN 56.6 fps） | - |
-| OCR 整页（218 行） | 0.8 fps | - |
-| face-rec pipeline | 16.9 fps | - |
-| face-as pipeline | 9.4 fps | - |
-| pedestrian-attr | 5.4 fps | - |
+| 场景 | CPU | GPU（CUDA-EP / TRT） | GPU 加速 |
+|---|---|---|---|
+| det 单帧 | 25.9 fps | **172 fps**（TRT 5.8ms） | 6.6x |
+| cls | 270 fps | **1212 fps**（TRT 0.83ms） | 4.5x |
+| insightface 全流程 | 21.7 fps（MNN 54.8） | **356 fps**（CUDA）/ **813 fps**（TRT） | 37x |
+| face-rec pipeline | 13.3 fps | **62.9 fps** | 4.7x |
+| face-as pipeline | 7.6 fps | **52.0 fps** | 6.8x |
+| pedestrian-attr | 3.8 fps | **13.4 fps** | 3.5x |
+| OCR 整页（218 行） | 0.7 fps | **2.0 fps** | 2.7x |
 
 **提升吞吐量的关键动作**（按优先级）：
 1. ~~二次 sigmoid~~ → 已完成（det post 463ms→2.16ms，见 §9.1）；
-2. **OCR rec 宽度聚类分组**（宽窄分开 batch，减少动态宽 pad 浪费），预计 OCR
-   1302ms→<800ms；
-3. 生产环境换带内嵌 NMS 的模型 + GPU TRT engine（已实测 3.6-11x）。
+2. **GPU 部署**：det/insightface 用 TRT engine（5.8ms / 1.2ms），所有模型 GPU 3.5-37x；
+3. **OCR rec 宽度聚类分组**（宽窄分开 batch，减少动态宽 pad 浪费），预计 OCR
+   GPU 507ms→<350ms。
 
 ## 8. 复现命令
 
@@ -188,10 +215,10 @@ TEST_DATA_DIR=repo cmake 构建后:
 build_tdc/bin/test_modeldeploy        # CPU 全量（138 用例 / 1639 断言）
 build_tdc_gpu/bin/test_modeldeploy    # GPU 全量（143 用例 / 1754 断言，全过）
 
-# 性能
-build_tdc/bin/benchmark.exe "[all_models][benchmark]"   # CPU ORT + MNN
-build_tdc_gpu/bin/benchmark.exe "[all_models][benchmark]"  # GPU ORT + TRT
-build_tdc/bin/benchmark.exe "[pipeline][benchmark]"     # pipeline
+# 性能（GPU benchmark 需在构建目录根运行，命中 ./trt_engine 缓存）
+build_tdc/bin/benchmark.exe "[all_models][benchmark]"    # CPU ORT + MNN
+cd build_tdc_gpu && ./bin/benchmark.exe "[all_models][benchmark]"   # GPU（含 TRT-EP）
+cd build_tdc_gpu && ./bin/benchmark.exe "[pipeline][benchmark]"     # pipeline
 ```
 
 ## 9. 优化修复记录（2026-08）
