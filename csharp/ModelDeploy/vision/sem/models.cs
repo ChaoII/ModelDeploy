@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.sem
 {
@@ -20,20 +21,20 @@ namespace ModelDeploy.vision.sem
         {
             _model = new MDModel();
             var nativeOption = option.ToNative();
-            Utils.Check(NativeBindings.md_create_sem_model(ref _model, modelPath, ref nativeOption),
+            Utils.Check(md_create_sem_model(ref _model, modelPath, ref nativeOption),
                 "Create semantic segmentation model");
         }
 
         public void SetInputSize(int width, int height)
         {
             var size = new MDSize { width = width, height = height };
-            Utils.Check(NativeBindings.md_set_sem_input_size(ref _model, size), "Set semantic segmentation input size");
+            Utils.Check(md_set_sem_input_size(ref _model, size), "Set semantic segmentation input size");
         }
 
         public SemSegResult Predict(Image image)
         {
             var cResult = new MDSemSegResult();
-            Utils.Check(NativeBindings.md_sem_predict(ref _model, ref image.RawImage, ref cResult),
+            Utils.Check(md_sem_predict(ref _model, ref image.RawImage, ref cResult),
                 "Semantic segmentation predict");
             try
             {
@@ -41,7 +42,7 @@ namespace ModelDeploy.vision.sem
             }
             finally
             {
-                NativeBindings.md_free_sem_result(ref cResult);
+                md_free_sem_result(ref cResult);
             }
         }
 
@@ -53,7 +54,7 @@ namespace ModelDeploy.vision.sem
             var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
             try
             {
-                Utils.Check(NativeBindings.md_sem_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                Utils.Check(md_sem_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
                         uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResult),
                     "Semantic segmentation predict NV12");
                 return SemSegResult.FromNative(cResult);
@@ -62,7 +63,7 @@ namespace ModelDeploy.vision.sem
             {
                 yPinned.Free();
                 uvPinned.Free();
-                NativeBindings.md_free_sem_result(ref cResult);
+                md_free_sem_result(ref cResult);
             }
         }
 
@@ -77,15 +78,12 @@ namespace ModelDeploy.vision.sem
         {
             if (!_disposed)
             {
-                NativeBindings.md_free_sem_model(ref _model);
+                md_free_sem_model(ref _model);
                 _disposed = true;
                 GC.SuppressFinalize(this);
             }
         }
 
         ~UltralyticsSem() => Dispose();
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
     }
 }

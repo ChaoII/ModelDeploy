@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using ModelDeploy.types_internal_c;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.utils
 {
@@ -87,16 +88,9 @@ namespace ModelDeploy.utils
             return md_get_button_enable_status(ref image.RawImage, pixThreshold, rateThreshold);
         }
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern MDKeyValuePair md_create_key_value_pair(int key, IntPtr value);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        public static extern void md_free_md_map(ref MDMapData cMap);
 
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool md_get_button_enable_status(ref MDImage image, int pixThreshold,
-            double rateThreshold);
+
     }
 
     // 自动释放的 UTF8 字符串封装

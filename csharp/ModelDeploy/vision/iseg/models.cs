@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.iseg
 {
@@ -111,40 +112,5 @@ namespace ModelDeploy.vision.iseg
 
         ~UltralyticsSeg() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int
-            md_create_instance_seg_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_instance_seg_input_size(ref MDModel model, MDSize size);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_instance_seg_predict(ref MDModel model, ref MDImage image,
-            ref MDISegResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_iseg_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
-            ref MDISegResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_instance_seg_result(ref MDISegResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_instance_seg_result(ref MDImage image, ref MDISegResults result,
-            double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_instance_seg_result(ref MDISegResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_instance_seg_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 }

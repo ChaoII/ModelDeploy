@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.face
 {
@@ -72,32 +73,6 @@ namespace ModelDeploy.vision.face
 
         ~Scrfd() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_det_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_det_predict(ref MDModel model, ref MDImage image,
-            ref MDKeyPointResults cResults);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_face_det_result(ref MDImage image,
-            ref MDKeyPointResults cResults, string fontPath, int fontSize,
-            int landmarkRadius, double alpha, bool saveResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_det_result(ref MDKeyPointResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_det_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class SeetaFaceId : IDisposable
@@ -164,29 +139,6 @@ namespace ModelDeploy.vision.face
 
         ~SeetaFaceId() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_rec_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_rec_predict(ref MDModel model, ref MDImage image,
-            ref MDFaceRecognizerResult cResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_face_rec_result(ref MDFaceRecognizerResult cResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_rec_result(ref MDFaceRecognizerResult cResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_rec_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
 
@@ -235,23 +187,6 @@ namespace ModelDeploy.vision.face
 
         ~SeetaFaceAge() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_age_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_age_predict(ref MDModel model, ref MDImage image,
-            ref int cResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_age_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class SeetaFaceGender : IDisposable
@@ -305,23 +240,6 @@ namespace ModelDeploy.vision.face
 
         ~SeetaFaceGender() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_gender_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_gender_predict(ref MDModel model, ref MDImage image,
-            ref int cResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_gender_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class SeetaFaceAsFirst : IDisposable
@@ -370,22 +288,6 @@ namespace ModelDeploy.vision.face
 
         ~SeetaFaceAsFirst() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_face_as_first_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_as_first_predict(ref MDModel model, ref MDImage image, ref float cResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_as_first_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class SeetaFaceAsSecond : IDisposable
@@ -441,26 +343,6 @@ namespace ModelDeploy.vision.face
 
         ~SeetaFaceAsSecond() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int
-            md_create_face_as_second_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_as_second_predict(ref MDModel model, ref MDImage image,
-            ref MDFaceAsSecondResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_as_second_result(ref MDFaceAsSecondResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_as_second_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class SeetaFaceAntiSpoof : IDisposable
@@ -525,27 +407,6 @@ namespace ModelDeploy.vision.face
 
         ~SeetaFaceAntiSpoof() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int
-            md_create_face_as_pipeline_model(ref MDModel model, string faceDetModelFile, string firstModelFile,
-                string secondModelFile, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_as_pipeline_predict(ref MDModel model, ref MDImage image,
-            ref MDFaceAsResults cResults, float fuseThreshold = 0.8f, float clarityThreshold = 0.3f);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_as_pipeline_result(ref MDFaceAsResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_as_pipeline_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class FaceRecognizerPipeline : IDisposable
@@ -617,30 +478,5 @@ namespace ModelDeploy.vision.face
 
         ~FaceRecognizerPipeline() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int
-            md_create_face_rec_pipeline_model(ref MDModel model, string faceDetModelFile, string faceRecModelFile,
-                ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_face_rec_pipeline_predict(ref MDModel model, ref MDImage image,
-            ref MDFaceRecognizerResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_face_rec_pipeline_result(ref MDFaceRecognizerResults cResults);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_rec_pipeline_result(ref MDFaceRecognizerResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_face_rec_pipeline_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 }

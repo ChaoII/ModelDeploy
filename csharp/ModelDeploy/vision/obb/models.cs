@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.obb
 {
@@ -112,39 +113,5 @@ namespace ModelDeploy.vision.obb
 
         ~UltralyticsObb() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_obb_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_obb_input_size(ref MDModel model, MDSize size);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_obb_predict(ref MDModel model, ref MDImage image,
-            ref MDObbResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_obb_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
-            ref MDObbResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_obb_result(ref MDObbResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_obb_result(ref MDImage image, ref MDObbResults result,
-            double threshold, string fontPath, int fontSize, double alpha, bool saveResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_obb_result(ref MDObbResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_obb_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 }

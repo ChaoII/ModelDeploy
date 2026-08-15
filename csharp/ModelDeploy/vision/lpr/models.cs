@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.lpr
 {
@@ -85,34 +86,6 @@ namespace ModelDeploy.vision.lpr
 
         ~LprDetection() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_lpr_det_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_lpr_det_predict(ref MDModel model, ref MDImage image,
-            ref MDKeyPointResults cResults);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_lpr_det_result(ref MDImage image, ref MDKeyPointResults cResults,
-            string fontPath, int fontSize, int landmarkRadius, double alpha, int saveResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_lpr_det_result(ref MDKeyPointResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_det_result(ref MDKeyPointResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_det_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class LprRecognizer : IDisposable
@@ -180,30 +153,6 @@ namespace ModelDeploy.vision.lpr
 
         ~LprRecognizer() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_lpr_rec_model(ref MDModel model, string modelPath,
-            ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_lpr_rec_predict(ref MDModel model, ref MDImage image,
-            ref MDLPRResults cResults);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_lpr_rec_result(ref MDLPRResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_rec_result(ref MDLPRResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_rec_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 
     public sealed class LprPipeline : IDisposable
@@ -286,34 +235,5 @@ namespace ModelDeploy.vision.lpr
 
         ~LprPipeline() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_lpr_pipeline_model(ref MDModel model, string lprDetModelFile,
-            string lprRecModelFile, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_lpr_pipeline_predict(ref MDModel model, ref MDImage image,
-            ref MDLPRResults cResults);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_lpr_pipeline_result(ref MDLPRResults cResults);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_lpr_pipeline_result(ref MDImage image, ref MDLPRResults cResults,
-            string fontPath, int fontSize, int landmarkRadius, double alpha, bool saveResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_pipeline_result(ref MDLPRResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_lpr_pipeline_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 }

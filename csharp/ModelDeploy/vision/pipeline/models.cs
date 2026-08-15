@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.pipeline
 {
@@ -92,7 +93,7 @@ namespace ModelDeploy.vision.pipeline
             finally
             {
                 md_free_attr_result(ref cResults);
-                Utils.md_free_md_map(ref cMap);
+                md_free_md_map(ref cMap);
             }
         }
 
@@ -117,46 +118,5 @@ namespace ModelDeploy.vision.pipeline
 
         ~PedestrianAttribute() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_attr_model(
-            ref MDModel model, string detModelPath, string clsModelPath, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_attr_det_input_size(ref MDModel model, MDSize size);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_attr_cls_input_size(ref MDModel model, MDSize size);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_attr_cls_batch_size(ref MDModel model, int batchSize);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_attr_det_threshold(ref MDModel model, float threshold);
-
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_attr_model_predict(ref MDModel model, ref MDImage image,
-            ref MDAttributeResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_attr_result(ref MDAttributeResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_attr_result(ref MDImage image, ref MDAttributeResults result,
-            double threshold, ref MDMapData labelMap, string fontPath, int fontSize, double alpha, bool saveResult,
-            int[] abnormalIds, int abnormalIdsSize, int showAttr);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_attr_result(ref MDAttributeResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_attr_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.face
 {
@@ -131,23 +132,10 @@ namespace ModelDeploy.vision.face
 
         #region Native bindings
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_insightface_model(ref MDModel model,
-            string detModelPath, string recModelPath, string lmk2dModelPath, string lmk3dModelPath,
-            string genderageModelPath, ref MDRuntimeOption option);
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_insightface_analyze(ref MDModel model, ref MDImage image,
-            ref MDInsightFaceResults cResults);
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_insightface_set_det_thresh(ref MDModel model, float thresh);
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_insightface_result(ref MDInsightFaceResults cResults);
 
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_insightface_model(ref MDModel model);
 
         #endregion
     }

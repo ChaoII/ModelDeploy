@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 using ModelDeploy.vision.face;
 
 namespace ModelDeploy.vision.pose
@@ -114,39 +115,5 @@ namespace ModelDeploy.vision.pose
 
         ~UltralyticsPose() => Dispose();
 
-        #region Native bindings
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_create_keypoint_model(ref MDModel model, string modelPath, ref MDRuntimeOption option);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_set_keypoint_input_size(ref MDModel model, MDSize size);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_keypoint_predict(ref MDModel model, ref MDImage image,
-            ref MDKeyPointResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_pose_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
-            ref MDKeyPointResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_print_keypoint_result(ref MDKeyPointResults cResults);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_draw_keypoint_result(ref MDImage image, ref MDKeyPointResults result,
-            string fontPath, int fontSize, int keypointRadius, double alpha, bool saveResult);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_keypoint_result(ref MDKeyPointResults results);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void md_free_keypoint_model(ref MDModel model);
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
-
-        #endregion
     }
 }

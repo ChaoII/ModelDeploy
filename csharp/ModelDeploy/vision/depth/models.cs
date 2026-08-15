@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.utils;
+using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.vision.depth
 {
@@ -20,20 +21,20 @@ namespace ModelDeploy.vision.depth
         {
             _model = new MDModel();
             var nativeOption = option.ToNative();
-            Utils.Check(NativeBindings.md_create_depth_model(ref _model, modelPath, ref nativeOption),
+            Utils.Check(md_create_depth_model(ref _model, modelPath, ref nativeOption),
                 "Create depth estimation model");
         }
 
         public void SetInputSize(int width, int height)
         {
             var size = new MDSize { width = width, height = height };
-            Utils.Check(NativeBindings.md_set_depth_input_size(ref _model, size), "Set depth estimation input size");
+            Utils.Check(md_set_depth_input_size(ref _model, size), "Set depth estimation input size");
         }
 
         public DepthResult Predict(Image image)
         {
             var cResult = new MDDepthResult();
-            Utils.Check(NativeBindings.md_depth_predict(ref _model, ref image.RawImage, ref cResult),
+            Utils.Check(md_depth_predict(ref _model, ref image.RawImage, ref cResult),
                 "Depth estimation predict");
             try
             {
@@ -41,7 +42,7 @@ namespace ModelDeploy.vision.depth
             }
             finally
             {
-                NativeBindings.md_free_depth_result(ref cResult);
+                md_free_depth_result(ref cResult);
             }
         }
 
@@ -53,7 +54,7 @@ namespace ModelDeploy.vision.depth
             var uvPinned = GCHandle.Alloc(srcUV, GCHandleType.Pinned);
             try
             {
-                Utils.Check(NativeBindings.md_depth_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
+                Utils.Check(md_depth_predict_nv12(ref _model, yPinned.AddrOfPinnedObject(),
                         uvPinned.AddrOfPinnedObject(), width, height, stepY, stepUV, srcDevice, ref cResult),
                     "Depth estimation predict NV12");
                 return DepthResult.FromNative(cResult);
@@ -62,7 +63,7 @@ namespace ModelDeploy.vision.depth
             {
                 yPinned.Free();
                 uvPinned.Free();
-                NativeBindings.md_free_depth_result(ref cResult);
+                md_free_depth_result(ref cResult);
             }
         }
 
@@ -77,15 +78,12 @@ namespace ModelDeploy.vision.depth
         {
             if (!_disposed)
             {
-                NativeBindings.md_free_depth_model(ref _model);
+                md_free_depth_model(ref _model);
                 _disposed = true;
                 GC.SuppressFinalize(this);
             }
         }
 
         ~UltralyticsDepth() => Dispose();
-
-        [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int md_clone_model(ref MDModel model, ref MDModel from);
     }
 }
