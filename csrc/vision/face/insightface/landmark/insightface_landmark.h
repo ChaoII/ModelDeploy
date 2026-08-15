@@ -29,6 +29,17 @@ namespace modeldeploy::vision::face {
                           std::array<float, 3>* pose,
                           TimerArray* timers = nullptr);
 
+        // 多张脸一次 batch 推理（输入 [N,3,192,192]）
+        bool batch_predict_2d106(const ImageData& image,
+                                 const std::vector<std::array<float, 4>>& bboxes,
+                                 std::vector<std::vector<std::array<float, 2>>>* landmarks_list,
+                                 TimerArray* timers = nullptr);
+        bool batch_predict_3d68(const ImageData& image,
+                                const std::vector<std::array<float, 4>>& bboxes,
+                                std::vector<std::vector<std::array<float, 3>>>* landmarks_list,
+                                std::vector<std::array<float, 3>>* poses,
+                                TimerArray* timers = nullptr);
+
         [[nodiscard]] std::unique_ptr<InsightFaceLandmark> clone() const;
 
         virtual InsightFaceLandmarkPreprocessor& get_preprocessor() { return preprocessor_; }

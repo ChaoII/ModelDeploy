@@ -4,6 +4,8 @@
 #include "core/md_log.h"
 #include "vision/face/insightface/genderage/insightface_genderage.h"
 #include "vision/processors/processor_factory.h"
+#include <cstring>
+#include <cmath>
 
 namespace modeldeploy::vision::face {
 
@@ -39,6 +41,46 @@ namespace modeldeploy::vision::face {
         if (timers) timers->infer_timer.stop();
         if (timers) timers->post_timer.start();
         if (!postprocessor_.run(reused_output_tensors_, result)) return false;
+        if (timers) timers->post_timer.stop();
+        return true;
+    }
+
+    bool InsightFaceGenderAge::batch_predict_gender_age(
+        const ImageData& image, const std::vector<std::array<float, 4>>& bboxes,
+        std::vector<GenderAgeResult>* results, TimerArray* timers) {
+        if (!results || bboxes.empty()) return false;
+        const size_t n = bboxes.size();
+        results->resize(n);
+        if (n == 1) {
+            return predict_gender_age(image, bboxes[0], &(*results)[0], timers);
+        }
+        const int H = input_size_[0];
+        const int W = input_size_[1];
+        const size_t plane = static_cast<size_t>(3) * H * W;
+        std::vector<Tensor> singles(n);
+        Tensor batch_tensor({static_cast<int64_t>(n), 3, H, W}, DataType::FP32, Device::CPU);
+        float* batch_data = batch_tensor.data_ptr<float>();
+        if (timers) timers->pre_timer.start();
+        for (size_t i = 0; i < n; ++i) {
+            cv::Mat M;
+            if (!preprocessor_.run(image, bboxes[i], &M, &singles[i])) return false;
+            std::memcpy(batch_data + i * plane, singles[i].data(), plane * sizeof(float));
+        }
+        if (timers) timers->pre_timer.stop();
+        batch_tensor.set_name(get_input_info(0).name);
+        std::vector<Tensor> input_tensors{batch_tensor};
+        std::vector<Tensor> output_tensors;
+        if (timers) timers->infer_timer.start();
+        if (!infer(input_tensors, &output_tensors)) return false;
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
+        // 输出 [N,3]：每张脸 3 元素（gender 前 2、age 第 3）
+        const float* out = static_cast<const float*>(output_tensors[0].data());
+        for (size_t i = 0; i < n; ++i) {
+            const float* p = out + i * 3;
+            (*results)[i].gender = (p[0] >= p[1]) ? 0 : 1;
+            (*results)[i].age = static_cast<int>(std::lround(p[2] * 100.0f));
+        }
         if (timers) timers->post_timer.stop();
         return true;
     }

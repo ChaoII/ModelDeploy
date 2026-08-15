@@ -26,6 +26,12 @@ namespace modeldeploy::vision::face {
                      std::vector<float>* embedding,
                      TimerArray* timers = nullptr);
 
+        // 多张脸一次 batch 推理（输入同尺寸 [N,3,112,112]，显著快于逐脸 predict）
+        bool batch_predict(const ImageData& image,
+                           const std::vector<std::vector<std::array<float, 2>>>& kps_list,
+                           std::vector<std::vector<float>>* embeddings,
+                           TimerArray* timers = nullptr);
+
         [[nodiscard]] std::unique_ptr<InsightFaceRecognition> clone() const;
 
         virtual InsightFaceRecPreprocessor& get_preprocessor() { return preprocessor_; }

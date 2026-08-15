@@ -46,36 +46,67 @@ namespace modeldeploy::vision::face {
         std::vector<InsightFaceBox> boxes;
         if (!detect(image, &boxes, timers)) return false;
 
-        results->reserve(boxes.size());
-        for (const auto& b : boxes) {
-            InsightFaceResult r;
-            r.bbox = b.bbox;
-            r.det_score = b.score;
-            r.kps = b.kps;
-            if (with_2d106 && lmk_2d_) {
-                std::vector<std::array<float, 2>> lmk;
-                if (lmk_2d_->predict_2d106(image, b.bbox, &lmk, timers)) r.landmark_2d_106 = std::move(lmk);
+        const size_t n = boxes.size();
+        results->resize(n);
+        // bbox 列表（供 batch 推理）
+        std::vector<std::array<float, 4>> bbox_list(n);
+        for (size_t i = 0; i < n; ++i) {
+            bbox_list[i] = boxes[i].bbox;
+            (*results)[i].bbox = boxes[i].bbox;
+            (*results)[i].det_score = boxes[i].score;
+            (*results)[i].kps = boxes[i].kps;
+        }
+
+        // 2D 106 关键点：一次 batch 推理
+        if (with_2d106 && lmk_2d_ && n > 0) {
+            std::vector<std::vector<std::array<float, 2>>> lmk_list;
+            if (lmk_2d_->batch_predict_2d106(image, bbox_list, &lmk_list, timers)) {
+                for (size_t i = 0; i < n; ++i) (*results)[i].landmark_2d_106 = std::move(lmk_list[i]);
             }
-            if (with_3d68 && lmk_3d_) {
-                std::vector<std::array<float, 3>> lmk;
-                std::array<float, 3> pose{0, 0, 0};
-                if (lmk_3d_->predict_3d68(image, b.bbox, &lmk, &pose, timers)) {
-                    r.landmark_3d_68 = std::move(lmk);
-                    r.pose = pose;
+        }
+        // 3D 68 关键点 + pose：一次 batch 推理
+        if (with_3d68 && lmk_3d_ && n > 0) {
+            std::vector<std::vector<std::array<float, 3>>> lmk_list;
+            std::vector<std::array<float, 3>> pose_list;
+            if (lmk_3d_->batch_predict_3d68(image, bbox_list, &lmk_list, &pose_list, timers)) {
+                for (size_t i = 0; i < n; ++i) {
+                    (*results)[i].landmark_3d_68 = std::move(lmk_list[i]);
+                    (*results)[i].pose = pose_list[i];
                 }
             }
-            if (with_recognition && rec_ && b.kps.size() == 5) {
-                std::vector<float> emb;
-                if (rec_->predict(image, b.kps, &emb, timers)) r.embedding = std::move(emb);
+        }
+        // 识别 embedding：一次 batch 推理
+        if (with_recognition && rec_ && n > 0) {
+            std::vector<std::vector<std::array<float, 2>>> kps_list;
+            bool all_kps = true;
+            for (size_t i = 0; i < n; ++i) {
+                if (boxes[i].kps.size() == 5) kps_list.push_back(boxes[i].kps);
+                else { all_kps = false; kps_list.emplace_back(); }
             }
-            if (with_genderage && genderage_) {
-                GenderAgeResult ga;
-                if (genderage_->predict_gender_age(image, b.bbox, &ga, timers)) {
-                    r.gender = ga.gender;
-                    r.age = ga.age;
+            if (all_kps) {
+                std::vector<std::vector<float>> emb_list;
+                if (rec_->batch_predict(image, kps_list, &emb_list, timers)) {
+                    for (size_t i = 0; i < n; ++i) (*results)[i].embedding = std::move(emb_list[i]);
+                }
+            } else {
+                // 个别脸缺 kps：逐脸 fallback
+                for (size_t i = 0; i < n; ++i) {
+                    if (boxes[i].kps.size() == 5) {
+                        std::vector<float> emb;
+                        if (rec_->predict(image, boxes[i].kps, &emb, timers)) (*results)[i].embedding = std::move(emb);
+                    }
                 }
             }
-            results->push_back(std::move(r));
+        }
+        // genderage：一次 batch 推理
+        if (with_genderage && genderage_ && n > 0) {
+            std::vector<GenderAgeResult> ga_list;
+            if (genderage_->batch_predict_gender_age(image, bbox_list, &ga_list, timers)) {
+                for (size_t i = 0; i < n; ++i) {
+                    (*results)[i].gender = ga_list[i].gender;
+                    (*results)[i].age = ga_list[i].age;
+                }
+            }
         }
         return true;
     }

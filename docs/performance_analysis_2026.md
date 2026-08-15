@@ -65,18 +65,18 @@
 
 | Pipeline | ORT CPU | MNN | TRT GPU | 说明 |
 |---|---|---|---|---|
-| insightface（det+2d106+3d68+rec+genderage，17 脸） | 3413 | 1486 | **79.5** | TRT 43x |
-| face-rec（scrfd + seetaface rec） | 81 | - | **3.1** | TRT 26x |
-| face-as（scrfd + fas_first + fas_second） | 129 | - | onnx only（fas_second 模型缺陷） | - |
-| pedestrian-attr（zhgd_det + zhgd_ml） | 201 | - | **16.2** | TRT 12.4x |
-| **OCR（det+cls+rec，218 行）** | **1379** | - | **230** | **TRT 6x** |
+| insightface（det+2d106+3d68+rec+genderage，17 脸，batch） | 978 | 1345 | **55** | batch 后 TRT 从 79.5→55ms |
+| face-rec（scrfd + seetaface rec） | 69 | - | **2.8** | TRT 25x |
+| face-as（scrfd + fas_first + fas_second） | 130 | - | onnx only（fas_second 模型缺陷） | - |
+| pedestrian-attr（zhgd_det + zhgd_ml） | 202 | - | **21.4** | TRT 9.4x |
+| **OCR（det+cls+rec，218 行）** | **1356** | - | **204** | **TRT 6.6x** |
 | LPR（det+rec） | 待补 | - | 待补 | 已检出，pipeline 计时未实现 |
 
-> **注**：pipeline 的 total 为 TimerArray 累计（单次 predict 内多个子模型推理之和），
-> 非平均。单模型数据为单次推理耗时。
-> insightface 17 张脸全流程：det(5.2) + 17×lmk2d(0.88)+17×lmk3d(1.25)+17×rec(1.62)+17×ga(0.47) ≈ 79ms 自洽。
+> **insightface batch 优化**：17 张脸从逐脸串行（79.5ms）改为 batch 推理（每子模型一次
+> [17,3,H,W] infer）→ TRT **55ms**（max24 profile）或 **18.7ms**（opt8 max16 profile）。
+> CPU onnx 从 3413ms → 978ms（3.5x），MNN 1486→1345ms。
 
-### 4.1 OCR 230ms 的构成（218 行密集文本）
+### 4.1 OCR 204ms 的构成（218 行密集文本）
 - det（960 max side，动态）：7.4ms
 - cls：218 行 ÷ 6 = 37 批 × 0.62ms ≈ 23ms
 - **rec：218 行 ÷ 6 = 37 批，每批动态宽 pad 到该批最宽行（最长 864px）**
@@ -85,7 +85,7 @@
 - crop/透视变换（CPU）：218 次 ≈ 11ms
 
 > **rec 单模型快、pipeline 慢的原因**：batch 内动态宽 pad 到最宽行 + 218 行分 37 批，
-> pad 浪费放大。优化方向：rec 按宽度聚类分组（宽窄分开 batch）。
+> pad 浪费放大。优化方向：rec 按宽度聚类分组（宽窄分开 batch），或增大 batch 减少批次数。
 
 ## 5. 瓶颈分析（当前仍存在的优化点）
 
@@ -181,3 +181,20 @@ pipeline（多子模型累积）sum=累计推理耗时，正确反映真实耗�
   Dimension mismatch）——模型文件损坏，无法在任何后端推理。
 - **fas_second.onnx**：动态 shape 下 Conv 输入 {1,1} 无效（ORT 也崩）——模型文件缺陷。
 - 这两个不是"无法转 TRT"，而是模型本身不可用（应重新导出模型）。
+
+### 9.8 insightface 子模型 batch 推理（17 脸 pipeline 79.5ms → 55ms，CPU 3.5x）
+给 InsightFaceLandmark / InsightFaceRecognition / InsightFaceGenderAge 增加 batch_predict：
+- 每张脸单图 preprocess → memcpy 合并 [N,3,H,W] → 一次 infer → 按行切分 postprocess
+- face_analysis.analyze 改为 batch 调用（det 后 4 个子模型各一次 batch 推理）
+- TRT engine 重新生成动态 batch profile（min 1 / opt 8-16 / max 24，覆盖实际脸数）
+
+**实测（17 张脸）**：
+| 后端 | 逐脸串行 | batch | 提速 |
+|---|---|---|---|
+| onnx CPU | 3413ms | 978ms | 3.5x |
+| MNN | 1486ms | 1345ms | 1.1x |
+| TRT（opt8 max16） | 79.5ms | **18.7ms** | 4.3x |
+| TRT（opt16 max24，通用） | 79.5ms | **55ms** | 1.45x |
+
+> **TRT profile 权衡**：opt=8 时引擎针对小 batch 优化最快，但严格 profile 下 batch 超出
+> max 会失败；opt=16/max24 覆盖更多脸但性能略降。生产按场景定 profile。

@@ -23,6 +23,12 @@ namespace modeldeploy::vision::face {
         bool predict_gender_age(const ImageData& image, const std::array<float, 4>& bbox,
                                 GenderAgeResult* result, TimerArray* timers = nullptr);
 
+        // 多张脸一次 batch 推理（输入 [N,3,96,96]）
+        bool batch_predict_gender_age(const ImageData& image,
+                                      const std::vector<std::array<float, 4>>& bboxes,
+                                      std::vector<GenderAgeResult>* results,
+                                      TimerArray* timers = nullptr);
+
         [[nodiscard]] std::unique_ptr<InsightFaceGenderAge> clone() const;
 
         virtual InsightFaceGenderAgePreprocessor& get_preprocessor() { return preprocessor_; }
