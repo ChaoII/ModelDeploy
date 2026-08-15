@@ -11,12 +11,13 @@
 extern "C" {
 #endif
 
-/// 创建 insightface 综合人脸分析模型（det + 2d106 + 3d68 + recognition）
+/// 创建 insightface 综合人脸分析模型（det + 2d106 + 3d68 + recognition + genderage）
 /// \param model 模型
 /// \param det_model_path det_10g.onnx 路径
 /// \param rec_model_path w600k_r50.onnx 路径
 /// \param lmk2d_model_path 2d106det.onnx 路径
 /// \param lmk3d_model_path 1k3d68.onnx 路径
+/// \param genderage_model_path genderage.onnx 路径（可空，跳过 genderage）
 /// \param option
 MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_insightface_model(
     MDModel* model,
@@ -24,6 +25,7 @@ MODELDEPLOY_CAPI_EXPORT MDStatusCode md_create_insightface_model(
     const char* rec_model_path,
     const char* lmk2d_model_path,
     const char* lmk3d_model_path,
+    const char* genderage_model_path,
     const MDRuntimeOption* option);
 
 /// 创建 insightface 检测模型（仅 det_10g）

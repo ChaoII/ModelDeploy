@@ -52,6 +52,9 @@ namespace {
         c->embedding_size = static_cast<int>(r.embedding.size());
         c->embedding = c->embedding_size > 0 ? new float[c->embedding_size] : nullptr;
         if (c->embedding) std::memcpy(c->embedding, r.embedding.data(), c->embedding_size * sizeof(float));
+        // genderage
+        c->gender = r.gender;
+        c->age = r.age;
     }
 } // namespace
 
@@ -60,13 +63,14 @@ MDStatusCode md_create_insightface_model(MDModel* model,
                                          const char* rec_model_path,
                                          const char* lmk2d_model_path,
                                          const char* lmk3d_model_path,
+                                         const char* genderage_model_path,
                                          const MDRuntimeOption* option) {
     modeldeploy::RuntimeOption _option;
     c_runtime_option_2_runtime_option(option, &_option);
     auto analysis = std::make_unique<modeldeploy::vision::face::InsightFaceAnalysis>(
         det_model_path ? det_model_path : "", rec_model_path ? rec_model_path : "",
         lmk2d_model_path ? lmk2d_model_path : "", lmk3d_model_path ? lmk3d_model_path : "",
-        _option);
+        _option, genderage_model_path ? genderage_model_path : "");
     model->format = MDModelFormat::ONNX;
     model->model_name = strdup("InsightFaceAnalysis");
     model->model_content = analysis.release();
@@ -101,7 +105,7 @@ MDStatusCode md_insightface_analyze(const MDModel* model, MDImage* image,
     auto image_data = md_image_to_image_data(image);
     std::vector<modeldeploy::vision::face::InsightFaceResult> results;
     const auto analysis = static_cast<modeldeploy::vision::face::InsightFaceAnalysis*>(model->model_content);
-    if (!analysis->analyze(image_data, &results, true, true, true)) {
+    if (!analysis->analyze(image_data, &results, true, true, true, true)) {
         return MDStatusCode::ModelPredictFailed;
     }
     c_results->size = static_cast<int>(results.size());

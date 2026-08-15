@@ -15,6 +15,8 @@ namespace ModelDeploy.vision.face
         public List<Point3F> Landmark3D68 { get; set; } = new List<Point3F>();
         public float[] Pose { get; set; } = new float[3];
         public float[] Embedding { get; set; } = new float[0];
+        public int Gender { get; set; } = -1;
+        public int Age { get; set; } = -1;
 
         internal static InsightFaceResult FromNative(MDInsightFaceResult c)
         {
@@ -23,6 +25,8 @@ namespace ModelDeploy.vision.face
                 Box = Rect.FromNative(c.box),
                 Score = c.score,
                 Pose = c.pose ?? new float[3],
+                Gender = c.gender,
+                Age = c.age,
             };
             r.Kps = ReadPoints(c.kps, c.kps_size);
             r.Landmark2D106 = ReadPoints(c.landmark_2d_106, c.landmark_2d_106_size);
@@ -78,12 +82,18 @@ namespace ModelDeploy.vision.face
 
         public InsightFaceAnalysis(string detModelPath, string recModelPath,
             string lmk2dModelPath, string lmk3dModelPath, RuntimeOption option)
+            : this(detModelPath, recModelPath, lmk2dModelPath, lmk3dModelPath, "", option)
+        {
+        }
+
+        public InsightFaceAnalysis(string detModelPath, string recModelPath,
+            string lmk2dModelPath, string lmk3dModelPath, string genderageModelPath, RuntimeOption option)
         {
             _model = new MDModel();
             var nativeOption = option.ToNative();
             Utils.Check(
                 md_create_insightface_model(ref _model, detModelPath, recModelPath,
-                    lmk2dModelPath, lmk3dModelPath, ref nativeOption),
+                    lmk2dModelPath, lmk3dModelPath, genderageModelPath, ref nativeOption),
                 "Create insightface model");
         }
 
@@ -124,7 +134,7 @@ namespace ModelDeploy.vision.face
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_create_insightface_model(ref MDModel model,
             string detModelPath, string recModelPath, string lmk2dModelPath, string lmk3dModelPath,
-            ref MDRuntimeOption option);
+            string genderageModelPath, ref MDRuntimeOption option);
 
         [DllImport("ModelDeploySDK", CallingConvention = CallingConvention.Cdecl)]
         private static extern int md_insightface_analyze(ref MDModel model, ref MDImage image,

@@ -265,6 +265,9 @@ typedef struct {
     // 512 维 embedding
     float* embedding;
     int embedding_size;
+    // 性别 0=male 1=female（未启用 genderage 为 -1）；年龄
+    int gender;
+    int age;
 } MDInsightFaceResult;
 
 typedef struct {

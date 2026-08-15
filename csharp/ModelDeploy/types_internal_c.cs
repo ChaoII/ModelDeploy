@@ -305,6 +305,8 @@ namespace ModelDeploy
             public float[] pose;
             public IntPtr embedding;
             public int embedding_size;
+            public int gender;
+            public int age;
         }
 
         [StructLayout(LayoutKind.Sequential)]

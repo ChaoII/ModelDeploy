@@ -250,6 +250,8 @@ pub struct MDInsightFaceResult {
     pub pose: [c_float; 3],
     pub embedding: *mut c_float,
     pub embedding_size: c_int,
+    pub gender: c_int,
+    pub age: c_int,
 }
 
 #[repr(C)]
@@ -598,6 +600,7 @@ extern "C" {
         rec_model_path: *const c_char,
         lmk2d_model_path: *const c_char,
         lmk3d_model_path: *const c_char,
+        genderage_model_path: *const c_char,
         option: *const MDRuntimeOption,
     ) -> MDStatusCode;
     pub fn md_create_insightface_det_model(

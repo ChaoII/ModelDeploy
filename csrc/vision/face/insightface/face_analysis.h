@@ -12,6 +12,7 @@
 #include "vision/face/insightface/scrfd/insightface_scrfd.h"
 #include "vision/face/insightface/landmark/insightface_landmark.h"
 #include "vision/face/insightface/recognition/insightface_recognition.h"
+#include "vision/face/insightface/genderage/insightface_genderage.h"
 #include "vision/face/insightface/insightface_types.h"
 
 namespace modeldeploy::vision::face {
@@ -25,6 +26,8 @@ namespace modeldeploy::vision::face {
         std::vector<std::array<float, 3>> landmark_3d_68; // 68 个 3D 点（原图坐标）
         std::array<float, 3> pose{0, 0, 0}; // pitch, yaw, roll
         std::vector<float> embedding; // 512 维
+        int gender = -1; // 0=male, 1=female；未启用 genderage 时为 -1
+        int age = -1;
     };
 
     class MODELDEPLOY_CXX_EXPORT InsightFaceAnalysis {
@@ -33,11 +36,12 @@ namespace modeldeploy::vision::face {
                             const std::string& rec_model,
                             const std::string& lmk2d_model,
                             const std::string& lmk3d_model,
-                            const RuntimeOption& option = RuntimeOption());
+                            const RuntimeOption& option = RuntimeOption(),
+                            const std::string& genderage_model = "");
 
         bool analyze(const ImageData& image, std::vector<InsightFaceResult>* results,
                      bool with_2d106 = true, bool with_3d68 = true,
-                     bool with_recognition = true,
+                     bool with_recognition = true, bool with_genderage = true,
                      TimerArray* timers = nullptr);
 
         bool detect(const ImageData& image, std::vector<InsightFaceBox>* boxes,
@@ -56,12 +60,14 @@ namespace modeldeploy::vision::face {
         [[nodiscard]] InsightFaceRecognition* rec() { return rec_.get(); }
         [[nodiscard]] InsightFaceLandmark* lmk_2d() { return lmk_2d_.get(); }
         [[nodiscard]] InsightFaceLandmark* lmk_3d() { return lmk_3d_.get(); }
+        [[nodiscard]] InsightFaceGenderAge* genderage() { return genderage_.get(); }
 
     private:
         std::unique_ptr<InsightFaceDet> det_;
         std::unique_ptr<InsightFaceRecognition> rec_;
         std::unique_ptr<InsightFaceLandmark> lmk_2d_;
         std::unique_ptr<InsightFaceLandmark> lmk_3d_;
+        std::unique_ptr<InsightFaceGenderAge> genderage_;
         bool initialized_ = false;
     };
 

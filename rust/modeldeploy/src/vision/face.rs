@@ -121,13 +121,20 @@ unsafe impl Send for InsightFaceAnalysis {}
 unsafe impl Sync for InsightFaceAnalysis {}
 
 impl InsightFaceAnalysis {
-    /// 加载 insightface 模型（det/rec/2d106/3d68 四模型路径）
+    /// 加载 insightface 模型（det/rec/2d106/3d68 四模型路径，无 genderage）
     pub fn new(det_model: &str, rec_model: &str, lmk2d_model: &str, lmk3d_model: &str,
                option: &RuntimeOption) -> Result<Self, MdError> {
+        Self::new_with_genderage(det_model, rec_model, lmk2d_model, lmk3d_model, "", option)
+    }
+
+    /// 加载 insightface 模型（含 genderage，空字符串则跳过）
+    pub fn new_with_genderage(det_model: &str, rec_model: &str, lmk2d_model: &str, lmk3d_model: &str,
+                              genderage_model: &str, option: &RuntimeOption) -> Result<Self, MdError> {
         let cd = CString::new(det_model).map_err(|_| MdError::PathNotFound(det_model.into()))?;
         let cr = CString::new(rec_model).map_err(|_| MdError::PathNotFound(rec_model.into()))?;
         let c2 = CString::new(lmk2d_model).map_err(|_| MdError::PathNotFound(lmk2d_model.into()))?;
         let c3 = CString::new(lmk3d_model).map_err(|_| MdError::PathNotFound(lmk3d_model.into()))?;
+        let cg = CString::new(genderage_model).map_err(|_| MdError::PathNotFound(genderage_model.into()))?;
         let mut model = ffi::MDModel {
             model_name: ptr::null_mut(),
             type_: ffi::MDModelType_InsightFace,
@@ -136,7 +143,7 @@ impl InsightFaceAnalysis {
         };
         let status = unsafe {
             ffi::md_create_insightface_model(&mut model, cd.as_ptr(), cr.as_ptr(), c2.as_ptr(), c3.as_ptr(),
-                                             &option.raw)
+                                             cg.as_ptr(), &option.raw)
         };
         check_status(status)?;
         if model.model_content.is_null() {
@@ -160,6 +167,8 @@ impl InsightFaceAnalysis {
                 landmark_3d_68: read_points(r.landmark_3d_68, r.landmark_3d_68_size),
                 pose: r.pose,
                 embedding: read_f32s(r.embedding, r.embedding_size),
+                gender: r.gender,
+                age: r.age,
             }).collect()
         } else {
             Vec::new()

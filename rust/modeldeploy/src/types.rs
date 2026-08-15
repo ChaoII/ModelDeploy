@@ -92,7 +92,7 @@ pub struct FaceDetection {
     pub landmarks: Vec<Point3f>,
 }
 
-/// insightface 人脸分析结果（bbox + 5 关键点 + 2D106 + 3D68 + pose + embedding）
+/// insightface 人脸分析结果（bbox + 5 关键点 + 2D106 + 3D68 + pose + embedding + gender/age）
 #[derive(Debug, Clone)]
 pub struct InsightFaceResult {
     pub rect: Rect,
@@ -102,6 +102,8 @@ pub struct InsightFaceResult {
     pub landmark_3d_68: Vec<Point3f>,
     pub pose: [f32; 3],
     pub embedding: Vec<f32>,
+    pub gender: i32,
+    pub age: i32,
 }
 
 /// 模型类型

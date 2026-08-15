@@ -9,7 +9,7 @@
 #include <string>
 #include "core/md_decl.h"
 
-class Timer {
+class MODELDEPLOY_CXX_EXPORT Timer {
 public:
     using Clock = std::chrono::high_resolution_clock;
 

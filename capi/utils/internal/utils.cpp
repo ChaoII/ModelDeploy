@@ -626,15 +626,16 @@ void c_runtime_option_2_runtime_option(
     modeldeploy::RuntimeOption* option) {
     option->set_cpu_thread_num(c_option->cpu_thread_num);
     option->ort_option.graph_optimization_level = c_option->graph_opt_level;
-    option->ort_option.trt_engine_cache_path = c_option->trt_engine_cache_path;
+    option->ort_option.trt_engine_cache_path =
+        c_option->trt_engine_cache_path ? c_option->trt_engine_cache_path : "";
     option->enable_fp16 = c_option->enable_fp16;
     option->enable_trt = c_option->enable_trt;
     option->device_id = c_option->device_id;
     option->device = static_cast<modeldeploy::Device>(c_option->device);
     option->backend = static_cast<modeldeploy::Backend>(c_option->backend);
-    option->set_trt_min_shape(c_option->trt_min_shape);
-    option->set_trt_opt_shape(c_option->trt_opt_shape);
-    option->set_trt_max_shape(c_option->trt_max_shape);
-    option->password = c_option->password;
+    option->set_trt_min_shape(c_option->trt_min_shape ? c_option->trt_min_shape : "");
+    option->set_trt_opt_shape(c_option->trt_opt_shape ? c_option->trt_opt_shape : "");
+    option->set_trt_max_shape(c_option->trt_max_shape ? c_option->trt_max_shape : "");
+    option->password = c_option->password ? c_option->password : "";
     option->ort_option.log_severity_level = c_option->ort_log_severity;
 }

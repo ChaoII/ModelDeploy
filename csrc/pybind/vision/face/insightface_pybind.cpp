@@ -22,7 +22,9 @@ namespace modeldeploy::vision {
             .def_readwrite("landmark_2d_106", &face::InsightFaceResult::landmark_2d_106)
             .def_readwrite("landmark_3d_68", &face::InsightFaceResult::landmark_3d_68)
             .def_readwrite("pose", &face::InsightFaceResult::pose)
-            .def_readwrite("embedding", &face::InsightFaceResult::embedding);
+            .def_readwrite("embedding", &face::InsightFaceResult::embedding)
+            .def_readwrite("gender", &face::InsightFaceResult::gender)
+            .def_readwrite("age", &face::InsightFaceResult::age);
 
         // 检测模型
         pybind11::class_<face::InsightFaceDetPreprocessor>(m, "InsightFaceDetPreprocessor")
@@ -78,28 +80,43 @@ namespace modeldeploy::vision {
                      return embedding;
                  }, pybind11::arg("image"), pybind11::arg("kps"));
 
+        // 性别年龄模型
+        pybind11::class_<face::InsightFaceGenderAge, BaseModel>(m, "InsightFaceGenderAge")
+            .def(pybind11::init<std::string, RuntimeOption>(),
+                 pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption())
+            .def("predict_gender_age",
+                 [](face::InsightFaceGenderAge& self, const pybind11::array& image,
+                    const std::array<float, 4>& bbox) {
+                     const auto mat = pyarray_to_cv_mat(image);
+                     face::GenderAgeResult result;
+                     self.predict_gender_age(ImageData(std::move(mat)), bbox, &result);
+                     return pybind11::make_tuple(result.gender, result.age);
+                 }, pybind11::arg("image"), pybind11::arg("bbox"));
+
         // 综合 pipeline
         pybind11::class_<face::InsightFaceAnalysis>(m, "InsightFaceAnalysis")
-            .def(pybind11::init<std::string, std::string, std::string, std::string, RuntimeOption>(),
+            .def(pybind11::init<std::string, std::string, std::string, std::string, RuntimeOption, std::string>(),
                  pybind11::arg("det_model"), pybind11::arg("rec_model"),
                  pybind11::arg("lmk2d_model"), pybind11::arg("lmk3d_model"),
-                 pybind11::arg("option") = RuntimeOption())
+                 pybind11::arg("option") = RuntimeOption(),
+                 pybind11::arg("genderage_model") = "")
             .def_static("create_from_dir",
                         [](const std::string& model_dir, const RuntimeOption& option) {
                             return face::InsightFaceAnalysis::create_from_dir(model_dir, option);
                         }, pybind11::arg("model_dir"), pybind11::arg("option") = RuntimeOption())
             .def("analyze",
                  [](face::InsightFaceAnalysis& self, const pybind11::array& image,
-                    bool with_2d106, bool with_3d68, bool with_recognition) {
+                    bool with_2d106, bool with_3d68, bool with_recognition, bool with_genderage) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<face::InsightFaceResult> results;
                      self.analyze(ImageData(std::move(mat)), &results,
-                                  with_2d106, with_3d68, with_recognition);
+                                  with_2d106, with_3d68, with_recognition, with_genderage);
                      return results;
                  }, pybind11::arg("image"),
                  pybind11::arg("with_2d106") = true,
                  pybind11::arg("with_3d68") = true,
-                 pybind11::arg("with_recognition") = true)
+                 pybind11::arg("with_recognition") = true,
+                 pybind11::arg("with_genderage") = true)
             .def("detect",
                  [](face::InsightFaceAnalysis& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
@@ -107,6 +124,7 @@ namespace modeldeploy::vision {
                      self.detect(ImageData(std::move(mat)), &boxes);
                      return boxes;
                  }, pybind11::arg("image"))
-            .def("set_det_thresh", &face::InsightFaceAnalysis::set_det_thresh);
+            .def("set_det_thresh", &face::InsightFaceAnalysis::set_det_thresh)
+            .def_property_readonly("genderage", &face::InsightFaceAnalysis::genderage);
     }
 } // namespace modeldeploy

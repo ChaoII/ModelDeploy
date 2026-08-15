@@ -13,6 +13,11 @@
 #include <nlohmann/json.hpp>
 
 #include "csrc/vision/face/insightface/face_analysis.h"
+#include "capi/common/md_types.h"
+#include "capi/common/md_decl.h"
+#include "capi/utils/md_image_capi.h"
+#include "capi/vision/face/insightface_capi.h"
+#include <opencv2/opencv.hpp>
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -170,6 +175,14 @@ TEST_CASE("InsightFace full pipeline aligns with python", "[insightface][model]"
         INFO("embedding cosine sim=" << sim);
         REQUIRE(sim > 0.99);
     }
+
+    // genderage：与 python 逐人脸对齐（gender 精确、age 精确）
+    if (results[match].gender >= 0 && j["faces"][best_idx].contains("gender")) {
+        REQUIRE(results[match].gender == j["faces"][best_idx]["gender"].get<int>());
+    }
+    if (results[match].age >= 0 && j["faces"][best_idx].contains("age")) {
+        REQUIRE(results[match].age == j["faces"][best_idx]["age"].get<int>());
+    }
 }
 
 // ==================== MNN 后端 ====================
@@ -203,21 +216,24 @@ TEST_CASE("InsightFace full pipeline on MNN backend", "[insightface][model][back
     // 用 MNN 模型路径构造 pipeline（各子模型自动选 MNN 后端）
     face::InsightFaceAnalysis analysis(
         model_dir + "/det_10g.mnn", model_dir + "/w600k_r50.mnn",
-        model_dir + "/2d106det.mnn", model_dir + "/1k3d68.mnn");
+        model_dir + "/2d106det.mnn", model_dir + "/1k3d68.mnn",
+        RuntimeOption(), model_dir + "/genderage.mnn");
     REQUIRE(analysis.is_initialized());
     auto img = ImageData::imread(img_path);
 
     std::vector<face::InsightFaceResult> results;
-    REQUIRE(analysis.analyze(img, &results, true, true, true));
+    REQUIRE(analysis.analyze(img, &results, true, true, true, true));
     REQUIRE(!results.empty());
     // 关键点/embedding 应被填充
-    bool has_lmk = false, has_emb = false;
+    bool has_lmk = false, has_emb = false, has_ga = false;
     for (const auto& r : results) {
         if (!r.landmark_2d_106.empty()) has_lmk = true;
         if (!r.embedding.empty()) has_emb = true;
+        if (r.gender >= 0 && r.age >= 0) has_ga = true;
     }
     REQUIRE(has_lmk);
     REQUIRE(has_emb);
+    REQUIRE(has_ga);
 }
 #endif // ENABLE_MNN
 
@@ -241,4 +257,123 @@ TEST_CASE("InsightFace det_10g on TRT backend", "[insightface][model][backend:tr
     REQUIRE(det->predict(img, &boxes));
     REQUIRE(!boxes.empty());
 }
+
+TEST_CASE("InsightFace genderage on TRT backend", "[insightface][model][backend:trt][gpu]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/trt/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/genderage.engine")) return;
+    if (!std::filesystem::exists(model_dir + "/det_10g.engine")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    RuntimeOption opt;
+    opt.use_gpu(0);
+    opt.use_trt_backend();
+    face::InsightFaceAnalysis analysis(
+        model_dir + "/det_10g.engine", "", "", "",
+        opt, model_dir + "/genderage.engine");
+    REQUIRE(analysis.is_initialized());
+    auto img = ImageData::imread(img_path);
+
+    std::vector<face::InsightFaceResult> results;
+    REQUIRE(analysis.analyze(img, &results, false, false, false, true));
+    REQUIRE(!results.empty());
+    bool has_ga = false;
+    for (const auto& r : results) {
+        if (r.gender >= 0 && r.age >= 0) has_ga = true;
+    }
+    REQUIRE(has_ga);
+}
 #endif // ENABLE_TRT
+
+// ==================== SOPHGO 后端（Linux + Sophon-Sail，需 ENABLE_SOPHGO 编译） ====================
+#ifdef ENABLE_SOPHGO
+TEST_CASE("InsightFace det_10g on SOPHGO backend", "[insightface][model][backend:sophgo]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/sophgo/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/det_10g.bmodel")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    RuntimeOption opt;
+    opt.use_sophgo_backend(0);
+    auto det = std::make_unique<face::InsightFaceDet>(model_dir + "/det_10g.bmodel", opt);
+    REQUIRE(det->is_initialized());
+    auto img = ImageData::imread(img_path);
+
+    std::vector<face::InsightFaceBox> boxes;
+    REQUIRE(det->predict(img, &boxes));
+    REQUIRE(!boxes.empty());
+}
+
+TEST_CASE("InsightFace full pipeline on SOPHGO backend", "[insightface][model][backend:sophgo]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/sophgo/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/det_10g.bmodel")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    RuntimeOption opt;
+    opt.use_sophgo_backend(0);
+    face::InsightFaceAnalysis analysis(
+        model_dir + "/det_10g.bmodel", model_dir + "/w600k_r50.bmodel",
+        model_dir + "/2d106det.bmodel", model_dir + "/1k3d68.bmodel",
+        opt, model_dir + "/genderage.bmodel");
+    REQUIRE(analysis.is_initialized());
+    auto img = ImageData::imread(img_path);
+
+    std::vector<face::InsightFaceResult> results;
+    REQUIRE(analysis.analyze(img, &results, true, true, true, true));
+    REQUIRE(!results.empty());
+    bool has_lmk = false, has_emb = false, has_ga = false;
+    for (const auto& r : results) {
+        if (!r.landmark_2d_106.empty()) has_lmk = true;
+        if (!r.embedding.empty()) has_emb = true;
+        if (r.gender >= 0 && r.age >= 0) has_ga = true;
+    }
+    REQUIRE(has_lmk);
+    REQUIRE(has_emb);
+    REQUIRE(has_ga);
+}
+#endif // ENABLE_SOPHGO
+
+// ==================== C API 绑定（含 genderage） ====================
+TEST_CASE("InsightFace C API analyze returns gender/age", "[insightface][capi][model]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/onnx/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/genderage.onnx")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    MDModel model{};
+    model.model_name = nullptr;
+    model.model_content = nullptr;
+    MDRuntimeOption c_option{};
+    c_option.device = MD_DEVICE_CPU;
+    const auto status = md_create_insightface_model(
+        &model, (model_dir + "/det_10g.onnx").c_str(),
+        (model_dir + "/w600k_r50.onnx").c_str(),
+        (model_dir + "/2d106det.onnx").c_str(),
+        (model_dir + "/1k3d68.onnx").c_str(),
+        (model_dir + "/genderage.onnx").c_str(),
+        &c_option);
+    REQUIRE(status == MDStatusCode::Success);
+    REQUIRE(model.model_content != nullptr);
+
+    auto img_mat = cv::imread(img_path);
+    REQUIRE(!img_mat.empty());
+    REQUIRE(img_mat.isContinuous());
+    std::vector<uint8_t> bgr(img_mat.data, img_mat.data + img_mat.total() * 3);
+    MDImage c_image = md_from_bgr24_data(bgr.data(), img_mat.cols, img_mat.rows);
+    REQUIRE(c_image.data != nullptr);
+
+    MDInsightFaceResults c_results{};
+    REQUIRE(md_insightface_analyze(&model, &c_image, &c_results) == MDStatusCode::Success);
+    REQUIRE(c_results.size > 0);
+    bool has_ga = false;
+    for (int i = 0; i < c_results.size; ++i) {
+        if (c_results.data[i].gender >= 0 && c_results.data[i].age >= 0) has_ga = true;
+        REQUIRE(c_results.data[i].embedding_size == 512);
+    }
+    REQUIRE(has_ga);
+
+    md_free_insightface_result(&c_results);
+    md_free_image(&c_image);
+    md_free_insightface_model(&model);
+}
