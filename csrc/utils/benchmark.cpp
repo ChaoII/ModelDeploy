@@ -16,11 +16,14 @@
         durations_.push_back(std::chrono::duration<double, std::milli>(end_time_ - start_time_).count());
     }
 
+    // 返回所有计时段的总耗时（ms）。
+    // 单次 predict（start/stop 一次）：等于该次耗时；
+    // pipeline 内多次子模型共用同一 TimerArray：等于累计耗时。
+    // 此前返回平均值，导致 pipeline 多子模型共用计时时严重低估。
     [[nodiscard]] double Timer::average_ms() const {
-        if (durations_.empty()) return 0.0;
         double sum = 0.0;
         for (const double d : durations_) sum += d;
-        return sum / durations_.size();
+        return sum;
     }
 
     void Timer::push_back(const double duration) {

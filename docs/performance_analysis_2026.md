@@ -43,7 +43,9 @@
 | insightface w600k | 35.10 | **1.62** | 21.7x |
 | insightface genderage | 0.31 | **0.47** | 0.7x |
 
-> **无法转 TRT**：face-age（Gemm 固定 batch）、fas_second（动态 reshape）——仅 ORT CPU。
+> **模型缺陷（非转换问题）**：face-age（age_predictor.onnx）的 Gemm 权重维度错
+> （ORT 推理也报 Dimension mismatch）、fas_second 的 Conv 动态 shape 无效（ORT 也崩）——
+> 这两个模型文件本身有缺陷，**任何后端都无法推理**，非 TRT 转换限制。
 > 所有 TRT 数据均为 trtexec 预编译 .engine 在 RTX 4060 Ti FP16 实测。
 
 ## 3. 单模型 pre/infer/post 分解（关键模型）
@@ -63,42 +65,54 @@
 
 | Pipeline | ORT CPU | MNN | TRT GPU | 说明 |
 |---|---|---|---|---|
-| insightface（det+2d106+3d68+rec+genderage） | 48.95 | 21.20 | **1.09** | TRT 45x |
-| face-rec（scrfd + seetaface rec） | 76.01 | - | **2.82** | TRT 27x |
-| face-as（scrfd + fas_first + fas_second） | 112.92 | - | onnx only（fas_second 无 TRT） | - |
-| pedestrian-attr（zhgd_det + zhgd_ml） | 198.11 | - | **15.73** | TRT 12.6x |
-| **OCR（det+cls+rec，218 行）** | **1311.31** | - | **202.87** | **TRT 6.5x** |
+| insightface（det+2d106+3d68+rec+genderage，17 脸） | 3413 | 1486 | **79.5** | TRT 43x |
+| face-rec（scrfd + seetaface rec） | 81 | - | **3.1** | TRT 26x |
+| face-as（scrfd + fas_first + fas_second） | 129 | - | onnx only（fas_second 模型缺陷） | - |
+| pedestrian-attr（zhgd_det + zhgd_ml） | 201 | - | **16.2** | TRT 12.4x |
+| **OCR（det+cls+rec，218 行）** | **1379** | - | **230** | **TRT 6x** |
 | LPR（det+rec） | 待补 | - | 待补 | 已检出，pipeline 计时未实现 |
 
-> **OCR 关键结论**：218 行密集文本页 CPU 1311ms → GPU TRT 203ms（6.5x）。
-> 实际文档（几十行）GPU 下 <100ms。
+> **注**：pipeline 的 total 为 TimerArray 累计（单次 predict 内多个子模型推理之和），
+> 非平均。单模型数据为单次推理耗时。
+> insightface 17 张脸全流程：det(5.2) + 17×lmk2d(0.88)+17×lmk3d(1.25)+17×rec(1.62)+17×ga(0.47) ≈ 79ms 自洽。
+
+### 4.1 OCR 230ms 的构成（218 行密集文本）
+- det（960 max side，动态）：7.4ms
+- cls：218 行 ÷ 6 = 37 批 × 0.62ms ≈ 23ms
+- **rec：218 行 ÷ 6 = 37 批，每批动态宽 pad 到该批最宽行（最长 864px）**
+  - rec 单行（48x320）仅 1.2ms，但 864px 宽行 pad 放大计算量 ~2.7x
+  - **37 批 × ~5ms ≈ 185ms（主要瓶颈）**
+- crop/透视变换（CPU）：218 次 ≈ 11ms
+
+> **rec 单模型快、pipeline 慢的原因**：batch 内动态宽 pad 到最宽行 + 218 行分 37 批，
+> pad 浪费放大。优化方向：rec 按宽度聚类分组（宽窄分开 batch）。
 
 ## 5. 瓶颈分析（当前仍存在的优化点）
 
-### 5.1 OCR rec 逐行推理（GPU 下 203ms 的主要成本）
-- 218 行 → rec batch=6（动态宽 pad 到 batch_max_w），GPU 下 rec 单次 1.2ms × 37 批 ≈ 44ms；
-  det 7.4ms + cls 逐行 + crop/透视 ≈ 剩余。
-- **优化方向**：rec 按宽度聚类分组（宽窄分开 batch），减少 pad 浪费。
+### 5.1 OCR rec 动态宽 pad（GPU 下 230ms 的主要成本，~185ms）
+- 218 行 → rec batch=6，37 批；每批 pad 到该批最宽行（最长 864px），pad 浪费放大 2.7x
+- rec 单行仅 1.2ms；**优化方向：按宽度聚类分组**（宽窄分开 batch），预计可省 ~100ms
 
-### 5.2 det post 的 CPU NMS
+### 5.2 insightface pipeline 逐脸推理（79.5ms，17 脸）
+- 每张脸串行 lmk2d/lmk3d/rec/genderage（TRT 各 ~1ms）
+- **优化方向**：人脸 batch 化（同 face-as first 的做法），多脸场景可显著提速
+
+### 5.3 det post 的 CPU NMS
 - 非内嵌 NMS 模型（obb/pose/seg onnx）post 在 CPU 做 NMS（3.9-10ms）。
 - TRT engine 用内嵌 NMS 模型后 post≈0.005ms（已解决）。
 
-### 5.3 face-as 的 fas_second 整图推理 + clarity 估计
-- fas_second 无法转 TRT（动态 reshape），face-as 只能部分 GPU。
-
-### 5.4 pre 阶段 SIMD
-- det pre 8ms（CPU）/ insightface det pre 2.2ms（含 align）。
+### 5.4 face-as 的 fas_second
+- fas_second 模型缺陷（Conv 动态 shape 崩），face-as 无法完整 TRT。
 
 ## 6. 吞吐量结论（fps，最新实测）
 
 | 场景 | CPU | GPU TRT | 加速 |
 |---|---|---|---|
-| det 单帧 | 49 fps | **278 fps** | 5.7x |
-| insightface 全流程 | 20 fps | **917 fps** | 45x |
-| face-rec pipeline | 13 fps | **355 fps** | 27x |
-| pedestrian-attr | 5 fps | **64 fps** | 12.6x |
-| OCR 整页（218 行） | 0.76 fps | **4.9 fps** | 6.5x |
+| det 单帧 | 47 fps | **278 fps** | 5.9x |
+| insightface 全流程（17 脸） | 0.29 fps | **12.6 fps** | 43x |
+| face-rec pipeline | 12 fps | **319 fps** | 26x |
+| pedestrian-attr | 5 fps | **62 fps** | 12.4x |
+| OCR 整页（218 行） | 0.73 fps | **4.3 fps** | 6x |
 
 ## 7. 代码结构 / 质量审查发现（已修复项标注）
 
@@ -150,3 +164,20 @@ yolov5plate 的 obj/cls 已是概率，误加 sigmoid 致全候选过阈。回�
 - 为 face/lpr/ocr/insightface/zhgd 生成全部 TRT engine（trtexec FP16）
 - benchmark 每个模型测 {ORT CPU, MNN, TRT backend}，pipeline 测 {CPU, TRT}
 - 修正 TRT engine 的 profile（det 动态 320-1280、cls/rec batch 8、rec 宽 1024）
+
+### 9.6 本版修复：TimerArray 累计语义 bug（重要）
+**问题**：`Timer::average_ms()` 返回"平均"而非"总和"。insightface analyze 把同一个
+TimerArray 传给 det + 每张脸的 lmk2d/lmk3d/rec/genderage（17 脸 = 69 次 start/stop），
+平均后严重低估——insightface pipeline 被误报为 **1.1ms**（实际 **79.5ms**）。
+
+**修复**：`average_ms()` 改为返回计时段**总和**。单模型（一次 start/stop）sum=实际耗时不变；
+pipeline（多子模型累积）sum=累计推理耗时，正确反映真实耗时。
+
+**影响**：单模型数据不变；仅 insightface pipeline 数据修正（1.1ms→79.5ms）。
+其他 pipeline（face-rec/pedestrian/OCR）内部用单次计时，未受影响。
+
+### 9.7 模型缺陷确认
+- **age_predictor.onnx**：Gemm219 权重维度错（W{1024,6144} K:1536，ORT 推理即报
+  Dimension mismatch）——模型文件损坏，无法在任何后端推理。
+- **fas_second.onnx**：动态 shape 下 Conv 输入 {1,1} 无效（ORT 也崩）——模型文件缺陷。
+- 这两个不是"无法转 TRT"，而是模型本身不可用（应重新导出模型）。
