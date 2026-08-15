@@ -78,26 +78,16 @@ namespace {
 // ==================== 单模型 ====================
 
     // 后端选择：
-    //  - .engine          → 纯 TRT engine（GPU，最快）
-    //  - .mnn             → MNN（CPU）
-    //  - .onnx（GPU 构建）→ ORT backend + CUDA EP + FP16（examples/demo_benchmark 生产配置；
-    //                       所有模型都快。注：enable_trt=true(TRT EP) 对无内嵌 NMS 的模型极慢，
-    //                       故 onnx 默认走 CUDA EP，TRT EP 仅对 det 单独测）
-    //  - .onnx（CPU 构建）→ ORT CPU
+    //  - .engine → TRT backend（GPU，最快，生产推荐）
+    //  - .mnn    → MNN（CPU）
+    //  - .onnx   → ORT CPU（基线；GPU 生产见 TRT backend / ORT TRT-EP 单独标注）
+    // 注：ORT TRT-EP（enable_trt=true）对动态 shape 的 onnx（非 NMS 导出）极慢/卡死，
+    //     故 onnx 统一 ORT CPU 作基线，GPU 用 trtexec 预编译 .engine（TRT backend）。
     RuntimeOption bench_opt(const std::string& rel) {
         RuntimeOption opt;
         if (rel.find(".engine") != std::string::npos) {
             opt.use_gpu(0);
             opt.use_trt_backend();
-        } else if (rel.find(".onnx") != std::string::npos) {
-#ifdef WITH_GPU
-            opt.use_ort_backend();
-            opt.use_gpu(0);
-            opt.enable_fp16 = true;
-            opt.enable_trt = false;  // ORT CUDA EP（生产配置，快且所有模型可用）
-#else
-            opt.use_cpu();
-#endif
         } else {
             opt.use_cpu();
         }
@@ -113,17 +103,10 @@ namespace {
 #endif
     }
 
-    // onnx 模型的生产配置：GPU 构建 → ORT CUDA EP + FP16（demo_benchmark 配置），CPU → ORT CPU
+    // onnx 基线：ORT CPU（GPU 用 TRT backend .engine）
     RuntimeOption bench_opt_onnx() {
         RuntimeOption opt;
-#ifdef WITH_GPU
-        opt.use_ort_backend();
-        opt.use_gpu(0);
-        opt.enable_fp16 = true;
-        opt.enable_trt = false;  // CUDA EP（所有模型可用且快；TRT EP 仅对 det 单独测）
-#else
         opt.use_cpu();
-#endif
         return opt;
     }
 
@@ -143,6 +126,11 @@ TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
         if (!model.is_initialized()) continue;
         auto img = load_img("test_detection0.jpg");
         if (img.empty()) continue;
+        // 预热：触发 TRT EP engine 构建 / 内存分配等一次性开销（不计时）
+        {
+            std::vector<DetectionResult> r;
+            for (int i = 0; i < 5; ++i) model.predict(img, &r);
+        }
         constexpr int kRuns = 20;
         std::vector<TimerArray> runs;
         for (int i = 0; i < kRuns; ++i) {
@@ -155,36 +143,6 @@ TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
         report(std::string("det ") + rel, runs);
     }
 }
-
-#ifdef WITH_GPU
-// det 的 ORT TRT EP 生产配置（examples/demo_detection_cxx：enable_trt=true，engine 缓存到 ./trt_engine）。
-// 仅 det 测 TRT EP：它对内嵌 NMS 模型快，但对无 NMS 模型（obb/pose/seg onnx）极慢。
-TEST_CASE("Benchmark det ORT TRT-EP", "[all_models][benchmark][orttrt]") {
-    const auto rel = "onnx/yolo11n/yolo11n_nms.onnx";
-    auto mp = bench_data_dir() / "test_models" / rel;
-    if (!has_file(mp)) return;
-    RuntimeOption opt;
-    opt.use_ort_backend();
-    opt.use_gpu(0);
-    opt.enable_fp16 = true;
-    opt.enable_trt = true;  // ORT TRT EP（生产配置，engine 已缓存）
-    opt.ort_option.trt_engine_cache_path = "./trt_engine";
-    detection::UltralyticsDet model(mp.string(), opt);
-    if (!model.is_initialized()) return;
-    auto img = load_img("test_detection0.jpg");
-    if (img.empty()) return;
-    constexpr int kRuns = 20;
-    std::vector<TimerArray> runs;
-    for (int i = 0; i < kRuns; ++i) {
-        std::vector<DetectionResult> r;
-        TimerArray t;
-        REQUIRE(model.predict(img, &r, &t));
-        if (r.empty()) { runs.clear(); break; }
-        runs.push_back(t);
-    }
-    report("det ORT TRT-EP (yolo11n_nms.onnx)", runs);
-}
-#endif
 
 TEST_CASE("Benchmark UltralyticsCls", "[all_models][benchmark]") {
     for (const auto& rel : {"onnx/yolo11n/yolo11n-cls.onnx", "mnn/yolo11n-cls.mnn", "trt/yolo11n-cls.engine"}) {
@@ -287,119 +245,134 @@ TEST_CASE("Benchmark UltralyticsSeg", "[all_models][benchmark]") {
 // ==================== 人脸模型 ====================
 
 TEST_CASE("Benchmark Scrfd face det", "[all_models][benchmark]") {
-    auto mp = bench_data_dir() / "test_models" / "onnx" / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx";
-    if (!has_file(mp)) return;
-    RuntimeOption opt = bench_opt_onnx();
-    face::Scrfd model(mp.string(), opt);
-    if (!model.is_initialized()) return;
-    auto img = load_img("test_face_detection.jpg");
-    if (img.empty()) return;
-    constexpr int kRuns = 20;
-    std::vector<TimerArray> runs;
-    for (int i = 0; i < kRuns; ++i) {
-        std::vector<KeyPointsResult> r;
-        TimerArray t;
-        REQUIRE(model.predict(img, &r, &t));
-        if (r.empty()) { runs.clear(); break; }
-        runs.push_back(t);
+    // onnx → ORT（GPU 下 TRT EP）；.engine → TRT backend
+    for (const auto& rel : {"onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx", "trt/scrfd_2.5g.engine"}) {
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
+        RuntimeOption opt = bench_opt(rel);
+        face::Scrfd model(mp.string(), opt);
+        if (!model.is_initialized()) continue;
+        auto img = load_img("test_face_detection.jpg");
+        if (img.empty()) continue;
+        // 预热
+        { std::vector<KeyPointsResult> r; for (int i = 0; i < 3; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::vector<KeyPointsResult> r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            if (r.empty()) { runs.clear(); break; }
+            runs.push_back(t);
+        }
+        report(std::string("face-det ") + rel, runs);
     }
-    report("face-det scrfd onnx", runs);
 }
 
 TEST_CASE("Benchmark SeetaFace face models", "[all_models][benchmark]") {
-    struct FaceCfg { const char* tag; const char* file; const char* img; };
+    // tag / onnx 文件 / trt engine 文件 / 图片
+    struct FaceCfg { const char* tag; const char* file; const char* trt_file; const char* img; };
     const FaceCfg cfgs[] = {
-        {"face-age", "age_predictor.onnx", "test_face_gender.jpg"},
-        {"face-gender", "gender_predictor.onnx", "test_face_gender.jpg"},
-        {"face-rec", "face_recognizer.onnx", "test_face_id.jpg"},
+        {"face-age", "age_predictor.onnx", "", "test_face_gender.jpg"},            // age 无法转 TRT（Gemm 固定 batch）
+        {"face-gender", "gender_predictor.onnx", "gender_predictor.engine", "test_face_gender.jpg"},
+        {"face-rec", "face_recognizer.onnx", "face_recognizer.engine", "test_face_id.jpg"},
     };
     for (const auto& c : cfgs) {
-        auto mp = bench_data_dir() / "test_models" / "onnx" / "face" / c.file;
-        if (!has_file(mp)) continue;
-        RuntimeOption opt = bench_opt_onnx();
-        std::vector<TimerArray> runs;
-        auto img = load_img(c.img);
-        if (img.empty()) continue;
-        constexpr int kRuns = 20;
-        if (std::string(c.tag) == "face-age") {
-            face::SeetaFaceAge model(mp.string(), opt);
-            if (!model.is_initialized()) continue;
-            for (int i = 0; i < kRuns; ++i) {
-                int age = 0;
-                TimerArray t;
-                REQUIRE(model.predict(img, &age, &t));
-                runs.push_back(t);
+        // 遍历后端：onnx + trt engine
+        std::vector<std::string> rels;
+        rels.push_back(std::string("onnx/face/") + c.file);
+        if (std::string(c.trt_file).size()) rels.push_back(std::string("trt/") + c.trt_file);
+        for (const auto& rel : rels) {
+            auto mp = bench_data_dir() / "test_models" / rel;
+            if (!has_file(mp)) continue;
+            if (!bench_supported(rel)) continue;
+            RuntimeOption opt = bench_opt(rel);
+            auto img = load_img(c.img);
+            if (img.empty()) continue;
+            constexpr int kRuns = 20;
+            std::vector<TimerArray> runs;
+            if (std::string(c.tag) == "face-age") {
+                face::SeetaFaceAge model(mp.string(), opt);
+                if (!model.is_initialized()) continue;
+                { int a; for (int i = 0; i < 3; ++i) model.predict(img, &a); }
+                for (int i = 0; i < kRuns; ++i) {
+                    int age = 0;
+                    TimerArray t;
+                    REQUIRE(model.predict(img, &age, &t));
+                    runs.push_back(t);
+                }
+            } else if (std::string(c.tag) == "face-gender") {
+                face::SeetaFaceGender model(mp.string(), opt);
+                if (!model.is_initialized()) continue;
+                { int g; for (int i = 0; i < 3; ++i) model.predict(img, &g); }
+                for (int i = 0; i < kRuns; ++i) {
+                    int g = 0;
+                    TimerArray t;
+                    REQUIRE(model.predict(img, &g, &t));
+                    runs.push_back(t);
+                }
+            } else {
+                face::SeetaFaceID model(mp.string(), opt);
+                if (!model.is_initialized()) continue;
+                { FaceRecognitionResult r; for (int i = 0; i < 3; ++i) model.predict(img, &r); }
+                for (int i = 0; i < kRuns; ++i) {
+                    FaceRecognitionResult r;
+                    TimerArray t;
+                    REQUIRE(model.predict(img, &r, &t));
+                    runs.push_back(t);
+                }
             }
-        } else if (std::string(c.tag) == "face-gender") {
-            face::SeetaFaceGender model(mp.string(), opt);
-            if (!model.is_initialized()) continue;
-            for (int i = 0; i < kRuns; ++i) {
-                int g = 0;
-                TimerArray t;
-                REQUIRE(model.predict(img, &g, &t));
-                runs.push_back(t);
-            }
-        } else {
-            face::SeetaFaceID model(mp.string(), opt);
-            if (!model.is_initialized()) continue;
-            for (int i = 0; i < kRuns; ++i) {
-                FaceRecognitionResult r;
-                TimerArray t;
-                REQUIRE(model.predict(img, &r, &t));
-                runs.push_back(t);
-            }
+            report(std::string("face ") + c.tag + " " + rel, runs);
         }
-        report(std::string("face ") + c.tag + " onnx", runs);
     }
 }
 
 // ==================== LPR / OCR ====================
 
 TEST_CASE("Benchmark LPR", "[all_models][benchmark]") {
-    // lpr det
-    {
-        auto mp = bench_data_dir() / "test_models" / "onnx" / "yolov5plate.onnx";
-        if (has_file(mp)) {
-            RuntimeOption opt = bench_opt_onnx();
-            lpr::LprDetection model(mp.string(), opt);
-            if (model.is_initialized()) {
-                auto img = load_img("test_lpr_detection.jpg");
-                if (!img.empty()) {
-                    constexpr int kRuns = 20;
-                    std::vector<TimerArray> runs;
-                    for (int i = 0; i < kRuns; ++i) {
-                        std::vector<KeyPointsResult> r;
-                        TimerArray t;
-                        REQUIRE(model.predict(img, &r, &t));
-                        if (r.empty()) { runs.clear(); break; }
-                        runs.push_back(t);
-                    }
-                    report("lpr-det yolov5plate onnx", runs);
-                }
-            }
+    // lpr det（onnx + TRT backend）
+    for (const auto& rel : {"onnx/yolov5plate.onnx", "trt/yolov5plate.engine"}) {
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
+        RuntimeOption opt = bench_opt(rel);
+        lpr::LprDetection model(mp.string(), opt);
+        if (!model.is_initialized()) continue;
+        auto img = load_img("test_lpr_detection.jpg");
+        if (img.empty()) continue;
+        { std::vector<KeyPointsResult> r; for (int i = 0; i < 3; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::vector<KeyPointsResult> r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            if (r.empty()) { runs.clear(); break; }
+            runs.push_back(t);
         }
+        report(std::string("lpr-det ") + rel, runs);
     }
-    // lpr rec
-    {
-        auto mp = bench_data_dir() / "test_models" / "onnx" / "plate_recognition_color.onnx";
-        if (has_file(mp)) {
-            RuntimeOption opt = bench_opt_onnx();
-            lpr::LprRecognizer model(mp.string(), opt);
-            if (model.is_initialized()) {
-                auto img = load_img("test_lpr_recognizer.jpg");
-                if (!img.empty()) {
-                    constexpr int kRuns = 20;
-                    std::vector<TimerArray> runs;
-                    for (int i = 0; i < kRuns; ++i) {
-                        LprResult r;
-                        TimerArray t;
-                        REQUIRE(model.predict(img, &r, &t));
-                        runs.push_back(t);
-                    }
-                    report("lpr-rec plate_recognition onnx", runs);
-                }
-            }
+    // lpr rec（onnx + TRT backend）
+    for (const auto& rel : {"onnx/plate_recognition_color.onnx", "trt/plate_recognition_color.engine"}) {
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) continue;
+        if (!bench_supported(rel)) continue;
+        RuntimeOption opt = bench_opt(rel);
+        lpr::LprRecognizer model(mp.string(), opt);
+        if (!model.is_initialized()) continue;
+        auto img = load_img("test_lpr_recognizer.jpg");
+        if (img.empty()) continue;
+        { LprResult r; for (int i = 0; i < 3; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            LprResult r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            runs.push_back(t);
         }
+        report(std::string("lpr-rec ") + rel, runs);
     }
 }
 
@@ -408,63 +381,69 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
     auto dict = ocr_dict();
     if (img.empty() || dict.empty()) return;
 
-    // det
-    auto det = find_ocr_model("det", ".onnx");
-    if (has_file(det)) {
-        RuntimeOption opt = bench_opt_onnx();
-        ocr::DBDetector model(det.string(), opt);
-        if (model.is_initialized()) {
-            constexpr int kRuns = 20;
-            std::vector<TimerArray> runs;
-            for (int i = 0; i < kRuns; ++i) {
-                std::vector<std::array<int, 8>> boxes;
-                TimerArray t;
-                REQUIRE(model.predict(img, &boxes, &t));
-                if (boxes.empty()) { runs.clear(); break; }
-                runs.push_back(t);
-            }
-            report("ocr-det ppocrv4 onnx", runs);
+    // det（onnx + TRT backend）
+    for (const auto& rel : {std::string("onnx/ocr/ppocrv4_mobile/det_infer.onnx"), std::string("trt/ocr_det.engine")}) {
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) continue;
+        if (!bench_supported(mp.string())) continue;
+        RuntimeOption opt = bench_opt(mp.string());
+        ocr::DBDetector model(mp.string(), opt);
+        if (!model.is_initialized()) continue;
+        { std::vector<std::array<int, 8>> b; for (int i = 0; i < 3; ++i) model.predict(img, &b); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::vector<std::array<int, 8>> boxes;
+            TimerArray t;
+            REQUIRE(model.predict(img, &boxes, &t));
+            if (boxes.empty()) { runs.clear(); break; }
+            runs.push_back(t);
         }
+        report(std::string("ocr-det ") + rel, runs);
     }
-    // rec
-    auto rec = find_ocr_model("rec", ".onnx");
-    if (has_file(rec)) {
-        RuntimeOption opt = bench_opt_onnx();
-        ocr::Recognizer model(rec.string(), dict.string(), opt);
-        if (model.is_initialized()) {
-            constexpr int kRuns = 20;
-            std::vector<TimerArray> runs;
-            for (int i = 0; i < kRuns; ++i) {
-                std::string text; float score = 0;
-                TimerArray t;
-                REQUIRE(model.predict(img, &text, &score, &t));
-                if (text.empty()) { runs.clear(); break; }
-                runs.push_back(t);
-            }
-            report("ocr-rec ppocrv4 onnx", runs);
+    // rec（onnx + TRT backend）
+    for (const auto& rel : {std::string("onnx/ocr/ppocrv4_mobile/rec_infer.onnx"), std::string("trt/ocr_rec.engine")}) {
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) continue;
+        if (!bench_supported(mp.string())) continue;
+        RuntimeOption opt = bench_opt(mp.string());
+        ocr::Recognizer model(mp.string(), dict.string(), opt);
+        if (!model.is_initialized()) continue;
+        { std::string t; float s; for (int i = 0; i < 3; ++i) model.predict(img, &t, &s); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::string text; float score = 0;
+            TimerArray t;
+            REQUIRE(model.predict(img, &text, &score, &t));
+            if (text.empty()) { runs.clear(); break; }
+            runs.push_back(t);
         }
+        report(std::string("ocr-rec ") + rel, runs);
     }
-    // cls
-    auto cls = find_ocr_model("cls", ".onnx");
-    if (has_file(cls)) {
-        RuntimeOption opt = bench_opt_onnx();
-        ocr::Classifier model(cls.string(), opt);
-        if (model.is_initialized()) {
-            constexpr int kRuns = 20;
-            std::vector<double> times;
-            for (int i = 0; i < kRuns; ++i) {
-                int32_t label = -1; float score = 0;
-                auto t0 = std::chrono::high_resolution_clock::now();
-                REQUIRE(model.predict(img, &label, &score));
-                auto t1 = std::chrono::high_resolution_clock::now();
-                times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
-            }
-            if (!times.empty()) {
-                double sum = 0;
-                for (auto v : times) sum += v;
-                std::cout << "[bench] ocr-cls ppocrv4 onnx | total=" << sum / times.size()
-                          << "ms (n=" << times.size() << ")" << std::endl;
-            }
+    // cls（onnx + TRT backend）
+    for (const auto& rel : {std::string("onnx/ocr/ppocrv4_mobile/cls_infer.onnx"), std::string("trt/ocr_cls.engine")}) {
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) continue;
+        if (!bench_supported(mp.string())) continue;
+        RuntimeOption opt = bench_opt(mp.string());
+        ocr::Classifier model(mp.string(), opt);
+        if (!model.is_initialized()) continue;
+        { int32_t l; float s; for (int i = 0; i < 3; ++i) model.predict(img, &l, &s); }
+        constexpr int kRuns = 20;
+        std::vector<double> times;
+        for (int i = 0; i < kRuns; ++i) {
+            int32_t label = -1; float score = 0;
+            auto t0 = std::chrono::high_resolution_clock::now();
+            REQUIRE(model.predict(img, &label, &score));
+            auto t1 = std::chrono::high_resolution_clock::now();
+            times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+        }
+        if (!times.empty()) {
+            double sum = 0;
+            for (auto v : times) sum += v;
+            std::cout << "[bench] ocr-cls " << rel << " | total=" << sum / times.size()
+                      << "ms (n=" << times.size() << ")" << std::endl;
         }
     }
 }
@@ -488,11 +467,37 @@ TEST_CASE("Benchmark insightface single models", "[all_models][benchmark]") {
 
     for (const auto& c : ifs) {
         for (const auto& be : {std::string("onnx"), std::string("mnn"), std::string("trt")}) {
-            auto mp = bench_data_dir() / subdir / be / "insightface" / "buffalo_l" / c.file;
+            // basename + 按后端扩展名
+            std::string base(c.file);
+            auto dot = base.find(".onnx");
+            if (dot != std::string::npos) base = base.substr(0, dot);
+            std::string ext = (be == "onnx") ? ".onnx" : (be == "mnn" ? ".mnn" : ".engine");
+            auto mp = bench_data_dir() / subdir / be / "insightface" / "buffalo_l" / (base + ext);
             if (!has_file(mp)) continue;
-            RuntimeOption opt = bench_opt_onnx();
+            if (!bench_supported(mp.string())) continue;
+            RuntimeOption opt = bench_opt(mp.string());
             std::vector<TimerArray> runs;
             constexpr int kRuns = 10;
+            {   // 预热
+                if (std::string(c.tag) == "det") {
+                    face::InsightFaceDet m(mp.string(), opt);
+                    if (!m.is_initialized()) continue;
+                    std::vector<face::InsightFaceBox> r; for (int i = 0; i < 3; ++i) m.predict(img, &r);
+                } else if (std::string(c.tag) == "lmk2d" || std::string(c.tag) == "lmk3d") {
+                    face::InsightFaceLandmark m(mp.string(), opt);
+                    if (!m.is_initialized()) continue;
+                    std::vector<std::array<float, 2>> pts; for (int i = 0; i < 3; ++i) m.predict_2d106(img, bbox, &pts);
+                } else if (std::string(c.tag) == "rec") {
+                    face::InsightFaceRecognition m(mp.string(), opt);
+                    if (!m.is_initialized()) continue;
+                    std::vector<std::array<float, 2>> kps(5, {650.0f, 140.0f});
+                    std::vector<float> emb; for (int i = 0; i < 3; ++i) m.predict(img, kps, &emb);
+                } else {
+                    face::InsightFaceGenderAge m(mp.string(), opt);
+                    if (!m.is_initialized()) continue;
+                    face::GenderAgeResult r; for (int i = 0; i < 3; ++i) m.predict_gender_age(img, bbox, &r);
+                }
+            }
             if (std::string(c.tag) == "det") {
                 face::InsightFaceDet model(mp.string(), opt);
                 if (!model.is_initialized()) continue;
@@ -550,44 +555,57 @@ TEST_CASE("Benchmark insightface single models", "[all_models][benchmark]") {
 // ==================== pipeline ====================
 
 TEST_CASE("Benchmark LPR pipeline", "[pipeline][benchmark]") {
-    auto det = bench_data_dir() / "test_models" / "onnx" / "yolov5plate.onnx";
-    auto rec = bench_data_dir() / "test_models" / "onnx" / "plate_recognition_color.onnx";
-    if (!has_file(det) || !has_file(rec)) return;
-    RuntimeOption opt = bench_opt_onnx();
-    lpr::LprPipeline model(det.string(), rec.string(), opt);
-    if (!model.is_initialized()) return;
-    auto img = load_img("test_lpr_pipeline.jpg");
-    if (img.empty()) return;
-    constexpr int kRuns = 20;
-    std::vector<TimerArray> runs;
-    for (int i = 0; i < kRuns; ++i) {
-        std::vector<LprResult> r;
-        TimerArray t;
-        REQUIRE(model.predict(img, &r, &t));
-        runs.push_back(t);
+    // onnx（ORT CPU 基线）+ trt（TRT backend）
+    for (const auto& be : {std::string("onnx"), std::string("trt")}) {
+        auto det = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "yolov5plate.engine")
+                                 : (bench_data_dir() / "test_models" / "onnx" / "yolov5plate.onnx");
+        auto rec = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "plate_recognition_color.engine")
+                                 : (bench_data_dir() / "test_models" / "onnx" / "plate_recognition_color.onnx");
+        if (!has_file(det) || !has_file(rec)) continue;
+        RuntimeOption opt = bench_opt(det.string());
+        lpr::LprPipeline model(det.string(), rec.string(), opt);
+        if (!model.is_initialized()) continue;
+        auto img = load_img("test_lpr_pipeline.jpg");
+        if (img.empty()) continue;
+        { std::vector<LprResult> r; for (int i = 0; i < 2; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::vector<LprResult> r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            runs.push_back(t);
+        }
+        report("pipeline lpr (det+rec) " + be, runs);
     }
-    report("pipeline lpr (det+rec) onnx", runs);
 }
 
 TEST_CASE("Benchmark face recognition pipeline", "[pipeline][benchmark]") {
-    auto det = bench_data_dir() / "test_models" / "onnx" / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx";
-    auto rec = bench_data_dir() / "test_models" / "onnx" / "face" / "face_recognizer.onnx";
-    if (!has_file(det) || !has_file(rec)) return;
-    RuntimeOption opt = bench_opt_onnx();
-    face::FaceRecognizerPipeline model(det.string(), rec.string(), opt);
-    if (!model.is_initialized()) return;
-    auto img = load_img("test_face_detection.jpg");
-    if (img.empty()) return;
-    constexpr int kRuns = 20;
-    std::vector<TimerArray> runs;
-    for (int i = 0; i < kRuns; ++i) {
-        std::vector<FaceRecognitionResult> r;
-        TimerArray t;
-        REQUIRE(model.predict(img, &r, &t));
-        if (r.empty()) { runs.clear(); break; }
-        runs.push_back(t);
+    // onnx（ORT CPU 基线）+ trt（TRT backend）
+    for (const auto& be : {std::string("onnx"), std::string("trt")}) {
+        auto sub = bench_data_dir() / "test_models" / be;
+        auto det = (be == "trt") ? (sub / "scrfd_2.5g.engine")
+                                 : (sub / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx");
+        auto rec = (be == "trt") ? (sub / "face_recognizer.engine")
+                                 : (sub / "face" / "face_recognizer.onnx");
+        if (!has_file(det) || !has_file(rec)) continue;
+        RuntimeOption opt = bench_opt(det.string());
+        face::FaceRecognizerPipeline model(det.string(), rec.string(), opt);
+        if (!model.is_initialized()) continue;
+        auto img = load_img("test_face_detection.jpg");
+        if (img.empty()) continue;
+        { std::vector<FaceRecognitionResult> r; for (int i = 0; i < 3; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::vector<FaceRecognitionResult> r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            if (r.empty()) { runs.clear(); break; }
+            runs.push_back(t);
+        }
+        report("pipeline face-rec (scrfd+rec) " + be, runs);
     }
-    report("pipeline face-rec (scrfd+rec) onnx", runs);
 }
 
 TEST_CASE("Benchmark face anti-spoof pipeline", "[pipeline][benchmark]") {
@@ -618,49 +636,63 @@ TEST_CASE("Benchmark face anti-spoof pipeline", "[pipeline][benchmark]") {
 }
 
 TEST_CASE("Benchmark pedestrian attribute pipeline", "[pipeline][benchmark]") {
-    auto det = bench_data_dir() / "test_models" / "onnx" / "zhgd_det.onnx";
-    auto ml = bench_data_dir() / "test_models" / "onnx" / "zhgd_ml.onnx";
-    if (!has_file(det) || !has_file(ml)) return;
-    RuntimeOption opt = bench_opt_onnx();
-    pipeline::PedestrianAttribute model(det.string(), ml.string(), opt);
-    if (!model.is_initialized()) return;
-    model.set_det_input_size({1280, 1280});
-    model.set_cls_input_size({192, 256});
-    auto img = load_img("test_pedestrian_attribute.jpg");
-    if (img.empty()) return;
-    constexpr int kRuns = 20;
-    std::vector<TimerArray> runs;
-    for (int i = 0; i < kRuns; ++i) {
-        std::vector<AttributeResult> r;
-        TimerArray t;
-        REQUIRE(model.predict(img, &r, &t));
-        if (r.empty()) { runs.clear(); break; }
-        runs.push_back(t);
+    // onnx（ORT CPU 基线）+ trt（TRT backend）
+    for (const auto& be : {std::string("onnx"), std::string("trt")}) {
+        auto det = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "zhgd_det.engine")
+                                 : (bench_data_dir() / "test_models" / "onnx" / "zhgd_det.onnx");
+        auto ml = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "zhgd_ml.engine")
+                                : (bench_data_dir() / "test_models" / "onnx" / "zhgd_ml.onnx");
+        if (!has_file(det) || !has_file(ml)) continue;
+        RuntimeOption opt = bench_opt(det.string());
+        pipeline::PedestrianAttribute model(det.string(), ml.string(), opt);
+        if (!model.is_initialized()) continue;
+        model.set_det_input_size({1280, 1280});
+        model.set_cls_input_size({192, 256});
+        auto img = load_img("test_pedestrian_attribute.jpg");
+        if (img.empty()) continue;
+        { std::vector<AttributeResult> r; for (int i = 0; i < 2; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            std::vector<AttributeResult> r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            if (r.empty()) { runs.clear(); break; }
+            runs.push_back(t);
+        }
+        report("pipeline pedestrian-attr (det+mlc) " + be, runs);
     }
-    report("pipeline pedestrian-attr (det+mlc) onnx", runs);
 }
 
 TEST_CASE("Benchmark OCR pipeline", "[pipeline][benchmark]") {
-    auto det = find_ocr_model("det", ".onnx");
-    auto cls = find_ocr_model("cls", ".onnx");
-    auto rec = find_ocr_model("rec", ".onnx");
     auto dict = ocr_dict();
-    if (!has_file(det) || !has_file(cls) || !has_file(rec) || dict.empty()) return;
-    RuntimeOption opt = bench_opt_onnx();
-    ocr::PaddleOCR model(det.string(), cls.string(), rec.string(), dict.string(), opt);
-    if (!model.is_initialized()) return;
-    auto img = load_img("test_ocr.png");
-    if (img.empty()) return;
-    constexpr int kRuns = 20;
-    std::vector<TimerArray> runs;
-    for (int i = 0; i < kRuns; ++i) {
-        OCRResult r;
-        TimerArray t;
-        REQUIRE(model.predict(img, &r, &t));
-        if (r.boxes.empty()) { runs.clear(); break; }
-        runs.push_back(t);
+    if (dict.empty()) return;
+    // onnx（ORT CPU 基线）+ trt（TRT backend）
+    for (const auto& be : {std::string("onnx"), std::string("trt")}) {
+        auto det = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr_det.engine")
+                                 : find_ocr_model("det", ".onnx");
+        auto cls = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr_cls.engine")
+                                 : find_ocr_model("cls", ".onnx");
+        auto rec = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr_rec.engine")
+                                 : find_ocr_model("rec", ".onnx");
+        if (!has_file(det) || !has_file(cls) || !has_file(rec)) continue;
+        RuntimeOption opt = bench_opt(det.string());
+        ocr::PaddleOCR model(det.string(), cls.string(), rec.string(), dict.string(), opt);
+        if (!model.is_initialized()) continue;
+        auto img = load_img("test_ocr.png");
+        if (img.empty()) continue;
+        { OCRResult r; for (int i = 0; i < 2; ++i) model.predict(img, &r); }
+        constexpr int kRuns = 20;
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            OCRResult r;
+            TimerArray t;
+            REQUIRE(model.predict(img, &r, &t));
+            if (r.boxes.empty()) { runs.clear(); break; }
+            runs.push_back(t);
+        }
+        report("pipeline ocr (det+cls+rec) " + be, runs);
     }
-    report("pipeline ocr (det+cls+rec) onnx", runs);
 }
 
 TEST_CASE("Benchmark insightface pipeline", "[pipeline][benchmark]") {
