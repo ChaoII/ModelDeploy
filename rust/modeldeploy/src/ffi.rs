@@ -52,6 +52,7 @@ pub const MDModelType_OCRPipeline: MDModelType = MDModelType(21);
 pub const MDModelType_OCRRec: MDModelType = MDModelType(22);
 pub const MDModelType_SemSeg: MDModelType = MDModelType(23);
 pub const MDModelType_Depth: MDModelType = MDModelType(24);
+pub const MDModelType_InsightFace: MDModelType = MDModelType(25);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,6 +233,29 @@ pub struct MDKeyPointResult {
 #[derive(Debug)]
 pub struct MDKeyPointResults {
     pub data: *mut MDKeyPointResult,
+    pub size: c_int,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct MDInsightFaceResult {
+    pub box_: MDRect,
+    pub score: c_float,
+    pub kps: *mut MDPoint3f,
+    pub kps_size: c_int,
+    pub landmark_2d_106: *mut MDPoint3f,
+    pub landmark_2d_106_size: c_int,
+    pub landmark_3d_68: *mut MDPoint3f,
+    pub landmark_3d_68_size: c_int,
+    pub pose: [c_float; 3],
+    pub embedding: *mut c_float,
+    pub embedding_size: c_int,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct MDInsightFaceResults {
+    pub data: *mut MDInsightFaceResult,
     pub size: c_int,
 }
 
@@ -565,6 +589,35 @@ extern "C" {
     ) -> MDStatusCode;
     pub fn md_free_face_det_result(results: *mut MDKeyPointResults);
     pub fn md_free_face_det_model(model: *mut MDModel);
+
+    // ── insightface 人脸分析 ──
+
+    pub fn md_create_insightface_model(
+        model: *mut MDModel,
+        det_model_path: *const c_char,
+        rec_model_path: *const c_char,
+        lmk2d_model_path: *const c_char,
+        lmk3d_model_path: *const c_char,
+        option: *const MDRuntimeOption,
+    ) -> MDStatusCode;
+    pub fn md_create_insightface_det_model(
+        model: *mut MDModel,
+        model_path: *const c_char,
+        option: *const MDRuntimeOption,
+    ) -> MDStatusCode;
+    pub fn md_insightface_analyze(
+        model: *const MDModel,
+        image: *const MDImage,
+        results: *mut MDInsightFaceResults,
+    ) -> MDStatusCode;
+    pub fn md_insightface_detect(
+        model: *const MDModel,
+        image: *const MDImage,
+        results: *mut MDKeyPointResults,
+    ) -> MDStatusCode;
+    pub fn md_insightface_set_det_thresh(model: *mut MDModel, thresh: c_float);
+    pub fn md_free_insightface_result(results: *mut MDInsightFaceResults);
+    pub fn md_free_insightface_model(model: *mut MDModel);
 
     // ── TTS（Kokoro） ──
 

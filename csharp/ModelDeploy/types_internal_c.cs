@@ -290,6 +290,30 @@ namespace ModelDeploy
             public int size;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDInsightFaceResult
+        {
+            public MDRect box;
+            public float score;
+            public IntPtr kps;
+            public int kps_size;
+            public IntPtr landmark_2d_106;
+            public int landmark_2d_106_size;
+            public IntPtr landmark_3d_68;
+            public int landmark_3d_68_size;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+            public float[] pose;
+            public IntPtr embedding;
+            public int embedding_size;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDInsightFaceResults
+        {
+            public IntPtr data;
+            public int size;
+        }
+
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MDLPRResult

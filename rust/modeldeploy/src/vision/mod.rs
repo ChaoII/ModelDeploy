@@ -10,6 +10,7 @@ pub mod depth;
 pub use detection::UltralyticsDet;
 pub use classification::UltralyticsCls;
 pub use face::Scrfd;
+pub use face::InsightFaceAnalysis;
 pub use face_extra::{FaceRec, FaceAge, FaceGender, FaceAntiSpoofPipeline, FaceRecPipeline, FaceRecResult, Gender, AntiSpoofResult};
 pub use obb_iseg_pose::{UltralyticsObb, UltralyticsSeg, UltralyticsPose, ObbResult, IsegResult, PoseResult};
 pub use ocr_lpr_attr::{PaddleOcr, OcrRecognition, LprPipeline, PedestrianAttribute, OcrResult, LprResult, AttributeResult};
