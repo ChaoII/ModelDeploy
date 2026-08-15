@@ -67,7 +67,8 @@ namespace modeldeploy::vision::ocr {
     private:
         // cls 输入固定尺寸，批量推理无 pad 浪费；默认 6（原 1 逐行推理在密集文本页极慢）
         int cls_batch_size_ = 6;
-        // rec 动态宽（batch 内 pad 到最宽行），batch 过大 pad 浪费；6 为折中
+        // rec 动态宽：batch 内所有行 pad 到该批最宽行，batch 过大 pad 浪费反而更慢
+        // （实测 batch=16 在密集文本页 3509ms vs batch=6 1437ms）。6 为最优折中。
         int rec_batch_size_ = 6;
     };
 }

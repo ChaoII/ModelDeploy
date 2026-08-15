@@ -5,6 +5,7 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/face/face_as/face_as_first.h"
+#include <cstring>
 
 
 namespace modeldeploy::vision::face {
@@ -86,6 +87,46 @@ namespace modeldeploy::vision::face {
             return false;
         }
         postprocess(output_tensors, result);
+        return true;
+    }
+
+    bool SeetaFaceAsFirst::batch_predict(const std::vector<ImageData>& images,
+                                         std::vector<float>* results) {
+        if (images.empty() || results == nullptr) return false;
+        const int n = static_cast<int>(images.size());
+        results->resize(n);
+        if (n == 1) {
+            return predict(images[0], &(*results)[0]);
+        }
+        // 每图独立 fused 预处理到临时 tensor，再合并为一个 batch tensor 一次推理
+        // （fas_first.onnx 输入全动态 [-1,-1,-1,-1]，支持动态 batch）
+        const int dst_w = size_[0];
+        const int dst_h = size_[1];
+        const int plane = 3 * dst_h * dst_w;
+        Tensor batch_tensor({n, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
+        float* batch_data = batch_tensor.data_ptr<float>();
+        for (int i = 0; i < n; ++i) {
+            Tensor single;
+            auto img = images[i];
+            if (!preprocess(&img, &single)) {
+                MD_LOG_ERROR << "Failed to preprocess input image " << i << "." << std::endl;
+                return false;
+            }
+            std::memcpy(batch_data + static_cast<size_t>(i) * plane, single.data(), plane * sizeof(float));
+        }
+        batch_tensor.set_name(get_input_info(0).name);
+        std::vector<Tensor> input_tensors{batch_tensor};
+        std::vector<Tensor> output_tensors;
+        if (!infer(input_tensors, &output_tensors)) {
+            MD_LOG_ERROR << "Failed to batch inference." << std::endl;
+            return false;
+        }
+        // postprocess：输出 [N, C]，每行取 [1]（与单图 postprocess 一致）
+        const float* out_data = static_cast<const float*>(output_tensors[0].data());
+        const int num_classes = static_cast<int>(output_tensors[0].size()) / n;
+        for (int i = 0; i < n; ++i) {
+            (*results)[i] = out_data[static_cast<size_t>(i) * num_classes + 1];
+        }
         return true;
     }
 

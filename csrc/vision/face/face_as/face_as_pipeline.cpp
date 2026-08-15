@@ -127,23 +127,27 @@ namespace modeldeploy::vision::face {
                                       std::vector<FaceAntiSpoofResult>* results,
                                       const float fuse_threshold,
                                       const float clarity_threshold) const {
-        const ImageData im_bak0 = image.clone();
-        const ImageData im_bak1 = image.clone();
+        // 不再整图 clone（原 im_bak0/im_bak1 各复制一份全图，纯浪费；
+        // predict 内部不修改输入，直接传原图引用即可）
         std::vector<std::tuple<int, float>> face_as_second_result;
-        face_as_second_->predict(im_bak0, &face_as_second_result);
+        face_as_second_->predict(image, &face_as_second_result);
         std::vector<float> passive_results;
         std::vector<KeyPointsResult> face_det_result;
         const bool has_box = !face_as_second_result.empty();
-        if (!face_det_->predict(im_bak1, &face_det_result)) {
+        if (!face_det_->predict(image, &face_det_result)) {
             return false;
         }
         results->resize(face_det_result.size());
         auto align_im_list = utils::align_face_with_five_points(image, face_det_result);
-        for (auto& align_image : align_im_list) {
-            float passive_result;
-            const auto clarity = clarity_estimate(align_image);
-            face_as_first_->predict(align_image, &passive_result);
-            const float result = has_box ? 0.0f : passive_result;
+        // 所有对齐人脸一次 batch 推理（原逐脸串行 ORT Run，多脸时显著更慢）
+        std::vector<float> first_scores;
+        if (!face_as_first_->batch_predict(align_im_list, &first_scores)) {
+            MD_LOG_ERROR << "Failed to batch predict face anti-spoof first stage." << std::endl;
+            return false;
+        }
+        for (size_t i = 0; i < align_im_list.size(); ++i) {
+            const float clarity = clarity_estimate(align_im_list[i]);
+            const float result = has_box ? 0.0f : first_scores[i];
             if (result > fuse_threshold) {
                 if (clarity >= clarity_threshold) {
                     results->push_back(FaceAntiSpoofResult::REAL);

@@ -31,6 +31,14 @@ namespace modeldeploy::vision::face {
          */
         bool predict(const ImageData& image, float* result);
 
+        /** \brief Batch predict face anti-spoof results for multiple aligned faces.
+         *
+         * \param[in] images Aligned face images
+         * \param[in] results Output anti-spoof scores, same size as images
+         * \return true if success
+         */
+        bool batch_predict(const std::vector<ImageData>& images, std::vector<float>* results);
+
         [[nodiscard]] std::unique_ptr<SeetaFaceAsFirst> clone() const;
 
 
