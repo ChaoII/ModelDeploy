@@ -38,7 +38,7 @@ static void test_model_predict(Model& model, const ImageData& img, std::vector<R
 
 // ==================== Classification ====================
 TEST_CASE("Classification model", "[vision_models]") {
-    auto modelfile = model_path("yolo11n-cls.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n-cls.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -63,7 +63,7 @@ TEST_CASE("Classification model", "[vision_models]") {
 
 // ==================== Ultralytics Detection ====================
 TEST_CASE("UltralyticsDet model", "[vision_models]") {
-    auto modelfile = model_path("yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -88,7 +88,7 @@ TEST_CASE("UltralyticsDet model", "[vision_models]") {
 
 // ==================== Ultralytics Segmentation ====================
 TEST_CASE("UltralyticsSeg model", "[vision_models]") {
-    auto modelfile = model_path("yolo11n-seg.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n-seg.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -112,7 +112,7 @@ TEST_CASE("UltralyticsSeg model", "[vision_models]") {
 
 // ==================== Ultralytics Pose ====================
 TEST_CASE("UltralyticsPose model", "[vision_models]") {
-    auto modelfile = model_path("yolo11n-pose.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n-pose.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -135,7 +135,7 @@ TEST_CASE("UltralyticsPose model", "[vision_models]") {
 
 // ==================== Ultralytics OBB ====================
 TEST_CASE("UltralyticsObb model", "[vision_models]") {
-    auto modelfile = model_path("yolo11n-obb.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n-obb.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -162,7 +162,7 @@ TEST_CASE("UltralyticsObb model", "[vision_models]") {
 
 // ==================== Batch Predict ====================
 TEST_CASE("Batch predict for vision models", "[vision_models]") {
-    auto modelfile = model_path("yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -183,7 +183,7 @@ TEST_CASE("Batch predict for vision models", "[vision_models]") {
 
 // ==================== Face Models ====================
 TEST_CASE("Scrfd face detection model", "[vision_models]") {
-    auto modelfile = model_path("face/scrfd_2.5g_bnkps_shape640x640.onnx");
+    auto modelfile = model_path("onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -200,7 +200,7 @@ TEST_CASE("Scrfd face detection model", "[vision_models]") {
 }
 
 TEST_CASE("SeetaFaceAge model", "[vision_models]") {
-    auto modelfile = model_path("face/age_predictor.onnx");
+    auto modelfile = model_path("onnx/face/age_predictor.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -217,7 +217,7 @@ TEST_CASE("SeetaFaceAge model", "[vision_models]") {
 }
 
 TEST_CASE("SeetaFaceGender model", "[vision_models]") {
-    auto modelfile = model_path("face/gender_predictor.onnx");
+    auto modelfile = model_path("onnx/face/gender_predictor.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -235,9 +235,9 @@ TEST_CASE("SeetaFaceGender model", "[vision_models]") {
 
 // ==================== OCR Models ====================
 TEST_CASE("OCR DBDetector model", "[vision_models]") {
-    auto modelfile = model_path("ocr") / "ppocrv4_mobile" / "det" / "inference.onnx";
+    auto modelfile = model_path("onnx/ocr/ppocrv4_mobile/det_infer.onnx");
     if (!fs::exists(modelfile)) {
-        modelfile = model_path("ocr") / "ppocrv5_mobile" / "det" / "inference.onnx";
+        modelfile = model_path("onnx/ocr/ppocrv5_mobile/det_infer.onnx");
     }
     if (!fs::exists(modelfile)) return;
 
@@ -245,7 +245,7 @@ TEST_CASE("OCR DBDetector model", "[vision_models]") {
     opt.use_cpu();
 
     DBDetector model(modelfile.string(), opt);
-    REQUIRE(model.name() == "DBDetector");
+    REQUIRE(model.name() == "ppocr/ocr_det");
 
     auto img = load_image("test_ocr.png");
     if (img.empty()) return;
@@ -256,9 +256,9 @@ TEST_CASE("OCR DBDetector model", "[vision_models]") {
 }
 
 TEST_CASE("OCR Classifier model", "[vision_models]") {
-    auto modelfile = model_path("ocr") / "ppocrv4_mobile" / "cls" / "inference.onnx";
+    auto modelfile = model_path("onnx/ocr/ppocrv4_mobile/cls_infer.onnx");
     if (!fs::exists(modelfile)) {
-        modelfile = model_path("ocr") / "ppocrv5_mobile" / "cls" / "inference.onnx";
+        modelfile = model_path("onnx/ocr/ppocrv5_mobile/cls_infer.onnx");
     }
     if (!fs::exists(modelfile)) return;
 
@@ -277,9 +277,9 @@ TEST_CASE("OCR Classifier model", "[vision_models]") {
 }
 
 TEST_CASE("OCR Recognizer model", "[vision_models]") {
-    auto modelfile = model_path("ocr") / "ppocrv4_mobile" / "rec" / "inference.onnx";
+    auto modelfile = model_path("onnx/ocr/ppocrv4_mobile/rec_infer.onnx");
     if (!fs::exists(modelfile)) {
-        modelfile = model_path("ocr") / "ppocrv5_mobile" / "rec" / "inference.onnx";
+        modelfile = model_path("onnx/ocr/ppocrv5_mobile/rec_infer.onnx");
     }
     if (!fs::exists(modelfile)) return;
 
@@ -303,7 +303,7 @@ TEST_CASE("OCR Recognizer model", "[vision_models]") {
 
 // ==================== Preprocessor access ====================
 TEST_CASE("Preprocessor/Postprocessor access", "[vision_models]") {
-    auto modelfile = model_path("yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
