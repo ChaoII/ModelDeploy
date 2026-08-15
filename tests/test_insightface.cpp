@@ -286,16 +286,20 @@ TEST_CASE("InsightFace genderage on TRT backend", "[insightface][model][backend:
 #endif // ENABLE_TRT
 
 // ==================== SOPHGO 后端（Linux + Sophon-Sail，需 ENABLE_SOPHGO 编译） ====================
+// bmodel 命名: <name>_f16.bmodel / <name>_int8.bmodel（见 tools/docker/sophgo/convert_all.sh）
 #ifdef ENABLE_SOPHGO
 TEST_CASE("InsightFace det_10g on SOPHGO backend", "[insightface][model][backend:sophgo]") {
     const std::string model_dir = test_data_dir() + "/test_data/test_models/sophgo/insightface/buffalo_l";
     const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
-    if (!std::filesystem::exists(model_dir + "/det_10g.bmodel")) return;
+    if (!std::filesystem::exists(model_dir + "/det_10g_f16.bmodel") &&
+        !std::filesystem::exists(model_dir + "/det_10g.bmodel")) return;
     if (!std::filesystem::exists(img_path)) return;
+    std::string bmodel = std::filesystem::exists(model_dir + "/det_10g_f16.bmodel")
+        ? model_dir + "/det_10g_f16.bmodel" : model_dir + "/det_10g.bmodel";
 
     RuntimeOption opt;
     opt.use_sophgo_backend(0);
-    auto det = std::make_unique<face::InsightFaceDet>(model_dir + "/det_10g.bmodel", opt);
+    auto det = std::make_unique<face::InsightFaceDet>(bmodel, opt);
     REQUIRE(det->is_initialized());
     auto img = ImageData::imread(img_path);
 
@@ -307,15 +311,16 @@ TEST_CASE("InsightFace det_10g on SOPHGO backend", "[insightface][model][backend
 TEST_CASE("InsightFace full pipeline on SOPHGO backend", "[insightface][model][backend:sophgo]") {
     const std::string model_dir = test_data_dir() + "/test_data/test_models/sophgo/insightface/buffalo_l";
     const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
-    if (!std::filesystem::exists(model_dir + "/det_10g.bmodel")) return;
+    std::string ext = std::filesystem::exists(model_dir + "/det_10g_f16.bmodel") ? "_f16" : "";
+    if (!std::filesystem::exists(model_dir + "/det_10g" + ext + ".bmodel")) return;
     if (!std::filesystem::exists(img_path)) return;
 
     RuntimeOption opt;
     opt.use_sophgo_backend(0);
     face::InsightFaceAnalysis analysis(
-        model_dir + "/det_10g.bmodel", model_dir + "/w600k_r50.bmodel",
-        model_dir + "/2d106det.bmodel", model_dir + "/1k3d68.bmodel",
-        opt, model_dir + "/genderage.bmodel");
+        model_dir + "/det_10g" + ext + ".bmodel", model_dir + "/w600k_r50" + ext + ".bmodel",
+        model_dir + "/2d106det" + ext + ".bmodel", model_dir + "/1k3d68" + ext + ".bmodel",
+        opt, model_dir + "/genderage" + ext + ".bmodel");
     REQUIRE(analysis.is_initialized());
     auto img = ImageData::imread(img_path);
 

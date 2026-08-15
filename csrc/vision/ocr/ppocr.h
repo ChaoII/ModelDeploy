@@ -69,6 +69,6 @@ namespace modeldeploy::vision::ocr {
         int cls_batch_size_ = 6;
         // rec 动态宽：batch 内所有行 pad 到该批最宽行，batch 过大 pad 浪费反而更慢
         // （实测 batch=16 在密集文本页 3509ms vs batch=6 1437ms）。6 为最优折中。
-        int rec_batch_size_ = 6;
+        int rec_batch_size_ = 8;
     };
 }

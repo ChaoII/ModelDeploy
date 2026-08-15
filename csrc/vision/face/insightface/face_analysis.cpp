@@ -40,12 +40,51 @@ namespace modeldeploy::vision::face {
 
     bool InsightFaceAnalysis::analyze(const ImageData& image, std::vector<InsightFaceResult>* results,
                                       bool with_2d106, bool with_3d68, bool with_recognition,
-                                      bool with_genderage, TimerArray* timers) {
+                                      bool with_genderage, bool max_face_only, TimerArray* timers) {
         if (!results) return false;
         results->clear();
         std::vector<InsightFaceBox> boxes;
         if (!detect(image, &boxes, timers)) return false;
+        if (boxes.empty()) return true;
 
+        // 仅最大人脸模式：按 bbox 面积取最大
+        if (max_face_only) {
+            size_t max_i = 0;
+            float max_area = -1.0f;
+            for (size_t i = 0; i < boxes.size(); ++i) {
+                const float w = boxes[i].bbox[2] - boxes[i].bbox[0];
+                const float h = boxes[i].bbox[3] - boxes[i].bbox[1];
+                const float area = w * h;
+                if (area > max_area) { max_area = area; max_i = i; }
+            }
+            std::vector<InsightFaceBox> one{boxes[max_i]};
+            return analyze_impl(image, one, results, with_2d106, with_3d68,
+                                with_recognition, with_genderage, timers);
+        }
+        return analyze_impl(image, boxes, results, with_2d106, with_3d68,
+                            with_recognition, with_genderage, timers);
+    }
+
+    bool InsightFaceAnalysis::analyze_max_face(const ImageData& image, InsightFaceResult* result,
+                                               bool with_2d106, bool with_3d68,
+                                               bool with_recognition, bool with_genderage,
+                                               int* face_count, TimerArray* timers) {
+        if (!result) return false;
+        std::vector<InsightFaceResult> results;
+        if (!analyze(image, &results, with_2d106, with_3d68, with_recognition, with_genderage,
+                     true, timers)) return false;
+        if (face_count) *face_count = static_cast<int>(results.size());
+        if (results.empty()) return false;
+        *result = std::move(results[0]);
+        return true;
+    }
+
+    bool InsightFaceAnalysis::analyze_impl(const ImageData& image,
+                                           const std::vector<InsightFaceBox>& boxes,
+                                           std::vector<InsightFaceResult>* results,
+                                           bool with_2d106, bool with_3d68,
+                                           bool with_recognition, bool with_genderage,
+                                           TimerArray* timers) {
         const size_t n = boxes.size();
         results->resize(n);
         // bbox 列表（供 batch 推理）

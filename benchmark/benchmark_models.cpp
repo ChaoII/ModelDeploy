@@ -729,3 +729,113 @@ TEST_CASE("Benchmark insightface pipeline", "[pipeline][benchmark]") {
         report(std::string("pipeline insightface (det+lmk+rec+ga) ") + be, runs);
     }
 }
+
+#ifdef ENABLE_SOPHGO
+// ==================== SOPHGO 后端（Linux + Sophon-Sail，BM1688/CV186AH） ====================
+// 遍历 test_models/sophgo/ 下所有已转换的 bmodel（fp16/int8），用对应模型类推理计时。
+// 模型转换见 tools/docker/sophgo/convert_all.sh。
+TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
+    auto soph_dir = bench_data_dir() / "test_models" / "sophgo";
+    if (!fs::exists(soph_dir)) return;
+    RuntimeOption opt;
+    opt.use_sophgo_backend(0);
+
+    // name -> 模型类构造（用 lambda 统一 predict 到 TimerArray）
+    struct SG { const char* bmodel; const char* img; };
+    const SG cfgs[] = {
+        {"yolo11n_det_f16.bmodel", "test_detection0.jpg"},
+        {"yolo11n_det_int8.bmodel", "test_detection0.jpg"},
+        {"yolo11n_cls_f16.bmodel", "test_person.jpg"},
+        {"yolo11n_cls_int8.bmodel", "test_person.jpg"},
+        {"yolo11n_obb_f16.bmodel", "test_obb.jpg"},
+        {"yolo11n_obb_int8.bmodel", "test_obb.jpg"},
+        {"yolo11n_pose_f16.bmodel", "test_person.jpg"},
+        {"yolo11n_pose_int8.bmodel", "test_person.jpg"},
+        {"yolo11n_seg_f16.bmodel", "test_person.jpg"},
+        {"yolo11n_seg_int8.bmodel", "test_person.jpg"},
+    };
+    for (const auto& c : cfgs) {
+        auto mp = soph_dir / c.bmodel;
+        if (!has_file(mp)) continue;
+        auto img = load_img(c.img);
+        if (img.empty()) continue;
+        std::vector<TimerArray> runs;
+        constexpr int kRuns = 20;
+        if (std::string(c.bmodel).find("_cls_") != std::string::npos) {
+            classification::Classification m(mp.string(), opt);
+            if (!m.is_initialized()) continue;
+            for (int i = 0; i < kRuns; ++i) {
+                classification::ClassifyResult r;
+                TimerArray t;
+                auto t0 = std::chrono::high_resolution_clock::now();
+                REQUIRE(m.predict(img, &r));
+                auto t1 = std::chrono::high_resolution_clock::now();
+                TimerArray tt; tt.pre_timer.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+                runs.push_back(tt);
+            }
+        } else if (std::string(c.bmodel).find("_obb_") != std::string::npos) {
+            detection::UltralyticsObb m(mp.string(), opt);
+            if (!m.is_initialized()) continue;
+            for (int i = 0; i < kRuns; ++i) {
+                std::vector<ObbResult> r; TimerArray t;
+                REQUIRE(m.predict(img, &r, &t));
+                if (r.empty()) { runs.clear(); break; }
+                runs.push_back(t);
+            }
+        } else if (std::string(c.bmodel).find("_pose_") != std::string::npos) {
+            detection::UltralyticsPose m(mp.string(), opt);
+            if (!m.is_initialized()) continue;
+            for (int i = 0; i < kRuns; ++i) {
+                std::vector<KeyPointsResult> r; TimerArray t;
+                REQUIRE(m.predict(img, &r, &t));
+                if (r.empty()) { runs.clear(); break; }
+                runs.push_back(t);
+            }
+        } else if (std::string(c.bmodel).find("_seg_") != std::string::npos) {
+            detection::UltralyticsSeg m(mp.string(), opt);
+            if (!m.is_initialized()) continue;
+            for (int i = 0; i < kRuns; ++i) {
+                std::vector<InstanceSegResult> r; TimerArray t;
+                REQUIRE(m.predict(img, &r, &t));
+                if (r.empty()) { runs.clear(); break; }
+                runs.push_back(t);
+            }
+        } else {
+            detection::UltralyticsDet m(mp.string(), opt);
+            if (!m.is_initialized()) continue;
+            for (int i = 0; i < kRuns; ++i) {
+                std::vector<DetectionResult> r; TimerArray t;
+                REQUIRE(m.predict(img, &r, &t));
+                if (r.empty()) { runs.clear(); break; }
+                runs.push_back(t);
+            }
+        }
+        report(std::string("sophgo ") + c.bmodel, runs);
+    }
+}
+
+// SOPHGO insightface pipeline（det + 子模型，fp16/int8）
+TEST_CASE("Benchmark SOPHGO insightface pipeline", "[sophgo][benchmark]") {
+    auto dir = bench_data_dir() / "test_models" / "sophgo" / "insightface" / "buffalo_l";
+    if (!has_file(dir / "det_10g_f16.bmodel")) return;
+    RuntimeOption opt;
+    opt.use_sophgo_backend(0);
+    auto analysis = std::make_unique<face::InsightFaceAnalysis>(
+        (dir / "det_10g_f16.bmodel").string(), (dir / "w600k_r50_f16.bmodel").string(),
+        (dir / "2d106det_f16.bmodel").string(), (dir / "1k3d68_f16.bmodel").string(),
+        opt, (dir / "genderage_f16.bmodel").string());
+    if (!analysis->is_initialized()) return;
+    auto img = load_img("test_person.jpg");
+    if (img.empty()) return;
+    constexpr int kRuns = 10;
+    std::vector<TimerArray> runs;
+    for (int i = 0; i < kRuns; ++i) {
+        std::vector<face::InsightFaceResult> r;
+        TimerArray t;
+        REQUIRE(analysis->analyze(img, &r, true, true, true, true, &t));
+        if (r.empty()) { runs.clear(); break; }
+        runs.push_back(t);
+    }
+    report("sophgo pipeline insightface (det+lmk+rec+ga) f16", runs);
+}
+#endif // ENABLE_SOPHGO

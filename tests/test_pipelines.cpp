@@ -88,6 +88,24 @@ TEST_CASE("Pipeline face recognition det+rec", "[pipeline][model]") {
     }
 }
 
+TEST_CASE("Pipeline face rec predict_max_face", "[pipeline][model]") {
+    auto det = onnx_model("face/scrfd_2.5g_bnkps_shape640x640.onnx");
+    auto rec = onnx_model("face/face_recognizer.onnx");
+    if (!has_file(det) || !has_file(rec)) return;
+    modeldeploy::RuntimeOption opt;
+    opt.use_cpu();
+    face::FaceRecognizerPipeline model(det.string(), rec.string(), opt);
+    REQUIRE(model.is_initialized());
+    auto img = pipe_img("test_face_detection.jpg");
+    if (img.empty()) return;
+    // 应只返回一张脸（最大），并报告总脸数
+    FaceRecognitionResult r;
+    int count = 0;
+    REQUIRE(model.predict_max_face(img, &r, &count));
+    REQUIRE(!r.embedding.empty());
+    REQUIRE(count >= 1);
+}
+
 TEST_CASE("Pipeline face anti-spoof det+first+second", "[pipeline][model]") {
     auto det = onnx_model("face/scrfd_2.5g_bnkps_shape640x640.onnx");
     auto first = onnx_model("face/fas_first.onnx");
@@ -172,4 +190,36 @@ TEST_CASE("Pipeline insightface full", "[pipeline][model]") {
     REQUIRE(has_lmk);
     REQUIRE(has_emb);
     REQUIRE(has_ga);
+}
+
+TEST_CASE("Pipeline insightface max_face + sub-model selection", "[pipeline][model]") {
+    auto dir = pipe_data_dir() / "test_models" / "onnx" / "insightface" / "buffalo_l";
+    if (!has_file(dir / "det_10g.onnx")) return;
+    modeldeploy::RuntimeOption opt;
+    opt.use_cpu();
+    auto analysis = face::InsightFaceAnalysis::create_from_dir(dir.string(), opt);
+    REQUIRE(analysis != nullptr);
+    REQUIRE(analysis->is_initialized());
+    auto img = pipe_img("test_person.jpg");
+    if (img.empty()) return;
+
+    // 1) 子模型可选：只做识别（跳过 landmark/age）
+    std::vector<face::InsightFaceResult> results;
+    REQUIRE(analysis->analyze(img, &results, false, false, true, false));
+    REQUIRE(!results.empty());
+    for (const auto& r : results) {
+        REQUIRE(r.landmark_2d_106.empty());   // 2d 已跳过
+        REQUIRE(r.landmark_3d_68.empty());    // 3d 已跳过
+        REQUIRE(!r.embedding.empty());        // recognition 保留
+        REQUIRE(r.gender < 0);                // genderage 已跳过
+    }
+
+    // 2) 只识别最大人脸
+    face::InsightFaceResult max_face;
+    int count = 0;
+    REQUIRE(analysis->analyze_max_face(img, &max_face, true, true, true, true, &count));
+    REQUIRE(count >= 1);
+    REQUIRE(!max_face.embedding.empty());
+    REQUIRE(max_face.gender >= 0);
+    REQUIRE(max_face.age >= 0);
 }

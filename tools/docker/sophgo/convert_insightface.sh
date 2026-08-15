@@ -23,6 +23,8 @@ OUT_DIR=
 CHIP=bm1688
 QUANTIZE=F16
 CONVERT=/conv/convert.sh
+CALI_IMAGES=
+CALI_NUM=100
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -31,6 +33,8 @@ while [ $# -gt 0 ]; do
         --chip)     CHIP=$2; shift 2 ;;
         --quantize) QUANTIZE=$2; shift 2 ;;
         --convert)  CONVERT=$2; shift 2 ;;
+        --cali_images) CALI_IMAGES=$2; shift 2 ;;
+        --cali_num)  CALI_NUM=$2; shift 2 ;;
         *) echo "未知参数: $1" >&2; exit 1 ;;
     esac
 done
@@ -54,10 +58,12 @@ for name in det_10g 2d106det 1k3d68 w600k_r50 genderage; do
         echo "跳过: 未找到 $onnx" >&2
         continue
     fi
-    echo "=== 转换 $name (1x3x${size}x${size}) ==="
+    echo "=== 转换 $name (1x3x${size}x${size}, $QUANTIZE) ==="
     bash "$CONVERT" --onnx "$onnx" --name "$name" \
         --shapes "[[1,3,${size},${size}]]" \
-        --chip "$CHIP" --quantize "$QUANTIZE" --out "$OUT_DIR/$name.bmodel"
+        --chip "$CHIP" --quantize "$QUANTIZE" \
+        ${CALI_IMAGES:+--cali_images "$CALI_IMAGES" --cali_num "$CALI_NUM"} \
+        --out "$OUT_DIR/${name}_${QUANTIZE,,}.bmodel"
 done
 
 echo "全部完成: $OUT_DIR"

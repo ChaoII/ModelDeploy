@@ -42,10 +42,18 @@ namespace modeldeploy::vision::face {
         bool analyze(const ImageData& image, std::vector<InsightFaceResult>* results,
                      bool with_2d106 = true, bool with_3d68 = true,
                      bool with_recognition = true, bool with_genderage = true,
+                     bool max_face_only = false,
                      TimerArray* timers = nullptr);
 
         bool detect(const ImageData& image, std::vector<InsightFaceBox>* boxes,
                     TimerArray* timers = nullptr);
+
+        // 只识别 bbox 面积最大的那张人脸（多人场景只取主脸，其余丢弃）
+        bool analyze_max_face(const ImageData& image, InsightFaceResult* result,
+                              bool with_2d106 = true, bool with_3d68 = true,
+                              bool with_recognition = true, bool with_genderage = true,
+                              int* face_count = nullptr,
+                              TimerArray* timers = nullptr);
 
         [[nodiscard]] bool is_initialized() const;
 
@@ -63,6 +71,12 @@ namespace modeldeploy::vision::face {
         [[nodiscard]] InsightFaceGenderAge* genderage() { return genderage_.get(); }
 
     private:
+        // 内部实现：对给定 boxes 做 batch 子模型推理
+        bool analyze_impl(const ImageData& image, const std::vector<InsightFaceBox>& boxes,
+                          std::vector<InsightFaceResult>* results,
+                          bool with_2d106, bool with_3d68,
+                          bool with_recognition, bool with_genderage,
+                          TimerArray* timers);
         std::unique_ptr<InsightFaceDet> det_;
         std::unique_ptr<InsightFaceRecognition> rec_;
         std::unique_ptr<InsightFaceLandmark> lmk_2d_;

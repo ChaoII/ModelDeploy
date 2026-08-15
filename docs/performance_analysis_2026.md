@@ -69,23 +69,31 @@
 | face-rec（scrfd + seetaface rec） | 69 | - | **2.8** | TRT 25x |
 | face-as（scrfd + fas_first + fas_second） | 130 | - | onnx only（fas_second 模型缺陷） | - |
 | pedestrian-attr（zhgd_det + zhgd_ml） | 202 | - | **21.4** | TRT 9.4x |
-| **OCR（det+cls+rec，218 行）** | **1356** | - | **204** | **TRT 6.6x** |
+| **OCR（det+cls+rec，218 行，rec batch=8）** | **1474** | - | **199** | **TRT 7.4x** |
 | LPR（det+rec） | 待补 | - | 待补 | 已检出，pipeline 计时未实现 |
 
 > **insightface batch 优化**：17 张脸从逐脸串行（79.5ms）改为 batch 推理（每子模型一次
 > [17,3,H,W] infer）→ TRT **55ms**（max24 profile）或 **18.7ms**（opt8 max16 profile）。
 > CPU onnx 从 3413ms → 978ms（3.5x），MNN 1486→1345ms。
 
-### 4.1 OCR 204ms 的构成（218 行密集文本）
+### 4.0 资源受限场景（SOPHGO/嵌入式）的模型裁剪
+insightface pipeline 支持按需跳过子模型（`analyze` 的 with_2d106/with_3d68/with_recognition/
+with_genderage 参数），资源受限设备可只保留关键模型：
+- 仅人脸识别：`analyze(img, &r, false, false, true, false)`（跳过 landmark 和 age）
+- 仅检测：`detect()`（只跑 det_10g）
+- 人脸识别业务：`analyze_max_face()` 只识别**最大人脸**，`face_count` 报告画面人数
+  （>1 可触发"多人警告"）；`FaceRecognizerPipeline::predict_max_face` 同理。
+
+### 4.1 OCR 199ms 的构成（218 行密集文本，rec batch=8）
 - det（960 max side，动态）：7.4ms
 - cls：218 行 ÷ 6 = 37 批 × 0.62ms ≈ 23ms
-- **rec：218 行 ÷ 6 = 37 批，每批动态宽 pad 到该批最宽行（最长 864px）**
+- **rec：218 行 ÷ 8 = 28 批（batch 6→8 减少批次数），每批动态宽 pad 到该批最宽行**
   - rec 单行（48x320）仅 1.2ms，但 864px 宽行 pad 放大计算量 ~2.7x
-  - **37 批 × ~5ms ≈ 185ms（主要瓶颈）**
+  - **28 批 × ~6ms ≈ 165ms（主要瓶颈）**
 - crop/透视变换（CPU）：218 次 ≈ 11ms
 
-> **rec 单模型快、pipeline 慢的原因**：batch 内动态宽 pad 到最宽行 + 218 行分 37 批，
-> pad 浪费放大。优化方向：rec 按宽度聚类分组（宽窄分开 batch），或增大 batch 减少批次数。
+> **优化记录**：rec_batch 6→8（GPU 203→199ms，TRT engine 支持 batch 8）。宽度排序已
+> 实现聚类（arg_sort 让相近宽度同批）；进一步优化需宽度分桶（>512px 宽行单独处理）。
 
 ## 5. 瓶颈分析（当前仍存在的优化点）
 
@@ -198,3 +206,19 @@ pipeline（多子模型累积）sum=累计推理耗时，正确反映真实耗�
 
 > **TRT profile 权衡**：opt=8 时引擎针对小 batch 优化最快，但严格 profile 下 batch 超出
 > max 会失败；opt=16/max24 覆盖更多脸但性能略降。生产按场景定 profile。
+
+### 9.9 OCR rec batch 6→8（GPU 203→199ms）
+rec_batch_size_ 6→8（TRT ocr_rec.engine 支持 batch 8），218 行分 37→28 批。
+GPU 上减少批次数收益 > pad 浪费；CPU 上持平（pad 浪费抵消）。
+
+### 9.10 模型裁剪 + 最大人脸（资源受限场景）
+- insightface analyze 支持跳过子模型（2d/3d landmark、genderage 可关），嵌入式只保留 det+rec
+- 新增 `analyze_max_face()`：只识别最大人脸，`face_count` 报告画面人数（多人告警）
+- `FaceRecognizerPipeline::predict_max_face()` 同理（人脸识别业务场景）
+
+### 9.11 SOPHGO 全模型转换 + benchmark
+- `tools/docker/sophgo/convert_all.sh`：全模型（yolo11n 全家/face/lpr/ocr/insightface）
+  ONNX→bmodel，支持 F16/INT8（INT8 需校准图）
+- `tools/docker/sophgo/convert_insightface.sh`：insightface 5 子模型（已更新命名 `_f16/_int8`）
+- benchmark 新增 `[sophgo]` 用例：遍历 yolo11n 全家 bmodel（fp16/int8）+ insightface pipeline
+- 需 Linux + Sophon-Sail 环境实际执行（Windows 无法编译/运行 sophgo）

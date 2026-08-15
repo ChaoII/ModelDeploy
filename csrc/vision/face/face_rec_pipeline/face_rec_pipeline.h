@@ -23,6 +23,13 @@ namespace modeldeploy::vision::face {
         virtual bool predict(const ImageData& image, std::vector<FaceRecognitionResult>* results,
                              TimerArray* timers = nullptr);
 
+        // 只识别 bbox 面积最大的人脸（多人场景只取主脸）。
+        // face_count 返回检测到的人脸总数（>1 表示画面多人，可作告警）。
+        // 返回 false 表示画面无人脸。
+        virtual bool predict_max_face(const ImageData& image, FaceRecognitionResult* result,
+                                      int* face_count = nullptr,
+                                      TimerArray* timers = nullptr);
+
         [[nodiscard]] bool is_initialized() const override;
 
         [[nodiscard]] std::unique_ptr<FaceRecognizerPipeline> clone() const;
