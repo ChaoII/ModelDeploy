@@ -171,3 +171,74 @@ TEST_CASE("InsightFace full pipeline aligns with python", "[insightface][model]"
         REQUIRE(sim > 0.99);
     }
 }
+
+// ==================== MNN 后端 ====================
+#ifdef ENABLE_MNN
+TEST_CASE("InsightFace det_10g on MNN backend", "[insightface][model][backend:mnn]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/mnn/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/det_10g.mnn")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    // .mnn 路径自动选 MNN 后端
+    auto det = std::make_unique<face::InsightFaceDet>(model_dir + "/det_10g.mnn");
+    REQUIRE(det->is_initialized());
+    auto img = ImageData::imread(img_path);
+
+    std::vector<face::InsightFaceBox> boxes;
+    REQUIRE(det->predict(img, &boxes));
+    // MNN 动态 shape 推理应至少检出人脸（结果数量可与 ORT 不同，但不应为空）
+    REQUIRE(!boxes.empty());
+}
+
+TEST_CASE("InsightFace full pipeline on MNN backend", "[insightface][model][backend:mnn]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/mnn/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/det_10g.mnn")) return;
+    if (!std::filesystem::exists(model_dir + "/2d106det.mnn")) return;
+    if (!std::filesystem::exists(model_dir + "/1k3d68.mnn")) return;
+    if (!std::filesystem::exists(model_dir + "/w600k_r50.mnn")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    // 用 MNN 模型路径构造 pipeline（各子模型自动选 MNN 后端）
+    face::InsightFaceAnalysis analysis(
+        model_dir + "/det_10g.mnn", model_dir + "/w600k_r50.mnn",
+        model_dir + "/2d106det.mnn", model_dir + "/1k3d68.mnn");
+    REQUIRE(analysis.is_initialized());
+    auto img = ImageData::imread(img_path);
+
+    std::vector<face::InsightFaceResult> results;
+    REQUIRE(analysis.analyze(img, &results, true, true, true));
+    REQUIRE(!results.empty());
+    // 关键点/embedding 应被填充
+    bool has_lmk = false, has_emb = false;
+    for (const auto& r : results) {
+        if (!r.landmark_2d_106.empty()) has_lmk = true;
+        if (!r.embedding.empty()) has_emb = true;
+    }
+    REQUIRE(has_lmk);
+    REQUIRE(has_emb);
+}
+#endif // ENABLE_MNN
+
+// ==================== TRT 后端 ====================
+#ifdef ENABLE_TRT
+TEST_CASE("InsightFace det_10g on TRT backend", "[insightface][model][backend:trt][gpu]") {
+    const std::string model_dir = test_data_dir() + "/test_data/test_models/trt/insightface/buffalo_l";
+    const std::string img_path = test_data_dir() + "/test_data/test_images/test_person.jpg";
+    if (!std::filesystem::exists(model_dir + "/det_10g.engine")) return;
+    if (!std::filesystem::exists(img_path)) return;
+
+    // .engine 路径自动选 TRT 后端，需指定 GPU
+    RuntimeOption opt;
+    opt.use_gpu(0);
+    opt.use_trt_backend();
+    auto det = std::make_unique<face::InsightFaceDet>(model_dir + "/det_10g.engine", opt);
+    REQUIRE(det->is_initialized());
+    auto img = ImageData::imread(img_path);
+
+    std::vector<face::InsightFaceBox> boxes;
+    REQUIRE(det->predict(img, &boxes));
+    REQUIRE(!boxes.empty());
+}
+#endif // ENABLE_TRT
