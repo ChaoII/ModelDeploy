@@ -35,6 +35,7 @@ enum MDModelType {
     OCRRec,
     SemSeg,
     Depth,
+    InsightFace,
 };
 
 enum MDStatusCode {
@@ -245,6 +246,31 @@ typedef struct {
     MDKeyPointResult* data;
     int size;
 } MDKeyPointResults;
+
+// insightface 人脸分析结果
+typedef struct {
+    MDRect box;
+    float score;
+    // 5 个关键点
+    MDPoint3f* kps;
+    int kps_size;
+    // 2D 106 关键点（原图坐标）
+    MDPoint3f* landmark_2d_106;
+    int landmark_2d_106_size;
+    // 3D 68 关键点（原图坐标）
+    MDPoint3f* landmark_3d_68;
+    int landmark_3d_68_size;
+    // 姿态 pitch/yaw/roll（角度）
+    float pose[3];
+    // 512 维 embedding
+    float* embedding;
+    int embedding_size;
+} MDInsightFaceResult;
+
+typedef struct {
+    MDInsightFaceResult* data;
+    int size;
+} MDInsightFaceResults;
 
 
 typedef struct {

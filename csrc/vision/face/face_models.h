@@ -12,3 +12,4 @@
 #include "vision/face/face_gender/seetaface_gender.h"
 #include "vision/face/face_rec/seetaface.h"
 #include "vision/face/face_rec_pipeline/face_rec_pipeline.h"
+#include "vision/face/insightface/face_analysis.h"

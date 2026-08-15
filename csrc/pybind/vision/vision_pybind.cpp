@@ -24,6 +24,7 @@ namespace modeldeploy::vision {
     void bind_face_as_second(const pybind11::module&);
     void bind_as_pipeline(const pybind11::module&);
     void bind_face_rec_pipeline(const pybind11::module&);
+    void bind_insightface(const pybind11::module&);
     void bind_visualize(pybind11::module&);
     void bind_ocr_db(const pybind11::module&);
     void bind_ocr_cls(const pybind11::module&);
@@ -56,6 +57,7 @@ namespace modeldeploy::vision {
         bind_face_as_second(m);
         bind_as_pipeline(m);
         bind_face_rec_pipeline(m);
+        bind_insightface(m);
         bind_visualize(m);
         bind_ocr_db(m);
         bind_ocr_cls(m);

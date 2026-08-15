@@ -15,6 +15,7 @@ build_win
 build_linux1
 build_tdc
 build_tdc_gpu
+build_tdc_py
 python/modeldeploy/__init__.py
 dist
 .idea
