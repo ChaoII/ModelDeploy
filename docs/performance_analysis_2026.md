@@ -221,16 +221,22 @@ GPU 上减少批次数收益 > pad 浪费；CPU 上持平（pad 浪费抵消）�
   ONNX→bmodel，支持 F16/INT8（INT8 需校准图）
 - `tools/docker/sophgo/convert_insightface.sh`：insightface 5 子模型（已更新命名 `_f16/_int8`）
 - benchmark 新增 `[sophgo]` 用例：遍历 yolo11n 全家 bmodel（fp16/int8）+ insightface pipeline
-- **实测（sophon 服务器 BM1688/SE9，aarch64）**：
+- **实测（sophon 服务器 BM1688/SE9，aarch64）**：完整 pre/infer/post 分解
 
-| 模型 | F16 | INT8 | 对比 CPU ORT |
-|---|---|---|---|
-| det yolo11n 1280 | 无结果（f16 精度待查） | **26.8ms** | CPU 640 32ms |
-| cls yolo11n | 3.8ms | **3.6ms** | CPU 2ms |
-| obb yolo11n | 227.7ms | **197.4ms** | CPU 51ms |
-| pose yolo11n | 61.0ms | **47.9ms** | CPU 46ms |
-| seg yolo11n | 171.3ms | **147.5ms** | CPU 68ms |
+| 模型 | 输入 | pre | infer | post | total |
+|---|---|---|---|---|---|
+| det yolo11n | 640 | 3.8 | 19.7 | 15.5 | **39.0** |
+| det yolo11n | 1280 int8 | 8.4 | 16.9 | 1.8 | **27.1** |
+| cls | 224 f16/int8 | 3.7/3.4 | 0 | 0 | **3.7/3.4** |
+| obb | 640 | 6.8 | 17.1 | **85.3** | **109.2** |
+| obb | 1024 f16/int8 | 8.1/8.2 | 44.1/12.4 | 176/179 | 228/199 |
+| pose | 640 | 4.6 | 19.4 | 37.5 | **61.5** |
+| **pose (NMS 内嵌)** | 640 | 4.6 | 20.7 | **0.08** | **25.4** |
+| seg | 640 | 4.7 | 29.0 | 138.7 | **172.4** |
+| **seg (NMS 内嵌)** | 640 | 4.7 | 27.8 | **58.7** | **91.1** |
 
-> **注意**：det1280_f16 推理无检测结果（int8 正常）——疑为 f16 bmodel 精度导致后处理
-> 过滤全部框，待换模型转换参数排查。sophgo obb/seg 的 post 处理在 CPU 做（NMS/mask），
-> 是主要耗时（175ms/129ms）。
+> **关键结论**：
+> 1. **post 是瓶颈，非 infer**：sophgo TPU infer 快（12-29ms），但 CPU post（NMS/mask）主导
+> 2. **640 输入比 1024/1280 快**（obb 109 vs 199/228，post 候选少）
+> 3. **NMS 内嵌 bmodel 是正解**：pose post 37.5→0.08ms（470x）、seg post 138.7→58.7ms
+> 4. det1280_f16 无检测结果（int8 正常，f16 精度待查）

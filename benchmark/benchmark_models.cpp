@@ -741,16 +741,23 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
     opt.use_sophgo_backend(0);
 
     // name -> 模型类构造（用 lambda 统一 predict 到 TimerArray）
+    // 640 版 post 候选少 4x（8400 vs 33600）；_nms 版模型内嵌 NMS，post 应 <1ms
     struct SG { const char* bmodel; const char* img; };
     const SG cfgs[] = {
-        {"yolo11n_det1280_f16.bmodel", "test_detection0.jpg"},
-        {"yolo11n_det1280_int8.bmodel", "test_detection0.jpg"},
+        {"yolo11n.bmodel", "test_detection0.jpg"},                  // det 640
+        {"yolo11n_det1280_f16.bmodel", "test_detection0.jpg"},      // det 1280 f16
+        {"yolo11n_det1280_int8.bmodel", "test_detection0.jpg"},     // det 1280 int8
         {"yolo11n-cls_f16.bmodel", "test_person.jpg"},
         {"yolo11n-cls_int8.bmodel", "test_person.jpg"},
-        {"yolo11n-obb_f16.bmodel", "test_obb.jpg"},
-        {"yolo11n-obb_int8.bmodel", "test_obb.jpg"},
+        {"yolo11n-obb.bmodel", "test_obb.jpg"},                     // obb 640
+        {"yolo11n-obb_f16.bmodel", "test_obb.jpg"},                 // obb 1024 f16
+        {"yolo11n-obb_int8.bmodel", "test_obb.jpg"},                // obb 1024 int8
+        {"yolo11n-pose.bmodel", "test_person.jpg"},                 // pose 640
+        {"yolo11n-pose_nms.bmodel", "test_person.jpg"},             // pose 640 NMS 内嵌
         {"yolo11n-pose_f16.bmodel", "test_person.jpg"},
         {"yolo11n-pose_int8.bmodel", "test_person.jpg"},
+        {"yolo11n-seg.bmodel", "test_person.jpg"},                  // seg 640
+        {"yolo11n-seg_nms.bmodel", "test_person.jpg"},              // seg 640 NMS 内嵌
         {"yolo11n-seg_f16.bmodel", "test_person.jpg"},
         {"yolo11n-seg_int8.bmodel", "test_person.jpg"},
     };
@@ -761,7 +768,7 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
         if (img.empty()) continue;
         std::vector<TimerArray> runs;
         constexpr int kRuns = 20;
-        if (std::string(c.bmodel).find("-cls_") != std::string::npos) {
+        if (std::string(c.bmodel).find("-cls") != std::string::npos) {
             classification::Classification m(mp.string(), opt);
             if (!m.is_initialized()) continue;
             for (int i = 0; i < kRuns; ++i) {
@@ -773,17 +780,20 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
                 TimerArray tt; tt.pre_timer.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
                 runs.push_back(tt);
             }
-        } else if (std::string(c.bmodel).find("-obb_") != std::string::npos) {
+        } else if (std::string(c.bmodel).find("-obb") != std::string::npos) {
             detection::UltralyticsObb m(mp.string(), opt);
             if (!m.is_initialized()) continue;
-            m.get_preprocessor().set_size({1024, 1024});  // obb bmodel 输入 1024
+            // obb bmodel：yolo11n-obb.bmodel=640，_f16/_int8=1024
+            const int obb_size = (std::string(c.bmodel).find("-obb_f16") != std::string::npos ||
+                                  std::string(c.bmodel).find("-obb_int8") != std::string::npos) ? 1024 : 640;
+            m.get_preprocessor().set_size({obb_size, obb_size});
             for (int i = 0; i < kRuns; ++i) {
                 std::vector<ObbResult> r; TimerArray t;
                 REQUIRE(m.predict(img, &r, &t));
                 if (r.empty()) { runs.clear(); break; }
                 runs.push_back(t);
             }
-        } else if (std::string(c.bmodel).find("-pose_") != std::string::npos) {
+        } else if (std::string(c.bmodel).find("-pose") != std::string::npos) {
             detection::UltralyticsPose m(mp.string(), opt);
             if (!m.is_initialized()) continue;
             m.get_preprocessor().set_size({640, 640});
@@ -793,7 +803,7 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
                 if (r.empty()) { runs.clear(); break; }
                 runs.push_back(t);
             }
-        } else if (std::string(c.bmodel).find("-seg_") != std::string::npos) {
+        } else if (std::string(c.bmodel).find("-seg") != std::string::npos) {
             detection::UltralyticsSeg m(mp.string(), opt);
             if (!m.is_initialized()) continue;
             m.get_preprocessor().set_size({640, 640});
@@ -806,8 +816,9 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
         } else {
             detection::UltralyticsDet m(mp.string(), opt);
             if (!m.is_initialized()) continue;
-            // sophgo det bmodel 固定 1280 输入
-            m.get_preprocessor().set_size({1280, 1280});
+            // det bmodel 输入：1280（yolo11n_det1280_*）或 640（yolo11n.bmodel）
+            const int det_size = (std::string(c.bmodel).find("1280") != std::string::npos) ? 1280 : 640;
+            m.get_preprocessor().set_size({det_size, det_size});
             for (int i = 0; i < kRuns; ++i) {
                 std::vector<DetectionResult> r; TimerArray t;
                 REQUIRE(m.predict(img, &r, &t));
