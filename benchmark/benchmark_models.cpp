@@ -741,23 +741,23 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
     opt.use_sophgo_backend(0);
 
     // name -> 模型类构造（用 lambda 统一 predict 到 TimerArray）
-    // 640 版 post 候选少 4x（8400 vs 33600）；_nms 版模型内嵌 NMS，post 应 <1ms
+    // 640 版 post 候选少 4x（8400 vs 33600）
     struct SG { const char* bmodel; const char* img; };
     const SG cfgs[] = {
-        {"yolo11n.bmodel", "test_detection0.jpg"},                  // det 640
-        {"yolo11n_det1280_f16.bmodel", "test_detection0.jpg"},      // det 1280 f16
-        {"yolo11n_det1280_int8.bmodel", "test_detection0.jpg"},     // det 1280 int8
+        {"yolo11n.bmodel", "test_detection0.jpg"},                  // det 640 (84类)
+        {"yolo11n_det1280_f16.bmodel", "test_detection0.jpg"},      // det 1280 f16 (单类5)
+        {"yolo11n_det1280_int8.bmodel", "test_detection0.jpg"},     // det 1280 int8 (单类5)
+        {"zhgd_without_nms_640.bmodel", "test_pedestrian_attribute.jpg"},   // zhgd 单类5
+        {"zhgd_without_nms_1280.bmodel", "test_pedestrian_attribute.jpg"},  // zhgd 单类5 1280
         {"yolo11n-cls_f16.bmodel", "test_person.jpg"},
         {"yolo11n-cls_int8.bmodel", "test_person.jpg"},
         {"yolo11n-obb.bmodel", "test_obb.jpg"},                     // obb 640
         {"yolo11n-obb_f16.bmodel", "test_obb.jpg"},                 // obb 1024 f16
         {"yolo11n-obb_int8.bmodel", "test_obb.jpg"},                // obb 1024 int8
         {"yolo11n-pose.bmodel", "test_person.jpg"},                 // pose 640
-        {"yolo11n-pose_nms.bmodel", "test_person.jpg"},             // pose 640 NMS 内嵌
         {"yolo11n-pose_f16.bmodel", "test_person.jpg"},
         {"yolo11n-pose_int8.bmodel", "test_person.jpg"},
         {"yolo11n-seg.bmodel", "test_person.jpg"},                  // seg 640
-        {"yolo11n-seg_nms.bmodel", "test_person.jpg"},              // seg 640 NMS 内嵌
         {"yolo11n-seg_f16.bmodel", "test_person.jpg"},
         {"yolo11n-seg_int8.bmodel", "test_person.jpg"},
     };

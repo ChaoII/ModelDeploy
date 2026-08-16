@@ -48,40 +48,33 @@ namespace modeldeploy::vision::detection {
         const size_t dim2 = num_classes; // 84
         for (size_t bs = 0; bs < batch; ++bs) {
             const float* data = buf.data() + bs * plane;
-            // 过阈值的结果通常很少（正常图 3-10 个），依赖 vector 自动增长即可；
-            // 不写死 reserve（避免硬编码上限导致过度分配或 realloc）
+            // 过阈值的结果通常很少（正常图 3-10 个），依赖 vector 自动增长即可
             std::vector<DetectionResult> _results;
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
-                // 单类无NMS输出 [B,5,N]（xywh + conf，conf 已概率激活）：直接用 conf，不做 sigmoid
-                float confidence;
-                int32_t label_id;
-                if (dim2 == 5) {
-                    confidence = attr_ptr[4];
-                    label_id = 0;
-                } else {
-                    const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
-                    // Ultralytics 端到端导出（无内嵌 NMS）的 class 通道已含 Sigmoid，输出即概率 [0,1]，
-                    // 不能再做 sigmoid（二次 sigmoid 会把分数推向 1，导致全部 anchor 过阈值、NMS 退化
-                    // 为 O(n^2) 全量比较，实测 det post 463ms 的根因）。
-                    confidence = *max_class_score;
-                    label_id = std::distance(attr_ptr + 4, max_class_score);
+                const float x = attr_ptr[0], y = attr_ptr[1];
+                const float w = attr_ptr[2], h = attr_ptr[3];
+                // 过滤无效框（非正宽高）
+                if (w <= 0 || h <= 0) {
+                    continue;
                 }
-                // filter boxes by conf_threshold
+                // 取最高类分数：单类（[B,5,N]，仅 conf 一个通道）时 max_element
+                // 即为该 conf、label=0，与多类行为一致，无需特判。
+                const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
+                float confidence = *max_class_score;
+                const int32_t label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
+                // 模型 class 通道可能为未激活 logits（apply_sigmoid_=false 时），
+                // 需 sigmoid 转概率再比阈值。Ultralytics 官方导出已含 Sigmoid
+                // （apply_sigmoid_=true，不做二次 sigmoid——二次会把概率推向 1，
+                //  导致全候选过阈、NMS 退化为 O(n^2)，实测 det post 463ms 的根因）。
+                if (!apply_sigmoid_) {
+                    confidence = 1.0f / (1.0f + std::exp(-confidence));
+                }
                 if (confidence <= conf_threshold_) {
                     continue;
                 }
                 // convert from [xc, yc, w, h] to [x, y, width, height]
-                Rect2f box = {
-                    attr_ptr[0] - attr_ptr[2] / 2.0f,
-                    attr_ptr[1] - attr_ptr[3] / 2.0f,
-                    attr_ptr[2],
-                    attr_ptr[3]
-                };
-                // 过滤无效框（低置信假阳性常产生非正宽高）
-                if (box.width <= 0 || box.height <= 0) {
-                    continue;
-                }
+                Rect2f box = {x - w / 2.0f, y - h / 2.0f, w, h};
                 _results.push_back({box, label_id, confidence});
             }
             if (_results.empty()) {

@@ -42,8 +42,15 @@ namespace modeldeploy::vision::detection {
         /// Get nms_threshold, default 0.5
         [[nodiscard]] float get_nms_threshold() const { return nms_threshold_; }
 
+        /// 模型 class 通道是否已含 Sigmoid（输出即概率 [0,1]）。
+        /// Ultralytics 官方导出 Detect 头已含 Sigmoid → 默认 true（不做二次 sigmoid）。
+        /// 若模型输出为未激活 raw logits，设 false 后 postprocess 会先 sigmoid 再过滤。
+        void set_apply_sigmoid(bool apply) { apply_sigmoid_ = apply; }
+        [[nodiscard]] bool get_apply_sigmoid() const { return apply_sigmoid_; }
+
     protected:
         float conf_threshold_;
         float nms_threshold_;
+        bool apply_sigmoid_ = true; // Ultralytics Detect 头已含 Sigmoid
     };
 } // namespace modeldeploy
