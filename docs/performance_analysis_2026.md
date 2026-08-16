@@ -216,9 +216,21 @@ GPU 上减少批次数收益 > pad 浪费；CPU 上持平（pad 浪费抵消）�
 - 新增 `analyze_max_face()`：只识别最大人脸，`face_count` 报告画面人数（多人告警）
 - `FaceRecognizerPipeline::predict_max_face()` 同理（人脸识别业务场景）
 
-### 9.11 SOPHGO 全模型转换 + benchmark
+### 9.11 SOPHGO 全模型转换 + benchmark（已在服务器实测）
 - `tools/docker/sophgo/convert_all.sh`：全模型（yolo11n 全家/face/lpr/ocr/insightface）
   ONNX→bmodel，支持 F16/INT8（INT8 需校准图）
 - `tools/docker/sophgo/convert_insightface.sh`：insightface 5 子模型（已更新命名 `_f16/_int8`）
 - benchmark 新增 `[sophgo]` 用例：遍历 yolo11n 全家 bmodel（fp16/int8）+ insightface pipeline
-- 需 Linux + Sophon-Sail 环境实际执行（Windows 无法编译/运行 sophgo）
+- **实测（sophon 服务器 BM1688/SE9，aarch64）**：
+
+| 模型 | F16 | INT8 | 对比 CPU ORT |
+|---|---|---|---|
+| det yolo11n 1280 | 无结果（f16 精度待查） | **26.8ms** | CPU 640 32ms |
+| cls yolo11n | 3.8ms | **3.6ms** | CPU 2ms |
+| obb yolo11n | 227.7ms | **197.4ms** | CPU 51ms |
+| pose yolo11n | 61.0ms | **47.9ms** | CPU 46ms |
+| seg yolo11n | 171.3ms | **147.5ms** | CPU 68ms |
+
+> **注意**：det1280_f16 推理无检测结果（int8 正常）——疑为 f16 bmodel 精度导致后处理
+> 过滤全部框，待换模型转换参数排查。sophgo obb/seg 的 post 处理在 CPU 做（NMS/mask），
+> 是主要耗时（175ms/129ms）。
