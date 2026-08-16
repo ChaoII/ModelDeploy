@@ -39,10 +39,10 @@ namespace {
         if (runs.empty()) return;
         double pre = 0, infer = 0, post = 0, total = 0;
         for (const auto& t : runs) {
-            pre += t.pre_timer.average_ms();
-            infer += t.infer_timer.average_ms();
-            post += t.post_timer.average_ms();
-            total += t.total_ms();
+            pre += t.pre_timer.total_ms();
+            infer += t.infer_timer.total_ms();
+            post += t.post_timer.total_ms();
+            total += t.pre_timer.total_ms() + t.infer_timer.total_ms() + t.post_timer.total_ms();
         }
         const size_t n = runs.size();
         std::cout << "[bench] " << tag << " | pre=" << pre / n

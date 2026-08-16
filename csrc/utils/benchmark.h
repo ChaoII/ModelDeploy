@@ -19,6 +19,10 @@ public:
 
     [[nodiscard]] double average_ms() const;
 
+    // 所有计时段的总耗时（ms）：单次 predict = 该次耗时；
+    // pipeline 内多个子模型共用同一 Timer 时 = 累计耗时。
+    [[nodiscard]] double total_ms() const;
+
     void push_back(const double duration);
 
     void reset();

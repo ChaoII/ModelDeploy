@@ -16,11 +16,16 @@
         durations_.push_back(std::chrono::duration<double, std::milli>(end_time_ - start_time_).count());
     }
 
-    // 返回所有计时段的总耗时（ms）。
-    // 单次 predict（start/stop 一次）：等于该次耗时；
-    // pipeline 内多次子模型共用同一 TimerArray：等于累计耗时。
-    // 此前返回平均值，导致 pipeline 多子模型共用计时时严重低估。
+    // 平均耗时：单次 predict = 该次耗时；多次 start/stop = 平均每次
     [[nodiscard]] double Timer::average_ms() const {
+        if (durations_.empty()) return 0.0;
+        double sum = 0.0;
+        for (const double d : durations_) sum += d;
+        return sum / durations_.size();
+    }
+
+    // 总耗时：所有计时段之和（pipeline 内多次子模型共用时 = 累计）
+    [[nodiscard]] double Timer::total_ms() const {
         double sum = 0.0;
         for (const double d : durations_) sum += d;
         return sum;
@@ -69,6 +74,9 @@
 
 
 
+    // 单帧平均总耗时（= 各阶段单次平均之和）。
+    // 注意：demo 循环多次 predict 复用同一 TimerArray 时，average_ms 是单次平均，
+    // total_ms() 也应返回单次平均，与 print_benchmark 的 pre/infer/post 一致。
     [[nodiscard]] double TimerArray::total_ms() const {
         return pre_timer.average_ms() + infer_timer.average_ms() + post_timer.average_ms();
     }
