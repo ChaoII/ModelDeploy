@@ -6,7 +6,6 @@
 #include "vision/utils.h"
 #include "vision/detection/postprocessor.h"
 #include <algorithm>
-#include <cmath>
 
 namespace modeldeploy::vision::detection {
     UltralyticsPostprocessor::UltralyticsPostprocessor() {
@@ -60,16 +59,12 @@ namespace modeldeploy::vision::detection {
                 }
                 // 取最高类分数：单类（[B,5,N]，仅 conf 一个通道）时 max_element
                 // 即为该 conf、label=0，与多类行为一致，无需特判。
+                // Ultralytics 官方导出 Detect 头已含 Sigmoid，输出即概率 [0,1]，
+                // 直接比阈值即可（二次 sigmoid 会把概率推向 1，导致全候选过阈、
+                // NMS 退化为 O(n^2)，实测 det post 463ms 的根因）。
                 const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
-                float confidence = *max_class_score;
+                const float confidence = *max_class_score;
                 const int32_t label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
-                // 模型 class 通道可能为未激活 logits（apply_sigmoid_=false 时），
-                // 需 sigmoid 转概率再比阈值。Ultralytics 官方导出已含 Sigmoid
-                // （apply_sigmoid_=true，不做二次 sigmoid——二次会把概率推向 1，
-                //  导致全候选过阈、NMS 退化为 O(n^2)，实测 det post 463ms 的根因）。
-                if (!apply_sigmoid_) {
-                    confidence = 1.0f / (1.0f + std::exp(-confidence));
-                }
                 if (confidence <= conf_threshold_) {
                     continue;
                 }
