@@ -48,10 +48,9 @@ namespace modeldeploy::vision::detection {
         const size_t dim2 = num_classes; // 84
         for (size_t bs = 0; bs < batch; ++bs) {
             const float* data = buf.data() + bs * plane;
+            // 过阈值的结果通常很少（正常图 3-10 个），依赖 vector 自动增长即可；
+            // 不写死 reserve（避免硬编码上限导致过度分配或 realloc）
             std::vector<DetectionResult> _results;
-            // 过阈值的结果通常只有几个（正常图 3-10 个），不 reserve 8400 个大对象
-            // （每个含 vector，8400×56B ≈ 470KB 堆分配，是 A53 上 post 的主要开销之一）
-            _results.reserve(64);
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
                 // 单类无NMS输出 [B,5,N]（xywh + conf，conf 已概率激活）：直接用 conf，不做 sigmoid

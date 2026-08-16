@@ -33,7 +33,6 @@ namespace modeldeploy::vision::detection {
             const auto dim2 = tensor_transpose.shape()[2];
             const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * dim1 * dim2;
             std::vector<ObbResult> _results;
-            _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 const auto attr_ptr = data + i * dim2;
                 // 4(xc, yc, w, h)+classes_num(15)+1(angle)
@@ -91,7 +90,6 @@ namespace modeldeploy::vision::detection {
             const auto dim2 = tensors[0].shape()[2];
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<ObbResult> _results;
-            _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 const auto attr_ptr = data + i * dim2;
                 float score = attr_ptr[4];

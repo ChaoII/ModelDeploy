@@ -35,7 +35,6 @@ namespace modeldeploy::vision::detection {
             const float* data = static_cast<const float*>(tensor_transpose.data()) + bs * dim1 * dim2;
 
             std::vector<KeyPointsResult> _results;
-            _results.reserve(dim1);
             for (size_t i = 0; i < dim1; ++i) {
                 // 4(xc,yc,w,h)+1(conf)+17(keypoints)*3(x,y,conf)=56
                 const float* attr_ptr = data + i * dim2;

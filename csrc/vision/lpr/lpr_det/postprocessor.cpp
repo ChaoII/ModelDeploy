@@ -29,7 +29,6 @@ namespace modeldeploy::vision::lpr {
             const size_t dim2 = tensors[0].shape()[2]; //15
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<KeyPointsResult> _results;
-            _results.reserve(dim1);
             // x,y,w,h,obj_conf,x1,y1,x2,y2,x3,y3,x4,y4,cls_conf0(单层车牌),cls_conf1(双层车牌)
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;

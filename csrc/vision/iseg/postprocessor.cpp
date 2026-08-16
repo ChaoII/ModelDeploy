@@ -34,8 +34,6 @@ namespace modeldeploy::vision::detection {
             const size_t dim2 = tensors[0].shape()[2]; //84
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<InstanceSegResult> _results;
-            _results.reserve(dim1); // 预分配空间
-            mask_embeddings.reserve(dim1); // 预分配空间
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
                 float cls_conf = attr_ptr[4];
@@ -200,8 +198,6 @@ namespace modeldeploy::vision::detection {
             const size_t dim2 = tensors[0].shape()[2]; //38
             const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
             std::vector<InstanceSegResult> _results;
-            _results.reserve(dim1); // 预分配空间
-            mask_embeddings.reserve(dim1); // 预分配空间
             for (size_t i = 0; i < dim1; ++i) {
                 const float* attr_ptr = data + i * dim2;
                 float score = attr_ptr[4];
