@@ -25,7 +25,7 @@ namespace ModelDeploy
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int md_detection_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+            int width, int height, int stepY, int stepUV, Device srcDevice,
             ref MDDetectionResults results);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -90,7 +90,7 @@ namespace ModelDeploy
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int md_pose_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+            int width, int height, int stepY, int stepUV, Device srcDevice,
             ref MDKeyPointResults results);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -123,7 +123,7 @@ namespace ModelDeploy
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int md_obb_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+            int width, int height, int stepY, int stepUV, Device srcDevice,
             ref MDObbResults results);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -156,7 +156,7 @@ namespace ModelDeploy
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int md_iseg_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+            int width, int height, int stepY, int stepUV, Device srcDevice,
             ref MDISegResults results);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -189,7 +189,7 @@ namespace ModelDeploy
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int md_sem_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+            int width, int height, int stepY, int stepUV, Device srcDevice,
             ref MDSemSegResult result);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -215,7 +215,7 @@ namespace ModelDeploy
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int md_depth_predict_nv12(ref MDModel model, IntPtr srcY, IntPtr srcUV,
-            int width, int height, int stepY, int stepUV, MDDevice srcDevice,
+            int width, int height, int stepY, int stepUV, Device srcDevice,
             ref MDDepthResult result);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

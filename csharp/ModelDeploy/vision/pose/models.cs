@@ -47,7 +47,7 @@ namespace ModelDeploy.vision.pose
 
 
         public List<KeyPointResult> PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
-            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+            int stepY, int stepUV, Device srcDevice = Device.CPU)
         {
             var cResults = new MDKeyPointResults();
             var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);

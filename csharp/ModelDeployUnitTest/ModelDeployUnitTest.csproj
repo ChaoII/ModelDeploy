@@ -26,6 +26,9 @@
 
     <Target Name="CopySDKDll" AfterTargets="Build">
         <Copy SourceFiles="..\..\build\bin\ModelDeploySDK.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true"/>
+        <!-- SDK 动态依赖（ORT/MNN 等），一并复制保证可加载 -->
+        <Copy SourceFiles="..\..\build\bin\onnxruntime.dll;..\..\build\bin\MNN.dll"
+              DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true"/>
     </Target>
 
 </Project>

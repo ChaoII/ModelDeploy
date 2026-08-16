@@ -46,7 +46,7 @@ namespace ModelDeploy.vision.obb
 
 
         public List<ObbResult> PredictNv12(byte[] srcY, byte[] srcUV, int width, int height,
-            int stepY, int stepUV, MDDevice srcDevice = MDDevice.CPU)
+            int stepY, int stepUV, Device srcDevice = Device.CPU)
         {
             var cResults = new MDObbResults();
             var yPinned = GCHandle.Alloc(srcY, GCHandleType.Pinned);

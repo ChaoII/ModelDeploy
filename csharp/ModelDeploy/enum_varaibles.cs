@@ -52,15 +52,6 @@
         TPU = 4
     }
 
-    public enum MDDevice
-    {
-        CPU = 0,
-        GPU = 1,
-        OPENCL = 2,
-        VULKAN = 3,
-        TPU = 4
-    }
-
     public enum Backend
     {
         ORT = 0,
