@@ -30,8 +30,8 @@ namespace modeldeploy::vision::face {
     bool FaceRecognizerPipeline::predict(const ImageData& image, std::vector<FaceRecognitionResult>* results,
                                          TimerArray* timers) {
         if (timers) {
-            timers->pre_timer.push_back(0);
-            timers->post_timer.push_back(0);
+            timers->pre_timer.add_sample(0);
+            timers->post_timer.add_sample(0);
             timers->infer_timer.start();
         }
         std::vector<KeyPointsResult> det_result;
@@ -59,8 +59,8 @@ namespace modeldeploy::vision::face {
         if (!result) return false;
         std::vector<KeyPointsResult> det_result;
         if (timers) {
-            timers->pre_timer.push_back(0);
-            timers->post_timer.push_back(0);
+            timers->pre_timer.add_sample(0);
+            timers->post_timer.add_sample(0);
             timers->infer_timer.start();
         }
         if (!detector_->predict(image, &det_result)) {

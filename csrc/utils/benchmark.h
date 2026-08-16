@@ -1,6 +1,15 @@
 //
 // Created by aichao on 2025/6/5.
 //
+// 计时工具：Timer（单段采样）+ TimerArray（pre/infer/post 三段）。
+//
+// 架构约定：
+//  - Timer 记录多次 start/stop 的时长样本；mean_ms()/sum_ms()/count() 为只读查询。
+//  - TimerArray 的三个 Timer 语义一致（同一帧三段各采样一次），
+//    mean_ms() = 单帧平均总耗时；sum_ms() = 多次/多子模型累积总耗时。
+//  - demo/examples 打印单帧平均用 print_benchmark()（mean）；
+//    benchmark/测试聚合多轮用 sum_ms()。
+//
 
 #pragma once
 
@@ -14,28 +23,22 @@ public:
     using Clock = std::chrono::high_resolution_clock;
 
     void start();
-
     void stop();
 
-    [[nodiscard]] double average_ms() const;
+    /// 多次采样平均耗时（ms）。无样本返回 0。
+    [[nodiscard]] double mean_ms() const;
+    /// 所有采样总耗时（ms）。pipeline 内多子模型共用同一 Timer 时 = 累积耗时。
+    [[nodiscard]] double sum_ms() const;
+    /// 采样次数。
+    [[nodiscard]] size_t count() const;
 
-    // 所有计时段的总耗时（ms）：单次 predict = 该次耗时；
-    // pipeline 内多个子模型共用同一 Timer 时 = 累计耗时。
-    [[nodiscard]] double total_ms() const;
-
-    void push_back(const double duration);
+    /// 手动追加一个时长样本（单位 ms）。用于 pipeline 层对 pre/post 段占位。
+    void add_sample(double duration_ms);
 
     void reset();
 
-    void print(const std::string& tag) const;
-
-    void set_durations(const std::vector<double>& durations);
-
-    [[nodiscard]] std::vector<double> get_durations() const;
-
-
+    /// 逐样本相加（对齐补 0，避免静默截断）。
     Timer operator+(const Timer& other) const;
-
     Timer& operator+=(const Timer& other);
 
 private:
@@ -49,14 +52,16 @@ struct MODELDEPLOY_CXX_EXPORT TimerArray {
     Timer infer_timer;
     Timer post_timer;
 
-    [[nodiscard]] double total_ms() const;
+    /// 单帧平均总耗时（ms）= 三段 mean 之和。与 print_benchmark 输出一致。
+    [[nodiscard]] double mean_ms() const;
+    /// 累积总耗时（ms）= 三段 sum 之和。多轮/multi 子模型聚合用。
+    [[nodiscard]] double sum_ms() const;
 
     TimerArray operator+(const TimerArray& other) const;
-
-    // 重载 +=
     TimerArray& operator+=(const TimerArray& other);
 
     void reset();
 
+    /// 打印单帧平均耗时（各段 mean + 总 mean）。
     void print_benchmark() const;
 };

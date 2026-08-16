@@ -88,8 +88,8 @@ namespace modeldeploy::vision::ocr {
         batch_result->resize(images.size());
         std::vector<std::vector<std::array<int, 8>>> batch_boxes(images.size());
         if (timers) {
-            timers->pre_timer.push_back(0);
-            timers->post_timer.push_back(0);
+            timers->pre_timer.add_sample(0);
+            timers->post_timer.add_sample(0);
             timers->infer_timer.start();
         }
         if (!detector_->batch_predict(images, &batch_boxes)) {

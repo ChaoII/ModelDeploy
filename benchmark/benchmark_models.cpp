@@ -39,10 +39,10 @@ namespace {
         if (runs.empty()) return;
         double pre = 0, infer = 0, post = 0, total = 0;
         for (const auto& t : runs) {
-            pre += t.pre_timer.total_ms();
-            infer += t.infer_timer.total_ms();
-            post += t.post_timer.total_ms();
-            total += t.pre_timer.total_ms() + t.infer_timer.total_ms() + t.post_timer.total_ms();
+            pre += t.pre_timer.sum_ms();
+            infer += t.infer_timer.sum_ms();
+            post += t.post_timer.sum_ms();
+            total += t.pre_timer.sum_ms() + t.infer_timer.sum_ms() + t.post_timer.sum_ms();
         }
         const size_t n = runs.size();
         std::cout << "[bench] " << tag << " | pre=" << pre / n
@@ -777,7 +777,7 @@ TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
                 auto t0 = std::chrono::high_resolution_clock::now();
                 REQUIRE(m.predict(img, &r));
                 auto t1 = std::chrono::high_resolution_clock::now();
-                TimerArray tt; tt.pre_timer.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+                TimerArray tt; tt.pre_timer.add_sample(std::chrono::duration<double, std::milli>(t1 - t0).count());
                 runs.push_back(tt);
             }
         } else if (std::string(c.bmodel).find("-obb") != std::string::npos) {

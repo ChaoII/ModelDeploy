@@ -90,8 +90,8 @@ namespace modeldeploy::vision::pipeline {
         batch_result->resize(images.size());
         std::vector<std::vector<DetectionResult>> batch_detection_results(images.size());
         if (timers) {
-            timers->pre_timer.push_back(0);
-            timers->post_timer.push_back(0);
+            timers->pre_timer.add_sample(0);
+            timers->post_timer.add_sample(0);
             timers->infer_timer.start();
         }
         if (!detector_->batch_predict(images, &batch_detection_results, nullptr)) {
