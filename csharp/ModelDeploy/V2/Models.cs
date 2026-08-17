@@ -9,7 +9,7 @@ namespace ModelDeploy.V2.Models
 {
     public sealed class DetectionModel : BaseModel
     {
-        private DetectionModel(IntPtr handle) : base(handle) { }
+        private DetectionModel(IntPtr handle) : base(MDModelKind.MD_MODEL_DETECTION, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public DetectionModel Clone() => new DetectionModel(CloneNative());
@@ -50,7 +50,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class ClassificationModel : BaseModel
     {
-        private ClassificationModel(IntPtr handle) : base(handle) { }
+        private ClassificationModel(IntPtr handle) : base(MDModelKind.MD_MODEL_CLASSIFICATION, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public ClassificationModel Clone() => new ClassificationModel(CloneNative());
@@ -73,7 +73,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class PoseModel : BaseModel
     {
-        private PoseModel(IntPtr handle) : base(handle) { }
+        private PoseModel(IntPtr handle) : base(MDModelKind.MD_MODEL_POSE, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public PoseModel Clone() => new PoseModel(CloneNative());
@@ -110,7 +110,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class ObbModel : BaseModel
     {
-        private ObbModel(IntPtr handle) : base(handle) { }
+        private ObbModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OBB, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public ObbModel Clone() => new ObbModel(CloneNative());
@@ -138,7 +138,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class InstanceSegModel : BaseModel
     {
-        private InstanceSegModel(IntPtr handle) : base(handle) { }
+        private InstanceSegModel(IntPtr handle) : base(MDModelKind.MD_MODEL_INSTANCE_SEG, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public InstanceSegModel Clone() => new InstanceSegModel(CloneNative());
@@ -173,7 +173,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class SemSegModel : BaseModel
     {
-        private SemSegModel(IntPtr handle) : base(handle) { }
+        private SemSegModel(IntPtr handle) : base(MDModelKind.MD_MODEL_SEM_SEG, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public SemSegModel Clone() => new SemSegModel(CloneNative());
@@ -204,7 +204,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class DepthModel : BaseModel
     {
-        private DepthModel(IntPtr handle) : base(handle) { }
+        private DepthModel(IntPtr handle) : base(MDModelKind.MD_MODEL_DEPTH, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public DepthModel Clone() => new DepthModel(CloneNative());
@@ -234,7 +234,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class FaceDetModel : BaseModel
     {
-        private FaceDetModel(IntPtr handle) : base(handle) { }
+        private FaceDetModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_DET, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceDetModel Clone() => new FaceDetModel(CloneNative());
@@ -271,7 +271,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class FaceRecModel : BaseModel
     {
-        private FaceRecModel(IntPtr handle) : base(handle) { }
+        private FaceRecModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_REC, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceRecModel Clone() => new FaceRecModel(CloneNative());
@@ -291,7 +291,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class FaceAgeModel : BaseModel
     {
-        private FaceAgeModel(IntPtr handle) : base(handle) { }
+        private FaceAgeModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_AGE, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceAgeModel Clone() => new FaceAgeModel(CloneNative());
@@ -311,7 +311,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class FaceGenderModel : BaseModel
     {
-        private FaceGenderModel(IntPtr handle) : base(handle) { }
+        private FaceGenderModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_GENDER, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceGenderModel Clone() => new FaceGenderModel(CloneNative());
@@ -331,7 +331,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class InsightFaceModel : BaseModel
     {
-        private InsightFaceModel(IntPtr handle) : base(handle) { }
+        private InsightFaceModel(IntPtr handle) : base(MDModelKind.MD_MODEL_INSIGHTFACE, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public InsightFaceModel Clone() => new InsightFaceModel(CloneNative());
@@ -375,7 +375,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class OcrModel : BaseModel
     {
-        private OcrModel(IntPtr handle) : base(handle) { }
+        private OcrModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public OcrModel Clone() => new OcrModel(CloneNative());
@@ -412,7 +412,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class LprModel : BaseModel
     {
-        private LprModel(IntPtr handle) : base(handle) { }
+        private LprModel(IntPtr handle) : base(MDModelKind.MD_MODEL_LPR_PIPELINE, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public LprModel Clone() => new LprModel(CloneNative());
@@ -452,7 +452,7 @@ namespace ModelDeploy.V2.Models
 
     public sealed class PedestrianAttributeModel : BaseModel
     {
-        private PedestrianAttributeModel(IntPtr handle) : base(handle) { }
+        private PedestrianAttributeModel(IntPtr handle) : base(MDModelKind.MD_MODEL_PED_ATTR, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public PedestrianAttributeModel Clone() => new PedestrianAttributeModel(CloneNative());
@@ -490,7 +490,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>OCR 文本检测子模型（对应 C++ DBDetector）。modelPath 为 det.onnx。</summary>
     public sealed class DbDetectorModel : BaseModel
     {
-        private DbDetectorModel(IntPtr handle) : base(handle) { }
+        private DbDetectorModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR_DET, handle) { }
         public DbDetectorModel Clone() => new DbDetectorModel(CloneNative());
         public DbDetectorModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_OCR_DET, modelPath, opt) { }
@@ -517,7 +517,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>OCR 文本识别子模型（对应 C++ Recognizer）。modelPath 为 rec.onnx|dict.txt。</summary>
     public sealed class RecognizerModel : BaseModel
     {
-        private RecognizerModel(IntPtr handle) : base(handle) { }
+        private RecognizerModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR_REC, handle) { }
         public RecognizerModel Clone() => new RecognizerModel(CloneNative());
         public RecognizerModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_OCR_REC, modelPath, opt) { }
@@ -544,7 +544,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>OCR 方向分类子模型（对应 C++ Classifier）。modelPath 为 cls.onnx。</summary>
     public sealed class OcrClassifierModel : BaseModel
     {
-        private OcrClassifierModel(IntPtr handle) : base(handle) { }
+        private OcrClassifierModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR_CLS, handle) { }
         public OcrClassifierModel Clone() => new OcrClassifierModel(CloneNative());
         public OcrClassifierModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_OCR_CLS, modelPath, opt) { }
@@ -571,7 +571,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>车牌检测子模型（对应 C++ LprDetection）。modelPath 为 det.onnx。</summary>
     public sealed class LprDetectionModel : BaseModel
     {
-        private LprDetectionModel(IntPtr handle) : base(handle) { }
+        private LprDetectionModel(IntPtr handle) : base(MDModelKind.MD_MODEL_LPR_DET, handle) { }
         public LprDetectionModel Clone() => new LprDetectionModel(CloneNative());
         public LprDetectionModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_LPR_DET, modelPath, opt) { }
@@ -596,7 +596,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>车牌识别子模型（对应 C++ LprRecognizer）。modelPath 为 rec.onnx。</summary>
     public sealed class LprRecognizerModel : BaseModel
     {
-        private LprRecognizerModel(IntPtr handle) : base(handle) { }
+        private LprRecognizerModel(IntPtr handle) : base(MDModelKind.MD_MODEL_LPR_REC, handle) { }
         public LprRecognizerModel Clone() => new LprRecognizerModel(CloneNative());
         public LprRecognizerModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_LPR_REC, modelPath, opt) { }
@@ -627,7 +627,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>insightface 人脸检测子模型（对应 C++ InsightFaceDet）。modelPath 为 det_10g.onnx。</summary>
     public sealed class InsightFaceDetModel : BaseModel
     {
-        private InsightFaceDetModel(IntPtr handle) : base(handle) { }
+        private InsightFaceDetModel(IntPtr handle) : base(MDModelKind.MD_MODEL_INSIGHTFACE_DET, handle) { }
         public InsightFaceDetModel Clone() => new InsightFaceDetModel(CloneNative());
         public InsightFaceDetModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_INSIGHTFACE_DET, modelPath, opt) { }
@@ -663,7 +663,7 @@ namespace ModelDeploy.V2.Models
     /// modelPath 为 det.onnx|rec.onnx。</summary>
     public sealed class FaceRecognizerPipelineModel : BaseModel
     {
-        private FaceRecognizerPipelineModel(IntPtr handle) : base(handle) { }
+        private FaceRecognizerPipelineModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_REC_PIPELINE, handle) { }
         public FaceRecognizerPipelineModel Clone() => new FaceRecognizerPipelineModel(CloneNative());
         public FaceRecognizerPipelineModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_FACE_REC_PIPELINE, modelPath, opt) { }
@@ -688,7 +688,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>人脸年龄/性别子模型（对应 C++ InsightFaceGenderAge）。modelPath 为 genderage.onnx。</summary>
     public sealed class FaceGenderAgeModel : BaseModel
     {
-        private FaceGenderAgeModel(IntPtr handle) : base(handle) { }
+        private FaceGenderAgeModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_AS, handle) { }
         public FaceGenderAgeModel Clone() => new FaceGenderAgeModel(CloneNative());
         public FaceGenderAgeModel(string modelPath, RuntimeOption2 opt = null)
             : base(MDModelKind.MD_MODEL_FACE_AS, modelPath, opt) { }

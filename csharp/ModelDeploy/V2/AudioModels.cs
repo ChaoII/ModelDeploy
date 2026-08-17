@@ -8,7 +8,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>SenseVoice ASR。modelPath 格式: model.onnx|tokens.txt</summary>
     public sealed class SenseVoiceModel : BaseModel
     {
-        private SenseVoiceModel(IntPtr handle) : base(handle) { }
+        private SenseVoiceModel(IntPtr handle) : base(MDModelKind.MD_MODEL_ASR, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public SenseVoiceModel Clone() => new SenseVoiceModel(CloneNative());
@@ -36,7 +36,7 @@ namespace ModelDeploy.V2.Models
     /// <summary>Kokoro TTS。modelPath 格式: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir</summary>
     public sealed class KokoroModel : BaseModel
     {
-        private KokoroModel(IntPtr handle) : base(handle) { }
+        private KokoroModel(IntPtr handle) : base(MDModelKind.MD_MODEL_TTS, handle) { }
 
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public KokoroModel Clone() => new KokoroModel(CloneNative());

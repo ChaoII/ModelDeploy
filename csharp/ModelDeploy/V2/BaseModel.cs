@@ -200,8 +200,9 @@ namespace ModelDeploy.V2
         }
 
         /// <summary>从原生句柄包装（子类 Clone 用）。</summary>
-        protected BaseModel(IntPtr existingHandle)
+        protected BaseModel(MDModelKind kind, IntPtr existingHandle)
         {
+            _kind = kind;
             _handle = existingHandle;
         }
 
