@@ -1,60 +1,58 @@
 //
-// Created by aichao on 2025/2/26.
+// capi2 行人属性示例：检测 + 属性分类
 //
+#include "../capi2_common.h"
 
-#include <iostream>
-#include <chrono>
+int main() {
+    MDOptionHandle opt = nullptr;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_cpu_threads(opt, 4);
 
-#include "capi/utils/md_image_capi.h"
-#include "capi/utils/md_utils_capi.h"
-#include "capi/vision/pipeline/pedestrian_attribute_capi.h"
+    MDModelHandle model = nullptr;
+    die(md_model_create(&model, MD_MODEL_PED_ATTR,
+                        "../../test_data/test_models/onnx/zhgd_det.onnx|"
+                        "../../test_data/test_models/onnx/zhgd_ml.onnx", opt),
+        "create pedestrian attribute");
 
-int main(int argc, char** argv) {
-    MDStatusCode ret;
-    //简单百宝箱
-    MDModel model;
+    die(md_model_set_param_d(model, "det_threshold", 0.5), "set det_threshold");
+    die(md_model_set_cls_input_size(model, 192, 256), "set cls input size");
+    die(md_model_set_input_size(model, 1280, 1280), "set det input size");
 
-    MDRuntimeOption option = md_create_default_runtime_option();
-    option.device = MD_DEVICE_GPU;
-    option.backend = MD_BACKEND_TRT;
-    option.enable_trt = 1;
-    option.enable_fp16 = 1;
-    if ((ret = md_create_attr_model(&model, "../../test_data/test_models/trt/zhgd_det_20251219.engine",
-                                    "../../test_data/test_models/trt/zhgd_ml.engine", &option)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
+    MDImageHandle img = nullptr;
+    die(md_image_from_file(&img, "../../test_data/test_images/test_pedestrian_attribute1.jpg"),
+        "read image");
+
+    MDResultHandle res = nullptr;
+    die(md_model_predict(model, img, &res), "predict");
+
+    const MDAttrItem* items = nullptr;
+    size_t n = 0;
+    die(md_result_attribute(res, &items, &n), "get attribute result");
+    std::printf("detected %zu persons\n", n);
+    for (size_t i = 0; i < n; ++i) {
+        const float* scores = nullptr;
+        size_t sn = 0;
+        die(md_result_attr_scores(res, i, &scores, &sn), "get attr scores");
+        std::printf("  [%zu] box=%.0f,%.0f,%.0f,%.0f box_score=%.3f attrs=(",
+                    i, items[i].x, items[i].y, items[i].w, items[i].h, items[i].box_score);
+        for (size_t k = 0; k < sn; ++k)
+            std::printf("%s%.3f", k ? "," : "", scores[k]);
+        std::printf(")\n");
     }
-    md_set_attr_cls_batch_size(&model, 8);
-    md_set_attr_cls_input_size(&model, {192, 256});
-    md_set_attr_det_input_size(&model, {1280, 1280});
-    md_set_attr_det_threshold(&model, 0.5);
-    MDImage image = md_read_image("../../test_data/test_images/test_pedestrian_attribute1.jpg");
-    MDAttributeResults results;
-    if ((ret = md_attr_model_predict(&model, &image, &results)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
 
-    MDMapData label_map;
-    const auto l1 = md_create_key_value_pair(0, "张三");
-    const auto l2 = md_create_key_value_pair(1, "李四");
-    const auto l3 = md_create_key_value_pair(2, "王五");
-    const auto l4 = md_create_key_value_pair(3, "赵六");
+    MDDrawOptions draw{};
+    draw.threshold = 0.5;
+    draw.font_path = "../../test_data/msyh.ttc";
+    draw.save_result = 1;
+    die(md_draw_result(img, res, &draw), "draw");
+    die(md_image_save(img, "capi2_attr_out.jpg"), "save");
 
-    label_map.size = 4;
-    label_map.data = static_cast<MDKeyValuePair*>(malloc(sizeof(MDKeyValuePair) * label_map.size));
-    label_map.data[0] = l1;
-    label_map.data[1] = l2;
-    label_map.data[2] = l3;
-    label_map.data[3] = l4;
-    constexpr int abnormal_ids[] = {0, 1};
-    md_draw_attr_result(&image, &results, 0.5, &label_map, "../../test_data/msyh.ttc", 8, 0.2, 1, abnormal_ids, 2,true);
-    md_print_attr_result(&results);
-    md_free_attr_result(&results);
-    md_show_image(&image);
-    // 释放内存
-    md_free_image(&image);
-    md_free_attr_model(&model);
-    md_free_md_map(&label_map);
-    return ret;
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(model);
+    md_option_destroy(opt);
+    std::puts("OK -> capi2_attr_out.jpg");
+    return 0;
 }

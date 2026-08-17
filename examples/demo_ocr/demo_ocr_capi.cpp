@@ -1,75 +1,53 @@
 //
-// Created by aichao on 2025/2/26.
+// capi2 OCR 整链路示例：演示多子模型聚合创建与参数 API
 //
+#include "../capi2_common.h"
 
-#include <iostream>
-#include <chrono>
-#include <fstream>
-#ifdef WIN32
-#include <windows.h>
-#endif
-#include "capi/utils/md_image_capi.h"
-#include "capi/utils/md_utils_capi.h"
-#include "capi/vision/ocr/ocr_capi.h"
+int main() {
+    MDOptionHandle opt = nullptr;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_cpu_threads(opt, 4);
 
-int main(int argc, char** argv) {
-#ifdef WIN32
-    SetConsoleOutputCP(CP_UTF8);
-#endif
-    MDStatusCode ret;
-    //简单百宝箱
-    MDModel model;
-    MDOCRModelParameters ocr_parameters = {
-        "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx",
-        "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/cls_infer.onnx",
-        "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx",
-        "../../test_data/dict.txt",
-        1440,
-        0.3,
-        0.6,
-        1.5,
-        "slow",
-        0,
-        16
-    };
+    MDModelHandle model = nullptr;
+    die(md_model_create(&model, MD_MODEL_OCR,
+                        "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/det_infer.onnx|"
+                        "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/cls_infer.onnx|"
+                        "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/rec_infer.onnx|"
+                        "../../test_data/ppocrv4_dict.txt", opt), "create ocr");
 
-    MDRuntimeOption option = md_create_default_runtime_option();
-    option.device = MD_DEVICE_GPU;
-    option.enable_fp16 = 1;
-    if ((ret = md_create_ocr_model(&model, &ocr_parameters, &option)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
+    die(md_model_set_param_d(model, "det_db_box_thresh", 0.6), "set box_thresh");
+    die(md_model_set_param_d(model, "cls_thresh", 0.9), "set cls_thresh");
+
+    MDImageHandle img = nullptr;
+    die(md_image_from_file(&img, "../../test_data/test_images/test_ocr.png"), "read image");
+
+    MDResultHandle res = nullptr;
+    die(md_model_predict(model, img, &res), "predict");
+
+    size_t n = 0;
+    die(md_result_count(res, &n), "count");
+    std::printf("detected %zu text lines\n", n);
+    for (size_t i = 0; i < n; ++i) {
+        const int* quad = nullptr;
+        const char* text = nullptr;
+        float score = 0.f;
+        die(md_result_ocr(res, i, &quad, &text, &score), "get ocr result");
+        if (text)
+            std::printf("  [%zu] score=%.3f %s\n", i, score, text);
     }
 
-    // md_ocr_det_set_max_side_len(&model, 1920);
-    // md_ocr_det_db_set_use_dilation(&model, 1);
-    // md_ocr_det_set_db_thresh(&model, 0.3);
-    // md_ocr_det_set_db_box_thresh(&model, 0.6);
-    // md_ocr_det_db_unclip_ratio(&model,1.8);
+    MDDrawOptions draw{};
+    draw.font_path = "../../test_data/msyh.ttc";
+    draw.save_result = 1;
+    die(md_draw_result(img, res, &draw), "draw");
+    die(md_image_save(img, "capi2_ocr_out.jpg"), "save");
 
-    MDImage image = md_read_image("C:/Users/aichao/Desktop/pictures_test/35.png");
-    MDOCRResults results;
-    if ((ret = md_ocr_model_predict(&model, &image, &results)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-
-    // for (int i = 0; i < results.size; i++) {
-    //     auto rect = md_create_rect_from_polygon(&results.data[i].box);
-    //     auto image_crop = md_crop_image(&image, &rect);
-    //     md_show_image(&image_crop);
-    // }
-
-
-    const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    md_draw_ocr_result(&image, &results, "../../test_data/msyh.ttc", 12, 0.1, 1);
-    const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
-    std::cout << "cost: " << diff.count() << std::endl;
-    md_print_ocr_result(&results);
-    md_free_ocr_result(&results);
-    md_show_image(&image);
-    // 释放内存
-    md_free_image(&image);
-    md_free_ocr_model(&model);
-    return ret;
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(model);
+    md_option_destroy(opt);
+    std::puts("OK -> capi2_ocr_out.jpg");
+    return 0;
 }
