@@ -47,6 +47,17 @@ namespace modeldeploy::vision {
         [[nodiscard]] uint8_t* data();
         [[nodiscard]] bool empty() const;
 
+        [[nodiscard]] Device device() const;
+        // NV12/NV21：Y/UV 平面指针与步长；非 NV12 返回 nullptr/0
+        [[nodiscard]] const uint8_t* y() const;
+        [[nodiscard]] const uint8_t* uv() const;
+        [[nodiscard]] int step_y() const;
+        [[nodiscard]] int step_uv() const;
+        // 通用平面数量（NV12=2，packed=1）
+        [[nodiscard]] size_t plane_count() const;
+        // 设备侧构造：绑定外部设备内存平面（零拷贝，不拥有内存）
+        static ImageData from_device_planes(uint8_t* y, uint8_t* uv, int w, int h,
+                                            int step_y, int step_uv, Device device);
 
         [[nodiscard]] bool is_shared_with(const ImageData& other) const;
 
@@ -69,63 +80,6 @@ namespace modeldeploy::vision {
         [[nodiscard]] ImageData crop(const Rect2f& rect) const;
         [[nodiscard]] ImageData rotate_crop(std::array<float, 8> box) const;
         [[nodiscard]] ImageData resize(int width, int height) const;
-        [[nodiscard]] ImageData cast(const std::string& dtype = "float", bool scale = true) const;
-        [[nodiscard]] ImageData pad(int top, int bottom, int left, int right, float value) const;
-        [[nodiscard]] ImageData convert(const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
-                                        const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
-        [[nodiscard]] ImageData normalize(const std::vector<float>& mean, const std::vector<float>& std,
-                                          bool scale = true, bool swap_rb = true) const;
-        //         目标尺寸 (dst)
-        //   +---------------------------+
-        //   |   +-------------------+   |
-        //   |   |                   |   |
-        //   |   |                   |   |
-        //   |   |     比例缩放后图    |   |
-        //   |   |                   |   |
-        //   |   |                   |   |
-        //   |   |                   |   |
-        //   |   +-------------------+   |
-        //   +---------------------------+
-        //     目标: width × height
-        [[nodiscard]] ImageData letter_box(const std::vector<int>& dst_size, float padding_value) const;
-        [[nodiscard]] ImageData center_crop(const std::vector<int>& dst_size) const;
-        [[nodiscard]] ImageData permute() const;
-        [[nodiscard]] ImageData fuse_normalize_and_permute(const std::vector<float>& mean,
-                                                           const std::vector<float>& std, bool scale = true) const;
-        [[nodiscard]] ImageData fuse_convert_and_permute(
-            const std::vector<float>& alpha = {1 / 255.0f, 1 / 255.0f, 1 / 255.0f},
-            const std::vector<float>& beta = {0.0f, 0.0f, 0.0f}) const;
-
-        //   +---------------------+---------+
-        //   |                     |         |
-        //   |  resize后的图像      |  pad_r  |
-        //   |  (width×height)     |  (右填充)|
-        //   |                     |         |
-        //   +---------------------+---------+
-        //   |                     |         |
-        //   |      pad_b          |  pad_b  |
-        //   |     (下填充)         |  pad_r  |
-        //   |                     | (右下角) |
-        //   +---------------------+---------+
-        [[nodiscard]] ImageData fuse_resize_and_pad(int width, int height, int pad_r, int pad_b, float pad_val) const;
-
-
-        template <typename T>
-        static std::vector<T> images_to_vector(const std::vector<ImageData>& imgs) {
-            size_t total_byte = 0;
-            for (auto& img : imgs) {
-                total_byte += img.bytes();
-            }
-            size_t length = total_byte / sizeof(T);
-            std::vector<T> out(length);
-            size_t offset = 0;
-            for (auto& img : imgs) {
-                const size_t elem_count = img.element_bytes() / sizeof(T);
-                std::memcpy(out.data() + offset, img.data(), img.element_bytes());
-                offset += elem_count;
-            }
-            return out;
-        }
 
     private:
         std::shared_ptr<ImageDataImpl> impl_;

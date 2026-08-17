@@ -18,46 +18,47 @@ namespace modeldeploy::vision {
         ImageDataImpl(ImageDataImpl&& other) noexcept = default;
         ImageDataImpl& operator=(ImageDataImpl&& other) noexcept = default;
 
-        // 统一在 mat 被替换后刷新元数据与缓存
+        // 平面描述：packed 格式 1 个平面（data），NV12/NV21 2 个平面（y, uv），I420 3 个平面（y, u, v）
+        struct Plane { uint8_t* data = nullptr; int step = 0; };
+
         void refresh_meta() {
-            if (mat.empty()) {
+            if (device != Device::CPU) {
                 width = height = channels = 0;
                 element_count_ = element_bytes_ = bytes_ = 0;
                 return;
             }
+            // CPU 模式下 mat 仍是事实源，refresh 逻辑保持不变
+            if (mat.empty()) { width = height = channels = 0; element_count_ = element_bytes_ = bytes_ = 0; return; }
             if (is_planar_type(type) && mat.dims >= 3) {
-                // Planar CHW 3D Mat: size[0]=C, size[1]=H, size[2]=W
                 channels = static_cast<int>(mat.size[0]);
                 height = static_cast<int>(mat.size[1]);
                 width = static_cast<int>(mat.size[2]);
-            }
-            else {
-                // Packed HWC 或 2D Planar Mat
-                width = mat.cols;
-                height = mat.rows;
-                channels = is_planar_type(type)
-                               ? static_cast<int>(mat.size[0])
-                               : mat.channels();
+            } else {
+                width = mat.cols; height = mat.rows;
+                channels = is_planar_type(type) ? static_cast<int>(mat.size[0]) : mat.channels();
             }
             element_count_ = mat.total();
             element_bytes_ = mat.elemSize();
             bytes_ = element_count_ * element_bytes_;
         }
 
-        bool empty() const { return mat.empty(); }
+        bool empty() const {
+            if (device != Device::CPU) return planes.empty() || !planes[0].data;
+            return mat.empty();
+        }
         size_t element_count() const { return element_count_; }
         size_t element_bytes() const { return element_bytes_; }
         size_t bytes() const { return bytes_; }
-        const uint8_t* data() const { return mat.data; }
-        uint8_t* data() { return mat.data; }
+        const uint8_t* data() const { return device == Device::CPU && !mat.empty() ? mat.data : (planes.empty() ? nullptr : planes[0].data); }
+        uint8_t* data() { return device == Device::CPU && !mat.empty() ? mat.data : (planes.empty() ? nullptr : planes[0].data); }
 
-        cv::Mat mat;
+        cv::Mat mat;                       // CPU 模式：事实数据源；设备模式：空
+        std::vector<Plane> planes;         // 设备/裸指针模式：平面指针+步长；CPU 模式也填充（data 指向 mat.data）
+        Device device = Device::CPU;
         int width = 0;
         int height = 0;
         int channels = 0;
         MdImageType type = MdImageType::PKG_BGR_U8;
-
-    private:
         size_t element_count_ = 0;
         size_t element_bytes_ = 0;
         size_t bytes_ = 0;
@@ -68,6 +69,17 @@ namespace modeldeploy::vision {
         impl_->type = type;
         const int ocv_type = md_image_type_to_ocv_type(type);
         impl_->mat = cv::Mat(height, width, ocv_type);
+        // 构造后同步平面描述（CPU 模式 data 指向 mat.data）
+        if (!impl_->mat.empty()) {
+            impl_->planes.clear();
+            if (impl_->type == MdImageType::NV12 || impl_->type == MdImageType::NV21) {
+                // Y 平面 h 行，UV 平面 h/2 行（沿用 from_raw 的单 buffer 布局：mat 为 (h+h/2, w)）
+                impl_->planes.push_back({impl_->mat.data, width});
+                impl_->planes.push_back({impl_->mat.data + static_cast<size_t>(height) * width, width});
+            } else {
+                impl_->planes.push_back({impl_->mat.data, static_cast<int>(impl_->mat.step)});
+            }
+        }
         impl_->refresh_meta();
     }
 
@@ -76,6 +88,19 @@ namespace modeldeploy::vision {
         impl_(std::make_shared<ImageDataImpl>()) {
         impl_->mat = mat;
         impl_->type = md_image_type_from_ocv_type(mat.type());
+        // 构造后同步平面描述（CPU 模式 data 指向 mat.data）
+        if (!impl_->mat.empty()) {
+            impl_->planes.clear();
+            if (impl_->type == MdImageType::NV12 || impl_->type == MdImageType::NV21) {
+                // Y 平面 h 行，UV 平面 h/2 行（沿用 from_raw 的单 buffer 布局：mat 为 (h+h/2, w)）
+                const int w = impl_->mat.cols;
+                const int h = 2 * impl_->mat.rows / 3;
+                impl_->planes.push_back({impl_->mat.data, w});
+                impl_->planes.push_back({impl_->mat.data + static_cast<size_t>(h) * w, w});
+            } else {
+                impl_->planes.push_back({impl_->mat.data, static_cast<int>(impl_->mat.step)});
+            }
+        }
         impl_->refresh_meta();
     }
 
@@ -83,6 +108,19 @@ namespace modeldeploy::vision {
         impl_(std::make_shared<ImageDataImpl>()) {
         impl_->mat = std::move(mat);
         impl_->type = md_image_type_from_ocv_type(impl_->mat.type());
+        // 构造后同步平面描述（CPU 模式 data 指向 mat.data）
+        if (!impl_->mat.empty()) {
+            impl_->planes.clear();
+            if (impl_->type == MdImageType::NV12 || impl_->type == MdImageType::NV21) {
+                // Y 平面 h 行，UV 平面 h/2 行（沿用 from_raw 的单 buffer 布局：mat 为 (h+h/2, w)）
+                const int w = impl_->mat.cols;
+                const int h = 2 * impl_->mat.rows / 3;
+                impl_->planes.push_back({impl_->mat.data, w});
+                impl_->planes.push_back({impl_->mat.data + static_cast<size_t>(h) * w, w});
+            } else {
+                impl_->planes.push_back({impl_->mat.data, static_cast<int>(impl_->mat.step)});
+            }
+        }
         impl_->refresh_meta();
     }
 
@@ -92,6 +130,19 @@ namespace modeldeploy::vision {
             result.impl_ = std::make_shared<ImageDataImpl>();
             result.impl_->mat = impl_->mat.clone();
             result.impl_->type = impl_->type;
+            // 构造后同步平面描述（CPU 模式 data 指向 mat.data）
+            if (!result.impl_->mat.empty()) {
+                result.impl_->planes.clear();
+                if (result.impl_->type == MdImageType::NV12 || result.impl_->type == MdImageType::NV21) {
+                    // Y 平面 h 行，UV 平面 h/2 行（沿用 from_raw 的单 buffer 布局：mat 为 (h+h/2, w)）
+                    const int w = result.impl_->mat.cols;
+                    const int h = 2 * result.impl_->mat.rows / 3;
+                    result.impl_->planes.push_back({result.impl_->mat.data, w});
+                    result.impl_->planes.push_back({result.impl_->mat.data + static_cast<size_t>(h) * w, w});
+                } else {
+                    result.impl_->planes.push_back({result.impl_->mat.data, static_cast<int>(result.impl_->mat.step)});
+                }
+            }
             result.impl_->refresh_meta();
         }
         return result;
@@ -141,6 +192,40 @@ namespace modeldeploy::vision {
     size_t ImageData::bytes() const { return impl_ ? impl_->bytes() : 0; }
     const uint8_t* ImageData::data() const { return impl_ ? impl_->data() : nullptr; }
     uint8_t* ImageData::data() { return impl_ ? impl_->data() : nullptr; }
+
+    Device ImageData::device() const { return impl_ ? impl_->device : Device::CPU; }
+    const uint8_t* ImageData::y() const {
+        if (!impl_ || impl_->planes.size() < 1) return nullptr;
+        return impl_->planes[0].data;
+    }
+    const uint8_t* ImageData::uv() const {
+        if (!impl_ || impl_->planes.size() < 2) return nullptr;
+        return impl_->planes[1].data;
+    }
+    int ImageData::step_y() const { return impl_ && !impl_->planes.empty() ? impl_->planes[0].step : 0; }
+    int ImageData::step_uv() const { return impl_ && impl_->planes.size() >= 2 ? impl_->planes[1].step : 0; }
+    size_t ImageData::plane_count() const { return impl_ ? impl_->planes.size() : 0; }
+
+    ImageData ImageData::from_device_planes(uint8_t* y, uint8_t* uv, int w, int h,
+                                            int step_y, int step_uv, Device device) {
+        if (!y || w <= 0 || h <= 0) {
+            MD_LOG_ERROR << "from_device_planes: invalid parameters" << std::endl;
+            return ImageData();
+        }
+        ImageData img;
+        img.impl_ = std::make_shared<ImageDataImpl>();
+        img.impl_->device = device;
+        img.impl_->type = MdImageType::NV12;
+        img.impl_->width = w;
+        img.impl_->height = h;
+        img.impl_->channels = 1;
+        img.impl_->planes.push_back({y, step_y > 0 ? step_y : w});
+        if (uv) img.impl_->planes.push_back({uv, step_uv > 0 ? step_uv : w});
+        img.impl_->element_count_ = static_cast<size_t>(w) * h;
+        img.impl_->element_bytes_ = 1;
+        img.impl_->bytes_ = static_cast<size_t>(w) * h * 3 / 2;
+        return img;
+    }
 
 
     ImageData& ImageData::rotate(const RotateFlags flag) {
@@ -232,219 +317,6 @@ namespace modeldeploy::vision {
         cv::Mat resized;
         cv::resize(impl_->mat, resized, cv::Size(width, height));
         return ImageData(std::move(resized));
-    }
-
-    ImageData ImageData::cast(const std::string& dtype, bool scale) const {
-        if (!impl_ || impl_->empty()) {
-            return ImageData();
-        }
-        const float scale_factor = scale ? 1.0f / 255.0f : 1.0f;
-        cv::Mat converted;
-        bool need_convert = false;
-        if (dtype == "float" || dtype == "float32" || dtype == "fp32") {
-            if (impl_->mat.type() != CV_32FC(impl_->channels) || scale) {
-                impl_->mat.convertTo(converted, CV_32FC(impl_->channels), scale_factor);
-                need_convert = true;
-            }
-        }
-        else if (dtype == "float16" || dtype == "fp16") {
-            if (impl_->mat.type() != CV_16FC(impl_->channels) || scale) {
-                impl_->mat.convertTo(converted, CV_16FC(impl_->channels), scale_factor);
-                need_convert = true;
-            }
-        }
-        else if (dtype == "double" || dtype == "float64" || dtype == "fp64") {
-            if (impl_->mat.type() != CV_64FC(impl_->channels) || scale) {
-                impl_->mat.convertTo(converted, CV_64FC(impl_->channels), scale_factor);
-                need_convert = true;
-            }
-        }
-        else {
-            MD_LOG_WARN << "Cast not supported for " << dtype << ", returning original image." << std::endl;
-            return clone();
-        }
-        if (!need_convert) {
-            // 类型已匹配且无需缩放：浅拷贝共享底层数据（零拷贝）
-            return *this;
-        }
-        return ImageData(std::move(converted));
-    }
-
-    ImageData ImageData::pad(const int top, const int bottom, const int left, const int right,
-                             const float value) const {
-        if (!impl_ || impl_->empty()) {
-            return ImageData();
-        }
-        cv::Scalar padding_scalar;
-        switch (channels()) {
-        case 1: padding_scalar = cv::Scalar(value);
-            break;
-        case 3: padding_scalar = cv::Scalar(value, value, value);
-            break;
-        case 4: padding_scalar = cv::Scalar(value, value, value, value);
-            break;
-        default: {
-            MD_LOG_ERROR << "Unsupported image channels: " << channels() << std::endl;
-            return ImageData();
-        }
-        }
-        cv::Mat padded;
-        cv::copyMakeBorder(impl_->mat, padded, top, bottom, left, right, cv::BORDER_CONSTANT, padding_scalar);
-        return ImageData(std::move(padded));
-    }
-
-    ImageData ImageData::convert(const std::vector<float>& alpha, const std::vector<float>& beta) const {
-        if (channels() != 3 || alpha.size() != 3 || beta.size() != 3) {
-            MD_LOG_ERROR << "channels must be 3 and alpha/beta size must be 3" << std::endl;
-            return ImageData();
-        }
-        std::vector<cv::Mat> split_im;
-        cv::split(impl_->mat, split_im);
-        for (int c = 0; c < impl_->mat.channels(); c++) {
-            split_im[c].convertTo(split_im[c], CV_32FC1, alpha[c], beta[c]);
-        }
-        cv::Mat tmp_mat;
-        cv::merge(split_im, tmp_mat);
-        return ImageData(std::move(tmp_mat));
-    }
-
-    ImageData ImageData::normalize(const std::vector<float>& mean,
-                                   const std::vector<float>& std,
-                                   const bool scale,
-                                   const bool swap_rb) const {
-        if (channels() != 3 || channels() != mean.size() || channels() != std.size()) {
-            MD_LOG_ERROR << "channels must be 3 and mean/std size must be 3" << std::endl;
-            return ImageData();
-        }
-        std::vector<float> alpha;
-        std::vector<float> beta;
-        for (int i = 0; i < channels(); i++) {
-            auto _alpha = 1.0f / std[i];
-            _alpha = scale ? _alpha / 255.0f : _alpha;
-            auto _beta = -mean[i] / std[i];
-            alpha.push_back(_alpha);
-            beta.push_back(_beta);
-        }
-        std::vector<cv::Mat> split_im;
-        cv::split(impl_->mat, split_im);
-        if (swap_rb) std::swap(split_im[0], split_im[2]);
-        for (int c = 0; c < impl_->mat.channels(); c++) {
-            split_im[c].convertTo(split_im[c], CV_32FC1, alpha[c], beta[c]);
-        }
-        cv::Mat tmp_mat;
-        cv::merge(split_im, tmp_mat);
-        return ImageData(std::move(tmp_mat));
-    }
-
-    ImageData ImageData::letter_box(const std::vector<int>& dst_size, const float padding_value) const {
-        const float src_w = static_cast<float>(width());
-        const float src_h = static_cast<float>(height());
-        const float dst_w = static_cast<float>(dst_size[0]);
-        const float dst_h = static_cast<float>(dst_size[1]);
-        const float scale = std::min(dst_h / src_h, dst_w / src_w);
-        const float resize_w = src_w * scale;
-        const float resize_h = src_h * scale;
-        const float pad_w = (dst_w - resize_w) * 0.5f;
-        const float pad_h = (dst_h - resize_h) * 0.5f;
-
-        cv::Scalar padding_scalar;
-        switch (channels()) {
-        case 1: padding_scalar = cv::Scalar(padding_value);
-            break;
-        case 3: padding_scalar = cv::Scalar(padding_value, padding_value, padding_value);
-            break;
-        case 4: padding_scalar = cv::Scalar(padding_value, padding_value, padding_value, padding_value);
-            break;
-        default: {
-            MD_LOG_ERROR << "Unsupported image channels." << std::endl;
-            return ImageData();
-        }
-        }
-        cv::Mat tmp_image(dst_size[1], dst_size[0], impl_->mat.type(), padding_scalar);
-        cv::Mat roi = tmp_image(cv::Rect(pad_w, pad_h, resize_w, resize_h));
-        cv::resize(impl_->mat, roi, cv::Size(resize_w, resize_h));
-        return ImageData(std::move(tmp_image));
-    }
-
-    [[nodiscard]] ImageData ImageData::center_crop(const std::vector<int>& dst_size) const {
-        if (!impl_ || impl_->empty() || dst_size.size() != 2) {
-            return ImageData();
-        }
-        if (width() < dst_size[0] || height() < dst_size[1]) {
-            throw std::invalid_argument("ImageData::center_crop: dst_size must be smaller than image size.");
-        }
-        const int offset_x = (width() - dst_size[0]) / 2;
-        const int offset_y = (height() - dst_size[1]) / 2;
-        const Rect2f crop_roi(offset_x, offset_y, dst_size[0], dst_size[1]);
-        return crop(crop_roi);
-    }
-
-    ImageData ImageData::permute() const {
-        return cvt_color(*this, ColorConvertType::CVT_PA_RGB2PL_RGB);
-    }
-
-    ImageData ImageData::fuse_normalize_and_permute(const std::vector<float>& mean,
-                                                    const std::vector<float>& std,
-                                                    const bool scale) const {
-        if (channels() != 3 || channels() != mean.size() || channels() != std.size()) {
-            MD_LOG_ERROR << "channels must be 3 and mean/std size must be 3" << std::endl;
-            return ImageData();
-        }
-        std::vector<float> alpha;
-        std::vector<float> beta;
-        for (int i = 0; i < channels(); i++) {
-            auto _alpha = 1.0f / std[i];
-            _alpha = scale ? _alpha / 255.0f : _alpha;
-            auto _beta = -mean[i] / std[i];
-            alpha.push_back(_alpha);
-            beta.push_back(_beta);
-        }
-        cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
-        std::vector<cv::Mat> split_image;
-        cv::split(impl_->mat, split_image);
-        std::swap(split_image[0], split_image[2]);
-        for (int c = 0; c < channels(); ++c) {
-            // 转换为浮点并归一化，直接写入 chw_image 的对应行（避免中间 channel_float 分配+拷贝）
-            split_image[c].reshape(1, 1).convertTo(chw_image.row(c), CV_32FC1, alpha[c], beta[c]);
-        }
-
-        ImageData dst_image;
-        dst_image.impl_ = std::make_shared<ImageDataImpl>();
-        dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
-        dst_image.impl_->type = MdImageType::PLA_RGB_F32;
-        dst_image.impl_->refresh_meta();
-        return dst_image;
-    }
-
-    ImageData ImageData::fuse_convert_and_permute(const std::vector<float>& alpha,
-                                                  const std::vector<float>& beta) const {
-        if (channels() != 3 || channels() != alpha.size() || channels() != beta.size()) {
-            MD_LOG_ERROR << "channels must be 3 and alpha/beta size must be 3" << std::endl;
-            return ImageData();
-        }
-        cv::Mat chw_image(channels(), height() * width(), CV_32FC1);
-        std::vector<cv::Mat> split_image;
-        cv::split(impl_->mat, split_image);
-        std::swap(split_image[0], split_image[2]);
-        for (int c = 0; c < channels(); ++c) {
-            // 直接写入 chw_image 对应行（避免中间 channel_float 分配+拷贝）
-            split_image[c].reshape(1, 1).convertTo(chw_image.row(c), CV_32FC1, alpha[c], beta[c]);
-        }
-        ImageData dst_image;
-        dst_image.impl_ = std::make_shared<ImageDataImpl>();
-        dst_image.impl_->mat = chw_image.reshape(1, {channels(), height(), width()});
-        dst_image.impl_->type = MdImageType::PLA_RGB_F32;
-        dst_image.impl_->refresh_meta();
-        return dst_image;
-    }
-
-    ImageData ImageData::fuse_resize_and_pad(const int width, const int height,
-                                             const int pad_r, const int pad_b, const float pad_val) const {
-        // 不能加const不然退化为拷贝构造，当然在ImageData内部的设是shader copy 但是就不符合代码预期
-        cv::Mat dst(height + pad_b, width + pad_r, impl_->mat.type(), cv::Scalar::all(pad_val));
-        cv::Mat dst_roi = dst(cv::Rect(0, 0, width, height));
-        cv::resize(impl_->mat, dst_roi, cv::Size(width, height));
-        return ImageData(std::move(dst));
     }
 
     ImageData ImageData::cvt_color(const ImageData& image, const ColorConvertType type) {
