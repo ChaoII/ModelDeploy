@@ -12,6 +12,7 @@ set(TEST_SOURCES
     test_core.cpp
     test_bugfix.cpp
     test_image_data.cpp
+    test_capi.cpp
     test_vision_models.cpp
     test_processor_accuracy.cpp
     test_insightface.cpp

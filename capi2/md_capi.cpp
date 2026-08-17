@@ -20,6 +20,7 @@
 #endif
 
 #include "csrc/vision.h"
+#include "csrc/vision/processors/cpu/cpu_processor_backend.h"
 #include "csrc/vision/face/insightface/face_analysis.h"
 #include "csrc/vision/face/insightface/insightface_types.h"
 #include "csrc/vision/ocr/ppocr.h"
@@ -50,6 +51,7 @@ struct md_image_handle {
     int width = 0;
     int height = 0;
     unsigned char* data = nullptr;
+    modeldeploy::vision::ImageData image;  // 统一描述：CPU BGR（包 data）或设备 NV12 帧（零拷贝借用）
     std::unique_ptr<std::vector<unsigned char>> encoded;  // encode 输出暂存
     ~md_image_handle() { if (owns_data) delete[] data; }
 };
@@ -136,10 +138,14 @@ ResultData<T>* raw_result(md_result_handle* rh) {
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
 
-/* 把 ImageHandle 转成 ImageData（零拷贝引用外部 BGR） */
+/* 把 ImageHandle 转成 ImageData（零拷贝引用底层：CPU BGR 或设备 NV12） */
 ImageData handle_to_image(const md_image_handle* hi) {
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
-    return ImageData(mat);
+    return hi->image;
+}
+
+/* 是否为可直访问的 CPU BGR 数据（设备 NV12 帧 data==nullptr，无法做 CPU Mat 操作） */
+inline bool handle_has_cpu_bgr(const md_image_handle* hi) {
+    return hi && hi->data != nullptr && hi->image.device() == Device::CPU;
 }
 
 /* 按分隔符拆分子模型路径 */
@@ -227,6 +233,7 @@ MDStatus md_image_from_file(MDImageHandle* out, const char* path) {
     h->data = new unsigned char[bytes];
     std::memcpy(h->data, img.data, bytes);
     h->owns_data = true;
+    h->image = ImageData::from_raw(h->data, h->width, h->height, MdImageType::PKG_BGR_U8, false);
     *out = h;
     return MD_OK;
 }
@@ -241,6 +248,7 @@ static MDStatus image_from_mat(MDImageHandle* out, cv::Mat&& mat) {
     h->data = new unsigned char[bytes];
     std::memcpy(h->data, mat.data, bytes);
     h->owns_data = true;
+    h->image = ImageData::from_raw(h->data, h->width, h->height, MdImageType::PKG_BGR_U8, false);
     *out = h;
     return MD_OK;
 }
@@ -252,6 +260,7 @@ MDStatus md_image_from_bgr24(MDImageHandle* out, const void* bgr, int w, int h) 
     hi->width = w;
     hi->height = h;
     hi->data = static_cast<unsigned char*>(const_cast<void*>(bgr));
+    hi->image = ImageData::from_raw(hi->data, hi->width, hi->height, MdImageType::PKG_BGR_U8, false);
     *out = hi;
     return MD_OK;
 }
@@ -274,9 +283,9 @@ MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
     (void)src;
     const int uv_h = h / 2;
     cv::Mat y_mat(h, step_y, CV_8UC1, const_cast<void*>(y));
-    cv::Mat uv_mat(uv_h, step_uv, CV_8UC2, const_cast<void*>(uv));
+    cv::Mat uv_mat(uv_h, step_uv / 2, CV_8UC2, const_cast<void*>(uv));
     cv::Mat bgr;
-    cv::cvtColorTwoPlane(y_mat(cv::Rect(0, 0, w, h)), uv_mat(cv::Rect(0, 0, w, uv_h)),
+    cv::cvtColorTwoPlane(y_mat(cv::Rect(0, 0, w, h)), uv_mat(cv::Rect(0, 0, w / 2, uv_h)),
                          bgr, cv::COLOR_YUV2BGR_NV12);
     return image_from_mat(out, std::move(bgr));
 }
@@ -312,6 +321,7 @@ MDStatus md_image_from_base64(MDImageHandle* out, const char* b64) {
 MDStatus md_image_clone(MDImageHandle in, MDImageHandle* out) {
     if (!in || !out) return MD_ERR_NULL_POINTER;
     const auto* hi = static_cast<md_image_handle*>(in);
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_clone: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     auto* nh = new md_image_handle();
     nh->width = hi->width;
     nh->height = hi->height;
@@ -319,6 +329,7 @@ MDStatus md_image_clone(MDImageHandle in, MDImageHandle* out) {
     nh->data = new unsigned char[bytes];
     std::memcpy(nh->data, hi->data, bytes);
     nh->owns_data = true;
+    nh->image = ImageData::from_raw(nh->data, nh->width, nh->height, MdImageType::PKG_BGR_U8, false);
     *out = nh;
     return MD_OK;
 }
@@ -327,6 +338,7 @@ MDStatus md_image_crop(MDImageHandle in, int x, int y, int w, int h, MDImageHand
     if (!in || !out) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) return MD_ERR_INVALID_ARGUMENT;
     const auto* hi = static_cast<md_image_handle*>(in);
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_crop: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     cv::Mat src(hi->height, hi->width, CV_8UC3, hi->data);
     if (x < 0 || y < 0 || x + w > hi->width || y + h > hi->height) {
         set_error("md_image_crop: crop rect out of bounds");
@@ -338,6 +350,7 @@ MDStatus md_image_crop(MDImageHandle in, int x, int y, int w, int h, MDImageHand
 MDStatus md_image_show(MDImageHandle h) {
     auto* hi = static_cast<md_image_handle*>(h);
     if (!hi) return MD_ERR_NULL_POINTER;
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_show: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
 #ifdef HAVE_OPENCV_HIGHGUI
     cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     cv::imshow("ModelDeploy", mat);
@@ -352,6 +365,7 @@ MDStatus md_image_show(MDImageHandle h) {
 MDStatus md_image_save(MDImageHandle h, const char* path) {
     auto* hi = static_cast<md_image_handle*>(h);
     if (!hi || !path || !*path) return MD_ERR_NULL_POINTER;
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_save: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     if (!cv::imwrite(path, mat)) { set_error_fmt("md_image_save: failed to write '%s'", path); return MD_ERR_INVALID_ARGUMENT; }
     return MD_OK;
@@ -361,6 +375,7 @@ MDStatus md_image_encode(MDImageHandle h, const char* ext,
                          const unsigned char** buf, size_t* n) {
     auto* hi = static_cast<md_image_handle*>(h);
     if (!hi || !ext || !buf || !n) return MD_ERR_NULL_POINTER;
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_encode: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     std::vector<int> params;
     if (std::strcmp(ext, ".jpg") == 0 || std::strcmp(ext, ".jpeg") == 0) params = {cv::IMWRITE_JPEG_QUALITY, 95};
@@ -383,6 +398,21 @@ MDStatus md_image_size(MDImageHandle h, int* w, int* height_out) {
     if (w) *w = hi->width;
     if (height_out) *height_out = hi->height;
     return MD_OK;
+}
+
+MDStatus md_image_plane_ptrs(MDImageHandle h, MDDevice* dev, void** y, void** uv) {
+    auto* hi = static_cast<md_image_handle*>(h);
+    if (!hi || !dev || !y || !uv) return MD_ERR_NULL_POINTER;
+    *y = nullptr; *uv = nullptr; *dev = MD_DEV_CPU;
+    if (hi->image.type() != MdImageType::NV12) return MD_ERR_UNSUPPORTED_TYPE;
+    switch (hi->image.device()) {
+        case Device::GPU: *dev = MD_DEV_GPU; break;
+        case Device::TPU: *dev = MD_DEV_TPU; break;
+        default: *dev = MD_DEV_CPU; break;
+    }
+    *y = const_cast<uint8_t*>(hi->image.y());
+    *uv = const_cast<uint8_t*>(hi->image.uv());
+    return (*y) ? MD_OK : MD_ERR_INVALID_ARGUMENT;
 }
 
 /* ==================== 模型创建分发 ==================== */
@@ -994,13 +1024,17 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
 MDStatus md_model_predict_nv12(MDModelHandle handle,
                                const void* y, const void* uv,
                                int w, int h, int step_y, int step_uv,
-                               MDDevice src_device, MDResultHandle* out) {
+                               MDDevice src_device, MDImageHandle* out_frame,
+                               MDResultHandle* out) {
     auto* mh = static_cast<md_model_handle*>(handle);
     if (!mh || !y || !uv || !out) return MD_ERR_NULL_POINTER;
     if (!mh->ready) return MD_ERR_MODEL_INIT;
     if (w <= 0 || h <= 0) return MD_ERR_INVALID_ARGUMENT;
     if (step_y <= 0) step_y = w;
     if (step_uv <= 0) step_uv = w;
+
+    // out_frame 未创建则先分配
+    if (out_frame && !*out_frame) *out_frame = new md_image_handle();
 
     const auto* py = static_cast<const uint8_t*>(y);
     const auto* puv = static_cast<const uint8_t*>(uv);
@@ -1026,8 +1060,13 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_DETECTION: {
                 auto* m = static_cast<detection::UltralyticsDet*>(mh->model);
                 auto* d = new ResultData<DetectionResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
+                ImageData frame_img;
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, &frame_img, dev))
                     return fail("detection nv12");
+                if (out_frame) {
+                    auto* fh = static_cast<md_image_handle*>(*out_frame);
+                    fh->image = frame_img; fh->width = w; fh->height = h; fh->owns_data = false;
+                }
                 rh->kind = MD_RES_DETECTION;
                 rh->data = d;
                 break;
@@ -1035,8 +1074,13 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_POSE: {
                 auto* m = static_cast<detection::UltralyticsPose*>(mh->model);
                 auto* d = new ResultData<KeyPointsResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
+                ImageData frame_img;
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, &frame_img, dev))
                     return fail("pose nv12");
+                if (out_frame) {
+                    auto* fh = static_cast<md_image_handle*>(*out_frame);
+                    fh->image = frame_img; fh->width = w; fh->height = h; fh->owns_data = false;
+                }
                 rh->kind = MD_RES_POSE;
                 rh->data = d;
                 break;
@@ -1044,8 +1088,13 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_OBB: {
                 auto* m = static_cast<detection::UltralyticsObb*>(mh->model);
                 auto* d = new ResultData<ObbResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
+                ImageData frame_img;
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, &frame_img, dev))
                     return fail("obb nv12");
+                if (out_frame) {
+                    auto* fh = static_cast<md_image_handle*>(*out_frame);
+                    fh->image = frame_img; fh->width = w; fh->height = h; fh->owns_data = false;
+                }
                 rh->kind = MD_RES_OBB;
                 rh->data = d;
                 break;
@@ -1053,8 +1102,13 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_INSTANCE_SEG: {
                 auto* m = static_cast<detection::UltralyticsSeg*>(mh->model);
                 auto* d = new ResultData<InstanceSegResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
+                ImageData frame_img;
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, &frame_img, dev))
                     return fail("instance seg nv12");
+                if (out_frame) {
+                    auto* fh = static_cast<md_image_handle*>(*out_frame);
+                    fh->image = frame_img; fh->width = w; fh->height = h; fh->owns_data = false;
+                }
                 rh->kind = MD_RES_INSTANCE_SEG;
                 rh->data = d;
                 break;
@@ -1062,8 +1116,13 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_SEM_SEG: {
                 auto* m = static_cast<detection::UltralyticsSem*>(mh->model);
                 auto* d = new SingleResult<SemSegResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, nullptr, dev))
+                ImageData frame_img;
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, &frame_img, dev))
                     return fail("sem seg nv12");
+                if (out_frame) {
+                    auto* fh = static_cast<md_image_handle*>(*out_frame);
+                    fh->image = frame_img; fh->width = w; fh->height = h; fh->owns_data = false;
+                }
                 rh->kind = MD_RES_SEM_SEG;
                 rh->data = d;
                 break;
@@ -1071,8 +1130,13 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_DEPTH: {
                 auto* m = static_cast<detection::UltralyticsDepth*>(mh->model);
                 auto* d = new SingleResult<DepthResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, nullptr, dev))
+                ImageData frame_img;
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, &frame_img, dev))
                     return fail("depth nv12");
+                if (out_frame) {
+                    auto* fh = static_cast<md_image_handle*>(*out_frame);
+                    fh->image = frame_img; fh->width = w; fh->height = h; fh->owns_data = false;
+                }
                 rh->kind = MD_RES_DEPTH;
                 rh->data = d;
                 break;
@@ -1641,6 +1705,7 @@ MDStatus md_draw_rect(MDImageHandle img, float x, float y, float w, float h,
                       MDColorRGBA color, float alpha) {
     auto* hi = static_cast<md_image_handle*>(img);
     if (!hi) return MD_ERR_NULL_POINTER;
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_draw_rect: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     const cv::Scalar cv_color = md_color_to_scalar(color);
     // 直接复用 C++ 的绘制实现（与 vis_* 系一致的 alpha 混合）
@@ -1654,6 +1719,7 @@ MDStatus md_draw_polygon(MDImageHandle img, const float* xs, const float* ys, si
     auto* hi = static_cast<md_image_handle*>(img);
     if (!hi || !xs || !ys) return MD_ERR_NULL_POINTER;
     if (n < 3) return MD_ERR_INVALID_ARGUMENT;
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_draw_polygon: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     std::vector<cv::Point> pts;
     pts.reserve(n);
@@ -1668,6 +1734,7 @@ MDStatus md_draw_text(MDImageHandle img, float x, float y, const char* text,
                       const char* font_path, int font_size, MDColorRGBA color, float alpha) {
     auto* hi = static_cast<md_image_handle*>(img);
     if (!hi || !text) return MD_ERR_NULL_POINTER;
+    if (!handle_has_cpu_bgr(hi)) { set_error("md_draw_text: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     const cv::Scalar cv_color = md_color_to_scalar(color);
     (void)alpha;
@@ -1704,10 +1771,9 @@ MDDrawOptions default_draw_options() {
     return opt;
 }
 
-// 就地绘制：把 ImageHandle 包成 ImageData（浅拷贝共享底层），vis_* 会写回
+// 就地绘制：返回 ImageHandle 的统一 ImageData（浅拷贝共享底层），vis_* 会写回
 ImageData image_handle_as_data(md_image_handle* hi) {
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
-    return ImageData(mat);
+    return hi->image;
 }
 
 } // namespace
@@ -1726,6 +1792,32 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
     const auto label_map = build_label_map(opt.label_map, opt.label_map_size);
 
     ImageData image = image_handle_as_data(hi);
+
+    // 设备帧（NV12 且非 CPU）：就地设备绘制，按 frame.device() 分发到 processor backend。
+    // 当前统一走 CPU 顺序实现以保证 CP 路径可测；GPU/TPU 加速绘制见 Task 6（CUDA）/Task 7（Sophgo）。
+    if (image.device() != Device::CPU && image.type() == MdImageType::NV12) {
+        const double threshold = opt.threshold > 0 ? opt.threshold : 0.5;
+        bool ok = false;
+        switch (rh->kind) {
+            case MD_RES_DETECTION: {
+                auto* d = raw_result<DetectionResult>(rh);
+                if (!d) return MD_ERR_INVALID_ARGUMENT;
+                CpuProcessorBackend cpu_backend;
+                for (const auto& r : d->v) {
+                    if (r.score < threshold) continue;
+                    const auto& box = r.box;
+                    ok = cpu_backend.draw_rect_nv12(image, box.x, box.y, box.width, box.height,
+                                                    255, 0, 0, 2) || ok;
+                    ok = cpu_backend.draw_text_nv12(image, box.x, box.y - 16,
+                                                    std::to_string(r.label_id), 255, 255, 255, 1) || ok;
+                }
+                return ok ? MD_OK : MD_ERR_INVALID_ARGUMENT;
+            }
+            default:
+                set_error_fmt("md_draw_result: device draw for kind %d not yet implemented", (int)rh->kind);
+                return MD_ERR_NOT_IMPLEMENTED;
+        }
+    }
 
     try {
         switch (rh->kind) {

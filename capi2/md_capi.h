@@ -153,6 +153,13 @@ MD_CAPI_EXPORT void md_image_destroy(MDImageHandle);
 /* 图像尺寸查询 */
 MD_CAPI_EXPORT MDStatus md_image_size(MDImageHandle, int* w, int* h);
 
+/*
+ * 取帧平面指针（供外部零拷贝读取/写入，典型于 NV12 设备帧）。
+ *  - 仅对 NV12 类型有效；CPU BGR 图此处返回 MD_ERR_UNSUPPORTED_TYPE 且 y=uv=NULL。
+ *  - dev 返回帧所在设备（CPU/GPU/TPU）。
+ */
+MD_CAPI_EXPORT MDStatus md_image_plane_ptrs(MDImageHandle, MDDevice* dev, void** y, void** uv);
+
 /* ==================== 模型 ==================== */
 
 /*
@@ -198,7 +205,9 @@ MD_CAPI_EXPORT MDStatus md_model_predict(MDModelHandle, MDImageHandle, MDResultH
 MD_CAPI_EXPORT MDStatus md_model_predict_nv12(MDModelHandle,
                                const void* y, const void* uv,
                                int w, int h, int step_y, int step_uv,
-                               MDDevice src_device, MDResultHandle* out);
+                               MDDevice src_device,
+                               MDImageHandle* out_frame,   // 可选：绑定输入 NV12 帧的 ImageData（设备相关，随 predict 填充；可传 NULL）
+                               MDResultHandle* out);
 
 /* 批量推理（多图，仅支持的模型） */
 MD_CAPI_EXPORT MDStatus md_model_predict_batch(MDModelHandle, MDImageHandle* imgs, size_t n,
