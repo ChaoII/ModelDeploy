@@ -27,6 +27,37 @@ namespace modeldeploy::audio::tts {
         initialized_ = initialize();
     }
 
+    std::unique_ptr<Kokoro> Kokoro::clone() const {
+        auto clone_model = std::unique_ptr<Kokoro>(new Kokoro());   // 不触发 initialize
+        // 复用已加载的 backend session（不重新加载模型/显存）
+        clone_model->set_runtime(const_cast<Kokoro*>(this)->clone_runtime());
+        // 复制配置与已解析的数据
+        clone_model->runtime_option = runtime_option;
+        clone_model->token_path_str_ = token_path_str_;
+        clone_model->lexicons_ = lexicons_;
+        clone_model->voices_bin_ = voices_bin_;
+        clone_model->jieba_dir_ = jieba_dir_;
+        clone_model->text_normalization_dir_ = text_normalization_dir_;
+        clone_model->token2id_ = token2id_;
+        clone_model->word2token_ = word2token_;
+        clone_model->voices_ = voices_;
+        clone_model->style_dims_ = style_dims_;
+        clone_model->punc_set_ = punc_set_;
+        clone_model->sample_rate_ = sample_rate_;
+        clone_model->max_len_ = max_len_;
+        // 重建轻量词典对象（jieba / text_normalizer），不占显存
+        auto jieba_dir_path = fs::path(jieba_dir_);
+        clone_model->jieba_ = std::make_unique<cppjieba::Jieba>(
+            (jieba_dir_path / "jieba.dict.utf8").string().c_str(),
+            (jieba_dir_path / "hmm_model.utf8").string().c_str(),
+            (jieba_dir_path / "user.dict.utf8").string().c_str(),
+            (jieba_dir_path / "idf.utf8").string().c_str(),
+            (jieba_dir_path / "stop_words.utf8").string().c_str());
+        clone_model->text_normalizer_ = std::make_unique<TextNormalizer>(text_normalization_dir_);
+        clone_model->initialized_ = initialized_;
+        return clone_model;
+    }
+
     bool Kokoro::initialize() {
         if (!init_runtime()) {
             MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;

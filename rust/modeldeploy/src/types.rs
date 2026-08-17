@@ -1,87 +1,94 @@
 use crate::ffi;
-use std::ffi::CStr;
 use std::fmt;
 
-/// 检测框
+/// 浮点矩形
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rect {
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
-}
-
-impl From<ffi::MDRect> for Rect {
-    fn from(r: ffi::MDRect) -> Self {
-        Self {
-            x: r.x,
-            y: r.y,
-            width: r.width,
-            height: r.height,
-        }
-    }
-}
-
-impl From<Rect> for ffi::MDRect {
-    fn from(r: Rect) -> Self {
-        Self {
-            x: r.x,
-            y: r.y,
-            width: r.width,
-            height: r.height,
-        }
-    }
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 /// 2D 点
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point {
-    pub x: i32,
-    pub y: i32,
+    pub x: f32,
+    pub y: f32,
 }
 
-impl From<ffi::MDPoint> for Point {
-    fn from(p: ffi::MDPoint) -> Self {
-        Self { x: p.x, y: p.y }
-    }
-}
-
-/// 3D 浮点关键点
+/// 3D 关键点
 #[derive(Debug, Clone, PartialEq)]
-pub struct Point3f {
+pub struct Point3 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
 
-impl From<ffi::MDPoint3f> for Point3f {
-    fn from(p: ffi::MDPoint3f) -> Self {
-        Self { x: p.x, y: p.y, z: p.z }
-    }
-}
-
-/// 尺寸
+/// 旋转框（OBB）
 #[derive(Debug, Clone, PartialEq)]
-pub struct Size {
-    pub width: i32,
-    pub height: i32,
+pub struct RotatedBox {
+    pub cx: f32,
+    pub cy: f32,
+    pub width: f32,
+    pub height: f32,
+    pub angle: f32,
 }
 
-/// 单个检测结果
+/// 检测结果
 #[derive(Debug, Clone)]
 pub struct Detection {
     pub rect: Rect,
     pub label_id: i32,
     pub score: f32,
-    pub label_name: String,
 }
 
 /// 分类结果
 #[derive(Debug, Clone)]
-pub struct Classification {
+pub struct ClassificationResult {
     pub label_id: i32,
     pub score: f32,
-    pub label_name: String,
+}
+
+/// 姿态结果（骨架）
+#[derive(Debug, Clone)]
+pub struct Pose {
+    pub rect: Rect,
+    pub score: f32,
+    pub keypoints: Vec<Point3>,
+}
+
+/// OBB 旋转框结果
+#[derive(Debug, Clone)]
+pub struct Obb {
+    pub rotated_box: RotatedBox,
+    pub label_id: i32,
+    pub score: f32,
+}
+
+/// 实例分割结果
+#[derive(Debug, Clone)]
+pub struct InstanceSeg {
+    pub rect: Rect,
+    pub label_id: i32,
+    pub score: f32,
+}
+
+/// 语义分割结果（整图 label）
+#[derive(Debug, Clone)]
+pub struct SemSeg {
+    pub labels: Vec<u8>,
+    pub height: usize,
+    pub width: usize,
+    pub num_classes: i32,
+}
+
+/// 深度估计结果
+#[derive(Debug, Clone)]
+pub struct Depth {
+    pub depth: Vec<f32>,
+    pub height: usize,
+    pub width: usize,
 }
 
 /// 人脸检测结果
@@ -89,90 +96,134 @@ pub struct Classification {
 pub struct FaceDetection {
     pub rect: Rect,
     pub score: f32,
-    pub landmarks: Vec<Point3f>,
+    pub keypoints: Vec<Point>,
 }
 
-/// insightface 人脸分析结果（bbox + 5 关键点 + 2D106 + 3D68 + pose + embedding + gender/age）
+/// 人脸识别结果（embedding）
 #[derive(Debug, Clone)]
-pub struct InsightFaceResult {
+pub struct FaceRecognition {
+    pub embedding: Vec<f32>,
+}
+
+/// InsightFace 完整分析结果
+#[derive(Debug, Clone)]
+pub struct InsightFace {
     pub rect: Rect,
     pub score: f32,
-    pub kps: Vec<Point3f>,
-    pub landmark_2d_106: Vec<Point3f>,
-    pub landmark_3d_68: Vec<Point3f>,
-    pub pose: [f32; 3],
+    pub keypoints: Vec<Point>,
     pub embedding: Vec<f32>,
+    pub pose: Vec<f32>,
     pub gender: i32,
     pub age: i32,
 }
 
-/// 模型类型
+/// OCR 结果
+#[derive(Debug, Clone)]
+pub struct OcrLine {
+    pub quad: [i32; 8],
+    pub text: String,
+    pub score: f32,
+    pub cls_label: i32,
+    pub cls_score: f32,
+}
+
+/// 车牌结果
+#[derive(Debug, Clone)]
+pub struct LicensePlate {
+    pub rect: Rect,
+    pub plate: String,
+    pub color: String,
+    pub score: f32,
+    pub keypoints: Vec<Point>,
+}
+
+/// 行人属性结果
+#[derive(Debug, Clone)]
+pub struct Attribute {
+    pub rect: Rect,
+    pub box_label_id: i32,
+    pub box_score: f32,
+    pub attr_scores: Vec<f32>,
+}
+
+/// ASR 识别结果
+#[derive(Debug, Clone)]
+pub struct AsrText {
+    pub text: String,
+}
+
+/// TTS 合成结果
+#[derive(Debug, Clone)]
+pub struct TtsAudio {
+    pub samples: Vec<f32>,
+    pub sample_rate: i32,
+}
+
+/// 模型类型（对应 capi2 MDModelKind）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ModelType {
-    Classification,
+pub enum ModelKind {
     Detection,
-    Keypoint,
-    Ocr,
-    Face,
-    Lpr,
-    Pipeline,
-    Asr,
-    Tts,
+    Classification,
+    Pose,
+    Obb,
+    InstanceSeg,
     SemSeg,
     Depth,
+    FaceDet,
+    FaceRec,
+    FaceAge,
+    FaceGender,
+    FaceAs,
+    FaceRecPipeline,
+    InsightFace,
+    InsightFaceDet,
+    Ocr,
+    OcrDet,
+    OcrRec,
+    OcrCls,
+    LprDet,
+    LprRec,
+    LprPipeline,
+    PedestrianAttribute,
+    Asr,
+    Tts,
 }
 
-impl fmt::Display for ModelType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl ModelKind {
+    pub(crate) fn to_ffi(self) -> ffi::MDModelKind {
+        use ffi::MDModelKind::*;
         match self {
-            ModelType::Classification => write!(f, "Classification"),
-            ModelType::Detection => write!(f, "Detection"),
-            ModelType::Keypoint => write!(f, "Keypoint"),
-            ModelType::Ocr => write!(f, "OCR"),
-            ModelType::Face => write!(f, "Face"),
-            ModelType::Lpr => write!(f, "LPR"),
-            ModelType::Pipeline => write!(f, "Pipeline"),
-            ModelType::Asr => write!(f, "ASR"),
-            ModelType::Tts => write!(f, "TTS"),
-            ModelType::SemSeg => write!(f, "SemSeg"),
-            ModelType::Depth => write!(f, "Depth"),
+            ModelKind::Detection => DETECTION,
+            ModelKind::Classification => CLASSIFICATION,
+            ModelKind::Pose => POSE,
+            ModelKind::Obb => OBB,
+            ModelKind::InstanceSeg => INSTANCE_SEG,
+            ModelKind::SemSeg => SEM_SEG,
+            ModelKind::Depth => DEPTH,
+            ModelKind::FaceDet => FACE_DET,
+            ModelKind::FaceRec => FACE_REC,
+            ModelKind::FaceAge => FACE_AGE,
+            ModelKind::FaceGender => FACE_GENDER,
+            ModelKind::FaceAs => FACE_AS,
+            ModelKind::FaceRecPipeline => FACE_REC_PIPELINE,
+            ModelKind::InsightFace => INSIGHTFACE,
+            ModelKind::InsightFaceDet => INSIGHTFACE_DET,
+            ModelKind::Ocr => OCR,
+            ModelKind::OcrDet => OCR_DET,
+            ModelKind::OcrRec => OCR_REC,
+            ModelKind::OcrCls => OCR_CLS,
+            ModelKind::LprDet => LPR_DET,
+            ModelKind::LprRec => LPR_REC,
+            ModelKind::LprPipeline => LPR_PIPELINE,
+            ModelKind::PedestrianAttribute => PED_ATTR,
+            ModelKind::Asr => ASR,
+            ModelKind::Tts => TTS,
         }
     }
 }
 
-impl From<ffi::MDModelType> for ModelType {
-    fn from(t: ffi::MDModelType) -> Self {
-        match t.0 {
-            0 => ModelType::Classification,
-            1 => ModelType::Detection,
-            2 => ModelType::Keypoint,
-            3 => ModelType::Ocr,
-            4 => ModelType::Face,
-            5 => ModelType::Lpr,
-            6 => ModelType::Pipeline,
-            7 => ModelType::Asr,
-            8 => ModelType::Tts,
-            23 => ModelType::SemSeg,
-            24 => ModelType::Depth,
-            _ => ModelType::Detection,
-        }
+impl fmt::Display for ModelKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
-}
-
-/// 将 C 字符串指针转为 Rust String
-#[allow(dead_code)]
-pub(crate) unsafe fn c_str_to_string(s: *const libc::c_char) -> String {
-    if s.is_null() {
-        String::new()
-    } else {
-        CStr::from_ptr(s).to_string_lossy().into_owned()
-    }
-}
-
-/// 将 Rust 字符串转为 C 字符串指针（使用时需确保生命周期）
-#[allow(dead_code)]
-pub(crate) fn string_to_c_str(s: &str) -> Vec<u8> {
-    let mut bytes = s.as_bytes().to_vec();
-    bytes.push(0);
-    bytes
 }

@@ -32,6 +32,32 @@ namespace modeldeploy::vision {
         }
     }
 
+    void draw_filled_rect(cv::Mat& image, const cv::Rect& rect, const cv::Scalar& color, const double alpha) {
+        cv::Mat overlay;
+        image.copyTo(overlay);
+        cv::rectangle(overlay, rect, color, -1);
+        cv::addWeighted(overlay, alpha, image, 1 - alpha, 0, image);
+        cv::rectangle(image, rect, color, 1, cv::LINE_AA, 0);
+    }
+
+    void draw_filled_polygon(cv::Mat& image, const std::vector<cv::Point>& points,
+                             const cv::Scalar& color, const double alpha) {
+        cv::Mat overlay;
+        image.copyTo(overlay);
+        cv::fillPoly(overlay, points, color, cv::LINE_AA, 0);
+        cv::addWeighted(overlay, alpha, image, 1 - alpha, 0, image);
+        cv::polylines(image, points, true, color, 1, cv::LINE_AA, 0);
+    }
+
+    void draw_text(cv::Mat& image, const std::string& text, const std::string& font_path,
+                   const int font_size, const cv::Scalar& color, const cv::Point& origin) {
+        MD_FONT_OBJ font = MD_FONT_SIMPLEX;
+        if (!font_path.empty()) {
+            font = cv::FontFace(font_path);   // OpenCV 4.11+ / 5.x 支持从字体文件构造
+        }
+        cv::putText(image, text, origin, color, font, font_size);
+    }
+
     void draw_landmarks(cv::Mat& cv_image,
                         const std::vector<cv::Point3f>& landmarks,
                         const int landmark_radius, const bool draw_lines) {

@@ -2,17 +2,15 @@
 // Created by aichao on 2025/2/20.
 //
 
-#include <numeric>
-#include <iostream>
-#include "tabulate/tabulate.hpp"
+#include <vector>
 #include "vision/common/result.h"
 
 
 namespace modeldeploy::vision {
     void ClassifyResult::free() {
-        label_ids.shrink_to_fit();
-        scores.shrink_to_fit();
-        feature.shrink_to_fit();
+        std::vector<int32_t>().swap(label_ids);
+        std::vector<float>().swap(scores);
+        std::vector<float>().swap(feature);
     }
 
     void ClassifyResult::clear() {
@@ -30,19 +28,6 @@ namespace modeldeploy::vision {
     void ClassifyResult::resize(const int size) {
         label_ids.resize(size);
         scores.resize(size);
-        // TODO: feature not perform resize now.
-        // may need the code below for future.
-        // feature.resize(size);
-    }
-
-
-    ClassifyResult& ClassifyResult::operator=(ClassifyResult&& other) noexcept {
-        if (&other != this) {
-            label_ids = std::move(other.label_ids);
-            scores = std::move(other.scores);
-            feature = std::move(other.feature);
-        }
-        return *this;
     }
 
     void Mask::reserve(const int size) { buffer.reserve(size); }
@@ -50,8 +35,8 @@ namespace modeldeploy::vision {
     void Mask::resize(const int size) { buffer.resize(size); }
 
     void Mask::free() {
-        buffer.shrink_to_fit();
-        shape.shrink_to_fit();
+        std::vector<uint8_t>().swap(buffer);
+        std::vector<int64_t>().swap(shape);
     }
 
     void Mask::clear() {

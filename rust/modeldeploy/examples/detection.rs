@@ -1,32 +1,40 @@
 use anyhow::Result;
-use modeldeploy::image::Image;
-use modeldeploy::runtime::RuntimeOption;
-use modeldeploy::vision::detection::UltralyticsDet;
-use std::path::Path;
+use modeldeploy::{DrawOptions, Image, RuntimeOption, UltralyticsDet};
+
+fn test_data(rel: &str) -> String {
+    format!("{}/../../test_data/{}", env!("CARGO_MANIFEST_DIR"), rel)
+}
 
 fn main() -> Result<()> {
-    let model_path = std::env::args().nth(1).unwrap_or_else(|| {
-        "../../test_data/test_models/yolo11n_nms.onnx".to_string()
-    });
-    let image_path = std::env::args().nth(2).unwrap_or_else(|| {
-        "../../test_data/test_images/test_detection0.jpg".to_string()
-    });
-    if !Path::new(&model_path).exists() { eprintln!("模型不存在: {}", model_path); return Ok(()); }
-    if !Path::new(&image_path).exists() { eprintln!("图片不存在: {}", image_path); return Ok(()); }
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU).set_cpu_threads(4);
 
-    // GPU + enable_trt = false
-    let opt = RuntimeOption::new()
-        .gpu(0)
-        .fp16(true)
-        .enable_trt(false)
-        .ort_backend();
+    let model = UltralyticsDet::new(&test_data("test_models/onnx/yolo11n/yolo11n.onnx"), &opt)?;
+    let img = Image::read(&test_data("test_images/test_detection0.jpg"))?;
 
-    println!("enable_trt = false");
-    let model = UltralyticsDet::new(&model_path, &opt)?;
-    println!("模型加载成功");
-    let img = Image::read(&image_path)?;
-    let results = model.predict(&img)?;
-    println!("检测到 {} 个目标", results.len());
-    println!("检测到 {:#?} 个目标", results);
+    // 纯推理
+    let dets = model.predict(&img)?;
+    println!("detected {} objects", dets.len());
+    for d in &dets {
+        println!("  [{:?}] score={:.3}", d.rect, d.score);
+    }
+
+    // 需要可视化时：句柄直达 C++ vis_det
+    let canvas = img.clone()?;
+    model.predict_and_draw(
+        &img,
+        &canvas,
+        &DrawOptions::new()
+            .with_threshold(0.4)
+            .with_label_map(vec![
+                (0, "person".into()),
+                (1, "bicycle".into()),
+                (2, "car".into()),
+            ])
+            .with_alpha(0.3),
+    )?;
+    canvas.save("detection_annotated.png")?;
+    println!("visualized -> detection_annotated.png");
+
     Ok(())
 }

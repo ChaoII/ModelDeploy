@@ -6,6 +6,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
+        <!-- SDK 构建目录：默认视觉版（build_tdc），音频版传 -p:ModelDeploySdkDir=build_audio -->
+        <ModelDeploySdkDir Condition="'$(ModelDeploySdkDir)'==''">build_tdc</ModelDeploySdkDir>
     </PropertyGroup>
 
     <ItemGroup>
@@ -25,10 +27,10 @@
     </ItemGroup>
 
     <Target Name="CopySDKDll" AfterTargets="Build">
-        <Copy SourceFiles="..\..\build\bin\ModelDeploySDK.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true"/>
-        <!-- SDK 动态依赖（ORT/MNN 等），一并复制保证可加载 -->
-        <Copy SourceFiles="..\..\build\bin\onnxruntime.dll;..\..\build\bin\MNN.dll"
-              DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true"/>
+        <!-- capi2 SDK（目录由 ModelDeploySdkDir 指定，默认 build_tdc 视觉版） -->
+        <Copy SourceFiles="..\..\$(ModelDeploySdkDir)\bin\ModelDeploySDK.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true"/>
+        <!-- libcrypto（SDK 静态链 OpenSSL 的运行时依赖，来自 vcpkg） -->
+        <Copy SourceFiles="E:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('E:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll')"/>
     </Target>
 
 </Project>

@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
     <PackageId>ModelDeploySDK</PackageId>
     <Version>1.8.0</Version>
     <Authors>ModelDeploy Contributors</Authors>

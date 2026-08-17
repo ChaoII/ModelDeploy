@@ -19,7 +19,7 @@ fn find_sdk_root() -> Option<PathBuf> {
     }
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let project_root = manifest_dir.parent().unwrap().parent().unwrap();
-    for rel in &["build", "build_debug"] {
+    for rel in &["build_tdc", "build_audio", "build", "build_debug"] {
         let dir = project_root.join(rel);
         if sdk_file_exists(&dir.join("bin"), "ModelDeploySDK")
             || sdk_file_exists(&dir.join("lib"), "ModelDeploySDK")
@@ -51,6 +51,8 @@ fn main() {
             let copy_dirs = vec![
                 out_dir.join(&profile),
                 out_dir.join(&profile).join("examples"),
+                out_dir.join(&profile).join("tests"),
+                out_dir.join(&profile).join("deps"),
             ];
 
             if let Ok(entries) = fs::read_dir(&bin_dir) {
@@ -61,18 +63,28 @@ fn main() {
                             for dest_dir in &copy_dirs {
                                 if dest_dir.exists() {
                                     let dest = dest_dir.join(path.file_name().unwrap());
-                                    if !dest.exists() {
-                                        let _ = fs::copy(&path, &dest);
-                                    }
+                                    let _ = fs::copy(&path, &dest);
                                 }
                             }
                         }
                     }
                 }
             }
+            // 拷贝 SDK 的运行时依赖（libcrypto 等，来自 vcpkg）
+            for dep in ["libcrypto-3-x64.dll"] {
+                let src = std::path::Path::new("E:/vcpkg/installed/x64-windows/bin").join(dep);
+                if src.exists() {
+                    for dest_dir in &copy_dirs {
+                        if dest_dir.exists() {
+                            let dest = dest_dir.join(dep);
+                            let _ = fs::copy(&src, &dest);
+                        }
+                    }
+                }
+            }
         }
     } else {
-        println!("cargo:warning=ModelDeploySDK not found. Build it first: cmake --build ../../build");
+        println!("cargo:warning=ModelDeploySDK not found. Build it first: cmake --build ../../build_tdc");
     }
 
     println!("cargo:rerun-if-changed=build.rs");

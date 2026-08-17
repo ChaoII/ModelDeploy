@@ -1,63 +1,21 @@
 ﻿namespace ModelDeploy
 {
-    public enum MDModelFormat
-    {
-        ONNX = 0,
-        MNN
-    }
-
-    public enum MDModelType
-    {
-        Classification,
-        Detection = 1,
-        OCR,
-        FACE,
-        LPR,
-        ASR,
-        TTS,
-        SemSeg = 23,
-        Depth = 24
-    }
-
-    public enum MDStatusCode
-    {
-        Success = 0x00,
-        PathNotFound,
-        FileOpenFailed,
-        CallError,
-        ModelInitializeFailed,
-        ModelPredictFailed,
-        MemoryAllocatedFailed,
-        ModelTypeError,
-        WriteWaveFailed
-    }
-
-    public enum FaceQualityEvaluateType
-    {
-        Brightness = 0,
-        Clarity = 1,
-        Integrity = 2,
-        Pose = 3,
-        Resolution = 4,
-        ClarityEx = 5,
-        NoMask = 6
-    }
-
+    /// <summary>设备枚举（与 capi2 MD_DEVICE 对齐）。</summary>
     public enum Device
     {
         CPU = 0,
         GPU = 1,
-        OPENCL = 2,
-        VULKAN = 3,
-        TPU = 4
+        TPU = 2,
+        OPENCL = 3,
+        VULKAN = 4
     }
 
+    /// <summary>后端枚举（与 capi2 MD_BACKEND 对齐）。</summary>
     public enum Backend
     {
         ORT = 0,
         MNN = 1,
         TRT = 2,
-        SOPHGO = 3,
-        NONE = 4
+        SOPHGO = 3
     }
 }

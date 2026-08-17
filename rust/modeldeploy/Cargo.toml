@@ -12,9 +12,7 @@ name = "modeldeploy"
 thiserror = "2"
 libc = "0.2"
 
-[features]
-# 音频模块（TTS/ASR），对应 SDK 的 BUILD_AUDIO。SDK 以 BUILD_AUDIO=OFF 构建时需关闭
-audio = []
+
 
 [dev-dependencies]
 anyhow = "1"

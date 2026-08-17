@@ -26,6 +26,33 @@ namespace modeldeploy::vision::face {
         if (genderage_ && !genderage_->is_initialized()) { MD_LOG_ERROR << "genderage model init failed" << std::endl; initialized_ = false; }
     }
 
+    InsightFaceAnalysis::InsightFaceAnalysis(std::unique_ptr<InsightFaceDet> det,
+                                             std::unique_ptr<InsightFaceRecognition> rec,
+                                             std::unique_ptr<InsightFaceLandmark> lmk2d,
+                                             std::unique_ptr<InsightFaceLandmark> lmk3d,
+                                             std::unique_ptr<InsightFaceGenderAge> genderage)
+        : det_(std::move(det)), rec_(std::move(rec)),
+          lmk_2d_(std::move(lmk2d)), lmk_3d_(std::move(lmk3d)),
+          genderage_(std::move(genderage)) {
+        initialized_ = true;
+    }
+
+    std::unique_ptr<InsightFaceAnalysis> InsightFaceAnalysis::clone() const {
+        std::unique_ptr<InsightFaceDet> det;
+        std::unique_ptr<InsightFaceRecognition> rec;
+        std::unique_ptr<InsightFaceLandmark> lmk2d;
+        std::unique_ptr<InsightFaceLandmark> lmk3d;
+        std::unique_ptr<InsightFaceGenderAge> genderage;
+        // 逐个深拷贝子模型：复用各自已加载的 backend session，不重新加载模型
+        if (det_) det = det_->clone();
+        if (rec_) rec = rec_->clone();
+        if (lmk_2d_) lmk2d = lmk_2d_->clone();
+        if (lmk_3d_) lmk3d = lmk_3d_->clone();
+        if (genderage_) genderage = genderage_->clone();
+        return std::unique_ptr<InsightFaceAnalysis>(new InsightFaceAnalysis(
+            std::move(det), std::move(rec), std::move(lmk2d), std::move(lmk3d), std::move(genderage)));
+    }
+
     bool InsightFaceAnalysis::is_initialized() const { return initialized_; }
 
     void InsightFaceAnalysis::set_det_thresh(float thresh) {

@@ -18,6 +18,9 @@ namespace modeldeploy::audio::asr {
 
         bool predict(const std::vector<float>& data, std::string* result);
 
+        // 深拷贝：复用已加载的 backend session（不重新加载模型/显存）
+        [[nodiscard]] std::unique_ptr<SenseVoice> clone() const;
+
     protected:
         bool initialize();
 
@@ -26,6 +29,8 @@ namespace modeldeploy::audio::asr {
         bool postprocess(std::vector<Tensor>& infer_result, std::string* result);
 
     private:
+        // 供 clone() 使用：不触发 initialize
+        explicit SenseVoice() = default;
         int32_t window_size_{};
         int32_t window_shift_{};
         int32_t with_itn_{};

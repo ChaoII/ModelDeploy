@@ -19,6 +19,25 @@ namespace modeldeploy::audio::asr {
         initialized_ = initialize();
     }
 
+    std::unique_ptr<SenseVoice> SenseVoice::clone() const {
+        auto clone_model = std::unique_ptr<SenseVoice>(new SenseVoice());   // 不触发 initialize
+        // 复用已加载的 backend session（不重新加载模型/显存）
+        clone_model->set_runtime(const_cast<SenseVoice*>(this)->clone_runtime());
+        // 复制推理配置字段
+        clone_model->runtime_option = runtime_option;
+        clone_model->token_path_str_ = token_path_str_;
+        clone_model->window_size_ = window_size_;
+        clone_model->window_shift_ = window_shift_;
+        clone_model->with_itn_ = with_itn_;
+        clone_model->without_itn_ = without_itn_;
+        clone_model->neg_mean_ = neg_mean_;
+        clone_model->inv_stddev_ = inv_stddev_;
+        clone_model->lang_id_ = lang_id_;
+        clone_model->tokens_ = tokens_;
+        clone_model->initialized_ = initialized_;
+        return clone_model;
+    }
+
     bool SenseVoice::initialize() {
         if (!init_runtime()) {
             std::cerr << "Failed to initialize modeldeploy runtime." << std::endl;

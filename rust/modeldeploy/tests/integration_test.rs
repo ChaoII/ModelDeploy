@@ -1,316 +1,411 @@
 use anyhow::Result;
-use modeldeploy::image::Image;
-use modeldeploy::runtime::RuntimeOption;
-use modeldeploy::types::*;
+use modeldeploy::{
+    Classification, DbDetectorModel, DrawOptions, FaceGenderAgeModel, FaceRecognizerPipelineModel,
+    Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
+    LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
+    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, UltralyticsDepth,
+    UltralyticsDet, UltralyticsObb, UltralyticsPose, UltralyticsSeg, UltralyticsSem,
+};
 
-// ════════════════════════════════════════════════════════════════
-// Image 函数全覆盖测试
-// ════════════════════════════════════════════════════════════════
-
-/// 基于 CARGO_MANIFEST_DIR 构造 test_data 绝对路径
 fn test_data(rel: &str) -> String {
-    let root = env!("CARGO_MANIFEST_DIR");
-    // CARGO_MANIFEST_DIR = .../rust/modeldeploy，仓库根在其上两级
-    format!("{}/../../test_data/{}", root, rel)
+    format!("{}/../../test_data/{}", env!("CARGO_MANIFEST_DIR"), rel)
 }
 
-/// 基于仓库根的测试图绝对路径
 fn test_img(rel: &str) -> String {
-    let root = env!("CARGO_MANIFEST_DIR");
-    format!("{}/../../test_data/test_images/{}", root, rel)
+    format!("{}/../../test_data/test_images/{}", env!("CARGO_MANIFEST_DIR"), rel)
 }
 
-/// from_bgr24 + 属性
-#[test]
-fn test_image_from_bgr24() {
-    let data = vec![0u8; 2 * 2 * 3];
-    let img = Image::from_bgr24(&data, 2, 2);
-    assert_eq!(img.width(), 2);
-    assert_eq!(img.height(), 2);
-    assert_eq!(img.channels(), 3);
-    assert_eq!(img.data().len(), 12);
-    println!("from_bgr24 OK");
+fn cpu_opt() -> Result<RuntimeOption> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU).set_cpu_threads(4);
+    Ok(opt)
 }
 
-/// read + save + clone + crop
+// ═══ Image ═══
+
 #[test]
-fn test_image_read_save_clone_crop() -> Result<()> {
+fn test_image_basics() -> Result<()> {
     let img = Image::read(&test_img("test_detection0.jpg"))?;
-    assert!(img.width() > 0);
-    assert!(img.height() > 0);
-    assert!(img.channels() == 3 || img.channels() == 1);
+    assert!(img.width() > 0 && img.height() > 0);
 
-    let cloned = img.clone_image()?;
-    assert_eq!(cloned.width(), img.width());
-    assert_eq!(cloned.height(), img.height());
+    let clone = img.clone()?;
+    assert_eq!(clone.width(), img.width());
+    assert_eq!(clone.height(), img.height());
 
-    // 裁剪左上 100x100
-    let cropped = img.crop(0, 0, 100, 100)?;
-    assert_eq!(cropped.width(), 100);
-    assert_eq!(cropped.height(), 100);
+    let crop = img.crop(10, 10, 50, 50)?;
+    assert_eq!(crop.width(), 50);
+    assert_eq!(crop.height(), 50);
 
-    // 保存裁剪结果
-    cropped.save("rust_test_crop.jpg")?;
-    println!("read/save/clone/crop OK");
+    let jpg = img.encode(".jpg")?;
+    assert!(!jpg.is_empty());
+    assert_eq!(jpg[0], 0xFF);
+    assert_eq!(jpg[1], 0xD8);
+
+    let tmp = std::env::temp_dir().join("md_rust_test.png");
+    let tmp = tmp.to_string_lossy().to_string();
+    img.save(&tmp)?;
+    std::fs::remove_file(&tmp).ok();
     Ok(())
 }
 
-/// from_rgb24
 #[test]
-fn test_image_from_rgb24() -> Result<()> {
-    let rgb = vec![0u8; 4 * 4 * 3]; // 4x4 RGB
-    let img = Image::from_rgb24(&rgb, 4, 4)?;
-    assert_eq!(img.width(), 4);
-    assert_eq!(img.height(), 4);
-    assert_eq!(img.channels(), 3);
-    println!("from_rgb24 OK");
+fn test_image_from_bgr24() -> Result<()> {
+    let data = vec![0u8; 20 * 10 * 3];
+    let img = Image::from_bgr24(&data, 20, 10)?;
+    assert_eq!(img.width(), 20);
+    assert_eq!(img.height(), 10);
     Ok(())
 }
 
-/// from_nv12
-#[test]
-fn test_image_from_nv12() -> Result<()> {
-    let w = 4; let h = 4;
-    let nv12 = vec![0u8; (w * h * 3 / 2) as usize];
-    let img = Image::from_nv12(&nv12, w, h)?;
-    assert_eq!(img.width(), w);
-    assert_eq!(img.height(), h);
-    println!("from_nv12 OK");
-    Ok(())
-}
-
-/// from_yuv420p
-#[test]
-fn test_image_from_yuv420p() -> Result<()> {
-    let w = 4; let h = 4;
-    let yuv = vec![0u8; (w * h * 3 / 2) as usize];
-    let img = Image::from_yuv420p(&yuv, w, h)?;
-    assert_eq!(img.width(), w);
-    assert_eq!(img.height(), h);
-    println!("from_yuv420p OK");
-    Ok(())
-}
-
-/// from_compressed / encode
-#[test]
-fn test_image_from_compressed() -> Result<()> {
-    // 从文件读图，压缩后解码验证
-    let _img = Image::read(&test_img("test_detection0.jpg"))?;
-    // 先验证 from_compressed: 从已存在的 jpg 读取
-    let jpg_bytes = std::fs::read(&test_img("test_detection0.jpg")).unwrap_or_default();
-    if !jpg_bytes.is_empty() {
-        let decoded = Image::from_compressed(&jpg_bytes)?;
-        assert!(decoded.width() > 0);
-        assert!(decoded.height() > 0);
-        println!("from_compressed OK ({} bytes, {}x{})", jpg_bytes.len(), decoded.width(), decoded.height());
-    } else {
-        // 没有测试图片时跳过
-        println!("from_compressed SKIP (no test data)");
-    }
-    Ok(())
-}
-
-/// show（仅验证不崩溃 - 需要在有 GUI 的环境运行）
-#[test]
-#[ignore]
-fn test_image_show() {
-    let img = Image::from_bgr24(&[0u8; 3], 1, 1);
-    img.show();
-}
-
-// ════════════════════════════════════════════════════════════════
-// RuntimeOption 测试
-// ════════════════════════════════════════════════════════════════
+// ═══ Detection ═══
 
 #[test]
-fn test_runtime_option_default() {
-    let opt = RuntimeOption::new();
-    assert_eq!(opt.get_device_id(), 0);
-}
-
-#[test]
-fn test_runtime_option_gpu() {
-    let opt = RuntimeOption::new().gpu(0).fp16(true).ort_backend();
-    assert_eq!(opt.get_backend_value(), 0);
-    assert!(opt.is_fp16());
-}
-
-#[test]
-fn test_runtime_option_trt() {
-    let opt = RuntimeOption::new().gpu(1).trt_backend().fp16(true)
-        .trt_min_shape("images:1x3x640x640").trt_cache("./cache");
-    assert_eq!(opt.get_backend_value(), 2);
-    assert_eq!(opt.get_device_id(), 1);
-}
-
-// ════════════════════════════════════════════════════════════════
-// 类型测试
-// ════════════════════════════════════════════════════════════════
-
-#[test]
-fn test_type_conversions() {
-    let md_rect = modeldeploy::ffi::MDRect { x: 10, y: 20, width: 100, height: 200 };
-    let rect: Rect = md_rect.into();
-    assert_eq!(rect.x, 10);
-    assert_eq!(rect.y, 20);
-    let _back: modeldeploy::ffi::MDRect = rect.into();
-}
-
-#[test]
-fn test_detection_result() {
-    let det = Detection {
-        rect: Rect { x: 1, y: 2, width: 100, height: 50 },
-        label_id: 0, score: 0.95, label_name: "person".into(),
-    };
-    assert_eq!(det.score, 0.95);
-}
-
-#[test]
-fn test_face_detection_result() {
-    let face = FaceDetection {
-        rect: Rect { x: 10, y: 10, width: 50, height: 50 },
-        score: 0.98,
-        landmarks: vec![Point3f { x: 20.0, y: 20.0, z: 0.0 }],
-    };
-    assert_eq!(face.landmarks.len(), 1);
-}
-
-// ════════════════════════════════════════════════════════════════
-// 错误码测试
-// ════════════════════════════════════════════════════════════════
-
-#[test]
-fn test_error_conversion() {
-    use modeldeploy::ffi::*;
-    use modeldeploy::error::*;
-
-    let err = MdError::from(MDStatusCode_ModelInitializeFailed);
-    assert!(matches!(err, MdError::ModelInitFailed(_)));
-
-    let err = MdError::from(MDStatusCode_ModelPredictFailed);
-    assert!(matches!(err, MdError::PredictFailed(_)));
-
-    assert!(check_status(MDStatusCode_Success).is_ok());
-    assert!(check_status(MDStatusCode_PathNotFound).is_err());
-}
-
-// ════════════════════════════════════════════════════════════════
-// 内存泄漏压力测试
-// ════════════════════════════════════════════════════════════════
-// 反复分配/释放，如果内存持续增长说明有泄漏。
-// 这些测试不是精确的泄漏检测（需要 valgrind/asan），
-// 但可以作为 CI 上的快速检查。
-
-/// Image 反复创建释放 1000 次
-#[test]
-fn test_image_repeated_alloc_free() {
-    let data = vec![0u8; 640 * 480 * 3];
-    for _ in 0..1000 {
-        // from_bgr24（零拷贝，不分配）
-        let img = Image::from_bgr24(&data, 640, 480);
-        drop(img);
-    }
-    println!("Image repeated alloc/free 1000x OK");
-}
-
-/// Image read + drop 反复 100 次（每次分配 CAPI 内存）
-#[test]
-fn test_image_repeated_read_drop() -> Result<()> {
-    for i in 0..100 {
-        let img = Image::read(&test_img("test_detection0.jpg"))?;
-        assert!(img.width() > 0);
-        drop(img); // 显式释放 CAPI 内存
-        if i == 0 { println!("First iteration OK"); }
-    }
-    println!("Image read/drop 100x OK");
-    Ok(())
-}
-
-/// clone + crop 反复 100 次
-#[test]
-fn test_image_repeated_clone_crop() -> Result<()> {
+fn test_detection() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsDet::new(&test_data("test_models/onnx/yolo11n/yolo11n.onnx"), &opt)?;
     let img = Image::read(&test_img("test_detection0.jpg"))?;
-    for _ in 0..100 {
-        let cloned = img.clone_image()?;
-        let cropped = cloned.crop(0, 0, 100, 100)?;
-        assert_eq!(cropped.width(), 100);
-        drop(cropped);
-        drop(cloned);
-    }
-    println!("Image clone/crop 100x OK");
+    let dets = model.predict(&img)?;
+    assert!(!dets.is_empty(), "should detect objects");
+    assert!(dets[0].score > 0.0 && dets[0].score <= 1.0);
+    assert!(dets[0].rect.width > 0.0);
     Ok(())
 }
 
-// ════════════════════════════════════════════════════════════════
-// 检测模型 predict + predict_nv12
-// ════════════════════════════════════════════════════════════════
-
-/// 检测模型 predict（BGR 图输入）
 #[test]
-fn test_detection_predict() -> Result<()> {
-    let opt = RuntimeOption::default();
-    let det = modeldeploy::vision::detection::UltralyticsDet::new(&test_data("test_models/onnx/yolo26n/yolo26n.onnx"), &opt)?;
+fn test_detection_clone() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsDet::new(&test_data("test_models/onnx/yolo11n/yolo11n.onnx"), &opt)?;
+    let cloned = model.clone()?;
+    assert!(cloned.is_ready());
     let img = Image::read(&test_img("test_detection0.jpg"))?;
-    let results = det.predict(&img)?;
-    println!("detection predict got {} results", results.len());
-    for r in results.iter().take(3) {
-        println!(
-            "  box=[{} {} {} {}] score={}",
-            r.rect.x, r.rect.y, r.rect.width, r.rect.height, r.score
-        );
-    }
+    let a = model.predict(&img)?;
+    let b = cloned.predict(&img)?;
+    assert_eq!(a.len(), b.len());
+    assert!((a[0].score - b[0].score).abs() < 1e-4);
     Ok(())
 }
 
-/// 检测模型 predict_nv12（YUV 输入），不应崩溃且结果长度合法
 #[test]
-fn test_detection_predict_nv12() -> Result<()> {
-    use modeldeploy::image::Image;
-    let opt = RuntimeOption::default();
-    let det = modeldeploy::vision::detection::UltralyticsDet::new(&test_data("test_models/onnx/yolo26n/yolo26n.onnx"), &opt)?;
-
-    // 从测试图构建 NV12
+fn test_detection_draw() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsDet::new(&test_data("test_models/onnx/yolo11n/yolo11n.onnx"), &opt)?;
     let img = Image::read(&test_img("test_detection0.jpg"))?;
-    let w = img.width();
-    let h = img.height();
-    // 偶数对齐
-    let w = w - w % 2;
-    let h = h - h % 2;
-    let bgr = img.data();
-    let (y, uv) = rgb_to_nv12(&bgr, w, h);
-    let results = det.predict_nv12(&y, &uv, w, h, w, w, 0)?;
-    println!("detection predict_nv12 got {} results", results.len());
+    let canvas = img.clone()?;
+    let options = DrawOptions::new()
+        .with_threshold(0.4)
+        .with_label_map(vec![(0, "person".into()), (1, "bicycle".into()), (2, "car".into())])
+        .with_alpha(0.3);
+    let dets = model.predict_and_draw(&img, &canvas, &options)?;
+    assert!(!dets.is_empty());
+    let tmp = std::env::temp_dir().join("md_rust_draw.png");
+    let tmp = tmp.to_string_lossy().to_string();
+    canvas.save(&tmp)?;
+    std::fs::remove_file(&tmp).ok();
     Ok(())
 }
 
-/// 内存泄漏压力：检测模型反复 predict
+// ═══ Classification ═══
+
 #[test]
-fn test_detection_repeated_predict() -> Result<()> {
-    let opt = RuntimeOption::default();
-    let det = modeldeploy::vision::detection::UltralyticsDet::new(&test_data("test_models/onnx/yolo26n/yolo26n.onnx"), &opt)?;
-    let img = Image::read(&test_img("test_detection0.jpg"))?;
-    for _ in 0..10 {
-        let results = det.predict(&img)?;
-        let _ = results;
-    }
-    println!("detection repeated predict 10x OK");
+fn test_classification() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = Classification::new(&test_data("test_models/onnx/yolo11n/yolo11n-cls.onnx"), &opt)?;
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let cls = model.predict(&img)?;
+    assert!(!cls.is_empty());
+    assert!(cls[0].label_id >= 0);
     Ok(())
 }
 
-/// 辅助：BGR → NV12（Y 平面 + 交错 UV）
-fn rgb_to_nv12(bgr: &[u8], w: i32, h: i32) -> (Vec<u8>, Vec<u8>) {
-    let w = w as usize;
-    let h = h as usize;
-    let mut y = vec![0u8; w * h];
-    let uv = vec![128u8; w * h / 2]; // 中性灰 UV
-    for row in 0..h {
-        for col in 0..w {
-            let idx = (row * w + col) * 3;
-            let b = bgr[idx] as f32;
-            let g = bgr[idx + 1] as f32;
-            let r = bgr[idx + 2] as f32;
-            y[row * w + col] = ((0.257 * r + 0.504 * g + 0.098 * b) + 16.0) as u8;
-        }
-    }
-    (y, uv)
+// ═══ Pose ═══
+
+#[test]
+fn test_pose() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsPose::new(&test_data("test_models/onnx/yolo11n/yolo11n-pose.onnx"), &opt)?;
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let poses = model.predict(&img)?;
+    assert!(!poses.is_empty());
+    assert!(poses[0].keypoints.len() > 0);
+    Ok(())
+}
+
+// ═══ OBB ═══
+
+#[test]
+fn test_obb() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsObb::new(&test_data("test_models/onnx/yolo11n/yolo11n-obb.onnx"), &opt)?;
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let obbs = model.predict(&img)?;
+    let _ = obbs;
+    Ok(())
+}
+
+// ═══ InstanceSeg ═══
+
+#[test]
+fn test_instance_seg() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsSeg::new(&test_data("test_models/onnx/yolo11n/yolo11n-seg.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
+    let segs = model.predict(&img)?;
+    assert!(!segs.is_empty());
+    Ok(())
+}
+
+// ═══ SemSeg ═══
+
+#[test]
+fn test_sem_seg() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsSem::new(&test_data("test_models/onnx/yolo26n/yolo26n-sem.onnx"), &opt)?;
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let sem = model.predict(&img)?;
+    assert!(!sem.is_empty());
+    assert!(sem[0].labels.len() > 0);
+    assert!(sem[0].num_classes > 0);
+    Ok(())
+}
+
+// ═══ Depth ═══
+
+#[test]
+fn test_depth() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsDepth::new(&test_data("test_models/onnx/yolo26n/yolo26n-depth.onnx"), &opt)?;
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let depth = model.predict(&img)?;
+    assert!(depth[0].depth.len() > 0);
+    Ok(())
+}
+
+// ═══ FaceDet ═══
+
+#[test]
+fn test_face_detection() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = Scrfd::new(&test_data("test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_face_detection4.jpg"))?;
+    let faces = model.predict(&img)?;
+    assert!(!faces.is_empty());
+    assert!(faces[0].keypoints.len() > 0);
+    Ok(())
+}
+
+// ═══ FaceRec ═══
+
+#[test]
+fn test_face_recognition() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = SeetaFaceID::new(&test_data("test_models/onnx/face/face_recognizer.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_face_id.jpg"))?;
+    let rec = model.predict(&img)?;
+    assert!(rec[0].embedding.len() > 0);
+    Ok(())
+}
+
+// ═══ FaceAge / Gender ═══
+
+#[test]
+fn test_face_age_gender() -> Result<()> {
+    let opt = cpu_opt()?;
+    let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/face/age_predictor.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_face_id1.jpg"))?;
+    let age = age_model.predict(&img)?;
+    assert!(age[0] >= 0);
+
+    let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/face/gender_predictor.onnx"), &opt)?;
+    let img2 = Image::read(&test_img("test_face_gender.jpg"))?;
+    let gender = gender_model.predict(&img2)?;
+    assert!(gender[0] >= 0);
+    Ok(())
+}
+
+// ═══ InsightFace ═══
+
+#[test]
+fn test_insightface() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/insightface/buffalo_l");
+    let path = format!("{}/det_10g.onnx|{}/w600k_r50.onnx|{}/2d106det.onnx|{}/1k3d68.onnx|{}/genderage.onnx",
+        dir, dir, dir, dir, dir);
+    let model = InsightFaceAnalysis::new(&path, &opt)?;
+    let img = Image::read(&test_img("test_face1.jpg"))?;
+    let faces = model.predict(&img)?;
+    assert!(!faces.is_empty());
+    assert!(faces[0].embedding.len() > 0);
+    assert!(faces[0].gender >= 0);
+    Ok(())
+}
+
+// ═══ OCR ═══
+
+#[test]
+fn test_ocr() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/ocr/ppocrv4_mobile");
+    let dict = test_data("ppocrv4_dict.txt");
+    let path = format!("{}/det_infer.onnx|{}/cls_infer.onnx|{}/rec_infer.onnx|{}", dir, dir, dir, dict);
+    let model = PaddleOCR::new(&path, &opt)?;
+    let img = Image::read(&test_img("test_ocr.png"))?;
+    let lines = model.predict(&img)?;
+    assert!(!lines.is_empty());
+    assert!(!lines[0].text.is_empty());
+    Ok(())
+}
+
+// ═══ LPR ═══
+
+#[test]
+fn test_lpr() -> Result<()> {
+    let opt = cpu_opt()?;
+    let det = test_data("test_models/onnx/yolov5plate.onnx");
+    let rec = test_data("test_models/onnx/plate_recognition_color.onnx");
+    let path = format!("{}|{}", det, rec);
+    let model = LprPipeline::new(&path, &opt)?;
+    let img = Image::read(&test_img("test_lpr_pipeline2.jpg"))?;
+    let plates = model.predict(&img)?;
+    let _ = plates;
+    Ok(())
+}
+
+// ═══ PedestrianAttribute ═══
+
+#[test]
+fn test_pedestrian_attribute() -> Result<()> {
+    let opt = cpu_opt()?;
+    let det = test_data("test_models/onnx/zhgd_det.onnx");
+    let cls = test_data("test_models/onnx/zhgd_ml.onnx");
+    let path = format!("{}|{}", det, cls);
+    let model = PedestrianAttribute::new(&path, &opt)?;
+    model.set_input_size(1280, 1280)?;
+    model.set_cls_input_size(192, 256)?;
+    let img = Image::read(&test_img("test_pedestrian_attribute1.jpg"))?;
+    let attrs = model.predict(&img)?;
+    assert!(!attrs.is_empty());
+    Ok(())
+}
+
+// ═══ 子模型测试 ═══
+
+#[test]
+fn test_ocr_det_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = DbDetectorModel::new(
+        &test_data("test_models/onnx/ocr/ppocrv4_mobile/det_infer.onnx"),
+        &opt,
+    )?;
+    let img = Image::read(&test_img("test_ocr.png"))?;
+    let boxes = model.predict(&img)?;
+    assert!(!boxes.is_empty());
+    Ok(())
+}
+
+#[test]
+fn test_ocr_rec_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/ocr/ppocrv4_mobile");
+    let dict = test_data("ppocrv4_dict.txt");
+    let path = format!("{}/rec_infer.onnx|{}", dir, dict);
+    let model = RecognizerModel::new(&path, &opt)?;
+    let img = Image::read(&test_img("test_ocr_recognition1.jpg"))?;
+    let lines = model.predict(&img)?;
+    let _ = lines;
+    Ok(())
+}
+
+#[test]
+fn test_face_rec_pipeline_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/face");
+    let path = format!("{}/scrfd_2.5g_bnkps_shape640x640.onnx|{}/face_recognizer.onnx", dir, dir);
+    let model = FaceRecognizerPipelineModel::new(&path, &opt)?;
+    let img = Image::read(&test_img("test_face_detection4.jpg"))?;
+    let recs = model.predict(&img)?;
+    assert!(!recs.is_empty());
+    assert!(recs[0].embedding.len() > 0);
+    Ok(())
+}
+
+#[test]
+fn test_face_gender_age_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = FaceGenderAgeModel::new(
+        &test_data("test_models/onnx/insightface/buffalo_l/genderage.onnx"),
+        &opt,
+    )?;
+    let img = Image::read(&test_img("test_face1.jpg"))?;
+    let faces = model.predict(&img)?;
+    assert!(!faces.is_empty());
+    assert!(faces[0].gender >= 0);
+    assert!(faces[0].age >= 0);
+    Ok(())
+}
+
+#[test]
+fn test_insightface_det_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = InsightFaceDetModel::new(
+        &test_data("test_models/onnx/insightface/buffalo_l/det_10g.onnx"),
+        &opt,
+    )?;
+    let img = Image::read(&test_img("test_face1.jpg"))?;
+    let faces = model.predict(&img)?;
+    assert!(!faces.is_empty());
+    assert!(faces[0].keypoints.len() > 0);
+    Ok(())
+}
+
+#[test]
+fn test_lpr_det_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = LprDetectionModel::new(
+        &test_data("test_models/onnx/yolov5plate.onnx"),
+        &opt,
+    )?;
+    let img = Image::read(&test_img("test_lpr_pipeline2.jpg"))?;
+    let plates = model.predict(&img)?;
+    let _ = plates;
+    Ok(())
+}
+
+#[test]
+fn test_lpr_rec_submodel() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = LprRecognizerModel::new(
+        &test_data("test_models/onnx/plate_recognition_color.onnx"),
+        &opt,
+    )?;
+    let img = Image::read(&test_img("test_lpr_recognizer.jpg"))?;
+    let plates = model.predict(&img)?;
+    assert!(!plates.is_empty());
+    Ok(())
+}
+
+// ═══ ASR / TTS（需 build_audio SDK，默认跳过） ═══
+
+#[test]
+#[ignore = "requires build_audio SDK with audio module"]
+fn test_asr() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/sense_voice");
+    let path = format!("{}/model.int8.onnx|{}/tokens.txt", dir, dir);
+    let model = SenseVoice::new(&path, &opt)?;
+    let wav = format!("{}/test_wavs/zh.wav", dir);
+    let text = model.predict_wav(&wav)?;
+    assert!(!text.is_empty());
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires build_audio SDK with audio module"]
+fn test_tts() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/kokoro_v1_1");
+    let path = format!("{}/model.onnx|{}/tokens.txt|{}/lexicon-gb-en.txt|{}/lexicon-zh.txt|{}/voices.bin|{}/dict|{}",
+        dir, dir, dir, dir, dir, dir, dir);
+    let model = Kokoro::new(&path, &opt)?;
+    assert!(model.is_ready());
+    Ok(())
 }

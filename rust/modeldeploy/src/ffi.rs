@@ -1,6 +1,7 @@
-//! ModelDeploy C API 的 Rust FFI 绑定（手动定义）
+//! ModelDeploy C API v2 的 Rust FFI 绑定（手动定义）
 //!
-//! 对应 CAPI 头文件: capi/common/md_types.h, capi/vision/detection/detection_capi.h 等
+//! 对应 CAPI 头文件: capi2/md_capi.h
+//! 设计: 不透明句柄（MDModelHandle/MDImageHandle/MDResultHandle/MDOptionHandle = 裸指针）
 //! 所有函数均为 `extern "C"` 调用，通过 link 到 ModelDeploySDK 动态库
 
 #![allow(non_camel_case_types, dead_code, non_upper_case_globals)]
@@ -8,90 +9,137 @@
 use libc::{c_char, c_float, c_int, c_void};
 
 // ════════════════════════════════════════════════════════════════
-// 枚举（repr(transparent) + 常量）
+// 枚举
 // ════════════════════════════════════════════════════════════════
 
-#[repr(transparent)]
+/// 状态码（MDStatus）
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MDStatusCode(pub i32);
-pub const MDStatusCode_Success: MDStatusCode = MDStatusCode(0x00);
-pub const MDStatusCode_PathNotFound: MDStatusCode = MDStatusCode(0x01);
-pub const MDStatusCode_FileOpenFailed: MDStatusCode = MDStatusCode(0x02);
-pub const MDStatusCode_CallError: MDStatusCode = MDStatusCode(0x03);
-pub const MDStatusCode_ModelInitializeFailed: MDStatusCode = MDStatusCode(0x04);
-pub const MDStatusCode_ModelPredictFailed: MDStatusCode = MDStatusCode(0x05);
-pub const MDStatusCode_MemoryAllocatedFailed: MDStatusCode = MDStatusCode(0x06);
-pub const MDStatusCode_ModelTypeError: MDStatusCode = MDStatusCode(0x07);
-pub const MDStatusCode_WriteWaveFailed: MDStatusCode = MDStatusCode(0x08);
+pub enum MDStatus {
+    OK = 0,
+    ERR_NULL_POINTER,
+    ERR_INVALID_ARGUMENT,
+    ERR_PATH_NOT_FOUND,
+    ERR_MODEL_LOAD,
+    ERR_MODEL_PREDICT,
+    ERR_MODEL_INIT,
+    ERR_UNSUPPORTED_TYPE,
+    ERR_UNSUPPORTED_BACKEND,
+    ERR_OUT_OF_MEMORY,
+    ERR_IMAGE_DECODE,
+    ERR_BUSY,
+    ERR_NOT_IMPLEMENTED,
+    ERR_AUDIO_DECODE,
+}
 
-#[repr(transparent)]
+/// 模型类型（MDModelKind）
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MDModelType(pub i32);
-pub const MDModelType_Classification: MDModelType = MDModelType(0);
-pub const MDModelType_Detection: MDModelType = MDModelType(1);
-pub const MDModelType_Keypoint: MDModelType = MDModelType(2);
-pub const MDModelType_OCR: MDModelType = MDModelType(3);
-pub const MDModelType_FACE: MDModelType = MDModelType(4);
-pub const MDModelType_LPR: MDModelType = MDModelType(5);
-pub const MDModelType_PIPELINE: MDModelType = MDModelType(6);
-pub const MDModelType_ASR: MDModelType = MDModelType(7);
-pub const MDModelType_TTS: MDModelType = MDModelType(8);
-pub const MDModelType_InstanceSeg: MDModelType = MDModelType(9);
-pub const MDModelType_OBB: MDModelType = MDModelType(10);
-pub const MDModelType_FaceDet: MDModelType = MDModelType(11);
-pub const MDModelType_FaceRec: MDModelType = MDModelType(12);
-pub const MDModelType_FaceAge: MDModelType = MDModelType(13);
-pub const MDModelType_FaceGender: MDModelType = MDModelType(14);
-pub const MDModelType_FaceASFirst: MDModelType = MDModelType(15);
-pub const MDModelType_FaceASSecond: MDModelType = MDModelType(16);
-pub const MDModelType_FaceASPipeline: MDModelType = MDModelType(17);
-pub const MDModelType_FaceRecPipeline: MDModelType = MDModelType(18);
-pub const MDModelType_LPRRec: MDModelType = MDModelType(19);
-pub const MDModelType_LPRPipeline: MDModelType = MDModelType(20);
-pub const MDModelType_OCRPipeline: MDModelType = MDModelType(21);
-pub const MDModelType_OCRRec: MDModelType = MDModelType(22);
-pub const MDModelType_SemSeg: MDModelType = MDModelType(23);
-pub const MDModelType_Depth: MDModelType = MDModelType(24);
-pub const MDModelType_InsightFace: MDModelType = MDModelType(25);
+pub enum MDModelKind {
+    DETECTION = 0,
+    CLASSIFICATION,
+    POSE,
+    OBB,
+    INSTANCE_SEG,
+    SEM_SEG,
+    DEPTH,
+    FACE_DET,
+    FACE_REC,
+    FACE_AGE,
+    FACE_GENDER,
+    FACE_AS,
+    FACE_AS_PIPELINE,
+    FACE_REC_PIPELINE,
+    INSIGHTFACE,
+    INSIGHTFACE_DET,
+    OCR,
+    OCR_DET,
+    OCR_REC,
+    OCR_CLS,
+    LPR_DET,
+    LPR_REC,
+    LPR_PIPELINE,
+    PED_ATTR,
+    ASR,
+    TTS,
+}
 
-#[repr(transparent)]
+/// 结果类型（MDResultKind）
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MDModelFormat(pub i32);
-pub const MDModelFormat_ONNX: MDModelFormat = MDModelFormat(0);
-pub const MDModelFormat_MNN: MDModelFormat = MDModelFormat(1);
+pub enum MDResultKind {
+    DETECTION = 0,
+    CLASSIFICATION,
+    POSE,
+    OBB,
+    INSTANCE_SEG,
+    SEM_SEG,
+    DEPTH,
+    FACE,
+    FACE_REC,
+    INSIGHTFACE,
+    OCR,
+    LPR,
+    ATTR,
+    AGE,
+    GENDER,
+    ASR,
+    TTS,
+}
 
-#[repr(transparent)]
+/// 设备（MDDevice）
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MDDevice(pub i32);
-pub const MD_DEVICE_CPU: MDDevice = MDDevice(0);
-pub const MD_DEVICE_GPU: MDDevice = MDDevice(1);
-pub const MD_DEVICE_OPENCL: MDDevice = MDDevice(2);
-pub const MD_DEVICE_VULKAN: MDDevice = MDDevice(3);
-pub const MD_DEVICE_TPU: MDDevice = MDDevice(4);
+pub enum MDDevice {
+    CPU = 0,
+    GPU = 1,
+    TPU = 2,
+    OPENCL = 3,
+    VULKAN = 4,
+}
 
-#[repr(transparent)]
+/// 后端（MDBackend）
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MDBackend(pub i32);
-pub const MD_BACKEND_ORT: MDBackend = MDBackend(0);
-pub const MD_BACKEND_MNN: MDBackend = MDBackend(1);
-pub const MD_BACKEND_TRT: MDBackend = MDBackend(2);
-pub const MD_BACKEND_SOPHGO: MDBackend = MDBackend(3);
-pub const MD_BACKEND_NONE: MDBackend = MDBackend(4);
+pub enum MDBackend {
+    ORT = 0,
+    MNN = 1,
+    TRT = 2,
+    SOPHGO = 3,
+}
 
 // ════════════════════════════════════════════════════════════════
-// 结构体
+// 句柄（不透明指针）
+// ════════════════════════════════════════════════════════════════
+
+pub type MDModelHandle = *mut c_void;
+pub type MDImageHandle = *mut c_void;
+pub type MDResultHandle = *mut c_void;
+pub type MDOptionHandle = *mut c_void;
+
+// ════════════════════════════════════════════════════════════════
+// 通用几何 / 颜色 / blittable 结构
 // ════════════════════════════════════════════════════════════════
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct MDPoint {
-    pub x: c_int,
-    pub y: c_int,
+pub struct MDBox {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct MDPoint3f {
+pub struct MDPoint {
+    pub x: c_float,
+    pub y: c_float,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDPoint3 {
     pub x: c_float,
     pub y: c_float,
     pub z: c_float,
@@ -99,393 +147,140 @@ pub struct MDPoint3f {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct MDRect {
-    pub x: c_int,
-    pub y: c_int,
-    pub width: c_int,
-    pub height: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct MDRotatedRect {
-    pub xc: c_float,
-    pub yc: c_float,
-    pub width: c_float,
-    pub height: c_float,
+pub struct MDRotatedBox {
+    pub cx: c_float,
+    pub cy: c_float,
+    pub w: c_float,
+    pub h: c_float,
     pub angle: c_float,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct MDSize {
-    pub width: c_int,
-    pub height: c_int,
+pub struct MDColorRGBA {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+/// 结果项结构（blittable，数组式 getter 返回其数组）
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDDetectionItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub score: c_float,
+    pub label_id: c_int,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct MDColor {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDPolygon {
-    pub data: *mut MDPoint,
-    pub size: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDMask {
-    pub buffer: *mut c_char,
-    pub buffer_size: c_int,
-    pub shape: *mut c_int,
-    pub num_dims: c_int,
-}
-
-/// 图像
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct MDImage {
-    pub width: c_int,
-    pub height: c_int,
-    pub channels: c_int,
-    pub data: *mut u8,
-}
-
-/// 模型句柄（所有模型类型的通用结构）
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDModel {
-    pub model_name: *mut c_char,
-    pub type_: MDModelType,
-    pub format: MDModelFormat,
-    pub model_content: *mut c_void,
-}
-
-/// 运行时选项
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDRuntimeOption {
-    pub trt_min_shape: *const c_char,
-    pub trt_opt_shape: *const c_char,
-    pub trt_max_shape: *const c_char,
-    pub trt_engine_cache_path: *const c_char,
-    pub enable_fp16: c_int,
-    pub cpu_thread_num: c_int,
-    pub device_id: c_int,
-    pub enable_trt: c_int,
-    pub device: MDDevice,
-    pub backend: MDBackend,
-    pub graph_opt_level: c_int,
-    pub password: *const c_char,
-    pub ort_log_severity: c_int,
-}
-
-// ════════════════════════════════════════════════════════════════
-// 结果类型
-// ════════════════════════════════════════════════════════════════
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDDetectionResult {
-    pub box_: MDRect,
+pub struct MDClassifyItem {
     pub label_id: c_int,
     pub score: c_float,
 }
 
 #[repr(C)]
-#[derive(Debug)]
-pub struct MDDetectionResults {
-    pub data: *mut MDDetectionResult,
-    pub size: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDClassificationResult {
-    pub label_id: c_int,
+#[derive(Debug, Clone, Copy)]
+pub struct MDPoseItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
     pub score: c_float,
 }
 
 #[repr(C)]
-#[derive(Debug)]
-pub struct MDClassificationResults {
-    pub data: *mut MDClassificationResult,
-    pub size: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDKeyPointResult {
-    pub box_: MDRect,
+#[derive(Debug, Clone, Copy)]
+pub struct MDObbItem {
+    pub cx: c_float,
+    pub cy: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub angle: c_float,
     pub score: c_float,
     pub label_id: c_int,
-    pub keypoints: *mut MDPoint3f,
-    pub keypoints_size: c_int,
 }
 
 #[repr(C)]
-#[derive(Debug)]
-pub struct MDKeyPointResults {
-    pub data: *mut MDKeyPointResult,
-    pub size: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDInsightFaceResult {
-    pub box_: MDRect,
+#[derive(Debug, Clone, Copy)]
+pub struct MDIsegItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
     pub score: c_float,
-    pub kps: *mut MDPoint3f,
-    pub kps_size: c_int,
-    pub landmark_2d_106: *mut MDPoint3f,
-    pub landmark_2d_106_size: c_int,
-    pub landmark_3d_68: *mut MDPoint3f,
-    pub landmark_3d_68_size: c_int,
-    pub pose: [c_float; 3],
-    pub embedding: *mut c_float,
-    pub embedding_size: c_int,
+    pub label_id: c_int,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDLprItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub score: c_float,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDAttrItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub box_score: c_float,
+    pub box_label_id: c_int,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDFaceItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub score: c_float,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDInsightFaceItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub score: c_float,
     pub gender: c_int,
     pub age: c_int,
 }
 
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDInsightFaceResults {
-    pub data: *mut MDInsightFaceResult,
-    pub size: c_int,
-}
+// ════════════════════════════════════════════════════════════════
+// 绘制选项（MDDrawOptions + MDLabelItem）
+// ════════════════════════════════════════════════════════════════
 
 #[repr(C)]
-#[derive(Debug)]
-#[cfg(feature = "audio")]
-pub struct MDTTSResult {
-    pub data: *mut c_float,
-    pub size: c_int,
-    pub sample_rate: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDImageResults {
-    pub data: *mut MDImage,
-    pub size: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDMapNode {
-    pub key: *mut c_char,
-    pub value: *mut c_char,
-}
-
-// ── Kokoro TTS 参数 ──
-#[repr(C)]
-#[derive(Debug)]
-#[cfg(feature = "audio")]
-pub struct MDKokoroParameters {
-    pub model: *mut c_char,
-    pub tokens: *mut c_char,
-    pub lexicons: *mut c_char,
-    pub voice: *mut c_char,
-    pub jieba: *mut c_char,
-}
-
-// ── OBB ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDObbResult {
-    pub rotated_box: MDRotatedRect,
-    pub label_id: c_int,
-    pub score: c_float,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDObbResults {
-    pub data: *mut MDObbResult,
-    pub size: c_int,
-}
-
-// ── 实例分割 ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDIsegResult {
-    pub box_: MDRect,
-    pub mask: MDMask,
-    pub label_id: c_int,
-    pub score: c_float,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDIsegResults {
-    pub data: *mut MDIsegResult,
-    pub size: c_int,
-}
-
-// ── 语义分割（Semantic Segmentation） ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDSemSegResult {
-    pub labels: *mut u8,
-    pub shape: *mut c_int,
-    pub shape_size: c_int,
-    pub num_classes: c_int,
-}
-
-// ── 深度估计（Depth Estimation） ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDDepthResult {
-    pub depth: *mut c_float,
-    pub shape: *mut c_int,
-    pub shape_size: c_int,
-}
-
-// ── OCR ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDOCRResult {
-    pub box_: MDPolygon,
-    pub text: *mut c_char,
-    pub score: c_float,
-    pub table_boxes: MDPolygon,
-    pub table_structure: *mut c_char,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDOCRResults {
-    pub data: *mut MDOCRResult,
-    pub table_html: *mut c_char,
-    pub size: c_int,
-}
-
-// ── LPR ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDLPRResult {
-    pub box_: MDRect,
-    pub landmarks: *mut MDPoint,
-    pub landmarks_size: c_int,
-    pub label_id: c_int,
-    pub score: c_float,
-    pub car_plate_str: *mut c_char,
-    pub car_plate_color: *mut c_char,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDLPRResults {
-    pub data: *mut MDLPRResult,
-    pub size: c_int,
-}
-
-// ── 行人属性 ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDAttributeResult {
-    pub box_: MDRect,
-    pub box_label_id: c_int,
-    pub box_score: c_float,
-    pub attr_scores: *mut c_float,
-    pub attr_scores_size: c_int,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDAttributeResults {
-    pub data: *mut MDAttributeResult,
-    pub size: c_int,
-}
-
-// ── 人脸识别 ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDFaceRecognizerResult {
-    pub embedding: *mut c_float,
-    pub size: c_int,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDFaceRecognizerResults {
-    pub data: *mut MDFaceRecognizerResult,
-    pub size: c_int,
-}
-
-// ── 人脸防伪第二段 ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDFaceAsSecondResult {
-    pub label_id: c_int,
-    pub score: c_float,
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDFaceAsSecondResults {
-    pub data: *mut MDFaceAsSecondResult,
-    pub size: c_int,
-}
-
-// ── 人脸防伪 Pipeline ──
-#[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
-pub struct MDFaceAsResult(pub i32);
-pub const MDFaceAsResult_REAL: MDFaceAsResult = MDFaceAsResult(0);
-pub const MDFaceAsResult_FUZZY: MDFaceAsResult = MDFaceAsResult(1);
-pub const MDFaceAsResult_SPOOF: MDFaceAsResult = MDFaceAsResult(2);
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDFaceAsResults {
-    pub data: *mut MDFaceAsResult,
-    pub size: c_int,
+pub struct MDLabelItem {
+    pub id: c_int,
+    pub name: *const c_char,
 }
 
-// ── 人脸年龄/性别 ──
-pub type MDFaceAgeResult = c_int;
-pub const MDFACE_AGE_UNKNOWN: c_int = -1;
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MDFaceGenderResult(pub i32);
-pub const MDFaceGenderResult_FEMALE: MDFaceGenderResult = MDFaceGenderResult(0);
-pub const MDFaceGenderResult_MALE: MDFaceGenderResult = MDFaceGenderResult(1);
-
-// ── OCR 模型参数 ──
 #[repr(C)]
-#[derive(Debug)]
-pub struct MDOCRModelParameters {
-    pub det_model_file: *const c_char,
-    pub cls_model_file: *const c_char,
-    pub rec_model_file: *const c_char,
-    pub dict_path: *const c_char,
-    pub max_side_len: c_int,
-    pub det_db_thresh: f64,
-    pub det_db_box_thresh: f64,
-    pub det_db_unclip_ratio: f64,
-    pub det_db_score_mode: *const c_char,
-    pub use_dilation: c_int,
-    pub rec_batch_size: c_int,
-}
-
-// ── Structure Table 模型参数 ──
-#[repr(C)]
-#[derive(Debug)]
-pub struct MDStructureTableModelParameters {
-    pub det_model_file: *const c_char,
-    pub rec_model_file: *const c_char,
-    pub table_model_file: *const c_char,
-    pub rec_label_file: *const c_char,
-    pub table_char_dict_path: *const c_char,
-    pub max_side_len: c_int,
-    pub det_db_thresh: f64,
-    pub det_db_box_thresh: f64,
-    pub det_db_unclip_ratio: f64,
-    pub det_db_score_mode: *const c_char,
-    pub use_dilation: c_int,
-    pub rec_batch_size: c_int,
+#[derive(Debug, Clone, Copy)]
+pub struct MDDrawOptions {
+    pub threshold: f64,
+    pub label_map: *const MDLabelItem,
+    pub label_map_size: usize,
+    pub font_path: *const c_char,
+    pub font_size: c_int,
+    pub alpha: f64,
+    pub save_result: c_int,
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -493,358 +288,96 @@ pub struct MDStructureTableModelParameters {
 // ════════════════════════════════════════════════════════════════
 
 extern "C" {
+    // ── 错误 ──
+    pub fn md_get_last_error() -> *const c_char;
 
-    // ── RuntimeOption ──
+    // ── 选项 ──
+    pub fn md_option_create(out: *mut MDOptionHandle) -> MDStatus;
+    pub fn md_option_destroy(h: MDOptionHandle);
+    pub fn md_option_set_device(h: MDOptionHandle, d: MDDevice);
+    pub fn md_option_set_backend(h: MDOptionHandle, b: MDBackend);
+    pub fn md_option_set_cpu_threads(h: MDOptionHandle, n: c_int);
+    pub fn md_option_set_fp16(h: MDOptionHandle, enable: c_int);
+    pub fn md_option_set_trt_engine_path(h: MDOptionHandle, path: *const c_char);
 
-    pub fn md_create_default_runtime_option() -> MDRuntimeOption;
+    // ── 图像 ──
+    pub fn md_image_from_file(out: *mut MDImageHandle, path: *const c_char) -> MDStatus;
+    pub fn md_image_from_bgr24(out: *mut MDImageHandle, bgr: *const c_void, w: c_int, h: c_int) -> MDStatus;
+    pub fn md_image_from_rgb24(out: *mut MDImageHandle, rgb: *const c_void, w: c_int, h: c_int) -> MDStatus;
+    pub fn md_image_from_nv12(out: *mut MDImageHandle, y: *const c_void, uv: *const c_void,
+        w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src: MDDevice) -> MDStatus;
+    pub fn md_image_from_yuv420p(out: *mut MDImageHandle, data: *const c_void, w: c_int, h: c_int) -> MDStatus;
+    pub fn md_image_from_encoded(out: *mut MDImageHandle, bytes: *const c_void, n: usize) -> MDStatus;
+    pub fn md_image_from_base64(out: *mut MDImageHandle, b64: *const c_char) -> MDStatus;
+    pub fn md_image_clone(src: MDImageHandle, out: *mut MDImageHandle) -> MDStatus;
+    pub fn md_image_crop(src: MDImageHandle, x: c_int, y: c_int, w: c_int, h: c_int, out: *mut MDImageHandle) -> MDStatus;
+    pub fn md_image_show(h: MDImageHandle) -> MDStatus;
+    pub fn md_image_save(h: MDImageHandle, path: *const c_char) -> MDStatus;
+    pub fn md_image_encode(h: MDImageHandle, ext: *const c_char, buf: *mut *const u8, n: *mut usize) -> MDStatus;
+    pub fn md_image_destroy(h: MDImageHandle);
+    pub fn md_image_size(h: MDImageHandle, w: *mut c_int, h: *mut c_int) -> MDStatus;
 
-    // ── Image ──
+    // ── 模型 ──
+    pub fn md_model_create(out: *mut MDModelHandle, kind: MDModelKind,
+        model_path: *const c_char, opt: MDOptionHandle) -> MDStatus;
+    pub fn md_model_destroy(h: MDModelHandle);
+    pub fn md_model_clone(src: MDModelHandle, out: *mut MDModelHandle) -> MDStatus;
+    pub fn md_model_ready(h: MDModelHandle) -> MDStatus;
+    pub fn md_model_set_input_size(h: MDModelHandle, w: c_int, h: c_int) -> MDStatus;
+    pub fn md_model_set_cls_input_size(h: MDModelHandle, w: c_int, h: c_int) -> MDStatus;
+    pub fn md_model_predict(h: MDModelHandle, img: MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
+    pub fn md_model_predict_nv12(h: MDModelHandle, y: *const c_void, uv: *const c_void,
+        w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src_device: MDDevice,
+        out: *mut MDResultHandle) -> MDStatus;
+    pub fn md_model_predict_batch(h: MDModelHandle, imgs: *mut MDImageHandle, n: usize, out: *mut MDResultHandle) -> MDStatus;
 
-    pub fn md_read_image(path: *const c_char) -> MDImage;
-    pub fn md_read_image_from_device(
-        device_id: c_int, frame_width: c_int, frame_height: c_int, is_save_file: bool,
-    ) -> MDImage;
-    pub fn md_save_image(image: *const MDImage, path: *const c_char);
-    pub fn md_clone_image(src: *const MDImage) -> MDImage;
-    pub fn md_crop_image(src: *mut MDImage, rect: *const MDRect) -> MDImage;
-    pub fn md_free_image(image: *mut MDImage);
-    pub fn md_show_image(image: *const MDImage);
+    // ── 音频 ──
+    pub fn md_audio_asr_wav(h: MDModelHandle, wav: *const c_char, text: *mut *const c_char) -> MDStatus;
+    pub fn md_audio_asr(h: MDModelHandle, samples: *const c_float, n: usize, sample_rate: c_int, text: *mut *const c_char) -> MDStatus;
+    pub fn md_audio_tts(h: MDModelHandle, text: *const c_char, voice: *const c_char, speed: c_float,
+        sample_rate: *mut c_int, audio: *mut *const c_float, audio_n: *mut usize) -> MDStatus;
+    pub fn md_wav_save(samples: *const c_float, n: usize, sample_rate: c_int, path: *const c_char) -> MDStatus;
 
-    // 格式转换
-    pub fn md_from_compressed_bytes(bytes: *const u8, size: c_int) -> MDImage;
-    pub fn md_to_compressed_bytes(image: *const MDImage, ext: *const c_char) -> MDImage;
-    pub fn md_from_bgr24_data(data: *const u8, width: c_int, height: c_int) -> MDImage;
-    pub fn md_from_rgb24_data(data: *const u8, width: c_int, height: c_int) -> MDImage;
-    pub fn md_from_rgb24_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
-    pub fn md_from_yuv420p_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
-    pub fn md_from_nv12_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
-    pub fn md_from_nv21_data_to_bgr24(data: *const u8, width: c_int, height: c_int) -> MDImage;
-    pub fn md_from_base64_str(base64_str: *const c_char) -> MDImage;
+    // ── 结果 ──
+    pub fn md_result_destroy(h: MDResultHandle);
+    pub fn md_result_kind(h: MDResultHandle, kind: *mut MDResultKind) -> MDStatus;
+    pub fn md_result_count(h: MDResultHandle, count: *mut usize) -> MDStatus;
 
-    // ── 工具 ──
+    // 数组式 getter
+    pub fn md_result_detection(h: MDResultHandle, items: *mut *const MDDetectionItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_classification(h: MDResultHandle, items: *mut *const MDClassifyItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_pose(h: MDResultHandle, items: *mut *const MDPoseItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_keypoints(h: MDResultHandle, i: usize, kps: *mut *const MDPoint3, n: *mut usize) -> MDStatus;
+    pub fn md_result_obb(h: MDResultHandle, items: *mut *const MDObbItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_instance_seg(h: MDResultHandle, items: *mut *const MDIsegItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_mask(h: MDResultHandle, i: usize, buf: *mut *const u8, out_h: *mut usize, out_w: *mut usize) -> MDStatus;
+    pub fn md_result_sem_seg(h: MDResultHandle, labels: *mut *const u8, out_h: *mut usize, out_w: *mut usize, num_classes: *mut c_int) -> MDStatus;
+    pub fn md_result_depth(h: MDResultHandle, depth: *mut *const c_float, out_h: *mut usize, out_w: *mut usize) -> MDStatus;
+    pub fn md_result_face(h: MDResultHandle, items: *mut *const MDFaceItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_face_kps(h: MDResultHandle, i: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
+    pub fn md_result_face_embedding(h: MDResultHandle, i: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_insightface(h: MDResultHandle, items: *mut *const MDInsightFaceItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_kps(h: MDResultHandle, i: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_embedding(h: MDResultHandle, i: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_pose(h: MDResultHandle, i: usize, pose: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_ocr(h: MDResultHandle, i: usize, quad: *mut *const c_int, text: *mut *const c_char, score: *mut c_float) -> MDStatus;
+    pub fn md_result_ocr_cls(h: MDResultHandle, i: usize, cls_label: *mut c_int, cls_score: *mut c_float) -> MDStatus;
+    pub fn md_result_lpr(h: MDResultHandle, items: *mut *const MDLprItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_plate(h: MDResultHandle, i: usize, plate: *mut *const c_char, color: *mut *const c_char) -> MDStatus;
+    pub fn md_result_lpr_keypoints(h: MDResultHandle, i: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
+    pub fn md_result_attribute(h: MDResultHandle, items: *mut *const MDAttrItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_attr_scores(h: MDResultHandle, i: usize, scores: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_age(h: MDResultHandle, age: *mut c_int) -> MDStatus;
+    pub fn md_result_gender(h: MDResultHandle, gender: *mut c_int) -> MDStatus;
 
-    pub fn md_get_version() -> *const c_char;
+    // ── 绘制（基础） ──
+    pub fn md_draw_rect(h: MDImageHandle, x: c_float, y: c_float, w: c_float, h: c_float,
+        color: MDColorRGBA, alpha: c_float) -> MDStatus;
+    pub fn md_draw_polygon(h: MDImageHandle, xs: *const c_float, ys: *const c_float, n: usize,
+        color: MDColorRGBA, alpha: c_float) -> MDStatus;
+    pub fn md_draw_text(h: MDImageHandle, x: c_float, y: c_float, text: *const c_char,
+        font_path: *const c_char, font_size: c_int, color: MDColorRGBA, alpha: c_float) -> MDStatus;
 
-    // ── 检测（Detection） ──
-
-    pub fn md_create_detection_model(
-        model: *mut MDModel,
-        path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_detection_predict(
-        model: *const MDModel,
-        image: *const MDImage,
-        results: *mut MDDetectionResults,
-    ) -> MDStatusCode;
-    pub fn md_detection_predict_nv12(
-        model: *const MDModel,
-        src_y: *const u8,
-        src_uv: *const u8,
-        width: c_int,
-        height: c_int,
-        step_y: c_int,
-        step_uv: c_int,
-        src_device: MDDevice,
-        results: *mut MDDetectionResults,
-    ) -> MDStatusCode;
-    pub fn md_free_detection_result(results: *mut MDDetectionResults);
-    pub fn md_free_detection_model(model: *mut MDModel);
-    pub fn md_set_detection_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
-    pub fn md_draw_detection_result(
-        image: *const MDImage,
-        results: *const MDDetectionResults,
-        threshold: f64,
-        font_path: *const c_char,
-        font_size: i32,
-        alpha: f64,
-        save_result: i32,
-    );
-
-    // ── 分类（Classification） ──
-
-    pub fn md_create_classification_model(
-        model: *mut MDModel,
-        path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_classification_predict(
-        model: *const MDModel,
-        image: *const MDImage,
-        topk: c_int,
-        results: *mut MDClassificationResults,
-    ) -> MDStatusCode;
-    pub fn md_free_classification_result(results: *mut MDClassificationResults);
-    pub fn md_free_classification_model(model: *mut MDModel);
-
-    // ── 人脸检测（Face Detection） ──
-
-    pub fn md_create_face_det_model(
-        model: *mut MDModel,
-        path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_det_predict(
-        model: *const MDModel,
-        image: *const MDImage,
-        results: *mut MDKeyPointResults,
-    ) -> MDStatusCode;
-    pub fn md_free_face_det_result(results: *mut MDKeyPointResults);
-    pub fn md_free_face_det_model(model: *mut MDModel);
-
-    // ── insightface 人脸分析 ──
-
-    pub fn md_create_insightface_model(
-        model: *mut MDModel,
-        det_model_path: *const c_char,
-        rec_model_path: *const c_char,
-        lmk2d_model_path: *const c_char,
-        lmk3d_model_path: *const c_char,
-        genderage_model_path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_create_insightface_det_model(
-        model: *mut MDModel,
-        model_path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_insightface_analyze(
-        model: *const MDModel,
-        image: *const MDImage,
-        results: *mut MDInsightFaceResults,
-    ) -> MDStatusCode;
-    pub fn md_insightface_detect(
-        model: *const MDModel,
-        image: *const MDImage,
-        results: *mut MDKeyPointResults,
-    ) -> MDStatusCode;
-    pub fn md_insightface_set_det_thresh(model: *mut MDModel, thresh: c_float);
-    pub fn md_free_insightface_result(results: *mut MDInsightFaceResults);
-    pub fn md_free_insightface_model(model: *mut MDModel);
-
-    // ── TTS（Kokoro） ──
-
-    #[cfg(feature = "audio")]
-    pub fn md_create_kokoro_model(
-        model: *mut MDModel,
-        params: *const MDKokoroParameters,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    #[cfg(feature = "audio")]
-    pub fn md_kokoro_model_predict(
-        model: *const MDModel,
-        text: *const c_char,
-        result: *mut MDTTSResult,
-    ) -> MDStatusCode;
-    #[cfg(feature = "audio")]
-    pub fn md_free_kokoro_result(result: *mut MDTTSResult);
-    #[cfg(feature = "audio")]
-    pub fn md_free_kokoro_model(model: *mut MDModel);
-    #[cfg(feature = "audio")]
-    pub fn md_write_wav(result: *const MDTTSResult, path: *const c_char) -> MDStatusCode;
-
-    // ── OBB ──
-    pub fn md_create_obb_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_set_obb_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
-    pub fn md_obb_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDObbResults,
-    ) -> MDStatusCode;
-    pub fn md_free_obb_result(results: *mut MDObbResults);
-    pub fn md_free_obb_model(model: *mut MDModel);
-
-    // ── 实例分割 ──
-    pub fn md_create_instance_seg_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_set_instance_seg_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
-    pub fn md_instance_seg_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDIsegResults,
-    ) -> MDStatusCode;
-    pub fn md_free_instance_seg_result(results: *mut MDIsegResults);
-    pub fn md_free_instance_seg_model(model: *mut MDModel);
-
-    // ── 语义分割（Semantic Segmentation） ──
-    pub fn md_create_sem_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_set_sem_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
-    pub fn md_sem_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut MDSemSegResult,
-    ) -> MDStatusCode;
-    pub fn md_free_sem_result(result: *mut MDSemSegResult);
-    pub fn md_free_sem_model(model: *mut MDModel);
-
-    // ── 深度估计（Depth Estimation） ──
-    pub fn md_create_depth_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_set_depth_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
-    pub fn md_depth_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut MDDepthResult,
-    ) -> MDStatusCode;
-    pub fn md_free_depth_result(result: *mut MDDepthResult);
-    pub fn md_free_depth_model(model: *mut MDModel);
-
-    // ── OCR ──
-    pub fn md_create_ocr_model(
-        model: *mut MDModel, params: *const MDOCRModelParameters, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_ocr_model_predict(
-        model: *const MDModel, image: *mut MDImage, results: *mut MDOCRResults,
-    ) -> MDStatusCode;
-    pub fn md_free_ocr_result(results: *mut MDOCRResults);
-    pub fn md_free_ocr_model(model: *mut MDModel);
-
-    // ── OCR Recognition ──
-    pub fn md_create_ocr_recognition_model(
-        model: *mut MDModel, path: *const c_char, dict_path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_ocr_recognition_model_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut MDOCRResult,
-    ) -> MDStatusCode;
-    pub fn md_free_ocr_recognition_result(result: *mut MDOCRResult);
-    pub fn md_free_ocr_recognition_model(model: *mut MDModel);
-
-    // ── Structure Table ──
-    pub fn md_create_structure_table_model(
-        model: *mut MDModel, params: *const MDStructureTableModelParameters,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_structure_table_model_predict(
-        model: *const MDModel, image: *mut MDImage, results: *mut MDOCRResults,
-    ) -> MDStatusCode;
-    pub fn md_free_structure_table_result(results: *mut MDOCRResults);
-    pub fn md_free_structure_table_model(model: *mut MDModel);
-
-    // ── 姿态估计（Keypoint） ──
-    pub fn md_create_keypoint_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_set_keypoint_input_size(model: *const MDModel, size: MDSize) -> MDStatusCode;
-    pub fn md_set_keypoint_num(model: *const MDModel, num: c_int) -> MDStatusCode;
-    pub fn md_keypoint_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDKeyPointResults,
-    ) -> MDStatusCode;
-    pub fn md_free_keypoint_result(results: *mut MDKeyPointResults);
-    pub fn md_free_keypoint_model(model: *mut MDModel);
-
-    // ── LPR 检测 ──
-    pub fn md_create_lpr_det_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_lpr_det_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDKeyPointResults,
-    ) -> MDStatusCode;
-    pub fn md_free_lpr_det_result(results: *mut MDKeyPointResults);
-    pub fn md_free_lpr_det_model(model: *mut MDModel);
-
-    // ── LPR 识别 ──
-    pub fn md_create_lpr_rec_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_lpr_rec_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDLPRResults,
-    ) -> MDStatusCode;
-    pub fn md_free_lpr_rec_result(results: *mut MDLPRResults);
-    pub fn md_free_lpr_rec_model(model: *mut MDModel);
-
-    // ── LPR Pipeline ──
-    pub fn md_create_lpr_pipeline_model(
-        model: *mut MDModel, det_path: *const c_char, rec_path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_lpr_pipeline_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDLPRResults,
-    ) -> MDStatusCode;
-    pub fn md_free_lpr_pipeline_result(results: *mut MDLPRResults);
-    pub fn md_free_lpr_pipeline_model(model: *mut MDModel);
-
-    // ── 行人属性 ──
-    pub fn md_create_attr_model(
-        model: *mut MDModel, det_path: *const c_char, cls_path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_attr_model_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDAttributeResults,
-    ) -> MDStatusCode;
-    pub fn md_free_attr_result(results: *mut MDAttributeResults);
-    pub fn md_free_attr_model(model: *mut MDModel);
-
-    // ── 人脸识别 ──
-    pub fn md_create_face_rec_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_rec_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut MDFaceRecognizerResult,
-    ) -> MDStatusCode;
-    pub fn md_free_face_rec_result(result: *mut MDFaceRecognizerResult);
-    pub fn md_free_face_rec_model(model: *mut MDModel);
-
-    // ── 人脸年龄 ──
-    pub fn md_create_face_age_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_age_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut c_int,
-    ) -> MDStatusCode;
-    pub fn md_free_face_age_result(result: *mut c_int);
-    pub fn md_free_face_age_model(model: *mut MDModel);
-
-    // ── 人脸性别 ──
-    pub fn md_create_face_gender_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_gender_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut MDFaceGenderResult,
-    ) -> MDStatusCode;
-    pub fn md_free_face_gender_result(result: *mut MDFaceGenderResult);
-    pub fn md_free_face_gender_model(model: *mut MDModel);
-
-    // ── 人脸防伪第一段 ──
-    pub fn md_create_face_as_first_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_as_first_predict(
-        model: *const MDModel, image: *const MDImage, result: *mut c_float,
-    ) -> MDStatusCode;
-    pub fn md_free_face_as_first_model(model: *mut MDModel);
-
-    // ── 人脸防伪第二段 ──
-    pub fn md_create_face_as_second_model(
-        model: *mut MDModel, path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_as_second_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDFaceAsSecondResults,
-    ) -> MDStatusCode;
-    pub fn md_free_face_as_second_result(results: *mut MDFaceAsSecondResults);
-    pub fn md_free_face_as_second_model(model: *mut MDModel);
-
-    // ── 人脸防伪 Pipeline ──
-    pub fn md_create_face_as_pipeline_model(
-        model: *mut MDModel, det_path: *const c_char, first_path: *const c_char,
-        second_path: *const c_char, option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_as_pipeline_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDFaceAsResults,
-        fuse_threshold: c_float, clarity_threshold: c_float,
-    ) -> MDStatusCode;
-    pub fn md_free_face_as_pipeline_result(results: *mut MDFaceAsResults);
-    pub fn md_free_face_as_pipeline_model(model: *mut MDModel);
-
-    // ── 人脸识别 Pipeline ──
-    pub fn md_create_face_rec_pipeline_model(
-        model: *mut MDModel, det_path: *const c_char, rec_path: *const c_char,
-        option: *const MDRuntimeOption,
-    ) -> MDStatusCode;
-    pub fn md_face_rec_pipeline_predict(
-        model: *const MDModel, image: *const MDImage, results: *mut MDFaceRecognizerResults,
-    ) -> MDStatusCode;
-    pub fn md_free_face_rec_pipeline_result(results: *mut MDFaceRecognizerResults);
-    pub fn md_free_face_rec_pipeline_model(model: *mut MDModel);
-
-    // ── 通用克隆 ──
-    pub fn md_clone_model(model: *mut MDModel, from: *const MDModel) -> MDStatusCode;
+    // ── 结果可视化（句柄直达 C++ vis_*） ──
+    pub fn md_draw_result(img: MDImageHandle, result: MDResultHandle, opt: *const MDDrawOptions) -> MDStatus;
 }

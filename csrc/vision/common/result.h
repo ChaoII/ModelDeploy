@@ -10,17 +10,6 @@
 #include "vision/common/struct.h"
 
 namespace modeldeploy::vision {
-    enum ResultType {
-        CLASSIFY,
-        DETECTION,
-        OCR,
-        FACE_DETECTION,
-        FACE_RECOGNITION,
-        MASK,
-        SEM_SEG,
-        DEPTH,
-    };
-
     enum class FaceAntiSpoofResult:std::uint8_t {
         REAL,
         FUZZY,
@@ -34,13 +23,13 @@ namespace modeldeploy::vision {
         std::vector<int32_t> label_ids;
         std::vector<float> scores;
         std::vector<float> feature;
-        ResultType type = ResultType::CLASSIFY;
         void reserve(int size);
         void resize(int size);
         void clear();
+        // 释放内部 vector 的 capacity（真正归还内存）
         void free();
         ClassifyResult(const ClassifyResult& other) = default;
-        ClassifyResult& operator=(ClassifyResult&& other) noexcept;
+        ClassifyResult& operator=(ClassifyResult&& other) noexcept = default;
     };
 
     /*! Mask structure, used in DetectionResult for instance segmentation models
@@ -48,8 +37,8 @@ namespace modeldeploy::vision {
     struct MODELDEPLOY_CXX_EXPORT Mask {
         std::vector<uint8_t> buffer;
         std::vector<int64_t> shape; // (H,W) ...
-        ResultType type = ResultType::MASK;
         void clear();
+        // 释放内部 vector 的 capacity（真正归还内存）
         void free();
         void* data() { return buffer.data(); }
         [[nodiscard]] const void* data() const { return buffer.data(); }
@@ -63,7 +52,6 @@ namespace modeldeploy::vision {
         Rect2f box;
         int32_t label_id{};
         float score{};
-        ResultType type = ResultType::DETECTION;
     };
 
 
@@ -72,7 +60,6 @@ namespace modeldeploy::vision {
         Mask mask;
         int32_t label_id{};
         float score{};
-        ResultType type = ResultType::DETECTION;
     };
 
     /*! @brief Semantic segmentation result structure for yolo26n-sem (cityscapes 19 classes)
@@ -82,7 +69,6 @@ namespace modeldeploy::vision {
         std::vector<uint8_t> labels;
         std::vector<int64_t> shape; // (H, W)
         int32_t num_classes{};
-        ResultType type = ResultType::SEM_SEG;
     };
 
     /*! @brief Depth estimation result structure for yolo26n-depth (log-depth 模型输出经 exp 还原)
@@ -91,14 +77,12 @@ namespace modeldeploy::vision {
     struct MODELDEPLOY_CXX_EXPORT DepthResult {
         std::vector<float> depth;
         std::vector<int64_t> shape; // (H, W)
-        ResultType type = ResultType::DEPTH;
     };
 
     struct MODELDEPLOY_CXX_EXPORT ObbResult {
         RotatedRect rotated_box;
         int32_t label_id{};
         float score{};
-        ResultType type = ResultType::DETECTION;
     };
 
 
@@ -107,7 +91,6 @@ namespace modeldeploy::vision {
         std::vector<Point3f> keypoints;
         int32_t label_id{};
         float score{};
-        ResultType type = ResultType::FACE_DETECTION;
     };
 
 
@@ -120,13 +103,11 @@ namespace modeldeploy::vision {
         std::vector<std::array<int, 8>> table_boxes;
         std::vector<std::string> table_structure;
         std::string table_html;
-        ResultType type = ResultType::OCR;
         void clear();
     };
 
     struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult {
         std::vector<float> embedding;
-        ResultType type = ResultType::FACE_RECOGNITION;
     };
 
     struct MODELDEPLOY_CXX_EXPORT LprResult {

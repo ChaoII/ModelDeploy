@@ -1,0 +1,412 @@
+//
+// ModelDeploy 纯 C API v2
+//
+// 设计原则：
+//  1. 不透明句柄：调用方永远接触不到库内部指针/结构体字段，杜绝类型强转与字段篡改。
+//  2. 单一分发点：模型创建/释放/推理各自只有一个入口，内部按类型分发，消灭重复样板。
+//  3. 统一内存所有权：句柄一律由库分配/释放，结果统一 md_result_destroy，杜绝
+//     malloc/new[]/strdup 混用导致的不配对 free。
+//  4. 纯 C99：头文件不依赖 C++ 语法（无 bool/默认参数/引用），任何 C 编译器可编译。
+//  5. 富错误模型：MDStatus 覆盖参数/状态/并发类错误，md_get_last_error() 提供线程安全
+//     的错误信息。
+//  6. 线程模型：每个句柄只能单线程使用；多线程并发需各自 create 句柄。库内部不加锁
+//     以保持零开销。
+//  7. 数组式结果访问：固定字段结果一次取回 blittable 结构体数组（零拷贝），可变长
+//     数据（关键点/embedding/mask/字符串）按项取，每次仅一次调用。
+//
+
+#ifndef MD_CAPI_V2_H
+#define MD_CAPI_V2_H
+
+#include <stddef.h>
+
+/* 导出宏（Windows dllexport / Linux visibility） */
+#if defined(_WIN32)
+#  if defined(MD_CAPI)
+#    define MD_CAPI_EXPORT __declspec(dllexport)
+#  else
+#    define MD_CAPI_EXPORT __declspec(dllimport)
+#  endif
+#else
+#  define MD_CAPI_EXPORT __attribute__((visibility("default")))
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ==================== 错误模型 ==================== */
+
+typedef enum MD_STATUS {
+    MD_OK = 0,
+    MD_ERR_NULL_POINTER,        /* 入参为空 */
+    MD_ERR_INVALID_ARGUMENT,    /* 参数不合法（路径为空/尺寸非法等） */
+    MD_ERR_PATH_NOT_FOUND,      /* 模型/文件不存在 */
+    MD_ERR_MODEL_LOAD,          /* 模型加载失败（含后端初始化失败） */
+    MD_ERR_MODEL_PREDICT,       /* 推理失败 */
+    MD_ERR_MODEL_INIT,          /* 模型初始化失败（is_initialized()==false） */
+    MD_ERR_UNSUPPORTED_TYPE,    /* 模型类型不支持 */
+    MD_ERR_UNSUPPORTED_BACKEND, /* 后端不可用 */
+    MD_ERR_OUT_OF_MEMORY,       /* 内存分配失败 */
+    MD_ERR_IMAGE_DECODE,        /* 图像解码失败 */
+    MD_ERR_BUSY,                /* 句柄并发使用（检测到非单线程） */
+    MD_ERR_NOT_IMPLEMENTED,     /* 功能未实现 */
+    MD_ERR_AUDIO_DECODE         /* 音频解码失败 */
+} MDStatus;
+
+/* 线程安全地获取最近一次错误信息（thread_local，返回空串表示无错误） */
+MD_CAPI_EXPORT const char* md_get_last_error(void);
+
+/* ==================== 句柄类型（不透明：调用方只见指针，不可解引用） ==================== */
+
+typedef struct md_model_handle* MDModelHandle;
+typedef struct md_image_handle* MDImageHandle;
+typedef struct md_result_handle* MDResultHandle;
+typedef struct md_option_handle* MDOptionHandle;
+
+/* ==================== 模型类型 ==================== */
+
+typedef enum MD_MODEL_KIND {
+    MD_MODEL_DETECTION = 0,
+    MD_MODEL_CLASSIFICATION,
+    MD_MODEL_POSE,
+    MD_MODEL_OBB,
+    MD_MODEL_INSTANCE_SEG,
+    MD_MODEL_SEM_SEG,
+    MD_MODEL_DEPTH,
+    MD_MODEL_FACE_DET,
+    MD_MODEL_FACE_REC,
+    MD_MODEL_FACE_AGE,
+    MD_MODEL_FACE_GENDER,
+    MD_MODEL_FACE_AS,
+    MD_MODEL_FACE_AS_PIPELINE,
+    MD_MODEL_FACE_REC_PIPELINE,
+    MD_MODEL_INSIGHTFACE,
+    MD_MODEL_INSIGHTFACE_DET,
+    MD_MODEL_OCR,
+    MD_MODEL_OCR_DET,
+    MD_MODEL_OCR_REC,
+    MD_MODEL_OCR_CLS,
+    MD_MODEL_LPR_DET,
+    MD_MODEL_LPR_REC,
+    MD_MODEL_LPR_PIPELINE,
+    MD_MODEL_PED_ATTR,
+    MD_MODEL_ASR,
+    MD_MODEL_TTS,
+    MD_MODEL_COUNT
+} MDModelKind;
+
+/* ==================== 运行时选项 ==================== */
+
+/* 设备与后端 */
+typedef enum MD_DEVICE {
+    MD_DEV_CPU = 0,
+    MD_DEV_GPU = 1,
+    MD_DEV_TPU = 2,
+    MD_DEV_OPENCL = 3,
+    MD_DEV_VULKAN = 4
+} MDDevice;
+
+typedef enum MD_BACKEND {
+    MD_BK_ORT = 0,
+    MD_BK_MNN = 1,
+    MD_BK_TRT = 2,
+    MD_BK_SOPHGO = 3
+} MDBackend;
+
+/* 创建默认选项（可后续用 setter 覆盖） */
+MD_CAPI_EXPORT MDStatus md_option_create(MDOptionHandle* out);
+MD_CAPI_EXPORT void md_option_destroy(MDOptionHandle);
+
+MD_CAPI_EXPORT void md_option_set_device(MDOptionHandle, MDDevice);
+MD_CAPI_EXPORT void md_option_set_backend(MDOptionHandle, MDBackend);
+MD_CAPI_EXPORT void md_option_set_cpu_threads(MDOptionHandle, int n);
+MD_CAPI_EXPORT void md_option_set_fp16(MDOptionHandle, int enable);
+MD_CAPI_EXPORT void md_option_set_trt_engine_path(MDOptionHandle, const char* path);
+
+/* ==================== 图像 ==================== */
+
+/* 从文件读图（库内解码 + 分配，调用方只需 destroy） */
+MD_CAPI_EXPORT MDStatus md_image_from_file(MDImageHandle* out, const char* path);
+
+/* 从内存构造（data 由调用方持有，库只引用不拷贝；调用方保证生命周期） */
+MD_CAPI_EXPORT MDStatus md_image_from_bgr24(MDImageHandle* out, const void* bgr, int w, int h);
+MD_CAPI_EXPORT MDStatus md_image_from_rgb24(MDImageHandle* out, const void* rgb, int w, int h);
+MD_CAPI_EXPORT MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
+                            int w, int h, int step_y, int step_uv, MDDevice src);
+MD_CAPI_EXPORT MDStatus md_image_from_yuv420p(MDImageHandle* out, const void* data, int w, int h);
+
+/* 编码数据 / base64 / 压缩字节 */
+MD_CAPI_EXPORT MDStatus md_image_from_encoded(MDImageHandle* out, const void* bytes, size_t n);
+MD_CAPI_EXPORT MDStatus md_image_from_base64(MDImageHandle* out, const char* b64);
+
+/* 深拷贝 / 裁剪 / 显示 / 保存 / 编码（输出 buffer 归图像句柄所有，随 destroy 释放） */
+MD_CAPI_EXPORT MDStatus md_image_clone(MDImageHandle in, MDImageHandle* out);
+MD_CAPI_EXPORT MDStatus md_image_crop(MDImageHandle in, int x, int y, int w, int h, MDImageHandle* out);
+MD_CAPI_EXPORT MDStatus md_image_show(MDImageHandle);
+MD_CAPI_EXPORT MDStatus md_image_save(MDImageHandle, const char* path);
+MD_CAPI_EXPORT MDStatus md_image_encode(MDImageHandle, const char* ext,
+                         const unsigned char** buf, size_t* n);
+
+MD_CAPI_EXPORT void md_image_destroy(MDImageHandle);
+
+/* 图像尺寸查询 */
+MD_CAPI_EXPORT MDStatus md_image_size(MDImageHandle, int* w, int* h);
+
+/* ==================== 模型 ==================== */
+
+/*
+ * 统一创建模型。
+ *  - kind: 模型类型（见 MD_MODEL_*）
+ *  - model_path: 模型文件路径（onnx/mnn/engine/bmodel，库按扩展名推断后端，
+ *    也可通过 option 强制指定后端）
+ *  - 多子模型（OCR/LPR pipeline/insightface/audio）：model_path 用 '|' 分隔符串联：
+ *      OCR:        det.onnx|cls.onnx|rec.onnx|dict.txt
+ *      LPR pipeline: det.onnx|rec.onnx
+ *      insightface:  det.onnx|rec.onnx|lmk2d.onnx|lmk3d.onnx[|genderage.onnx]
+ *      ASR:        model.onnx|tokens.txt
+ *      TTS:        model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
+ */
+MD_CAPI_EXPORT MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
+                         const char* model_path, const MDOptionHandle opt);
+
+MD_CAPI_EXPORT void md_model_destroy(MDModelHandle);
+
+/* 深拷贝模型句柄（独立实例，可并行/独立使用；基于模型内部 clone()，组合模型重新加载） */
+MD_CAPI_EXPORT MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out);
+
+/* 模型是否就绪 */
+MD_CAPI_EXPORT MDStatus md_model_ready(MDModelHandle);
+
+/* 设置模型输入尺寸（可选；默认按模型内置输入。pipeline 模型设置检测子模型尺寸） */
+MD_CAPI_EXPORT MDStatus md_model_set_input_size(MDModelHandle, int w, int h);
+
+/* 设置 pipeline 模型的分类子模型输入尺寸（当前仅 PedestrianAttribute 使用） */
+MD_CAPI_EXPORT MDStatus md_model_set_cls_input_size(MDModelHandle, int w, int h);
+
+/* 推理：统一入口（视觉），结果句柄由库分配，调用方用 md_result_destroy 释放 */
+MD_CAPI_EXPORT MDStatus md_model_predict(MDModelHandle, MDImageHandle, MDResultHandle* out);
+
+/*
+ * NV12 直接输入推理（硬解码/摄像头直通，省去 BGR 转换；支持的模型：
+ * detection/pose/obb/instance_seg/sem_seg/depth）。
+ *  - y/uv: NV12 平面指针；src_device 指明其所在内存设备（CPU/GPU/TPU）：
+ *      GPU 内存零拷贝直通 CUDA kernel，CPU 内存软件转换（均不进中间 BGR 缓冲）。
+ *  - step_y/step_uv: 平面行步长（0 表示 = width）。
+ * 结果句柄与 md_model_predict 同构，用 md_result_* 读取。
+ */
+MD_CAPI_EXPORT MDStatus md_model_predict_nv12(MDModelHandle,
+                               const void* y, const void* uv,
+                               int w, int h, int step_y, int step_uv,
+                               MDDevice src_device, MDResultHandle* out);
+
+/* 批量推理（多图，仅支持的模型） */
+MD_CAPI_EXPORT MDStatus md_model_predict_batch(MDModelHandle, MDImageHandle* imgs, size_t n,
+                                MDResultHandle* out);
+
+/* ==================== 音频（ASR / TTS） ==================== */
+
+/* ASR：从 wav 文件识别文本（库内解码 wav），text 归结果句柄所有无需释放 */
+MD_CAPI_EXPORT MDStatus md_audio_asr_wav(MDModelHandle, const char* wav_path, const char** text);
+
+/* ASR：从 PCM 浮点采样识别文本（data 由调用方持有，库只读） */
+MD_CAPI_EXPORT MDStatus md_audio_asr(MDModelHandle, const float* samples, size_t n, int sample_rate,
+                      const char** text);
+
+/* TTS：文本合成音频（零拷贝返回库内 buffer；audio 归结果内部，随 md_model_destroy 释放前有效） */
+MD_CAPI_EXPORT MDStatus md_audio_tts(MDModelHandle, const char* text, const char* voice, float speed,
+                      int* sample_rate, const float** audio, size_t* audio_n);
+
+/* wav 落盘辅助 */
+MD_CAPI_EXPORT MDStatus md_wav_save(const float* samples, size_t n, int sample_rate, const char* path);
+
+/* ==================== 结果（统一释放） ==================== */
+
+MD_CAPI_EXPORT void md_result_destroy(MDResultHandle);
+
+/* 结果种类（用于区分 getter） */
+typedef enum MD_RESULT_KIND {
+    MD_RES_DETECTION = 0,
+    MD_RES_CLASSIFICATION,
+    MD_RES_POSE,
+    MD_RES_OBB,
+    MD_RES_INSTANCE_SEG,
+    MD_RES_SEM_SEG,
+    MD_RES_DEPTH,
+    MD_RES_FACE,
+    MD_RES_FACE_REC,
+    MD_RES_INSIGHTFACE,
+    MD_RES_OCR,
+    MD_RES_LPR,
+    MD_RES_ATTR,
+    MD_RES_AGE,
+    MD_RES_GENDER,
+    MD_RES_ASR,
+    MD_RES_TTS
+} MDResultKind;
+
+MD_CAPI_EXPORT MDStatus md_result_kind(MDResultHandle, MDResultKind* out);
+/* 结果对应的图内实例数（人脸数/文本行数/目标数等；单值结果恒为 1） */
+MD_CAPI_EXPORT MDStatus md_result_count(MDResultHandle, size_t* out);
+
+/* ==================== 通用几何 / 颜色 ==================== */
+
+typedef struct MDBox { float x, y, w, h; } MDBox;
+typedef struct MDPoint { float x, y; } MDPoint;
+typedef struct MDPoint3 { float x, y, z; } MDPoint3;
+typedef struct MDRotatedBox { float cx, cy, w, h, angle; } MDRotatedBox;
+typedef struct MDRectF { float x, y, w, h; } MDRectF;
+typedef struct MDColorRGBA { unsigned char r, g, b, a; } MDColorRGBA;
+
+/* ==================== 结果项结构（blittable：纯数值、无指针，C# 可直映） ==================== */
+
+typedef struct MDDetectionItem {
+    float x, y, w, h;
+    float score;
+    int label_id;
+} MDDetectionItem;
+
+typedef struct MDClassifyItem {
+    int label_id;
+    float score;
+} MDClassifyItem;
+
+typedef struct MDPoseItem {
+    float x, y, w, h;
+    float score;
+} MDPoseItem;
+
+typedef struct MDObbItem {
+    float cx, cy, w, h, angle;
+    float score;
+    int label_id;
+} MDObbItem;
+
+typedef struct MDIsegItem {
+    float x, y, w, h;
+    float score;
+    int label_id;
+} MDIsegItem;
+
+typedef struct MDLprItem {
+    float x, y, w, h;
+    float score;
+} MDLprItem;
+
+typedef struct MDAttrItem {
+    float x, y, w, h;
+    float box_score;
+    int box_label_id;
+} MDAttrItem;
+
+typedef struct MDFaceItem {
+    float x, y, w, h;
+    float score;
+} MDFaceItem;
+
+typedef struct MDInsightFaceItem {
+    float x, y, w, h;
+    float score;
+    int gender;
+    int age;
+} MDInsightFaceItem;
+
+/* ==================== 结果 getter（数组式：一次取回，内存归结果句柄所有） ==================== */
+
+/* Detection */
+MD_CAPI_EXPORT MDStatus md_result_detection(MDResultHandle, const MDDetectionItem** items, size_t* count);
+
+/* Classification */
+MD_CAPI_EXPORT MDStatus md_result_classification(MDResultHandle, const MDClassifyItem** items, size_t* count);
+
+/* Pose（bbox + score 在数组项；骨架关键点在 md_result_keypoints） */
+MD_CAPI_EXPORT MDStatus md_result_pose(MDResultHandle, const MDPoseItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_keypoints(MDResultHandle, size_t i, const MDPoint3** kps, size_t* n);
+
+/* OBB */
+MD_CAPI_EXPORT MDStatus md_result_obb(MDResultHandle, const MDObbItem** items, size_t* count);
+
+/* InstanceSeg（mask 单列） */
+MD_CAPI_EXPORT MDStatus md_result_instance_seg(MDResultHandle, const MDIsegItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_mask(MDResultHandle, size_t i, const unsigned char** buf, size_t* out_h, size_t* out_w);
+
+/* SemSeg / Depth（整图单值） */
+MD_CAPI_EXPORT MDStatus md_result_sem_seg(MDResultHandle, const unsigned char** labels, size_t* h, size_t* w,
+                           int* num_classes);
+MD_CAPI_EXPORT MDStatus md_result_depth(MDResultHandle, const float** depth, size_t* h, size_t* w);
+
+/* FaceDet（bbox + score + 关键点） */
+MD_CAPI_EXPORT MDStatus md_result_face(MDResultHandle, const MDFaceItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_face_kps(MDResultHandle, size_t i, const MDPoint** kps, size_t* n);
+
+/* FaceRec（embedding 单列，i 为实例序号） */
+MD_CAPI_EXPORT MDStatus md_result_face_embedding(MDResultHandle, size_t i,
+                                  const float** embedding, size_t* emb_n);
+
+/* InsightFace 完整分析 */
+MD_CAPI_EXPORT MDStatus md_result_insightface(MDResultHandle, const MDInsightFaceItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_insightface_kps(MDResultHandle, size_t i, const MDPoint** kps, size_t* n);
+MD_CAPI_EXPORT MDStatus md_result_insightface_embedding(MDResultHandle, size_t i,
+                                         const float** embedding, size_t* emb_n);
+MD_CAPI_EXPORT MDStatus md_result_insightface_pose(MDResultHandle, size_t i,
+                                    const float** pose, size_t* n);
+
+/* OCR（字符串按行取） */
+MD_CAPI_EXPORT MDStatus md_result_ocr(MDResultHandle, size_t i, const int** quad, const char** text, float* score);
+
+/* OCR 方向分类（cls 子模型结果：label + score） */
+MD_CAPI_EXPORT MDStatus md_result_ocr_cls(MDResultHandle, size_t i, int* cls_label, float* cls_score);
+
+/* LPR（plate 单列） */
+MD_CAPI_EXPORT MDStatus md_result_lpr(MDResultHandle, const MDLprItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_plate(MDResultHandle, size_t i, const char** plate, const char** color);
+/* 车牌 4 角点（x1,y1,x2,y2,x3,y3,x4,y4，MDPoint 数组） */
+MD_CAPI_EXPORT MDStatus md_result_lpr_keypoints(MDResultHandle, size_t i, const MDPoint** kps, size_t* n);
+
+/* 行人属性 */
+MD_CAPI_EXPORT MDStatus md_result_attribute(MDResultHandle, const MDAttrItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_attr_scores(MDResultHandle, size_t i, const float** scores, size_t* n);
+
+/* 年龄 / 性别（单值，0 号索引） */
+MD_CAPI_EXPORT MDStatus md_result_age(MDResultHandle, int* age);
+MD_CAPI_EXPORT MDStatus md_result_gender(MDResultHandle, int* gender);
+
+/* ==================== 绘制（对 MDImageHandle 就地绘制） ==================== */
+
+MD_CAPI_EXPORT MDStatus md_draw_rect(MDImageHandle, float x, float y, float w, float h,
+                      MDColorRGBA color, float alpha);
+MD_CAPI_EXPORT MDStatus md_draw_polygon(MDImageHandle, const float* xs, const float* ys, size_t n,
+                         MDColorRGBA color, float alpha);
+MD_CAPI_EXPORT MDStatus md_draw_text(MDImageHandle, float x, float y, const char* text,
+                      const char* font_path, int font_size, MDColorRGBA color, float alpha);
+
+/* ==================== 结果可视化（直接复用 C++ 的 vis_* 系列） ==================== */
+
+/* 类别名映射：label_id -> 名称 */
+typedef struct MDLabelItem {
+    int id;
+    const char* name;
+} MDLabelItem;
+
+/* 绘制选项（与 C++ vis_* 参数一一对应，第三方可完全控制） */
+typedef struct MDDrawOptions {
+    double threshold;            /* 置信度阈值（默认 0.5） */
+    const MDLabelItem* label_map; /* 类别名映射，可为 NULL */
+    size_t label_map_size;       /* label_map 条数 */
+    const char* font_path;       /* 字体文件路径，可为 NULL */
+    int font_size;               /* 默认 14 */
+    double alpha;                /* 半透明混合系数（默认 0.15） */
+    int save_result;             /* 非 0 保存 vis_result.jpg */
+} MDDrawOptions;
+
+/* 把预测结果就地绘制到图像上（内部调用 C++ vis_det/vis_obb/vis_pose/vis_ocr/...）。
+ * 支持的 kind：detection / obb / pose / keypoints / instance_seg / sem_seg / depth /
+ *               ocr / lpr / attr / classification；其余返回 MD_ERR_UNSUPPORTED_TYPE。
+ * 注意：绘制需在结果句柄存活期间调用（Predict 返回的结果对象持有句柄，绘制前请勿释放）。 */
+MD_CAPI_EXPORT MDStatus md_draw_result(MDImageHandle, MDResultHandle, const MDDrawOptions* opt);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MD_CAPI_V2_H */

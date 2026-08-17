@@ -82,3 +82,8 @@ rust/modeldeploy/test.jpg
 rust/modeldeploy/trt_engine/
 rust_test_*.jpg
 identifier.sqlite
+
+build_audio
+cl_capi.txt
+
+build_py

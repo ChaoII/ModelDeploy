@@ -10,7 +10,6 @@ int main() {
     option.set_cpu_thread_num(10);
     option.use_ort_backend();
     option.use_gpu(0);
-    option.password = "123456";
     option.enable_fp16 = true;
     option.enable_trt = true;
     option.ort_option.trt_engine_cache_path = "./trt_engine";

@@ -28,6 +28,9 @@ namespace modeldeploy::audio::tts
 
         void set_sample_rate(const int32_t sample_rate) { sample_rate_ = sample_rate; }
 
+        // 深拷贝：复用已加载的 backend session（不重新加载模型/显存）；jieba/词典轻量重建
+        [[nodiscard]] std::unique_ptr<Kokoro> clone() const;
+
     protected:
         bool initialize();
 
@@ -36,6 +39,8 @@ namespace modeldeploy::audio::tts
         bool postprocess(std::vector<Tensor>& infer_result, std::vector<float>* out_audio);
 
     private:
+        // 供 clone() 使用：不触发 initialize
+        explicit Kokoro() = default;
         void load_tokens(const std::string&);
         void load_lexicons(const std::vector<std::string>&);
         bool load_voices(const std::vector<std::string>& speaker_names,

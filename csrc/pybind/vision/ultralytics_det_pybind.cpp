@@ -4,8 +4,7 @@
 
 #include "pybind/utils/utils.h"
 #include "vision/detection/ultralytics_det.h"
-#include "capi/vision/detection/detection_capi.h"
-#include "capi/utils/internal/utils.h"
+#include "capi2/md_capi.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_det(const pybind11::module& m) {
@@ -32,7 +31,7 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsPreprocessor::set_size)
             .def_property("padding_value",
                           &detection::UltralyticsPreprocessor::get_padding_value,
-                          &detection::UltralyticsPreprocessor::set_padding_value)
+                          &detection::UltralyticsPreprocessor::set_padding_value);
 
         pybind11::class_<detection::UltralyticsPostprocessor>(
                 m, "UltralyticsPostprocessor")
@@ -122,31 +121,23 @@ namespace modeldeploy::vision {
                      const auto* y_ptr = static_cast<const unsigned char*>(y_buf.ptr);
                      const auto* uv_ptr = static_cast<const unsigned char*>(uv_buf.ptr);
 
-                     MDModel model{};
-                     model.type = MDModelType::Detection;
-                     model.format = MDModelFormat::ONNX;
-                     model.model_name = nullptr;
-                     model.model_content = &self;
-
-                     MDDetectionResults c_results{};
-                     const auto status = md_detection_predict_nv12(
-                         &model, y_ptr, uv_ptr, width, height, step_y, step_uv,
-                         static_cast<MDDevice>(src_device), &c_results);
-                     if (status != MDStatusCode::Success) {
-                         throw std::runtime_error(
-                             "predict_nv12: md_detection_predict_nv12 failed with status=" +
-                             std::to_string(status));
-                     }
+                     // 直调 C++ 原生：NV12 预处理（CPU/CUDA/Sophgo-BMCV）由 processor backend 按 src_device 分发
                      std::vector<DetectionResult> results;
-                     c_results_2_detection_results(&c_results, &results);
-                     md_free_detection_result(&c_results);
+                     const Device dev =
+                         src_device == static_cast<int>(Device::GPU) ? Device::GPU
+                         : src_device == static_cast<int>(Device::TPU) ? Device::TPU
+                                                                       : Device::CPU;
+                     if (!self.predict_nv12(y_ptr, uv_ptr, width, height, step_y_eff, step_uv_eff,
+                                            &results, nullptr, dev)) {
+                         throw std::runtime_error("predict_nv12: predict_nv12 failed");
+                     }
                      return results;
                  },
                  pybind11::arg("src_y"), pybind11::arg("src_uv"),
                  pybind11::arg("width"), pybind11::arg("height"),
                  pybind11::arg("step_y") = 0,
                  pybind11::arg("step_uv") = 0,
-                 pybind11::arg("src_device") = static_cast<int>(MD_DEVICE_CPU))
+                 pybind11::arg("src_device") = static_cast<int>(MD_DEV_CPU))
             .def_property_readonly("preprocessor",
                                    &detection::UltralyticsDet::get_preprocessor)
             .def_property_readonly("postprocessor",

@@ -70,6 +70,9 @@ namespace modeldeploy::vision::face {
         [[nodiscard]] InsightFaceLandmark* lmk_3d() { return lmk_3d_.get(); }
         [[nodiscard]] InsightFaceGenderAge* genderage() { return genderage_.get(); }
 
+        // 深拷贝：复用已加载的子模型运行时（不重新加载模型/显存，适合多实例并行）
+        [[nodiscard]] std::unique_ptr<InsightFaceAnalysis> clone() const;
+
     private:
         // 内部实现：对给定 boxes 做 batch 子模型推理
         bool analyze_impl(const ImageData& image, const std::vector<InsightFaceBox>& boxes,
@@ -77,6 +80,12 @@ namespace modeldeploy::vision::face {
                           bool with_2d106, bool with_3d68,
                           bool with_recognition, bool with_genderage,
                           TimerArray* timers);
+        // 私有：用子模型 clone 构造深拷贝实例
+        InsightFaceAnalysis(std::unique_ptr<InsightFaceDet> det,
+                            std::unique_ptr<InsightFaceRecognition> rec,
+                            std::unique_ptr<InsightFaceLandmark> lmk2d,
+                            std::unique_ptr<InsightFaceLandmark> lmk3d,
+                            std::unique_ptr<InsightFaceGenderAge> genderage);
         std::unique_ptr<InsightFaceDet> det_;
         std::unique_ptr<InsightFaceRecognition> rec_;
         std::unique_ptr<InsightFaceLandmark> lmk_2d_;
