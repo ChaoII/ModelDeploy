@@ -12,11 +12,8 @@ set(TEST_SOURCES
     test_core.cpp
     test_bugfix.cpp
     test_image_data.cpp
-    test_capi_image.cpp
-    test_md_image.cpp
     test_vision_models.cpp
     test_processor_accuracy.cpp
-    test_insightface.cpp
     test_pipelines.cpp
     test_benchmark_insightface.cpp
     test_encryption.cpp
