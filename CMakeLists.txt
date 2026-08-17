@@ -213,6 +213,7 @@ if (BUILD_AUDIO)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cppjieba)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
+    include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include)
     list(APPEND ALL_SOURCE ${AUDIO_SOURCE})
     # 音频静态依赖 PRIVATE 链接（打进共享库，导出时无需第三方 target）
     list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core cppjieba)
