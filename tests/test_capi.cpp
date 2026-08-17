@@ -119,6 +119,13 @@ TEST_CASE("capi2 model set param + introspection", "[capi]") {
     REQUIRE(md_model_param_type(MD_MODEL_OCR_DET, "det_db_score_mode", &t) == MD_OK);
     CHECK(t == 'S');
 
+    // OCR 整链路自省也包含 cls_thresh（经 get_classifier() 路由）
+    const char* ocr_names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_OCR, &ocr_names) == MD_OK);
+    CHECK(std::string(ocr_names).find("cls_thresh") != std::string::npos);
+    REQUIRE(md_model_param_type(MD_MODEL_OCR, "cls_thresh", &t) == MD_OK);
+    CHECK(t == 'D');
+
     // 未知名 → INVALID_ARGUMENT
     CHECK(md_model_param_type(MD_MODEL_DETECTION, "nope", &t) == MD_ERR_INVALID_ARGUMENT);
 

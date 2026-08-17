@@ -797,8 +797,9 @@ const char* kind_param_names(MDModelKind kind) {
         case MD_MODEL_FACE_REC_PIPELINE:
             return "conf_threshold|nms_threshold|landmarks_per_face";
         case MD_MODEL_OCR_DET:
-        case MD_MODEL_OCR:
             return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation";
+        case MD_MODEL_OCR:
+            return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation|cls_thresh";
         case MD_MODEL_OCR_CLS:
             return "cls_thresh";
         case MD_MODEL_PED_ATTR:
@@ -833,12 +834,19 @@ char param_type_of(MDModelKind kind, const char* name) {
             if (std::strcmp(name, "landmarks_per_face") == 0) return PT_I;
             return 0;
         case MD_MODEL_OCR_DET:
+            if (std::strcmp(name, "det_db_thresh") == 0) return PT_D;
+            if (std::strcmp(name, "det_db_box_thresh") == 0) return PT_D;
+            if (std::strcmp(name, "det_db_unclip_ratio") == 0) return PT_D;
+            if (std::strcmp(name, "det_db_score_mode") == 0) return PT_S;
+            if (std::strcmp(name, "use_dilation") == 0) return PT_B;
+            return 0;
         case MD_MODEL_OCR:
             if (std::strcmp(name, "det_db_thresh") == 0) return PT_D;
             if (std::strcmp(name, "det_db_box_thresh") == 0) return PT_D;
             if (std::strcmp(name, "det_db_unclip_ratio") == 0) return PT_D;
             if (std::strcmp(name, "det_db_score_mode") == 0) return PT_S;
             if (std::strcmp(name, "use_dilation") == 0) return PT_B;
+            if (std::strcmp(name, "cls_thresh") == 0) return PT_D;
             return 0;
         case MD_MODEL_OCR_CLS:
             if (std::strcmp(name, "cls_thresh") == 0) return PT_D;
