@@ -1,45 +1,43 @@
 //
-// Created by AC on 2025-01-13.
+// capi2 人脸防伪 pipeline（scrfd + fas_first + fas_second）示例
 //
-
-#include <iostream>
-
-#include "capi/utils/md_image_capi.h"
-#include "capi/utils/md_utils_capi.h"
-#include "capi/vision/face/face_as_pipeline_capi.h"
-
+// 注意：capi2 中 MD_MODEL_FACE_AS_PIPELINE 尚未实现（md_model_create 返回
+// MD_ERR_UNSUPPORTED_TYPE），因此 capi2 目前无法输出 REAL/FUZZY/SPOOF 判定。
+// 本示例如实报告该限制，不伪造防伪结果。
+//
+#include "../capi2_common.h"
 
 int main() {
-    MDModel model;
-    const MDRuntimeOption option = md_create_default_runtime_option();
-    md_create_face_as_pipeline_model(&model,
-                                     "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx",
-                                     "../../test_data/test_models/onnx/face/fas_first.onnx",
-                                     "../../test_data/test_models/onnx/face/fas_second.onnx", &option);
-    MDImage image = md_read_image("../../test_data/test_images/test_face_detection4.jpg");
-    MDFaceAsResults c_results;
-    md_face_as_pipeline_predict(&model, &image, &c_results);
+    MDOptionHandle opt = nullptr;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_cpu_threads(opt, 4);
 
-    // REAL = 0, FUZZY = 1, SPOOF = 2
-    for (int i = 0; i < c_results.size; i++) {
-        switch (c_results.data[i]) {
-        case 0:
-            std::cout << "REAL" << std::endl;
-            break;
-        case 1:
-            std::cout << "FUZZY" << std::endl;
-            break;
-        case 2:
-            std::cout << "SPOOF" << std::endl;
-            break;
-        default:
-            std::cout << "UNKNOWN" << std::endl;
-            break;
-        }
+    MDModelHandle model = nullptr;
+    MDStatus st = md_model_create(&model, MD_MODEL_FACE_AS_PIPELINE,
+                                  "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx|"
+                                  "../../test_data/test_models/onnx/face/fas_first.onnx|"
+                                  "../../test_data/test_models/onnx/face/fas_second.onnx", opt);
+    if (st != MD_OK) {
+        std::fprintf(stderr,
+                     "[capi2] face anti-spoof pipeline unavailable in capi2: "
+                     "MD_MODEL_FACE_AS_PIPELINE is not implemented (need upstream wiring to "
+                     "SeetaFaceAsPipeline) -> %s\n", md_get_last_error());
+        md_option_destroy(opt);
+        return 0;
     }
 
-    md_free_image(&image);
-    md_free_face_as_pipeline_result(&c_results);
-    md_free_face_as_pipeline_model(&model);
+    MDImageHandle img = nullptr;
+    die(md_image_from_file(&img, "../../test_data/test_images/test_face_detection4.jpg"), "read image");
+    MDResultHandle res = nullptr;
+    st = md_model_predict(model, img, &res);
+    if (st != MD_OK)
+        std::fprintf(stderr, "[capi2] predict failed: %s\n", md_get_last_error());
+    else
+        md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(model);
+    md_option_destroy(opt);
     return 0;
 }

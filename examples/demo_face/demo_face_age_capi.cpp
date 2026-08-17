@@ -1,21 +1,33 @@
 //
-// Created by AC on 2025-01-13.
+// capi2 人脸年龄示例
 //
-#include <iostream>
-#include "capi/utils/md_image_capi.h"
-#include "capi/utils/md_utils_capi.h"
-#include "capi/vision/face/face_age_capi.h"
+#include "../capi2_common.h"
 
 int main() {
-    MDModel model;
-    const MDRuntimeOption option = md_create_default_runtime_option();
-    md_create_face_age_model(&model, "../../test_data/test_models/onnx/face/age_predictor.onnx", &option);
-    MDImage image = md_read_image("../../test_data/test_images/test_face_id1.jpg");
-    MDFaceAgeResult c_result;
-    md_face_age_predict(&model, &image, &c_result);
-    std::cout << "age is: " << c_result << std::endl;
-    md_free_image(&image);
-    md_free_face_age_result(&c_result);
-    md_free_face_age_model(&model);
+    MDOptionHandle opt = nullptr;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_cpu_threads(opt, 4);
+
+    MDModelHandle model = nullptr;
+    die(md_model_create(&model, MD_MODEL_FACE_AGE,
+                        "../../test_data/test_models/onnx/face/age_predictor.onnx", opt),
+        "create face age");
+
+    MDImageHandle img = nullptr;
+    die(md_image_from_file(&img, "../../test_data/test_images/test_face_id1.jpg"), "read image");
+
+    MDResultHandle res = nullptr;
+    die(md_model_predict(model, img, &res), "predict");
+
+    int age = 0;
+    die(md_result_age(res, &age), "get age");
+    std::printf("[capi2] age: %d\n", age);
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(model);
+    md_option_destroy(opt);
     return 0;
 }
