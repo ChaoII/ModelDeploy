@@ -50,6 +50,13 @@ static class Program
             Path.Combine(TestDataPath, "test_models/onnx/yolo11n/yolo11n.onnx"), CpuOrt());
         using var image = VisionImage.Read(Path.Combine(TestDataPath, "test_images/test_detection0.jpg"));
 
+        // 演示新参数 API：设置前后处理参数 + 参数名/类型自省
+        det.SetParam("conf_threshold", 0.4);
+        det.SetParam("nms_threshold", 0.45);
+        Console.WriteLine("params: " + string.Join(", ", det.ParamNames())
+            + " | conf_threshold type=" + det.ParamType("conf_threshold")
+            + " nms_threshold type=" + det.ParamType("nms_threshold"));
+
         // 纯推理：Prediction<T> 同时是可枚举的列表（读结果）
         using var result = det.Predict(image);
         Console.WriteLine($"detected {result.Count} objects");
@@ -141,9 +148,9 @@ static class Program
             Path.Combine(dir, "lexicon-zh.txt"),
             Path.Combine(dir, "voices.bin"),
             Path.Combine(dir, "dict"),
-            dir);
+            TestDataPath);
         using var tts = new KokoroModel(model, CpuOrt());
-        var result = tts.Predict("你好世界 hello world", "af_heart", 1.0f);
+        var result = tts.Predict("你好世界今天天气不错 hello world", "zf_001", 1.0f);
         tts.SaveWav(result, "output.wav");
         Console.WriteLine($"TTS: {result.Audio.Length} samples @ {result.SampleRate}Hz -> output.wav");
     }
@@ -152,11 +159,11 @@ static class Program
     {
         TestDetection();
         TestImage();
-        // TestClassification();
-        // TestPose();
-        // TestOCR();
-        // TestInsightFace();
-        // TestSenseVoice();
-        // TestKokoro();
+        TestClassification();
+        TestPose();
+        TestOCR();
+        TestInsightFace();
+        TestSenseVoice();
+        TestKokoro();
     }
 }

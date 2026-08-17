@@ -168,8 +168,8 @@ string wavPath, out IntPtr text);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_audio_tts(IntPtr handle,
-string text,
-string voice, float speed,
+IntPtr text,
+IntPtr voice, float speed,
             out int sampleRate, out IntPtr audio, out UIntPtr audioN);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

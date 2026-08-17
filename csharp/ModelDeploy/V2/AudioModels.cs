@@ -46,14 +46,24 @@ namespace ModelDeploy.V2.Models
 
         public TtsResult Predict(string text, string voice, float speed = 1.0f)
         {
-            var status = md_audio_tts(_handle, text, voice, speed, out var sr, out var audio, out var n);
-            if (status != MDStatus.MD_OK)
-                throw new InvalidOperationException($"TTS predict failed: {GetLastError()}");
-            return new TtsResult
+            var textPtr = Utf8.Alloc(text);
+            var voicePtr = Utf8.Alloc(voice);
+            try
             {
-                Audio = ResultReader.ReadFloats(audio, n),
-                SampleRate = sr
-            };
+                var status = md_audio_tts(_handle, textPtr, voicePtr, speed, out var sr, out var audio, out var n);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"TTS predict failed: {GetLastError()}");
+                return new TtsResult
+                {
+                    Audio = ResultReader.ReadFloats(audio, n),
+                    SampleRate = sr
+                };
+            }
+            finally
+            {
+                Utf8.Free(textPtr);
+                Utf8.Free(voicePtr);
+            }
         }
 
         /// <summary>把音频写入 wav 文件。</summary>
@@ -64,5 +74,23 @@ namespace ModelDeploy.V2.Models
             if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"Wav save failed: {GetLastError()}");
         }
+    }
+}
+
+namespace ModelDeploy
+{
+    /// <summary>把托管 string 以 UTF-8 字节分配为本机缓冲区（netstandard2.0 无 LPUTF8Str，手动封送）。</summary>
+    internal static class Utf8
+    {
+        public static IntPtr Alloc(string s)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(s);
+            var ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(bytes.Length + 1);
+            System.Runtime.InteropServices.Marshal.Copy(bytes, 0, ptr, bytes.Length);
+            System.Runtime.InteropServices.Marshal.WriteByte(ptr, bytes.Length, 0);
+            return ptr;
+        }
+
+        public static void Free(IntPtr ptr) => System.Runtime.InteropServices.Marshal.FreeHGlobal(ptr);
     }
 }
