@@ -1,46 +1,49 @@
 //
-// Created by aichao on 2025/2/24.
+// capi2 检测示例：演示 md_model_set_param_d 设置 conf/nms threshold
 //
-
-#include <iostream>
-#include <chrono>
-#include <capi/utils/md_utils_capi.h>
-#include "capi/utils/md_image_capi.h"
-#include "capi/vision/detection/detection_capi.h"
+#include "../capi2_common.h"
 
 int main() {
-    MDStatusCode ret;
-    MDModel model;
-    MDRuntimeOption runtime_option = md_create_default_runtime_option();
-    runtime_option.cpu_thread_num = 8;
-    runtime_option.device = MD_DEVICE_GPU;
-    runtime_option.trt_engine_cache_path = "./trt_engine";
-    runtime_option.device_id = 0;
-    runtime_option.enable_fp16 = 1;
-    runtime_option.enable_trt = 0;
-    if (ret = md_create_detection_model(&model, "../../test_data/test_models/onnx/yolo11n_nms.onnx", &runtime_option); ret) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-    if (constexpr MDSize size = {640, 640}; (ret = md_set_detection_input_size(&model, size)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-    auto im = md_read_image("../../test_data/test_images/test_detection0.jpg");
+    MDOptionHandle opt = nullptr;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_cpu_threads(opt, 4);
 
-    const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    MDDetectionResults result;
-    if ((ret = md_detection_predict(&model, &im, &result)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-    const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
-    md_draw_detection_result(&im, &result, 0.3, "../../test_data/msyh.ttc", 14, 0.5, 1);
-    std::cout << "duration cost: " << diff.count() << "s" << std::endl;
-    md_show_image(&im);
-    md_print_detection_result(&result);
-    md_free_detection_result(&result);
-    md_free_image(&im);
-    md_free_detection_model(&model);
-    return ret;
+    MDModelHandle model = nullptr;
+    die(md_model_create(&model, MD_MODEL_DETECTION,
+                        "../../test_data/test_models/onnx/yolo11n/yolo11n.onnx", opt), "create detection");
+
+    // 演示新参数 API
+    die(md_model_set_param_d(model, "conf_threshold", 0.4), "set conf_threshold");
+    die(md_model_set_param_d(model, "nms_threshold", 0.45), "set nms_threshold");
+
+    MDImageHandle img = nullptr;
+    die(md_image_from_file(&img, "../../test_data/test_images/test_detection0.jpg"), "read image");
+
+    MDResultHandle res = nullptr;
+    die(md_model_predict(model, img, &res), "predict");
+
+    const MDDetectionItem* items = nullptr;
+    size_t n = 0;
+    die(md_result_detection(res, &items, &n), "get detection result");
+    std::printf("detected %zu objects\n", n);
+    for (size_t i = 0; i < n; ++i)
+        std::printf("  [%d] score=%.3f box=(%.0f,%.0f,%.0f,%.0f)\n",
+                    items[i].label_id, items[i].score,
+                    items[i].x, items[i].y, items[i].w, items[i].h);
+
+    MDDrawOptions draw{};
+    draw.threshold = 0.4;
+    draw.font_path = "../../test_data/msyh.ttc";
+    draw.save_result = 1;
+    die(md_draw_result(img, res, &draw), "draw");
+    die(md_image_save(img, "capi2_detection_out.jpg"), "save");
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(model);
+    md_option_destroy(opt);
+    std::puts("OK -> capi2_detection_out.jpg");
+    return 0;
 }

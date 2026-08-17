@@ -1,40 +1,47 @@
 //
-// Created by aichao on 2025/5/26.
+// capi2 图像分类示例：演示 md_model_set_param_i/b
 //
-
-#include <iostream>
-#include <chrono>
-
-#include "capi/utils/md_image_capi.h"
-#include "capi/utils/md_utils_capi.h"
-#include "capi/vision/classification/classification_capi.h"
+#include "../capi2_common.h"
 
 int main() {
-    MDStatusCode ret;
-    MDModel model;
-    const MDRuntimeOption option = md_create_default_runtime_option();
-    if (ret = md_create_classification_model(&model, "../../test_data/test_models/onnx/yolo11n-cls.onnx", &option); ret) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-    if (constexpr MDSize size = {224, 224}; (ret = md_set_classification_input_size(&model, size)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-    const std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    auto im = md_read_image("../../test_data/test_images/test_face.jpg");
-    MDClassificationResults result;
-    if ((ret = md_classification_predict(&model, &im, &result)) != 0) {
-        std::cout << ret << std::endl;
-        return ret;
-    }
-    md_draw_classification_result(&im, &result, 1, 0.5, "../../test_data/msyh.ttc", 14, 0.5, 1);
-    const std::chrono::duration<double> diff = std::chrono::system_clock::now() - start;
-    std::cout << "duration cost: " << diff.count() << "s" << std::endl;
-    md_show_image(&im);
-    md_print_classification_result(&result);
-    md_free_classification_result(&result);
-    md_free_image(&im);
-    md_free_classification_model(&model);
-    return ret;
+    MDOptionHandle opt = nullptr;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_cpu_threads(opt, 4);
+
+    MDModelHandle model = nullptr;
+    die(md_model_create(&model, MD_MODEL_CLASSIFICATION,
+                        "../../test_data/test_models/onnx/yolo11n/yolo11n-cls.onnx", opt), "create classification");
+
+    // 演示新参数 API
+    die(md_model_set_param_i(model, "top_k", 5), "set top_k");
+    die(md_model_set_param_b(model, "multi_label", 0), "set multi_label");
+
+    MDImageHandle img = nullptr;
+    die(md_image_from_file(&img, "../../test_data/test_images/bus.jpg"), "read image");
+
+    MDResultHandle res = nullptr;
+    die(md_model_predict(model, img, &res), "predict");
+
+    const MDClassifyItem* items = nullptr;
+    size_t n = 0;
+    die(md_result_classification(res, &items, &n), "get classification result");
+    std::printf("top %zu classes\n", n);
+    for (size_t i = 0; i < n; ++i)
+        std::printf("  [%d] score=%.3f\n", items[i].label_id, items[i].score);
+
+    MDDrawOptions draw{};
+    draw.threshold = 0.4;
+    draw.font_path = "../../test_data/msyh.ttc";
+    draw.save_result = 1;
+    die(md_draw_result(img, res, &draw), "draw");
+    die(md_image_save(img, "capi2_cls_out.jpg"), "save");
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(model);
+    md_option_destroy(opt);
+    std::puts("OK -> capi2_cls_out.jpg");
+    return 0;
 }
