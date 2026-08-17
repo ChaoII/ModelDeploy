@@ -57,6 +57,16 @@ namespace ModelDeploy.V2
             return new VisionImage(hh);
         }
 
+        /// <summary>
+        /// 包装 predict_nv12 输出的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
+        /// 生命周期由本对象管理（Dispose 调用 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
+        /// </summary>
+        public static VisionImage FromDeviceFrame(IntPtr handle)
+        {
+            if (handle == IntPtr.Zero) throw new ArgumentNullException(nameof(handle));
+            return new VisionImage(handle);
+        }
+
         public static VisionImage FromYuv420PData(byte[] data, int w, int h)
         {
             var status = md_image_from_yuv420p(out var hh, data, w, h);

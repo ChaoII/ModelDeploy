@@ -25,6 +25,13 @@ namespace ModelDeploy.V2.Models
             int w, int h, int stepY = 0, int stepUv = 0, Device srcDevice = Device.CPU)
             => MakePredictionNv12(y, uv, w, h, stepY, stepUv, srcDevice, ReadDetection);
 
+        /// <summary>NV12 推理并返回绑定的输入帧（设备相关的 ImageData 包装，可取平面指针/就地绘制）。
+        /// Frame 为 null 或需调用方 Dispose。</summary>
+        public (Prediction<DetectionResult> Prediction, VisionImage Frame) PredictNv12WithFrame(
+            byte[] y, byte[] uv,
+            int w, int h, int stepY = 0, int stepUv = 0, Device srcDevice = Device.CPU)
+            => MakePredictionNv12WithFrame(y, uv, w, h, stepY, stepUv, srcDevice, ReadDetection);
+
         private static DetectionResult[] ReadDetection(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDDetectionItem>(result, md_result_detection);

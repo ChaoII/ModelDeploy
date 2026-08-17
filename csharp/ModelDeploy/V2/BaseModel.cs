@@ -124,11 +124,27 @@ namespace ModelDeploy.V2
         protected Prediction<T> MakePredictionNv12<T>(byte[] y, byte[] uv,
             int w, int h, int stepY, int stepUv, Device srcDevice, Func<IntPtr, T[]> reader)
         {
+            var (pred, frame) = MakePredictionNv12WithFrame<T>(y, uv, w, h, stepY, stepUv, srcDevice, reader);
+            frame?.Dispose();
+            return pred;
+        }
+
+        /// <summary>
+        /// NV12 直接输入推理并返回绑定的输入帧（设备相关的 ImageData 包装）。
+        /// 可从 Frame 取 Y/UV 平面指针或就地绘制；Frame 由调用方负责 Dispose，
+        /// Prediction 也需 Dispose 释放结果句柄。
+        /// </summary>
+        protected (Prediction<T> Prediction, VisionImage Frame) MakePredictionNv12WithFrame<T>(
+            byte[] y, byte[] uv,
+            int w, int h, int stepY, int stepUv, Device srcDevice, Func<IntPtr, T[]> reader)
+        {
             var status = md_model_predict_nv12(_handle, y, uv, w, h,
-                stepY, stepUv, (int)srcDevice, out var result);
+                stepY, stepUv, (int)srcDevice, out var frame, out var result);
             if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"Predict NV12 failed: {GetLastError()}");
-            return new Prediction<T>(result, reader);
+            var prediction = new Prediction<T>(result, reader);
+            VisionImage frameImg = frame == IntPtr.Zero ? null : VisionImage.FromDeviceFrame(frame);
+            return (prediction, frameImg);
         }
 
         /// <summary>深拷贝原生模型句柄（独立实例）。</summary>

@@ -32,6 +32,22 @@ impl Image {
         })
     }
 
+    /// 包装 predict_nv12 输出的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
+    /// 生命周期归本结构管理（Drop 调 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
+    pub fn from_device_frame(handle: ffi::MDImageHandle) -> Result<Self, MdError> {
+        Self::from_handle(handle)
+    }
+
+    /// 取 NV12 帧的 Y/UV 平面指针 + 所在设备（仅对 NV12 帧有效；提供零拷贝外部访问）。
+    /// 返回指针在图像句柄存活期间有效。
+    pub fn plane_ptrs(&self) -> Result<(ffi::MDDevice, *const u8, *const u8), MdError> {
+        let mut dev = ffi::MDDevice::CPU;
+        let mut y: *mut std::ffi::c_void = std::ptr::null_mut();
+        let mut uv: *mut std::ffi::c_void = std::ptr::null_mut();
+        check_status(unsafe { ffi::md_image_plane_ptrs(self.handle, &mut dev, &mut y, &mut uv) })?;
+        Ok((dev, y as *const u8, uv as *const u8))
+    }
+
     /// 从文件读取图像
     pub fn read(path: &str) -> Result<Self, MdError> {
         let cpath = CString::new(path).map_err(|_| MdError::InvalidArgument("path".into()))?;

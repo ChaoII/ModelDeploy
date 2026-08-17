@@ -316,6 +316,9 @@ extern "C" {
     pub fn md_image_encode(h: MDImageHandle, ext: *const c_char, buf: *mut *const u8, n: *mut usize) -> MDStatus;
     pub fn md_image_destroy(h: MDImageHandle);
     pub fn md_image_size(h: MDImageHandle, w: *mut c_int, h: *mut c_int) -> MDStatus;
+    // 取 NV12 帧平面指针（dev 返回帧所在设备；仅对 NV12 有效，CPU BGR 图返回 UNSUPPORTED_TYPE）
+    pub fn md_image_plane_ptrs(h: MDImageHandle, dev: *mut MDDevice,
+        y: *mut *mut c_void, uv: *mut *mut c_void) -> MDStatus;
 
     // ── 模型 ──
     pub fn md_model_create(out: *mut MDModelHandle, kind: MDModelKind,
@@ -328,7 +331,7 @@ extern "C" {
     pub fn md_model_predict(h: MDModelHandle, img: MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
     pub fn md_model_predict_nv12(h: MDModelHandle, y: *const c_void, uv: *const c_void,
         w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src_device: MDDevice,
-        out: *mut MDResultHandle) -> MDStatus;
+        out_frame: *mut MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
     pub fn md_model_predict_batch(h: MDModelHandle, imgs: *mut MDImageHandle, n: usize, out: *mut MDResultHandle) -> MDStatus;
 
     // ── 音频 ──

@@ -100,6 +100,10 @@ string ext, out IntPtr buf, out UIntPtr n);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_size(IntPtr handle, out int w, out int h);
 
+        // 取 NV12 帧平面指针（dev 返回帧所在设备；仅对 NV12 有效，CPU BGR 图返回 UNSUPPORTED_TYPE）
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_plane_ptrs(IntPtr handle, out int dev, out IntPtr y, out IntPtr uv);
+
         #endregion
 
         #region 模型
@@ -128,7 +132,7 @@ string modelPath, IntPtr opt);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_predict_nv12(IntPtr handle, byte[] y, byte[] uv,
-            int w, int h, int stepY, int stepUv, int srcDevice, out IntPtr result);
+            int w, int h, int stepY, int stepUv, int srcDevice, out IntPtr frame, out IntPtr result);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_predict_batch(IntPtr handle, IntPtr[] imgs, UIntPtr n,
