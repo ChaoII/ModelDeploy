@@ -17,6 +17,12 @@ namespace ModelDeploy.V2
 
         private bool _disposed;
 
+        // NV12 零拷贝 frame 引用的托管缓冲 pin：frame 存活期内禁止 GC 移动调用方 byte[]。
+        private GCHandle _pinY;
+        private GCHandle _pinUv;
+        private bool _hasPinY;
+        private bool _hasPinUv;
+
         private VisionImage(IntPtr handle)
         {
             Handle = handle;
@@ -63,8 +69,24 @@ namespace ModelDeploy.V2
         /// </summary>
         public static VisionImage FromDeviceFrame(IntPtr handle)
         {
-            if (handle == IntPtr.Zero) throw new ArgumentNullException(nameof(handle));
+            if (handle == IntPtr.Zero) throw new ArgumentException("Frame handle must be non-zero", nameof(handle));
             return new VisionImage(handle);
+        }
+
+        /// <summary>
+        /// Pin 本 frame 零拷贝引用的托管缓冲（调用方 byte[] y/uv），禁止 GC 在 frame 存活期内移动它们。
+        /// 仅用于持托管数组源的设备帧路径；未持托管缓冲的路径（如解码器 IntPtr 源）不调用。
+        /// 由 Dispose / 析构统一 Free。
+        /// </summary>
+        internal void PinBuffers(byte[] y, byte[] uv)
+        {
+            _pinY = GCHandle.Alloc(y, GCHandleType.Pinned);
+            _hasPinY = true;
+            if (uv != null)
+            {
+                _pinUv = GCHandle.Alloc(uv, GCHandleType.Pinned);
+                _hasPinUv = true;
+            }
         }
 
         public static VisionImage FromYuv420PData(byte[] data, int w, int h)
@@ -153,6 +175,8 @@ namespace ModelDeploy.V2
                     md_image_destroy(Handle);
                     Handle = IntPtr.Zero;
                 }
+                if (_hasPinY) { _pinY.Free(); _hasPinY = false; }
+                if (_hasPinUv) { _pinUv.Free(); _hasPinUv = false; }
                 _disposed = true;
                 GC.SuppressFinalize(this);
             }

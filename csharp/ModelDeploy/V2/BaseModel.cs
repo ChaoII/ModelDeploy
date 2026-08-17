@@ -144,6 +144,8 @@ namespace ModelDeploy.V2
                 throw new InvalidOperationException($"Predict NV12 failed: {GetLastError()}");
             var prediction = new Prediction<T>(result, reader);
             VisionImage frameImg = frame == IntPtr.Zero ? null : VisionImage.FromDeviceFrame(frame);
+            if (frameImg != null)
+                frameImg.PinBuffers(y, uv);
             return (prediction, frameImg);
         }
 
