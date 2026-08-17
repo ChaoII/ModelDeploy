@@ -432,3 +432,57 @@ TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
     }
 }
 
+TEST_CASE("image_data: device frame self-describes (w/h not zeroed)", "[core]") {
+    std::vector<unsigned char> y(128 * 96, 100);
+    std::vector<unsigned char> uv(128 * 48, 100);
+    auto img = modeldeploy::vision::ImageData::from_device_planes(
+        y.data(), uv.data(), 128, 96, 128, 128, Device::CPU);
+    REQUIRE(!img.empty());
+    CHECK(img.width() == 128);
+    CHECK(img.height() == 96);
+    CHECK(img.format() == MdImageType::NV12);
+    CHECK(img.device() == Device::CPU);
+    CHECK(img.plane_count() == 2);
+    CHECK(img.plane(0).data == y.data());
+    CHECK(img.plane(1).data == uv.data());
+    CHECK(img.plane(0).step == 128);
+    CHECK(img.plane(1).step == 128);
+}
+
+TEST_CASE("image_data: from_bgr24 builds CPU single-plane", "[core]") {
+    std::vector<unsigned char> bgr(10 * 8 * 3, 42);
+    auto img = modeldeploy::vision::ImageData::from_bgr24(bgr.data(), 10, 8);
+    REQUIRE(!img.empty());
+    CHECK(img.width() == 10);
+    CHECK(img.height() == 8);
+    CHECK(img.format() == MdImageType::PKG_BGR_U8);
+    CHECK(img.device() == Device::CPU);
+    CHECK(img.plane_count() == 1);
+    CHECK(img.plane(0).data == bgr.data());
+}
+
+TEST_CASE("image_data: asMat cpu borrow / toCpu device copy", "[core]") {
+    std::vector<unsigned char> bgr(6 * 4 * 3, 7);
+    auto cpu = modeldeploy::vision::ImageData::from_bgr24(bgr.data(), 6, 4);
+    cv::Mat m;
+    REQUIRE(cpu.asMat(&m));                 // CPU 借用
+    CHECK(!m.empty());
+    std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
+    auto dev = modeldeploy::vision::ImageData::from_device_planes(y.data(), uv.data(), 8, 4, 8, 8, Device::CPU);
+    modeldeploy::vision::ImageData cpu_copy;
+    REQUIRE(dev.toCpu(&cpu_copy));          // 平面→CPU 深拷贝
+    CHECK(cpu_copy.width() == 8);
+    CHECK(cpu_copy.height() == 4);
+    modeldeploy::vision::ImageData gpu;
+    CHECK_FALSE(gpu.asMat(&m));             // 空图失败
+    CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
+}
+
+TEST_CASE("image_data: refresh_meta preserves device dims", "[core]") {
+    std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
+    auto dev = modeldeploy::vision::ImageData::from_device_planes(y.data(), uv.data(), 8, 4, 8, 8, Device::CPU);
+    // 内部 refresh_meta 不再清空设备帧宽高（对设备帧安全）
+    CHECK(dev.width() == 8);
+    CHECK(dev.height() == 4);
+}
+
