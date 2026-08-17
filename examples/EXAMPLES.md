@@ -1,0 +1,98 @@
+# ModelDeploy Examples 目录
+
+本文件列出 `examples/` 下**已在本机（CPU/ORT）验证可编译 + 可实际推理**的 demo。
+构建（CPU，`BUILD_CAPI=ON`、`BUILD_AUDIO=ON`、`BUILD_VISION=ON`）：
+
+```bash
+cmake -S . -B build -G Ninja -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON \
+      -DBUILD_PYTHON=OFF -DBUILD_TESTS=ON -DENABLE_MNN=OFF -DENABLE_ORT=ON \
+      -DENABLE_TRT=OFF -DWITH_GPU=OFF -DBUILD_BENCHMARK=OFF
+cmake --build build
+```
+
+运行：所有 demo 从 `build/bin` 启动（镜像内 `../../test_data` 相对该 cwd 解析到仓库根）。
+测试数据需先从 modelscope 下载（见根 README / AGENTS.md）。
+
+---
+
+## C API（capi2）
+
+> `_capi`（capi2）示例统一使用 `#include "../capi2_common.h"` 的 `die()` 做错误处理。
+
+| Demo | 类别 | 模型 | 输入 | 输出 |
+|------|------|------|------|------|
+| `demo_detection_capi` | 检测 | `onnx/yolo11n/yolo11n.onnx` | `test_images/test_detection0.jpg` | 打印检测框 + `capi2_detection_out.jpg` |
+| `demo_pose_capi` | 姿态 | `onnx/yolo11n/yolo11n-pose.onnx` | 人脸/行人图 | 关键点 + `capi2_pose_out.jpg` |
+| `demo_obb_capi` | 旋转框 | `onnx/yolo11n/yolo11n-obb_nms.onnx` | `test_images/test_obb1.jpg` | 旋转框 + `capi2_obb_out.jpg` |
+| `demo_instance_seg_capi` | 实例分割 | `onnx/yolo11n/yolo11n-seg_nms.onnx` | 图 | 分割实例 + `capi2_iseg_out.jpg` |
+| `demo_classification_capi` | 分类 | `onnx/yolo11n/yolo11n-cls.onnx` | `test_images/bus.jpg` | top5 + `capi2_cls_out.jpg` |
+| `demo_face_det_capi` | 人脸检测 | `onnx/face/scrfd_*.onnx` | `test_images/test_face1.jpg` | 人脸框/关键点 + `capi2_face_det_out.jpg` |
+| `demo_face_age_capi` | 年龄 | `onnx/face/age_predictor.onnx` | `test_images/test_face_id1.jpg` | 打印 age |
+| `demo_face_gender_capi` | 性别 | `onnx/face/gender_predictor.onnx` | `test_images/test_face_gender.jpg` | 打印 gender |
+| `demo_face_rec_capi` | 人脸特征 | `onnx/face/face_recognizer.onnx` | `test_images/test_face_id4.jpg` | 打印 1024 维 embedding |
+| `demo_face_rec_pipeline_capi` | 检测+特征 | `scrfd_*.onnx|face_recognizer.onnx` | `test_images/test_face_detection4.jpg` | 打印每张脸 embedding |
+| `demo_face_as_first_capi` | 防伪(first) | `onnx/face/fas_first.onnx` | `test_images/test_face_id3.jpg` | 打印 capi2 限制（AS 未接线，见下） |
+| `demo_face_as_second_capi` | 防伪(second) | `onnx/face/fas_second.onnx` | `test_images/test_face_as_second2.jpg` | 同上 |
+| `demo_face_as_pipeline_capi` | 防伪管线 | `scrfd_*.onnx|fas_first.onnx|fas_second.onnx` | `test_images/test_face_detection4.jpg` | 同上 |
+| `demo_ocr_capi` | OCR 整链 | `ocr/ppocrv4_mobile/det_infer.infer|cls_infer.onnx|rec_infer.onnx|ppocrv4_dict.txt` | `test_images/test_ocr.png` | 打印行文本 + `capi2_ocr_out.jpg`（演示 `det_db_box_thresh`/`cls_thresh` 参数） |
+| `demo_lpr_pipeline_capi` | 车牌管线 | `lpr/yolov5plate.onnx|plate_recognition_color.onnx` | `test_images/test_lpr_pipeline.jpg` | 打印车牌/颜色 + `capi2_lpr_out.jpg` |
+| `demo_pedestrian_attribute_capi` | 行人属性 | `zhgd_det.onnx|zhgd_ml.onnx` | `test_images/test_pedestrian_attribute1.jpg` | 打印属性分数 + `capi2_attr_out.jpg`（演示 `det_threshold`/`set_input_size`/`set_cls_input_size`） |
+| `demo_kokoro_capi` | TTS | `kokoro_v1_1/model.onnx|tokens.txt|lexicon-gb-en.txt|lexicon-zh.txt|voices.bin|dict|test_data` | 合成文本 | `capi2_tts_out.wav` |
+| `demo_sense_voice_capi` | ASR | `sense_voice/model.int8.onnx|tokens.txt` | `sense_voice/test_wavs/zh.wav` | 打印识别文本 |
+| `demo_image_from_base64` | 图像工具 | —（`test_base64_image.txt`） | — | `capi2_base64_out.png` |
+| `demo_image_from_bgr24` | 图像工具 | —（合成 BGR 样本） | — | `capi2_bgr24_out.png` |
+| `demo_image_rotate` | 图像工具 | `test_images/test_face_as_second.jpg` | — | `capi2_rotate_original.jpg` / `capi2_rotate90_out.jpg` |
+
+> **防伪 capi2 现状**：`MD_MODEL_FACE_AS` / `MD_MODEL_FACE_AS_PIPELINE` 在 `capi2/md_capi.cpp` 中未正确接线（`FACE_AS` 误映射为 InsightFace genderage，`FACE_AS_PIPELINE` 无实现）。三个 `demo_face_as_*_capi` 可编译、可干净运行，但会打印该 capi2 限制而不做真实判定（不伪造）。C++ SDK 已有正确的 `SeetaFaceAsFirst/Second/Pipeline`，等待 capi2 接线后即可。
+
+---
+
+## C++ SDK（`.cxx`）
+
+已统一为 **CPU/ORT + 落盘保存**（`imshow` → `imwrite`，去掉 GPU/TRT 选项）：
+
+| Demo | 类别 | 落盘输出 |
+|------|------|----------|
+| `demo_detection_cxx` | 检测（benchmark 循环） | `result_out.jpg` |
+| `demo_detection_batch` | 检测（batch） | 打印各行目标数 |
+| `demo_detection_multi_thread` | 检测（多线程） | 打印各线程目标数 |
+| `demo_detection_multi_thread_trt` | 检测（多线程，CPU 版） | 打印各线程目标数 |
+| `demo_multi_thread_compare` | 单/多线程对比 | 打印 FPS |
+| `demo_benchmark` | 基准 | 打印 FPS |
+| `demo_profile` | 剖析 | `print_benchmark` |
+| `demo_pose_cxx` | 姿态 | `pose_out.jpg` |
+| `demo_keypoint_cxx` | 关键点 | `keypoint_out.jpg` |
+| `demo_obb_cxx` | 旋转框 | `obb_out.jpg` |
+| `demo_instance_seg_cxx` | 实例分割 | `iseg_out.jpg` |
+| `demo_classification_cxx` | 分类 | `cls_out.jpg` |
+| `demo_sem_cxx` | 语义分割 | `sem_out.jpg` |
+| `demo_depth_cxx` | 深度 | `depth_out.jpg` |
+| `demo_lpr_detection_cxx` | 车牌检测 | `lpr_detection_out.jpg` |
+| `demo_lpr_recognizer_cxx` | 车牌识别 | 打印车牌 |
+| `demo_lpr_pipeline_cxx` | 车牌管线 | `lpr_pipeline_out.jpg` |
+| `demo_ocr_cxx` | OCR 整链 | `ocr_out.jpg` |
+| `demo_ocr_det_cxx` | OCR 检测子模型 | `ocr_db_det_out.jpg` |
+| `demo_ocr_rec_cxx` | OCR 识别子模型 | `ocr_rec_out.jpg` |
+| `demo_structure_table_cxx` | 表格 | `structure_table_out.jpg` |
+| `demo_pp_structure_table_cxx` | PP 表格 | `pp_structure_table_out.jpg` |
+| `demo_face_det_cxx` | 人脸检测 | `face_det_out.jpg` + `align_face_<i>.jpg` |
+| `demo_face_gender_cxx` | 性别 | `face_gender_out.jpg` |
+| `demo_face_rec_pipeline_cxx` | 检测+特征 | 打印 embedding |
+| `demo_pedestrian_attribute_cxx` | 行人属性 | `pedestrian_attr_out.jpg` |
+
+> sophgo 目标（`demo_*_sophgo`）仅在 `ENABLE_SOPHGO=ON` 且平台支持时构建；本机 CPU 构建不参与。
+
+---
+
+## C#（dotnet）
+
+```bash
+cd csharp
+dotnet build ModelDeployExample/ModelDeployExample.csproj -c Debug
+cd ModelDeployExample/bin/Debug/net9.0
+./ModelDeployExample.exe
+```
+
+`Program.cs` 的 `Main` 依次运行：检测（含 `SetParam("conf_threshold"/"nms_threshold")` 与 `ParamNames()/ParamType()` 自省演示）→ 图像工具 → 分类 → 姿态 → OCR → InsightFace → ASR(SenseVoice) → TTS(Kokoro)。各模型推理结果打印到控制台，检测/图像可视化落盘 `detection_annotated.jpg` / `annotated.jpg`，TTS 落盘 `output.wav`。
+
+> TTS 中文合成需要原生端按 UTF-8 封送字符串：`md_audio_tts` 的 `text`/`voice` 以 UTF-8 字节指针传递（`ModelDeploy/V2/AudioModels.cs` 中 `Utf8` 手动封送）。
