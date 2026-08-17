@@ -19,6 +19,7 @@
 #define MD_CAPI_V2_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* 导出宏（Windows dllexport / Linux visibility） */
 #if defined(_WIN32)
@@ -51,7 +52,8 @@ typedef enum MD_STATUS {
     MD_ERR_IMAGE_DECODE,        /* 图像解码失败 */
     MD_ERR_BUSY,                /* 句柄并发使用（检测到非单线程） */
     MD_ERR_NOT_IMPLEMENTED,     /* 功能未实现 */
-    MD_ERR_AUDIO_DECODE         /* 音频解码失败 */
+    MD_ERR_AUDIO_DECODE,        /* 音频解码失败 */
+    MD_ERR_INVALID_TYPE         /* 参数类型不匹配 */
 } MDStatus;
 
 /* 线程安全地获取最近一次错误信息（thread_local，返回空串表示无错误） */
@@ -190,6 +192,20 @@ MD_CAPI_EXPORT MDStatus md_model_set_input_size(MDModelHandle, int w, int h);
 
 /* 设置 pipeline 模型的分类子模型输入尺寸（当前仅 PedestrianAttribute 使用） */
 MD_CAPI_EXPORT MDStatus md_model_set_cls_input_size(MDModelHandle, int w, int h);
+
+/* ==================== 模型前/后处理参数 ==================== */
+/* 按扁平参数名设置模型前/后处理参数（模型级持久；未设置用默认值）。
+ * _i 整型、_d 浮点、_b 布尔(0/1)、_s 字符串/枚举。不支持的 kind → MD_ERR_UNSUPPORTED_TYPE；
+ * 未知名 → MD_ERR_INVALID_ARGUMENT；类型不匹配 → MD_ERR_INVALID_TYPE；s 且 value=null → MD_ERR_NULL_POINTER。 */
+MD_CAPI_EXPORT MDStatus md_model_set_param_i(MDModelHandle, const char* name, int64_t value);
+MD_CAPI_EXPORT MDStatus md_model_set_param_d(MDModelHandle, const char* name, double value);
+MD_CAPI_EXPORT MDStatus md_model_set_param_b(MDModelHandle, const char* name, int enable);
+MD_CAPI_EXPORT MDStatus md_model_set_param_s(MDModelHandle, const char* name, const char* value);
+
+/* 自省：names 以 '|' 分隔的单个字符串（库持有，无需释放；kind 无参数→空串）；
+ * type_out 输出 'I'/'D'/'B'/'S'；未知名 → MD_ERR_INVALID_ARGUMENT；kind 越界 → MD_ERR_INVALID_ARGUMENT。 */
+MD_CAPI_EXPORT MDStatus md_model_param_names(MDModelKind kind, const char** names);
+MD_CAPI_EXPORT MDStatus md_model_param_type(MDModelKind kind, const char* name, char* type_out);
 
 /* 推理：统一入口（视觉），结果句柄由库分配，调用方用 md_result_destroy 释放 */
 MD_CAPI_EXPORT MDStatus md_model_predict(MDModelHandle, MDImageHandle, MDResultHandle* out);

@@ -776,6 +776,258 @@ MDStatus md_model_set_cls_input_size(MDModelHandle handle, int w, int h) {
     return MD_OK;
 }
 
+/* ==================== 模型前/后处理参数（扁平参数名分发表） ==================== */
+
+namespace {
+
+// 参数类型标记（自省返回字符）
+enum ParamType { PT_I = 'I', PT_D = 'D', PT_B = 'B', PT_S = 'S' };
+
+// 依据 kind 上报支持的参数名列表（'|' 拼接，静态）
+const char* kind_param_names(MDModelKind kind) {
+    switch (kind) {
+        case MD_MODEL_DETECTION:
+        case MD_MODEL_POSE:
+        case MD_MODEL_OBB:
+        case MD_MODEL_INSTANCE_SEG:
+            return "conf_threshold|nms_threshold";
+        case MD_MODEL_CLASSIFICATION:
+            return "top_k|multi_label";
+        case MD_MODEL_FACE_DET:
+        case MD_MODEL_FACE_REC_PIPELINE:
+            return "conf_threshold|nms_threshold|landmarks_per_face";
+        case MD_MODEL_OCR_DET:
+        case MD_MODEL_OCR:
+            return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation";
+        case MD_MODEL_OCR_CLS:
+            return "cls_thresh";
+        case MD_MODEL_PED_ATTR:
+            return "det_threshold";
+        case MD_MODEL_INSIGHTFACE:
+            return "det_thresh";
+        default:
+            return "";
+    }
+}
+
+// 依据 kind 上报某参数的类型字符（'I'/'D'/'B'/'S'），未知返回 0
+char param_type_of(MDModelKind kind, const char* name) {
+    if (!name) return 0;
+    const bool is_det = std::strcmp(name, "conf_threshold") == 0 || std::strcmp(name, "nms_threshold") == 0;
+    switch (kind) {
+        case MD_MODEL_DETECTION:
+        case MD_MODEL_POSE:
+        case MD_MODEL_OBB:
+        case MD_MODEL_INSTANCE_SEG:
+            if (is_det) return PT_D;
+            if (kind == MD_MODEL_POSE && std::strcmp(name, "keypoints_num") == 0) return PT_I;
+            if (kind == MD_MODEL_INSTANCE_SEG && std::strcmp(name, "mask_threshold") == 0) return PT_D;
+            return 0;
+        case MD_MODEL_CLASSIFICATION:
+            if (std::strcmp(name, "top_k") == 0) return PT_I;
+            if (std::strcmp(name, "multi_label") == 0) return PT_B;
+            return 0;
+        case MD_MODEL_FACE_DET:
+        case MD_MODEL_FACE_REC_PIPELINE:
+            if (is_det) return PT_D;
+            if (std::strcmp(name, "landmarks_per_face") == 0) return PT_I;
+            return 0;
+        case MD_MODEL_OCR_DET:
+        case MD_MODEL_OCR:
+            if (std::strcmp(name, "det_db_thresh") == 0) return PT_D;
+            if (std::strcmp(name, "det_db_box_thresh") == 0) return PT_D;
+            if (std::strcmp(name, "det_db_unclip_ratio") == 0) return PT_D;
+            if (std::strcmp(name, "det_db_score_mode") == 0) return PT_S;
+            if (std::strcmp(name, "use_dilation") == 0) return PT_B;
+            return 0;
+        case MD_MODEL_OCR_CLS:
+            if (std::strcmp(name, "cls_thresh") == 0) return PT_D;
+            return 0;
+        case MD_MODEL_PED_ATTR:
+            if (std::strcmp(name, "det_threshold") == 0) return PT_D;
+            return 0;
+        case MD_MODEL_INSIGHTFACE:
+            if (std::strcmp(name, "det_thresh") == 0) return PT_D;
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+// 按 kind+参数名分派到具体模型 setter。返回 0=ok，否则返回对应 MD_ERR_* 并已 set_error。
+int apply_model_param(md_model_handle* mh, const char* name, char req_type,
+                      int64_t i, double d, const char* s) {
+    const MDModelKind kind = mh->kind;
+    const void* m = mh->model;
+    const char decl_type = param_type_of(kind, name);
+    if (decl_type == 0) {
+        const char* supported = kind_param_names(kind);
+        if (!*supported)
+            set_error_fmt("md_model_set_param: kind %d has no supported params", (int)kind);
+        else
+            set_error_fmt("md_model_set_param: unknown param '%s' for kind %d (supported: %s)",
+                          name, (int)kind, supported);
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    if (decl_type != req_type) {
+        set_error_fmt("md_model_set_param: param '%s' expects type '%c' but got '%c'",
+                      name, decl_type, req_type);
+        return MD_ERR_INVALID_TYPE;
+    }
+
+    const bool is_bool = req_type == PT_B;
+    const bool enable = is_bool && i != 0;
+
+    switch (kind) {
+        case MD_MODEL_DETECTION: {
+            auto* pm = static_cast<detection::UltralyticsDet*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else pm->get_postprocessor().set_nms_threshold((float)d);
+            break;
+        }
+        case MD_MODEL_POSE: {
+            auto* pm = static_cast<detection::UltralyticsPose*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
+            else pm->get_postprocessor().set_keypoints_num((int)i);
+            break;
+        }
+        case MD_MODEL_OBB: {
+            auto* pm = static_cast<detection::UltralyticsObb*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else pm->get_postprocessor().set_nms_threshold((float)d);
+            break;
+        }
+        case MD_MODEL_INSTANCE_SEG: {
+            auto* pm = static_cast<detection::UltralyticsSeg*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
+            else pm->get_postprocessor().set_mask_threshold((float)d);
+            break;
+        }
+        case MD_MODEL_CLASSIFICATION: {
+            auto* pm = static_cast<classification::Classification*>(const_cast<void*>(m));
+            if (std::strcmp(name, "top_k") == 0) pm->get_postprocessor().set_top_k((int)i);
+            else pm->get_postprocessor().set_multi_label(enable);
+            break;
+        }
+        case MD_MODEL_FACE_DET: {
+            auto* pm = static_cast<face::Scrfd*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
+            else pm->get_postprocessor().set_landmarks_per_face((int)i);
+            break;
+        }
+        case MD_MODEL_OCR_DET: {
+            auto* pm = static_cast<ocr::DBDetector*>(const_cast<void*>(m));
+            auto& pp = pm->get_postprocessor();
+            if (std::strcmp(name, "det_db_thresh") == 0) pp.set_det_db_thresh(d);
+            else if (std::strcmp(name, "det_db_box_thresh") == 0) pp.set_det_db_box_thresh(d);
+            else if (std::strcmp(name, "det_db_unclip_ratio") == 0) pp.set_det_db_unclip_ratio(d);
+            else if (std::strcmp(name, "det_db_score_mode") == 0) pp.set_det_db_score_mode(s);
+            else pp.set_use_dilation(enable ? 1 : 0);
+            break;
+        }
+        case MD_MODEL_OCR_CLS: {
+            auto* pm = static_cast<ocr::Classifier*>(const_cast<void*>(m));
+            pm->get_postprocessor().set_cls_thresh((float)d);
+            break;
+        }
+        case MD_MODEL_OCR: {
+            auto* pm = static_cast<ocr::PaddleOCR*>(const_cast<void*>(m));
+            if (std::strcmp(name, "cls_thresh") == 0) {
+                pm->get_classifier()->get_postprocessor().set_cls_thresh((float)d);
+            } else {
+                auto& pp = pm->get_detector()->get_postprocessor();
+                if (std::strcmp(name, "det_db_thresh") == 0) pp.set_det_db_thresh(d);
+                else if (std::strcmp(name, "det_db_box_thresh") == 0) pp.set_det_db_box_thresh(d);
+                else if (std::strcmp(name, "det_db_unclip_ratio") == 0) pp.set_det_db_unclip_ratio(d);
+                else if (std::strcmp(name, "det_db_score_mode") == 0) pp.set_det_db_score_mode(s);
+                else pp.set_use_dilation(enable ? 1 : 0);
+            }
+            break;
+        }
+        case MD_MODEL_PED_ATTR: {
+            auto* pm = static_cast<pipeline::PedestrianAttribute*>(const_cast<void*>(m));
+            pm->set_det_threshold((float)d);
+            break;
+        }
+        case MD_MODEL_INSIGHTFACE: {
+            auto* pm = static_cast<face::InsightFaceAnalysis*>(const_cast<void*>(m));
+            pm->set_det_thresh((float)d);
+            break;
+        }
+        case MD_MODEL_FACE_REC_PIPELINE: {
+            auto* pm = static_cast<face::FaceRecognizerPipeline*>(const_cast<void*>(m));
+            auto& pp = pm->get_detector()->get_postprocessor();
+            if (std::strcmp(name, "conf_threshold") == 0) pp.set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pp.set_nms_threshold((float)d);
+            else pp.set_landmarks_per_face((int)i);
+            break;
+        }
+        default:
+            set_error_fmt("md_model_set_param: unsupported kind %d", (int)kind);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    return MD_OK;
+}
+
+} // namespace
+
+MDStatus md_model_set_param_i(MDModelHandle handle, const char* name, int64_t value) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (!name || !*name) { set_error("md_model_set_param_i: name is empty"); return MD_ERR_INVALID_ARGUMENT; }
+    return (MDStatus)apply_model_param(mh, name, PT_I, value, 0.0, nullptr);
+}
+
+MDStatus md_model_set_param_d(MDModelHandle handle, const char* name, double value) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (!name || !*name) { set_error("md_model_set_param_d: name is empty"); return MD_ERR_INVALID_ARGUMENT; }
+    return (MDStatus)apply_model_param(mh, name, PT_D, 0, value, nullptr);
+}
+
+MDStatus md_model_set_param_b(MDModelHandle handle, const char* name, int enable) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (!name || !*name) { set_error("md_model_set_param_b: name is empty"); return MD_ERR_INVALID_ARGUMENT; }
+    return (MDStatus)apply_model_param(mh, name, PT_B, enable != 0 ? 1 : 0, 0.0, nullptr);
+}
+
+MDStatus md_model_set_param_s(MDModelHandle handle, const char* name, const char* value) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (!name || !*name) { set_error("md_model_set_param_s: name is empty"); return MD_ERR_INVALID_ARGUMENT; }
+    if (!value) { set_error("md_model_set_param_s: value is null"); return MD_ERR_NULL_POINTER; }
+    return (MDStatus)apply_model_param(mh, name, PT_S, 0, 0.0, value);
+}
+
+MDStatus md_model_param_names(MDModelKind kind, const char** names) {
+    if (!names) return MD_ERR_NULL_POINTER;
+    if (kind < 0 || kind >= MD_MODEL_COUNT) {
+        set_error("md_model_param_names: invalid kind");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    *names = kind_param_names(kind);
+    return MD_OK;
+}
+
+MDStatus md_model_param_type(MDModelKind kind, const char* name, char* type_out) {
+    if (!name || !type_out) return MD_ERR_NULL_POINTER;
+    if (kind < 0 || kind >= MD_MODEL_COUNT) {
+        set_error("md_model_param_type: invalid kind");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    const char t = param_type_of(kind, name);
+    if (t == 0) {
+        set_error_fmt("md_model_param_type: unknown param '%s' for kind %d", name, (int)kind);
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    *type_out = t;
+    return MD_OK;
+}
+
 /* ==================== 结果容器释放 ==================== */
 
 md_result_handle::~md_result_handle() {

@@ -14,6 +14,9 @@
 #include "capi2/md_capi.h"
 
 #include <cstring>
+#include <cstdlib>
+#include <filesystem>
+#include <string>
 #include <vector>
 
 namespace {
@@ -91,4 +94,74 @@ TEST_CASE("capi2 null args are rejected", "[capi]") {
     CHECK(md_image_plane_ptrs(img, &dev, nullptr, &uv) == MD_ERR_NULL_POINTER);
     CHECK(md_image_plane_ptrs(img, &dev, &y, nullptr) == MD_ERR_NULL_POINTER);
     md_image_destroy(img);
+}
+
+TEST_CASE("capi2 model set param + introspection", "[capi]") {
+    // 自省：names
+    const char* names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_DETECTION, &names) == MD_OK);
+    REQUIRE(names);
+    CHECK(std::string(names).find("conf_threshold") != std::string::npos);
+    CHECK(std::string(names).find("nms_threshold") != std::string::npos);
+
+    // 自省：type
+    char t = 0;
+    REQUIRE(md_model_param_type(MD_MODEL_DETECTION, "conf_threshold", &t) == MD_OK);
+    CHECK(t == 'D');
+    REQUIRE(md_model_param_type(MD_MODEL_DETECTION, "nms_threshold", &t) == MD_OK);
+    CHECK(t == 'D');
+
+    // pose / classification / ocr 类型
+    REQUIRE(md_model_param_type(MD_MODEL_POSE, "keypoints_num", &t) == MD_OK);
+    CHECK(t == 'I');
+    REQUIRE(md_model_param_type(MD_MODEL_CLASSIFICATION, "multi_label", &t) == MD_OK);
+    CHECK(t == 'B');
+    REQUIRE(md_model_param_type(MD_MODEL_OCR_DET, "det_db_score_mode", &t) == MD_OK);
+    CHECK(t == 'S');
+
+    // 未知名 → INVALID_ARGUMENT
+    CHECK(md_model_param_type(MD_MODEL_DETECTION, "nope", &t) == MD_ERR_INVALID_ARGUMENT);
+
+    // 无参数 kind → 空 names
+    const char* sem_names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_SEM_SEG, &sem_names) == MD_OK);
+    CHECK(std::string(sem_names).empty());
+
+    // kind 越界 → INVALID_ARGUMENT
+    const char* dummy_names = nullptr;
+    CHECK(md_model_param_names((MDModelKind)999, &dummy_names) == MD_ERR_INVALID_ARGUMENT);
+    char dummy_t = 0;
+    CHECK(md_model_param_type((MDModelKind)999, "conf_threshold", &dummy_t) == MD_ERR_INVALID_ARGUMENT);
+
+    // 自省空指针
+    CHECK(md_model_param_names(MD_MODEL_DETECTION, nullptr) == MD_ERR_NULL_POINTER);
+    CHECK(md_model_param_type(MD_MODEL_DETECTION, nullptr, &t) == MD_ERR_NULL_POINTER);
+}
+
+// 端到端 setter：需可加载的检测模型（[model] 标签，CI 有模型时执行）
+TEST_CASE("capi2 detection param setter on loaded model", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string modelfile = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    if (!std::filesystem::exists(modelfile)) return;
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle det = nullptr;
+    REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, modelfile.c_str(), opt) == MD_OK);
+    REQUIRE(det != nullptr);
+    md_option_destroy(opt);
+
+    CHECK(md_model_set_param_d(det, "conf_threshold", 0.3) == MD_OK);
+    CHECK(md_model_set_param_d(det, "nms_threshold", 0.4) == MD_OK);
+
+    // 类型不匹配：conf_threshold 是 D，用 _i 应返回 INVALID_TYPE
+    CHECK(md_model_set_param_i(det, "conf_threshold", 3) == MD_ERR_INVALID_TYPE);
+    // 未知名 → INVALID_ARGUMENT
+    CHECK(md_model_set_param_d(det, "nope", 0.5) == MD_ERR_INVALID_ARGUMENT);
+
+    md_model_destroy(det);
 }
