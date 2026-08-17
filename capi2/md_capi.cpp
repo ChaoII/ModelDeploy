@@ -787,10 +787,12 @@ enum ParamType { PT_I = 'I', PT_D = 'D', PT_B = 'B', PT_S = 'S' };
 const char* kind_param_names(MDModelKind kind) {
     switch (kind) {
         case MD_MODEL_DETECTION:
-        case MD_MODEL_POSE:
         case MD_MODEL_OBB:
-        case MD_MODEL_INSTANCE_SEG:
             return "conf_threshold|nms_threshold";
+        case MD_MODEL_POSE:
+            return "conf_threshold|nms_threshold|keypoints_num";
+        case MD_MODEL_INSTANCE_SEG:
+            return "conf_threshold|nms_threshold|mask_threshold";
         case MD_MODEL_CLASSIFICATION:
             return "top_k|multi_label";
         case MD_MODEL_FACE_DET:

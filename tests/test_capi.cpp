@@ -119,6 +119,14 @@ TEST_CASE("capi2 model set param + introspection", "[capi]") {
     REQUIRE(md_model_param_type(MD_MODEL_OCR_DET, "det_db_score_mode", &t) == MD_OK);
     CHECK(t == 'S');
 
+    // pose / iseg 自省 names 也包含额外参数
+    const char* pose_names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_POSE, &pose_names) == MD_OK);
+    CHECK(std::string(pose_names).find("keypoints_num") != std::string::npos);
+    const char* iseg_names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_INSTANCE_SEG, &iseg_names) == MD_OK);
+    CHECK(std::string(iseg_names).find("mask_threshold") != std::string::npos);
+
     // OCR 整链路自省也包含 cls_thresh（经 get_classifier() 路由）
     const char* ocr_names = nullptr;
     REQUIRE(md_model_param_names(MD_MODEL_OCR, &ocr_names) == MD_OK);
