@@ -23,11 +23,6 @@ namespace modeldeploy::vision {
         std::vector<int32_t> label_ids;
         std::vector<float> scores;
         std::vector<float> feature;
-        void reserve(int size);
-        void resize(int size);
-        void clear();
-        // 释放内部 vector 的 capacity（真正归还内存）
-        void free();
         ClassifyResult(const ClassifyResult& other) = default;
         ClassifyResult& operator=(ClassifyResult&& other) noexcept = default;
     };
@@ -37,12 +32,8 @@ namespace modeldeploy::vision {
     struct MODELDEPLOY_CXX_EXPORT Mask {
         std::vector<uint8_t> buffer;
         std::vector<int64_t> shape; // (H,W) ...
-        void clear();
-        // 释放内部 vector 的 capacity（真正归还内存）
-        void free();
         void* data() { return buffer.data(); }
         [[nodiscard]] const void* data() const { return buffer.data(); }
-        void reserve(int size);
         void resize(int size);
     };
 
@@ -103,7 +94,6 @@ namespace modeldeploy::vision {
         std::vector<std::array<int, 8>> table_boxes;
         std::vector<std::string> table_structure;
         std::string table_html;
-        void clear();
     };
 
     struct MODELDEPLOY_CXX_EXPORT FaceRecognitionResult {
