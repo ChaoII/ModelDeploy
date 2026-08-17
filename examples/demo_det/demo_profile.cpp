@@ -10,12 +10,9 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(4);
     option.use_ort_backend();
-    option.use_gpu(0);
-    option.enable_fp16 = true;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
 
     auto det = modeldeploy::vision::detection::UltralyticsDet(
-        "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
+        "../../test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx", option);
     det.get_preprocessor().set_size({640, 640});
 
     auto img = ImageData::imread("../../test_data/test_images/test_detection0.jpg");

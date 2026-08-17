@@ -57,25 +57,25 @@ void get_image_list(std::vector<std::vector<std::string>>* image_list, const std
 
 int main() {
     modeldeploy::RuntimeOption option;
-    option.use_trt_backend();
-    option.use_gpu(0);
-    option.enable_fp16 = true;
-    option.enable_trt = true;
+    option.use_ort_backend();
     const modeldeploy::vision::detection::UltralyticsDet model(
-        "../../test_data/test_models/trt/yolo11n.engine", option);
+        "../../test_data/test_models/onnx/yolo11n/yolo11n.onnx", option);
     if (!model.is_initialized()) {
         std::cerr << "Failed to initialize model." << std::endl;
         return -1;
     }
-    const std::string image_file_path = "F:/ultralytics_workspace/dataset/D000007/split/images/train";
-    constexpr int thread_num = 8;
+    const std::vector<std::vector<std::string>> image_list = {
+        {"../../test_data/test_images/test_detection0.jpg"},
+        {"../../test_data/test_images/bus.jpg"},
+        {"../../test_data/test_images/test_face1.jpg"},
+        {"../../test_data/test_images/test_obb1.jpg"},
+    };
+    constexpr int thread_num = 4;
     std::vector<decltype(model.clone())> models;
     models.reserve(thread_num);
     for (int i = 0; i < thread_num; ++i) {
         models.emplace_back(std::move(model.clone()));
     }
-    std::vector<std::vector<std::string>> image_list(thread_num);
-    get_image_list(&image_list, image_file_path, thread_num);
     const auto start_time = std::chrono::steady_clock::now();
     std::vector<std::thread> threads;
     threads.reserve(thread_num);

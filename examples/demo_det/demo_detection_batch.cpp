@@ -67,26 +67,23 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
     option.use_ort_backend();
-    option.use_gpu(0);
-    option.password = "123456";
-    option.enable_fp16 = true;
-    option.enable_trt = true;
-    option.ort_option.trt_min_shape = "images:1x3x224x224";
-    option.ort_option.trt_opt_shape = "images:8x3x640x640";
-    option.ort_option.trt_max_shape = "images:16x3x1280x1280";
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
     modeldeploy::vision::detection::UltralyticsDet model(
-        "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
-    const std::string image_file_path = "F:/ultralytics_workspace/dataset/D000007/split/images/train";
-    constexpr int batch_size = 1;
-    const auto image_lists = get_image_list(image_file_path, batch_size);
+        "../../test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx", option);
+    model.get_preprocessor().set_size({640, 640});
+    const std::vector<std::string> image_list = {
+        "../../test_data/test_images/test_detection0.jpg",
+        "../../test_data/test_images/bus.jpg",
+        "../../test_data/test_images/test_face1.jpg",
+        "../../test_data/test_images/test_obb1.jpg",
+    };
+    std::vector<modeldeploy::vision::ImageData> images = get_images(image_list);
+    std::cout << "Total images: " << images.size() << std::endl;
     const auto start_time = std::chrono::steady_clock::now();
-    for (auto& image_list : image_lists) {
-        std::cout << "Image list size: " << image_list.size() << std::endl;
-        std::vector<std::vector<modeldeploy::vision::DetectionResult>> ress;
-        auto images = get_images(image_list);
-        std::cout << "Start predict..." << std::endl;
-        model.batch_predict(images, &ress);
+    std::vector<std::vector<modeldeploy::vision::DetectionResult>> ress;
+    std::cout << "Start predict..." << std::endl;
+    model.batch_predict(images, &ress);
+    for (size_t i = 0; i < ress.size(); ++i) {
+        std::cout << "image " << i << " | obj count: " << ress[i].size() << std::endl;
     }
     const auto end_time = std::chrono::steady_clock::now();
     std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count()

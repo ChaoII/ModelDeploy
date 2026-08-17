@@ -11,11 +11,8 @@
 
 int main(int argc, char** argv) {
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
-    option.use_trt_backend();
-    option.enable_fp16 = true;
-    option.enable_trt = true;
-    const std::string model_file = "../../test_data/test_models/onnx/yolo11n-seg_nms.onnx";
+    option.use_ort_backend();
+    const std::string model_file = "../../test_data/test_models/onnx/yolo11n/yolo11n-seg_nms.onnx";
     const std::string image_file = "../../test_data/test_images/test_person.jpg";
     auto model = modeldeploy::vision::detection::UltralyticsSeg(model_file, option);
     auto im = modeldeploy::vision::ImageData::imread(image_file);
@@ -28,5 +25,5 @@ int main(int argc, char** argv) {
     times.print_benchmark();
     // res.display();
     auto vis_im = modeldeploy::vision::vis_iseg(im, res, 0.2, "../../test_data/msyh.ttc", 14, 0.5, false);
-    vis_im.imshow("result");
+    (void)vis_im.imwrite("iseg_out.jpg");
 }

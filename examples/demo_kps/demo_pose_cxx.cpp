@@ -8,10 +8,8 @@
 
 int main() {
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
-    option.enable_trt = true;
-    option.enable_fp16 = true;
-    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/onnx/yolo11n-pose.onnx", option);
+    option.use_ort_backend();
+    modeldeploy::vision::detection::UltralyticsPose yolov8("../../test_data/test_models/onnx/yolo11n/yolo11n-pose.onnx", option);
     yolov8.get_postprocessor().set_keypoints_num(17);
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_person.jpg");
     std::vector<modeldeploy::vision::KeyPointsResult> result;
@@ -29,5 +27,5 @@ int main() {
     // result.display();
     const auto vis_image =
         modeldeploy::vision::vis_pose(img, result, "../../test_data/msyh.ttc", 12, 4, 0.3, false);
-    vis_image.imshow("result");
+    (void)vis_image.imwrite("pose_out.jpg");
 }

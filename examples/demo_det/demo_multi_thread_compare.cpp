@@ -17,22 +17,18 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(4);
     option.use_ort_backend();
-    option.use_gpu(0);
-    option.enable_fp16 = true;
-    option.enable_trt = false;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
 
     // 加载模型
     modeldeploy::vision::detection::UltralyticsDet yolo11_det(
-        "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
+        "../../test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx", option);
     yolo11_det.get_preprocessor().set_size({640, 640});
 
     // 读取多张不同图像（模拟多路摄像头）
     std::vector<std::string> img_paths = {
         "../../test_data/test_images/test_detection0.jpg",
-        "../../test_data/test_images/111.jpg",
-        "../../test_data/test_images/best_0.jpg",
-        "../../test_data/test_images/2341.jpg",
+        "../../test_data/test_images/bus.jpg",
+        "../../test_data/test_images/test_face1.jpg",
+        "../../test_data/test_images/test_obb1.jpg",
     };
 
     std::vector<ImageData> images;

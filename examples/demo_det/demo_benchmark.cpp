@@ -13,18 +13,14 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(4);
     option.use_ort_backend();
-    option.use_gpu(0);
-    option.enable_fp16 = true;
-    option.enable_trt = false;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
 
     auto det = modeldeploy::vision::detection::UltralyticsDet(
-        "../../test_data/test_models/onnx/yolo11n_nms.onnx", option);
+        "../../test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx", option);
     det.get_preprocessor().set_size({640, 640});
 
     // 使用多张不同图片（避免缓存）
     std::vector<ImageData> images;
-    for (auto& p : {"test_detection0.jpg", "111.jpg", "best_0.jpg", "2341.jpg"}) {
+    for (auto& p : {"test_detection0.jpg", "bus.jpg", "test_face1.jpg", "test_obb1.jpg"}) {
         auto img = ImageData::imread(std::string("../../test_data/test_images/") + p);
         if (!img.empty()) images.push_back(img);
     }

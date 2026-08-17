@@ -9,15 +9,10 @@ int main() {
     modeldeploy::RuntimeOption option;
     option.set_cpu_thread_num(10);
     option.use_ort_backend();
-    option.use_gpu(0);
-    option.enable_fp16 = true;
-    option.enable_trt = true;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
     modeldeploy::vision::detection::UltralyticsDet yolo11_det("../../test_data/test_models/onnx/yolo26n/yolo26n.onnx", option);
     const auto label_map = yolo11_det.get_label_map("names");
     // auto img = modeldeploy::ImageData::imread("../../test_data/test_images/111.jpg");
     auto img = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute_scale.png");
-    // img.imshow("img");
     // auto img1 = img.clone();
     std::vector<modeldeploy::vision::DetectionResult> result;
     yolo11_det.get_preprocessor().set_size({640, 640});
@@ -35,7 +30,7 @@ int main() {
     const auto vis_image =
         modeldeploy::vision::vis_det(img, result, 0.5, label_map, "../../test_data/msyh.ttc", 12, 0.3,
                                      true);
-    vis_image.imshow("result");
+    (void)vis_image.imwrite("result_out.jpg");
 
     // test_camera();
 }
