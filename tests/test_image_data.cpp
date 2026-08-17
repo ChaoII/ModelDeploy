@@ -1,9 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <array>
+#include <cstring>
 #include <filesystem>
+#include <memory>
 #include <opencv2/core/mat.hpp>
 #include "vision/common/image_data.h"
 #include "vision/common/basic_types.h"
+#include "vision/processors/cpu/cpu_processor_backend.h"
 #include "core/md_log.h"
 
 using namespace modeldeploy;
@@ -370,6 +373,62 @@ TEST_CASE("ImageData read/write file", "[image_data]") {
         REQUIRE(loaded.width() == 50);
         REQUIRE(loaded.height() == 50);
         std::filesystem::remove(tmp);
+    }
+}
+
+TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
+    const int w = 320, h = 240;
+    // 构造 host NV12 帧（Y 平面 + UV 交错平面），初始化为纯灰（Y=128, Cb=Cr=128）
+    auto y_buf = std::make_unique<uint8_t[]>(static_cast<size_t>(w) * h);
+    auto uv_buf = std::make_unique<uint8_t[]>(static_cast<size_t>(w) * (h / 2));
+    std::memset(y_buf.get(), 128, static_cast<size_t>(w) * h);
+    std::memset(uv_buf.get(), 128, static_cast<size_t>(w) * (h / 2));
+    ImageData frame = ImageData::from_device_planes(y_buf.get(), uv_buf.get(), w, h, w, w, Device::CPU);
+
+    CpuProcessorBackend backend;
+
+    SECTION("draw_rect writes Y and UV planes") {
+        REQUIRE(backend.draw_rect_nv12(frame, 20, 20, 100, 60, 255, 0, 0, 2));
+        const uint8_t* y = frame.y();
+        // 顶边中间像素（x=60,y=20）：画成红色 → 亮度低
+        REQUIRE(y[20 * w + 60] != 128);
+        // 边框外像素保持灰
+        REQUIRE(y[20 * w + 5] == 128);
+        // UV 平面也被写（矩形内某 UV 像素偏离灰平衡 128）
+        const uint8_t* uv = frame.uv();
+        bool uv_changed = false;
+        for (int uy = 10; uy < 40; ++uy) {
+            for (int ux = 10; ux < 60; ++ux) {
+                if (uv[uy * w + ux * 2] != 128 || uv[uy * w + ux * 2 + 1] != 128) { uv_changed = true; break; }
+            }
+        }
+        REQUIRE(uv_changed);
+    }
+
+    SECTION("draw_text writes label pixels") {
+        REQUIRE(backend.draw_text_nv12(frame, 30, 100, "AB", 255, 255, 255, 1));
+        const uint8_t* y = frame.y();
+        bool any_changed = false;
+        for (int py = 100; py < 116; ++py) {
+            for (int px = 30; px < 30 + 16; ++px) {
+                if (y[py * w + px] != 128) { any_changed = true; break; }
+            }
+        }
+        REQUIRE(any_changed);
+    }
+
+    SECTION("draw_points writes") {
+        std::vector<Point3f> pts = {Point3f(50, 50, 0)};
+        REQUIRE(backend.draw_points_nv12(frame, pts, 0, 255, 0, 3));
+        REQUIRE(frame.y()[50 * w + 50] != 128);
+    }
+
+    SECTION("draw_polygon draws closed loop") {
+        std::vector<Point2f> pts = {Point2f(10, 10), Point2f(90, 10), Point2f(90, 70)};
+        REQUIRE(backend.draw_polygon_nv12(frame, pts, 0, 0, 255, 2));
+        const uint8_t* y = frame.y();
+        // 顶点处应有像素
+        REQUIRE(y[10 * w + 10] != 128);
     }
 }
 
