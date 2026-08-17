@@ -22,6 +22,12 @@
 #include "csrc/vision.h"
 #include "csrc/vision/processors/processor_factory.h"
 #include "csrc/vision/processors/cpu/cpu_processor_backend.h"
+#ifdef WITH_GPU
+#include "csrc/vision/processors/cuda/cuda_processor_backend.h"
+#endif
+#ifdef ENABLE_SOPHGO
+#include "csrc/vision/processors/sophgo/sophgo_processor_backend.h"
+#endif
 #include "csrc/vision/face/insightface/face_analysis.h"
 #include "csrc/vision/face/insightface/insightface_types.h"
 #include "csrc/vision/ocr/ppocr.h"
@@ -1800,9 +1806,26 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
         const double threshold = opt.threshold > 0 ? opt.threshold : 0.5;
         auto draw_backend = modeldeploy::vision::create_processor_backend(
             image.device(), modeldeploy::Backend::SOPHGO, 0);
-        // 若该设备未启用对应后端（如 WITH_GPU/OFF、非 TPU），工厂会回退到 CPU 顺序后端，
-        // 但 y()/uv() 指向设备内存，CPU 后端用宿主指针写入会越界/UB —— 直接拒绝。
-        if (dynamic_cast<modeldeploy::vision::CpuProcessorBackend*>(draw_backend.get())) {
+        // 校验该设备是否真返回了对应设备后端（而非回退到 CPU 顺序后端）。注意：
+        // Cuda/SophgoProcessorBackend 均继承自 CpuProcessorBackend，故不能用
+        // dynamic_cast<CpuProcessorBackend*> 判断回退（那会误杀设备绘制）；
+        // 必须按 device 精确匹配期望的具体后端。若设备未启用对应后端
+        // （如 WITH_GPU/OFF、非 TPU），工厂回退到 CPU，但 y()/uv() 指向设备内存，
+        // CPU 后端用宿主指针写入会越界/UB —— 直接拒绝。
+        bool device_backend_ready = false;
+#ifdef WITH_GPU
+        if (image.device() == Device::GPU) {
+            device_backend_ready =
+                dynamic_cast<modeldeploy::vision::CudaProcessorBackend*>(draw_backend.get()) != nullptr;
+        }
+#endif
+#ifdef ENABLE_SOPHGO
+        if (image.device() == Device::TPU) {
+            device_backend_ready =
+                dynamic_cast<modeldeploy::vision::SophgoProcessorBackend*>(draw_backend.get()) != nullptr;
+        }
+#endif
+        if (!device_backend_ready) {
             set_error_fmt("md_draw_result: backend for device %d unavailable (fallback to CPU cannot draw device memory)",
                           (int)image.device());
             return MD_ERR_NOT_IMPLEMENTED;
