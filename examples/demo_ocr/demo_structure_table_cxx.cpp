@@ -11,7 +11,7 @@ int main() {
     auto table_model = modeldeploy::vision::ocr::StructureV2Table(
         "../../test_data/test_models/onnx/ocr/SLANet_plus.onnx",
         "../../test_data/table_structure_dict_ch.txt");
-    auto im = modeldeploy::vision::ImageData::imread("C:/Users/aichao/Desktop/stock/0001.jpg");
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_table.jpg");
     auto im_bak = im.clone();
     modeldeploy::vision::OCRResult result;
     if (!table_model.predict(im, &result)) {
@@ -19,7 +19,7 @@ int main() {
         return -1;
     }
     auto vis_image = modeldeploy::vision::vis_ocr(im_bak, result, "../../test_data/msyh.ttc", 20, 0.5, 0);
-    vis_image.imshow("result");
+    (void)vis_image.imwrite("structure_table_out.jpg");
     modeldeploy::vision::dis_ocr(result);
     return 0;
 }

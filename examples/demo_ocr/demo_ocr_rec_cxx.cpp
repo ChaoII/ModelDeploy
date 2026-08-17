@@ -16,12 +16,7 @@ int main() {
     SetConsoleOutputCP(CP_UTF8);
 #endif
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
-    option.enable_trt = true;
-    option.enable_fp16 = true;
-    option.set_trt_min_shape("x:1x3x48x48");
-    option.set_trt_opt_shape("x:8x3x48x320");
-    option.set_trt_max_shape("x:64x3x48x640");
+    option.use_ort_backend();
     modeldeploy::vision::ocr::Recognizer ocr_recognizer("../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx",
                                                         "../../test_data/dict.txt",
                                                         option);
@@ -49,5 +44,5 @@ int main() {
     timers.print_benchmark();
     modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc");
-    vis_image.imshow("ocr_db_detector");
+    vis_image.imwrite("ocr_rec_out.jpg");
 }

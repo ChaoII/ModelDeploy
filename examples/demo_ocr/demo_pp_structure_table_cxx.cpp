@@ -22,7 +22,7 @@ int main() {
     const std::string& table_model_file = "../../test_data/test_models/onnx/ocr/SLANeXt_wired.onnx";
     const std::string& rec_label_file = "../../test_data/ppocrv4_dict.txt";
     const std::string& table_char_dict_path = "../../test_data/table_structure_dict_ch.txt";
-    const std::string& image_file = "C:/Users/aichao/Desktop/stock/0003.jpg";
+    const std::string& image_file = "../../test_data/test_images/test_table1.jpg";
 
     constexpr int rec_batch_size = 8;
 
@@ -46,7 +46,7 @@ int main() {
         return -1;
     }
     auto vis_image = modeldeploy::vision::vis_ocr(im_bak, result, "../../test_data/msyh.ttc", 20, 0.5, 0);
-    vis_image.imshow("result");
+    (void)vis_image.imwrite("pp_structure_table_out.jpg");
 
     modeldeploy::vision::dis_ocr(result);
 }

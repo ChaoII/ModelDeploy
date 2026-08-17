@@ -16,7 +16,7 @@ int main() {
 #endif
 
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
+    option.use_ort_backend();
 
     auto model = modeldeploy::vision::face::FaceRecognizerPipeline(
         "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx",

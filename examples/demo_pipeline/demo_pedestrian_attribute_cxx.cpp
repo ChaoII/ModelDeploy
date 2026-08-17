@@ -8,32 +8,14 @@
 
 
 int main(int argc, char** argv) {
-    if (argc < 5) {
-        std::cout << "usage: demo_pedestrian_attribute_cxx det_model ml_model image_path backend" << std::endl;
-        return 1;
-    }
-
-
-    const std::string det_model = argv[1];
-    const std::string ml_model = argv[2];
-    const std::string image_path = argv[3];
-    const std::string backend = argv[4];
+    const std::string det_model = argc > 1 ? argv[1]
+        : "../../test_data/test_models/onnx/zhgd_det.onnx";
+    const std::string ml_model = argc > 2 ? argv[2]
+        : "../../test_data/test_models/onnx/zhgd_ml.onnx";
+    const std::string image_path = argc > 3 ? argv[3]
+        : "../../test_data/test_images/test_pedestrian_attribute_scale.png";
     modeldeploy::RuntimeOption option;
-    if (backend == "ort") {
-        option.use_gpu();
-        option.use_ort_backend();
-    }
-
-    else if (backend == "trt") {
-        option.use_gpu();
-        option.use_trt_backend();
-    }
-    else if (backend == "mnn") {
-        option.use_gpu();
-        option.use_mnn_backend();
-    }
-    option.enable_trt = true;
-    option.enable_fp16 = true;
+    option.use_ort_backend();
     modeldeploy::vision::pipeline::PedestrianAttribute pedestrian_attribute(
         det_model, ml_model, option);
     auto img = modeldeploy::vision::ImageData::imread(image_path);
@@ -57,5 +39,5 @@ int main(int argc, char** argv) {
     label_map.insert({3, "work_uniform"});
     const auto vis_image =
         modeldeploy::vision::vis_attr(img, results, 0.5, label_map, "../../test_data/msyh.ttc", 6, 0.15, true, {0, 1});
-    vis_image.imshow("pedestrian");
+    (void)vis_image.imwrite("pedestrian_attr_out.jpg");
 }

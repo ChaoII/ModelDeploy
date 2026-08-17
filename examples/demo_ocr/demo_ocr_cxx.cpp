@@ -16,9 +16,7 @@ int main() {
 #endif
 
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
-    option.enable_trt = false;
-    option.enable_fp16 = true;
+    option.use_ort_backend();
     modeldeploy::vision::ocr::PaddleOCR ocr("../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx",
                                             "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/cls_infer.onnx",
                                             "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx",
@@ -41,5 +39,5 @@ int main() {
     timers.print_benchmark();
     modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc");
-    vis_image.imshow("ocr");
+    (void)vis_image.imwrite("ocr_out.jpg");
 }

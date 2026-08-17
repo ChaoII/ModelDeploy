@@ -16,6 +16,6 @@ int main() {
     }
     const std::string gender = gender_id == 0 ? "female" : "male";
     std::cout << "gender: " << gender << std::endl;
-    im0.imshow("123");
+    (void)im0.imwrite("face_gender_out.jpg");
     return 0;
 }

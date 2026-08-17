@@ -30,15 +30,16 @@ int main() {
     timers.print_benchmark();
     // res.display();
     const auto image = modeldeploy::vision::vis_keypoints(im_bak, res, "../../test_data/msyh.ttc", 14, 2, 0.3);
-    image.imshow("result");
+    (void)image.imwrite("face_det_out.jpg");
     const auto vis_im_list =
         modeldeploy::vision::utils::align_face_with_five_points(im, res);
     if (!vis_im_list.empty()) {
         std::vector<modeldeploy::vision::ImageData> cropped_images;
+        int crop_idx = 0;
         for (auto& align_image : vis_im_list) {
             auto img_crop = modeldeploy::vision::utils::center_crop(align_image, {248, 248});
             cropped_images.push_back(img_crop);
-            img_crop.imshow("align_face");
+            (void)img_crop.imwrite("align_face_" + std::to_string(crop_idx++) + ".jpg");
         }
         // int size = static_cast<int>(std::sqrt(cropped_images.size())) + 1;
         // // 如果图像数量不足，填充空白图像
