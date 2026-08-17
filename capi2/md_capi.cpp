@@ -181,6 +181,8 @@ const char* md_get_last_error(void) {
 struct md_option_handle {
     RuntimeOption opt;
     bool backend_explicit = false;
+    MDDevice device = MD_DEV_CPU;
+    int device_id = 0;
 };
 
 MDStatus md_option_create(MDOptionHandle* out) {
@@ -193,14 +195,27 @@ void md_option_destroy(MDOptionHandle h) {
     delete static_cast<md_option_handle*>(h);
 }
 
-void md_option_set_device(MDOptionHandle h, MDDevice d) {
-    auto* o = static_cast<md_option_handle*>(h);
-    switch (d) {
+void md_option_apply_device_(md_option_handle* o) {
+    switch (o->device) {
         case MD_DEV_CPU: o->opt.use_cpu(); break;
-        case MD_DEV_GPU: o->opt.use_gpu(0); break;
-        case MD_DEV_TPU: o->opt.use_sophgo_backend(0); break;
+        case MD_DEV_GPU: o->opt.use_gpu(o->device_id); break;
+        case MD_DEV_TPU: o->opt.use_sophgo_backend(o->device_id); break;
         default: break;
     }
+}
+
+void md_option_set_device(MDOptionHandle h, MDDevice d) {
+    auto* o = static_cast<md_option_handle*>(h);
+    o->device = d;
+    md_option_apply_device_(o);
+}
+
+void md_option_set_device_id(MDOptionHandle h, int id) {
+    auto* o = static_cast<md_option_handle*>(h);
+    if (id < 0) id = 0;
+    o->device_id = id;
+    // 已设过 device 时立即生效，否则等 set_device 应用
+    md_option_apply_device_(o);
 }
 
 void md_option_set_backend(MDOptionHandle h, MDBackend b) {
@@ -521,8 +536,21 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             break;
         }
         case MD_MODEL_FACE_AS: {
-            mh->model = make_model<face::InsightFaceGenderAge>(model_path, opt, "InsightFaceGenderAge", &err);
-            if (!mh->model) return fail_init("InsightFaceGenderAge");
+            mh->model = make_model<face::SeetaFaceAsFirst>(model_path, opt, "SeetaFaceAsFirst", &err);
+            if (!mh->model) return fail_init("SeetaFaceAsFirst");
+            break;
+        }
+        case MD_MODEL_FACE_AS_SECOND: {
+            mh->model = make_model<face::SeetaFaceAsSecond>(model_path, opt, "SeetaFaceAsSecond", &err);
+            if (!mh->model) return fail_init("SeetaFaceAsSecond");
+            break;
+        }
+        case MD_MODEL_FACE_AS_PIPELINE: {
+            if (!need_parts(3, "face-as-pipeline")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new face::SeetaFaceAsPipeline(parts[0], parts[1], parts[2], opt);
+            mh->model = m;
+            if (!m->is_initialized()) return fail_init("SeetaFaceAsPipeline");
             break;
         }
         case MD_MODEL_INSIGHTFACE_DET: {
@@ -654,7 +682,9 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_FACE_REC: delete static_cast<face::SeetaFaceID*>(model); break;
         case MD_MODEL_FACE_AGE: delete static_cast<face::SeetaFaceAge*>(model); break;
         case MD_MODEL_FACE_GENDER: delete static_cast<face::SeetaFaceGender*>(model); break;
-        case MD_MODEL_FACE_AS: delete static_cast<face::InsightFaceGenderAge*>(model); break;
+        case MD_MODEL_FACE_AS: delete static_cast<face::SeetaFaceAsFirst*>(model); break;
+        case MD_MODEL_FACE_AS_SECOND: delete static_cast<face::SeetaFaceAsSecond*>(model); break;
+        case MD_MODEL_FACE_AS_PIPELINE: delete static_cast<face::SeetaFaceAsPipeline*>(model); break;
         case MD_MODEL_FACE_REC_PIPELINE: delete static_cast<face::FaceRecognizerPipeline*>(model); break;
         case MD_MODEL_INSIGHTFACE: delete static_cast<face::InsightFaceAnalysis*>(model); break;
         case MD_MODEL_INSIGHTFACE_DET: delete static_cast<face::InsightFaceDet*>(model); break;
@@ -708,7 +738,9 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_FACE_AGE: cloned = static_cast<face::SeetaFaceAge*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_GENDER: cloned = static_cast<face::SeetaFaceGender*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_REC_PIPELINE: cloned = static_cast<face::FaceRecognizerPipeline*>(src->model)->clone().release(); break;
-        case MD_MODEL_FACE_AS: cloned = static_cast<face::InsightFaceGenderAge*>(src->model)->clone().release(); break;
+        case MD_MODEL_FACE_AS: cloned = static_cast<face::SeetaFaceAsFirst*>(src->model)->clone().release(); break;
+        case MD_MODEL_FACE_AS_SECOND: cloned = static_cast<face::SeetaFaceAsSecond*>(src->model)->clone().release(); break;
+        case MD_MODEL_FACE_AS_PIPELINE: cloned = static_cast<face::SeetaFaceAsPipeline*>(src->model)->clone().release(); break;
         case MD_MODEL_INSIGHTFACE_DET: cloned = static_cast<face::InsightFaceDet*>(src->model)->clone().release(); break;
         case MD_MODEL_INSIGHTFACE: cloned = static_cast<face::InsightFaceAnalysis*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR: cloned = static_cast<ocr::PaddleOCR*>(src->model)->clone().release(); break;
@@ -1176,17 +1208,36 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
             break;
         }
         case MD_MODEL_FACE_AS: {
-            auto* m = static_cast<face::InsightFaceGenderAge*>(mh->model);
-            auto* d = new ResultData<face::InsightFaceResult>();
-            face::GenderAgeResult r;
-            std::array<float, 4> whole{0.f, 0.f, static_cast<float>(image.width()), static_cast<float>(image.height())};
-            if (!m->predict_gender_age(image, whole, &r)) return predict_fail("face gender age");
-            face::InsightFaceResult out;
-            out.gender = r.gender;
-            out.age = r.age;
-            out.bbox = whole;
-            d->v.push_back(std::move(out));
-            rh->kind = MD_RES_INSIGHTFACE;
+            auto* m = static_cast<face::SeetaFaceAsFirst*>(mh->model);
+            auto* d = new ResultData<int>();
+            float score = 0.f;
+            if (!m->predict(image, &score)) return predict_fail("face anti-spoof first");
+            // 单幅整图被动防伪：score > 0.8 判 REAL，否则 SPOOF（与 v1 demo 一致）
+            d->v.push_back(score > 0.8f ? static_cast<int>(FaceAntiSpoofResult::REAL)
+                                        : static_cast<int>(FaceAntiSpoofResult::SPOOF));
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_FACE_AS_SECOND: {
+            auto* m = static_cast<face::SeetaFaceAsSecond*>(mh->model);
+            auto* d = new ResultData<int>();
+            std::vector<std::tuple<int, float>> spoofs;
+            if (!m->predict(image, &spoofs)) return predict_fail("face anti-spoof second");
+            d->v.push_back(spoofs.empty() ? static_cast<int>(FaceAntiSpoofResult::REAL)
+                                          : static_cast<int>(FaceAntiSpoofResult::SPOOF));
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_FACE_AS_PIPELINE: {
+            auto* m = static_cast<face::SeetaFaceAsPipeline*>(mh->model);
+            auto* d = new ResultData<int>();
+            std::vector<FaceAntiSpoofResult> labels;
+            if (!m->predict(image, &labels)) return predict_fail("face anti-spoof pipeline");
+            d->v.reserve(labels.size());
+            for (const auto& l : labels) d->v.push_back(static_cast<int>(l));
+            rh->kind = MD_RES_ANTISPOOF;
             rh->data = d;
             break;
         }
@@ -1957,6 +2008,16 @@ MDStatus md_result_gender(MDResultHandle h, int* gender) {
     if (!rh) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_GENDER) return MD_ERR_INVALID_ARGUMENT;
     if (gender) *gender = static_cast<SingleResult<int>*>(rh->data)->value;
+    return MD_OK;
+}
+
+MDStatus md_result_spoof(MDResultHandle h, size_t i, int* label) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !label) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_ANTISPOOF) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = static_cast<ResultData<int>*>(rh->data);
+    if (i >= d->count()) return MD_ERR_INVALID_ARGUMENT;
+    *label = d->v[i];
     return MD_OK;
 }
 

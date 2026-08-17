@@ -180,3 +180,73 @@ TEST_CASE("capi2 detection param setter on loaded model", "[model]") {
 
     md_model_destroy(det);
 }
+
+TEST_CASE("capi2 option device id setter", "[capi]") {
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+
+    // 默认；set_device 与 set_device_id 独立调用均须不崩溃、可重复设置
+    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device_id(opt, 0);
+    md_option_set_device(opt, MD_DEV_GPU);
+    md_option_set_device_id(opt, 1);
+    md_option_set_device_id(opt, 2);
+    // 负数收敛为 0（内部），仍可调用
+    md_option_set_device_id(opt, -1);
+    md_option_set_device_id(opt, 3);
+
+    md_option_destroy(opt);
+}
+
+TEST_CASE("capi2 face anti-spoof enum + spoof getter guards", "[capi]") {
+    // 新增 kind 在合法枚举范围内（不越界、不撞 MD_MODEL_COUNT）
+    CHECK(static_cast<int>(MD_MODEL_FACE_AS_SECOND) < static_cast<int>(MD_MODEL_COUNT));
+
+    // spoof getter 空指针 / 类型不符
+    MDResultHandle res = nullptr;
+    CHECK(md_result_spoof(nullptr, 0, nullptr) == MD_ERR_NULL_POINTER);
+    CHECK(md_result_spoof(res, 0, nullptr) == MD_ERR_NULL_POINTER);
+
+    // FACE_AS 用不存在的文件 create → 返回错误（不崩溃）
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    MDModelHandle m = nullptr;
+    CHECK(md_model_create(&m, MD_MODEL_FACE_AS, "no_such_fas.onnx", opt) != MD_OK);
+    md_option_destroy(opt);
+}
+
+// 端到端人脸防伪：需模型文件（[model] 标签，CI 有模型时执行）
+TEST_CASE("capi2 face anti-spoof inference (first)", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string model = data_dir + "/test_models/onnx/face/fas_first.onnx";
+    const std::string imgf = data_dir + "/test_images/test_face_id3.jpg";
+    if (!std::filesystem::exists(model) || !std::filesystem::exists(imgf)) return;
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle as = nullptr;
+    REQUIRE(md_model_create(&as, MD_MODEL_FACE_AS, model.c_str(), opt) == MD_OK);
+    md_option_destroy(opt);
+
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_file(&img, imgf.c_str()) == MD_OK);
+    MDResultHandle res = nullptr;
+    REQUIRE(md_model_predict(as, img, &res) == MD_OK);
+    size_t n = 0;
+    REQUIRE(md_result_count(res, &n) == MD_OK);
+    REQUIRE(n >= 1);
+    int label = -1;
+    REQUIRE(md_result_spoof(res, 0, &label) == MD_OK);
+    CHECK(label >= 0);
+    CHECK(label <= 2);
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(as);
+}

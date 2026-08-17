@@ -95,6 +95,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_PED_ATTR,
     MD_MODEL_ASR,
     MD_MODEL_TTS,
+    MD_MODEL_FACE_AS_SECOND,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -121,6 +122,7 @@ MD_CAPI_EXPORT MDStatus md_option_create(MDOptionHandle* out);
 MD_CAPI_EXPORT void md_option_destroy(MDOptionHandle);
 
 MD_CAPI_EXPORT void md_option_set_device(MDOptionHandle, MDDevice);
+MD_CAPI_EXPORT void md_option_set_device_id(MDOptionHandle, int device_id);
 MD_CAPI_EXPORT void md_option_set_backend(MDOptionHandle, MDBackend);
 MD_CAPI_EXPORT void md_option_set_cpu_threads(MDOptionHandle, int n);
 MD_CAPI_EXPORT void md_option_set_fp16(MDOptionHandle, int enable);
@@ -267,9 +269,9 @@ typedef enum MD_RESULT_KIND {
     MD_RES_AGE,
     MD_RES_GENDER,
     MD_RES_ASR,
-    MD_RES_TTS
+    MD_RES_TTS,
+    MD_RES_ANTISPOOF
 } MDResultKind;
-
 MD_CAPI_EXPORT MDStatus md_result_kind(MDResultHandle, MDResultKind* out);
 /* 结果对应的图内实例数（人脸数/文本行数/目标数等；单值结果恒为 1） */
 MD_CAPI_EXPORT MDStatus md_result_count(MDResultHandle, size_t* out);
@@ -395,6 +397,9 @@ MD_CAPI_EXPORT MDStatus md_result_attr_scores(MDResultHandle, size_t i, const fl
 /* 年龄 / 性别（单值，0 号索引） */
 MD_CAPI_EXPORT MDStatus md_result_age(MDResultHandle, int* age);
 MD_CAPI_EXPORT MDStatus md_result_gender(MDResultHandle, int* gender);
+
+/* 人脸防伪（每实例 label：0=REAL, 1=FUZZY, 2=SPOOF） */
+MD_CAPI_EXPORT MDStatus md_result_spoof(MDResultHandle, size_t i, int* label);
 
 /* ==================== 绘制（对 MDImageHandle 就地绘制） ==================== */
 
