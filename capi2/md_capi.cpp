@@ -20,7 +20,7 @@
 #endif
 
 #include "csrc/vision.h"
-#include "csrc/vision/processors/cpu/cpu_processor_backend.h"
+#include "csrc/vision/processors/processor_factory.h"
 #include "csrc/vision/face/insightface/face_analysis.h"
 #include "csrc/vision/face/insightface/insightface_types.h"
 #include "csrc/vision/ocr/ppocr.h"
@@ -1793,23 +1793,24 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
 
     ImageData image = image_handle_as_data(hi);
 
-    // 设备帧（NV12 且非 CPU）：就地设备绘制，按 frame.device() 分发到 processor backend。
-    // 当前统一走 CPU 顺序实现以保证 CP 路径可测；GPU/TPU 加速绘制见 Task 6（CUDA）/Task 7（Sophgo）。
+    // 设备帧（NV12 且非 CPU）：就地设备绘制，按 frame.device() 分发到对应 processor backend
+    // （GPU→CUDA kernel，TPU→Sophgo，其余→CPU 顺序实现）。
     if (image.device() != Device::CPU && image.type() == MdImageType::NV12) {
         const double threshold = opt.threshold > 0 ? opt.threshold : 0.5;
+        auto draw_backend = modeldeploy::vision::create_processor_backend(
+            image.device(), modeldeploy::Backend::SOPHGO, 0);
         bool ok = false;
         switch (rh->kind) {
             case MD_RES_DETECTION: {
                 auto* d = raw_result<DetectionResult>(rh);
                 if (!d) return MD_ERR_INVALID_ARGUMENT;
-                CpuProcessorBackend cpu_backend;
                 for (const auto& r : d->v) {
                     if (r.score < threshold) continue;
                     const auto& box = r.box;
-                    ok = cpu_backend.draw_rect_nv12(image, box.x, box.y, box.width, box.height,
-                                                    255, 0, 0, 2) || ok;
-                    ok = cpu_backend.draw_text_nv12(image, box.x, box.y - 16,
-                                                    std::to_string(r.label_id), 255, 255, 255, 1) || ok;
+                    ok = draw_backend->draw_rect_nv12(image, box.x, box.y, box.width, box.height,
+                                                      255, 0, 0, 2) || ok;
+                    ok = draw_backend->draw_text_nv12(image, box.x, box.y - 16,
+                                                      std::to_string(r.label_id), 255, 255, 255, 1) || ok;
                 }
                 return ok ? MD_OK : MD_ERR_INVALID_ARGUMENT;
             }

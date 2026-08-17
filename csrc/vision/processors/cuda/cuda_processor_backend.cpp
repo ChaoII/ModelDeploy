@@ -7,6 +7,8 @@
 #include "vision/processors/cuda/yolo_preproc.cuh"
 #include "vision/processors/cuda/fused_preproc.cuh"
 #include "vision/processors/cuda/scrfd_preproc.cuh"
+#include "vision/processors/cuda/draw_gpu.cuh"
+#include <vector>
 
 namespace modeldeploy::vision {
     // 惰性创建并返回持久 CUDA stream（backend 生命周期内复用）
@@ -124,5 +126,56 @@ namespace modeldeploy::vision {
                                 std::vector<float>(alpha, alpha + 3),
                                 std::vector<float>(beta, beta + 3), pad,
                                 get_persistent_stream(&stream_), &out_pool_);
+    }
+
+    bool CudaProcessorBackend::draw_rect_nv12(ImageData& frame, float x, float y, float w, float h,
+                                              float r, float g, float b, int thickness) {
+        return draw_rect_nv12_gpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                                  frame.width(), frame.height(),
+                                  frame.step_y(), frame.step_uv(),
+                                  x, y, w, h,
+                                  static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                                  static_cast<uint8_t>(b), thickness,
+                                  get_persistent_stream(&stream_));
+    }
+
+    bool CudaProcessorBackend::draw_polygon_nv12(ImageData& frame, const std::vector<Point2f>& pts,
+                                                 float r, float g, float b, int thickness) {
+        std::vector<float> xs, ys;
+        xs.reserve(pts.size()); ys.reserve(pts.size());
+        for (const auto& p : pts) { xs.push_back(p.x); ys.push_back(p.y); }
+        return draw_polygon_nv12_gpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                                     frame.width(), frame.height(),
+                                     frame.step_y(), frame.step_uv(),
+                                     xs.data(), ys.data(), static_cast<int>(xs.size()),
+                                     static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                                     static_cast<uint8_t>(b), thickness,
+                                     get_persistent_stream(&stream_));
+    }
+
+    bool CudaProcessorBackend::draw_points_nv12(ImageData& frame, const std::vector<Point3f>& pts,
+                                                float r, float g, float b, int radius) {
+        std::vector<float> xs, ys;
+        xs.reserve(pts.size()); ys.reserve(pts.size());
+        for (const auto& p : pts) { xs.push_back(p.x); ys.push_back(p.y); }
+        return draw_points_nv12_gpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                                    frame.width(), frame.height(),
+                                    frame.step_y(), frame.step_uv(),
+                                    xs.data(), ys.data(), static_cast<int>(xs.size()),
+                                    static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                                    static_cast<uint8_t>(b), radius,
+                                    get_persistent_stream(&stream_));
+    }
+
+    bool CudaProcessorBackend::draw_text_nv12(ImageData& frame, float x, float y,
+                                              const std::string& text,
+                                              float r, float g, float b, int font_size) {
+        return draw_text_nv12_gpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                                  frame.width(), frame.height(),
+                                  frame.step_y(), frame.step_uv(),
+                                  x, y, text.c_str(),
+                                  static_cast<uint8_t>(r), static_cast<uint8_t>(g),
+                                  static_cast<uint8_t>(b), font_size,
+                                  get_persistent_stream(&stream_));
     }
 } // namespace modeldeploy::vision

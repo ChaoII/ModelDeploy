@@ -53,6 +53,21 @@ namespace modeldeploy::vision {
             const std::vector<int>& dst_size,
             const std::vector<float>& mean, const std::vector<float>& std,
             float pad_value) override;
+
+        // ── NV12 设备侧就地绘制（覆写为 CUDA kernel）──
+        bool draw_rect_nv12(ImageData& frame,
+                            float x, float y, float w, float h,
+                            float r, float g, float b, int thickness) override;
+        bool draw_polygon_nv12(ImageData& frame,
+                               const std::vector<Point2f>& pts,
+                               float r, float g, float b, int thickness) override;
+        bool draw_points_nv12(ImageData& frame,
+                              const std::vector<Point3f>& pts,
+                              float r, float g, float b, int radius) override;
+        bool draw_text_nv12(ImageData& frame,
+                            float x, float y, const std::string& text,
+                            float r, float g, float b, int font_size) override;
+
         ~CudaProcessorBackend() override;
 
     private:

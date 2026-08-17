@@ -19,4 +19,29 @@ namespace modeldeploy::vision {
         uint8_t* bgr, int width, int height,
         const GpuDrawBox* d_boxes, int num_boxes,
         float alpha = 0.15f, cudaStream_t stream = nullptr);
+
+    // ── NV12 设备侧就地绘制（y/uv 为设备指针；颜色 BGR→YUV BT.601）──
+    MODELDEPLOY_CXX_EXPORT bool draw_rect_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        float x, float yo, float rw, float rh,
+        uint8_t r, uint8_t g, uint8_t b, int thickness,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool draw_polygon_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        const float* xs, const float* ys, int npts,
+        uint8_t r, uint8_t g, uint8_t b, int thickness,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool draw_points_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        const float* xs, const float* ys, int npts,
+        uint8_t r, uint8_t g, uint8_t b, int radius,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool draw_text_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        float x, float yo, const char* text,
+        uint8_t r, uint8_t g, uint8_t b, int font_size,
+        cudaStream_t stream = nullptr);
 }
