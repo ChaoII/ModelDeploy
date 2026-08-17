@@ -42,8 +42,13 @@
 /* Set to 1 if you have libsndfile. */
 #cmakedefine01 HAVE_SNDFILE
 
-/* Define to 1 if you have the <stdbool.h> header file. */
-#cmakedefine HAVE_STDBOOL_H
+/* Define to 1 if you have the <stdbool.h> header file.
+   MSVC check_include_file() 会在某些工具链下误判 stdbool.h 不可用，导致
+   使用 bool/true 的 C 文件（src_linear.c / src_zoh.c）编译失败。
+   现代编译器（MSVC / GCC / Clang）均提供 <stdbool.h>，因此在这里强制兜底。 */
+#ifndef HAVE_STDBOOL_H
+#define HAVE_STDBOOL_H 1
+#endif
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #cmakedefine01 HAVE_STDINT_H
