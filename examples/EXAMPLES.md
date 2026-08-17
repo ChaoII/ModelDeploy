@@ -31,9 +31,9 @@ cmake --build build
 | `demo_face_gender_capi` | 性别 | `onnx/face/gender_predictor.onnx` | `test_images/test_face_gender.jpg` | 打印 gender |
 | `demo_face_rec_capi` | 人脸特征 | `onnx/face/face_recognizer.onnx` | `test_images/test_face_id4.jpg` | 打印 1024 维 embedding |
 | `demo_face_rec_pipeline_capi` | 检测+特征 | `scrfd_*.onnx|face_recognizer.onnx` | `test_images/test_face_detection4.jpg` | 打印每张脸 embedding |
-| `demo_face_as_first_capi` | 防伪(first) | `onnx/face/fas_first.onnx` | `test_images/test_face_id3.jpg` | 打印 capi2 限制（AS 未接线，见下） |
-| `demo_face_as_second_capi` | 防伪(second) | `onnx/face/fas_second.onnx` | `test_images/test_face_as_second2.jpg` | 同上 |
-| `demo_face_as_pipeline_capi` | 防伪管线 | `scrfd_*.onnx|fas_first.onnx|fas_second.onnx` | `test_images/test_face_detection4.jpg` | 同上 |
+| `demo_face_as_first_capi` | 防伪(first) | `onnx/face/fas_first.onnx` | `test_images/test_face_id3.jpg` | 打印 REAL/SPOOF |
+| `demo_face_as_second_capi` | 防伪(second) | `onnx/face/fas_second.onnx` | `test_images/test_face_as_second2.jpg` | 打印 REAL/SPOOF |
+| `demo_face_as_pipeline_capi` | 防伪管线 | `scrfd_*.onnx|fas_first.onnx|fas_second.onnx` | `test_images/test_face_detection4.jpg` | 逐脸打印 REAL/FUZZY/SPOOF |
 | `demo_ocr_capi` | OCR 整链 | `ocr/ppocrv4_mobile/det_infer.infer|cls_infer.onnx|rec_infer.onnx|ppocrv4_dict.txt` | `test_images/test_ocr.png` | 打印行文本 + `capi2_ocr_out.jpg`（演示 `det_db_box_thresh`/`cls_thresh` 参数） |
 | `demo_lpr_pipeline_capi` | 车牌管线 | `lpr/yolov5plate.onnx|plate_recognition_color.onnx` | `test_images/test_lpr_pipeline.jpg` | 打印车牌/颜色 + `capi2_lpr_out.jpg` |
 | `demo_pedestrian_attribute_capi` | 行人属性 | `zhgd_det.onnx|zhgd_ml.onnx` | `test_images/test_pedestrian_attribute1.jpg` | 打印属性分数 + `capi2_attr_out.jpg`（演示 `det_threshold`/`set_input_size`/`set_cls_input_size`） |
@@ -43,7 +43,9 @@ cmake --build build
 | `demo_image_from_bgr24` | 图像工具 | —（合成 BGR 样本） | — | `capi2_bgr24_out.png` |
 | `demo_image_rotate` | 图像工具 | `test_images/test_face_as_second.jpg` | — | `capi2_rotate_original.jpg` / `capi2_rotate90_out.jpg` |
 
-> **防伪 capi2 现状**：`MD_MODEL_FACE_AS` / `MD_MODEL_FACE_AS_PIPELINE` 在 `capi2/md_capi.cpp` 中未正确接线（`FACE_AS` 误映射为 InsightFace genderage，`FACE_AS_PIPELINE` 无实现）。三个 `demo_face_as_*_capi` 可编译、可干净运行，但会打印该 capi2 限制而不做真实判定（不伪造）。C++ SDK 已有正确的 `SeetaFaceAsFirst/Second/Pipeline`，等待 capi2 接线后即可。
+> **防伪 kind**：`MD_MODEL_FACE_AS` = `SeetaFaceAsFirst`（被动防伪），`MD_MODEL_FACE_AS_SECOND` = `SeetaFaceAsSecond`，`MD_MODEL_FACE_AS_PIPELINE` = `scrfd|first|second` 管线。结果经 `md_result_spoof(res, i, &label)` 读取，label 0=REAL / 1=FUZZY / 2=SPOOF。
+
+> **设备选择**：除 `md_option_set_device(opt, MD_DEV_* )` 外，可用 `md_option_set_device_id(opt, id)` 指定多卡/多 TPU 的设备号（GPU/TPU 生效，CPU 忽略；默认 0）。
 
 ---
 
