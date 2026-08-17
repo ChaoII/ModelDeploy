@@ -9,6 +9,9 @@ pub enum MdError {
     #[error("参数不合法: {0}")]
     InvalidArgument(String),
 
+    #[error("参数类型不匹配: {0}")]
+    InvalidType(String),
+
     #[error("路径不存在: {0}")]
     PathNotFound(String),
 
@@ -60,6 +63,7 @@ impl MdError {
             MDStatus::OK => unreachable!("OK is not an error"),
             MDStatus::ERR_NULL_POINTER => MdError::NullPointer,
             MDStatus::ERR_INVALID_ARGUMENT => MdError::InvalidArgument(msg("invalid argument")),
+            MDStatus::ERR_INVALID_TYPE => MdError::InvalidType(msg("invalid type")),
             MDStatus::ERR_PATH_NOT_FOUND => MdError::PathNotFound(msg("path not found")),
             MDStatus::ERR_MODEL_LOAD => MdError::ModelLoad(msg("model load")),
             MDStatus::ERR_MODEL_PREDICT => MdError::ModelPredict(msg("predict")),

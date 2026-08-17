@@ -383,6 +383,34 @@ fn test_lpr_rec_submodel() -> Result<()> {
     Ok(())
 }
 
+// ═══ 参数自省冒烟（直接调 ffi，不构造模型） ═══
+
+#[test]
+fn test_param_introspection_ffi() -> Result<()> {
+    use modeldeploy::ffi::{self, MDModelKind, MDStatus};
+
+    let mut names: *const libc::c_char = std::ptr::null();
+    let status = unsafe { ffi::md_model_param_names(MDModelKind::DETECTION, &mut names) };
+    assert_eq!(status, MDStatus::OK, "md_model_param_names failed");
+    assert!(!names.is_null());
+    let s = unsafe { std::ffi::CStr::from_ptr(names) }.to_string_lossy().to_string();
+    assert!(s.contains("conf_threshold"), "det names should contain conf_threshold: {s}");
+    assert!(s.contains("nms_threshold"), "det names should contain nms_threshold: {s}");
+
+    let cname = std::ffi::CString::new("conf_threshold")?;
+    let mut t: libc::c_char = 0;
+    let status = unsafe { ffi::md_model_param_type(MDModelKind::DETECTION, cname.as_ptr(), &mut t) };
+    assert_eq!(status, MDStatus::OK, "md_model_param_type failed");
+    assert_eq!(t as u8 as char, 'D', "conf_threshold should be type 'D'");
+
+    let mut sem_names: *const libc::c_char = std::ptr::null();
+    let status = unsafe { ffi::md_model_param_names(MDModelKind::SEM_SEG, &mut sem_names) };
+    assert_eq!(status, MDStatus::OK, "md_model_param_names (sem_seg) failed");
+    let s = unsafe { std::ffi::CStr::from_ptr(sem_names) }.to_string_lossy().to_string();
+    assert!(s.is_empty(), "sem_seg should have no params, got: {s}");
+    Ok(())
+}
+
 // ═══ ASR / TTS（需 build_audio SDK，默认跳过） ═══
 
 #[test]

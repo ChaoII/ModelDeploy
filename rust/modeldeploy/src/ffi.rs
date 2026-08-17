@@ -30,6 +30,7 @@ pub enum MDStatus {
     ERR_BUSY,
     ERR_NOT_IMPLEMENTED,
     ERR_AUDIO_DECODE,
+    ERR_INVALID_TYPE,
 }
 
 /// 模型类型（MDModelKind）
@@ -328,6 +329,13 @@ extern "C" {
     pub fn md_model_ready(h: MDModelHandle) -> MDStatus;
     pub fn md_model_set_input_size(h: MDModelHandle, w: c_int, h: c_int) -> MDStatus;
     pub fn md_model_set_cls_input_size(h: MDModelHandle, w: c_int, h: c_int) -> MDStatus;
+    // 模型前/后处理参数（扁平参数名）
+    pub fn md_model_set_param_i(model: MDModelHandle, name: *const c_char, value: i64) -> MDStatus;
+    pub fn md_model_set_param_d(model: MDModelHandle, name: *const c_char, value: f64) -> MDStatus;
+    pub fn md_model_set_param_b(model: MDModelHandle, name: *const c_char, enable: c_int) -> MDStatus;
+    pub fn md_model_set_param_s(model: MDModelHandle, name: *const c_char, value: *const c_char) -> MDStatus;
+    pub fn md_model_param_names(kind: MDModelKind, names: *mut *const c_char) -> MDStatus;
+    pub fn md_model_param_type(kind: MDModelKind, name: *const c_char, type_out: *mut c_char) -> MDStatus;
     pub fn md_model_predict(h: MDModelHandle, img: MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
     pub fn md_model_predict_nv12(h: MDModelHandle, y: *const c_void, uv: *const c_void,
         w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src_device: MDDevice,

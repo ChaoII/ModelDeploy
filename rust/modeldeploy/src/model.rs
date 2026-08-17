@@ -55,6 +55,57 @@ impl Model {
         check_status(unsafe { ffi::md_model_set_cls_input_size(self.handle, w, h) })
     }
 
+    /// 按扁平参数名设置模型前/后处理参数（整型）。
+    pub fn set_param_int(&self, name: &str, value: i64) -> Result<(), MdError> {
+        let cn = CString::new(name).map_err(|_| MdError::InvalidArgument("name".into()))?;
+        check_status(unsafe { ffi::md_model_set_param_i(self.handle, cn.as_ptr(), value) })
+    }
+
+    /// 按扁平参数名设置模型前/后处理参数（浮点）。
+    pub fn set_param_double(&self, name: &str, value: f64) -> Result<(), MdError> {
+        let cn = CString::new(name).map_err(|_| MdError::InvalidArgument("name".into()))?;
+        check_status(unsafe { ffi::md_model_set_param_d(self.handle, cn.as_ptr(), value) })
+    }
+
+    /// 按扁平参数名设置模型前/后处理参数（布尔）。
+    pub fn set_param_bool(&self, name: &str, value: bool) -> Result<(), MdError> {
+        let cn = CString::new(name).map_err(|_| MdError::InvalidArgument("name".into()))?;
+        check_status(unsafe {
+            ffi::md_model_set_param_b(self.handle, cn.as_ptr(), value as libc::c_int)
+        })
+    }
+
+    /// 按扁平参数名设置模型前/后处理参数（字符串/枚举）。
+    pub fn set_param_str(&self, name: &str, value: &str) -> Result<(), MdError> {
+        let cn = CString::new(name).map_err(|_| MdError::InvalidArgument("name".into()))?;
+        let cv = CString::new(value).map_err(|_| MdError::InvalidArgument("value".into()))?;
+        check_status(unsafe { ffi::md_model_set_param_s(self.handle, cn.as_ptr(), cv.as_ptr()) })
+    }
+
+    /// 该模型 kind 支持的参数名（kind 级自省；无需模型就绪）。
+    pub fn param_names(&self) -> Result<Vec<String>, MdError> {
+        let mut p: *const libc::c_char = ptr::null();
+        check_status(unsafe { ffi::md_model_param_names(self.kind.to_ffi(), &mut p) })?;
+        if p.is_null() {
+            return Ok(Vec::new());
+        }
+        let s = unsafe { std::ffi::CStr::from_ptr(p) }
+            .to_string_lossy()
+            .into_owned();
+        Ok(s.split('|')
+            .filter(|x| !x.is_empty())
+            .map(|x| x.to_string())
+            .collect())
+    }
+
+    /// 该模型 kind 下某参数的类型字符（'I'/'D'/'B'/'S'）。
+    pub fn param_type(&self, name: &str) -> Result<char, MdError> {
+        let cn = CString::new(name).map_err(|_| MdError::InvalidArgument("name".into()))?;
+        let mut t: libc::c_char = 0;
+        check_status(unsafe { ffi::md_model_param_type(self.kind.to_ffi(), cn.as_ptr(), &mut t) })?;
+        Ok(t as u8 as char)
+    }
+
     /// 推理：返回持句柄的结果包装
     pub fn predict(&self, image: &Image) -> Result<RawResult, MdError> {
         let mut result = ptr::null_mut();
