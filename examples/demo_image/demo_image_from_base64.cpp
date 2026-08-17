@@ -1,23 +1,26 @@
-//
-// Created by aichao on 2025/3/18.
-//
-
 #include <fstream>
-#include <iostream>
-#include <filesystem>
-#include "capi/utils/md_image_capi.h"
+#include <iterator>
+#include <string>
+#include <cstdio>
 
-int main(int argc, char** argv) {
-    //读取base64_image.txt文件
+#include "../capi2_common.h"
 
-    auto file_path = "../../test_data/test_images/test_base64_image.txt";
+int main() {
+    MDImageHandle img = nullptr;
+    const char* file_path = "../../test_data/test_images/test_base64_image.txt";
     std::ifstream file(file_path);
     if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << file_path << std::endl;
+        std::fprintf(stderr, "Failed to open file: %s\n", file_path);
+        return 1;
     }
-    const std::string base64_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    const std::string b64((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
-    MDImage image = md_from_base64_str(base64_str.c_str());
-    md_save_image(&image, "s.jpg");
-    md_show_image(&image);
+
+    die(md_image_from_base64(&img, b64.c_str()), "from_base64");
+    int w = 0, h = 0;
+    die(md_image_size(img, &w, &h), "size");
+    die(md_image_save(img, "capi2_base64_out.png"), "save");
+    md_image_destroy(img);
+    std::printf("decoded %dx%d OK -> capi2_base64_out.png\n", w, h);
+    return 0;
 }

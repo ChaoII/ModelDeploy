@@ -1,20 +1,26 @@
-//
-// Created by aichao on 2025/3/18.
-//
+#include <vector>
+#include <cstdio>
 
-#include <fstream>
-#include <iostream>
-#include <filesystem>
-#include "capi/utils/md_image_capi.h"
+#include "../capi2_common.h"
 
-int main(int argc, char** argv) {
-    //读取base64_image.txt文件
+int main() {
+    const int w = 64, h = 48;
+    std::vector<unsigned char> bgr(static_cast<size_t>(w) * h * 3);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            size_t i = (static_cast<size_t>(y) * w + x) * 3;
+            bgr[i] = static_cast<unsigned char>(x * 255 / (w - 1));
+            bgr[i + 1] = static_cast<unsigned char>(y * 255 / (h - 1));
+            bgr[i + 2] = 128;
+        }
+    }
 
-    auto file_path = "../../test_data/test_images/test_face_as_second.jpg";
-    MDImage image = md_read_image(file_path);
-    MDImage image1 = md_from_bgr24_data(image.data, image.width, image.height);
-    md_save_image(&image1, "s.jpg");
-    md_show_image(&image1);
-    md_free_image(&image1);
-    md_free_image(&image);
+    MDImageHandle img = nullptr;
+    die(md_image_from_bgr24(&img, bgr.data(), w, h), "from_bgr24");
+    int ww = 0, hh = 0;
+    die(md_image_size(img, &ww, &hh), "size");
+    die(md_image_save(img, "capi2_bgr24_out.png"), "save");
+    md_image_destroy(img);
+    std::printf("constructed %dx%d OK -> capi2_bgr24_out.png\n", ww, hh);
+    return 0;
 }
