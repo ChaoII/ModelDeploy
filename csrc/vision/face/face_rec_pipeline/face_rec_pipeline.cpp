@@ -10,11 +10,15 @@ namespace modeldeploy::vision::face {
     FaceRecognizerPipeline::FaceRecognizerPipeline(const std::string& det_model_path,
                                                    const std::string& rec_model_path,
                                                    const RuntimeOption& option) {
-        detector_ = std::make_unique<Scrfd>(det_model_path, option);
-        recognizer_ = std::make_unique<SeetaFaceID>(rec_model_path, option);
+        detector_ = std::make_shared<Scrfd>(det_model_path, option);
+        recognizer_ = std::make_shared<SeetaFaceID>(rec_model_path, option);
     }
 
     FaceRecognizerPipeline::~FaceRecognizerPipeline() = default;
+
+    std::shared_ptr<Scrfd> FaceRecognizerPipeline::get_detector() {
+        return detector_;
+    }
 
     bool FaceRecognizerPipeline::is_initialized() const {
         if (detector_ != nullptr && !detector_->is_initialized()) {

@@ -32,6 +32,9 @@ namespace modeldeploy::vision::face {
 
         [[nodiscard]] bool is_initialized() const override;
 
+        /// 暴露 det 子模型（用于配置检测前/后处理参数，如 conf/nms threshold）
+        std::shared_ptr<Scrfd> get_detector();
+
         [[nodiscard]] std::unique_ptr<FaceRecognizerPipeline> clone() const;
 
 
