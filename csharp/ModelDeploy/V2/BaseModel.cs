@@ -57,10 +57,12 @@ namespace ModelDeploy.V2
     public abstract class BaseModel : IDisposable
     {
         protected IntPtr _handle;
+        protected MDModelKind _kind;
         private bool _disposed;
 
         protected BaseModel(MDModelKind kind, string modelPath, RuntimeOption2 opt = null)
         {
+            _kind = kind;
             RuntimeOption2 ownedOpt = null;
             try
             {
@@ -94,6 +96,45 @@ namespace ModelDeploy.V2
             var status = md_model_set_cls_input_size(_handle, w, h);
             if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"Set cls input size failed: {GetLastError()}");
+        }
+
+        /// <summary>设置模型前/后处理参数（扁平参数名，见 ParamNames）。类型按重载匹配。</summary>
+        public void SetParam(string name, long value)
+        {
+            var status = md_model_set_param_i(_handle, name, value);
+            if (status != MDStatus.MD_OK) throw new InvalidOperationException($"SetParam[{name}] failed: {GetLastError()}");
+        }
+        public void SetParam(string name, double value)
+        {
+            var status = md_model_set_param_d(_handle, name, value);
+            if (status != MDStatus.MD_OK) throw new InvalidOperationException($"SetParam[{name}] failed: {GetLastError()}");
+        }
+        public void SetParam(string name, bool value)
+        {
+            var status = md_model_set_param_b(_handle, name, value ? 1 : 0);
+            if (status != MDStatus.MD_OK) throw new InvalidOperationException($"SetParam[{name}] failed: {GetLastError()}");
+        }
+        public void SetParam(string name, string value)
+        {
+            var status = md_model_set_param_s(_handle, name, value);
+            if (status != MDStatus.MD_OK) throw new InvalidOperationException($"SetParam[{name}] failed: {GetLastError()}");
+        }
+
+        /// <summary>该模型 kind 支持的参数名（'|' 分隔）。无需模型已就绪，kind 级自省。</summary>
+        public string[] ParamNames()
+        {
+            var status = md_model_param_names((int)_kind, out var p);
+            if (status != MDStatus.MD_OK) throw new InvalidOperationException($"ParamNames failed: {GetLastError()}");
+            var s = p == IntPtr.Zero ? string.Empty : Utf8Helper.Read(p);
+            return s.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        /// <summary>该模型 kind 下某参数的类型字符（'I'/'D'/'B'/'S'）。</summary>
+        public char ParamType(string name)
+        {
+            var status = md_model_param_type((int)_kind, name, out var t);
+            if (status != MDStatus.MD_OK) throw new InvalidOperationException($"ParamType[{name}] failed: {GetLastError()}");
+            return (char)t;
         }
 
         internal static string GetLastError()

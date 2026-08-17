@@ -127,6 +127,22 @@ string modelPath, IntPtr opt);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_set_cls_input_size(IntPtr handle, int w, int h);
 
+        // 模型前/后处理参数（扁平参数名，见 md_model_param_names/type）
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_param_i(IntPtr model, string name, long value);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_param_d(IntPtr model, string name, double value);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_param_b(IntPtr model, string name, int enable);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_param_s(IntPtr model, string name, string value);
+
+        // 自省（kind 级，无需模型就绪）：names 以 '|' 分隔（库持有，无需释放）；type_out 为 'I'/'D'/'B'/'S'
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_param_names(int kind, out IntPtr names);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_param_type(int kind, string name, out byte typeOut);
+
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_predict(IntPtr handle, IntPtr image, out IntPtr result);
 

@@ -102,6 +102,22 @@ public class Capi2VisionTests
         }
     }
 
+    // ==================== 前/后处理参数（自省，kind 级） ====================
+
+    [Test]
+    public void Detection_ParamIntrospection_ReturnsConfNms()
+    {
+        var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n.onnx");
+        if (!Has(model)) Assert.Ignore("model not found");
+
+        using var det = new DetectionModel(model, CpuOrt());
+        var names = det.ParamNames();
+        Assert.That(names, Does.Contain("conf_threshold"));
+        Assert.That(names, Does.Contain("nms_threshold"));
+        Assert.That(det.ParamType("conf_threshold"), Is.EqualTo('D'));
+        Assert.That(det.ParamType("nms_threshold"), Is.EqualTo('D'));
+    }
+
     // ==================== InsightFace ====================
 
     [Test]
