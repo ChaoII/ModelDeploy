@@ -14,10 +14,7 @@
 
 int main(int argc, char** argv) {
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
     option.use_ort_backend();
-    option.enable_fp16 = true;
-    option.enable_trt = true;
     const std::string model_file = argc > 1
                                        ? argv[1]
                                        : "../../test_data/test_models/onnx/yolo26n/yolo26n-depth.onnx";
@@ -39,7 +36,7 @@ int main(int argc, char** argv) {
     times.print_benchmark();
     std::cout << "depth result: shape=[" << res.shape[0] << " " << res.shape[1] << "]" << std::endl;
     auto vis_im = modeldeploy::vision::vis_depth(im, res, true, true);
-    vis_im.imshow("depth");
-    std::cout << "saved vis_depth.jpg" << std::endl;
+    (void)vis_im.imwrite("depth_out.jpg");
+    std::cout << "saved depth_out.jpg" << std::endl;
     return 0;
 }

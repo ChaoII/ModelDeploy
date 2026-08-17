@@ -23,7 +23,7 @@ int main() {
     const auto image = modeldeploy::vision::vis_keypoints(im_bak, res,
                                                               "../../test_data/msyh.ttc", 14, 2, 0.3, true);
 
-    image.imshow("result");
+    (void)image.imwrite("lpr_detection_out.jpg");
     // cv::resize(image, image, cv::Size(0, 0), 0.5, 0.5);
 
     return 0;

@@ -14,10 +14,7 @@
 
 int main(int argc, char** argv) {
     modeldeploy::RuntimeOption option;
-    option.use_gpu();
     option.use_ort_backend();
-    option.enable_fp16 = true;
-    option.enable_trt = true;
     const std::string model_file = argc > 1
                                        ? argv[1]
                                        : "../../test_data/test_models/onnx/yolo26n/yolo26n-sem.onnx";
@@ -42,7 +39,7 @@ int main(int argc, char** argv) {
         << "] num_classes=" << res.num_classes << std::endl;
     const auto label_map = model.get_label_map("names");
     auto vis_im = modeldeploy::vision::vis_sem(im, res, label_map, 0.5, true);
-    vis_im.imshow("depth");
-    std::cout << "saved vis_sem.jpg" << std::endl;
+    (void)vis_im.imwrite("sem_out.jpg");
+    std::cout << "saved sem_out.jpg" << std::endl;
     return 0;
 }

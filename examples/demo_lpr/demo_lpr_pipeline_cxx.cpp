@@ -26,6 +26,6 @@ int main() {
     }
 
     auto vis_image = modeldeploy::vision::vis_lpr(im_bak, res, "../../test_data/msyh.ttc");
-    vis_image.imshow("result");
+    (void)vis_image.imwrite("lpr_pipeline_out.jpg");
     return 0;
 }
