@@ -277,4 +277,83 @@ namespace modeldeploy::vision {
         return CpuProcessorBackend::yolo_preprocess_nv12(
             src_y, src_uv, src_size, step_y, step_uv, out, dst_size, pad_val, record, src_device);
     }
+
+    // NV12 设备绘制辅助：仅当 frame 为 TPU 设备帧且 Y/UV 平面步长与宽度连续时走 BMCV 设备路径；
+    // 否则返回 false（不回退 CPU，因为 CPU 顺序实现会用宿主指针写设备显存，属 UB）。
+    bool SophgoProcessorBackend::draw_rect_nv12(ImageData& frame, float x, float y, float w, float h,
+                                                float r, float g, float b, int thickness) {
+        if (handle_ && frame.device() == Device::TPU &&
+            frame.type() == MdImageType::NV12 &&
+            !(frame.step_y() > 0 && frame.step_y() != frame.width()) &&
+            !(frame.step_uv() > 0 && frame.step_uv() != frame.width())) {
+            const int st = md_bmcv_draw_rect_nv12(
+                handle_, const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                frame.width(), frame.height(),
+                static_cast<int>(x), static_cast<int>(y),
+                static_cast<int>(x + w), static_cast<int>(y + h),
+                static_cast<int>(r), static_cast<int>(g), static_cast<int>(b), thickness);
+            if (st == 0) return true;
+            MD_LOG_WARN << "SophgoProcessorBackend: BMCV draw_rect_nv12 failed (st=" << st << ")." << std::endl;
+        }
+        return false;
+    }
+
+    bool SophgoProcessorBackend::draw_polygon_nv12(ImageData& frame, const std::vector<Point2f>& pts,
+                                                   float r, float g, float b, int thickness) {
+        if (handle_ && frame.device() == Device::TPU &&
+            frame.type() == MdImageType::NV12 &&
+            !(frame.step_y() > 0 && frame.step_y() != frame.width()) &&
+            !(frame.step_uv() > 0 && frame.step_uv() != frame.width()) &&
+            pts.size() >= 3) {
+            std::vector<float> xs, ys;
+            xs.reserve(pts.size()); ys.reserve(pts.size());
+            for (const auto& p : pts) { xs.push_back(p.x); ys.push_back(p.y); }
+            const int st = md_bmcv_draw_polygon_nv12(
+                handle_, const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                frame.width(), frame.height(), xs.data(), ys.data(), static_cast<int>(xs.size()),
+                static_cast<int>(r), static_cast<int>(g), static_cast<int>(b), thickness);
+            if (st == 0) return true;
+            MD_LOG_WARN << "SophgoProcessorBackend: BMCV draw_polygon_nv12 failed (st=" << st << ")." << std::endl;
+        }
+        return false;
+    }
+
+    bool SophgoProcessorBackend::draw_points_nv12(ImageData& frame, const std::vector<Point3f>& pts,
+                                                  float r, float g, float b, int radius) {
+        if (handle_ && frame.device() == Device::TPU &&
+            frame.type() == MdImageType::NV12 &&
+            !(frame.step_y() > 0 && frame.step_y() != frame.width()) &&
+            !(frame.step_uv() > 0 && frame.step_uv() != frame.width()) &&
+            !pts.empty()) {
+            std::vector<float> xs, ys;
+            xs.reserve(pts.size()); ys.reserve(pts.size());
+            for (const auto& p : pts) { xs.push_back(p.x); ys.push_back(p.y); }
+            const int st = md_bmcv_draw_points_nv12(
+                handle_, const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                frame.width(), frame.height(), xs.data(), ys.data(), static_cast<int>(xs.size()),
+                radius, static_cast<int>(r), static_cast<int>(g), static_cast<int>(b));
+            if (st == 0) return true;
+            MD_LOG_WARN << "SophgoProcessorBackend: BMCV draw_points_nv12 failed (st=" << st << ")." << std::endl;
+        }
+        return false;
+    }
+
+    bool SophgoProcessorBackend::draw_text_nv12(ImageData& frame, float x, float y,
+                                                const std::string& text,
+                                                float r, float g, float b, int font_size) {
+        if (handle_ && frame.device() == Device::TPU &&
+            frame.type() == MdImageType::NV12 &&
+            !(frame.step_y() > 0 && frame.step_y() != frame.width()) &&
+            !(frame.step_uv() > 0 && frame.step_uv() != frame.width()) &&
+            !text.empty()) {
+            const int st = md_bmcv_draw_text_nv12(
+                handle_, const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+                frame.width(), frame.height(),
+                static_cast<int>(x), static_cast<int>(y), text.c_str(),
+                static_cast<int>(r), static_cast<int>(g), static_cast<int>(b), font_size);
+            if (st == 0) return true;
+            MD_LOG_WARN << "SophgoProcessorBackend: BMCV draw_text_nv12 failed (st=" << st << ")." << std::endl;
+        }
+        return false;
+    }
 } // namespace modeldeploy::vision

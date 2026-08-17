@@ -28,4 +28,20 @@ namespace modeldeploy::vision {
                                                    float alpha0, float alpha1, float alpha2,
                                                    unsigned char pad_val,
                                                    bool src_is_device = false);
+
+    // ── NV12 设备侧就地绘制（TPU 设备显存 x/uv，bm_image attach 两平面）──
+    // 坐标均为原图坐标；r/g/b 为 BGR 颜色分量（0-255，与 CPU/CUDA 后端一致）。
+    // 返回 0 成功；非 0 失败。
+    int md_bmcv_draw_rect_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                               int x1, int y1, int x2, int y2,
+                               int r, int g, int b, int thickness);
+    int md_bmcv_draw_polygon_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                                  const float* xs, const float* ys, int npts,
+                                  int r, int g, int b, int thickness);
+    int md_bmcv_draw_points_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                                 const float* xs, const float* ys, int npts, int radius,
+                                 int r, int g, int b);
+    int md_bmcv_draw_text_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                               int x, int y, const char* text,
+                               int r, int g, int b, int font_size);
 } // namespace modeldeploy::vision

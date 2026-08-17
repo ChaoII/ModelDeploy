@@ -6,6 +6,7 @@
 #include "bmcv_bridge.h"
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 #include <vector>
 
 #include "bmlib_runtime.h"
@@ -179,6 +180,138 @@ namespace modeldeploy::vision {
         bm_image_destroy(nv12_img);
         bm_image_destroy(letter_img);
         bm_image_destroy(out_img);
+        return st == BM_SUCCESS ? 0 : -1;
+    }
+
+    // ── NV12 设备侧就地绘制实现 ──
+    // 把 TPU 设备显存 Y/UV 地址 attach 成 NV12 bm_image（两平面），就地绘制后 detach。
+    // 颜色语义与 CPU/CUDA 后端一致：r/g/b 为 BGR 分量（BMCV 后台转 YUV）。
+
+    namespace {
+        // 用给定的 Y/UV 设备地址构造 NV12 bm_image 并 attach（不拥有显存）。
+        // 成功返回 BM_SUCCESS 并填充 img；失败返回错误码。
+        bm_status_t attach_nv12_image(bm_handle_t h, void* y_mem, void* uv_mem,
+                                      int w, int h_image, bm_image* img) {
+            if (!h || !y_mem || !uv_mem || w <= 0 || h_image <= 0) return BM_ERR_FAILURE;
+            *img = bm_image{};
+            bm_status_t st = bm_image_create(h, h_image, w, FORMAT_NV12,
+                                             DATA_TYPE_EXT_1N_BYTE, img, nullptr);
+            if (st != BM_SUCCESS) return st;
+            bm_device_mem_t planes[2]{};
+            bm_mem_set_device_addr(&planes[0], reinterpret_cast<unsigned long long>(y_mem));
+            bm_mem_set_device_size(&planes[0], static_cast<unsigned int>(h_image * w));
+            bm_mem_set_device_addr(&planes[1], reinterpret_cast<unsigned long long>(uv_mem));
+            bm_mem_set_device_size(&planes[1], static_cast<unsigned int>(h_image / 2 * w));
+            st = bm_image_attach(*img, planes);
+            if (st != BM_SUCCESS) bm_image_destroy(img);
+            return st;
+        }
+    } // namespace
+
+    int md_bmcv_draw_rect_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                               int x1, int y1, int x2, int y2,
+                               int r, int g, int b, int thickness) {
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        bm_image img{};
+        bm_status_t st = attach_nv12_image(hd, y_mem, uv_mem, w, h, &img);
+        if (st != BM_SUCCESS) return -1;
+        if (thickness <= 0) thickness = 1;
+        // 坐标裁剪到帧内（与 CPU/CUDA 后端一致），避免越界设备写
+        const int xa = std::max(x1, 0);
+        const int ya = std::max(y1, 0);
+        const int xb = std::min(x2, w);
+        const int yb = std::min(y2, h);
+        bmcv_rect_t rect{};
+        rect.start_x = static_cast<unsigned int>(xa);
+        rect.start_y = static_cast<unsigned int>(ya);
+        rect.crop_w = static_cast<unsigned int>(std::max(xb - xa, 0));
+        rect.crop_h = static_cast<unsigned int>(std::max(yb - ya, 0));
+        if (rect.crop_w == 0 || rect.crop_h == 0) { st = BM_ERR_FAILURE; }
+        else {
+            st = bmcv_image_draw_rectangle(hd, img, 1, &rect, thickness,
+                                           static_cast<unsigned char>(r),
+                                           static_cast<unsigned char>(g),
+                                           static_cast<unsigned char>(b));
+        }
+        bm_image_detach(img);
+        bm_image_destroy(&img);
+        return st == BM_SUCCESS ? 0 : -1;
+    }
+
+    int md_bmcv_draw_polygon_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                                  const float* xs, const float* ys, int npts,
+                                  int r, int g, int b, int thickness) {
+        if (!xs || !ys || npts < 3) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        bm_image img{};
+        bm_status_t st = attach_nv12_image(hd, y_mem, uv_mem, w, h, &img);
+        if (st != BM_SUCCESS) return -1;
+        if (thickness <= 0) thickness = 1;
+        std::vector<bmcv_point_t> start(npts), end(npts);
+        for (int i = 0; i < npts; ++i) {
+            const int j = (i + 1) % npts;
+            start[i] = {static_cast<int>(xs[i]), static_cast<int>(ys[i])};
+            end[i] = {static_cast<int>(xs[j]), static_cast<int>(ys[j])};
+        }
+        bmcv_color_t color{static_cast<unsigned char>(r),
+                           static_cast<unsigned char>(g),
+                           static_cast<unsigned char>(b)};
+        st = bmcv_image_draw_lines(hd, img, start.data(), end.data(), npts, color, thickness);
+        bm_image_detach(img);
+        bm_image_destroy(&img);
+        return st == BM_SUCCESS ? 0 : -1;
+    }
+
+    int md_bmcv_draw_points_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                                 const float* xs, const float* ys, int npts, int radius,
+                                 int r, int g, int b) {
+        if (!xs || !ys || npts < 1) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        bm_image img{};
+        bm_status_t st = attach_nv12_image(hd, y_mem, uv_mem, w, h, &img);
+        if (st != BM_SUCCESS) return -1;
+        if (radius <= 0) radius = 1;
+        // 每个点绘制一个边长 = 2*radius 的小方块（用 fill_rectangle 填充整块）
+        std::vector<bmcv_rect_t> rects(npts);
+        for (int i = 0; i < npts; ++i) {
+            const int cx = static_cast<int>(xs[i]);
+            const int cy = static_cast<int>(ys[i]);
+            const int x0 = std::max(cx - radius, 0);
+            const int y0 = std::max(cy - radius, 0);
+            const int x1 = std::min(cx + radius, w - 1);
+            const int y1 = std::min(cy + radius, h - 1);
+            rects[i].start_x = static_cast<unsigned int>(x0);
+            rects[i].start_y = static_cast<unsigned int>(y0);
+            rects[i].crop_w = static_cast<unsigned int>(std::max(x1 - x0, 0));
+            rects[i].crop_h = static_cast<unsigned int>(std::max(y1 - y0, 0));
+        }
+        st = bmcv_image_fill_rectangle(hd, img, npts, rects.data(),
+                                       static_cast<unsigned char>(r),
+                                       static_cast<unsigned char>(g),
+                                       static_cast<unsigned char>(b));
+        bm_image_detach(img);
+        bm_image_destroy(&img);
+        return st == BM_SUCCESS ? 0 : -1;
+    }
+
+    int md_bmcv_draw_text_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                               int x, int y, const char* text,
+                               int r, int g, int b, int font_size) {
+        if (!text || std::strlen(text) == 0) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        bm_image img{};
+        bm_status_t st = attach_nv12_image(hd, y_mem, uv_mem, w, h, &img);
+        if (st != BM_SUCCESS) return -1;
+        if (font_size <= 0) font_size = 1;
+        bmcv_point_t org{std::max(x, 0), std::max(y, 0)};
+        bmcv_color_t color{static_cast<unsigned char>(r),
+                           static_cast<unsigned char>(g),
+                           static_cast<unsigned char>(b)};
+        // font_size 语义对齐 CPU/CUDA（近似映射：scale = font_size*2，thickness=2）
+        const float font_scale = static_cast<float>(font_size) * 2.0f;
+        st = bmcv_image_put_text(hd, img, text, org, color, font_scale, 2);
+        bm_image_detach(img);
+        bm_image_destroy(&img);
         return st == BM_SUCCESS ? 0 : -1;
     }
 } // namespace modeldeploy::vision
