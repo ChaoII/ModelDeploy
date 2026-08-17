@@ -130,5 +130,38 @@ namespace modeldeploy::vision {
             (void)mat; (void)bias; (void)pad_value;
             return false;
         }
+
+        // ── 设备侧绘制（NV12 帧就地绘制，保持 NV12）──
+        // 坐标均为原图坐标（非 letterbox 空间）。返回 false 表示后端不支持/参数非法。
+        // r/g/b 为 BGR 颜色分量（0-255）。thickness/radius 为像素。
+        virtual bool draw_rect_nv12(ImageData& frame,
+                                    float x, float y, float w, float h,
+                                    float r, float g, float b, int thickness) {
+            (void)frame; (void)x; (void)y; (void)w; (void)h;
+            (void)r; (void)g; (void)b; (void)thickness;
+            return false;
+        }
+
+        virtual bool draw_polygon_nv12(ImageData& frame,
+                                       const std::vector<Point2f>& pts,
+                                       float r, float g, float b, int thickness) {
+            (void)frame; (void)pts; (void)r; (void)g; (void)b; (void)thickness;
+            return false;
+        }
+
+        virtual bool draw_points_nv12(ImageData& frame,
+                                      const std::vector<Point3f>& pts,
+                                      float r, float g, float b, int radius) {
+            (void)frame; (void)pts; (void)r; (void)g; (void)b; (void)radius;
+            return false;
+        }
+
+        virtual bool draw_text_nv12(ImageData& frame,
+                                    float x, float y, const std::string& text,
+                                    float r, float g, float b, int font_size) {
+            (void)frame; (void)x; (void)y; (void)text;
+            (void)r; (void)g; (void)b; (void)font_size;
+            return false;
+        }
     };
 } // namespace modeldeploy::vision
