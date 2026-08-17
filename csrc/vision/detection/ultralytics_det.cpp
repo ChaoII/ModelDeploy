@@ -8,6 +8,8 @@
 #include "vision/utils.h"
 
 #include <cstdio>
+#include <cmath>
+#include <string>
 #include <vector>
 
 namespace modeldeploy::vision::detection {
@@ -67,8 +69,14 @@ namespace modeldeploy::vision::detection {
                                       int width, int height, int step_y, int step_uv,
                                       std::vector<DetectionResult>* result,
                                       LetterBoxRecord* letter_box_record,
+                                      ImageData* out_frame,
                                       Device src_device, TimerArray* timers) {
         if (!src_y || !src_uv || !result) return false;
+        if (out_frame) {
+            *out_frame = ImageData::from_device_planes(
+                const_cast<uint8_t*>(src_y), const_cast<uint8_t*>(src_uv),
+                width, height, step_y, step_uv, src_device);
+        }
         reused_input_tensors_.resize(1);
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
@@ -93,6 +101,22 @@ namespace modeldeploy::vision::detection {
         }
         if (timers) timers->post_timer.stop();
         if (!results.empty()) *result = std::move(results[0]);
+        return true;
+    }
+
+    bool UltralyticsDet::draw_result(ImageData& frame, const std::vector<DetectionResult>& result,
+                                     double threshold) {
+        if (frame.empty()) return false;
+        auto* backend = preprocessor_.get_processor_backend().get();
+        if (!backend) return false;
+        for (const auto& r : result) {
+            if (r.score < threshold) continue;
+            const Rect2f& box = r.box;
+            if (!backend->draw_rect_nv12(frame, box.x, box.y, box.width, box.height,
+                                         255, 0, 0, 2)) return false;
+            const std::string label = std::to_string(r.label_id) + " " + std::to_string(r.score);
+            backend->draw_text_nv12(frame, box.x, box.y - 16, label, 255, 255, 255, 1);
+        }
         return true;
     }
 

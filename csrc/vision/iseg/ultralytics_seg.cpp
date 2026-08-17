@@ -5,6 +5,8 @@
 #include "core/md_log.h"
 #include "vision/iseg/ultralytics_seg.h"
 
+#include <string>
+
 namespace modeldeploy::vision::detection {
     UltralyticsSeg::UltralyticsSeg(const std::string& model_file,
                                    const RuntimeOption& custom_option) {
@@ -69,8 +71,14 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsSeg::predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                              int width, int height, int step_y, int step_uv,
                              std::vector<InstanceSegResult>* result, LetterBoxRecord* letter_box_record,
+                             ImageData* out_frame,
                              Device src_device, TimerArray* timers) {
         if (!src_y || !src_uv || !result) return false;
+        if (out_frame) {
+            *out_frame = ImageData::from_device_planes(
+                const_cast<uint8_t*>(src_y), const_cast<uint8_t*>(src_uv),
+                width, height, step_y, step_uv, src_device);
+        }
         std::vector<LetterBoxRecord> lbr(1);
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
@@ -99,6 +107,22 @@ namespace modeldeploy::vision::detection {
         }
         if (letter_box_record) {
             *letter_box_record = lbr[0];
+        }
+        return true;
+    }
+
+    bool UltralyticsSeg::draw_result(ImageData& frame, const std::vector<InstanceSegResult>& result,
+                                     double threshold) {
+        if (frame.empty()) return false;
+        auto* backend = preprocessor_.get_processor_backend().get();
+        if (!backend) return false;
+        for (const auto& r : result) {
+            if (r.score < threshold) continue;
+            const Rect2f& box = r.box;
+            if (!backend->draw_rect_nv12(frame, box.x, box.y, box.width, box.height,
+                                         0, 165, 255, 2)) return false;
+            const std::string label = std::to_string(r.label_id) + " " + std::to_string(r.score);
+            backend->draw_text_nv12(frame, box.x, box.y - 16, label, 255, 255, 255, 1);
         }
         return true;
     }

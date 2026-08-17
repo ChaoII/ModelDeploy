@@ -128,7 +128,7 @@ namespace modeldeploy::vision {
                          : src_device == static_cast<int>(Device::TPU) ? Device::TPU
                                                                        : Device::CPU;
                      if (!self.predict_nv12(y_ptr, uv_ptr, width, height, step_y_eff, step_uv_eff,
-                                            &results, nullptr, dev)) {
+                                            &results, nullptr, nullptr, dev)) {
                          throw std::runtime_error("predict_nv12: predict_nv12 failed");
                      }
                      return results;

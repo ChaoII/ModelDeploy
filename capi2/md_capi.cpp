@@ -1026,7 +1026,7 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_DETECTION: {
                 auto* m = static_cast<detection::UltralyticsDet*>(mh->model);
                 auto* d = new ResultData<DetectionResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, dev))
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
                     return fail("detection nv12");
                 rh->kind = MD_RES_DETECTION;
                 rh->data = d;
@@ -1035,7 +1035,7 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_POSE: {
                 auto* m = static_cast<detection::UltralyticsPose*>(mh->model);
                 auto* d = new ResultData<KeyPointsResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, dev))
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
                     return fail("pose nv12");
                 rh->kind = MD_RES_POSE;
                 rh->data = d;
@@ -1044,7 +1044,7 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_OBB: {
                 auto* m = static_cast<detection::UltralyticsObb*>(mh->model);
                 auto* d = new ResultData<ObbResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, dev))
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
                     return fail("obb nv12");
                 rh->kind = MD_RES_OBB;
                 rh->data = d;
@@ -1053,7 +1053,7 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_INSTANCE_SEG: {
                 auto* m = static_cast<detection::UltralyticsSeg*>(mh->model);
                 auto* d = new ResultData<InstanceSegResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, dev))
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->v, nullptr, nullptr, dev))
                     return fail("instance seg nv12");
                 rh->kind = MD_RES_INSTANCE_SEG;
                 rh->data = d;
@@ -1062,7 +1062,7 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_SEM_SEG: {
                 auto* m = static_cast<detection::UltralyticsSem*>(mh->model);
                 auto* d = new SingleResult<SemSegResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, dev))
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, nullptr, dev))
                     return fail("sem seg nv12");
                 rh->kind = MD_RES_SEM_SEG;
                 rh->data = d;
@@ -1071,7 +1071,7 @@ MDStatus md_model_predict_nv12(MDModelHandle handle,
             case MD_MODEL_DEPTH: {
                 auto* m = static_cast<detection::UltralyticsDepth*>(mh->model);
                 auto* d = new SingleResult<DepthResult>();
-                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, dev))
+                if (!m->predict_nv12(py, puv, w, h, step_y, step_uv, &d->value, nullptr, nullptr, dev))
                     return fail("depth nv12");
                 rh->kind = MD_RES_DEPTH;
                 rh->data = d;

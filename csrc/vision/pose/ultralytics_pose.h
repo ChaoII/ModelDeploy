@@ -24,8 +24,13 @@ namespace modeldeploy::vision::detection {
         bool predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                           int width, int height, int step_y, int step_uv,
                           std::vector<KeyPointsResult>* result, LetterBoxRecord* letter_box_record = nullptr,
+                          ImageData* out_frame = nullptr,
                           Device src_device = Device::CPU,
                           TimerArray* timers = nullptr);
+
+        // 就地绘制结果到 frame（按 frame.device() 分发到 processor backend）
+        bool draw_result(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                         double threshold = 0.5);
 
 
         [[nodiscard]] std::unique_ptr<UltralyticsPose> clone() const;

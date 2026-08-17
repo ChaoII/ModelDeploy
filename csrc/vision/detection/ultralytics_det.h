@@ -25,8 +25,13 @@ namespace modeldeploy::vision::detection {
                           int width, int height, int step_y, int step_uv,
                           std::vector<DetectionResult>* result,
                           LetterBoxRecord* letter_box_record,
+                          ImageData* out_frame,
                           Device src_device = Device::CPU,
                           TimerArray* timers = nullptr);
+
+        // 就地绘制结果到 frame（按 frame.device() 分发到 processor backend）
+        bool draw_result(ImageData& frame, const std::vector<DetectionResult>& result,
+                         double threshold = 0.5);
 
         bool batch_predict(const std::vector<ImageData>& images,
                            std::vector<std::vector<DetectionResult>>* results,

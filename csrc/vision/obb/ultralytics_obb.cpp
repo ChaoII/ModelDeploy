@@ -5,6 +5,10 @@
 #include "core/md_log.h"
 #include "vision/obb/ultralytics_obb.h"
 
+#include <cmath>
+#include <string>
+#include <vector>
+
 namespace modeldeploy::vision::detection {
     UltralyticsObb::UltralyticsObb(const std::string& model_file,
                                    const RuntimeOption& custom_option) {
@@ -68,8 +72,14 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsObb::predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
                              int width, int height, int step_y, int step_uv,
                              std::vector<ObbResult>* result, LetterBoxRecord* letter_box_record,
+                             ImageData* out_frame,
                              Device src_device, TimerArray* timers) {
         if (!src_y || !src_uv || !result) return false;
+        if (out_frame) {
+            *out_frame = ImageData::from_device_planes(
+                const_cast<uint8_t*>(src_y), const_cast<uint8_t*>(src_uv),
+                width, height, step_y, step_uv, src_device);
+        }
         std::vector<LetterBoxRecord> lbr(1);
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(src_y, src_uv, {width, height}, step_y, step_uv,
@@ -98,6 +108,31 @@ namespace modeldeploy::vision::detection {
         }
         if (letter_box_record) {
             *letter_box_record = lbr[0];
+        }
+        return true;
+    }
+
+    bool UltralyticsObb::draw_result(ImageData& frame, const std::vector<ObbResult>& result,
+                                     double threshold) {
+        if (frame.empty()) return false;
+        auto* backend = preprocessor_.get_processor_backend().get();
+        if (!backend) return false;
+        for (const auto& r : result) {
+            if (r.score < threshold) continue;
+            const RotatedRect& rr = r.rotated_box;
+            const float rad = rr.angle * 3.14159265f / 180.0f;
+            const float cos_a = std::cos(rad), sin_a = std::sin(rad);
+            const float hw = rr.width * 0.5f, hh = rr.height * 0.5f;
+            std::vector<Point2f> quad(4);
+            const float dx[4] = { hw, -hw, -hw, hw };
+            const float dy[4] = { hh, hh, -hh, -hh };
+            for (int i = 0; i < 4; ++i) {
+                quad[i] = Point2f(rr.xc + dx[i] * cos_a - dy[i] * sin_a,
+                                  rr.yc + dx[i] * sin_a + dy[i] * cos_a);
+            }
+            if (!backend->draw_polygon_nv12(frame, quad, 255, 215, 0, 2)) return false;
+            const std::string label = std::to_string(r.label_id) + " " + std::to_string(r.score);
+            backend->draw_text_nv12(frame, rr.xc, rr.yc, label, 255, 255, 255, 1);
         }
         return true;
     }
