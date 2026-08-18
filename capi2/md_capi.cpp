@@ -89,12 +89,20 @@ thread_local std::string g_last_error;
 
 void set_error(const char* msg) { g_last_error = msg ? msg : "unknown error"; }
 void set_error_fmt(const char* fmt, ...) {
-    char buf[512];
-    va_list ap;
+    if (!fmt) { g_last_error = "unknown error"; return; }
+    va_list ap, ap2;
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_copy(ap2, ap);
+    const int n = vsnprintf(nullptr, 0, fmt, ap);  // 先测长度，避免 512 字节截断
     va_end(ap);
-    g_last_error = buf;
+    if (n > 0) {
+        std::string s(static_cast<size_t>(n), '\0');
+        vsnprintf(s.data(), static_cast<size_t>(n) + 1, fmt, ap2);
+        g_last_error = std::move(s);
+    } else {
+        g_last_error = "unknown error";
+    }
+    va_end(ap2);
 }
 
 /* ---------------- 泛型结果容器 ---------------- */
@@ -140,6 +148,33 @@ ResultData<T>* raw_result(md_result_handle* rh) {
         return dynamic_cast<ResultData<T>*>(p->origin_ptr());
     }
     return nullptr;
+}
+
+// 幂等投影：若 handle 已缓存同类型投影则直接复用；否则用 raw_result 解析出的真实
+// origin 构建并替换。消除"同一数组 getter 二次调用把 ProjectedResult 当 ResultData 强转"的
+// 未定义行为（旧实现 detection/classification 二次调用会读到野值甚至崩溃）。
+template <typename Src, typename Dst, typename Fn>
+ProjectedResult<Dst>* project_cached(md_result_handle* rh, Fn&& fill) {
+    auto* base = static_cast<ResultDataBase*>(rh->data);
+    if (auto* e = dynamic_cast<ProjectedResult<Dst>*>(base)) {
+        return e;  // 已投影且类型相符 → 幂等复用，不再重投影/链式包裹
+    }
+    auto* d = raw_result<Src>(rh);
+    if (!d) return nullptr;
+    ProjectedResult<Dst>* p = new ProjectedResult<Dst>();
+    fill(*p, d->v);   // 只填充投影项，无错误分支
+    p->origin = d;    // 显式指向真实 origin
+    rh->data = p;     // 最后提交
+    return p;
+}
+
+// 原始（未投影）结果条数：始终读 origin，而非投影容器（投影数恒等于 origin，但语义应指原始结果）
+size_t origin_count(md_result_handle* rh) {
+    auto* base = static_cast<ResultDataBase*>(rh->data);
+    if (auto* p = dynamic_cast<ProjectedResultBase*>(base)) {
+        return p->origin_ptr()->count();
+    }
+    return base->count();
 }
 
 using namespace modeldeploy;
@@ -200,7 +235,10 @@ void md_option_apply_device_(md_option_handle* o) {
         case MD_DEV_CPU: o->opt.use_cpu(); break;
         case MD_DEV_GPU: o->opt.use_gpu(o->device_id); break;
         case MD_DEV_TPU: o->opt.use_sophgo_backend(o->device_id); break;
-        default: break;
+        default:
+            // OPENCL/VULKAN 为预留未实现枚举：明确报错，避免调用方误以为已启用
+            set_error_fmt("md_option_set_device: device %d is reserved/not implemented", (int)o->device);
+            break;
     }
 }
 
@@ -1155,7 +1193,7 @@ MDStatus md_result_kind(MDResultHandle h, MDResultKind* out) {
 MDStatus md_result_count(MDResultHandle h, size_t* out) {
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !out) return MD_ERR_NULL_POINTER;
-    *out = static_cast<ResultDataBase*>(rh->data)->count();
+    *out = origin_count(rh);
     return MD_OK;
 }
 
@@ -1539,17 +1577,17 @@ MDStatus md_result_detection(MDResultHandle h, const MDDetectionItem** items, si
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_DETECTION) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<DetectionResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDDetectionItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        MDDetectionItem it{};
-        it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
-        it.score = r.score; it.label_id = r.label_id;
-        p->v.push_back(it);
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<DetectionResult, MDDetectionItem>(
+        rh, [](ProjectedResult<MDDetectionItem>& pp, const std::vector<DetectionResult>& srcv) {
+            pp.v.reserve(srcv.size());
+            for (const auto& r : srcv) {
+                MDDetectionItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.score = r.score; it.label_id = r.label_id;
+                pp.v.push_back(it);
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1559,20 +1597,19 @@ MDStatus md_result_classification(MDResultHandle h, const MDClassifyItem** items
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_CLASSIFICATION) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<ClassifyResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDClassifyItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        const size_t m = std::min(r.label_ids.size(), r.scores.size());
-        for (size_t i = 0; i < m; ++i) {
-            MDClassifyItem it{};
-            it.label_id = r.label_ids[i];
-            it.score = r.scores[i];
-            p->v.push_back(it);
-        }
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<ClassifyResult, MDClassifyItem>(
+        rh, [](ProjectedResult<MDClassifyItem>& pp, const std::vector<ClassifyResult>& srcv) {
+            for (const auto& r : srcv) {
+                const size_t m = std::min(r.label_ids.size(), r.scores.size());
+                for (size_t i = 0; i < m; ++i) {
+                    MDClassifyItem it{};
+                    it.label_id = r.label_ids[i];
+                    it.score = r.scores[i];
+                    pp.v.push_back(it);
+                }
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1582,17 +1619,17 @@ MDStatus md_result_pose(MDResultHandle h, const MDPoseItem** items, size_t* coun
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_POSE) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<KeyPointsResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDPoseItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        MDPoseItem it{};
-        it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
-        it.score = r.score;
-        p->v.push_back(it);
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<KeyPointsResult, MDPoseItem>(
+        rh, [](ProjectedResult<MDPoseItem>& pp, const std::vector<KeyPointsResult>& srcv) {
+            pp.v.reserve(srcv.size());
+            for (const auto& r : srcv) {
+                MDPoseItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.score = r.score;
+                pp.v.push_back(it);
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1602,9 +1639,8 @@ MDStatus md_result_keypoints(MDResultHandle h, size_t i, const MDPoint3** kps, s
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_POSE) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDPoseItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    auto* origin = static_cast<ResultData<KeyPointsResult>*>(p->origin);
+    auto* origin = raw_result<KeyPointsResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
     if (kps) *kps = reinterpret_cast<const MDPoint3*>(origin->v[i].keypoints.data());
     if (n) *n = origin->v[i].keypoints.size();
     return MD_OK;
@@ -1614,19 +1650,19 @@ MDStatus md_result_obb(MDResultHandle h, const MDObbItem** items, size_t* count)
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_OBB) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<ObbResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDObbItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        MDObbItem it{};
-        it.cx = r.rotated_box.xc; it.cy = r.rotated_box.yc;
-        it.w = r.rotated_box.width; it.h = r.rotated_box.height;
-        it.angle = r.rotated_box.angle;
-        it.score = r.score; it.label_id = r.label_id;
-        p->v.push_back(it);
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<ObbResult, MDObbItem>(
+        rh, [](ProjectedResult<MDObbItem>& pp, const std::vector<ObbResult>& srcv) {
+            pp.v.reserve(srcv.size());
+            for (const auto& r : srcv) {
+                MDObbItem it{};
+                it.cx = r.rotated_box.xc; it.cy = r.rotated_box.yc;
+                it.w = r.rotated_box.width; it.h = r.rotated_box.height;
+                it.angle = r.rotated_box.angle;
+                it.score = r.score; it.label_id = r.label_id;
+                pp.v.push_back(it);
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1636,17 +1672,17 @@ MDStatus md_result_instance_seg(MDResultHandle h, const MDIsegItem** items, size
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_INSTANCE_SEG) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<InstanceSegResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDIsegItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        MDIsegItem it{};
-        it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
-        it.score = r.score; it.label_id = r.label_id;
-        p->v.push_back(it);
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<InstanceSegResult, MDIsegItem>(
+        rh, [](ProjectedResult<MDIsegItem>& pp, const std::vector<InstanceSegResult>& srcv) {
+            pp.v.reserve(srcv.size());
+            for (const auto& r : srcv) {
+                MDIsegItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.score = r.score; it.label_id = r.label_id;
+                pp.v.push_back(it);
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1656,9 +1692,8 @@ MDStatus md_result_mask(MDResultHandle h, size_t i, const unsigned char** buf, s
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !buf) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_INSTANCE_SEG) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDIsegItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    auto* origin = static_cast<ResultData<InstanceSegResult>*>(p->origin);
+    auto* origin = raw_result<InstanceSegResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
     const auto& r = origin->v[i];
     if (buf) *buf = r.mask.buffer.data();
     if (out_h) *out_h = r.mask.shape.empty() ? 0 : static_cast<size_t>(r.mask.shape[0]);
@@ -1726,16 +1761,19 @@ MDStatus md_result_face_kps(MDResultHandle h, size_t i, const MDPoint** kps, siz
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_FACE) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDFaceItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    if (auto* origin = dynamic_cast<ResultData<KeyPointsResult>*>(p->origin)) {
+    if (auto* origin = raw_result<KeyPointsResult>(rh)) {
+        if (i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
         if (kps) *kps = reinterpret_cast<const MDPoint*>(origin->v[i].keypoints.data());
         if (n) *n = origin->v[i].keypoints.size();
-    } else if (auto* origin = dynamic_cast<ResultData<face::InsightFaceBox>*>(p->origin)) {
+        return MD_OK;
+    }
+    if (auto* origin = raw_result<face::InsightFaceBox>(rh)) {
+        if (i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
         if (kps) *kps = reinterpret_cast<const MDPoint*>(origin->v[i].kps.data());
         if (n) *n = origin->v[i].kps.size();
+        return MD_OK;
     }
-    return MD_OK;
+    return MD_ERR_INVALID_ARGUMENT;
 }
 
 MDStatus md_result_face_embedding(MDResultHandle h, size_t i,
@@ -1743,10 +1781,10 @@ MDStatus md_result_face_embedding(MDResultHandle h, size_t i,
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_FACE_REC) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<FaceRecognitionResult>*>(rh->data);
-    if (i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
-    if (emb_n) *emb_n = d->v[i].embedding.size();
-    if (embedding) *embedding = d->v[i].embedding.data();
+    auto* origin = raw_result<FaceRecognitionResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
+    if (emb_n) *emb_n = origin->v[i].embedding.size();
+    if (embedding) *embedding = origin->v[i].embedding.data();
     return MD_OK;
 }
 
@@ -1754,17 +1792,17 @@ MDStatus md_result_insightface(MDResultHandle h, const MDInsightFaceItem** items
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<face::InsightFaceResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDInsightFaceItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        MDInsightFaceItem it{};
-        it.x = r.bbox[0]; it.y = r.bbox[1]; it.w = r.bbox[2] - r.bbox[0]; it.h = r.bbox[3] - r.bbox[1];
-        it.score = r.det_score; it.gender = r.gender; it.age = r.age;
-        p->v.push_back(it);
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<face::InsightFaceResult, MDInsightFaceItem>(
+        rh, [](ProjectedResult<MDInsightFaceItem>& pp, const std::vector<face::InsightFaceResult>& srcv) {
+            pp.v.reserve(srcv.size());
+            for (const auto& r : srcv) {
+                MDInsightFaceItem it{};
+                it.x = r.bbox[0]; it.y = r.bbox[1]; it.w = r.bbox[2] - r.bbox[0]; it.h = r.bbox[3] - r.bbox[1];
+                it.score = r.det_score; it.gender = r.gender; it.age = r.age;
+                pp.v.push_back(it);
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1774,9 +1812,8 @@ MDStatus md_result_insightface_kps(MDResultHandle h, size_t i, const MDPoint** k
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDInsightFaceItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    auto* origin = static_cast<ResultData<face::InsightFaceResult>*>(p->origin);
+    auto* origin = raw_result<face::InsightFaceResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
     if (kps) *kps = reinterpret_cast<const MDPoint*>(origin->v[i].kps.data());
     if (n) *n = origin->v[i].kps.size();
     return MD_OK;
@@ -1787,9 +1824,8 @@ MDStatus md_result_insightface_embedding(MDResultHandle h, size_t i,
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDInsightFaceItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    auto* origin = static_cast<ResultData<face::InsightFaceResult>*>(p->origin);
+    auto* origin = raw_result<face::InsightFaceResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
     if (emb_n) *emb_n = origin->v[i].embedding.size();
     if (embedding) *embedding = origin->v[i].embedding.data();
     return MD_OK;
@@ -1799,9 +1835,8 @@ MDStatus md_result_insightface_pose(MDResultHandle h, size_t i, const float** po
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !pose || !n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDInsightFaceItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    auto* origin = static_cast<ResultData<face::InsightFaceResult>*>(p->origin);
+    auto* origin = raw_result<face::InsightFaceResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
     if (n) *n = origin->v[i].pose.size();
     if (pose && !origin->v[i].pose.empty()) *pose = origin->v[i].pose.data();
     return MD_OK;
@@ -1855,15 +1890,14 @@ MDStatus md_result_plate(MDResultHandle h, size_t i, const char** plate, const c
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !plate) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_LPR) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDLprItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    if (auto* origin = dynamic_cast<ResultData<LprResult>*>(p->origin)) {
+    if (auto* origin = raw_result<LprResult>(rh)) {
+        if (i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
         if (plate) *plate = origin->v[i].car_plate_str.c_str();
         if (color) *color = origin->v[i].car_plate_color.c_str();
-    } else {
-        if (plate) *plate = "";
-        if (color) *color = "";
+        return MD_OK;
     }
+    if (plate) *plate = "";
+    if (color) *color = "";
     return MD_OK;
 }
 
@@ -1881,15 +1915,14 @@ MDStatus md_result_lpr_keypoints(MDResultHandle h, size_t i, const MDPoint** kps
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_LPR) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDLprItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    if (auto* origin = dynamic_cast<ResultData<LprResult>*>(p->origin)) {
+    if (auto* origin = raw_result<LprResult>(rh)) {
+        if (i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
         if (kps) *kps = reinterpret_cast<const MDPoint*>(origin->v[i].keypoints.data());
         if (n) *n = origin->v[i].keypoints.size();
-    } else {
-        if (kps) *kps = nullptr;
-        if (n) *n = 0;
+        return MD_OK;
     }
+    if (kps) *kps = nullptr;
+    if (n) *n = 0;
     return MD_OK;
 }
 
@@ -1897,17 +1930,17 @@ MDStatus md_result_attribute(MDResultHandle h, const MDAttrItem** items, size_t*
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_ATTR) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<AttributeResult>*>(rh->data);
-    auto* p = new ProjectedResult<MDAttrItem>();
-    p->v.reserve(d->v.size());
-    for (const auto& r : d->v) {
-        MDAttrItem it{};
-        it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
-        it.box_score = r.box_score; it.box_label_id = r.box_label_id;
-        p->v.push_back(it);
-    }
-    p->origin = d;
-    rh->data = p;
+    auto* p = project_cached<AttributeResult, MDAttrItem>(
+        rh, [](ProjectedResult<MDAttrItem>& pp, const std::vector<AttributeResult>& srcv) {
+            pp.v.reserve(srcv.size());
+            for (const auto& r : srcv) {
+                MDAttrItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.box_score = r.box_score; it.box_label_id = r.box_label_id;
+                pp.v.push_back(it);
+            }
+        });
+    if (!p) return MD_ERR_INVALID_ARGUMENT;
     *items = p->v.data();
     *count = p->v.size();
     return MD_OK;
@@ -1917,9 +1950,8 @@ MDStatus md_result_attr_scores(MDResultHandle h, size_t i, const float** scores,
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !scores || !n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_ATTR) return MD_ERR_INVALID_ARGUMENT;
-    auto* p = static_cast<ProjectedResult<MDAttrItem>*>(rh->data);
-    if (i >= p->count() || !p->origin) return MD_ERR_INVALID_ARGUMENT;
-    auto* origin = static_cast<ResultData<AttributeResult>*>(p->origin);
+    auto* origin = raw_result<AttributeResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
     if (n) *n = origin->v[i].attr_scores.size();
     if (scores) *scores = origin->v[i].attr_scores.data();
     return MD_OK;
@@ -1945,8 +1977,8 @@ MDStatus md_result_spoof(MDResultHandle h, size_t i, int* label) {
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !label) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_ANTISPOOF) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<ResultData<int>*>(rh->data);
-    if (i >= d->count()) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = raw_result<int>(rh);
+    if (!d || i >= d->count()) return MD_ERR_INVALID_ARGUMENT;
     *label = d->v[i];
     return MD_OK;
 }

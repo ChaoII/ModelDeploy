@@ -320,3 +320,95 @@ TEST_CASE("capi2 crop delegates to ImageData, preserves CPU/OOB/device semantics
     CHECK(md_image_crop(dev, 0, 0, 4, 4, &dcrop) == MD_ERR_UNSUPPORTED_TYPE);
     md_image_destroy(dev);
 }
+
+//
+// R1 回归：结果数组 getter 必须幂等（同一 getter 二次调用返回一致的量化结果），
+// 且"依赖型" getter（keypoints/mask 等）在未先调用数组 getter 时也应安全。
+// 旧实现把已投影的 ProjectedResult 当 ResultData 强转（正式 UB，classification 会读到野值）。
+//
+TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    const std::string cls_file = data_dir + "/test_models/onnx/yolo11n/yolo11n-cls.onnx";
+    const std::string pose_file = data_dir + "/test_models/onnx/yolo11n/yolo11n-pose.onnx";
+    const std::string imgf = data_dir + "/test_images/bus.jpg";
+    if (!std::filesystem::exists(det_file) || !std::filesystem::exists(cls_file) ||
+        !std::filesystem::exists(pose_file) || !std::filesystem::exists(imgf)) {
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_file(&img, imgf.c_str()) == MD_OK);
+
+    // --- detection：同一 getter 二次调用，结果必须一致 ---
+    {
+        MDModelHandle det = nullptr;
+        REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, det_file.c_str(), opt) == MD_OK);
+        MDResultHandle res = nullptr;
+        REQUIRE(md_model_predict(det, img, &res) == MD_OK);
+
+        size_t n1 = 0, n2 = 0;
+        const MDDetectionItem* a1 = nullptr;
+        const MDDetectionItem* a2 = nullptr;
+        REQUIRE(md_result_detection(res, &a1, &n1) == MD_OK);
+        REQUIRE(md_result_detection(res, &a2, &n2) == MD_OK);
+        CHECK(n1 == n2);
+        size_t cnt = 0;
+        REQUIRE(md_result_count(res, &cnt) == MD_OK);
+        CHECK(cnt == n1);
+        for (size_t i = 0; i < n1 && i < n2; ++i) {
+            CHECK(a1[i].x == a2[i].x);
+            CHECK(a1[i].y == a2[i].y);
+            CHECK(a1[i].w == a2[i].w);
+            CHECK(a1[i].h == a2[i].h);
+            CHECK(a1[i].score == a2[i].score);
+            CHECK(a1[i].label_id == a2[i].label_id);
+        }
+        md_result_destroy(res);
+        md_model_destroy(det);
+    }
+
+    // --- classification：二次调用不得读野值（旧实现此处损坏） ---
+    {
+        MDModelHandle cls = nullptr;
+        REQUIRE(md_model_create(&cls, MD_MODEL_CLASSIFICATION, cls_file.c_str(), opt) == MD_OK);
+        MDResultHandle res = nullptr;
+        REQUIRE(md_model_predict(cls, img, &res) == MD_OK);
+
+        size_t n1 = 0, n2 = 0;
+        const MDClassifyItem* c1 = nullptr;
+        const MDClassifyItem* c2 = nullptr;
+        REQUIRE(md_result_classification(res, &c1, &n1) == MD_OK);
+        REQUIRE(md_result_classification(res, &c2, &n2) == MD_OK);
+        CHECK(n1 == n2);
+        for (size_t i = 0; i < n1 && i < n2; ++i) {
+            CHECK(c1[i].label_id == c2[i].label_id);
+            CHECK(c1[i].score == c2[i].score);
+        }
+        md_result_destroy(res);
+        md_model_destroy(cls);
+    }
+
+    // --- pose：keypoints 依赖型 getter，在数组 getter 之前独立调用须安全 ---
+    {
+        MDModelHandle pose = nullptr;
+        REQUIRE(md_model_create(&pose, MD_MODEL_POSE, pose_file.c_str(), opt) == MD_OK);
+        MDResultHandle res = nullptr;
+        REQUIRE(md_model_predict(pose, img, &res) == MD_OK);
+
+        const MDPoint3* kps = nullptr;
+        size_t kn = 0;
+        CHECK(md_result_keypoints(res, 0, &kps, &kn) == MD_OK);  // 未先调 md_result_pose
+        md_result_destroy(res);
+        md_model_destroy(pose);
+    }
+
+    md_image_destroy(img);
+    md_option_destroy(opt);
+}
