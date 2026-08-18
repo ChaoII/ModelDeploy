@@ -335,7 +335,12 @@ static MDStatus image_from_image(MDImageHandle* out, ImageData&& img) {
     h->height = img.height();
     const size_t bytes = static_cast<size_t>(h->width) * h->height * 3;
     h->data = new unsigned char[bytes];
-    std::memcpy(h->data, p0.data, bytes);
+    // 逐行拷贝，尊重源平面 step（CPU 紧致 BGR 步长==w*3，行为不变；padded-stride 帧不产出乱码）
+    const size_t row_bytes = static_cast<size_t>(h->width) * 3;
+    const int step_src = p0.step > 0 ? p0.step : static_cast<int>(row_bytes);
+    for (int r = 0; r < h->height; ++r)
+        std::memcpy(h->data + static_cast<size_t>(r) * row_bytes,
+                    p0.data + static_cast<size_t>(r) * step_src, row_bytes);
     h->owns_data = true;
     h->image = ImageData::from_raw(h->data, h->width, h->height, MdImageType::PKG_BGR_U8, false);
     *out = h;
@@ -476,8 +481,12 @@ MDStatus md_image_clone(MDImageHandle in, MDImageHandle* out) {
     nh->width = mat.cols;
     nh->height = mat.rows;
     const size_t bytes = static_cast<size_t>(mat.total()) * static_cast<size_t>(mat.elemSize());
+    const size_t row_bytes = static_cast<size_t>(mat.cols) * static_cast<size_t>(mat.elemSize());
     nh->data = new unsigned char[bytes];
-    std::memcpy(nh->data, mat.data, bytes);
+    // 逐行拷贝，尊重 mat.step（CPU 紧致/连续步骤长时行为字节等价；padded-stride 的 CPU BGR 帧不产出乱码）
+    for (int r = 0; r < mat.rows; ++r)
+        std::memcpy(nh->data + static_cast<size_t>(r) * row_bytes,
+                    mat.data + static_cast<size_t>(r) * mat.step, row_bytes);
     nh->owns_data = true;
     nh->image = ImageData::from_raw(nh->data, nh->width, nh->height, MdImageType::PKG_BGR_U8, false);
     *out = nh;

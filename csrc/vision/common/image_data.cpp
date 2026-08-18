@@ -38,8 +38,6 @@ namespace modeldeploy::vision {
         size_t nplanes = 0;
         std::shared_ptr<void> owner;
         size_t bytes_ = 0, element_count_ = 0, element_bytes_ = 1;
-        bool cmat_valid = false;
-        cv::Mat cmat_;
     };
 
     static ImageDataImpl* get_impl(const ImageData& img) {
@@ -394,6 +392,7 @@ namespace modeldeploy::vision {
         g_last_error_msg.clear();
         if (!VisionProcessorBackend::supports(device(), ImageOp::Rotate)) {
             set_last_error("rotate: device unsupported (fast-fail)");
+            // 不对称：fast-fail 清空本帧（返回类型 guard），而下方 backend 失败路径保留原位不动。
             ImageData empty;
             *this = std::move(empty);
             return *this;
@@ -564,6 +563,8 @@ namespace modeldeploy::vision {
     static bool codec_supported(const ImageData& image) {
         if (image.device() != Device::CPU) return false;
         if (image.plane_count() > 1) return false;
+        // 阈值为 >= 0（非 > 0）：刻意允许 GRAY_U8（CV_8UC1==0）参与编解码 —— OpenCV 能正确编码灰度；
+        // 这是修复过去错误拒绝灰度图的意图，勿当作意外的放宽。
         return md_image_type_to_ocv_type(image.format()) >= 0;
     }
 
