@@ -176,6 +176,10 @@ namespace modeldeploy::vision {
         g_last_error_msg.clear();
         if (!impl_ || empty()) return ImageData();
         auto* d = get_impl(*this);
+        if (d->device != Device::CPU) {
+            set_last_error("clone: device frame not supported");
+            return ImageData();
+        }
         ImageData img = make_owned(d->fmt, d->w, d->h, Device::CPU);
         if (img.empty()) {
             set_last_error("clone: unsupported format");
@@ -425,60 +429,12 @@ namespace modeldeploy::vision {
             set_last_error("rotate_crop: device unsupported (fast-fail)");
             return ImageData();
         }
-        cv::Mat src;
-        if (!asMat(&src)) {
-            set_last_error("rotate_crop: packed CPU only");
-            return ImageData();
+        ImageData out;
+        if (backend_for(device())->rotate_crop(*this, box, &out)) {
+            return out;
         }
-        std::vector<std::vector<float>> points;
-        for (int i = 0; i < 4; ++i) {
-            std::vector<float> tmp;
-            tmp.push_back(box[2 * i]);
-            tmp.push_back(box[2 * i + 1]);
-            points.push_back(tmp);
-        }
-        float x_collect[4] = {box[0], box[2], box[4], box[6]};
-        float y_collect[4] = {box[1], box[3], box[5], box[7]};
-        float left = *std::min_element(x_collect, x_collect + 4);
-        float right = *std::max_element(x_collect, x_collect + 4);
-        float top = *std::min_element(y_collect, y_collect + 4);
-        float bottom = *std::max_element(y_collect, y_collect + 4);
-        cv::Rect roi(std::max(0, static_cast<int>(left)), std::max(0, static_cast<int>(top)),
-                     std::max(1, static_cast<int>(right - left)), std::max(1, static_cast<int>(bottom - top)));
-        cv::Mat img_crop;
-        src(roi & cv::Rect(0, 0, src.cols, src.rows)).copyTo(img_crop);
-        for (auto& point : points) {
-            point[0] -= left;
-            point[1] -= top;
-        }
-
-        const float img_crop_width = sqrt(pow(points[0][0] - points[1][0], 2) +
-            pow(points[0][1] - points[1][1], 2));
-        const float img_crop_height = sqrt(pow(points[0][0] - points[3][0], 2) +
-            pow(points[0][1] - points[3][1], 2));
-
-        cv::Point2f pts_std[4];
-        pts_std[0] = cv::Point2f(0., 0.);
-        pts_std[1] = cv::Point2f(img_crop_width, 0.);
-        pts_std[2] = cv::Point2f(img_crop_width, img_crop_height);
-        pts_std[3] = cv::Point2f(0.f, img_crop_height);
-
-        cv::Point2f pointsf[4];
-        pointsf[0] = cv::Point2f(points[0][0], points[0][1]);
-        pointsf[1] = cv::Point2f(points[1][0], points[1][1]);
-        pointsf[2] = cv::Point2f(points[2][0], points[2][1]);
-        pointsf[3] = cv::Point2f(points[3][0], points[3][1]);
-        cv::Mat M = cv::getPerspectiveTransform(pointsf, pts_std);
-        cv::Mat dst_img;
-        cv::warpPerspective(img_crop, dst_img, M,
-                            cv::Size(img_crop_width, img_crop_height),
-                            cv::BORDER_REPLICATE);
-
-        if (dst_img.rows >= dst_img.cols * 1.5) {
-            cv::transpose(dst_img, dst_img);
-            cv::flip(dst_img, dst_img, 0);
-        }
-        return ImageData(dst_img);
+        set_last_error("rotate_crop: backend could not process the image (device frame or unsupported)");
+        return ImageData();
     }
 
 
@@ -508,23 +464,13 @@ namespace modeldeploy::vision {
             set_last_error("cvt_color: device unsupported (fast-fail)");
             return ImageData();
         }
-        const auto ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
-        if (ocv_type > 0) {
-            // OpenCV 原生颜色转换：按设备经 backend 分派（设备帧未实现 → 报错，不静默）
-            ImageData out;
-            if (backend_for(image.device())->cvt_color(image, type, &out)) {
-                return out;
-            }
-            set_last_error("cvt_color: backend could not process the image (device frame or unsupported)");
-            return ImageData();
+        // 全部颜色转换（含 OpenCV 原生 + NV12/I420 + PL↔PA 拆合）统一经 backend 分派；
+        // 设备帧未实现的 op 由 supports(CvtColor) 前置 fast-fail，不静默回退 CPU。
+        ImageData out;
+        if (backend_for(image.device())->cvt_color(image, type, &out)) {
+            return out;
         }
-        if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB ||
-            type == ColorConvertType::CVT_PL_BGR2PA_BGR || type == ColorConvertType::CVT_PL_RGB2PA_RGB) {
-            // PL↔PA 拆合在后续 Task（4/5）正式迁入 CPU backend；本 Task 先显式拒绝（保留旧错误语义）。
-            set_last_error("cvt_color: PL/PA layout conversion not migrated in this task");
-            return ImageData();
-        }
-        set_last_error("cvt_color: unsupported color conversion type");
+        set_last_error("cvt_color: backend could not process the image (device frame or unsupported)");
         return ImageData();
     }
 
@@ -658,9 +604,14 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "Cannot display empty image" << std::endl;
             return;
         }
+        g_last_error_msg.clear();
+        if (device() != Device::CPU) {
+            set_last_error("imshow: CPU only");
+            return;
+        }
         cv::Mat m;
         if (!asMat(&m)) {
-            MD_LOG_ERROR << "Cannot display non-packed image" << std::endl;
+            set_last_error("imshow: CPU packed image only");
             return;
         }
         cv::imshow(win_name, m);

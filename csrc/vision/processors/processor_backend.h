@@ -96,6 +96,10 @@ namespace modeldeploy::vision {
             (void)image; (void)type; (void)out;
             return false;
         }
+        virtual bool rotate_crop(const ImageData& image, std::array<float, 8> box, ImageData* out) {
+            (void)image; (void)box; (void)out;
+            return false;
+        }
 
         // 整批融合算子（OCR det 用：resize+pad+normalize+permute，batch 内统一 pad）
         virtual bool fusion_resize_pad_normalize_permute(

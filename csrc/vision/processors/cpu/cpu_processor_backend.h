@@ -45,6 +45,7 @@ namespace modeldeploy::vision {
                   ImageData* out) override;
         bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override;
         bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override;
+        bool rotate_crop(const ImageData& image, std::array<float, 8> box, ImageData* out) override;
         bool fusion_resize_pad_normalize_permute(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<std::array<int, 2>>& resize_sizes,

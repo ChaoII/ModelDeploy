@@ -3,8 +3,8 @@
 #include <cstring>
 #include <filesystem>
 #include <memory>
-#include <opencv2/core/mat.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/geometry/2d.hpp>
 #include "vision/common/image_data.h"
 #include "vision/common/basic_types.h"
 #include "vision/processors/cpu/cpu_processor_backend.h"
@@ -786,5 +786,121 @@ TEST_CASE("image_data: from_planes NV12/I420/NV21 self-describes", "[image_data]
         CHECK(img.empty());
     }
 }
+
+// 与 cpu_processor_backend::rotate_crop 逐位等价的独立参考实现（同一 cv 语义）
+static cv::Mat reference_rotate_crop(const cv::Mat& src, const std::array<float, 8>& box) {
+    std::vector<std::vector<float>> points;
+    for (int i = 0; i < 4; ++i) points.push_back({box[2 * i], box[2 * i + 1]});
+    float x_collect[4] = {box[0], box[2], box[4], box[6]};
+    float y_collect[4] = {box[1], box[3], box[5], box[7]};
+    float left = *std::min_element(x_collect, x_collect + 4);
+    float right = *std::max_element(x_collect, x_collect + 4);
+    float top = *std::min_element(y_collect, y_collect + 4);
+    float bottom = *std::max_element(y_collect, y_collect + 4);
+    cv::Rect roi(std::max(0, static_cast<int>(left)), std::max(0, static_cast<int>(top)),
+                 std::max(1, static_cast<int>(right - left)), std::max(1, static_cast<int>(bottom - top)));
+    cv::Mat img_crop;
+    src(roi & cv::Rect(0, 0, src.cols, src.rows)).copyTo(img_crop);
+    for (auto& point : points) { point[0] -= left; point[1] -= top; }
+    const float img_crop_width = sqrt(pow(points[0][0] - points[1][0], 2) + pow(points[0][1] - points[1][1], 2));
+    const float img_crop_height = sqrt(pow(points[0][0] - points[3][0], 2) + pow(points[0][1] - points[3][1], 2));
+    cv::Point2f pts_std[4] = {{0.f, 0.f}, {img_crop_width, 0.f},
+                              {img_crop_width, img_crop_height}, {0.f, img_crop_height}};
+    cv::Point2f pointsf[4] = {{points[0][0], points[0][1]}, {points[1][0], points[1][1]},
+                              {points[2][0], points[2][1]}, {points[3][0], points[3][1]}};
+    cv::Mat M = cv::getPerspectiveTransform(pointsf, pts_std);
+    cv::Mat dst;
+    cv::warpPerspective(img_crop, dst, M, cv::Size(img_crop_width, img_crop_height), cv::BORDER_REPLICATE);
+    if (dst.rows >= dst.cols * 1.5) { cv::transpose(dst, dst); cv::flip(dst, dst, 0); }
+    return dst;
+}
+
+TEST_CASE("image_data: rotate_crop CPU byte-exact vs reference", "[core]") {
+    auto img = create_gradient_image(80, 60);
+    std::array<float, 8> box = {10, 10, 70, 12, 68, 52, 12, 50};
+    auto out = img.rotate_crop(box);
+    REQUIRE(!out.empty());
+    cv::Mat src, got;
+    REQUIRE(img.asMat(&src));
+    REQUIRE(out.asMat(&got));
+    cv::Mat ref = reference_rotate_crop(src, box);
+    REQUIRE(got.total() == ref.total());
+    REQUIRE(got.type() == ref.type());
+    REQUIRE(std::memcmp(got.data, ref.data, ref.total() * ref.channels()) == 0);
+
+    // 转置分支（高>宽*1.5）也逐位一致
+    std::array<float, 8> tall = {5, 5, 50, 5, 52, 55, 7, 55};
+    auto out_tall = img.rotate_crop(tall);
+    REQUIRE(!out_tall.empty());
+    cv::Mat got_tall;
+    REQUIRE(out_tall.asMat(&got_tall));
+    cv::Mat ref_tall = reference_rotate_crop(src, tall);
+    REQUIRE(got_tall.total() == ref_tall.total());
+    REQUIRE(got_tall.type() == ref_tall.type());
+    REQUIRE(std::memcmp(got_tall.data, ref_tall.data, ref_tall.total() * ref_tall.channels()) == 0);
+}
+
+TEST_CASE("image_data: PA2PL/PL2PA CPU byte-equivalent to cv split/merge", "[core]") {
+    const int w = 7, h = 5;
+    std::vector<uint8_t> bgr(static_cast<size_t>(w) * h * 3);
+    for (int i = 0; i < w * h * 3; ++i) bgr[i] = static_cast<uint8_t>((i * 29 + 11) % 256);
+    auto pkg = ImageData::from_bgr24(bgr.data(), w, h);
+
+    // PA_BGR -> PL_BGR：逐平面与 cv::split 逐字节一致
+    auto pl = ImageData::cvt_color(pkg, ColorConvertType::CVT_PA_BGR2PL_BGR);
+    REQUIRE(!pl.empty());
+    CHECK(pl.format() == MdImageType::PLA_BGR_U8);
+    cv::Mat m;
+    REQUIRE(pkg.asMat(&m));
+    std::vector<cv::Mat> ref;
+    cv::split(m, ref);
+    const uint8_t* pd = pl.plane(0).data;
+    REQUIRE(pd != nullptr);
+    for (int c = 0; c < 3; ++c)
+        REQUIRE(std::memcmp(pd + static_cast<size_t>(c) * w * h, ref[c].data, static_cast<size_t>(w) * h) == 0);
+
+    // PL_BGR -> PA_BGR：与 cv::merge 逐字节一致
+    auto back = ImageData::cvt_color(pl, ColorConvertType::CVT_PL_BGR2PA_BGR);
+    REQUIRE(!back.empty());
+    CHECK(back.format() == MdImageType::PKG_BGR_U8);
+    cv::Mat hwc_ref;
+    cv::merge(ref, hwc_ref);
+    cv::Mat got;
+    REQUIRE(back.asMat(&got));
+    REQUIRE(got.total() == hwc_ref.total());
+    REQUIRE(std::memcmp(got.data, hwc_ref.data, static_cast<size_t>(w) * h * 3) == 0);
+}
+
+TEST_CASE("image_data: device-frame imshow/clone guards", "[core]") {
+    // 真实 host 缓冲 + Device::GPU：守卫须在触碰数据前拦截（不 crash、返回空/报错）
+    std::vector<uint8_t> y(8 * 4, 0), uv(8 * 2, 0);
+    ImageData::Plane pl[2] = {{y.data(), 8}, {uv.data(), 8}};
+    auto dev = ImageData::from_planes(pl, 2, MdImageType::NV12, 8, 4, Device::GPU);
+    REQUIRE(!dev.empty());
+
+    // clone：device 帧 → 空 + last_error
+    ImageData::last_error();
+    auto c = dev.clone();
+    CHECK(c.empty());
+    CHECK(ImageData::last_error() != nullptr);
+
+    // imshow：device 帧 → 提前返回 + last_error（不打开窗口）
+    ImageData::last_error();
+    dev.imshow("task4_guard");
+    CHECK(ImageData::last_error() != nullptr);
+
+    // CPU 帧 clone 深拷贝：改副本不影响原图
+    auto img = create_solid_image(20, 20, 100, 150, 200);
+    ImageData::last_error();
+    auto cc = img.clone();
+    CHECK(!cc.empty());
+    CHECK(ImageData::last_error() == nullptr);
+    CHECK_FALSE(cc.is_shared_with(img));
+    cv::Mat cm;
+    REQUIRE(cc.asMat(&cm));
+    cm.data[0] = 0;
+    REQUIRE(img.plane(0).data[0] == 100);
+}
+
 
 

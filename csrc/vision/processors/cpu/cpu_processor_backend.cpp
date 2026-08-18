@@ -12,6 +12,11 @@
 #include "vision/common/convert.h"
 #include "vision/utils.h"
 #include "vision/face/face_det/scrfd_preproc.h"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstring>
+#include <vector>
 
 namespace modeldeploy::vision {
     bool CpuProcessorBackend::yolo_preprocess(const ImageData& image, Tensor* out,
@@ -120,6 +125,62 @@ namespace modeldeploy::vision {
         return true;
     }
 
+    bool CpuProcessorBackend::rotate_crop(const ImageData& image, std::array<float, 8> box, ImageData* out) {
+        if (!out) return false;
+        cv::Mat src;
+        if (!image.asMat(&src)) return false;
+        std::vector<std::vector<float>> points;
+        for (int i = 0; i < 4; ++i) {
+            std::vector<float> tmp;
+            tmp.push_back(box[2 * i]);
+            tmp.push_back(box[2 * i + 1]);
+            points.push_back(tmp);
+        }
+        float x_collect[4] = {box[0], box[2], box[4], box[6]};
+        float y_collect[4] = {box[1], box[3], box[5], box[7]};
+        float left = *std::min_element(x_collect, x_collect + 4);
+        float right = *std::max_element(x_collect, x_collect + 4);
+        float top = *std::min_element(y_collect, y_collect + 4);
+        float bottom = *std::max_element(y_collect, y_collect + 4);
+        cv::Rect roi(std::max(0, static_cast<int>(left)), std::max(0, static_cast<int>(top)),
+                     std::max(1, static_cast<int>(right - left)), std::max(1, static_cast<int>(bottom - top)));
+        cv::Mat img_crop;
+        src(roi & cv::Rect(0, 0, src.cols, src.rows)).copyTo(img_crop);
+        for (auto& point : points) {
+            point[0] -= left;
+            point[1] -= top;
+        }
+
+        const float img_crop_width = sqrt(pow(points[0][0] - points[1][0], 2) +
+            pow(points[0][1] - points[1][1], 2));
+        const float img_crop_height = sqrt(pow(points[0][0] - points[3][0], 2) +
+            pow(points[0][1] - points[3][1], 2));
+
+        cv::Point2f pts_std[4];
+        pts_std[0] = cv::Point2f(0., 0.);
+        pts_std[1] = cv::Point2f(img_crop_width, 0.);
+        pts_std[2] = cv::Point2f(img_crop_width, img_crop_height);
+        pts_std[3] = cv::Point2f(0.f, img_crop_height);
+
+        cv::Point2f pointsf[4];
+        pointsf[0] = cv::Point2f(points[0][0], points[0][1]);
+        pointsf[1] = cv::Point2f(points[1][0], points[1][1]);
+        pointsf[2] = cv::Point2f(points[2][0], points[2][1]);
+        pointsf[3] = cv::Point2f(points[3][0], points[3][1]);
+        cv::Mat M = cv::getPerspectiveTransform(pointsf, pts_std);
+        cv::Mat dst_img;
+        cv::warpPerspective(img_crop, dst_img, M,
+                            cv::Size(img_crop_width, img_crop_height),
+                            cv::BORDER_REPLICATE);
+
+        if (dst_img.rows >= dst_img.cols * 1.5) {
+            cv::transpose(dst_img, dst_img);
+            cv::flip(dst_img, dst_img, 0);
+        }
+        *out = ImageData(dst_img);
+        return !out->empty();
+    }
+
     bool CpuProcessorBackend::cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) {
         if (!out) return false;
         if (type == ColorConvertType::CVT_NV122PKG_BGR) {
@@ -173,8 +234,63 @@ namespace modeldeploy::vision {
             *out = ImageData(std::move(bgr));
             return true;
         }
+        // PA（packed HWC）→ PL（planar CHW）：cv::split 拆通道后按平面平铺到连续 CHW 缓冲。
+        if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB) {
+            cv::Mat src;
+            if (!image.asMat(&src)) return false;
+            const int ch = src.channels();
+            if (ch < 1) return false;
+            std::vector<cv::Mat> chans;
+            cv::split(src, chans);
+            const MdImageType pl_type =
+                (type == ColorConvertType::CVT_PA_BGR2PL_BGR)
+                    ? (src.depth() == CV_8U ? MdImageType::PLA_BGR_U8 : MdImageType::PLA_BGR_F32)
+                    : (src.depth() == CV_8U ? MdImageType::PLA_RGB_U8 : MdImageType::PLA_RGB_F32);
+            const size_t plane_bytes =
+                static_cast<size_t>(image.width()) * image.height() * static_cast<size_t>(src.elemSize1());
+            std::vector<uint8_t> planar(plane_bytes * static_cast<size_t>(ch));
+            uint8_t* pd = planar.data();
+            for (int i = 0; i < ch; ++i) {
+                if (!chans[i].isContinuous()) return false;
+                std::memcpy(pd + static_cast<size_t>(i) * plane_bytes, chans[i].data, plane_bytes);
+            }
+            ImageData dst =
+                ImageData::from_raw(planar.data(), image.width(), image.height(), pl_type, true, Device::CPU);
+            if (dst.empty()) return false;
+            *out = std::move(dst);
+            return true;
+        }
+        // PL（planar CHW）→ PA（packed HWC）：按通道 rowRange 切出 H x W 视图后 cv::merge 交错。
+        if (type == ColorConvertType::CVT_PL_BGR2PA_BGR || type == ColorConvertType::CVT_PL_RGB2PA_RGB) {
+            if (!is_planar_type(image.format()) || image.plane_count() != 1) return false;
+            const int ch = image.channels();
+            const int w = image.width();
+            const int h = image.height();
+            const auto p0 = image.plane(0);
+            if (!p0.data || ch < 1) return false;
+            int ocv_depth = -1;
+            switch (image.format()) {
+            case MdImageType::PLA_BGR_U8: case MdImageType::PLA_RGB_U8:
+            case MdImageType::PLA_BGRA_U8: case MdImageType::PLA_RGBA_U8:
+                ocv_depth = CV_8U; break;
+            case MdImageType::PLA_BGR_F32: case MdImageType::PLA_RGB_F32:
+            case MdImageType::PLA_BGRA_F32: case MdImageType::PLA_RGBA_F32:
+                ocv_depth = CV_32F; break;
+            default:
+                return false;
+            }
+            // 连续 CHW 平面 → [ch*h][w] 单通道视图，再按通道切出 H x W
+            cv::Mat planar(h * ch, w, CV_MAKETYPE(ocv_depth, 1), const_cast<uint8_t*>(p0.data));
+            std::vector<cv::Mat> chans(ch);
+            for (int i = 0; i < ch; ++i)
+                chans[i] = planar.rowRange(i * h, (i + 1) * h);
+            cv::Mat hwc;
+            cv::merge(chans, hwc);
+            if (hwc.empty()) return false;
+            *out = ImageData(std::move(hwc));
+            return !out->empty();
+        }
         const int ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
-        // 仅处理 OpenCV 原生颜色转换；PL↔PA 拆合在 ImageData 内部完成（需要私有 impl 访问）
         if (ocv_type <= 0) return false;
         cv::Mat src;
         if (!image.asMat(&src)) return false;
