@@ -160,7 +160,7 @@ namespace ModelDeploy.V2
 
         /// <summary>
         /// NV12 直接输入推理（硬解码/摄像头直通，srcDevice 指明 Y/UV 内存所在设备；
-        /// GPU 内存零拷贝直通 CUDA kernel，CPU 内存软件转换，均不进中间 BGR 缓冲）。
+        /// 经 md_image_from_device_nv12 包装为设备帧 ImageData 后走统一 predict(ImageData) 单入口）。
         /// </summary>
         protected Prediction<T> MakePredictionNv12<T>(byte[] y, byte[] uv,
             int w, int h, int stepY, int stepUv, Device srcDevice, Func<IntPtr, T[]> reader)
@@ -172,6 +172,7 @@ namespace ModelDeploy.V2
 
         /// <summary>
         /// NV12 直接输入推理并返回绑定的输入帧（设备相关的 ImageData 包装）。
+        /// 每步：md_image_from_device_nv12 构造设备帧 → md_model_predict（统一单入口）。
         /// 可从 Frame 取 Y/UV 平面指针或就地绘制；Frame 由调用方负责 Dispose，
         /// Prediction 也需 Dispose 释放结果句柄。
         /// </summary>
@@ -179,14 +180,13 @@ namespace ModelDeploy.V2
             byte[] y, byte[] uv,
             int w, int h, int stepY, int stepUv, Device srcDevice, Func<IntPtr, T[]> reader)
         {
-            var status = md_model_predict_nv12(_handle, y, uv, w, h,
-                stepY, stepUv, (int)srcDevice, out var frame, out var result);
+            var status = md_image_from_device_nv12(out var img, y, uv, w, h,
+                stepY, stepUv, (int)srcDevice);
             if (status != MDStatus.MD_OK)
-                throw new InvalidOperationException($"Predict NV12 failed: {GetLastError()}");
-            var prediction = new Prediction<T>(result, reader);
-            VisionImage frameImg = frame == IntPtr.Zero ? null : VisionImage.FromDeviceFrame(frame);
-            if (frameImg != null)
-                frameImg.PinBuffers(y, uv);
+                throw new InvalidOperationException($"MakePredictionNv12: md_image_from_device_nv12 failed: {GetLastError()}");
+            var prediction = new Prediction<T>(PredictNative(img), reader);
+            var frameImg = VisionImage.FromDeviceFrame(img);
+            frameImg.PinBuffers(y, uv);
             return (prediction, frameImg);
         }
 

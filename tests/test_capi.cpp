@@ -7,7 +7,7 @@
 //   - md_image_plane_ptrs：NV12 才有效；CPU BGR 返回 UNSUPPORTED_TYPE 且 y/uv=NULL
 //   - md_draw_result 对 CPU BGR 仍走 vis_*（就地绘制，写回底层内存）
 //
-// 注：真正的设备 NV12 帧由 predict_nv12 产出，需模型文件（[model] 标签，CI 下载）。
+// 注：真正的设备 NV12 帧由 md_image_from_device_nv12 + md_model_predict 产出，需模型文件（[model] 标签，CI 下载）。
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -119,37 +119,6 @@ impl Model {
         })
     }
 
-    /// NV12 直接输入推理（硬解码/摄像头直通；src_device 指明 Y/UV 内存所在设备：
-    /// GPU 内存零拷贝直通 CUDA kernel，CPU 内存软件转换，均不进中间 BGR 缓冲）。
-    pub fn predict_nv12(&self, y: &[u8], uv: &[u8], w: i32, h: i32,
-                        step_y: i32, step_uv: i32, src_device: ffi::MDDevice) -> Result<RawResult, MdError> {
-        let (result, frame) = self.predict_nv12_with_frame(y, uv, w, h, step_y, step_uv, src_device)?;
-        drop(frame);
-        Ok(result)
-    }
-
-    /// NV12 直接输入推理并返回绑定的输入帧 ImageData（可取平面指针 / 就地绘制）。
-    /// frame 生命周期归调用方（Drop 仅释放包装句柄，不碰输入缓冲）。
-    pub fn predict_nv12_with_frame(&self, y: &[u8], uv: &[u8], w: i32, h: i32,
-                                   step_y: i32, step_uv: i32, src_device: ffi::MDDevice)
-        -> Result<(RawResult, Image), MdError> {
-        let mut frame: ffi::MDImageHandle = ptr::null_mut();
-        let mut result = ptr::null_mut();
-        check_status(unsafe {
-            ffi::md_model_predict_nv12(
-                self.handle, y.as_ptr() as *const _, uv.as_ptr() as *const _,
-                w, h, step_y, step_uv, src_device, &mut frame, &mut result)
-        })?;
-        if result.is_null() {
-            return Err(MdError::ModelPredict("null nv12 result".into()));
-        }
-        let frame = Image::from_device_frame(frame)?;
-        Ok((RawResult {
-            handle: result,
-            _kind: self.kind,
-        }, frame))
-    }
-
     /// ASR：从 wav 文件识别
     pub fn asr_wav(&self, wav_path: &str) -> Result<String, MdError> {
         let cpath = CString::new(wav_path).map_err(|_| MdError::InvalidArgument("wav".into()))?;
@@ -675,37 +644,6 @@ macro_rules! model_wrapper {
             /// 推理并读取结果（结果句柄随返回值释放）
             pub fn predict(&self, image: &Image) -> Result<Vec<<$name as ResultType>::Item>, MdError> {
                 $reader(&self.inner.predict(image)?)
-            }
-
-            /// NV12 直接输入推理（硬解码/摄像头直通；GPU 内存零拷贝直通 CUDA kernel）
-            pub fn predict_nv12(
-                &self,
-                y: &[u8],
-                uv: &[u8],
-                w: i32,
-                h: i32,
-                step_y: i32,
-                step_uv: i32,
-                src_device: ffi::MDDevice,
-            ) -> Result<Vec<<$name as ResultType>::Item>, MdError> {
-                $reader(&self.inner.predict_nv12(y, uv, w, h, step_y, step_uv, src_device)?)
-            }
-
-            /// NV12 直接输入推理并返回绑定的输入帧（可取平面指针 / 就地绘制）
-            pub fn predict_nv12_with_frame(
-                &self,
-                y: &[u8],
-                uv: &[u8],
-                w: i32,
-                h: i32,
-                step_y: i32,
-                step_uv: i32,
-                src_device: ffi::MDDevice,
-            ) -> Result<(Vec<<$name as ResultType>::Item>, Image), MdError> {
-                let (result, frame) =
-                    self.inner.predict_nv12_with_frame(y, uv, w, h, step_y, step_uv, src_device)?;
-                let items = $reader(&result)?;
-                Ok((items, frame))
             }
 
             /// 推理并把结果绘制到图像上（句柄直达 C++ vis_*）

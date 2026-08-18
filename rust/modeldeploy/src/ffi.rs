@@ -307,6 +307,8 @@ extern "C" {
     pub fn md_image_from_rgb24(out: *mut MDImageHandle, rgb: *const c_void, w: c_int, h: c_int) -> MDStatus;
     pub fn md_image_from_nv12(out: *mut MDImageHandle, y: *const c_void, uv: *const c_void,
         w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src: MDDevice) -> MDStatus;
+    pub fn md_image_from_device_nv12(out: *mut MDImageHandle, y: *const c_void, uv: *const c_void,
+        w: c_int, h: c_int, step_y: c_int, step_uv: c_int, dev: MDDevice) -> MDStatus;
     pub fn md_image_from_yuv420p(out: *mut MDImageHandle, data: *const c_void, w: c_int, h: c_int) -> MDStatus;
     pub fn md_image_from_encoded(out: *mut MDImageHandle, bytes: *const c_void, n: usize) -> MDStatus;
     pub fn md_image_from_base64(out: *mut MDImageHandle, b64: *const c_char) -> MDStatus;
@@ -337,9 +339,6 @@ extern "C" {
     pub fn md_model_param_names(kind: MDModelKind, names: *mut *const c_char) -> MDStatus;
     pub fn md_model_param_type(kind: MDModelKind, name: *const c_char, type_out: *mut c_char) -> MDStatus;
     pub fn md_model_predict(h: MDModelHandle, img: MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
-    pub fn md_model_predict_nv12(h: MDModelHandle, y: *const c_void, uv: *const c_void,
-        w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src_device: MDDevice,
-        out_frame: *mut MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
     pub fn md_model_predict_batch(h: MDModelHandle, imgs: *mut MDImageHandle, n: usize, out: *mut MDResultHandle) -> MDStatus;
 
     // ── 音频 ──

@@ -172,11 +172,12 @@ bool InferenceEngine::infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane
     result->type = cfg_.type;
     if (cfg_.type != "detection" || !det_model_) return false;
 
-    modeldeploy::vision::LetterBoxRecord record;
+    // 收敛后的单入口：设备/主机 NV12 帧 → from_device_planes → predict(ImageData)
+    auto frame = ImageData::from_device_planes(
+        const_cast<uint8_t*>(y_plane), const_cast<uint8_t*>(uv_plane),
+        width, height, y_step, uv_step, Device::CPU);
     std::vector<modeldeploy::vision::DetectionResult> det_results;
-    if (!det_model_->predict_nv12(y_plane, uv_plane, width, height,
-                                  y_step, uv_step, &det_results, &record,
-                                  Device::CPU, timers)) {
+    if (!det_model_->predict(frame, &det_results, timers)) {
         return false;
     }
     for (auto& d : det_results) {

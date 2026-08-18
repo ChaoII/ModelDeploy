@@ -64,7 +64,7 @@ namespace ModelDeploy.V2
         }
 
         /// <summary>
-        /// 包装 predict_nv12 输出的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
+        /// 包装 md_image_from_device_nv12 构造的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
         /// 生命周期由本对象管理（Dispose 调用 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
         /// </summary>
         public static VisionImage FromDeviceFrame(IntPtr handle)

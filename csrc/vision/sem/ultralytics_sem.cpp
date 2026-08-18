@@ -112,21 +112,6 @@ namespace modeldeploy::vision::detection {
         return clone_model;
     }
 
-    bool UltralyticsSem::predict_nv12(const uint8_t* src_y, const uint8_t* src_uv,
-                             int width, int height, int step_y, int step_uv,
-                             SemSegResult* result, LetterBoxRecord* letter_box_record,
-                             ImageData* out_frame,
-                             Device src_device, TimerArray* timers) {
-        if (!src_y || !src_uv || !result) return false;
-        ImageData frame = ImageData::from_device_planes(
-            const_cast<uint8_t*>(src_y), const_cast<uint8_t*>(src_uv),
-            width, height, step_y, step_uv, src_device);
-        if (out_frame) {
-            *out_frame = frame;
-        }
-        return predict_single_nv12(frame, result, letter_box_record, timers);
-    }
-
     bool UltralyticsSem::draw_result(ImageData& frame, const SemSegResult& result,
                                      double threshold) {
         (void) result;

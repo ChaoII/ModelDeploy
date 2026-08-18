@@ -32,7 +32,7 @@ impl Image {
         })
     }
 
-    /// 包装 predict_nv12 输出的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
+    /// 包装 md_image_from_device_nv12 / md_model_predict 构造的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
     /// 生命周期归本结构管理（Drop 调 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
     pub fn from_device_frame(handle: ffi::MDImageHandle) -> Result<Self, MdError> {
         Self::from_handle(handle)
@@ -87,6 +87,34 @@ impl Image {
                 step_y,
                 step_uv,
                 ffi::MDDevice::CPU,
+            )
+        })?;
+        Self::from_handle(handle)
+    }
+
+    /// 从设备 NV12 两平面构造自描述 ImageData（零拷贝借用外部 y/uv，库不拥有内存）。
+    /// dev 指明帧所在设备（CPU/GPU/TPU）。返回的 Image 是统一 predict(ImageData) 单入口的输入，
+    /// 也是可从平面指针访问的绑定输入帧。
+    pub fn from_device_nv12(
+        y: &[u8],
+        uv: &[u8],
+        width: i32,
+        height: i32,
+        step_y: i32,
+        step_uv: i32,
+        dev: ffi::MDDevice,
+    ) -> Result<Self, MdError> {
+        let mut handle = std::ptr::null_mut();
+        check_status(unsafe {
+            ffi::md_image_from_device_nv12(
+                &mut handle,
+                y.as_ptr() as *const _,
+                uv.as_ptr() as *const _,
+                width,
+                height,
+                step_y,
+                step_uv,
+                dev,
             )
         })?;
         Self::from_handle(handle)

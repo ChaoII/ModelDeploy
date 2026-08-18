@@ -89,55 +89,6 @@ namespace modeldeploy::vision {
                      self.batch_predict(_images, &results);
                      return results;
                  }, pybind11::arg("images"))
-            .def("predict_nv12",
-                 [](detection::UltralyticsDet& self,
-                    const pybind11::array_t<uint8_t,
-                                           pybind11::array::c_style | pybind11::array::forcecast>& src_y,
-                    const pybind11::array_t<uint8_t,
-                                           pybind11::array::c_style | pybind11::array::forcecast>& src_uv,
-                    int width, int height, int step_y, int step_uv, int src_device) {
-                     if (width <= 0 || height <= 0) {
-                         throw std::invalid_argument(
-                             "predict_nv12: width and height must be positive.");
-                     }
-                     const auto y_buf = src_y.request();
-                     const auto uv_buf = src_uv.request();
-                     const int step_y_eff = step_y > 0 ? step_y : width;
-                     const int step_uv_eff = step_uv > 0 ? step_uv : width;
-                     const auto y_required = static_cast<pybind11::ssize_t>(step_y_eff) * height;
-                     const auto uv_required = static_cast<pybind11::ssize_t>(step_uv_eff) * (height / 2);
-                     if (y_buf.size < y_required) {
-                         throw std::invalid_argument(
-                             "predict_nv12: src_y buffer is too small, need " +
-                             std::to_string(y_required) + " bytes but got " +
-                             std::to_string(y_buf.size) + ".");
-                     }
-                     if (uv_buf.size < uv_required) {
-                         throw std::invalid_argument(
-                             "predict_nv12: src_uv buffer is too small, need " +
-                             std::to_string(uv_required) + " bytes but got " +
-                             std::to_string(uv_buf.size) + ".");
-                     }
-                     const auto* y_ptr = static_cast<const unsigned char*>(y_buf.ptr);
-                     const auto* uv_ptr = static_cast<const unsigned char*>(uv_buf.ptr);
-
-                     // 直调 C++ 原生：NV12 预处理（CPU/CUDA/Sophgo-BMCV）由 processor backend 按 src_device 分发
-                     std::vector<DetectionResult> results;
-                     const Device dev =
-                         src_device == static_cast<int>(Device::GPU) ? Device::GPU
-                         : src_device == static_cast<int>(Device::TPU) ? Device::TPU
-                                                                       : Device::CPU;
-                     if (!self.predict_nv12(y_ptr, uv_ptr, width, height, step_y_eff, step_uv_eff,
-                                            &results, nullptr, nullptr, dev)) {
-                         throw std::runtime_error("predict_nv12: predict_nv12 failed");
-                     }
-                     return results;
-                 },
-                 pybind11::arg("src_y"), pybind11::arg("src_uv"),
-                 pybind11::arg("width"), pybind11::arg("height"),
-                 pybind11::arg("step_y") = 0,
-                 pybind11::arg("step_uv") = 0,
-                 pybind11::arg("src_device") = static_cast<int>(MD_DEV_CPU))
             .def_property_readonly("preprocessor",
                                    &detection::UltralyticsDet::get_preprocessor)
             .def_property_readonly("postprocessor",

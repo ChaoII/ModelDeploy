@@ -67,6 +67,10 @@ string path);
             int w, int h, int step_y, int step_uv, int src);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_from_device_nv12(out IntPtr handle, byte[] y, byte[] uv,
+            int w, int h, int step_y, int step_uv, int dev);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_from_yuv420p(out IntPtr handle, byte[] data, int w, int h);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -145,10 +149,6 @@ string modelPath, IntPtr opt);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_predict(IntPtr handle, IntPtr image, out IntPtr result);
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern MDStatus md_model_predict_nv12(IntPtr handle, byte[] y, byte[] uv,
-            int w, int h, int stepY, int stepUv, int srcDevice, out IntPtr frame, out IntPtr result);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_predict_batch(IntPtr handle, IntPtr[] imgs, UIntPtr n,

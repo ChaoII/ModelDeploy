@@ -87,9 +87,9 @@ TEST_CASE("UltralyticsDet model", "[vision_models]") {
     }
 }
 
-// 同一 NV12 缓冲：predict(ImageData)（NV12 分叉）与 predict_nv12（薄包装）须结果一致
+// 同一 NV12 缓冲：predict(ImageData) 的 NV12 分叉是统一单入口，须能零拷贝预处并产出合理结果
 // [model]：需模型文件，缺文件时跳过（不自红）
-TEST_CASE("UltralyticsDet predict(ImageData NV12) == predict_nv12", "[model]") {
+TEST_CASE("UltralyticsDet predict(ImageData) on NV12 device frame", "[model]") {
     auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
     if (!fs::exists(modelfile)) return;
 
@@ -119,17 +119,14 @@ TEST_CASE("UltralyticsDet predict(ImageData NV12) == predict_nv12", "[model]") {
     REQUIRE(frame.format() == MdImageType::NV12);
     REQUIRE(frame.plane_count() == 2);
 
-    std::vector<DetectionResult> r_predict, r_nv12;
+    std::vector<DetectionResult> r_predict;
     REQUIRE(model.predict(frame, &r_predict, nullptr));
-    REQUIRE(model.predict_nv12(y.data(), uv.data(), w, h, w, w, &r_nv12, nullptr, nullptr,
-                               modeldeploy::Device::CPU, nullptr));
-
-    REQUIRE(r_predict.size() == r_nv12.size());
-    for (size_t i = 0; i < r_predict.size(); ++i) {
-        CHECK(r_predict[i].label_id == r_nv12[i].label_id);
-        CHECK(r_predict[i].score == Catch::Approx(r_nv12[i].score));
-        CHECK(r_predict[i].box.width == Catch::Approx(r_nv12[i].box.width));
-        CHECK(r_predict[i].box.height == Catch::Approx(r_nv12[i].box.height));
+    REQUIRE(r_predict.size() > 0);
+    for (auto& r : r_predict) {
+        REQUIRE(r.box.width > 0);
+        REQUIRE(r.box.height >= 0);
+        REQUIRE(r.label_id >= 0);
+        REQUIRE(r.score > 0);
     }
 }
 

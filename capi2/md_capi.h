@@ -216,21 +216,6 @@ MD_CAPI_EXPORT MDStatus md_model_param_type(MDModelKind kind, const char* name, 
 /* 推理：统一入口（视觉），结果句柄由库分配，调用方用 md_result_destroy 释放 */
 MD_CAPI_EXPORT MDStatus md_model_predict(MDModelHandle, MDImageHandle, MDResultHandle* out);
 
-/*
- * NV12 直接输入推理（硬解码/摄像头直通，省去 BGR 转换；支持的模型：
- * detection/pose/obb/instance_seg/sem_seg/depth）。
- *  - y/uv: NV12 平面指针；src_device 指明其所在内存设备（CPU/GPU/TPU）：
- *      GPU 内存零拷贝直通 CUDA kernel，CPU 内存软件转换（均不进中间 BGR 缓冲）。
- *  - step_y/step_uv: 平面行步长（0 表示 = width）。
- * 结果句柄与 md_model_predict 同构，用 md_result_* 读取。
- */
-MD_CAPI_EXPORT MDStatus md_model_predict_nv12(MDModelHandle,
-                               const void* y, const void* uv,
-                               int w, int h, int step_y, int step_uv,
-                               MDDevice src_device,
-                               MDImageHandle* out_frame,   // 可选：绑定输入 NV12 帧的 ImageData（设备相关，随 predict 填充；可传 NULL）
-                               MDResultHandle* out);
-
 /* 批量推理（多图，仅支持的模型） */
 MD_CAPI_EXPORT MDStatus md_model_predict_batch(MDModelHandle, MDImageHandle* imgs, size_t n,
                                 MDResultHandle* out);
