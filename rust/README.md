@@ -232,7 +232,7 @@ let img = Image::from_nv12(&nv12_buf, w, h)?;      // 从 NV12 转换
 img.width();                                       // 图像宽度
 img.height();                                      // 图像高度
 img.channels();                                    // 通道数
-img.data();                                        // 像素数据切片
+img.plane(0).data;                                  // 第 0 平面像素数据指针
 img.save("out.jpg")?;                              // 保存到文件
 img.clone_image()?;                                // 深拷贝
 ```

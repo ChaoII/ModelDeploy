@@ -21,7 +21,9 @@ namespace {
 
     ImageData create_test_image(int w, int h) {
         ImageData img(w, h, MdImageType::PKG_BGR_U8);
-        uint8_t* data = img.data();
+        cv::Mat m;
+        img.asMat(&m);
+        uint8_t* data = m.data;
         for (int y = 0; y < h; ++y) {
             for (int x = 0; x < w; ++x) {
                 int idx = (y * w + x) * 3;
@@ -282,14 +284,14 @@ TEST_CASE("GPU preprocessing benchmarks", "[benchmark][yolo]") {
     BENCHMARK("yolo_preprocess_bgr_cuda (raw BGR)") {
         Tensor output;
         LetterBoxRecord record;
-        yolo_preprocess_bgr_cuda(img.data(), {img.width(), img.height()},
+        yolo_preprocess_bgr_cuda(img.plane(0).data, {img.width(), img.height()},
                                  &output, {640, 640}, kPadVal, &record, nullptr);
         return output.size();
     };
 
     BENCHMARK("yolo_preprocess_nv12_cuda (raw NV12)") {
         auto nv12 = create_nv12_image(640, 640);
-        const auto* data = nv12.data();
+        const auto* data = nv12.plane(0).data;
         const int w = 640, h = 640;
         Tensor output;
         LetterBoxRecord record;

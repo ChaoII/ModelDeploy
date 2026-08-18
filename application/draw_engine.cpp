@@ -121,6 +121,6 @@ bool DrawEngine::draw_gpu(ImageData& image,
     if (boxes.empty()) return true;
 
     // bgr/boxes 均为 host 指针 → draw_boxes_gpu 内部自动上传、绘制、回拷
-    return draw_boxes_gpu(image.data(), width, height, boxes.data(),
+    return draw_boxes_gpu(image.plane(0).data, width, height, boxes.data(),
                           static_cast<int>(boxes.size()), 0.15f, nullptr);
 }

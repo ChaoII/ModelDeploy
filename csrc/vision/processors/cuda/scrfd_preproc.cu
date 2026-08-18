@@ -205,7 +205,7 @@ namespace modeldeploy::vision {
         LetterBoxRecord* letter_box_record,
         cudaStream_t stream,
         CudaOutputBufferPool* dst_pool) {
-        return scrfd_preprocess_bgr_cuda(image.data(),
+        return scrfd_preprocess_bgr_cuda(image.plane(0).data,
                                          {image.width(), image.height()},
                                          output,
                                          dst_size,
@@ -404,7 +404,7 @@ namespace modeldeploy::vision {
             scrfd_ws0.capacity = total_src_bytes;
         }
         for (int i = 0; i < batch; ++i) {
-            cudaMemcpyAsync(scrfd_ws0.d_src + src_offsets[i], images[i].data(),
+            cudaMemcpyAsync(scrfd_ws0.d_src + src_offsets[i], images[i].plane(0).data,
                             static_cast<size_t>(src_hs[i]) * src_ws[i] * 3,
                             cudaMemcpyHostToDevice, stream);
         }

@@ -143,16 +143,6 @@ namespace modeldeploy::vision {
             return true;
         }
 
-        const uint8_t* data() const {
-            if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat.empty() ? nullptr : cs->mat.data;
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) return ps->planes.empty() ? nullptr : ps->planes[0].data;
-            return nullptr;
-        }
-        uint8_t* data() {
-            if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat.empty() ? nullptr : cs->mat.data;
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) return ps->planes.empty() ? nullptr : const_cast<uint8_t*>(ps->planes[0].data);
-            return nullptr;
-        }
     };
 
     ImageData::ImageData(const int width, const int height, const MdImageType type)
@@ -240,8 +230,6 @@ namespace modeldeploy::vision {
     size_t ImageData::element_count() const { return impl_ ? impl_->element_count_ : 0; }
     size_t ImageData::element_bytes() const { return impl_ ? impl_->element_bytes_ : 0; }
     size_t ImageData::bytes() const { return impl_ ? impl_->bytes_ : 0; }
-    const uint8_t* ImageData::data() const { return impl_ ? impl_->data() : nullptr; }
-    uint8_t* ImageData::data() { return impl_ ? impl_->data() : nullptr; }
 
     Device ImageData::device() const { return impl_ ? (impl_->storage ? impl_->storage->device : Device::CPU) : Device::CPU; }
     size_t ImageData::plane_count() const { return impl_ ? impl_->planes().size() : 0; }
@@ -607,7 +595,7 @@ namespace modeldeploy::vision {
         tensor->allocate(shape, dtype);
         uint8_t* base = static_cast<uint8_t*>(tensor->data());
         for (size_t i = 0; i < images.size(); ++i) {
-            const uint8_t* src = images[i].data();
+            const uint8_t* src = images[i].plane(0).data;
             if (src) {
                 std::memcpy(base + i * bytes, src, bytes);
             }
@@ -635,13 +623,13 @@ namespace modeldeploy::vision {
                     << ", size of Mat = " << num_bytes << "." << std::endl;
                 return;
             }
-            if (data() && tensor->data()) {
-                memcpy(tensor->data(), data(), num_bytes);
+            if (plane(0).data && tensor->data()) {
+                memcpy(tensor->data(), plane(0).data, num_bytes);
             }
         }
         else {
             // 零拷贝：共享外部内存，不复制
-            tensor->from_external_memory(data(), shape, dtype);
+            tensor->from_external_memory(const_cast<uint8_t*>(plane(0).data), shape, dtype);
         }
     }
 

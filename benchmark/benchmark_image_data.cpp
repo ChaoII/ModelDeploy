@@ -19,7 +19,9 @@ constexpr int YOLO_LARGE_W = 1280, YOLO_LARGE_H = 1280;
 
 static ImageData create_test_image(int w, int h, MdImageType type = MdImageType::PKG_BGR_U8) {
     ImageData img(w, h, type);
-    uint8_t* data = img.data();
+    cv::Mat m;
+    img.asMat(&m);
+    uint8_t* data = m.data;
     for (int i = 0; i < h * w * 3; ++i) {
         data[i] = static_cast<uint8_t>((i * 7 + 13) % 256);
     }

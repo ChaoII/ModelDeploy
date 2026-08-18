@@ -297,7 +297,7 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
     };
     if (cudaMalloc(&d_src, total) != cudaSuccess) return fail();
     for (int b = 0; b < batch; ++b) {
-        if (cudaMemcpyAsync(d_src + offsets[b], images[b].data(),
+        if (cudaMemcpyAsync(d_src + offsets[b], images[b].plane(0).data,
                             static_cast<size_t>(hs[b]) * ws[b] * 3,
                             cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
     }
@@ -447,7 +447,7 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
     };
     if (cudaMalloc(&d_src, total) != cudaSuccess) return fail();
     for (int b = 0; b < batch; ++b) {
-        if (cudaMemcpyAsync(d_src + offsets[b], images[b].data(),
+        if (cudaMemcpyAsync(d_src + offsets[b], images[b].plane(0).data,
                             static_cast<size_t>(hs[b]) * ws[b] * 3,
                             cudaMemcpyHostToDevice, stream) != cudaSuccess) return fail();
     }

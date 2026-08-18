@@ -39,8 +39,8 @@ void print_imagedata_pixels(const modeldeploy::vision::ImageData& img, const int
         for (int c = 0; c < max_c; c++) {
             std::cout << "(";
             for (int ch = 0; ch < img.channels(); ch++) {
-                // 获取像素值，假设 img.data() 是一个指向图像数据的指针
-                const uint8_t val = img.data()[r * img.width() * img.channels() + c * img.channels() + ch];
+                // 获取像素值，假设 img.plane(0).data 是一个指向图像数据的指针
+                const uint8_t val = img.plane(0).data[r * img.width() * img.channels() + c * img.channels() + ch];
                 std::cout << static_cast<int>(val) << "/" << std::hex << static_cast<int>(val) << std::dec;
                 if (ch != img.channels() - 1) std::cout << ",";
             }

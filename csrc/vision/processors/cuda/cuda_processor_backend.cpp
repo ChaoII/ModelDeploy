@@ -74,7 +74,7 @@ namespace modeldeploy::vision {
         const std::vector<float>& alpha,
         const std::vector<float>& beta,
         bool swap_rb, float pad_value) {
-        return fused_preprocess_cuda(image.data(), {image.width(), image.height()},
+        return fused_preprocess_cuda(image.plane(0).data, {image.width(), image.height()},
                                      out, dst_size,
                                      origin_x, origin_y, scale_x, scale_y,
                                      alpha, beta, swap_rb, pad_value,

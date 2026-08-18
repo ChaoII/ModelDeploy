@@ -116,7 +116,7 @@ namespace modeldeploy::vision {
 
                 if (void* dev_mem = ensure_input_mem(dst_w, dst_h)) {
                     const int st = md_bmcv_letterbox_normalize_to_devmem(
-                        handle_, image.data(), src_w, src_h, dev_mem,
+                        handle_, image.plane(0).data, src_w, src_h, dev_mem, /* data migration (TPU CI verify) */
                         dst_w, dst_h, pad_w, pad_h, resize_w, resize_h,
                         alpha[0], alpha[1], alpha[2], p, swap_rb ? 1 : 0);
                     if (st == 0 && finish_tpu_tensor(out, dst_w, dst_h)) {
@@ -217,7 +217,7 @@ namespace modeldeploy::vision {
                 pad_raw = std::max(0, std::min(pad_raw, 255));
                 const unsigned char p = static_cast<unsigned char>(pad_raw);
                 const int st = md_bmcv_letterbox_normalize_to_devmem(
-                    handle_, image.data(), src_w, src_h, &work,
+                    handle_, image.plane(0).data, src_w, src_h, &work, /* data migration (TPU CI verify) */
                     dst_w, dst_h, pad_w, pad_h, resize_w, resize_h,
                     alpha[0], alpha[1], alpha[2], p, /*swap_rb*/1);
                 if (st != 0) {

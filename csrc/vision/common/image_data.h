@@ -49,8 +49,6 @@ namespace modeldeploy::vision {
         [[nodiscard]] size_t element_count() const;
         [[nodiscard]] size_t element_bytes() const;
         [[nodiscard]] size_t bytes() const;
-        [[nodiscard]] const uint8_t* data() const;
-        [[nodiscard]] uint8_t* data();
         [[nodiscard]] bool empty() const;
 
         [[nodiscard]] Device device() const;

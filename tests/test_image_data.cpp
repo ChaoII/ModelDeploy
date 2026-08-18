@@ -15,7 +15,9 @@ using namespace modeldeploy::vision;
 static ImageData create_solid_image(int w, int h, uint8_t b, uint8_t g, uint8_t r,
                                     MdImageType type = MdImageType::PKG_BGR_U8) {
     ImageData img(w, h, type);
-    auto* data = img.data();
+    cv::Mat m;
+    if (!img.asMat(&m)) return img;
+    auto* data = m.data;
     if (!data) return img;
     int ch = img.channels();
     for (int y = 0; y < h; ++y) {
@@ -32,7 +34,9 @@ static ImageData create_solid_image(int w, int h, uint8_t b, uint8_t g, uint8_t 
 
 static ImageData create_gradient_image(int w, int h) {
     ImageData img(w, h, MdImageType::PKG_BGR_U8);
-    auto* data = img.data();
+    cv::Mat m;
+    img.asMat(&m);
+    auto* data = m.data;
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
             int idx = (y * w + x) * 3;
@@ -50,7 +54,7 @@ TEST_CASE("ImageData construction", "[image_data]") {
         REQUIRE(img.empty());
         REQUIRE(img.width() == 0);
         REQUIRE(img.height() == 0);
-        REQUIRE(img.data() == nullptr);
+        REQUIRE(img.plane(0).data == nullptr);
     }
 
     SECTION("from dimensions") {
@@ -60,7 +64,7 @@ TEST_CASE("ImageData construction", "[image_data]") {
         REQUIRE(img.height() == 480);
         REQUIRE(img.channels() == 3);
         REQUIRE(img.type() == MdImageType::PKG_BGR_U8);
-        REQUIRE(img.data() != nullptr);
+        REQUIRE(img.plane(0).data != nullptr);
         REQUIRE(img.bytes() == 640 * 480 * 3);
     }
 
@@ -105,14 +109,16 @@ TEST_CASE("ImageData accessors", "[image_data]") {
     }
 
     SECTION("data pointer modification") {
-        REQUIRE(img.data() != nullptr);
-        img.data()[0] = 99;
-        REQUIRE(img.data()[0] == 99);
+        cv::Mat m;
+        REQUIRE(img.asMat(&m));
+        REQUIRE(m.data != nullptr);
+        m.data[0] = 99;
+        REQUIRE(img.plane(0).data[0] == 99);
     }
 
     SECTION("const data") {
         const ImageData& const_img = img;
-        REQUIRE(const_img.data() != nullptr);
+        REQUIRE(const_img.plane(0).data != nullptr);
     }
 
     SECTION("empty check") {
@@ -128,8 +134,10 @@ TEST_CASE("ImageData clone and sharing", "[image_data]") {
         auto cloned = img.clone();
         REQUIRE(cloned.width() == img.width());
         REQUIRE(cloned.height() == img.height());
-        cloned.data()[0] = 0;
-        REQUIRE(img.data()[0] == 100);
+        cv::Mat cm;
+        REQUIRE(cloned.asMat(&cm));
+        cm.data[0] = 0;
+        REQUIRE(img.plane(0).data[0] == 100);
     }
 }
 
@@ -141,7 +149,7 @@ TEST_CASE("ImageData from_raw", "[image_data]") {
         REQUIRE(img.width() == 100);
         REQUIRE(img.height() == 100);
         REQUIRE(img.channels() == 3);
-        REQUIRE(img.data()[0] == 128);
+        REQUIRE(img.plane(0).data[0] == 128);
     }
 
     SECTION("BGR zero-copy") {
@@ -172,9 +180,9 @@ TEST_CASE("ImageData color conversion", "[image_data]") {
         auto img = create_solid_image(10, 10, 255, 0, 0);
         auto converted = ImageData::cvt_color(img, ColorConvertType::CVT_PA_BGR2PA_RGB);
         REQUIRE_FALSE(converted.empty());
-        REQUIRE(converted.data()[0] == 0);
-        REQUIRE(converted.data()[1] == 0);
-        REQUIRE(converted.data()[2] == 255);
+        REQUIRE(converted.plane(0).data[0] == 0);
+        REQUIRE(converted.plane(0).data[1] == 0);
+        REQUIRE(converted.plane(0).data[2] == 255);
     }
 
     SECTION("BGR to GRAY") {
@@ -310,9 +318,9 @@ TEST_CASE("ImageData 1x1 image edge case", "[image_data]") {
         auto img = create_solid_image(1, 1, 255, 128, 64);
         REQUIRE(img.width() == 1);
         REQUIRE(img.height() == 1);
-        REQUIRE(img.data()[0] == 255);
-        REQUIRE(img.data()[1] == 128);
-        REQUIRE(img.data()[2] == 64);
+        REQUIRE(img.plane(0).data[0] == 255);
+        REQUIRE(img.plane(0).data[1] == 128);
+        REQUIRE(img.plane(0).data[2] == 64);
     }
 
     SECTION("resize 1x1") {

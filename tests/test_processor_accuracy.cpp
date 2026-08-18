@@ -99,7 +99,7 @@ TEST_CASE("Processor accuracy: fused_preprocess scalar vs SIMD", "[processor_acc
 
     // 标量参考
     std::vector<float> ref(3 * 224 * 224);
-    fused_ref(img.data(), src_w, src_h, ref.data(), 224, 224,
+    fused_ref(img.plane(0).data, src_w, src_h, ref.data(), 224, 224,
               0.0f, 0.0f, static_cast<float>(dst[0]) / src_w, static_cast<float>(dst[1]) / src_h,
               alpha, beta, true, 0.0f);
 
@@ -107,7 +107,7 @@ TEST_CASE("Processor accuracy: fused_preprocess scalar vs SIMD", "[processor_acc
     Tensor simd_t;
     simd_t.allocate({3, 224, 224}, DataType::FP32, Device::CPU);
     const auto kernel = get_fused_preproc_kernel();
-    kernel(img.data(), src_w, src_h, static_cast<float*>(simd_t.data()), 224, 224,
+    kernel(img.plane(0).data, src_w, src_h, static_cast<float*>(simd_t.data()), 224, 224,
            0.0f, 0.0f, static_cast<float>(dst[0]) / src_w, static_cast<float>(dst[1]) / src_h,
            alpha, beta, true, 0.0f);
     size_t nd = 0;
@@ -127,7 +127,7 @@ TEST_CASE("Processor accuracy: fused_preprocess CPU vs CUDA", "[processor_accura
     const float sx = static_cast<float>(dst[0]) / src_w, sy = static_cast<float>(dst[1]) / src_h;
 
     std::vector<float> ref(3 * 224 * 224);
-    fused_ref(img.data(), src_w, src_h, ref.data(), 224, 224, ox, oy, sx, sy, alpha, beta, true, 0.0f);
+    fused_ref(img.plane(0).data, src_w, src_h, ref.data(), 224, 224, ox, oy, sx, sy, alpha, beta, true, 0.0f);
 
     // CUDA backend
     auto backend = create_processor_backend(Device::GPU, Backend::ORT, 0);

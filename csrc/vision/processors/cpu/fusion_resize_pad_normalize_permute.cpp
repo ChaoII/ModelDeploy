@@ -42,7 +42,7 @@ namespace modeldeploy::vision {
         // 运行时 dispatch：标量/AVX2/AVX512/NEON/SVE，每图独立 resize 尺寸
         const auto kernel = get_fusion_rpnp_kernel();
         for (int i = 0; i < batch_size; ++i) {
-            kernel(images[i].data(), images[i].width(), images[i].height(),
+            kernel(images[i].plane(0).data, images[i].width(), images[i].height(),
                    dst + static_cast<size_t>(i) * 3 * dst_h * dst_w,
                    dst_w, dst_h, resize_sizes[i][0], resize_sizes[i][1],
                    alpha, beta, pad);

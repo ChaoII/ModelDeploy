@@ -148,7 +148,9 @@ namespace modeldeploy::vision {
                                           int width, int height, ImageData* out) {
         *out = ImageData(width, height, MdImageType::PKG_BGR_U8);
         if (out->empty()) return false;
-        return nv12_to_bgr_cpu(y, uv, width, height, width, width, out->data());
+        cv::Mat m;
+        if (!out->asMat(&m)) return false;
+        return nv12_to_bgr_cpu(y, uv, width, height, width, width, m.data);
     }
 
     bool CpuProcessorBackend::yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
@@ -192,7 +194,7 @@ namespace modeldeploy::vision {
         float* dst = out->data_ptr<float>();
         const auto kernel = get_fused_preproc_kernel();
         for (int b = 0; b < batch; ++b) {
-            kernel(images[b].data(), images[b].width(), images[b].height(),
+            kernel(images[b].plane(0).data, images[b].width(), images[b].height(),
                    dst + static_cast<size_t>(b) * plane, dst_w, dst_h,
                    origins_x[b], origins_y[b], scales_x[b], scales_y[b],
                    alpha.data(), beta.data(), swap_rb, pad_value);
@@ -213,7 +215,7 @@ namespace modeldeploy::vision {
         const int src_h = image.height();
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
-        const uint8_t* src = image.data();
+        const uint8_t* src = image.plane(0).data;
 
         // 直接 allocate 带 batch 维的 shape，避免 expand_dim 导致 shape 与下一帧不匹配而每帧重分配
         out->allocate({1, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
@@ -240,7 +242,7 @@ namespace modeldeploy::vision {
         const int src_h = image.height();
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
-        const uint8_t* src = image.data();
+        const uint8_t* src = image.plane(0).data;
 
         out->allocate({1, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
         float* dst = out->data_ptr<float>();
@@ -264,7 +266,7 @@ namespace modeldeploy::vision {
         const int src_h = image.height();
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
-        const uint8_t* src = image.data();
+        const uint8_t* src = image.plane(0).data;
 
         out->allocate({1, 3, dst_h, dst_w}, DataType::FP32, Device::CPU);
         float* dst = out->data_ptr<float>();

@@ -41,7 +41,7 @@ TEST_CASE("DrawEngine draw with detection results", "[draw]") {
     REQUIRE_NOTHROW(de.draw(img, results));
 
     // 确认像素被修改了
-    auto* data = img.data();
+    auto* data = img.plane(0).data;
     bool has_nonzero = false;
     size_t total = static_cast<size_t>(200) * 200 * 3;
     for (size_t i = 0; i < total; ++i) {
@@ -87,7 +87,9 @@ TEST_CASE("DrawEngine::draw_gpu on device BGR", "[draw_engine][gpu]") {
     DrawConfig cfg;
     DrawEngine de(cfg);
     ImageData img(200, 200, MdImageType::PKG_BGR_U8);
-    std::memset(img.data(), 0, img.bytes());   // 确定性黑底
+    cv::Mat m;
+    REQUIRE(img.asMat(&m));
+    std::memset(m.data, 0, img.bytes());   // 确定性黑底
 
     InferResult r;
     r.model_name = "det";
@@ -103,7 +105,7 @@ TEST_CASE("DrawEngine::draw_gpu on device BGR", "[draw_engine][gpu]") {
     REQUIRE(de.draw_gpu(img, results));
 
     // 边框像素应为纯 box 色
-    auto* data = img.data();
+    auto* data = img.plane(0).data;
     const int bpx = (10 * 200 + 10) * 3;
     REQUIRE(data[bpx + 0] == 0);
     REQUIRE(data[bpx + 1] == 255);

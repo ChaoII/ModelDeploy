@@ -210,7 +210,7 @@ namespace modeldeploy::vision {
         LetterBoxRecord* letter_box_record,
         cudaStream_t stream,
         CudaOutputBufferPool* dst_pool) {
-        return yolo_preprocess_bgr_cuda(image.data(),
+        return yolo_preprocess_bgr_cuda(image.plane(0).data,
                                         {image.width(), image.height()},
                                         output,
                                         dst_size,
@@ -471,14 +471,14 @@ namespace modeldeploy::vision {
         // 跳过 H2D 上传，kernel 直接用设备指针（消除双重 PCIe 往返）。
         // 要求各帧设备缓冲连续（src_offsets 线性索引），由调用方保证（见 batch_scheduler）。
         bool all_device = true;
-        if (images[0].data()) {
+        if (images[0].plane(0).data) {
             cudaPointerAttributes attr{};
-            all_device = cudaPointerGetAttributes(&attr, images[0].data()) == cudaSuccess &&
+            all_device = cudaPointerGetAttributes(&attr, images[0].plane(0).data) == cudaSuccess &&
                          attr.type == cudaMemoryTypeDevice;
         }
         const uint8_t* d_src = nullptr;
         if (all_device) {
-            d_src = images[0].data();
+            d_src = images[0].plane(0).data;
         } else {
             if (ws0.capacity < total_src_bytes) {
                 if (ws0.d_src) cudaFree(ws0.d_src);
@@ -488,7 +488,7 @@ namespace modeldeploy::vision {
             uint8_t* dst_ptr = ws0.d_src;
             for (int i = 0; i < batch; ++i) {
                 const size_t bytes = static_cast<size_t>(images[i].height()) * images[i].width() * 3;
-                cudaMemcpyAsync(dst_ptr, images[i].data(), bytes, cudaMemcpyHostToDevice, stream);
+                cudaMemcpyAsync(dst_ptr, images[i].plane(0).data, bytes, cudaMemcpyHostToDevice, stream);
                 dst_ptr += bytes;
             }
             d_src = ws0.d_src;

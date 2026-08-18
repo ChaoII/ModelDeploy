@@ -223,13 +223,13 @@ namespace modeldeploy::vision::utils {
                     << ", size of Mat = " << num_bytes << "." << std::endl;
                 return false;
             }
-            memcpy(tensor->data(), image.data(), num_bytes);
+            memcpy(tensor->data(), image.plane(0).data, num_bytes);
         }
         else {
             // OpenCV Mat 的内存管理由 Mat 自己处理，这里不需要额外操作
             // 注意tensor共享外部内存，所以需要从外部内存中创建tensor，内存由Mat提供，所以deleter可以不给，不需要进行手动释放
             // 确保mat在tensor生命周期结束前有效
-            tensor->from_external_memory(image.data(), {image.channels(), image.height(), image.width()}, dtype);
+            tensor->from_external_memory(const_cast<uint8_t*>(image.plane(0).data), {image.channels(), image.height(), image.width()}, dtype);
         }
         return true;
     }
