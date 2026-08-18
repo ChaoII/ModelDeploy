@@ -1,8 +1,15 @@
 #include "draw_engine.hpp"
 #include "csrc/vision/common/visualize/visualize.h"
-#include "csrc/vision/processors/cuda/draw_gpu.cuh"
+#include "csrc/vision/processors/processor_factory.h"
+#ifdef WITH_GPU
+#include "csrc/vision/processors/cuda/cuda_processor_backend.h"
+#endif
+#ifdef ENABLE_SOPHGO
+#include "csrc/vision/processors/sophgo/sophgo_processor_backend.h"
+#endif
 #include <iostream>
 #include <cstdio>
+#include <algorithm>
 
 using namespace modeldeploy::vision;
 
@@ -44,7 +51,6 @@ void DrawEngine::draw_face(ImageData& image, const InferResult& result) {
         kp.box = {b.x, b.y, b.w, b.h};
         kp.score = b.score;
         kp.label_id = b.label_id;
-        kp.type = ResultType::FACE_DETECTION;
         if (i < result.keypoints.size()) {
             for (const auto& p : result.keypoints[i]) {
                 kp.keypoints.emplace_back(p.x, p.y, 0.0f);
@@ -93,37 +99,49 @@ bool DrawEngine::draw_gpu(ImageData& image,
                           const std::vector<InferResult>& results,
                           bool show_label, bool show_score) {
     if (image.empty()) return true;
-    const int width = image.width();
-    const int height = image.height();
+    // 统一设备/CPU NV12 就地绘制（零拷贝，不 D2H/H2D）：
+    // 按 frame.device() 分派到对应 processor backend 的 draw_*_nv12，直接写设备 y/uv 平面。
+    // 仅对 NV12 帧可用（CPU packed / 非 NV12 无 NV12 内核）→ 返回 false，由调用方回退 CPU 绘制。
+    if (image.type() != MdImageType::NV12 || image.plane_count() < 2) return false;
 
-    for (const auto& r : results) {
-        // face_detection 关键点尚无 GPU 绘制实现：任一此类结果回退 CPU 路径（vis_keypoints）
-        if (r.type == "face_detection") return false;
+    const auto device = image.device();
+    auto backend = create_processor_backend(
+        device, device == modeldeploy::Device::TPU ? modeldeploy::Backend::SOPHGO
+                                                   : modeldeploy::Backend::ORT, 0);
+    if (!backend) return false;
+
+    // 设备帧必须确认真实设备后端，杜绝工厂回退 CPU 后在设备内存上跑 CPU 内核（越界/UB）。
+    if (device != modeldeploy::Device::CPU) {
+        bool device_ready = false;
+#ifdef WITH_GPU
+        if (device == modeldeploy::Device::GPU &&
+            dynamic_cast<CudaProcessorBackend*>(backend.get()) != nullptr) device_ready = true;
+#endif
+#ifdef ENABLE_SOPHGO
+        if (device == modeldeploy::Device::TPU &&
+            dynamic_cast<SophgoProcessorBackend*>(backend.get()) != nullptr) device_ready = true;
+#endif
+        if (!device_ready) return false;
     }
 
-    std::vector<GpuDrawBox> boxes;
+    bool any = false;
+    uint8_t rgb[3];
+    const float threshold = show_score ? 0.0f : 0.5f;   // 与 draw_detection 阈值一致
     for (const auto& r : results) {
-        if (r.type != "detection") continue;
-        for (const auto& b : r.boxes) {
-            GpuDrawBox gb{};
-            gb.x1 = static_cast<int>(b.x);
-            gb.y1 = static_cast<int>(b.y);
-            gb.x2 = static_cast<int>(b.x + b.w);
-            gb.y2 = static_cast<int>(b.y + b.h);
-            gb.score = b.score;
-            gb.label_id = b.label_id;
-            color_for_label(b.label_id, &gb.r);   // 按 r,g,b 字段顺序写入
-            const std::string label = format_label(b, show_label, show_score);
-            std::snprintf(gb.label, sizeof(gb.label), "%s", label.c_str());
-            boxes.push_back(gb);
+        if (r.type == "detection") {
+            for (const auto& b : r.boxes) {
+                if (b.score < threshold) continue;
+                color_for_label(b.label_id, rgb);
+                backend->draw_rect_nv12(image, b.x, b.y, b.w, b.h,
+                                        rgb[0], rgb[1], rgb[2], 2);
+                if (show_label) {
+                    const std::string label = format_label(b, show_label, show_score);
+                    backend->draw_text_nv12(image, b.x, std::max(0.0f, b.y - 16), label,
+                                            255, 255, 255, 1);
+                }
+                any = true;
+            }
         }
     }
-    if (boxes.empty()) return true;
-
-    // bgr/boxes 均为 host 指针 → draw_boxes_gpu 内部自动上传、绘制、回拷
-    // draw_boxes_gpu 会回拷写回该缓冲，必须是可变借用（CPU 平面借用 m.data）
-    cv::Mat m;
-    if (!image.asMat(&m)) return false;
-    return draw_boxes_gpu(m.data, width, height, boxes.data(),
-                          static_cast<int>(boxes.size()), 0.15f, nullptr);
+    return any || results.empty();
 }

@@ -18,7 +18,9 @@ public:
     void draw(modeldeploy::vision::ImageData& image,
               const std::vector<InferResult>& results);
 
-    /// GPU 绘制：CUDA 不可用时返回 false（调用方回退 CPU draw）
+    /// 统一设备/CPU NV12 就地绘制（按 frame.device() 分派到 CUDA/TPU/CPU backend 的
+    /// draw_*_nv12，零拷贝写设备 y/uv 平面）。仅对 NV12 帧可用；非 NV12（如 packed BGR）
+    /// 返回 false，由调用方回退 CPU draw()。
     bool draw_gpu(modeldeploy::vision::ImageData& image,
                   const std::vector<InferResult>& results,
                   bool show_label = true, bool show_score = true);

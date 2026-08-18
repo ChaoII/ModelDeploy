@@ -4,7 +4,6 @@
 #include <memory>
 #include <map>
 
-#include "capi/common/md_types.h"
 #include "csrc/vision/detection/ultralytics_det.h"
 #include "csrc/vision/classification/classification.h"
 #include "csrc/vision/face/face_det/scrfd.h"

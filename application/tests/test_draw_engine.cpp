@@ -50,6 +50,38 @@ TEST_CASE("DrawEngine draw with detection results", "[draw]") {
     REQUIRE(has_nonzero);
 }
 
+TEST_CASE("DrawEngine::draw_gpu CPU NV12", "[draw_engine]") {
+    const int W = 200, H = 200;
+    std::vector<uint8_t> y(W * H, 128), uv(W * H / 2, 128);
+    ImageData::Plane pl[2] = {{y.data(), static_cast<size_t>(W)},
+                              {uv.data(), static_cast<size_t>(W)}};
+    auto img = ImageData::from_planes(pl, 2, MdImageType::NV12, W, H,
+                                      modeldeploy::Device::CPU, {});
+    REQUIRE(img.plane_count() == 2);
+
+    DrawConfig cfg;
+    cfg.show_label = false;
+    DrawEngine de(cfg);
+    InferResult r;
+    r.model_name = "det";
+    r.type = "detection";
+    DetectionBox b;
+    b.x = 10; b.y = 10; b.w = 50; b.h = 50;
+    b.score = 0.95f;
+    b.label_id = 1;
+    b.label_name = "person";
+    r.boxes.push_back(b);
+    std::vector<InferResult> results = {r};
+
+    REQUIRE(de.draw_gpu(img, results, false, false));
+    // 统一 NV12 绘制：Y 平面顶边框被绘制（不再是纯 128）
+    const int bpx = 10 * W + 10;
+    REQUIRE(y[static_cast<size_t>(bpx)] != 128);
+    // packed 帧无 NV12 内核 → draw_gpu 应拒绝并回退（返回 false）
+    ImageData pkg(100, 100, MdImageType::PKG_BGR_U8);
+    REQUIRE_FALSE(de.draw_gpu(pkg, results, false, false));
+}
+
 #ifdef WITH_GPU
 TEST_CASE("draw_boxes_gpu modifies interior pixels", "[draw_engine][gpu]") {
     constexpr int W = 640, H = 640;
@@ -83,35 +115,52 @@ TEST_CASE("draw_boxes_gpu modifies interior pixels", "[draw_engine][gpu]") {
     cudaFree(d_box);
 }
 
-TEST_CASE("DrawEngine::draw_gpu on device BGR", "[draw_engine][gpu]") {
-    DrawConfig cfg;
-    DrawEngine de(cfg);
-    ImageData img(200, 200, MdImageType::PKG_BGR_U8);
-    cv::Mat m;
-    REQUIRE(img.asMat(&m));
-    std::memset(m.data, 0, img.bytes());   // 确定性黑底
+TEST_CASE("DrawEngine::draw_gpu device NV12 zero-copy", "[draw_engine][gpu]") {
+    const int w = 200, h = 200;
+    const size_t ybytes = static_cast<size_t>(w) * h;
+    const size_t uvbytes = static_cast<size_t>(w) * (h / 2);
+    uint8_t* y = nullptr;
+    uint8_t* uv = nullptr;
+    REQUIRE(cudaMalloc(&y, ybytes) == cudaSuccess);
+    REQUIRE(cudaMalloc(&uv, uvbytes) == cudaSuccess);
+    REQUIRE(cudaMemset(y, 128, ybytes) == cudaSuccess);
+    REQUIRE(cudaMemset(uv, 128, uvbytes) == cudaSuccess);
 
+    // 包装为 Device::GPU NV12 帧：plane 指针即设备内存，零拷贝
+    ImageData::Plane pl[2] = {{y, w}, {uv, w}};
+    auto img = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h,
+                                      modeldeploy::Device::GPU, {});
+    REQUIRE(img.plane_count() == 2);
+    REQUIRE(img.device() == modeldeploy::Device::GPU);
+
+    DrawConfig cfg;
+    cfg.show_label = false;
+    DrawEngine de(cfg);
     InferResult r;
     r.model_name = "det";
     r.type = "detection";
-    DetectionBox box;
-    box.x = 10; box.y = 10; box.w = 50; box.h = 50;
-    box.score = 0.95f;
-    box.label_id = 1;   // 调色板绿色 (BGR 0,255,0)
-    box.label_name = "person";
-    r.boxes.push_back(box);
-
+    DetectionBox b;
+    b.x = 20; b.y = 20; b.w = 60; b.h = 60;
+    b.score = 0.95f;
+    b.label_id = 1;
+    b.label_name = "person";
+    r.boxes.push_back(b);
     std::vector<InferResult> results = {r};
-    REQUIRE(de.draw_gpu(img, results));
 
-    // 边框像素应为纯 box 色
-    auto* data = img.plane(0).data;
-    const int bpx = (10 * 200 + 10) * 3;
-    REQUIRE(data[bpx + 0] == 0);
-    REQUIRE(data[bpx + 1] == 255);
-    REQUIRE(data[bpx + 2] == 0);
-    // 内部像素应被混合（绿色 α=0.15 叠加黑底 → G≈38）
-    const int ipx = (30 * 200 + 30) * 3;
-    REQUIRE(data[ipx + 1] >= 30);
+    REQUIRE(de.draw_gpu(img, results, false, false));
+
+    // 读回并确认 Y 平面边框像素被绘制（不再是纯 128）
+    std::vector<uint8_t> hy(ybytes);
+    REQUIRE(cudaMemcpy(hy.data(), y, ybytes, cudaMemcpyDeviceToHost) == cudaSuccess);
+    const int bpx = 20 * w + 20;
+    REQUIRE(hy[bpx] != 128);
+    // 框外仍保持 128：仅在框区域绘制
+    REQUIRE(hy[0] == 128);
+    // 帧仍是设备 NV12，plane 指针不变：绘制全程留在设备端，无 H2D/D2H
+    REQUIRE(img.device() == modeldeploy::Device::GPU);
+    REQUIRE(img.plane(0).data == y);
+    REQUIRE(img.plane(1).data == uv);
+    cudaFree(y);
+    cudaFree(uv);
 }
 #endif
