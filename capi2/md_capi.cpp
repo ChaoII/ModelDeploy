@@ -345,10 +345,29 @@ static MDStatus image_from_image(MDImageHandle* out, ImageData&& img) {
 MDStatus md_image_from_rgb24(MDImageHandle* out, const void* rgb, int w, int h) {
     if (!out || !rgb) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_rgb24: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
-    cv::Mat src(h, w, CV_8UC3, const_cast<void*>(rgb));
-    cv::Mat bgr;
-    cv::cvtColor(src, bgr, cv::COLOR_RGB2BGR);
-    return image_from_mat(out, std::move(bgr));
+    // 借调用方 RGB（零拷贝）→ cvt_color 产出自有 BGR 缓冲（不手造 cv::Mat）
+    ImageData src = ImageData::from_raw(static_cast<unsigned char*>(const_cast<void*>(rgb)),
+                                        w, h, MdImageType::PKG_RGB_U8, /*copy=*/false);
+    if (src.empty()) {
+        set_error("md_image_from_rgb24: invalid RGB buffer");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    ImageData bgr = ImageData::cvt_color(src, ColorConvertType::CVT_PA_RGB2PA_BGR);
+    if (bgr.empty()) {
+        const char* le = ImageData::last_error();
+        set_error_fmt("md_image_from_rgb24: convert failed (%s)", (le && *le) ? le : "unknown");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    // from_raw(copy=false) 借用的调用方指针仅用于转 BGR；cvt_color 返回到自有缓冲，
+    // 由 move 进句柄的 ImageData（impl 内 owner shared_ptr）持有 → 无悬垂。
+    auto* hi = new md_image_handle();
+    hi->width = w;
+    hi->height = h;
+    hi->data = const_cast<uint8_t*>(bgr.plane(0).data);  // 指向将被 image 拥有的缓冲
+    hi->owns_data = false;
+    hi->image = std::move(bgr);   // 句柄持有自有 BGR 缓冲
+    *out = hi;
+    return MD_OK;
 }
 
 MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
@@ -451,13 +470,14 @@ MDStatus md_image_from_base64(MDImageHandle* out, const char* b64) {
 MDStatus md_image_clone(MDImageHandle in, MDImageHandle* out) {
     if (!in || !out) return MD_ERR_NULL_POINTER;
     const auto* hi = static_cast<md_image_handle*>(in);
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_clone: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_image_clone: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     auto* nh = new md_image_handle();
-    nh->width = hi->width;
-    nh->height = hi->height;
-    const size_t bytes = static_cast<size_t>(hi->width) * hi->height * 3;
+    nh->width = mat.cols;
+    nh->height = mat.rows;
+    const size_t bytes = static_cast<size_t>(mat.total()) * static_cast<size_t>(mat.elemSize());
     nh->data = new unsigned char[bytes];
-    std::memcpy(nh->data, hi->data, bytes);
+    std::memcpy(nh->data, mat.data, bytes);
     nh->owns_data = true;
     nh->image = ImageData::from_raw(nh->data, nh->width, nh->height, MdImageType::PKG_BGR_U8, false);
     *out = nh;
@@ -492,9 +512,9 @@ MDStatus md_image_crop(MDImageHandle in, int x, int y, int w, int h, MDImageHand
 MDStatus md_image_show(MDImageHandle h) {
     auto* hi = static_cast<md_image_handle*>(h);
     if (!hi) return MD_ERR_NULL_POINTER;
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_show: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_image_show: device or non-packed frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
 #ifdef HAVE_OPENCV_HIGHGUI
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
     cv::imshow("ModelDeploy", mat);
     cv::waitKey(0);
     return MD_OK;
@@ -507,8 +527,8 @@ MDStatus md_image_show(MDImageHandle h) {
 MDStatus md_image_save(MDImageHandle h, const char* path) {
     auto* hi = static_cast<md_image_handle*>(h);
     if (!hi || !path || !*path) return MD_ERR_NULL_POINTER;
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_save: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_image_save: device or non-packed frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     if (!cv::imwrite(path, mat)) { set_error_fmt("md_image_save: failed to write '%s'", path); return MD_ERR_INVALID_ARGUMENT; }
     return MD_OK;
 }
@@ -517,8 +537,8 @@ MDStatus md_image_encode(MDImageHandle h, const char* ext,
                          const unsigned char** buf, size_t* n) {
     auto* hi = static_cast<md_image_handle*>(h);
     if (!hi || !ext || !buf || !n) return MD_ERR_NULL_POINTER;
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_image_encode: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_image_encode: device or non-packed frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     std::vector<int> params;
     if (std::strcmp(ext, ".jpg") == 0 || std::strcmp(ext, ".jpeg") == 0) params = {cv::IMWRITE_JPEG_QUALITY, 95};
     else if (std::strcmp(ext, ".png") == 0) params = {cv::IMWRITE_PNG_COMPRESSION, 3};
@@ -2014,10 +2034,10 @@ MDStatus md_draw_rect(MDImageHandle img, float x, float y, float w, float h,
                       MDColorRGBA color, float alpha) {
     auto* hi = static_cast<md_image_handle*>(img);
     if (!hi) return MD_ERR_NULL_POINTER;
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_draw_rect: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_draw_rect: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     const cv::Scalar cv_color = md_color_to_scalar(color);
-    // 直接复用 C++ 的绘制实现（与 vis_* 系一致的 alpha 混合）
+    // 直接复用 C++ 的绘制实现（与 vis_* 系一致的 alpha 混合）；mat 为借用视图，写回句柄底层缓冲
     modeldeploy::vision::draw_filled_rect(mat, {cvRound(x), cvRound(y), cvRound(w), cvRound(h)},
                                           cv_color, alpha);
     return MD_OK;
@@ -2028,8 +2048,8 @@ MDStatus md_draw_polygon(MDImageHandle img, const float* xs, const float* ys, si
     auto* hi = static_cast<md_image_handle*>(img);
     if (!hi || !xs || !ys) return MD_ERR_NULL_POINTER;
     if (n < 3) return MD_ERR_INVALID_ARGUMENT;
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_draw_polygon: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_draw_polygon: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     std::vector<cv::Point> pts;
     pts.reserve(n);
     for (size_t i = 0; i < n; ++i) pts.emplace_back(cvRound(xs[i]), cvRound(ys[i]));
@@ -2043,8 +2063,8 @@ MDStatus md_draw_text(MDImageHandle img, float x, float y, const char* text,
                       const char* font_path, int font_size, MDColorRGBA color, float alpha) {
     auto* hi = static_cast<md_image_handle*>(img);
     if (!hi || !text) return MD_ERR_NULL_POINTER;
-    if (!handle_has_cpu_bgr(hi)) { set_error("md_draw_text: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
-    cv::Mat mat(hi->height, hi->width, CV_8UC3, hi->data);
+    cv::Mat mat;
+    if (!hi->image.asMat(&mat)) { set_error("md_draw_text: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
     const cv::Scalar cv_color = md_color_to_scalar(color);
     (void)alpha;
     try {

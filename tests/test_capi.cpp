@@ -450,3 +450,79 @@ TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") 
     md_image_destroy(img);
     md_option_destroy(opt);
 }
+
+TEST_CASE("capi2 rgb24 input converts to BGR identical to reference", "[capi]") {
+    const int w = 32, h = 24;
+    std::vector<unsigned char> rgb(static_cast<size_t>(w) * h * 3);
+    for (size_t i = 0; i < rgb.size(); i += 3) {
+        rgb[i] = static_cast<unsigned char>((i * 7) % 256);
+        rgb[i + 1] = static_cast<unsigned char>((i * 11) % 256);
+        rgb[i + 2] = static_cast<unsigned char>((i * 13) % 256);
+    }
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_rgb24(&img, rgb.data(), w, h) == MD_OK);
+    REQUIRE(img != nullptr);
+
+    // 无损 BMP 编码解码还原手柄内 BGR 像素
+    const unsigned char* enc = nullptr;
+    size_t n = 0;
+    REQUIRE(md_image_encode(img, ".bmp", &enc, &n) == MD_OK);
+    std::vector<unsigned char> encbuf(enc, enc + n);
+    cv::Mat out = cv::imdecode(encbuf, cv::IMREAD_COLOR);
+    REQUIRE(!out.empty());
+
+    // 参考：cv::cvtColor RGB->BGR
+    cv::Mat src(h, w, CV_8UC3, const_cast<unsigned char*>(rgb.data()));
+    cv::Mat ref;
+    cv::cvtColor(src, ref, cv::COLOR_RGB2BGR);
+    REQUIRE(!ref.empty());
+
+    CHECK(out.rows == ref.rows);
+    CHECK(out.cols == ref.cols);
+    CHECK(std::memcmp(out.data, ref.data, ref.total() * 3) == 0);
+
+    md_image_destroy(img);
+}
+
+TEST_CASE("capi2 device NV12 frame ops return UNSUPPORTED_TYPE", "[capi]") {
+    const int w = 16, h = 16;
+    std::vector<unsigned char> y(w * h, 100), uv(w * h / 2, 100);
+    MDImageHandle dev = nullptr;
+    REQUIRE(md_image_from_device_nv12(&dev, y.data(), uv.data(), w, h, w, w, MD_DEV_CPU) == MD_OK);
+    REQUIRE(dev != nullptr);
+
+    // encode
+    const unsigned char* enc = nullptr;
+    size_t n = 0;
+    CHECK(md_image_encode(dev, ".bmp", &enc, &n) == MD_ERR_UNSUPPORTED_TYPE);
+    // save（asMat 失败前不应写文件）
+    CHECK(md_image_save(dev, "capi2_t6_should_not_exist.bmp") == MD_ERR_UNSUPPORTED_TYPE);
+    CHECK(!std::filesystem::exists("capi2_t6_should_not_exist.bmp"));
+    // draw_rect
+    MDColorRGBA c{255, 0, 0, 255};
+    CHECK(md_draw_rect(dev, 1, 1, 4, 4, c, 1.0f) == MD_ERR_UNSUPPORTED_TYPE);
+    // show（在 asMat 处即报错，不会阻塞在 waitKey）
+    CHECK(md_image_show(dev) == MD_ERR_UNSUPPORTED_TYPE);
+
+    md_image_destroy(dev);
+}
+
+TEST_CASE("capi2 CPU BGR frame encode/save still OK", "[capi]") {
+    const int w = 16, h = 16;
+    auto bgr = make_gray_bgr(w, h);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+
+    const unsigned char* enc = nullptr;
+    size_t n = 0;
+    REQUIRE(md_image_encode(img, ".png", &enc, &n) == MD_OK);
+    REQUIRE(n > 0);
+
+    const char* tmp = std::getenv("TEMP");
+    const std::string p = std::string(tmp && *tmp ? tmp : ".") + "/md_capi_t6_save.png";
+    REQUIRE(md_image_save(img, p.c_str()) == MD_OK);
+    CHECK(std::filesystem::exists(p));
+    std::filesystem::remove(p);
+
+    md_image_destroy(img);
+}
