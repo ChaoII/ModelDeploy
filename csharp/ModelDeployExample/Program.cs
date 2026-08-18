@@ -64,15 +64,16 @@ static class Program
             Console.WriteLine($"  {r}");
 
         // 需要可视化时：result.Draw，句柄直达 C++ vis_det（可控制阈值/类别名/字体/透明度）
-        using var canvas = image.Clone();
-        result.Draw(canvas, new DrawOptions
+        // using var canvas = image.Clone();
+        result.Draw(image, new DrawOptions
         {
             Threshold = 0.4,
             LabelMap = new Dictionary<int, string> { { 0, "person" }, { 1, "bicycle" }, { 2, "car" } },
             FontSize = 16,
             Alpha = 0.3,
         });
-        canvas.Save("detection_annotated.jpg");
+        image.Save("detection_annotated.jpg");
+        image.Show();
         Console.WriteLine("visualized -> detection_annotated.jpg");
     }
 
@@ -158,12 +159,12 @@ static class Program
     static void Main(string[] args)
     {
         TestDetection();
-        TestImage();
-        TestClassification();
-        TestPose();
-        TestOCR();
-        TestInsightFace();
-        TestSenseVoice();
-        TestKokoro();
+        // TestImage();
+        // TestClassification();
+        // TestPose();
+        // TestOCR();
+        // TestInsightFace();
+        // TestSenseVoice();
+        // TestKokoro();
     }
 }
