@@ -329,16 +329,55 @@ namespace modeldeploy::vision {
         const int dst_w = dst_size[0];
         const int dst_h = dst_size[1];
         records->resize(batch);
+        // NV12 帧：先紧凑化 + 转 host BGR 视图，再走 packed BGR 批路径（CPU 正确性回退）
+        std::vector<ImageData> imgs;
+        std::vector<std::vector<uint8_t>> bgr_owns;
+        imgs.reserve(batch);
+        bgr_owns.reserve(batch);
+        for (int i = 0; i < batch; ++i) {
+            const ImageData& im = images[i];
+            if (im.type() != MdImageType::NV12 || im.plane_count() < 2) {
+                imgs.push_back(im);
+                bgr_owns.emplace_back();
+                continue;
+            }
+            if (im.device() != Device::CPU) {
+                MD_LOG_ERROR << "CpuProcessorBackend::yolo_preprocess_batch: device NV12 frame requires GPU backend"
+                             << std::endl;
+                return false;
+            }
+            const int w = im.width(), h = im.height();
+            const auto py = im.plane(0);
+            const auto pu = im.plane(1);
+            if (!py.data || !pu.data || w <= 0 || h <= 0) {
+                MD_LOG_ERROR << "CpuProcessorBackend::yolo_preprocess_batch: invalid NV12 image #" << i
+                             << std::endl;
+                return false;
+            }
+            const int sy = py.step > 0 ? py.step : w;
+            const int suv = pu.step > 0 ? pu.step : w;
+            std::vector<uint8_t> nv12_buf(static_cast<size_t>(h) * w * 3 / 2);
+            for (int r = 0; r < h; ++r)
+                std::memcpy(nv12_buf.data() + static_cast<size_t>(r) * w, py.data + static_cast<size_t>(r) * sy, w);
+            for (int r = 0; r < h / 2; ++r)
+                std::memcpy(nv12_buf.data() + static_cast<size_t>(h) * w + static_cast<size_t>(r) * w,
+                            pu.data + static_cast<size_t>(r) * suv, w);
+            cv::Mat nv12_mat(h * 3 / 2, w, CV_8UC1, nv12_buf.data());
+            auto& bgr_own = bgr_owns.emplace_back(static_cast<size_t>(w) * h * 3);
+            cv::Mat bgr_mat(h, w, CV_8UC3, bgr_own.data());
+            cv::cvtColor(nv12_mat, bgr_mat, cv::COLOR_YUV2BGR_NV12);
+            imgs.push_back(ImageData::from_raw(bgr_own.data(), w, h, MdImageType::PKG_BGR_U8, false));
+        }
         // 整批一次遍历：每图独立 letterbox 映射，统一经 fused SIMD kernel 写入 batch 输出
         std::vector<float> oxs(batch), oys(batch), sxs(batch), sys(batch);
         for (int i = 0; i < batch; ++i) {
             (*records)[i] = utils::cal_letter_box_param(
-                {images[i].width(), images[i].height()}, {dst_w, dst_h});
+                {imgs[i].width(), imgs[i].height()}, {dst_w, dst_h});
             utils::letter_box_to_fused_params((*records)[i], &oxs[i], &oys[i], &sxs[i], &sys[i]);
         }
         const float alpha[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const float beta[3] = {0.0f, 0.0f, 0.0f};
-        return fused_preprocess_batch(images, out, dst_size,
+        return fused_preprocess_batch(imgs, out, dst_size,
                                       oxs, oys, sxs, sys,
                                       std::vector<float>(alpha, alpha + 3),
                                       std::vector<float>(beta, beta + 3),

@@ -94,6 +94,51 @@ TEST_CASE("UltralyticsDet model", "[vision_models]") {
     }
 }
 
+// yolo26n_b8.engine（TRT，动态 batch，end2end NMS 输出 [batch,300,6]）：
+// 单图 + batch_predict(batch=3) 均须能加载并产出检测
+TEST_CASE("UltralyticsDet yolo26n TRT engine (dynamic batch)", "[vision_models][gpu][trt]") {
+    auto modelfile = model_path("trt/yolo26n_b8.engine");
+    if (!fs::exists(modelfile)) return;
+
+    modeldeploy::RuntimeOption opt;
+    opt.use_gpu(0);
+    opt.use_trt_backend();
+
+    UltralyticsDet model(modelfile.string(), opt);
+    if (!model.is_initialized()) {
+        std::cerr << "yolo26n_b8 TRT engine not initializable (TRT unavailable) — skip" << std::endl;
+        return;
+    }
+
+    auto img = load_image("test_detection0.jpg");
+    auto img2 = load_image("test_person.jpg");
+    auto img3 = load_image("test_detection1.jpg");
+    if (img.empty() || img2.empty() || img3.empty()) return;
+
+    std::vector<DetectionResult> results;
+    REQUIRE(model.predict(img, &results, nullptr));
+    std::cout << "[yolo26n_b8] single detections=" << results.size() << std::endl;
+    REQUIRE(results.size() > 0);
+    for (auto& r : results) {
+        REQUIRE(r.box.width > 0);
+        REQUIRE(r.box.height >= 0);
+        REQUIRE(r.label_id >= 0);
+        REQUIRE(r.score > 0);
+    }
+
+    std::vector<std::vector<DetectionResult>> batched;
+    REQUIRE(model.batch_predict({img, img2, img3}, &batched, nullptr));
+    REQUIRE(batched.size() == 3);
+    std::cout << "[yolo26n_b8] batch sizes=" << batched[0].size() << ","
+              << batched[1].size() << "," << batched[2].size() << std::endl;
+    for (auto& r : batched[0]) {
+        REQUIRE(r.box.width > 0);
+        REQUIRE(r.box.height >= 0);
+        REQUIRE(r.label_id >= 0);
+        REQUIRE(r.score > 0);
+    }
+}
+
 // 同一 NV12 缓冲：predict(ImageData) 的 NV12 分叉是统一单入口，须能零拷贝预处并产出合理结果
 // [model]：需模型文件，缺文件时跳过（不自红）
 TEST_CASE("UltralyticsDet predict(ImageData) on NV12 device frame", "[model]") {

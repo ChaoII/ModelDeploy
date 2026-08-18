@@ -233,7 +233,7 @@ namespace modeldeploy {
             model_buffer_.assign(static_cast<const char*>(serialized_engine->data()),
                                  serialized_engine->size());
             delete serialized_engine;
-            if (cudaStreamCreate(&stream_) != 0) {
+            if (cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking) != 0) {
                 MD_LOG_FATAL << "Cannot call cudaStreamCreate()." << std::endl;
             }
             return load_trt_cache(model_buffer_);
@@ -248,7 +248,7 @@ namespace modeldeploy {
             MD_LOG_INFO << "[TensorRT engine loaded, size: "
                 << std::fixed << std::setprecision(3)
                 << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]" << std::endl;
-            if (cudaStreamCreate(&stream_) != 0) {
+            if (cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking) != 0) {
                 MD_LOG_FATAL << "Cannot call cudaStreamCreate()." << std::endl;
             }
             return load_trt_cache(model_buffer_);

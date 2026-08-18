@@ -383,6 +383,52 @@ bool StreamEncoder::encode_from_gpu(const uint8_t* gpu_bgr, int width, int heigh
 #endif
 }
 
+bool StreamEncoder::encode_from_gpu_nv12(const uint8_t* d_nv12, int width, int height) {
+#ifdef WITH_GPU
+    if (!opened_ || !enc_frame_ || open_permanently_failed_.load()) return false;
+    if (!d_nv12 || width <= 0 || height <= 0) return false;
+
+    if (av_frame_make_writable(enc_frame_) < 0) {
+        return false;
+    }
+
+    // 限速（与 encode() 一致）
+    if (!accept_frame_rate_limit()) return true;
+    enc_frame_->pts = encode_frame_count_;
+    ++encode_frame_count_;
+
+    const size_t y_bytes = static_cast<size_t>(height) * width;
+
+    // NV12 → enc_frame_：逐平面 D2H 拷贝，兼容对齐后的 linesize。
+    // d_nv12 为紧凑连续设备 NV12（step==width），spitch=width。
+    cudaError_t c1 = cudaMemcpy2D(enc_frame_->data[0], enc_frame_->linesize[0],
+                                  d_nv12, width,
+                                  width, height, cudaMemcpyDeviceToHost);
+    cudaError_t c2 = cudaMemcpy2D(enc_frame_->data[1], enc_frame_->linesize[1],
+                                  d_nv12 + y_bytes, width,
+                                  width, height / 2, cudaMemcpyDeviceToHost);
+    if (c1 != cudaSuccess || c2 != cudaSuccess) return false;
+
+    if (avcodec_send_frame(enc_ctx_, enc_frame_) < 0) {
+        return false;
+    }
+
+    while (avcodec_receive_packet(enc_ctx_, enc_pkt_) == 0) {
+        av_packet_rescale_ts(enc_pkt_, enc_ctx_->time_base, stream_->time_base);
+        enc_pkt_->stream_index = stream_->index;
+        av_interleaved_write_frame(fmt_ctx_, enc_pkt_);
+        av_packet_unref(enc_pkt_);
+    }
+    return true;
+#else
+    (void)d_nv12; (void)width; (void)height;
+    return false;
+#endif
+}
+
+
+
+
 
 
 bool StreamEncoder::start_async() {

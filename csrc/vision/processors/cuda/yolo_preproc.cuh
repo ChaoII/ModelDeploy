@@ -48,4 +48,15 @@ namespace modeldeploy::vision {
                                     std::vector<LetterBoxRecord>* letter_box_records,
                                     cudaStream_t stream = nullptr,
                                     CudaOutputBufferPool* dst_pool = nullptr);
+
+    // NV12 整批融合预处理（3D grid 一次 launch）：逐图 Y/UV 平面（设备零拷贝或 host H2D）
+    // 设备帧：plane 指针为显存，kernel 直读（零 PCIe）；host 帧：聚合 H2D 后 kernel 读设备槽。
+    // 输出 Tensor [batch, 3, dst_h, dst_w] FP32 GPU
+    bool yolo_preprocess_nv12_batch_cuda(const std::vector<ImageData>& images,
+                                         Tensor* output,
+                                         const std::vector<int>& dst_size,
+                                         float pad_value,
+                                         std::vector<LetterBoxRecord>* letter_box_records,
+                                         cudaStream_t stream = nullptr,
+                                         CudaOutputBufferPool* dst_pool = nullptr);
 }

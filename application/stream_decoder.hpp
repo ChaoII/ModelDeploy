@@ -48,6 +48,11 @@ public:
     /// @return true 表示有帧，false 表示 EOF 或错误
     bool read_one_frame(DecodedFrame* out);
 
+    /// 设备直通模式：true 时跳过 av_hwframe_transfer_data（省 D2H），
+    /// 仅暴露 device 指针，y_plane/uv_plane 置空（调用方须走 GPU 直通路径）。
+    void set_device_only(bool v) { device_only_ = v; }
+    bool device_only() const { return device_only_; }
+
     /// 注册帧回调（异步模式，不启用时忽略）
     using FrameCallback = std::function<bool(const DecodedFrame&)>;
     void set_callback(FrameCallback cb) { callback_ = std::move(cb); }
@@ -68,6 +73,7 @@ private:
     DecoderConfig cfg_;
     std::string url_;
     FrameCallback callback_;
+    bool device_only_ = false;
 
     mutable std::mutex ctx_mtx_;
     AVFormatContext* fmt_ctx_ = nullptr;

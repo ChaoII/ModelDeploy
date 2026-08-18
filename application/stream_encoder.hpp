@@ -38,6 +38,9 @@ public:
     /// 编码并推送一帧 GPU BGR（设备指针，BGR24 连续内存），内部 BGR→NV12 走 GPU 内核（BT.709 limited）
     bool encode_from_gpu(const uint8_t* gpu_bgr, int width, int height);
 
+    /// 编码并推送一帧 GPU NV12（设备指针，Y/UV 连续紧凑，step==width），D2H 直达编码平面，省 BGR 中转
+    bool encode_from_gpu_nv12(const uint8_t* d_nv12, int width, int height);
+
     /// 同步编码，返回编码耗时(us)
     int64_t encode_timed(const modeldeploy::vision::ImageData& image);
 

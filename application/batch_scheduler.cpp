@@ -8,6 +8,7 @@
 #endif
 #include "csrc/vision/common/image_data.h"
 
+using namespace modeldeploy;
 using namespace modeldeploy::vision;
 
 BatchScheduler::BatchScheduler(int max_batch_size, int batch_timeout_ms)
@@ -121,55 +122,35 @@ void BatchScheduler::scheduler_loop() {
 
 void BatchScheduler::process_batch(
     std::vector<std::pair<BatchRequest, std::shared_ptr<BatchResult>>>& batch) {
-    // P3.2: True batch inference via batch_predict
-    // Preprocess all frames to BGR (host 缓冲；设备零拷贝路径经实测在当前环境收益为负，已回退)
-    std::vector<ImageData> bgr_images;
-    bgr_images.reserve(batch.size());
-    // 每帧独立 BGR 缓冲，生命周期贯穿本批（bgr_images 的 copy=false view 指向它们）
-    std::vector<std::vector<uint8_t>> bgr_owns;
-    bgr_owns.reserve(batch.size());
-
-    for (auto& [req, res] : batch) {
-        const size_t y_size = static_cast<size_t>(req.height) * req.width;
-        const size_t uv_size = y_size / 2;
-
-        if (last_w_ != req.width || last_h_ != req.height || nv12_buf_.size() != y_size + uv_size) {
-            nv12_buf_.resize(y_size + uv_size);
-            last_w_ = req.width;
-            last_h_ = req.height;
+    // 全 NV12 通路：设备请求零拷贝直用设备指针；host 请求紧凑 host NV12。
+    // 统一 batch_predict → yolo_preprocess_nv12_batch_cuda（逐图判定设备/host，设备零 PCIe，
+    // host 聚合 H2D），消除原先 NV12→BGR→back 的双重转换。
+    std::vector<ImageData> nv12_images;
+    nv12_images.reserve(batch.size());
+    std::vector<bool> is_device(batch.size(), false);
+    for (size_t i = 0; i < batch.size(); ++i) {
+        auto& [req, res] = batch[i];
+        if (req.y_device && req.uv_device && req.gpu_nv12) {
+            ImageData::Plane pl[2] = {{
+                                          const_cast<uint8_t*>(req.y_device), req.y_step_device},
+                                      {const_cast<uint8_t*>(req.uv_device), req.uv_step_device}};
+            auto img = ImageData::from_planes(pl, 2, MdImageType::NV12, req.width, req.height,
+                                              Device::GPU, req.gpu_nv12);
+            nv12_images.push_back(std::move(img));
+            is_device[i] = true;
+        } else if (req.y_plane && req.uv_plane) {
+            ImageData::Plane pl[2] = {{req.y_plane, req.width}, {req.uv_plane, req.width}};
+            auto img = ImageData::from_planes(pl, 2, MdImageType::NV12, req.width, req.height,
+                                              Device::CPU, {});
+            nv12_images.push_back(std::move(img));
+        } else {
+            nv12_images.emplace_back();  // 空：本帧无法预处理（保位）
         }
-
-        std::memcpy(nv12_buf_.data(), req.y_plane, y_size);
-        std::memcpy(nv12_buf_.data() + y_size, req.uv_plane, uv_size);
-
-        bgr_owns.emplace_back(static_cast<size_t>(req.width) * req.height * 3);
-        auto& bgr_own = bgr_owns.back();
-#ifdef WITH_GPU
-        nv12_to_bgr_cuda(nv12_buf_.data(), nv12_buf_.data() + y_size,
-                          req.width, req.height, req.width, req.width,
-                          bgr_own.data(), nv12_stream_);
-        auto bgr_image = ImageData::from_raw(bgr_own.data(), req.width, req.height,
-                                               MdImageType::PKG_BGR_U8, false);
-#else
-        auto nv12_image = ImageData::from_raw(nv12_buf_.data(), req.width, req.height,
-                                                MdImageType::NV12, true);
-        auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PKG_BGR);
-#endif
-        // 非预览路：推理结果已足够，无需把 BGR 传回 pipeline（省一次深拷贝）
-        if (req.need_bgr) {
-            auto bgr_copy = ImageData::from_raw(bgr_own.data(), req.width, req.height,
-                                                MdImageType::PKG_BGR_U8, true);
-            res->bgr_image = std::move(bgr_copy);
-        }
-        bgr_images.push_back(std::move(bgr_image));
     }
 
-    // 检查 batch 内所有帧尺寸是否一致；不一致则回退逐帧
     std::lock_guard<std::mutex> lock(models_mtx_);
 
     for (auto& [key, entry] : models_) {
-        // 仅处理请求了本模型（或 model_names 为空 = 全部）的帧，避免把
-        // 本模型结果塞给不相关的 pipeline（多模型部署正确性）。
         std::vector<size_t> want;
         want.reserve(batch.size());
         for (size_t i = 0; i < batch.size(); ++i) {
@@ -183,28 +164,31 @@ void BatchScheduler::process_batch(
         if (want.empty()) continue;
 
         // Batch 推理要求该模型命中的帧尺寸一致；不一致则回退逐帧
-        bool subset_uniform = want.size() > 1;
-        if (subset_uniform) {
-            const int ref_w = batch[want[0]].first.width;
-            const int ref_h = batch[want[0]].first.height;
-            for (size_t k = 1; k < want.size(); ++k) {
-                if (batch[want[k]].first.width != ref_w ||
-                    batch[want[k]].first.height != ref_h) {
-                    subset_uniform = false;
-                    break;
+        bool subset_uniform = true;
+        {
+            const BatchRequest* ref = nullptr;
+            for (size_t k : want) {
+                auto& [req, res] = batch[k];
+                if (!ref) { ref = &req; }
+                else if (req.width != ref->width || req.height != ref->height) {
+                    subset_uniform = false; break;
                 }
             }
+            for (size_t k : want) if (nv12_images[k].empty()) { subset_uniform = false; break; }
         }
 
         if (entry.prototype->config().type == "detection" && subset_uniform) {
-            // True batch inference for detection models
             std::vector<ImageData> sub_images;
             sub_images.reserve(want.size());
-            for (size_t k : want) sub_images.push_back(bgr_images[k]);
+            for (size_t k : want) sub_images.push_back(nv12_images[k]);
             auto* det = entry.prototype->det_model();
             if (det && det->is_initialized()) {
                 std::vector<std::vector<DetectionResult>> all_results;
-                if (det->batch_predict(sub_images, &all_results)) {
+                auto it0 = std::chrono::steady_clock::now();
+                const bool ok = det->batch_predict(sub_images, &all_results);
+                auto it1 = std::chrono::steady_clock::now();
+                total_infer_us_.fetch_add(std::chrono::duration_cast<std::chrono::microseconds>(it1 - it0).count());
+                if (ok) {
                     for (size_t k = 0; k < want.size() && k < all_results.size(); ++k) {
                         auto& [req, res] = batch[want[k]];
                         for (auto& d : all_results[k]) {
@@ -225,11 +209,12 @@ void BatchScheduler::process_batch(
             }
         }
 
-        // Fallback: sequential per-frame inference
+        // Fallback: sequential per-frame inference (NV12)
         for (size_t k : want) {
             auto& [req, res] = batch[k];
+            if (nv12_images[k].empty()) continue;
             InferResult result;
-            if (entry.prototype->infer(bgr_images[k], &result)) {
+            if (entry.prototype->infer(nv12_images[k], &result)) {
                 if (!result.boxes.empty()) {
                     res->results.push_back(std::move(result));
                 }
@@ -237,15 +222,14 @@ void BatchScheduler::process_batch(
         }
     }
 
-    // Fill results
+    // Fill results：预览路径把（绘制后的）设备 NV12 回传，非预览路省去
     for (size_t i = 0; i < batch.size(); ++i) {
         auto& [req, res] = batch[i];
-        auto t0 = std::chrono::steady_clock::now();
-        // bgr_image 已在循环内按 need_bgr 深拷贝到 res->bgr_image；此处不覆盖。
-        // 非预览路（need_bgr=false）res->bgr_image 为空，pipeline 跳过绘制。
-
+        if (req.need_nv12 && req.gpu_nv12 && is_device[i]) {
+            res->nv12_gpu = req.gpu_nv12;
+            res->width = req.width;
+            res->height = req.height;
+        }
         res->ready = true;
-        auto t1 = std::chrono::steady_clock::now();
-        res->infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
     }
 }

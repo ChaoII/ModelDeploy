@@ -9,18 +9,6 @@
 
 using namespace modeldeploy::vision;
 
-#ifdef WITH_GPU
-namespace {
-/// 分配设备缓冲并以 shared_ptr 持有（析构自动 cudaFree）。失败返回 nullptr。
-/// 供 PendingFrame::gpu_nv12 使用：D2D 拷贝自 CUVID 复用帧，跨 read_one_frame 持久有效。
-std::shared_ptr<uint8_t> alloc_device_buffer(size_t bytes) {
-    uint8_t* p = nullptr;
-    if (bytes == 0 || cudaMalloc(&p, bytes) != cudaSuccess) return nullptr;
-    return std::shared_ptr<uint8_t>(p, [](uint8_t* q) { cudaFree(q); });
-}
-} // namespace
-#endif
-
 static bool is_network_url(const std::string& url) {
     return url.find("rtsp://") == 0 || url.find("rtmp://") == 0 ||
            url.find("http://") == 0 || url.find("https://") == 0 ||
@@ -187,7 +175,9 @@ void Pipeline::decode_loop() {
     cudaSetDevice(0);
 
     // ── 1) 初始化推理组 + 绘制 ──
-    infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_);
+    // 有 BatchScheduler 时走 batch_only：本组不建引擎（省 20× TRT context），
+    // 推理统一由批调度经唯一 prototype 完成。
+    infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_, batch_scheduler_ != nullptr);
     if (!infer_group_->init()) {
         set_init_error("InferGroup init failed");
         std::cerr << "[Pipeline] " << init_error() << std::endl;
@@ -255,6 +245,7 @@ void Pipeline::decode_loop() {
             running_ = false;
             return;
         }
+        decoder_->set_device_only(cfg_.decoder.device_only);
         source_fps_ = decoder_->fps();
         std::cout << "[Pipeline] Source FPS: " << source_fps_ << std::endl;
         initialized_ = true;
@@ -277,13 +268,12 @@ void Pipeline::decode_loop() {
             // CUVID 硬解 GPU 帧 → PendingFrame 持久设备缓冲（D2D 拷贝，零 PCIe 往返）。
             // 设备指针仅当下有效（read_hw_frame_ 下次 read_one_frame 即被 unref 复用），
             // 拷贝到 pf.gpu_nv12 后指针跨队列/pipeline 生命周期安全。
-            // 仅当 InferGroup 可走 GPU-direct（全 detection+gpu+无 ROI）且未用 batch
-            // （batch submit 只收 host NV12 指针）时启用；否则保留 host NV12 拷贝作回退。
+            // 仅当 InferGroup 可走 GPU-direct（全 detection+gpu+无 ROI）时启用。
+            // 批模式亦受益：设备 NV12 池块指针一次 D2D 后提交批调度，后续零拷贝。
             const bool gpu_path = infer_group_->gpu_nv12_ready() &&
-                                  raw.y_plane_device && raw.uv_plane_device &&
-                                  !batch_scheduler_;
+                                  raw.y_plane_device && raw.uv_plane_device;
             if (gpu_path) {
-                auto dbuf = alloc_device_buffer(y_size + uv_size);
+                auto dbuf = infer_group_->acquire_device_buffer(y_size + uv_size);
                 bool ok = dbuf && raw.y_step_device >= raw.width &&
                           raw.uv_step_device >= raw.width;
                 if (!dbuf) {
@@ -318,8 +308,9 @@ void Pipeline::decode_loop() {
             }
 #endif
             // 硬解帧仍需落 host NV12（供预览/快照/非 GPU 路径回退）；
-            // GPU-direct 路径（gpu_path 已填充 gpu_nv12）跳过，实现全 GPU 零拷贝
-            if (!pf.gpu_nv12) {
+            // GPU-direct 路径（gpu_path 已填充 gpu_nv12）跳过，实现全 GPU 零拷贝。
+            // device_only 且无 GPU-direct 缓冲时（无 host 平面）直接丢弃，避免空指针拷贝。
+            if (!pf.gpu_nv12 && raw.y_plane) {
                 pf.nv12_data.resize(y_size + uv_size);
                 uint8_t* dst = pf.nv12_data.data();
                 if (raw.y_step == raw.width && raw.uv_step == raw.width) {
@@ -384,6 +375,9 @@ void Pipeline::process_loop() {
         ImageData bgr_image;
         bool ran_inference = false;
         int models_ran = 0;
+        // 批路径预览：设备 NV12 输出（含绘制），编码段直用
+        std::shared_ptr<uint8_t> out_nv12;
+        int out_nvw = 0, out_nvh = 0;
 
         if (batch_scheduler_) {
             BatchRequest req;
@@ -392,20 +386,36 @@ void Pipeline::process_loop() {
             req.uv_plane = const_cast<uint8_t*>(pf.uv_ptr());
             req.width = pf.width;
             req.height = pf.height;
-            req.need_bgr = cfg_.enable_preview;
+            req.need_nv12 = cfg_.enable_preview;
+            // 设备 NV12 直通（CUVID 持久缓冲池块）：批 kernel 零拷贝直用设备指针
+            if (pf.gpu_nv12 && pf.y_plane_device && pf.uv_plane_device) {
+                req.gpu_nv12 = pf.gpu_nv12;
+                req.y_device = pf.y_plane_device;
+                req.uv_device = pf.uv_plane_device;
+                req.y_step_device = pf.width;   // 池块紧凑，step==width
+                req.uv_step_device = pf.width;
+            }
             req.model_names.reserve(cfg_.models.size());
             for (const auto& m : cfg_.models) {
                 req.model_names.push_back(m.name);
             }
             auto future = batch_scheduler_->submit(req);
             // 轮询等结果：sleep 而非 yield，避免空转打满单核 CPU
+            auto wait0 = std::chrono::steady_clock::now();
             while (!future->ready) {
                 std::this_thread::sleep_for(std::chrono::microseconds(200));
             }
+            auto wait1 = std::chrono::steady_clock::now();
             results = std::move(future->results);
             bgr_image = std::move(future->bgr_image);
             ran_inference = !results.empty();
-            last_infer_us_ = future->infer_us;
+            last_infer_us_ = std::chrono::duration_cast<std::chrono::microseconds>(wait1 - wait0).count();
+            // 预览：设备 NV12 输出（含绘制）进编码段；无法力不需要 BGR
+            if (future->nv12_gpu) {
+                out_nv12 = future->nv12_gpu;
+                out_nvw = future->width;
+                out_nvh = future->height;
+            }
         } else {
             models_ran = infer_group_->run_models(
                 const_cast<uint8_t*>(pf.y_ptr()),
@@ -460,7 +470,42 @@ void Pipeline::process_loop() {
             }
         }
         auto t2 = std::chrono::steady_clock::now();
-        if (bgr_image.empty()) continue;
+        if (bgr_image.empty() && !out_nv12) continue;
+
+        if (out_nv12) {
+            // 设备 NV12 直接预览：检测框就地绘制到设备缓冲（零拷贝），再进编码段
+            ImageData::Plane pl[2] = {
+                {out_nv12.get(), out_nvw ? out_nvw : pf.width},
+                {out_nv12.get() + (size_t)(out_nvw ? out_nvw : pf.width) *
+                                              (out_nvh ? out_nvh : pf.height),
+                 out_nvw ? out_nvw : pf.width}};
+            {
+                ImageData dnv12 = ImageData::from_planes(
+                    pl, 2, MdImageType::NV12, out_nvw ? out_nvw : pf.width,
+                    out_nvh ? out_nvh : pf.height, modeldeploy::Device::GPU, out_nv12);
+                const std::vector<InferResult>* draw_set = nullptr;
+                if (!results.empty()) draw_set = &results;
+                else if (has_cached_results) draw_set = &cached_results_;
+                if (draw_set) draw_engine_->draw_gpu(dnv12, *draw_set,
+                                                     cfg_.draw.show_label, cfg_.draw.show_score);
+            }
+            EncodedFrame ef;
+            ef.gpu_nv12 = std::move(out_nv12);
+            ef.width = out_nvw ? out_nvw : pf.width;
+            ef.height = out_nvh ? out_nvh : pf.height;
+            ef.pts = pf.pts;
+            {
+                std::unique_lock<std::mutex> lock(out_mtx_);
+                if (out_queue_.size() >= out_max_size_) out_queue_.pop();
+                out_queue_.push(std::move(ef));
+                lock.unlock();
+                out_cv_.notify_one();
+            }
+            int64_t infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+            stats_.record_frame(last_decode_us_.load(), infer_us, 0, last_encode_us_.load());
+            t_last = t2;
+            continue;
+        }
 
         if (++snapshot_counter % snapshot_interval_ == 0) {
             std::lock_guard<std::mutex> lock(snapshot_mtx_);
@@ -536,7 +581,14 @@ void Pipeline::encode_loop() {
 
         int64_t enc_us;
 #ifdef WITH_GPU
-        if (ef.gpu_bgr) {
+        // 优先级：设备 NV12（全 GPU 零拷贝）→ GPU BGR（旧）→ CPU BGR
+        if (ef.gpu_nv12) {
+            auto e0 = std::chrono::steady_clock::now();
+            encoder_->encode_from_gpu_nv12(ef.gpu_nv12.get(), ef.width, ef.height);
+            auto e1 = std::chrono::steady_clock::now();
+            enc_us = std::chrono::duration_cast<std::chrono::microseconds>(e1 - e0).count();
+            ef.gpu_nv12.reset();
+        } else if (ef.gpu_bgr) {
             auto e0 = std::chrono::steady_clock::now();
             encoder_->encode_from_gpu(ef.gpu_bgr, ef.width, ef.height);
             auto e1 = std::chrono::steady_clock::now();
@@ -597,6 +649,10 @@ bool Pipeline::encode_jpeg(const std::shared_ptr<ImageData>& snap,
     cv::Mat mat;
     ImageData cpu;
     if (!snap->toCpu(&cpu)) return false;
+    // NV12 快照（设备或 host）→ BGR，再走 JPEG 编码
+    if (cpu.type() == MdImageType::NV12) {
+        cpu = ImageData::cvt_color(cpu, ColorConvertType::CVT_NV122PKG_BGR);
+    }
     cpu.asMat(&mat);
     if (mat.empty()) return false;
     cv::Mat bgr;

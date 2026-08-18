@@ -30,6 +30,7 @@ struct DecoderConfig {
     int timeout_us = 10000000;
     std::string rtsp_transport = "tcp";   // tcp / udp
     std::string hw_accel = "cuda";        // cuda / none
+    bool device_only = false;             // true 时跳过 D2H，仅暴露设备指针（GPU 直通）
 };
 
 // ==================== 编码器配置 ====================

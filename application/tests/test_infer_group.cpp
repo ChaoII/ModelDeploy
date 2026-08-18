@@ -32,6 +32,48 @@ TEST_CASE("InferGroup init with nonexistent model", "[infer_group]") {
     REQUIRE_FALSE(group.init());
 }
 
+TEST_CASE("InferGroup batch_only mode", "[infer_group][gpu]") {
+    TaskConfig cfg;
+    cfg.input_url = "rtsp://in";
+    cfg.output_url = "rtsp://out";
+    {
+        // 无模型：batch_only 仍不应 ready（models 为空 → gpu 直通 false）
+        InferGroup g0(cfg, nullptr, true);
+        REQUIRE_FALSE(g0.init());
+    }
+    // 全 detection + gpu + 无 ROI → gpu_nv12_ready 为 true
+    ModelConfig m;
+    m.name = "det";
+    m.type = "detection";
+    m.device = "gpu";
+    m.path = "/nonexistent.onnx";   // batch_only 不建引擎，路径无关
+    cfg.models.push_back(m);
+    {
+        InferGroup g(cfg, nullptr, true);
+        REQUIRE(g.init());
+        REQUIRE(g.batch_only());
+        REQUIRE(g.ready());
+        REQUIRE(g.gpu_nv12_ready());
+        // run_models 被调用 → 记错返回 0
+        std::vector<InferResult> results;
+        REQUIRE(g.run_models(nullptr, nullptr, nullptr, nullptr, 640, 640, 640, 640, &results) == 0);
+        // add/remove/update 均返回 false
+        REQUIRE_FALSE(g.add_model(m));
+        REQUIRE_FALSE(g.remove_model("det"));
+        REQUIRE_FALSE(g.update_model("det", m));
+    }
+    // 含非 detection → gpu_nv12_ready 为 false
+    {
+        ModelConfig ocr = m;
+        ocr.name = "ocr";
+        ocr.type = "ocr";
+        cfg.models.push_back(ocr);
+        InferGroup g(cfg, nullptr, true);
+        REQUIRE(g.init());
+        REQUIRE_FALSE(g.gpu_nv12_ready());
+    }
+}
+
 TEST_CASE("InferGroup add/remove model dynamic", "[infer_group]") {
     TaskConfig cfg;
     cfg.input_url = "rtsp://in";

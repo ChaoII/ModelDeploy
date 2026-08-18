@@ -21,11 +21,19 @@
 struct BatchRequest {
     std::string pipeline_id;
     std::vector<std::string> model_names;  // models this pipeline needs for this frame (empty = all)
+    // host NV12（紧凑，step==width）；设备直通时以 y_device/uv_device 优先
     uint8_t* y_plane = nullptr;
     uint8_t* uv_plane = nullptr;
     int width = 0;
     int height = 0;
-    bool need_bgr = false;  // 是否需要 BGR 结果（预览/绘制路径；非预览路省去拷贝）
+    // CUVID 硬解设备 NV12 指针（GPU 直通零拷贝）
+    const uint8_t* y_device = nullptr;
+    const uint8_t* uv_device = nullptr;
+    int y_step_device = 0;
+    int uv_step_device = 0;
+    // device NV12 缓冲所有权（池块），跨批生命周期安全；host 请求可为空
+    std::shared_ptr<uint8_t> gpu_nv12;
+    bool need_nv12 = false;  // 是否需要把（绘制后的）NV12 帧回传（预览路径；非预览路省去）
 };
 
 /// Batch result: returned to the pipeline after inference
@@ -33,7 +41,11 @@ struct BatchResult {
     std::string pipeline_id;
     std::vector<InferResult> results;
     modeldeploy::vision::ImageData bgr_image;
-    int64_t infer_us = 0;
+    // 设备 NV12 输出（含绘制），预览路径；非预览路为空
+    std::shared_ptr<uint8_t> nv12_gpu;
+    int width = 0;
+    int height = 0;
+    int64_t us = 0;       // submit→ready 等待耗时（us）
     bool ready = false;
 };
 
@@ -82,6 +94,12 @@ public:
         return n ? static_cast<double>(total_batch_process_us_.load()) / n : 0.0;
     }
 
+    /// Average batch_predict (在 process_batch 内部) 耗时 in microseconds
+    double avg_batch_infer_us() const {
+        uint64_t n = total_batches_.load();
+        return n ? static_cast<double>(total_infer_us_.load()) / n : 0.0;
+    }
+
 private:
     int max_batch_size_;
     int batch_timeout_ms_;
@@ -116,6 +134,7 @@ private:
     std::atomic<uint64_t> total_batches_{0};
     std::atomic<uint64_t> total_batched_frames_{0};
     std::atomic<uint64_t> total_batch_process_us_{0};
+    std::atomic<uint64_t> total_infer_us_{0};
 
     void scheduler_loop();
     void process_batch(std::vector<std::pair<BatchRequest, std::shared_ptr<BatchResult>>>& batch);

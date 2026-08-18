@@ -209,23 +209,40 @@ void StreamDecoder::decode_loop() {
 
             // Transfer GPU frame to CPU NV12
             AVFrame* out_frame = hw_frame;
-            if (hw_frame->hw_frames_ctx) {
-                av_frame_unref(sw_frame);
-                sw_frame->format = AV_PIX_FMT_NV12;
-                sw_frame->width = hw_frame->width;
-                sw_frame->height = hw_frame->height;
-                if (av_frame_get_buffer(sw_frame, 0) < 0) continue;
-                if (av_hwframe_transfer_data(sw_frame, hw_frame, 0) == 0)
-                    out_frame = sw_frame;
-            }
-
             DecodedFrame df;
-            df.y_plane = out_frame->data[0];
-            df.uv_plane = out_frame->data[1];
+            const bool is_hw = hw_frame->hw_frames_ctx != nullptr;
+            if (is_hw) {
+                if (device_only_) {
+                    // 设备直通：仅暴露 device 指针，host 平面置空
+                    df.y_plane_device = hw_frame->data[0];
+                    df.uv_plane_device = hw_frame->data[1];
+                    df.y_step_device = hw_frame->linesize[0];
+                    df.uv_step_device = hw_frame->linesize[1];
+                    df.y_plane = nullptr;
+                    df.uv_plane = nullptr;
+                    df.y_step = 0;
+                    df.uv_step = 0;
+                } else {
+                    av_frame_unref(sw_frame);
+                    sw_frame->format = AV_PIX_FMT_NV12;
+                    sw_frame->width = hw_frame->width;
+                    sw_frame->height = hw_frame->height;
+                    if (av_frame_get_buffer(sw_frame, 0) < 0) continue;
+                    if (av_hwframe_transfer_data(sw_frame, hw_frame, 0) == 0)
+                        out_frame = sw_frame;
+                    df.y_plane = out_frame->data[0];
+                    df.uv_plane = out_frame->data[1];
+                    df.y_step = out_frame->linesize[0];
+                    df.uv_step = out_frame->linesize[1];
+                }
+            } else {
+                df.y_plane = out_frame->data[0];
+                df.uv_plane = out_frame->data[1];
+                df.y_step = out_frame->linesize[0];
+                df.uv_step = out_frame->linesize[1];
+            }
             df.width = out_frame->width;
             df.height = out_frame->height;
-            df.y_step = out_frame->linesize[0];
-            df.uv_step = out_frame->linesize[1];
             df.pts = out_frame->pts;
 
             if (callback_ && !callback_(df)) {
@@ -263,19 +280,29 @@ bool StreamDecoder::read_one_frame(DecodedFrame* out) {
                 out->uv_plane_device = read_hw_frame_->data[1];
                 out->y_step_device = read_hw_frame_->linesize[0];
                 out->uv_step_device = read_hw_frame_->linesize[1];
-                read_sw_frame_->format = AV_PIX_FMT_NV12;
-                read_sw_frame_->width = read_hw_frame_->width;
-                read_sw_frame_->height = read_hw_frame_->height;
-                if (av_frame_get_buffer(read_sw_frame_, 0) < 0) continue;
-                if (av_hwframe_transfer_data(read_sw_frame_, read_hw_frame_, 0) == 0)
-                    out_frame = read_sw_frame_;
+                if (!device_only_) {
+                    read_sw_frame_->format = AV_PIX_FMT_NV12;
+                    read_sw_frame_->width = read_hw_frame_->width;
+                    read_sw_frame_->height = read_hw_frame_->height;
+                    if (av_frame_get_buffer(read_sw_frame_, 0) < 0) continue;
+                    if (av_hwframe_transfer_data(read_sw_frame_, read_hw_frame_, 0) == 0)
+                        out_frame = read_sw_frame_;
+                }
             }
-            out->y_plane = out_frame->data[0];
-            out->uv_plane = out_frame->data[1];
+            if (device_only_ && read_hw_frame_->hw_frames_ctx) {
+                // 设备直通：仅暴露 device 指针，host 平面置空
+                out->y_plane = nullptr;
+                out->uv_plane = nullptr;
+                out->y_step = 0;
+                out->uv_step = 0;
+            } else {
+                out->y_plane = out_frame->data[0];
+                out->uv_plane = out_frame->data[1];
+                out->y_step = out_frame->linesize[0];
+                out->uv_step = out_frame->linesize[1];
+            }
             out->width = out_frame->width;
             out->height = out_frame->height;
-            out->y_step = out_frame->linesize[0];
-            out->uv_step = out_frame->linesize[1];
             out->pts = out_frame->pts;
             return true;
         }

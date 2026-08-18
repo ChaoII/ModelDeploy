@@ -173,6 +173,7 @@ struct PreprocWorkspace {
 
 static thread_local PreprocWorkspace ws0;
 static thread_local PreprocWorkspace ws1;
+static thread_local PreprocWorkspace ws2; // NV12 batch host 帧聚合上传槽
 
 // batch 参数数组池：一次 cudaMalloc 打包全部 kernel 参数，跨调用复用
 struct BatchParamWorkspace {
@@ -527,6 +528,208 @@ namespace modeldeploy::vision {
         if (is_internal_stream) cudaStreamDestroy(stream);
         if (err != cudaSuccess) {
             MD_LOG_ERROR << "batch kernel launch failed: " << cudaGetErrorString(err) << std::endl;
+            return false;
+        }
+        return true;
+    }
+
+    // ==================== NV12 batch fused preprocessing (3D grid) ====================
+    // 逐图源参数（设备数组，一次 H2D）：设备帧指针直传零拷贝，host 帧经聚合槽缓冲
+    struct Nv12BatchSrc {
+        const uint8_t* y_ptr;
+        const uint8_t* uv_ptr;
+        int w;
+        int h;
+        int step_y;
+        int step_uv;
+        float scale;
+        float pad_w;
+        float pad_h;
+    };
+
+    // 与 kernel_nv12_fusion 相同采样/换算（BT.601、最近邻、letterbox、/255），
+    // 额外带 batch 维（blockIdx.z）与逐图参数
+    __global__ void kernel_nv12_fusion_batch(
+        const Nv12BatchSrc* __restrict__ srcs,
+        float* __restrict__ dst,
+        const int dst_h,
+        const int dst_w,
+        const float pad_value) {
+        const int b = blockIdx.z;
+        const size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+        const size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+        if (x >= dst_w || y >= dst_h) return;
+
+        const Nv12BatchSrc src = srcs[b];
+        const int src_w = src.w;
+        const int src_h = src.h;
+        const int plane_size = dst_h * dst_w;
+        float* dst_b = dst + static_cast<size_t>(b) * 3 * plane_size;
+        const int dst_idx = y * dst_w + x;
+
+        const float src_xf = (static_cast<float>(x) - src.pad_w) / src.scale;
+        const float src_yf = (static_cast<float>(y) - src.pad_h) / src.scale;
+        if (src_xf < 0.0f || src_xf >= static_cast<float>(src_w) ||
+            src_yf < 0.0f || src_yf >= static_cast<float>(src_h)) {
+            dst_b[0 * plane_size + dst_idx] = (pad_value - k_mean[0]) * k_std[0];
+            dst_b[1 * plane_size + dst_idx] = (pad_value - k_mean[1]) * k_std[1];
+            dst_b[2 * plane_size + dst_idx] = (pad_value - k_mean[2]) * k_std[2];
+            return;
+        }
+
+        const int src_x = static_cast<int>(src_xf);
+        const int src_y = static_cast<int>(src_yf);
+        const float y_val = src.y_ptr[src_y * src.step_y + src_x];
+        const int uv_x = min(src_x >> 1, (src_w >> 1) - 1);
+        const int uv_y = min(src_y >> 1, (src_h >> 1) - 1);
+        const uint8_t* uv_row = src.uv_ptr + uv_y * src.step_uv;
+        const float u_val = static_cast<float>(uv_row[uv_x * 2 + 0]) - 128.0f;
+        const float v_val = static_cast<float>(uv_row[uv_x * 2 + 1]) - 128.0f;
+
+        float r = y_val + 1.402f * v_val;
+        float g = y_val - 0.344136f * u_val - 0.714136f * v_val;
+        float b_val = y_val + 1.772f * u_val;
+        r = fminf(fmaxf(r, 0.0f), 255.0f);
+        g = fminf(fmaxf(g, 0.0f), 255.0f);
+        b_val = fminf(fmaxf(b_val, 0.0f), 255.0f);
+
+        dst_b[0 * plane_size + dst_idx] = (r - k_mean[0]) * k_std[0];
+        dst_b[1 * plane_size + dst_idx] = (g - k_mean[1]) * k_std[1];
+        dst_b[2 * plane_size + dst_idx] = (b_val - k_mean[2]) * k_std[2];
+    }
+
+    bool yolo_preprocess_nv12_batch_cuda(const std::vector<ImageData>& images,
+                                         Tensor* output,
+                                         const std::vector<int>& dst_size,
+                                         float pad_value,
+                                         std::vector<LetterBoxRecord>* letter_box_records,
+                                         cudaStream_t stream,
+                                         CudaOutputBufferPool* dst_pool) {
+        if (images.empty() || dst_size.size() != 2) return false;
+        const int batch = static_cast<int>(images.size());
+        const int dst_w = dst_size[0];
+        const int dst_h = dst_size[1];
+
+        float* dst_ptr = wrap_output_tensor(output, dst_pool, {batch, 3, dst_h, dst_w},
+                                            DataType::FP32, output->get_name());
+        if (!dst_ptr) return false;
+
+        bool is_internal_stream = false;
+        if (stream == nullptr) {
+            if (cudaStreamCreate(&stream) != cudaSuccess) return false;
+            is_internal_stream = true;
+        }
+
+        std::vector<Nv12BatchSrc> srcs(batch);
+        letter_box_records->resize(batch);
+        size_t host_upload_bytes = 0;
+        for (int i = 0; i < batch; ++i) {
+            const ImageData& im = images[i];
+            if (im.plane_count() < 2) {
+                MD_LOG_ERROR << "yolo_preprocess_nv12_batch: image #" << i
+                             << " has < 2 planes" << std::endl;
+                return false;
+            }
+            const int sw = im.width(), sh = im.height();
+            const auto py = im.plane(0);
+            const auto pu = im.plane(1);
+            if (!py.data || !pu.data || sw <= 0 || sh <= 0 || (sh & 1) != 0) {
+                MD_LOG_ERROR << "yolo_preprocess_nv12_batch: invalid NV12 image #" << i
+                             << " (" << sw << "x" << sh << ")" << std::endl;
+                return false;
+            }
+            const int step_y = py.step > 0 ? py.step : sw;
+            const int step_uv = pu.step > 0 ? pu.step : sw;
+            const LetterBoxRecord rec = utils::cal_letter_box_param({sw, sh}, dst_size);
+            (*letter_box_records)[i] = rec;
+            Nv12BatchSrc& s = srcs[i];
+            s.w = sw;
+            s.h = sh;
+            s.step_y = step_y;
+            s.step_uv = step_uv;
+            s.scale = rec.scale;
+            s.pad_w = rec.pad_w;
+            s.pad_h = rec.pad_h;
+
+            cudaPointerAttributes attr{};
+            const bool is_device =
+                cudaPointerGetAttributes(&attr, py.data) == cudaSuccess &&
+                attr.type == cudaMemoryTypeDevice;
+            if (is_device) {
+                s.y_ptr = py.data;
+                s.uv_ptr = pu.data;
+            } else {
+                s.y_ptr = nullptr;   // 占位：host 帧，下面聚合 H2D 后填槽指针
+                s.uv_ptr = nullptr;
+                host_upload_bytes += static_cast<size_t>(sh) * step_y +
+                                     static_cast<size_t>(sh / 2) * step_uv;
+            }
+        }
+
+        // host 帧聚合上传（布局 [Y0..Yn][UV0..UVn]，逐图紧凑化）
+        if (host_upload_bytes > 0) {
+            if (ws2.capacity < host_upload_bytes) {
+                if (ws2.d_src) cudaFree(ws2.d_src);
+                if (cudaMalloc(&ws2.d_src, host_upload_bytes) != cudaSuccess) return false;
+                ws2.capacity = host_upload_bytes;
+            }
+            uint8_t* base = ws2.d_src;
+            for (int i = 0; i < batch; ++i) {
+                if (srcs[i].y_ptr != nullptr) continue;   // 设备帧直传
+                const int sw = images[i].width(), sh = images[i].height();
+                const auto py = images[i].plane(0);
+                const auto pu = images[i].plane(1);
+                const size_t yb = static_cast<size_t>(sh) * sw;
+                const size_t uvb = static_cast<size_t>(sh / 2) * sw;
+                if (srcs[i].step_y == sw) {
+                    if (cudaMemcpyAsync(base, py.data, yb, cudaMemcpyHostToDevice, stream) != cudaSuccess) return false;
+                } else {
+                    for (int r = 0; r < sh; ++r) {
+                        if (cudaMemcpyAsync(base + static_cast<size_t>(r) * sw,
+                                            py.data + static_cast<size_t>(r) * srcs[i].step_y,
+                                            sw, cudaMemcpyHostToDevice, stream) != cudaSuccess) return false;
+                    }
+                }
+                srcs[i].y_ptr = base;
+                srcs[i].step_y = sw;
+                base += yb;
+                if (srcs[i].step_uv == sw) {
+                    if (cudaMemcpyAsync(base, pu.data, uvb, cudaMemcpyHostToDevice, stream) != cudaSuccess) return false;
+                } else {
+                    for (int r = 0; r < sh / 2; ++r) {
+                        if (cudaMemcpyAsync(base + static_cast<size_t>(r) * sw,
+                                            pu.data + static_cast<size_t>(r) * srcs[i].step_uv,
+                                            sw, cudaMemcpyHostToDevice, stream) != cudaSuccess) return false;
+                    }
+                }
+                srcs[i].uv_ptr = base;
+                srcs[i].step_uv = sw;
+                base += uvb;
+            }
+        }
+
+        // 参数数组单块打包 + 线程局部池复用（避免每帧多次 cudaMalloc）
+        const size_t need = sizeof(Nv12BatchSrc) * batch;
+        if (param_ws.capacity < need) {
+            if (param_ws.d_ptr) cudaFree(param_ws.d_ptr);
+            if (cudaMalloc(&param_ws.d_ptr, need) != cudaSuccess) return false;
+            param_ws.capacity = need;
+        }
+        if (cudaMemcpyAsync(param_ws.d_ptr, srcs.data(), need, cudaMemcpyHostToDevice, stream) != cudaSuccess) {
+            return false;
+        }
+
+        dim3 block(16, 16);
+        dim3 grid((dst_w + block.x - 1) / block.x, (dst_h + block.y - 1) / block.y, batch);
+        kernel_nv12_fusion_batch<<<grid, block, 0, stream>>>(
+            reinterpret_cast<const Nv12BatchSrc*>(param_ws.d_ptr),
+            dst_ptr, dst_h, dst_w, pad_value);
+
+        const cudaError_t err = cudaGetLastError();
+        cudaStreamSynchronize(stream);
+        if (is_internal_stream) cudaStreamDestroy(stream);
+        if (err != cudaSuccess) {
+            MD_LOG_ERROR << "nv12 batch kernel launch failed: " << cudaGetErrorString(err) << std::endl;
             return false;
         }
         return true;

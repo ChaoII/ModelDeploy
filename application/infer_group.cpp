@@ -10,8 +10,14 @@
 
 using namespace modeldeploy::vision;
 
-InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory)
-    : cfg_(cfg), factory_(factory), frame_pool_(32) {
+InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory, bool batch_only)
+    : cfg_(cfg), factory_(factory), frame_pool_(32), batch_only_(batch_only) {
+}
+
+std::shared_ptr<uint8_t> InferGroup::acquire_device_buffer(size_t bytes) {
+    uint8_t* p = frame_pool_.acquire(bytes);
+    if (!p) return nullptr;
+    return std::shared_ptr<uint8_t>(p, [this](uint8_t* q) { frame_pool_.release(q); });
 }
 
 InferGroup::~InferGroup() {
@@ -32,6 +38,23 @@ static std::unique_ptr<InferenceEngine> make_engine(
 }
 
 bool InferGroup::init() {
+    if (batch_only_) {
+        // batch-only：不建引擎/不 warmup，gpu_nv12_ready_ 直接按 cfg 计算
+        if (cfg_.models.empty()) return false;
+        gpu_nv12_ready_ = true;
+        for (const auto& mcfg : cfg_.models) {
+            if (mcfg.type != "detection" || mcfg.device != "gpu" ||
+                mcfg.roi[2] > 0 || mcfg.roi[3] > 0) {
+                gpu_nv12_ready_ = false;
+                break;
+            }
+        }
+        std::cout << "[InferGroup] batch_only mode, gpu_nv12_ready_="
+                  << (gpu_nv12_ready_ ? "true" : "false")
+                  << " models=" << cfg_.models.size() << std::endl;
+        initialized_ = true;
+        return true;
+    }
     for (const auto& mcfg : cfg_.models) {
         auto engine = make_engine(mcfg, factory_);
         if (!engine) {
@@ -152,6 +175,11 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                               std::vector<InferResult>* results,
                               ImageData* frame_out, bool need_bgr) {
     if (!initialized_) return 0;
+    if (batch_only_) {
+        std::cerr << "[InferGroup] run_models called in batch_only mode (no engines built); "
+                  << "inference must go through BatchScheduler." << std::endl;
+        return 0;
+    }
     // 全程持模型锁：与 add/remove/update_model 串行化，防止遍历 engines_/workers_ 时被改写
     std::lock_guard<std::mutex> lock(models_mtx_);
     results->clear();
@@ -346,6 +374,7 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
 }
 
 bool InferGroup::add_model(const ModelConfig& mcfg) {
+    if (batch_only_) return false;
     std::lock_guard<std::mutex> lock(models_mtx_);
     auto engine = std::make_unique<InferenceEngine>();
     if (!engine->load(mcfg)) return false;
@@ -359,6 +388,7 @@ bool InferGroup::add_model(const ModelConfig& mcfg) {
 }
 
 bool InferGroup::remove_model(const std::string& name) {
+    if (batch_only_) return false;
     std::lock_guard<std::mutex> lock(models_mtx_);
     for (size_t i = 0; i < engines_.size(); ++i) {
         if (engines_[i]->config().name == name) {
@@ -374,6 +404,7 @@ bool InferGroup::remove_model(const std::string& name) {
 }
 
 bool InferGroup::update_model(const std::string& name, const ModelConfig& mcfg) {
+    if (batch_only_) return false;
     std::lock_guard<std::mutex> lock(models_mtx_);
     for (auto& eng : engines_) {
         if (eng->config().name == name) {

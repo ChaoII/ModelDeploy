@@ -17,7 +17,9 @@ set(TEST_SOURCES
     test_processor_accuracy.cpp
     test_insightface.cpp
     test_pipelines.cpp
+    test_nv12_batch_preproc.cpp
     test_benchmark_insightface.cpp
+    test_benchmark_yolo26n.cpp
     test_encryption.cpp
     baseline_compare.cpp
     baseline_utils.cpp

@@ -65,6 +65,7 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["decoder"]["timeout_us"] = cfg.decoder.timeout_us;
     j["decoder"]["rtsp_transport"] = cfg.decoder.rtsp_transport;
     j["decoder"]["hw_accel"] = cfg.decoder.hw_accel;
+    j["decoder"]["device_only"] = cfg.decoder.device_only;
 
     j["encoder"]["fps"] = cfg.encoder.fps;
     j["encoder"]["bitrate_kbps"] = cfg.encoder.bitrate_kbps;
@@ -115,6 +116,7 @@ TaskConfig task_config_from_json(const json& j) {
         if (d.contains("timeout_us")) cfg.decoder.timeout_us = d["timeout_us"];
         if (d.contains("rtsp_transport") && d["rtsp_transport"].is_string()) cfg.decoder.rtsp_transport = d["rtsp_transport"];
         if (d.contains("hw_accel") && d["hw_accel"].is_string()) cfg.decoder.hw_accel = d["hw_accel"];
+        if (d.contains("device_only") && d["device_only"].is_boolean()) cfg.decoder.device_only = d["device_only"];
     }
 
     if (j.contains("encoder") && j["encoder"].is_object()) {

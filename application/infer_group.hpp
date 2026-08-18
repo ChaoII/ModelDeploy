@@ -19,7 +19,8 @@ class InferGroup {
 public:
     using ModelFactory = std::function<std::unique_ptr<InferenceEngine>(const ModelConfig&)>;
 
-    explicit InferGroup(const TaskConfig& cfg, ModelFactory factory = nullptr);
+    explicit InferGroup(const TaskConfig& cfg, ModelFactory factory = nullptr,
+                        bool batch_only = false);
     ~InferGroup();
 
     /// 初始化所有模型 + 启动 worker 线程池
@@ -45,6 +46,11 @@ public:
 
     /// 是否可走 GPU NV12 直通（所有模型为 detection + device=gpu + 无 ROI）
     bool gpu_nv12_ready() const { return gpu_nv12_ready_; }
+    bool batch_only() const { return batch_only_; }
+
+    /// 从设备显存池获取一块≥bytes 的缓冲，shared_ptr 析构自动归还池（非 cudaFree）。
+    /// 供 Pipeline 的 CUVID D2D 目的端复用，避免每帧 cudaMalloc。失败返回 nullptr。
+    std::shared_ptr<uint8_t> acquire_device_buffer(size_t bytes);
 
     bool add_model(const ModelConfig& cfg);
     bool remove_model(const std::string& name);
@@ -62,6 +68,8 @@ private:
     PerfStats stats_;
     FramePool frame_pool_;
     std::atomic<bool> initialized_{false};
+    // batch-only 模式：本组不建引擎/不 warmup，推理统一走 BatchScheduler（省 N×TRT context）
+    bool batch_only_ = false;
 
     // 复用缓冲：避免每帧分配
     std::vector<uint8_t> nv12_buf_;

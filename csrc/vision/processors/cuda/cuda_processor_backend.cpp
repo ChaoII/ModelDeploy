@@ -15,7 +15,9 @@ namespace modeldeploy::vision {
     static cudaStream_t get_persistent_stream(void** slot) {
         cudaStream_t s = static_cast<cudaStream_t>(*slot);
         if (!s) {
-            cudaStreamCreate(&s);
+            // NonBlocking：不与默认流(stream 0)隐式同步。否则与 20 路解码默认流上的
+            // 同步 D2D 拷贝串行化，批推理耗时膨胀 ~5×（实测 23ms→4.6ms/batch-8）。
+            cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
             *slot = s;
         }
         return s;
@@ -85,6 +87,20 @@ namespace modeldeploy::vision {
                                                      const std::vector<int>& dst_size,
                                                      float pad_val,
                                                      std::vector<LetterBoxRecord>* records) {
+        // NV12 帧（设备/host）→ NV12 融合 kernel：设备帧零 PCIe，host 帧聚合 H2D
+        if (!images.empty()) {
+            bool all_nv12 = true;
+            for (const auto& im : images) {
+                if (im.type() != MdImageType::NV12 || im.plane_count() < 2) {
+                    all_nv12 = false;
+                    break;
+                }
+            }
+            if (all_nv12) {
+                return yolo_preprocess_nv12_batch_cuda(images, out, dst_size, pad_val, records,
+                                                       get_persistent_stream(&stream_), &out_pool_);
+            }
+        }
         return yolo_preprocess_batch_cuda(images, out, dst_size, pad_val, records,
                                           get_persistent_stream(&stream_), &out_pool_);
     }

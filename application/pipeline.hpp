@@ -53,6 +53,8 @@ struct EncodedFrame {
     // P3 GPU 编码：上游若已产生 GPU BGR（设备指针）则编码段走 encode_from_gpu。
     // 调用方必须保证 device buffer 生命周期覆盖编码线程消费完成
     const uint8_t* gpu_bgr = nullptr;
+    // 设备 NV12 快照（紧凑 YUV NV12，step==width）。持所有权，覆盖 encode_loop 消费完成。
+    std::shared_ptr<uint8_t> gpu_nv12;
 };
 
 /// 单路视频流水线：三段异步流水线

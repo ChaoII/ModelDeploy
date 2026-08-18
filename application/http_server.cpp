@@ -228,6 +228,7 @@ void HttpServer::register_routes() {
         j["time"] = std::time(nullptr);
         j["batch_avg_size"] = mgr_.batch_scheduler() ? mgr_.batch_scheduler()->avg_batch_size() : 0.0;
         j["batch_avg_process_ms"] = mgr_.batch_scheduler() ? mgr_.batch_scheduler()->avg_batch_process_us() / 1000.0 : 0.0;
+    j["batch_avg_infer_ms"] = mgr_.batch_scheduler() ? mgr_.batch_scheduler()->avg_batch_infer_us() / 1000.0 : 0.0;
         res.set_content(ok_json({{"metrics", j}}), "application/json");
     });
 
