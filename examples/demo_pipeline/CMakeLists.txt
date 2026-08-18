@@ -9,3 +9,11 @@ endif()
 
 add_executable(demo_pedestrian_attribute_cxx demo_pedestrian_attribute_cxx.cpp)
 target_link_libraries(demo_pedestrian_attribute_cxx PUBLIC ${LIBRARY_NAME})
+
+if(ENABLE_SOPHGO)
+    add_executable(demo_pedestrian_attribute_sophgo demo_pedestrian_attribute_sophgo.cpp)
+    target_link_libraries(demo_pedestrian_attribute_sophgo PUBLIC ${LIBRARY_NAME})
+
+    add_executable(demo_sophgo_clone demo_sophgo_clone.cpp)
+    target_link_libraries(demo_sophgo_clone PUBLIC ${LIBRARY_NAME} ${SOPHGO_LIBS})
+endif()
