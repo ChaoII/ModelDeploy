@@ -153,7 +153,7 @@ void BatchScheduler::process_batch(
 #else
         auto nv12_image = ImageData::from_raw(nv12_buf_.data(), req.width, req.height,
                                                 MdImageType::NV12, true);
-        auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
+        auto bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PKG_BGR);
 #endif
         // 非预览路：推理结果已足够，无需把 BGR 传回 pipeline（省一次深拷贝）
         if (req.need_bgr) {

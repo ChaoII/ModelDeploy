@@ -406,7 +406,7 @@ namespace modeldeploy::vision::utils {
         const int left = (img_width - crop_width) / 2;
         // 使用子矩阵操作进行裁剪, 裁剪后cv::Mat 内存不连续，需要执行clone()操作
         const cv::Mat cropped_image = cv_image(cv::Rect(left, top, crop_width, crop_height)).clone();
-        return ImageData(std::move(cropped_image));
+        return ImageData(cropped_image);
     }
 
     void print_mat_type(const cv::Mat& mat) {

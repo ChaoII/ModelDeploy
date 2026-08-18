@@ -14,7 +14,7 @@ namespace modeldeploy::vision {
                   [](face::FaceRecognizerPipeline& self, pybind11::array& image) {
                       const auto mat = pyarray_to_cv_mat(image);
                       std::vector<FaceRecognitionResult> result;
-                      self.predict(ImageData(std::move(mat)), &result);
+                      self.predict(ImageData(mat), &result);
                       return result;
                   }, pybind11::arg("image"))
             .def("clone", [](const face::FaceRecognizerPipeline& self) {

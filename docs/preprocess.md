@@ -4,7 +4,7 @@
 
 ## 1. ImageData（图像类型）
 
-`ImageData` 是 ModelDeploy 的图像封装，底层基于 OpenCV Mat，默认 **BGR HWC uint8** 布局。
+`ImageData` 是 ModelDeploy 的图像封装，采用**统一平面存储**（`fmt/w/h/ch/device/planes/owner`），默认 **BGR HWC uint8** 单平面布局；`cv::Mat` 仅作为输入桥（`ImageData(Mat)`/`from_raw` 摄取）与 `asMat()`/`plane()` 弹出，不再作为内部数据源。多平面格式（NV12/NV21=2 平面、I420=3 平面）自描述并显式路由到处理器后端。
 
 ### 1.1 读取 / 保存
 

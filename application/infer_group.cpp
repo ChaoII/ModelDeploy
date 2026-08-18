@@ -208,7 +208,7 @@ int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
                                               MdImageType::PKG_BGR_U8, true); // copy=true：独立所有权，防跨队列缓冲别名竞争
 #else
         auto nv12_image = ImageData::from_raw(y_src, width, height, MdImageType::NV12, true);
-        bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PA_BGR);
+        bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PKG_BGR);
 #endif
         if (frame_out)
             *frame_out = bgr_image;

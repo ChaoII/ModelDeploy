@@ -39,7 +39,7 @@ namespace modeldeploy::vision {
                  [](face::InsightFaceDet& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<face::InsightFaceBox> result;
-                     self.predict(ImageData(std::move(mat)), &result);
+                     self.predict(ImageData(mat), &result);
                      return result;
                  }, pybind11::arg("image"))
             .def_property_readonly("preprocessor", &face::InsightFaceDet::get_preprocessor)
@@ -54,7 +54,7 @@ namespace modeldeploy::vision {
                     const std::array<float, 4>& bbox) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<std::array<float, 2>> landmarks;
-                     self.predict_2d106(ImageData(std::move(mat)), bbox, &landmarks);
+                     self.predict_2d106(ImageData(mat), bbox, &landmarks);
                      return landmarks;
                  }, pybind11::arg("image"), pybind11::arg("bbox"))
             .def("predict_3d68",
@@ -63,7 +63,7 @@ namespace modeldeploy::vision {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<std::array<float, 3>> landmarks;
                      std::array<float, 3> pose{0, 0, 0};
-                     self.predict_3d68(ImageData(std::move(mat)), bbox, &landmarks, &pose);
+                     self.predict_3d68(ImageData(mat), bbox, &landmarks, &pose);
                      return pybind11::make_tuple(landmarks, pose);
                  }, pybind11::arg("image"), pybind11::arg("bbox"));
 
@@ -76,7 +76,7 @@ namespace modeldeploy::vision {
                     const std::vector<std::array<float, 2>>& kps) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<float> embedding;
-                     self.predict(ImageData(std::move(mat)), kps, &embedding);
+                     self.predict(ImageData(mat), kps, &embedding);
                      return embedding;
                  }, pybind11::arg("image"), pybind11::arg("kps"));
 
@@ -89,7 +89,7 @@ namespace modeldeploy::vision {
                     const std::array<float, 4>& bbox) {
                      const auto mat = pyarray_to_cv_mat(image);
                      face::GenderAgeResult result;
-                     self.predict_gender_age(ImageData(std::move(mat)), bbox, &result);
+                     self.predict_gender_age(ImageData(mat), bbox, &result);
                      return pybind11::make_tuple(result.gender, result.age);
                  }, pybind11::arg("image"), pybind11::arg("bbox"));
 
@@ -109,7 +109,7 @@ namespace modeldeploy::vision {
                     bool with_2d106, bool with_3d68, bool with_recognition, bool with_genderage) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<face::InsightFaceResult> results;
-                     self.analyze(ImageData(std::move(mat)), &results,
+                     self.analyze(ImageData(mat), &results,
                                   with_2d106, with_3d68, with_recognition, with_genderage);
                      return results;
                  }, pybind11::arg("image"),
@@ -121,7 +121,7 @@ namespace modeldeploy::vision {
                  [](face::InsightFaceAnalysis& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
                      std::vector<face::InsightFaceBox> boxes;
-                     self.detect(ImageData(std::move(mat)), &boxes);
+                     self.detect(ImageData(mat), &boxes);
                      return boxes;
                  }, pybind11::arg("image"))
             .def("set_det_thresh", &face::InsightFaceAnalysis::set_det_thresh)
