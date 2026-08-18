@@ -549,17 +549,31 @@ TEST_CASE("image_data: device-frame op not supported errors (no silent cpu)", "[
 }
 
 TEST_CASE("image_data: imread/imencode/imwrite roundtrip (CPU)", "[core]") {
-    auto img = modeldeploy::vision::ImageData::imread("test_data/test_images/test_detection0.jpg");
+    const int w = 50, h = 50;
+    std::vector<unsigned char> bgr(static_cast<size_t>(w) * h * 3);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            bgr[(y * w + x) * 3 + 0] = static_cast<unsigned char>(x);
+            bgr[(y * w + x) * 3 + 1] = static_cast<unsigned char>(y);
+            bgr[(y * w + x) * 3 + 2] = 128;
+        }
+    auto img = modeldeploy::vision::ImageData::from_bgr24(bgr.data(), w, h);
     REQUIRE(!img.empty());
+
     auto buf = modeldeploy::vision::ImageData::imencode(img, ".jpg");
     REQUIRE(!buf.empty());
     auto dec = modeldeploy::vision::ImageData::imdecode(buf);
     REQUIRE(!dec.empty());
-    CHECK(dec.width() == img.width());
-    CHECK(dec.height() == img.height());
-    std::string tmp = "capi2_plan_t3_out.jpg";
-    REQUIRE(img.imwrite(tmp));
-    std::remove(tmp.c_str());
+    CHECK(dec.width() == w);
+    CHECK(dec.height() == h);
+
+    auto tmp = std::filesystem::temp_directory_path() / "md_t3_roundtrip.png";
+    REQUIRE(img.imwrite(tmp.string()));
+    auto loaded = modeldeploy::vision::ImageData::imread(tmp.string());
+    REQUIRE(!loaded.empty());
+    CHECK(loaded.width() == w);
+    CHECK(loaded.height() == h);
+    std::filesystem::remove(tmp);
 }
 
 TEST_CASE("image_data: device nv12 frame imencode/imwrite rejected (no silent cpu)", "[core]") {
