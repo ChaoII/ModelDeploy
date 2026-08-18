@@ -68,6 +68,21 @@ namespace modeldeploy::vision {
                             float x, float y, const std::string& text,
                             float r, float g, float b, int font_size) override;
 
+        // ── 中间图像算子：设备帧未实现 → 返回 false（ImageData 置 last_error，不静默回退 CPU）──
+        bool crop(const ImageData& image, float x, float y, float w, float h,
+                  ImageData* out) override {
+            (void)image; (void)x; (void)y; (void)w; (void)h; (void)out;
+            return false;
+        }
+        bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override {
+            (void)image; (void)flag; (void)out;
+            return false;
+        }
+        bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override {
+            (void)image; (void)type; (void)out;
+            return false;
+        }
+
         ~CudaProcessorBackend() override;
 
     private:

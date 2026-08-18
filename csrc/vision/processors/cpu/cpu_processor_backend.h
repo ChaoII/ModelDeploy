@@ -41,6 +41,10 @@ namespace modeldeploy::vision {
                                     std::vector<LetterBoxRecord>* records) override;
         bool resize(const ImageData& image, ImageData* out,
                     int width, int height) override;
+        bool crop(const ImageData& image, float x, float y, float w, float h,
+                  ImageData* out) override;
+        bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override;
+        bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override;
         bool fusion_resize_pad_normalize_permute(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<std::array<int, 2>>& resize_sizes,

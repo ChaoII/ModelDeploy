@@ -519,3 +519,32 @@ TEST_CASE("image_data: from_bgr24 is usable by OpenCV members", "[core]") {
     CHECK_FALSE(encoded.empty());
 }
 
+TEST_CASE("image_data: crop/rotate/cvt_color dispatch via CPU backend", "[core]") {
+    std::vector<unsigned char> bgr(10 * 8 * 3, 0);
+    for (int i = 0; i < 10 * 8; ++i) bgr[i * 3] = static_cast<unsigned char>(i % 256);
+    auto img = modeldeploy::vision::ImageData::from_bgr24(bgr.data(), 10, 8);
+    // crop
+    auto c = img.crop({2, 2, 4, 4});
+    REQUIRE(!c.empty());
+    CHECK(c.width() == 4);
+    CHECK(c.height() == 4);
+    // rotate
+    auto r = img.clone().rotate(ROTATE_90);
+    CHECK(r.width() == 8);
+    CHECK(r.height() == 10);
+    // cvt_color BGR->GRAY
+    auto g = modeldeploy::vision::ImageData::cvt_color(img, ColorConvertType::CVT_PA_BGR2GRAY);
+    REQUIRE(!g.empty());
+    CHECK(g.format() == MdImageType::GRAY_U8);
+}
+
+TEST_CASE("image_data: device-frame op not supported errors (no silent cpu)", "[core]") {
+    std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
+    auto dev = modeldeploy::vision::ImageData::from_device_planes(
+        y.data(), uv.data(), 8, 4, 8, 8, Device::GPU);
+    modeldeploy::vision::ImageData::last_error();           // 先清空
+    auto c = dev.crop({0, 0, 2, 2});
+    CHECK(c.empty());                                       // 设备帧未实现 → 空
+    CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);  // 且报错
+}
+

@@ -6,12 +6,24 @@
 #include "core/md_log.h"
 #include "vision/common/convert.h"
 #include "vision/common/image_data.h"
+#include "vision/processors/processor_factory.h"
 #include <opencv2/opencv.hpp>
 
 
 namespace modeldeploy::vision {
     // thread_local 错误通道
     static thread_local std::string g_last_error_msg;
+
+    // 置错误（成功返回 true 的操作不调用；失败时写入含 op 名的可读信息）
+    static void set_last_error(const std::string& msg) {
+        g_last_error_msg = msg;
+    }
+
+    // 按设备分派到对应预处理后端（CPU 由 CpuProcessorBackend 实现；设备帧由各自后端，
+    // 未实现 → 返回 false，ImageData 置 last_error，不静默回退 CPU）
+    static std::unique_ptr<VisionProcessorBackend> backend_for(Device d) {
+        return create_processor_backend(d, d == Device::TPU ? Backend::SOPHGO : Backend::ORT, 0);
+    }
 
     // 承载抽象：CPU=OpenCV、设备/借用=平面+RAII
     struct ImageDataStorage {
@@ -426,15 +438,13 @@ namespace modeldeploy::vision {
         if (!impl_ || impl_->empty()) {
             return *this;
         }
-        cv::rotate(impl_->mat(), impl_->mat(), flag);
-        // 仅真正的单平面 packed CPU 借用图（rotate 确实就地平移到真实 mat 上）才交换宽高；
-        // 设备/借用(non-CPU) 或 NV12 等无法包装成单平面 mat 的帧保持旧 no-op（mat 为空，不交换）
-        if (impl_->is_cpu_plane() && !impl_->mat().empty()
-            && (flag == RotateFlags::ROTATE_90 || flag == RotateFlags::ROTATE_270)) {
-            std::swap(impl_->width, impl_->height);
-            impl_->set_cpu_plane_dims(impl_->width, impl_->height);
+        g_last_error_msg.clear();
+        ImageData out;
+        if (!backend_for(device())->rotate(*this, flag, &out)) {
+            set_last_error("rotate: backend could not process the image (device frame or unsupported)");
+            return *this;
         }
-        impl_->refresh_meta();
+        *this = std::move(out);
         return *this;
     }
 
@@ -443,14 +453,13 @@ namespace modeldeploy::vision {
         if (!impl_ || impl_->empty()) {
             return ImageData();
         }
-        cv::Rect2f cv_rect(rect.x, rect.y, rect.width, rect.height);
-        // 确保矩形在图像范围内
-        cv_rect = cv_rect & cv::Rect2f(0, 0, impl_->width, impl_->height);
-        if (cv_rect.width <= 0 || cv_rect.height <= 0) {
-            return ImageData();
+        g_last_error_msg.clear();
+        ImageData out;
+        if (backend_for(device())->crop(*this, rect.x, rect.y, rect.width, rect.height, &out)) {
+            return out;
         }
-        cv::Mat cropped = impl_->mat()(cv_rect).clone();
-        return ImageData(std::move(cropped));
+        set_last_error("crop: backend could not process the image (device frame or unsupported)");
+        return ImageData();
     }
 
     ImageData ImageData::rotate_crop(std::array<float, 8> box) const {
@@ -514,23 +523,32 @@ namespace modeldeploy::vision {
         if (!impl_ || impl_->empty() || width <= 0 || height <= 0) {
             return ImageData();
         }
-
-        cv::Mat resized;
-        cv::resize(impl_->mat(), resized, cv::Size(width, height));
-        return ImageData(std::move(resized));
+        g_last_error_msg.clear();
+        ImageData out;
+        if (backend_for(device())->resize(*this, &out, width, height)) {
+            return out;
+        }
+        set_last_error("resize: backend could not process the image (device frame or unsupported)");
+        return ImageData();
     }
 
     ImageData ImageData::cvt_color(const ImageData& image, const ColorConvertType type) {
         if (!image.impl_ || image.impl_->empty()) {
             return ImageData();
         }
+        g_last_error_msg.clear();
         const auto ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
         if (ocv_type > 0) {
-            cv::Mat converted;
-            cv::cvtColor(image.impl_->mat(), converted, ocv_type);
-            return ImageData(std::move(converted));
+            // OpenCV 原生颜色转换：按设备经 backend 分派（设备帧未实现 → 报错，不静默）
+            ImageData out;
+            if (backend_for(image.device())->cvt_color(image, type, &out)) {
+                return out;
+            }
+            set_last_error("cvt_color: backend could not process the image (device frame or unsupported)");
+            return ImageData();
         }
         if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB) {
+            // PL↔PA 拆合需要私有 impl 访问，留在本 TU 完成（与后端返回的 packed mat 等价）
             ImageData dst_image;
             dst_image.impl_ = std::make_shared<ImageDataImpl>();
             const int single_channel_type = CV_MAKETYPE(image.impl_->mat().depth(), 1);
@@ -554,7 +572,8 @@ namespace modeldeploy::vision {
             // valid chw format
             if (image.type() != MdImageType::PLA_BGR_U8 && image.type() != MdImageType::PLA_BGR_F32
                 && image.type() != MdImageType::PLA_RGB_U8 && image.type() != MdImageType::PLA_RGB_F32) {
-                throw std::runtime_error("Invalid PL_BGR format: expected Planar layout");
+                set_last_error("cvt_color: invalid planar layout (expected Planar format)");
+                return ImageData();
             }
             ImageData dst_image;
             dst_image.impl_ = std::make_shared<ImageDataImpl>();
@@ -581,7 +600,8 @@ namespace modeldeploy::vision {
             dst_image.impl_->refresh_meta();
             return dst_image;
         }
-        throw std::runtime_error("Unsupported color conversion type");
+        set_last_error("cvt_color: unsupported color conversion type");
+        return ImageData();
     }
 
     void ImageData::images_to_tensor(const std::vector<ImageData>& images, Tensor* tensor) {

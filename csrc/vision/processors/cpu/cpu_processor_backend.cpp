@@ -9,6 +9,7 @@
 #include "vision/processors/cpu/nv12_to_bgr.h"
 #include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
 #include "vision/processors/cpu/draw_nv12.h"
+#include "vision/common/convert.h"
 #include "vision/utils.h"
 #include "vision/face/face_det/scrfd_preproc.h"
 
@@ -84,8 +85,53 @@ namespace modeldeploy::vision {
 
     bool CpuProcessorBackend::resize(const ImageData& image, ImageData* out,
                                      int width, int height) {
-        *out = image.resize(width, height);
-        return !out->empty();
+        if (!out || width <= 0 || height <= 0) return false;
+        cv::Mat src;
+        if (!image.asMat(&src)) return false;
+        cv::Mat resized;
+        cv::resize(src, resized, cv::Size(width, height));
+        if (resized.empty()) return false;
+        *out = ImageData(std::move(resized));
+        return true;
+    }
+
+    bool CpuProcessorBackend::crop(const ImageData& image, float x, float y,
+                                   float w, float h, ImageData* out) {
+        if (!out || w <= 0 || h <= 0) return false;
+        cv::Mat src;
+        if (!image.asMat(&src)) return false;
+        cv::Rect2f cv_rect(x, y, w, h);
+        cv_rect = cv_rect & cv::Rect2f(0, 0, static_cast<float>(src.cols), static_cast<float>(src.rows));
+        if (cv_rect.width <= 0 || cv_rect.height <= 0) return false;
+        cv::Mat cropped = src(cv_rect).clone();
+        if (cropped.empty()) return false;
+        *out = ImageData(std::move(cropped));
+        return true;
+    }
+
+    bool CpuProcessorBackend::rotate(const ImageData& image, RotateFlags flag, ImageData* out) {
+        if (!out) return false;
+        cv::Mat src;
+        if (!image.asMat(&src)) return false;
+        cv::Mat rotated;
+        cv::rotate(src, rotated, static_cast<int>(flag));
+        if (rotated.empty()) return false;
+        *out = ImageData(std::move(rotated));
+        return true;
+    }
+
+    bool CpuProcessorBackend::cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) {
+        if (!out) return false;
+        const int ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
+        // 仅处理 OpenCV 原生颜色转换；PL↔PA 拆合在 ImageData 内部完成（需要私有 impl 访问）
+        if (ocv_type <= 0) return false;
+        cv::Mat src;
+        if (!image.asMat(&src)) return false;
+        cv::Mat converted;
+        cv::cvtColor(src, converted, ocv_type);
+        if (converted.empty()) return false;
+        *out = ImageData(std::move(converted));
+        return true;
     }
 
     bool CpuProcessorBackend::fusion_resize_pad_normalize_permute(

@@ -62,6 +62,22 @@ namespace modeldeploy::vision {
         virtual bool resize(const ImageData& image, ImageData* out,
                             int width, int height) = 0;
 
+        // 中间图像算子（crop/rotate/cvt_color）：由 ImageData 按 device() 分派到这里。
+        // 默认返回 false（未实现后端 → ImageData 置 last_error，不静默回退 CPU）。
+        virtual bool crop(const ImageData& image, float x, float y, float w, float h,
+                          ImageData* out) {
+            (void)image; (void)x; (void)y; (void)w; (void)h; (void)out;
+            return false;
+        }
+        virtual bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) {
+            (void)image; (void)flag; (void)out;
+            return false;
+        }
+        virtual bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) {
+            (void)image; (void)type; (void)out;
+            return false;
+        }
+
         // 整批融合算子（OCR det 用：resize+pad+normalize+permute，batch 内统一 pad）
         virtual bool fusion_resize_pad_normalize_permute(
             const std::vector<ImageData>& images, Tensor* out,
