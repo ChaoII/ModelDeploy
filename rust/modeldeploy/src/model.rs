@@ -751,9 +751,6 @@ impl ResultType for InsightFaceDetModel {
 impl ResultType for FaceRecognizerPipelineModel {
     type Item = FaceRecognition;
 }
-impl ResultType for FaceGenderAgeModel {
-    type Item = InsightFace;
-}
 
 model_wrapper!(DbDetectorModel, ModelKind::OcrDet, RawResult::ocr);
 model_wrapper!(RecognizerModel, ModelKind::OcrRec, RawResult::ocr);
@@ -762,7 +759,6 @@ model_wrapper!(LprDetectionModel, ModelKind::LprDet, RawResult::lpr);
 model_wrapper!(LprRecognizerModel, ModelKind::LprRec, RawResult::lpr);
 model_wrapper!(InsightFaceDetModel, ModelKind::InsightFaceDet, RawResult::face_det);
 model_wrapper!(FaceRecognizerPipelineModel, ModelKind::FaceRecPipeline, RawResult::face_recognition_all);
-model_wrapper!(FaceGenderAgeModel, ModelKind::FaceAs, RawResult::insightface);
 
 // ═══ 音频模型（非 predict 形态，单独实现） ═══
 

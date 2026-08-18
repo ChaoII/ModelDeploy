@@ -513,15 +513,16 @@ public class AllModelsTests
     [Test]
     public void FaceGenderAge_Works()
     {
-        var model = Path.Combine(ModelRoot, "insightface", "buffalo_l", "genderage.onnx");
+        // 年龄/性别是 face/ 下的两个独立 Seeta 子模型（非 insightface genderage）。
+        var ageModel = Path.Combine(ModelRoot, "face", "age_predictor.onnx");
+        var genderModel = Path.Combine(ModelRoot, "face", "gender_predictor.onnx");
         var img = Path.Combine(ImageRoot, "test_face1.jpg");
-        if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
+        if (!Has(ageModel) || !Has(genderModel) || !Has(img)) Assert.Ignore("data missing");
         using var vi = VisionImage.Read(img);
-        using var m = new FaceGenderAgeModel(model, CpuOrt());
-        using var r = m.Predict(vi);
-        Assert.That(r.Count, Is.GreaterThan(0));
-        Assert.That(r[0].Gender, Is.GreaterThanOrEqualTo(0));
-        Assert.That(r[0].Age, Is.GreaterThanOrEqualTo(0));
+        using var ageM = new FaceAgeModel(ageModel, CpuOrt());
+        using var genderM = new FaceGenderModel(genderModel, CpuOrt());
+        Assert.That(ageM.Predict(vi), Is.GreaterThanOrEqualTo(0));
+        Assert.That(genderM.Predict(vi), Is.GreaterThanOrEqualTo(0));
     }
 
     [Test]

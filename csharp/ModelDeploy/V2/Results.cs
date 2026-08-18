@@ -178,15 +178,6 @@ namespace ModelDeploy.V2.Results
         public int SampleRate { get; set; }
     }
 
-    /// <summary>人脸年龄/性别（FACE_AS 子模型结果）。</summary>
-    public sealed class FaceGenderAgeResult
-    {
-        public RectF Box { get; set; }
-        public int Gender { get; set; } = -1;
-        public int Age { get; set; } = -1;
-        public override string ToString() => $"FaceGenderAge(gender={Gender}, age={Age})";
-    }
-
     /// <summary>车牌检测结果（LPR_DET 子模型，仅框 + 置信度）。</summary>
     public sealed class LprDetResult
     {

@@ -684,30 +684,4 @@ namespace ModelDeploy.V2.Models
             return list.ToArray();
         }
     }
-
-    /// <summary>人脸年龄/性别子模型（对应 C++ InsightFaceGenderAge）。modelPath 为 genderage.onnx。</summary>
-    public sealed class FaceGenderAgeModel : BaseModel
-    {
-        private FaceGenderAgeModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_AS, handle) { }
-        public FaceGenderAgeModel Clone() => new FaceGenderAgeModel(CloneNative());
-        public FaceGenderAgeModel(string modelPath, RuntimeOption2 opt = null)
-            : base(MDModelKind.MD_MODEL_FACE_AS, modelPath, opt) { }
-
-        public Prediction<FaceGenderAgeResult> Predict(VisionImage image)
-            => MakePrediction(image, ReadGenderAge);
-
-        private static FaceGenderAgeResult[] ReadGenderAge(IntPtr result)
-        {
-            var items = ResultReader.ReadItems<MDInsightFaceItem>(result, md_result_insightface);
-            var list = new List<FaceGenderAgeResult>(items.Length);
-            foreach (var it in items)
-                list.Add(new FaceGenderAgeResult
-                {
-                    Box = new RectF(it.x, it.y, it.w, it.h),
-                    Gender = it.gender,
-                    Age = it.age
-                });
-            return list.ToArray();
-        }
-    }
 }

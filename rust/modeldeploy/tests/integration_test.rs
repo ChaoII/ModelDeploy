@@ -1,6 +1,6 @@
 use anyhow::Result;
 use modeldeploy::{
-    Classification, DbDetectorModel, DrawOptions, FaceGenderAgeModel, FaceRecognizerPipelineModel,
+    Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
     Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
     RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, UltralyticsDepth,
@@ -325,21 +325,6 @@ fn test_face_rec_pipeline_submodel() -> Result<()> {
     let recs = model.predict(&img)?;
     assert!(!recs.is_empty());
     assert!(recs[0].embedding.len() > 0);
-    Ok(())
-}
-
-#[test]
-fn test_face_gender_age_submodel() -> Result<()> {
-    let opt = cpu_opt()?;
-    let model = FaceGenderAgeModel::new(
-        &test_data("test_models/onnx/insightface/buffalo_l/genderage.onnx"),
-        &opt,
-    )?;
-    let img = Image::read(&test_img("test_face1.jpg"))?;
-    let faces = model.predict(&img)?;
-    assert!(!faces.is_empty());
-    assert!(faces[0].gender >= 0);
-    assert!(faces[0].age >= 0);
     Ok(())
 }
 
