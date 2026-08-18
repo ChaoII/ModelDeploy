@@ -41,16 +41,46 @@ namespace modeldeploy::vision {
         size_t element_count_ = 0, element_bytes_ = 0, bytes_ = 0;
         std::shared_ptr<ImageDataStorage> storage;
 
-        // CPU 事实数据源 mat（设备/借用模式返回空 mat，保持旧"对设备帧操作空 mat"行为）
+        // per-instance：CPU 借用平面包装 mat 的缓存 + 设备/借用(non-CPU) 的空 mat
+        // （替代旧 shared static empty，避免并发线程在设备帧上写同一共享对象）
+        mutable cv::Mat plane_mat_;
+
+        // CPU 事实数据源 mat；CPU 借用平面 → 包装成借用 mat（不复制）；设备/借用(non-CPU) → 空 mat（保持旧 no-op 行为）
         cv::Mat& mat() {
             if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat;
-            static cv::Mat empty;
-            return empty;
+            return materialize_plane_mat();
         }
         const cv::Mat& mat() const {
             if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat;
-            static cv::Mat empty;
-            return empty;
+            return materialize_plane_mat();
+        }
+
+        // 仅 CPU 借用平面（from_bgr24 等）把外置平面包装成借用 mat；设备/借用(non-CPU) 返回空 mat（不 materialize）
+        cv::Mat& materialize_plane_mat() const {
+            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) {
+                if (ps->device == Device::CPU && !ps->planes.empty() && ps->planes[0].data && ps->w > 0 && ps->h > 0) {
+                    const int ocv_type = md_image_type_to_ocv_type(ps->fmt);
+                    if (ocv_type > 0) {
+                        plane_mat_ = cv::Mat(ps->h, ps->w, ocv_type,
+                                             const_cast<uint8_t*>(ps->planes[0].data));
+                        return plane_mat_;
+                    }
+                }
+            }
+            plane_mat_ = cv::Mat();
+            return plane_mat_;
+        }
+
+        bool is_cpu_plane() const {
+            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get()))
+                return ps->device == Device::CPU;
+            return false;
+        }
+        void set_cpu_plane_dims(int w, int h) {
+            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) {
+                ps->w = w;
+                ps->h = h;
+            }
         }
 
         // 统一平面描述：PlaneStorage 直接用；CpuStorage 从 mat 派生
@@ -397,6 +427,13 @@ namespace modeldeploy::vision {
             return *this;
         }
         cv::rotate(impl_->mat(), impl_->mat(), flag);
+        // 仅真正的单平面 packed CPU 借用图（rotate 确实就地平移到真实 mat 上）才交换宽高；
+        // 设备/借用(non-CPU) 或 NV12 等无法包装成单平面 mat 的帧保持旧 no-op（mat 为空，不交换）
+        if (impl_->is_cpu_plane() && !impl_->mat().empty()
+            && (flag == RotateFlags::ROTATE_90 || flag == RotateFlags::ROTATE_270)) {
+            std::swap(impl_->width, impl_->height);
+            impl_->set_cpu_plane_dims(impl_->width, impl_->height);
+        }
         impl_->refresh_meta();
         return *this;
     }

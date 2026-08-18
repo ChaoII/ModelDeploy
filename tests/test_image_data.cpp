@@ -484,5 +484,38 @@ TEST_CASE("image_data: refresh_meta preserves device dims", "[core]") {
     // 内部 refresh_meta 不再清空设备帧宽高（对设备帧安全）
     CHECK(dev.width() == 8);
     CHECK(dev.height() == 4);
+    // 走到 refresh_meta 的就地操作后设备帧宽高仍须保留（旧逻辑会在此清零 → 失败）
+    ImageData rotated = dev; // 浅拷贝，共享 impl_
+    rotated.rotate(RotateFlags::ROTATE_90);
+    CHECK(rotated.width() == 8);
+    CHECK(rotated.height() == 4);
+}
+
+TEST_CASE("image_data: from_bgr24 is usable by OpenCV members", "[core]") {
+    std::vector<unsigned char> bgr(10 * 8 * 3, 0);
+    for (int y = 0; y < 8; ++y)
+        for (int x = 0; x < 10; ++x) {
+            bgr[(y * 10 + x) * 3 + 0] = static_cast<unsigned char>(x);
+            bgr[(y * 10 + x) * 3 + 1] = static_cast<unsigned char>(y);
+            bgr[(y * 10 + x) * 3 + 2] = 128;
+        }
+    auto img = modeldeploy::vision::ImageData::from_bgr24(bgr.data(), 10, 8);
+    REQUIRE(!img.empty());
+
+    auto resized = img.resize(5, 4);
+    CHECK(resized.width() == 5);
+    CHECK(resized.height() == 4);
+
+    ImageData rotated = img;
+    rotated.rotate(RotateFlags::ROTATE_90);
+    CHECK(rotated.width() == 8);
+    CHECK(rotated.height() == 10);
+
+    auto gray = modeldeploy::vision::ImageData::cvt_color(img, ColorConvertType::CVT_PA_BGR2GRAY);
+    CHECK_FALSE(gray.empty());
+    CHECK(gray.channels() == 1);
+
+    auto encoded = modeldeploy::vision::ImageData::imencode(img, ".png");
+    CHECK_FALSE(encoded.empty());
 }
 

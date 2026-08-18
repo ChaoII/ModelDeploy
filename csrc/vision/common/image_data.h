@@ -74,7 +74,7 @@ namespace modeldeploy::vision {
         [[nodiscard]] bool toCpu(ImageData* out) const;
         // 仅 device()==CPU 的 mat 有效（借用）；否则 false
         [[nodiscard]] bool asMat(cv::Mat* out) const;
-        // thread_local 错误通道（每操作起始清空，失败写入；成功返回非空）
+        // thread_local 错误通道（每操作起始清空，失败写入；成功返回 nullptr）
         static const char* last_error();
 
         [[nodiscard]] bool is_shared_with(const ImageData& other) const;
