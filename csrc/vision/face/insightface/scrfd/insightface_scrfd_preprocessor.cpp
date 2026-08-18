@@ -33,7 +33,7 @@ namespace modeldeploy::vision::face {
         }
         // 双线性 resize + 左上放置 + pad 0（python cv2.resize INTER_LINEAR + det_img 左上）
         cv::Mat src_mat;
-        image.to_mat(src_mat);
+        image.asMat(&src_mat);
         cv::Mat resized;
         cv::resize(src_mat, resized, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
         cv::Mat det_img(dst_h, dst_w, CV_8UC3, cv::Scalar(0, 0, 0));

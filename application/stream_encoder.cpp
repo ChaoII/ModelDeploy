@@ -252,7 +252,7 @@ bool StreamEncoder::encode(const modeldeploy::vision::ImageData& image) {
     if (!opened_ || !enc_frame_ || open_permanently_failed_.load()) return false;
 
     cv::Mat mat;
-    image.to_mat(mat, false);
+    image.asMat(&mat);
 
     if (mat.empty()) {
         std::cerr << "[Encoder] empty input mat" << std::endl;

@@ -595,7 +595,9 @@ bool Pipeline::encode_jpeg(const std::shared_ptr<ImageData>& snap,
                            std::vector<uint8_t>* out, int quality) {
     if (!out || !snap) return false;
     cv::Mat mat;
-    snap->to_mat(mat, true);
+    ImageData cpu;
+    if (!snap->toCpu(&cpu)) return false;
+    cpu.asMat(&mat);
     if (mat.empty()) return false;
     cv::Mat bgr;
     if (mat.channels() == 4) cv::cvtColor(mat, bgr, cv::COLOR_BGRA2BGR);

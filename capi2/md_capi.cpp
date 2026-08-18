@@ -474,8 +474,8 @@ MDStatus md_image_plane_ptrs(MDImageHandle h, MDDevice* dev, void** y, void** uv
         case Device::TPU: *dev = MD_DEV_TPU; break;
         default: *dev = MD_DEV_CPU; break;
     }
-    *y = const_cast<uint8_t*>(hi->image.y());
-    *uv = const_cast<uint8_t*>(hi->image.uv());
+    *y = const_cast<uint8_t*>(hi->image.plane(0).data);
+    *uv = const_cast<uint8_t*>(hi->image.plane(1).data);
     return (*y) ? MD_OK : MD_ERR_INVALID_ARGUMENT;
 }
 

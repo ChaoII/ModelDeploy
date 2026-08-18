@@ -244,26 +244,6 @@ namespace modeldeploy::vision {
     uint8_t* ImageData::data() { return impl_ ? impl_->data() : nullptr; }
 
     Device ImageData::device() const { return impl_ ? (impl_->storage ? impl_->storage->device : Device::CPU) : Device::CPU; }
-    const uint8_t* ImageData::y() const {
-        if (!impl_) return nullptr;
-        const auto pl = impl_->planes();
-        return pl.size() < 1 ? nullptr : pl[0].data;
-    }
-    const uint8_t* ImageData::uv() const {
-        if (!impl_) return nullptr;
-        const auto pl = impl_->planes();
-        return pl.size() < 2 ? nullptr : pl[1].data;
-    }
-    int ImageData::step_y() const {
-        if (!impl_) return 0;
-        const auto pl = impl_->planes();
-        return pl.empty() ? 0 : pl[0].step;
-    }
-    int ImageData::step_uv() const {
-        if (!impl_) return 0;
-        const auto pl = impl_->planes();
-        return pl.size() < 2 ? 0 : pl[1].step;
-    }
     size_t ImageData::plane_count() const { return impl_ ? impl_->planes().size() : 0; }
     ImageData::Plane ImageData::plane(size_t i) const {
         if (!impl_) return {};
@@ -662,20 +642,6 @@ namespace modeldeploy::vision {
         else {
             // 零拷贝：共享外部内存，不复制
             tensor->from_external_memory(data(), shape, dtype);
-        }
-    }
-
-    void ImageData::to_mat(cv::Mat& mat, const bool copy) const {
-        if (!impl_ || impl_->empty()) {
-            return;
-        }
-        if (copy) {
-            // Deep copy: clone the underlying data
-            mat = impl_->mat().clone();
-        }
-        else {
-            // Shallow copy: share underlying data
-            mat = impl_->mat();
         }
     }
 

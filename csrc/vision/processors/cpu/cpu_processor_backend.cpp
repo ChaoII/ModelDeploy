@@ -279,27 +279,33 @@ namespace modeldeploy::vision {
 
     bool CpuProcessorBackend::draw_rect_nv12(ImageData& frame, float x, float y, float w, float h,
                                              float r, float g, float b, int thickness) {
-        return draw_rect_nv12_cpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+        const auto pl0 = frame.plane(0);
+        const auto pl1 = frame.plane(1);
+        return draw_rect_nv12_cpu(const_cast<uint8_t*>(pl0.data), const_cast<uint8_t*>(pl1.data),
                                   frame.width(), frame.height(),
-                                  frame.step_y(), frame.step_uv(),
+                                  pl0.step, pl1.step,
                                   x, y, w, h, static_cast<uint8_t>(r), static_cast<uint8_t>(g),
                                   static_cast<uint8_t>(b), thickness);
     }
 
     bool CpuProcessorBackend::draw_polygon_nv12(ImageData& frame, const std::vector<Point2f>& pts,
                                                 float r, float g, float b, int thickness) {
-        return draw_polygon_nv12_cpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+        const auto pl0 = frame.plane(0);
+        const auto pl1 = frame.plane(1);
+        return draw_polygon_nv12_cpu(const_cast<uint8_t*>(pl0.data), const_cast<uint8_t*>(pl1.data),
                                      frame.width(), frame.height(),
-                                     frame.step_y(), frame.step_uv(),
+                                     pl0.step, pl1.step,
                                      pts, static_cast<uint8_t>(r), static_cast<uint8_t>(g),
                                      static_cast<uint8_t>(b), thickness);
     }
 
     bool CpuProcessorBackend::draw_points_nv12(ImageData& frame, const std::vector<Point3f>& pts,
                                                float r, float g, float b, int radius) {
-        return draw_points_nv12_cpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+        const auto pl0 = frame.plane(0);
+        const auto pl1 = frame.plane(1);
+        return draw_points_nv12_cpu(const_cast<uint8_t*>(pl0.data), const_cast<uint8_t*>(pl1.data),
                                     frame.width(), frame.height(),
-                                    frame.step_y(), frame.step_uv(),
+                                    pl0.step, pl1.step,
                                     pts, static_cast<uint8_t>(r), static_cast<uint8_t>(g),
                                     static_cast<uint8_t>(b), radius);
     }
@@ -307,9 +313,11 @@ namespace modeldeploy::vision {
     bool CpuProcessorBackend::draw_text_nv12(ImageData& frame, float x, float y,
                                              const std::string& text,
                                              float r, float g, float b, int font_size) {
-        return draw_text_nv12_cpu(const_cast<uint8_t*>(frame.y()), const_cast<uint8_t*>(frame.uv()),
+        const auto pl0 = frame.plane(0);
+        const auto pl1 = frame.plane(1);
+        return draw_text_nv12_cpu(const_cast<uint8_t*>(pl0.data), const_cast<uint8_t*>(pl1.data),
                                   frame.width(), frame.height(),
-                                  frame.step_y(), frame.step_uv(),
+                                  pl0.step, pl1.step,
                                   x, y, text, static_cast<uint8_t>(r), static_cast<uint8_t>(g),
                                   static_cast<uint8_t>(b), font_size);
     }

@@ -28,7 +28,7 @@ namespace modeldeploy::vision::face {
                                          Tensor* output) const {
         if (kps.size() != 5) return false;
         cv::Mat src_mat;
-        image.to_mat(src_mat);
+        image.asMat(&src_mat);
         // norm_crop：Umeyama 相似变换 + warpAffine（含旋转）
         const cv::Mat warped = norm_crop(src_mat, kps, input_size_);
         std::vector<float> blob(static_cast<size_t>(3) * input_size_ * input_size_);

@@ -28,7 +28,7 @@ namespace modeldeploy::vision::face {
         M2x3.at<double>(1, 2) = (dst / 2.0) - cy * scale;
         // 双线性 warpAffine（对齐 python cv2.warpAffine INTER_LINEAR + BORDER_CONSTANT 0）
         cv::Mat src_mat;
-        image.to_mat(src_mat);
+        image.asMat(&src_mat);
         cv::Mat warped;
         cv::warpAffine(src_mat, warped, M2x3, cv::Size(dst, dst),
                        cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));

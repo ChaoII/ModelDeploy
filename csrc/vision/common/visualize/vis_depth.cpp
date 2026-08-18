@@ -10,7 +10,7 @@ namespace modeldeploy::vision {
     ImageData vis_depth(ImageData& image, const DepthResult& result,
                         bool colorize, bool save_result) {
         cv::Mat cv_image;
-        image.to_mat(cv_image);
+        image.asMat(&cv_image);
         if (result.shape.size() != 2) {
             MD_LOG_WARN << "vis_depth: invalid result shape." << std::endl;
             return image;

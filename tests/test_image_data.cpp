@@ -277,7 +277,7 @@ TEST_CASE("ImageData to_mat and to_tensor", "[image_data]") {
 
     SECTION("to_mat") {
         cv::Mat mat;
-        img.to_mat(mat, false);
+        img.asMat(&mat);
         REQUIRE(mat.cols == 20);
         REQUIRE(mat.rows == 20);
     }
@@ -389,13 +389,13 @@ TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
 
     SECTION("draw_rect writes Y and UV planes") {
         REQUIRE(backend.draw_rect_nv12(frame, 20, 20, 100, 60, 255, 0, 0, 2));
-        const uint8_t* y = frame.y();
+        const uint8_t* y = frame.plane(0).data;
         // 顶边中间像素（x=60,y=20）：画成红色 → 亮度低
         REQUIRE(y[20 * w + 60] != 128);
         // 边框外像素保持灰
         REQUIRE(y[20 * w + 5] == 128);
         // UV 平面也被写（矩形内某 UV 像素偏离灰平衡 128）
-        const uint8_t* uv = frame.uv();
+        const uint8_t* uv = frame.plane(1).data;
         bool uv_changed = false;
         for (int uy = 10; uy < 40; ++uy) {
             for (int ux = 10; ux < 60; ++ux) {
@@ -407,7 +407,7 @@ TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
 
     SECTION("draw_text writes label pixels") {
         REQUIRE(backend.draw_text_nv12(frame, 30, 100, "AB", 255, 255, 255, 1));
-        const uint8_t* y = frame.y();
+        const uint8_t* y = frame.plane(0).data;
         bool any_changed = false;
         for (int py = 100; py < 116; ++py) {
             for (int px = 30; px < 30 + 16; ++px) {
@@ -420,13 +420,13 @@ TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
     SECTION("draw_points writes") {
         std::vector<Point3f> pts = {Point3f(50, 50, 0)};
         REQUIRE(backend.draw_points_nv12(frame, pts, 0, 255, 0, 3));
-        REQUIRE(frame.y()[50 * w + 50] != 128);
+        REQUIRE(frame.plane(0).data[50 * w + 50] != 128);
     }
 
     SECTION("draw_polygon draws closed loop") {
         std::vector<Point2f> pts = {Point2f(10, 10), Point2f(90, 10), Point2f(90, 70)};
         REQUIRE(backend.draw_polygon_nv12(frame, pts, 0, 0, 255, 2));
-        const uint8_t* y = frame.y();
+        const uint8_t* y = frame.plane(0).data;
         // 顶点处应有像素
         REQUIRE(y[10 * w + 10] != 128);
     }

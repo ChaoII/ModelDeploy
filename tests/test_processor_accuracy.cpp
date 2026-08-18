@@ -351,7 +351,7 @@ TEST_CASE("Processor accuracy: fused_color_matrix BGR2YCrCb vs OpenCV", "[proces
     // 原链路参考：center_crop(224 from 256) + cvtColor(BGR2YCrCb) + cast(float) + HWC2CHW
     auto ref_image = make_test_image(256, 256);
     cv::Mat ref_mat;
-    ref_image.to_mat(ref_mat);
+    ref_image.asMat(&ref_mat);
     const cv::Rect roi(16, 16, 224, 224);
     cv::Mat crop_mat = ref_mat(roi).clone();
     cv::Mat ycrcb_mat;

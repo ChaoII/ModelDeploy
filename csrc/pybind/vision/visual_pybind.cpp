@@ -21,7 +21,7 @@ namespace modeldeploy::vision {
                   const auto vis_im = vis_cls(image_data, result, top_k,
                                               threshold, font_path, font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -46,7 +46,7 @@ namespace modeldeploy::vision {
                   const ImageData vis_im = vis_det(image_data, result, threshold, label_map, font_path,
                                                    font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -70,7 +70,7 @@ namespace modeldeploy::vision {
                   const ImageData vis_im = vis_iseg(image_data, result, threshold, font_path,
                                                     font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -89,7 +89,7 @@ namespace modeldeploy::vision {
                   const ImageData vis_im = vis_obb(image_data, result, threshold, font_path,
                                                    font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -110,7 +110,7 @@ namespace modeldeploy::vision {
                   auto image_data = ImageData(std::move(cv_image));
                   const ImageData vis_im = vis_ocr(image_data, result, font_path, font_size, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -132,7 +132,7 @@ namespace modeldeploy::vision {
                   const ImageData vis_im = vis_lpr(image_data, result, font_path, font_size,
                                                    landmark_radius, alpha, save_result);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -156,7 +156,7 @@ namespace modeldeploy::vision {
                   const ImageData vis_im = vis_keypoints(image_data, result, font_path, font_size, landmark_radius,
                                                          alpha, save_result, draw_lines);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),
@@ -183,7 +183,7 @@ namespace modeldeploy::vision {
                   const ImageData vis_im = vis_attr(image_data, result, threshold, label_map, font_path, font_size,
                                                     alpha, save_result, abnormal_ids, show_attr);
                   cv::Mat mat;
-                  vis_im.to_mat(mat);
+                  vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
               },
               pybind11::arg("image"),

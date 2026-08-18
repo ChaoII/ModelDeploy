@@ -11,7 +11,7 @@ namespace modeldeploy::vision {
                       const std::unordered_map<int, std::string>& label_map,
                       double alpha, bool save_result) {
         cv::Mat cv_image;
-        image.to_mat(cv_image);
+        image.asMat(&cv_image);
         if (result.shape.size() != 2) {
             MD_LOG_WARN << "vis_sem: invalid result shape." << std::endl;
             return image;

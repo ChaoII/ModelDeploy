@@ -54,11 +54,6 @@ namespace modeldeploy::vision {
         [[nodiscard]] bool empty() const;
 
         [[nodiscard]] Device device() const;
-        // NV12/NV21：Y/UV 平面指针与步长；非 NV12 返回 nullptr/0
-        [[nodiscard]] const uint8_t* y() const;
-        [[nodiscard]] const uint8_t* uv() const;
-        [[nodiscard]] int step_y() const;
-        [[nodiscard]] int step_uv() const;
         // 通用平面数量（NV12=2，packed=1）
         [[nodiscard]] size_t plane_count() const;
         // 统一取第 i 个平面（多平面/设备）；越界返回空 Plane
@@ -84,7 +79,6 @@ namespace modeldeploy::vision {
         // Caller must guarantee data lifetime >= ImageData lifetime
         static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false);
         static void images_to_tensor(const std::vector<ImageData>& images, Tensor* tensor);
-        void to_mat(cv::Mat& mat, bool copy = false) const;
         void to_tensor(Tensor* tensor, bool copy = false);
         static std::vector<uint8_t> imencode(const ImageData& image, const std::string& ext);
         static ImageData imdecode(const std::vector<uint8_t>& buf);

@@ -92,7 +92,7 @@ namespace modeldeploy::vision::lpr {
         results->reserve(lp_num);
         // 整图只拷贝一次（原来在循环内每辆车重复拷贝）
         cv::Mat _image;
-        image.to_mat(_image);
+        image.asMat(&_image);
 
         for (int i = 0; i < static_cast<int>(lp_num); ++i) {
             LprResult r;

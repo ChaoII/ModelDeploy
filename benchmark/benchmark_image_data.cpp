@@ -663,7 +663,7 @@ TEST_CASE("ImageData to_mat benchmark", "[benchmark][image_data]") {
         auto img = create_test_image(SMALL_W, SMALL_H);
         BENCHMARK("to_mat 320x240") {
             cv::Mat mat;
-            img.to_mat(mat);
+            img.asMat(&mat);
             return mat;
         };
     }
@@ -671,7 +671,7 @@ TEST_CASE("ImageData to_mat benchmark", "[benchmark][image_data]") {
         auto img = create_test_image(MEDIUM_W, MEDIUM_H);
         BENCHMARK("to_mat 640x480") {
             cv::Mat mat;
-            img.to_mat(mat);
+            img.asMat(&mat);
             return mat;
         };
     }
@@ -679,7 +679,7 @@ TEST_CASE("ImageData to_mat benchmark", "[benchmark][image_data]") {
         auto img = create_test_image(LARGE_W, LARGE_H);
         BENCHMARK("to_mat 1920x1080") {
             cv::Mat mat;
-            img.to_mat(mat);
+            img.asMat(&mat);
             return mat;
         };
     }
@@ -687,7 +687,7 @@ TEST_CASE("ImageData to_mat benchmark", "[benchmark][image_data]") {
         auto img = create_test_image(YOLO_W, YOLO_H);
         BENCHMARK("to_mat 640x640") {
             cv::Mat mat;
-            img.to_mat(mat);
+            img.asMat(&mat);
             return mat;
         };
     }
@@ -695,7 +695,7 @@ TEST_CASE("ImageData to_mat benchmark", "[benchmark][image_data]") {
         auto img = create_test_image(YOLO_LARGE_W, YOLO_LARGE_H);
         BENCHMARK("to_mat 1280x1280") {
             cv::Mat mat;
-            img.to_mat(mat);
+            img.asMat(&mat);
             return mat;
         };
     }
