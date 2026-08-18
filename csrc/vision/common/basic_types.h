@@ -94,6 +94,7 @@ enum class ColorConvertType {
     CVT_NV212PA_RGB,
     CVT_NV122PA_BGR,
     CVT_NV212PA_BGR,
+    CVT_NV122PKG_BGR,
     CVT_I4202PA_BGR,
     CVT_I4202PA_RGB,
 
@@ -194,6 +195,7 @@ inline std::string color_convert_type_to_string(ColorConvertType type) {
     case ColorConvertType::CVT_NV212PA_RGB: return "CVT_NV212PA_RGB";
     case ColorConvertType::CVT_NV122PA_BGR: return "CVT_NV122PA_BGR";
     case ColorConvertType::CVT_NV212PA_BGR: return "CVT_NV212PA_BGR";
+    case ColorConvertType::CVT_NV122PKG_BGR: return "CVT_NV122PKG_BGR";
     case ColorConvertType::CVT_I4202PA_BGR: return "CVT_I4202PA_BGR";
     case ColorConvertType::CVT_I4202PA_RGB: return "CVT_I4202PA_RGB";
 

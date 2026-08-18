@@ -145,6 +145,8 @@ namespace modeldeploy::vision {
             return cv::COLOR_YUV2BGR_NV12;
         case ColorConvertType::CVT_NV212PA_BGR:
             return cv::COLOR_YUV2BGR_NV21;
+        case ColorConvertType::CVT_NV122PKG_BGR:
+            return cv::COLOR_YUV2BGR_NV12;
         case ColorConvertType::CVT_I4202PA_BGR:
             return cv::COLOR_YUV2BGR_I420;
         case ColorConvertType::CVT_I4202PA_RGB:

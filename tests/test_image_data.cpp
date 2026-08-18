@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <opencv2/core/mat.hpp>
+#include <opencv2/imgproc.hpp>
 #include "vision/common/image_data.h"
 #include "vision/common/basic_types.h"
 #include "vision/processors/cpu/cpu_processor_backend.h"
@@ -554,6 +555,37 @@ TEST_CASE("image_data: device-frame op not supported errors (no silent cpu)", "[
     auto c = dev.crop({0, 0, 2, 2});
     CHECK(c.empty());                                       // 设备帧未实现 → 空
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);  // 且报错
+}
+
+TEST_CASE("image_data: CVT_NV122PKG_BGR converts NV12 to packed BGR (CPU)", "[core]") {
+    const int w = 8, h = 6;  // 偶宽偶高
+    std::vector<unsigned char> y(static_cast<size_t>(w) * h);
+    std::vector<unsigned char> uv(static_cast<size_t>(w) * (h / 2));
+    for (int i = 0; i < w * h; ++i) y[i] = static_cast<unsigned char>((i * 7) % 256);
+    for (int i = 0; i < w * (h / 2); ++i) uv[i] = static_cast<unsigned char>(100 + (i % 100));
+    auto nv12 = modeldeploy::vision::ImageData::from_device_planes(
+        y.data(), uv.data(), w, h, w, w, Device::CPU);
+    REQUIRE(!nv12.empty());
+
+    auto bgr = modeldeploy::vision::ImageData::cvt_color(nv12, ColorConvertType::CVT_NV122PKG_BGR);
+    REQUIRE(!bgr.empty());
+    CHECK(bgr.format() == MdImageType::PKG_BGR_U8);
+    CHECK(bgr.width() == w);
+    CHECK(bgr.height() == h);
+    CHECK(bgr.device() == Device::CPU);
+    CHECK(bgr.plane_count() == 1);
+    REQUIRE(bgr.plane(0).data != nullptr);
+
+    // 与旧 cvtColorTwoPlane 语义逐像素一致（大端/步长正确性）
+    cv::Mat y_mat(h, w, CV_8UC1, y.data());
+    cv::Mat uv_mat(h / 2, w / 2, CV_8UC2, uv.data());
+    cv::Mat ref;
+    cv::cvtColorTwoPlane(y_mat, uv_mat, ref, cv::COLOR_YUV2BGR_NV12);
+    REQUIRE(!ref.empty());
+    cv::Mat got;
+    REQUIRE(bgr.asMat(&got));
+    REQUIRE(got.total() == ref.total());
+    REQUIRE(std::memcmp(got.data, ref.data, ref.total() * 3) == 0);
 }
 
 TEST_CASE("image_data: imread/imencode/imwrite roundtrip (CPU)", "[core]") {

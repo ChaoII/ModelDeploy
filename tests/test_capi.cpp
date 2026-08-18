@@ -80,6 +80,27 @@ TEST_CASE("capi2 nv12 input converts to CPU BGR and plane_ptrs rejects it", "[ca
     md_image_destroy(img);
 }
 
+TEST_CASE("capi2 nv12 from delegate: CPU BGR handle usable by md_draw_rect", "[capi]") {
+    const int w = 64, h = 48;
+    std::vector<unsigned char> y(w * h, 128);
+    std::vector<unsigned char> uv(w * h / 2, 128);
+    MDImageHandle img = nullptr;
+    const MDStatus s = md_image_from_nv12(&img, y.data(), uv.data(), w, h, w, w, MD_DEV_CPU);
+    REQUIRE(s == MD_OK);
+    REQUIRE(img != nullptr);
+
+    int ow = 0, oh = 0;
+    REQUIRE(md_image_size(img, &ow, &oh) == MD_OK);
+    CHECK(ow == w);
+    CHECK(oh == h);
+
+    // CPU BGR handle 可直接被绘制接口使用（就地绘制，不走设备帧）
+    MDColorRGBA color{255, 0, 0, 255};
+    CHECK(md_draw_rect(img, 2, 2, 30, 20, color, 1.0f) == MD_OK);
+
+    md_image_destroy(img);
+}
+
 TEST_CASE("capi2 null args are rejected", "[capi]") {
     MDDevice dev;
     void* y;

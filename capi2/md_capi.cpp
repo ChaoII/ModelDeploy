@@ -287,6 +287,23 @@ MDStatus md_image_from_bgr24(MDImageHandle* out, const void* bgr, int w, int h) 
     return MD_OK;
 }
 
+static MDStatus image_from_image(MDImageHandle* out, ImageData&& img) {
+    if (!out) return MD_ERR_NULL_POINTER;
+    if (img.empty()) return MD_ERR_IMAGE_DECODE;
+    const auto p0 = img.plane(0);
+    if (!p0.data) return MD_ERR_IMAGE_DECODE;
+    auto* h = new md_image_handle();
+    h->width = img.width();
+    h->height = img.height();
+    const size_t bytes = static_cast<size_t>(h->width) * h->height * 3;
+    h->data = new unsigned char[bytes];
+    std::memcpy(h->data, p0.data, bytes);
+    h->owns_data = true;
+    h->image = ImageData::from_raw(h->data, h->width, h->height, MdImageType::PKG_BGR_U8, false);
+    *out = h;
+    return MD_OK;
+}
+
 MDStatus md_image_from_rgb24(MDImageHandle* out, const void* rgb, int w, int h) {
     if (!out || !rgb) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_rgb24: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
@@ -300,16 +317,22 @@ MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
                             int w, int h, int step_y, int step_uv, MDDevice src) {
     if (!out || !y) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_nv12: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
-    if (step_y <= 0) step_y = w;
-    if (step_uv <= 0) step_uv = w;
     (void)src;
-    const int uv_h = h / 2;
-    cv::Mat y_mat(h, step_y, CV_8UC1, const_cast<void*>(y));
-    cv::Mat uv_mat(uv_h, step_uv / 2, CV_8UC2, const_cast<void*>(uv));
-    cv::Mat bgr;
-    cv::cvtColorTwoPlane(y_mat(cv::Rect(0, 0, w, h)), uv_mat(cv::Rect(0, 0, w / 2, uv_h)),
-                         bgr, cv::COLOR_YUV2BGR_NV12);
-    return image_from_mat(out, std::move(bgr));
+    auto img = ImageData::from_device_planes(
+        const_cast<uint8_t*>(static_cast<const uint8_t*>(y)),
+        uv ? const_cast<uint8_t*>(static_cast<const uint8_t*>(uv)) : nullptr,
+        w, h, step_y > 0 ? step_y : w, step_uv > 0 ? step_uv : w, Device::CPU);
+    if (img.empty()) {
+        set_error("md_image_from_nv12: failed to construct NV12");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    auto bgr = ImageData::cvt_color(img, ColorConvertType::CVT_NV122PKG_BGR);
+    if (bgr.empty()) {
+        const char* le = ImageData::last_error();
+        set_error_fmt("md_image_from_nv12: convert failed (%s)", (le && *le) ? le : "unknown");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    return image_from_image(out, std::move(bgr));
 }
 
 MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void* uv,

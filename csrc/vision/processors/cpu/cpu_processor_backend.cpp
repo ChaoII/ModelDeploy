@@ -122,6 +122,25 @@ namespace modeldeploy::vision {
 
     bool CpuProcessorBackend::cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) {
         if (!out) return false;
+        if (type == ColorConvertType::CVT_NV122PKG_BGR) {
+            // NV12 → packed BGR（多平面，需 cvtColorTwoPlane，不能用单 mat asMat）
+            if (image.format() != MdImageType::NV12) return false;
+            const int w = image.width();
+            const int h = image.height();
+            if (w <= 0 || h <= 0 || (w % 2) != 0 || (h % 2) != 0) return false;
+            const auto p0 = image.plane(0);
+            const auto p1 = image.plane(1);
+            if (!p0.data || !p1.data || p0.step <= 0 || p1.step <= 0) return false;
+            cv::Mat y_mat(h, p0.step, CV_8UC1, const_cast<uint8_t*>(p0.data));
+            cv::Mat uv_mat(h / 2, p1.step / 2, CV_8UC2, const_cast<uint8_t*>(p1.data));
+            cv::Mat bgr;
+            cv::cvtColorTwoPlane(y_mat(cv::Rect(0, 0, w, h)),
+                                 uv_mat(cv::Rect(0, 0, w / 2, h / 2)),
+                                 bgr, cv::COLOR_YUV2BGR_NV12);
+            if (bgr.empty()) return false;
+            *out = ImageData(std::move(bgr));
+            return true;
+        }
         const int ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
         // 仅处理 OpenCV 原生颜色转换；PL↔PA 拆合在 ImageData 内部完成（需要私有 impl 访问）
         if (ocv_type <= 0) return false;
