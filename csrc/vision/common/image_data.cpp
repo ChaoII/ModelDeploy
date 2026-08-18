@@ -680,10 +680,23 @@ namespace modeldeploy::vision {
     }
 
 
+    // 编解码唯一支持的图像：CPU + 单平面（packed/gray）+ OpenCV 可映射格式。
+    // 设备帧 / NV12 等多平面帧 → false（不静默回退 CPU、不操作空 mat，避免 OpenCV 断言）。
+    static bool codec_supported(const ImageData& image) {
+        if (image.device() != Device::CPU) return false;
+        if (image.plane_count() > 1) return false;
+        return md_image_type_to_ocv_type(image.format()) > 0;
+    }
+
     std::vector<uint8_t> ImageData::imencode(const ImageData& image, const std::string& ext) {
+        g_last_error_msg.clear();
         std::vector<uint8_t> buf;
         if (image.empty()) {
-            MD_LOG_ERROR << "Cannot encode empty image" << std::endl;
+            g_last_error_msg = "imencode: image is empty";
+            return buf;
+        }
+        if (!codec_supported(image)) {
+            g_last_error_msg = "imencode: only CPU single-plane image supported";
             return buf;
         }
         cv::imencode(ext, image.impl_->mat(), buf);
@@ -707,8 +720,13 @@ namespace modeldeploy::vision {
     }
 
     bool ImageData::imwrite(const std::string& filename) const {
+        g_last_error_msg.clear();
         if (!impl_ || impl_->empty()) {
-            MD_LOG_ERROR << "Cannot write empty image" << std::endl;
+            g_last_error_msg = "imwrite: image is empty";
+            return false;
+        }
+        if (!codec_supported(*this)) {
+            g_last_error_msg = "imwrite: only CPU single-plane image supported";
             return false;
         }
         return cv::imwrite(filename, impl_->mat());

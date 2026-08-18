@@ -548,3 +548,30 @@ TEST_CASE("image_data: device-frame op not supported errors (no silent cpu)", "[
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);  // 且报错
 }
 
+TEST_CASE("image_data: imread/imencode/imwrite roundtrip (CPU)", "[core]") {
+    auto img = modeldeploy::vision::ImageData::imread("test_data/test_images/test_detection0.jpg");
+    REQUIRE(!img.empty());
+    auto buf = modeldeploy::vision::ImageData::imencode(img, ".jpg");
+    REQUIRE(!buf.empty());
+    auto dec = modeldeploy::vision::ImageData::imdecode(buf);
+    REQUIRE(!dec.empty());
+    CHECK(dec.width() == img.width());
+    CHECK(dec.height() == img.height());
+    std::string tmp = "capi2_plan_t3_out.jpg";
+    REQUIRE(img.imwrite(tmp));
+    std::remove(tmp.c_str());
+}
+
+TEST_CASE("image_data: device nv12 frame imencode/imwrite rejected (no silent cpu)", "[core]") {
+    std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
+    auto dev = modeldeploy::vision::ImageData::from_device_planes(
+        y.data(), uv.data(), 8, 4, 8, 8, modeldeploy::Device::CPU);
+    modeldeploy::vision::ImageData::last_error();
+    auto buf = modeldeploy::vision::ImageData::imencode(dev, ".jpg");
+    CHECK(buf.empty());
+    CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
+    modeldeploy::vision::ImageData::last_error();
+    CHECK_FALSE(dev.imwrite("capi2_plan_t3_should_not_exist.jpg"));
+    CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
+}
+
