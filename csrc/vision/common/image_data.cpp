@@ -516,7 +516,12 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB) {
-            // PL↔PA 拆合需要私有 impl 访问，留在本 TU 完成（与后端返回的 packed mat 等价）
+            // PL↔PA 拆合需要私有 impl 访问，留在本 TU 完成（与后端返回的 packed mat 等价）。
+            // 设备帧 mat() 会 materialize 为空 → cv::split/merge 可能抛 cv::Exception；本库无异常，显式拒绝。
+            if (image.device() != Device::CPU) {
+                set_last_error("cvt_color: PA2PL requires CPU image (device frame not supported)");
+                return ImageData();
+            }
             ImageData dst_image;
             dst_image.impl_ = std::make_shared<ImageDataImpl>();
             const int single_channel_type = CV_MAKETYPE(image.impl_->mat().depth(), 1);
