@@ -199,6 +199,18 @@ MD_CAPI_EXPORT MDStatus md_model_set_input_size(MDModelHandle, int w, int h);
 /* 设置 pipeline 模型的分类子模型输入尺寸（当前仅 PedestrianAttribute 使用） */
 MD_CAPI_EXPORT MDStatus md_model_set_cls_input_size(MDModelHandle, int w, int h);
 
+/* 设置 pipeline 模型分类子模型的 batch 大小（>0 固定，-1 自动；PedestrianAttribute / OCR）。
+ * 0 或 < -1 → MD_ERR_INVALID_ARGUMENT；非 pipeline kind → MD_ERR_UNSUPPORTED_TYPE */
+MD_CAPI_EXPORT MDStatus md_model_set_cls_batch_size(MDModelHandle, int batch);
+
+/* 设置 OCR 整链路识别子模型（rec）的 batch 大小（>0 固定，-1 自动）。
+ * 0 或 < -1 → MD_ERR_INVALID_ARGUMENT；非 OCR kind → MD_ERR_UNSUPPORTED_TYPE */
+MD_CAPI_EXPORT MDStatus md_model_set_rec_batch_size(MDModelHandle, int batch);
+
+/* 设置 OCR 识别子模型输入形状 (c, h, w)（对应 rec_preprocessor::set_rec_image_shape）。
+ * 仅 OCR_REC / OCR；其余 → MD_ERR_UNSUPPORTED_TYPE */
+MD_CAPI_EXPORT MDStatus md_model_set_rec_image_shape(MDModelHandle, int c, int h, int w);
+
 /* ==================== 模型前/后处理参数 ==================== */
 /* 按扁平参数名设置模型前/后处理参数（模型级持久；未设置用默认值）。
  * _i 整型、_d 浮点、_b 布尔(0/1)、_s 字符串/枚举。不支持的 kind → MD_ERR_UNSUPPORTED_TYPE；

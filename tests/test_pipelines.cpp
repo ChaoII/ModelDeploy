@@ -139,6 +139,12 @@ TEST_CASE("Pipeline pedestrian attribute det+cls", "[pipeline][model]") {
     REQUIRE(model.is_initialized());
     model.set_det_input_size({1280, 1280});
     model.set_cls_input_size({192, 256});
+    // cls batch size：合法值为 >0 或 -1
+    REQUIRE(model.set_cls_batch_size(-1));    // 自动
+    REQUIRE(model.set_cls_batch_size(2));     // 固定 batch
+    REQUIRE_FALSE(model.set_cls_batch_size(0));   // 非法
+    REQUIRE_FALSE(model.set_cls_batch_size(-2));  // 非法
+    REQUIRE(model.set_cls_batch_size(1));
     auto img = pipe_img("test_pedestrian_attribute.jpg");
     if (img.empty()) return;
     std::vector<AttributeResult> results;

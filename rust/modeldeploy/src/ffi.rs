@@ -331,6 +331,9 @@ extern "C" {
     pub fn md_model_ready(h: MDModelHandle) -> MDStatus;
     pub fn md_model_set_input_size(h: MDModelHandle, w: c_int, h: c_int) -> MDStatus;
     pub fn md_model_set_cls_input_size(h: MDModelHandle, w: c_int, h: c_int) -> MDStatus;
+    pub fn md_model_set_cls_batch_size(h: MDModelHandle, batch: c_int) -> MDStatus;
+    pub fn md_model_set_rec_batch_size(h: MDModelHandle, batch: c_int) -> MDStatus;
+    pub fn md_model_set_rec_image_shape(h: MDModelHandle, c: c_int, h: c_int, w: c_int) -> MDStatus;
     // 模型前/后处理参数（扁平参数名）
     pub fn md_model_set_param_i(model: MDModelHandle, name: *const c_char, value: i64) -> MDStatus;
     pub fn md_model_set_param_d(model: MDModelHandle, name: *const c_char, value: f64) -> MDStatus;

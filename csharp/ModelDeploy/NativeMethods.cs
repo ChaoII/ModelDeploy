@@ -131,6 +131,15 @@ string modelPath, IntPtr opt);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_set_cls_input_size(IntPtr handle, int w, int h);
 
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_cls_batch_size(IntPtr handle, int batch);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_rec_batch_size(IntPtr handle, int batch);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_model_set_rec_image_shape(IntPtr handle, int c, int h, int w);
+
         // 模型前/后处理参数（扁平参数名，见 md_model_param_names/type）
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_model_set_param_i(IntPtr model, string name, long value);

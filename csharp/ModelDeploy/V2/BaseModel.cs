@@ -98,6 +98,31 @@ namespace ModelDeploy.V2
                 throw new InvalidOperationException($"Set cls input size failed: {GetLastError()}");
         }
 
+        /// <summary>设置 pipeline 分类子模型 batch 大小（&gt;0 固定，-1 自动；PedestrianAttribute/OCR）。
+        /// Sophgo int8 bmodel 为 batch=1 静态形状时须设为 1。</summary>
+        public void SetClsBatchSize(int batch)
+        {
+            var status = md_model_set_cls_batch_size(_handle, batch);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Set cls batch size failed: {GetLastError()}");
+        }
+
+        /// <summary>设置 OCR 识别子模型 batch 大小（&gt;0 固定，-1 自动）。</summary>
+        public void SetRecBatchSize(int batch)
+        {
+            var status = md_model_set_rec_batch_size(_handle, batch);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Set rec batch size failed: {GetLastError()}");
+        }
+
+        /// <summary>设置 OCR 识别子模型输入形状 (c,h,w)。</summary>
+        public void SetRecImageShape(int c, int h, int w)
+        {
+            var status = md_model_set_rec_image_shape(_handle, c, h, w);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Set rec image shape failed: {GetLastError()}");
+        }
+
         /// <summary>设置模型前/后处理参数（扁平参数名，见 ParamNames）。类型按重载匹配。</summary>
         public void SetParam(string name, long value)
         {

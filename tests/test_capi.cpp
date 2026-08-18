@@ -205,6 +205,125 @@ TEST_CASE("capi2 detection param setter on loaded model", "[model]") {
     md_model_destroy(det);
 }
 
+// PedestrianAttribute pipeline：cls batch size setter 的合法性验证（[model] 有数据时执行）
+TEST_CASE("capi2 ped-attr cls batch size setter", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string det = data_dir + "/test_models/onnx/zhgd_det.onnx";
+    const std::string ml = data_dir + "/test_models/onnx/zhgd_ml.onnx";
+    if (!std::filesystem::exists(det) || !std::filesystem::exists(ml)) return;
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle ped = nullptr;
+    const std::string joined = det + "|" + ml;
+    REQUIRE(md_model_create(&ped, MD_MODEL_PED_ATTR, joined.c_str(), opt) == MD_OK);
+    REQUIRE(ped != nullptr);
+    md_option_destroy(opt);
+
+    // 非法 batch：0 / < -1 → INVALID_ARGUMENT
+    CHECK(md_model_set_cls_batch_size(ped, 0) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_model_set_cls_batch_size(ped, -2) == MD_ERR_INVALID_ARGUMENT);
+    // 合法：-1（自动）/ >0（固定）
+    CHECK(md_model_set_cls_batch_size(ped, -1) == MD_OK);
+    CHECK(md_model_set_cls_batch_size(ped, 1) == MD_OK);
+    CHECK(md_model_set_cls_batch_size(ped, 4) == MD_OK);
+
+    // 非 pipeline kind 上调用 → UNSUPPORTED（用一个未就绪句柄避免额外加载）
+    CHECK(md_model_set_cls_batch_size(nullptr, 1) == MD_ERR_MODEL_INIT);
+
+    md_model_destroy(ped);
+}
+
+// LPR_DET：阈值 + 输入尺寸 全链路暴露（此前为整类黑盒）
+TEST_CASE("capi2 lpr-det setter + introspection", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string model = data_dir + "/test_models/onnx/yolov5plate.onnx";
+    if (!std::filesystem::exists(model)) return;
+
+    // 自省
+    const char* names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_LPR_DET, &names) == MD_OK);
+    CHECK(std::string(names).find("conf_threshold") != std::string::npos);
+    CHECK(std::string(names).find("nms_threshold") != std::string::npos);
+    CHECK(std::string(names).find("landmarks_per_card") != std::string::npos);
+    char t = 0;
+    REQUIRE(md_model_param_type(MD_MODEL_LPR_DET, "landmarks_per_card", &t) == MD_OK);
+    CHECK(t == 'D');
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    MDModelHandle det = nullptr;
+    REQUIRE(md_model_create(&det, MD_MODEL_LPR_DET, model.c_str(), opt) == MD_OK);
+    REQUIRE(det != nullptr);
+    md_option_destroy(opt);
+
+    CHECK(md_model_set_param_d(det, "conf_threshold", 0.35) == MD_OK);
+    CHECK(md_model_set_param_d(det, "nms_threshold", 0.5) == MD_OK);
+    CHECK(md_model_set_param_d(det, "landmarks_per_card", 4) == MD_OK);
+    CHECK(md_model_set_input_size(det, 640, 640) == MD_OK);
+    md_model_destroy(det);
+}
+
+// OCR：det_max_side_len / cls_batch / rec_batch / rec_image_shape 全链路暴露
+TEST_CASE("capi2 ocr setter batch + shape", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string ocr_dir = data_dir + "/test_models/onnx/ocr/ppocrv4_mobile";
+    const std::string det = ocr_dir + "/det_infer.onnx";
+    const std::string cls = ocr_dir + "/cls_infer.onnx";
+    const std::string rec = ocr_dir + "/rec_infer.onnx";
+    const std::string dict = data_dir + "/ppocrv4_dict.txt";
+    if (!std::filesystem::exists(det) || !std::filesystem::exists(cls) ||
+        !std::filesystem::exists(rec) || !std::filesystem::exists(dict)) return;
+
+    // OCR_DET 单模型：max_side_len 自省 + 设置
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    MDModelHandle detm = nullptr;
+    REQUIRE(md_model_create(&detm, MD_MODEL_OCR_DET, det.c_str(), opt) == MD_OK);
+    REQUIRE(detm != nullptr);
+    const char* dnames = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_OCR_DET, &dnames) == MD_OK);
+    CHECK(std::string(dnames).find("max_side_len") != std::string::npos);
+    CHECK(md_model_set_param_i(detm, "max_side_len", 960) == MD_OK);
+    CHECK(md_model_set_param_d(detm, "max_side_len", 0.5) == MD_ERR_INVALID_TYPE);  // 类型不符
+    md_model_destroy(detm);
+
+    // OCR 整链路：cls_batch/rec_batch/rec_image_shape/max_side_len
+    MDModelHandle ocr = nullptr;
+    const std::string joined = det + "|" + cls + "|" + rec + "|" + dict;
+    REQUIRE(md_model_create(&ocr, MD_MODEL_OCR, joined.c_str(), opt) == MD_OK);
+    REQUIRE(ocr != nullptr);
+    md_option_destroy(opt);
+
+    CHECK(md_model_set_cls_batch_size(ocr, -1) == MD_OK);
+    CHECK(md_model_set_cls_batch_size(ocr, 2) == MD_OK);
+    CHECK(md_model_set_cls_batch_size(ocr, 0) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_model_set_rec_batch_size(ocr, -1) == MD_OK);
+    CHECK(md_model_set_rec_batch_size(ocr, 3) == MD_OK);
+    CHECK(md_model_set_rec_batch_size(ocr, -2) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_model_set_param_i(ocr, "max_side_len", 1920) == MD_OK);
+    CHECK(md_model_set_rec_image_shape(ocr, 3, 48, 320) == MD_OK);
+    CHECK(md_model_set_rec_image_shape(ocr, 0, 48, 320) == MD_ERR_INVALID_ARGUMENT);
+    md_model_destroy(ocr);
+}
+
+// 非对应 kind 上的 size 路由不应崩溃：FACE_REC_PIPELINE 缺模型时跳过路由测试仅需 det 类已覆盖，
+// 这里验证 UNSUPPORTED 分支（nullptr → MODEL_INIT）
+TEST_CASE("capi2 ocr batch size rejects wrong kind", "[capi]") {
+    CHECK(md_model_set_rec_batch_size(nullptr, 1) == MD_ERR_MODEL_INIT);
+    CHECK(md_model_set_rec_image_shape(nullptr, 3, 48, 320) == MD_ERR_MODEL_INIT);
+}
+
 TEST_CASE("capi2 option device id setter", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);

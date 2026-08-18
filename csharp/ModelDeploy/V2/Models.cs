@@ -20,6 +20,11 @@ namespace ModelDeploy.V2.Models
         public Prediction<DetectionResult> Predict(VisionImage image)
             => MakePrediction(image, ReadDetection);
 
+        /// <summary>检测置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+
         /// <summary>NV12 直接输入推理（硬解码/摄像头直通；srcDevice 指明 Y/UV 所在设备）。</summary>
         public Prediction<DetectionResult> PredictNv12(byte[] y, byte[] uv,
             int w, int h, int stepY = 0, int stepUv = 0, Device srcDevice = Device.CPU)
@@ -61,6 +66,11 @@ namespace ModelDeploy.V2.Models
         public Prediction<ClassificationResult> Predict(VisionImage image)
             => MakePrediction(image, ReadClassification);
 
+        /// <summary>分类 Top-K 输出个数。</summary>
+        public void SetTopK(long v) => SetParam("top_k", v);
+        /// <summary>是否多标签分类。</summary>
+        public void SetMultiLabel(bool v) => SetParam("multi_label", v);
+
         private static ClassificationResult[] ReadClassification(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDClassifyItem>(result, md_result_classification);
@@ -83,6 +93,13 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<PoseResult> Predict(VisionImage image)
             => MakePrediction(image, ReadPose);
+
+        /// <summary>姿态关键点置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>关键点数量。</summary>
+        public void SetKeypointsNum(long v) => SetParam("keypoints_num", v);
 
         private static PoseResult[] ReadPose(IntPtr result)
         {
@@ -121,6 +138,11 @@ namespace ModelDeploy.V2.Models
         public Prediction<ObbResult> Predict(VisionImage image)
             => MakePrediction(image, ReadObb);
 
+        /// <summary>旋转框检测置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+
         private static ObbResult[] ReadObb(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDObbItem>(result, md_result_obb);
@@ -148,6 +170,13 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<InstanceSegResult> Predict(VisionImage image)
             => MakePrediction(image, ReadInstanceSeg);
+
+        /// <summary>实例分割置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>掩码二值化阈值。</summary>
+        public void SetMaskThreshold(double v) => SetParam("mask_threshold", v);
 
         private static InstanceSegResult[] ReadInstanceSeg(IntPtr result)
         {
@@ -244,6 +273,13 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<FaceDetResult> Predict(VisionImage image)
             => MakePrediction(image, ReadFaceDet);
+
+        /// <summary>人脸检测置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>每人脸关键点数量。</summary>
+        public void SetLandmarksPerFace(long v) => SetParam("landmarks_per_face", v);
 
         private static FaceDetResult[] ReadFaceDet(IntPtr result)
         {
@@ -342,6 +378,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<InsightFaceResult> Predict(VisionImage image)
             => MakePrediction(image, ReadInsightFace);
 
+        /// <summary>人脸检测阈值（insightface）。</summary>
+        public void SetDetThresh(double v) => SetParam("det_thresh", v);
+
         private static InsightFaceResult[] ReadInsightFace(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDInsightFaceItem>(result, md_result_insightface);
@@ -385,6 +424,35 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<OcrResult> Predict(VisionImage image)
             => MakePrediction(image, ReadOcr);
+
+        /// <summary>DB 检测二值化阈值。</summary>
+        public void SetDetDbThresh(double v) => SetParam("det_db_thresh", v);
+        /// <summary>DB 检测框阈值。</summary>
+        public void SetDetDbBoxThresh(double v) => SetParam("det_db_box_thresh", v);
+        /// <summary>DB 检测 unclip 比率。</summary>
+        public void SetDetDbUnclipRatio(double v) => SetParam("det_db_unclip_ratio", v);
+        /// <summary>DB 检测得分模式（枚举字符串）。</summary>
+        public void SetDetDbScoreMode(string v) => SetParam("det_db_score_mode", v);
+        /// <summary>是否启用膨胀。</summary>
+        public void SetUseDilation(bool v) => SetParam("use_dilation", v);
+        /// <summary>方向分类阈值。</summary>
+        public void SetClsThresh(double v) => SetParam("cls_thresh", v);
+        /// <summary>DB 检测最长边（缩放主控）。</summary>
+        public void SetMaxSideLen(long v) => SetParam("max_side_len", v);
+        /// <summary>识别子模型 batch 大小（&gt;0 固定，-1 自动）。</summary>
+        public void SetRecBatchSize(int batch)
+        {
+            var status = md_model_set_rec_batch_size(_handle, batch);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Set rec batch size failed: {GetLastError()}");
+        }
+        /// <summary>识别子模型输入形状 (c,h,w)。</summary>
+        public void SetRecImageShape(int c, int h, int w)
+        {
+            var status = md_model_set_rec_image_shape(_handle, c, h, w);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Set rec image shape failed: {GetLastError()}");
+        }
 
         private static OcrResult[] ReadOcr(IntPtr result)
         {
@@ -463,6 +531,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<AttributeResult> Predict(VisionImage image)
             => MakePrediction(image, ReadAttribute);
 
+        /// <summary>检测阈值（pedestrian attribute）。</summary>
+        public void SetDetThreshold(double v) => SetParam("det_threshold", v);
+
         private static AttributeResult[] ReadAttribute(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDAttrItem>(result, md_result_attribute);
@@ -498,6 +569,19 @@ namespace ModelDeploy.V2.Models
         public Prediction<OcrResult> Predict(VisionImage image)
             => MakePrediction(image, ReadOcr);
 
+        /// <summary>DB 检测二值化阈值。</summary>
+        public void SetDetDbThresh(double v) => SetParam("det_db_thresh", v);
+        /// <summary>DB 检测框阈值。</summary>
+        public void SetDetDbBoxThresh(double v) => SetParam("det_db_box_thresh", v);
+        /// <summary>DB 检测 unclip 比率。</summary>
+        public void SetDetDbUnclipRatio(double v) => SetParam("det_db_unclip_ratio", v);
+        /// <summary>DB 检测得分模式（枚举字符串）。</summary>
+        public void SetDetDbScoreMode(string v) => SetParam("det_db_score_mode", v);
+        /// <summary>是否启用膨胀。</summary>
+        public void SetUseDilation(bool v) => SetParam("use_dilation", v);
+        /// <summary>DB 检测最长边（缩放主控）。</summary>
+        public void SetMaxSideLen(long v) => SetParam("max_side_len", v);
+
         private static OcrResult[] ReadOcr(IntPtr result)
         {
             md_result_count(result, out var count);
@@ -524,6 +608,14 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<OcrResult> Predict(VisionImage image)
             => MakePrediction(image, ReadOcr);
+
+        /// <summary>识别子模型输入形状 (c,h,w)。</summary>
+        public void SetRecImageShape(int c, int h, int w)
+        {
+            var status = md_model_set_rec_image_shape(_handle, c, h, w);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Set rec image shape failed: {GetLastError()}");
+        }
 
         private static OcrResult[] ReadOcr(IntPtr result)
         {
@@ -552,6 +644,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<OcrResult> Predict(VisionImage image)
             => MakePrediction(image, ReadOcr);
 
+        /// <summary>方向分类阈值。</summary>
+        public void SetClsThresh(double v) => SetParam("cls_thresh", v);
+
         private static OcrResult[] ReadOcr(IntPtr result)
         {
             md_result_count(result, out var count);
@@ -578,6 +673,13 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<LprDetResult> Predict(VisionImage image)
             => MakePrediction(image, ReadLprDet);
+
+        /// <summary>车牌检测置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>每车牌关键点数量。</summary>
+        public void SetLandmarksPerCard(double v) => SetParam("landmarks_per_card", v);
 
         private static LprDetResult[] ReadLprDet(IntPtr result)
         {
@@ -670,6 +772,13 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<FaceRecResult> Predict(VisionImage image)
             => MakePrediction(image, ReadFaceRec);
+
+        /// <summary>人脸检测置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>每人脸关键点数量。</summary>
+        public void SetLandmarksPerFace(long v) => SetParam("landmarks_per_face", v);
 
         private static FaceRecResult[] ReadFaceRec(IntPtr result)
         {

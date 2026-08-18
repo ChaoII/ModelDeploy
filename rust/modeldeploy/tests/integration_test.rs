@@ -248,6 +248,13 @@ fn test_ocr() -> Result<()> {
     let dict = test_data("ppocrv4_dict.txt");
     let path = format!("{}/det_infer.onnx|{}/cls_infer.onnx|{}/rec_infer.onnx|{}", dir, dir, dir, dict);
     let model = PaddleOCR::new(&path, &opt)?;
+    // OCR 外部控制：max_side_len / cls_batch / rec_batch / rec_image_shape
+    model.set_max_side_len(960)?;
+    model.set_cls_batch_size(2)?;
+    model.set_rec_batch_size(-1)?;
+    model.set_rec_image_shape(3, 48, 320)?;
+    assert!(model.set_cls_batch_size(0).is_err());
+    assert!(model.set_rec_batch_size(-2).is_err());
     let img = Image::read(&test_img("test_ocr.png"))?;
     let lines = model.predict(&img)?;
     assert!(!lines.is_empty());
@@ -281,6 +288,12 @@ fn test_pedestrian_attribute() -> Result<()> {
     let model = PedestrianAttribute::new(&path, &opt)?;
     model.set_input_size(1280, 1280)?;
     model.set_cls_input_size(192, 256)?;
+    // cls batch size：-1 自动、>0 固定；0 / <-1 非法
+    model.set_cls_batch_size(-1)?;
+    model.set_cls_batch_size(2)?;
+    assert!(model.set_cls_batch_size(0).is_err());
+    assert!(model.set_cls_batch_size(-2).is_err());
+    model.set_cls_batch_size(1)?;
     let img = Image::read(&test_img("test_pedestrian_attribute1.jpg"))?;
     let attrs = model.predict(&img)?;
     assert!(!attrs.is_empty());
@@ -349,6 +362,11 @@ fn test_lpr_det_submodel() -> Result<()> {
         &test_data("test_models/onnx/yolov5plate.onnx"),
         &opt,
     )?;
+    // 类型化 setter：阈值 + 关键点 + 输入尺寸
+    model.set_conf_threshold(0.35)?;
+    model.set_nms_threshold(0.5)?;
+    model.set_landmarks_per_card(4.0)?;
+    model.set_input_size(640, 640)?;
     let img = Image::read(&test_img("test_lpr_pipeline2.jpg"))?;
     let plates = model.predict(&img)?;
     let _ = plates;

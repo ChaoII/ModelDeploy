@@ -50,9 +50,9 @@ static class Program
             Path.Combine(TestDataPath, "test_models/onnx/yolo11n/yolo11n.onnx"), CpuOrt());
         using var image = VisionImage.Read(Path.Combine(TestDataPath, "test_images/test_detection0.jpg"));
 
-        // 演示新参数 API：设置前后处理参数 + 参数名/类型自省
-        det.SetParam("conf_threshold", 0.4);
-        det.SetParam("nms_threshold", 0.45);
+        // 演示参数 API：类型化 setter（编译期检查，杜绝字符串拼错）+ 参数名/类型自省
+        det.SetConfThreshold(0.4);
+        det.SetNmsThreshold(0.45);
         Console.WriteLine("params: " + string.Join(", ", det.ParamNames())
             + " | conf_threshold type=" + det.ParamType("conf_threshold")
             + " nms_threshold type=" + det.ParamType("nms_threshold"));

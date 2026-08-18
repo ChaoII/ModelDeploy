@@ -55,6 +55,24 @@ impl Model {
         check_status(unsafe { ffi::md_model_set_cls_input_size(self.handle, w, h) })
     }
 
+    /// set pipeline cls-submodel batch size (>0 fixed, -1 auto; PedestrianAttribute).
+    /// For Sophgo int8 bmodel (batch=1 static shape) set to 1.
+    pub fn set_cls_batch_size(&self, batch: i32) -> Result<(), MdError> {
+        check_status(unsafe { ffi::md_model_set_cls_batch_size(self.handle, batch) })
+    }
+
+    /// set OCR rec-submodel batch size (>0 fixed, -1 auto).
+    pub fn set_rec_batch_size(&self, batch: i32) -> Result<(), MdError> {
+        check_status(unsafe { ffi::md_model_set_rec_batch_size(self.handle, batch) })
+    }
+
+    /// set OCR rec-submodel input shape (c, h, w).
+    pub fn set_rec_image_shape(&self, c: i32, h: i32, w: i32) -> Result<(), MdError> {
+        check_status(unsafe {
+            ffi::md_model_set_rec_image_shape(self.handle, c, h, w)
+        })
+    }
+
     /// 按扁平参数名设置模型前/后处理参数（整型）。
     pub fn set_param_int(&self, name: &str, value: i64) -> Result<(), MdError> {
         let cn = CString::new(name).map_err(|_| MdError::InvalidArgument("name".into()))?;
@@ -104,6 +122,91 @@ impl Model {
         let mut t: libc::c_char = 0;
         check_status(unsafe { ffi::md_model_param_type(self.kind.to_ffi(), cn.as_ptr(), &mut t) })?;
         Ok(t as u8 as char)
+    }
+
+    /// 检测/关键点/实例分割通用：置信度阈值（detection/obb/pose/iseg/facedet 等）。
+    pub fn set_conf_threshold(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("conf_threshold", v)
+    }
+
+    /// 检测/关键点/实例分割通用：NMS 阈值（detection/obb/pose/iseg/facedet 等）。
+    pub fn set_nms_threshold(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("nms_threshold", v)
+    }
+
+    /// 姿态：关键点数量。
+    pub fn set_keypoints_num(&self, v: i64) -> Result<(), MdError> {
+        self.set_param_int("keypoints_num", v)
+    }
+
+    /// 实例分割：掩码二值化阈值。
+    pub fn set_mask_threshold(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("mask_threshold", v)
+    }
+
+    /// 分类：Top-K 输出个数。
+    pub fn set_top_k(&self, v: i64) -> Result<(), MdError> {
+        self.set_param_int("top_k", v)
+    }
+
+    /// 分类：是否多标签。
+    pub fn set_multi_label(&self, v: bool) -> Result<(), MdError> {
+        self.set_param_bool("multi_label", v)
+    }
+
+    /// 人脸检测：每人脸关键点数量。
+    pub fn set_landmarks_per_face(&self, v: i64) -> Result<(), MdError> {
+        self.set_param_int("landmarks_per_face", v)
+    }
+
+    /// OCR：DB 检测二值化阈值。
+    pub fn set_det_db_thresh(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("det_db_thresh", v)
+    }
+
+    /// OCR：DB 检测框阈值。
+    pub fn set_det_db_box_thresh(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("det_db_box_thresh", v)
+    }
+
+    /// OCR：DB 检测 unclip 比率。
+    pub fn set_det_db_unclip_ratio(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("det_db_unclip_ratio", v)
+    }
+
+    /// OCR：DB 检测得分模式（枚举字符串）。
+    pub fn set_det_db_score_mode(&self, v: &str) -> Result<(), MdError> {
+        self.set_param_str("det_db_score_mode", v)
+    }
+
+    /// OCR：是否启用膨胀。
+    pub fn set_use_dilation(&self, v: bool) -> Result<(), MdError> {
+        self.set_param_bool("use_dilation", v)
+    }
+
+    /// OCR：方向分类阈值。
+    pub fn set_cls_thresh(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("cls_thresh", v)
+    }
+
+    /// 行人属性：行人检测阈值。
+    pub fn set_det_threshold(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("det_threshold", v)
+    }
+
+    /// insightface：人脸检测阈值。
+    pub fn set_det_thresh(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("det_thresh", v)
+    }
+
+    /// OCR：DB 检测最长边（缩放主控）。
+    pub fn set_max_side_len(&self, v: i64) -> Result<(), MdError> {
+        self.set_param_int("max_side_len", v)
+    }
+
+    /// 车牌检测：每车牌关键点数量。
+    pub fn set_landmarks_per_card(&self, v: f64) -> Result<(), MdError> {
+        self.set_param_double("landmarks_per_card", v)
     }
 
     /// 推理：返回持句柄的结果包装
@@ -639,6 +742,106 @@ macro_rules! model_wrapper {
             /// 设置 pipeline 分类子模型输入尺寸（PedestrianAttribute）
             pub fn set_cls_input_size(&self, w: i32, h: i32) -> Result<(), MdError> {
                 self.inner.set_cls_input_size(w, h)
+            }
+
+            /// 设置 pipeline 分类子模型 batch 大小（>0 固定，-1 自动；PedestrianAttribute）
+            pub fn set_cls_batch_size(&self, batch: i32) -> Result<(), MdError> {
+                self.inner.set_cls_batch_size(batch)
+            }
+
+            /// 设置 OCR 识别子模型 batch 大小（>0 固定，-1 自动）
+            pub fn set_rec_batch_size(&self, batch: i32) -> Result<(), MdError> {
+                self.inner.set_rec_batch_size(batch)
+            }
+
+            /// 设置 OCR 识别子模型输入形状 (c, h, w)
+            pub fn set_rec_image_shape(&self, c: i32, h: i32, w: i32) -> Result<(), MdError> {
+                self.inner.set_rec_image_shape(c, h, w)
+            }
+
+            /// 检测置信度阈值（detection/obb/pose/iseg/facedet/lpr_det 等）
+            pub fn set_conf_threshold(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_conf_threshold(v)
+            }
+
+            /// NMS 阈值
+            pub fn set_nms_threshold(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_nms_threshold(v)
+            }
+
+            /// 姿态：关键点数量
+            pub fn set_keypoints_num(&self, v: i64) -> Result<(), MdError> {
+                self.inner.set_keypoints_num(v)
+            }
+
+            /// 实例分割：掩码阈值
+            pub fn set_mask_threshold(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_mask_threshold(v)
+            }
+
+            /// 分类：Top-K
+            pub fn set_top_k(&self, v: i64) -> Result<(), MdError> {
+                self.inner.set_top_k(v)
+            }
+
+            /// 分类：多标签
+            pub fn set_multi_label(&self, v: bool) -> Result<(), MdError> {
+                self.inner.set_multi_label(v)
+            }
+
+            /// 人脸检测：每人脸关键点数量
+            pub fn set_landmarks_per_face(&self, v: i64) -> Result<(), MdError> {
+                self.inner.set_landmarks_per_face(v)
+            }
+
+            /// OCR det：DB 二值化阈值
+            pub fn set_det_db_thresh(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_det_db_thresh(v)
+            }
+
+            /// OCR det：DB 框阈值
+            pub fn set_det_db_box_thresh(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_det_db_box_thresh(v)
+            }
+
+            /// OCR det：unclip 比率
+            pub fn set_det_db_unclip_ratio(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_det_db_unclip_ratio(v)
+            }
+
+            /// OCR det：得分模式（字符串）
+            pub fn set_det_db_score_mode(&self, v: &str) -> Result<(), MdError> {
+                self.inner.set_det_db_score_mode(v)
+            }
+
+            /// OCR det：膨胀
+            pub fn set_use_dilation(&self, v: bool) -> Result<(), MdError> {
+                self.inner.set_use_dilation(v)
+            }
+
+            /// OCR cls：方向分类阈值
+            pub fn set_cls_thresh(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_cls_thresh(v)
+            }
+
+            /// 行人属性：检测阈值
+            pub fn set_det_threshold(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_det_threshold(v)
+            }
+
+            /// insightface：检测阈值
+            pub fn set_det_thresh(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_det_thresh(v)
+            }
+
+            /// OCR det：最长边（缩放主控）
+            pub fn set_max_side_len(&self, v: i64) -> Result<(), MdError> {
+                self.inner.set_max_side_len(v)
+            }
+
+            /// 车牌检测：每车牌关键点数量
+            pub fn set_landmarks_per_card(&self, v: f64) -> Result<(), MdError> {
+                self.inner.set_landmarks_per_card(v)
             }
 
             /// 推理并读取结果（结果句柄随返回值释放）

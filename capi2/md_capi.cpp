@@ -936,6 +936,10 @@ MDStatus md_model_set_input_size(MDModelHandle handle, int w, int h) {
         case MD_MODEL_DEPTH: static_cast<detection::UltralyticsDepth*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_FACE_DET: static_cast<face::Scrfd*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_PED_ATTR: static_cast<pipeline::PedestrianAttribute*>(mh->model)->set_det_input_size(size); break;
+        case MD_MODEL_LPR_DET: static_cast<lpr::LprDetection*>(mh->model)->get_preprocessor().set_size(size); break;
+        case MD_MODEL_FACE_REC_PIPELINE:
+            static_cast<face::FaceRecognizerPipeline*>(mh->model)->get_detector()->get_preprocessor().set_size(size);
+            break;
         default:
             set_error_fmt("md_model_set_input_size: unsupported for kind %d", (int)mh->kind);
             return MD_ERR_UNSUPPORTED_TYPE;
@@ -952,6 +956,73 @@ MDStatus md_model_set_cls_input_size(MDModelHandle handle, int w, int h) {
         case MD_MODEL_PED_ATTR: static_cast<pipeline::PedestrianAttribute*>(mh->model)->set_cls_input_size(size); break;
         default:
             set_error_fmt("md_model_set_cls_input_size: unsupported for kind %d", (int)mh->kind);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    return MD_OK;
+}
+
+MDStatus md_model_set_cls_batch_size(MDModelHandle handle, int batch) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (batch == 0 || batch < -1) {
+        set_error_fmt("md_model_set_cls_batch_size: invalid batch %d (must be >0 or -1)", batch);
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    switch (mh->kind) {
+        case MD_MODEL_PED_ATTR:
+            if (!static_cast<pipeline::PedestrianAttribute*>(mh->model)->set_cls_batch_size(batch)) {
+                set_error("md_model_set_cls_batch_size: set_cls_batch_size rejected value");
+                return MD_ERR_INVALID_ARGUMENT;
+            }
+            break;
+        case MD_MODEL_OCR:
+            if (!static_cast<ocr::PaddleOCR*>(mh->model)->set_cls_batch_size(batch)) {
+                set_error("md_model_set_cls_batch_size: set_cls_batch_size rejected value");
+                return MD_ERR_INVALID_ARGUMENT;
+            }
+            break;
+        default:
+            set_error_fmt("md_model_set_cls_batch_size: unsupported for kind %d", (int)mh->kind);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    return MD_OK;
+}
+
+MDStatus md_model_set_rec_batch_size(MDModelHandle handle, int batch) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (batch == 0 || batch < -1) {
+        set_error_fmt("md_model_set_rec_batch_size: invalid batch %d (must be >0 or -1)", batch);
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    switch (mh->kind) {
+        case MD_MODEL_OCR:
+            if (!static_cast<ocr::PaddleOCR*>(mh->model)->set_rec_batch_size(batch)) {
+                set_error("md_model_set_rec_batch_size: set_rec_batch_size rejected value");
+                return MD_ERR_INVALID_ARGUMENT;
+            }
+            break;
+        default:
+            set_error_fmt("md_model_set_rec_batch_size: unsupported for kind %d", (int)mh->kind);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    return MD_OK;
+}
+
+MDStatus md_model_set_rec_image_shape(MDModelHandle handle, int c, int h, int w) {
+    auto* mh = static_cast<md_model_handle*>(handle);
+    if (!mh || !mh->ready) return MD_ERR_MODEL_INIT;
+    if (c <= 0 || h <= 0 || w <= 0) return MD_ERR_INVALID_ARGUMENT;
+    const std::vector<int> shape{c, h, w};
+    switch (mh->kind) {
+        case MD_MODEL_OCR_REC:
+            static_cast<ocr::Recognizer*>(mh->model)->get_preprocessor().set_rec_image_shape(shape);
+            break;
+        case MD_MODEL_OCR:
+            static_cast<ocr::PaddleOCR*>(mh->model)->get_recognizer()->get_preprocessor().set_rec_image_shape(shape);
+            break;
+        default:
+            set_error_fmt("md_model_set_rec_image_shape: unsupported for kind %d", (int)mh->kind);
             return MD_ERR_UNSUPPORTED_TYPE;
     }
     return MD_OK;
@@ -980,15 +1051,17 @@ const char* kind_param_names(MDModelKind kind) {
         case MD_MODEL_FACE_REC_PIPELINE:
             return "conf_threshold|nms_threshold|landmarks_per_face";
         case MD_MODEL_OCR_DET:
-            return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation";
+            return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation|max_side_len";
         case MD_MODEL_OCR:
-            return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation|cls_thresh";
+            return "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|det_db_score_mode|use_dilation|cls_thresh|max_side_len";
         case MD_MODEL_OCR_CLS:
             return "cls_thresh";
         case MD_MODEL_PED_ATTR:
             return "det_threshold";
         case MD_MODEL_INSIGHTFACE:
             return "det_thresh";
+        case MD_MODEL_LPR_DET:
+            return "conf_threshold|nms_threshold|landmarks_per_card";
         default:
             return "";
     }
@@ -1022,6 +1095,7 @@ char param_type_of(MDModelKind kind, const char* name) {
             if (std::strcmp(name, "det_db_unclip_ratio") == 0) return PT_D;
             if (std::strcmp(name, "det_db_score_mode") == 0) return PT_S;
             if (std::strcmp(name, "use_dilation") == 0) return PT_B;
+            if (std::strcmp(name, "max_side_len") == 0) return PT_I;
             return 0;
         case MD_MODEL_OCR:
             if (std::strcmp(name, "det_db_thresh") == 0) return PT_D;
@@ -1030,12 +1104,17 @@ char param_type_of(MDModelKind kind, const char* name) {
             if (std::strcmp(name, "det_db_score_mode") == 0) return PT_S;
             if (std::strcmp(name, "use_dilation") == 0) return PT_B;
             if (std::strcmp(name, "cls_thresh") == 0) return PT_D;
+            if (std::strcmp(name, "max_side_len") == 0) return PT_I;
             return 0;
         case MD_MODEL_OCR_CLS:
             if (std::strcmp(name, "cls_thresh") == 0) return PT_D;
             return 0;
         case MD_MODEL_PED_ATTR:
             if (std::strcmp(name, "det_threshold") == 0) return PT_D;
+            return 0;
+        case MD_MODEL_LPR_DET:
+            if (std::strcmp(name, "conf_threshold") == 0 || std::strcmp(name, "nms_threshold") == 0 ||
+                std::strcmp(name, "landmarks_per_card") == 0) return PT_D;
             return 0;
         case MD_MODEL_INSIGHTFACE:
             if (std::strcmp(name, "det_thresh") == 0) return PT_D;
@@ -1111,6 +1190,10 @@ int apply_model_param(md_model_handle* mh, const char* name, char req_type,
         }
         case MD_MODEL_OCR_DET: {
             auto* pm = static_cast<ocr::DBDetector*>(const_cast<void*>(m));
+            if (std::strcmp(name, "max_side_len") == 0) {
+                pm->get_preprocessor().set_max_side_len((int)i);
+                break;
+            }
             auto& pp = pm->get_postprocessor();
             if (std::strcmp(name, "det_db_thresh") == 0) pp.set_det_db_thresh(d);
             else if (std::strcmp(name, "det_db_box_thresh") == 0) pp.set_det_db_box_thresh(d);
@@ -1126,7 +1209,9 @@ int apply_model_param(md_model_handle* mh, const char* name, char req_type,
         }
         case MD_MODEL_OCR: {
             auto* pm = static_cast<ocr::PaddleOCR*>(const_cast<void*>(m));
-            if (std::strcmp(name, "cls_thresh") == 0) {
+            if (std::strcmp(name, "max_side_len") == 0) {
+                pm->get_detector()->get_preprocessor().set_max_side_len((int)i);
+            } else if (std::strcmp(name, "cls_thresh") == 0) {
                 pm->get_classifier()->get_postprocessor().set_cls_thresh((float)d);
             } else {
                 auto& pp = pm->get_detector()->get_postprocessor();
@@ -1141,6 +1226,14 @@ int apply_model_param(md_model_handle* mh, const char* name, char req_type,
         case MD_MODEL_PED_ATTR: {
             auto* pm = static_cast<pipeline::PedestrianAttribute*>(const_cast<void*>(m));
             pm->set_det_threshold((float)d);
+            break;
+        }
+        case MD_MODEL_LPR_DET: {
+            auto* pm = static_cast<lpr::LprDetection*>(const_cast<void*>(m));
+            auto& pp = pm->get_postprocessor();
+            if (std::strcmp(name, "conf_threshold") == 0) pp.set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pp.set_nms_threshold((float)d);
+            else pp.set_landmarks_per_card((float)d);
             break;
         }
         case MD_MODEL_INSIGHTFACE: {

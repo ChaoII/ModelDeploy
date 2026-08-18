@@ -118,6 +118,27 @@ public class Capi2VisionTests
         Assert.That(det.ParamType("nms_threshold"), Is.EqualTo('D'));
     }
 
+    // ==================== PedestrianAttribute pipeline ====================
+
+    [Test]
+    public void PedAttr_TypedSetters_WorkAndValidate()
+    {
+        var det = Path.Combine(ModelRoot, "zhgd_det.onnx");
+        var ml = Path.Combine(ModelRoot, "zhgd_ml.onnx");
+        if (!Has(det) || !Has(ml)) Assert.Ignore("model not found");
+
+        using var ped = new PedestrianAttributeModel(det + "|" + ml, CpuOrt());
+        // 类型化 setter：阈值 + 输入尺寸 + cls batch size
+        ped.SetDetThreshold(0.5);
+        ped.SetInputSize(640, 640);
+        ped.SetClsInputSize(192, 256);
+        ped.SetClsBatchSize(-1);   // 自动
+        ped.SetClsBatchSize(1);    // Sophgo batch=1 静态
+        // 非法 batch → 抛异常
+        Assert.Throws<InvalidOperationException>(() => ped.SetClsBatchSize(0));
+        Assert.Throws<InvalidOperationException>(() => ped.SetClsBatchSize(-2));
+    }
+
     // ==================== InsightFace ====================
 
     [Test]
@@ -144,6 +165,40 @@ public class Capi2VisionTests
     }
 
     // ==================== OCR ====================
+
+    [Test]
+    public void Ocr_ControlSetters_WorkAndValidate()
+    {
+        var dir = Path.Combine(ModelRoot, "ocr", "ppocrv4_mobile");
+        var dict = Path.Combine(GetTestDataDir(), "test_data", "ppocrv4_dict.txt");
+        var model = string.Join("|",
+            Path.Combine(dir, "det_infer.onnx"),
+            Path.Combine(dir, "cls_infer.onnx"),
+            Path.Combine(dir, "rec_infer.onnx"),
+            dict);
+        if (!Has(Path.Combine(dir, "det_infer.onnx"))) Assert.Ignore("model not found");
+
+        using var ocr = new OcrModel(model, CpuOrt());
+        ocr.SetMaxSideLen(960);
+        ocr.SetClsBatchSize(2);
+        ocr.SetRecBatchSize(-1);
+        ocr.SetRecImageShape(3, 48, 320);
+        Assert.Throws<InvalidOperationException>(() => ocr.SetClsBatchSize(0));
+        Assert.Throws<InvalidOperationException>(() => ocr.SetRecBatchSize(-2));
+    }
+
+    [Test]
+    public void LprDet_TypedSetters_WorkAndValidate()
+    {
+        var model = Path.Combine(ModelRoot, "yolov5plate.onnx");
+        if (!Has(model)) Assert.Ignore("model not found");
+
+        using var lpr = new LprDetectionModel(model, CpuOrt());
+        lpr.SetConfThreshold(0.35);
+        lpr.SetNmsThreshold(0.5);
+        lpr.SetLandmarksPerCard(4);
+        lpr.SetInputSize(640, 640);
+    }
 
     [Test]
     public void Ocr_Predict_ReturnsText()
