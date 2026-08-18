@@ -629,3 +629,39 @@ TEST_CASE("image_data: device nv12 frame imencode/imwrite rejected (no silent cp
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
 }
 
+TEST_CASE("image_data unified storage: ctor/family/height/asMat", "[image_data]") {
+    // (a) 自分配 NV12 不再空（height 恒真实 h）
+    ImageData nv(64, 48, MdImageType::NV12);
+    CHECK(!nv.empty());
+    CHECK(nv.width() == 64);
+    CHECK(nv.height() == 48);        // 真实 h，非 1.5h
+    CHECK(nv.plane_count() == 2);
+
+    // (b) from_raw(NV12) 平面自描述、height==h
+    std::vector<uint8_t> buf(64 * 48 * 3 / 2);
+    std::fill(buf.begin(), buf.end(), 100);
+    auto fr = ImageData::from_raw(buf.data(), 64, 48, MdImageType::NV12, true);
+    REQUIRE(!fr.empty());
+    CHECK(fr.height() == 48);
+    CHECK(fr.plane_count() == 2);
+    CHECK(fr.plane(0).step == 64);
+    CHECK(fr.plane(1).data == fr.plane(0).data + static_cast<size_t>(64) * 48);
+
+    // (c) asMat packed-only
+    std::vector<uint8_t> pkg(2 * 2 * 3, 0);
+    auto bgr = ImageData::from_raw(pkg.data(), 2, 2, MdImageType::PKG_BGR_U8, false);
+    cv::Mat m;
+    CHECK(bgr.asMat(&m));
+    CHECK(m.rows == 2);
+    CHECK(m.cols == 2);
+    CHECK(m.channels() == 3);
+    cv::Mat mn;
+    CHECK(!nv.asMat(&mn));           // YUV → asMat=false
+
+    // (d) from_bgr24 别名行为一致
+    auto fb = ImageData::from_bgr24(pkg.data(), 2, 2);
+    CHECK(fb.format() == MdImageType::PKG_BGR_U8);
+    CHECK(fb.plane(0).data != nullptr);
+}
+
+

@@ -19,14 +19,11 @@ namespace cv {
 }
 
 namespace modeldeploy::vision {
-    class ImageDataImpl;
-
     class MODELDEPLOY_CXX_EXPORT ImageData {
     public:
         ImageData() = default;
         ImageData(int width, int height, MdImageType type);
         explicit ImageData(const cv::Mat& mat);
-        explicit ImageData(cv::Mat&& mat);
 
         // 全部是浅拷贝
         ImageData(const ImageData& other) = default;
@@ -75,7 +72,11 @@ namespace modeldeploy::vision {
         [[nodiscard]] ImageData clone() const;
         static ImageData cvt_color(const ImageData& image, ColorConvertType type);
         // Caller must guarantee data lifetime >= ImageData lifetime
-        static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false);
+        static ImageData from_raw(unsigned char* data, int width, int height, MdImageType type, bool copy = false,
+                                  Device device = Device::CPU, std::shared_ptr<void> owner = {});
+        // 统一平面构造：直接摄取调用方平面（借用/自有取决于 owner），fmt 推导通道/字节
+        static ImageData from_planes(const Plane* planes, size_t n, MdImageType fmt, int w, int h,
+                                     Device device = Device::CPU, std::shared_ptr<void> owner = {});
         static void images_to_tensor(const std::vector<ImageData>& images, Tensor* tensor);
         void to_tensor(Tensor* tensor, bool copy = false);
         static std::vector<uint8_t> imencode(const ImageData& image, const std::string& ext);
@@ -92,6 +93,12 @@ namespace modeldeploy::vision {
         [[nodiscard]] ImageData resize(int width, int height) const;
 
     private:
-        std::shared_ptr<ImageDataImpl> impl_;
+        std::shared_ptr<void> impl_;
+
+    public:
+        // 内部实现访问器（仅供 image_data.cpp 的匿名域 ImageDataImpl 使用；对库用户无意义）。
+        // impl_ 持有的值即 ImageDataImpl*。
+        void* data_impl() const { return impl_.get(); }
+        void take_impl(std::shared_ptr<void> p) { impl_ = std::move(p); }
     };
 }

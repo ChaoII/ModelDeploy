@@ -2,6 +2,9 @@
 // Created by aichao on 2025/7/18.
 //
 
+#include <array>
+#include <cmath>
+#include <algorithm>
 #include "vision/utils.h"
 #include "core/md_log.h"
 #include "vision/common/convert.h"
@@ -25,166 +28,161 @@ namespace modeldeploy::vision {
         return create_processor_backend(d, d == Device::TPU ? Backend::SOPHGO : Backend::ORT, 0);
     }
 
-    // 承载抽象：CPU=OpenCV、设备/借用=平面+RAII
-    struct ImageDataStorage {
-        Device device = Device::CPU;
-        virtual ~ImageDataStorage() = default;
-        [[nodiscard]] virtual Device dev() const = 0;
-    };
-
-    struct CpuStorage : ImageDataStorage {
-        cv::Mat mat;                       // CPU 事实数据源
-        [[nodiscard]] Device dev() const override { return Device::CPU; }
-    };
-
-    struct PlaneStorage : ImageDataStorage {   // 设备/借用平面
-        std::vector<ImageData::Plane> planes;  // data 借用（外置，不拥有）
-        std::shared_ptr<void> keeper;          // 借用源 RAII（可空），保活
-        MdImageType fmt = MdImageType::NV12;
+    // 统一平面存储：唯一数据源 planes[]；owner 延续内存（自有缓冲 / 借用源 RAII）。
+    // cv::Mat 仅作 asMat 结果的临时物化缓存，从不作为数据源。
+    struct ImageDataImpl {
+        MdImageType fmt = MdImageType::PKG_BGR_U8;
         int w = 0, h = 0, ch = 1;
-        size_t nbytes = 0;
-        [[nodiscard]] Device dev() const override { return device; }
+        Device device = Device::CPU;
+        std::array<ImageData::Plane, 3> planes{};
+        size_t nplanes = 0;
+        std::shared_ptr<void> owner;
+        size_t bytes_ = 0, element_count_ = 0, element_bytes_ = 1;
+        bool cmat_valid = false;
+        cv::Mat cmat_;
     };
 
-    class ImageDataImpl {
-    public:
-        MdImageType type = MdImageType::PKG_BGR_U8;
-        int width = 0, height = 0, channels = 0;
-        size_t element_count_ = 0, element_bytes_ = 0, bytes_ = 0;
-        std::shared_ptr<ImageDataStorage> storage;
+    static ImageDataImpl* get_impl(const ImageData& img) {
+        return static_cast<ImageDataImpl*>(img.data_impl());
+    }
 
-        // per-instance：CPU 借用平面包装 mat 的缓存 + 设备/借用(non-CPU) 的空 mat
-        // （替代旧 shared static empty，避免并发线程在设备帧上写同一共享对象）
-        mutable cv::Mat plane_mat_;
-
-        // CPU 事实数据源 mat；CPU 借用平面 → 包装成借用 mat（不复制）；设备/借用(non-CPU) → 空 mat（保持旧 no-op 行为）
-        cv::Mat& mat() {
-            if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat;
-            return materialize_plane_mat();
-        }
-        const cv::Mat& mat() const {
-            if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat;
-            return materialize_plane_mat();
-        }
-
-        // 仅 CPU 借用平面（from_bgr24 等）把外置平面包装成借用 mat；设备/借用(non-CPU) 返回空 mat（不 materialize）
-        cv::Mat& materialize_plane_mat() const {
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) {
-                if (ps->device == Device::CPU && !ps->planes.empty() && ps->planes[0].data && ps->w > 0 && ps->h > 0) {
-                    const int ocv_type = md_image_type_to_ocv_type(ps->fmt);
-                    if (ocv_type > 0) {
-                        plane_mat_ = cv::Mat(ps->h, ps->w, ocv_type,
-                                             const_cast<uint8_t*>(ps->planes[0].data));
-                        return plane_mat_;
-                    }
-                }
-            }
-            plane_mat_ = cv::Mat();
-            return plane_mat_;
-        }
-
-        bool is_cpu_plane() const {
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get()))
-                return ps->device == Device::CPU;
-            return false;
-        }
-        void set_cpu_plane_dims(int w, int h) {
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) {
-                ps->w = w;
-                ps->h = h;
-            }
-        }
-
-        // 统一平面描述：PlaneStorage 直接用；CpuStorage 从 mat 派生
-        std::vector<ImageData::Plane> planes() const {
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) return ps->planes;
-            std::vector<ImageData::Plane> out;
-            const cv::Mat& m = mat();
-            if (m.empty()) return out;
-            if (type == MdImageType::NV12 || type == MdImageType::NV21) {
-                // Y 平面 h 行，UV 平面 h/2 行（沿用单 buffer 布局：mat 为 (h+h/2, w)）
-                const int w = m.cols;
-                const int h = 2 * m.rows / 3;
-                out.push_back({m.data, w});
-                out.push_back({m.data + static_cast<size_t>(h) * w, w});
-            } else {
-                out.push_back({m.data, static_cast<int>(m.step)});
-            }
-            return out;
-        }
-
-        void refresh_meta() {
-            auto* cs = dynamic_cast<CpuStorage*>(storage.get());
-            if (!cs) {
-                // PlaneStorage：宽高通道已是构造时填好的真实值，不清零
-                return;
-            }
-            if (cs->mat.empty()) {
-                width = height = channels = 0;
-                element_count_ = element_bytes_ = bytes_ = 0;
-                return;
-            }
-            if (is_planar_type(type) && cs->mat.dims >= 3) {
-                channels = static_cast<int>(cs->mat.size[0]);
-                height = static_cast<int>(cs->mat.size[1]);
-                width = static_cast<int>(cs->mat.size[2]);
-            } else {
-                width = cs->mat.cols; height = cs->mat.rows;
-                channels = is_planar_type(type) ? static_cast<int>(cs->mat.size[0]) : cs->mat.channels();
-            }
-            element_count_ = cs->mat.total();
-            element_bytes_ = cs->mat.elemSize();
-            bytes_ = element_count_ * element_bytes_;
-        }
-
-        bool empty() const {
-            if (auto* cs = dynamic_cast<CpuStorage*>(storage.get())) return cs->mat.empty();
-            if (auto* ps = dynamic_cast<PlaneStorage*>(storage.get())) return ps->planes.empty() || !ps->planes[0].data;
+    // 推导格式的通道数与 (w,h) 下总字节；返回 false 表示未知/不支持格式。
+    static bool image_layout(const MdImageType fmt, const int w, const int h, int& ch, size_t& bytes) {
+        const int ocv = md_image_type_to_ocv_type(fmt);
+        if (ocv >= 0) {   // 含 GRAY_U8（CV_8UC1==0）与全部 packed 类型
+            ch = CV_MAT_CN(ocv);
+            bytes = static_cast<size_t>(w) * h * static_cast<size_t>(CV_ELEM_SIZE(ocv));
             return true;
         }
+        if (fmt == MdImageType::NV12 || fmt == MdImageType::NV21 || fmt == MdImageType::I420) {
+            ch = 1;
+            bytes = static_cast<size_t>(w) * h * 3 / 2;
+            return true;
+        }
+        // Planar (CHW) 平面布局
+        if (is_planar_type(fmt)) {
+            int elem = 1;
+            switch (fmt) {
+            case MdImageType::PLA_BGR_F32: case MdImageType::PLA_RGB_F32:
+            case MdImageType::PLA_BGRA_F32: case MdImageType::PLA_RGBA_F32:
+                elem = 4; break;
+            default:
+                break;
+            }
+            switch (fmt) {
+            case MdImageType::PLA_BGRA_U8: case MdImageType::PLA_RGBA_U8:
+            case MdImageType::PLA_BGRA_F32: case MdImageType::PLA_RGBA_F32:
+                ch = 4; break;
+            default:
+                ch = 3; break;
+            }
+            bytes = static_cast<size_t>(w) * h * static_cast<size_t>(elem) * static_cast<size_t>(ch);
+            return true;
+        }
+        return false;
+    }
 
-    };
+    // 构造自有内存的统一平面 ImageData（唯一数据源入口）。
+    static ImageData make_owned(const MdImageType fmt, const int w, const int h, const Device device) {
+        if (w <= 0 || h <= 0) return ImageData();
+        int ch = 1;
+        size_t bytes = 0;
+        if (!image_layout(fmt, w, h, ch, bytes)) return ImageData();
+        auto sp = std::make_shared<ImageDataImpl>();
+        sp->fmt = fmt;
+        sp->w = w;
+        sp->h = h;
+        sp->ch = ch;
+        sp->device = device;
+        sp->bytes_ = bytes;
+        sp->element_count_ = static_cast<size_t>(w) * h;
+        sp->element_bytes_ = bytes / (static_cast<size_t>(w) * h);
+        auto buf = std::make_shared<std::vector<uint8_t>>(bytes);
+        sp->owner = buf;
+        uint8_t* p0 = buf->data();
+        if (fmt == MdImageType::NV12 || fmt == MdImageType::NV21) {
+            sp->planes[0] = {p0, w};
+            sp->planes[1] = {p0 + static_cast<size_t>(w) * h, w};
+            sp->nplanes = 2;
+        } else if (fmt == MdImageType::I420) {
+            sp->planes[0] = {p0, w};
+            sp->planes[1] = {p0 + static_cast<size_t>(w) * h, w / 2};
+            sp->planes[2] = {p0 + static_cast<size_t>(w) * h * 5 / 4, w / 2};
+            sp->nplanes = 3;
+        } else {
+            sp->planes[0] = {p0, static_cast<int>(static_cast<size_t>(w) * ch)};
+            sp->nplanes = 1;
+        }
+        ImageData img;
+        img.take_impl(sp);
+        return img;
+    }
 
-    ImageData::ImageData(const int width, const int height, const MdImageType type)
-        : impl_(std::make_shared<ImageDataImpl>()) {
-        impl_->type = type;
-        const int ocv_type = md_image_type_to_ocv_type(type);
-        auto* cs = new CpuStorage();
-        cs->mat = cv::Mat(height, width, ocv_type);
-        impl_->storage.reset(cs);
-        impl_->refresh_meta();
+    // 逐平面搬运（尊重源步长，去处源数据填充），用于 clone / toCpu 深拷贝。
+    static void copy_planes_like(const ImageDataImpl* src, ImageDataImpl* dst) {
+        const size_t n = (std::min)(src->nplanes, dst->nplanes);
+        for (size_t i = 0; i < n; ++i) {
+            size_t rows = static_cast<size_t>(src->h);
+            size_t stride = static_cast<size_t>(src->w) * static_cast<size_t>(src->ch);
+            if (src->fmt == MdImageType::NV12 || src->fmt == MdImageType::NV21) {
+                rows = (i == 0) ? static_cast<size_t>(src->h) : static_cast<size_t>(src->h) / 2;
+                stride = static_cast<size_t>(src->w);
+            } else if (src->fmt == MdImageType::I420) {
+                rows = (i == 0) ? static_cast<size_t>(src->h) : static_cast<size_t>(src->h) / 2;
+                stride = (i == 0) ? static_cast<size_t>(src->w) : static_cast<size_t>(src->w) / 2;
+            }
+            if (!src->planes[i].data || !dst->planes[i].data) continue;
+            const uint8_t* s = src->planes[i].data;
+            uint8_t* d = const_cast<uint8_t*>(dst->planes[i].data);
+            const int step_src = src->planes[i].step > 0 ? src->planes[i].step : static_cast<int>(stride);
+            const int step_dst = dst->planes[i].step;
+            for (size_t r = 0; r < rows; ++r)
+                std::memcpy(d + static_cast<size_t>(r) * step_dst,
+                            s + static_cast<size_t>(r) * step_src, stride);
+        }
+    }
+
+    ImageData::ImageData(const int width, const int height, const MdImageType type) {
+        g_last_error_msg.clear();
+        *this = make_owned(type, width, height, Device::CPU);
     }
 
 
-    ImageData::ImageData(const cv::Mat& mat) :
-        impl_(std::make_shared<ImageDataImpl>()) {
-        auto* cs = new CpuStorage();
-        cs->mat = mat;
-        impl_->storage.reset(cs);
-        impl_->type = md_image_type_from_ocv_type(mat.type());
-        impl_->refresh_meta();
-    }
-
-    ImageData::ImageData(cv::Mat&& mat) :
-        impl_(std::make_shared<ImageDataImpl>()) {
-        auto* cs = new CpuStorage();
-        cs->mat = std::move(mat);
-        impl_->storage.reset(cs);
-        impl_->type = md_image_type_from_ocv_type(cs->mat.type());
-        impl_->refresh_meta();
+    ImageData::ImageData(const cv::Mat& mat) {
+        g_last_error_msg.clear();
+        if (mat.empty()) {
+            set_last_error("ImageData(Mat): empty mat");
+            return;
+        }
+        const MdImageType t = md_image_type_from_ocv_type(mat.type());
+        if (t == MdImageType::UNKNOWN) {
+            set_last_error("ImageData(Mat): non-packed Mat type not supported");
+            return;
+        }
+        *this = make_owned(t, mat.cols, mat.rows, Device::CPU);
+        auto* d = get_impl(*this);
+        if (d && d->nplanes == 1 && d->owner) {
+            auto* buf = static_cast<std::vector<uint8_t>*>(d->owner.get());
+            uint8_t* dst = buf->data();
+            const size_t row_bytes = static_cast<size_t>(mat.cols) * mat.elemSize();
+            const size_t step_src = mat.step;
+            for (int r = 0; r < mat.rows; ++r)
+                std::memcpy(dst + static_cast<size_t>(r) * row_bytes,
+                            mat.data + static_cast<size_t>(r) * step_src, row_bytes);
+        }
     }
 
     ImageData ImageData::clone() const {
-        ImageData result;
-        if (impl_) {
-            result.impl_ = std::make_shared<ImageDataImpl>();
-            auto* cs = new CpuStorage();
-            cs->mat = impl_->mat().clone();
-            result.impl_->storage.reset(cs);
-            result.impl_->type = impl_->type;
-            result.impl_->refresh_meta();
+        g_last_error_msg.clear();
+        if (!impl_ || empty()) return ImageData();
+        auto* d = get_impl(*this);
+        ImageData img = make_owned(d->fmt, d->w, d->h, Device::CPU);
+        if (img.empty()) {
+            set_last_error("clone: unsupported format");
+            return ImageData();
         }
-        return result;
+        copy_planes_like(d, get_impl(img));
+        return img;
     }
 
 
@@ -192,209 +190,212 @@ namespace modeldeploy::vision {
                                   const int width,
                                   const int height,
                                   const MdImageType type,
-                                  const bool copy) {
+                                  const bool copy,
+                                  const Device device,
+                                  std::shared_ptr<void> owner) {
+        g_last_error_msg.clear();
         if (!data || width <= 0 || height <= 0) {
             MD_LOG_ERROR << "Invalid parameters for from_raw" << std::endl;
-            return ImageData();
-        }
-        const int ocv_type = md_image_type_to_ocv_type(type);
-        cv::Mat tmp_mat;
-        if (ocv_type > 0) {
-            tmp_mat = cv::Mat(height, width, ocv_type, data);
-        }
-        else if (type == MdImageType::I420 || type == MdImageType::NV12 || type == MdImageType::NV21) {
-            tmp_mat = cv::Mat(height + height / 2, width, CV_8UC1, data);
-        }
-        else {
-            MD_LOG_ERROR << "Invalid MdImageType format: " << md_image_type_to_string(type) << std::endl;
+            set_last_error("from_raw: invalid parameters");
             return ImageData();
         }
         if (copy) {
-            return ImageData(tmp_mat.clone());
+            ImageData img = make_owned(type, width, height, device);
+            auto* d = get_impl(img);
+            if (!d || !d->owner) {
+                MD_LOG_ERROR << "Invalid MdImageType format: " << md_image_type_to_string(type) << std::endl;
+                set_last_error("from_raw: unsupported format");
+                return ImageData();
+            }
+            std::memcpy(static_cast<std::vector<uint8_t>*>(d->owner.get())->data(), data, d->bytes_);
+            return img;
         }
-        return ImageData(tmp_mat);
+        // 零拷贝借用
+        int ch = 1;
+        size_t bytes = 0;
+        if (!image_layout(type, width, height, ch, bytes)) {
+            MD_LOG_ERROR << "Invalid MdImageType format: " << md_image_type_to_string(type) << std::endl;
+            set_last_error("from_raw: unsupported format");
+            return ImageData();
+        }
+        auto sp = std::make_shared<ImageDataImpl>();
+        sp->fmt = type;
+        sp->w = width;
+        sp->h = height;
+        sp->ch = ch;
+        sp->device = device;
+        sp->bytes_ = bytes;
+        sp->element_count_ = static_cast<size_t>(width) * height;
+        sp->element_bytes_ = bytes / (static_cast<size_t>(width) * height);
+        sp->owner = owner;
+        uint8_t* p0 = const_cast<uint8_t*>(data);
+        if (type == MdImageType::NV12 || type == MdImageType::NV21) {
+            sp->planes[0] = {p0, width};
+            sp->planes[1] = {p0 + static_cast<size_t>(width) * height, width};
+            sp->nplanes = 2;
+        } else if (type == MdImageType::I420) {
+            sp->planes[0] = {p0, width};
+            sp->planes[1] = {p0 + static_cast<size_t>(width) * height, width / 2};
+            sp->planes[2] = {p0 + static_cast<size_t>(width) * height * 5 / 4, width / 2};
+            sp->nplanes = 3;
+        } else {
+            sp->planes[0] = {p0, static_cast<int>(static_cast<size_t>(width) * ch)};
+            sp->nplanes = 1;
+        }
+        ImageData img;
+        img.take_impl(sp);
+        return img;
     }
 
 
-    int ImageData::width() const { return impl_ ? impl_->width : 0; }
-    int ImageData::height() const { return impl_ ? impl_->height : 0; }
-    int ImageData::channels() const { return impl_ ? impl_->channels : 0; }
-    MdImageType ImageData::type() const { return impl_ ? impl_->type : MdImageType::PKG_BGR_U8; }
+    int ImageData::width() const { return impl_ ? get_impl(*this)->w : 0; }
+    int ImageData::height() const { return impl_ ? get_impl(*this)->h : 0; }
+    int ImageData::channels() const { return impl_ ? get_impl(*this)->ch : 0; }
+    MdImageType ImageData::type() const { return impl_ ? get_impl(*this)->fmt : MdImageType::PKG_BGR_U8; }
     MdImageType ImageData::format() const { return type(); }
-    bool ImageData::empty() const { return !impl_ || impl_->empty(); }
+    bool ImageData::empty() const {
+        if (!impl_) return true;
+        auto* d = get_impl(*this);
+        return d->nplanes == 0 || !d->planes[0].data;
+    }
 
     bool ImageData::is_shared_with(const ImageData& other) const {
         return impl_ && other.impl_ && impl_.get() == other.impl_.get();
     }
 
-    size_t ImageData::element_count() const { return impl_ ? impl_->element_count_ : 0; }
-    size_t ImageData::element_bytes() const { return impl_ ? impl_->element_bytes_ : 0; }
-    size_t ImageData::bytes() const { return impl_ ? impl_->bytes_ : 0; }
+    size_t ImageData::element_count() const { return impl_ ? get_impl(*this)->element_count_ : 0; }
+    size_t ImageData::element_bytes() const { return impl_ ? get_impl(*this)->element_bytes_ : 0; }
+    size_t ImageData::bytes() const { return impl_ ? get_impl(*this)->bytes_ : 0; }
 
-    Device ImageData::device() const { return impl_ ? (impl_->storage ? impl_->storage->device : Device::CPU) : Device::CPU; }
-    size_t ImageData::plane_count() const { return impl_ ? impl_->planes().size() : 0; }
+    Device ImageData::device() const { return impl_ ? get_impl(*this)->device : Device::CPU; }
+    size_t ImageData::plane_count() const { return impl_ ? get_impl(*this)->nplanes : 0; }
     ImageData::Plane ImageData::plane(size_t i) const {
         if (!impl_) return {};
-        const auto pl = impl_->planes();
-        return i < pl.size() ? pl[i] : Plane{};
+        auto* d = get_impl(*this);
+        return i < d->nplanes ? d->planes[i] : Plane{};
     }
 
     ImageData ImageData::from_device_planes(uint8_t* y, uint8_t* uv, int w, int h,
                                             int step_y, int step_uv, Device device) {
+        g_last_error_msg.clear();
         if (!y || w <= 0 || h <= 0) {
             MD_LOG_ERROR << "from_device_planes: invalid parameters" << std::endl;
+            set_last_error("from_device_planes: invalid parameters");
             return ImageData();
         }
+        auto sp = std::make_shared<ImageDataImpl>();
+        sp->fmt = MdImageType::NV12;
+        sp->w = w;
+        sp->h = h;
+        sp->ch = 1;
+        sp->device = device;
+        sp->bytes_ = static_cast<size_t>(w) * h * 3 / 2;
+        sp->element_count_ = static_cast<size_t>(w) * h;
+        sp->element_bytes_ = 1;
+        sp->planes[0] = {y, step_y > 0 ? step_y : w};
+        if (uv) sp->planes[1] = {uv, step_uv > 0 ? step_uv : w};
+        sp->nplanes = uv ? 2 : 1;
         ImageData img;
-        img.impl_ = std::make_shared<ImageDataImpl>();
-        auto* ps = new PlaneStorage();
-        ps->device = device;
-        ps->fmt = MdImageType::NV12;
-        ps->w = w;
-        ps->h = h;
-        ps->ch = 1;
-        ps->planes.push_back({y, step_y > 0 ? step_y : w});
-        if (uv) ps->planes.push_back({uv, step_uv > 0 ? step_uv : w});
-        ps->nbytes = static_cast<size_t>(w) * h * 3 / 2;
-        img.impl_->storage.reset(ps);
-        img.impl_->type = MdImageType::NV12;
-        img.impl_->width = w;
-        img.impl_->height = h;
-        img.impl_->channels = 1;
-        img.impl_->element_count_ = static_cast<size_t>(w) * h;
-        img.impl_->element_bytes_ = 1;
-        img.impl_->bytes_ = ps->nbytes;
+        img.take_impl(sp);
+        return img;
+    }
+
+    ImageData ImageData::from_planes(const Plane* planes, const size_t n, const MdImageType fmt, const int w, const int h,
+                                     const Device device, std::shared_ptr<void> owner) {
+        g_last_error_msg.clear();
+        if (!planes || n == 0 || n > 3 || w <= 0 || h <= 0) {
+            set_last_error("from_planes: invalid parameters");
+            return ImageData();
+        }
+        int ch = 1;
+        size_t bytes = 0;
+        if (!image_layout(fmt, w, h, ch, bytes)) {
+            set_last_error("from_planes: unsupported format");
+            return ImageData();
+        }
+        auto sp = std::make_shared<ImageDataImpl>();
+        sp->fmt = fmt;
+        sp->w = w;
+        sp->h = h;
+        sp->ch = ch;
+        sp->device = device;
+        sp->owner = owner;
+        sp->bytes_ = bytes;
+        sp->element_count_ = static_cast<size_t>(w) * h;
+        sp->element_bytes_ = bytes / (static_cast<size_t>(w) * h);
+        for (size_t i = 0; i < n; ++i) sp->planes[i] = planes[i];
+        sp->nplanes = n;
+        ImageData img;
+        img.take_impl(sp);
         return img;
     }
 
     ImageData ImageData::from_bgr24(const uint8_t* bgr, int w, int h) {
         g_last_error_msg.clear();
-        if (!bgr || w <= 0 || h <= 0) {
-            g_last_error_msg = "from_bgr24: invalid parameters";
-            return ImageData();
-        }
-        ImageData img;
-        img.impl_ = std::make_shared<ImageDataImpl>();
-        auto* ps = new PlaneStorage();
-        ps->device = Device::CPU;
-        ps->fmt = MdImageType::PKG_BGR_U8;
-        ps->w = w;
-        ps->h = h;
-        ps->ch = 3;
-        ps->planes.push_back({bgr, static_cast<int>(static_cast<size_t>(w) * 3)});
-        ps->nbytes = static_cast<size_t>(w) * h * 3;
-        img.impl_->storage.reset(ps);
-        img.impl_->type = MdImageType::PKG_BGR_U8;
-        img.impl_->width = w;
-        img.impl_->height = h;
-        img.impl_->channels = 3;
-        img.impl_->element_count_ = static_cast<size_t>(w) * h;
-        img.impl_->element_bytes_ = 3;
-        img.impl_->bytes_ = ps->nbytes;
-        return img;
+        return from_raw(const_cast<unsigned char*>(bgr), w, h, MdImageType::PKG_BGR_U8, false, Device::CPU);
     }
 
     bool ImageData::toCpu(ImageData* out) const {
         g_last_error_msg.clear();
         if (!out) {
-            g_last_error_msg = "toCpu: null output";
+            set_last_error("toCpu: null output");
             return false;
         }
-        if (!impl_ || impl_->empty()) {
-            g_last_error_msg = "toCpu: source image is empty";
+        if (!impl_ || empty()) {
+            set_last_error("toCpu: source image is empty");
             return false;
         }
-        if (auto* cs = dynamic_cast<CpuStorage*>(impl_->storage.get())) {
-            // 已是 CPU：浅 clone（共享 mat）
-            out->impl_ = std::make_shared<ImageDataImpl>();
-            auto* ncs = new CpuStorage();
-            ncs->mat = cs->mat;
-            out->impl_->storage.reset(ncs);
-            out->impl_->type = impl_->type;
-            out->impl_->width = impl_->width;
-            out->impl_->height = impl_->height;
-            out->impl_->channels = impl_->channels;
-            out->impl_->element_count_ = impl_->element_count_;
-            out->impl_->element_bytes_ = impl_->element_bytes_;
-            out->impl_->bytes_ = impl_->bytes_;
+        auto* d = get_impl(*this);
+        if (d->device == Device::CPU && d->nplanes == 1 && md_image_type_to_ocv_type(d->fmt) >= 0) {
+            // 已是 CPU packed：浅 clone（共享 owner）
+            auto sp = std::make_shared<ImageDataImpl>();
+            sp->fmt = d->fmt;
+            sp->w = d->w;
+            sp->h = d->h;
+            sp->ch = d->ch;
+            sp->device = Device::CPU;
+            sp->owner = d->owner;
+            sp->planes = d->planes;
+            sp->nplanes = d->nplanes;
+            sp->bytes_ = d->bytes_;
+            sp->element_count_ = d->element_count_;
+            sp->element_bytes_ = d->element_bytes_;
+            out->impl_ = sp;
             return true;
         }
-        // 设备/借用平面 → CPU 深拷贝
-        const auto src_planes = impl_->planes();
-        auto* ncs = new CpuStorage();
-        if (impl_->type == MdImageType::NV12 || impl_->type == MdImageType::NV21) {
-            const int w = impl_->width;
-            const int h = impl_->height;
-            cv::Mat nv12(h + h / 2, w, CV_8UC1);
-            uint8_t* dst = nv12.data;
-            if (src_planes.size() >= 1 && src_planes[0].data) {
-                for (int r = 0; r < h; ++r) {
-                    std::memcpy(dst + static_cast<size_t>(r) * w,
-                                src_planes[0].data + static_cast<size_t>(r) * src_planes[0].step, w);
-                }
-            }
-            if (src_planes.size() >= 2 && src_planes[1].data) {
-                for (int r = 0; r < h / 2; ++r) {
-                    std::memcpy(dst + static_cast<size_t>(h) * w + static_cast<size_t>(r) * w,
-                                src_planes[1].data + static_cast<size_t>(r) * src_planes[1].step, w);
-                }
-            }
-            ncs->mat = nv12;
-        } else {
-            // 单平面 packed（如 from_bgr24）
-            const int w = impl_->width;
-            const int h = impl_->height;
-            const int ch = impl_->channels > 0 ? impl_->channels : 1;
-            cv::Mat packed(h, w, CV_MAKETYPE(CV_8U, ch));
-            if (src_planes.size() >= 1 && src_planes[0].data) {
-                const int step_src = src_planes[0].step > 0 ? src_planes[0].step : w * ch;
-                const int step_dst = static_cast<int>(packed.step);
-                for (int r = 0; r < h; ++r) {
-                    std::memcpy(packed.data + static_cast<size_t>(r) * step_dst,
-                                src_planes[0].data + static_cast<size_t>(r) * step_src, static_cast<size_t>(w) * ch);
-                }
-            }
-            ncs->mat = packed;
+        // 设备 / 多平面 → CPU 自有深拷贝（保持真实宽高与平面布局）
+        ImageData img = make_owned(d->fmt, d->w, d->h, Device::CPU);
+        if (img.empty()) {
+            set_last_error("toCpu: unsupported format");
+            return false;
         }
-        out->impl_ = std::make_shared<ImageDataImpl>();
-        out->impl_->storage.reset(ncs);
-        out->impl_->type = impl_->type;
-        out->impl_->width = impl_->width;
-        out->impl_->height = impl_->height;
-        out->impl_->channels = impl_->channels;
-        out->impl_->element_count_ = impl_->element_count_;
-        out->impl_->element_bytes_ = impl_->element_bytes_;
-        out->impl_->bytes_ = impl_->bytes_;
+        copy_planes_like(d, get_impl(img));
+        *out = std::move(img);
         return true;
     }
 
     bool ImageData::asMat(cv::Mat* out) const {
         g_last_error_msg.clear();
         if (!out) {
-            g_last_error_msg = "asMat: null output";
+            set_last_error("asMat: null output");
             return false;
         }
-        if (!impl_ || impl_->empty()) {
-            g_last_error_msg = "asMat: image is empty";
+        if (!impl_ || empty()) {
+            set_last_error("asMat: image is empty");
             return false;
         }
-        if (auto* cs = dynamic_cast<CpuStorage*>(impl_->storage.get())) {
-            *out = cs->mat;
-            return true;
+        auto* d = get_impl(*this);
+        if (d->device != Device::CPU || d->nplanes != 1 || !d->planes[0].data) {
+            set_last_error("asMat: packed CPU only");
+            return false;
         }
-        if (auto* ps = dynamic_cast<PlaneStorage*>(impl_->storage.get())) {
-            if (ps->device == Device::CPU && !ps->planes.empty() && ps->planes[0].data) {
-                const int ocv_type = md_image_type_to_ocv_type(impl_->type);
-                if (ocv_type > 0) {
-                    // CPU 借用平面 → 包装成 mat（借用，不复制）
-                    *out = cv::Mat(impl_->height, impl_->width, ocv_type,
-                                   const_cast<uint8_t*>(ps->planes[0].data));
-                    return true;
-                }
-            }
+        const int ocv = md_image_type_to_ocv_type(d->fmt);
+        if (ocv < 0) {
+            set_last_error("asMat: packed CPU only");
+            return false;
         }
-        g_last_error_msg = "asMat: no CPU mat available to borrow";
-        return false;
+        *out = cv::Mat(d->h, d->w, ocv, const_cast<uint8_t*>(d->planes[0].data), d->planes[0].step);
+        return true;
     }
 
     const char* ImageData::last_error() {
@@ -403,7 +404,7 @@ namespace modeldeploy::vision {
 
 
     ImageData& ImageData::rotate(const RotateFlags flag) {
-        if (!impl_ || impl_->empty()) {
+        if (!impl_ || empty()) {
             return *this;
         }
         g_last_error_msg.clear();
@@ -418,7 +419,7 @@ namespace modeldeploy::vision {
 
 
     ImageData ImageData::crop(const Rect2f& rect) const {
-        if (!impl_ || impl_->empty()) {
+        if (!impl_ || empty()) {
             return ImageData();
         }
         g_last_error_msg.clear();
@@ -431,7 +432,13 @@ namespace modeldeploy::vision {
     }
 
     ImageData ImageData::rotate_crop(std::array<float, 8> box) const {
-        if (!impl_ || impl_->empty()) {
+        if (!impl_ || empty()) {
+            return ImageData();
+        }
+        g_last_error_msg.clear();
+        cv::Mat src;
+        if (!asMat(&src)) {
+            set_last_error("rotate_crop: packed CPU only");
             return ImageData();
         }
         std::vector<std::vector<float>> points;
@@ -447,11 +454,10 @@ namespace modeldeploy::vision {
         float right = *std::max_element(x_collect, x_collect + 4);
         float top = *std::min_element(y_collect, y_collect + 4);
         float bottom = *std::max_element(y_collect, y_collect + 4);
-        // 直接在原图上取 ROI，避免整图拷贝（密集文本页每行一次整图 copy 开销很大）
         cv::Rect roi(std::max(0, static_cast<int>(left)), std::max(0, static_cast<int>(top)),
                      std::max(1, static_cast<int>(right - left)), std::max(1, static_cast<int>(bottom - top)));
         cv::Mat img_crop;
-        impl_->mat()(roi & cv::Rect(0, 0, impl_->mat().cols, impl_->mat().rows)).copyTo(img_crop);
+        src(roi & cv::Rect(0, 0, src.cols, src.rows)).copyTo(img_crop);
         for (auto& point : points) {
             point[0] -= left;
             point[1] -= top;
@@ -483,12 +489,12 @@ namespace modeldeploy::vision {
             cv::transpose(dst_img, dst_img);
             cv::flip(dst_img, dst_img, 0);
         }
-        return ImageData(std::move(dst_img));
+        return ImageData(dst_img);
     }
 
 
     ImageData ImageData::resize(int width, int height) const {
-        if (!impl_ || impl_->empty() || width <= 0 || height <= 0) {
+        if (!impl_ || empty() || width <= 0 || height <= 0) {
             return ImageData();
         }
         g_last_error_msg.clear();
@@ -501,7 +507,7 @@ namespace modeldeploy::vision {
     }
 
     ImageData ImageData::cvt_color(const ImageData& image, const ColorConvertType type) {
-        if (!image.impl_ || image.impl_->empty()) {
+        if (!image.impl_ || image.empty()) {
             return ImageData();
         }
         g_last_error_msg.clear();
@@ -515,63 +521,11 @@ namespace modeldeploy::vision {
             set_last_error("cvt_color: backend could not process the image (device frame or unsupported)");
             return ImageData();
         }
-        if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB) {
-            // PL↔PA 拆合需要私有 impl 访问，留在本 TU 完成（与后端返回的 packed mat 等价）。
-            // 设备帧 mat() 会 materialize 为空 → cv::split/merge 可能抛 cv::Exception；本库无异常，显式拒绝。
-            if (image.device() != Device::CPU) {
-                set_last_error("cvt_color: PA2PL requires CPU image (device frame not supported)");
-                return ImageData();
-            }
-            ImageData dst_image;
-            dst_image.impl_ = std::make_shared<ImageDataImpl>();
-            const int single_channel_type = CV_MAKETYPE(image.impl_->mat().depth(), 1);
-            cv::Mat chw_image(image.channels(), image.height() * image.width(), single_channel_type);
-            std::vector<cv::Mat> split_image;
-            cv::split(image.impl_->mat(), split_image);
-            for (int i = 0; i < split_image.size(); i++) {
-                split_image[i] = split_image[i].reshape(1, 1);
-                split_image[i].copyTo(chw_image.row(i));
-            }
-            auto* cs = new CpuStorage();
-            cs->mat = chw_image.reshape(1, {image.channels(), image.height(), image.width()});
-            dst_image.impl_->storage.reset(cs);
-            dst_image.impl_->type = image.impl_->mat().depth() == CV_8U
-                                        ? MdImageType::PLA_BGR_U8
-                                        : MdImageType::PLA_BGR_F32;
-            dst_image.impl_->refresh_meta();
-            return dst_image;
-        }
-        if (type == ColorConvertType::CVT_PL_BGR2PA_BGR || type == ColorConvertType::CVT_PL_RGB2PA_RGB) {
-            // valid chw format
-            if (image.type() != MdImageType::PLA_BGR_U8 && image.type() != MdImageType::PLA_BGR_F32
-                && image.type() != MdImageType::PLA_RGB_U8 && image.type() != MdImageType::PLA_RGB_F32) {
-                set_last_error("cvt_color: invalid planar layout (expected Planar format)");
-                return ImageData();
-            }
-            ImageData dst_image;
-            dst_image.impl_ = std::make_shared<ImageDataImpl>();
-
-            // 1 channel per row, total rows equal to channels
-            cv::Mat planar_image = image.impl_->mat().reshape(1, image.channels());
-            // 2. Split the planar image into separate channel matrices.
-            std::vector<cv::Mat> split_images(image.channels());
-            for (int i = 0; i < image.channels(); ++i) {
-                split_images[i] = planar_image.row(i).reshape(1, image.height()); // reshape each row back to H x W
-            }
-            // 3. Merge these channel matrices into a single HWC image.
-            cv::Mat hwc_image;
-            cv::merge(split_images, hwc_image);
-
-            auto* cs = new CpuStorage();
-            cs->mat = hwc_image;
-            dst_image.impl_->storage.reset(cs);
-            dst_image.impl_->type = hwc_image.depth() == CV_8U
-                                        ? MdImageType::PKG_BGR_U8
-                                        : hwc_image.depth() == CV_32F
-                                        ? MdImageType::PKG_BGR_F32
-                                        : MdImageType::PKG_BGR_F64;
-            dst_image.impl_->refresh_meta();
-            return dst_image;
+        if (type == ColorConvertType::CVT_PA_BGR2PL_BGR || type == ColorConvertType::CVT_PA_RGB2PL_RGB ||
+            type == ColorConvertType::CVT_PL_BGR2PA_BGR || type == ColorConvertType::CVT_PL_RGB2PA_RGB) {
+            // PL↔PA 拆合在后续 Task（4/5）正式迁入 CPU backend；本 Task 先显式拒绝（保留旧错误语义）。
+            set_last_error("cvt_color: PL/PA layout conversion not migrated in this task");
+            return ImageData();
         }
         set_last_error("cvt_color: unsupported color conversion type");
         return ImageData();
@@ -608,7 +562,7 @@ namespace modeldeploy::vision {
     }
 
     void ImageData::to_tensor(Tensor* tensor, const bool copy) {
-        if (!impl_ || impl_->empty()) {
+        if (!impl_ || empty()) {
             MD_LOG_ERROR << "Image is empty" << std::endl;
             return;
         }
@@ -644,7 +598,7 @@ namespace modeldeploy::vision {
     static bool codec_supported(const ImageData& image) {
         if (image.device() != Device::CPU) return false;
         if (image.plane_count() > 1) return false;
-        return md_image_type_to_ocv_type(image.format()) > 0;
+        return md_image_type_to_ocv_type(image.format()) >= 0;
     }
 
     std::vector<uint8_t> ImageData::imencode(const ImageData& image, const std::string& ext) {
@@ -658,14 +612,19 @@ namespace modeldeploy::vision {
             g_last_error_msg = "imencode: only CPU single-plane image supported";
             return buf;
         }
-        cv::imencode(ext, image.impl_->mat(), buf);
+        cv::Mat m;
+        if (!image.asMat(&m)) {
+            g_last_error_msg = "imencode: cannot map image to Mat";
+            return buf;
+        }
+        cv::imencode(ext, m, buf);
         return buf;
     }
 
     ImageData ImageData::imdecode(const std::vector<uint8_t>& buf) {
         cv::Mat mat = cv::imdecode(buf, cv::IMREAD_UNCHANGED);
         if (mat.empty()) return ImageData();
-        return ImageData(std::move(mat));
+        return ImageData(mat);
     }
 
 
@@ -675,12 +634,12 @@ namespace modeldeploy::vision {
             MD_LOG_ERROR << "Failed to read image: " << filename << std::endl;
             return ImageData();
         }
-        return ImageData(std::move(mat));
+        return ImageData(mat);
     }
 
     bool ImageData::imwrite(const std::string& filename) const {
         g_last_error_msg.clear();
-        if (!impl_ || impl_->empty()) {
+        if (!impl_ || empty()) {
             g_last_error_msg = "imwrite: image is empty";
             return false;
         }
@@ -688,16 +647,26 @@ namespace modeldeploy::vision {
             g_last_error_msg = "imwrite: only CPU single-plane image supported";
             return false;
         }
-        return cv::imwrite(filename, impl_->mat());
+        cv::Mat m;
+        if (!asMat(&m)) {
+            g_last_error_msg = "imwrite: cannot map image to Mat";
+            return false;
+        }
+        return cv::imwrite(filename, m);
     }
 
     // 显示图片
     void ImageData::imshow(const std::string& win_name) const {
-        if (!impl_ || impl_->empty()) {
+        if (!impl_ || empty()) {
             MD_LOG_ERROR << "Cannot display empty image" << std::endl;
             return;
         }
-        cv::imshow(win_name, impl_->mat());
+        cv::Mat m;
+        if (!asMat(&m)) {
+            MD_LOG_ERROR << "Cannot display non-packed image" << std::endl;
+            return;
+        }
+        cv::imshow(win_name, m);
         cv::waitKey(0);
     }
 }
