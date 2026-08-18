@@ -420,4 +420,49 @@ TEST_CASE("ImageData to_tensor device zero-copy on GPU", "[gpu]") {
         CHECK(ImageData::last_error() != nullptr);
     }
 }
+
+TEST_CASE("GPU device NV12 frame in-place draw (zero-copy, no D2H)", "[gpu]") {
+    const int w = 64, h = 48;
+    const size_t ybytes = static_cast<size_t>(w) * h;
+    const size_t uvbytes = static_cast<size_t>(w) * (h / 2);
+    uint8_t* y = nullptr;
+    uint8_t* uv = nullptr;
+    REQUIRE(cudaMalloc(&y, ybytes) == cudaSuccess);
+    REQUIRE(cudaMalloc(&uv, uvbytes) == cudaSuccess);
+    struct NG { uint8_t* y; uint8_t* uv; ~NG() { if (y) cudaFree(y); if (uv) cudaFree(uv); } } ng{y, uv};
+    // 全图初始为常量：Y=100（由 BT.601 反推近似灰），UV=128
+    REQUIRE(cudaMemset(y, 100, ybytes) == cudaSuccess);
+    REQUIRE(cudaMemset(uv, 128, uvbytes) == cudaSuccess);
+
+    // 包装为 Device::GPU NV12 帧：plane 指针即设备内存，零拷贝
+    ImageData::Plane pl[2] = {{y, w}, {uv, w}};
+    auto frame = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, Device::GPU, {});
+    REQUIRE(!frame.empty());
+    REQUIRE(frame.device() == Device::GPU);
+    REQUIRE(frame.plane_count() == 2);
+    REQUIRE(frame.plane(0).data == y);   // 仍指向原设备内存：就地、零拷贝
+    REQUIRE(frame.plane(1).data == uv);
+
+    // 通过 vision backend 分派到 CUDA 设备侧 kernel，直接在设备 Y 平面画白框
+    auto bk = modeldeploy::vision::create_processor_backend(Device::GPU, Backend::ORT, 0);
+    REQUIRE(bk != nullptr);
+    REQUIRE(bk->draw_rect_nv12(frame, 2, 2, 8, 6, 255, 255, 255, 1));
+
+    std::vector<uint8_t> hy(ybytes);
+    REQUIRE(cudaMemcpy(hy.data(), y, ybytes, cudaMemcpyDeviceToHost) == cudaSuccess);
+    // 顶边框（y=2, x∈[2,10)）变亮（白≈Y~235）：证明白框写入了设备内存
+    for (int x = 2; x < 10; ++x) {
+        REQUIRE(hy[2 * w + x] > 200);
+    }
+    // 框外顶部（y=0）保持 100：写入选定的框区域，未越界
+    for (int x = 0; x < w; ++x) {
+        REQUIRE(hy[0 * w + x] == 100);
+    }
+    // 框内部（非边框）保持 100：仅描边框，不在框内部回填
+    REQUIRE(hy[4 * w + 5] == 100);
+    // 帧仍是设备 NV12，plane 指针不变：绘制全程留在设备端，无 H2D/D2H
+    REQUIRE(frame.device() == Device::GPU);
+    REQUIRE(frame.plane(0).data == y);
+    REQUIRE(frame.plane(1).data == uv);
+}
 #endif
