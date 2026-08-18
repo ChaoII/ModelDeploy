@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -83,6 +84,52 @@ TEST_CASE("UltralyticsDet model", "[vision_models]") {
         REQUIRE(r.box.height >= 0);
         REQUIRE(r.label_id >= 0);
         REQUIRE(r.score > 0);
+    }
+}
+
+// 同一 NV12 缓冲：predict(ImageData)（NV12 分叉）与 predict_nv12（薄包装）须结果一致
+// [model]：需模型文件，缺文件时跳过（不自红）
+TEST_CASE("UltralyticsDet predict(ImageData NV12) == predict_nv12", "[model]") {
+    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    if (!fs::exists(modelfile)) return;
+
+    modeldeploy::RuntimeOption opt;
+    opt.use_cpu();
+    UltralyticsDet model(modelfile.string(), opt);
+
+    auto img = load_image("test_detection0.jpg");
+    if (img.empty()) return;
+    const int w = img.width(), h = img.height();
+    const int step_src = img.plane(0).step > 0 ? img.plane(0).step : w * 3;
+
+    // BGR → NV12：Y 取 luma（保留场景结构），UV 置中性灰 128
+    std::vector<uint8_t> y(static_cast<size_t>(w) * h);
+    for (int i = 0; i < h; ++i) {
+        const uint8_t* row = img.plane(0).data + static_cast<size_t>(i) * step_src;
+        for (int j = 0; j < w; ++j) {
+            const uint8_t b = row[j * 3 + 0], g = row[j * 3 + 1], r = row[j * 3 + 2];
+            y[static_cast<size_t>(i) * w + j] =
+                static_cast<uint8_t>((77 * r + 150 * g + 29 * b + 128) >> 8);
+        }
+    }
+    std::vector<uint8_t> uv(static_cast<size_t>(w) * h / 2, 128);
+
+    ImageData frame = ImageData::from_device_planes(
+        y.data(), uv.data(), w, h, w, w, modeldeploy::Device::CPU);
+    REQUIRE(frame.format() == MdImageType::NV12);
+    REQUIRE(frame.plane_count() == 2);
+
+    std::vector<DetectionResult> r_predict, r_nv12;
+    REQUIRE(model.predict(frame, &r_predict, nullptr));
+    REQUIRE(model.predict_nv12(y.data(), uv.data(), w, h, w, w, &r_nv12, nullptr, nullptr,
+                               modeldeploy::Device::CPU, nullptr));
+
+    REQUIRE(r_predict.size() == r_nv12.size());
+    for (size_t i = 0; i < r_predict.size(); ++i) {
+        CHECK(r_predict[i].label_id == r_nv12[i].label_id);
+        CHECK(r_predict[i].score == Catch::Approx(r_nv12[i].score));
+        CHECK(r_predict[i].box.width == Catch::Approx(r_nv12[i].box.width));
+        CHECK(r_predict[i].box.height == Catch::Approx(r_nv12[i].box.height));
     }
 }
 

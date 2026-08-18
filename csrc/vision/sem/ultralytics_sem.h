@@ -41,6 +41,11 @@ namespace modeldeploy::vision::detection {
 
     protected:
         bool initialize();
+        // NV12/device 单帧共享推理核心（预处走 plane(0)/plane(1) 零拷贝），predict/predict_nv12 共用
+        bool predict_single_nv12(const ImageData& frame,
+                                 SemSegResult* result,
+                                 LetterBoxRecord* letter_box_record,
+                                 TimerArray* timers);
         UltralyticsSemPreprocessor preprocessor_;
         UltralyticsSemPostprocessor postprocessor_;
     };
