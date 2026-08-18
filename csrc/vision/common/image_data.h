@@ -55,9 +55,6 @@ namespace modeldeploy::vision {
         [[nodiscard]] Plane plane(size_t i) const;
         // == type() 的别名
         [[nodiscard]] MdImageType format() const;
-        // 设备侧构造：绑定外部设备内存平面（零拷贝，不拥有内存）
-        static ImageData from_device_planes(uint8_t* y, uint8_t* uv, int w, int h,
-                                            int step_y, int step_uv, Device device);
         // CPU 单平面（PKG_BGR_U8）借用构造
         static ImageData from_bgr24(const uint8_t* bgr, int w, int h);
         // 设备/平面 → CPU 深拷贝；已是 CPU 则浅 clone

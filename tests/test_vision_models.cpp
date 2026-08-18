@@ -114,8 +114,8 @@ TEST_CASE("UltralyticsDet predict(ImageData) on NV12 device frame", "[model]") {
     }
     std::vector<uint8_t> uv(static_cast<size_t>(w) * h / 2, 128);
 
-    ImageData frame = ImageData::from_device_planes(
-        y.data(), uv.data(), w, h, w, w, modeldeploy::Device::CPU);
+    ImageData::Plane pl[2] = {{y.data(), w}, {uv.data(), w}};
+    ImageData frame = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, modeldeploy::Device::CPU);
     REQUIRE(frame.format() == MdImageType::NV12);
     REQUIRE(frame.plane_count() == 2);
 

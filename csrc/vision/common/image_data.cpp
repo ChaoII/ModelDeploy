@@ -275,31 +275,6 @@ namespace modeldeploy::vision {
         return i < d->nplanes ? d->planes[i] : Plane{};
     }
 
-    ImageData ImageData::from_device_planes(uint8_t* y, uint8_t* uv, int w, int h,
-                                            int step_y, int step_uv, Device device) {
-        g_last_error_msg.clear();
-        if (!y || w <= 0 || h <= 0) {
-            MD_LOG_ERROR << "from_device_planes: invalid parameters" << std::endl;
-            set_last_error("from_device_planes: invalid parameters");
-            return ImageData();
-        }
-        auto sp = std::make_shared<ImageDataImpl>();
-        sp->fmt = MdImageType::NV12;
-        sp->w = w;
-        sp->h = h;
-        sp->ch = 1;
-        sp->device = device;
-        sp->bytes_ = static_cast<size_t>(w) * h * 3 / 2;
-        sp->element_count_ = static_cast<size_t>(w) * h;
-        sp->element_bytes_ = 1;
-        sp->planes[0] = {y, step_y > 0 ? step_y : w};
-        if (uv) sp->planes[1] = {uv, step_uv > 0 ? step_uv : w};
-        sp->nplanes = uv ? 2 : 1;
-        ImageData img;
-        img.take_impl(sp);
-        return img;
-    }
-
     ImageData ImageData::from_planes(const Plane* planes, const size_t n, const MdImageType fmt, const int w, const int h,
                                      const Device device, std::shared_ptr<void> owner) {
         g_last_error_msg.clear();

@@ -392,7 +392,8 @@ TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
     auto uv_buf = std::make_unique<uint8_t[]>(static_cast<size_t>(w) * (h / 2));
     std::memset(y_buf.get(), 128, static_cast<size_t>(w) * h);
     std::memset(uv_buf.get(), 128, static_cast<size_t>(w) * (h / 2));
-    ImageData frame = ImageData::from_device_planes(y_buf.get(), uv_buf.get(), w, h, w, w, Device::CPU);
+    ImageData::Plane pl[2] = {{y_buf.get(), w}, {uv_buf.get(), w}};
+    ImageData frame = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, Device::CPU);
 
     CpuProcessorBackend backend;
 
@@ -444,8 +445,8 @@ TEST_CASE("CPU NV12 device-style drawing", "[image_data]") {
 TEST_CASE("image_data: device frame self-describes (w/h not zeroed)", "[core]") {
     std::vector<unsigned char> y(128 * 96, 100);
     std::vector<unsigned char> uv(128 * 48, 100);
-    auto img = modeldeploy::vision::ImageData::from_device_planes(
-        y.data(), uv.data(), 128, 96, 128, 128, Device::CPU);
+    ImageData::Plane pls[2] = {{y.data(), 128}, {uv.data(), 128}};
+    auto img = modeldeploy::vision::ImageData::from_planes(pls, 2, MdImageType::NV12, 128, 96, Device::CPU);
     REQUIRE(!img.empty());
     CHECK(img.width() == 128);
     CHECK(img.height() == 96);
@@ -477,7 +478,8 @@ TEST_CASE("image_data: asMat cpu borrow / toCpu device copy", "[core]") {
     REQUIRE(cpu.asMat(&m));                 // CPU 借用
     CHECK(!m.empty());
     std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
-    auto dev = modeldeploy::vision::ImageData::from_device_planes(y.data(), uv.data(), 8, 4, 8, 8, Device::CPU);
+    ImageData::Plane pls[2] = {{y.data(), 8}, {uv.data(), 8}};
+    auto dev = modeldeploy::vision::ImageData::from_planes(pls, 2, MdImageType::NV12, 8, 4, Device::CPU);
     modeldeploy::vision::ImageData cpu_copy;
     REQUIRE(dev.toCpu(&cpu_copy));          // 平面→CPU 深拷贝
     CHECK(cpu_copy.width() == 8);
@@ -489,7 +491,8 @@ TEST_CASE("image_data: asMat cpu borrow / toCpu device copy", "[core]") {
 
 TEST_CASE("image_data: refresh_meta preserves device dims", "[core]") {
     std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
-    auto dev = modeldeploy::vision::ImageData::from_device_planes(y.data(), uv.data(), 8, 4, 8, 8, Device::CPU);
+    ImageData::Plane pls[2] = {{y.data(), 8}, {uv.data(), 8}};
+    auto dev = modeldeploy::vision::ImageData::from_planes(pls, 2, MdImageType::NV12, 8, 4, Device::CPU);
     // 内部 refresh_meta 不再清空设备帧宽高（对设备帧安全）
     CHECK(dev.width() == 8);
     CHECK(dev.height() == 4);
@@ -549,8 +552,9 @@ TEST_CASE("image_data: crop/rotate/cvt_color dispatch via CPU backend", "[core]"
 
 TEST_CASE("image_data: device-frame op not supported errors (no silent cpu)", "[core]") {
     std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
-    auto dev = modeldeploy::vision::ImageData::from_device_planes(
-        y.data(), uv.data(), 8, 4, 8, 8, Device::GPU);
+    ImageData::Plane pl[2] = {{y.data(), 8}, {uv.data(), 8}};
+    auto dev = modeldeploy::vision::ImageData::from_planes(
+        pl, 2, MdImageType::NV12, 8, 4, Device::GPU);
     modeldeploy::vision::ImageData::last_error();           // 先清空
     auto c = dev.crop({0, 0, 2, 2});
     CHECK(c.empty());                                       // 设备帧未实现 → 空
@@ -563,8 +567,9 @@ TEST_CASE("image_data: CVT_NV122PKG_BGR converts NV12 to packed BGR (CPU)", "[co
     std::vector<unsigned char> uv(static_cast<size_t>(w) * (h / 2));
     for (int i = 0; i < w * h; ++i) y[i] = static_cast<unsigned char>((i * 7) % 256);
     for (int i = 0; i < w * (h / 2); ++i) uv[i] = static_cast<unsigned char>(100 + (i % 100));
-    auto nv12 = modeldeploy::vision::ImageData::from_device_planes(
-        y.data(), uv.data(), w, h, w, w, Device::CPU);
+    ImageData::Plane pl[2] = {{y.data(), w}, {uv.data(), w}};
+    auto nv12 = modeldeploy::vision::ImageData::from_planes(
+        pl, 2, MdImageType::NV12, w, h, Device::CPU);
     REQUIRE(!nv12.empty());
 
     auto bgr = modeldeploy::vision::ImageData::cvt_color(nv12, ColorConvertType::CVT_NV122PKG_BGR);
@@ -618,8 +623,9 @@ TEST_CASE("image_data: imread/imencode/imwrite roundtrip (CPU)", "[core]") {
 
 TEST_CASE("image_data: device nv12 frame imencode/imwrite rejected (no silent cpu)", "[core]") {
     std::vector<unsigned char> y(8 * 4, 0), uv(8 * 2, 0);
-    auto dev = modeldeploy::vision::ImageData::from_device_planes(
-        y.data(), uv.data(), 8, 4, 8, 8, modeldeploy::Device::CPU);
+    ImageData::Plane pls[2] = {{y.data(), 8}, {uv.data(), 8}};
+    auto dev = modeldeploy::vision::ImageData::from_planes(
+        pls, 2, MdImageType::NV12, 8, 4, modeldeploy::Device::CPU);
     modeldeploy::vision::ImageData::last_error();
     auto buf = modeldeploy::vision::ImageData::imencode(dev, ".jpg");
     CHECK(buf.empty());
@@ -726,6 +732,59 @@ TEST_CASE("image_data unified storage: ctor/family/height/asMat", "[image_data]"
     auto fb = ImageData::from_bgr24(pkg.data(), 2, 2);
     CHECK(fb.format() == MdImageType::PKG_BGR_U8);
     CHECK(fb.plane(0).data != nullptr);
+}
+
+TEST_CASE("image_data: from_planes NV12/I420/NV21 self-describes", "[image_data]") {
+    // NV12：2 平面，Y step=w，UV step=w
+    {
+        std::vector<uint8_t> y(8 * 4), uv(8 * 2);
+        ImageData::Plane pl[2] = {{y.data(), 8}, {uv.data(), 8}};
+        auto img = ImageData::from_planes(pl, 2, MdImageType::NV12, 8, 4, Device::CPU);
+        REQUIRE(!img.empty());
+        CHECK(img.width() == 8);
+        CHECK(img.height() == 4);
+        CHECK(img.format() == MdImageType::NV12);
+        CHECK(img.plane_count() == 2);
+        CHECK(img.plane(0).data == y.data());
+        CHECK(img.plane(0).step == 8);
+        CHECK(img.plane(1).data == uv.data());
+        CHECK(img.plane(1).step == 8);
+    }
+    // I420：3 平面，Y step=w，U/V step=w/2（偏移沿用平铺布局）
+    {
+        std::vector<uint8_t> y(8 * 4), u(4 * 2), v(4 * 2);
+        ImageData::Plane pl[3] = {{y.data(), 8}, {u.data(), 4}, {v.data(), 4}};
+        auto img = ImageData::from_planes(pl, 3, MdImageType::I420, 8, 4, Device::CPU);
+        REQUIRE(!img.empty());
+        CHECK(img.width() == 8);
+        CHECK(img.height() == 4);
+        CHECK(img.format() == MdImageType::I420);
+        CHECK(img.plane_count() == 3);
+        CHECK(img.plane(0).data == y.data());
+        CHECK(img.plane(0).step == 8);
+        CHECK(img.plane(1).data == u.data());
+        CHECK(img.plane(1).step == 4);
+        CHECK(img.plane(2).data == v.data());
+        CHECK(img.plane(2).step == 4);
+    }
+    // NV21：2 平面（Y + 交错 VU）
+    {
+        std::vector<uint8_t> y(8 * 4), vu(8 * 2);
+        ImageData::Plane pl[2] = {{y.data(), 8}, {vu.data(), 8}};
+        auto img = ImageData::from_planes(pl, 2, MdImageType::NV21, 8, 4, Device::CPU);
+        REQUIRE(!img.empty());
+        CHECK(img.width() == 8);
+        CHECK(img.height() == 4);
+        CHECK(img.format() == MdImageType::NV21);
+        CHECK(img.plane_count() == 2);
+        CHECK(img.plane(1).data == vu.data());
+        CHECK(img.plane(1).step == 8);
+    }
+    // 非法参数 → 空图
+    {
+        auto img = ImageData::from_planes(nullptr, 2, MdImageType::NV12, 8, 4, Device::CPU);
+        CHECK(img.empty());
+    }
 }
 
 

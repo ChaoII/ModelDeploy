@@ -141,6 +141,38 @@ namespace modeldeploy::vision {
             *out = ImageData(std::move(bgr));
             return true;
         }
+        if (type == ColorConvertType::CVT_I4202PKG_BGR) {
+            // I420 → packed BGR（3 平面合并为单 buffer 再 cvtColor；不能用单 mat asMat）
+            if (image.format() != MdImageType::I420) return false;
+            const int w = image.width();
+            const int h = image.height();
+            if (w <= 0 || h <= 0 || (w % 2) != 0 || (h % 2) != 0 || image.plane_count() < 3) return false;
+            const auto p0 = image.plane(0);
+            const auto p1 = image.plane(1);
+            const auto p2 = image.plane(2);
+            if (!p0.data || !p1.data || !p2.data || p0.step <= 0 || p1.step <= 0 || p2.step <= 0) return false;
+            const int uw = w / 2, uh = h / 2;
+            std::vector<uint8_t> flat(static_cast<size_t>(w) * h * 3 / 2);
+            uint8_t* d = flat.data();
+            for (int r = 0; r < h; ++r)
+                std::memcpy(d + static_cast<size_t>(r) * w,
+                            p0.data + static_cast<size_t>(r) * p0.step, w);
+            d += static_cast<size_t>(w) * h;
+            for (int r = 0; r < uh; ++r)
+                std::memcpy(d + static_cast<size_t>(r) * uw,
+                            p1.data + static_cast<size_t>(r) * p1.step, uw);
+            d += static_cast<size_t>(uw) * uh;
+            for (int r = 0; r < uh; ++r)
+                std::memcpy(d + static_cast<size_t>(r) * uw,
+                            p2.data + static_cast<size_t>(r) * p2.step, uw);
+            cv::Mat f(h * 3 / 2, w, CV_8UC1, flat.data());
+            cv::Mat bgr;
+            cv::cvtColor(f, bgr, cv::COLOR_YUV2BGR_I420);
+            if (bgr.empty()) return false;
+            if (!bgr.isContinuous()) bgr = bgr.clone();
+            *out = ImageData(std::move(bgr));
+            return true;
+        }
         const int ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
         // 仅处理 OpenCV 原生颜色转换；PL↔PA 拆合在 ImageData 内部完成（需要私有 impl 访问）
         if (ocv_type <= 0) return false;

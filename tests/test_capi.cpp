@@ -18,6 +18,9 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 namespace {
 
@@ -270,6 +273,41 @@ TEST_CASE("capi2 face anti-spoof inference (first)", "[model]") {
     md_result_destroy(res);
     md_image_destroy(img);
     md_model_destroy(as);
+}
+
+TEST_CASE("capi2 md_image_from_yuv420p matches reference cvtColor(COLOR_YUV2BGR_I420)", "[capi]") {
+    const int w = 16, h = 16;  // 偶宽偶高（I420 转换要求）
+    std::vector<unsigned char> flat(static_cast<size_t>(w) * h * 3 / 2);
+    for (size_t i = 0; i < flat.size(); ++i)
+        flat[i] = static_cast<unsigned char>((i * 13) % 256);
+
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_yuv420p(&img, flat.data(), w, h) == MD_OK);
+    REQUIRE(img != nullptr);
+    int ow = 0, oh = 0;
+    REQUIRE(md_image_size(img, &ow, &oh) == MD_OK);
+    CHECK(ow == w);
+    CHECK(oh == h);
+
+    // 手柄 → lossless BMP 编码 → 解码还原 CPU BGR 像素
+    const unsigned char* enc = nullptr;
+    size_t n = 0;
+    REQUIRE(md_image_encode(img, ".bmp", &enc, &n) == MD_OK);
+    std::vector<unsigned char> encbuf(enc, enc + n);
+    cv::Mat out = cv::imdecode(encbuf, cv::IMREAD_COLOR);
+    REQUIRE(!out.empty());
+
+    // 参考：对同一平铺 buffer 直接做 OpenCV I420→BGR
+    cv::Mat yuv(h * 3 / 2, w, CV_8UC1, const_cast<unsigned char*>(flat.data()));
+    cv::Mat ref;
+    cv::cvtColor(yuv, ref, cv::COLOR_YUV2BGR_I420);
+    REQUIRE(!ref.empty());
+
+    CHECK(out.rows == ref.rows);
+    CHECK(out.cols == ref.cols);
+    CHECK(std::memcmp(out.data, ref.data, ref.total() * 3) == 0);
+
+    md_image_destroy(img);
 }
 
 TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane, self-describes", "[capi]") {

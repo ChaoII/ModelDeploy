@@ -356,10 +356,11 @@ MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
     if (!out || !y) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_nv12: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
     (void)src;
-    auto img = ImageData::from_device_planes(
-        const_cast<uint8_t*>(static_cast<const uint8_t*>(y)),
-        uv ? const_cast<uint8_t*>(static_cast<const uint8_t*>(uv)) : nullptr,
-        w, h, step_y > 0 ? step_y : w, step_uv > 0 ? step_uv : w, Device::CPU);
+    ImageData::Plane pl[2] = {
+        {static_cast<const uint8_t*>(y), step_y > 0 ? step_y : w},
+        {static_cast<const uint8_t*>(uv), step_uv > 0 ? step_uv : w},
+    };
+    auto img = ImageData::from_planes(pl, uv ? 2 : 1, MdImageType::NV12, w, h, Device::CPU);
     if (img.empty()) {
         set_error("md_image_from_nv12: failed to construct NV12");
         return MD_ERR_IMAGE_DECODE;
@@ -385,10 +386,11 @@ MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void
         case MD_DEV_TPU: d = Device::TPU; break;
         default: d = Device::CPU; break;
     }
-    auto img = ImageData::from_device_planes(
-        const_cast<uint8_t*>(static_cast<const uint8_t*>(y)),
-        uv ? const_cast<uint8_t*>(static_cast<const uint8_t*>(uv)) : nullptr,
-        w, h, step_y, step_uv, d);
+    ImageData::Plane pl[2] = {
+        {static_cast<const uint8_t*>(y), step_y},
+        {static_cast<const uint8_t*>(uv), step_uv},
+    };
+    auto img = ImageData::from_planes(pl, uv ? 2 : 1, MdImageType::NV12, w, h, d);
     if (img.empty()) {
         set_error("md_image_from_device_nv12: failed to construct device frame");
         return MD_ERR_INVALID_ARGUMENT;
@@ -406,10 +408,25 @@ MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void
 MDStatus md_image_from_yuv420p(MDImageHandle* out, const void* data, int w, int h) {
     if (!out || !data) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_yuv420p: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
-    cv::Mat yuv(h * 3 / 2, w, CV_8UC1, const_cast<void*>(data));
-    cv::Mat bgr;
-    cv::cvtColor(yuv, bgr, cv::COLOR_YUV2BGR_I420);
-    return image_from_mat(out, std::move(bgr));
+    // 平铺 I420(Y[h*w], U[w*h/4], V[w*h/4]) → 三平面 from_planes → CVT_I4202PKG_BGR
+    const auto* p = static_cast<const uint8_t*>(data);
+    ImageData::Plane pl[3] = {
+        {p, w},
+        {p + static_cast<size_t>(w) * h, w / 2},
+        {p + static_cast<size_t>(w) * h * 5 / 4, w / 2},
+    };
+    auto nv = ImageData::from_planes(pl, 3, MdImageType::I420, w, h, Device::CPU);
+    if (nv.empty()) {
+        set_error("md_image_from_yuv420p: failed to construct I420");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    auto bgr = ImageData::cvt_color(nv, ColorConvertType::CVT_I4202PKG_BGR);
+    if (bgr.empty()) {
+        const char* le = ImageData::last_error();
+        set_error_fmt("md_image_from_yuv420p: convert failed (%s)", (le && *le) ? le : "unknown");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    return image_from_image(out, std::move(bgr));
 }
 
 MDStatus md_image_from_encoded(MDImageHandle* out, const void* bytes, size_t n) {
