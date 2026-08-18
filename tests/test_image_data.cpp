@@ -305,6 +305,49 @@ TEST_CASE("ImageData to_mat and to_tensor", "[image_data]") {
     }
 }
 
+TEST_CASE("ImageData to_tensor respects device and rejects multi-plane", "[image_data]") {
+    auto bgr = create_solid_image(16, 12, 10, 20, 30);
+
+    SECTION("zero-copy shares buffer on CPU") {
+        Tensor t;
+        bgr.to_tensor(&t, false);
+        REQUIRE(t.shape().size() == 3);
+        CHECK(t.device() == Device::CPU);
+        CHECK(t.data() == bgr.plane(0).data);
+    }
+    SECTION("copy=true copies on CPU") {
+        Tensor t;
+        bgr.to_tensor(&t, true);
+        REQUIRE(t.data() != nullptr);
+        CHECK(t.data() != bgr.plane(0).data);
+    }
+    SECTION("multi-plane NV12 rejected (zero-copy)") {
+        std::vector<uint8_t> buf(16 * 12 * 3 / 2);
+        std::fill(buf.begin(), buf.end(), 80);
+        auto nv = ImageData::from_raw(buf.data(), 16, 12, MdImageType::NV12, true);
+        REQUIRE(!nv.empty());
+        Tensor t;
+        nv.to_tensor(&t, false);
+        CHECK(ImageData::last_error() != nullptr);
+    }
+    SECTION("multi-plane NV12 rejected (copy)") {
+        std::vector<uint8_t> buf(16 * 12 * 3 / 2);
+        std::fill(buf.begin(), buf.end(), 80);
+        auto nv = ImageData::from_raw(buf.data(), 16, 12, MdImageType::NV12, true);
+        Tensor t;
+        nv.to_tensor(&t, true);
+        CHECK(ImageData::last_error() != nullptr);
+    }
+    SECTION("images_to_tensor rejects multi-plane NV12") {
+        std::vector<uint8_t> buf(16 * 12 * 3 / 2);
+        std::fill(buf.begin(), buf.end(), 80);
+        auto nv = ImageData::from_raw(buf.data(), 16, 12, MdImageType::NV12, true);
+        Tensor t;
+        ImageData::images_to_tensor({nv}, &t);
+        CHECK(ImageData::last_error() != nullptr);
+    }
+}
+
 TEST_CASE("ImageData rotate_crop", "[image_data]") {
     auto img = create_gradient_image(100, 100);
 

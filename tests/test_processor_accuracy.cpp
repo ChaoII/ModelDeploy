@@ -392,3 +392,32 @@ TEST_CASE("Processor accuracy: fused_color_matrix BGR2YCrCb vs OpenCV", "[proces
     INFO("BGR2YCrCb fused vs OpenCV max_diff=" << max_diff << " count=" << diff_count);
     REQUIRE(max_diff < 1.5);
 }
+
+#ifdef WITH_GPU
+TEST_CASE("ImageData to_tensor device zero-copy on GPU", "[gpu]") {
+    const int w = 16, h = 12;
+    const size_t bytes = static_cast<size_t>(w) * h * 3;
+    uint8_t* dev = nullptr;
+    REQUIRE(cudaMalloc(&dev, bytes) == cudaSuccess);
+    struct DevGuard { uint8_t* p; ~DevGuard() { if (p) cudaFree(p); } } guard{dev};
+
+    ImageData::Plane pl{dev, w * 3};
+    auto img = ImageData::from_planes(&pl, 1, MdImageType::PKG_BGR_U8, w, h, Device::GPU, {});
+    REQUIRE(!img.empty());
+    REQUIRE(img.device() == Device::GPU);
+
+    SECTION("zero-copy wraps device memory as GPU tensor") {
+        Tensor t;
+        img.to_tensor(&t, false);
+        CHECK(ImageData::last_error() == nullptr);
+        REQUIRE(t.shape().size() == 3);
+        CHECK(t.device() == Device::GPU);
+        CHECK(t.data() == dev);   // 同一设备指针：零拷贝，无 H2D/D2H、无新分配
+    }
+    SECTION("copy=true rejected on device frame (no hidden D2H)") {
+        Tensor t;
+        img.to_tensor(&t, true);
+        CHECK(ImageData::last_error() != nullptr);
+    }
+}
+#endif

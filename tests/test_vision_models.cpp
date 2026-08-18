@@ -4,7 +4,14 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 #include "csrc/vision.h"
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#include <opencv2/opencv.hpp>
+#endif
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::vision;
@@ -129,6 +136,124 @@ TEST_CASE("UltralyticsDet predict(ImageData) on NV12 device frame", "[model]") {
         REQUIRE(r.score > 0);
     }
 }
+
+#ifdef WITH_GPU
+namespace {
+    // BGR packed ImageData -> 真实 NV12 主机缓冲（Y + 交织 UV），供上传到 GPU
+    void bgr_to_nv12_host(const ImageData& bgr,
+                          std::vector<uint8_t>* y_out, std::vector<uint8_t>* uv_out) {
+        const int w = bgr.width(), h = bgr.height();
+        const int step_src = bgr.plane(0).step > 0 ? bgr.plane(0).step : w * 3;
+        cv::Mat bgr_mat(h, w, CV_8UC3, const_cast<uint8_t*>(bgr.plane(0).data), step_src);
+        cv::Mat i420;
+        cv::cvtColor(bgr_mat, i420, cv::COLOR_BGR2YUV_I420);
+        const uint8_t* p = i420.ptr<uint8_t>();
+        y_out->resize(static_cast<size_t>(w) * h);
+        uv_out->resize(static_cast<size_t>(w) * h / 2);
+        std::memcpy(y_out->data(), p, static_cast<size_t>(w) * h);
+        const uint8_t* up = p + static_cast<size_t>(w) * h;
+        const uint8_t* vp = p + static_cast<size_t>(w) * h + static_cast<size_t>(w) * h / 4;
+        const size_t n = static_cast<size_t>(w) * h / 4;
+        for (size_t i = 0; i < n; ++i) {
+            (*uv_out)[2 * i] = up[i];
+            (*uv_out)[2 * i + 1] = vp[i];
+        }
+    }
+
+    // 排序后取最高分检测
+    static void top_detection(std::vector<DetectionResult>* rs, DetectionResult* out) {
+        REQUIRE_FALSE(rs->empty());
+        std::sort(rs->begin(), rs->end(), [](const DetectionResult& a, const DetectionResult& b) {
+            return a.score > b.score;
+        });
+        *out = rs->front();
+    }
+
+    static float box_iou(const Rect2f& a, const Rect2f& b) {
+        const float ax2 = a.x + a.width, ay2 = a.y + a.height;
+        const float bx2 = b.x + b.width, by2 = b.y + b.height;
+        const float ix = std::max(0.0f, std::min(ax2, bx2) - std::max(a.x, b.x));
+        const float iy = std::max(0.0f, std::min(ay2, by2) - std::max(a.y, b.y));
+        const float inter = ix * iy;
+        const float ua = a.width * a.height + b.width * b.height - inter;
+        return ua > 0 ? inter / ua : 0.0f;
+    }
+} // namespace
+
+// 端到端：真实 NV12 帧常驻 GPU 显存 → ImageData(Device::GPU) → predict() 全程零拷贝
+// CUDA 预处理 kernel 直接读 plane(0)/plane(1) 设备指针 → GPU Tensor → ORT CUDA EP 推理
+TEST_CASE("UltralyticsDet predict(ImageData) on GPU NV12 device frame (zero-copy e2e)", "[model][gpu]") {
+    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    if (!fs::exists(modelfile)) return;
+
+    auto img = load_image("bus.jpg");
+    if (img.empty()) return;
+    const int w = img.width(), h = img.height();
+
+    // 1) 主机 BGR -> NV12（真实色度，非中性灰）
+    std::vector<uint8_t> h_y, h_uv;
+    bgr_to_nv12_host(img, &h_y, &h_uv);
+
+    // 2) 上传 Y/UV 到 GPU 显存（真实 NV12 frame 常驻 device memory）
+    uint8_t* d_y = nullptr;
+    uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, static_cast<size_t>(w) * h) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, static_cast<size_t>(w) * h / 2) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, h_y.data(), static_cast<size_t>(w) * h, cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, h_uv.data(), static_cast<size_t>(w) * h / 2, cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    // owner 维护 cudaMalloc'd 缓冲（ImageData 借用，随 owner 析构释放）
+    std::shared_ptr<void> owner(static_cast<void*>(nullptr),
+                                [d_y, d_uv](void*) {
+                                    if (d_y) cudaFree(d_y);
+                                    if (d_uv) cudaFree(d_uv);
+                                });
+    ImageData::Plane pl[2] = {{d_y, w}, {d_uv, w}};
+    ImageData frame = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h,
+                                             modeldeploy::Device::GPU, owner);
+
+    // 3) 验证帧是 GPU 且 plane 指向设备内存（零拷贝，未经 from_planes 复制）
+    REQUIRE(frame.device() == modeldeploy::Device::GPU);
+    REQUIRE(frame.plane_count() == 2);
+    REQUIRE(frame.plane(0).data == d_y);
+    REQUIRE(frame.plane(1).data == d_uv);
+
+    // 4) 完整 model.predict()：CUDA 预处理 kernel 直读设备 plane + ORT CUDA EP 推理
+    modeldeploy::RuntimeOption opt;
+    opt.use_gpu(0);
+    UltralyticsDet model(modelfile.string(), opt);
+
+    std::vector<DetectionResult> r_gpu;
+    REQUIRE(model.predict(frame, &r_gpu, nullptr));
+    REQUIRE_FALSE(r_gpu.empty());
+    for (auto& r : r_gpu) {
+        REQUIRE(r.box.width > 0);
+        REQUIRE(r.box.height >= 0);
+        REQUIRE(r.label_id >= 0);
+        REQUIRE(r.score > 0);
+    }
+
+    // 5) 交叉校验：同图 CPU predict（BGR 打包帧）→ 最高分检测框应与设备路径 IoU 重叠
+    modeldeploy::RuntimeOption copt;
+    copt.use_cpu();
+    UltralyticsDet cmodel(modelfile.string(), copt);
+    auto cpu_img = load_image("bus.jpg");
+    REQUIRE_FALSE(cpu_img.empty());
+    std::vector<DetectionResult> r_cpu;
+    REQUIRE(cmodel.predict(cpu_img, &r_cpu, nullptr));
+    REQUIRE_FALSE(r_cpu.empty());
+
+    DetectionResult top_gpu, top_cpu;
+    top_detection(&r_gpu, &top_gpu);
+    top_detection(&r_cpu, &top_cpu);
+    INFO("GPU top box=(" << top_gpu.box.x << "," << top_gpu.box.y << "," <<
+        top_gpu.box.width << "," << top_gpu.box.height << ") score=" << top_gpu.score
+        << " | CPU top box=(" << top_cpu.box.x << "," << top_cpu.box.y << "," <<
+        top_cpu.box.width << "," << top_cpu.box.height << ") score=" << top_cpu.score);
+    REQUIRE(box_iou(top_gpu.box, top_cpu.box) > 0.5f);
+}
+#endif // WITH_GPU
 
 // ==================== Ultralytics Segmentation ====================
 TEST_CASE("UltralyticsSeg model", "[vision_models]") {

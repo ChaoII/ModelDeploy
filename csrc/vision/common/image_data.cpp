@@ -496,19 +496,43 @@ namespace modeldeploy::vision {
         return ImageData();
     }
 
+    // to_tensor/images_to_tensor 通用前置：统一平面存储下，只有"单平面 + 紧致"的图才能映射为
+    // 单个 Tensor 平面（packed/GRAY）。多平面 YUV（NV12/I420）无法表达为单 tensor，显式拒绝而非静默丢 UV。
+    // 返回 true 表示可通过 plane(0) 访问；否则置错返回 false。
+    static bool tensor_mappable(const ImageData& img) {
+        if (img.plane_count() != 1) {
+            set_last_error("to_tensor: multi-plane YUV (NV12/I420) cannot map to a single tensor");
+            return false;
+        }
+        // 紧致性：单平面 step（每行字节数）必须等于 w*ch，零拷贝共享/逐帧拷贝才不致错位。
+        // 带填充（step>w*ch）的外部借用平面拒绝。
+        if (img.plane(0).step != img.width() * img.channels()) {
+            set_last_error("to_tensor: non-contiguous (padded) single plane cannot map to a tensor");
+            return false;
+        }
+        return true;
+    }
+
     void ImageData::images_to_tensor(const std::vector<ImageData>& images, Tensor* tensor) {
         if (images.empty() || !tensor) {
-            MD_LOG_ERROR << "images is empty or tensor is null" << std::endl;
+            set_last_error("images_to_tensor: empty images or null tensor");
             return;
         }
+        g_last_error_msg.clear();
         const int n = static_cast<int>(images.size());
         const int c = images[0].channels();
         const int h = images[0].height();
         const int w = images[0].width();
 
-        for (auto& img : images) {
+        for (const auto& img : images) {
             if (img.channels() != c || img.width() != w || img.height() != h) {
-                MD_LOG_ERROR << "images shape is not equal" << std::endl;
+                set_last_error("images_to_tensor: images shape is not equal");
+                return;
+            }
+            // 批量是 CPU 侧"拷贝成 NCHW"语义：仅支持 CPU 单平面紧致；设备帧/多平面显式拒绝
+            // （设备零拷贝走 predict/from_planes 链路，不在此处做隐含 D2H）。
+            if (img.device() != Device::CPU || !tensor_mappable(img)) {
+                set_last_error("images_to_tensor: only CPU single-plane contiguous images supported");
                 return;
             }
         }
@@ -528,23 +552,33 @@ namespace modeldeploy::vision {
 
     void ImageData::to_tensor(Tensor* tensor, const bool copy) {
         if (!impl_ || empty()) {
-            MD_LOG_ERROR << "Image is empty" << std::endl;
+            set_last_error("to_tensor: image empty");
             return;
         }
         if (!tensor) {
-            MD_LOG_ERROR << "Tensor pointer is null" << std::endl;
+            set_last_error("to_tensor: null tensor");
+            return;
+        }
+        g_last_error_msg.clear();
+        // 统一平面存储 + 设备感知：先把不可映射/跨设备情况显式拦下，杜绝"默认 CPU"的隐式拷贝。
+        if (!tensor_mappable(*this)) {
             return;
         }
         const auto dtype = utils::md_image_dtype_to_md_dtype(type());
         const std::vector<int64_t> shape = {channels(), height(), width()};
         if (copy) {
+            // copy=true 产生 CPU 副本（Tensor::allocate 仅分配 CPU 内存）。
+            // 设备帧的"拷贝"本身就需要一次 D2H —— 与"全程零拷贝、无 D2H/H2D"的主线相悖，显式拒绝。
+            if (device() != Device::CPU) {
+                set_last_error("to_tensor: copy=true not supported for device frame; use copy=false zero-copy");
+                return;
+            }
             const size_t num_bytes = bytes();
             // allocate 复用逻辑：shape/dtype/device 不变时复用已有 MemoryBlock
             tensor->allocate(shape, dtype);
             if (num_bytes != tensor->byte_size()) {
-                MD_LOG_ERROR << "While copy Mat to Tensor, requires the memory size be same, "
-                    "but now size of Tensor = " << tensor->byte_size()
-                    << ", size of Mat = " << num_bytes << "." << std::endl;
+                set_last_error("to_tensor: tensor size mismatch, tensor=" +
+                               std::to_string(tensor->byte_size()) + ", image=" + std::to_string(num_bytes));
                 return;
             }
             if (plane(0).data && tensor->data()) {
@@ -552,8 +586,9 @@ namespace modeldeploy::vision {
             }
         }
         else {
-            // 零拷贝：共享外部内存，不复制
-            tensor->from_external_memory(const_cast<uint8_t*>(plane(0).data), shape, dtype);
+            // 零拷贝：把 plane(0) 按该内存所属 device（CPU/GPU/TPU）包装成 Tensor，共享外部内存，不做任何拷贝。
+            // 设备帧的 plane(0).data 指向设备内存，故产出设备 Tensor，绝无 H2D/D2H。
+            tensor->from_external_memory(const_cast<uint8_t*>(plane(0).data), shape, dtype, nullptr, device());
         }
     }
 
