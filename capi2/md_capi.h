@@ -161,6 +161,9 @@ MD_CAPI_EXPORT void md_image_destroy(MDImageHandle);
 /* 图像尺寸查询 */
 MD_CAPI_EXPORT MDStatus md_image_size(MDImageHandle, int* w, int* h);
 
+/* 图像元数据：type=MdImageType 数值, dev=MDDevice, nplanes=平面数（NV12=2, packed=1）；任一指针可为空 */
+MD_CAPI_EXPORT MDStatus md_image_info(MDImageHandle, int* type, int* dev, int* nplanes);
+
 /*
  * 取帧平面指针（供外部零拷贝读取/写入，典型于 NV12 设备帧）。
  *  - 仅对 NV12 类型有效；CPU BGR 图此处返回 MD_ERR_UNSUPPORTED_TYPE 且 y=uv=NULL。

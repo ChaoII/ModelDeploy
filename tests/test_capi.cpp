@@ -447,6 +447,45 @@ TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane, self-describe
     md_image_destroy(img);
 }
 
+// 元数据 getter：type=MdImageType 数值, dev=MDDevice, nplanes=平面数（NV12=2, packed=1）
+TEST_CASE("capi2 md_image_info returns type/device/plane metadata", "[capi]") {
+    // GPU 设备 NV12 两平面帧（外部 y/uv 借用，仅验证元数据）：type=NV12(60), dev=GPU, nplanes=2
+    const int w = 16, h = 16;
+    std::vector<unsigned char> y(static_cast<size_t>(w) * h, 100),
+                               uv(static_cast<size_t>(w) * h / 2, 100);
+    MDImageHandle nv = nullptr;
+    REQUIRE(md_image_from_device_nv12(&nv, y.data(), uv.data(), w, h, w, w, MD_DEV_GPU) == MD_OK);
+    REQUIRE(nv != nullptr);
+    int type = -1, dev = -1, nplanes = -1;
+    REQUIRE(md_image_info(nv, &type, &dev, &nplanes) == MD_OK);
+    CHECK(type == 60);            // MdImageType::NV12
+    CHECK(nplanes == 2);
+    CHECK(dev == MD_DEV_GPU);     // MD_DEV_GPU == 1 == Device::GPU
+    md_image_destroy(nv);
+
+    // CPU 紧致 BGR 图：type=PKG_BGR_U8(22), 单平面, CPU
+    auto bgr = make_gray_bgr(w, h);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+    type = -1; dev = -1; nplanes = -1;
+    REQUIRE(md_image_info(img, &type, &dev, &nplanes) == MD_OK);
+    CHECK(type == 22);            // MdImageType::PKG_BGR_U8
+    CHECK(nplanes == 1);
+    CHECK(dev == MD_DEV_CPU);
+    md_image_destroy(img);
+
+    // 空句柄 → MD_ERR_NULL_POINTER
+    CHECK(md_image_info(nullptr, &type, &dev, &nplanes) == MD_ERR_NULL_POINTER);
+
+    // 任一输出指针可为空（仅查询部分项）
+    MDImageHandle img2 = nullptr;
+    REQUIRE(md_image_from_bgr24(&img2, bgr.data(), w, h) == MD_OK);
+    type = -1;
+    REQUIRE(md_image_info(img2, &type, nullptr, nullptr) == MD_OK);
+    CHECK(type == 22);
+    md_image_destroy(img2);
+}
+
 TEST_CASE("capi2 crop delegates to ImageData, preserves CPU/OOB/device semantics", "[capi]") {
     const int w = 16, h = 16;
     auto bgr = make_gray_bgr(w, h);

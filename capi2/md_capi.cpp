@@ -586,6 +586,24 @@ MDStatus md_image_plane_ptrs(MDImageHandle h, MDDevice* dev, void** y, void** uv
     return (*y) ? MD_OK : MD_ERR_INVALID_ARGUMENT;
 }
 
+MDStatus md_image_info(MDImageHandle h, int* type, int* dev, int* nplanes) {
+    auto* hi = static_cast<md_image_handle*>(h);
+    if (!hi) return MD_ERR_NULL_POINTER;
+    if (type)    *type    = static_cast<int>(hi->image.type());
+    if (nplanes) *nplanes = static_cast<int>(hi->image.plane_count());
+    if (dev) {
+        // MDDevice 与 Device 数值映射（TPU/OPENCL/VULKAN 顺序不同，须 switch 对齐现有 md_image_plane_ptrs）
+        switch (hi->image.device()) {
+            case Device::GPU:    *dev = static_cast<int>(MD_DEV_GPU); break;
+            case Device::TPU:    *dev = static_cast<int>(MD_DEV_TPU); break;
+            case Device::OPENCL: *dev = static_cast<int>(MD_DEV_OPENCL); break;
+            case Device::VULKAN: *dev = static_cast<int>(MD_DEV_VULKAN); break;
+            default:             *dev = static_cast<int>(MD_DEV_CPU); break;
+        }
+    }
+    return MD_OK;
+}
+
 /* ==================== 模型创建分发 ==================== */
 
 namespace {
