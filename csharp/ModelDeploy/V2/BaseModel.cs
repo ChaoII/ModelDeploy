@@ -184,9 +184,18 @@ namespace ModelDeploy.V2
                 stepY, stepUv, (int)srcDevice);
             if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"MakePredictionNv12: md_image_from_device_nv12 failed: {GetLastError()}");
-            var prediction = new Prediction<T>(PredictNative(img), reader);
             var frameImg = VisionImage.FromDeviceFrame(img);
             frameImg.PinBuffers(y, uv);
+            Prediction<T> prediction;
+            try
+            {
+                prediction = new Prediction<T>(PredictNative(img), reader);
+            }
+            catch
+            {
+                frameImg.Dispose();
+                throw;
+            }
             return (prediction, frameImg);
         }
 
