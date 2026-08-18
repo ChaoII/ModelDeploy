@@ -138,6 +138,10 @@ MD_CAPI_EXPORT MDStatus md_image_from_bgr24(MDImageHandle* out, const void* bgr,
 MD_CAPI_EXPORT MDStatus md_image_from_rgb24(MDImageHandle* out, const void* rgb, int w, int h);
 MD_CAPI_EXPORT MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
                             int w, int h, int step_y, int step_uv, MDDevice src);
+/* 从设备 NV12 两平面构造自描述 ImageData（零拷贝借用外部 y/uv，库不拥有内存）。
+ * dev 指明帧所在设备（CPU/GPU/TPU）；step_y/step_uv<=0 时依 w 兜底。 */
+MD_CAPI_EXPORT MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void* uv,
+                            int w, int h, int step_y, int step_uv, MDDevice dev);
 MD_CAPI_EXPORT MDStatus md_image_from_yuv420p(MDImageHandle* out, const void* data, int w, int h);
 
 /* 编码数据 / base64 / 压缩字节 */

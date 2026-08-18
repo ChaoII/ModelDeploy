@@ -312,6 +312,36 @@ MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
     return image_from_mat(out, std::move(bgr));
 }
 
+MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void* uv,
+                                    int w, int h, int step_y, int step_uv, MDDevice dev) {
+    if (!out || !y) return MD_ERR_NULL_POINTER;
+    if (w <= 0 || h <= 0) { set_error("md_image_from_device_nv12: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
+    if (step_y <= 0) step_y = w;
+    if (step_uv <= 0) step_uv = w;
+    Device d;
+    switch (dev) {
+        case MD_DEV_GPU: d = Device::GPU; break;
+        case MD_DEV_TPU: d = Device::TPU; break;
+        default: d = Device::CPU; break;
+    }
+    auto img = ImageData::from_device_planes(
+        const_cast<uint8_t*>(static_cast<const uint8_t*>(y)),
+        uv ? const_cast<uint8_t*>(static_cast<const uint8_t*>(uv)) : nullptr,
+        w, h, step_y, step_uv, d);
+    if (img.empty()) {
+        set_error("md_image_from_device_nv12: failed to construct device frame");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    auto* hi = new md_image_handle();
+    hi->width = w;
+    hi->height = h;
+    hi->data = nullptr;
+    hi->owns_data = false;
+    hi->image = std::move(img);
+    *out = hi;
+    return MD_OK;
+}
+
 MDStatus md_image_from_yuv420p(MDImageHandle* out, const void* data, int w, int h) {
     if (!out || !data) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_yuv420p: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
@@ -361,12 +391,24 @@ MDStatus md_image_crop(MDImageHandle in, int x, int y, int w, int h, MDImageHand
     if (w <= 0 || h <= 0) return MD_ERR_INVALID_ARGUMENT;
     const auto* hi = static_cast<md_image_handle*>(in);
     if (!handle_has_cpu_bgr(hi)) { set_error("md_image_crop: device frame not supported"); return MD_ERR_UNSUPPORTED_TYPE; }
-    cv::Mat src(hi->height, hi->width, CV_8UC3, hi->data);
     if (x < 0 || y < 0 || x + w > hi->width || y + h > hi->height) {
         set_error("md_image_crop: crop rect out of bounds");
         return MD_ERR_INVALID_ARGUMENT;
     }
-    return image_from_mat(out, src(cv::Rect(x, y, w, h)).clone());
+    auto src = handle_to_image(hi);
+    auto r = src.crop({static_cast<float>(x), static_cast<float>(y),
+                       static_cast<float>(w), static_cast<float>(h)});
+    if (r.empty()) {
+        const char* le = ImageData::last_error();
+        set_error_fmt("md_image_crop: %s", (le && *le) ? le : "crop failed");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    cv::Mat mat;
+    if (!r.asMat(&mat) || mat.empty()) {
+        set_error("md_image_crop: cannot take cropped mat");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    return image_from_mat(out, std::move(mat));
 }
 
 MDStatus md_image_show(MDImageHandle h) {

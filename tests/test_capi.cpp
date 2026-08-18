@@ -250,3 +250,52 @@ TEST_CASE("capi2 face anti-spoof inference (first)", "[model]") {
     md_image_destroy(img);
     md_model_destroy(as);
 }
+
+TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane, self-describes", "[capi]") {
+    const int w = 16, h = 16;
+    std::vector<unsigned char> y(w * h, 100), uv(w * h / 2, 100);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_device_nv12(&img, y.data(), uv.data(), w, h, w, w, MD_DEV_CPU) == MD_OK);
+    REQUIRE(img != nullptr);
+    int ow = 0, oh = 0;
+    REQUIRE(md_image_size(img, &ow, &oh) == MD_OK);
+    CHECK(ow == w);
+    CHECK(oh == h);
+    MDDevice dev = MD_DEV_CPU; void* py = nullptr; void* puv = nullptr;
+    REQUIRE(md_image_plane_ptrs(img, &dev, &py, &puv) == MD_OK);
+    CHECK(dev == MD_DEV_CPU);
+    CHECK(py == y.data());
+    CHECK(puv == uv.data());
+    md_image_destroy(img);
+}
+
+TEST_CASE("capi2 crop delegates to ImageData, preserves CPU/OOB/device semantics", "[capi]") {
+    const int w = 16, h = 16;
+    auto bgr = make_gray_bgr(w, h);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+
+    // CPU BGR 界内裁剪：结果尺寸正确
+    MDImageHandle crop = nullptr;
+    REQUIRE(md_image_crop(img, 2, 2, 6, 6, &crop) == MD_OK);
+    REQUIRE(crop != nullptr);
+    int cw = 0, ch = 0;
+    REQUIRE(md_image_size(crop, &cw, &ch) == MD_OK);
+    CHECK(cw == 6);
+    CHECK(ch == 6);
+    md_image_destroy(crop);
+
+    // 界外裁剪：仍返回 MD_ERR_INVALID_ARGUMENT（行为保持）
+    MDImageHandle oob = (MDImageHandle)0x1;
+    CHECK(md_image_crop(img, 4, 4, 100, 100, &oob) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(oob == (MDImageHandle)0x1);  // out 未被写入
+    md_image_destroy(img);
+
+    // 设备 NV12 帧裁剪：MD_ERR_UNSUPPORTED_TYPE
+    std::vector<unsigned char> y(w * h, 100), uv(w * h / 2, 100);
+    MDImageHandle dev = nullptr;
+    REQUIRE(md_image_from_device_nv12(&dev, y.data(), uv.data(), w, h, w, w, MD_DEV_CPU) == MD_OK);
+    MDImageHandle dcrop = nullptr;
+    CHECK(md_image_crop(dev, 0, 0, 4, 4, &dcrop) == MD_ERR_UNSUPPORTED_TYPE);
+    md_image_destroy(dev);
+}
