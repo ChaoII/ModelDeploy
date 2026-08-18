@@ -33,6 +33,9 @@ namespace modeldeploy {
         std::vector<TensorInfo> get_input_infos() override;
         std::vector<TensorInfo> get_output_infos() override;
         bool infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) override;
+        std::unique_ptr<BaseBackend> clone(const RuntimeOption& runtime_option,
+                                           void* stream = nullptr,
+                                           int device_id = -1) override;
         [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const override;
 
     private:

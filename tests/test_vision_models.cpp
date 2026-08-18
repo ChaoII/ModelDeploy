@@ -253,6 +253,53 @@ TEST_CASE("UltralyticsDet predict(ImageData) on GPU NV12 device frame (zero-copy
         top_cpu.box.width << "," << top_cpu.box.height << ") score=" << top_cpu.score);
     REQUIRE(box_iou(top_gpu.box, top_cpu.box) > 0.5f);
 }
+
+// 模型 Clone 真共享验证（ORT/GPU）：克隆必须复用已加载的 ORT session（共享显存/权重），
+// 而非重新加载模型。用 cudaMemGetInfo 实测：克隆造成的显存增量应远小于独立再加载一份模型。
+TEST_CASE("ORT GPU model clone shares device memory (no re-load)", "[model][gpu]") {
+    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    if (!fs::exists(modelfile)) return;
+    auto img = load_image("bus.jpg");
+    if (img.empty()) return;
+
+    modeldeploy::RuntimeOption opt;
+    opt.use_gpu(0);
+    UltralyticsDet model(modelfile.string(), opt);
+
+    size_t total = 0, free0 = 0;
+    REQUIRE(cudaMemGetInfo(&free0, &total) == cudaSuccess);
+
+    // 克隆应共享已加载的 ORT session（显存/权重），不重载模型
+    auto clone = model.clone();
+    REQUIRE(clone != nullptr);
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+    size_t free1 = 0;
+    REQUIRE(cudaMemGetInfo(&free1, &total) == cudaSuccess);
+    const size_t used_clone = (free0 > free1) ? (free0 - free1) : 0;
+
+    // 原模型与克隆各自 predict 结果一致
+    std::vector<DetectionResult> r0, r1;
+    REQUIRE(model.predict(img, &r0, nullptr));
+    REQUIRE(clone->predict(img, &r1, nullptr));
+    REQUIRE_FALSE(r0.empty());
+    REQUIRE_FALSE(r1.empty());
+    DetectionResult t0, t1;
+    top_detection(&r0, &t0);
+    top_detection(&r1, &t1);
+    REQUIRE(box_iou(t0.box, t1.box) > 0.5f);
+
+    // 对照：独立再加载一份模型（新 session）必然为其单独分配权重显存
+    UltralyticsDet model2(modelfile.string(), opt);
+    size_t free2 = 0;
+    REQUIRE(cudaMemGetInfo(&free2, &total) == cudaSuccess);
+    const size_t used_full_load = (free1 > free2) ? (free1 - free2) : 0;
+
+    INFO("clone GPU delta=" << used_clone << " bytes | independent full load delta="
+        << used_full_load << " bytes");
+    // 克隆 Δ 应远小于一份完整模型加载（< 1/4），证明是共享显存而非重载复制权重
+    REQUIRE(used_full_load > 0);
+    REQUIRE(used_clone < used_full_load / 4);
+}
 #endif // WITH_GPU
 
 // ==================== Ultralytics Segmentation ====================

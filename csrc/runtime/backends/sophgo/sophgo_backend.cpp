@@ -37,10 +37,22 @@ namespace {
     }
 } // namespace
 
-    SophgoBackend::~SophgoBackend() {
+    SophgoBackend::Engine::~Engine() {
         // 缓存的 input/output 设备内存由 bmrt_tensor 分配，bmrt_destroy 统一释放。
-        // 这里手动 bm_free_device_mem 会导致 double-free 段错误（与官方 SOPHON-DEMO
-        // 只调 bmrt_destroy + bm_dev_free 的行为一致）。
+        // 多个 clone 共享同一 engine_，仅在最后一个引用释放时才销毁 bmrt/handle（TPU 内存）。
+        if (bmrt) {
+            bmrt_destroy(static_cast<void*>(bmrt));
+            bmrt = nullptr;
+        }
+        if (handle) {
+            bm_dev_free(static_cast<bm_handle_t>(handle));
+            handle = nullptr;
+        }
+        net_info = nullptr;
+    }
+
+    SophgoBackend::~SophgoBackend() {
+        // 只释放本实例自己的 io 缓存数组描述（设备内存仍由共享 engine_->bmrt 统一释放）。
         if (cached_in_mems_) {
             delete[] static_cast<bm_device_mem_t*>(cached_in_mems_);
             cached_in_mems_ = nullptr;
@@ -50,15 +62,8 @@ namespace {
             cached_out_mems_ = nullptr;
         }
         io_cached_ = false;
-        if (bmrt_) {
-            bmrt_destroy(static_cast<void*>(bmrt_));
-            bmrt_ = nullptr;
-        }
-        if (handle_) {
-            bm_dev_free(static_cast<bm_handle_t>(handle_));
-            handle_ = nullptr;
-        }
-        net_info_ = nullptr;
+        // engine_ 为 shared_ptr：最后一个引用析构时自动 bmrt_destroy + bm_dev_free。
+        engine_.reset();
     }
 
     bool SophgoBackend::init(const RuntimeOption& option) {
@@ -66,7 +71,8 @@ namespace {
             MD_LOG_ERROR << "SophgoBackend is already initialized." << std::endl;
             return false;
         }
-        bmodel_path_ = option.sophgo_option.bmodel_path.empty()
+        auto engine = std::make_shared<SophgoBackend::Engine>();
+        engine->bmodel_path = option.sophgo_option.bmodel_path.empty()
             ? option.model_file : option.sophgo_option.bmodel_path;
         const int device_id = option.sophgo_option.device_id;
 
@@ -75,7 +81,7 @@ namespace {
             MD_LOG_ERROR << "[SophgoBackend] bm_dev_request failed (device " << device_id << ")." << std::endl;
             return false;
         }
-        handle_ = static_cast<void*>(h);
+        engine->handle = static_cast<void*>(h);
         static bm_misc_info m{};
         bm_get_misc_info(h, &m);
         misc_info_ = &m;
@@ -84,17 +90,15 @@ namespace {
         if (!bmrt) {
             MD_LOG_ERROR << "[SophgoBackend] bmrt_create failed." << std::endl;
             bm_dev_free(h);
-            handle_ = nullptr;
             return false;
         }
-        if (!bmrt_load_bmodel(bmrt, bmodel_path_.c_str())) {
-            MD_LOG_ERROR << "[SophgoBackend] bmrt_load_bmodel failed: " << bmodel_path_ << std::endl;
+        if (!bmrt_load_bmodel(bmrt, engine->bmodel_path.c_str())) {
+            MD_LOG_ERROR << "[SophgoBackend] bmrt_load_bmodel failed: " << engine->bmodel_path << std::endl;
             bmrt_destroy(bmrt);
             bm_dev_free(h);
-            handle_ = nullptr;
             return false;
         }
-        bmrt_ = bmrt;
+        engine->bmrt = bmrt;
 
         const char** net_names = nullptr;
         bmrt_get_network_names(bmrt, &net_names);
@@ -102,13 +106,13 @@ namespace {
             MD_LOG_ERROR << "[SophgoBackend] no network in bmodel." << std::endl;
             return false;
         }
-        graph_name_ = net_names[0];
-        const bm_net_info_t* info = bmrt_get_network_info(bmrt, graph_name_.c_str());
+        engine->graph_name = net_names[0];
+        const bm_net_info_t* info = bmrt_get_network_info(bmrt, engine->graph_name.c_str());
         if (!info) {
-            MD_LOG_ERROR << "[SophgoBackend] get_network_info failed: " << graph_name_ << std::endl;
+            MD_LOG_ERROR << "[SophgoBackend] get_network_info failed: " << engine->graph_name << std::endl;
             return false;
         }
-        net_info_ = info;
+        engine->net_info = info;
 
         for (int i = 0; i < info->input_num; ++i) {
             TensorInfo ti;
@@ -125,22 +129,23 @@ namespace {
             outputs_desc_.emplace_back(std::move(ti));
         }
 
+        engine_ = std::move(engine);
         initialized_ = true;
-        MD_LOG_INFO << "SophgoBackend(bmrt) loaded " << bmodel_path_
-            << " graph[" << graph_name_ << "] inputs=" << inputs_desc_.size()
+        MD_LOG_INFO << "SophgoBackend(bmrt) loaded " << engine_->bmodel_path
+            << " graph[" << engine_->graph_name << "] inputs=" << inputs_desc_.size()
             << " outputs=" << outputs_desc_.size() << std::endl;
         return true;
     }
 
     bool SophgoBackend::infer(std::vector<Tensor>& inputs, std::vector<Tensor>* outputs) {
-        if (!initialized_ || !bmrt_ || !net_info_) return false;
-        bm_handle_t h = static_cast<bm_handle_t>(handle_);
+        if (!initialized_ || !engine_ || !engine_->bmrt || !engine_->net_info) return false;
+        bm_handle_t h = static_cast<bm_handle_t>(engine_->handle);
         if (inputs.size() != inputs_desc_.size()) {
             MD_LOG_ERROR << "[SophgoBackend] inputs size mismatch: " << inputs.size()
                 << " vs " << inputs_desc_.size() << std::endl;
             return false;
         }
-        const bm_net_info_t* info = static_cast<const bm_net_info_t*>(net_info_);
+        const bm_net_info_t* info = static_cast<const bm_net_info_t*>(engine_->net_info);
         const size_t ni = inputs.size();
         const size_t no = outputs_desc_.size();
 
@@ -180,7 +185,8 @@ namespace {
             }
         }
 
-        if (!bmrt_launch_tensor_ex(bmrt_, graph_name_.c_str(), in_t.data(), static_cast<int>(ni),
+        if (!bmrt_launch_tensor_ex(engine_->bmrt, engine_->graph_name.c_str(),
+                                   in_t.data(), static_cast<int>(ni),
                                    out_t.data(), static_cast<int>(no),
                                    /*user_mem*/true, /*user_stmode*/false)) {
             MD_LOG_ERROR << "[SophgoBackend] bmrt_launch_tensor failed." << std::endl;
@@ -221,14 +227,14 @@ namespace {
 
     bool SophgoBackend::ensure_io_cache() {
         if (io_cached_ && cached_in_mems_ && cached_out_mems_) return true;
-        if (!bmrt_ || !net_info_) return false;
-        const bm_net_info_t* info = static_cast<const bm_net_info_t*>(net_info_);
+        if (!engine_ || !engine_->bmrt || !engine_->net_info) return false;
+        const bm_net_info_t* info = static_cast<const bm_net_info_t*>(engine_->net_info);
         const size_t ni = inputs_desc_.size();
         const size_t no = outputs_desc_.size();
         auto* ins = new bm_device_mem_t[ni];
         for (size_t i = 0; i < ni; ++i) {
             bm_tensor_t t;
-            if (!bmrt_tensor(&t, bmrt_, info->input_dtypes[i],
+            if (!bmrt_tensor(&t, engine_->bmrt, info->input_dtypes[i],
                              info->stages[0].input_shapes[i])) {
                 MD_LOG_ERROR << "[SophgoBackend] bmrt_tensor(input) failed." << std::endl;
                 delete[] ins;
@@ -239,7 +245,7 @@ namespace {
         auto* outs = new bm_device_mem_t[no];
         for (size_t i = 0; i < no; ++i) {
             bm_tensor_t t;
-            if (!bmrt_tensor(&t, bmrt_, info->output_dtypes[i],
+            if (!bmrt_tensor(&t, engine_->bmrt, info->output_dtypes[i],
                              info->stages[0].output_shapes[i])) {
                 MD_LOG_ERROR << "[SophgoBackend] bmrt_tensor(output) failed." << std::endl;
                 delete[] ins; delete[] outs;
@@ -255,15 +261,19 @@ namespace {
 
     std::unique_ptr<BaseBackend> SophgoBackend::clone(const RuntimeOption& runtime_option,
                                                        void* stream, int device_id) {
+        // 真共享克隆：不与原实例重建 TPU engine（不重载 bmodel、不复制权重）。
+        // clone 直接共享已加载的 engine_（bmrt/handle/net_info），即共享同一份 TPU 权重/算子内存；
+        // 仅输入输出描述与 io 设备内存缓存为各实例独立（避免并发 infer 相互覆盖）。
         (void)stream;
+        (void)device_id;
+        (void)runtime_option;
+        if (!engine_) return nullptr;
         auto nb = std::make_unique<SophgoBackend>();
-        RuntimeOption opt = runtime_option;
-        if (device_id >= 0) {
-            opt.sophgo_option.device_id = device_id;
-        }
-        if (!nb->init(opt)) {
-            return nullptr;
-        }
+        nb->engine_ = engine_;
+        nb->inputs_desc_ = inputs_desc_;
+        nb->outputs_desc_ = outputs_desc_;
+        nb->misc_info_ = misc_info_;
+        nb->initialized_ = initialized_;
         return nb;
     }
 

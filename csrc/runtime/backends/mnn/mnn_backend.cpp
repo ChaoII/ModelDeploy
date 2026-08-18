@@ -212,4 +212,24 @@ namespace modeldeploy {
     std::map<std::string, std::string> MnnBackend::get_custom_meta_data() const {
         return net_->getInfo()->metaData;
     }
+
+    std::unique_ptr<BaseBackend> MnnBackend::clone(const RuntimeOption& runtime_option,
+                                                   void* stream, int device_id) {
+        // 真共享克隆：不重载模型、不复制权重。直接共享已加载的 net_（MNN::Express::Module，
+        // 持有网络图与权重所在的 RuntimeManager 后端内存）与 rtmgr_，即共享同一份模型/设备内存。
+        // 仅输入输出描述为各实例独立。
+        (void)runtime_option;
+        (void)stream;
+        (void)device_id;
+        if (!net_) return nullptr;
+        auto nb = std::make_unique<MnnBackend>();
+        nb->rtmgr_ = rtmgr_;
+        nb->net_ = net_;
+        nb->model_buffer_ = model_buffer_;
+        nb->option_ = option_;
+        nb->inputs_desc_ = inputs_desc_;
+        nb->outputs_desc_ = outputs_desc_;
+        nb->initialized_ = true;
+        return nb;
+    }
 } // namespace modeldeploy
