@@ -408,6 +408,12 @@ namespace modeldeploy::vision {
             return *this;
         }
         g_last_error_msg.clear();
+        if (!VisionProcessorBackend::supports(device(), ImageOp::Rotate)) {
+            set_last_error("rotate: device unsupported (fast-fail)");
+            ImageData empty;
+            *this = std::move(empty);
+            return *this;
+        }
         ImageData out;
         if (!backend_for(device())->rotate(*this, flag, &out)) {
             set_last_error("rotate: backend could not process the image (device frame or unsupported)");
@@ -423,6 +429,10 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         g_last_error_msg.clear();
+        if (!VisionProcessorBackend::supports(device(), ImageOp::Crop)) {
+            set_last_error("crop: device unsupported (fast-fail)");
+            return ImageData();
+        }
         ImageData out;
         if (backend_for(device())->crop(*this, rect.x, rect.y, rect.width, rect.height, &out)) {
             return out;
@@ -436,6 +446,10 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         g_last_error_msg.clear();
+        if (!VisionProcessorBackend::supports(device(), ImageOp::RotateCrop)) {
+            set_last_error("rotate_crop: device unsupported (fast-fail)");
+            return ImageData();
+        }
         cv::Mat src;
         if (!asMat(&src)) {
             set_last_error("rotate_crop: packed CPU only");
@@ -498,6 +512,10 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         g_last_error_msg.clear();
+        if (!VisionProcessorBackend::supports(device(), ImageOp::Resize)) {
+            set_last_error("resize: device unsupported (fast-fail)");
+            return ImageData();
+        }
         ImageData out;
         if (backend_for(device())->resize(*this, &out, width, height)) {
             return out;
@@ -511,6 +529,10 @@ namespace modeldeploy::vision {
             return ImageData();
         }
         g_last_error_msg.clear();
+        if (!VisionProcessorBackend::supports(image.device(), ImageOp::CvtColor)) {
+            set_last_error("cvt_color: device unsupported (fast-fail)");
+            return ImageData();
+        }
         const auto ocv_type = md_color_convert_type_to_ocv_color_convert_type(type);
         if (ocv_type > 0) {
             // OpenCV 原生颜色转换：按设备经 backend 分派（设备帧未实现 → 报错，不静默）

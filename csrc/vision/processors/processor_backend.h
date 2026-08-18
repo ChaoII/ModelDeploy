@@ -13,8 +13,27 @@
 #include "vision/common/struct.h"
 
 namespace modeldeploy::vision {
+    // 设备侧图像算子门控：决定 ImageData op 入口是否前置快速失败（不建 backend）。
+    enum class ImageOp {
+        Preprocess,
+        Draw,
+        Crop,
+        Rotate,
+        Resize,
+        CvtColor,
+        RotateCrop,
+        PlaneSplit,
+    };
+
     class MODELDEPLOY_CXX_EXPORT VisionProcessorBackend {
     public:
+        // 是否支持在指定设备上执行某图像算子。
+        // CPU→全支持；GPU/TPU→仅 Preprocess/Draw（其余 op 前置 fast-fail，不建 backend）。
+        static bool supports(Device d, ImageOp op) {
+            if (d == Device::CPU) return true;
+            return op == ImageOp::Preprocess || op == ImageOp::Draw;
+        }
+
         virtual ~VisionProcessorBackend() = default;
 
         // YOLO 系融合算子（letterbox + resize + normalize + hwc2chw）

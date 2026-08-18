@@ -629,6 +629,70 @@ TEST_CASE("image_data: device nv12 frame imencode/imwrite rejected (no silent cp
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
 }
 
+TEST_CASE("image_data: supports(device,op) fast-fails device frames without building backend", "[core]") {
+    using modeldeploy::vision::ImageOp;
+    using modeldeploy::vision::VisionProcessorBackend;
+
+    // supports 语义：CPU→true；GPU/TPU→仅 Preprocess/Draw
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Crop));
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Rotate));
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Resize));
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::CvtColor));
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::RotateCrop));
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Preprocess));
+    REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Draw));
+    // GPU/TPU 仅 Preprocess/Draw
+    REQUIRE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Preprocess));
+    REQUIRE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Draw));
+    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Crop));
+    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Rotate));
+    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Resize));
+    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::CvtColor));
+    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::RotateCrop));
+    REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Preprocess));
+    REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Draw));
+    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Resize));
+
+    // GPU NV12 设备帧（哑指针，绝不 dereference）→ 各 op fast-fail：空 + last_error（不建 backend）
+    auto* dummy_y = reinterpret_cast<uint8_t*>(uintptr_t(0x1));
+    auto* dummy_uv = reinterpret_cast<uint8_t*>(uintptr_t(0x2));
+    ImageData::Plane planes[2] = {{dummy_y, 8}, {dummy_uv, 8}};
+    auto frame = ImageData::from_planes(planes, 2, MdImageType::NV12, 8, 4, Device::GPU);
+    REQUIRE(!frame.empty());
+    REQUIRE(frame.device() == Device::GPU);
+
+    // crop
+    ImageData::last_error();
+    auto c = frame.crop({0, 0, 2, 2});
+    CHECK(c.empty());
+    CHECK(ImageData::last_error() != nullptr);
+
+    // rotate（就地 fast-fail → 帧清空 + last_error）
+    ImageData::last_error();
+    ImageData r = frame;
+    r.rotate(RotateFlags::ROTATE_90);
+    CHECK(r.empty());
+    CHECK(ImageData::last_error() != nullptr);
+
+    // resize
+    ImageData::last_error();
+    auto rs = frame.resize(4, 2);
+    CHECK(rs.empty());
+    CHECK(ImageData::last_error() != nullptr);
+
+    // cvt_color
+    ImageData::last_error();
+    auto cv = ImageData::cvt_color(frame, ColorConvertType::CVT_NV122PKG_BGR);
+    CHECK(cv.empty());
+    CHECK(ImageData::last_error() != nullptr);
+
+    // rotate_crop
+    ImageData::last_error();
+    auto rc = frame.rotate_crop({0, 0, 4, 0, 4, 4, 0, 4});
+    CHECK(rc.empty());
+    CHECK(ImageData::last_error() != nullptr);
+}
+
 TEST_CASE("image_data unified storage: ctor/family/height/asMat", "[image_data]") {
     // (a) 自分配 NV12 不再空（height 恒真实 h）
     ImageData nv(64, 48, MdImageType::NV12);
