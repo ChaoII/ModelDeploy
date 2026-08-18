@@ -325,6 +325,11 @@ namespace modeldeploy::vision {
             return false;
         }
         auto* d = get_impl(*this);
+        // NV21/I420 无正确 CPU 布局搬运实现 → 显式拒绝而非静默产出数据（NV12 保留平面搬运）
+        if (d->fmt == MdImageType::NV21 || d->fmt == MdImageType::I420) {
+            set_last_error("toCpu: unsupported YUV " + md_image_type_to_string(d->fmt));
+            return false;
+        }
         if (d->device == Device::CPU && d->nplanes == 1 && md_image_type_to_ocv_type(d->fmt) >= 0) {
             // 已是 CPU packed：浅 clone（共享 owner）
             auto sp = std::make_shared<ImageDataImpl>();
@@ -464,6 +469,24 @@ namespace modeldeploy::vision {
             set_last_error("cvt_color: device unsupported (fast-fail)");
             return ImageData();
         }
+        // 对 CPU 帧：无正确实现的 YUV 转换显式拒绝，绝不静默产出垃圾。
+        // NV21 全部无专用实现；I420 仅新增 CVT_I4202PKG_BGR 有专用实现。
+        switch (type) {
+        case ColorConvertType::CVT_NV212GRAY:
+        case ColorConvertType::CVT_NV212PA_RGB:
+        case ColorConvertType::CVT_NV212PA_BGR:
+        case ColorConvertType::CVT_NV212PA_BGRA:
+        case ColorConvertType::CVT_NV212PA_RGBA:
+        case ColorConvertType::CVT_I4202GRAY:
+        case ColorConvertType::CVT_I4202PA_BGR:
+        case ColorConvertType::CVT_I4202PA_RGB:
+        case ColorConvertType::CVT_I4202PA_BGRA:
+        case ColorConvertType::CVT_I4202PA_RGBA:
+            set_last_error("cvt_color: unsupported YUV conversion");
+            return ImageData();
+        default:
+            break;
+        }
         // 全部颜色转换（含 OpenCV 原生 + NV12/I420 + PL↔PA 拆合）统一经 backend 分派；
         // 设备帧未实现的 op 由 supports(CvtColor) 前置 fast-fail，不静默回退 CPU。
         ImageData out;
@@ -555,6 +578,10 @@ namespace modeldeploy::vision {
             g_last_error_msg = "imencode: only CPU single-plane image supported";
             return buf;
         }
+        if (image.format() == MdImageType::NV21 || image.format() == MdImageType::I420) {
+            g_last_error_msg = "imencode: YUV NV21/I420 encoding unsupported (CPU single-plane only)";
+            return buf;
+        }
         cv::Mat m;
         if (!image.asMat(&m)) {
             g_last_error_msg = "imencode: cannot map image to Mat";
@@ -588,6 +615,10 @@ namespace modeldeploy::vision {
         }
         if (!codec_supported(*this)) {
             g_last_error_msg = "imwrite: only CPU single-plane image supported";
+            return false;
+        }
+        if (format() == MdImageType::NV21 || format() == MdImageType::I420) {
+            g_last_error_msg = "imwrite: YUV NV21/I420 encoding unsupported (CPU single-plane only)";
             return false;
         }
         cv::Mat m;

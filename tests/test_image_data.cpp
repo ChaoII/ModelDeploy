@@ -902,5 +902,91 @@ TEST_CASE("image_data: device-frame imshow/clone guards", "[core]") {
     REQUIRE(img.plane(0).data[0] == 100);
 }
 
+// Task 5, Step 2：CPU-only NV12→BGR 补测 —— 经 from_raw(NV12, copy=true) 走 cvt_color 与
+// 参考 cvtColor(COLOR_YUV2BGR_NV12) 逐像素 byte 等价（此前该路径零单测）。
+TEST_CASE("image_data: NV12->BGR byte-equal via from_raw copy (CPU-only)", "[core]") {
+    const int w = 16, h = 12;
+    std::vector<uint8_t> nv12buf(static_cast<size_t>(w) * h * 3 / 2);
+    for (size_t i = 0; i < nv12buf.size(); ++i)
+        nv12buf[i] = static_cast<uint8_t>((i * 31 + 7) % 256);
+
+    auto img = ImageData::from_raw(nv12buf.data(), w, h, MdImageType::NV12, true);
+    REQUIRE(!img.empty());
+    REQUIRE(img.plane_count() == 2);
+
+    auto bgr = ImageData::cvt_color(img, ColorConvertType::CVT_NV122PKG_BGR);
+    REQUIRE(!bgr.empty());
+    CHECK(bgr.format() == MdImageType::PKG_BGR_U8);
+    CHECK(bgr.plane_count() == 1);
+
+    // 参考：同一平铺 NV12 buffer → cv::cvtColor(COLOR_YUV2BGR_NV12)
+    cv::Mat matYUV(h * 3 / 2, w, CV_8UC1, nv12buf.data());
+    cv::Mat ref;
+    cv::cvtColor(matYUV, ref, cv::COLOR_YUV2BGR_NV12);
+    REQUIRE(!ref.empty());
+
+    cv::Mat got;
+    REQUIRE(bgr.asMat(&got));
+    REQUIRE(got.type() == ref.type());
+    REQUIRE(got.total() == ref.total());
+    REQUIRE(std::memcmp(got.data, ref.data, static_cast<size_t>(ref.total()) * 3) == 0);
+}
+
+// Task 5, Step 3：YUV 无正确实现的操作显式拒绝（toCpu/cvt_color/codec），非静默。
+TEST_CASE("image_data: YUV ops explicitly reject NV21/I420 (no silent garbage)", "[core]") {
+    // toCpu：NV21/I420 → false + last_error
+    {
+        std::vector<uint8_t> yn(8 * 4, 0), vun(8 * 2, 0);
+        ImageData::Plane pln[2] = {{yn.data(), 8}, {vun.data(), 8}};
+        auto nv21 = ImageData::from_planes(pln, 2, MdImageType::NV21, 8, 4, Device::CPU);
+        REQUIRE(!nv21.empty());
+        ImageData cpu21;
+        ImageData::last_error();
+        REQUIRE_FALSE(nv21.toCpu(&cpu21));
+        CHECK(ImageData::last_error() != nullptr);
+        // NV12 仍保持 CPU 平面搬运（回归：既有 toCpu NV12 成功路径不变）
+        std::vector<uint8_t> y12(8 * 4, 0), uv12(8 * 2, 0);
+        ImageData::Plane pl12[2] = {{y12.data(), 8}, {uv12.data(), 8}};
+        auto nv12 = ImageData::from_planes(pl12, 2, MdImageType::NV12, 8, 4, Device::CPU);
+        ImageData cpu12;
+        ImageData::last_error();
+        REQUIRE(nv12.toCpu(&cpu12));
+        CHECK(ImageData::last_error() == nullptr);
+
+        std::vector<uint8_t> yi(8 * 4, 0), ui(4 * 2, 0), vi(4 * 2, 0);
+        ImageData::Plane pli[3] = {{yi.data(), 8}, {ui.data(), 4}, {vi.data(), 4}};
+        auto i420 = ImageData::from_planes(pli, 3, MdImageType::I420, 8, 4, Device::CPU);
+        REQUIRE(!i420.empty());
+        ImageData cpui;
+        ImageData::last_error();
+        REQUIRE_FALSE(i420.toCpu(&cpui));
+        CHECK(ImageData::last_error() != nullptr);
+
+        // cvt_color：NV21 转换 / I4202PA 转换 → 空 + last_error
+        ImageData::last_error();
+        auto c1 = ImageData::cvt_color(nv21, ColorConvertType::CVT_NV212GRAY);
+        CHECK(c1.empty());
+        CHECK(ImageData::last_error() != nullptr);
+        ImageData::last_error();
+        auto c2 = ImageData::cvt_color(i420, ColorConvertType::CVT_I4202PA_BGR);
+        CHECK(c2.empty());
+        CHECK(ImageData::last_error() != nullptr);
+        // 而 CVT_I4202PKG_BGR（已实现）在 I420 帧仍成功
+        ImageData::last_error();
+        auto ok = ImageData::cvt_color(i420, ColorConvertType::CVT_I4202PKG_BGR);
+        CHECK(!ok.empty());
+        CHECK(ImageData::last_error() == nullptr);
+
+        // codec：NV21/I420 → 拒绝 + last_error（新文案）
+        ImageData::last_error();
+        auto eb = ImageData::imencode(nv21, ".jpg");
+        CHECK(eb.empty());
+        CHECK(ImageData::last_error() != nullptr);
+        ImageData::last_error();
+        CHECK_FALSE(i420.imwrite("md_t5_nv21_should_not_exist.jpg"));
+        CHECK(ImageData::last_error() != nullptr);
+    }
+}
+
 
 
