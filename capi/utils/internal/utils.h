@@ -8,6 +8,7 @@
 #include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
 #include "capi/common/md_types.h"
+#include "capi/common/md_decl.h"
 
 ///
 /// 将MDImage对象转换为OpenCV的Mat对象
@@ -155,7 +156,7 @@ void detection_results_2_c_results(
     MDDetectionResults* c_results);
 
 
-void c_results_2_detection_results(
+MODELDEPLOY_CAPI_EXPORT void c_results_2_detection_results(
     const MDDetectionResults* c_results,
     std::vector<DetectionResult>* results);
 
