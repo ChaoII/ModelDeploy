@@ -13,7 +13,9 @@ namespace demo {
 namespace {
 constexpr const char* kFont = "../../test_data/msyh.ttc";
 
-modeldeploy::RuntimeOption make_option(Backend b) {
+// trt_profile 形如 "x:1x3x640x640"，仅用于 ORT TRT EP（ORT 在线建引擎需 min/opt/max）。
+// 原生 TRT 后端(_trt)直接加载预构建 .engine，无需 profile。
+modeldeploy::RuntimeOption make_option(Backend b, const char* trt_profile = nullptr) {
     modeldeploy::RuntimeOption opt;
     switch (b) {
         case Backend::OrtCpu:
@@ -31,6 +33,16 @@ modeldeploy::RuntimeOption make_option(Backend b) {
             opt.enable_trt = true;
             opt.enable_fp16 = true;
             opt.ort_option.trt_engine_cache_path = "./trt_engine";
+            if (trt_profile) {
+                opt.set_trt_min_shape(trt_profile);
+                opt.set_trt_opt_shape(trt_profile);
+                opt.set_trt_max_shape(trt_profile);
+            }
+            break;
+        case Backend::Trt:
+            opt.use_trt_backend();
+            opt.use_gpu(0);
+            opt.enable_fp16 = true;
             break;
         case Backend::MnnCpu:
             opt.use_mnn_backend();
@@ -61,6 +73,7 @@ const char* backend_tag(Backend b) {
         case Backend::OrtCpu: return "ort_cpu";
         case Backend::OrtGpuCudaEp: return "ort_gpu_cuda_ep";
         case Backend::OrtGpuTrtEp: return "ort_gpu_trt_ep";
+        case Backend::Trt: return "trt";
         case Backend::MnnCpu: return "mnn_cpu";
         case Backend::MnnCuda: return "mnn_cuda";
         case Backend::MnnOpencl: return "mnn_opencl";
@@ -71,10 +84,20 @@ const char* backend_tag(Backend b) {
     return "?";
 }
 
-// MNN 模型多数尚未提供 .mnn；未提供时仍指向 onnx 路径（运行时报文件/加载失败不会崩溃，便于外部对照）。
-std::string model_path(const std::string& onnx, const std::string& bmodel, Backend b) {
-    if (b == Backend::SophgoF16 || b == Backend::SophgoInt8)
-        return "../../test_data/test_models/sophgo/" + bmodel;
+bool is_sophgo(Backend b) { return b == Backend::SophgoF16 || b == Backend::SophgoInt8; }
+
+// 后端感知模型路径：ORT 用 .onnx, MNN 用 .mnn, 原生 TRT 用 .engine, Sophgo 用 .bmodel。
+// mnn/engine 传空串表示该模型未转换，对应后端运行时加载 onnx（会失败，便于外部对照补充）。
+std::string model_path(const std::string& onnx, const std::string& mnn,
+                       const std::string& engine, const std::string& bmodel, Backend b) {
+    if (is_sophgo(b)) return "../../test_data/test_models/sophgo/" + bmodel;
+    if (b == Backend::Trt)
+        return engine.empty() ? "../../test_data/test_models/onnx/" + onnx
+                              : "../../test_data/test_models/trt/" + engine;
+    if (b == Backend::MnnCpu || b == Backend::MnnCuda ||
+        b == Backend::MnnOpencl || b == Backend::MnnVulkan)
+        return mnn.empty() ? "../../test_data/test_models/onnx/" + onnx
+                           : "../../test_data/test_models/mnn/" + mnn;
     return "../../test_data/test_models/onnx/" + onnx;
 }
 
@@ -93,8 +116,9 @@ void bench(Model& m, const modeldeploy::vision::ImageData& im, Result* res,
 }  // namespace
 
 int run_detection(Backend b) {
-    std::string model = model_path("yolo26n/yolo26n.onnx", "zhgd_without_nms_640_int8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b);
+    std::string model = model_path("yolo26n/yolo26n.onnx", "yolo11n_nms.mnn",
+                                   "yolo11n_nms.engine", "zhgd_without_nms_640_int8.bmodel", b);
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
     auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>(model, opt);
     if (!det->is_initialized()) {
         std::fprintf(stderr, "[%s] init failed: %s\n", backend_tag(b), model.c_str());
@@ -115,11 +139,16 @@ int run_detection(Backend b) {
 }
 
 int run_classification(Backend b) {
-    std::string model = model_path("zhgd_ml.onnx", "zhgd_ml_int8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b);
+    std::string model = model_path("zhgd_ml.onnx", "yolo11n-cls.mnn",
+                                   "yolo11n-cls.engine", "zhgd_ml_int8.bmodel", b);
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x192x256");
     auto m = std::make_unique<modeldeploy::vision::classification::Classification>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
-    m->get_preprocessor().set_size({192, 256});
+    const bool is_yolo_cls = (b == Backend::MnnCpu || b == Backend::MnnCuda ||
+                              b == Backend::MnnOpencl || b == Backend::MnnVulkan ||
+                              b == Backend::Trt);
+    m->get_preprocessor().set_size(is_yolo_cls ? std::vector<int>{224, 224}
+                                               : std::vector<int>{192, 256});
     m->get_preprocessor().disable_center_crop();
     m->get_postprocessor().set_multi_label(true);
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face.jpg");
@@ -141,8 +170,9 @@ int run_classification(Backend b) {
 }
 
 int run_pose(Backend b) {
-    std::string model = model_path("yolo11n/yolo11n-pose.onnx", "yolo26n/yolo26n-pose_int8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b);
+    std::string model = model_path("yolo11n/yolo11n-pose.onnx", "yolo11n-pose.mnn",
+                                   "yolo11n-pose.engine", "yolo26n/yolo26n-pose_int8.bmodel", b);
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsPose>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
     m->get_postprocessor().set_keypoints_num(17);
@@ -157,8 +187,9 @@ int run_pose(Backend b) {
 }
 
 int run_obb(Backend b) {
-    std::string model = model_path("yolo11n/yolo11n-obb_nms.onnx", "yolo26n/yolo26n-obb_int8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b);
+    std::string model = model_path("yolo11n/yolo11n-obb_nms.onnx", "yolo11n-obb_nms.mnn",
+                                   "yolo11n-obb_nms.engine", "yolo26n/yolo26n-obb_int8.bmodel", b);
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
@@ -172,8 +203,9 @@ int run_obb(Backend b) {
 }
 
 int run_instance_seg(Backend b) {
-    std::string model = model_path("yolo11n/yolo11n-seg_nms.onnx", "yolo26n/yolo26n-seg_int8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b);
+    std::string model = model_path("yolo11n/yolo11n-seg_nms.onnx", "yolo11n-seg_nms.mnn",
+                                   "yolo11n-seg_nms.engine", "yolo26n/yolo26n-seg_int8.bmodel", b);
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsSeg>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_person.jpg");
@@ -187,7 +219,9 @@ int run_instance_seg(Backend b) {
 }
 
 int run_sem(Backend b) {
-    std::string model = model_path("yolo26n/yolo26n-sem.onnx", "yolo26n/yolo26n-sem_int8.bmodel", b);
+    // sem 暂无 .mnn/.engine，仅 ORT/Sophgo 可用
+    std::string model = model_path("yolo26n/yolo26n-sem.onnx", "", "",
+                                   "yolo26n/yolo26n-sem_int8.bmodel", b);
     modeldeploy::RuntimeOption opt = make_option(b);
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsSem>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
@@ -205,7 +239,9 @@ int run_sem(Backend b) {
 }
 
 int run_depth(Backend b) {
-    std::string model = model_path("yolo26n/yolo26n-depth.onnx", "yolo26n/yolo26n-depth_int8.bmodel", b);
+    // depth 暂无 .mnn/.engine，仅 ORT/Sophgo 可用
+    std::string model = model_path("yolo26n/yolo26n-depth.onnx", "", "",
+                                   "yolo26n/yolo26n-depth_int8.bmodel", b);
     modeldeploy::RuntimeOption opt = make_option(b);
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsDepth>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
@@ -222,8 +258,10 @@ int run_depth(Backend b) {
 }
 
 int run_face_det(Backend b) {
-    std::string model = model_path("face/scrfd_2.5g_bnkps_shape640x640.onnx", "face/scrfd_2.5g_int8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b);
+    // face_det 暂无 .mnn，TRT 有预构建 scrfd_2.5g.engine
+    std::string model = model_path("face/scrfd_2.5g_bnkps_shape640x640.onnx", "",
+                                   "scrfd_2.5g.engine", "face/scrfd_2.5g_int8.bmodel", b);
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
     auto m = std::make_unique<modeldeploy::vision::face::Scrfd>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");
@@ -239,8 +277,9 @@ int run_face_det(Backend b) {
 }
 
 int run_lpr_pipeline(Backend b) {
-    std::string det = "../../test_data/test_models/onnx/yolov5plate.onnx";
-    std::string rec = "../../test_data/test_models/onnx/plate_recognition_color.onnx";
+    // lpr 暂无 .mnn；TRT 有预构建 yolov5plate/plate_recognition_color.engine
+    std::string det = model_path("yolov5plate.onnx", "", "yolov5plate.engine", "", b);
+    std::string rec = model_path("plate_recognition_color.onnx", "", "plate_recognition_color.engine", "", b);
     modeldeploy::RuntimeOption opt = make_option(b);
     auto m = std::make_unique<modeldeploy::vision::lpr::LprPipeline>(det, rec, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
@@ -256,15 +295,38 @@ int run_lpr_pipeline(Backend b) {
 }
 
 int run_ocr_pipeline(Backend b) {
-    const char* det = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx";
-    const char* cls = "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/cls_infer.onnx";
-    const char* rec = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx";
-    const char* dict = "../../test_data/dict.txt";
+    const char* dict = b == Backend::Trt  ? "../../test_data/ppocrv4_dict.txt"
+                     : (b == Backend::MnnCpu || b == Backend::MnnCuda ||
+                        b == Backend::MnnOpencl || b == Backend::MnnVulkan)
+                         ? "../../test_data/ppocrv5_dict.txt"
+                         : "../../test_data/dict.txt";
+    // ORT: onnx；MNN: test_data/test_models/onnx/ocr/ppocrv5_mobile/*.mnn（OCR 的 .mnn 位于 onnx 目录下）
+    // TRT: test_data/test_models/trt/ocr_*.engine
+    std::string det, cls, rec;
+    if (b == Backend::MnnCpu || b == Backend::MnnCuda ||
+        b == Backend::MnnOpencl || b == Backend::MnnVulkan) {
+        det = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer.mnn";
+        cls = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/cls_infer.mnn";
+        rec = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer.mnn";
+    } else if (b == Backend::Trt) {
+        det = "../../test_data/test_models/trt/ocr_det.engine";
+        cls = "../../test_data/test_models/trt/ocr_cls.engine";
+        rec = "../../test_data/test_models/trt/ocr_rec.engine";
+    } else if (is_sophgo(b)) {
+        det = "../../test_data/test_models/sophgo/ocr_det.bmodel";
+        cls = "../../test_data/test_models/sophgo/ocr_cls.bmodel";
+        rec = "../../test_data/test_models/sophgo/ocr_rec.bmodel";
+    } else {
+        det = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/det_infer2.onnx";
+        cls = "../../test_data/test_models/onnx/ocr/ppocrv4_mobile/cls_infer.onnx";
+        rec = "../../test_data/test_models/onnx/ocr/ppocrv5_mobile/rec_infer1.onnx";
+    }
     modeldeploy::RuntimeOption opt = make_option(b);
     auto m = std::make_unique<modeldeploy::vision::ocr::PaddleOCR>(det, cls, rec, dict, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
     m->set_rec_batch_size(8);
-    m->get_detector()->get_preprocessor().set_max_side_len(1440);
+    auto& dpp = m->get_detector()->get_preprocessor();
+    dpp.set_max_side_len(b == Backend::Trt ? 1280 : 1440);
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
     modeldeploy::vision::OCRResult res;
@@ -277,8 +339,9 @@ int run_ocr_pipeline(Backend b) {
 }
 
 int run_pedestrian_attribute(Backend b) {
-    std::string det = "../../test_data/test_models/onnx/zhgd_det.onnx";
-    std::string ml = "../../test_data/test_models/onnx/zhgd_ml.onnx";
+    // ped_attr 暂无 .mnn；TRT 有 zhgd_det/zhgd_ml.engine
+    std::string det = model_path("zhgd_det.onnx", "", "zhgd_det.engine", "", b);
+    std::string ml = model_path("zhgd_ml.onnx", "", "zhgd_ml.engine", "", b);
     modeldeploy::RuntimeOption opt = make_option(b);
     auto m = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(det, ml, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }

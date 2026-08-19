@@ -2,6 +2,7 @@
 namespace demo {
 enum class Backend {
     OrtCpu, OrtGpuCudaEp, OrtGpuTrtEp,
+    Trt,
     MnnCpu, MnnCuda, MnnOpencl, MnnVulkan,
     SophgoF16, SophgoInt8
 };
