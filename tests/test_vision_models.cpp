@@ -46,7 +46,7 @@ static void test_model_predict(Model& model, const ImageData& img, std::vector<R
 
 // ==================== Classification ====================
 TEST_CASE("Classification model", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n-cls.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n-cls.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -71,7 +71,7 @@ TEST_CASE("Classification model", "[vision_models]") {
 
 // ==================== Ultralytics Detection ====================
 TEST_CASE("UltralyticsDet model", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -142,7 +142,7 @@ TEST_CASE("UltralyticsDet yolo26n TRT engine (dynamic batch)", "[vision_models][
 // 同一 NV12 缓冲：predict(ImageData) 的 NV12 分叉是统一单入口，须能零拷贝预处并产出合理结果
 // [model]：需模型文件，缺文件时跳过（不自红）
 TEST_CASE("UltralyticsDet predict(ImageData) on NV12 device frame", "[model]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -228,7 +228,7 @@ namespace {
 // 端到端：真实 NV12 帧常驻 GPU 显存 → ImageData(Device::GPU) → predict() 全程零拷贝
 // CUDA 预处理 kernel 直接读 plane(0)/plane(1) 设备指针 → GPU Tensor → ORT CUDA EP 推理
 TEST_CASE("UltralyticsDet predict(ImageData) on GPU NV12 device frame (zero-copy e2e)", "[model][gpu]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
 
     auto img = load_image("bus.jpg");
@@ -302,7 +302,7 @@ TEST_CASE("UltralyticsDet predict(ImageData) on GPU NV12 device frame (zero-copy
 // 模型 Clone 真共享验证（ORT/GPU）：克隆必须复用已加载的 ORT session（共享显存/权重），
 // 而非重新加载模型。用 cudaMemGetInfo 实测：克隆造成的显存增量应远小于独立再加载一份模型。
 TEST_CASE("ORT GPU model clone shares device memory (no re-load)", "[model][gpu]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
     auto img = load_image("bus.jpg");
     if (img.empty()) return;
@@ -349,7 +349,7 @@ TEST_CASE("ORT GPU model clone shares device memory (no re-load)", "[model][gpu]
 
 // ==================== Ultralytics Segmentation ====================
 TEST_CASE("UltralyticsSeg model", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n-seg.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n-seg.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -373,7 +373,7 @@ TEST_CASE("UltralyticsSeg model", "[vision_models]") {
 
 // ==================== Ultralytics Pose ====================
 TEST_CASE("UltralyticsPose model", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n-pose.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n-pose.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -396,7 +396,7 @@ TEST_CASE("UltralyticsPose model", "[vision_models]") {
 
 // ==================== Ultralytics OBB ====================
 TEST_CASE("UltralyticsObb model", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n-obb.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n-obb.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -423,7 +423,7 @@ TEST_CASE("UltralyticsObb model", "[vision_models]") {
 
 // ==================== Batch Predict ====================
 TEST_CASE("Batch predict for vision models", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -496,7 +496,7 @@ TEST_CASE("SeetaFaceGender model", "[vision_models]") {
 
 // ==================== OCR Models ====================
 TEST_CASE("OCR DBDetector model", "[vision_models]") {
-    auto modelfile = model_path("onnx/ocr/ppocrv4_mobile/det_infer.onnx");
+    auto modelfile = model_path("onnx/ocr/ppocrv6_tiny/det_infer.onnx");
     if (!fs::exists(modelfile)) {
         modelfile = model_path("onnx/ocr/ppocrv5_mobile/det_infer.onnx");
     }
@@ -517,7 +517,7 @@ TEST_CASE("OCR DBDetector model", "[vision_models]") {
 }
 
 TEST_CASE("OCR Classifier model", "[vision_models]") {
-    auto modelfile = model_path("onnx/ocr/ppocrv4_mobile/cls_infer.onnx");
+    auto modelfile = model_path("onnx/ocr/ppocrv6_tiny/cls_infer.onnx");
     if (!fs::exists(modelfile)) {
         modelfile = model_path("onnx/ocr/ppocrv5_mobile/cls_infer.onnx");
     }
@@ -538,13 +538,12 @@ TEST_CASE("OCR Classifier model", "[vision_models]") {
 }
 
 TEST_CASE("OCR Recognizer model", "[vision_models]") {
-    auto modelfile = model_path("onnx/ocr/ppocrv4_mobile/rec_infer.onnx");
+    auto modelfile = model_path("onnx/ocr/ppocrv6_tiny/rec_infer.onnx");
     if (!fs::exists(modelfile)) {
         modelfile = model_path("onnx/ocr/ppocrv5_mobile/rec_infer.onnx");
     }
-    if (!fs::exists(modelfile)) return;
 
-    auto dict = get_test_data() / "ppocrv4_dict.txt";
+    auto dict = get_test_data() / "ppocrv6_tiny_dict.txt";
     if (!fs::exists(dict)) return;
 
     modeldeploy::RuntimeOption opt;
@@ -564,7 +563,7 @@ TEST_CASE("OCR Recognizer model", "[vision_models]") {
 
 // ==================== Preprocessor access ====================
 TEST_CASE("Preprocessor/Postprocessor access", "[vision_models]") {
-    auto modelfile = model_path("onnx/yolo11n/yolo11n.onnx");
+    auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
 
     modeldeploy::RuntimeOption opt;
