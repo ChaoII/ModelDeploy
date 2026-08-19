@@ -70,6 +70,11 @@ string path);
         internal static extern MDStatus md_image_from_device_nv12(out IntPtr handle, byte[] y, byte[] uv,
             int w, int h, int step_y, int step_uv, int dev);
 
+        // 设备指针零拷贝工厂（y/uv 为设备内存指针）
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_from_device_nv12(out IntPtr handle, IntPtr y, IntPtr uv,
+            int w, int h, int step_y, int step_uv, int dev);
+
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_from_yuv420p(out IntPtr handle, byte[] data, int w, int h);
 
@@ -103,6 +108,9 @@ string ext, out IntPtr buf, out UIntPtr n);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_size(IntPtr handle, out int w, out int h);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_info(IntPtr handle, out int type, out int dev, out int nplanes);
 
         // 取 NV12 帧平面指针（dev 返回帧所在设备；仅对 NV12 有效，CPU BGR 图返回 UNSUPPORTED_TYPE）
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -283,6 +291,23 @@ string path);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_result_gender(IntPtr handle, out int gender);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_age_batch(IntPtr handle, out IntPtr items, out UIntPtr count);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_gender_batch(IntPtr handle, out IntPtr items, out UIntPtr count);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_sem_seg_batch(IntPtr handle, UIntPtr i, out IntPtr labels,
+            out UIntPtr outH, out UIntPtr outW, out int numClasses);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_depth_batch(IntPtr handle, UIntPtr i, out IntPtr depth,
+            out UIntPtr outH, out UIntPtr outW);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_ocr_batch_count(IntPtr handle, out UIntPtr n);
 
         #endregion
 
