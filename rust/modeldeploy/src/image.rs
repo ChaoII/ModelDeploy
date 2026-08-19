@@ -1,5 +1,6 @@
 use crate::error::{check_status, MdError};
 use crate::ffi;
+use crate::types::{ImageFormat, Plane};
 use std::ffi::{CStr, CString};
 
 /// 图像（对应 capi2 MDImageHandle，生命周期由本结构管理）
@@ -7,6 +8,8 @@ pub struct Image {
     pub(crate) handle: ffi::MDImageHandle,
     pub width: i32,
     pub height: i32,
+    step_y: i32,
+    step_uv: i32,
 }
 
 impl Image {
@@ -29,23 +32,87 @@ impl Image {
             handle,
             width: w,
             height: h,
+            step_y: 0,
+            step_uv: 0,
         })
     }
 
     /// 包装 md_image_from_device_nv12 / md_model_predict 构造的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
     /// 生命周期归本结构管理（Drop 调 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
-    pub fn from_device_frame(handle: ffi::MDImageHandle) -> Result<Self, MdError> {
+    pub(crate) fn from_device_frame(handle: ffi::MDImageHandle) -> Result<Self, MdError> {
         Self::from_handle(handle)
     }
 
-    /// 取 NV12 帧的 Y/UV 平面指针 + 所在设备（仅对 NV12 帧有效；提供零拷贝外部访问）。
+    /// 图像格式（经 md_image_info 查询）
+    pub fn format(&self) -> ImageFormat {
+        let mut t: i32 = 0;
+        if unsafe {
+            ffi::md_image_info(self.handle, &mut t, std::ptr::null_mut(), std::ptr::null_mut())
+        } == ffi::MDStatus::OK
+        {
+            ImageFormat::from(t)
+        } else {
+            ImageFormat::Unknown
+        }
+    }
+
+    /// 帧所在设备（经 md_image_info 查询）
+    pub fn device(&self) -> ffi::MDDevice {
+        let mut d = ffi::MDDevice::CPU;
+        unsafe {
+            ffi::md_image_info(self.handle, std::ptr::null_mut(), &mut d, std::ptr::null_mut());
+        }
+        d
+    }
+
+    /// 平面数量（经 md_image_info 查询）
+    pub fn plane_count(&self) -> usize {
+        let mut n: i32 = 0;
+        if unsafe {
+            ffi::md_image_info(self.handle, std::ptr::null_mut(), std::ptr::null_mut(), &mut n)
+        } == ffi::MDStatus::OK
+        {
+            n.max(0) as usize
+        } else {
+            0
+        }
+    }
+
+    /// 取第 i 个平面（仅 NV12/NV21 支持；越界或类型不符返回 Err）。
     /// 返回指针在图像句柄存活期间有效。
-    pub fn plane_ptrs(&self) -> Result<(ffi::MDDevice, *const u8, *const u8), MdError> {
+    pub fn plane(&self, i: usize) -> Result<Plane, MdError> {
+        match self.format() {
+            ImageFormat::NV12 | ImageFormat::NV21 => {}
+            _ => return Err(MdError::UnsupportedType),
+        }
         let mut dev = ffi::MDDevice::CPU;
         let mut y: *mut std::ffi::c_void = std::ptr::null_mut();
         let mut uv: *mut std::ffi::c_void = std::ptr::null_mut();
         check_status(unsafe { ffi::md_image_plane_ptrs(self.handle, &mut dev, &mut y, &mut uv) })?;
-        Ok((dev, y as *const u8, uv as *const u8))
+        match i {
+            0 => Ok(Plane {
+                data: y as *const u8,
+                step: if self.step_y > 0 { self.step_y } else { self.width },
+            }),
+            1 => Ok(Plane {
+                data: uv as *const u8,
+                step: if self.step_uv > 0 { self.step_uv } else { self.width },
+            }),
+            _ => Err(MdError::InvalidArgument("plane index".into())),
+        }
+    }
+
+    /// 便捷方法：Y/UV 平面指针 + 所在设备（仅对 NV12/NV21 帧有效）。基于 plane()/device()。
+    pub fn plane_ptrs(&self) -> Result<(ffi::MDDevice, *const u8, *const u8), MdError> {
+        Ok((
+            self.device(),
+            self.plane(0)?.data,
+            if self.plane_count() >= 2 {
+                self.plane(1)?.data
+            } else {
+                std::ptr::null()
+            },
+        ))
     }
 
     /// 从文件读取图像
@@ -74,7 +141,7 @@ impl Image {
         Self::from_handle(handle)
     }
 
-    /// 从 NV12 构造
+    /// 从 NV12 构造（产 CPU BGR，自有/安全的拷贝数据路径）
     pub fn from_nv12(y: &[u8], uv: &[u8], width: i32, height: i32, step_y: i32, step_uv: i32) -> Result<Self, MdError> {
         let mut handle = std::ptr::null_mut();
         check_status(unsafe {
@@ -89,15 +156,20 @@ impl Image {
                 ffi::MDDevice::CPU,
             )
         })?;
-        Self::from_handle(handle)
+        Self::from_handle(handle).map(|mut img| {
+            img.step_y = step_y;
+            img.step_uv = step_uv;
+            img
+        })
     }
 
-    /// 从设备 NV12 两平面构造自描述 ImageData（零拷贝借用外部 y/uv，库不拥有内存）。
+    /// 从设备 NV12 两平面构造自描述 ImageData（零拷贝借用外部 y/uv 裸指针，库不拥有内存）。
     /// dev 指明帧所在设备（CPU/GPU/TPU）。返回的 Image 是统一 predict(ImageData) 单入口的输入，
     /// 也是可从平面指针访问的绑定输入帧。
+    /// 注意：调用方必须保证 y/uv 指针在返回的 Image 存活期内有效且内容不被释放。
     pub fn from_device_nv12(
-        y: &[u8],
-        uv: &[u8],
+        y: *const u8,
+        uv: *const u8,
         width: i32,
         height: i32,
         step_y: i32,
@@ -108,8 +180,8 @@ impl Image {
         check_status(unsafe {
             ffi::md_image_from_device_nv12(
                 &mut handle,
-                y.as_ptr() as *const _,
-                uv.as_ptr() as *const _,
+                y as *const _,
+                uv as *const _,
                 width,
                 height,
                 step_y,
@@ -117,7 +189,11 @@ impl Image {
                 dev,
             )
         })?;
-        Self::from_handle(handle)
+        Self::from_handle(handle).map(|mut img| {
+            img.step_y = step_y;
+            img.step_uv = step_uv;
+            img
+        })
     }
 
     /// 从编码数据解码

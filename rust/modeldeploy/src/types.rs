@@ -227,3 +227,49 @@ impl fmt::Display for ModelKind {
         write!(f, "{:?}", self)
     }
 }
+
+/// 图像格式（对应 C++ ImageType 枚举值）
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageFormat {
+    GRAY_U8 = 0,
+    PLA_BGR_U8 = 20,
+    PLA_RGB_U8 = 21,
+    PKG_BGR_U8 = 22,
+    PKG_RGB_U8 = 23,
+    PLA_BGRA_U8 = 24,
+    PLA_RGBA_U8 = 25,
+    PKG_BGRA_U8 = 26,
+    PKG_RGBA_U8 = 27,
+    NV12 = 60,
+    NV21 = 61,
+    I420 = 62,
+    Unknown = 63,
+}
+
+impl From<i32> for ImageFormat {
+    fn from(v: i32) -> Self {
+        match v {
+            0 => ImageFormat::GRAY_U8,
+            20 => ImageFormat::PLA_BGR_U8,
+            21 => ImageFormat::PLA_RGB_U8,
+            22 => ImageFormat::PKG_BGR_U8,
+            23 => ImageFormat::PKG_RGB_U8,
+            24 => ImageFormat::PLA_BGRA_U8,
+            25 => ImageFormat::PLA_RGBA_U8,
+            26 => ImageFormat::PKG_BGRA_U8,
+            27 => ImageFormat::PKG_RGBA_U8,
+            60 => ImageFormat::NV12,
+            61 => ImageFormat::NV21,
+            62 => ImageFormat::I420,
+            _ => ImageFormat::Unknown,
+        }
+    }
+}
+
+/// 图像平面（原始指针 + 行步长），零拷贝访问，不拥有内存
+#[derive(Debug, Clone, Copy)]
+pub struct Plane {
+    pub data: *const u8,
+    pub step: i32,
+}

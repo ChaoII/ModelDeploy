@@ -24,6 +24,41 @@ fn cpu_opt() -> Result<RuntimeOption> {
 // ═══ Image ═══
 
 #[test]
+fn test_image_from_device_nv12_reports_nv12_planes() -> Result<()> {
+    use modeldeploy::ffi::MDDevice;
+    use modeldeploy::ImageFormat;
+
+    let width = 8;
+    let height = 8;
+    let mut y = vec![0u8; (width * height) as usize];
+    let mut uv = vec![0u8; (width * height / 2) as usize];
+    y[0] = 16;
+    uv[0] = 128;
+
+    let img = Image::from_device_nv12(
+        y.as_ptr(),
+        uv.as_ptr(),
+        width,
+        height,
+        width,
+        width,
+        MDDevice::CPU,
+    )?;
+
+    assert_eq!(img.format(), ImageFormat::NV12);
+    assert_eq!(img.plane_count(), 2);
+    assert_eq!(img.device(), MDDevice::CPU);
+
+    let p0 = img.plane(0)?;
+    assert!(!p0.data.is_null());
+    let p1 = img.plane(1)?;
+    assert!(!p1.data.is_null());
+
+    assert!(img.plane(2).is_err());
+    Ok(())
+}
+
+#[test]
 fn test_image_basics() -> Result<()> {
     let img = Image::read(&test_img("test_detection0.jpg"))?;
     assert!(img.width() > 0 && img.height() > 0);
