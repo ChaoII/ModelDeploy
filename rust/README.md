@@ -72,7 +72,7 @@ cargo run --release --example detection
 ```toml
 [dependencies.modeldeploy]
 git = "https://github.com/ChaoII/ModelDeploy.git"
-branch = "feature/rust-bindings"
+branch = "capi-v2"
 ```
 
 或者在项目目录结构关系如下时用本地路径：
@@ -115,9 +115,9 @@ my_app/
 │   modeldeploy = { path = "../ModelDeploy/rust/modeldeploy" }
 ├── src/
 │   └── main.rs
-│       use modeldeploy::vision::detection::UltralyticsDet;
-│       use modeldeploy::runtime::RuntimeOption;
-│       use modeldeploy::image::Image;
+│       use modeldeploy::UltralyticsDet;
+│       use modeldeploy::RuntimeOption;
+│       use modeldeploy::Image;
 └── test_data/             ← 模型文件放这里
     └── models/
         └── yolo11n.onnx
@@ -146,9 +146,9 @@ modeldeploy = "0.1"
 ### 最小检测示例
 
 ```rust
-use modeldeploy::image::Image;
-use modeldeploy::runtime::RuntimeOption;
-use modeldeploy::vision::detection::UltralyticsDet;
+use modeldeploy::Image;
+use modeldeploy::RuntimeOption;
+use modeldeploy::UltralyticsDet;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. 配置运行时
@@ -187,18 +187,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | 模块 | Rust 类型 | 对应 C++ 模型 | 示例 |
 |------|----------|-------------|------|
 | **检测** | `UltralyticsDet` | YOLO 检测 | `cargo run --example detection` |
-| **分类** | `UltralyticsCls` | YOLO 分类 | `cargo run --example classification` |
+| **分类** | `Classification` | YOLO 分类 | `cargo run --example classification` |
 | **人脸检测** | `Scrfd` | SCRFD | `cargo run --example face_detection` |
 | **OBB** | `UltralyticsObb` | YOLO OBB | `cargo run --example obb` |
 | **分割** | `UltralyticsSeg` | YOLO 实例分割 | `cargo run --example seg` |
 | **姿态** | `UltralyticsPose` | YOLO-Pose | `cargo run --example pose` |
-| **OCR** | `PaddleOcr` | PaddleOCR | — |
+| **OCR** | `PaddleOCR` | PaddleOCR | — |
 | **车牌识别** | `LprPipeline` | LPR Pipeline | — |
 | **行人属性** | `PedestrianAttribute` | PP-Human | — |
-| **人脸识别** | `FaceRec` | ArcFace | `cargo run --example face_rec` |
-| **人脸年龄** | `FaceAge` | AgeNet | `cargo run --example face_age` |
-| **人脸性别** | `FaceGender` | GenderNet | `cargo run --example face_gender` |
-| **人脸防伪** | `FaceAntiSpoofPipeline` | AntiSpoofing | — |
+| **人脸识别** | `SeetaFaceID` | ArcFace | `cargo run --example face_rec` |
+| **人脸年龄** | `SeetaFaceAge` | AgeNet（返回 `i32`） | `cargo run --example face_age` |
+| **人脸性别** | `SeetaFaceGender` | GenderNet（返回 `i32`） | `cargo run --example face_gender` |
 | **TTS** | `Kokoro` | Kokoro TTS | — |
 
 ---
@@ -222,19 +221,25 @@ let opt = RuntimeOption::new()               // 调用 CAPI md_create_default_ru
     .ort_log_level(3);                        // ORT 日志级别 (0=verbose..4=fatal)
 ```
 
-### 图像操作
+### 图像操作（对齐 C++ `ImageData`）
 
 ```rust
-let img = Image::read("path.jpg")?;               // 从文件读取
-let img = Image::from_bgr24(&data, w, h);          // 从 BGR 数据创建（零拷贝）
-let img = Image::from_nv12(&nv12_buf, w, h)?;      // 从 NV12 转换
+let img = Image::read("path.jpg")?;                          // 从文件读取
+let img = Image::from_bgr24(&data, w, h)?;                   // 从 BGR 数据创建（零拷贝）
+let img = Image::from_nv12(&y_plane, &uv_plane, w, h, step_y, step_uv)?; // host NV12（自有/安全）
+// 设备/外部内存零拷贝 NV12（借用外部指针，调用方保证存活）：
+let img = unsafe { Image::from_device_nv12(y_ptr, uv_ptr, w, h, step_y, step_uv, dev)? };
 
-img.width();                                       // 图像宽度
-img.height();                                      // 图像高度
-img.channels();                                    // 通道数
-img.plane(0).data;                                  // 第 0 平面像素数据指针
-img.save("out.jpg")?;                              // 保存到文件
-img.clone_image()?;                                // 深拷贝
+img.width();                                                  // 图像宽度
+img.height();                                                 // 图像高度
+img.format();                                                 // ImageFormat（NV12/NV21/BGR…）
+img.device();                                                 // MDDevice（CPU/GPU/TPU/…）
+img.plane_count();                                            // 平面数（NV12=2）
+img.plane(0)?.data;                                            // 第 0 平面像素数据指针/step（Result）
+img.plane(0)?.step;
+img.plane_ptrs()?;                                            // (dev, y_ptr, uv_ptr)
+img.save("out.jpg")?;                                         // 保存到文件
+img.clone()?;                                                 // 深拷贝
 ```
 
 ### 模型推理模式
@@ -248,13 +253,19 @@ let model = UltralyticsDet::new("model.onnx", &opt)?;
 // 2. 推理
 let results = model.predict(&image)?;
 
-// 3. 使用结果（for 循环等）
+// 3. 批量推理（多图一次提交，结果平铺）
+let results = model.predict_batch(&[&img1, &img2])?;
+
+// 4. 使用结果（for 循环等；标量模型 FaceAge/Gender 直接返回 i32）
 for r in &results {
     println!("{} {:.4}", r.label_id, r.score);
 }
 
-// 4. 自动释放：model 超出作用域时 Drop 调用 md_free_*_model()
+// 5. 自动释放：model 超出作用域时 Drop 调用 md_free_*_model()
 ```
+
+> 标量模型 `SeetaFaceAge` / `SeetaFaceGender` 的 `predict` 直接返回 `i32`，
+> 不提供 `predict_batch`（与 C++ 单值语义一致）。
 
 ---
 
