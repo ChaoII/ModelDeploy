@@ -158,31 +158,6 @@ namespace ModelDeploy.V2
             }
         }
 
-        /// <summary>
-        /// 包装 md_image_from_device_nv12 构造的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
-        /// 内部供 BaseModel NV12 直接输入路径使用；Dispose 仅释放包装句柄，不碰输入缓冲。
-        /// </summary>
-        internal static VisionImage FromDeviceFrame(IntPtr handle)
-        {
-            if (handle == IntPtr.Zero) throw new ArgumentException("Frame handle must be non-zero", nameof(handle));
-            return new VisionImage(handle);
-        }
-
-        /// <summary>
-        /// Pin 本 frame 零拷贝引用的托管缓冲（调用方 byte[] y/uv），禁止 GC 在 frame 存活期内移动它们。
-        /// 内部供 BaseModel NV12 直接输入路径使用；由 Dispose / 析构统一 Free。
-        /// </summary>
-        internal void PinBuffers(byte[] y, byte[] uv)
-        {
-            _pinY = GCHandle.Alloc(y, GCHandleType.Pinned);
-            _hasPinY = true;
-            if (uv != null)
-            {
-                _pinUv = GCHandle.Alloc(uv, GCHandleType.Pinned);
-                _hasPinUv = true;
-            }
-        }
-
         public static VisionImage FromYuv420PData(byte[] data, int w, int h)
         {
             var status = md_image_from_yuv420p(out var hh, data, w, h);
