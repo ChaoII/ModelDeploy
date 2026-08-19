@@ -18,6 +18,9 @@ extern "C" {
 
 #include "config.hpp"
 #include "csrc/vision/common/image_data.h"
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#endif
 
 /// H.264 编码器（NVENC / x264） + RTSP/RTMP/MP4/FLV 输出
 class StreamEncoder {
@@ -92,6 +95,9 @@ private:
     // GPU 编码：复用 device NV12 缓冲（懒分配，close 时释放）
     uint8_t* gpu_nv12_buf_ = nullptr;
     size_t gpu_nv12_capacity_ = 0;
+#ifdef WITH_GPU
+    cudaStream_t gpu_d2h_stream_ = nullptr;   // 每编码器独立非阻塞流，D2H 与默认流/推理解耦
+#endif
 
     // 推流重试跟踪：地址被占用时停止重试
     std::atomic<bool> open_permanently_failed_{false};

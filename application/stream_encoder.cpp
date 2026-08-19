@@ -62,6 +62,7 @@ void StreamEncoder::close() {
     if (gpu_nv12_buf_) cudaFree(gpu_nv12_buf_);
     gpu_nv12_buf_ = nullptr;
     gpu_nv12_capacity_ = 0;
+    if (gpu_d2h_stream_) { cudaStreamDestroy(gpu_d2h_stream_); gpu_d2h_stream_ = nullptr; }
 #endif
     if (enc_frame_) av_frame_free(&enc_frame_);
     if (enc_pkt_) av_packet_free(&enc_pkt_);
@@ -87,79 +88,95 @@ void StreamEncoder::close() {
 }
 
 bool StreamEncoder::init_encoder(int width, int height) {
-    // 编码器选择：cfg.codec=auto 时优先 h264_nvenc → libx264 → 默认 H264
-    const AVCodec* codec = nullptr;
+    // 编码器候选队列：cfg.codec=auto 时优先 h264_nvenc → libx264 → 默认 H264。
+    // NVENC 打开失败（并发会话上限等硬件限制）自动回退软编，保证各输出路都能编码。
+    std::vector<const AVCodec*> candidates;
+    auto add_name = [&](const char* n) {
+        if (n && *n) {
+            if (auto* c = avcodec_find_encoder_by_name(n)) candidates.push_back(c);
+        }
+    };
     if (cfg_.codec == "libx264" || cfg_.codec == "x264") {
-        codec = avcodec_find_encoder_by_name("libx264");
+        add_name("libx264");
     } else if (cfg_.codec == "h264_nvenc" || cfg_.codec == "nvenc") {
-        codec = avcodec_find_encoder_by_name("h264_nvenc");
+        add_name("h264_nvenc");
     } else {
         // auto: 优先 NVENC（GPU 编码不占 CPU），失败回退 libx264
-        codec = avcodec_find_encoder_by_name("h264_nvenc");
-        if (!codec) codec = avcodec_find_encoder_by_name("libx264");
+        add_name("h264_nvenc");
+        add_name("libx264");
     }
-    if (!codec) codec = avcodec_find_encoder(AV_CODEC_ID_H264);
-    if (!codec) {
+    if (candidates.empty()) {
+        if (auto* c = avcodec_find_encoder(AV_CODEC_ID_H264)) candidates.push_back(c);
+    }
+    if (candidates.empty()) {
         std::cerr << "[Encoder] No H.264 encoder found" << std::endl;
         return false;
     }
 
-    enc_ctx_ = avcodec_alloc_context3(codec);
-    enc_ctx_->width = width;
-    enc_ctx_->height = height;
-    enc_ctx_->time_base = {1, cfg_.fps};
-    enc_ctx_->framerate = {cfg_.fps, 1};
-    enc_ctx_->pix_fmt = AV_PIX_FMT_NV12;
-    enc_ctx_->gop_size = cfg_.gop;
-    enc_ctx_->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
-    enc_ctx_->max_b_frames = cfg_.max_b_frames;
-    // 显式设置色彩空间为 BT.709 limited range，避免播放器误解为 BT.601 导致颜色偏差
-    enc_ctx_->color_range = AVCOL_RANGE_MPEG;
-    enc_ctx_->colorspace = AVCOL_SPC_BT709;
-    enc_ctx_->color_primaries = AVCOL_PRI_BT709;
-    enc_ctx_->color_trc = AVCOL_TRC_BT709;
-    if (codec->id == AV_CODEC_ID_H264) {
-        enc_ctx_->profile = FF_PROFILE_H264_MAIN;
-        enc_ctx_->level = 41;
-    }
-
-    // 编码器特定参数
-    bool is_nvenc = (strcmp(codec->name, "h264_nvenc") == 0);
-    if (!is_nvenc) {
-        // libx264
-        av_opt_set(enc_ctx_->priv_data, "preset",
-                   cfg_.preset.empty() ? "ultrafast" : cfg_.preset.c_str(), 0);
-        if (cfg_.low_latency || !cfg_.tune.empty()) {
-            av_opt_set(enc_ctx_->priv_data, "tune",
-                       cfg_.tune.empty() ? "zerolatency" : cfg_.tune.c_str(), 0);
+    // 依序尝试每个候选：配置并 open，失败释放上下文继续下一个
+    const AVCodec* opened_codec = nullptr;
+    for (const AVCodec* codec : candidates) {
+        AVCodecContext* ctx = avcodec_alloc_context3(codec);
+        if (!ctx) continue;
+        ctx->width = width;
+        ctx->height = height;
+        ctx->time_base = {1, cfg_.fps};
+        ctx->framerate = {cfg_.fps, 1};
+        ctx->pix_fmt = AV_PIX_FMT_NV12;
+        ctx->gop_size = cfg_.gop;
+        ctx->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
+        ctx->max_b_frames = cfg_.max_b_frames;
+        // 显式设置色彩空间为 BT.709 limited range，避免播放器误解为 BT.601 导致颜色偏差
+        ctx->color_range = AVCOL_RANGE_MPEG;
+        ctx->colorspace = AVCOL_SPC_BT709;
+        ctx->color_primaries = AVCOL_PRI_BT709;
+        ctx->color_trc = AVCOL_TRC_BT709;
+        if (codec->id == AV_CODEC_ID_H264) {
+            ctx->profile = FF_PROFILE_H264_MAIN;
+            ctx->level = 41;
         }
-        std::cout << "[Encoder] libx264 preset=" << cfg_.preset
-                  << " tune=" << cfg_.tune << std::endl;
-    } else {
-        // NVENC
-        std::string nv_preset = cfg_.preset;
-        if (nv_preset == "ultrafast" || nv_preset.empty()) nv_preset = "p1";
-        else if (nv_preset == "superfast") nv_preset = "p2";
-        else if (nv_preset == "veryfast") nv_preset = "p3";
-        else if (nv_preset == "faster") nv_preset = "p4";
-        else if (nv_preset == "fast") nv_preset = "p5";
-        else if (nv_preset == "medium") nv_preset = "p5";
-        else if (nv_preset == "slow") nv_preset = "p6";
-        else if (nv_preset == "slower" || nv_preset == "veryslow") nv_preset = "p7";
-        av_opt_set(enc_ctx_->priv_data, "preset", nv_preset.c_str(), 0);
-        if (cfg_.low_latency) {
-            av_opt_set(enc_ctx_->priv_data, "tune", "ull", 0);
-            av_opt_set(enc_ctx_->priv_data, "zerolatency", "1", 0);
-        }
-        std::cout << "[Encoder] NVENC preset=" << nv_preset
-                  << " low_latency=" << cfg_.low_latency << std::endl;
-    }
 
-    int ret = avcodec_open2(enc_ctx_, codec, nullptr);
-    if (ret < 0) {
-        char errbuf[256];
-        av_strerror(ret, errbuf, sizeof(errbuf));
-        std::cerr << "[Encoder] Failed to open encoder: " << errbuf << std::endl;
+        const bool is_nvenc = (strcmp(codec->name, "h264_nvenc") == 0);
+        if (!is_nvenc) {
+            // libx264
+            av_opt_set(ctx->priv_data, "preset",
+                       cfg_.preset.empty() ? "ultrafast" : cfg_.preset.c_str(), 0);
+            if (cfg_.low_latency || !cfg_.tune.empty()) {
+                av_opt_set(ctx->priv_data, "tune",
+                           cfg_.tune.empty() ? "zerolatency" : cfg_.tune.c_str(), 0);
+            }
+        } else {
+            // NVENC
+            std::string nv_preset = cfg_.preset;
+            if (nv_preset == "ultrafast" || nv_preset.empty()) nv_preset = "p1";
+            else if (nv_preset == "superfast") nv_preset = "p2";
+            else if (nv_preset == "veryfast") nv_preset = "p3";
+            else if (nv_preset == "faster") nv_preset = "p4";
+            else if (nv_preset == "fast") nv_preset = "p5";
+            else if (nv_preset == "medium") nv_preset = "p5";
+            else if (nv_preset == "slow") nv_preset = "p6";
+            else if (nv_preset == "slower" || nv_preset == "veryslow") nv_preset = "p7";
+            av_opt_set(ctx->priv_data, "preset", nv_preset.c_str(), 0);
+            if (cfg_.low_latency) {
+                av_opt_set(ctx->priv_data, "tune", "ull", 0);
+                av_opt_set(ctx->priv_data, "zerolatency", "1", 0);
+            }
+        }
+
+        const int open_ret = avcodec_open2(ctx, codec, nullptr);
+        if (open_ret >= 0) {
+            enc_ctx_ = ctx;
+            opened_codec = codec;
+            break;
+        }
+        char errbuf[256] = {};
+        av_strerror(open_ret, errbuf, sizeof(errbuf));
+        std::cerr << "[Encoder] Failed to open " << codec->name << ": " << errbuf
+                  << " (trying next)" << std::endl;
+        avcodec_free_context(&ctx);
+    }
+    if (!enc_ctx_) {
+        std::cerr << "[Encoder] All H.264 encoders failed to open" << std::endl;
         return false;
     }
 
@@ -178,7 +195,7 @@ bool StreamEncoder::init_encoder(int width, int height) {
     }
     enc_pkt_ = av_packet_alloc();
 
-    std::cout << "[Encoder] " << codec->name
+    std::cout << "[Encoder] " << opened_codec->name
               << " [" << width << "x" << height << " @" << cfg_.fps << "fps "
               << cfg_.bitrate_kbps << "kbps gop=" << cfg_.gop << "]" << std::endl;
     return true;
@@ -401,13 +418,21 @@ bool StreamEncoder::encode_from_gpu_nv12(const uint8_t* d_nv12, int width, int h
 
     // NV12 → enc_frame_：逐平面 D2H 拷贝，兼容对齐后的 linesize。
     // d_nv12 为紧凑连续设备 NV12（step==width），spitch=width。
-    cudaError_t c1 = cudaMemcpy2D(enc_frame_->data[0], enc_frame_->linesize[0],
-                                  d_nv12, width,
-                                  width, height, cudaMemcpyDeviceToHost);
-    cudaError_t c2 = cudaMemcpy2D(enc_frame_->data[1], enc_frame_->linesize[1],
-                                  d_nv12 + y_bytes, width,
-                                  width, height / 2, cudaMemcpyDeviceToHost);
+    // 用每编码器独立非阻塞流异步拷贝：与默认流/解码 D2D/批推理解耦，避免同步
+    // 默认流 memcpy 制造 GPU 停滞气泡拖慢整条批推理链路。
+    if (!gpu_d2h_stream_) {
+        cudaStreamCreateWithFlags(&gpu_d2h_stream_, cudaStreamNonBlocking);
+    }
+    cudaError_t c1 = cudaMemcpy2DAsync(enc_frame_->data[0], enc_frame_->linesize[0],
+                                       d_nv12, width,
+                                       width, height, cudaMemcpyDeviceToHost,
+                                       gpu_d2h_stream_);
+    cudaError_t c2 = cudaMemcpy2DAsync(enc_frame_->data[1], enc_frame_->linesize[1],
+                                       d_nv12 + y_bytes, width,
+                                       width, height / 2, cudaMemcpyDeviceToHost,
+                                       gpu_d2h_stream_);
     if (c1 != cudaSuccess || c2 != cudaSuccess) return false;
+    if (cudaStreamSynchronize(gpu_d2h_stream_) != cudaSuccess) return false;
 
     if (avcodec_send_frame(enc_ctx_, enc_frame_) < 0) {
         return false;

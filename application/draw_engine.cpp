@@ -105,21 +105,34 @@ bool DrawEngine::draw_gpu(ImageData& image,
     if (image.type() != MdImageType::NV12 || image.plane_count() < 2) return false;
 
     const auto device = image.device();
-    auto backend = create_processor_backend(
-        device, device == modeldeploy::Device::TPU ? modeldeploy::Backend::SOPHGO
-                                                   : modeldeploy::Backend::ORT, 0);
-    if (!backend) return false;
+    // 复用 backend：避免每帧 create_processor_backend（建流/分配池为 CUDA 同步操作，
+    // 高频调用与 batch_predict 争用、拖慢整条批推理链路）
+    VisionProcessorBackend* backend = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(backend_mtx_);
+        auto it = backends_.find(device);
+        if (it == backends_.end()) {
+            auto b = create_processor_backend(
+                device, device == modeldeploy::Device::TPU ? modeldeploy::Backend::SOPHGO
+                                                           : modeldeploy::Backend::ORT, 0);
+            if (!b) return false;
+            backend = b.get();
+            backends_.emplace(device, std::move(b));
+        } else {
+            backend = it->second.get();
+        }
+    }
 
     // 设备帧必须确认真实设备后端，杜绝工厂回退 CPU 后在设备内存上跑 CPU 内核（越界/UB）。
     if (device != modeldeploy::Device::CPU) {
         bool device_ready = false;
 #ifdef WITH_GPU
         if (device == modeldeploy::Device::GPU &&
-            dynamic_cast<CudaProcessorBackend*>(backend.get()) != nullptr) device_ready = true;
+            dynamic_cast<CudaProcessorBackend*>(backend) != nullptr) device_ready = true;
 #endif
 #ifdef ENABLE_SOPHGO
         if (device == modeldeploy::Device::TPU &&
-            dynamic_cast<SophgoProcessorBackend*>(backend.get()) != nullptr) device_ready = true;
+            dynamic_cast<SophgoProcessorBackend*>(backend) != nullptr) device_ready = true;
 #endif
         if (!device_ready) return false;
     }

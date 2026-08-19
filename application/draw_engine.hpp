@@ -2,11 +2,14 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
+#include <mutex>
 
 #include "config.hpp"
 #include "inference_engine.hpp"
 #include "csrc/vision/common/image_data.h"
 #include "csrc/vision/common/result.h"
+#include "csrc/vision/processors/processor_backend.h"
 
 /// 绘制引擎：使用 ModelDeploy 的 vis_det 绘制检测结果
 class DrawEngine {
@@ -32,4 +35,10 @@ private:
                         const InferResult& result);
     void draw_face(modeldeploy::vision::ImageData& image,
                    const InferResult& result);
+
+    // 复用处理器 backend，避免每帧 create_processor_backend（其含惰性建流等
+    // CUDA 上下文同步操作，高频调用会与 batch_predict 争用）
+    mutable std::mutex backend_mtx_;
+    mutable std::map<modeldeploy::Device,
+                     std::unique_ptr<modeldeploy::vision::VisionProcessorBackend>> backends_;
 };
