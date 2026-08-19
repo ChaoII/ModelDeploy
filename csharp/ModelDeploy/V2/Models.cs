@@ -20,23 +20,14 @@ namespace ModelDeploy.V2.Models
         public Prediction<DetectionResult> Predict(VisionImage image)
             => MakePrediction(image, ReadDetection);
 
+        /// <summary>批量预测：所有图的检测框合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<DetectionResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadDetection);
+
         /// <summary>检测置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
         /// <summary>NMS 阈值。</summary>
         public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
-
-        /// <summary>NV12 直接输入推理（硬解码/摄像头直通；srcDevice 指明 Y/UV 所在设备）。</summary>
-        public Prediction<DetectionResult> PredictNv12(byte[] y, byte[] uv,
-            int w, int h, int stepY = 0, int stepUv = 0, Device srcDevice = Device.CPU)
-            => MakePredictionNv12(y, uv, w, h, stepY, stepUv, srcDevice, ReadDetection);
-
-        /// <summary>NV12 推理并返回绑定的输入帧（设备相关的 ImageData 包装，可取平面指针/就地绘制）。
-        /// Frame 为 null 或需调用方 Dispose。Frame 存活期内其引用的 y/uv 托管缓冲会被自动 pin，
-        /// 保持有效且不被 GC 移动；Frame Dispose 后释放 pin。</summary>
-        public (Prediction<DetectionResult> Prediction, VisionImage Frame) PredictNv12WithFrame(
-            byte[] y, byte[] uv,
-            int w, int h, int stepY = 0, int stepUv = 0, Device srcDevice = Device.CPU)
-            => MakePredictionNv12WithFrame(y, uv, w, h, stepY, stepUv, srcDevice, ReadDetection);
 
         private static DetectionResult[] ReadDetection(IntPtr result)
         {
@@ -66,6 +57,10 @@ namespace ModelDeploy.V2.Models
         public Prediction<ClassificationResult> Predict(VisionImage image)
             => MakePrediction(image, ReadClassification);
 
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<ClassificationResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadClassification);
+
         /// <summary>分类 Top-K 输出个数。</summary>
         public void SetTopK(long v) => SetParam("top_k", v);
         /// <summary>是否多标签分类。</summary>
@@ -93,6 +88,10 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<PoseResult> Predict(VisionImage image)
             => MakePrediction(image, ReadPose);
+
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<PoseResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadPose);
 
         /// <summary>姿态关键点置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -138,6 +137,10 @@ namespace ModelDeploy.V2.Models
         public Prediction<ObbResult> Predict(VisionImage image)
             => MakePrediction(image, ReadObb);
 
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<ObbResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadObb);
+
         /// <summary>旋转框检测置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
         /// <summary>NMS 阈值。</summary>
@@ -170,6 +173,10 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<InstanceSegResult> Predict(VisionImage image)
             => MakePrediction(image, ReadInstanceSeg);
+
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<InstanceSegResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadInstanceSeg);
 
         /// <summary>实例分割置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -274,6 +281,10 @@ namespace ModelDeploy.V2.Models
         public Prediction<FaceDetResult> Predict(VisionImage image)
             => MakePrediction(image, ReadFaceDet);
 
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<FaceDetResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadFaceDet);
+
         /// <summary>人脸检测置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
         /// <summary>NMS 阈值。</summary>
@@ -377,6 +388,10 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<InsightFaceResult> Predict(VisionImage image)
             => MakePrediction(image, ReadInsightFace);
+
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<InsightFaceResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadInsightFace);
 
         /// <summary>人脸检测阈值（insightface）。</summary>
         public void SetDetThresh(double v) => SetParam("det_thresh", v);
@@ -491,6 +506,10 @@ namespace ModelDeploy.V2.Models
         public Prediction<LprResult> Predict(VisionImage image)
             => MakePrediction(image, ReadLpr);
 
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<LprResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadLpr);
+
         private static LprResult[] ReadLpr(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDLprItem>(result, md_result_lpr);
@@ -530,6 +549,10 @@ namespace ModelDeploy.V2.Models
 
         public Prediction<AttributeResult> Predict(VisionImage image)
             => MakePrediction(image, ReadAttribute);
+
+        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
+        public Prediction<AttributeResult> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch(images, ReadAttribute);
 
         /// <summary>检测阈值（pedestrian attribute）。</summary>
         public void SetDetThreshold(double v) => SetParam("det_threshold", v);

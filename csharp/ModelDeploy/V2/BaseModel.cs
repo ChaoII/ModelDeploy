@@ -183,45 +183,26 @@ namespace ModelDeploy.V2
             return new Prediction<T>(PredictNative(image.Handle), reader);
         }
 
-        /// <summary>
-        /// NV12 直接输入推理（硬解码/摄像头直通，srcDevice 指明 Y/UV 内存所在设备；
-        /// 经 md_image_from_device_nv12 包装为设备帧 ImageData 后走统一 predict(ImageData) 单入口）。
-        /// </summary>
-        protected Prediction<T> MakePredictionNv12<T>(byte[] y, byte[] uv,
-            int w, int h, int stepY, int stepUv, Device srcDevice, Func<IntPtr, T[]> reader)
+        /// <summary>批量预测：把多张图一次提交给原生 md_model_predict_batch，返回累积的结果句柄。</summary>
+        protected IntPtr PredictBatchNative(IntPtr[] imgHandles)
         {
-            var (pred, frame) = MakePredictionNv12WithFrame<T>(y, uv, w, h, stepY, stepUv, srcDevice, reader);
-            frame?.Dispose();
-            return pred;
+            var status = md_model_predict_batch(_handle, imgHandles, new UIntPtr((uint)imgHandles.Length), out var result);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"PredictBatch failed: {GetLastError()}");
+            return result;
         }
 
-        /// <summary>
-        /// NV12 直接输入推理并返回绑定的输入帧（设备相关的 ImageData 包装）。
-        /// 每步：md_image_from_device_nv12 构造设备帧 → md_model_predict（统一单入口）。
-        /// 可从 Frame 取 Y/UV 平面指针或就地绘制；Frame 由调用方负责 Dispose，
-        /// Prediction 也需 Dispose 释放结果句柄。
-        /// </summary>
-        protected (Prediction<T> Prediction, VisionImage Frame) MakePredictionNv12WithFrame<T>(
-            byte[] y, byte[] uv,
-            int w, int h, int stepY, int stepUv, Device srcDevice, Func<IntPtr, T[]> reader)
+        /// <summary>批量预测并包装为 Prediction&lt;T&gt;（平铺：所有图全部项合并；丢图片边界）。</summary>
+        protected Prediction<T> PredictBatch<T>(IEnumerable<VisionImage> images, Func<IntPtr, T[]> reader)
         {
-            var status = md_image_from_device_nv12(out var img, y, uv, w, h,
-                stepY, stepUv, (int)srcDevice);
-            if (status != MDStatus.MD_OK)
-                throw new InvalidOperationException($"MakePredictionNv12: md_image_from_device_nv12 failed: {GetLastError()}");
-            var frameImg = VisionImage.FromDeviceFrame(img);
-            frameImg.PinBuffers(y, uv);
-            Prediction<T> prediction;
-            try
+            if (images == null) throw new ArgumentNullException(nameof(images));
+            var handles = new List<IntPtr>();
+            foreach (var im in images)
             {
-                prediction = new Prediction<T>(PredictNative(img), reader);
+                if (im == null) throw new ArgumentNullException(nameof(images));
+                handles.Add(im.Handle);
             }
-            catch
-            {
-                frameImg.Dispose();
-                throw;
-            }
-            return (prediction, frameImg);
+            return new Prediction<T>(PredictBatchNative(handles.ToArray()), reader);
         }
 
         /// <summary>深拷贝原生模型句柄（独立实例）。</summary>

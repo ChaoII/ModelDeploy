@@ -143,6 +143,38 @@ public class Capi2VisionTests
         }
     }
 
+    [Test]
+    public void DetectionModel_PredictBatch_FlattensAcrossImages()
+    {
+        var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n.onnx");
+        var img = Path.Combine(ImageRoot, "test_detection0.jpg");
+        if (!Has(model) || !Has(img)) Assert.Ignore("model/image not found");
+
+        using var det = new DetectionModel(model, CpuOrt());
+        using var vi1 = VisionImage.Read(img);
+        using var vi2 = VisionImage.Read(img);
+        int single = det.Predict(vi1).Count + det.Predict(vi2).Count;
+
+        var batch = det.PredictBatch(new[] { vi1, vi2 });
+        Assert.That(batch.Count, Is.EqualTo(single), "batch should flatten all images' boxes");
+    }
+
+    [Test]
+    public void DetectionModel_NoNv12Variants_UsesUnifiedEntry()
+    {
+        // PredictNv12 / PredictNv12WithFrame 已删除；统一入口 Predict(VisionImage) 需支持
+        // NV12 多平面图（FromNv12Data/FromDeviceNv12）——此用例保证编译通过且等价路径可用。
+        var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n.onnx");
+        if (!Has(model)) Assert.Ignore("model not found");
+
+        int w = 640, h = 640;
+        var y = new byte[w * h];
+        var uv = new byte[w * h / 2];
+        using var vi = VisionImage.FromNv12Data(y, uv, w, h);
+        using var det = new DetectionModel(model, CpuOrt());
+        Assert.DoesNotThrow(() => det.Predict(vi));
+    }
+
     // ==================== 前/后处理参数（自省，kind 级） ====================
 
     [Test]
