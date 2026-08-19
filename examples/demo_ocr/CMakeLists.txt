@@ -1,18 +1,17 @@
+md_add_demo_matrix(ocr_pipeline ${CMAKE_CURRENT_LIST_DIR})
 
-add_executable(demo_ocr_cxx demo_ocr_cxx.cpp)
-target_link_libraries(demo_ocr_cxx PUBLIC ${LIBRARY_NAME})
+if(ENABLE_ORT)
+  add_executable(demo_ocr_det_cxx demo_ocr_det_cxx.cpp)
+  target_link_libraries(demo_ocr_det_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_ocr_rec_cxx demo_ocr_rec_cxx.cpp)
+  target_link_libraries(demo_ocr_rec_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_structure_table_cxx demo_structure_table_cxx.cpp)
+  target_link_libraries(demo_structure_table_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_pp_structure_table_cxx demo_pp_structure_table_cxx.cpp)
+  target_link_libraries(demo_pp_structure_table_cxx PUBLIC ${LIBRARY_NAME})
+endif()
 
-add_executable(demo_ocr_det_cxx demo_ocr_det_cxx.cpp)
-target_link_libraries(demo_ocr_det_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_ocr_rec_cxx demo_ocr_rec_cxx.cpp)
-target_link_libraries(demo_ocr_rec_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_ocr_capi demo_ocr_capi.cpp)
-target_link_libraries(demo_ocr_capi PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_structure_table_cxx demo_structure_table_cxx.cpp)
-target_link_libraries(demo_structure_table_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_pp_structure_table_cxx demo_pp_structure_table_cxx.cpp)
-target_link_libraries(demo_pp_structure_table_cxx PUBLIC ${LIBRARY_NAME})
+if(BUILD_CAPI)
+  add_executable(demo_ocr_capi demo_ocr_capi.cpp)
+  target_link_libraries(demo_ocr_capi PUBLIC ${LIBRARY_NAME})
+endif()

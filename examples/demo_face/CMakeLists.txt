@@ -1,56 +1,41 @@
-add_executable(demo_face_det_cxx demo_face_det_cxx.cpp)
-target_link_libraries(demo_face_det_cxx PUBLIC ${LIBRARY_NAME})
+# 主模型矩阵（face_det）
+md_add_demo_matrix(face_det ${CMAKE_CURRENT_LIST_DIR})
 
-add_executable(demo_face_det_capi demo_face_det_capi.cpp)
-target_link_libraries(demo_face_det_capi PUBLIC ${LIBRARY_NAME})
+# 保留人脸子模型 demo
+if(ENABLE_ORT)
+  add_executable(demo_face_age_cxx demo_face_age_cxx.cpp)
+  target_link_libraries(demo_face_age_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_gender_cxx demo_face_gender_cxx.cpp)
+  target_link_libraries(demo_face_gender_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_rec_cxx demo_face_rec_cxx.cpp)
+  target_link_libraries(demo_face_rec_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_rec_pipeline_cxx demo_face_rec_pipeline_cxx.cpp)
+  target_link_libraries(demo_face_rec_pipeline_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_as_first_cxx demo_face_as_first_cxx.cpp)
+  target_link_libraries(demo_face_as_first_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_as_second_cxx demo_face_as_second_cxx.cpp)
+  target_link_libraries(demo_face_as_second_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_as_pipeline_cxx demo_face_as_pipeline_cxx.cpp)
+  target_link_libraries(demo_face_as_pipeline_cxx PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_insightface_cxx demo_insightface_cxx.cpp)
+  target_link_libraries(demo_insightface_cxx PUBLIC ${LIBRARY_NAME} ${OpenCV_LIBS})
+endif()
 
-
-add_executable(demo_face_age_cxx demo_face_age_cxx.cpp)
-target_link_libraries(demo_face_age_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_age_capi demo_face_age_capi.cpp)
-target_link_libraries(demo_face_age_capi PUBLIC ${LIBRARY_NAME})
-
-
-add_executable(demo_face_gender_cxx demo_face_gender_cxx.cpp)
-target_link_libraries(demo_face_gender_cxx PUBLIC ${LIBRARY_NAME})
-
-
-add_executable(demo_face_gender_capi demo_face_gender_capi.cpp)
-target_link_libraries(demo_face_gender_capi PUBLIC ${LIBRARY_NAME})
-
-
-add_executable(demo_face_rec_cxx demo_face_rec_cxx.cpp)
-target_link_libraries(demo_face_rec_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_rec_capi demo_face_rec_capi.cpp)
-target_link_libraries(demo_face_rec_capi PUBLIC ${LIBRARY_NAME})
-
-
-add_executable(demo_face_rec_pipeline_cxx demo_face_rec_pipeline_cxx.cpp)
-target_link_libraries(demo_face_rec_pipeline_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_rec_pipeline_capi demo_face_rec_pipeline_capi.cpp)
-target_link_libraries(demo_face_rec_pipeline_capi PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_first_cxx demo_face_as_first_cxx.cpp)
-target_link_libraries(demo_face_as_first_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_first_capi demo_face_as_first_capi.cpp)
-target_link_libraries(demo_face_as_first_capi PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_second_cxx demo_face_as_second_cxx.cpp)
-target_link_libraries(demo_face_as_second_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_second_capi demo_face_as_second_capi.cpp)
-target_link_libraries(demo_face_as_second_capi PUBLIC ${LIBRARY_NAME})
-
-
-add_executable(demo_face_as_pipeline_cxx demo_face_as_pipeline_cxx.cpp)
-target_link_libraries(demo_face_as_pipeline_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_face_as_pipeline_capi demo_face_as_pipeline_capi.cpp)
-target_link_libraries(demo_face_as_pipeline_capi PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_insightface_cxx demo_insightface_cxx.cpp)
-target_link_libraries(demo_insightface_cxx PUBLIC ${LIBRARY_NAME} ${OpenCV_LIBS})
+if(BUILD_CAPI)
+  add_executable(demo_face_det_capi demo_face_det_capi.cpp)
+  target_link_libraries(demo_face_det_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_age_capi demo_face_age_capi.cpp)
+  target_link_libraries(demo_face_age_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_gender_capi demo_face_gender_capi.cpp)
+  target_link_libraries(demo_face_gender_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_rec_capi demo_face_rec_capi.cpp)
+  target_link_libraries(demo_face_rec_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_rec_pipeline_capi demo_face_rec_pipeline_capi.cpp)
+  target_link_libraries(demo_face_rec_pipeline_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_as_first_capi demo_face_as_first_capi.cpp)
+  target_link_libraries(demo_face_as_first_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_as_second_capi demo_face_as_second_capi.cpp)
+  target_link_libraries(demo_face_as_second_capi PUBLIC ${LIBRARY_NAME})
+  add_executable(demo_face_as_pipeline_capi demo_face_as_pipeline_capi.cpp)
+  target_link_libraries(demo_face_as_pipeline_capi PUBLIC ${LIBRARY_NAME})
+endif()
