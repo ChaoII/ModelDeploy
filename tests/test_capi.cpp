@@ -759,3 +759,95 @@ TEST_CASE("capi2 predict_batch detection flattens both images", "[model]") {
     md_image_destroy(b);
     md_model_destroy(det);
 }
+
+// Task 3：单值类 kind 批量 getter —— 无模型可测的 NULL_POINTER 错误路径（[capi]）
+TEST_CASE("capi2 single-value batch getters reject null args (no model needed)", "[capi]") {
+    MDResultHandle h = nullptr;
+    const int* items = nullptr;
+    size_t count = 0;
+
+    // 逐项 batch getter：空句柄 → NULL_POINTER，不崩
+    CHECK(md_result_age_batch(h, &items, &count) == MD_ERR_NULL_POINTER);
+    CHECK(md_result_gender_batch(h, &items, &count) == MD_ERR_NULL_POINTER);
+
+    const unsigned char* labels = nullptr;
+    size_t oh = 0, ow = 0;
+    int nc = 0;
+    CHECK(md_result_sem_seg_batch(h, 0, &labels, &oh, &ow, &nc) == MD_ERR_NULL_POINTER);
+
+    const float* depth = nullptr;
+    CHECK(md_result_depth_batch(h, 0, &depth, &oh, &ow) == MD_ERR_NULL_POINTER);
+
+    CHECK(md_result_ocr_batch_count(h, &count) == MD_ERR_NULL_POINTER);
+
+    // 既有单值 getter：空句柄 → NULL_POINTER，不崩
+    int v = 0;
+    CHECK(md_result_age(h, &v) == MD_ERR_NULL_POINTER);
+    CHECK(md_result_gender(h, &v) == MD_ERR_NULL_POINTER);
+    CHECK(md_result_sem_seg(h, &labels, &oh, &ow, &nc) == MD_ERR_NULL_POINTER);
+    CHECK(md_result_depth(h, &depth, &oh, &ow) == MD_ERR_NULL_POINTER);
+    const int* quad = nullptr;
+    const char* text = nullptr;
+    float score = 0.f;
+    CHECK(md_result_ocr(h, 0, &quad, &text, &score) == MD_ERR_NULL_POINTER);
+}
+
+// Task 3：真实 age 批量断言（模型存在时才执行；无模型环境直接跳过保持 [capi] 全绿）
+TEST_CASE("capi2 age batch getters + single-getter compat (real model, guarded)", "[capi]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string age_file = data_dir + "/test_models/onnx/face/age_predictor.onnx";
+    const std::string img1 = data_dir + "/test_images/test_face.jpg";
+    const std::string img2 = data_dir + "/test_images/test_face.jpg";
+    if (!std::filesystem::exists(age_file) || !std::filesystem::exists(img1)) {
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle age = nullptr;
+    REQUIRE(md_model_create(&age, MD_MODEL_FACE_AGE, age_file.c_str(), opt) == MD_OK);
+    REQUIRE(age != nullptr);
+    md_option_destroy(opt);
+
+    MDImageHandle a = nullptr, b = nullptr;
+    REQUIRE(md_image_from_file(&a, img1.c_str()) == MD_OK);
+    REQUIRE(md_image_from_file(&b, img2.c_str()) == MD_OK);
+    MDImageHandle imgs[2] = {a, b};
+
+    MDResultHandle batch = nullptr;
+    REQUIRE(md_model_predict_batch(age, imgs, 2, &batch) == MD_OK);
+    REQUIRE(batch != nullptr);
+
+    // 批量 getter：返回 2 个 age
+    const int* items = nullptr;
+    size_t count = 0;
+    REQUIRE(md_result_age_batch(batch, &items, &count) == MD_OK);
+    CHECK(count == 2);
+    CHECK(items != nullptr);
+
+    // 既有单值 getter 兼容 ResultData：读 index 0，与 batch[0] 一致
+    int single_age = -1;
+    REQUIRE(md_result_age(batch, &single_age) == MD_OK);
+    CHECK(single_age == items[0]);
+
+    // kind 不匹配 → INVALID_ARGUMENT，不崩
+    int g = 0;
+    CHECK(md_result_gender_batch(batch, &items, &count) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_result_gender(batch, &g) == MD_ERR_INVALID_ARGUMENT);
+    const unsigned char* labels = nullptr;
+    size_t oh = 0, ow = 0;
+    int nc = 0;
+    CHECK(md_result_sem_seg_batch(batch, 0, &labels, &oh, &ow, &nc) == MD_ERR_INVALID_ARGUMENT);
+    const float* depth = nullptr;
+    CHECK(md_result_depth_batch(batch, 0, &depth, &oh, &ow) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_result_ocr_batch_count(batch, &count) == MD_ERR_INVALID_ARGUMENT);
+
+    md_result_destroy(batch);
+    md_image_destroy(a);
+    md_image_destroy(b);
+    md_model_destroy(age);
+}

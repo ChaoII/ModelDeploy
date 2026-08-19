@@ -361,10 +361,14 @@ MD_CAPI_EXPORT MDStatus md_result_obb(MDResultHandle, const MDObbItem** items, s
 MD_CAPI_EXPORT MDStatus md_result_instance_seg(MDResultHandle, const MDIsegItem** items, size_t* count);
 MD_CAPI_EXPORT MDStatus md_result_mask(MDResultHandle, size_t i, const unsigned char** buf, size_t* out_h, size_t* out_w);
 
-/* SemSeg / Depth（整图单值） */
+/* SemSeg / Depth（整图单值；批量句柄下读 index 0） */
 MD_CAPI_EXPORT MDStatus md_result_sem_seg(MDResultHandle, const unsigned char** labels, size_t* h, size_t* w,
                            int* num_classes);
 MD_CAPI_EXPORT MDStatus md_result_depth(MDResultHandle, const float** depth, size_t* h, size_t* w);
+/* 批量：按图索引取每图标签/深度 */
+MD_CAPI_EXPORT MDStatus md_result_sem_seg_batch(MDResultHandle, size_t i, const unsigned char** labels, size_t* h, size_t* w,
+                                 int* num_classes);
+MD_CAPI_EXPORT MDStatus md_result_depth_batch(MDResultHandle, size_t i, const float** depth, size_t* h, size_t* w);
 
 /* FaceDet（bbox + score + 关键点） */
 MD_CAPI_EXPORT MDStatus md_result_face(MDResultHandle, const MDFaceItem** items, size_t* count);
@@ -385,6 +389,9 @@ MD_CAPI_EXPORT MDStatus md_result_insightface_pose(MDResultHandle, size_t i,
 /* OCR（字符串按行取） */
 MD_CAPI_EXPORT MDStatus md_result_ocr(MDResultHandle, size_t i, const int** quad, const char** text, float* score);
 
+/* OCR 批量：返回 batch 内图像数（ResultData<OCRResult> size），逐图行读取复用 md_result_ocr */
+MD_CAPI_EXPORT MDStatus md_result_ocr_batch_count(MDResultHandle, size_t* n);
+
 /* OCR 方向分类（cls 子模型结果：label + score） */
 MD_CAPI_EXPORT MDStatus md_result_ocr_cls(MDResultHandle, size_t i, int* cls_label, float* cls_score);
 
@@ -398,9 +405,12 @@ MD_CAPI_EXPORT MDStatus md_result_lpr_keypoints(MDResultHandle, size_t i, const 
 MD_CAPI_EXPORT MDStatus md_result_attribute(MDResultHandle, const MDAttrItem** items, size_t* count);
 MD_CAPI_EXPORT MDStatus md_result_attr_scores(MDResultHandle, size_t i, const float** scores, size_t* n);
 
-/* 年龄 / 性别（单值，0 号索引） */
+/* 年龄 / 性别（单值，0 号索引；批量句柄下读 index 0） */
 MD_CAPI_EXPORT MDStatus md_result_age(MDResultHandle, int* age);
 MD_CAPI_EXPORT MDStatus md_result_gender(MDResultHandle, int* gender);
+/* 年龄 / 性别 批量：平铺 int 数组（每图一个值） */
+MD_CAPI_EXPORT MDStatus md_result_age_batch(MDResultHandle, const int** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_gender_batch(MDResultHandle, const int** items, size_t* count);
 
 /* 人脸防伪（每实例 label：0=REAL, 1=FUZZY, 2=SPOOF） */
 MD_CAPI_EXPORT MDStatus md_result_spoof(MDResultHandle, size_t i, int* label);
