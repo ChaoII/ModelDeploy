@@ -142,7 +142,7 @@ struct ProjectedResult : ProjectedResultBase {
 // 取结果句柄的原始 C++ 容器（已投影时从 ProjectedResult::origin 取回）
 template <typename T>
 ResultData<T>* raw_result(md_result_handle* rh) {
-    auto* base = static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data));
+    auto* base = static_cast<ResultDataBase*>(rh->data);
     if (auto* d = dynamic_cast<ResultData<T>*>(base)) return d;
     if (auto* p = dynamic_cast<ProjectedResultBase*>(base)) {
         return dynamic_cast<ResultData<T>*>(p->origin_ptr());
@@ -155,7 +155,7 @@ ResultData<T>* raw_result(md_result_handle* rh) {
 // 未定义行为（旧实现 detection/classification 二次调用会读到野值甚至崩溃）。
 template <typename Src, typename Dst, typename Fn>
 ProjectedResult<Dst>* project_cached(md_result_handle* rh, Fn&& fill) {
-    auto* base = static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data));
+    auto* base = static_cast<ResultDataBase*>(rh->data);
     if (auto* e = dynamic_cast<ProjectedResult<Dst>*>(base)) {
         return e;  // 已投影且类型相符 → 幂等复用，不再重投影/链式包裹
     }
@@ -170,7 +170,7 @@ ProjectedResult<Dst>* project_cached(md_result_handle* rh, Fn&& fill) {
 
 // 原始（未投影）结果条数：始终读 origin，而非投影容器（投影数恒等于 origin，但语义应指原始结果）
 size_t origin_count(md_result_handle* rh) {
-    auto* base = static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data));
+    auto* base = static_cast<ResultDataBase*>(rh->data);
     if (auto* p = dynamic_cast<ProjectedResultBase*>(base)) {
         return p->origin_ptr()->count();
     }
@@ -2255,7 +2255,7 @@ MDStatus md_result_face(MDResultHandle h, const MDFaceItem** items, size_t* coun
         delete p;
         return MD_ERR_INVALID_ARGUMENT;
     }
-    p->origin = static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data));
+    p->origin = static_cast<ResultDataBase*>(rh->data);
     rh->data = p;
     *items = p->v.data();
     *count = p->v.size();
@@ -2402,7 +2402,7 @@ MDStatus md_result_lpr(MDResultHandle h, const MDLprItem** items, size_t* count)
         delete p;
         return MD_ERR_INVALID_ARGUMENT;
     }
-    p->origin = static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data));
+    p->origin = static_cast<ResultDataBase*>(rh->data);
     rh->data = p;
     *items = p->v.data();
     *count = p->v.size();
@@ -2428,9 +2428,23 @@ MDStatus md_result_ocr_cls(MDResultHandle h, size_t i, int* cls_label, float* cl
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_OCR) return MD_ERR_INVALID_ARGUMENT;
-    auto* d = static_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data));
-    if (cls_label) *cls_label = i < d->value.cls_labels.size() ? d->value.cls_labels[i] : 0;
-    if (cls_score) *cls_score = i < d->value.cls_scores.size() ? d->value.cls_scores[i] : 0.f;
+    int label = 0;
+    float score = 0.f;
+    if (auto* s = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
+        const auto& v = s->value;
+        label = i < v.cls_labels.size() ? v.cls_labels[i] : 0;
+        score = i < v.cls_scores.size() ? v.cls_scores[i] : 0.f;
+    } else if (auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
+        if (!d->v.empty()) {  // 批量句柄：读 index 0
+            const auto& v = d->v[0];
+            label = i < v.cls_labels.size() ? v.cls_labels[i] : 0;
+            score = i < v.cls_scores.size() ? v.cls_scores[i] : 0.f;
+        }
+    } else {
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    if (cls_label) *cls_label = label;
+    if (cls_score) *cls_score = score;
     return MD_OK;
 }
 
@@ -2749,19 +2763,19 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
                 return MD_OK;
             }
             case MD_RES_SEM_SEG: {
-                auto* d = dynamic_cast<SingleResult<SemSegResult>*>(static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data)));
+                auto* d = dynamic_cast<SingleResult<SemSegResult>*>(static_cast<ResultDataBase*>(rh->data));
                 if (!d) return MD_ERR_INVALID_ARGUMENT;
                 modeldeploy::vision::vis_sem(image, d->value, label_map, alpha, save);
                 return MD_OK;
             }
             case MD_RES_DEPTH: {
-                auto* d = dynamic_cast<SingleResult<DepthResult>*>(static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data)));
+                auto* d = dynamic_cast<SingleResult<DepthResult>*>(static_cast<ResultDataBase*>(rh->data));
                 if (!d) return MD_ERR_INVALID_ARGUMENT;
                 modeldeploy::vision::vis_depth(image, d->value, true, save);
                 return MD_OK;
             }
             case MD_RES_OCR: {
-                auto* d = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(static_cast<ResultDataBase*>(rh->data)));
+                auto* d = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data));
                 if (!d) return MD_ERR_INVALID_ARGUMENT;
                 modeldeploy::vision::vis_ocr(image, d->value, font_path, font_size, alpha, save);
                 return MD_OK;
