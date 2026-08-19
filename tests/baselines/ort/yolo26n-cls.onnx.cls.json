@@ -1,16 +1,16 @@
 {
   "meta": {
-    "backend": "mnn-cpu",
-    "date": "2026-08-07",
+    "backend": "ort-cpu",
+    "date": "2026-08-19",
     "image": "test_person.jpg",
-    "model": "yolo11n-cls.mnn"
+    "model": "yolo26n-cls.onnx"
   },
   "results": {
     "label_ids": [
-      840
+      722
     ],
     "scores": [
-      1.0002440214157104
+      0.5032950043678284
     ]
   }
 }

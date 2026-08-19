@@ -1,7 +1,7 @@
 {
   "meta": {
     "backend": "ort-cpu",
-    "date": "2026-08-07",
+    "date": "2026-08-19",
     "image": "test_face_detection.jpg",
     "model": "scrfd_2.5g_bnkps_shape640x640.onnx"
   },

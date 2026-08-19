@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "backend": "mnn-cpu",
+    "date": "2026-08-19",
+    "image": "test_detection0.jpg",
+    "model": "yolo26n.mnn"
+  },
+  "results": [
+    {
+      "box": {
+        "height": 0.0,
+        "width": 0.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "label_id": 16,
+      "score": 0.9258790016174316
+    },
+    {
+      "box": {
+        "height": 0.0,
+        "width": 0.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "label_id": 1,
+      "score": 0.8869850039482117
+    },
+    {
+      "box": {
+        "height": 0.0,
+        "width": 0.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "label_id": 7,
+      "score": 0.8313930034637451
+    }
+  ]
+}

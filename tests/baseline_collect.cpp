@@ -147,17 +147,21 @@ namespace {
 
     std::string find_rec_dict(const std::string& model_file) {
         const std::vector<fs::path> candidates = {
+            fs::path(model_file).parent_path() / "ppocrv6_tiny_dict.txt",
+            fs::path(model_file).parent_path().parent_path() / "ppocrv6_tiny_dict.txt",
+            fs::path("test_data") / "ppocrv6_tiny_dict.txt",
+            fs::path("ppocrv6_tiny_dict.txt"),
+            fs::path(model_file).parent_path() / "ppocrv5_dict.txt",
             fs::path(model_file).parent_path() / "ppocrv4_dict.txt",
-            fs::path(model_file).parent_path().parent_path() / "ppocrv4_dict.txt",
+            fs::path("test_data") / "ppocrv5_dict.txt",
             fs::path("test_data") / "ppocrv4_dict.txt",
-            fs::path("ppocrv4_dict.txt"),
         };
         for (const auto& c : candidates) {
             if (fs::exists(c)) return c.string();
         }
-        std::cerr << "warning: ppocrv4_dict.txt not found near model or in test_data/, "
-                  << "falling back to test_data/ppocrv4_dict.txt\n";
-        return "test_data/ppocrv4_dict.txt";
+        std::cerr << "warning: ocr dict not found near model nor in test_data/, "
+                  << "falling back to test_data/ppocrv6_tiny_dict.txt\n";
+        return "test_data/ppocrv6_tiny_dict.txt";
     }
 
     modeldeploy::RuntimeOption make_option(const std::string& backend) {
