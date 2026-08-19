@@ -684,3 +684,78 @@ TEST_CASE("capi2 CPU BGR frame encode/save still OK", "[capi]") {
 
     md_image_destroy(img);
 }
+
+TEST_CASE("capi2 predict_batch rejects null args (no model needed)", "[capi]") {
+    MDImageHandle img = nullptr;
+    const int w = 16, h = 16;
+    auto bgr = make_gray_bgr(w, h);
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+
+    MDResultHandle res = nullptr;
+    MDImageHandle imgs[2] = {img, img};
+
+    // 空模型句柄 / 空输出 → NULL_POINTER
+    CHECK(md_model_predict_batch(nullptr, imgs, 2, &res) == MD_ERR_NULL_POINTER);
+    CHECK(md_model_predict_batch(nullptr, nullptr, 0, nullptr) == MD_ERR_NULL_POINTER);
+
+    md_image_destroy(img);
+}
+
+// 端到端批量：需可加载的检测模型（[model] 标签，CI 有模型时执行）
+TEST_CASE("capi2 predict_batch detection flattens both images", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    const std::string img1 = data_dir + "/test_images/test_detection0.jpg";
+    const std::string img2 = data_dir + "/test_images/test_detection1.jpg";
+    if (!std::filesystem::exists(det_file) || !std::filesystem::exists(img1) ||
+        !std::filesystem::exists(img2)) {
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle det = nullptr;
+    REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, det_file.c_str(), opt) == MD_OK);
+    REQUIRE(det != nullptr);
+    md_option_destroy(opt);
+
+    MDImageHandle a = nullptr, b = nullptr;
+    REQUIRE(md_image_from_file(&a, img1.c_str()) == MD_OK);
+    REQUIRE(md_image_from_file(&b, img2.c_str()) == MD_OK);
+    MDImageHandle imgs[2] = {a, b};
+
+    // 错误路径：n==0 → INVALID_ARGUMENT；imgs==nullptr → NULL_POINTER
+    MDResultHandle r = nullptr;
+    CHECK(md_model_predict_batch(det, imgs, 0, &r) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_model_predict_batch(det, nullptr, 2, &r) == MD_ERR_NULL_POINTER);
+
+    // 正确批量：结果 = 两图框数之和（平铺）
+    MDResultHandle batch = nullptr;
+    REQUIRE(md_model_predict_batch(det, imgs, 2, &batch) == MD_OK);
+    REQUIRE(batch != nullptr);
+
+    const MDDetectionItem* items = nullptr;
+    size_t total = 0;
+    REQUIRE(md_result_detection(batch, &items, &total) == MD_OK);
+
+    // 每图单图推理之和作为参考
+    size_t expect = 0;
+    for (auto* single : {a, b}) {
+        MDResultHandle sr = nullptr;
+        REQUIRE(md_model_predict(det, single, &sr) == MD_OK);
+        size_t cnt = 0;
+        REQUIRE(md_result_count(sr, &cnt) == MD_OK);
+        expect += cnt;
+        md_result_destroy(sr);
+    }
+    CHECK(total == expect);
+
+    md_result_destroy(batch);
+    md_image_destroy(a);
+    md_image_destroy(b);
+    md_model_destroy(det);
+}
