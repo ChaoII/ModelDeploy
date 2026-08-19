@@ -249,13 +249,49 @@ fn test_face_age_gender() -> Result<()> {
     let opt = cpu_opt()?;
     let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/face/age_predictor.onnx"), &opt)?;
     let img = Image::read(&test_img("test_face_id1.jpg"))?;
-    let age = age_model.predict(&img)?;
-    assert!(age[0] >= 0);
+    let age: i32 = age_model.predict(&img)?;
+    assert!(age >= 0);
 
     let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/face/gender_predictor.onnx"), &opt)?;
     let img2 = Image::read(&test_img("test_face_gender.jpg"))?;
-    let gender = gender_model.predict(&img2)?;
-    assert!(gender[0] >= 0);
+    let gender: i32 = gender_model.predict(&img2)?;
+    assert!(gender >= 0);
+    Ok(())
+}
+
+// ═══ 标量类型断言：SeetaFaceAge/Gender predict 返回 i32（编译期验证，不加载模型） ═══
+
+#[test]
+fn face_age_gender_returns_i32() -> Result<()> {
+    let opt = cpu_opt()?;
+    let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/face/age_predictor.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_face_id1.jpg"))?;
+
+    let mut _a: i32 = 0;
+    _a = age_model.predict(&img)?;
+    let _: Result<i32, modeldeploy::MdError> = age_model.predict(&img);
+
+    let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/face/gender_predictor.onnx"), &opt)?;
+    let img2 = Image::read(&test_img("test_face_gender.jpg"))?;
+    let mut _g: i32 = 0;
+    _g = gender_model.predict(&img2)?;
+    let _: Result<i32, modeldeploy::MdError> = gender_model.predict(&img2);
+    Ok(())
+}
+
+// ═══ 批量推理 predict_batch ═══
+
+#[test]
+fn test_detection_predict_batch() -> Result<()> {
+    let opt = cpu_opt()?;
+    let model = UltralyticsDet::new(&test_data("test_models/onnx/yolo11n/yolo11n.onnx"), &opt)?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
+    let imgs = [&img, &img];
+    let dets = model.predict_batch(&imgs)?;
+    assert!(!dets.is_empty());
+    assert!(dets.len() >= 1);
+    assert!(dets[0].score > 0.0 && dets[0].score <= 1.0);
+    assert!(dets[0].rect.width > 0.0);
     Ok(())
 }
 

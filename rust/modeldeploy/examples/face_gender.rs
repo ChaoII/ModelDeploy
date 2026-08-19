@@ -10,6 +10,6 @@ fn main() -> Result<()> {
     opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU);
     let model = SeetaFaceGender::new(&test_data("test_models/onnx/face/gender_predictor.onnx"), &opt)?;
     let img = Image::read(&test_data("test_images/test_face_gender.jpg"))?;
-    println!("gender: {}", model.predict(&img)?[0]);
+    println!("gender: {}", model.predict(&img)?);
     Ok(())
 }

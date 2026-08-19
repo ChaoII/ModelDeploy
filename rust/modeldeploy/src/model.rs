@@ -222,6 +222,22 @@ impl Model {
         })
     }
 
+    /// 批量推理（多图一次提交，结果平铺），返回 RawResult（调用方用对应 reader 读取）
+    pub fn predict_batch(&self, images: &[&Image]) -> Result<RawResult, MdError> {
+        let mut handles: Vec<ffi::MDImageHandle> = images.iter().map(|im| im.handle).collect();
+        let mut result = ptr::null_mut();
+        check_status(unsafe {
+            ffi::md_model_predict_batch(self.handle, handles.as_mut_ptr(), handles.len(), &mut result)
+        })?;
+        if result.is_null() {
+            return Err(MdError::ModelPredict("null batch result".into()));
+        }
+        Ok(RawResult {
+            handle: result,
+            _kind: self.kind,
+        })
+    }
+
     /// ASR：从 wav 文件识别
     pub fn asr_wav(&self, wav_path: &str) -> Result<String, MdError> {
         let cpath = CString::new(wav_path).map_err(|_| MdError::InvalidArgument("wav".into()))?;
@@ -704,9 +720,9 @@ impl DrawOptions {
 // 各模型一对一包装（对应 C++ 类，与 C# 的 Model 类一一映射）
 // ════════════════════════════════════════════════════════════════
 
-/// 宏：生成一个"持有 Model + 类型化 predict"的模型包装
-macro_rules! model_wrapper {
-    ($name:ident, $kind:expr, $reader:expr) => {
+/// 宏：生成"持有 Model"的公共包装骨架（struct + new/clone/is_ready + 各 setter）
+macro_rules! model_wrapper_common {
+    ($name:ident, $kind:expr) => {
         /// 对应 C++ 类（见文档注释）
         pub struct $name {
             inner: Model,
@@ -843,10 +859,24 @@ macro_rules! model_wrapper {
             pub fn set_landmarks_per_card(&self, v: f64) -> Result<(), MdError> {
                 self.inner.set_landmarks_per_card(v)
             }
+        }
+    };
+}
 
+/// 宏：生成一个"持有 Model + 类型化 predict(返回 Vec<Item>) + predict_batch"的模型包装
+macro_rules! model_wrapper {
+    ($name:ident, $kind:expr, $reader:expr) => {
+        model_wrapper_common!($name, $kind);
+
+        impl $name {
             /// 推理并读取结果（结果句柄随返回值释放）
             pub fn predict(&self, image: &Image) -> Result<Vec<<$name as ResultType>::Item>, MdError> {
                 $reader(&self.inner.predict(image)?)
+            }
+
+            /// 批量推理并读取结果（结果平铺）
+            pub fn predict_batch(&self, images: &[&Image]) -> Result<Vec<<$name as ResultType>::Item>, MdError> {
+                $reader(&self.inner.predict_batch(images)?)
             }
 
             /// 推理并把结果绘制到图像上（句柄直达 C++ vis_*）
@@ -859,6 +889,20 @@ macro_rules! model_wrapper {
                 let result = self.inner.predict(image)?;
                 result.draw(canvas, options)?;
                 $reader(&result)
+            }
+        }
+    };
+}
+
+/// 宏：生成一个标量模型包装（predict 直接返回 `Item`，无 predict_batch）
+macro_rules! scalar_model_wrapper {
+    ($name:ident, $kind:expr, $reader:expr) => {
+        model_wrapper_common!($name, $kind);
+
+        impl $name {
+            /// 推理并读取标量结果（结果句柄随返回值释放）
+            pub fn predict(&self, image: &Image) -> Result<<$name as ResultType>::Item, MdError> {
+                $reader(&self.inner.predict(image)?)
             }
         }
     };
@@ -924,8 +968,8 @@ model_wrapper!(UltralyticsSem, ModelKind::SemSeg, |r: &RawResult| r.sem_seg().ma
 model_wrapper!(UltralyticsDepth, ModelKind::Depth, |r: &RawResult| r.depth().map(|d| vec![d]));
 model_wrapper!(Scrfd, ModelKind::FaceDet, RawResult::face_det);
 model_wrapper!(SeetaFaceID, ModelKind::FaceRec, |r: &RawResult| r.face_recognition(0).map(|f| vec![f]));
-model_wrapper!(SeetaFaceAge, ModelKind::FaceAge, |r: &RawResult| r.age().map(|a| vec![a]));
-model_wrapper!(SeetaFaceGender, ModelKind::FaceGender, |r: &RawResult| r.gender().map(|g| vec![g]));
+scalar_model_wrapper!(SeetaFaceAge, ModelKind::FaceAge, RawResult::age);
+scalar_model_wrapper!(SeetaFaceGender, ModelKind::FaceGender, RawResult::gender);
 model_wrapper!(InsightFaceAnalysis, ModelKind::InsightFace, RawResult::insightface);
 model_wrapper!(PaddleOCR, ModelKind::Ocr, RawResult::ocr);
 model_wrapper!(LprPipeline, ModelKind::LprPipeline, RawResult::lpr);
