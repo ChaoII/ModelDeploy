@@ -363,7 +363,18 @@ namespace modeldeploy {
             }
             else {
                 input_buffer = allocate_cuda_buffer(buffer_size);
-                input_buffer->copy_from_host(input.data());
+                // 关键：必须在 stream_ 上异步拷贝输入（而非默认 legacy 流）。
+                // enqueueV3 使用 cudaStreamNonBlocking 流，与默认流无隐式同步；
+                // 若用同步 cudaMemcpy(默认流) 拷贝输入，会与非阻塞流上的引擎执行竞态，
+                // 导致反复运行结果随机抖动（分类 argmax 在归一化后仍偶发翻转）。
+                const cudaError_t cpy = cudaMemcpyAsync(
+                    input_buffer->data(), input.data(), buffer_size,
+                    cudaMemcpyHostToDevice, stream_);
+                if (cpy != cudaSuccess) {
+                    MD_LOG_ERROR << "CUDA host->device input copy failed: "
+                        << cudaGetErrorString(cpy) << std::endl;
+                    return false;
+                }
             }
             context_->setTensorAddress(name.c_str(), input_buffer->data());
             device_buffers.push_back(std::move(input_buffer));
