@@ -117,7 +117,7 @@ void bench(Model& m, const modeldeploy::vision::ImageData& im, Result* res,
 
 int run_detection(Backend b) {
     std::string model = model_path("yolo26n/yolo26n.onnx", "yolo11n_nms.mnn",
-                                   "yolo11n_nms.engine", "zhgd_without_nms_640_int8.bmodel", b);
+                                   "yolo26n.engine", "zhgd_without_nms_640_int8.bmodel", b);
     modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
     auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>(model, opt);
     if (!det->is_initialized()) {
@@ -130,7 +130,7 @@ int run_detection(Backend b) {
         "../../test_data/test_images/test_pedestrian_attribute_scale.png");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
     std::vector<modeldeploy::vision::DetectionResult> res;
-    bench(*det, im, &res, 10, 50);
+    bench(*det, im, &res, 20, 100);
     modeldeploy::vision::dis_det(res);
     auto vis = modeldeploy::vision::vis_det(im, res, 0.5, label_map, kFont, 12, 0.3, false);
     (void)vis.imwrite("result_detection_" + std::string(backend_tag(b)) + ".jpg");
@@ -150,7 +150,8 @@ int run_classification(Backend b) {
     m->get_preprocessor().set_size(is_yolo_cls ? std::vector<int>{224, 224}
                                                : std::vector<int>{192, 256});
     m->get_preprocessor().disable_center_crop();
-    m->get_postprocessor().set_multi_label(true);
+    // 后处理自动判别单/多标签：yolo11n-cls(单标签, softmax 和≈1)与 zhgd_ml(多标签, 和≈2)。
+    m->get_postprocessor().set_multi_label_auto(true);
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face.jpg");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
     modeldeploy::vision::ClassifyResult res;

@@ -26,7 +26,15 @@ namespace modeldeploy::vision::classification {
             const int64_t num_classes = infer_result.shape()[1];
             const float* infer_result_buffer =
                 static_cast<const float*>(infer_result.data()) + bs * infer_result.shape()[1];
-            if (multi_label_) {
+            bool multi = multi_label_;
+            if (auto_multi_label_) {
+                float sum = 0.0f;
+                for (int64_t i = 0; i < num_classes; ++i) {
+                    sum += infer_result_buffer[i];
+                }
+                multi = sum > auto_multi_label_thresh_;
+            }
+            if (multi) {
                 r.label_ids.resize(num_classes);
                 std::iota(r.label_ids.begin(),
                           r.label_ids.end(),0);

@@ -36,8 +36,21 @@ namespace modeldeploy::vision::classification {
         /// Get multi_label, default false
         [[nodiscard]] bool get_multi_label() const { return multi_label_; }
 
+        // 自动判别单/多标签分类：单标签模型输出为 softmax，全类概率和约等于 1；
+        // 多标签模型各维为独立概率，全类和可显著大于 1。当 auto_multi_label 开启时，
+        // 按全类概率和是否超过阈值(默认1.5)自动决定本次按单标签还是多标签后处理。
+        // 若同时显式 set_multi_label，则以显式设置优先。
+        void set_multi_label_auto(const bool& enable,
+                                  const float& threshold = 1.5f) {
+            auto_multi_label_ = enable;
+            auto_multi_label_thresh_ = threshold;
+        }
+        [[nodiscard]] bool get_multi_label_auto() const { return auto_multi_label_; }
+
     protected:
         int top_k_;
         bool multi_label_ = false;
+        bool auto_multi_label_ = false;
+        float auto_multi_label_thresh_ = 1.5f;
     };
 }
