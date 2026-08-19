@@ -306,7 +306,9 @@ extern "C" {
     pub fn md_image_from_bgr24(out: *mut MDImageHandle, bgr: *const c_void, w: c_int, h: c_int) -> MDStatus;
     pub fn md_image_from_rgb24(out: *mut MDImageHandle, rgb: *const c_void, w: c_int, h: c_int) -> MDStatus;
     pub fn md_image_from_nv12(out: *mut MDImageHandle, y: *const c_void, uv: *const c_void,
-        w: c_int, h: c_int, step_y: c_int, step_uv: c_int, src: MDDevice) -> MDStatus;
+        w: c_int, h: c_int, step_y: c_int, step_uv: c_int) -> MDStatus;
+    pub fn md_image_from_nv12_owned(out: *mut MDImageHandle, y: *const c_void, uv: *const c_void,
+        w: c_int, h: c_int, step_y: c_int, step_uv: c_int) -> MDStatus;
     pub fn md_image_from_device_nv12(out: *mut MDImageHandle, y: *const c_void, uv: *const c_void,
         w: c_int, h: c_int, step_y: c_int, step_uv: c_int, dev: MDDevice) -> MDStatus;
     pub fn md_image_from_yuv420p(out: *mut MDImageHandle, data: *const c_void, w: c_int, h: c_int) -> MDStatus;
@@ -388,6 +390,29 @@ extern "C" {
     pub fn md_result_gender(h: MDResultHandle, gender: *mut c_int) -> MDStatus;
     pub fn md_result_gender_batch(h: MDResultHandle, items: *mut *const c_int, count: *mut usize) -> MDStatus;
     pub fn md_result_ocr_batch_count(h: MDResultHandle, n: *mut usize) -> MDStatus;
+
+    // ── 2D 批量结果 getter（按图索引 img，逐图取项数组） ──
+    pub fn md_result_detection_batch(h: MDResultHandle, img: usize, items: *mut *const MDDetectionItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_classification_batch(h: MDResultHandle, img: usize, items: *mut *const MDClassifyItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_pose_batch(h: MDResultHandle, img: usize, items: *mut *const MDPoseItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_keypoints_batch(h: MDResultHandle, img: usize, item: usize, kps: *mut *const MDPoint3, n: *mut usize) -> MDStatus;
+    pub fn md_result_obb_batch(h: MDResultHandle, img: usize, items: *mut *const MDObbItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_instance_seg_batch(h: MDResultHandle, img: usize, items: *mut *const MDIsegItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_mask_batch(h: MDResultHandle, img: usize, item: usize, buf: *mut *const u8, out_h: *mut usize, out_w: *mut usize) -> MDStatus;
+    pub fn md_result_face_batch(h: MDResultHandle, img: usize, items: *mut *const MDFaceItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_face_kps_batch(h: MDResultHandle, img: usize, item: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
+    pub fn md_result_face_embedding_batch(h: MDResultHandle, img: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_batch(h: MDResultHandle, img: usize, items: *mut *const MDInsightFaceItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_kps_batch(h: MDResultHandle, img: usize, item: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_embedding_batch(h: MDResultHandle, img: usize, item: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_insightface_pose_batch(h: MDResultHandle, img: usize, item: usize, pose: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_ocr_batch(h: MDResultHandle, img: usize, line: usize, quad: *mut *const c_int, text: *mut *const c_char, score: *mut c_float) -> MDStatus;
+    pub fn md_result_ocr_cls_batch(h: MDResultHandle, img: usize, line: usize, cls_label: *mut c_int, cls_score: *mut c_float) -> MDStatus;
+    pub fn md_result_lpr_batch(h: MDResultHandle, img: usize, items: *mut *const MDLprItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_plate_batch(h: MDResultHandle, img: usize, item: usize, plate: *mut *const c_char, color: *mut *const c_char) -> MDStatus;
+    pub fn md_result_lpr_keypoints_batch(h: MDResultHandle, img: usize, item: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
+    pub fn md_result_attribute_batch(h: MDResultHandle, img: usize, items: *mut *const MDAttrItem, count: *mut usize) -> MDStatus;
+    pub fn md_result_attr_scores_batch(h: MDResultHandle, img: usize, item: usize, scores: *mut *const c_float, n: *mut usize) -> MDStatus;
 
     // ── 绘制（基础） ──
     pub fn md_draw_rect(h: MDImageHandle, x: c_float, y: c_float, w: c_float, h: c_float,

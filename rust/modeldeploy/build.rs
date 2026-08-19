@@ -19,7 +19,7 @@ fn find_sdk_root() -> Option<PathBuf> {
     }
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let project_root = manifest_dir.parent().unwrap().parent().unwrap();
-    for rel in &["build_tdc", "build_audio", "build", "build_debug"] {
+    for rel in &["build", "build_tdc", "build_audio", "build_debug"] {
         let dir = project_root.join(rel);
         if sdk_file_exists(&dir.join("bin"), "ModelDeploySDK")
             || sdk_file_exists(&dir.join("lib"), "ModelDeploySDK")
@@ -88,4 +88,6 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=build.rs");
+    // 切换原生 SDK 目录时应重跑本脚本（否则链接/拷贝沿用旧缓存）
+    println!("cargo:rerun-if-env-changed=MODELDEPLOY_LIB_DIR");
 }

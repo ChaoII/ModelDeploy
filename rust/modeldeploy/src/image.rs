@@ -141,11 +141,12 @@ impl Image {
         Self::from_handle(handle)
     }
 
-    /// 从 NV12 构造（产 CPU BGR，自有/安全的拷贝数据路径）
+    /// 从 NV12 构造（产真 NV12 两平面帧，库内拷入自有缓冲——安全，无需调用方保活）。
+    /// 与 C# `FromNv12Data` 语义一致（图像类型为 NV12，走零拷贝 NV12 推理路径，不做 NV12→BGR 转换）。
     pub fn from_nv12(y: &[u8], uv: &[u8], width: i32, height: i32, step_y: i32, step_uv: i32) -> Result<Self, MdError> {
         let mut handle = std::ptr::null_mut();
         check_status(unsafe {
-            ffi::md_image_from_nv12(
+            ffi::md_image_from_nv12_owned(
                 &mut handle,
                 y.as_ptr() as *const _,
                 uv.as_ptr() as *const _,
@@ -153,7 +154,6 @@ impl Image {
                 height,
                 step_y,
                 step_uv,
-                ffi::MDDevice::CPU,
             )
         })?;
         Self::from_handle(handle).map(|mut img| {

@@ -253,12 +253,15 @@ let model = UltralyticsDet::new("model.onnx", &opt)?;
 // 2. 推理
 let results = model.predict(&image)?;
 
-// 3. 批量推理（多图一次提交，结果平铺）
+// 3. 批量推理（2D：按图返回 `Vec<Vec<Item>>`，每图一组，保留图片边界）
 let results = model.predict_batch(&[&img1, &img2])?;
+assert!(results.len() == 2);
 
-// 4. 使用结果（for 循环等；标量模型 FaceAge/Gender 直接返回 i32）
-for r in &results {
-    println!("{} {:.4}", r.label_id, r.score);
+// 4. 使用结果
+for group in &results {
+    for r in group {
+        println!("{} {:.4}", r.label_id, r.score);
+    }
 }
 
 // 5. 自动释放：model 超出作用域时 Drop 调用 md_free_*_model()

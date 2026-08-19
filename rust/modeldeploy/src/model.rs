@@ -632,6 +632,303 @@ impl RawResult {
         Ok(g)
     }
 
+    // ────────────────── 2D 批量结果（按图索引 img，逐图取项数组） ──────────────────
+    pub fn detection_batch(&self) -> Result<Vec<Vec<Detection>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDDetectionItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_detection_batch(self.handle, img, &mut items, &mut n) })?;
+            out.push(slice_items(items, n)
+                .iter()
+                .map(|it| Detection {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    label_id: it.label_id,
+                    score: it.score,
+                })
+                .collect());
+        }
+        Ok(out)
+    }
+
+    pub fn classification_batch(&self) -> Result<Vec<Vec<ClassificationResult>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDClassifyItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_classification_batch(self.handle, img, &mut items, &mut n) })?;
+            out.push(slice_items(items, n)
+                .iter()
+                .map(|it| ClassificationResult { label_id: it.label_id, score: it.score })
+                .collect());
+        }
+        Ok(out)
+    }
+
+    pub fn pose_batch(&self) -> Result<Vec<Vec<Pose>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDPoseItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_pose_batch(self.handle, img, &mut items, &mut n) })?;
+            let items = slice_items(items, n);
+            let mut per_img = Vec::with_capacity(n);
+            for (i, it) in items.iter().enumerate() {
+                let mut kps: *const ffi::MDPoint3 = ptr::null();
+                let mut kn = 0usize;
+                check_status(unsafe { ffi::md_result_keypoints_batch(self.handle, img, i, &mut kps, &mut kn) })?;
+                per_img.push(Pose {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    score: it.score,
+                    keypoints: slice_items(kps, kn)
+                        .iter()
+                        .map(|p| Point3 { x: p.x, y: p.y, z: p.z })
+                        .collect(),
+                });
+            }
+            out.push(per_img);
+        }
+        Ok(out)
+    }
+
+    pub fn obb_batch(&self) -> Result<Vec<Vec<Obb>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDObbItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_obb_batch(self.handle, img, &mut items, &mut n) })?;
+            out.push(slice_items(items, n)
+                .iter()
+                .map(|it| Obb {
+                    rotated_box: RotatedBox { cx: it.cx, cy: it.cy, width: it.w, height: it.h, angle: it.angle },
+                    label_id: it.label_id,
+                    score: it.score,
+                })
+                .collect());
+        }
+        Ok(out)
+    }
+
+    pub fn instance_seg_batch(&self) -> Result<Vec<Vec<InstanceSeg>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDIsegItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_instance_seg_batch(self.handle, img, &mut items, &mut n) })?;
+            out.push(slice_items(items, n)
+                .iter()
+                .map(|it| InstanceSeg {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    label_id: it.label_id,
+                    score: it.score,
+                })
+                .collect());
+        }
+        Ok(out)
+    }
+
+    /// 批量语义分割：每图一个 SemSeg（域与单图保持一致）。
+    pub fn sem_seg_batch(&self) -> Result<Vec<Vec<SemSeg>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut labels: *const u8 = ptr::null();
+            let mut h = 0usize;
+            let mut w = 0usize;
+            let mut nc = 0;
+            check_status(unsafe { ffi::md_result_sem_seg_batch(self.handle, img, &mut labels, &mut h, &mut w, &mut nc) })?;
+            out.push(vec![SemSeg { labels: read_bytes(labels, h * w), height: h, width: w, num_classes: nc }]);
+        }
+        Ok(out)
+    }
+
+    /// 批量深度：每图一个 Depth（域与单图保持一致）。
+    pub fn depth_batch(&self) -> Result<Vec<Vec<Depth>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut depth: *const f32 = ptr::null();
+            let mut h = 0usize;
+            let mut w = 0usize;
+            check_status(unsafe { ffi::md_result_depth_batch(self.handle, img, &mut depth, &mut h, &mut w) })?;
+            out.push(vec![Depth { depth: read_f32(depth, h * w), height: h, width: w }]);
+        }
+        Ok(out)
+    }
+
+    pub fn face_det_batch(&self) -> Result<Vec<Vec<FaceDetection>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDFaceItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_face_batch(self.handle, img, &mut items, &mut n) })?;
+            let items = slice_items(items, n);
+            let mut per_img = Vec::with_capacity(n);
+            for (i, it) in items.iter().enumerate() {
+                let mut kps: *const ffi::MDPoint = ptr::null();
+                let mut kn = 0usize;
+                check_status(unsafe { ffi::md_result_face_kps_batch(self.handle, img, i, &mut kps, &mut kn) })?;
+                per_img.push(FaceDetection {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    score: it.score,
+                    keypoints: slice_items(kps, kn)
+                        .iter()
+                        .map(|p| Point { x: p.x, y: p.y })
+                        .collect(),
+                });
+            }
+            out.push(per_img);
+        }
+        Ok(out)
+    }
+
+    /// 批量人脸识别（face-rec / pipeline）：每图一个 embedding。
+    pub fn face_recognition_batch(&self) -> Result<Vec<Vec<FaceRecognition>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut emb: *const f32 = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_face_embedding_batch(self.handle, img, &mut emb, &mut n) })?;
+            out.push(vec![FaceRecognition { embedding: read_f32(emb, n) }]);
+        }
+        Ok(out)
+    }
+
+    pub fn insightface_batch(&self) -> Result<Vec<Vec<InsightFace>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDInsightFaceItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_insightface_batch(self.handle, img, &mut items, &mut n) })?;
+            let items = slice_items(items, n);
+            let mut per_img = Vec::with_capacity(n);
+            for (i, it) in items.iter().enumerate() {
+                let mut kps: *const ffi::MDPoint = ptr::null();
+                let mut kn = 0usize;
+                let mut emb: *const f32 = ptr::null();
+                let mut en = 0usize;
+                let mut pose: *const f32 = ptr::null();
+                let mut pn = 0usize;
+                check_status(unsafe { ffi::md_result_insightface_kps_batch(self.handle, img, i, &mut kps, &mut kn) })?;
+                check_status(unsafe { ffi::md_result_insightface_embedding_batch(self.handle, img, i, &mut emb, &mut en) })?;
+                check_status(unsafe { ffi::md_result_insightface_pose_batch(self.handle, img, i, &mut pose, &mut pn) })?;
+                per_img.push(InsightFace {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    score: it.score,
+                    keypoints: slice_items(kps, kn)
+                        .iter()
+                        .map(|p| Point { x: p.x, y: p.y })
+                        .collect(),
+                    embedding: read_f32(emb, en),
+                    pose: read_f32(pose, pn),
+                    gender: it.gender,
+                    age: it.age,
+                });
+            }
+            out.push(per_img);
+        }
+        Ok(out)
+    }
+
+    pub fn ocr_batch(&self) -> Result<Vec<Vec<OcrLine>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut per_img = Vec::new();
+            for line in 0.. {
+                let mut quad: *const i32 = ptr::null();
+                let mut text: *const libc::c_char = ptr::null();
+                let mut score = 0f32;
+                let status = unsafe { ffi::md_result_ocr_batch(self.handle, img, line, &mut quad, &mut text, &mut score) };
+                if status != ffi::MDStatus::OK {
+                    break;
+                }
+                let mut q = [0i32; 8];
+                if !quad.is_null() {
+                    let s = unsafe { std::slice::from_raw_parts(quad, 8) };
+                    q.copy_from_slice(s);
+                }
+                let mut cls_label = 0;
+                let mut cls_score = 0f32;
+                let _ = unsafe { ffi::md_result_ocr_cls_batch(self.handle, img, line, &mut cls_label, &mut cls_score) };
+                per_img.push(OcrLine {
+                    quad: q,
+                    text: unsafe { cstr_to_string(text) },
+                    score,
+                    cls_label,
+                    cls_score,
+                });
+            }
+            out.push(per_img);
+        }
+        Ok(out)
+    }
+
+    pub fn lpr_batch(&self) -> Result<Vec<Vec<LicensePlate>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDLprItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_lpr_batch(self.handle, img, &mut items, &mut n) })?;
+            let items = slice_items(items, n);
+            let mut per_img = Vec::with_capacity(n);
+            for (i, it) in items.iter().enumerate() {
+                let mut plate: *const libc::c_char = ptr::null();
+                let mut color: *const libc::c_char = ptr::null();
+                let mut kps: *const ffi::MDPoint = ptr::null();
+                let mut kn = 0usize;
+                check_status(unsafe { ffi::md_result_plate_batch(self.handle, img, i, &mut plate, &mut color) })?;
+                check_status(unsafe { ffi::md_result_lpr_keypoints_batch(self.handle, img, i, &mut kps, &mut kn) })?;
+                per_img.push(LicensePlate {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    plate: unsafe { cstr_to_string(plate) },
+                    color: unsafe { cstr_to_string(color) },
+                    score: it.score,
+                    keypoints: slice_items(kps, kn)
+                        .iter()
+                        .map(|p| Point { x: p.x, y: p.y })
+                        .collect(),
+                });
+            }
+            out.push(per_img);
+        }
+        Ok(out)
+    }
+
+    pub fn attribute_batch(&self) -> Result<Vec<Vec<Attribute>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut items: *const ffi::MDAttrItem = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_attribute_batch(self.handle, img, &mut items, &mut n) })?;
+            let items = slice_items(items, n);
+            let mut per_img = Vec::with_capacity(n);
+            for (i, it) in items.iter().enumerate() {
+                let mut scores: *const f32 = ptr::null();
+                let mut sn = 0usize;
+                check_status(unsafe { ffi::md_result_attr_scores_batch(self.handle, img, i, &mut scores, &mut sn) })?;
+                per_img.push(Attribute {
+                    rect: Rect { x: it.x, y: it.y, width: it.w, height: it.h },
+                    box_label_id: it.box_label_id,
+                    box_score: it.box_score,
+                    attr_scores: read_f32(scores, sn),
+                });
+            }
+            out.push(per_img);
+        }
+        Ok(out)
+    }
+
     /// 把结果绘制到图像上（句柄直达 C++ vis_*）
     pub fn draw(&self, image: &Image, options: &DrawOptions) -> Result<(), MdError> {
         let mut label_names: Vec<CString> = options
@@ -863,9 +1160,9 @@ macro_rules! model_wrapper_common {
     };
 }
 
-/// 宏：生成一个"持有 Model + 类型化 predict(返回 Vec<Item>) + predict_batch"的模型包装
+/// 宏：生成一个"持有 Model + 类型化 predict(返回 Vec<Item>) + predict_batch(返回 Vec<Vec<Item>>，按图)"的模型包装
 macro_rules! model_wrapper {
-    ($name:ident, $kind:expr, $reader:expr) => {
+    ($name:ident, $kind:expr, $reader:expr, $reader_batch:expr) => {
         model_wrapper_common!($name, $kind);
 
         impl $name {
@@ -874,9 +1171,9 @@ macro_rules! model_wrapper {
                 $reader(&self.inner.predict(image)?)
             }
 
-            /// 批量推理并读取结果（结果平铺）
-            pub fn predict_batch(&self, images: &[&Image]) -> Result<Vec<<$name as ResultType>::Item>, MdError> {
-                $reader(&self.inner.predict_batch(images)?)
+            /// 批量推理并读取结果（2D：按图返回，每图一组，保留图片边界）
+            pub fn predict_batch(&self, images: &[&Image]) -> Result<Vec<Vec<<$name as ResultType>::Item>>, MdError> {
+                $reader_batch(&self.inner.predict_batch(images)?)
             }
 
             /// 推理并把结果绘制到图像上（句柄直达 C++ vis_*）
@@ -959,21 +1256,21 @@ impl ResultType for PedestrianAttribute {
     type Item = Attribute;
 }
 
-model_wrapper!(UltralyticsDet, ModelKind::Detection, RawResult::detection);
-model_wrapper!(Classification, ModelKind::Classification, RawResult::classification);
-model_wrapper!(UltralyticsPose, ModelKind::Pose, RawResult::pose);
-model_wrapper!(UltralyticsObb, ModelKind::Obb, RawResult::obb);
-model_wrapper!(UltralyticsSeg, ModelKind::InstanceSeg, RawResult::instance_seg);
-model_wrapper!(UltralyticsSem, ModelKind::SemSeg, |r: &RawResult| r.sem_seg().map(|s| vec![s]));
-model_wrapper!(UltralyticsDepth, ModelKind::Depth, |r: &RawResult| r.depth().map(|d| vec![d]));
-model_wrapper!(Scrfd, ModelKind::FaceDet, RawResult::face_det);
-model_wrapper!(SeetaFaceID, ModelKind::FaceRec, |r: &RawResult| r.face_recognition(0).map(|f| vec![f]));
+model_wrapper!(UltralyticsDet, ModelKind::Detection, RawResult::detection, RawResult::detection_batch);
+model_wrapper!(Classification, ModelKind::Classification, RawResult::classification, RawResult::classification_batch);
+model_wrapper!(UltralyticsPose, ModelKind::Pose, RawResult::pose, RawResult::pose_batch);
+model_wrapper!(UltralyticsObb, ModelKind::Obb, RawResult::obb, RawResult::obb_batch);
+model_wrapper!(UltralyticsSeg, ModelKind::InstanceSeg, RawResult::instance_seg, RawResult::instance_seg_batch);
+model_wrapper!(UltralyticsSem, ModelKind::SemSeg, |r: &RawResult| r.sem_seg().map(|s| vec![s]), |r: &RawResult| r.sem_seg_batch());
+model_wrapper!(UltralyticsDepth, ModelKind::Depth, |r: &RawResult| r.depth().map(|d| vec![d]), |r: &RawResult| r.depth_batch());
+model_wrapper!(Scrfd, ModelKind::FaceDet, RawResult::face_det, RawResult::face_det_batch);
+model_wrapper!(SeetaFaceID, ModelKind::FaceRec, |r: &RawResult| r.face_recognition(0).map(|f| vec![f]), |r: &RawResult| r.face_recognition_batch());
 scalar_model_wrapper!(SeetaFaceAge, ModelKind::FaceAge, RawResult::age);
 scalar_model_wrapper!(SeetaFaceGender, ModelKind::FaceGender, RawResult::gender);
-model_wrapper!(InsightFaceAnalysis, ModelKind::InsightFace, RawResult::insightface);
-model_wrapper!(PaddleOCR, ModelKind::Ocr, RawResult::ocr);
-model_wrapper!(LprPipeline, ModelKind::LprPipeline, RawResult::lpr);
-model_wrapper!(PedestrianAttribute, ModelKind::PedestrianAttribute, RawResult::attribute);
+model_wrapper!(InsightFaceAnalysis, ModelKind::InsightFace, RawResult::insightface, RawResult::insightface_batch);
+model_wrapper!(PaddleOCR, ModelKind::Ocr, RawResult::ocr, RawResult::ocr_batch);
+model_wrapper!(LprPipeline, ModelKind::LprPipeline, RawResult::lpr, RawResult::lpr_batch);
+model_wrapper!(PedestrianAttribute, ModelKind::PedestrianAttribute, RawResult::attribute, RawResult::attribute_batch);
 
 // ═══ 子模型（OCR / LPR / insightface 组件，可独立部署） ═══
 
@@ -999,13 +1296,13 @@ impl ResultType for FaceRecognizerPipelineModel {
     type Item = FaceRecognition;
 }
 
-model_wrapper!(DbDetectorModel, ModelKind::OcrDet, RawResult::ocr);
-model_wrapper!(RecognizerModel, ModelKind::OcrRec, RawResult::ocr);
-model_wrapper!(OcrClassifierModel, ModelKind::OcrCls, RawResult::ocr);
-model_wrapper!(LprDetectionModel, ModelKind::LprDet, RawResult::lpr);
-model_wrapper!(LprRecognizerModel, ModelKind::LprRec, RawResult::lpr);
-model_wrapper!(InsightFaceDetModel, ModelKind::InsightFaceDet, RawResult::face_det);
-model_wrapper!(FaceRecognizerPipelineModel, ModelKind::FaceRecPipeline, RawResult::face_recognition_all);
+model_wrapper!(DbDetectorModel, ModelKind::OcrDet, RawResult::ocr, RawResult::ocr_batch);
+model_wrapper!(RecognizerModel, ModelKind::OcrRec, RawResult::ocr, RawResult::ocr_batch);
+model_wrapper!(OcrClassifierModel, ModelKind::OcrCls, RawResult::ocr, RawResult::ocr_batch);
+model_wrapper!(LprDetectionModel, ModelKind::LprDet, RawResult::lpr, RawResult::lpr_batch);
+model_wrapper!(LprRecognizerModel, ModelKind::LprRec, RawResult::lpr, RawResult::lpr_batch);
+model_wrapper!(InsightFaceDetModel, ModelKind::InsightFaceDet, RawResult::face_det, RawResult::face_det_batch);
+model_wrapper!(FaceRecognizerPipelineModel, ModelKind::FaceRecPipeline, RawResult::face_recognition_all, RawResult::face_recognition_batch);
 
 // ═══ 音频模型（非 predict 形态，单独实现） ═══
 

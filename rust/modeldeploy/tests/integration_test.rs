@@ -288,10 +288,13 @@ fn test_detection_predict_batch() -> Result<()> {
     let img = Image::read(&test_img("test_detection0.jpg"))?;
     let imgs = [&img, &img];
     let dets = model.predict_batch(&imgs)?;
-    assert!(!dets.is_empty());
-    assert!(dets.len() >= 1);
-    assert!(dets[0].score > 0.0 && dets[0].score <= 1.0);
-    assert!(dets[0].rect.width > 0.0);
+    // 2D：按图返回，两图各一组
+    assert_eq!(dets.len(), 2);
+    for group in &dets {
+        assert!(!group.is_empty());
+        assert!(group[0].score > 0.0 && group[0].score <= 1.0);
+        assert!(group[0].rect.width > 0.0);
+    }
     Ok(())
 }
 
