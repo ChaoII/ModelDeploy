@@ -1,5 +1,6 @@
 
 .superpowers/
+.opencode/
 build
 build_app
 build_trt

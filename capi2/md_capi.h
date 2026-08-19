@@ -137,7 +137,10 @@ MD_CAPI_EXPORT MDStatus md_image_from_file(MDImageHandle* out, const char* path)
 MD_CAPI_EXPORT MDStatus md_image_from_bgr24(MDImageHandle* out, const void* bgr, int w, int h);
 MD_CAPI_EXPORT MDStatus md_image_from_rgb24(MDImageHandle* out, const void* rgb, int w, int h);
 MD_CAPI_EXPORT MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
-                            int w, int h, int step_y, int step_uv, MDDevice src);
+                            int w, int h, int step_y, int step_uv);
+/* owned 版：拷入自有缓冲，产真 NV12 两平面帧（调用方无需保活） */
+MD_CAPI_EXPORT MDStatus md_image_from_nv12_owned(MDImageHandle* out, const void* y, const void* uv,
+                                  int w, int h, int step_y, int step_uv);
 /* 从设备 NV12 两平面构造自描述 ImageData（零拷贝借用外部 y/uv，库不拥有内存）。
  * dev 指明帧所在设备（CPU/GPU/TPU）；step_y/step_uv<=0 时依 w 兜底。 */
 MD_CAPI_EXPORT MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void* uv,
@@ -414,6 +417,48 @@ MD_CAPI_EXPORT MDStatus md_result_gender_batch(MDResultHandle, const int** items
 
 /* 人脸防伪（每实例 label：0=REAL, 1=FUZZY, 2=SPOOF） */
 MD_CAPI_EXPORT MDStatus md_result_spoof(MDResultHandle, size_t i, int* label);
+
+/* ==================== 2D 批量结果 getter（按图索引，逐图取项数组） ====================
+ * 批量结果来自 md_model_predict_batch（每图一组）。用法：先调 *_batch 数组 getter 取该图项数组，
+ * 再（如需）用 (图,项) 版 getter 读 kps/mask/embedding/plate/ocr 行。返回指针在结果句柄存活期内稳定。
+ * 单图（md_model_predict）仍用上方不带 _batch 的 getter，语义不变。 */
+
+/* Detection */
+MD_CAPI_EXPORT MDStatus md_result_detection_batch(MDResultHandle, size_t img_i, const MDDetectionItem** items, size_t* count);
+/* Classification（每图 top-k） */
+MD_CAPI_EXPORT MDStatus md_result_classification_batch(MDResultHandle, size_t img_i, const MDClassifyItem** items, size_t* count);
+/* Pose（bbox + 骨架） */
+MD_CAPI_EXPORT MDStatus md_result_pose_batch(MDResultHandle, size_t img_i, const MDPoseItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_keypoints_batch(MDResultHandle, size_t img_i, size_t item_j, const MDPoint3** kps, size_t* n);
+/* OBB */
+MD_CAPI_EXPORT MDStatus md_result_obb_batch(MDResultHandle, size_t img_i, const MDObbItem** items, size_t* count);
+/* InstanceSeg（mask 用 (图,项) 版） */
+MD_CAPI_EXPORT MDStatus md_result_instance_seg_batch(MDResultHandle, size_t img_i, const MDIsegItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_mask_batch(MDResultHandle, size_t img_i, size_t item_j, const unsigned char** buf,
+                              size_t* out_h, size_t* out_w);
+/* FaceDet（kps 用 (图,项) 版） */
+MD_CAPI_EXPORT MDStatus md_result_face_batch(MDResultHandle, size_t img_i, const MDFaceItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_face_kps_batch(MDResultHandle, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n);
+/* FaceRec（每图一个 embedding） */
+MD_CAPI_EXPORT MDStatus md_result_face_embedding_batch(MDResultHandle, size_t img_i, const float** embedding, size_t* emb_n);
+/* InsightFace（完整分析，按图） */
+MD_CAPI_EXPORT MDStatus md_result_insightface_batch(MDResultHandle, size_t img_i, const MDInsightFaceItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_insightface_kps_batch(MDResultHandle, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n);
+MD_CAPI_EXPORT MDStatus md_result_insightface_embedding_batch(MDResultHandle, size_t img_i, size_t item_j,
+                                              const float** embedding, size_t* emb_n);
+MD_CAPI_EXPORT MDStatus md_result_insightface_pose_batch(MDResultHandle, size_t img_i, size_t item_j,
+                                         const float** pose, size_t* n);
+/* OCR（按 (图,行) 读） */
+MD_CAPI_EXPORT MDStatus md_result_ocr_batch(MDResultHandle, size_t img_i, size_t line_j, const int** quad,
+                            const char** text, float* score);
+MD_CAPI_EXPORT MDStatus md_result_ocr_cls_batch(MDResultHandle, size_t img_i, size_t line_j, int* cls_label, float* cls_score);
+/* LPR（plate/keypoints 用 (图,项) 版） */
+MD_CAPI_EXPORT MDStatus md_result_lpr_batch(MDResultHandle, size_t img_i, const MDLprItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_plate_batch(MDResultHandle, size_t img_i, size_t item_j, const char** plate, const char** color);
+MD_CAPI_EXPORT MDStatus md_result_lpr_keypoints_batch(MDResultHandle, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n);
+/* 行人属性（scores 用 (图,项) 版） */
+MD_CAPI_EXPORT MDStatus md_result_attribute_batch(MDResultHandle, size_t img_i, const MDAttrItem** items, size_t* count);
+MD_CAPI_EXPORT MDStatus md_result_attr_scores_batch(MDResultHandle, size_t img_i, size_t item_j, const float** scores, size_t* n);
 
 /* ==================== 绘制（对 MDImageHandle 就地绘制） ==================== */
 

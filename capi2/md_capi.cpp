@@ -79,6 +79,9 @@ struct md_model_handle {
 struct md_result_handle {
     MDResultKind kind = MD_RES_DETECTION;
     void* data = nullptr;
+    /* 批量逐图投影缓存：类型为 BatchProjectionBase*（首访时构建，析构释放），
+       延迟把每图一组的结果投影为平铺 blittable 数组 + 每图偏移，返回稳定指针。 */
+    void* batch_cache = nullptr;
     ~md_result_handle();
 };
 
@@ -175,6 +178,36 @@ size_t origin_count(md_result_handle* rh) {
         return p->origin_ptr()->count();
     }
     return base->count();
+}
+
+/* ---------------- 批量逐图投影（2D 批量结果 API） ----------------
+ * 批量 md_model_predict_batch 现在把结果按图存储（变长 kind 为 ResultData<std::vector<T>>，
+ * 整图/单值 kind 为 ResultData<T>）。逐图批量 getter 惰性把整批投影成
+ * 「平铺 blittable 数组 + 每图偏移」，缓存在句柄 batch_cache 中；返回的每图指针
+ * 在结果句柄存活期内稳定（无悬垂）。同一句柄只有一种 kind/一种 Dst 投影。 */
+struct BatchProjectionBase {
+    virtual ~BatchProjectionBase() = default;
+};
+
+template <typename Dst>
+struct BatchProjection : BatchProjectionBase {
+    std::vector<Dst> flat;       // 平铺：图0项 + 图1项 + ...
+    std::vector<size_t> off;     // off.size()==images()+1；图 i 范围为 [off[i], off[i+1])
+    template <typename Fill>
+    explicit BatchProjection(size_t nimg, Fill&& fill) {
+        off.push_back(0);
+        for (size_t i = 0; i < nimg; ++i) { fill(flat, i); off.push_back(flat.size()); }
+    }
+};
+
+// 惰性构建/复用某 kind 的逐图投影（同一句柄仅一种 Dst）
+template <typename Dst, typename Fill>
+BatchProjection<Dst>* ensure_batch_proj(md_result_handle* rh, size_t nimg, Fill&& fill) {
+    if (auto* p = static_cast<BatchProjectionBase*>(rh->batch_cache))
+        return static_cast<BatchProjection<Dst>*>(p);
+    auto* p = new BatchProjection<Dst>(nimg, std::forward<Fill>(fill));
+    rh->batch_cache = p;
+    return p;
 }
 
 using namespace modeldeploy;
@@ -376,10 +409,9 @@ MDStatus md_image_from_rgb24(MDImageHandle* out, const void* rgb, int w, int h) 
 }
 
 MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
-                            int w, int h, int step_y, int step_uv, MDDevice src) {
+                            int w, int h, int step_y, int step_uv) {
     if (!out || !y) return MD_ERR_NULL_POINTER;
     if (w <= 0 || h <= 0) { set_error("md_image_from_nv12: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
-    (void)src;
     ImageData::Plane pl[2] = {
         {static_cast<const uint8_t*>(y), step_y > 0 ? step_y : w},
         {static_cast<const uint8_t*>(uv), step_uv > 0 ? step_uv : w},
@@ -396,6 +428,38 @@ MDStatus md_image_from_nv12(MDImageHandle* out, const void* y, const void* uv,
         return MD_ERR_IMAGE_DECODE;
     }
     return image_from_image(out, std::move(bgr));
+}
+
+/* 自有版 NV12：把调用方 Y/UV 拷入库内自有缓冲，产真 NV12 两平面帧（安全，无需调用方保活）。
+   与 md_image_from_nv12（转 BGR 拷贝）不同：保留 NV12 类型，走零拷贝 NV12 推理路径。 */
+MDStatus md_image_from_nv12_owned(MDImageHandle* out, const void* y, const void* uv,
+                                  int w, int h, int step_y, int step_uv) {
+    if (!out || !y) return MD_ERR_NULL_POINTER;
+    if (w <= 0 || h <= 0) { set_error("md_image_from_nv12_owned: invalid size"); return MD_ERR_INVALID_ARGUMENT; }
+    if (step_y <= 0) step_y = w;
+    if (step_uv <= 0) step_uv = w;
+    const size_t y_bytes = static_cast<size_t>(step_y) * h;
+    const size_t uv_bytes = static_cast<size_t>(step_uv) * (static_cast<size_t>(h) / 2);
+    auto* mem = new uint8_t[y_bytes + uv_bytes];
+    uint8_t* yown = mem;
+    uint8_t* uvown = mem + y_bytes;
+    std::memcpy(yown, y, y_bytes);
+    if (uv) std::memcpy(uvown, uv, uv_bytes);
+    auto owner = std::shared_ptr<void>(mem, [](void* p) { delete[] static_cast<uint8_t*>(p); });
+    ImageData::Plane pl[2] = {{yown, step_y}, {uvown, step_uv}};
+    auto img = ImageData::from_planes(pl, uv ? 2 : 1, MdImageType::NV12, w, h, Device::CPU, std::move(owner));
+    if (img.empty()) {
+        set_error("md_image_from_nv12_owned: failed to construct NV12");
+        return MD_ERR_IMAGE_DECODE;
+    }
+    auto* hi = new md_image_handle();
+    hi->width = w;
+    hi->height = h;
+    hi->data = nullptr;
+    hi->owns_data = false;
+    hi->image = std::move(img);  // 句柄经 owner 持有自有缓冲
+    *out = hi;
+    return MD_OK;
 }
 
 MDStatus md_image_from_device_nv12(MDImageHandle* out, const void* y, const void* uv,
@@ -1333,6 +1397,7 @@ MDStatus md_model_param_type(MDModelKind kind, const char* name, char* type_out)
 /* ==================== 结果容器释放 ==================== */
 
 md_result_handle::~md_result_handle() {
+    delete static_cast<BatchProjectionBase*>(batch_cache);
     delete static_cast<ResultDataBase*>(data);
 }
 
@@ -1626,11 +1691,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
     switch (mh->kind) {
         case MD_MODEL_DETECTION: {
             auto* m = static_cast<detection::UltralyticsDet*>(mh->model);
-            auto* d = new ResultData<DetectionResult>();
+            auto* d = new ResultData<std::vector<DetectionResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<DetectionResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("detection");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));  // 按图分组
             }
             rh->kind = MD_RES_DETECTION;
             rh->data = d;
@@ -1650,11 +1715,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_POSE: {
             auto* m = static_cast<detection::UltralyticsPose*>(mh->model);
-            auto* d = new ResultData<KeyPointsResult>();
+            auto* d = new ResultData<std::vector<KeyPointsResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("pose");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_POSE;
             rh->data = d;
@@ -1662,11 +1727,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_OBB: {
             auto* m = static_cast<detection::UltralyticsObb*>(mh->model);
-            auto* d = new ResultData<ObbResult>();
+            auto* d = new ResultData<std::vector<ObbResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<ObbResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("obb");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_OBB;
             rh->data = d;
@@ -1674,11 +1739,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_INSTANCE_SEG: {
             auto* m = static_cast<detection::UltralyticsSeg*>(mh->model);
-            auto* d = new ResultData<InstanceSegResult>();
+            auto* d = new ResultData<std::vector<InstanceSegResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<InstanceSegResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("instance seg");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_INSTANCE_SEG;
             rh->data = d;
@@ -1710,11 +1775,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_FACE_DET: {
             auto* m = static_cast<face::Scrfd*>(mh->model);
-            auto* d = new ResultData<KeyPointsResult>();
+            auto* d = new ResultData<std::vector<KeyPointsResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("face det");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_FACE;
             rh->data = d;
@@ -1790,11 +1855,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_FACE_REC_PIPELINE: {
             auto* m = static_cast<face::FaceRecognizerPipeline*>(mh->model);
-            auto* d = new ResultData<FaceRecognitionResult>();
+            auto* d = new ResultData<std::vector<FaceRecognitionResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<FaceRecognitionResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("face rec pipeline");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_FACE_REC;
             rh->data = d;
@@ -1802,11 +1867,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_INSIGHTFACE: {
             auto* m = static_cast<face::InsightFaceAnalysis*>(mh->model);
-            auto* d = new ResultData<face::InsightFaceResult>();
+            auto* d = new ResultData<std::vector<face::InsightFaceResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<face::InsightFaceResult> r;
                 if (!m->analyze(image_at(i), &r)) return predict_fail("insightface");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_INSIGHTFACE;
             rh->data = d;
@@ -1814,11 +1879,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_INSIGHTFACE_DET: {
             auto* m = static_cast<face::InsightFaceDet*>(mh->model);
-            auto* d = new ResultData<face::InsightFaceBox>();
+            auto* d = new ResultData<std::vector<face::InsightFaceBox>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<face::InsightFaceBox> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("insightface det");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_FACE;
             rh->data = d;
@@ -1855,11 +1920,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_LPR_DET: {
             auto* m = static_cast<lpr::LprDetection*>(mh->model);
-            auto* d = new ResultData<KeyPointsResult>();
+            auto* d = new ResultData<std::vector<KeyPointsResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("lpr det");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_LPR;
             rh->data = d;
@@ -1879,11 +1944,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_LPR_PIPELINE: {
             auto* m = static_cast<lpr::LprPipeline*>(mh->model);
-            auto* d = new ResultData<LprResult>();
+            auto* d = new ResultData<std::vector<LprResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<LprResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("lpr pipeline");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_LPR;
             rh->data = d;
@@ -1891,11 +1956,11 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         }
         case MD_MODEL_PED_ATTR: {
             auto* m = static_cast<pipeline::PedestrianAttribute*>(mh->model);
-            auto* d = new ResultData<AttributeResult>();
+            auto* d = new ResultData<std::vector<AttributeResult>>();
             for (size_t i = 0; i < n; ++i) {
                 std::vector<AttributeResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("ped attr");
-                d->v.insert(d->v.end(), r.begin(), r.end());
+                d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_ATTR;
             rh->data = d;
@@ -2169,18 +2234,26 @@ MDStatus md_result_sem_seg(MDResultHandle h, const unsigned char** labels, size_
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !labels) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_SEM_SEG) return MD_ERR_INVALID_ARGUMENT;
-    SemSegResult value{};
+    // 直接取 handle 持有容器的稳定存储（不再拷贝到局部，否则返回的指针在函数返回后悬垂）
+    const SemSegResult* value = nullptr;
     if (auto* s = dynamic_cast<SingleResult<SemSegResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-        value = s->value;
+        value = &s->value;
     } else if (auto* d = dynamic_cast<ResultData<SemSegResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-        if (!d->v.empty()) value = d->v[0];  // 批量句柄：读 index 0
+        if (!d->v.empty()) value = &d->v[0];  // 批量句柄：读 index 0
     } else {
         return MD_ERR_INVALID_ARGUMENT;
     }
-    if (labels) *labels = value.labels.data();
-    if (out_h) *out_h = value.shape.empty() ? 0 : static_cast<size_t>(value.shape[0]);
-    if (out_w) *out_w = value.shape.size() < 2 ? 0 : static_cast<size_t>(value.shape[1]);
-    if (num_classes) *num_classes = value.num_classes;
+    if (!value) {
+        if (labels) *labels = nullptr;
+        if (out_h) *out_h = 0;
+        if (out_w) *out_w = 0;
+        if (num_classes) *num_classes = 0;
+        return MD_OK;
+    }
+    if (labels) *labels = value->labels.data();
+    if (out_h) *out_h = value->shape.empty() ? 0 : static_cast<size_t>(value->shape[0]);
+    if (out_w) *out_w = value->shape.size() < 2 ? 0 : static_cast<size_t>(value->shape[1]);
+    if (num_classes) *num_classes = value->num_classes;
     return MD_OK;
 }
 
@@ -2188,17 +2261,24 @@ MDStatus md_result_depth(MDResultHandle h, const float** depth, size_t* out_h, s
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !depth) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_DEPTH) return MD_ERR_INVALID_ARGUMENT;
-    DepthResult value{};
+    // 直接取 handle 持有容器的稳定存储（不再拷贝到局部，否则返回的指针在函数返回后悬垂 → AccessViolation）
+    const DepthResult* value = nullptr;
     if (auto* s = dynamic_cast<SingleResult<DepthResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-        value = s->value;
+        value = &s->value;
     } else if (auto* d = dynamic_cast<ResultData<DepthResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-        if (!d->v.empty()) value = d->v[0];  // 批量句柄：读 index 0
+        if (!d->v.empty()) value = &d->v[0];  // 批量句柄：读 index 0
     } else {
         return MD_ERR_INVALID_ARGUMENT;
     }
-    if (depth) *depth = value.depth.data();
-    if (out_h) *out_h = value.shape.empty() ? 0 : static_cast<size_t>(value.shape[0]);
-    if (out_w) *out_w = value.shape.size() < 2 ? 0 : static_cast<size_t>(value.shape[1]);
+    if (!value) {
+        if (depth) *depth = nullptr;
+        if (out_h) *out_h = 0;
+        if (out_w) *out_w = 0;
+        return MD_OK;
+    }
+    if (depth) *depth = value->depth.data();
+    if (out_h) *out_h = value->shape.empty() ? 0 : static_cast<size_t>(value->shape[0]);
+    if (out_w) *out_w = value->shape.size() < 2 ? 0 : static_cast<size_t>(value->shape[1]);
     return MD_OK;
 }
 
@@ -2351,19 +2431,20 @@ MDStatus md_result_ocr(MDResultHandle h, size_t i, const int** quad, const char*
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_OCR) return MD_ERR_INVALID_ARGUMENT;
-    OCRResult value{};
+    // 直接取 handle 持有容器的稳定存储（不再拷贝到局部，否则返回的 text/quad 指针在函数返回后悬垂 → 读到空文本/野值）
+    const OCRResult* value = nullptr;
     if (auto* s = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-        value = s->value;
+        value = &s->value;
     } else if (auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
         if (d->v.empty()) return MD_ERR_INVALID_ARGUMENT;
-        value = d->v[0];  // 批量句柄：从第 0 张图读行
+        value = &d->v[0];  // 批量句柄：从第 0 张图读行
     } else {
         return MD_ERR_INVALID_ARGUMENT;
     }
-    if (i >= value.boxes.size()) return MD_ERR_INVALID_ARGUMENT;
-    if (quad) *quad = value.boxes[i].data();
-    if (text) *text = i < value.text.size() ? value.text[i].c_str() : "";
-    if (score) *score = i < value.rec_scores.size() ? value.rec_scores[i] : 0.f;
+    if (i >= value->boxes.size()) return MD_ERR_INVALID_ARGUMENT;
+    if (quad) *quad = value->boxes[i].data();
+    if (text) *text = i < value->text.size() ? value->text[i].c_str() : "";
+    if (score) *score = i < value->rec_scores.size() ? value->rec_scores[i] : 0.f;
     return MD_OK;
 }
 
@@ -2555,6 +2636,374 @@ MDStatus md_result_spoof(MDResultHandle h, size_t i, int* label) {
     auto* d = raw_result<int>(rh);
     if (!d || i >= d->count()) return MD_ERR_INVALID_ARGUMENT;
     *label = d->v[i];
+    return MD_OK;
+}
+
+/* ==================== 2D 批量结果 getter（按图索引，逐图取项数组） ==================== */
+/* 批量结果来自 md_model_predict_batch。用法：先调各 kind 的 *_batch 数组 getter 取该图项数组，
+   再（如需）用 (图,项) 版子项 getter 读 kps/mask/embedding/plate/ocr 行。返回指针在句柄存活期内稳定。 */
+
+MDStatus md_result_detection_batch(MDResultHandle h, size_t img_i, const MDDetectionItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_DETECTION) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<DetectionResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDDetectionItem>(rh, d->v.size(),
+        [d](std::vector<MDDetectionItem>& flat, size_t i) {
+            for (const auto& r : d->v[i]) {
+                MDDetectionItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.score = r.score; it.label_id = r.label_id;
+                flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_classification_batch(MDResultHandle h, size_t img_i, const MDClassifyItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_CLASSIFICATION) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<ClassifyResult>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDClassifyItem>(rh, d->v.size(),
+        [d](std::vector<MDClassifyItem>& flat, size_t img) {
+            const auto& r = d->v[img];
+            const size_t m = std::min(r.label_ids.size(), r.scores.size());
+            for (size_t k = 0; k < m; ++k) {
+                MDClassifyItem it{}; it.label_id = r.label_ids[k]; it.score = r.scores[k];
+                flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_pose_batch(MDResultHandle h, size_t img_i, const MDPoseItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_POSE) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<KeyPointsResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDPoseItem>(rh, d->v.size(),
+        [d](std::vector<MDPoseItem>& flat, size_t img) {
+            for (const auto& r : d->v[img]) {
+                MDPoseItem it{}; it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.score = r.score; flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_keypoints_batch(MDResultHandle h, size_t img_i, size_t item_j, const MDPoint3** kps, size_t* n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_POSE) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<KeyPointsResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+    *kps = reinterpret_cast<const MDPoint3*>(d->v[img_i][item_j].keypoints.data());
+    *n = d->v[img_i][item_j].keypoints.size();
+    return MD_OK;
+}
+
+MDStatus md_result_obb_batch(MDResultHandle h, size_t img_i, const MDObbItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_OBB) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<ObbResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDObbItem>(rh, d->v.size(),
+        [d](std::vector<MDObbItem>& flat, size_t img) {
+            for (const auto& r : d->v[img]) {
+                MDObbItem it{};
+                it.cx = r.rotated_box.xc; it.cy = r.rotated_box.yc;
+                it.w = r.rotated_box.width; it.h = r.rotated_box.height; it.angle = r.rotated_box.angle;
+                it.score = r.score; it.label_id = r.label_id;
+                flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_instance_seg_batch(MDResultHandle h, size_t img_i, const MDIsegItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_INSTANCE_SEG) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<InstanceSegResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDIsegItem>(rh, d->v.size(),
+        [d](std::vector<MDIsegItem>& flat, size_t img) {
+            for (const auto& r : d->v[img]) {
+                MDIsegItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.score = r.score; it.label_id = r.label_id;
+                flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_mask_batch(MDResultHandle h, size_t img_i, size_t item_j, const unsigned char** buf,
+                              size_t* out_h, size_t* out_w) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !buf) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_INSTANCE_SEG) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<InstanceSegResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+    const auto& r = d->v[img_i][item_j];
+    *buf = r.mask.buffer.data();
+    if (out_h) *out_h = r.mask.shape.empty() ? 0 : static_cast<size_t>(r.mask.shape[0]);
+    if (out_w) *out_w = r.mask.shape.size() < 2 ? 0 : static_cast<size_t>(r.mask.shape[1]);
+    return MD_OK;
+}
+
+MDStatus md_result_face_batch(MDResultHandle h, size_t img_i, const MDFaceItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_FACE) return MD_ERR_INVALID_ARGUMENT;
+    BatchProjection<MDFaceItem>* p = nullptr;
+    if (auto* d = dynamic_cast<ResultData<std::vector<KeyPointsResult>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        p = ensure_batch_proj<MDFaceItem>(rh, d->v.size(),
+            [d](std::vector<MDFaceItem>& flat, size_t img) {
+                for (const auto& f : d->v[img]) {
+                    MDFaceItem it{}; it.x = f.box.x; it.y = f.box.y; it.w = f.box.width; it.h = f.box.height;
+                    it.score = f.score; flat.push_back(it);
+                }
+            });
+        if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+        *items = p->flat.data() + p->off[img_i]; *count = p->off[img_i + 1] - p->off[img_i];
+        return MD_OK;
+    }
+    if (auto* d = dynamic_cast<ResultData<std::vector<face::InsightFaceBox>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        p = ensure_batch_proj<MDFaceItem>(rh, d->v.size(),
+            [d](std::vector<MDFaceItem>& flat, size_t img) {
+                for (const auto& f : d->v[img]) {
+                    MDFaceItem it{}; it.x = f.bbox[0]; it.y = f.bbox[1]; it.w = f.bbox[2] - f.bbox[0]; it.h = f.bbox[3] - f.bbox[1];
+                    it.score = f.score; flat.push_back(it);
+                }
+            });
+        if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+        *items = p->flat.data() + p->off[img_i]; *count = p->off[img_i + 1] - p->off[img_i];
+        return MD_OK;
+    }
+    return MD_ERR_INVALID_ARGUMENT;
+}
+
+MDStatus md_result_face_kps_batch(MDResultHandle h, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_FACE) return MD_ERR_INVALID_ARGUMENT;
+    if (auto* d = dynamic_cast<ResultData<std::vector<KeyPointsResult>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        if (img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+        *kps = reinterpret_cast<const MDPoint*>(d->v[img_i][item_j].keypoints.data());
+        *n = d->v[img_i][item_j].keypoints.size();
+        return MD_OK;
+    }
+    if (auto* d = dynamic_cast<ResultData<std::vector<face::InsightFaceBox>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        if (img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+        *kps = reinterpret_cast<const MDPoint*>(d->v[img_i][item_j].kps.data());
+        *n = d->v[img_i][item_j].kps.size();
+        return MD_OK;
+    }
+    return MD_ERR_INVALID_ARGUMENT;
+}
+
+MDStatus md_result_face_embedding_batch(MDResultHandle h, size_t img_i, const float** embedding, size_t* emb_n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_FACE_REC) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<FaceRecognitionResult>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
+    *emb_n = d->v[img_i].embedding.size();
+    *embedding = d->v[img_i].embedding.data();
+    return MD_OK;
+}
+
+MDStatus md_result_insightface_batch(MDResultHandle h, size_t img_i, const MDInsightFaceItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<face::InsightFaceResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDInsightFaceItem>(rh, d->v.size(),
+        [d](std::vector<MDInsightFaceItem>& flat, size_t img) {
+            for (const auto& r : d->v[img]) {
+                MDInsightFaceItem it{};
+                it.x = r.bbox[0]; it.y = r.bbox[1]; it.w = r.bbox[2] - r.bbox[0]; it.h = r.bbox[3] - r.bbox[1];
+                it.score = r.det_score; it.gender = r.gender; it.age = r.age;
+                flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_insightface_kps_batch(MDResultHandle h, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<face::InsightFaceResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+    *kps = reinterpret_cast<const MDPoint*>(d->v[img_i][item_j].kps.data());
+    *n = d->v[img_i][item_j].kps.size();
+    return MD_OK;
+}
+
+MDStatus md_result_insightface_embedding_batch(MDResultHandle h, size_t img_i, size_t item_j,
+                                               const float** embedding, size_t* emb_n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<face::InsightFaceResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+    *emb_n = d->v[img_i][item_j].embedding.size();
+    *embedding = d->v[img_i][item_j].embedding.data();
+    return MD_OK;
+}
+
+MDStatus md_result_insightface_pose_batch(MDResultHandle h, size_t img_i, size_t item_j, const float** pose, size_t* n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !pose || !n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_INSIGHTFACE) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<face::InsightFaceResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+    *n = d->v[img_i][item_j].pose.size();
+    *pose = d->v[img_i][item_j].pose.empty() ? nullptr : d->v[img_i][item_j].pose.data();
+    return MD_OK;
+}
+
+MDStatus md_result_lpr_batch(MDResultHandle h, size_t img_i, const MDLprItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_LPR) return MD_ERR_INVALID_ARGUMENT;
+    BatchProjection<MDLprItem>* p = nullptr;
+    if (auto* d = dynamic_cast<ResultData<std::vector<LprResult>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        p = ensure_batch_proj<MDLprItem>(rh, d->v.size(),
+            [d](std::vector<MDLprItem>& flat, size_t img) {
+                for (const auto& r : d->v[img]) {
+                    MDLprItem it{}; it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                    it.score = r.score; flat.push_back(it);
+                }
+            });
+    } else if (auto* d = dynamic_cast<ResultData<std::vector<KeyPointsResult>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        p = ensure_batch_proj<MDLprItem>(rh, d->v.size(),
+            [d](std::vector<MDLprItem>& flat, size_t img) {
+                for (const auto& r : d->v[img]) {
+                    MDLprItem it{}; it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                    it.score = r.score; flat.push_back(it);
+                }
+            });
+    } else {
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_plate_batch(MDResultHandle h, size_t img_i, size_t item_j, const char** plate, const char** color) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !plate) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_LPR) return MD_ERR_INVALID_ARGUMENT;
+    if (auto* d = dynamic_cast<ResultData<std::vector<LprResult>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        if (img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+        if (plate) *plate = d->v[img_i][item_j].car_plate_str.c_str();
+        if (color) *color = d->v[img_i][item_j].car_plate_color.c_str();
+        return MD_OK;
+    }
+    if (plate) *plate = "";
+    if (color) *color = "";
+    return MD_OK;
+}
+
+MDStatus md_result_lpr_keypoints_batch(MDResultHandle h, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !kps || !n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_LPR) return MD_ERR_INVALID_ARGUMENT;
+    if (auto* d = dynamic_cast<ResultData<std::vector<KeyPointsResult>>*>(static_cast<ResultDataBase*>(rh->data)); d) {
+        if (img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+        *kps = reinterpret_cast<const MDPoint*>(d->v[img_i][item_j].keypoints.data());
+        *n = d->v[img_i][item_j].keypoints.size();
+        return MD_OK;
+    }
+    return MD_ERR_INVALID_ARGUMENT;
+}
+
+MDStatus md_result_attribute_batch(MDResultHandle h, size_t img_i, const MDAttrItem** items, size_t* count) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_ATTR) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<AttributeResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d) return MD_ERR_INVALID_ARGUMENT;
+    auto* p = ensure_batch_proj<MDAttrItem>(rh, d->v.size(),
+        [d](std::vector<MDAttrItem>& flat, size_t img) {
+            for (const auto& r : d->v[img]) {
+                MDAttrItem it{};
+                it.x = r.box.x; it.y = r.box.y; it.w = r.box.width; it.h = r.box.height;
+                it.box_score = r.box_score; it.box_label_id = r.box_label_id;
+                flat.push_back(it);
+            }
+        });
+    if (img_i + 1 >= p->off.size()) return MD_ERR_INVALID_ARGUMENT;
+    *items = p->flat.data() + p->off[img_i];
+    *count = p->off[img_i + 1] - p->off[img_i];
+    return MD_OK;
+}
+
+MDStatus md_result_attr_scores_batch(MDResultHandle h, size_t img_i, size_t item_j, const float** scores, size_t* n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !scores || !n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_ATTR) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<std::vector<AttributeResult>>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size() || item_j >= d->v[img_i].size()) return MD_ERR_INVALID_ARGUMENT;
+    *n = d->v[img_i][item_j].attr_scores.size();
+    *scores = d->v[img_i][item_j].attr_scores.data();
+    return MD_OK;
+}
+
+/* OCR 批量：按 (图, 行) 读第 img_i 张图第 line_j 行（batch 存储为 ResultData<OCRResult>，每图一个） */
+MDStatus md_result_ocr_batch(MDResultHandle h, size_t img_i, size_t line_j, const int** quad,
+                             const char** text, float* score) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_OCR) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
+    const OCRResult& value = d->v[img_i];
+    if (line_j >= value.boxes.size()) return MD_ERR_INVALID_ARGUMENT;
+    if (quad) *quad = value.boxes[line_j].data();
+    if (text) *text = line_j < value.text.size() ? value.text[line_j].c_str() : "";
+    if (score) *score = line_j < value.rec_scores.size() ? value.rec_scores[line_j] : 0.f;
+    return MD_OK;
+}
+
+MDStatus md_result_ocr_cls_batch(MDResultHandle h, size_t img_i, size_t line_j, int* cls_label, float* cls_score) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_OCR) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
+    const OCRResult& value = d->v[img_i];
+    if (cls_label) *cls_label = line_j < value.cls_labels.size() ? value.cls_labels[line_j] : 0;
+    if (cls_score) *cls_score = line_j < value.cls_scores.size() ? value.cls_scores[line_j] : 0.f;
     return MD_OK;
 }
 

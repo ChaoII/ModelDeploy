@@ -62,7 +62,7 @@ TEST_CASE("capi2 nv12 input converts to CPU BGR and plane_ptrs rejects it", "[ca
     std::vector<unsigned char> y(w * h, 128);
     std::vector<unsigned char> uv(w * h / 2, 128);
     MDImageHandle img = nullptr;
-    const MDStatus s = md_image_from_nv12(&img, y.data(), uv.data(), w, h, w, w, MD_DEV_CPU);
+    const MDStatus s = md_image_from_nv12(&img, y.data(), uv.data(), w, h, w, w);
     REQUIRE(s == MD_OK);
     REQUIRE(img != nullptr);
 
@@ -88,7 +88,7 @@ TEST_CASE("capi2 nv12 from delegate: CPU BGR handle usable by md_draw_rect", "[c
     std::vector<unsigned char> y(w * h, 128);
     std::vector<unsigned char> uv(w * h / 2, 128);
     MDImageHandle img = nullptr;
-    const MDStatus s = md_image_from_nv12(&img, y.data(), uv.data(), w, h, w, w, MD_DEV_CPU);
+    const MDStatus s = md_image_from_nv12(&img, y.data(), uv.data(), w, h, w, w);
     REQUIRE(s == MD_OK);
     REQUIRE(img != nullptr);
 
@@ -609,6 +609,63 @@ TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") 
     md_option_destroy(opt);
 }
 
+// 2D 批量结果 API：predict_batch 按图分组，逐图 *_batch getter 返回每图自己的项数组
+TEST_CASE("capi2 batch result is per-image grouped (2D)", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    const std::string imgf = data_dir + "/test_images/bus.jpg";
+    if (!std::filesystem::exists(det_file) || !std::filesystem::exists(imgf)) {
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle det = nullptr;
+    REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, det_file.c_str(), opt) == MD_OK);
+
+    MDImageHandle im[2] = {nullptr, nullptr};
+    REQUIRE(md_image_from_file(&im[0], imgf.c_str()) == MD_OK);
+    REQUIRE(md_image_from_file(&im[1], imgf.c_str()) == MD_OK);
+
+    MDResultHandle res = nullptr;
+    REQUIRE(md_model_predict_batch(det, im, 2, &res) == MD_OK);
+    REQUIRE(res != nullptr);
+
+    // 批量容器按图分组：md_result_count 应等于图像数（2），而非平铺项数
+    size_t imgs = 0;
+    REQUIRE(md_result_count(res, &imgs) == MD_OK);
+    CHECK(imgs == 2);
+
+    size_t total = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        const MDDetectionItem* items = nullptr;
+        size_t cnt = i == 0 ? 0 : 1;  // 初始为非零，验证 getter 确实覆盖 out 参数
+        CHECK(md_result_detection_batch(res, i, &items, &cnt) == MD_OK);
+        CHECK(cnt > 0);            // 每图至少检出
+        CHECK(items != nullptr);
+        total += cnt;
+    }
+    CHECK(total > 0);
+
+    // 越界图索引：明确报错（不崩）
+    const MDDetectionItem* items = nullptr;
+    size_t cnt = 0;
+    CHECK(md_result_detection_batch(res, 2, &items, &cnt) == MD_ERR_INVALID_ARGUMENT);
+
+    // 单图 getter 不应作用在批量句柄上（返回 INVALID_ARGUMENT，而非读错误内存）
+    CHECK(md_result_detection(res, &items, &cnt) == MD_ERR_INVALID_ARGUMENT);
+
+    md_result_destroy(res);
+    md_image_destroy(im[0]);
+    md_image_destroy(im[1]);
+    md_model_destroy(det);
+    md_option_destroy(opt);
+}
+
 TEST_CASE("capi2 rgb24 input converts to BGR identical to reference", "[capi]") {
     const int w = 32, h = 24;
     std::vector<unsigned char> rgb(static_cast<size_t>(w) * h * 3);
@@ -733,22 +790,30 @@ TEST_CASE("capi2 predict_batch detection flattens both images", "[model]") {
     CHECK(md_model_predict_batch(det, imgs, 0, &r) == MD_ERR_INVALID_ARGUMENT);
     CHECK(md_model_predict_batch(det, nullptr, 2, &r) == MD_ERR_NULL_POINTER);
 
-    // 正确批量：结果 = 两图框数之和（平铺）
+    // 正确批量：按图分组（2D）。批量句柄用 *_batch 逐图取项；flat getter 不再适用
     MDResultHandle batch = nullptr;
     REQUIRE(md_model_predict_batch(det, imgs, 2, &batch) == MD_OK);
     REQUIRE(batch != nullptr);
 
     const MDDetectionItem* items = nullptr;
-    size_t total = 0;
-    REQUIRE(md_result_detection(batch, &items, &total) == MD_OK);
+    size_t flat_cnt = 0;
+    CHECK(md_result_detection(batch, &items, &flat_cnt) == MD_ERR_INVALID_ARGUMENT);  // flat getter 不适用批量句柄
 
-    // 每图单图推理之和作为参考
+    size_t total = 0;
+    size_t per_image[2] = {0, 0};
+    for (size_t i = 0; i < 2; ++i) {
+        REQUIRE(md_result_detection_batch(batch, i, &items, &per_image[i]) == MD_OK);
+        total += per_image[i];
+    }
+
+    // 每图单图推理作为参考：批量中该图项数必须与单图一致（2D 分组正确），且总框数 == 各单图之和
     size_t expect = 0;
-    for (auto* single : {a, b}) {
+    for (size_t i = 0; i < 2; ++i) {
         MDResultHandle sr = nullptr;
-        REQUIRE(md_model_predict(det, single, &sr) == MD_OK);
+        REQUIRE(md_model_predict(det, i == 0 ? a : b, &sr) == MD_OK);
         size_t cnt = 0;
         REQUIRE(md_result_count(sr, &cnt) == MD_OK);
+        CHECK(cnt == per_image[i]);
         expect += cnt;
         md_result_destroy(sr);
     }
