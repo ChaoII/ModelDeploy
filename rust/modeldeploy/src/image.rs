@@ -78,11 +78,11 @@ impl Image {
         }
     }
 
-    /// 取第 i 个平面（仅 NV12/NV21 支持；越界或类型不符返回 Err）。
+    /// 取第 i 个平面（仅 NV12 支持；越界或类型不符返回 Err）。
     /// 返回指针在图像句柄存活期间有效。
     pub fn plane(&self, i: usize) -> Result<Plane, MdError> {
         match self.format() {
-            ImageFormat::NV12 | ImageFormat::NV21 => {}
+            ImageFormat::NV12 => {}
             _ => return Err(MdError::UnsupportedType),
         }
         let mut dev = ffi::MDDevice::CPU;
@@ -166,8 +166,12 @@ impl Image {
     /// 从设备 NV12 两平面构造自描述 ImageData（零拷贝借用外部 y/uv 裸指针，库不拥有内存）。
     /// dev 指明帧所在设备（CPU/GPU/TPU）。返回的 Image 是统一 predict(ImageData) 单入口的输入，
     /// 也是可从平面指针访问的绑定输入帧。
-    /// 注意：调用方必须保证 y/uv 指针在返回的 Image 存活期内有效且内容不被释放。
-    pub fn from_device_nv12(
+    ///
+    /// # Safety
+    ///
+    /// 调用方必须保证 `y`/`uv` 在返回的 `Image` 存活期内指向有效的内存（设备或主机内存取决于 `dev`），
+    /// 且内容不被释放（库借用，不拥有）。
+    pub unsafe fn from_device_nv12(
         y: *const u8,
         uv: *const u8,
         width: i32,

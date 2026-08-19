@@ -35,15 +35,17 @@ fn test_image_from_device_nv12_reports_nv12_planes() -> Result<()> {
     y[0] = 16;
     uv[0] = 128;
 
-    let img = Image::from_device_nv12(
-        y.as_ptr(),
-        uv.as_ptr(),
-        width,
-        height,
-        width,
-        width,
-        MDDevice::CPU,
-    )?;
+    let img = unsafe {
+        Image::from_device_nv12(
+            y.as_ptr(),
+            uv.as_ptr(),
+            width,
+            height,
+            width,
+            width,
+            MDDevice::CPU,
+        )?
+    };
 
     assert_eq!(img.format(), ImageFormat::NV12);
     assert_eq!(img.plane_count(), 2);
