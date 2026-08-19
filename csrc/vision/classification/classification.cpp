@@ -5,6 +5,7 @@
 
 #include "core/md_log.h"
 #include "vision/classification/classification.h"
+#include "vision/processors/processor_factory.h"
 
 
 namespace modeldeploy::vision::classification {
@@ -19,6 +20,11 @@ namespace modeldeploy::vision::classification {
             MD_LOG_ERROR << "Failed to initialize modeldeploy runtime." << std::endl;
             return false;
         }
+        // 与其它 yolo 模型一致：按运行时选择预处理后端（GPU→CUDA，CPU→CPU）。
+        // 否则固定用 CPU 预处理，GPU/TRT 时输入是 CPU 张量，需额外 host->device 上传。
+        preprocessor_.set_processor_backend(
+            create_processor_backend(runtime_option.device, runtime_option.backend,
+                                     runtime_option.device_id));
         return true;
     }
 
