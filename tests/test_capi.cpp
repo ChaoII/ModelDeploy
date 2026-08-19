@@ -181,7 +181,7 @@ TEST_CASE("capi2 model set param + introspection", "[capi]") {
 TEST_CASE("capi2 detection param setter on loaded model", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string modelfile = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    const std::string modelfile = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
     if (!std::filesystem::exists(modelfile)) return;
 
     MDOptionHandle opt = nullptr;
@@ -275,11 +275,11 @@ TEST_CASE("capi2 lpr-det setter + introspection", "[model]") {
 TEST_CASE("capi2 ocr setter batch + shape", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string ocr_dir = data_dir + "/test_models/onnx/ocr/ppocrv4_mobile";
+    const std::string ocr_dir = data_dir + "/test_models/onnx/ocr/ppocrv6_tiny";
     const std::string det = ocr_dir + "/det_infer.onnx";
     const std::string cls = ocr_dir + "/cls_infer.onnx";
     const std::string rec = ocr_dir + "/rec_infer.onnx";
-    const std::string dict = data_dir + "/ppocrv4_dict.txt";
+    const std::string dict = data_dir + "/ppocrv6_tiny_dict.txt";
     if (!std::filesystem::exists(det) || !std::filesystem::exists(cls) ||
         !std::filesystem::exists(rec) || !std::filesystem::exists(dict)) return;
 
@@ -525,9 +525,9 @@ TEST_CASE("capi2 crop delegates to ImageData, preserves CPU/OOB/device semantics
 TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string det_file = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
-    const std::string cls_file = data_dir + "/test_models/onnx/yolo11n/yolo11n-cls.onnx";
-    const std::string pose_file = data_dir + "/test_models/onnx/yolo11n/yolo11n-pose.onnx";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
+    const std::string cls_file = data_dir + "/test_models/onnx/yolo26n/yolo26n-cls.onnx";
+    const std::string pose_file = data_dir + "/test_models/onnx/yolo26n/yolo26n-pose.onnx";
     const std::string imgf = data_dir + "/test_images/bus.jpg";
     if (!std::filesystem::exists(det_file) || !std::filesystem::exists(cls_file) ||
         !std::filesystem::exists(pose_file) || !std::filesystem::exists(imgf)) {
@@ -613,7 +613,7 @@ TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") 
 TEST_CASE("capi2 batch result is per-image grouped (2D)", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string det_file = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
     const std::string imgf = data_dir + "/test_images/bus.jpg";
     if (!std::filesystem::exists(det_file) || !std::filesystem::exists(imgf)) {
         return;
@@ -762,7 +762,7 @@ TEST_CASE("capi2 predict_batch rejects null args (no model needed)", "[capi]") {
 TEST_CASE("capi2 predict_batch detection flattens both images", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string det_file = data_dir + "/test_models/onnx/yolo11n/yolo11n.onnx";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
     const std::string img1 = data_dir + "/test_images/test_detection0.jpg";
     const std::string img2 = data_dir + "/test_images/test_detection1.jpg";
     if (!std::filesystem::exists(det_file) || !std::filesystem::exists(img1) ||
