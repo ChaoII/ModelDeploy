@@ -6,6 +6,7 @@
 
 namespace modeldeploy::vision {
     void bind_vision_struct(const pybind11::module&);
+    void bind_image_data(const pybind11::module&);
     void bind_classification(const pybind11::module&);
     void bind_ultralytics_det(const pybind11::module&);
     void bind_ultralytics_iseg(const pybind11::module&);
@@ -38,6 +39,7 @@ namespace modeldeploy::vision {
 
 
     void bind_vision(pybind11::module& m) {
+        bind_image_data(m);
         bind_vision_struct(m);
         bind_classification(m);
         bind_ultralytics_det(m);

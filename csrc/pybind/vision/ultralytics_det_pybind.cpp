@@ -76,6 +76,13 @@ namespace modeldeploy::vision {
                      self.predict(ImageData(mat), &result);
                      return result;
                  }, pybind11::arg("image"))
+            // NV12 帧（from_nv12 / from_device_nv12）走统一单入口 predict(ImageData)：NV12 零拷贝预处理
+            .def("predict",
+                 [](detection::UltralyticsDet& self, const ImageData& image) {
+                     std::vector<DetectionResult> result;
+                     self.predict(image, &result);
+                     return result;
+                 }, pybind11::arg("image"))
             .def("batch_predict",
                  [](detection::UltralyticsDet& self,
                     const std::vector<pybind11::array>& images) {
@@ -87,6 +94,12 @@ namespace modeldeploy::vision {
                      }
                      std::vector<std::vector<DetectionResult>> results;
                      self.batch_predict(_images, &results);
+                     return results;
+                 }, pybind11::arg("images"))
+            .def("batch_predict",
+                 [](detection::UltralyticsDet& self, const std::vector<ImageData>& images) {
+                     std::vector<std::vector<DetectionResult>> results;
+                     self.batch_predict(images, &results);
                      return results;
                  }, pybind11::arg("images"))
             .def_property_readonly("preprocessor",
