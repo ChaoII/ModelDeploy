@@ -139,16 +139,18 @@ int run_detection(Backend b) {
 }
 
 int run_classification(Backend b) {
+    // yolo-cls 标准输入 224（yolo26n-cls 已按 224 导出，各后端同族同尺寸）
     std::string model = model_path("yolo26n/yolo26n-cls.onnx", "yolo26n/yolo26n-cls.mnn",
                                    "yolo26n/yolo26n-cls.engine", "yolo26n/yolo26n-cls_INT8.bmodel", b);
-    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x640x640");
+    modeldeploy::RuntimeOption opt = make_option(b, "x:1x3x224x224");
     auto m = std::make_unique<modeldeploy::vision::classification::Classification>(model, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "[%s] init failed\n", backend_tag(b)); return 1; }
-    m->get_preprocessor().set_size({640, 640});
+    m->get_preprocessor().set_size({224, 224});
     m->get_preprocessor().disable_center_crop();
     // 后处理自动判别单/多标签（yolo26n-cls 单标签 softmax 和≈1）。
     m->get_postprocessor().set_multi_label_auto(true);
-    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face.jpg");
+    // best_0.jpg 高置信且各后端一致
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/best_0.jpg");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
     modeldeploy::vision::ClassifyResult res;
     for (int i = 0; i < 10; ++i) {
