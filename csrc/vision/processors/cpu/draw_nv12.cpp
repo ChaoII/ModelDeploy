@@ -13,7 +13,7 @@ namespace {
     const int kFontW = 8;
     const int kFontH = 16;
 
-    // BT.601 ???????????????????????
+    // BT.601 标准下 RGB 转 YUV 的定点系数
     inline void rgb_to_yuv(uint8_t r, uint8_t g, uint8_t b,
                            uint8_t* py, uint8_t* pu, uint8_t* pv) {
         const int ry = (66 * r + 129 * g + 25 * b + 128) >> 8;
@@ -31,13 +31,13 @@ namespace {
         uint8_t yy, uu, vv;
         rgb_to_yuv(r, g, b, &yy, &uu, &vv);
         y[static_cast<size_t>(yc) * step_y + x] = yy;
-        // UV ???? 2x2 ??? UV ???NV12 ? CbCr ???
+        // UV 平面按 2x2 像素共享一个 UV，NV12 中为 Cb Cr 交错布局
         const int ux = x >> 1, uy = yc >> 1;
         uv[static_cast<size_t>(uy) * step_uv + ux * 2] = uu;
         uv[static_cast<size_t>(uy) * step_uv + ux * 2 + 1] = vv;
     }
 
-    // Bresenham ??
+    // Bresenham 画线算法
     inline void draw_line_cpu(uint8_t* y, uint8_t* uv, int w, int h,
                               int step_y, int step_uv,
                               int x0, int y0, int x1, int y1,
@@ -124,7 +124,6 @@ bool draw_points_nv12_cpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int
     return true;
 }
 
-// ASCII 8x16 ?????font_size ?????1=?? 8x16?
 bool draw_text_nv12_cpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
                         float x, float yo, const std::string& text,
                         uint8_t r, uint8_t g, uint8_t b, int font_size) {

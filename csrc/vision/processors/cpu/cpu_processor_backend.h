@@ -20,7 +20,7 @@ namespace modeldeploy::vision {
                                   int step_y, int step_uv, Tensor* out,
                                   const std::vector<int>& dst_size,
                                   float pad_val, LetterBoxRecord* record,
-                                   Device src_device = Device::CPU) override;
+                                  Device src_device = Device::CPU) override;
         bool yolo_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
                                    const std::vector<int>& dst_size,
                                    float pad_val,
@@ -37,12 +37,9 @@ namespace modeldeploy::vision {
                               float pad_val, LetterBoxRecord* record) override;
         bool scrfd_preprocess_batch(const std::vector<ImageData>& images, Tensor* out,
                                     const std::vector<int>& dst_size,
-                                    float pad_val,
-                                    std::vector<LetterBoxRecord>* records) override;
-        bool resize(const ImageData& image, ImageData* out,
-                    int width, int height) override;
-        bool crop(const ImageData& image, float x, float y, float w, float h,
-                  ImageData* out) override;
+                                    float pad_val, std::vector<LetterBoxRecord>* records) override;
+        bool resize(const ImageData& image, ImageData* out, int width, int height) override;
+        bool crop(const ImageData& image, float x, float y, float w, float h, ImageData* out) override;
         bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override;
         bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override;
         bool rotate_crop(const ImageData& image, std::array<float, 8> box, ImageData* out) override;
