@@ -144,7 +144,7 @@ public class Capi2VisionTests
     }
 
     [Test]
-    public void DetectionModel_PredictBatch_FlattensAcrossImages()
+    public void DetectionModel_PredictBatch_Is2DPerImage()
     {
         var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n.onnx");
         var img = Path.Combine(ImageRoot, "test_detection0.jpg");
@@ -153,10 +153,17 @@ public class Capi2VisionTests
         using var det = new DetectionModel(model, CpuOrt());
         using var vi1 = VisionImage.Read(img);
         using var vi2 = VisionImage.Read(img);
-        int single = det.Predict(vi1).Count + det.Predict(vi2).Count;
+        int cnt0 = det.Predict(vi1).Count;
+        int cnt1 = det.Predict(vi2).Count;
 
         var batch = det.PredictBatch(new[] { vi1, vi2 });
-        Assert.That(batch.Count, Is.EqualTo(single), "batch should flatten all images' boxes");
+        // 2D：每图一组，保留图片边界
+        Assert.That(batch.Count, Is.EqualTo(2), "batch should return one array per image");
+        Assert.That(batch[0].Length, Is.EqualTo(cnt0), "img0 boxes should match its single predict");
+        Assert.That(batch[1].Length, Is.EqualTo(cnt1), "img1 boxes should match its single predict");
+        int total = 0;
+        foreach (var arr in batch) total += arr.Length;
+        Assert.That(total, Is.EqualTo(cnt0 + cnt1), "total boxes preserved across images");
     }
 
     [Test]

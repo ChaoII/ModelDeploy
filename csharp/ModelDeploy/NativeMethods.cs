@@ -64,7 +64,12 @@ string path);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_from_nv12(out IntPtr handle, byte[] y, byte[] uv,
-            int w, int h, int step_y, int step_uv, int src);
+            int w, int h, int step_y, int step_uv);
+
+        // owned 版：拷入自有缓冲，产真 NV12 两平面帧（调用方无需保活）
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_from_nv12_owned(out IntPtr handle, byte[] y, byte[] uv,
+            int w, int h, int step_y, int step_uv);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_from_device_nv12(out IntPtr handle, byte[] y, byte[] uv,
@@ -308,6 +313,54 @@ string path);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_result_ocr_batch_count(IntPtr handle, out UIntPtr n);
+
+        // ==================== 2D 批量结果 getter（按图索引，逐图取项数组） ====================
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_detection_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_classification_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_pose_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_keypoints_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr kps, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_obb_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_instance_seg_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_mask_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr buf,
+            out UIntPtr h, out UIntPtr w);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_face_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_face_kps_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr kps, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_face_embedding_batch(IntPtr handle, UIntPtr img, out IntPtr embedding, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_insightface_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_insightface_kps_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr kps, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_insightface_embedding_batch(IntPtr handle, UIntPtr img, UIntPtr item,
+            out IntPtr embedding, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_insightface_pose_batch(IntPtr handle, UIntPtr img, UIntPtr item,
+            out IntPtr pose, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_ocr_batch(IntPtr handle, UIntPtr img, UIntPtr line, out IntPtr quad,
+            out IntPtr text, out float score);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_ocr_cls_batch(IntPtr handle, UIntPtr img, UIntPtr line, out int clsLabel, out float clsScore);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_lpr_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_plate_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr plate, out IntPtr color);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_lpr_keypoints_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr kps, out UIntPtr n);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_attribute_batch(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_attr_scores_batch(IntPtr handle, UIntPtr img, UIntPtr item, out IntPtr scores, out UIntPtr n);
 
         #endregion
 

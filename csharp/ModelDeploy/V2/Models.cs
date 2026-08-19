@@ -20,9 +20,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<DetectionResult> Predict(VisionImage image)
             => MakePrediction(image, ReadDetection);
 
-        /// <summary>批量预测：所有图的检测框合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<DetectionResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadDetection);
+        /// <summary>批量预测（2D）：按图返回，每图一个检测结果数组（保留图片边界）。</summary>
+        public IReadOnlyList<DetectionResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadDetectionBatch);
 
         /// <summary>检测置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -32,6 +32,20 @@ namespace ModelDeploy.V2.Models
         private static DetectionResult[] ReadDetection(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDDetectionItem>(result, md_result_detection);
+            var list = new List<DetectionResult>(items.Length);
+            foreach (var it in items)
+                list.Add(new DetectionResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    LabelId = it.label_id,
+                    Score = it.score
+                });
+            return list.ToArray();
+        }
+
+        private static DetectionResult[] ReadDetectionBatch(IntPtr result, int img)
+        {
+            var items = ResultReader.ReadItemsBatch<MDDetectionItem>(result, new UIntPtr((uint)img), md_result_detection_batch);
             var list = new List<DetectionResult>(items.Length);
             foreach (var it in items)
                 list.Add(new DetectionResult
@@ -57,9 +71,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<ClassificationResult> Predict(VisionImage image)
             => MakePrediction(image, ReadClassification);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<ClassificationResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadClassification);
+        /// <summary>批量预测（2D）：按图返回，每图一个分类结果数组。</summary>
+        public IReadOnlyList<ClassificationResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadClassificationBatch);
 
         /// <summary>分类 Top-K 输出个数。</summary>
         public void SetTopK(long v) => SetParam("top_k", v);
@@ -69,6 +83,15 @@ namespace ModelDeploy.V2.Models
         private static ClassificationResult[] ReadClassification(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDClassifyItem>(result, md_result_classification);
+            var list = new List<ClassificationResult>(items.Length);
+            foreach (var it in items)
+                list.Add(new ClassificationResult { LabelId = it.label_id, Score = it.score });
+            return list.ToArray();
+        }
+
+        private static ClassificationResult[] ReadClassificationBatch(IntPtr result, int img)
+        {
+            var items = ResultReader.ReadItemsBatch<MDClassifyItem>(result, new UIntPtr((uint)img), md_result_classification_batch);
             var list = new List<ClassificationResult>(items.Length);
             foreach (var it in items)
                 list.Add(new ClassificationResult { LabelId = it.label_id, Score = it.score });
@@ -89,9 +112,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<PoseResult> Predict(VisionImage image)
             => MakePrediction(image, ReadPose);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<PoseResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadPose);
+        /// <summary>批量预测（2D）：按图返回，每图一个姿态结果数组。</summary>
+        public IReadOnlyList<PoseResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadPoseBatch);
 
         /// <summary>姿态关键点置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -122,6 +145,30 @@ namespace ModelDeploy.V2.Models
             }
             return list.ToArray();
         }
+
+        private static PoseResult[] ReadPoseBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDPoseItem>(result, imgU, md_result_pose_batch);
+            var list = new List<PoseResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                var kpsPtr = ResultReader.ReadItems<MDPoint3F>(result,
+                    new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
+                        md_result_keypoints_batch(h, imgU, new UIntPtr((uint)i), out k, out n)));
+                var kps = new Point3F[kpsPtr.Length];
+                for (int j = 0; j < kpsPtr.Length; j++)
+                    kps[j] = new Point3F(kpsPtr[j].x, kpsPtr[j].y, kpsPtr[j].z);
+                list.Add(new PoseResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    Score = it.score,
+                    KeyPoints = kps
+                });
+            }
+            return list.ToArray();
+        }
     }
 
     public sealed class ObbModel : BaseModel
@@ -137,9 +184,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<ObbResult> Predict(VisionImage image)
             => MakePrediction(image, ReadObb);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<ObbResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadObb);
+        /// <summary>批量预测（2D）：按图返回，每图一个旋转框检测结果数组。</summary>
+        public IReadOnlyList<ObbResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadObbBatch);
 
         /// <summary>旋转框检测置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -149,6 +196,20 @@ namespace ModelDeploy.V2.Models
         private static ObbResult[] ReadObb(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDObbItem>(result, md_result_obb);
+            var list = new List<ObbResult>(items.Length);
+            foreach (var it in items)
+                list.Add(new ObbResult
+                {
+                    Box = new RotatedRectF(it.cx, it.cy, it.w, it.h, it.angle),
+                    LabelId = it.label_id,
+                    Score = it.score
+                });
+            return list.ToArray();
+        }
+
+        private static ObbResult[] ReadObbBatch(IntPtr result, int img)
+        {
+            var items = ResultReader.ReadItemsBatch<MDObbItem>(result, new UIntPtr((uint)img), md_result_obb_batch);
             var list = new List<ObbResult>(items.Length);
             foreach (var it in items)
                 list.Add(new ObbResult
@@ -174,9 +235,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<InstanceSegResult> Predict(VisionImage image)
             => MakePrediction(image, ReadInstanceSeg);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<InstanceSegResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadInstanceSeg);
+        /// <summary>批量预测（2D）：按图返回，每图一个实例分割结果数组。</summary>
+        public IReadOnlyList<InstanceSegResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadInstanceSegBatch);
 
         /// <summary>实例分割置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -193,6 +254,28 @@ namespace ModelDeploy.V2.Models
             {
                 var it = items[i];
                 md_result_mask(result, new UIntPtr((uint)i), out var maskPtr, out var mh, out var mw);
+                list.Add(new InstanceSegResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    LabelId = it.label_id,
+                    Score = it.score,
+                    Mask = ResultReader.ReadBytes(maskPtr, new UIntPtr((ulong)mh * (ulong)mw)),
+                    MaskHeight = (int)mh,
+                    MaskWidth = (int)mw
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static InstanceSegResult[] ReadInstanceSegBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDIsegItem>(result, imgU, md_result_instance_seg_batch);
+            var list = new List<InstanceSegResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                md_result_mask_batch(result, imgU, new UIntPtr((uint)i), out var maskPtr, out var mh, out var mw);
                 list.Add(new InstanceSegResult
                 {
                     Box = new RectF(it.x, it.y, it.w, it.h),
@@ -281,9 +364,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<FaceDetResult> Predict(VisionImage image)
             => MakePrediction(image, ReadFaceDet);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<FaceDetResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadFaceDet);
+        /// <summary>批量预测（2D）：按图返回，每图一个人脸检测结果数组。</summary>
+        public IReadOnlyList<FaceDetResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadFaceDetBatch);
 
         /// <summary>人脸检测置信度阈值。</summary>
         public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
@@ -302,6 +385,30 @@ namespace ModelDeploy.V2.Models
                 var kpsArr = ResultReader.ReadItems<MDPointF>(result,
                     new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
                         md_result_face_kps(h, new UIntPtr((uint)i), out k, out n)));
+                var kps = new PointF[kpsArr.Length];
+                for (int j = 0; j < kpsArr.Length; j++)
+                    kps[j] = new PointF(kpsArr[j].x, kpsArr[j].y);
+                list.Add(new FaceDetResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    Score = it.score,
+                    KeyPoints = kps
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static FaceDetResult[] ReadFaceDetBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDFaceItem>(result, imgU, md_result_face_batch);
+            var list = new List<FaceDetResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                var kpsArr = ResultReader.ReadItems<MDPointF>(result,
+                    new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
+                        md_result_face_kps_batch(h, imgU, new UIntPtr((uint)i), out k, out n)));
                 var kps = new PointF[kpsArr.Length];
                 for (int j = 0; j < kpsArr.Length; j++)
                     kps[j] = new PointF(kpsArr[j].x, kpsArr[j].y);
@@ -389,9 +496,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<InsightFaceResult> Predict(VisionImage image)
             => MakePrediction(image, ReadInsightFace);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<InsightFaceResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadInsightFace);
+        /// <summary>批量预测（2D）：按图返回，每图一个综合性人脸分析结果数组。</summary>
+        public IReadOnlyList<InsightFaceResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadInsightFaceBatch);
 
         /// <summary>人脸检测阈值（insightface）。</summary>
         public void SetDetThresh(double v) => SetParam("det_thresh", v);
@@ -409,6 +516,37 @@ namespace ModelDeploy.V2.Models
                         md_result_insightface_kps(h, ui, out k, out n)));
                 md_result_insightface_embedding(result, ui, out var emb, out var embN);
                 md_result_insightface_pose(result, ui, out var pose, out var poseN);
+                var kps = new PointF[kpsArr.Length];
+                for (int j = 0; j < kpsArr.Length; j++)
+                    kps[j] = new PointF(kpsArr[j].x, kpsArr[j].y);
+                list.Add(new InsightFaceResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    Score = it.score,
+                    KeyPoints = kps,
+                    Embedding = ResultReader.ReadFloats(emb, embN),
+                    Pose = ResultReader.ReadFloats(pose, poseN),
+                    Gender = it.gender,
+                    Age = it.age
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static InsightFaceResult[] ReadInsightFaceBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDInsightFaceItem>(result, imgU, md_result_insightface_batch);
+            var list = new List<InsightFaceResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                var ui = new UIntPtr((uint)i);
+                var kpsArr = ResultReader.ReadItems<MDPointF>(result,
+                    new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
+                        md_result_insightface_kps_batch(h, imgU, ui, out k, out n)));
+                md_result_insightface_embedding_batch(result, imgU, ui, out var emb, out var embN);
+                md_result_insightface_pose_batch(result, imgU, ui, out var pose, out var poseN);
                 var kps = new PointF[kpsArr.Length];
                 for (int j = 0; j < kpsArr.Length; j++)
                     kps[j] = new PointF(kpsArr[j].x, kpsArr[j].y);
@@ -506,9 +644,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<LprResult> Predict(VisionImage image)
             => MakePrediction(image, ReadLpr);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<LprResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadLpr);
+        /// <summary>批量预测（2D）：按图返回，每图一个车牌识别结果数组。</summary>
+        public IReadOnlyList<LprResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadLprBatch);
 
         private static LprResult[] ReadLpr(IntPtr result)
         {
@@ -521,6 +659,34 @@ namespace ModelDeploy.V2.Models
                 var kpsArr = ResultReader.ReadItems<MDPointF>(result,
                     new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
                         md_result_lpr_keypoints(h, new UIntPtr((uint)i), out k, out n)));
+                var kps = new PointF[kpsArr.Length];
+                for (int j = 0; j < kpsArr.Length; j++)
+                    kps[j] = new PointF(kpsArr[j].x, kpsArr[j].y);
+                list.Add(new LprResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    Plate = ResultReader.ReadString(plate) ?? string.Empty,
+                    Color = ResultReader.ReadString(color) ?? string.Empty,
+                    Score = it.score,
+                    KeyPoints = kps
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static LprResult[] ReadLprBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDLprItem>(result, imgU, md_result_lpr_batch);
+            var list = new List<LprResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                var ui = new UIntPtr((uint)i);
+                md_result_plate_batch(result, imgU, ui, out var plate, out var color);
+                var kpsArr = ResultReader.ReadItems<MDPointF>(result,
+                    new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
+                        md_result_lpr_keypoints_batch(h, imgU, ui, out k, out n)));
                 var kps = new PointF[kpsArr.Length];
                 for (int j = 0; j < kpsArr.Length; j++)
                     kps[j] = new PointF(kpsArr[j].x, kpsArr[j].y);
@@ -550,9 +716,9 @@ namespace ModelDeploy.V2.Models
         public Prediction<AttributeResult> Predict(VisionImage image)
             => MakePrediction(image, ReadAttribute);
 
-        /// <summary>批量预测：所有图的结果合并平铺为单个 Prediction（丢图片边界）。</summary>
-        public Prediction<AttributeResult> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch(images, ReadAttribute);
+        /// <summary>批量预测（2D）：按图返回，每图一个行人属性结果数组。</summary>
+        public IReadOnlyList<AttributeResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadAttributeBatch);
 
         /// <summary>检测阈值（pedestrian attribute）。</summary>
         public void SetDetThreshold(double v) => SetParam("det_threshold", v);
@@ -565,6 +731,26 @@ namespace ModelDeploy.V2.Models
             {
                 var it = items[i];
                 md_result_attr_scores(result, new UIntPtr((uint)i), out var scores, out var n);
+                list.Add(new AttributeResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    BoxLabelId = it.box_label_id,
+                    BoxScore = it.box_score,
+                    AttrScores = ResultReader.ReadFloats(scores, n)
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static AttributeResult[] ReadAttributeBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDAttrItem>(result, imgU, md_result_attribute_batch);
+            var list = new List<AttributeResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                md_result_attr_scores_batch(result, imgU, new UIntPtr((uint)i), out var scores, out var n);
                 list.Add(new AttributeResult
                 {
                     Box = new RectF(it.x, it.y, it.w, it.h),

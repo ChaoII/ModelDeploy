@@ -205,6 +205,31 @@ namespace ModelDeploy.V2
             return new Prediction<T>(PredictBatchNative(handles.ToArray()), reader);
         }
 
+        /// <summary>批量预测（2D）：每图一组托管数组（保留图片边界）。急切读取后立即释放原生结果句柄。</summary>
+        protected IReadOnlyList<T[]> PredictBatch2D<T>(IEnumerable<VisionImage> images, Func<IntPtr, int, T[]> imageReader)
+        {
+            if (images == null) throw new ArgumentNullException(nameof(images));
+            var handles = new List<IntPtr>();
+            foreach (var im in images)
+            {
+                if (im == null) throw new ArgumentNullException(nameof(images));
+                handles.Add(im.Handle);
+            }
+            if (handles.Count == 0) return Array.Empty<T[]>();
+            IntPtr result = PredictBatchNative(handles.ToArray());
+            try
+            {
+                var list = new List<T[]>(handles.Count);
+                for (int i = 0; i < handles.Count; i++)
+                    list.Add(imageReader(result, i));
+                return list;
+            }
+            finally
+            {
+                md_result_destroy(result);
+            }
+        }
+
         /// <summary>深拷贝原生模型句柄（独立实例）。</summary>
         protected IntPtr CloneNative()
         {
@@ -251,12 +276,31 @@ namespace ModelDeploy.V2
         /// <summary>数组 getter 委托（out 参数不允许出现在 Func 泛型，故自定义）。</summary>
         internal delegate MDStatus ItemGetter(IntPtr handle, out IntPtr items, out UIntPtr count);
 
+        /// <summary>2D 批量数组 getter 委托：按图索引取每图项数组。</summary>
+        internal delegate MDStatus BatchItemGetter(IntPtr handle, UIntPtr img, out IntPtr items, out UIntPtr count);
+
         public static T[] ReadItems<T>(IntPtr result, ItemGetter getter)
             where T : struct
         {
             var status = getter(result, out var items, out var count);
             if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"Result getter failed: {BaseModel.GetLastError()}");
+            int n = checked((int)count);
+            if (n == 0 || items == IntPtr.Zero) return Array.Empty<T>();
+            var arr = new T[n];
+            int stride = Marshal.SizeOf<T>();
+            for (int i = 0; i < n; i++)
+                arr[i] = Marshal.PtrToStructure<T>(IntPtr.Add(items, i * stride));
+            return arr;
+        }
+
+        /// <summary>2D 批量：读第 img 张图的 blittable 项数组。</summary>
+        public static T[] ReadItemsBatch<T>(IntPtr result, UIntPtr img, BatchItemGetter getter)
+            where T : struct
+        {
+            var status = getter(result, img, out var items, out var count);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Batch getter failed: {BaseModel.GetLastError()}");
             int n = checked((int)count);
             if (n == 0 || items == IntPtr.Zero) return Array.Empty<T>();
             var arr = new T[n];
