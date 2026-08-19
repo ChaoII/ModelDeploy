@@ -19,7 +19,7 @@ int main() {
     opt.use_sophgo_backend(0);
 
     // ---- 2. 加载模型（目标检测）----
-    auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("../../test_data/test_models/sophgo/yolo26n/yolo26n_INT8.bmodel", opt);
+    auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("../../test_data/test_models/sophgo/yolo26n/yolo26n-int8.bmodel", opt);
     if (!det->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     det->get_preprocessor().set_size({640, 640});
     const auto label_map = det->get_label_map("names");

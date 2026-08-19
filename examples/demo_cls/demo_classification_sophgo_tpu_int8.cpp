@@ -19,7 +19,7 @@ int main() {
     opt.use_sophgo_backend(0);
 
     // ---- 2. 加载模型（图像分类）----
-    auto m = std::make_unique<modeldeploy::vision::classification::Classification>("../../test_data/test_models/sophgo/yolo26n/yolo26n-cls_INT8.bmodel", opt);
+    auto m = std::make_unique<modeldeploy::vision::classification::Classification>("../../test_data/test_models/sophgo/yolo26n/yolo26n-cls-int8.bmodel", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     m->get_preprocessor().set_size({224, 224});
     m->get_preprocessor().disable_center_crop();

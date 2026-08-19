@@ -27,7 +27,7 @@ static bool ends_with(const std::string& s, const std::string& suffix) {
 
 int main(int argc, char** argv) {
     const std::string model = argc > 1 ? argv[1]
-        : "../../test_data/test_models/sophgo/yolo26n/yolo26n-depth_F16.bmodel";
+        : "../../test_data/test_models/sophgo/yolo26n/yolo26n-depth-f16.bmodel";
     const std::string image = argc > 2 ? argv[2]
         : "../../test_data/test_images/test_depth_540.jpg";
     const int loop_count = argc > 3 ? atoi(argv[3]) : 50;

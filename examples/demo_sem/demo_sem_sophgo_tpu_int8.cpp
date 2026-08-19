@@ -19,7 +19,7 @@ int main() {
     opt.use_sophgo_backend(0);
 
     // ---- 2. 加载模型（语义分割）----
-    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsSem>("../../test_data/test_models/sophgo/yolo26n/yolo26n-sem_INT8.bmodel", opt);
+    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsSem>("../../test_data/test_models/sophgo/yolo26n/yolo26n-sem-int8.bmodel", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     const auto label_map = m->get_label_map("names");
     // ---- 3. 读图 ----

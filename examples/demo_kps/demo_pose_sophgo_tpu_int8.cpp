@@ -19,7 +19,7 @@ int main() {
     opt.use_sophgo_backend(0);
 
     // ---- 2. 加载模型（姿态估计）----
-    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsPose>("../../test_data/test_models/sophgo/yolo26n/yolo26n-pose_INT8.bmodel", opt);
+    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsPose>("../../test_data/test_models/sophgo/yolo26n/yolo26n-pose-int8.bmodel", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     m->get_postprocessor().set_keypoints_num(17);
     // ---- 3. 读图 ----

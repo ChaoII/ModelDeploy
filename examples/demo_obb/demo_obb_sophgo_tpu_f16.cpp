@@ -19,7 +19,7 @@ int main() {
     opt.use_sophgo_backend(0);
 
     // ---- 2. 加载模型（旋转目标检测）----
-    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("../../test_data/test_models/sophgo/yolo26n/yolo26n-obb_INT8.bmodel", opt);
+    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("../../test_data/test_models/sophgo/yolo26n/yolo26n-obb-f16.bmodel", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     // ---- 3. 读图 ----
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");

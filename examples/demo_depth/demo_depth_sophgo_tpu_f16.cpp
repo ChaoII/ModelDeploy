@@ -19,7 +19,7 @@ int main() {
     opt.use_sophgo_backend(0);
 
     // ---- 2. 加载模型（深度估计）----
-    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsDepth>("../../test_data/test_models/sophgo/yolo26n/yolo26n-depth_INT8.bmodel", opt);
+    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsDepth>("../../test_data/test_models/sophgo/yolo26n/yolo26n-depth-f16.bmodel", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     // ---- 3. 读图 ----
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_depth_540.jpg");
