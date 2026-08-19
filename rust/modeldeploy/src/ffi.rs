@@ -319,6 +319,7 @@ extern "C" {
     pub fn md_image_encode(h: MDImageHandle, ext: *const c_char, buf: *mut *const u8, n: *mut usize) -> MDStatus;
     pub fn md_image_destroy(h: MDImageHandle);
     pub fn md_image_size(h: MDImageHandle, w: *mut c_int, h: *mut c_int) -> MDStatus;
+    pub fn md_image_info(h: MDImageHandle, type_: *mut c_int, dev: *mut MDDevice, nplanes: *mut c_int) -> MDStatus;
     // 取 NV12 帧平面指针（dev 返回帧所在设备；仅对 NV12 有效，CPU BGR 图返回 UNSUPPORTED_TYPE）
     pub fn md_image_plane_ptrs(h: MDImageHandle, dev: *mut MDDevice,
         y: *mut *mut c_void, uv: *mut *mut c_void) -> MDStatus;
@@ -365,7 +366,9 @@ extern "C" {
     pub fn md_result_instance_seg(h: MDResultHandle, items: *mut *const MDIsegItem, count: *mut usize) -> MDStatus;
     pub fn md_result_mask(h: MDResultHandle, i: usize, buf: *mut *const u8, out_h: *mut usize, out_w: *mut usize) -> MDStatus;
     pub fn md_result_sem_seg(h: MDResultHandle, labels: *mut *const u8, out_h: *mut usize, out_w: *mut usize, num_classes: *mut c_int) -> MDStatus;
+    pub fn md_result_sem_seg_batch(h: MDResultHandle, i: usize, labels: *mut *const u8, out_h: *mut usize, out_w: *mut usize, num_classes: *mut c_int) -> MDStatus;
     pub fn md_result_depth(h: MDResultHandle, depth: *mut *const c_float, out_h: *mut usize, out_w: *mut usize) -> MDStatus;
+    pub fn md_result_depth_batch(h: MDResultHandle, i: usize, depth: *mut *const c_float, out_h: *mut usize, out_w: *mut usize) -> MDStatus;
     pub fn md_result_face(h: MDResultHandle, items: *mut *const MDFaceItem, count: *mut usize) -> MDStatus;
     pub fn md_result_face_kps(h: MDResultHandle, i: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
     pub fn md_result_face_embedding(h: MDResultHandle, i: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
@@ -381,7 +384,10 @@ extern "C" {
     pub fn md_result_attribute(h: MDResultHandle, items: *mut *const MDAttrItem, count: *mut usize) -> MDStatus;
     pub fn md_result_attr_scores(h: MDResultHandle, i: usize, scores: *mut *const c_float, n: *mut usize) -> MDStatus;
     pub fn md_result_age(h: MDResultHandle, age: *mut c_int) -> MDStatus;
+    pub fn md_result_age_batch(h: MDResultHandle, items: *mut *const c_int, count: *mut usize) -> MDStatus;
     pub fn md_result_gender(h: MDResultHandle, gender: *mut c_int) -> MDStatus;
+    pub fn md_result_gender_batch(h: MDResultHandle, items: *mut *const c_int, count: *mut usize) -> MDStatus;
+    pub fn md_result_ocr_batch_count(h: MDResultHandle, n: *mut usize) -> MDStatus;
 
     // ── 绘制（基础） ──
     pub fn md_draw_rect(h: MDImageHandle, x: c_float, y: c_float, w: c_float, h: c_float,
