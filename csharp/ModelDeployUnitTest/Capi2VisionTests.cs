@@ -81,6 +81,47 @@ public class Capi2VisionTests
         Assert.That(vi.Height, Is.EqualTo(80));
     }
 
+    [Test]
+    public void VisionImage_FromNv12Data_IsNv12TwoPlane()
+    {
+        int w = 64, h = 48;
+        var y = new byte[w * h];
+        var uv = new byte[w * h / 2];
+        using var vi = VisionImage.FromNv12Data(y, uv, w, h);
+        Assert.That(vi.Type, Is.EqualTo(MdImageType.NV12));
+        Assert.That(vi.PlaneCount, Is.EqualTo(2));
+        Assert.That(vi.Device, Is.EqualTo(Device.CPU));
+        Assert.That(vi.GetPlane(0).Data, Is.Not.EqualTo(IntPtr.Zero));
+        Assert.That(vi.GetPlane(1).Data, Is.Not.EqualTo(IntPtr.Zero));
+        Assert.That(vi.GetPlane(0).Step, Is.EqualTo(w));
+    }
+
+    [Test]
+    public void VisionImage_Read_TypeIsBgr()
+    {
+        var img = Path.Combine(ImageRoot, "test_detection0.jpg");
+        if (!Has(img)) Assert.Ignore("image not found");
+        using var vi = VisionImage.Read(img);
+        Assert.That(vi.Type, Is.EqualTo(MdImageType.PKG_BGR_U8));
+        Assert.That(vi.PlaneCount, Is.EqualTo(1));
+        Assert.That(vi.Channels, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void VisionImage_FromNv12Data_Then_DetectionPredict()
+    {
+        var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n.onnx");
+        if (!Has(model)) Assert.Ignore("model not found");
+
+        int w = 640, h = 640;
+        var y = new byte[w * h];
+        var uv = new byte[w * h / 2];
+        using var vi = VisionImage.FromNv12Data(y, uv, w, h);
+        using var det = new DetectionModel(model, CpuOrt());
+        var results = det.Predict(vi);
+        Assert.That(results, Is.Not.Null);
+    }
+
     // ==================== Detection ====================
 
     [Test]

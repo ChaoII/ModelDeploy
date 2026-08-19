@@ -5,15 +5,52 @@ using static ModelDeploy.NativeMethods;
 
 namespace ModelDeploy.V2
 {
+    /// <summary>图像像素类型（对齐 csrc/vision/common/basic_types.h 的 ImageType）。</summary>
+    public enum MdImageType
+    {
+        GRAY_U8 = 0,
+        PLA_BGR_U8 = 20, PLA_RGB_U8 = 21,
+        PKG_BGR_U8 = 22, PKG_RGB_U8 = 23,
+        PLA_BGRA_U8 = 24, PLA_RGBA_U8 = 25, PKG_BGRA_U8 = 26, PKG_RGBA_U8 = 27,
+        NV12 = 60, NV21 = 61, I420 = 62,
+        UNKNOWN = 63
+    }
+
+    /// <summary>图像平面描述（Data 指向平面像素，Step 为行距/跨度）。</summary>
+    public struct Plane
+    {
+        public IntPtr Data;
+        public int Step;
+    }
+
     /// <summary>
     /// capi2 图像包装：内部持有 MDImageHandle（IntPtr），生命周期由本类管理。
+    /// 对齐 C++ ImageData：类型/设备/平面数元信息 + 主机/NV12 设备工厂。
     /// </summary>
     public sealed class VisionImage : IDisposable
     {
         public IntPtr Handle { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
-        public int Channels => 3;
+
+        /// <summary>像素类型（由原生 md_image_info 读出）。</summary>
+        public MdImageType Type { get; private set; }
+
+        /// <summary>像素内存所在设备（由原生 md_image_info 读出）。</summary>
+        public ModelDeploy.Device Device { get; private set; }
+
+        /// <summary>平面数（由原生 md_image_info 读出）。</summary>
+        public int PlaneCount { get; private set; }
+
+        /// <summary>通道数由 Type 推导（BGR/RGB 三通道，灰度与 YUV 单通道，BGRA/RGBA 四通道）。</summary>
+        public int Channels => Type switch
+        {
+            MdImageType.NV12 or MdImageType.NV21 or MdImageType.I420 => 1,
+            MdImageType.GRAY_U8 => 1,
+            MdImageType.PLA_BGRA_U8 or MdImageType.PLA_RGBA_U8
+                or MdImageType.PKG_BGRA_U8 or MdImageType.PKG_RGBA_U8 => 4,
+            _ => 3
+        };
 
         private bool _disposed;
 
@@ -23,12 +60,33 @@ namespace ModelDeploy.V2
         private bool _hasPinY;
         private bool _hasPinUv;
 
-        private VisionImage(IntPtr handle)
+        // NV12 构造时记录的平面行距，供 GetPlane 返回 Step。
+        private int _stepY;
+        private int _stepUv;
+
+        private VisionImage(IntPtr handle, int stepY = 0, int stepUv = 0)
         {
             Handle = handle;
+            _stepY = stepY;
+            _stepUv = stepUv;
             md_image_size(handle, out var w, out var h);
             Width = w;
             Height = h;
+            md_image_info(handle, out int type, out int dev, out int nplanes);
+            Type = (MdImageType)type;
+            Device = (ModelDeploy.Device)dev;
+            PlaneCount = nplanes;
+        }
+
+        /// <summary>返回第 i 个平面（仅 NV12/NV21 支持）。</summary>
+        public Plane GetPlane(int i)
+        {
+            if (Type != MdImageType.NV12 && Type != MdImageType.NV21)
+                throw new NotSupportedException($"GetPlane: only NV12/NV21 supported (type={Type})");
+            md_image_plane_ptrs(Handle, out int dev, out IntPtr y, out IntPtr uv);
+            if (i == 0) return new Plane { Data = y, Step = _stepY > 0 ? _stepY : Width };
+            if (i == 1) return new Plane { Data = uv, Step = _stepUv > 0 ? _stepUv : Width };
+            throw new ArgumentOutOfRangeException(nameof(i));
         }
 
         public static VisionImage Read(string path)
@@ -55,19 +113,56 @@ namespace ModelDeploy.V2
             return new VisionImage(hh);
         }
 
+        /// <summary>
+        /// 用外部 y/uv 设备指针零拷贝构造 NV12 设备帧（库不拥有内存，调用方保证指针存活到预测结束）。不 pin。
+        /// </summary>
+        public static VisionImage FromDeviceNv12(IntPtr y, IntPtr uv, int w, int h, int stepY = 0, int stepUv = 0, ModelDeploy.Device dev = ModelDeploy.Device.CPU)
+        {
+            if (y == IntPtr.Zero) throw new ArgumentNullException(nameof(y));
+            if (uv == IntPtr.Zero) throw new ArgumentNullException(nameof(uv));
+            var status = md_image_from_device_nv12(out var hh, y, uv, w, h, stepY, stepUv, (int)dev);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"FromDeviceNv12 failed: {BaseModel.GetLastError()}");
+            return new VisionImage(hh, stepY, stepUv);
+        }
+
+        /// <summary>
+        /// 由托管 Y/UV 缓冲构造真正的 NV12 2 平面 CPU 图：内置 pin（_pinY/_pinUv）禁止 GC 移动缓冲，
+        /// 以 pin 指针调设备工厂（dev=CPU），等价 C++ from_planes(..., NV12, Device::CPU)。
+        /// 缓冲在 Dispose 时释放。
+        /// </summary>
         public static VisionImage FromNv12Data(byte[] y, byte[] uv, int w, int h, int stepY = 0, int stepUv = 0)
         {
-            var status = md_image_from_nv12(out var hh, y, uv, w, h, stepY, stepUv, (int)Device.CPU);
-            if (status != MDStatus.MD_OK)
-                throw new InvalidOperationException($"Image from NV12 failed: {BaseModel.GetLastError()}");
-            return new VisionImage(hh);
+            if (y == null) throw new ArgumentNullException(nameof(y));
+            if (uv == null) throw new ArgumentNullException(nameof(uv));
+            var pinY = GCHandle.Alloc(y, GCHandleType.Pinned);
+            var pinUv = GCHandle.Alloc(uv, GCHandleType.Pinned);
+            try
+            {
+                var status = md_image_from_device_nv12(out var hh, pinY.AddrOfPinnedObject(), pinUv.AddrOfPinnedObject(),
+                    w, h, stepY, stepUv, (int)ModelDeploy.Device.CPU);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"Image from NV12 failed: {BaseModel.GetLastError()}");
+                var v = new VisionImage(hh, stepY, stepUv);
+                v._pinY = pinY;
+                v._hasPinY = true;
+                v._pinUv = pinUv;
+                v._hasPinUv = true;
+                return v;
+            }
+            catch
+            {
+                pinY.Free();
+                pinUv.Free();
+                throw;
+            }
         }
 
         /// <summary>
         /// 包装 md_image_from_device_nv12 构造的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
-        /// 生命周期由本对象管理（Dispose 调用 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
+        /// 内部供 BaseModel NV12 直接输入路径使用；Dispose 仅释放包装句柄，不碰输入缓冲。
         /// </summary>
-        public static VisionImage FromDeviceFrame(IntPtr handle)
+        internal static VisionImage FromDeviceFrame(IntPtr handle)
         {
             if (handle == IntPtr.Zero) throw new ArgumentException("Frame handle must be non-zero", nameof(handle));
             return new VisionImage(handle);
@@ -75,8 +170,7 @@ namespace ModelDeploy.V2
 
         /// <summary>
         /// Pin 本 frame 零拷贝引用的托管缓冲（调用方 byte[] y/uv），禁止 GC 在 frame 存活期内移动它们。
-        /// 仅用于持托管数组源的设备帧路径；未持托管缓冲的路径（如解码器 IntPtr 源）不调用。
-        /// 由 Dispose / 析构统一 Free。
+        /// 内部供 BaseModel NV12 直接输入路径使用；由 Dispose / 析构统一 Free。
         /// </summary>
         internal void PinBuffers(byte[] y, byte[] uv)
         {
