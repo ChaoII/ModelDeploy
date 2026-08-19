@@ -32,7 +32,7 @@ namespace {
     }
 
     fs::path ocr_dict() {
-        for (const auto& d : {"ppocrv4_dict.txt", "ppocrv5_dict.txt", "dict.txt"}) {
+        for (const auto& d : {"ppocrv6_tiny_dict.txt", "ppocrv4_dict.txt", "ppocrv5_dict.txt", "dict.txt"}) {
             auto p = pipe_data_dir() / d;
             if (has_file(p)) return p;
         }
@@ -40,7 +40,7 @@ namespace {
     }
 
     fs::path find_ocr_model(const std::string& kind) {
-        for (const auto& v : {"ppocrv4_mobile", "ppocrv5_mobile", "ppocrv6_tiny", "repsvtr_mobile"}) {
+        for (const auto& v : {"ppocrv6_tiny", "ppocrv4_mobile", "ppocrv5_mobile", "repsvtr_mobile"}) {
             auto p = pipe_data_dir() / "test_models" / "onnx" / "ocr" / v / (kind + "_infer.onnx");
             if (has_file(p)) return p;
         }
