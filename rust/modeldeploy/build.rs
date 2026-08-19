@@ -41,6 +41,15 @@ fn main() {
         }
         println!("cargo:rustc-link-lib=ModelDeploySDK");
 
+        // SDK bin/lib 变更（重新编译 SDK）时重跑本脚本，刷新链接 + 运行时库拷贝，
+        // 避免 target/<profile>/deps 里残留旧 DLL 导致 加载崩溃(STARTUP_ENTRYPOINT_NOT_FOUND)/AV/空结果。
+        for sub in ["bin", "lib"] {
+            let dir = sdk_root.join(sub);
+            if dir.is_dir() {
+                println!("cargo:rerun-if-changed={}", dir.display());
+            }
+        }
+
         // 拷贝运行时库到输出目录
         let bin_dir = sdk_root.join("bin");
         if bin_dir.exists() {
