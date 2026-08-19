@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "backend": "sophgo-tpu",
+    "date": "2026-08-19",
+    "image": "test_detection0.png",
+    "model": "yolo26n-int8.bmodel"
+  },
+  "results": []
+}

@@ -551,7 +551,9 @@ TEST_CASE("OCR Recognizer model", "[vision_models]") {
 
     Recognizer model(modelfile.string(), dict.string(), opt);
 
-    auto img = load_image("test_ocr.png");
+    // rec 模型输入应为单行文本裁剪图；test_ocr.png 是多行文档图（v6 rec 返回空文本）。
+    auto img = load_image("test_ocr_recognition.jpg");
+    if (img.empty()) img = load_image("test_ocr.png");
     if (img.empty()) return;
 
     std::string text;
