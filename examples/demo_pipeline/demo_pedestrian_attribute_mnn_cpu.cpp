@@ -1,2 +1,51 @@
-#include "../common/demo_runner.h"
-int main() { return demo::run_pedestrian_attribute(demo::Backend::MnnCpu); }
+// ModelDeploy demo: 行人属性（mnn_cpu）。
+// 最小可运行示例，完整逻辑自包含：构造 RuntimeOption -> 加载模型 -> 预处理 -> 推理(计时) -> 可视化。
+#include "csrc/vision.h"
+#include "csrc/vision/common/display/display.h"
+#include "csrc/vision/common/visualize/visualize.h"
+#include "csrc/utils/benchmark.h"
+
+#include <cstdio>
+#include <memory>
+#include <string>
+#include <vector>
+
+int main() {
+    const char* kFont = "../../test_data/msyh.ttc";
+
+    // ---- 1. 运行时选项 ----
+
+    modeldeploy::RuntimeOption opt;
+    opt.use_mnn_backend();
+    opt.use_cpu();
+
+    // ---- 2. 加载模型（行人属性：检测 + 多标签分类）----
+    auto m = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>("../../test_data/test_models/onnx/zhgd_det.onnx", "../../test_data/test_models/onnx/zhgd_ml.onnx", opt);
+    if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
+    m->set_cls_batch_size(8);
+    m->set_det_input_size({1280, 1280});
+    m->set_det_threshold(0.5);
+    m->set_cls_input_size({192, 256});
+    // ---- 3. 读图 ----
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute_scale.png");
+    if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
+
+    std::vector<modeldeploy::vision::AttributeResult> res; // 推理结果
+
+    // ---- 4. 推理：先 warmup，再计时 ----
+    for (int i = 0; i < 10; ++i) m->predict(im, &res, nullptr);
+    TimerArray timers;
+    for (int i = 0; i < 50; ++i) m->predict(im, &res, &timers);
+    timers.print_benchmark();
+
+    // ---- 5. 结果与可视化 ----
+    modeldeploy::vision::dis_attr(res);
+    std::unordered_map<int, std::string> label_map;
+    label_map[0] = "safety_helmet"; label_map[1] = "reflective_vest";
+    label_map[2] = "safety_rope";   label_map[3] = "work_uniform";
+    auto vis = modeldeploy::vision::vis_attr(im, res, 0.5, label_map, kFont, 6, 0.15, false, {0, 1});
+    (void)vis.imwrite("result_pedestrian_attribute_mnn_cpu.jpg");
+    std::printf("done, %zu persons\n", res.size());
+    return 0;
+
+}
