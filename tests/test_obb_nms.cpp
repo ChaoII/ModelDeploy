@@ -19,7 +19,9 @@ using modeldeploy::vision::utils::obb_nms;
 using modeldeploy::vision::utils::rotated_rect_to_cv_type;
 
 namespace {
-    // 与 obb_nms.cpp 中 rotated_iou(cv, cv) 完全相同的 IoU 计算（cv 多边形相交）
+    // 与 obb_nms.cpp 中 rotated_iou(cv, cv) 相同的 IoU 计算（cv 多边形相交）。
+    // 注意：库实现在 double 下求值、最后 cast 到 float；此处先 cast float 再相除，
+    // 末位 ~1ulp 可能不同，但对 0.5 阈值在决策上等价（参考实现仅用于验证抑制决策不变）。
     float ref_rotated_iou(const cv::RotatedRect& a, const cv::RotatedRect& b) {
         std::vector<cv::Point2f> inter;
         if (cv::rotatedRectangleIntersection(a, b, inter) <= 0) return 0.0f;
@@ -28,7 +30,7 @@ namespace {
         return union_area > 0 ? inter_area / union_area : 0.0f;
     }
 
-    // 旧实现（O(N^2) 朴素）作为参考金标准 —— 新实现必须与之逐位一致
+    // 旧实现（O(N^2) 朴素）作为参考金标准 —— 新实现必须与之决策等价（抑制结果一致）
     void reference_obb_nms(std::vector<ObbResult>* result, float iou_threshold) {
         const size_t N = result->size();
         std::vector<int> sorted_indices(N);
