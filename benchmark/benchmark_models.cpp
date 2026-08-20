@@ -838,3 +838,46 @@ TEST_CASE("Benchmark SOPHGO insightface pipeline", "[sophgo][benchmark]") {
     report("sophgo pipeline insightface (det+lmk+rec+ga) f16", runs);
 }
 #endif // ENABLE_SOPHGO
+
+// with-NMS(end2end) 模型：输出 [1,300,7]，模型内已做 NMS，SDK 走 run_with_nms（post≈0）。
+// end2end 输入为 1024x1024，预处理器默认 640 需显式覆盖。仅 ORT-CPU 验证。
+TEST_CASE("Benchmark UltralyticsObb end2end (with-NMS)", "[all_models][benchmark]") {
+    constexpr int kRuns = 20;
+    const auto rel = bench_rel("yolo26n", "yolo26n-obb-end2end", OpBackend::OrtCpu);
+    const auto mp = bench_data_dir() / "test_models" / rel;
+    if (!has_file(mp)) {
+        std::printf("[bench][skip] ORT-CPU %s (missing)\n", rel.string().c_str());
+        return;
+    }
+    try {
+        RuntimeOption opt = bench_opt(BenchSpec{OpBackend::OrtCpu, "ORT-CPU"}, 1024);
+        detection::UltralyticsObb model(mp.string(), opt);
+        if (!model.is_initialized()) {
+            std::printf("[bench][skip] ORT-CPU %s (init fail)\n", rel.string().c_str());
+            return;
+        }
+        model.get_preprocessor().set_size({1024, 1024});
+        auto img = load_img("test_obb.jpg");
+        if (img.empty()) return;
+
+        std::vector<ObbResult> result;
+        if (!model.predict(img, &result)) {
+            std::printf("[bench][error] yolo26n-obb-end2end predict failed\n");
+            return;
+        }
+        std::printf("[bench] yolo26n-obb-end2end boxes=%zu\n", result.size());
+
+        for (int i = 0; i < 5; ++i) model.predict(img, &result);  // 预热
+        std::vector<TimerArray> runs;
+        for (int i = 0; i < kRuns; ++i) {
+            TimerArray t;
+            if (!model.predict(img, &result, &t)) { runs.clear(); break; }
+            runs.push_back(t);
+        }
+        if (!runs.empty()) report("yolo26n-obb-end2end ORT-CPU", runs);
+    } catch (const std::exception& e) {
+        std::printf("[bench][error] yolo26n-obb-end2end (%s)\n", e.what());
+    } catch (...) {
+        std::printf("[bench][error] yolo26n-obb-end2end (unknown exception)\n");
+    }
+}
