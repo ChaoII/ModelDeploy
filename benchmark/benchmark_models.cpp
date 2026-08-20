@@ -110,136 +110,176 @@ namespace {
         return opt;
     }
 
-TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
-    // det 特殊：GPU(ORT TRT EP) 用内嵌 NMS 版（生产配置，~5ms）；
-    // CPU ORT 用非 NMS 版（SDK 静态 ORT 加载 NMS onnx 报 protobuf 失败）
-#ifdef WITH_GPU
-    for (const auto& rel : {"onnx/yolo11n/yolo11n_nms.onnx", "trt/yolo11n_nms.engine"}) {
-#else
-    for (const auto& rel : {"onnx/yolo11n/yolo11n.onnx", "mnn/yolo11n_nms.mnn"}) {
-#endif
-        auto mp = bench_data_dir() / "test_models" / rel;
-        if (!has_file(mp)) continue;
-        if (!bench_supported(rel)) continue;
-        RuntimeOption opt = bench_opt(rel);
-        detection::UltralyticsDet model(mp.string(), opt);
-        if (!model.is_initialized()) continue;
-        auto img = load_img("test_detection0.jpg");
-        if (img.empty()) continue;
-        // 预热：触发 TRT EP engine 构建 / 内存分配等一次性开销（不计时）
-        {
-            std::vector<DetectionResult> r;
-            for (int i = 0; i < 5; ++i) model.predict(img, &r);
-        }
-        constexpr int kRuns = 20;
-        std::vector<TimerArray> runs;
-        for (int i = 0; i < kRuns; ++i) {
-            std::vector<DetectionResult> r;
-            TimerArray t;
-            REQUIRE(model.predict(img, &r, &t));
-            if (r.empty()) { runs.clear(); break; }
-            runs.push_back(t);
-        }
-        report(std::string("det ") + rel, runs);
+// ==================== 统一：同一模型（yolo26n 家族）跨后端 benchmark ====================
+// 目标：同一模型在不同后端上测性能，横向对比后端间差距。sophgo 仅在算能设备构建上启用。
+enum class OpBackend { OrtCpu, MnnCpu, OrtCuda, OrtTrtEp, TrtEngine, Sophgo };
+
+struct BenchSpec { OpBackend op; const char* tag; };
+
+// 各后端顺序即输出顺序。
+// 注意：ORT-TRT-EP 在本地对 yolo26n 动态 onnx 的首次 engine 构建时会卡死/崩溃（见注释），
+// 默认不启用，需显式设环境变量 MODELDEPLOY_BENCH_TRT_EP=1 才纳入。
+static std::vector<BenchSpec> bench_backends() {
+    std::vector<BenchSpec> v;
+#ifdef ENABLE_ORT
+    v.push_back({OpBackend::OrtCpu, "ORT-CPU"});
+    v.push_back({OpBackend::OrtCuda, "ORT-CUDA-EP"});
+    const char* env_ep = std::getenv("MODELDEPLOY_BENCH_TRT_EP");
+    if (env_ep && std::string(env_ep) == "1") {
+        v.push_back({OpBackend::OrtTrtEp, "ORT-TRT-EP"});
     }
+#endif
+#ifdef ENABLE_MNN
+    v.push_back({OpBackend::MnnCpu, "MNN-CPU"});
+#endif
+#ifdef ENABLE_TRT
+    v.push_back({OpBackend::TrtEngine, "TRT-engine"});
+#endif
+#ifdef ENABLE_SOPHGO
+    v.push_back({OpBackend::Sophgo, "SOPHGO-TPU"});
+#endif
+    return v;
+}
+
+// 按后端返回模型文件相对路径（onnx/mnn/engine/bmodel）
+static fs::path bench_rel(const char* family, const char* name, OpBackend op) {
+    switch (op) {
+        case OpBackend::OrtCpu:
+        case OpBackend::OrtCuda:
+        case OpBackend::OrtTrtEp:
+            return fs::path("onnx") / family / (std::string(name) + ".onnx");
+        case OpBackend::MnnCpu:
+            return fs::path("mnn") / family / (std::string(name) + ".mnn");
+        case OpBackend::TrtEngine:
+            return fs::path("trt") / family / (std::string(name) + ".engine");
+        case OpBackend::Sophgo:
+            return fs::path("sophgo") / family / (std::string(name) + ".bmodel");
+    }
+    return {};
+}
+
+// 生成对应 RuntimeOption；input 为方形输入边长（TRT-EP 静态 shape 用）
+static RuntimeOption bench_opt(const BenchSpec& s, int input) {
+    RuntimeOption opt;
+    switch (s.op) {
+        case OpBackend::OrtCpu:
+            opt.use_ort_backend(); opt.use_cpu(); break;
+        case OpBackend::MnnCpu:
+            opt.use_mnn_backend(); opt.use_cpu(); break;
+        case OpBackend::OrtCuda:
+            opt.use_ort_backend(); opt.use_gpu(0); break;
+        case OpBackend::OrtTrtEp:
+            opt.use_ort_backend(); opt.use_gpu(0); opt.enable_trt = true;
+            {  // 静态 shape，避免动态 onnx 在 ORT-TRT-EP 上反复构建/卡死
+                const std::string sh = "1x3x" + std::to_string(input) + "x" + std::to_string(input);
+                opt.set_trt_min_shape(sh); opt.set_trt_opt_shape(sh); opt.set_trt_max_shape(sh);
+            }
+            break;
+        case OpBackend::TrtEngine:
+            opt.use_trt_backend(); opt.use_gpu(0); break;
+        case OpBackend::Sophgo:
+            opt.use_sophgo_backend(0); break;
+    }
+    return opt;
+}
+
+// 通用计时：先预热到首个有效结果（含 TRT-EP/engine 一次性构建，不计时），再 kRuns 次计时。
+template <typename Model, typename Run>
+void bench_yolo(const char* family, const char* name, int input, const char* imgname, Run run) {
+    constexpr int kRuns = 20;
+    for (const auto& s : bench_backends()) {
+        auto rel = bench_rel(family, name, s.op);
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) {
+            std::printf("[bench][skip] %-12s %s (missing)\n", s.tag, rel.string().c_str());
+            continue;
+        }
+        try {
+            RuntimeOption opt = bench_opt(s, input);
+            Model model(mp.string(), opt);
+            if (!model.is_initialized()) {
+                std::printf("[bench][skip] %-12s %s (init fail)\n", s.tag, rel.string().c_str());
+                continue;
+            }
+            auto img = load_img(imgname);
+            if (img.empty()) continue;
+            for (int i = 0; i < 5 && !run(model, img); ++i) {}
+            std::vector<double> times;
+            for (int i = 0; i < kRuns; ++i) {
+                auto t0 = std::chrono::high_resolution_clock::now();
+                const bool ok = run(model, img);
+                auto t1 = std::chrono::high_resolution_clock::now();
+                if (!ok) { times.clear(); break; }
+                times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+            }
+            if (!times.empty()) {
+                double sum = 0;
+                for (auto v : times) sum += v;
+                std::printf("[bench] %-14s %-12s | total=%.3fms (n=%zu)\n",
+                            name, s.tag, sum / times.size(), times.size());
+            }
+        } catch (const std::exception& e) {
+            std::printf("[bench][error] %-12s %s (%s)\n", s.tag, rel.string().c_str(), e.what());
+        } catch (...) {
+            std::printf("[bench][error] %-12s %s (unknown exception)\n", s.tag, rel.string().c_str());
+        }
+    }
+}
+
+TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
+    bench_yolo<detection::UltralyticsDet>("yolo26n", "yolo26n", 640, "test_detection0.jpg",
+        [](detection::UltralyticsDet& m, const ImageData& img) {
+            std::vector<DetectionResult> r;
+            return m.predict(img, &r) && !r.empty();
+        });
 }
 
 TEST_CASE("Benchmark UltralyticsCls", "[all_models][benchmark]") {
-    for (const auto& rel : {"onnx/yolo11n/yolo11n-cls.onnx", "mnn/yolo11n-cls.mnn", "trt/yolo11n-cls.engine"}) {
-        auto mp = bench_data_dir() / "test_models" / rel;
-        if (!has_file(mp)) continue;
-        if (!bench_supported(rel)) continue;
-        RuntimeOption opt = bench_opt(rel);
-        classification::Classification model(mp.string(), opt);
-        if (!model.is_initialized()) continue;
-        auto img = load_img("test_person.jpg");
-        if (img.empty()) continue;
-        constexpr int kRuns = 20;
-        std::vector<double> times;
-        for (int i = 0; i < kRuns; ++i) {
+    bench_yolo<classification::Classification>("yolo26n", "yolo26n-cls", 224, "test_person.jpg",
+        [](classification::Classification& m, const ImageData& img) {
             ClassifyResult r;
-            auto t0 = std::chrono::high_resolution_clock::now();
-            REQUIRE(model.predict(img, &r));
-            auto t1 = std::chrono::high_resolution_clock::now();
-            if (r.label_ids.empty()) { times.clear(); break; }
-            times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
-        }
-        if (!times.empty()) {
-            double sum = 0;
-            for (auto v : times) sum += v;
-            std::cout << "[bench] cls " << rel << " | total=" << sum / times.size()
-                      << "ms (n=" << times.size() << ")" << std::endl;
-        }
-    }
+            return m.predict(img, &r) && !r.label_ids.empty();
+        });
 }
 
 TEST_CASE("Benchmark UltralyticsObb", "[all_models][benchmark]") {
-    for (const auto& rel : {"onnx/yolo11n/yolo11n-obb.onnx", "mnn/yolo11n-obb_nms.mnn", "trt/yolo11n-obb_nms.engine"}) {
-        auto mp = bench_data_dir() / "test_models" / rel;
-        if (!has_file(mp)) continue;
-        if (!bench_supported(rel)) continue;
-        RuntimeOption opt = bench_opt(rel);
-        detection::UltralyticsObb model(mp.string(), opt);
-        if (!model.is_initialized()) continue;
-        auto img = load_img("test_obb.jpg");
-        if (img.empty()) continue;
-        constexpr int kRuns = 20;
-        std::vector<TimerArray> runs;
-        for (int i = 0; i < kRuns; ++i) {
+    bench_yolo<detection::UltralyticsObb>("yolo26n", "yolo26n-obb", 640, "test_obb.jpg",
+        [](detection::UltralyticsObb& m, const ImageData& img) {
             std::vector<ObbResult> r;
-            TimerArray t;
-            REQUIRE(model.predict(img, &r, &t));
-            if (r.empty()) { runs.clear(); break; }
-            runs.push_back(t);
-        }
-        report(std::string("obb ") + rel, runs);
-    }
+            return m.predict(img, &r) && !r.empty();
+        });
 }
 
 TEST_CASE("Benchmark UltralyticsPose", "[all_models][benchmark]") {
-    for (const auto& rel : {"onnx/yolo11n/yolo11n-pose.onnx", "mnn/yolo11n-pose_nms.mnn", "trt/yolo11n-pose_nms.engine"}) {
-        auto mp = bench_data_dir() / "test_models" / rel;
-        if (!has_file(mp)) continue;
-        if (!bench_supported(rel)) continue;
-        RuntimeOption opt = bench_opt(rel);
-        detection::UltralyticsPose model(mp.string(), opt);
-        if (!model.is_initialized()) continue;
-        auto img = load_img("test_person.jpg");
-        if (img.empty()) continue;
-        constexpr int kRuns = 20;
-        std::vector<TimerArray> runs;
-        for (int i = 0; i < kRuns; ++i) {
+    bench_yolo<detection::UltralyticsPose>("yolo26n", "yolo26n-pose", 640, "test_person.jpg",
+        [](detection::UltralyticsPose& m, const ImageData& img) {
             std::vector<KeyPointsResult> r;
-            TimerArray t;
-            REQUIRE(model.predict(img, &r, &t));
-            if (r.empty()) { runs.clear(); break; }
-            runs.push_back(t);
-        }
-        report(std::string("pose ") + rel, runs);
-    }
+            return m.predict(img, &r) && !r.empty();
+        });
 }
 
 TEST_CASE("Benchmark UltralyticsSeg", "[all_models][benchmark]") {
-    for (const auto& rel : {"onnx/yolo11n/yolo11n-seg.onnx", "mnn/yolo11n-seg_nms.mnn", "trt/yolo11n-seg_nms.engine"}) {
-        auto mp = bench_data_dir() / "test_models" / rel;
-        if (!has_file(mp)) continue;
-        if (!bench_supported(rel)) continue;
-        RuntimeOption opt = bench_opt(rel);
-        detection::UltralyticsSeg model(mp.string(), opt);
-        if (!model.is_initialized()) continue;
-        auto img = load_img("test_person.jpg");
-        if (img.empty()) continue;
-        constexpr int kRuns = 20;
-        std::vector<TimerArray> runs;
-        for (int i = 0; i < kRuns; ++i) {
+    bench_yolo<detection::UltralyticsSeg>("yolo26n", "yolo26n-seg", 640, "test_person.jpg",
+        [](detection::UltralyticsSeg& m, const ImageData& img) {
             std::vector<InstanceSegResult> r;
-            TimerArray t;
-            REQUIRE(model.predict(img, &r, &t));
-            if (r.empty()) { runs.clear(); break; }
-            runs.push_back(t);
-        }
-        report(std::string("seg ") + rel, runs);
-    }
+            return m.predict(img, &r) && !r.empty();
+        });
+}
+
+TEST_CASE("Benchmark UltralyticsDepth", "[all_models][benchmark]") {
+    bench_yolo<detection::UltralyticsDepth>("yolo26n", "yolo26n-depth", 640, "test_person.jpg",
+        [](detection::UltralyticsDepth& m, const ImageData& img) {
+            DepthResult r;
+            return m.predict(img, &r) && !r.depth.empty();
+        });
+}
+
+TEST_CASE("Benchmark UltralyticsSem", "[all_models][benchmark]") {
+    bench_yolo<detection::UltralyticsSem>("yolo26n", "yolo26n-sem", 640, "test_person.jpg",
+        [](detection::UltralyticsSem& m, const ImageData& img) {
+            SemSegResult r;
+            return m.predict(img, &r) && !r.labels.empty();
+        });
 }
 
 // ==================== 人脸模型 ====================
@@ -732,103 +772,8 @@ TEST_CASE("Benchmark insightface pipeline", "[pipeline][benchmark]") {
 
 #ifdef ENABLE_SOPHGO
 // ==================== SOPHGO 后端（Linux + Sophon-Sail，BM1688/CV186AH） ====================
-// 遍历 test_models/sophgo/ 下所有已转换的 bmodel（fp16/int8），用对应模型类推理计时。
-// 模型转换见 tools/docker/sophgo/convert_all.sh。
-TEST_CASE("Benchmark SOPHGO models", "[sophgo][benchmark]") {
-    auto soph_dir = bench_data_dir() / "test_models" / "sophgo";
-    if (!fs::exists(soph_dir)) return;
-    RuntimeOption opt;
-    opt.use_sophgo_backend(0);
-
-    // name -> 模型类构造（用 lambda 统一 predict 到 TimerArray）
-    // 640 版 post 候选少 4x（8400 vs 33600）
-    struct SG { const char* bmodel; const char* img; };
-    const SG cfgs[] = {
-        {"yolo11n.bmodel", "test_detection0.jpg"},                  // det 640 (84类)
-        {"yolo11n_det1280_f16.bmodel", "test_detection0.jpg"},      // det 1280 f16 (单类5)
-        {"yolo11n_det1280_int8.bmodel", "test_detection0.jpg"},     // det 1280 int8 (单类5)
-        {"zhgd_without_nms_640.bmodel", "test_pedestrian_attribute.jpg"},   // zhgd 单类5
-        {"zhgd_without_nms_1280.bmodel", "test_pedestrian_attribute.jpg"},  // zhgd 单类5 1280
-        {"yolo11n-cls_f16.bmodel", "test_person.jpg"},
-        {"yolo11n-cls_int8.bmodel", "test_person.jpg"},
-        {"yolo11n-obb.bmodel", "test_obb.jpg"},                     // obb 640
-        {"yolo11n-obb_f16.bmodel", "test_obb.jpg"},                 // obb 1024 f16
-        {"yolo11n-obb_int8.bmodel", "test_obb.jpg"},                // obb 1024 int8
-        {"yolo11n-pose.bmodel", "test_person.jpg"},                 // pose 640
-        {"yolo11n-pose_f16.bmodel", "test_person.jpg"},
-        {"yolo11n-pose_int8.bmodel", "test_person.jpg"},
-        {"yolo11n-seg.bmodel", "test_person.jpg"},                  // seg 640
-        {"yolo11n-seg_f16.bmodel", "test_person.jpg"},
-        {"yolo11n-seg_int8.bmodel", "test_person.jpg"},
-    };
-    for (const auto& c : cfgs) {
-        auto mp = soph_dir / c.bmodel;
-        if (!has_file(mp)) continue;
-        auto img = load_img(c.img);
-        if (img.empty()) continue;
-        std::vector<TimerArray> runs;
-        constexpr int kRuns = 20;
-        if (std::string(c.bmodel).find("-cls") != std::string::npos) {
-            classification::Classification m(mp.string(), opt);
-            if (!m.is_initialized()) continue;
-            for (int i = 0; i < kRuns; ++i) {
-                ClassifyResult r;
-                TimerArray t;
-                auto t0 = std::chrono::high_resolution_clock::now();
-                REQUIRE(m.predict(img, &r));
-                auto t1 = std::chrono::high_resolution_clock::now();
-                TimerArray tt; tt.pre_timer.add_sample(std::chrono::duration<double, std::milli>(t1 - t0).count());
-                runs.push_back(tt);
-            }
-        } else if (std::string(c.bmodel).find("-obb") != std::string::npos) {
-            detection::UltralyticsObb m(mp.string(), opt);
-            if (!m.is_initialized()) continue;
-            // obb bmodel：yolo11n-obb.bmodel=640，_f16/_int8=1024
-            const int obb_size = (std::string(c.bmodel).find("-obb_f16") != std::string::npos ||
-                                  std::string(c.bmodel).find("-obb_int8") != std::string::npos) ? 1024 : 640;
-            m.get_preprocessor().set_size({obb_size, obb_size});
-            for (int i = 0; i < kRuns; ++i) {
-                std::vector<ObbResult> r; TimerArray t;
-                REQUIRE(m.predict(img, &r, &t));
-                if (r.empty()) { runs.clear(); break; }
-                runs.push_back(t);
-            }
-        } else if (std::string(c.bmodel).find("-pose") != std::string::npos) {
-            detection::UltralyticsPose m(mp.string(), opt);
-            if (!m.is_initialized()) continue;
-            m.get_preprocessor().set_size({640, 640});
-            for (int i = 0; i < kRuns; ++i) {
-                std::vector<KeyPointsResult> r; TimerArray t;
-                REQUIRE(m.predict(img, &r, &t));
-                if (r.empty()) { runs.clear(); break; }
-                runs.push_back(t);
-            }
-        } else if (std::string(c.bmodel).find("-seg") != std::string::npos) {
-            detection::UltralyticsSeg m(mp.string(), opt);
-            if (!m.is_initialized()) continue;
-            m.get_preprocessor().set_size({640, 640});
-            for (int i = 0; i < kRuns; ++i) {
-                std::vector<InstanceSegResult> r; TimerArray t;
-                REQUIRE(m.predict(img, &r, &t));
-                if (r.empty()) { runs.clear(); break; }
-                runs.push_back(t);
-            }
-        } else {
-            detection::UltralyticsDet m(mp.string(), opt);
-            if (!m.is_initialized()) continue;
-            // det bmodel 输入：1280（yolo11n_det1280_*）或 640（yolo11n.bmodel）
-            const int det_size = (std::string(c.bmodel).find("1280") != std::string::npos) ? 1280 : 640;
-            m.get_preprocessor().set_size({det_size, det_size});
-            for (int i = 0; i < kRuns; ++i) {
-                std::vector<DetectionResult> r; TimerArray t;
-                REQUIRE(m.predict(img, &r, &t));
-                if (r.empty()) { runs.clear(); break; }
-                runs.push_back(t);
-            }
-        }
-        report(std::string("sophgo ") + c.bmodel, runs);
-    }
-}
+// yolo26n 家族单模型在 sophgo 后端上的 benchmark 已由上方统一的 bench_yolo() 覆盖
+//（见 bench_backends() 中 SOPHGO-TPU 分支，bmodel 经 ENABLE_SOPHGO 时才启用）。
 
 // SOPHGO insightface pipeline（det + 子模型，fp16/int8）
 TEST_CASE("Benchmark SOPHGO insightface pipeline", "[sophgo][benchmark]") {
