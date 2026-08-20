@@ -183,7 +183,9 @@ static RuntimeOption bench_opt(const BenchSpec& s, int input) {
     return opt;
 }
 
-// 通用计时：先预热到首个有效结果（含 TRT-EP/engine 一次性构建，不计时），再 kRuns 次计时。
+// 通用计时：先预热（含 TRT-EP/engine 一次性构建，不计时），再 kRuns 次计时，
+// 经 report() 输出 pre/infer/post 分解（infer 即纯后端推理耗时，GPU 后端为 GPU 算时）。
+// run 返回值表示该帧结果是否有效（false 则终止该后端计时）。
 template <typename Model, typename Run>
 void bench_yolo(const char* family, const char* name, int input, const char* imgname, Run run) {
     constexpr int kRuns = 20;
@@ -203,7 +205,43 @@ void bench_yolo(const char* family, const char* name, int input, const char* img
             }
             auto img = load_img(imgname);
             if (img.empty()) continue;
-            for (int i = 0; i < 5 && !run(model, img); ++i) {}
+            { for (int i = 0; i < 5; ++i) run(model, img, nullptr); }  // 预热
+            std::vector<TimerArray> runs;
+            for (int i = 0; i < kRuns; ++i) {
+                TimerArray t;
+                if (!run(model, img, &t)) { runs.clear(); break; }
+                runs.push_back(t);
+            }
+            if (!runs.empty()) report(std::string(name) + " " + s.tag, runs);
+        } catch (const std::exception& e) {
+            std::printf("[bench][error] %-12s %s (%s)\n", s.tag, rel.string().c_str(), e.what());
+        } catch (...) {
+            std::printf("[bench][error] %-12s %s (unknown exception)\n", s.tag, rel.string().c_str());
+        }
+    }
+}
+
+// 纯墙钟总量计时（predict 无 TimerArray 的模型用，如 Classification）
+template <typename Model, typename Run>
+void bench_yolo_total_only(const char* family, const char* name, int input, const char* imgname, Run run) {
+    constexpr int kRuns = 20;
+    for (const auto& s : bench_backends()) {
+        auto rel = bench_rel(family, name, s.op);
+        auto mp = bench_data_dir() / "test_models" / rel;
+        if (!has_file(mp)) {
+            std::printf("[bench][skip] %-12s %s (missing)\n", s.tag, rel.string().c_str());
+            continue;
+        }
+        try {
+            RuntimeOption opt = bench_opt(s, input);
+            Model model(mp.string(), opt);
+            if (!model.is_initialized()) {
+                std::printf("[bench][skip] %-12s %s (init fail)\n", s.tag, rel.string().c_str());
+                continue;
+            }
+            auto img = load_img(imgname);
+            if (img.empty()) continue;
+            for (int i = 0; i < 5; ++i) run(model, img);  // 预热
             std::vector<double> times;
             for (int i = 0; i < kRuns; ++i) {
                 auto t0 = std::chrono::high_resolution_clock::now();
@@ -228,14 +266,14 @@ void bench_yolo(const char* family, const char* name, int input, const char* img
 
 TEST_CASE("Benchmark UltralyticsDet", "[all_models][benchmark]") {
     bench_yolo<detection::UltralyticsDet>("yolo26n", "yolo26n", 640, "test_detection0.jpg",
-        [](detection::UltralyticsDet& m, const ImageData& img) {
+        [](detection::UltralyticsDet& m, const ImageData& img, TimerArray* t) {
             std::vector<DetectionResult> r;
-            return m.predict(img, &r) && !r.empty();
+            return m.predict(img, &r, t) && !r.empty();
         });
 }
 
 TEST_CASE("Benchmark UltralyticsCls", "[all_models][benchmark]") {
-    bench_yolo<classification::Classification>("yolo26n", "yolo26n-cls", 224, "test_person.jpg",
+    bench_yolo_total_only<classification::Classification>("yolo26n", "yolo26n-cls", 224, "test_person.jpg",
         [](classification::Classification& m, const ImageData& img) {
             ClassifyResult r;
             return m.predict(img, &r) && !r.label_ids.empty();
@@ -244,41 +282,41 @@ TEST_CASE("Benchmark UltralyticsCls", "[all_models][benchmark]") {
 
 TEST_CASE("Benchmark UltralyticsObb", "[all_models][benchmark]") {
     bench_yolo<detection::UltralyticsObb>("yolo26n", "yolo26n-obb", 640, "test_obb.jpg",
-        [](detection::UltralyticsObb& m, const ImageData& img) {
+        [](detection::UltralyticsObb& m, const ImageData& img, TimerArray* t) {
             std::vector<ObbResult> r;
-            return m.predict(img, &r) && !r.empty();
+            return m.predict(img, &r, t) && !r.empty();
         });
 }
 
 TEST_CASE("Benchmark UltralyticsPose", "[all_models][benchmark]") {
     bench_yolo<detection::UltralyticsPose>("yolo26n", "yolo26n-pose", 640, "test_person.jpg",
-        [](detection::UltralyticsPose& m, const ImageData& img) {
+        [](detection::UltralyticsPose& m, const ImageData& img, TimerArray* t) {
             std::vector<KeyPointsResult> r;
-            return m.predict(img, &r) && !r.empty();
+            return m.predict(img, &r, t) && !r.empty();
         });
 }
 
 TEST_CASE("Benchmark UltralyticsSeg", "[all_models][benchmark]") {
     bench_yolo<detection::UltralyticsSeg>("yolo26n", "yolo26n-seg", 640, "test_person.jpg",
-        [](detection::UltralyticsSeg& m, const ImageData& img) {
+        [](detection::UltralyticsSeg& m, const ImageData& img, TimerArray* t) {
             std::vector<InstanceSegResult> r;
-            return m.predict(img, &r) && !r.empty();
+            return m.predict(img, &r, t) && !r.empty();
         });
 }
 
 TEST_CASE("Benchmark UltralyticsDepth", "[all_models][benchmark]") {
     bench_yolo<detection::UltralyticsDepth>("yolo26n", "yolo26n-depth", 640, "test_person.jpg",
-        [](detection::UltralyticsDepth& m, const ImageData& img) {
+        [](detection::UltralyticsDepth& m, const ImageData& img, TimerArray* t) {
             DepthResult r;
-            return m.predict(img, &r) && !r.depth.empty();
+            return m.predict(img, &r, t) && !r.depth.empty();
         });
 }
 
 TEST_CASE("Benchmark UltralyticsSem", "[all_models][benchmark]") {
     bench_yolo<detection::UltralyticsSem>("yolo26n", "yolo26n-sem", 640, "test_person.jpg",
-        [](detection::UltralyticsSem& m, const ImageData& img) {
+        [](detection::UltralyticsSem& m, const ImageData& img, TimerArray* t) {
             SemSegResult r;
-            return m.predict(img, &r) && !r.labels.empty();
+            return m.predict(img, &r, t) && !r.labels.empty();
         });
 }
 
