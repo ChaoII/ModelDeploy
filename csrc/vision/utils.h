@@ -35,7 +35,7 @@ namespace modeldeploy::vision::utils {
 
     cv::Rect2f rect2f_to_cv_type(Rect2f rect2f);
 
-    cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);
+    MODELDEPLOY_CXX_EXPORT cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);
 
     MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
 
@@ -44,7 +44,7 @@ namespace modeldeploy::vision::utils {
     MODELDEPLOY_CXX_EXPORT void sorted_det_results(std::vector<DetectionResult>& results);
 
 
-    void obb_nms(std::vector<ObbResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
+    MODELDEPLOY_CXX_EXPORT void obb_nms(std::vector<ObbResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 
     void nms(std::vector<DetectionResult>* result, float iou_threshold = 0.5, std::vector<int>* index = nullptr);
 

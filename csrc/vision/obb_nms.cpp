@@ -117,6 +117,7 @@ namespace modeldeploy::vision::utils {
 
     void obb_nms(std::vector<ObbResult>* result, const float iou_threshold, std::vector<int>* index) {
         const size_t N = result->size();
+        if (N == 0) return;
         // Step 1: 根据分数排序得到索引
         std::vector<int> sorted_indices(N);
         std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
@@ -124,23 +125,32 @@ namespace modeldeploy::vision::utils {
             return (*result)[a].score > (*result)[b].score; // 分数高的排前面
         });
 
-        // Step 2: NMS 主逻辑
-        std::vector suppressed(N, false);
-        std::vector<int> keep_indices;
-
+        // 预计算每个框的 cv::RotatedRect 与其轴对齐外接矩形（AABB），避免内层重复转换与相交开销
+        std::vector<cv::RotatedRect> cv_boxes(N);
+        std::vector<cv::Rect2f> aabb(N);
         for (size_t m = 0; m < N; ++m) {
-            int i = sorted_indices[m];
-            if (suppressed[i]) continue;
-            keep_indices.push_back(i); // 保留当前框
-            const auto& box_i = (*result)[i].rotated_box;
-            for (size_t n = m + 1; n < N; ++n) {
-                const int j = sorted_indices[n];
-                if (suppressed[j]) continue;
+            cv_boxes[m] = rotated_rect_to_cv_type((*result)[sorted_indices[m]].rotated_box);
+            aabb[m] = cv_boxes[m].boundingRect2f();
+        }
 
-                const auto& box_j = (*result)[j].rotated_box;
-                const float iou = rotated_iou(rotated_rect_to_cv_type(box_i), rotated_rect_to_cv_type(box_j));
-                if (iou > iou_threshold) {
-                    suppressed[j] = true;
+        // Step 2: NMS 主逻辑
+        std::vector<bool> suppressed(N, false);
+        std::vector<int> keep_indices;
+        for (size_t m = 0; m < N; ++m) {
+            if (suppressed[m]) continue;
+            keep_indices.push_back(sorted_indices[m]); // 保留当前框
+            const cv::RotatedRect& box_i = cv_boxes[m];
+            const cv::Rect2f& r_i = aabb[m];
+            for (size_t n = m + 1; n < N; ++n) {
+                if (suppressed[n]) continue;
+                // AABB 早筛：外接矩形不相交 → 旋转IoU必为0，跳过昂贵的多边形相交（等价变换，不改变抑制决策）
+                const cv::Rect2f& r_j = aabb[n];
+                if (!(r_i.x < r_j.x + r_j.width && r_j.x < r_i.x + r_i.width &&
+                      r_i.y < r_j.y + r_j.height && r_j.y < r_i.y + r_i.height)) {
+                    continue;
+                }
+                if (rotated_iou(box_i, cv_boxes[n]) > iou_threshold) {
+                    suppressed[n] = true;
                 }
             }
         }

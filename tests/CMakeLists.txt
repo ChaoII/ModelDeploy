@@ -14,6 +14,7 @@ set(TEST_SOURCES
     test_image_data.cpp
     test_capi.cpp
     test_vision_models.cpp
+    test_obb_nms.cpp
     test_processor_accuracy.cpp
     test_insightface.cpp
     test_pipelines.cpp
