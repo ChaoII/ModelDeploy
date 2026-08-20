@@ -88,7 +88,7 @@ namespace {
     }
 } // namespace
 
-TEST_CASE("obb_nms AABB-optimized matches reference (exact equivalence)", "[core]") {
+TEST_CASE("obb_nms AABB-optimized matches reference (decision equivalence)", "[core]") {
     const float thr = 0.5f;
     const std::vector<std::vector<ObbResult>> cases = {
         make_case_clustered(),
@@ -111,5 +111,49 @@ TEST_CASE("obb_nms AABB-optimized matches reference (exact equivalence)", "[core
             REQUIRE(ref[i].rotated_box.height == Catch::Approx(opt[i].rotated_box.height).margin(1e-3f));
             REQUIRE(ref[i].rotated_box.angle == Catch::Approx(opt[i].rotated_box.angle).margin(1e-3f));
         }
+    }
+}
+
+TEST_CASE("obb_nms AABB-optimized edge cases + index out-param", "[core]") {
+    // 空输入
+    std::vector<ObbResult> empty;
+    std::vector<int> idx_empty;
+    obb_nms(&empty, 0.5f, &idx_empty);
+    REQUIRE(empty.empty());
+    REQUIRE(idx_empty.empty());
+
+    // 单框
+    std::vector<ObbResult> single = {{{50, 50, 10, 10, 0}, 3, 0.9f}};
+    obb_nms(&single, 0.5f);
+    REQUIRE(single.size() == 1);
+    REQUIRE(single[0].score == 0.9f);
+    REQUIRE(single[0].label_id == 3);
+
+    // 完全重合（高置信保留，低置信抑制）
+    std::vector<ObbResult> overlap = {
+        {{10, 10, 20, 20, 0}, 0, 0.8f},
+        {{10, 10, 20, 20, 0}, 0, 0.9f},
+    };
+    obb_nms(&overlap, 0.5f);
+    REQUIRE(overlap.size() == 1);
+    REQUIRE(overlap[0].score == 0.9f);
+
+    // index 出参：应包含被保留框的原始下标，且与结果一一对应
+    const auto base = make_case_clustered();
+    std::vector<ObbResult> opt = base;
+    std::vector<int> idx;
+    obb_nms(&opt, 0.5f, &idx);
+    REQUIRE(idx.size() == opt.size());
+    for (size_t i = 0; i < opt.size(); ++i) {
+        REQUIRE(idx[i] >= 0);
+        REQUIRE(idx[i] < static_cast<int>(base.size()));
+        const auto& orig = base[static_cast<size_t>(idx[i])];
+        REQUIRE(orig.score == opt[i].score);
+        REQUIRE(orig.label_id == opt[i].label_id);
+        REQUIRE(orig.rotated_box.xc == Catch::Approx(opt[i].rotated_box.xc).margin(1e-3f));
+        REQUIRE(orig.rotated_box.yc == Catch::Approx(opt[i].rotated_box.yc).margin(1e-3f));
+        REQUIRE(orig.rotated_box.width == Catch::Approx(opt[i].rotated_box.width).margin(1e-3f));
+        REQUIRE(orig.rotated_box.height == Catch::Approx(opt[i].rotated_box.height).margin(1e-3f));
+        REQUIRE(orig.rotated_box.angle == Catch::Approx(opt[i].rotated_box.angle).margin(1e-3f));
     }
 }

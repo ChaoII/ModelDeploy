@@ -35,6 +35,8 @@ namespace modeldeploy::vision::utils {
 
     cv::Rect2f rect2f_to_cv_type(Rect2f rect2f);
 
+    // 以下两个符号由 tests/test_obb_nms.cpp（链接 SDK DLL）使用，故需导出；
+    // 与 utils.h 中其它供测试使用的函数（center_crop、sorted_det_results 等）保持一致。
     MODELDEPLOY_CXX_EXPORT cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);
 
     MODELDEPLOY_CXX_EXPORT ImageData center_crop(const ImageData& image, const cv::Size& crop_size);
