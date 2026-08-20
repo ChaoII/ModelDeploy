@@ -88,3 +88,7 @@ build_audio
 cl_capi.txt
 
 build_py
+
+# ORT-TRT-EP 运行时 engine/profile 缓存（调试 ORT-TRT-EP 时在 CWD 生成）
+TensorrtExecutionProvider_TRTKernel_*.engine
+TensorrtExecutionProvider_TRTKernel_*.profile
