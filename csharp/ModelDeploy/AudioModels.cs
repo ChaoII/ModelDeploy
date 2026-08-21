@@ -1,9 +1,9 @@
 using System;
 using ModelDeploy.types_internal_c;
-using ModelDeploy.V2.Results;
+using ModelDeploy.Results;
 using static ModelDeploy.NativeMethods;
 
-namespace ModelDeploy.V2.Models
+namespace ModelDeploy.Models
 {
     /// <summary>SenseVoice ASR。modelPath 格式: model.onnx|tokens.txt</summary>
     public sealed class SenseVoiceModel : BaseModel
@@ -13,7 +13,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public SenseVoiceModel Clone() => new SenseVoiceModel(CloneNative());
 
-        public SenseVoiceModel(string modelPath, RuntimeOption2 opt = null)
+        public SenseVoiceModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_ASR, modelPath, opt) { }
 
         public AsrResult PredictWav(string wavPath)
@@ -41,7 +41,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public KokoroModel Clone() => new KokoroModel(CloneNative());
 
-        public KokoroModel(string modelPath, RuntimeOption2 opt = null)
+        public KokoroModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_TTS, modelPath, opt) { }
 
         public TtsResult Predict(string text, string voice, float speed = 1.0f)

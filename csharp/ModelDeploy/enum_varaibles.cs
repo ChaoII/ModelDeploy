@@ -1,6 +1,6 @@
 ﻿namespace ModelDeploy
 {
-    /// <summary>设备枚举（与 capi2 MD_DEVICE 对齐）。</summary>
+    /// <summary>设备枚举（与 capi MD_DEVICE 对齐）。</summary>
     public enum Device
     {
         CPU = 0,
@@ -10,7 +10,7 @@
         VULKAN = 4
     }
 
-    /// <summary>后端枚举（与 capi2 MD_BACKEND 对齐）。</summary>
+    /// <summary>后端枚举（与 capi MD_BACKEND 对齐）。</summary>
     public enum Backend
     {
         ORT = 0,

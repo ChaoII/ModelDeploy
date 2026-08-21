@@ -9,11 +9,11 @@
 `ImageData` 当前是"cv::Mat + 后补 planes"的混合结构，存在三处设计缺陷（均有代码证据）：
 
 1. **设备帧不自描述**：`ImageDataImpl::refresh_meta()` 在 `device != CPU` 时把 `width/height/channels` 全部清零
-   （`image_data.cpp`）。设备帧因此连自身宽高都没有，capi2 不得不在外面另存 `fh->width/height`
+   （`image_data.cpp`）。设备帧因此连自身宽高都没有，capi 不得不在外面另存 `fh->width/height`
    （`md_capi.cpp`），容器描述不了自己，元数据外挂。
 2. **强依赖 OpenCV**：`cv::Mat` 是 CPU 模式的唯一真相锚点，planes 是后加的补丁；公开 API
    （`data()/y()/uv()/to_mat()`）围绕 cv::Mat 展开。
-3. **capi2 越俎代庖**：`md_image_from_nv12`（CPU cvtColor 拷贝）、`md_image_crop`、`md_draw_rect`
+3. **capi 越俎代庖**：`md_image_from_nv12`（CPU cvtColor 拷贝）、`md_image_crop`、`md_draw_rect`
    等在 `md_capi.cpp` 里各自用 cv::Mat 复刻 CPU 逻辑，与 C++ 层措辞脱节、设备盲；而
    `md_draw_result` 又已做过按 device 分派（draw_gpu / draw_bmcv）。同一套逻辑两处实现。
 
@@ -72,21 +72,21 @@
   经 `VisionProcessorBackend`（CPU/CUDA/SophgoBMCV）分派；该机制从"局部实现"扶正为统一做法。
 - 预处理器四件套：设备内优先（CUDA 走 cv-cuda/npp，BMCV 走 bmcv），零拷贝；后端未有该 op →
   明确报错，**绝不静默拷回 CPU**。cvtColor 同时承担格式转换（NV12↔BGR），设备感知。
-- 绘制：走同一分派（CPU=OpenCV，CUDA=draw_gpu，BMCV=bmcv 已登记绘制），capi2 `md_draw_*`
+- 绘制：走同一分派（CPU=OpenCV，CUDA=draw_gpu，BMCV=bmcv 已登记绘制），capi `md_draw_*`
   委托给这些 ImageData 方法，删掉 cv::Mat 复刻。
 - 编解码：保持在 CPU（OpenCV），统一走 ImageData 方法；设备帧执行 encode/save → 明确 "not CPU"
   错误，不静默拷贝；需保存设备帧时显式 `toCpu()`。
 - `predict(const ImageData&)` 成为唯一入口：识别 device≠CPU 帧，预处理器按 device 分派、设备内零拷贝。
 - 模型级 `predict_nv12(...)` 移除；"进入设备帧"统一为 `from_device_planes(y,uv,w,h,step_y,step_uv,device)`
   （零拷贝包装，正确填宽高）。
-- capi2：删除 `md_model_predict_nv12`；新增 `md_image_from_device_nv12`（包设备帧）+ `md_model_predict`
-  走通。`md_image_from_nv12`（CPU cvtColor 便捷）保留但重写为走 ImageData cvtColor。capi2 其余图像
+- capi：删除 `md_model_predict_nv12`；新增 `md_image_from_device_nv12`（包设备帧）+ `md_model_predict`
+  走通。`md_image_from_nv12`（CPU cvtColor 便捷）保留但重写为走 ImageData cvtColor。capi 其余图像
   方法改为薄委托给 ImageData。
 
 ## 第 3 节 · 错误处理与所有权/生命周期
 
 - **不使用异常**（部分 TU 未开 `/EHsc`，构建有 `C4530` 警告）。沿用仓库风格：
-  - 线程局部错误通道（对齐 capi2 `set_error/get_last_error`），操作失败写可读消息。
+  - 线程局部错误通道（对齐 capi `set_error/get_last_error`），操作失败写可读消息。
   - 就地操作（rotate、绘制、resize 就地）返回 `bool`；失败 `false` + last-error。
   - 返回值操作（crop/cvtColor/toCpu/imread/imwrite/encode）返回结果，失败返回"空"+ last-error。
   - 设备未实现 op → 明确 "device not supported" 错误，不静默降级。
@@ -108,7 +108,7 @@
   2. 操作分派层 + 三 backend 补齐预处/绘制/格式接口
   3. 编解码统一走 ImageData
   4. 收敛 `predict(ImageData)`（删模型级 `predict_nv12`）+ `from_device_planes`
-  5. capi2 图像/绘制/预测改为薄委托
+  5. capi 图像/绘制/预测改为薄委托
   6. pybind/绑定同步
   7. 删遗留 API + 全部回归 + 文档
 - 1、2 为核心；3-6 联动；7 收尾。1-2 阶段同步提供 `asMat()/toCpu()` 迁移出口，避免 C++ 消费方一步全断。
@@ -121,5 +121,5 @@
 ## 验收口径
 - 全量 CPU 回归保持基础断言数不下降。
 - 新增设备帧/零拷贝/predict 收敛测试通过。
-- capi2 图像、绘制、预测全部委托到 C++ ImageData（无 cv::Mat 复刻残留）。
+- capi 图像、绘制、预测全部委托到 C++ ImageData（无 cv::Mat 复刻残留）。
 - `predict_nv12` 公开 API 移除且无哨代码残留。

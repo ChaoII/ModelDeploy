@@ -3,7 +3,7 @@ use crate::ffi;
 use crate::types::{ImageFormat, Plane};
 use std::ffi::{CStr, CString};
 
-/// 图像（对应 capi2 MDImageHandle，生命周期由本结构管理）
+/// 图像（对应 capi MDImageHandle，生命周期由本结构管理）
 pub struct Image {
     pub(crate) handle: ffi::MDImageHandle,
     pub width: i32,

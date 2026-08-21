@@ -3,7 +3,7 @@
 #include <string>
 #include <cstdio>
 
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDImageHandle img = nullptr;
@@ -19,8 +19,8 @@ int main() {
     die(md_image_from_base64(&img, b64.c_str()), "from_base64");
     int w = 0, h = 0;
     die(md_image_size(img, &w, &h), "size");
-    die(md_image_save(img, "capi2_base64_out.png"), "save");
+    die(md_image_save(img, "capi_base64_out.png"), "save");
     md_image_destroy(img);
-    std::printf("decoded %dx%d OK -> capi2_base64_out.png\n", w, h);
+    std::printf("decoded %dx%d OK -> capi_base64_out.png\n", w, h);
     return 0;
 }

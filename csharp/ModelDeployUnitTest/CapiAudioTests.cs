@@ -1,11 +1,10 @@
 using ModelDeploy;
-using ModelDeploy.V2;
-using ModelDeploy.V2.Models;
+using ModelDeploy.Models;
 using NUnit.Framework;
 
 namespace ModelDeployUnitTest;
 
-public class Capi2AudioTests
+public class CapiAudioTests
 {
     private static string GetTestDataDir()
     {
@@ -16,9 +15,9 @@ public class Capi2AudioTests
     private static string ModelRoot => Path.Combine(GetTestDataDir(), "test_data", "test_models", "onnx");
     private static bool Has(string p) => File.Exists(p);
 
-    private static RuntimeOption2 CpuOrt()
+    private static RuntimeOption CpuOrt()
     {
-        return new RuntimeOption2().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
+        return new RuntimeOption().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
     }
 
     [Test]

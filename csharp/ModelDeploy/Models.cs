@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
-using ModelDeploy.V2.Results;
+using ModelDeploy.Results;
 using static ModelDeploy.NativeMethods;
 
-namespace ModelDeploy.V2.Models
+namespace ModelDeploy.Models
 {
     public sealed class DetectionModel : BaseModel
     {
@@ -14,7 +14,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public DetectionModel Clone() => new DetectionModel(CloneNative());
 
-        public DetectionModel(string modelPath, RuntimeOption2 opt = null)
+        public DetectionModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_DETECTION, modelPath, opt) { }
 
         public Prediction<DetectionResult> Predict(VisionImage image)
@@ -65,7 +65,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public ClassificationModel Clone() => new ClassificationModel(CloneNative());
 
-        public ClassificationModel(string modelPath, RuntimeOption2 opt = null)
+        public ClassificationModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_CLASSIFICATION, modelPath, opt) { }
 
         public Prediction<ClassificationResult> Predict(VisionImage image)
@@ -106,7 +106,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public PoseModel Clone() => new PoseModel(CloneNative());
 
-        public PoseModel(string modelPath, RuntimeOption2 opt = null)
+        public PoseModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_POSE, modelPath, opt) { }
 
         public Prediction<PoseResult> Predict(VisionImage image)
@@ -178,7 +178,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public ObbModel Clone() => new ObbModel(CloneNative());
 
-        public ObbModel(string modelPath, RuntimeOption2 opt = null)
+        public ObbModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_OBB, modelPath, opt) { }
 
         public Prediction<ObbResult> Predict(VisionImage image)
@@ -229,7 +229,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public InstanceSegModel Clone() => new InstanceSegModel(CloneNative());
 
-        public InstanceSegModel(string modelPath, RuntimeOption2 opt = null)
+        public InstanceSegModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_INSTANCE_SEG, modelPath, opt) { }
 
         public Prediction<InstanceSegResult> Predict(VisionImage image)
@@ -297,7 +297,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public SemSegModel Clone() => new SemSegModel(CloneNative());
 
-        public SemSegModel(string modelPath, RuntimeOption2 opt = null)
+        public SemSegModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_SEM_SEG, modelPath, opt) { }
 
         public Prediction<SemSegResult> Predict(VisionImage image)
@@ -328,7 +328,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public DepthModel Clone() => new DepthModel(CloneNative());
 
-        public DepthModel(string modelPath, RuntimeOption2 opt = null)
+        public DepthModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_DEPTH, modelPath, opt) { }
 
         public Prediction<DepthResult> Predict(VisionImage image)
@@ -358,7 +358,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceDetModel Clone() => new FaceDetModel(CloneNative());
 
-        public FaceDetModel(string modelPath, RuntimeOption2 opt = null)
+        public FaceDetModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_FACE_DET, modelPath, opt) { }
 
         public Prediction<FaceDetResult> Predict(VisionImage image)
@@ -430,7 +430,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceRecModel Clone() => new FaceRecModel(CloneNative());
 
-        public FaceRecModel(string modelPath, RuntimeOption2 opt = null)
+        public FaceRecModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_FACE_REC, modelPath, opt) { }
 
         public FaceRecResult Predict(VisionImage image)
@@ -450,7 +450,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceAgeModel Clone() => new FaceAgeModel(CloneNative());
 
-        public FaceAgeModel(string modelPath, RuntimeOption2 opt = null)
+        public FaceAgeModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_FACE_AGE, modelPath, opt) { }
 
         public int Predict(VisionImage image)
@@ -470,7 +470,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public FaceGenderModel Clone() => new FaceGenderModel(CloneNative());
 
-        public FaceGenderModel(string modelPath, RuntimeOption2 opt = null)
+        public FaceGenderModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_FACE_GENDER, modelPath, opt) { }
 
         public int Predict(VisionImage image)
@@ -490,7 +490,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public InsightFaceModel Clone() => new InsightFaceModel(CloneNative());
 
-        public InsightFaceModel(string modelPath, RuntimeOption2 opt = null)
+        public InsightFaceModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_INSIGHTFACE, modelPath, opt) { }
 
         public Prediction<InsightFaceResult> Predict(VisionImage image)
@@ -572,7 +572,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public OcrModel Clone() => new OcrModel(CloneNative());
 
-        public OcrModel(string modelPath, RuntimeOption2 opt = null)
+        public OcrModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_OCR, modelPath, opt) { }
 
         public Prediction<OcrResult> Predict(VisionImage image)
@@ -593,14 +593,14 @@ namespace ModelDeploy.V2.Models
         /// <summary>DB 检测最长边（缩放主控）。</summary>
         public void SetMaxSideLen(long v) => SetParam("max_side_len", v);
         /// <summary>识别子模型 batch 大小（&gt;0 固定，-1 自动）。</summary>
-        public void SetRecBatchSize(int batch)
+        public new void SetRecBatchSize(int batch)
         {
             var status = md_model_set_rec_batch_size(_handle, batch);
             if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"Set rec batch size failed: {GetLastError()}");
         }
         /// <summary>识别子模型输入形状 (c,h,w)。</summary>
-        public void SetRecImageShape(int c, int h, int w)
+        public new void SetRecImageShape(int c, int h, int w)
         {
             var status = md_model_set_rec_image_shape(_handle, c, h, w);
             if (status != MDStatus.MD_OK)
@@ -638,7 +638,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public LprModel Clone() => new LprModel(CloneNative());
 
-        public LprModel(string modelPath, RuntimeOption2 opt = null)
+        public LprModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_LPR_PIPELINE, modelPath, opt) { }
 
         public Prediction<LprResult> Predict(VisionImage image)
@@ -710,7 +710,7 @@ namespace ModelDeploy.V2.Models
         /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
         public PedestrianAttributeModel Clone() => new PedestrianAttributeModel(CloneNative());
 
-        public PedestrianAttributeModel(string modelPath, RuntimeOption2 opt = null)
+        public PedestrianAttributeModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_PED_ATTR, modelPath, opt) { }
 
         public Prediction<AttributeResult> Predict(VisionImage image)
@@ -772,7 +772,7 @@ namespace ModelDeploy.V2.Models
     {
         private DbDetectorModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR_DET, handle) { }
         public DbDetectorModel Clone() => new DbDetectorModel(CloneNative());
-        public DbDetectorModel(string modelPath, RuntimeOption2 opt = null)
+        public DbDetectorModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_OCR_DET, modelPath, opt) { }
 
         public Prediction<OcrResult> Predict(VisionImage image)
@@ -812,14 +812,14 @@ namespace ModelDeploy.V2.Models
     {
         private RecognizerModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR_REC, handle) { }
         public RecognizerModel Clone() => new RecognizerModel(CloneNative());
-        public RecognizerModel(string modelPath, RuntimeOption2 opt = null)
+        public RecognizerModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_OCR_REC, modelPath, opt) { }
 
         public Prediction<OcrResult> Predict(VisionImage image)
             => MakePrediction(image, ReadOcr);
 
         /// <summary>识别子模型输入形状 (c,h,w)。</summary>
-        public void SetRecImageShape(int c, int h, int w)
+        public new void SetRecImageShape(int c, int h, int w)
         {
             var status = md_model_set_rec_image_shape(_handle, c, h, w);
             if (status != MDStatus.MD_OK)
@@ -847,7 +847,7 @@ namespace ModelDeploy.V2.Models
     {
         private OcrClassifierModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OCR_CLS, handle) { }
         public OcrClassifierModel Clone() => new OcrClassifierModel(CloneNative());
-        public OcrClassifierModel(string modelPath, RuntimeOption2 opt = null)
+        public OcrClassifierModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_OCR_CLS, modelPath, opt) { }
 
         public Prediction<OcrResult> Predict(VisionImage image)
@@ -877,7 +877,7 @@ namespace ModelDeploy.V2.Models
     {
         private LprDetectionModel(IntPtr handle) : base(MDModelKind.MD_MODEL_LPR_DET, handle) { }
         public LprDetectionModel Clone() => new LprDetectionModel(CloneNative());
-        public LprDetectionModel(string modelPath, RuntimeOption2 opt = null)
+        public LprDetectionModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_LPR_DET, modelPath, opt) { }
 
         public Prediction<LprDetResult> Predict(VisionImage image)
@@ -909,7 +909,7 @@ namespace ModelDeploy.V2.Models
     {
         private LprRecognizerModel(IntPtr handle) : base(MDModelKind.MD_MODEL_LPR_REC, handle) { }
         public LprRecognizerModel Clone() => new LprRecognizerModel(CloneNative());
-        public LprRecognizerModel(string modelPath, RuntimeOption2 opt = null)
+        public LprRecognizerModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_LPR_REC, modelPath, opt) { }
 
         public Prediction<LprResult> Predict(VisionImage image)
@@ -940,7 +940,7 @@ namespace ModelDeploy.V2.Models
     {
         private InsightFaceDetModel(IntPtr handle) : base(MDModelKind.MD_MODEL_INSIGHTFACE_DET, handle) { }
         public InsightFaceDetModel Clone() => new InsightFaceDetModel(CloneNative());
-        public InsightFaceDetModel(string modelPath, RuntimeOption2 opt = null)
+        public InsightFaceDetModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_INSIGHTFACE_DET, modelPath, opt) { }
 
         public Prediction<FaceDetResult> Predict(VisionImage image)
@@ -976,7 +976,7 @@ namespace ModelDeploy.V2.Models
     {
         private FaceRecognizerPipelineModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_REC_PIPELINE, handle) { }
         public FaceRecognizerPipelineModel Clone() => new FaceRecognizerPipelineModel(CloneNative());
-        public FaceRecognizerPipelineModel(string modelPath, RuntimeOption2 opt = null)
+        public FaceRecognizerPipelineModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_FACE_REC_PIPELINE, modelPath, opt) { }
 
         public Prediction<FaceRecResult> Predict(VisionImage image)

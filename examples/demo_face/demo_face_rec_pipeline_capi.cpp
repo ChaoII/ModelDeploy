@@ -1,7 +1,7 @@
 //
-// capi2 人脸识别 pipeline（检测 + 特征提取）示例
+// capi 人脸识别 pipeline（检测 + 特征提取）示例
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -24,7 +24,7 @@ int main() {
 
     size_t count = 0;
     die(md_result_count(res, &count), "get count");
-    std::printf("[capi2] detected %zu faces\n", count);
+    std::printf("[capi] detected %zu faces\n", count);
     for (size_t i = 0; i < count; ++i) {
         const float* emb = nullptr;
         size_t n = 0;

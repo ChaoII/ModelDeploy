@@ -6,7 +6,7 @@ use crate::types::*;
 use std::ffi::CString;
 use std::ptr;
 
-/// 统一模型载体（capi2 单一分发内部实现；各具体模型包装它）
+/// 统一模型载体（capi 单一分发内部实现；各具体模型包装它）
 pub struct Model {
     pub(crate) handle: ffi::MDModelHandle,
     pub(crate) kind: ModelKind,
@@ -969,7 +969,7 @@ impl Drop for RawResult {
     }
 }
 
-/// 绘制选项（对应 capi2 MDDrawOptions）
+/// 绘制选项（对应 capi MDDrawOptions）
 #[derive(Default)]
 pub struct DrawOptions {
     pub threshold: f64,

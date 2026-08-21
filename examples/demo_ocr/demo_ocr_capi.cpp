@@ -1,7 +1,7 @@
 //
-// capi2 OCR 整链路示例：演示多子模型聚合创建与参数 API
+// capi OCR 整链路示例：演示多子模型聚合创建与参数 API
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -42,12 +42,12 @@ int main() {
     draw.font_path = "../../test_data/msyh.ttc";
     draw.save_result = 1;
     die(md_draw_result(img, res, &draw), "draw");
-    die(md_image_save(img, "capi2_ocr_out.jpg"), "save");
+    die(md_image_save(img, "capi_ocr_out.jpg"), "save");
 
     md_result_destroy(res);
     md_image_destroy(img);
     md_model_destroy(model);
     md_option_destroy(opt);
-    std::puts("OK -> capi2_ocr_out.jpg");
+    std::puts("OK -> capi_ocr_out.jpg");
     return 0;
 }

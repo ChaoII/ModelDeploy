@@ -4,18 +4,18 @@ using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using static ModelDeploy.NativeMethods;
 
-namespace ModelDeploy.V2
+namespace ModelDeploy
 {
     /// <summary>
-    /// capi2 运行时选项（链式 setter，替代 v1 的 MDRuntimeOption 结构体直译）。
+    /// capi 运行时选项（链式 setter，替代 v1 的 MDRuntimeOption 结构体直译）。
     /// </summary>
-    public sealed class RuntimeOption2
+    public sealed class RuntimeOption
     {
         internal IntPtr Handle { get; private set; }
         private bool _ownsHandle;
 
         /// <summary>创建默认选项（CPU + ORT）。</summary>
-        public RuntimeOption2()
+        public RuntimeOption()
         {
             md_option_create(out var h);
             Handle = h;
@@ -23,21 +23,21 @@ namespace ModelDeploy.V2
         }
 
         /// <summary>从已存在的原生句柄包装（内部使用）。</summary>
-        internal RuntimeOption2(IntPtr existing, bool owns = false)
+        internal RuntimeOption(IntPtr existing, bool owns = false)
         {
             Handle = existing;
             _ownsHandle = owns;
         }
 
-        public RuntimeOption2 UseOrt() { md_option_set_backend(Handle, 0); return this; }
-        public RuntimeOption2 UseMnn() { md_option_set_backend(Handle, 1); return this; }
-        public RuntimeOption2 UseTrt() { md_option_set_backend(Handle, 2); return this; }
-        public RuntimeOption2 UseSophgo() { md_option_set_backend(Handle, 3); return this; }
+        public RuntimeOption UseOrt() { md_option_set_backend(Handle, 0); return this; }
+        public RuntimeOption UseMnn() { md_option_set_backend(Handle, 1); return this; }
+        public RuntimeOption UseTrt() { md_option_set_backend(Handle, 2); return this; }
+        public RuntimeOption UseSophgo() { md_option_set_backend(Handle, 3); return this; }
 
-        public RuntimeOption2 SetDevice(Device d) { md_option_set_device(Handle, (int)d); return this; }
-        public RuntimeOption2 SetCpuThreads(int n) { md_option_set_cpu_threads(Handle, n); return this; }
-        public RuntimeOption2 SetFp16(bool enable) { md_option_set_fp16(Handle, enable ? 1 : 0); return this; }
-        public RuntimeOption2 SetTrtEnginePath(string path) { md_option_set_trt_engine_path(Handle, path); return this; }
+        public RuntimeOption SetDevice(Device d) { md_option_set_device(Handle, (int)d); return this; }
+        public RuntimeOption SetCpuThreads(int n) { md_option_set_cpu_threads(Handle, n); return this; }
+        public RuntimeOption SetFp16(bool enable) { md_option_set_fp16(Handle, enable ? 1 : 0); return this; }
+        public RuntimeOption SetTrtEnginePath(string path) { md_option_set_trt_engine_path(Handle, path); return this; }
 
         public void Dispose()
         {
@@ -51,7 +51,7 @@ namespace ModelDeploy.V2
     }
 
     /// <summary>
-    /// capi2 模型基类：统一句柄生命周期 + Create/Ready/Dispose。
+    /// capi 模型基类：统一句柄生命周期 + Create/Ready/Dispose。
     /// 派生类提供强类型 Predict。
     /// </summary>
     public abstract class BaseModel : IDisposable
@@ -60,13 +60,13 @@ namespace ModelDeploy.V2
         protected MDModelKind _kind;
         private bool _disposed;
 
-        protected BaseModel(MDModelKind kind, string modelPath, RuntimeOption2 opt = null)
+        protected BaseModel(MDModelKind kind, string modelPath, RuntimeOption opt = null)
         {
             _kind = kind;
-            RuntimeOption2 ownedOpt = null;
+            RuntimeOption ownedOpt = null;
             try
             {
-                ownedOpt = opt ?? new RuntimeOption2();
+                ownedOpt = opt ?? new RuntimeOption();
                 var status = md_model_create(out _handle, kind, modelPath, ownedOpt.Handle);
                 if (status != MDStatus.MD_OK)
                     throw new InvalidOperationException($"Model create failed: {GetLastError()}");

@@ -15,8 +15,8 @@
 //     数据（关键点/embedding/mask/字符串）按项取，每次仅一次调用。
 //
 
-#ifndef MD_CAPI_V2_H
-#define MD_CAPI_V2_H
+#ifndef MD_CAPI_H
+#define MD_CAPI_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -498,4 +498,4 @@ MD_CAPI_EXPORT MDStatus md_draw_result(MDImageHandle, MDResultHandle, const MDDr
 }
 #endif
 
-#endif /* MD_CAPI_V2_H */
+#endif /* MD_CAPI_H */

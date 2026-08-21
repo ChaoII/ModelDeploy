@@ -5,7 +5,7 @@
 #include "pybind/utils/utils.h"
 #include "pybind/utils/result_convert.h"
 #include "vision/common/visualize/visualize.h"
-#include "capi2/md_capi.h"
+#include "capi/md_capi.h"
 
 namespace modeldeploy::vision {
     void bind_vision_struct(const pybind11::module& m) {

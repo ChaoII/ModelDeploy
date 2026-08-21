@@ -1,52 +1,52 @@
-# Examples 全面可编译可运行 实施计划（capi2 重写 + C++ + C#）
+# Examples 全面可编译可运行 实施计划（capi 重写 + C++ + C#）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让所有 examples（C++/capi/C#）能编译并实际推理运行出结果（CPU/ORT 本机），演示本次新增的 `md_model_set_param_*` 参数 API。
 
-**Architecture:** 22 个 `*_capi.cpp` 从已删除的 v1 C API（`capi/utils/md_*.h`）重写为 capi2（`capi2/md_capi.h`）统一模板（`md_model_create(kind,path,opt)` → `md_model_predict`/`md_audio_*` → `md_result_*` → `md_draw_result` → `md_image_save`/`md_wav_save`）。修 CMake 保护平台特定目标。修 C++ `.cxx` 的 GPU/imshow 问题。C# example 全面启用测试 + 演示 SetParam。
+**Architecture:** 22 个 `*_capi.cpp` 从已删除的 v1 C API（`capi/utils/md_*.h`）重写为 capi（`capi/md_capi.h`）统一模板（`md_model_create(kind,path,opt)` → `md_model_predict`/`md_audio_*` → `md_result_*` → `md_draw_result` → `md_image_save`/`md_wav_save`）。修 CMake 保护平台特定目标。修 C++ `.cxx` 的 GPU/imshow 问题。C# example 全面启用测试 + 演示 SetParam。
 
-**Tech Stack:** C++17 / C99 capi2 / CMake / C# (.NET 9)。
+**Tech Stack:** C++17 / C99 capi / CMake / C# (.NET 9)。
 
 ## Global Constraints
 
-- capi2 头文件 `capi2/md_capi.h` 是唯一 C API 权威；不再引用 `capi/`（已删除目录）。
+- capi 头文件 `capi/md_capi.h` 是唯一 C API 权威；不再引用 `capi/`（已删除目录）。
 - 全部用 CPU/ORT 后端（`md_option_set_backend(opt, MD_BK_ORT)` + `md_option_set_device(opt, MD_DEV_CPU)`），避免 GPU/TRT。
 - 不调用阻塞 API：视觉用 `md_image_save` 代替 `md_image_show`；不调用 `waitKey`/`imshow`/`use_gpu`/`enable_trt`（除非平台条件编译保护）。
 - 模型路径相对 `../../test_data/`（examples 的可执行文件运行在 `build_tdc/bin`，cxx 源里用相对路径从 CMake 运行的 cwd 解析——统一沿用既有约定的 `../../test_data/...`）。
 - 平台特定目标（`*_sophgo`、`*_trt`、`multi_thread*`）保持 CMake 条件保护，不要求本机 CPU 推理；`demo_depth_sophgo`、`demo_sem_sophgo` 需补 `ENABLE_SOPHGO` 保护（当前缺）。
-- `${LIBRARY_NAME}` 是全项目 SDK 库变量（CMake 侧），capi2 examples 链接它即可（与既有 cxx 相同，无需新链接依赖）。
-- MDStatus 错误处理：每个 capi2 调用检查返回码，失败打印 `md_get_last_error()` 并非零退出——这是"运行不崩溃"的核心。
+- `${LIBRARY_NAME}` 是全项目 SDK 库变量（CMake 侧），capi examples 链接它即可（与既有 cxx 相同，无需新链接依赖）。
+- MDStatus 错误处理：每个 capi 调用检查返回码，失败打印 `md_get_last_error()` 并非零退出——这是"运行不崩溃"的核心。
 - 实际推理为最终验收：每个非平台特定 example 必须用 test_data 既有模型跑出结果并落盘。
 - 不改 SDK 本体，除非编译/运行阻塞且修复最小。
-- 设计 spec：`docs/superpowers/specs/2026-08-17-examples-build-run-capi2-design.md`。
+- 设计 spec：`docs/superpowers/specs/2026-08-17-examples-build-run-capi-design.md`。
 
 ---
 
-### Task 1: capi2 基础辅助头 + 模型路径常量
+### Task 1: capi 基础辅助头 + 模型路径常量
 
 **Files:**
-- Create: `examples/capi2_common.h`（可被各 `*_capi.cpp` 复用：die() + 常见 MDDrawOptions 辅助）
+- Create: `examples/capi_common.h`（可被各 `*_capi.cpp` 复用：die() + 常见 MDDrawOptions 辅助）
 
 **Interfaces:**
 - Produces: `die(MDStatus, const char*)`（供所有 Task 2-9 的 capi example 复用）
 
-- [ ] **Step 1: 写 examples/capi2_common.h**
+- [ ] **Step 1: 写 examples/capi_common.h**
 
 ```cpp
 //
-// 供 capi2 examples 复用的最小错误处理辅助
+// 供 capi examples 复用的最小错误处理辅助
 //
-#ifndef MODELDEPLOY_EXAMPLES_CAPI2_COMMON_H
-#define MODELDEPLOY_EXAMPLES_CAPI2_COMMON_H
+#ifndef MODELDEPLOY_EXAMPLES_CAPI_COMMON_H
+#define MODELDEPLOY_EXAMPLES_CAPI_COMMON_H
 
-#include "capi2/md_capi.h"
+#include "capi/md_capi.h"
 #include <cstdio>
 #include <cstdlib>
 
 inline void die(MDStatus s, const char* what) {
     if (s != MD_OK) {
-        std::fprintf(stderr, "[capi2] %s failed: %s\n", what, md_get_last_error());
+        std::fprintf(stderr, "[capi] %s failed: %s\n", what, md_get_last_error());
         std::exit(1);
     }
 }
@@ -57,8 +57,8 @@ inline void die(MDStatus s, const char* what) {
 - [ ] **Step 2: 提交**
 
 ```bash
-git add examples/capi2_common.h
-git commit -m "feat(examples): capi2 common error-checking helper"
+git add examples/capi_common.h
+git commit -m "feat(examples): capi common error-checking helper"
 ```
 
 ---
@@ -121,7 +121,7 @@ git commit -m "fix(examples): guard sophgo-only targets with ENABLE_SOPHGO"
 
 ---
 
-### Task 3: capi2 重写——视觉单模型 examples（det/pose/obb/iseg/cls/face_det）
+### Task 3: capi 重写——视觉单模型 examples（det/pose/obb/iseg/cls/face_det）
 
 **Files:**
 - Modify: `examples/demo_det/demo_detection_capi.cpp`
@@ -132,7 +132,7 @@ git commit -m "fix(examples): guard sophgo-only targets with ENABLE_SOPHGO"
 - Modify: `examples/demo_face/demo_face_det_capi.cpp`
 
 **Interfaces:**
-- Consumes: Task 1 的 `die()`；capi2 `md_model_create/predict/draw_result`；`md_result_{detection,pose,obb,instance_seg,classification,face}`
+- Consumes: Task 1 的 `die()`；capi `md_model_create/predict/draw_result`；`md_result_{detection,pose,obb,instance_seg,classification,face}`
 - Produces: 可编译可运行的六个单模型 capi example（含参数 API 演示）
 
 - [ ] **Step 1: 重写 demo_detection_capi.cpp（DETECTION，模板基准）**
@@ -141,9 +141,9 @@ git commit -m "fix(examples): guard sophgo-only targets with ENABLE_SOPHGO"
 
 ```cpp
 //
-// capi2 检测示例：演示 md_model_set_param_d 设置 conf/nms threshold
+// capi 检测示例：演示 md_model_set_param_d 设置 conf/nms threshold
 //
-#include "capi2_common.h"
+#include "capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -180,13 +180,13 @@ int main() {
     draw.font_path = "../../test_data/msyh.ttc";
     draw.save_result = 1;
     die(md_draw_result(img, res, &draw), "draw");
-    die(md_image_save(img, "capi2_detection_out.jpg"), "save");
+    die(md_image_save(img, "capi_detection_out.jpg"), "save");
 
     md_result_destroy(res);
     md_image_destroy(img);
     md_model_destroy(model);
     md_option_destroy(opt);
-    std::puts("OK -> capi2_detection_out.jpg");
+    std::puts("OK -> capi_detection_out.jpg");
     return 0;
 }
 ```
@@ -197,27 +197,27 @@ int main() {
 - kind: `MD_MODEL_POSE`；路径 `../../test_data/test_models/onnx/yolo11n/yolo11n-pose.onnx`
 - 参数：`md_model_set_param_d(model,"conf_threshold",0.4)` + `md_model_set_param_i(model,"keypoints_num",17)`
 - 结果：`md_result_pose`（MDPoseItem 数组）+ 打印；绘制 `md_draw_result` 支持 pose
-- 落盘 `capi2_pose_out.jpg`
+- 落盘 `capi_pose_out.jpg`
 
 - [ ] **Step 3: 重写 demo_obb_capi.cpp（OBB）**
 - kind `MD_MODEL_OBB`；路径 `../../test_data/test_models/onnx/yolo11n/yolo11n-obb.onnx`
-- 参数：conf/nms；结果 `md_result_obb`；落盘 `capi2_obb_out.jpg`
+- 参数：conf/nms；结果 `md_result_obb`；落盘 `capi_obb_out.jpg`
 
 - [ ] **Step 4: 重写 demo_instance_seg_capi.cpp（INSTANCE_SEG）**
 - kind `MD_MODEL_INSTANCE_SEG`；路径 `../../test_data/test_models/onnx/yolo11n/yolo11n-seg.onnx`
 - 参数：conf/nms/mask_threshold（`md_model_set_param_d(model,"mask_threshold",0.5)`）
-- 结果 `md_result_instance_seg`；绘制 mdraw_result；落盘 `capi2_iseg_out.jpg`
+- 结果 `md_result_instance_seg`；绘制 mdraw_result；落盘 `capi_iseg_out.jpg`
 
 - [ ] **Step 5: 重写 demo_classification_capi.cpp（CLASSIFICATION）**
 - kind `MD_MODEL_CLASSIFICATION`；路径 `../../test_data/test_models/onnx/yolo11n/yolo11n-cls.onnx`
 - 参数：`md_model_set_param_i(model,"top_k",5)` + `md_model_set_param_b(model,"multi_label",0)`
-- 结果 `md_result_classification`（MDClassifyItem）；绘制 md_draw_result 支持 classification；落盘 `capi2_cls_out.jpg`
+- 结果 `md_result_classification`（MDClassifyItem）；绘制 md_draw_result 支持 classification；落盘 `capi_cls_out.jpg`
 - 输入图 `../../test_data/test_images/bus.jpg`
 
 - [ ] **Step 6: 重写 demo_face_det_capi.cpp（FACE_DET）**
 - kind `MD_MODEL_FACE_DET`；路径 `../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx`
 - 参数：conf/nms/landmarks_per_face（`md_model_set_param_i(model,"landmarks_per_face",5)`）
-- 结果 `md_result_face`；落盘 `capi2_face_det_out.jpg`
+- 结果 `md_result_face`；落盘 `capi_face_det_out.jpg`
 - 输入 `../../test_data/test_images/test_face1.jpg`
 
 - [ ] **Step 7: 编译并逐个运行验证**
@@ -226,7 +226,7 @@ int main() {
 cd E:\CLionProjects\ModelDeploy
 "<VS>\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1 && cmake --build build_tdc --target demo_detection_capi demo_pose_capi demo_obb_capi demo_instance_seg_capi demo_classification_capi demo_face_det_capi
 ```
-然后逐个在 `build_tdc/bin` 运行（`cmd /c 'demo_detection_capi.exe'` 等），Expected：打印检测/分类结果 + `OK -> capi2_*_out.jpg`（实际推理出结果）。
+然后逐个在 `build_tdc/bin` 运行（`cmd /c 'demo_detection_capi.exe'` 等），Expected：打印检测/分类结果 + `OK -> capi_*_out.jpg`（实际推理出结果）。
 
 > 若某 example 因模型/图像缺失无法推理，报告 NEEDS_CONTEXT，不臆测；能跑的必须跑出结果。
 
@@ -234,28 +234,28 @@ cd E:\CLionProjects\ModelDeploy
 
 ```bash
 git add examples/demo_det/demo_detection_capi.cpp examples/demo_kps/demo_pose_capi.cpp examples/demo_obb/demo_obb_capi.cpp examples/demo_iseg/demo_instance_seg_capi.cpp examples/demo_cls/demo_classification_capi.cpp examples/demo_face/demo_face_det_capi.cpp
-git commit -m "feat(examples): rewrite capi demos to capi2 (det/pose/obb/iseg/cls/face_det) + param API"
+git commit -m "feat(examples): rewrite capi demos to capi (det/pose/obb/iseg/cls/face_det) + param API"
 ```
 
 ---
 
-### Task 4: capi2 重写——OCR / LPR / pedestrian 多模型 examples
+### Task 4: capi 重写——OCR / LPR / pedestrian 多模型 examples
 
 **Files:**
 - Modify: `examples/demo_ocr/demo_ocr_capi.cpp`
 - Modify: `examples/demo_ocr/demo_ocr_recognition_capi.cpp`（存在则合并/替换为整链 OCR）
 - Modify: `examples/demo_lpr/demo_lpr_pipeline_capi.cpp`
 - Modify: `examples/demo_pipeline/demo_pedestrian_attribute_capi.cpp`
-- （`demo_ocr_recognition_capi_batch.cpp`、`demo_pp_structure_table_capi.cpp`、`demo_lpr_detection_capi.cpp`、`demo_lpr_recognizer_capi.cpp` 视需要收编——若超出 capi2 能力则报告）
+- （`demo_ocr_recognition_capi_batch.cpp`、`demo_pp_structure_table_capi.cpp`、`demo_lpr_detection_capi.cpp`、`demo_lpr_recognizer_capi.cpp` 视需要收编——若超出 capi 能力则报告）
 
 **Interfaces:**
-- Consumes: capi2 `md_model_create`（多子模型 `|` 聚合）、`md_result_ocr`/`md_result_lpr`/`md_result_attribute`
+- Consumes: capi `md_model_create`（多子模型 `|` 聚合）、`md_result_ocr`/`md_result_lpr`/`md_result_attribute`
 - Produces: OCR/LPR/PED_ATTR capi example（含参数 API 演示）
 
 - [ ] **Step 1: 重写 demo_ocr_capi.cpp（OCR 整链路）**
 
 ```cpp
-#include "capi2_common.h"
+#include "capi_common.h"
 int main() {
     MDOptionHandle opt; md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT); md_option_set_device(opt, MD_DEV_CPU); md_option_set_cpu_threads(opt, 4);
@@ -276,53 +276,53 @@ int main() {
         die(md_result_ocr(res,i,&quad,&text,&score),"ocr");
         if (text) std::printf("  [%zu] score=%.3f %s\n", i, score, text); }
     MDDrawOptions draw{}; draw.font_path="../../test_data/msyh.ttc"; draw.save_result=1;
-    die(md_draw_result(img,res,&draw),"draw"); die(md_image_save(img,"capi2_ocr_out.jpg"),"save");
+    die(md_draw_result(img,res,&draw),"draw"); die(md_image_save(img,"capi_ocr_out.jpg"),"save");
     md_result_destroy(res); md_image_destroy(img); md_model_destroy(model); md_option_destroy(opt);
-    std::puts("OK -> capi2_ocr_out.jpg"); return 0;
+    std::puts("OK -> capi_ocr_out.jpg"); return 0;
 }
 ```
 
 - [ ] **Step 2: 重写 demo_lpr_pipeline_capi.cpp（LPR pipeline）**
 - kind `MD_MODEL_LPR_PIPELINE`；路径 `../../test_data/test_models/onnx/yolov5plate.onnx|../../test_data/test_models/onnx/plate_recognition_color.onnx`
-- 结果 `md_result_lpr` + `md_result_plate(i,&plate,&color)`；绘制；落盘 `capi2_lpr_out.jpg`
+- 结果 `md_result_lpr` + `md_result_plate(i,&plate,&color)`；绘制；落盘 `capi_lpr_out.jpg`
 - 输入 `../../test_data/test_images/` 下任一有车牌的图（若存在；按 test_data 实际图片命名）
 
 - [ ] **Step 3: 重写 demo_pedestrian_attribute_capi.cpp（PED_ATTR）**
 - kind `MD_MODEL_PED_ATTR`；路径聚合 det+attr：`../../test_data/test_models/onnx/zhgd_det.onnx|../../test_data/test_models/onnx/zhgd_ml.onnx`
 - 参数：`md_model_set_param_d(model,"det_threshold",0.5)`（PED_ATTR 支持 det_threshold）
 - 调用 `md_model_set_cls_input_size(model, 192, 256)` 与 `md_model_set_input_size(model, 1280, 1280)`（对齐 cxx 示例）
-- 结果 `md_result_attribute` + `md_result_attr_scores(i,&scores,&n)`；绘制；落盘 `capi2_attr_out.jpg`
+- 结果 `md_result_attribute` + `md_result_attr_scores(i,&scores,&n)`；绘制；落盘 `capi_attr_out.jpg`
 - 输入 `../../test_data/test_images/test_pedestrian_attribute1.jpg`
 
 - [ ] **Step 4: 编译 + 逐个运行验证**
 
 构建并运行三个目标（`demo_ocr_capi`、`demo_lpr_pipeline_capi`、`demo_pedestrian_attribute_capi`），Expected 实际推理输出 + 落盘。
 
-> `demo_ocr_recognition_capi.cpp`/`demo_ocr_recognition_capi_batch.cpp`/`demo_pp_structure_table_capi.cpp`/`demo_lpr_detection_capi.cpp`/`demo_lpr_recognizer_capi.cpp`：若这些 v1 示例在 capi2 中有等价（batch 用 `md_model_predict_batch`，structure table 可能无 capi2 等价），重写或收编；无法等价时从 CMake 移除目标并**在报告里说明**（不臆测保留带错误引用的文件）。实施者按每个文件实际情况决定，并在报告列出处置。
+> `demo_ocr_recognition_capi.cpp`/`demo_ocr_recognition_capi_batch.cpp`/`demo_pp_structure_table_capi.cpp`/`demo_lpr_detection_capi.cpp`/`demo_lpr_recognizer_capi.cpp`：若这些 v1 示例在 capi 中有等价（batch 用 `md_model_predict_batch`，structure table 可能无 capi 等价），重写或收编；无法等价时从 CMake 移除目标并**在报告里说明**（不臆测保留带错误引用的文件）。实施者按每个文件实际情况决定，并在报告列出处置。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add examples/demo_ocr examples/demo_lpr examples/demo_pipeline
-git commit -m "feat(examples): rewrite OCR/LPR/pedestrian attr capi demos to capi2"
+git commit -m "feat(examples): rewrite OCR/LPR/pedestrian attr capi demos to capi"
 ```
 
 ---
 
-### Task 5: capi2 重写——音频（ASR/TTS）examples
+### Task 5: capi 重写——音频（ASR/TTS）examples
 
 **Files:**
 - Modify: `examples/demo_audio/demo_kokoro_capi.cpp`（TTS）
 - Create/Modify: `examples/demo_audio/` 若需 ASR capi example（对应 v1 sense_voice capi，如存在）
 
 **Interfaces:**
-- Consumes: capi2 `md_model_create(kind=MD_MODEL_TTS/ASR, ...)`、`md_audio_tts`、`md_audio_asr_wav`、`md_wav_save`
+- Consumes: capi `md_model_create(kind=MD_MODEL_TTS/ASR, ...)`、`md_audio_tts`、`md_audio_asr_wav`、`md_wav_save`
 - Produces: 可运行的音频 capi example
 
 - [ ] **Step 1: 重写 demo_kokoro_capi.cpp（TTS）**
 
 ```cpp
-#include "capi2_common.h"
+#include "capi_common.h"
 int main() {
     MDOptionHandle opt; md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT); md_option_set_device(opt, MD_DEV_CPU);
@@ -339,9 +339,9 @@ int main() {
     die(md_audio_tts(model, "你好世界今天天气不错 hello world", "zf_001", 1.0f,
                      &sample_rate, &audio, &n), "tts");
     std::printf("synthesized %zu samples @ %d Hz\n", n, sample_rate);
-    die(md_wav_save(audio, n, sample_rate, "capi2_tts_out.wav"), "save wav");
+    die(md_wav_save(audio, n, sample_rate, "capi_tts_out.wav"), "save wav");
     md_model_destroy(model); md_option_destroy(opt);
-    std::puts("OK -> capi2_tts_out.wav"); return 0;
+    std::puts("OK -> capi_tts_out.wav"); return 0;
 }
 ```
 
@@ -355,17 +355,17 @@ int main() {
 
 ```bash
 git add examples/demo_audio
-git commit -m "feat(examples): rewrite audio capi demos to capi2 TTS/ASR"
+git commit -m "feat(examples): rewrite audio capi demos to capi TTS/ASR"
 ```
 
 ---
 
-### Task 6: Image examples（demo_image）capi2/null 处理
+### Task 6: Image examples（demo_image）capi/null 处理
 
 **Files:**
 - Modify: `examples/demo_image/demo_image_from_base64.cpp`
 - Modify: `examples/demo_image/demo_image_from_bgr24.cpp`
-- （`demo_image_rotate.cpp` 若用 v1 capi 则重写为 capi2，否则为 C++ 保留）
+- （`demo_image_rotate.cpp` 若用 v1 capi 则重写为 capi，否则为 C++ 保留）
 
 **Interfaces:**
 - Consumes: `md_image_from_base64`、`md_image_from_bgr24`、`md_image_size`、`md_image_save`
@@ -373,10 +373,10 @@ git commit -m "feat(examples): rewrite audio capi demos to capi2 TTS/ASR"
 
 - [ ] **Step 1: 评估并重写**
 读三个文件，判断各自是 C++ 还是 v1 capi：
-- 若引用 `capi/utils/md_*.h` → v1 capi，重写为 capi2（`md_image_from_base64`、`md_image_from_bgr24`，构造 BGR 样本 → `md_image_size` → `md_image_save`）
+- 若引用 `capi/utils/md_*.h` → v1 capi，重写为 capi（`md_image_from_base64`、`md_image_from_bgr24`，构造 BGR 样本 → `md_image_size` → `md_image_save`）
 - 若用 C++ SDK 且用 `imshow` → 改 `save`
 - 重写后编译 + 运行验证落盘
-- （此 Task 小，可与 Task 3/4 合并提交；若单独提交用 `git commit -m "feat(examples): rewrite image utils demos to capi2"`）
+- （此 Task 小，可与 Task 3/4 合并提交；若单独提交用 `git commit -m "feat(examples): rewrite image utils demos to capi"`）
 
 ---
 
@@ -388,7 +388,7 @@ git commit -m "feat(examples): rewrite audio capi demos to capi2 TTS/ASR"
 - Test: 每个改动目标编译 + 实际推理运行
 
 **Interfaces:**
-- Consumes: C++ SDK（`csrc/vision.h`），无需 capi2
+- Consumes: C++ SDK（`csrc/vision.h`），无需 capi
 - Produces: 本机 CPU 可编译可运行的 C++ examples
 
 - [ ] **Step 1: 全量 grep 清单**
@@ -485,7 +485,7 @@ Expected: 0 error（所有非平台特定 example 目标编译通过；sophgo/tr
 生成 `examples/EXAMPLES.md`（若无）或更新现有说明，列每个 example 的用途、所需模型、运行命令（用确认可跑的命令）。
 
 - [ ] **Step 3: 清理未跟踪产物**
-确认 build 产物（`*_out.jpg`、`capi2_*`）不在 working tree 中被误提交（若在根目录生成，确认删除或用 .gitignore）。
+确认 build 产物（`*_out.jpg`、`capi_*`）不在 working tree 中被误提交（若在根目录生成，确认删除或用 .gitignore）。
 
 - [ ] **Step 4: 提交（文档）**
 
@@ -499,7 +499,7 @@ git commit -m "docs(examples): catalog runnable demos with model deps + run comm
 ## Self-Review
 
 **Spec 覆盖：**
-- A. capi2 重写（22 个）→ Task 3/4/5/6
+- A. capi 重写（22 个）→ Task 3/4/5/6
 - B. 修 CMake 保护 → Task 2
 - C. C# 全面启用 + 新 API → Task 8
 - D. C++ `.cxx` 修复 → Task 7
@@ -514,7 +514,7 @@ git commit -m "docs(examples): catalog runnable demos with model deps + run comm
 
 **类型/命名一致性：**
 - `die()` 在 Task 1 定义，Task 3/4/5 复用——一致。
-- `MDModelKind` 常量（MD_MODEL_DETECTION/OCR/TTS/...）与 capi2/md_capi.h 一致。
+- `MDModelKind` 常量（MD_MODEL_DETECTION/OCR/TTS/...）与 capi/md_capi.h 一致。
 - `md_model_set_param_*` 名称与 Task 2-of-param-plan 一致。
 - `md_result_{detection,pose,obb,instance_seg,classification,face,ocr,lpr,attribute}` 均存在于 md_capi.h。
 - C# `SetParam/ParamNames` 与既有绑定一致。

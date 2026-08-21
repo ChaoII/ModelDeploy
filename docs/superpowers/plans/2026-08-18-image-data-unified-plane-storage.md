@@ -192,7 +192,7 @@ git commit -m "feat(image): supports(device,op) gate so device frames fast-fail 
 - Modify: `csrc/vision/common/basic_types.h`（`+CVT_I4202PKG_BGR`）
 - Modify: `csrc/vision/common/convert.cpp`（枚举↔ocv 映射补 `CVT_I4202PKG_BGR→COLOR_YUV2BGR_I420`）
 - Modify: `csrc/vision/processors/cpu/cpu_processor_backend.cpp`（`cvt_color` 加 `CVT_I4202PKG_BGR` 分支）
-- Modify: `capi2/md_capi.cpp`（`md_image_from_nv12/device_nv12/yuv420p` 走 `from_planes`/`cvt_color`）
+- Modify: `capi/md_capi.cpp`（`md_image_from_nv12/device_nv12/yuv420p` 走 `from_planes`/`cvt_color`）
 - Test: `tests/test_image_data.cpp`、`tests/test_capi.cpp`
 
 **Interfaces:**
@@ -208,7 +208,7 @@ ImageData::Plane pl[2] = {{y, step_y>0?step_y:w},{uv, step_uv>0?step_uv:w}};
 auto img = ImageData::from_planes(pl,2,MdImageType::NV12, w,h, dev, /*owner*/{});
 // host NV12 借用（device=CPU）同式，owner 传保活（若有）。
 ```
-涉及：`capi2/md_capi.cpp:321`（from_nv12）、`md_image_from_device_nv12`、后端 letterbox（cpu/cuda/sophgo 的 `md_ln...`/NV12 预处理调用处，若它们用 from_device_planes 则改）、`test_image_data.cpp:395/560-589` 等。删除 `from_device_planes` 声明（或保留标记 deprecated，按审阅定——默认删除，全部迁移后无引用）。
+涉及：`capi/md_capi.cpp:321`（from_nv12）、`md_image_from_device_nv12`、后端 letterbox（cpu/cuda/sophgo 的 `md_ln...`/NV12 预处理调用处，若它们用 from_device_planes 则改）、`test_image_data.cpp:395/560-589` 等。删除 `from_device_planes` 声明（或保留标记 deprecated，按审阅定——默认删除，全部迁移后无引用）。
 
 - [x] **Step 2: 新增 CVT_I4202PKG_BGR**
 
@@ -245,7 +245,7 @@ if (bgr.empty()) return MD_ERR_IMAGE_DECODE;  // 内部 set_error 由 cvt 填
 
 - [x] **Step 5: 运行 + Commit**
 
-Run: `.\\test_modeldeploy.exe "capi2*"` 与 `"*nv12*"` 全绿；`commit -m "feat(image): from_planes generalized; CVT_I4202PKG_BGR; capi nv12/yuv420p rerouted through ImageData"`
+Run: `.\\test_modeldeploy.exe "capi*"` 与 `"*nv12*"` 全绿；`commit -m "feat(image): from_planes generalized; CVT_I4202PKG_BGR; capi nv12/yuv420p rerouted through ImageData"`
 
 ---
 
@@ -314,7 +314,7 @@ Run: `.\\test_modeldeploy.exe "capi2*"` 与 `"*nv12*"` 全绿；`commit -m "feat
 ### Task 6: C API 图像操作全部走 ImageData 桥（§6）
 
 **Files:**
-- Modify: `capi2/md_capi.cpp`
+- Modify: `capi/md_capi.cpp`
 - Test: `tests/test_capi.cpp`
 
 **Interfaces:**
@@ -335,7 +335,7 @@ Run: `.\\test_modeldeploy.exe "capi2*"` 与 `"*nv12*"` 全绿；`commit -m "feat
 
 - [x] **Step 3: Run + Commit**
 
-Run: `.\\test_modeldeploy.exe "capi2*"` 全绿；`commit -m "refactor(capi): image ops all route through ImageData bridge (asMat/plane/cvt_color)"`
+Run: `.\\test_modeldeploy.exe "capi*"` 全绿；`commit -m "refactor(capi): image ops all route through ImageData bridge (asMat/plane/cvt_color)"`
 
 ---
 
@@ -369,7 +369,7 @@ Run: `cmake --build build_tdc --target test_modeldeploy` 全绿；`.\test_modeld
 
 - [x] **Step 1: 回归基线**
 
-Run: `.\test_modeldeploy.exe "~[model]"`（TEST_DATA_DIR 设仓库根）& `"capi2*"` & `"*nv12*"` & `"image_data*"` → 全绿。
+Run: `.\test_modeldeploy.exe "~[model]"`（TEST_DATA_DIR 设仓库根）& `"capi*"` & `"*nv12*"` & `"image_data*"` → 全绿。
 - [x] **Step 2: 像素级等价抽查**：NV12→BGR、I420→BGR（yuv420p）、RGB24→BGR、`from_bgr24` 与 `md_image_from_bgr24` 逐位一致。
 - [x] **Step 3: 设备帧 fast-fail 抽查**：GPU/TPU 帧 `crop/resize/rotate/cvt_color/rotate_crop` + capi `show/save/encode/draw_*` → 均报错不崩不静默。
 - [x] **Step 4: Commit**（如有修正）

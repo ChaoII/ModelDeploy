@@ -1,6 +1,6 @@
 //
 // Python 侧 ImageData 绑定：外部构造 NV12（host/device）帧，统一零拷贝 NV12 推理路径。
-//  - from_nv12         : host NV12，库内拷入自有缓冲（安全，无需调用方保活）——与 capi2 md_image_from_nv12_owned 一致。
+//  - from_nv12         : host NV12，库内拷入自有缓冲（安全，无需调用方保活）——与 capi md_image_from_nv12_owned 一致。
 //  - from_device_nv12  : 设备/主机 NV12 零拷贝借用（y/uv 指向调用方内存，不拷贝）；调用方须保证缓冲在 predict 期间存活。
 // 需模型文件（[model] 标签，CI 下载）时才走真实推理；本绑定仅为构造帧，供 predict/ImageData 路径使用。
 //

@@ -53,9 +53,9 @@ struct ImageDataImpl {
 - `from_bgr24(const uint8_t*,w,h)` → **降为 `from_raw(data,w,h,PKG_BGR_U8,false)` 的内联便捷别名**（5 个测试点，生产无调用）。保留符号避免波及测试/文档。
 - 删除：`from_device_planes`（13 处调用点迁移到 `from_planes`）、以 storage 区分的双 Mat 构造。
 - **消费兼容**【全部在 spec 审阅时核对，关键：
-  - `md_image_from_bgr24`（capi2:285）继续走 `from_raw`（现已是）。✅
-  - `md_image_from_nv12`（capi2:321）→ `from_planes(NV12, 2p)`。✅
-  - `md_image_from_device_nv12`（capi2）→ `from_planes(NV12, device 参数)`。✅
+  - `md_image_from_bgr24`（capi:285）继续走 `from_raw`（现已是）。✅
+  - `md_image_from_nv12`（capi:321）→ `from_planes(NV12, 2p)`。✅
+  - `md_image_from_device_nv12`（capi）→ `from_planes(NV12, device 参数)`。✅
   - pybind ~45 个 `Mat&&` 构造点 → `ImageData(const cv::Mat&)` 可接（&& 并入）。✅
   - `from_raw(NV12)` 现生产 3 处（batch_scheduler:154 / infer_group:210 / benchmark_yolo_preproc:54）→ 统一到新平面语义（真实 h），下游 `fused_preprocess` 改读 `plane(0/1)`。
 
@@ -120,7 +120,7 @@ C API 里凡"绕过 ImageData、直接在 `hi->data` 上 `cv::Mat`"的图像函�
 ## 7. 迁移与兼容
 
 - **对外 C ABI 不变**（`md_*` 签名不动）；`ImageData` C++ 公开方法名 `plane(i)/asMat/toCpu/clone/...` 保留；删除 `from_device_planes`/`from_bgr24`（改别名）。
-- **必须同步改的消费方**（调研已枚举，spec 审阅时报数）：capi2 5 处 `md_image_*`、6 个 ultralytics 模型后处理器（NV12→BGR 用 plane）、3 个 backend（cpu/cuda/sophgo 的 letterbox/draw 用 plane(0/1)）、pybind、utils/face_align、ppocr(rotate_crop)、batch_scheduler/infer_group/benchmark（from_raw NV12）、test_image_data/test_capi/test_vision_models。
+- **必须同步改的消费方**（调研已枚举，spec 审阅时报数）：capi 5 处 `md_image_*`、6 个 ultralytics 模型后处理器（NV12→BGR 用 plane）、3 个 backend（cpu/cuda/sophgo 的 letterbox/draw 用 plane(0/1)）、pybind、utils/face_align、ppocr(rotate_crop)、batch_scheduler/infer_group/benchmark（from_raw NV12）、test_image_data/test_capi/test_vision_models。
 - **验收**（回归基线）：
   - 全量非模型 `~[model]` ≥ 现状 1094/113 全绿；
   - 新增/修订测试覆盖：`from_raw(NV12)` 真实高度、自分配 YUV 非空、`from_planes(I420/NV21)` 自描述、`cvt_color`/`toCpu` 对 NV21/I420 显式拒绝、`CVT_NV122PKG_BGR` 像素等价、CPU-only NV12→BGR 补测、`asMat` packed-only、device 帧 crop/rotate/resize/rotate_crop fast-fail（不建 backend）、`clone` 设备守卫；

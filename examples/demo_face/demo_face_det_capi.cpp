@@ -1,7 +1,7 @@
 //
-// capi2 人脸检测示例：演示 md_model_set_param_d/i
+// capi 人脸检测示例：演示 md_model_set_param_d/i
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -45,9 +45,9 @@ int main() {
     draw.save_result = 1;
     MDStatus ds = md_draw_result(img, res, &draw);
     if (ds != MD_OK) {
-        std::fprintf(stderr, "[capi2] draw face_det unsupported (%s), saving original image\n", md_get_last_error());
+        std::fprintf(stderr, "[capi] draw face_det unsupported (%s), saving original image\n", md_get_last_error());
     } else {
-        die(md_image_save(img, "capi2_face_det_out.jpg"), "save");
+        die(md_image_save(img, "capi_face_det_out.jpg"), "save");
     }
 
     md_result_destroy(res);
@@ -55,7 +55,7 @@ int main() {
     md_model_destroy(model);
     md_option_destroy(opt);
     if (ds == MD_OK)
-        std::puts("OK -> capi2_face_det_out.jpg");
+        std::puts("OK -> capi_face_det_out.jpg");
     else
         std::puts("OK -> face detection printed (draw unsupported)");
     return 0;

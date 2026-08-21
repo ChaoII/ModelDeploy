@@ -18,10 +18,15 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsSegPostprocessor::run_without_nms(
         std::vector<Tensor>& tensors, std::vector<std::vector<InstanceSegResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
-        //(1,116,8400)->(1,8400,116)  116=4(xc,yc,w,h)+80(coco 80 classes)+32(mask coefficient)
-        tensors[0] = tensors[0].transpose({0, 2, 1}).contiguous();
+        //(1,116,8400)  116=4(xc,yc,w,h)+80(coco 80 classes)+32(mask coefficient)
+        // 无需转置物化：直接按 [B,C,N] 布局分块扫 class 行求 max，只对过阈候选解码 box/mask。
         auto mask_nums = tensors[1].shape()[1];
         size_t batch = tensors[0].shape()[0];
+        const size_t channels = tensors[0].shape()[1];  // 116
+        const size_t anchors = tensors[0].shape()[2];   // 8400
+        const size_t num_classes = channels - 4 - static_cast<size_t>(mask_nums);  // 80
+        const size_t num_box_channels = 4;              // xc,yc,w,h
+        const size_t num_mask_channels = static_cast<size_t>(mask_nums);           // 32
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             // store mask information
@@ -30,35 +35,44 @@ namespace modeldeploy::vision::detection {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
-            const size_t dim1 = tensors[0].shape()[1]; //8400
-            const size_t dim2 = tensors[0].shape()[2]; //84
-            const float* data = static_cast<const float*>(tensors[0].data()) + bs * dim1 * dim2;
+            const float* data = static_cast<const float*>(tensors[0].data()) + bs * channels * anchors;
             std::vector<InstanceSegResult> _results;
-            for (size_t i = 0; i < dim1; ++i) {
-                const float* attr_ptr = data + i * dim2;
-                float cls_conf = attr_ptr[4];
-                // 使用引用避免拷贝
-                const std::vector<float> mask_embedding(attr_ptr + dim2 - mask_nums, attr_ptr + dim2);
-                // 直接在原vector上操作，避免创建临时变量
-                for (size_t j = 0; j < mask_embedding.size(); ++j) {
-                    const_cast<std::vector<float>&>(mask_embedding)[j] *= cls_conf;
+            // 分块：块内锚点顺序可达，class 行顺序读（cache 友好），无全量转置写
+            const size_t kBlock = 256;
+            for (size_t blk = 0; blk < anchors; blk += kBlock) {
+                const size_t cnt = std::min(kBlock, anchors - blk);
+                float maxs[256];
+                int argmax[256];
+                const float* c0 = data + num_box_channels * anchors + blk;  // 通道4（class 0）
+                for (size_t i = 0; i < cnt; ++i) { maxs[i] = c0[i]; argmax[i] = 0; }
+                for (size_t c = 1; c < num_classes; ++c) {
+                    const float* row = data + (num_box_channels + c) * anchors + blk;
+                    for (size_t i = 0; i < cnt; ++i) {
+                        if (row[i] > maxs[i]) { maxs[i] = row[i]; argmax[i] = static_cast<int>(c); }
+                    }
                 }
-                const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2 - mask_nums);
-                float confidence = *max_class_score;
-                // filter boxes by conf_threshold
-                if (confidence <= conf_threshold_) {
-                    continue;
+                for (size_t i = 0; i < cnt; ++i) {
+                    const float confidence = maxs[i];
+                    if (confidence <= conf_threshold_) continue;
+                    const size_t a = blk + i;
+                    // 与旧实现一致：mask embedding 用 class 0 分数缩放（attr_ptr[4] 语义）
+                    const float cls_conf = data[num_box_channels * anchors + a];
+                    std::vector<float> mask_embedding;
+                    mask_embedding.reserve(num_mask_channels);
+                    const size_t mask_base = num_box_channels + num_classes;  // 84 通道偏移（mask 系数通道起始），非字节偏移
+                    for (size_t j = 0; j < num_mask_channels; ++j) {
+                        mask_embedding.push_back(data[(mask_base + j) * anchors + a] * cls_conf);
+                    }
+                    // convert from [xc, yc, w, h] to [x, y, width, height]
+                    Rect2f box{
+                        data[0 * anchors + a] - data[2 * anchors + a] / 2.0f,
+                        data[1 * anchors + a] - data[3 * anchors + a] / 2.0f,
+                        data[2 * anchors + a],
+                        data[3 * anchors + a]
+                    };
+                    mask_embeddings.push_back(std::move(mask_embedding));
+                    _results.push_back({box, Mask(), argmax[i], confidence});
                 }
-                auto label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
-                // convert from [xc, yc, w, h] to [w, y, w, h]
-                Rect2f box{
-                    attr_ptr[0] - attr_ptr[2] / 2.0f,
-                    attr_ptr[1] - attr_ptr[3] / 2.0f,
-                    attr_ptr[2],
-                    attr_ptr[3]
-                };
-                mask_embeddings.push_back(mask_embedding);
-                _results.push_back({box, Mask(), label_id, confidence}); // 使用emplace_back避免拷贝
             }
             if (_results.empty()) {
                 continue;

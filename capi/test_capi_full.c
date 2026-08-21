@@ -1,4 +1,4 @@
-/* capi2 综合验证：覆盖主要模型 kind 的完整流程（数组式 getter） */
+/* capi 综合验证：覆盖主要模型 kind 的完整流程（数组式 getter） */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

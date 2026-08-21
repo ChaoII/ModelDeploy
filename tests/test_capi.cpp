@@ -1,5 +1,5 @@
 //
-// capi2 设备帧/绘制相关回归测试（无需模型文件，CI 安全）
+// capi 设备帧/绘制相关回归测试（无需模型文件，CI 安全）
 //
 // 覆盖 Task 5 新增/改动：
 //   - md_image_handle 统一持有 ImageData image（from_bgr24/from_nv12 均已填充）
@@ -11,7 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "capi2/md_capi.h"
+#include "capi/md_capi.h"
 
 #include <cstring>
 #include <cstdlib>
@@ -32,7 +32,7 @@ std::vector<unsigned char> make_gray_bgr(int w, int h) {
 
 } // namespace
 
-TEST_CASE("capi2 image handle holds unified ImageData", "[capi]") {
+TEST_CASE("capi image handle holds unified ImageData", "[capi]") {
     const int w = 64, h = 48;
     auto bgr = make_gray_bgr(w, h);
     MDImageHandle img = nullptr;
@@ -57,7 +57,7 @@ TEST_CASE("capi2 image handle holds unified ImageData", "[capi]") {
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 nv12 input converts to CPU BGR and plane_ptrs rejects it", "[capi]") {
+TEST_CASE("capi nv12 input converts to CPU BGR and plane_ptrs rejects it", "[capi]") {
     const int w = 64, h = 48;
     std::vector<unsigned char> y(w * h, 128);
     std::vector<unsigned char> uv(w * h / 2, 128);
@@ -83,7 +83,7 @@ TEST_CASE("capi2 nv12 input converts to CPU BGR and plane_ptrs rejects it", "[ca
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 nv12 from delegate: CPU BGR handle usable by md_draw_rect", "[capi]") {
+TEST_CASE("capi nv12 from delegate: CPU BGR handle usable by md_draw_rect", "[capi]") {
     const int w = 64, h = 48;
     std::vector<unsigned char> y(w * h, 128);
     std::vector<unsigned char> uv(w * h / 2, 128);
@@ -104,7 +104,7 @@ TEST_CASE("capi2 nv12 from delegate: CPU BGR handle usable by md_draw_rect", "[c
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 null args are rejected", "[capi]") {
+TEST_CASE("capi null args are rejected", "[capi]") {
     MDDevice dev;
     void* y;
     void* uv;
@@ -120,7 +120,7 @@ TEST_CASE("capi2 null args are rejected", "[capi]") {
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 model set param + introspection", "[capi]") {
+TEST_CASE("capi model set param + introspection", "[capi]") {
     // 自省：names
     const char* names = nullptr;
     REQUIRE(md_model_param_names(MD_MODEL_DETECTION, &names) == MD_OK);
@@ -178,7 +178,7 @@ TEST_CASE("capi2 model set param + introspection", "[capi]") {
 }
 
 // 端到端 setter：需可加载的检测模型（[model] 标签，CI 有模型时执行）
-TEST_CASE("capi2 detection param setter on loaded model", "[model]") {
+TEST_CASE("capi detection param setter on loaded model", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string modelfile = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
@@ -206,7 +206,7 @@ TEST_CASE("capi2 detection param setter on loaded model", "[model]") {
 }
 
 // PedestrianAttribute pipeline：cls batch size setter 的合法性验证（[model] 有数据时执行）
-TEST_CASE("capi2 ped-attr cls batch size setter", "[model]") {
+TEST_CASE("capi ped-attr cls batch size setter", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string det = data_dir + "/test_models/onnx/zhgd_det.onnx";
@@ -239,7 +239,7 @@ TEST_CASE("capi2 ped-attr cls batch size setter", "[model]") {
 }
 
 // LPR_DET：阈值 + 输入尺寸 全链路暴露（此前为整类黑盒）
-TEST_CASE("capi2 lpr-det setter + introspection", "[model]") {
+TEST_CASE("capi lpr-det setter + introspection", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string model = data_dir + "/test_models/onnx/yolov5plate.onnx";
@@ -272,7 +272,7 @@ TEST_CASE("capi2 lpr-det setter + introspection", "[model]") {
 }
 
 // OCR：det_max_side_len / cls_batch / rec_batch / rec_image_shape 全链路暴露
-TEST_CASE("capi2 ocr setter batch + shape", "[model]") {
+TEST_CASE("capi ocr setter batch + shape", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string ocr_dir = data_dir + "/test_models/onnx/ocr/ppocrv6_tiny";
@@ -319,12 +319,12 @@ TEST_CASE("capi2 ocr setter batch + shape", "[model]") {
 
 // 非对应 kind 上的 size 路由不应崩溃：FACE_REC_PIPELINE 缺模型时跳过路由测试仅需 det 类已覆盖，
 // 这里验证 UNSUPPORTED 分支（nullptr → MODEL_INIT）
-TEST_CASE("capi2 ocr batch size rejects wrong kind", "[capi]") {
+TEST_CASE("capi ocr batch size rejects wrong kind", "[capi]") {
     CHECK(md_model_set_rec_batch_size(nullptr, 1) == MD_ERR_MODEL_INIT);
     CHECK(md_model_set_rec_image_shape(nullptr, 3, 48, 320) == MD_ERR_MODEL_INIT);
 }
 
-TEST_CASE("capi2 option device id setter", "[capi]") {
+TEST_CASE("capi option device id setter", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
 
@@ -341,7 +341,7 @@ TEST_CASE("capi2 option device id setter", "[capi]") {
     md_option_destroy(opt);
 }
 
-TEST_CASE("capi2 face anti-spoof enum + spoof getter guards", "[capi]") {
+TEST_CASE("capi face anti-spoof enum + spoof getter guards", "[capi]") {
     // 新增 kind 在合法枚举范围内（不越界、不撞 MD_MODEL_COUNT）
     CHECK(static_cast<int>(MD_MODEL_FACE_AS_SECOND) < static_cast<int>(MD_MODEL_COUNT));
 
@@ -361,7 +361,7 @@ TEST_CASE("capi2 face anti-spoof enum + spoof getter guards", "[capi]") {
 }
 
 // 端到端人脸防伪：需模型文件（[model] 标签，CI 有模型时执行）
-TEST_CASE("capi2 face anti-spoof inference (first)", "[model]") {
+TEST_CASE("capi face anti-spoof inference (first)", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string model = data_dir + "/test_models/onnx/face/fas_first.onnx";
@@ -394,7 +394,7 @@ TEST_CASE("capi2 face anti-spoof inference (first)", "[model]") {
     md_model_destroy(as);
 }
 
-TEST_CASE("capi2 md_image_from_yuv420p matches reference cvtColor(COLOR_YUV2BGR_I420)", "[capi]") {
+TEST_CASE("capi md_image_from_yuv420p matches reference cvtColor(COLOR_YUV2BGR_I420)", "[capi]") {
     const int w = 16, h = 16;  // 偶宽偶高（I420 转换要求）
     std::vector<unsigned char> flat(static_cast<size_t>(w) * h * 3 / 2);
     for (size_t i = 0; i < flat.size(); ++i)
@@ -429,7 +429,7 @@ TEST_CASE("capi2 md_image_from_yuv420p matches reference cvtColor(COLOR_YUV2BGR_
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane, self-describes", "[capi]") {
+TEST_CASE("capi image_from_device_nv12 wraps zero-copy two-plane, self-describes", "[capi]") {
     const int w = 16, h = 16;
     std::vector<unsigned char> y(w * h, 100), uv(w * h / 2, 100);
     MDImageHandle img = nullptr;
@@ -448,7 +448,7 @@ TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane, self-describe
 }
 
 // 元数据 getter：type=MdImageType 数值, dev=MDDevice, nplanes=平面数（NV12=2, packed=1）
-TEST_CASE("capi2 md_image_info returns type/device/plane metadata", "[capi]") {
+TEST_CASE("capi md_image_info returns type/device/plane metadata", "[capi]") {
     // GPU 设备 NV12 两平面帧（外部 y/uv 借用，仅验证元数据）：type=NV12(60), dev=GPU, nplanes=2
     const int w = 16, h = 16;
     std::vector<unsigned char> y(static_cast<size_t>(w) * h, 100),
@@ -486,7 +486,7 @@ TEST_CASE("capi2 md_image_info returns type/device/plane metadata", "[capi]") {
     md_image_destroy(img2);
 }
 
-TEST_CASE("capi2 crop delegates to ImageData, preserves CPU/OOB/device semantics", "[capi]") {
+TEST_CASE("capi crop delegates to ImageData, preserves CPU/OOB/device semantics", "[capi]") {
     const int w = 16, h = 16;
     auto bgr = make_gray_bgr(w, h);
     MDImageHandle img = nullptr;
@@ -522,7 +522,7 @@ TEST_CASE("capi2 crop delegates to ImageData, preserves CPU/OOB/device semantics
 // 且"依赖型" getter（keypoints/mask 等）在未先调用数组 getter 时也应安全。
 // 旧实现把已投影的 ProjectedResult 当 ResultData 强转（正式 UB，classification 会读到野值）。
 //
-TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") {
+TEST_CASE("capi result getters are idempotent and standalone-safe", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
@@ -610,7 +610,7 @@ TEST_CASE("capi2 result getters are idempotent and standalone-safe", "[model]") 
 }
 
 // 2D 批量结果 API：predict_batch 按图分组，逐图 *_batch getter 返回每图自己的项数组
-TEST_CASE("capi2 batch result is per-image grouped (2D)", "[model]") {
+TEST_CASE("capi batch result is per-image grouped (2D)", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
@@ -666,7 +666,7 @@ TEST_CASE("capi2 batch result is per-image grouped (2D)", "[model]") {
     md_option_destroy(opt);
 }
 
-TEST_CASE("capi2 rgb24 input converts to BGR identical to reference", "[capi]") {
+TEST_CASE("capi rgb24 input converts to BGR identical to reference", "[capi]") {
     const int w = 32, h = 24;
     std::vector<unsigned char> rgb(static_cast<size_t>(w) * h * 3);
     for (size_t i = 0; i < rgb.size(); i += 3) {
@@ -699,7 +699,7 @@ TEST_CASE("capi2 rgb24 input converts to BGR identical to reference", "[capi]") 
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 device NV12 frame ops return UNSUPPORTED_TYPE", "[capi]") {
+TEST_CASE("capi device NV12 frame ops return UNSUPPORTED_TYPE", "[capi]") {
     const int w = 16, h = 16;
     std::vector<unsigned char> y(w * h, 100), uv(w * h / 2, 100);
     MDImageHandle dev = nullptr;
@@ -711,8 +711,8 @@ TEST_CASE("capi2 device NV12 frame ops return UNSUPPORTED_TYPE", "[capi]") {
     size_t n = 0;
     CHECK(md_image_encode(dev, ".bmp", &enc, &n) == MD_ERR_UNSUPPORTED_TYPE);
     // save（asMat 失败前不应写文件）
-    CHECK(md_image_save(dev, "capi2_t6_should_not_exist.bmp") == MD_ERR_UNSUPPORTED_TYPE);
-    CHECK(!std::filesystem::exists("capi2_t6_should_not_exist.bmp"));
+    CHECK(md_image_save(dev, "capi_t6_should_not_exist.bmp") == MD_ERR_UNSUPPORTED_TYPE);
+    CHECK(!std::filesystem::exists("capi_t6_should_not_exist.bmp"));
     // draw_rect
     MDColorRGBA c{255, 0, 0, 255};
     CHECK(md_draw_rect(dev, 1, 1, 4, 4, c, 1.0f) == MD_ERR_UNSUPPORTED_TYPE);
@@ -722,7 +722,7 @@ TEST_CASE("capi2 device NV12 frame ops return UNSUPPORTED_TYPE", "[capi]") {
     md_image_destroy(dev);
 }
 
-TEST_CASE("capi2 CPU BGR frame encode/save still OK", "[capi]") {
+TEST_CASE("capi CPU BGR frame encode/save still OK", "[capi]") {
     const int w = 16, h = 16;
     auto bgr = make_gray_bgr(w, h);
     MDImageHandle img = nullptr;
@@ -742,7 +742,7 @@ TEST_CASE("capi2 CPU BGR frame encode/save still OK", "[capi]") {
     md_image_destroy(img);
 }
 
-TEST_CASE("capi2 predict_batch rejects null args (no model needed)", "[capi]") {
+TEST_CASE("capi predict_batch rejects null args (no model needed)", "[capi]") {
     MDImageHandle img = nullptr;
     const int w = 16, h = 16;
     auto bgr = make_gray_bgr(w, h);
@@ -759,7 +759,7 @@ TEST_CASE("capi2 predict_batch rejects null args (no model needed)", "[capi]") {
 }
 
 // 端到端批量：需可加载的检测模型（[model] 标签，CI 有模型时执行）
-TEST_CASE("capi2 predict_batch detection flattens both images", "[model]") {
+TEST_CASE("capi predict_batch detection flattens both images", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
@@ -826,7 +826,7 @@ TEST_CASE("capi2 predict_batch detection flattens both images", "[model]") {
 }
 
 // Task 3：单值类 kind 批量 getter —— 无模型可测的 NULL_POINTER 错误路径（[capi]）
-TEST_CASE("capi2 single-value batch getters reject null args (no model needed)", "[capi]") {
+TEST_CASE("capi single-value batch getters reject null args (no model needed)", "[capi]") {
     MDResultHandle h = nullptr;
     const int* items = nullptr;
     size_t count = 0;
@@ -858,7 +858,7 @@ TEST_CASE("capi2 single-value batch getters reject null args (no model needed)",
 }
 
 // Task 3：真实 age 批量断言（模型存在时才执行；无模型环境直接跳过保持 [capi] 全绿）
-TEST_CASE("capi2 age batch getters + single-getter compat (real model, guarded)", "[capi]") {
+TEST_CASE("capi age batch getters + single-getter compat (real model, guarded)", "[capi]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
     const std::string age_file = data_dir + "/test_models/onnx/face/age_predictor.onnx";

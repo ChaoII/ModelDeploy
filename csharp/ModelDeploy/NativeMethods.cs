@@ -1,5 +1,5 @@
 //
-// P/Invoke 统一入口：ModelDeploySDK (capi2) 的全部 extern 集中在此管理。
+// P/Invoke 统一入口：ModelDeploySDK (capi) 的全部 extern 集中在此管理。
 // 模型类通过 `using static ModelDeploy.NativeMethods;` 直接裸调用。
 //
 
@@ -11,7 +11,7 @@ namespace ModelDeploy
 {
     /// <summary>
     /// ModelDeploySDK 原生绑定统一入口（partial，按模块拆文件）。
-    /// 全部基于 capi2：不透明句柄（IntPtr）+ 数组式 getter。
+    /// 全部基于 capi：不透明句柄（IntPtr）+ 数组式 getter。
     /// </summary>
     internal static partial class NativeMethods
     {

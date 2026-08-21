@@ -159,7 +159,7 @@ pub struct TtsAudio {
     pub sample_rate: i32,
 }
 
-/// 模型类型（对应 capi2 MDModelKind）
+/// 模型类型（对应 capi MDModelKind）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelKind {
     Detection,

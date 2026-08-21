@@ -1,4 +1,4 @@
-/* capi2 音频验证：ASR（SenseVoice）+ TTS（Kokoro）+ wav 落盘 */
+/* capi 音频验证：ASR（SenseVoice）+ TTS（Kokoro）+ wav 落盘 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +37,7 @@ static void run_asr(void) {
         /* 用识别出的文本合成测试 wav 落盘（生成 0.2s 正弦波验证 wav 写出） */
         float tone[4800];
         for (int i = 0; i < 4800; ++i) tone[i] = 0.1f * (float)((i * 440) % 22050) / 22050.0f;
-        check("wav_save", md_wav_save(tone, 4800, 24000, "capi2/_tmp_tone.wav"));
+        check("wav_save", md_wav_save(tone, 4800, 24000, "capi/_tmp_tone.wav"));
         md_model_destroy(m);
     }
     md_option_destroy(opt);

@@ -1,7 +1,7 @@
 //
-// capi2 人脸年龄示例
+// capi 人脸年龄示例
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -23,7 +23,7 @@ int main() {
 
     int age = 0;
     die(md_result_age(res, &age), "get age");
-    std::printf("[capi2] age: %d\n", age);
+    std::printf("[capi] age: %d\n", age);
 
     md_result_destroy(res);
     md_image_destroy(img);

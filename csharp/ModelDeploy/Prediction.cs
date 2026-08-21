@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using static ModelDeploy.NativeMethods;
 
-namespace ModelDeploy.V2
+namespace ModelDeploy
 {
     /// <summary>
     /// 预测结果：同时持有原生结果句柄 + 惰性读取的托管列表。

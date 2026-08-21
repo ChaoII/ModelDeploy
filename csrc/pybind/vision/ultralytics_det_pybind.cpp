@@ -4,7 +4,7 @@
 
 #include "pybind/utils/utils.h"
 #include "vision/detection/ultralytics_det.h"
-#include "capi2/md_capi.h"
+#include "capi/md_capi.h"
 
 namespace modeldeploy::vision {
     void bind_ultralytics_det(const pybind11::module& m) {

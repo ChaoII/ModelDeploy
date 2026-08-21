@@ -1,7 +1,7 @@
 //
-// capi2 人脸识别（embedding 提取）示例
+// capi 人脸识别（embedding 提取）示例
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -27,7 +27,7 @@ int main() {
         const float* emb = nullptr;
         size_t n = 0;
         die(md_result_face_embedding(res, i, &emb, &n), "get embedding");
-        std::printf("[capi2] face[%zu] embedding dim=%zu\n", i, n);
+        std::printf("[capi] face[%zu] embedding dim=%zu\n", i, n);
         std::printf("  first values:");
         for (size_t k = 0; k < n && k < 8; ++k)
             std::printf(" %.4f", emb[k]);

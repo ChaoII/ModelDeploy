@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 `ImageData` 重写为多设备统一的设备帧容器 + 按 device 分派的操作层，并让 `predict(ImageData)` 成为唯一推理入口（收敛 `predict_nv12`/`from_nv12`），capi2 图像/绘制/预测改为薄委托。
+**Goal:** 把 `ImageData` 重写为多设备统一的设备帧容器 + 按 device 分派的操作层，并让 `predict(ImageData)` 成为唯一推理入口（收敛 `predict_nv12`/`from_nv12`），capi 图像/绘制/预测改为薄委托。
 
 **Architecture:** `ImageData`（值类型 → `shared_ptr<ImageDataImpl>`）描述 planes/fmt/w/h/device + 一个 `Storage` 承载抽象（CPU=OpenCV，GPU=CUDA，TPU=BMCV）。所有 op（resize/crop/rotate/cvtColor/绘制/编解码）按 `device()` 经 `VisionProcessorBackend` 分派。`predict(const ImageData&)` 识别设备帧后设备内零拷贝预处。
 
-**Tech Stack:** C++17、CMake/Ninja/MSVC（win 本机）/OpenCV（CPU）、CUDA（GPU）、SophgoBMCV（TPU）、capi2（C ABI）、pybind11/C#（后续绑定），Catch2 测试。
+**Tech Stack:** C++17、CMake/Ninja/MSVC（win 本机）/OpenCV（CPU）、CUDA（GPU）、SophgoBMCV（TPU）、capi（C ABI）、pybind11/C#（后续绑定），Catch2 测试。
 
 **Spec:** `docs/superpowers/specs/2026-08-17-image-data-multidevice-rewrite-design.md`
 
@@ -14,10 +14,10 @@
 
 - 分支 `capi-v2`；本机构建缓存 `build_tdc`（BUILD_CAPI=ON、BUILD_AUDIO=ON、BUILD_VISION=ON、ENABLE_ORT=ON、ENABLE_SOPHGO=OFF、WITH_GPU=OFF、BUILD_TESTS=ON、BUILD_BENCHMARK=OFF）。**不要重配 CMake**，仅增量 `cmd /c '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1 && cmake --build build_tdc --target <目标>'`。
 - 运行 demo/测试从 `build_tdc\bin`（`../../test_data` 相对该 cwd 解析到仓库根）。
-- **不使用异常**（部分 TU 未开 `/EHsc`）。错误走线程局部错误通道（对齐 capi2 `set_error/get_last_error`）。
+- **不使用异常**（部分 TU 未开 `/EHsc`）。错误走线程局部错误通道（对齐 capi `set_error/get_last_error`）。
 - 设备未实现的 op → 明确 "device not supported" 错误，**绝不静默拷回 CPU**。
 - 每阶段必须全量 CPU 回归保持基础断言数不下降（口基准：339 断言 / 94 用例）。
-- 改动范围仅限 `csrc/`、`capi2/`、`tests/`、`examples/`、绑定目录；不改第三方。
+- 改动范围仅限 `csrc/`、`capi/`、`tests/`、`examples/`、绑定目录；不改第三方。
 
 ---
 
@@ -74,7 +74,7 @@ public:
 };
 ```
 
-> 实现者注意：`Device`、`MdImageType`、`RotateFlags`、`MDColorRGBA` 均已存在（见 `csrc/core/*`、`csrc/vision/common/basic_types.h`、`capi2/md_capi.h`）。`MDColorRGBA` 在 capi2 定义——若 `image_data.h` 不想依赖 capi2，则在 `csrc/vision/common/` 定义等价 `struct RgbaColor{uint8_t r,g,b,a;}` 并在 ImageData 绘制用 RgbaColor；capi2 侧做映射。**用 `RgbaColor`，避免 csrc→capi2 反向依赖。**
+> 实现者注意：`Device`、`MdImageType`、`RotateFlags`、`MDColorRGBA` 均已存在（见 `csrc/core/*`、`csrc/vision/common/basic_types.h`、`capi/md_capi.h`）。`MDColorRGBA` 在 capi 定义——若 `image_data.h` 不想依赖 capi，则在 `csrc/vision/common/` 定义等价 `struct RgbaColor{uint8_t r,g,b,a;}` 并在 ImageData 绘制用 RgbaColor；capi 侧做映射。**用 `RgbaColor`，避免 csrc→capi 反向依赖。**
 
 ---
 
@@ -273,10 +273,10 @@ TEST_CASE("image_data: imread/imwrite roundtrip (CPU)", "[core]") {
     auto img = modeldeploy::vision::ImageData::imread("test_data/test_images/test_detection0.jpg");
     REQUIRE(!img.empty());
     auto out = img.clone();
-    REQUIRE(out.imwrite("capi2_plan_tmp_out.jpg"));
-    auto again = modeldeploy::vision::ImageData::imread("capi2_plan_tmp_out.jpg");
+    REQUIRE(out.imwrite("capi_plan_tmp_out.jpg"));
+    auto again = modeldeploy::vision::ImageData::imread("capi_plan_tmp_out.jpg");
     REQUIRE(!again.empty());
-    std::remove("capi2_plan_tmp_out.jpg");
+    std::remove("capi_plan_tmp_out.jpg");
 }
 
 TEST_CASE("image_data: device nv12 frame imwrite is not-supported (no silent cpu)", "[core]") {
@@ -315,7 +315,7 @@ git commit -m "feat(image): codec unified through ImageData (CPU), device non-si
 - [ ] **Step 1: 定位所有 `predict_nv12`**
 
 ```
-rg -n "predict_nv12" csrc capi2 tests
+rg -n "predict_nv12" csrc capi tests
 ```
 列出清单，作为移除范围。
 
@@ -339,10 +339,10 @@ git commit -m "refactor(vision): converge to predict(ImageData); remove model-le
 
 ---
 
-### Task 5: capi2 图像/绘制/预测薄委托 + 收敛 nv12 API
+### Task 5: capi 图像/绘制/预测薄委托 + 收敛 nv12 API
 
 **Files:**
-- Modify: `capi2/md_capi.cpp`、`capi2/md_capi.h`
+- Modify: `capi/md_capi.cpp`、`capi/md_capi.h`
 - Test: `tests/test_capi.cpp`
 
 **Interfaces:**
@@ -356,7 +356,7 @@ git commit -m "refactor(vision): converge to predict(ImageData); remove model-le
 - [ ] **Step 1: 失败测试（[capi]）**
 
 ```cpp
-TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane", "[capi]") {
+TEST_CASE("capi image_from_device_nv12 wraps zero-copy two-plane", "[capi]") {
     const int w=16,h=16; std::vector<unsigned char> y(w*h,0), uv(w*h/2,0);
     MDImageHandle img=nullptr;
     REQUIRE(md_image_from_device_nv12(&img, y.data(), uv.data(), w,h, w, w, MD_DEV_CPU)==MD_OK);
@@ -364,7 +364,7 @@ TEST_CASE("capi2 image_from_device_nv12 wraps zero-copy two-plane", "[capi]") {
     CHECK(ow==w); CHECK(oh==h);   // 设备帧自描述，不再依赖外带 w/h
     md_image_destroy(img);
 }
-TEST_CASE("capi2 predict_nv12 removed", "[capi]") {
+TEST_CASE("capi predict_nv12 removed", "[capi]") {
     // 编译期：如果函数仍导出会编译错；此处仅占位断言（删除函数后无需调用）
     CHECK(true);
 }
@@ -376,7 +376,7 @@ TEST_CASE("capi2 predict_nv12 removed", "[capi]") {
 - [ ] **Step 5: 提交**
 
 ```bash
-git add capi2/md_capi.h capi2/md_capi.cpp tests/test_capi.cpp
+git add capi/md_capi.h capi/md_capi.cpp tests/test_capi.cpp
 git commit -m "refactor(capi): delegate image/draw/predict to ImageData; md_image_from_device_nv12; drop predict_nv12"
 ```
 
@@ -417,7 +417,7 @@ git commit -m "refactor(bindings): sync with planarized ImageData; drop nv12 leg
 - Consumes: Task 1-6。
 - Produces：无遗留 nv12/predict_nv12 的干净 API 面。
 
-- [ ] **Step 1: rg 清理**：`rg -n "predict_nv12|\bdata\(\)|\.to_mat|->y\(\)|->uv\(\)" csrc capi2 tests examples csharp rust pybind`，确保无残留（或一一迁移）。
+- [ ] **Step 1: rg 清理**：`rg -n "predict_nv12|\bdata\(\)|\.to_mat|->y\(\)|->uv\(\)" csrc capi tests examples csharp rust pybind`，确保无残留（或一一迁移）。
 - [ ] **Step 2: 全量构建 + 回归**
 
 ```
@@ -443,7 +443,7 @@ git commit -m "refactor(image): remove legacy data()/nv12 API; docs + full regre
 **Spec 覆盖：**
 - 容器平面化（spec §1）→ Task 1
 - 预处理器四件套分派（spec §2.1）→ Task 2
-- 绘制分派（spec §2.2）→ Task 2（+Task 5 capi2 委托）
+- 绘制分派（spec §2.2）→ Task 2（+Task 5 capi 委托）
 - 编解码（spec §2.3）→ Task 3
 - 收敛 predict_nv12/from_nv12（spec §2.4）→ Task 4、Task 5
 - 错误通道/所有权（spec §3）→ Task 1（last_error/Storage keeper）、Task 2

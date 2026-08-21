@@ -26,7 +26,7 @@ ModelDeploy SDK 的 C++ 层各模型通过 `get_preprocessor()/get_postprocessor
 C#/Rust 绑定
     │  kv 透传 + 自省驱动强类型包装
     ▼
-capi2/md_capi.*        ← md_model_set_param_* + md_model_param_names/type
+capi/md_capi.*        ← md_model_set_param_* + md_model_param_names/type
     │  kind × 参数名 分发表（数据驱动，switch→static_cast→setter）
     ▼
 C++ 模型类 (det/pose/obb/iseg/cls/face/ocr/lpr/ped/insightface…)
@@ -39,7 +39,7 @@ pre/postprocessor 对象（参数实际存储处 = 模型持久状态）
 
 ## C API 设计
 
-### 新增头文件声明（`capi2/md_capi.h`）
+### 新增头文件声明（`capi/md_capi.h`）
 
 ```c
 /* ==================== 模型前/后处理参数 ==================== */

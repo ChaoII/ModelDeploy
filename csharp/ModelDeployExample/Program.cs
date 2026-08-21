@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using ModelDeploy;
-using ModelDeploy.V2;
-using ModelDeploy.V2.Models;
+using ModelDeploy;
+using ModelDeploy.Models;
 
 namespace TestModelDeploy;
 
@@ -11,8 +11,8 @@ static class Program
     private static readonly string TestDataPath =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "test_data"));
 
-    private static RuntimeOption2 CpuOrt() =>
-        new RuntimeOption2().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
+    private static RuntimeOption CpuOrt() =>
+        new RuntimeOption().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
 
     static void TestImage()
     {

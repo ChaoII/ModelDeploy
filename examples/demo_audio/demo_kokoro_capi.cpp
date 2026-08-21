@@ -1,7 +1,7 @@
 //
-// capi2 TTS（Kokoro）示例
+// capi TTS（Kokoro）示例
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -33,10 +33,10 @@ int main() {
     die(md_audio_tts(model, "你好世界今天天气不错 hello world", "zf_001", 1.0f,
                      &sample_rate, &audio, &n), "tts");
     std::printf("synthesized %zu samples @ %d Hz\n", n, sample_rate);
-    die(md_wav_save(audio, n, sample_rate, "capi2_tts_out.wav"), "save wav");
+    die(md_wav_save(audio, n, sample_rate, "capi_tts_out.wav"), "save wav");
 
     md_model_destroy(model);
     md_option_destroy(opt);
-    std::puts("OK -> capi2_tts_out.wav");
+    std::puts("OK -> capi_tts_out.wav");
     return 0;
 }

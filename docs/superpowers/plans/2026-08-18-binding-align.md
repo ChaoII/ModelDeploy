@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 C# 与 Rust 绑定的视觉推理入口收敛为与 C++ `predict(const ImageData&)` 一致的"唯一 `predict(Image)` + Image 指针/设备工厂"，撤掉所有 NV12 变体与元组，并补齐统一 `PredictBatch` / `predict_batch`（需先在 capi2 原生实现 `md_model_predict_batch`）。
+**Goal:** 把 C# 与 Rust 绑定的视觉推理入口收敛为与 C++ `predict(const ImageData&)` 一致的"唯一 `predict(Image)` + Image 指针/设备工厂"，撤掉所有 NV12 变体与元组，并补齐统一 `PredictBatch` / `predict_batch`（需先在 capi 原生实现 `md_model_predict_batch`）。
 
-**Architecture:** 三层推进——先在 capi2 原生层实现 `md_model_predict_batch`（重构 `md_model_predict` 的逐 kind 逻辑为共享累加器，DRY）与图像元数据 getter `md_image_info`；再改 C#（NativeMethods→VisionImage→BaseModel→Models）；最后改 Rust（ffi→Image→model）并更新 README 与两端测试。每层独立可测、可提交。
+**Architecture:** 三层推进——先在 capi 原生层实现 `md_model_predict_batch`（重构 `md_model_predict` 的逐 kind 逻辑为共享累加器，DRY）与图像元数据 getter `md_image_info`；再改 C#（NativeMethods→VisionImage→BaseModel→Models）；最后改 Rust（ffi→Image→model）并更新 README 与两端测试。每层独立可测、可提交。
 
-**Tech Stack:** C++17 (capi2 原生)、C# (.NET)、Rust (无外部依赖的安全 FFI 包装)、Catch2 / NUnit / cargo test。
+**Tech Stack:** C++17 (capi 原生)、C# (.NET)、Rust (无外部依赖的安全 FFI 包装)、Catch2 / NUnit / cargo test。
 
 ## Global Constraints
 
@@ -22,7 +22,7 @@
 
 ## 文件结构
 
-- `capi2/md_capi.h`、`capi2/md_capi.cpp` — 原生：新增 `md_image_info`、`md_model_predict_batch` 及单值 kind 的批量 getter 扩展。
+- `capi/md_capi.h`、`capi/md_capi.cpp` — 原生：新增 `md_image_info`、`md_model_predict_batch` 及单值 kind 的批量 getter 扩展。
 - `tests/test_capi*.cpp`（或新 capi 测试） — 原生 capi 测试。
 - `csharp/ModelDeploy/V2/VisionImage.cs` — 加 Type/Device/PlaneCount/GetPlane、FromDeviceNv12(IntPtr)、宿主自动 pin；删 FromDeviceFrame 公开。
 - `csharp/ModelDeploy/V2/BaseModel.cs` — 删 MakePredictionNv12/WithFrame；加 PredictBatch 辅助。
@@ -36,10 +36,10 @@
 
 ---
 
-### Task 1: capi2 原生 — 新增 `md_image_info` 图像元数据 getter
+### Task 1: capi 原生 — 新增 `md_image_info` 图像元数据 getter
 
 **Files:**
-- Modify: `capi2/md_capi.h`（声明）、`capi2/md_capi.cpp`（实现）
+- Modify: `capi/md_capi.h`（声明）、`capi/md_capi.cpp`（实现）
 - Test: `tests/test_capi_image.cpp`（或并入既有 capi 测试文件）
 
 **Interfaces:**
@@ -71,10 +71,10 @@ MDStatus md_image_info(MDImageHandle h, int* type, int* dev, int* nplanes) {
 
 ---
 
-### Task 2: capi2 原生 — 实现 `md_model_predict_batch`
+### Task 2: capi 原生 — 实现 `md_model_predict_batch`
 
 **Files:**
-- Modify: `capi2/md_capi.cpp`（1341-1589 区域）
+- Modify: `capi/md_capi.cpp`（1341-1589 区域）
 - Test: `tests/test_capi_batch.cpp`（新）
 
 **Interfaces:**
@@ -136,10 +136,10 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n, 
 
 ---
 
-### Task 3: capi2 原生 — 单值 kind 批量 getter 扩展
+### Task 3: capi 原生 — 单值 kind 批量 getter 扩展
 
 **Files:**
-- Modify: `capi2/md_capi.cpp`（`md_result_age` 2099、`md_result_gender` 2107、`md_result_sem_seg` 1843、`md_result_depth` 1856、`md_result_ocr` 1984）
+- Modify: `capi/md_capi.cpp`（`md_result_age` 2099、`md_result_gender` 2107、`md_result_sem_seg` 1843、`md_result_depth` 1856、`md_result_ocr` 1984）
 - Test: `tests/test_capi_batch.cpp`
 
 **Interfaces:**

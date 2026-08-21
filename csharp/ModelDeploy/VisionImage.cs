@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using static ModelDeploy.NativeMethods;
 
-namespace ModelDeploy.V2
+namespace ModelDeploy
 {
     /// <summary>图像像素类型（对齐 csrc/vision/common/basic_types.h 的 ImageType）。</summary>
     public enum MdImageType
@@ -24,7 +24,7 @@ namespace ModelDeploy.V2
     }
 
     /// <summary>
-    /// capi2 图像包装：内部持有 MDImageHandle（IntPtr），生命周期由本类管理。
+    /// capi 图像包装：内部持有 MDImageHandle（IntPtr），生命周期由本类管理。
     /// 对齐 C++ ImageData：类型/设备/平面数元信息 + 主机/NV12 设备工厂。
     /// </summary>
     public sealed class VisionImage : IDisposable
@@ -224,7 +224,7 @@ namespace ModelDeploy.V2
         public byte[] ToByteArray()
         {
             // BGR 数据 = Handle 内部 data；通过 encode 到 PNG 再解码不可行，直接取内部指针需要额外 API。
-            // capi2 未暴露裸指针读取，走 encode(".bmp") 保证无损返回像素。
+            // capi 未暴露裸指针读取，走 encode(".bmp") 保证无损返回像素。
             // 说明：BMP 编码有 54 字节头，此处返回原始像素区。
             var encoded = Encode(".bmp");
             int headerSize = 54;

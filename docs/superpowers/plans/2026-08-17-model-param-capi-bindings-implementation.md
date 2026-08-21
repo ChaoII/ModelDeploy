@@ -6,7 +6,7 @@
 
 **Architecture:** capi 新增 `md_model_set_param_i/d/b/s` + 自省 `md_model_param_names/type`，内部用"kind × 参数名"分发表把 kv 映射到 C++ 模型的 `get_preprocessor()/get_postprocessor().set_*()`（沿用现有 `md_model_set_input_size` 的 switch+static_cast 模式）。C++ 层为 pipeline 子模型补齐缺失的 public setter。C#/Rust 做 kv 透传 + 自省驱动强类型包装。
 
-**Tech Stack:** C++17，capi2（C API），C#（P/Invoke），Rust（FFI），Catch2（capi 测试）。
+**Tech Stack:** C++17，capi（C API），C#（P/Invoke），Rust（FFI），Catch2（capi 测试）。
 
 ## Global Constraints
 
@@ -73,8 +73,8 @@ git commit -m "feat(vision): expose FaceRecognizerPipeline det submodel getter f
 ### Task 2: capi 分发表 + 4 个 setter + 2 个自省函数
 
 **Files:**
-- Modify: `capi2/md_capi.h`（枚举 + 6 个函数声明）
-- Modify: `capi2/md_capi.cpp`（分发表 + 实现）
+- Modify: `capi/md_capi.h`（枚举 + 6 个函数声明）
+- Modify: `capi/md_capi.cpp`（分发表 + 实现）
 - Test: `tests/test_capi.cpp`
 
 **Interfaces:**
@@ -262,7 +262,7 @@ Expected: 0 error。
 新增 TEST_CASE，覆盖：det set conf/nms 成功、ocr_det set 各参数、自省 names/type、错误码（未知名 → INVALID_ARGUMENT、类型不匹配 → INVALID_TYPE、kind 无参数 → 空 names）：
 
 ```cpp
-TEST_CASE("capi2 model set param + introspection", "[capi]") {
+TEST_CASE("capi model set param + introspection", "[capi]") {
     // 自省
     const char* names = nullptr;
     REQUIRE(md_model_param_names(MD_MODEL_DETECTION, &names) == MD_OK);
@@ -295,7 +295,7 @@ Expected: 全部通过（含新增自省用例）。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add capi2/md_capi.h capi2/md_capi.cpp tests/test_capi.cpp
+git add capi/md_capi.h capi/md_capi.cpp tests/test_capi.cpp
 git commit -m "feat(capi): model pre/post-process param setters + introspection (md_model_set_param_*)"
 ```
 
@@ -307,7 +307,7 @@ git commit -m "feat(capi): model pre/post-process param setters + introspection 
 - Modify: `csharp/ModelDeploy/NativeMethods.cs`
 - Modify: `csharp/ModelDeploy/V2/BaseModel.cs`
 - Modify: `csharp/ModelDeploy/V2/Models.cs`
-- Test: `csharp/ModelDeployUnitTest/Capi2VisionTests.cs`（可选冒烟）
+- Test: `csharp/ModelDeployUnitTest/CapiVisionTests.cs`（可选冒烟）
 
 **Interfaces:**
 - Consumes: Task 2 的 6 个 C 函数
@@ -448,7 +448,7 @@ git commit -m "feat(rust): model pre/post-process param setter + introspection"
 
 **Files:**
 - Test: `tests/test_capi.cpp`（已有）、`csharp/ModelDeployUnitTest`、`rust/modeldeploy/tests`
-- Docs: 更新 `docs/capi2_bindings_analysis.md`（如存在）或 README 的 C API 一览（如被维护）
+- Docs: 更新 `docs/capi_bindings_analysis.md`（如存在）或 README 的 C API 一览（如被维护）
 
 **Interfaces:**
 - Consumes: Task 2/3/4 全部产出

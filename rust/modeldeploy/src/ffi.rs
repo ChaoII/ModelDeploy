@@ -1,6 +1,6 @@
 //! ModelDeploy C API v2 的 Rust FFI 绑定（手动定义）
 //!
-//! 对应 CAPI 头文件: capi2/md_capi.h
+//! 对应 CAPI 头文件: capi/md_capi.h
 //! 设计: 不透明句柄（MDModelHandle/MDImageHandle/MDResultHandle/MDOptionHandle = 裸指针）
 //! 所有函数均为 `extern "C"` 调用，通过 link 到 ModelDeploySDK 动态库
 

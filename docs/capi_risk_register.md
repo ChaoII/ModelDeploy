@@ -1,7 +1,7 @@
 # capiv2 风险登记表（Risk Register）
 
 > 登记日期：2026-08-18
-> 来源：`capi2`（`capi2/md_capi.h` / `capi2/md_capi.cpp`）设计分析，逐行代码核查得出。
+> 来源：`capi`（`capi/md_capi.h` / `capi/md_capi.cpp`）设计分析，逐行代码核查得出。
 > 状态词表：`未处理` / `处理中` / `已修复` / `接受风险`
 > 级别定义：
 > - **高**：现有用法即可触发，后果为内存破坏 / 未定义行为；
@@ -9,7 +9,7 @@
 > - **低**：语义 / 命名 / 提示类问题，不影响正确性；
 > - **信息**：设计层面的可选增强项。
 >
-> 配套文档：[capi2_bindings_analysis.md](capi2_bindings_analysis.md)（设计分析）、
+> 配套文档：[capi_bindings_analysis.md](capi_bindings_analysis.md)（设计分析）、
 > [capi_cpp_language_binding_best_practices.md](capi_cpp_language_binding_best_practices.md)（最佳实践手册）。
 
 ---
@@ -82,7 +82,7 @@ vtable 指针 / `v` / `origin`），读取结果是**未定义行为**（读到�
 - 长期：见 R2（handle 改双槽位后此问题从根上消失）。
 
 **修复记录（2026-08-18）**：已按短期方案落地，`tests/test_capi.cpp` 新增回归
-`capi2 result getters are idempotent and standalone-safe`（[model]，本地已跑通）：
+`capi result getters are idempotent and standalone-safe`（[model]，本地已跑通）：
 - 新增 `project_cached<Src,Dst>(rh, fill)` 助手：已缓存同类型投影则幂等复用，否则经 `raw_result` 解析真实 origin 构建；
 - 7 个数组 getter（detection / classification / pose / obb / instance_seg / insightface / attribute）改用之；
 - "依赖型" getter（pose keypoints / iseg mask / insightface kps·embedding·pose / attr_scores / face_kps / plate / lpr_keypoints）改为直接读 `raw_result`，不再假设必须先调数组 getter；

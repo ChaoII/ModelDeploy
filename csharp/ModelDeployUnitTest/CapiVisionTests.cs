@@ -1,12 +1,11 @@
 using ModelDeploy;
-using ModelDeploy.V2;
-using ModelDeploy.V2.Models;
-using ModelDeploy.V2.Results;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
 using NUnit.Framework;
 
 namespace ModelDeployUnitTest;
 
-public class Capi2VisionTests
+public class CapiVisionTests
 {
     private static string GetTestDataDir()
     {
@@ -19,9 +18,9 @@ public class Capi2VisionTests
 
     private static bool Has(string p) => File.Exists(p);
 
-    private static RuntimeOption2 CpuOrt()
+    private static RuntimeOption CpuOrt()
     {
-        return new RuntimeOption2().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
+        return new RuntimeOption().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
     }
 
     // ==================== VisionImage ====================

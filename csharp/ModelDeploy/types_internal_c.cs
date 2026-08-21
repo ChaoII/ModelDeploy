@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 
 //
-// capi2 原生类型映射（types_internal_c）
+// capi 原生类型映射（types_internal_c）
 // 句柄一律用 IntPtr；结果项结构为 blittable（纯数值、无指针），供 Marshal.PtrToStructure 循环读取。
 //
 

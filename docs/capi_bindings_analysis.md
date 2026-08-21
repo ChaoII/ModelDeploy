@@ -1,6 +1,6 @@
 # capiv2 与 C#/Rust 绑定对比分析
 
-> 主题：`capi2`（C API v2）+ 它的 C#（`csharp/ModelDeploy/V2`）与 Rust（`rust/modeldeploy`）
+> 主题：`capi`（C API v2）+ 它的 C#（`csharp/ModelDeploy/V2`）与 Rust（`rust/modeldeploy`）
 > 绑定，对比原始的 `capi/`（C API v1）绑定方案；
 > 并横向对比另一个分支 `tensor-decouple-device-memory` 的核心重构。
 >
@@ -10,7 +10,7 @@
 >
 > 配套可落地的操作指南见 [capi_cpp_language_binding_best_practices.md](capi_cpp_language_binding_best_practices.md)
 > （C 封装 C++、供多语言绑定的最佳实践，含参数设置/前后处理参数/踩坑清单/范例）；
-> 已知设计缺陷与风险登记见 [capi2_risk_register.md](capi2_risk_register.md)。
+> 已知设计缺陷与风险登记见 [capi_risk_register.md](capi_risk_register.md)。
 
 ---
 
@@ -19,7 +19,7 @@
 | 对比项 | 原始 capi（v1） | capiv2 + 新绑定 |
 |--------|----------------|-----------------|
 | 本质 | 每个模型一把独立的裸 C 函数族，结构体对外暴露 | 一套"不透明句柄 + 单一分发 + 统一所有权 + blittable 结果"的稳定 C ABI |
-| 代码规模 | 61 个文件 / 约 4581 行，散布于 `capi/**` | 2 个主文件 / 约 2124 行（`capi2/md_capi.{h,cpp}`） |
+| 代码规模 | 61 个文件 / 约 4581 行，散布于 `capi/**` | 2 个主文件 / 约 2124 行（`capi/md_capi.{h,cpp}`） |
 | 绑定成本 | 每个模型都要在 C#/Rust 里写一套样板 | 每个语言只需"1 个通用基类 + 若干结果读取器"即可全覆盖 |
 
 **从软件工程的角度讲，capiv2 干的这件事，在现代对应几个很明确的说法：**
@@ -93,7 +93,7 @@ Rust 同样。这是典型的"重复样板随模型数量线性增长"，维护�
 
 ## 3. capiv2：革命性的契约重构
 
-`capi2/md_capi.h` 的注释直接点明了设计原则（这就是"革命性"的官方措辞）：
+`capi/md_capi.h` 的注释直接点明了设计原则（这就是"革命性"的官方措辞）：
 
 > 1. 不透明句柄：调用方永远接触不到库内部指针/结构体字段，杜绝类型强转与字段篡改。
 > 2. 单一分发点：模型创建/释放/推理各自只有一个入口，内部按类型分发，消灭重复样板。
@@ -242,7 +242,7 @@ Rust 的 `rust/modeldeploy/src/` 是这套哲学的**最佳体现**：
   句柄随所有权自动释放，不可能泄漏。
 - **安全 API 包裹不安全 FFI**：`unsafe { ffi::md_* }` 全部收敛在内部，对外只暴露 `Result<_, MdError>`；
   `unsafe impl Send/Sync` 显式声明这些句柄可并发传递（配合 capiv2 的"每句柄单线程"契约）。
-- `RawResult` 透出 `capi2` 的每种结果读取方法（detection / pose / ocr / lpr / embed 等）
+- `RawResult` 透出 `capi` 的每种结果读取方法（detection / pose / ocr / lpr / embed 等）
   并自动做 `*const` → `Vec<T>` 的零拷贝切边。
 
 这套写法在 Rust 生态里就是标准的 **"安全 wrapper 包裹 unsafe FFI + RAII 管理资源"**
@@ -253,7 +253,7 @@ Rust 的 `rust/modeldeploy/src/` 是这套哲学的**最佳体现**：
 ## 6. result 结构体的使用 / 传递 / 解析（数据流详解）
 
 这里深入 capiv2 的结果句柄（`MDResultHandle`）——它是一切"零拷贝、统一所有权"
-承诺真正落地的地方。核心实现见 `capi2/md_capi.cpp` 约 1293–1699 行。
+承诺真正落地的地方。核心实现见 `capi/md_capi.cpp` 约 1293–1699 行。
 
 ### 6.1 三段式生命周期
 
@@ -590,7 +590,7 @@ tensor-decouple = 内核层重构：让设备内存从核心 Tensor 解耦到后
 
 ## 附录 A：参考文件
 
-- `capi2/md_capi.h`（431 行）、`capi2/md_capi.cpp`（2204 行）—— 新契约本体
+- `capi/md_capi.h`（431 行）、`capi/md_capi.cpp`（2204 行）—— 新契约本体
 - `capi/`（61 文件 / 约 4581 行，`main` 分支）—— 原契约
 - `csharp/ModelDeploy/NativeMethods.cs`、`types_internal_c.cs`、`V2/*.cs` —— C# 新绑定
 - `csharp/ModelDeploy/vision/**（main）` —— C# 旧绑定对照

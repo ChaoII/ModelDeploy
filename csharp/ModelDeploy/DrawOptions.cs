@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 
-namespace ModelDeploy.V2
+namespace ModelDeploy
 {
     /// <summary>
     /// 结果可视化选项（复用 C++ vis_* 系列）。纯托管类型，无需关心原生内存布局。

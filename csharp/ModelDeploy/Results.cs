@@ -1,6 +1,6 @@
 using System;
 
-namespace ModelDeploy.V2
+namespace ModelDeploy
 {
     /// <summary>浮点矩形。</summary>
     public readonly struct RectF
@@ -53,7 +53,7 @@ namespace ModelDeploy.V2
     }
 }
 
-namespace ModelDeploy.V2.Results
+namespace ModelDeploy.Results
 {
     public sealed class DetectionResult
     {

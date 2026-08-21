@@ -642,7 +642,7 @@ int run_pedestrian_attribute(Backend b) {
 }
 ```
 - [ ] **Step 2:** 9 个 `demo_pedestrian_attribute_<backend>.cpp`。
-- [ ] **Step 3: 重写 `demo_pipeline/CMakeLists.txt`**：`md_add_demo_matrix(pedestrian_attribute ...)` + 保留 `demo_pedestrian_attribute_capi.cpp`（BUILD_CAPI；win32 输出名 `demo_pedestrian_attribute_capi2`，按原 CMake）、`demo_pedestrian_attribute_sophgo.cpp`（ENABLE_SOPHGO，链接 `${SOPHGO_LIBS}` 按原）、`demo_sophgo_clone.cpp`（ENABLE_SOPHGO）。移除原 `demo_pedestrian_attribute_cxx.cpp`（被矩阵取代）。
+- [ ] **Step 3: 重写 `demo_pipeline/CMakeLists.txt`**：`md_add_demo_matrix(pedestrian_attribute ...)` + 保留 `demo_pedestrian_attribute_capi.cpp`（BUILD_CAPI；win32 输出名 `demo_pedestrian_attribute_capi`，按原 CMake）、`demo_pedestrian_attribute_sophgo.cpp`（ENABLE_SOPHGO，链接 `${SOPHGO_LIBS}` 按原）、`demo_sophgo_clone.cpp`（ENABLE_SOPHGO）。移除原 `demo_pedestrian_attribute_cxx.cpp`（被矩阵取代）。
   > 请先读原 `demo_pipeline/CMakeLists.txt`，按其保留/特殊链接规则逐项 gating。
 - [ ] **Step 4-5:** 构建 `tm demo_pedestrian_attribute_ort_cpu` + 运行。
 - [ ] **Step 6: 提交** `feat(examples): pedestrian_attribute demo matrix`

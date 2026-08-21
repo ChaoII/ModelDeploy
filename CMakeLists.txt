@@ -220,7 +220,7 @@ if (BUILD_AUDIO)
 endif ()
 
 if (BUILD_CAPI)
-    include("${CMAKE_SOURCE_DIR}/capi2/CMakeLists.txt")
+    include("${CMAKE_SOURCE_DIR}/capi/CMakeLists.txt")
     if (MSVC)
         add_definitions(-DMD_CAPI)
     endif ()

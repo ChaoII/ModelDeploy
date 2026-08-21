@@ -79,7 +79,7 @@ C++ 各模型 `batch_predict` 结果形状不一（det 每图一组框、cls 每
 
 ## 非目标
 
-- 不改 C++/capi2 原生层语义（`md_image_from_device_nv12` 借指针、`from_planes` 保持）。
+- 不改 C++/capi 原生层语义（`md_image_from_device_nv12` 借指针、`from_planes` 保持）。
 - 不新增人脸反欺骗（FACE_AS）C# 包装类（当前本就无，超出本次范围）。
 - 不改 OCR 具体模型的 batch 分组细节（统一平铺）。
 

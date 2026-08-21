@@ -2,8 +2,8 @@
 
 > 主题：如何用一套**稳定的 C ABI** 把 C++ 推理 SDK 暴露给 C# / Rust / Python 等语言，
 > 让绑定层"零冗余、零泄漏、零 UB"。
-> 本文不是理论拼盘，而是从本项目 `capiv2`（`capi2/md_capi.{h,cpp}`）与原始 `capi/`（v1）
-> 的真实工程经验中提炼出的**可落地清单**。随文档配套可参考 `docs/capi2_bindings_analysis.md`
+> 本文不是理论拼盘，而是从本项目 `capiv2`（`capi/md_capi.{h,cpp}`）与原始 `capi/`（v1）
+> 的真实工程经验中提炼出的**可落地清单**。随文档配套可参考 `docs/capi_bindings_analysis.md`
 > （侧重优劣分析）与本项目源码。
 
 ---
@@ -22,7 +22,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  第 3 层  语言绑定  C# (ModelDeploy/V2) · Rust (modeldeploy) │ ← 只做 RAII + 类型安全
 ├─────────────────────────────────────────────────────────────┤
-│  第 2 层  稳定 C ABI  capi2/md_capi.{h,cpp}                 │ ← 不透明句柄 + 零拷贝 + 统一所有权
+│  第 2 层  稳定 C ABI  capi/md_capi.{h,cpp}                 │ ← 不透明句柄 + 零拷贝 + 统一所有权
 ├─────────────────────────────────────────────────────────────┤
 │  第 1 层  C++ 内核  csrc/（runtime · vision · audio）         │ ← 真正的模型/推理
 └─────────────────────────────────────────────────────────────┘
@@ -268,7 +268,7 @@ internal static extern void     md_option_set_fp16(IntPtr handle, int enable);
 internal static extern void     md_option_set_trt_engine_path(IntPtr handle, string path);
 ```
 
-`capi2/md_capi.cpp`（原生实现，约 181–227 行）：
+`capi/md_capi.cpp`（原生实现，约 181–227 行）：
 
 ```c
 struct md_option_handle {

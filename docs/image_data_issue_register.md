@@ -3,7 +3,7 @@
 - 日期：2026-08-18
 - 分支：`capi-v2`
 - **审计基线 HEAD：`65baa31`**（统一平面存储改造完成后的当前 HEAD；下文行号均相对此提交；改代码后行号会漂移，复核时先对照基线）
-- 审计范围：`csrc/vision/common/image_data.h/.cpp` 及其消费方（processors / capi2 / application / pybind / tests）
+- 审计范围：`csrc/vision/common/image_data.h/.cpp` 及其消费方（processors / capi / application / pybind / tests）
 - 审计方法：逐行代码审计 + `git diff e000f75~1..HEAD` 改造前后对照 + 设计 spec（`docs/superpowers/specs/2026-08-17-image-data-multidevice-rewrite-design.md`）逐条核对 + 全仓库消费方 grep
 - 严重度定义：
   - **P0 严重**：错误结果 / 崩溃 / 数据竞争（已发生或必然发生）
@@ -27,7 +27,7 @@
 - 影响：
   - `to_tensor` / `images_to_tensor` 产出错误 shape `{c, 1.5h, w}`
   - `fused_preprocess`（`cpu_processor_backend.cpp:233`）会把 NV12 帧当 HWC 图读 1.5h 行
-  - **生产两条路并存**：`capi2/md_capi.cpp:321`（`md_image_from_nv12`）走 `from_device_planes`，`application/infer_group.cpp:210` 走 `from_raw(NV12)`
+  - **生产两条路并存**：`capi/md_capi.cpp:321`（`md_image_from_nv12`）走 `from_device_planes`，`application/infer_group.cpp:210` 走 `from_raw(NV12)`
 - **并入 #5（2026-08-18 复核）**：原 #5（CPU-only NV12→BGR 走 `from_raw(NV12)` 单 mat 路径，`convert.cpp:144-145`）与本条同根——都是 `from_raw` 的"设备无关单 mat"表示。保留其"疑似，需实测"待验证：该路径目前无单测覆盖（像素级测试全走 `from_device_planes`），建议补一个 CPU-only NV12→BGR 单测锁定行为后再决定去留。
 
 ### 2. `plane_mat_` 数据竞争
@@ -42,7 +42,7 @@
 - **状态：已解决（2026-08-18 Task 7 复核）**：`clone()` 现对 `device()!=CPU` 显式 `set_last_error("clone: device frame not supported")` 并返回空图，不再静默。
 - 位置：`image_data.cpp:177-188`
 - 说明：`clone()` 走 `impl_->mat().clone()`，设备帧的 mat 恒为空 → 返回空图，且**不写 last_error**，静默丢数据。
-- 影响：设计 spec §3 承诺"clone() 深拷贝到同设备"未实现；capi2 `md_image_clone`（`md_capi.cpp:396-410`）被迫只支持 CPU BGR。
+- 影响：设计 spec §3 承诺"clone() 深拷贝到同设备"未实现；capi `md_image_clone`（`md_capi.cpp:396-410`）被迫只支持 CPU BGR。
 
 ### 4. `rotate_crop` / `imshow` 无设备守卫
 
@@ -89,7 +89,7 @@
 - **状态：已解决（2026-08-18 Task 7 复核）**：I420 现为 3 平面自描述，并新增专用 `CVT_I4202PKG_BGR` 后端路径（`cpu_processor_backend.cpp:205`）；不支持/未实现的 YUV 转换在 `cvt_color` 入口显式拒绝（`image_data.cpp:474-489`），不再静默走错路径。
 - 位置：`image_data.cpp:104-113`（`planes()` 只特判 NV12/NV21）、`:322-358`（`toCpu` 无 I420 分支）、`convert.cpp`（转换表有 I420 映射）
 - 说明：枚举 + `from_raw` 接受 I420，但平面派生 / toCpu / codec 守卫（只认单平面）全不支持 → I420 帧静默走错路径。
-- 备注：唯一消费方 capi2 `md_image_from_yuv420p`（`md_capi.cpp:368-375`）根本没走 ImageData，直接裸 `cv::Mat` + `cvtColor`。
+- 备注：唯一消费方 capi `md_image_from_yuv420p`（`md_capi.cpp:368-375`）根本没走 ImageData，直接裸 `cv::Mat` + `cvtColor`。
 
 ### 11. `from_device_planes` 命名泄漏历史 + 签名写死 NV12
 

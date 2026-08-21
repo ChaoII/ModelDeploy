@@ -1,7 +1,7 @@
 //
-// capi2 图像分类示例：演示 md_model_set_param_i/b
+// capi 图像分类示例：演示 md_model_set_param_i/b
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -36,12 +36,12 @@ int main() {
     draw.font_path = "../../test_data/msyh.ttc";
     draw.save_result = 1;
     die(md_draw_result(img, res, &draw), "draw");
-    die(md_image_save(img, "capi2_cls_out.jpg"), "save");
+    die(md_image_save(img, "capi_cls_out.jpg"), "save");
 
     md_result_destroy(res);
     md_image_destroy(img);
     md_model_destroy(model);
     md_option_destroy(opt);
-    std::puts("OK -> capi2_cls_out.jpg");
+    std::puts("OK -> capi_cls_out.jpg");
     return 0;
 }

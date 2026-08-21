@@ -2,7 +2,7 @@ use crate::error::MdError;
 use crate::ffi;
 use std::ffi::CString;
 
-/// 运行时选项（对应 capi2 MDOptionHandle，链式 setter）
+/// 运行时选项（对应 capi MDOptionHandle，链式 setter）
 pub struct RuntimeOption {
     pub(crate) handle: ffi::MDOptionHandle,
 }

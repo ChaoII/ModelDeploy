@@ -1,7 +1,7 @@
 //
-// capi2 ASR（SenseVoice）示例
+// capi ASR（SenseVoice）示例
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 #ifdef _WIN32
 #include <windows.h>

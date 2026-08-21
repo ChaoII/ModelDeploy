@@ -22,55 +22,49 @@ namespace modeldeploy::vision::detection {
             return false;
         }
         // 原始布局 [B, C, N]：C=84 (4(xc,yc,w,h)+80 classes)，N=8400 (anchors)
-        const size_t num_classes = tensors[0].shape()[1]; // 84
-        const size_t num_anchors = tensors[0].shape()[2]; // 8400
+        // 无需转置物化：按 anchor 分块顺序扫各 class 行求 max，只对过阈候选解码。
+        const size_t num_classes_total = tensors[0].shape()[1]; // 84
+        const size_t num_anchors = tensors[0].shape()[2];       // 8400
+        const size_t num_classes = num_classes_total - 4;       // 80（通道 4..83）
         results->resize(batch);
 
-        // 高效转置 [B,84,N] -> [B,N,84]：普通双层循环（编译器向量化），避免递归逐元素拷贝
-        static thread_local std::vector<float> buf;
-        const size_t plane = num_anchors * num_classes;
-        buf.resize(batch * plane);
-        const float* src = static_cast<const float*>(tensors[0].data());
-        for (size_t b = 0; b < batch; ++b) {
-            const float* src_b = src + b * plane;
-            float* dst_b = buf.data() + b * plane;
-            // dst[anchor*84 + class] = src[class*8400 + anchor]
-            for (size_t c = 0; c < num_classes; ++c) {
-                const float* srow = src_b + c * num_anchors;
-                for (size_t i = 0; i < num_anchors; ++i) {
-                    dst_b[i * num_classes + c] = srow[i];
-                }
-            }
-        }
-
-        const size_t dim1 = num_anchors; // 8400
-        const size_t dim2 = num_classes; // 84
         for (size_t bs = 0; bs < batch; ++bs) {
-            const float* data = buf.data() + bs * plane;
+            const float* src = static_cast<const float*>(tensors[0].data()) + bs * num_classes_total * num_anchors;
             // 过阈值的结果通常很少（正常图 3-10 个），依赖 vector 自动增长即可
             std::vector<DetectionResult> _results;
-            for (size_t i = 0; i < dim1; ++i) {
-                const float* attr_ptr = data + i * dim2;
-                const float x = attr_ptr[0], y = attr_ptr[1];
-                const float w = attr_ptr[2], h = attr_ptr[3];
-                // 过滤无效框（非正宽高）
-                if (w <= 0 || h <= 0) {
-                    continue;
+            const size_t kBlock = 256;
+            for (size_t blk = 0; blk < num_anchors; blk += kBlock) {
+                const size_t cnt = std::min(kBlock, num_anchors - blk);
+                float maxs[256];
+                int argmax[256];
+                const float* c0 = src + 4 * num_anchors + blk;  // class 0（通道4）
+                for (size_t i = 0; i < cnt; ++i) { maxs[i] = c0[i]; argmax[i] = 0; }
+                for (size_t c = 1; c < num_classes; ++c) {
+                    const float* row = src + (4 + c) * num_anchors + blk;
+                    for (size_t i = 0; i < cnt; ++i) {
+                        if (row[i] > maxs[i]) { maxs[i] = row[i]; argmax[i] = static_cast<int>(c); }
+                    }
                 }
-                // 取最高类分数：单类（[B,5,N]，仅 conf 一个通道）时 max_element
-                // 即为该 conf、label=0，与多类行为一致，无需特判。
-                // Ultralytics 官方导出 Detect 头已含 Sigmoid，输出即概率 [0,1]，
-                // 直接比阈值即可（二次 sigmoid 会把概率推向 1，导致全候选过阈、
-                // NMS 退化为 O(n^2)，实测 det post 463ms 的根因）。
-                const float* max_class_score = std::max_element(attr_ptr + 4, attr_ptr + dim2);
-                const float confidence = *max_class_score;
-                const int32_t label_id = static_cast<int32_t>(std::distance(attr_ptr + 4, max_class_score));
-                if (confidence <= conf_threshold_) {
-                    continue;
+                for (size_t i = 0; i < cnt; ++i) {
+                    const size_t a = blk + i;
+                    const float x = src[0 * num_anchors + a], y = src[1 * num_anchors + a];
+                    const float w = src[2 * num_anchors + a], h = src[3 * num_anchors + a];
+                    // 过滤无效框（非正宽高）
+                    if (w <= 0 || h <= 0) {
+                        continue;
+                    }
+                    // maxs[i] 即最高类分数；argmax[i] 即类别。
+                    // Ultralytics 官方导出 Detect 头已含 Sigmoid，输出即概率 [0,1]，
+                    // 直接比阈值即可（二次 sigmoid 会把概率推向 1，导致全候选过阈、
+                    // NMS 退化为 O(n^2)，实测 det post 463ms 的根因）。
+                    const float confidence = maxs[i];
+                    if (confidence <= conf_threshold_) {
+                        continue;
+                    }
+                    // convert from [xc, yc, w, h] to [x, y, width, height]
+                    Rect2f box = {x - w / 2.0f, y - h / 2.0f, w, h};
+                    _results.push_back({box, argmax[i], confidence});
                 }
-                // convert from [xc, yc, w, h] to [x, y, width, height]
-                Rect2f box = {x - w / 2.0f, y - h / 2.0f, w, h};
-                _results.push_back({box, label_id, confidence});
             }
             if (_results.empty()) {
                 continue;

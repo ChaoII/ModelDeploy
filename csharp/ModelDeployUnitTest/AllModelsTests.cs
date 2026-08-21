@@ -1,6 +1,5 @@
 using ModelDeploy;
-using ModelDeploy.V2;
-using ModelDeploy.V2.Models;
+using ModelDeploy.Models;
 using NUnit.Framework;
 
 namespace ModelDeployUnitTest;
@@ -21,9 +20,9 @@ public class AllModelsTests
     private static string ImageRoot => Path.Combine(GetTestDataDir(), "test_data", "test_images");
     private static bool Has(string p) => File.Exists(p);
 
-    private static RuntimeOption2 CpuOrt()
+    private static RuntimeOption CpuOrt()
     {
-        return new RuntimeOption2().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
+        return new RuntimeOption().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
     }
 
     [Test]

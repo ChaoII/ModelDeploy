@@ -674,7 +674,7 @@ TEST_CASE("image_data: device nv12 frame imencode/imwrite rejected (no silent cp
     CHECK(buf.empty());
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
     modeldeploy::vision::ImageData::last_error();
-    CHECK_FALSE(dev.imwrite("capi2_plan_t3_should_not_exist.jpg"));
+    CHECK_FALSE(dev.imwrite("capi_plan_t3_should_not_exist.jpg"));
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);
 }
 

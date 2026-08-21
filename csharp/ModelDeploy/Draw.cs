@@ -2,9 +2,9 @@ using System;
 using ModelDeploy.types_internal_c;
 using static ModelDeploy.NativeMethods;
 
-namespace ModelDeploy.V2
+namespace ModelDeploy
 {
-    /// <summary>capi2 绘制工具（就地绘制到 VisionImage）。</summary>
+    /// <summary>capi 绘制工具（就地绘制到 VisionImage）。</summary>
     public static class Draw
     {
         public static void DrawRect(VisionImage image, float x, float y, float w, float h,

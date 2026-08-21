@@ -1,7 +1,7 @@
 //
-// capi2 人脸性别示例
+// capi 人脸性别示例
 //
-#include "../capi2_common.h"
+#include "../capi_common.h"
 
 int main() {
     MDOptionHandle opt = nullptr;
@@ -23,7 +23,7 @@ int main() {
 
     int gender = 0;
     die(md_result_gender(res, &gender), "get gender");
-    std::printf("[capi2] gender: %s (%d)\n", gender == 0 ? "female" : "male", gender);
+    std::printf("[capi] gender: %s (%d)\n", gender == 0 ? "female" : "male", gender);
 
     md_result_destroy(res);
     md_image_destroy(img);
