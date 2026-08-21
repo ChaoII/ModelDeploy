@@ -25,7 +25,8 @@
 **Files:**
 - Create: `csrc/vision/tracking/base_tracker.h`
 - Create: `csrc/vision/tracking/base_tracker.cpp`
-- Test: `tests/test_tracking.cpp`
+- Create: `tests/test_tracking.cpp`
+- Modify: `tests/CMakeLists.txt`（把 `test_tracking.cpp` 加进 `TEST_SOURCES` 列表——注意 tests 用**显式列表**而非 GLOB）
 
 **Interfaces:**
 - Produces:
@@ -52,8 +53,8 @@ TEST_CASE("BaseTracker: empty input yields empty output", "[tracking]") {
 
 - [ ] **Step 2: 运行确认失败（编译失败）**
 
-Run: `cmake --build build --target test_modeldeploy && cd build && ctest -R tracking`
-Expected: 编译失败，"vision/tracking/base_tracker.h no such file"
+Run: `cmake --build build_tdc_gpu --target test_modeldeploy && cd build_tdc_gpu && ctest -R tracking`
+Expected: 编译失败，"vision/tracking/base_tracker.h no such file"（本机验证环境为 `build_tdc_gpu`，即 WITH_GPU=ON + BUILD_TESTS=ON 的 ninja 增量构建；`build` 目录是 WSL 产物不可用）
 
 - [ ] **Step 3: 写最小实现**
 
