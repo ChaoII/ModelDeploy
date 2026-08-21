@@ -99,7 +99,7 @@ cd /workspace/build_sophgo \
 ```
 
 关键选项（其余沿用已有 `CMakeCache.txt`）：`ENABLE_SOPHGO=ON`、**`ENABLE_ORT=OFF`**、`ENABLE_MNN/OFF`、`ENABLE_TRT/OFF`、`WITH_GPU=OFF`、`BUILD_VISION=ON`、`BUILD_CAPI=ON`、`BUILD_EXAMPLES=ON`、`CMAKE_BUILD_TYPE=Release`。
-构建成功后产物：`/workspace/build_sophgo/bin/{demo_xxx_sophgo, libModelDeploySDK.so.1.8.0}`。
+构建成功后产物：`/workspace/build_sophgo/bin/{demo_xxx_sophgo, libModelDeploySDK.so.2.0.0}`。
 用 `ldd` 确认 demo 只依赖 sophgo 库、无 onnxruntime：
 ```bash
 ldd bin/demo_xxx_sophgo | grep -iE "onnx|bm|not found"
@@ -113,17 +113,17 @@ ldd bin/demo_xxx_sophgo | grep -iE "onnx|bm|not found"
 export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 mkdir -p /Users/aichao/md_out
 docker cp tpuc_dev:/workspace/build_sophgo/bin/demo_pedestrian_attribute_sophgo /Users/aichao/md_out/
-docker cp tpuc_dev:/workspace/build_sophgo/bin/libModelDeploySDK.so.1.8.0 /Users/aichao/md_out/
+docker cp tpuc_dev:/workspace/build_sophgo/bin/libModelDeploySDK.so.2.0.0 /Users/aichao/md_out/
 ```
 
 `.243 → .70`（用上面 `connect`，读 .243 写 .70）：
 ```python
 BIN = "/data/ModelDeploy/build_sophgo/bin"
-for f in ["demo_pedestrian_attribute_sophgo", "libModelDeploySDK.so.1.8.0"]:
+for f in ["demo_pedestrian_attribute_sophgo", "libModelDeploySDK.so.2.0.0"]:
     b = s_sftp.open(f"/Users/aichao/md_out/{f}", "rb").read()
     d_sftp.open(f"{BIN}/{f}", "wb").write(b)
 # 重建 SDK 软链接（.70 上执行）：
-#   ln -sfn libModelDeploySDK.so.1.8.0 libModelDeploySDK.so.1
+#   ln -sfn libModelDeploySDK.so.2.0.0 libModelDeploySDK.so.1
 #   ln -sfn libModelDeploySDK.so.1      libModelDeploySDK.so
 #   chmod +x demo_pedestrian_attribute_sophgo
 ```
