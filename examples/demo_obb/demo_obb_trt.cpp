@@ -24,7 +24,7 @@ int main() {
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("../../test_data/test_models/trt/yolo26n/yolo26n-obb.engine", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     // ---- 3. 读图 ----
-    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb.jpg");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
 
     std::vector<modeldeploy::vision::ObbResult> res; // 推理结果
