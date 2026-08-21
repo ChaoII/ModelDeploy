@@ -23,12 +23,6 @@ namespace modeldeploy::vision::tracking {
             double operator()(int i, int j) const { return data[static_cast<size_t>(i) * cols + j]; }
         };
 
-        Mat make_identity(int n) {
-            Mat m(n, n);
-            for (int i = 0; i < n; ++i) m(i, i) = 1.0;
-            return m;
-        }
-
         Mat make_diag(const std::vector<double>& d) {
             const int n = static_cast<int>(d.size());
             Mat m(n, n);
@@ -66,12 +60,6 @@ namespace modeldeploy::vision::tracking {
             Mat r(a.rows, a.cols);
             for (int i = 0; i < a.rows; ++i)
                 for (int j = 0; j < a.cols; ++j) r(i, j) = a(i, j) - b(i, j);
-            return r;
-        }
-
-        Mat mat_scale(const Mat& a, double s) {
-            Mat r = a;
-            for (auto& v : r.data) v *= s;
             return r;
         }
 
@@ -166,9 +154,9 @@ namespace modeldeploy::vision::tracking {
             1e-2, 2.0 * kStdWeightPosition * h,
             10.0 * kStdWeightVelocity * h, 10.0 * kStdWeightVelocity * h,
             1e-5, 10.0 * kStdWeightVelocity * h};
+        for (auto& row : covariance_) row.fill(0.0);
         for (int i = 0; i < kStateDim; ++i) {
             const double v = std[i] * std[i];
-            for (auto& row : covariance_) row.fill(0.0);
             covariance_[i][i] = v;
         }
         initialized_ = true;
@@ -230,6 +218,12 @@ namespace modeldeploy::vision::tracking {
         mean_ = from_mat(mat_add(mean, k_innov));
         const Mat kcov = mat_mul(k, mat_mul(s, mat_transpose(k)));
         covariance_ = cov_from_mat(mat_sub(cov, kcov));
+    }
+
+    std::array<double, 8> KalmanFilter::get_covariance_diag() const {
+        std::array<double, 8> diag{};
+        for (int i = 0; i < kStateDim; ++i) diag[i] = covariance_[i][i];
+        return diag;
     }
 
     Rect2f KalmanFilter::get_state() const {

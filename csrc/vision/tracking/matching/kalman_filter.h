@@ -4,9 +4,9 @@
 #include "vision/common/struct.h"
 
 namespace modeldeploy::vision::tracking {
-    // SORT/ByteTrack-style 7-dim constant-velocity Kalman filter.
-    // State: [x, y, a, h, vx, vy, va, vh] where (x, y) is the center,
-    // a = width / height aspect ratio, h = height.
+    // SORT/ByteTrack-style 8-dim constant-velocity Kalman filter.
+    // State: [x, y, a, h, vx, vy, va, vh] (constant velocity) where (x, y) is the
+    // center, a = width / height aspect ratio, h = height.
     class MODELDEPLOY_CXX_EXPORT KalmanFilter {
     public:
         KalmanFilter();
@@ -15,6 +15,7 @@ namespace modeldeploy::vision::tracking {
         void predict();
         void update(const Rect2f& box);
         Rect2f get_state() const;
+        std::array<double, 8> get_covariance_diag() const;
 
         static constexpr double chi2inv95[10] = {
             3.841458820694124, 5.991464547107979, 7.814727903251179,

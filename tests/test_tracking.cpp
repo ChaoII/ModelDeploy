@@ -60,6 +60,18 @@ TEST_CASE("Matching: hungarian rectangular", "[tracking]") {
     REQUIRE(total == Approx(2.0f));
 }
 
+TEST_CASE("KalmanFilter: init sets nonzero position/velocity covariance diag", "[tracking]") {
+    KalmanFilter kf;
+    Rect2f box{10, 10, 20, 40};
+    kf.init(box);
+    auto diag = kf.get_covariance_diag();
+    REQUIRE(diag.size() == 8);
+    for (size_t i = 0; i < diag.size(); ++i) {
+        INFO("state dim " << i);
+        REQUIRE(diag[i] > 0.0);
+    }
+}
+
 TEST_CASE("KalmanFilter: static box stays put", "[tracking]") {
     KalmanFilter kf;
     Rect2f box{10,10,20,40};
