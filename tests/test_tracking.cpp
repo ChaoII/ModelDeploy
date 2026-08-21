@@ -6,6 +6,7 @@
 #include "vision/tracking/matching/iou_matching.h"
 #include "vision/tracking/matching/hungarian.h"
 #include "vision/tracking/matching/kalman_filter.h"
+#include "vision/tracking/bytetrack.h"
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tracking;
 using namespace Catch;
@@ -105,4 +106,23 @@ TEST_CASE("KalmanFilter: converges toward measurement", "[tracking]") {
     REQUIRE(prev.y == Approx(50.0f).margin(2.0f));
     REQUIRE(prev.width == Approx(30.0f).margin(2.0f));
     REQUIRE(prev.height == Approx(60.0f).margin(2.0f));
+}
+
+TEST_CASE("ByteTrack: stable id across frames", "[tracking]") {
+    ByteTracker tr;
+    Detection d1{{0,0,20,20},0.9f,0};
+    auto f1 = tr.update({d1});
+    Detection d2{{2,2,20,20},0.9f,0};
+    auto f2 = tr.update({d2});
+    REQUIRE(f1.size()==1); REQUIRE(f2.size()==1);
+    REQUIRE(f1[0].track_id == f2[0].track_id);
+}
+TEST_CASE("ByteTrack: lost keeps id within max_age", "[tracking]") {
+    ByteTracker tr;
+    Detection d{{0,0,20,20},0.9f,0};
+    tr.update({d});                          // 检出
+    auto miss = tr.update({});               // 丢失一帧
+    auto back = tr.update({d});              // 回到视野
+    REQUIRE(back.size()==1);
+    REQUIRE(back[0].track_id == 0);          // id 复用
 }
