@@ -22,6 +22,7 @@ set(TEST_SOURCES
     test_benchmark_insightface.cpp
     test_benchmark_yolo26n.cpp
     test_encryption.cpp
+    test_tracking.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
