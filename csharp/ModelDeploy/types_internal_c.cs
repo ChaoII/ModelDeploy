@@ -149,6 +149,21 @@ namespace ModelDeploy
             public int label_id;
         }
 
+        /* ==================== 条码识别（BarcodeDetector） ==================== */
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        public struct MDBarcodeItem
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string Text;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)] public string Format;
+            public float Quad0_x; public float Quad0_y;
+            public float Quad1_x; public float Quad1_y;
+            public float Quad2_x; public float Quad2_y;
+            public float Quad3_x; public float Quad3_y;
+            public float Score;
+            public int IsQr;
+        }
+
         /* ==================== 多目标跟踪（Tracker） ==================== */
 
         [StructLayout(LayoutKind.Sequential)]

@@ -390,6 +390,23 @@ string path);
 
         #endregion
 
+        #region 条码识别
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_barcode_create(out IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void md_barcode_destroy(IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_barcode_set_formats(IntPtr handle, uint formats);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_barcode_detect(IntPtr handle, IntPtr image,
+            [Out] MDBarcodeItem[] items, ref uint count);
+
+        #endregion
+
         #region 多目标跟踪
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
