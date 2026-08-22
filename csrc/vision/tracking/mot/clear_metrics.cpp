@@ -84,6 +84,8 @@ namespace modeldeploy::vision::tracking {
                     track_gt[track_id] = gt_id;
                 }
             }
+            // 局限性 #1：#id_switches 按"预测 track"计数（该 track 首次切换到新 GT 时 +1），
+            // 而非按 GT 计数（一个 GT 被多个 track 抢占时不会成比例计入）。
             fn += static_cast<long long>(n_g);
         }
         fn -= tp;  // unmatched GT boxes across all frames

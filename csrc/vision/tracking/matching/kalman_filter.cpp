@@ -209,6 +209,12 @@ namespace modeldeploy::vision::tracking {
 
         const Mat s = mat_add(mat_mul(mat_mul(H, cov), ht), R);      // S = H P H^T + R
         const Mat sinv = mat_inverse(s);
+        if (sinv.rows == 0) {
+            // Singular covariance: skip the state/covariance update this frame
+            // (mirrors the NSA guard in strongsort.cpp). Avoids reading past an
+            // empty inverse and keeps the filter numerically stable.
+            return;
+        }
         const Mat k = mat_mul(mat_mul(cov, ht), sinv);               // K = P H^T S^-1
 
         const Mat proj_mean = mat_mul(H, mean);
