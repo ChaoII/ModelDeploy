@@ -37,6 +37,10 @@
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 #include "csrc/vision/lpr/lpr_det/lpr_det.h"
 #include "csrc/vision/lpr/lpr_rec/lpr_rec.h"
+#include "csrc/vision/tracking/base_tracker.h"
+#include "csrc/vision/tracking/bytetrack.h"
+#include "csrc/vision/tracking/botsort.h"
+#include "csrc/vision/tracking/strongsort.h"
 #include "csrc/vision/pipeline/pedestrian_attribute.h"
 #include "csrc/vision/common/visualize/utils.h"
 #include "csrc/vision/common/visualize/visualize.h"
@@ -85,6 +89,28 @@ struct md_result_handle {
     ~md_result_handle();
 };
 
+/* 跟踪器参数集：set_params 为位置参数且不可部分设置，故 C API 缓存完整参数集，
+   每次命名 set_params 后按 kind 重建整组默认/已设值传给 C++ set_params。 */
+struct TrackerParams {
+    float track_thresh = 0.5f;
+    float high_thresh = 0.5f;
+    float low_thresh = 0.1f;
+    int max_age = 30;
+    int min_hits = 3;
+    float iou_threshold = 0.3f;
+    float match_thresh = 0.8f;
+    float fuse_score_weight = 0.5f;
+    float ema_alpha = 0.9f;
+    float appearance_priority = 0.7f;
+    bool with_cmc = true;
+};
+
+struct md_tracker_handle {
+    MDTrackerKind kind = MD_TRACKER_BYTETRACK;
+    std::unique_ptr<modeldeploy::vision::tracking::BaseTracker> tracker;
+    TrackerParams params;
+};
+
 namespace {
 
 /* ---------------- 错误模型（thread_local） ---------------- */
@@ -106,6 +132,30 @@ void set_error_fmt(const char* fmt, ...) {
         g_last_error = "unknown error";
     }
     va_end(ap2);
+}
+
+/* 按 kind 把完整参数集派发给对应跟踪器的位置 set_params */
+void apply_tracker_params(modeldeploy::vision::tracking::BaseTracker* t, MDTrackerKind kind,
+                          const TrackerParams& p) {
+    using namespace modeldeploy::vision::tracking;
+    switch (kind) {
+        case MD_TRACKER_BYTETRACK:
+            static_cast<ByteTracker*>(t)->set_params(p.track_thresh, p.high_thresh, p.low_thresh,
+                p.max_age, p.min_hits, p.iou_threshold);
+            break;
+        case MD_TRACKER_BOTSORT:
+            static_cast<BotSortTracker*>(t)->set_params(p.track_thresh, p.high_thresh, p.low_thresh,
+                p.max_age, p.min_hits, p.iou_threshold, p.match_thresh, p.fuse_score_weight,
+                p.ema_alpha, p.with_cmc);
+            break;
+        case MD_TRACKER_STRONGSORT:
+            static_cast<StrongSortTracker*>(t)->set_params(p.track_thresh, p.high_thresh, p.low_thresh,
+                p.max_age, p.min_hits, p.iou_threshold, p.match_thresh, p.ema_alpha,
+                p.appearance_priority, p.with_cmc);
+            break;
+        default:
+            break;
+    }
 }
 
 /* ---------------- 泛型结果容器 ---------------- */
@@ -3257,4 +3307,111 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
         set_error_fmt("md_draw_result: %s", e.what());
         return MD_ERR_INVALID_ARGUMENT;
     }
+}
+
+/* ==================== 跟踪器 ==================== */
+
+MDStatus md_tracker_create(MDTrackerKind kind, MDTrackerHandle* out) {
+    if (!out) { set_error("md_tracker_create: out is null"); return MD_ERR_NULL_POINTER; }
+    using namespace modeldeploy::vision::tracking;
+    auto* h = new md_tracker_handle();
+    h->kind = kind;
+    switch (kind) {
+        case MD_TRACKER_BYTETRACK: h->tracker = std::make_unique<ByteTracker>(); break;
+        case MD_TRACKER_BOTSORT:   h->tracker = std::make_unique<BotSortTracker>(); break;
+        case MD_TRACKER_STRONGSORT: h->tracker = std::make_unique<StrongSortTracker>(); break;
+        default:
+            delete h;
+            set_error_fmt("md_tracker_create: unsupported kind %d", (int)kind);
+            return MD_ERR_INVALID_ARGUMENT;
+    }
+    apply_tracker_params(h->tracker.get(), kind, h->params);
+    *out = h;
+    return MD_OK;
+}
+
+void md_tracker_destroy(MDTrackerHandle h) {
+    delete static_cast<md_tracker_handle*>(h);
+}
+
+MDStatus md_tracker_update(MDTrackerHandle h, const MDBox* boxes, const float* scores,
+                           const int* label_ids, size_t n, MDTrackItem* out, size_t* out_count) {
+    auto* th = static_cast<md_tracker_handle*>(h);
+    if (!th || !th->tracker) { set_error("md_tracker_update: handle is null"); return MD_ERR_NULL_POINTER; }
+    if (!out_count) { set_error("md_tracker_update: out_count is null"); return MD_ERR_NULL_POINTER; }
+    if (!out) { set_error("md_tracker_update: out is null"); return MD_ERR_NULL_POINTER; }
+    if (n > 0 && (!boxes || !scores || !label_ids)) {
+        set_error("md_tracker_update: boxes/scores/label_ids null for non-empty n");
+        return MD_ERR_NULL_POINTER;
+    }
+
+    using namespace modeldeploy::vision::tracking;
+    std::vector<Detection> dets;
+    dets.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        Detection d;
+        d.box = Rect2f(boxes[i].x, boxes[i].y, boxes[i].w, boxes[i].h);
+        d.score = scores ? scores[i] : 0.f;
+        d.label_id = label_ids ? label_ids[i] : 0;
+        dets.push_back(std::move(d));
+    }
+
+    try {
+        std::vector<TrackResult> res = th->tracker->update(dets);
+        const size_t need = res.size();
+        const size_t cap = *out_count;
+        if (cap < need) {
+            *out_count = need;
+            set_error_fmt("md_tracker_update: output capacity %zu < needed %zu (track count)", cap, need);
+            return MD_ERR_INVALID_ARGUMENT;
+        }
+        for (size_t i = 0; i < need; ++i) {
+            MDTrackItem it;
+            it.x = res[i].box.x; it.y = res[i].box.y;
+            it.w = res[i].box.width; it.h = res[i].box.height;
+            it.track_id = res[i].track_id;
+            it.label_id = res[i].label_id;
+            it.score = res[i].score;
+            it.state = res[i].state;
+            out[i] = it;
+        }
+        *out_count = need;
+    } catch (const std::exception& e) {
+        set_error_fmt("md_tracker_update: %s", e.what());
+        return MD_ERR_MODEL_PREDICT;
+    }
+    return MD_OK;
+}
+
+MDStatus md_tracker_set_params(MDTrackerHandle h, const char* name, double value) {
+    auto* th = static_cast<md_tracker_handle*>(h);
+    if (!th || !th->tracker) { set_error("md_tracker_set_params: handle is null"); return MD_ERR_NULL_POINTER; }
+    if (!name || !*name) { set_error("md_tracker_set_params: name is empty"); return MD_ERR_INVALID_ARGUMENT; }
+
+    TrackerParams& p = th->params;
+    std::string n(name);
+    if (n == "track_thresh") p.track_thresh = (float)value;
+    else if (n == "high_thresh") p.high_thresh = (float)value;
+    else if (n == "low_thresh") p.low_thresh = (float)value;
+    else if (n == "max_age") p.max_age = (int)value;
+    else if (n == "min_hits") p.min_hits = (int)value;
+    else if (n == "iou_threshold") p.iou_threshold = (float)value;
+    else if (n == "match_thresh") p.match_thresh = (float)value;
+    else if (n == "ema_alpha") p.ema_alpha = (float)value;
+    else if (n == "fuse_score_weight") p.fuse_score_weight = (float)value;
+    else if (n == "appearance_priority") p.appearance_priority = (float)value;
+    else if (n == "with_cmc") p.with_cmc = (value != 0.0);
+    else {
+        set_error_fmt("md_tracker_set_params: unsupported parameter '%s'", name);
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    apply_tracker_params(th->tracker.get(), th->kind, p);
+    return MD_OK;
+}
+
+MDStatus md_tracker_reset(MDTrackerHandle h) {
+    auto* th = static_cast<md_tracker_handle*>(h);
+    if (!th || !th->tracker) { set_error("md_tracker_reset: handle is null"); return MD_ERR_NULL_POINTER; }
+    th->tracker->reset();
+    return MD_OK;
 }

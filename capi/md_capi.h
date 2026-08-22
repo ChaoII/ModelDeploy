@@ -460,6 +460,54 @@ MD_CAPI_EXPORT MDStatus md_result_lpr_keypoints_batch(MDResultHandle, size_t img
 MD_CAPI_EXPORT MDStatus md_result_attribute_batch(MDResultHandle, size_t img_i, const MDAttrItem** items, size_t* count);
 MD_CAPI_EXPORT MDStatus md_result_attr_scores_batch(MDResultHandle, size_t img_i, size_t item_j, const float** scores, size_t* n);
 
+/* ==================== 多目标跟踪器 ==================== */
+
+typedef enum MD_TRACKER_KIND {
+    MD_TRACKER_BYTETRACK = 0,
+    MD_TRACKER_BOTSORT   = 1,
+    MD_TRACKER_STRONGSORT= 2,
+} MDTrackerKind;
+
+/* 跟踪目标的状态（对应 C++ TrackState：New/Tracked/Lost/Removed） */
+typedef enum MD_TRACK_STATE {
+    MD_TRACK_NEW = 0,
+    MD_TRACK_TRACKED = 1,
+    MD_TRACK_LOST = 2,
+    MD_TRACK_REMOVED = 3
+} MDTrackState;
+
+typedef struct MDTrackItem {
+    float x, y, w, h;
+    int track_id;
+    int label_id;
+    float score;
+    int state;   /* MDTrackState */
+} MDTrackItem;
+
+typedef struct md_tracker_handle* MDTrackerHandle;
+
+/* 创建跟踪器（按 kind 选择 ByteTracker / BotSort / StrongSort）。
+ * 纯 CPU 无模型依赖；跟踪 ID 跨帧稳定，reset() 归零。 */
+MD_CAPI_EXPORT MDStatus md_tracker_create(MDTrackerKind kind, MDTrackerHandle* out);
+MD_CAPI_EXPORT void md_tracker_destroy(MDTrackerHandle h);
+
+/* 逐帧更新：输入检测框（MDBox，复用通用框结构），逐帧返回跟踪目标。
+ * out 指向调用方分配的 MDTrackItem 数组，其容量为 *out_count（进入时）。
+ * 返回时 *out_count 置为实际写入数；若容量不足则报 MD_ERR_INVALID_ARGUMENT，
+ * 且不写越界（*out_count 置为需要数）。 */
+MD_CAPI_EXPORT MDStatus md_tracker_update(MDTrackerHandle h, const MDBox* boxes,
+                          const float* scores, const int* label_ids, size_t n,
+                          MDTrackItem* out, size_t* out_count);
+
+/* 通用命名参数设置（double 值）。
+ * 支持名字：track_thresh / high_thresh / low_thresh / max_age / min_hits /
+ *          iou_threshold / match_thresh / ema_alpha / fuse_score_weight /
+ *          appearance_priority / with_cmc
+ * 未知名 → MD_ERR_INVALID_ARGUMENT；不支持的 kind 只忽略不适用项。 */
+MD_CAPI_EXPORT MDStatus md_tracker_set_params(MDTrackerHandle h, const char* name, double value);
+
+MD_CAPI_EXPORT MDStatus md_tracker_reset(MDTrackerHandle h);
+
 /* ==================== 绘制（对 MDImageHandle 就地绘制） ==================== */
 
 MD_CAPI_EXPORT MDStatus md_draw_rect(MDImageHandle, float x, float y, float w, float h,

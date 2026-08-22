@@ -916,3 +916,100 @@ TEST_CASE("capi age batch getters + single-getter compat (real model, guarded)",
     md_image_destroy(b);
     md_model_destroy(age);
 }
+
+// Task 10：C API 跟踪器 —— 纯 CPU 无模型依赖（[capi]）
+TEST_CASE("capi tracker bytetrack update keeps stable track_id", "[capi]") {
+    MDTrackerHandle h = nullptr;
+    REQUIRE(md_tracker_create(MD_TRACKER_BYTETRACK, &h) == MD_OK);
+    REQUIRE(h != nullptr);
+
+    // 一个移动框，两帧映射到同一 track
+    MDBox boxes[1];
+    float scores[1];
+    int label_ids[1];
+
+    MDTrackItem out[4];
+    int first_id = -1;
+
+    boxes[0] = MDBox{100.f, 100.f, 40.f, 40.f};
+    scores[0] = 0.95f;
+    label_ids[0] = 1;
+    {
+        size_t cap = 4;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 1, out, &cap) == MD_OK);
+        REQUIRE(cap >= 1);
+        REQUIRE(cap <= 4);
+        first_id = out[0].track_id;
+        CHECK(out[0].label_id == 1);
+        CHECK(out[0].score == 0.95f);
+        CHECK(out[0].state >= 0);
+        CHECK(out[0].state <= 3);
+        CHECK(out[0].x == 100.f);
+        CHECK(out[0].y == 100.f);
+    }
+
+    // 第二帧同目标小幅移动 → 应关联到同一个 track_id
+    boxes[0] = MDBox{104.f, 104.f, 40.f, 40.f};
+    {
+        size_t cap = 4;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 1, out, &cap) == MD_OK);
+        REQUIRE(cap >= 1);
+        CHECK(out[0].track_id == first_id);
+    }
+
+    // 容量不足 → 报错且不写越界
+    {
+        size_t cap = 0;
+        MDTrackItem tmp = MDTrackItem{-1.f, -1.f, -1.f, -1.f, -1, -1, -1.f, -1};
+        CHECK(md_tracker_update(h, boxes, scores, label_ids, 1, &tmp, &cap) == MD_ERR_INVALID_ARGUMENT);
+        CHECK(cap == 1);              // 需求数 1（*out_count 置为需要数）
+        CHECK(tmp.track_id == -1);    // out 未被写入
+    }
+
+    // set_params：已知名生效，未知名报错
+    CHECK(md_tracker_set_params(h, "max_age", 60) == MD_OK);
+    CHECK(md_tracker_set_params(h, "track_thresh", 0.6) == MD_OK);
+    CHECK(md_tracker_set_params(h, "match_thresh", 0.99) == MD_OK);
+    CHECK(md_tracker_set_params(h, "nope", 1.0) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_tracker_set_params(h, "", 1.0) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_tracker_set_params(nullptr, "max_age", 1.0) == MD_ERR_NULL_POINTER);
+
+    // reset 后可继续使用（track_id 从 0 重新计数，因不再匹配旧 track）
+    REQUIRE(md_tracker_reset(h) == MD_OK);
+    {
+        size_t cap = 4;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 1, out, &cap) == MD_OK);
+        REQUIRE(cap >= 1);
+        CHECK(out[0].track_id == 0);   // reset 归零
+    }
+
+    md_tracker_destroy(h);
+}
+
+TEST_CASE("capi tracker create null args + empty-frame capacity", "[capi]") {
+    MDTrackerHandle h = nullptr;
+    CHECK(md_tracker_create(MD_TRACKER_BYTETRACK, nullptr) == MD_ERR_NULL_POINTER);
+    CHECK(md_tracker_create(MD_TRACKER_STRONGSORT, &h) == MD_OK);
+    REQUIRE(h != nullptr);
+
+    // 空输入（n=0）：合法，无输出
+    MDTrackItem out[4];
+    size_t cap = 4;
+    const MDBox* nb = nullptr;
+    const float* ns = nullptr;
+    const int* nl = nullptr;
+    REQUIRE(md_tracker_update(h, nb, ns, nl, 0, out, &cap) == MD_OK);
+    CHECK(cap == 0);
+
+    // null 入参守卫
+    CHECK(md_tracker_update(nullptr, nb, ns, nl, 0, out, &cap) == MD_ERR_NULL_POINTER);
+    CHECK(md_tracker_update(h, nb, ns, nl, 0, nullptr, &cap) == MD_ERR_NULL_POINTER);
+    CHECK(md_tracker_update(h, nb, ns, nl, 1, out, &cap) == MD_ERR_NULL_POINTER);
+
+    // 非法 kind → INVALID_ARGUMENT
+    MDTrackerHandle bad = (MDTrackerHandle)0x1;
+    CHECK(md_tracker_create((MDTrackerKind)999, &bad) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(bad == (MDTrackerHandle)0x1);  // out 未被写入
+
+    md_tracker_destroy(h);
+}
