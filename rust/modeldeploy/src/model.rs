@@ -488,6 +488,25 @@ impl RawResult {
         Ok(out)
     }
 
+    pub fn reid(&self, i: usize) -> Result<ReIdResult, MdError> {
+        let mut emb: *const f32 = ptr::null();
+        let mut n = 0usize;
+        check_status(unsafe { ffi::md_result_reid_embedding(self.handle, i, &mut emb, &mut n) })?;
+        Ok(ReIdResult {
+            embedding: read_f32(emb, n),
+        })
+    }
+
+    /// 读取全部 ReID embedding
+    pub fn reid_all(&self) -> Result<Vec<ReIdResult>, MdError> {
+        let mut out = Vec::new();
+        let n = self.count()?;
+        for i in 0..n {
+            out.push(self.reid(i)?);
+        }
+        Ok(out)
+    }
+
     pub fn insightface(&self) -> Result<Vec<InsightFace>, MdError> {
         let mut items: *const ffi::MDInsightFaceItem = ptr::null();
         let mut n = 0usize;
@@ -798,6 +817,19 @@ impl RawResult {
             let mut n = 0usize;
             check_status(unsafe { ffi::md_result_face_embedding_batch(self.handle, img, &mut emb, &mut n) })?;
             out.push(vec![FaceRecognition { embedding: read_f32(emb, n) }]);
+        }
+        Ok(out)
+    }
+
+    /// 批量行人重识别：每图一个 embedding。
+    pub fn reid_batch(&self) -> Result<Vec<Vec<ReIdResult>>, MdError> {
+        let images = self.count()?;
+        let mut out = Vec::with_capacity(images);
+        for img in 0..images {
+            let mut emb: *const f32 = ptr::null();
+            let mut n = 0usize;
+            check_status(unsafe { ffi::md_result_reid_embedding_batch(self.handle, img, &mut emb, &mut n) })?;
+            out.push(vec![ReIdResult { embedding: read_f32(emb, n) }]);
         }
         Ok(out)
     }
@@ -1261,6 +1293,9 @@ impl ResultType for LprPipeline {
 impl ResultType for PedestrianAttribute {
     type Item = Attribute;
 }
+impl ResultType for ReID {
+    type Item = ReIdResult;
+}
 
 model_wrapper!(UltralyticsDet, ModelKind::Detection, RawResult::detection, RawResult::detection_batch);
 model_wrapper!(Classification, ModelKind::Classification, RawResult::classification, RawResult::classification_batch);
@@ -1278,6 +1313,7 @@ model_wrapper!(InsightFaceAnalysis, ModelKind::InsightFace, RawResult::insightfa
 model_wrapper!(PaddleOCR, ModelKind::Ocr, RawResult::ocr, RawResult::ocr_batch);
 model_wrapper!(LprPipeline, ModelKind::LprPipeline, RawResult::lpr, RawResult::lpr_batch);
 model_wrapper!(PedestrianAttribute, ModelKind::PedestrianAttribute, RawResult::attribute, RawResult::attribute_batch);
+model_wrapper!(ReID, ModelKind::ReId, |r: &RawResult| r.reid(0).map(|x| vec![x]), RawResult::reid_batch);
 
 // ═══ 子模型（OCR / LPR / insightface 组件，可独立部署） ═══
 

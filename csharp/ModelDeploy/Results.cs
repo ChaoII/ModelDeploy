@@ -125,6 +125,11 @@ namespace ModelDeploy.Results
         public float[] Embedding { get; set; } = Array.Empty<float>();
     }
 
+    public sealed class ReIdResult
+    {
+        public float[] Embedding { get; set; } = Array.Empty<float>();
+    }
+
     public sealed class InsightFaceResult
     {
         public RectF Box { get; set; }

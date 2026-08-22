@@ -253,6 +253,10 @@ string path);
             out IntPtr embedding, out UIntPtr n);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_reid_embedding(IntPtr handle, UIntPtr i,
+            out IntPtr embedding, out UIntPtr n);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_result_insightface(IntPtr handle, out IntPtr items, out UIntPtr count);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

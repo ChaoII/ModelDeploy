@@ -15,6 +15,7 @@
 #include "vision/sem/ultralytics_sem.h"
 #include "vision/depth/ultralytics_depth.h"
 #include "vision/classification/classification.h"
+#include "vision/reid/reid.h"
 #include "vision/face/face_models.h"
 #include "vision/lpr/lpr_models.h"
 

@@ -65,6 +65,7 @@ pub enum MDModelKind {
     TTS,
     FACE_AS_SECOND,
     HAND,
+    REID,
 }
 
 /// 结果类型（MDResultKind）
@@ -414,6 +415,7 @@ extern "C" {
     pub fn md_result_face(h: MDResultHandle, items: *mut *const MDFaceItem, count: *mut usize) -> MDStatus;
     pub fn md_result_face_kps(h: MDResultHandle, i: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
     pub fn md_result_face_embedding(h: MDResultHandle, i: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_reid_embedding(h: MDResultHandle, i: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
     pub fn md_result_insightface(h: MDResultHandle, items: *mut *const MDInsightFaceItem, count: *mut usize) -> MDStatus;
     pub fn md_result_insightface_kps(h: MDResultHandle, i: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
     pub fn md_result_insightface_embedding(h: MDResultHandle, i: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
@@ -442,6 +444,7 @@ extern "C" {
     pub fn md_result_face_batch(h: MDResultHandle, img: usize, items: *mut *const MDFaceItem, count: *mut usize) -> MDStatus;
     pub fn md_result_face_kps_batch(h: MDResultHandle, img: usize, item: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
     pub fn md_result_face_embedding_batch(h: MDResultHandle, img: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
+    pub fn md_result_reid_embedding_batch(h: MDResultHandle, img: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;
     pub fn md_result_insightface_batch(h: MDResultHandle, img: usize, items: *mut *const MDInsightFaceItem, count: *mut usize) -> MDStatus;
     pub fn md_result_insightface_kps_batch(h: MDResultHandle, img: usize, item: usize, kps: *mut *const MDPoint, n: *mut usize) -> MDStatus;
     pub fn md_result_insightface_embedding_batch(h: MDResultHandle, img: usize, item: usize, emb: *mut *const c_float, n: *mut usize) -> MDStatus;

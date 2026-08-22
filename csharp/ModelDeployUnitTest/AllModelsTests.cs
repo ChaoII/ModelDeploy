@@ -205,6 +205,17 @@ public class AllModelsTests
         var r = m.Predict(vi);
         Assert.That(r.Embedding.Length, Is.GreaterThan(0));
     }
+    [Test]
+    public void ReId_Works()
+    {
+        var model = Path.Combine(ModelRoot, "osnet_x1_0.onnx");
+        var img = Path.Combine(ImageRoot, "test_face_id.jpg");
+        if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
+        using var vi = VisionImage.Read(img);
+        using var m = new ReIdModel(model, CpuOrt());
+        var r = m.Predict(vi);
+        Assert.That(r.Embedding.Length, Is.GreaterThan(0));
+    }
 
     [Test]
     public void FaceAge_Works()

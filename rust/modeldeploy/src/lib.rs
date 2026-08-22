@@ -15,7 +15,7 @@ pub use model::{
     Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel, HandKeypoint,
     InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, OcrClassifierModel, PaddleOCR, PedestrianAttribute, RawResult,
-    RecognizerModel, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice,
+    RecognizerModel, ReID, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice,
     UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose, UltralyticsSeg,
     UltralyticsSem,
 };
