@@ -37,6 +37,7 @@ namespace modeldeploy::vision {
     void bind_attr_pipeline(const pybind11::module&);
     void bind_tracking(const pybind11::module&);
     void bind_barcode(const pybind11::module&);
+    void bind_hand(const pybind11::module&);
 
 
 
@@ -73,5 +74,6 @@ namespace modeldeploy::vision {
         bind_attr_pipeline(m);
         bind_tracking(m);
         bind_barcode(m);
+        bind_hand(m);
     }
 }
