@@ -117,6 +117,20 @@ public class AllModelsTests
     }
 
     [Test]
+    public void Hand_Works()
+    {
+        var model = Path.Combine(ModelRoot, "hand_pose.onnx");
+        var img = Path.Combine(ImageRoot, "bus.jpg");
+        if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
+        using var vi = VisionImage.Read(img);
+        using var m = new HandModel(model, CpuOrt());
+        m.SetKeypointsNum(21);
+        var r = m.Predict(vi);
+        Assert.That(r, Is.Not.Empty);
+        Assert.That(r[0].KeyPoints.Length, Is.GreaterThan(0));
+    }
+
+    [Test]
     public void Obb_Works()
     {
         var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n-obb.onnx");

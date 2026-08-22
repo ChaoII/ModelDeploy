@@ -171,6 +171,78 @@ namespace ModelDeploy.Models
         }
     }
 
+    public sealed class HandModel : BaseModel
+    {
+        private HandModel(IntPtr handle) : base(MDModelKind.MD_MODEL_HAND, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public HandModel Clone() => new HandModel(CloneNative());
+
+        public HandModel(string modelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_HAND, modelPath, opt) { }
+
+        public Prediction<PoseResult> Predict(VisionImage image)
+            => MakePrediction(image, ReadHand);
+
+        /// <summary>批量预测（2D）：按图返回，每图一个手部关键点结果数组。</summary>
+        public IReadOnlyList<PoseResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, ReadHandBatch);
+
+        /// <summary>手部关键点置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>关键点数量（默认 21）。</summary>
+        public void SetKeypointsNum(long v) => SetParam("keypoints_num", v);
+
+        private static PoseResult[] ReadHand(IntPtr result)
+        {
+            var items = ResultReader.ReadItems<MDPoseItem>(result, md_result_pose);
+            var list = new List<PoseResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                var kpsPtr = ResultReader.ReadItems<MDPoint3F>(result,
+                    new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
+                        md_result_keypoints(h, new UIntPtr((uint)i), out k, out n)));
+                var kps = new Point3F[kpsPtr.Length];
+                for (int j = 0; j < kpsPtr.Length; j++)
+                    kps[j] = new Point3F(kpsPtr[j].x, kpsPtr[j].y, kpsPtr[j].z);
+                list.Add(new PoseResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    Score = it.score,
+                    KeyPoints = kps
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static PoseResult[] ReadHandBatch(IntPtr result, int img)
+        {
+            var imgU = new UIntPtr((uint)img);
+            var items = ResultReader.ReadItemsBatch<MDPoseItem>(result, imgU, md_result_pose_batch);
+            var list = new List<PoseResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                var kpsPtr = ResultReader.ReadItems<MDPoint3F>(result,
+                    new ResultReader.ItemGetter((IntPtr h, out IntPtr k, out UIntPtr n) =>
+                        md_result_keypoints_batch(h, imgU, new UIntPtr((uint)i), out k, out n)));
+                var kps = new Point3F[kpsPtr.Length];
+                for (int j = 0; j < kpsPtr.Length; j++)
+                    kps[j] = new Point3F(kpsPtr[j].x, kpsPtr[j].y, kpsPtr[j].z);
+                list.Add(new PoseResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    Score = it.score,
+                    KeyPoints = kps
+                });
+            }
+            return list.ToArray();
+        }
+    }
+
     public sealed class ObbModel : BaseModel
     {
         private ObbModel(IntPtr handle) : base(MDModelKind.MD_MODEL_OBB, handle) { }
