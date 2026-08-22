@@ -1,6 +1,6 @@
 use anyhow::Result;
 use modeldeploy::{
-    Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
+    BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
     Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
     RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, Tracker,
@@ -543,6 +543,19 @@ fn test_tracker_byte_track_stable_id() -> Result<()> {
     let id2 = frame2[0].track_id;
 
     assert_eq!(id1, id2, "跟踪 ID 跨帧应稳定");
+    Ok(())
+}
+
+// ═══ 条码 / 二维码解码（纯 CPU 无模型依赖） ═══
+
+#[test]
+fn test_barcode_qr_decode() -> Result<()> {
+    let det = BarcodeDetector::new()?;
+    let img = Image::read(&test_data("qr_sample.png"))?;
+    let res = det.detect(&img)?;
+    assert!(!res.is_empty(), "QR 样本应至少解码出一个码");
+    assert!(res[0].is_qr, "应为二维码");
+    assert_eq!(res[0].text, "https://example.com/MD");
     Ok(())
 }
 

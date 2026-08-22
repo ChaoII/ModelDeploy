@@ -1,3 +1,4 @@
+pub mod barcode;
 pub mod error;
 pub mod ffi;
 pub mod image;
@@ -7,6 +8,7 @@ pub mod tracker;
 pub mod types;
 
 // 重新导出常用类型
+pub use barcode::BarcodeDetector;
 pub use error::MdError;
 pub use image::Image;
 pub use model::{

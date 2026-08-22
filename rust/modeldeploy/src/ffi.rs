@@ -6,7 +6,7 @@
 
 #![allow(non_camel_case_types, dead_code, non_upper_case_globals)]
 
-use libc::{c_char, c_float, c_int, c_void};
+use libc::{c_char, c_float, c_int, c_uint, c_void};
 
 // ════════════════════════════════════════════════════════════════
 // 枚举
@@ -118,6 +118,7 @@ pub type MDImageHandle = *mut c_void;
 pub type MDResultHandle = *mut c_void;
 pub type MDOptionHandle = *mut c_void;
 pub type MDTrackerHandle = *mut c_void;
+pub type MDBarcodeHandle = *mut c_void;
 
 // ════════════════════════════════════════════════════════════════
 // 通用几何 / 颜色 / blittable 结构
@@ -278,6 +279,29 @@ pub struct MDTrackItem {
 // ════════════════════════════════════════════════════════════════
 // 绘制选项（MDDrawOptions + MDLabelItem）
 // ════════════════════════════════════════════════════════════════
+
+/// 条码 / 二维码解码结果项（对应 capi MD_BarcodeItem，blittable）
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDBarcodeItem {
+    pub text: [c_char; 256],
+    pub format: [c_char; 16],
+    pub quad: [c_float; 8],
+    pub score: c_float,
+    pub is_qr: c_int,
+}
+
+impl Default for MDBarcodeItem {
+    fn default() -> Self {
+        Self {
+            text: [0; 256],
+            format: [0; 16],
+            quad: [0.0; 8],
+            score: 0.0,
+            is_qr: 0,
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -450,4 +474,11 @@ extern "C" {
         out: *mut MDTrackItem, out_count: *mut usize) -> MDStatus;
     pub fn md_tracker_set_params(h: MDTrackerHandle, name: *const c_char, value: f64) -> MDStatus;
     pub fn md_tracker_reset(h: MDTrackerHandle) -> MDStatus;
+
+    // ── 条码 / 二维码 ──
+    pub fn md_barcode_create(out: *mut MDBarcodeHandle) -> MDStatus;
+    pub fn md_barcode_destroy(h: MDBarcodeHandle);
+    pub fn md_barcode_set_formats(h: MDBarcodeHandle, formats: c_uint) -> MDStatus;
+    pub fn md_barcode_detect(h: MDBarcodeHandle, img: MDImageHandle,
+        items: *mut MDBarcodeItem, count: *mut c_uint) -> MDStatus;
 }

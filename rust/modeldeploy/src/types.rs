@@ -337,3 +337,52 @@ pub struct Plane {
     pub data: *const u8,
     pub step: i32,
 }
+
+/// 条码 / 二维码格式（对应 capi format 字符串，如 "QR Code"）
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BarcodeFormat {
+    QrCode,
+    DataMatrix,
+    Aztec,
+    Ean8,
+    Ean13,
+    Upca,
+    Upce,
+    Code128,
+    Code39,
+    Code93,
+    Itf,
+    Codabar,
+    Other(String),
+}
+
+impl BarcodeFormat {
+    /// 由 capi 传入的格式名（ZXing::ToString，如 "QR Code" / "EAN-13"）解析。
+    pub fn from_name(s: &str) -> Self {
+        match s.to_ascii_uppercase().replace('_', " ").trim() {
+            "QR CODE" => BarcodeFormat::QrCode,
+            "DATA MATRIX" => BarcodeFormat::DataMatrix,
+            "AZTEC" => BarcodeFormat::Aztec,
+            "EAN-8" => BarcodeFormat::Ean8,
+            "EAN-13" => BarcodeFormat::Ean13,
+            "UPCA" | "UPC-A" => BarcodeFormat::Upca,
+            "UPCE" | "UPC-E" => BarcodeFormat::Upce,
+            "CODE 128" => BarcodeFormat::Code128,
+            "CODE 39" => BarcodeFormat::Code39,
+            "CODE 93" => BarcodeFormat::Code93,
+            "ITF" | "INTERLEAVED 2 OF 5" => BarcodeFormat::Itf,
+            "CODABAR" => BarcodeFormat::Codabar,
+            other => BarcodeFormat::Other(other.to_string()),
+        }
+    }
+}
+
+/// 条码 / 二维码解码结果
+#[derive(Debug, Clone)]
+pub struct BarcodeResult {
+    pub text: String,
+    pub format: BarcodeFormat,
+    pub quad: [(f32, f32); 4],
+    pub score: f32,
+    pub is_qr: bool,
+}
