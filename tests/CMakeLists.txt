@@ -24,6 +24,7 @@ set(TEST_SOURCES
     test_barcode.cpp
     test_hand.cpp
     test_reid.cpp
+    test_speaker_verify.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
