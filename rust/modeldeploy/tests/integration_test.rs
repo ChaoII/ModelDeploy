@@ -3,7 +3,7 @@ use modeldeploy::{
     BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
     Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
-    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, Tracker,
+    RuntimeOption, ReID, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, Tracker,
     TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
     UltralyticsSeg, UltralyticsSem,
 };
@@ -240,6 +240,24 @@ fn test_face_recognition() -> Result<()> {
     let img = Image::read(&test_img("test_face_id.jpg"))?;
     let rec = model.predict(&img)?;
     assert!(rec[0].embedding.len() > 0);
+    Ok(())
+}
+
+// ═══ ReID（行人重识别，需 osnet_x1_0.onnx 权重；缺失则跳过） ═══
+
+#[test]
+fn test_reid() -> Result<()> {
+    let model_path = test_data("test_models/onnx/osnet_x1_0.onnx");
+    if !std::path::Path::new(&model_path).exists() {
+        eprintln!("OSNet model not found; skipping reid test.");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let model = ReID::new(&model_path, &opt)?;
+    let bgr = vec![128u8; 256 * 128 * 3];
+    let img = Image::from_bgr24(&bgr, 256, 128)?;
+    let rec = model.predict(&img)?;
+    assert_eq!(rec[0].embedding.len(), 512);
     Ok(())
 }
 

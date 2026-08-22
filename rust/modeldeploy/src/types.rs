@@ -105,6 +105,12 @@ pub struct FaceRecognition {
     pub embedding: Vec<f32>,
 }
 
+/// 行人重识别（ReID）结果（512-d embedding）
+#[derive(Debug, Clone)]
+pub struct ReIdResult {
+    pub embedding: Vec<f32>,
+}
+
 /// InsightFace 完整分析结果
 #[derive(Debug, Clone)]
 pub struct InsightFace {
@@ -187,6 +193,7 @@ pub enum ModelKind {
     PedestrianAttribute,
     Asr,
     Tts,
+    ReId,
 }
 
 impl ModelKind {
@@ -218,6 +225,7 @@ impl ModelKind {
             ModelKind::PedestrianAttribute => PED_ATTR,
             ModelKind::Asr => ASR,
             ModelKind::Tts => TTS,
+            ModelKind::ReId => REID,
         }
     }
 }
