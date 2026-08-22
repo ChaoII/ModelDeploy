@@ -9,6 +9,7 @@
 #include "vision/tracking/matching/kalman_filter.h"
 #include "vision/tracking/bytetrack.h"
 #include "vision/tracking/botsort.h"
+#include "vision/tracking/strongsort.h"
 #include "vision/tracking/reid_extractor.h"
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tracking;
@@ -291,4 +292,96 @@ TEST_CASE("BoT-SORT: EMA feature is blended, not copied", "[tracking]") {
     REQUIRE(f2[0].feature[0] == Approx(e0 / norm).margin(1e-3f));
     REQUIRE(f2[0].feature[1] == Approx(e1 / norm).margin(1e-3f));
     REQUIRE(f2[0].feature[2] == Approx(0.0f).margin(1e-3f));
+}
+
+TEST_CASE("StrongSORT: no frames stable ids", "[tracking]") {
+    StrongSortTracker tr;
+    Detection d1{{0,0,20,20},0.9f,0};
+    auto f1 = tr.update({d1});
+    Detection d2{{2,2,20,20},0.9f,0};
+    auto f2 = tr.update({d2});
+    REQUIRE(f1.size()==1); REQUIRE(f2.size()==1);
+    REQUIRE(f1[0].track_id == f2[0].track_id);
+}
+
+// DISCRIMINATING: a pure-IoU implementation FAILS this; appearance-priority
+// (StrongSORT, appearance_priority=0.7) passes it. Frame 1 seeds id0 with
+// feature {1,0,0}. Frame 2 presents two detections near the SAME spot: the true
+// object B (feature {1,0,0}, slightly offset box) and a foreign object C
+// (feature {0,1,0}) whose box sits EXACTLY on the track's predicted position, so
+// C has the better IoU with id0. Pure IoU would match the foreign C to id0
+// (cost_C = 1-IoU = 0 vs cost_B = 0.32); appearance-priority routes B to id0
+// (cost_B = 0.7*0 + 0.3*0.32 = 0.096 vs cost_C = 0.7*1.0 + 0.3*0 = 0.7).
+TEST_CASE("StrongSORT: appearance prevents foreign re-association", "[tracking]") {
+    StrongSortTracker tr;
+    Detection a{{100,100,20,20},0.9f,0,{1.0f,0.0f,0.0f}};
+    auto f1 = tr.update({a});   // seeds id0 with feature {1,0,0}
+    REQUIRE(f1.size() == 1);
+    REQUIRE(f1[0].track_id == 0);
+
+    // True object B: same appearance, slight box offset (IoU(track,B) < 1).
+    Detection b{{102,102,20,20},0.9f,0,{1.0f,0.0f,0.0f}};
+    // Foreign object C: different appearance, box exactly on predicted position
+    // (IoU(track,C) == 1 > IoU(track,B)) so pure IoU would wrongly pick C.
+    Detection c{{100,100,20,20},0.9f,0,{0.0f,1.0f,0.0f}};
+    auto f2 = tr.update({b, c});
+    REQUIRE(f2.size() == 2);                      // two distinct objects
+    REQUIRE(f2[0].track_id != f2[1].track_id);
+
+    // The true-feature {1,0,0} object must own id0 (appearance beat IoU).
+    bool true_on_id0 = false;
+    bool foreign_seen = false;
+    for (const auto& r : f2) {
+        if (r.feature.size() >= 2 && r.feature[0] > 0.9f) {   // ~{1,0,0}
+            REQUIRE(r.track_id == 0);
+            true_on_id0 = true;
+        }
+        if (r.feature.size() >= 2 && r.feature[1] > 0.9f) {   // ~{0,1,0}
+            foreign_seen = true;
+        }
+    }
+    REQUIRE(true_on_id0);
+    REQUIRE(foreign_seen);
+
+    // Re-feed the pair on frame 3: id0 stays glued to the true appearance.
+    auto f3 = tr.update({b, c});
+    REQUIRE(f3.size() == 2);
+    for (const auto& r : f3) {
+        if (r.feature.size() >= 2 && r.feature[0] > 0.9f) {
+            REQUIRE(r.track_id == 0);
+        }
+    }
+}
+
+// DISCRIMINATING against "copy latest det feature" implementations: asserts the
+// EMA actually blends. Frame 1 seeds id0's EMA = A = {1,0,0}. Frame 2 matches a
+// single det B = {0,1,0}. ema_alpha = 0.9 => blended pre-normalize v = 0.9*A +
+// 0.1*B = {0.9, 0.1, 0}, renormalized. A "copy latest" would give B; "no
+// averaging" would give A; this asserts the actual average.
+TEST_CASE("StrongSORT: EMA blend asserted", "[tracking]") {
+    StrongSortTracker tr;
+    std::vector<float> A{1.0f, 0.0f, 0.0f};
+    std::vector<float> B{0.0f, 1.0f, 0.0f};
+    auto f1 = tr.update({Detection{{0,0,20,20},0.9f,0,A}});
+    REQUIRE(f1.size() == 1);
+    REQUIRE(f1[0].track_id == 0);
+    auto r = tr.update({Detection{{2,2,20,20},0.9f,0,B}});
+    REQUIRE(r.size() == 1);
+    REQUIRE(r[0].track_id == 0);
+    // alpha=0.9: 0.9*{1,0,0}+0.1*{0,1,0}={0.9,0.1,0}, norm=sqrt(0.82)~0.90554
+    // normalized => {0.99388, 0.11043, 0}
+    REQUIRE(r[0].feature.size() == 3);
+    REQUIRE(std::abs(r[0].feature[0] - 0.99388f) < 1e-4);
+    REQUIRE(std::abs(r[0].feature[1] - 0.11043f) < 1e-4);
+    REQUIRE(std::abs(r[0].feature[2]) < 1e-4);
+}
+
+TEST_CASE("StrongSORT: lost keeps id within max_age", "[tracking]") {
+    StrongSortTracker tr;
+    Detection d{{0,0,20,20},0.9f,0};
+    tr.update({d});             // 检出
+    auto miss = tr.update({});  // 丢失一帧
+    auto back = tr.update({d}); // 回到视野
+    REQUIRE(back.size() == 1);
+    REQUIRE(back[0].track_id == 0); // id 复用
 }
