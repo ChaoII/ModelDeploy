@@ -81,6 +81,9 @@ cmake --build build
 | `demo_face_gender_cxx` | 性别 | `face_gender_out.jpg` |
 | `demo_face_rec_pipeline_cxx` | 检测+特征 | 打印 embedding |
 | `demo_pedestrian_attribute_cxx` | 行人属性 | `pedestrian_attr_out.jpg` |
+| `demo_tracking_ort_cpu` | 多目标跟踪（det→track→可视化，ByteTracker + 对比 BoT-SORT） | `result_tracking_ort_cpu.jpg`（画框 + 稳定 track_id） |
+
+> **跟踪 demo**：无真实视频时用单张测试图（`test_detection1.jpg` 等）模拟多帧序列——把同一批检测框按帧做轻微确定性抖动连续送入追踪器，展示同一物体在帧间保持**稳定 track_id**。逐帧打印 track 数量，并统计"稳定物体数（每个物体跨帧只使用单一 track_id）"。
 
 > sophgo 目标（`demo_*_sophgo`）仅在 `ENABLE_SOPHGO=ON` 且平台支持时构建；本机 CPU 构建不参与。
 
