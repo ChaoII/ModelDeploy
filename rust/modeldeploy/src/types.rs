@@ -231,6 +231,8 @@ impl fmt::Display for ModelKind {
 /// 图像格式（对应 C++ ImageType 枚举值）
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// 变体名故意与 C 枚举一致（GRAY_U8/PLA_BGR_U8/... 等含下划线），不宜改为 camelCase。
+#[allow(non_camel_case_types)]
 pub enum ImageFormat {
     GRAY_U8 = 0,
     PLA_BGR_U8 = 20,

@@ -167,7 +167,6 @@ pub struct MDColorRGBA {
 }
 
 /// 结果项结构（blittable，数组式 getter 返回其数组）
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct MDDetectionItem {

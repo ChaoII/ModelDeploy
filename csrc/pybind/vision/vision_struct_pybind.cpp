@@ -5,9 +5,18 @@
 #include "pybind/utils/utils.h"
 #include "pybind/utils/result_convert.h"
 #include "vision/common/visualize/visualize.h"
-#include "capi/md_capi.h"
 
 namespace modeldeploy::vision {
+    // 设备枚举：值须与 capi/md_capi.h 的 MD_DEVICE 保持一致。
+    // 此处本地定义而非包含 capi/md_capi.h，因为 sdist 构建（wheel）会剔除 capi 目录。
+    enum MDDevice {
+        MD_DEV_CPU = 0,
+        MD_DEV_GPU = 1,
+        MD_DEV_TPU = 2,
+        MD_DEV_OPENCL = 3,
+        MD_DEV_VULKAN = 4,
+    };
+
     void bind_vision_struct(const pybind11::module& m) {
         pybind11::enum_<MDDevice>(m, "MDDevice")
             .value("CPU", MD_DEV_CPU)

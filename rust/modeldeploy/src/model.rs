@@ -32,6 +32,7 @@ impl Model {
     }
 
     /// 深拷贝（复用已加载的 backend session）
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Result<Self, MdError> {
         let mut out = ptr::null_mut();
         check_status(unsafe { ffi::md_model_clone(self.handle, &mut out) })?;
@@ -1037,6 +1038,8 @@ macro_rules! model_wrapper_common {
             }
 
             /// 深拷贝（复用 backend session）
+            /// 与 std Clone::clone 不同：返回 Result<Self, MdError>（深拷贝可失败）。
+            #[allow(clippy::should_implement_trait)]
             pub fn clone(&self) -> Result<Self, MdError> {
                 Ok(Self {
                     inner: self.inner.clone()?,
@@ -1322,6 +1325,7 @@ impl SenseVoice {
         })
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Result<Self, MdError> {
         Ok(Self {
             inner: self.inner.clone()?,
@@ -1359,6 +1363,7 @@ impl Kokoro {
         })
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Result<Self, MdError> {
         Ok(Self {
             inner: self.inner.clone()?,

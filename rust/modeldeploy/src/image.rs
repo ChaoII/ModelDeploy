@@ -39,6 +39,7 @@ impl Image {
 
     /// 包装 md_image_from_device_nv12 / md_model_predict 构造的绑定输入帧 ImageData（设备相关的 NV12 帧，库内不属主）。
     /// 生命周期归本结构管理（Drop 调 md_image_destroy，仅释放包装句柄，不碰输入缓冲）。
+    #[allow(dead_code)]
     pub(crate) fn from_device_frame(handle: ffi::MDImageHandle) -> Result<Self, MdError> {
         Self::from_handle(handle)
     }
@@ -210,6 +211,7 @@ impl Image {
     }
 
     /// 深拷贝
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Result<Self, MdError> {
         let mut out = std::ptr::null_mut();
         check_status(unsafe { ffi::md_image_clone(self.handle, &mut out) })?;
