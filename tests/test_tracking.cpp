@@ -2,6 +2,9 @@
 #include <catch2/catch_approx.hpp>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <vector>
 #include "vision/tracking/base_tracker.h"
 #include "vision/tracking/matching/iou_matching.h"
@@ -11,6 +14,8 @@
 #include "vision/tracking/botsort.h"
 #include "vision/tracking/strongsort.h"
 #include "vision/tracking/reid_extractor.h"
+#include "vision/tracking/mot/mot_loader.h"
+#include "vision/tracking/mot/clear_metrics.h"
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tracking;
 using namespace Catch;
@@ -384,4 +389,103 @@ TEST_CASE("StrongSORT: lost keeps id within max_age", "[tracking]") {
     auto back = tr.update({d}); // 回到视野
     REQUIRE(back.size() == 1);
     REQUIRE(back[0].track_id == 0); // id 复用
+}
+
+// RAII temp file helper for MOT loader tests (never committed to repo).
+namespace {
+struct TempMotFile {
+    std::filesystem::path path;
+    explicit TempMotFile(const std::string& content) {
+        path = std::filesystem::temp_directory_path() /
+               ("mot_test_" + std::to_string(std::rand()) + std::to_string(std::rand()) + ".txt");
+        std::ofstream os(path, std::ios::trunc);
+        os << content;
+    }
+    ~TempMotFile() { std::error_code ec; std::filesystem::remove(path, ec); }
+};
+}  // namespace
+
+TEST_CASE("MotLoader: empty / nonexistent file yields empty sequence", "[tracking]") {
+    auto seq = load_mot_sequence("nonexistent_mot_file_xyz.txt");
+    REQUIRE(seq.frames.empty());
+    std::vector<std::vector<TrackResult>> preds;   // empty seq -> empty predictions
+    auto m = compute_clear(seq, preds);
+    REQUIRE(m.mota == Approx(1.0f));               // vacuous perfect (num_gt == 0)
+    REQUIRE(m.idf1 == Approx(0.0f));
+    REQUIRE(m.num_gt == 0);
+}
+
+TEST_CASE("MotLoader: parses MOTChallenge text into GT + dets, perfect prediction -> MOTA==1", "[tracking]") {
+    std::string mot =
+        "1,1,0,0,10,10,-1,-1,-1\n"
+        "1,2,100,100,10,10,-1,-1,-1\n"
+        "1,-1,0,0,10,10,0.9,1,-1\n"
+        "1,-1,100,100,10,10,0.8,1,-1\n"
+        "2,1,0,0,10,10,-1,-1,-1\n"
+        "2,2,100,100,10,10,-1,-1,-1\n"
+        "2,-1,0,0,10,10,0.85,1,-1\n"
+        "2,-1,100,100,10,10,0.75,1,-1\n";
+    TempMotFile f(mot);
+
+    auto seq = load_mot_sequence(f.path.string());
+    REQUIRE(seq.frames.size() == 2);
+    REQUIRE(seq.frames[0].frame_id == 1);
+    REQUIRE(seq.frames[1].frame_id == 2);
+    REQUIRE(seq.num_gt_ids == 2);
+    REQUIRE(seq.frames[0].gt_boxes.size() == 2);
+    REQUIRE(seq.frames[0].gt_ids[0] == 1);
+    REQUIRE(seq.frames[0].gt_ids[1] == 2);
+    REQUIRE(seq.frames[0].dets.size() == 2);
+    REQUIRE(seq.frames[0].dets[0].score == Approx(0.9f));
+    REQUIRE(seq.frames[0].dets[1].score == Approx(0.8f));
+    REQUIRE(seq.frames[1].dets[0].score == Approx(0.85f));
+
+    // PERFECT predictions: each GT box with GT id as track id.
+    std::vector<std::vector<TrackResult>> perfect(seq.frames.size());
+    for (size_t i = 0; i < seq.frames.size(); ++i) {
+        const auto& fr = seq.frames[i];
+        for (size_t j = 0; j < fr.gt_boxes.size(); ++j) {
+            TrackResult tr;
+            tr.track_id = fr.gt_ids[j];
+            tr.box = fr.gt_boxes[j];
+            tr.score = 1.0f;
+            tr.label_id = 0;
+            perfect[i].push_back(tr);
+        }
+    }
+    auto m = compute_clear(seq, perfect);
+    REQUIRE(m.mota == Approx(1.0f));
+    REQUIRE(m.idf1 >= Approx(0.99f));
+    REQUIRE(m.num_fp == 0);
+    REQUIRE(m.num_fn == 0);
+    REQUIRE(m.precision == Approx(1.0f));
+    REQUIRE(m.recall == Approx(1.0f));
+
+    // Predictions that MISS every GT -> MOTA == 0, all FN.
+    std::vector<std::vector<TrackResult>> miss(seq.frames.size());
+    auto mm = compute_clear(seq, miss);
+    REQUIRE(mm.mota == Approx(0.0f));
+    REQUIRE(mm.num_fn == 4);               // 2 frames x 2 GT
+    REQUIRE(mm.recall == Approx(0.0f));
+}
+
+TEST_CASE("MotLoader: detects ID switch when a track swaps GT identity", "[tracking]") {
+    MotSequence seq;
+    MotFrame f1, f2;
+    f1.frame_id = 1;
+    f1.gt_boxes.push_back({0, 0, 10, 10});
+    f1.gt_ids.push_back(1);
+    f2.frame_id = 2;
+    f2.gt_boxes.push_back({100, 100, 10, 10});
+    f2.gt_ids.push_back(2);
+    seq.frames = {f1, f2};
+
+    std::vector<std::vector<TrackResult>> preds(2);
+    TrackResult a; a.track_id = 0; a.box = {0, 0, 10, 10};
+    TrackResult b; b.track_id = 0; b.box = {100, 100, 10, 10};
+    preds[0].push_back(a);   // track 0 -> GT 1
+    preds[1].push_back(b);   // track 0 -> GT 2  (identity swapped)
+
+    auto m = compute_clear(seq, preds);
+    REQUIRE(m.id_switches >= 1);
 }
