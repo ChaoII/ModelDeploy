@@ -126,3 +126,27 @@ TEST_CASE("ByteTrack: lost keeps id within max_age", "[tracking]") {
     REQUIRE(back.size()==1);
     REQUIRE(back[0].track_id == 0);          // id 复用
 }
+TEST_CASE("ByteTrack: low-IoU object not merged into existing track id", "[tracking]") {
+    ByteTracker tr;                          // match_thresh=0.8 -> min required IoU 0.2
+    Detection a{{0,0,10,10},0.9f,0};
+    auto f1 = tr.update({a});
+    REQUIRE(f1.size()==1);
+    REQUIRE(f1[0].track_id == 0);
+    Detection b{{5,5,10,10},0.9f,0};         // IoU(a,b) ~ 0.14 -> distance ~0.86 > 0.8
+    tr.update({b});                          // must NOT absorb b into id0 (gate rejects)
+    auto f3 = tr.update({b});                // b is a distinct object, has a fresh id
+    REQUIRE(f3.size()==1);
+    REQUIRE(f3[0].track_id != 0);            // b is not the old a-track
+    REQUIRE(f3[0].track_id == 1);            // b got a fresh distinct track id
+}
+TEST_CASE("ByteTrack: two low-overlap objects keep distinct stable ids", "[tracking]") {
+    ByteTracker tr;
+    Detection a{{0,0,10,10},0.9f,0};
+    Detection b{{5,5,10,10},0.9f,0};         // IoU(a,b) ~ 0.14 (partial overlap, below min)
+    auto f1 = tr.update({a,b});
+    REQUIRE(f1.size()==2);
+    REQUIRE(f1[0].track_id != f1[1].track_id);
+    auto f2 = tr.update({a,b});
+    REQUIRE(f2.size()==2);
+    REQUIRE(f2[0].track_id != f2[1].track_id);
+}

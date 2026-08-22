@@ -45,6 +45,13 @@ namespace modeldeploy::vision::tracking {
         float low_thresh_{0.1f};
         int max_age_{30};
         int min_hits_{3};
+        // Active association gate: a matched pair is accepted only when its IoU
+        // distance (1 - IoU) is below match_thresh_ (default 0.8 => min required
+        // IoU of 0.2), matching canonical ByteTrack's match_thresh semantics.
+        float match_thresh_{0.8f};
+        // Kept in the public set_params signature for API compatibility. The
+        // effective gating threshold is match_thresh_ (above); this value is
+        // stored but is not consulted by the association stages.
         float iou_threshold_{0.3f};
     };
 }

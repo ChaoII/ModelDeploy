@@ -7,12 +7,6 @@
 #include "vision/tracking/matching/iou_matching.h"
 
 namespace modeldeploy::vision::tracking {
-    namespace {
-        // Accept a Hungarian assignment in the association stage when the matched
-        // pair shares any spatial overlap (distance < 1.0 means iou > 0.0).
-        constexpr float kMatchOverlap = 1.0f;
-    }
-
     ByteTracker::ByteTracker() { set_params(); }
 
     ByteTracker::~ByteTracker() = default;
@@ -25,6 +19,8 @@ namespace modeldeploy::vision::tracking {
         max_age_ = max_age;
         min_hits_ = min_hits;
         iou_threshold_ = iou_threshold;
+        // Canonical ByteTrack match_thresh: distance gate, default 0.8 (~IoU 0.2).
+        match_thresh_ = 0.8f;
     }
 
     void ByteTracker::reset() {
@@ -87,7 +83,7 @@ namespace modeldeploy::vision::tracking {
                 const int r = pr.first;
                 const int c = pr.second;
                 if (r < 0 || c < 0) continue;
-                if (dist[static_cast<size_t>(r)][static_cast<size_t>(c)] < kMatchOverlap) {
+                if (dist[static_cast<size_t>(r)][static_cast<size_t>(c)] < match_thresh_) {
                     pool_used[static_cast<size_t>(r)] = 1;
                     high_used[static_cast<size_t>(c)] = 1;
                     Track& t = tracks_[static_cast<size_t>(pool[static_cast<size_t>(r)])];
@@ -124,7 +120,7 @@ namespace modeldeploy::vision::tracking {
                     const int r = pr.first;
                     const int c = pr.second;
                     if (r < 0 || c < 0) continue;
-                    if (dist[static_cast<size_t>(r)][static_cast<size_t>(c)] < kMatchOverlap) {
+                    if (dist[static_cast<size_t>(r)][static_cast<size_t>(c)] < match_thresh_) {
                         low_used[static_cast<size_t>(c)] = 1;
                         Track& t = tracks_[static_cast<size_t>(pool[static_cast<size_t>(cand[static_cast<size_t>(r)])])];
                         t.kf.update(low[static_cast<size_t>(c)]->box);
