@@ -7,6 +7,7 @@
 #include "vision/tracking/matching/hungarian.h"
 #include "vision/tracking/matching/kalman_filter.h"
 #include "vision/tracking/bytetrack.h"
+#include "vision/tracking/botsort.h"
 #include "vision/tracking/reid_extractor.h"
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tracking;
@@ -184,4 +185,33 @@ TEST_CASE("ByteTrack: two low-overlap objects keep distinct stable ids", "[track
     auto f2 = tr.update({a,b});
     REQUIRE(f2.size()==2);
     REQUIRE(f2[0].track_id != f2[1].track_id);
+}
+
+TEST_CASE("BoT-SORT: no frames still stable ids", "[tracking]") {
+    BotSortTracker tr;
+    Detection d1{{0,0,20,20},0.9f,0};
+    auto f1 = tr.update({d1});
+    Detection d2{{2,2,20,20},0.9f,0};
+    auto f2 = tr.update({d2});
+    REQUIRE(f1.size()==1);
+    REQUIRE(f2.size()==1);
+    REQUIRE(f1[0].track_id == f2[0].track_id);
+}
+TEST_CASE("BoT-SORT: distinct appearance keeps distinct ids at same spot", "[tracking]") {
+    BotSortTracker tr;
+    Detection a{{0,0,20,20},0.9f,0,{1.0f,0.0f,0.0f}};
+    Detection b{{0,0,20,20},0.9f,0,{0.0f,1.0f,0.0f}};
+    tr.update({a,b});
+    auto f2 = tr.update({a,b});
+    REQUIRE(f2.size()==2);
+    REQUIRE(f2[0].track_id != f2[1].track_id);
+}
+TEST_CASE("BoT-SORT: EMA feature tracking keeps id amid appearance drift", "[tracking]") {
+    BotSortTracker tr;
+    std::vector<float> f0{1,0,0}, f1{0.9f,0.2f,0}, f2{0.8f,0.4f,0};
+    Detection d0{{0,0,20,20},0.9f,0,f0};
+    tr.update({d0});
+    auto r1 = tr.update({Detection{{2,2,20,20},0.9f,0,f1}});
+    auto r2 = tr.update({Detection{{4,4,20,20},0.9f,0,f2}});
+    REQUIRE(r2.size()==1);
 }
