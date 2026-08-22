@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "pybind/utils/utils.h"
 #include "vision/barcode/barcode.h"
 #include "vision/barcode/result.h"
 
@@ -37,6 +38,12 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("set_formats", &BarcodeDetector::set_formats,
                  pybind11::arg("formats"))
+            .def("detect",
+                 [](const BarcodeDetector& self, const pybind11::array& img) {
+                     const auto cv_image = pyarray_to_cv_mat(img);
+                     return self.detect(ImageData(cv_image));
+                 },
+                 pybind11::arg("img"))
             .def("detect", &BarcodeDetector::detect, pybind11::arg("img"))
             .def_property_readonly("formats", &BarcodeDetector::formats);
     }

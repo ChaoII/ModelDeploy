@@ -6,7 +6,31 @@ import modeldeploy.modeldeploy
 import numpy
 import pybind11_stubgen.typing_ext
 import typing
-__all__ = ['AttributeResult', 'Classification', 'ClassificationPostprocessor', 'ClassificationPreprocessor', 'Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionResult', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'KeyPointsResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'PedestrianAttribute', 'Point2f', 'Point3f', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_attr', 'vis_cls', 'vis_det', 'vis_iseg', 'vis_keypoints', 'vis_lpr', 'vis_obb', 'vis_ocr']
+__all__ = ['BarcodeDetector', 'BarcodeResult', 'FMT_ALL', 'FMT_AZTEC', 'FMT_CODABAR', 'FMT_CODE_128', 'FMT_CODE_39', 'FMT_CODE_93', 'FMT_DATA_MATRIX', 'FMT_EAN_13', 'FMT_EAN_8', 'FMT_ITF', 'FMT_QR_CODE', 'FMT_UPC_A', 'FMT_UPC_E', 'AttributeResult', 'Classification', 'ClassificationPostprocessor', 'ClassificationPreprocessor', 'Classifier', 'ClassifierPostprocessor', 'ClassifierPreprocessor', 'ClassifyResult', 'DBDetector', 'DBDetectorPostprocessor', 'DBDetectorPreprocessor', 'DetectionResult', 'FaceAntiSpoofResult', 'FaceRecognitionResult', 'FaceRecognizerPipeline', 'InstanceSegResult', 'KeyPointsResult', 'LetterBoxRecord', 'LprDetPostprocessor', 'LprDetPreprocessor', 'LprDetection', 'LprPipeline', 'LprRecPostprocessor', 'LprRecPreprocessor', 'LprRecognizer', 'LprResult', 'Mask', 'OCRResult', 'ObbResult', 'PPStructureV2Table', 'PaddleOCR', 'PedestrianAttribute', 'Point2f', 'Point3f', 'Recognizer', 'RecognizerPostprocessor', 'RecognizerPreprocessor', 'Rect2f', 'RotatedRect', 'SeetaFaceAge', 'SeetaFaceAgePostprocessor', 'SeetaFaceAgePreprocessor', 'SeetaFaceAsFirst', 'SeetaFaceAsPipeline', 'SeetaFaceAsSecond', 'SeetaFaceGender', 'SeetaFaceGenderPostprocessor', 'SeetaFaceGenderPreprocessor', 'SeetaFaceID', 'SeetaFaceIDPostprocessor', 'SeetaFaceIDPreprocessor', 'StructureV2Layout', 'StructureV2LayoutPostprocessor', 'StructureV2LayoutPreprocessor', 'StructureV2SERViLayoutXLMModel', 'StructureV2Table', 'StructureV2TablePostprocessor', 'StructureV2TablePreprocessor', 'UltralyticsDet', 'UltralyticsObb', 'UltralyticsObbPostprocessor', 'UltralyticsObbPreprocessor', 'UltralyticsPose', 'UltralyticsPosePostprocessor', 'UltralyticsPosePreprocessor', 'UltralyticsPostprocessor', 'UltralyticsPreprocessor', 'UltralyticsSeg', 'UltralyticsSegPostprocessor', 'UltralyticsSegPreprocessor', 'vis_attr', 'vis_cls', 'vis_det', 'vis_iseg', 'vis_keypoints', 'vis_lpr', 'vis_obb', 'vis_ocr']
+class BarcodeDetector:
+    def __init__(self) -> None:
+        ...
+    @typing.overload
+    def detect(self, img: numpy.ndarray) -> list[BarcodeResult]:
+        ...
+    @typing.overload
+    def detect(self, img: ImageData) -> list[BarcodeResult]:
+        ...
+    def set_formats(self, formats: int) -> None:
+        ...
+    @property
+    def formats(self) -> int:
+        ...
+class BarcodeResult:
+    format: str
+    is_qr: bool
+    quad: typing.Annotated[list[Point2f], pybind11_stubgen.typing_ext.FixedSize(4)]
+    score: float
+    text: str
+    def __init__(self) -> None:
+        ...
+    def __repr__(self) -> str:
+        ...
 class AttributeResult:
     attr_scores: list[float]
     box: Rect2f
@@ -895,3 +919,16 @@ def vis_obb(image: numpy.ndarray, result: list[ObbResult], threshold: float = 0.
     ...
 def vis_ocr(image: numpy.ndarray, result: OCRResult, font_path: str = '', font_size: int = 14, alpha: float = 0.15, save_result: bool = False) -> numpy.ndarray:
     ...
+FMT_ALL: int = 4294967295
+FMT_AZTEC: int = 4
+FMT_CODABAR: int = 2048
+FMT_CODE_128: int = 128
+FMT_CODE_39: int = 256
+FMT_CODE_93: int = 512
+FMT_DATA_MATRIX: int = 2
+FMT_EAN_13: int = 16
+FMT_EAN_8: int = 8
+FMT_ITF: int = 1024
+FMT_QR_CODE: int = 1
+FMT_UPC_A: int = 32
+FMT_UPC_E: int = 64
