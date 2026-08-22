@@ -77,7 +77,11 @@ namespace modeldeploy::vision {
                  pybind11::arg("fuse_score_weight") = 0.5f,
                  pybind11::arg("ema_alpha") = 0.9f,
                  pybind11::arg("with_cmc") = true)
-            .def("set_reid", &BotSortTracker::set_reid)
+            // Note: set_reid() is intentionally NOT bound here — ReidExtractor is
+            // a C++-only type (not pybind-exposed) and not constructible from
+            // Python, so keeping the binding would be a dead/failing API. Python
+            // appearance is supplied inline via Detection.feature; the C++ set_reid
+            // remains available to C++ users only.
             .def("update", &BotSortTracker::update,
                  pybind11::arg("detections"),
                  pybind11::arg("frame") = pybind11::none(),
@@ -97,7 +101,7 @@ namespace modeldeploy::vision {
                  pybind11::arg("ema_alpha") = 0.9f,
                  pybind11::arg("appearance_priority") = 0.7f,
                  pybind11::arg("with_cmc") = true)
-            .def("set_reid", &StrongSortTracker::set_reid)
+            // set_reid() intentionally not bound — see BotSortTracker note above.
             .def("update", &StrongSortTracker::update,
                  pybind11::arg("detections"),
                  pybind11::arg("frame") = pybind11::none(),
