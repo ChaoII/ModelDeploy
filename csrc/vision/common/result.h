@@ -100,6 +100,13 @@ namespace modeldeploy::vision {
         std::vector<float> embedding;
     };
 
+    /*! @brief Pedestrian Re-ID result structure
+     *  OSNet 输出经 L2 归一化后的 512-d 特征向量
+     */
+    struct MODELDEPLOY_CXX_EXPORT ReIdResult {
+        std::vector<float> embedding;  //!< 已 L2 归一化的 512-d 特征
+    };
+
     struct MODELDEPLOY_CXX_EXPORT LprResult {
         Rect2f box;
         // 4 points
