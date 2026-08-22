@@ -1222,6 +1222,9 @@ impl ResultType for Classification {
 impl ResultType for UltralyticsPose {
     type Item = Pose;
 }
+impl ResultType for HandKeypoint {
+    type Item = Pose;
+}
 impl ResultType for UltralyticsObb {
     type Item = Obb;
 }
@@ -1262,6 +1265,7 @@ impl ResultType for PedestrianAttribute {
 model_wrapper!(UltralyticsDet, ModelKind::Detection, RawResult::detection, RawResult::detection_batch);
 model_wrapper!(Classification, ModelKind::Classification, RawResult::classification, RawResult::classification_batch);
 model_wrapper!(UltralyticsPose, ModelKind::Pose, RawResult::pose, RawResult::pose_batch);
+model_wrapper!(HandKeypoint, ModelKind::Hand, RawResult::pose, RawResult::pose_batch);
 model_wrapper!(UltralyticsObb, ModelKind::Obb, RawResult::obb, RawResult::obb_batch);
 model_wrapper!(UltralyticsSeg, ModelKind::InstanceSeg, RawResult::instance_seg, RawResult::instance_seg_batch);
 model_wrapper!(UltralyticsSem, ModelKind::SemSeg, |r: &RawResult| r.sem_seg().map(|s| vec![s]), |r: &RawResult| r.sem_seg_batch());
