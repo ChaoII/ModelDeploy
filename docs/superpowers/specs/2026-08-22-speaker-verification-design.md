@@ -29,9 +29,24 @@ ModelDeploy 已具备完整 audio 模块（ASR 的 `SenseVoice`、TTS 的 `Kokor
 - 不做持久化 SpeakerGallery（内存态，与 ReIdGallery 一致）。
 - 不做多说话人分离（说话人分离是另一模型/任务）。
 
-## 3. 架构与组件
+## 3. 模型选型：SOTA + 轻量化
 
-### 3.1 目录与命名（沿用 audio 约定）
+选用 **ECAPA-TDNN C512**（ERes2Net/ECAPA 系说话人嵌入，说话人验证 SOTA 基线）作为默认嵌入模型。论证（SOTA、轻量、快三者平衡）：
+
+| 模型 | 参数/体积 | embedding | 说明 |
+|------|----------|-----------|------|
+| **ECAPA-TDNN C512**（选用） | ~20MB | 192-d | 说话人验证社区标准 SOTA，CPU 实时（<10ms/1s 音频），ONNX 易得 |
+| ECAPA-TDNN C1024 | ~45MB | 512-d | 精度微高但体积/算力翻倍，为"轻量"让位 |
+| wav2vec2 / WavLM（自监督） | 300MB+ | 1024-d | 精度高但**远非轻量**，CPU 不可实时，X 掉 |
+| x-vector | 小 | 512-d | 经典但对短语音鲁棒性弱于 ECAPA |
+
+- 前端：80 维 mel-fbank，16kHz（与 ECAPA 官方设置一致），复用 kaldi-native-fbank。
+- 默认 `C512`（192-d）满足"轻量 + 速度 + SOTA"；`set_embedding_dim` / 换模型文件即可切换到 C1024，**SDK 管线不变**。
+- 若需要更极致的轻量化（如嵌入式），预留配置以兼容更小 ECAPA 变体（`C256` 等），仍在同一 `SpeakerVerify` 类范畴。
+
+## 4. 架构与组件
+
+### 4.1 目录与命名（沿用 audio 约定）
 ```
 csrc/audio/speaker_verify/
     ecapa.h / .cpp          # class SpeakerVerify : BaseModel
@@ -41,7 +56,7 @@ csrc/audio/speaker_gallery.h / .cpp   # class SpeakerGallery（内存库）
 - `csrc/audio/*.cpp` 已被根 CMakeLists 的 `GLOB_RECURSE csrc/audio/*.cpp` 自动收集，无需改 CMake（探索已确认，行 117）。
 - 新增 `.cpp` 是否依赖 audio 专用依赖：ecapa 仅用已捆绑的 `kaldi-native-fbank` + `csrc/utils`，无新第三方依赖。
 
-### 3.2 `SpeakerVerify` 类（继承 `BaseModel`）
+### 4.2 `SpeakerVerify` 类（继承 `BaseModel`）
 ```cpp
 namespace modeldeploy::audio::speaker_verify {
 class MODELDEPLOY_CXX_EXPORT SpeakerVerify : public BaseModel {
@@ -72,7 +87,7 @@ private:
 } // namespace modeldeploy::audio::speaker_verify
 ```
 
-### 3.3 `SpeakerGallery`（复用 ReIdGallery 模式）
+### 4.3 `SpeakerGallery`（复用 ReIdGallery 模式）
 ```cpp
 namespace modeldeploy::audio {
 class MODELDEPLOY_CXX_EXPORT SpeakerGallery {
@@ -94,7 +109,7 @@ private:
 - 同 label 重复 enroll = 覆盖。
 - match 返回 `(label, score)`，按 score 降序，取 top_k。
 
-### 3.4 数据流
+### 4.4 数据流
 ```
 float PCM(16k)
    └─ preprocess: 分帧(25ms/10ms) → mel-fbank(80) → Tensor [1,80,T]
@@ -103,14 +118,14 @@ float PCM(16k)
 SpeakerGallery.enroll/math: l2_normalize → compute_similarity → top_k
 ```
 
-## 4. Python（pybind）
+## 5. Python（pybind）
 - 新增 `csrc/pybind/audio/speaker_verify_pybind.cpp`，定义 `bind_speaker_verify(pybind11::module&)`：
   - `SpeakerVerify(model_file)`：构造；`.predict(samples: List[float]) -> List[float]`（embedding）；`.is_initialized()`。
   - `SpeakerGallery`：`.enroll(label, emb)` / `.remove(label)` / `.match(emb, top_k=1) -> List[Tuple[str,float]]` / `.size()` / `.reset()`。
 - 注册入口 `csrc/pybind/main.cpp`：在 `#ifdef BUILD_AUDIO` 下 `audio::bind_speaker_verify(audio_module)`（探索已确认 main.cpp 行 8-42 结构）。
 - 注意：根 CMakeLists 行 310-312 在 `NOT BUILD_AUDIO` 时要一并 `REMOVE_ITEM` 新增的 `speaker_verify_pybind.cpp`（与 kokoro_pybind 相同处理）。
 
-## 5. CAPI
+## 6. CAPI
 - 枚举：`capi/md_capi.h` `MD_MODEL_KIND`（行 96-97 附近）新增 `MD_MODEL_SPEAKER_VERIFY`（在 `MD_MODEL_COUNT` 前；注意与 Item 2/3 的 HAND=27/REID=28 对齐现状，新值从 29 起或按当前 count 追加）。
 - `md_model_create` switch 的 `#ifdef BUILD_AUDIO` 块（行 928-948）：新增构造 `new audio::speaker_verify::SpeakerVerify(parts[0], opt)`。
 - `md_model_handle::~md_model_handle`（行 999-1002）：新增 `delete` 分发。
