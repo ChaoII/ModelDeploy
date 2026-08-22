@@ -283,6 +283,10 @@ namespace modeldeploy::vision::tracking {
         warp_ = cv::Mat::eye(2, 3, CV_32FC1);
     }
 
+    std::unique_ptr<BaseTracker> StrongSortTracker::clone() const {
+        return std::make_unique<StrongSortTracker>(*this);
+    }
+
     std::vector<float> StrongSortTracker::l2_normalize(std::vector<float> v) {
         double sum = 0.0;
         for (const float x : v) sum += static_cast<double>(x) * static_cast<double>(x);

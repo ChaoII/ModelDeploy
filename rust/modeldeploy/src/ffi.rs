@@ -443,6 +443,9 @@ extern "C" {
     // ── 多目标跟踪器 ──
     pub fn md_tracker_create(kind: c_int, out: *mut MDTrackerHandle) -> MDStatus;
     pub fn md_tracker_destroy(h: MDTrackerHandle);
+    pub fn md_tracker_capacity(h: MDTrackerHandle, boxes: *const MDBox,
+        scores: *const c_float, label_ids: *const c_int, n: usize,
+        out_count: *mut usize) -> MDStatus;
     pub fn md_tracker_update(h: MDTrackerHandle, boxes: *const MDBox,
         scores: *const c_float, label_ids: *const c_int, n: usize,
         out: *mut MDTrackItem, out_count: *mut usize) -> MDStatus;

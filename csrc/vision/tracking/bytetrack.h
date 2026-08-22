@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <vector>
 #include "core/md_decl.h"
 #include "vision/common/struct.h"
@@ -22,6 +23,7 @@ namespace modeldeploy::vision::tracking {
                                         const ImageData* frame = nullptr,
                                         double timestamp = -1) override;
         void reset() override;
+        std::unique_ptr<BaseTracker> clone() const override;
 
     private:
         struct Track {

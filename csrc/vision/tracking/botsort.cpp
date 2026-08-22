@@ -47,6 +47,10 @@ namespace modeldeploy::vision::tracking {
         warp_ = cv::Mat::eye(2, 3, CV_32FC1);
     }
 
+    std::unique_ptr<BaseTracker> BotSortTracker::clone() const {
+        return std::make_unique<BotSortTracker>(*this);
+    }
+
     bool BotSortTracker::normalize(std::vector<float>& v) const {
         double sum = 0.0;
         for (const float x : v) {

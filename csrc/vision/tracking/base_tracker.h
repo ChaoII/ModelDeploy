@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <vector>
 #include "core/md_decl.h"
 #include "vision/common/struct.h"
@@ -20,6 +21,12 @@ namespace modeldeploy::vision::tracking {
             const std::vector<Detection>& detections,
             const ImageData* frame = nullptr, double timestamp = -1) = 0;
         virtual void reset() = 0;
+        // Deep(-enough) clone of the tracker state. Used by the capi for the
+        // non-mutating capacity query (md_tracker_capacity) so callers can size
+        // their output buffer before the single stateful update() commit, without
+        // advancing the real tracker's frame counter / Kalman state. This is a
+        // query/commit *mechanism* only; it does not change tracking semantics.
+        virtual std::unique_ptr<BaseTracker> clone() const = 0;
         virtual ~BaseTracker() = default;
     };
     inline std::vector<TrackResult> empty_update() { return {}; }

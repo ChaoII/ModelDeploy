@@ -1013,3 +1013,110 @@ TEST_CASE("capi tracker create null args + empty-frame capacity", "[capi]") {
 
     md_tracker_destroy(h);
 }
+
+// F1 回归：md_tracker_capacity 是**非变异**查询——查询本身不推进跟踪器状态。
+TEST_CASE("capi tracker_capacity is a non-mutating query", "[capi]") {
+    MDTrackerHandle h = nullptr;
+    REQUIRE(md_tracker_create(MD_TRACKER_BYTETRACK, &h) == MD_OK);
+    REQUIRE(h != nullptr);
+
+    MDBox b = MDBox{10.f, 10.f, 40.f, 40.f};
+    float s = 0.9f;
+    int l = 0;
+    MDTrackItem out[4];
+    size_t cap = 4;
+    REQUIRE(md_tracker_update(h, &b, &s, &l, 1, out, &cap) == MD_OK);
+    REQUIRE(cap == 1);
+    const int id1 = out[0].track_id;
+
+    // 多次非变异容量查询：返回需要数，且不改变任何状态
+    for (int i = 0; i < 3; ++i) {
+        size_t need = 99;
+        REQUIRE(md_tracker_capacity(h, &b, &s, &l, 1, &need) == MD_OK);
+        CHECK(need == 1);
+    }
+
+    // 查询后再次 update（同一框）仍关联到原 track：若查询曾推进帧计数/Kalman，
+    // 输出计数会偏移/ID 会变化，此断言即失败。
+    REQUIRE(md_tracker_update(h, &b, &s, &l, 1, out, &cap) == MD_OK);
+    CHECK(cap == 1);
+    CHECK(out[0].track_id == id1);
+
+    // 空指针守卫
+    CHECK(md_tracker_capacity(nullptr, &b, &s, &l, 1, &cap) == MD_ERR_NULL_POINTER);
+    CHECK(md_tracker_capacity(h, &b, &s, &l, 1, nullptr) == MD_ERR_NULL_POINTER);
+
+    md_tracker_destroy(h);
+}
+
+// F1 回归：双阶段探测（用 md_tracker_update 自身探测容量）会对每个有输出的帧推进两次，
+// 导致 Lost 目标的 max_age 有效减半、过早被移除。修复后经 capacity 查询 + 单次 update，
+// 目标在 max_age 内重新出现应沿用原 track_id（保持 ID）。
+TEST_CASE("capi tracker no double-advance keeps lost track id", "[capi]") {
+    MDTrackerHandle h = nullptr;
+    REQUIRE(md_tracker_create(MD_TRACKER_BYTETRACK, &h) == MD_OK);
+    REQUIRE(h != nullptr);
+    REQUIRE(md_tracker_set_params(h, "max_age", 30) == MD_OK);
+
+    MDBox boxes[2];
+    float scores[2];
+    int label_ids[2];
+    MDTrackItem out[4];
+
+    // 帧 1、2：目标 A 出现（小幅移动保持同一 track）
+    boxes[0] = MDBox{100.f, 100.f, 40.f, 40.f};
+    scores[0] = 0.95f;
+    label_ids[0] = 1;
+    {
+        size_t cap = 4;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 1, out, &cap) == MD_OK);
+        REQUIRE(cap >= 1);
+    }
+    boxes[0].x = 102.f;
+    {
+        size_t cap = 4;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 1, out, &cap) == MD_OK);
+        REQUIRE(cap >= 1);
+    }
+    const int a_id = out[0].track_id;
+
+    // 帧 3..25：A 消失，目标 B 持续出现于远处 → 每帧有输出（need>=1）。
+    // 修复前：每逻辑帧推进 2 次，A 的 cur-frame_id 增长加倍，约第 18 帧即被移除；
+    // 修复后：每帧推进 1 次，A 到第 33 帧才被移除，第 26 帧时仍存活。
+    boxes[0] = MDBox{400.f, 400.f, 40.f, 40.f};
+    scores[0] = 0.95f;
+    label_ids[0] = 2;
+    for (int i = 0; i < 23; ++i) {  // 帧 3..25
+        size_t cap = 4;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 1, out, &cap) == MD_OK);
+        REQUIRE(cap >= 1);
+    }
+
+    // 帧 26：A 重新出现（连同 B）。查询/提交契约：capacity（非变异）→ 分配 → update（恰一次）
+    boxes[0] = MDBox{100.f, 100.f, 40.f, 40.f};  // A
+    boxes[1] = MDBox{400.f, 400.f, 40.f, 40.f};  // B
+    scores[0] = 0.95f;
+    scores[1] = 0.95f;
+    label_ids[0] = 1;
+    label_ids[1] = 2;
+    {
+        size_t need = 0;
+        REQUIRE(md_tracker_capacity(h, boxes, scores, label_ids, 2, &need) == MD_OK);
+        REQUIRE(need >= 1);
+        std::vector<MDTrackItem> vout(need);
+        size_t wcap = need;
+        REQUIRE(md_tracker_update(h, boxes, scores, label_ids, 2, vout.data(), &wcap) == MD_OK);
+        REQUIRE(wcap >= 1);
+
+        bool found_a = false;
+        for (size_t i = 0; i < wcap; ++i) {
+            if (vout[i].x == 100.f && vout[i].y == 100.f) {
+                found_a = true;
+                CHECK(vout[i].track_id == a_id);  // 修复前此处失败（A 已丢、新 id）
+            }
+        }
+        REQUIRE(found_a);
+    }
+
+    md_tracker_destroy(h);
+}

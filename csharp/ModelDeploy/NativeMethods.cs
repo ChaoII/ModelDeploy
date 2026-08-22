@@ -398,7 +398,14 @@ string path);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void md_tracker_destroy(IntPtr handle);
 
-        // out 为调用方分配的缓冲（容量 = 进入时 *out_count，size_t）；不足时返回 MD_ERR_INVALID_ARGUMENT 且 *out_count 置为需要数。
+        // 非变异容量查询：计算 update(n) 会产生的输出数，不推进跟踪器状态。调用方先查询，
+        // 再分配该容量，最后调用一次有状态 update（见 md_tracker_update 契约）。
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_tracker_capacity(IntPtr handle, MDBox[] boxes,
+            float[] scores, int[] labelIds, UIntPtr n, out UIntPtr outCount);
+
+        // 有状态更新提交（每逻辑帧恰一次）。out 容量 = 进入时 *out_count（size_t）；不足时返回
+        // MD_ERR_INVALID_ARGUMENT 且 *out_count 置为需要数。调用方应以 md_tracker_capacity 先行。
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_tracker_update(IntPtr handle, MDBox[] boxes,
             float[] scores, int[] labelIds, UIntPtr n,

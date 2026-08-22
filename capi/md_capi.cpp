@@ -3334,6 +3334,56 @@ void md_tracker_destroy(MDTrackerHandle h) {
     delete static_cast<md_tracker_handle*>(h);
 }
 
+namespace {
+// Converts capi box array into the tracking Detection vector (shared by the
+// non-mutating capacity query and the stateful update commit).
+std::vector<modeldeploy::vision::tracking::Detection> tracker_build_dets(
+    const MDBox* boxes, const float* scores, const int* label_ids, size_t n) {
+    using namespace modeldeploy::vision::tracking;
+    std::vector<Detection> dets;
+    dets.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        Detection d;
+        d.box = Rect2f(boxes[i].x, boxes[i].y, boxes[i].w, boxes[i].h);
+        d.score = scores ? scores[i] : 0.f;
+        d.label_id = label_ids ? label_ids[i] : 0;
+        dets.push_back(std::move(d));
+    }
+    return dets;
+}
+} // namespace
+
+/* 非变异容量查询：计算对给定检测调用 update(n) 会产生的 TrackResult 数量，
+ * 但**不推进**跟踪器状态（帧计数 / Kalman / 关联）。实现为对跟踪器做一次克隆后
+ * 在克隆上运行 update，从而得到与真实 update 完全一致的输出数。
+ * 调用方应先调用本函数确定缓冲大小，再分配并用该容量调用 stateful md_tracker_update
+ * —— 这保证 update 每逻辑帧只提交一次（避免两阶段容量探测导致的双重推进）。 */
+MDStatus md_tracker_capacity(MDTrackerHandle h, const MDBox* boxes, const float* scores,
+                             const int* label_ids, size_t n, size_t* out_count) {
+    auto* th = static_cast<md_tracker_handle*>(h);
+    if (!th || !th->tracker) { set_error("md_tracker_capacity: handle is null"); return MD_ERR_NULL_POINTER; }
+    if (!out_count) { set_error("md_tracker_capacity: out_count is null"); return MD_ERR_NULL_POINTER; }
+    if (n > 0 && (!boxes || !scores || !label_ids)) {
+        set_error("md_tracker_capacity: boxes/scores/label_ids null for non-empty n");
+        return MD_ERR_NULL_POINTER;
+    }
+    auto dets = tracker_build_dets(boxes, scores, label_ids, n);
+    try {
+        std::unique_ptr<modeldeploy::vision::tracking::BaseTracker> probe = th->tracker->clone();
+        std::vector<modeldeploy::vision::tracking::TrackResult> res = probe->update(dets);
+        *out_count = res.size();
+    } catch (const std::exception& e) {
+        set_error_fmt("md_tracker_capacity: %s", e.what());
+        return MD_ERR_MODEL_PREDICT;
+    }
+    return MD_OK;
+}
+
+/* 有状态更新提交：推进跟踪器一帧并写入输出。
+ * 调用方应先经 md_tracker_capacity 得到所需数量并分配足够缓冲，再调用本函数（每逻辑帧
+ * 恰好一次）。容量不足时本函数会在**克隆**上预估所需数、写 *out_count 为需要数并返回
+ * MD_ERR_INVALID_ARGUMENT，且**不推进**真实跟踪器状态（帧计数 / Kalman / 关联），
+ * 从而保证容量探测永不导致双重推进。 */
 MDStatus md_tracker_update(MDTrackerHandle h, const MDBox* boxes, const float* scores,
                            const int* label_ids, size_t n, MDTrackItem* out, size_t* out_count) {
     auto* th = static_cast<md_tracker_handle*>(h);
@@ -3346,26 +3396,24 @@ MDStatus md_tracker_update(MDTrackerHandle h, const MDBox* boxes, const float* s
     }
 
     using namespace modeldeploy::vision::tracking;
-    std::vector<Detection> dets;
-    dets.reserve(n);
-    for (size_t i = 0; i < n; ++i) {
-        Detection d;
-        d.box = Rect2f(boxes[i].x, boxes[i].y, boxes[i].w, boxes[i].h);
-        d.score = scores ? scores[i] : 0.f;
-        d.label_id = label_ids ? label_ids[i] : 0;
-        dets.push_back(std::move(d));
-    }
+    auto dets = tracker_build_dets(boxes, scores, label_ids, n);
+    const size_t cap = *out_count;
 
     try {
-        std::vector<TrackResult> res = th->tracker->update(dets);
-        const size_t need = res.size();
-        const size_t cap = *out_count;
+        // 先做**非变异**容量预估：在克隆上跑一次 update 得所需数量，不触碰真实状态。
+        // 仅当容量充足时才提交真实的有状态 update；容量不足则直接返回，保证本函数
+        // 不会在容量未命中时推进帧状态（这正是查询/提交契约的核心保证）。
+        std::unique_ptr<BaseTracker> probe = th->tracker->clone();
+        const size_t need = probe->update(dets).size();
         if (cap < need) {
             *out_count = need;
             set_error_fmt("md_tracker_update: output capacity %zu < needed %zu (track count)", cap, need);
-            return MD_ERR_INVALID_ARGUMENT;
+            return MD_ERR_INVALID_ARGUMENT;  // 未推进真实跟踪器状态
         }
-        for (size_t i = 0; i < need; ++i) {
+
+        std::vector<TrackResult> res = th->tracker->update(dets);
+        const size_t written = res.size();
+        for (size_t i = 0; i < written; ++i) {
             MDTrackItem it;
             it.x = res[i].box.x; it.y = res[i].box.y;
             it.w = res[i].box.width; it.h = res[i].box.height;
@@ -3375,7 +3423,7 @@ MDStatus md_tracker_update(MDTrackerHandle h, const MDBox* boxes, const float* s
             it.state = res[i].state;
             out[i] = it;
         }
-        *out_count = need;
+        *out_count = written;
     } catch (const std::exception& e) {
         set_error_fmt("md_tracker_update: %s", e.what());
         return MD_ERR_MODEL_PREDICT;

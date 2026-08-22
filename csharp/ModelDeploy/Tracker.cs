@@ -52,6 +52,11 @@ namespace ModelDeploy.Tracking
         }
 
         /// <summary>逐帧更新：输入检测框/得分/类别，返回本帧跟踪目标（TrackId 跨帧稳定）。</summary>
+        /// <remarks>
+        /// 遵循 capi 查询/提交契约：先以 md_tracker_capacity 做非变异容量查询（不推进状态），
+        /// 分配所需缓冲后再以恰好容量调用有状态 md_tracker_update 一次。这样每逻辑帧跟踪器只
+        /// 推进一次（Kalman / max_age / ID 计数正确），避免旧的双阶段探测导致的双重推进。
+        /// </remarks>
         public TrackItem[] Update(RectF[] boxes, float[] scores, int[] labelIds)
         {
             ThrowIfDisposed();
@@ -75,29 +80,26 @@ namespace ModelDeploy.Tracking
             }
 
             var nU = new UIntPtr((uint)n);
-            uint cap = (uint)Math.Max(n, 1);
-            while (true)
-            {
-                var buf = new MDTrackItem[cap];
-                var outCount = new UIntPtr(cap);
-                var status = md_tracker_update(_handle, mdBoxes, scores, labelIds, nU, buf, ref outCount);
-                if (status == MDStatus.MD_OK)
-                {
-                    int written = checked((int)outCount);
-                    var result = new TrackItem[written];
-                    for (int i = 0; i < written; i++)
-                        result[i] = ToTrackItem(buf[i]);
-                    return result;
-                }
-                if (status == MDStatus.MD_ERR_INVALID_ARGUMENT)
-                {
-                    uint needed = checked((uint)outCount);
-                    if (needed <= cap) return Array.Empty<TrackItem>();
-                    cap = needed;
-                    continue;
-                }
+
+            // 阶段 1：非变异容量查询（不推进跟踪器状态）
+            if (md_tracker_capacity(_handle, mdBoxes, scores, labelIds, nU, out UIntPtr need) != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Tracker capacity query failed: {BaseModel.GetLastError()}");
+
+            // 阶段 2：分配 needed 个目标，正式写入（有状态，恰一次）。
+            // 注意：即使 need==0（空帧）也要调用一次 update 以推进状态；此时仍给一个
+            // 最小为 1 的非空缓冲，避免空数组被 marshal 成 null 触发 native 空指针守卫。
+            uint cap = Math.Max(checked((uint)need), 1);
+            var buf = new MDTrackItem[cap];
+            var outCount = new UIntPtr(cap);
+            var status = md_tracker_update(_handle, mdBoxes, scores, labelIds, nU, buf, ref outCount);
+            if (status != MDStatus.MD_OK)
                 throw new InvalidOperationException($"Tracker update failed: {BaseModel.GetLastError()}");
-            }
+            int written = checked((int)outCount);
+
+            var result = new TrackItem[written];
+            for (int i = 0; i < written; i++)
+                result[i] = ToTrackItem(buf[i]);
+            return result;
         }
 
         /// <summary>设置跟踪参数（track_thresh / max_age / iou_threshold ...，双精度命名参数）。</summary>

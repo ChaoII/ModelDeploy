@@ -491,10 +491,23 @@ typedef struct md_tracker_handle* MDTrackerHandle;
 MD_CAPI_EXPORT MDStatus md_tracker_create(MDTrackerKind kind, MDTrackerHandle* out);
 MD_CAPI_EXPORT void md_tracker_destroy(MDTrackerHandle h);
 
-/* 逐帧更新：输入检测框（MDBox，复用通用框结构），逐帧返回跟踪目标。
+/* 非变异容量查询：计算对给定检测调用 md_tracker_update(n) 会产生的 TrackResult 数量，
+ * 但**不推进**跟踪器状态。调用方应先以本函数确定输出缓冲大小，再分配并用该容量调用
+ * md_tracker_update（见下）。返回 MD_OK，*out_count 置为需要数。 */
+MD_CAPI_EXPORT MDStatus md_tracker_capacity(MDTrackerHandle h, const MDBox* boxes,
+                          const float* scores, const int* label_ids, size_t n,
+                          size_t* out_count);
+
+/* 有状态更新提交：推进跟踪器一帧并写入输出。
  * out 指向调用方分配的 MDTrackItem 数组，其容量为 *out_count（进入时）。
  * 返回时 *out_count 置为实际写入数；若容量不足则报 MD_ERR_INVALID_ARGUMENT，
- * 且不写越界（*out_count 置为需要数）。 */
+ * 且不写越界（*out_count 置为需要数）。
+ *
+ * 查询/提交契约（client）：对每一逻辑帧——
+ *   1) md_tracker_capacity(..., &need)   —— 非变异，仅查询，不推进状态；
+ *   2) 分配 need 个 MDTrackItem；
+ *   3) md_tracker_update(..., cap=need)  —— 有状态，推进**一次**。
+ * 切勿用 md_tracker_update 自身作容量探测（会双重推进帧状态）。 */
 MD_CAPI_EXPORT MDStatus md_tracker_update(MDTrackerHandle h, const MDBox* boxes,
                           const float* scores, const int* label_ids, size_t n,
                           MDTrackItem* out, size_t* out_count);

@@ -569,3 +569,47 @@ fn test_tracker_set_param_and_reset() -> Result<()> {
     assert!(!f2.is_empty());
     Ok(())
 }
+
+// F1 回归：update() 遵循 查询(capacity,非变异)→分配→单次提交 契约，每逻辑帧只推进一次。
+// 若仍用 update 自身做两阶段探测（双重推进），一个 Lost 目标的 max_age 会按每帧 +2 增长、
+// 有效减半并被过早移除；本测试会让 A 在 max_age 内于"另一目标持续出现"的环境下重新出现，
+// 断言其 ID 保持不变 —— 修复前此处失败（A 已丢、得到新 id）。
+#[test]
+fn test_tracker_no_double_advance_keeps_lost_id() -> Result<()> {
+    use modeldeploy::Rect;
+
+    let mut tracker = Tracker::new(TrackerKind::ByteTrack)?;
+    tracker.set_param("max_age", 30.0)?;
+
+    // 帧 1、2：目标 A
+    let a = Rect { x: 100.0, y: 100.0, width: 40.0, height: 40.0 };
+    let a2 = Rect { x: 102.0, y: 102.0, width: 40.0, height: 40.0 };
+    let s = vec![0.95f32];
+    let l = vec![0i32];
+    let frame1 = tracker.update(&vec![a.clone()], &s, &l)?;
+    assert!(!frame1.is_empty(), "frame1 应产生跟踪目标");
+    let a_id = frame1[0].track_id;
+    let _ = tracker.update(&vec![a2], &s, &l)?;
+
+    // 帧 3..25：A 消失，目标 B 持续出现于远处（每帧有输出）
+    let b = Rect { x: 400.0, y: 400.0, width: 40.0, height: 40.0 };
+    let sb = vec![0.95f32];
+    let lb = vec![1i32];
+    for _ in 0..23 {
+        let r = tracker.update(&vec![b.clone()], &sb, &lb)?;
+        assert!(!r.is_empty(), "B 每帧都应被跟踪");
+    }
+
+    // 帧 26：A 重新出现（连同 B）—— 修复前 A 已被移除（新 id），修复后仍为原 id
+    let s2 = vec![0.95f32, 0.95f32];
+    let l2 = vec![0i32, 1i32];
+    let r = tracker.update(&vec![a, b], &s2, &l2)?;
+    let track_a = r.iter().find(|t| t.rect.x == 100.0 && t.rect.y == 100.0);
+    assert!(track_a.is_some(), "A 重新出现时应被跟踪");
+    assert_eq!(
+        track_a.unwrap().track_id,
+        a_id,
+        "A 的 ID 应保持不变（无双重推进）"
+    );
+    Ok(())
+}

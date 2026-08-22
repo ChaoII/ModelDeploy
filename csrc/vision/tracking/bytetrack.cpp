@@ -29,6 +29,10 @@ namespace modeldeploy::vision::tracking {
         next_id_ = 0;
     }
 
+    std::unique_ptr<BaseTracker> ByteTracker::clone() const {
+        return std::make_unique<ByteTracker>(*this);
+    }
+
     std::vector<TrackResult> ByteTracker::update(const std::vector<Detection>& detections,
                                                  const ImageData* frame, double timestamp) {
         (void)frame;

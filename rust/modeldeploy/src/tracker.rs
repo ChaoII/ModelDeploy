@@ -32,8 +32,10 @@ impl Tracker {
 
     /// 逐帧更新：输入检测框，返回跟踪目标（ID 跨帧稳定）。
     ///
-    /// 内部采用两阶段容量探测：先以容量 0 探测所需大小，再分配后正式写入，
-    /// 并对写入数做边界约束，避免读取越界。
+    /// 遵循 capi 的查询/提交契约：先以 md_tracker_capacity 做**非变异**容量查询（不推进
+    /// 跟踪器状态），分配所需缓冲后再以恰好的容量调用有状态 md_tracker_update **一次**。
+    /// 这样每逻辑帧跟踪器只推进一次（Kalman / max_age / ID 计数正确），避免旧的两阶段
+    /// 探测（用 update 自身探测）导致的双重推进。空帧（无输出）也会照常调用 update 推进状态。
     pub fn update(
         &mut self,
         boxes: &[Rect],
@@ -57,31 +59,23 @@ impl Tracker {
             })
             .collect();
 
-        // 阶段 1：容量探测。capi 要求 out 非空，故用 dangling（非空）指针，
-        // 容量 0 下必然不足，返回 ERR_INVALID_ARGUMENT 并在 out_count 写入所需数。
-        let mut probe_cap: usize = 0;
-        let probe = ptr::NonNull::<ffi::MDTrackItem>::dangling();
-        let status = unsafe {
-            ffi::md_tracker_update(
+        // 阶段 1：非变异容量查询（不推进状态）
+        let mut need: usize = 0;
+        check_status(unsafe {
+            ffi::md_tracker_capacity(
                 self.handle,
                 boxes_ffi.as_ptr(),
                 scores.as_ptr(),
                 label_ids.as_ptr(),
                 n,
-                probe.as_ptr(),
-                &mut probe_cap,
+                &mut need,
             )
-        };
-        if status == ffi::MDStatus::OK {
-            // 本帧无跟踪目标，容量保持 0
-            return Ok(Vec::new());
-        }
-        if status != ffi::MDStatus::ERR_INVALID_ARGUMENT {
-            return Err(status_err(status));
-        }
-        let need = probe_cap;
+        })?;
 
-        // 阶段 2：分配 need 个目标，正式写入
+        // 阶段 2：分配 need 个目标，正式写入（有状态，恰一次）。
+        // 空帧（need==0）也要调用 update 推进状态；分配 max(need,1) 保证传出指针非空，
+        // 满足 capi 的 out 空指针守卫（不写越界，写 0 项）。
+        let alloc = if need == 0 { 1 } else { need };
         let mut out = vec![
             ffi::MDTrackItem {
                 x: 0.0,
@@ -93,7 +87,7 @@ impl Tracker {
                 score: 0.0,
                 state: 0,
             };
-            need
+            alloc
         ];
         let mut written = need;
         check_status(unsafe {
@@ -145,15 +139,4 @@ impl Drop for Tracker {
             self.handle = ptr::null_mut();
         }
     }
-}
-
-/// 将非 OK 状态码转为 MdError（附最近错误信息）。
-fn status_err(code: ffi::MDStatus) -> MdError {
-    let err = unsafe { ffi::md_get_last_error() };
-    let last = if err.is_null() {
-        String::new()
-    } else {
-        unsafe { std::ffi::CStr::from_ptr(err).to_string_lossy().into_owned() }
-    };
-    MdError::from_status(code, &last)
 }
