@@ -117,6 +117,7 @@ pub type MDModelHandle = *mut c_void;
 pub type MDImageHandle = *mut c_void;
 pub type MDResultHandle = *mut c_void;
 pub type MDOptionHandle = *mut c_void;
+pub type MDTrackerHandle = *mut c_void;
 
 // ════════════════════════════════════════════════════════════════
 // 通用几何 / 颜色 / blittable 结构
@@ -259,6 +260,20 @@ pub struct MDInsightFaceItem {
     pub score: c_float,
     pub gender: c_int,
     pub age: c_int,
+}
+
+/// 跟踪目标项（对应 capi MDTrackItem）
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MDTrackItem {
+    pub x: c_float,
+    pub y: c_float,
+    pub w: c_float,
+    pub h: c_float,
+    pub track_id: c_int,
+    pub label_id: c_int,
+    pub score: c_float,
+    pub state: c_int, // MDTrackState
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -424,4 +439,13 @@ extern "C" {
 
     // ── 结果可视化（句柄直达 C++ vis_*） ──
     pub fn md_draw_result(img: MDImageHandle, result: MDResultHandle, opt: *const MDDrawOptions) -> MDStatus;
+
+    // ── 多目标跟踪器 ──
+    pub fn md_tracker_create(kind: c_int, out: *mut MDTrackerHandle) -> MDStatus;
+    pub fn md_tracker_destroy(h: MDTrackerHandle);
+    pub fn md_tracker_update(h: MDTrackerHandle, boxes: *const MDBox,
+        scores: *const c_float, label_ids: *const c_int, n: usize,
+        out: *mut MDTrackItem, out_count: *mut usize) -> MDStatus;
+    pub fn md_tracker_set_params(h: MDTrackerHandle, name: *const c_char, value: f64) -> MDStatus;
+    pub fn md_tracker_reset(h: MDTrackerHandle) -> MDStatus;
 }

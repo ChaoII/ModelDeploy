@@ -3,6 +3,7 @@ pub mod ffi;
 pub mod image;
 pub mod model;
 pub mod runtime;
+pub mod tracker;
 pub mod types;
 
 // 重新导出常用类型
@@ -17,4 +18,5 @@ pub use model::{
     UltralyticsSem,
 };
 pub use runtime::RuntimeOption;
+pub use tracker::Tracker;
 pub use types::*;

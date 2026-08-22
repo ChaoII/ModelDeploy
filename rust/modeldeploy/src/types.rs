@@ -267,6 +267,68 @@ impl From<i32> for ImageFormat {
     }
 }
 
+/// 跟踪器类型（对应 capi MDTrackerKind）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackerKind {
+    ByteTrack,
+    BotSort,
+    StrongSort,
+}
+
+impl TrackerKind {
+    pub(crate) fn to_ffi(self) -> i32 {
+        match self {
+            TrackerKind::ByteTrack => 0,
+            TrackerKind::BotSort => 1,
+            TrackerKind::StrongSort => 2,
+        }
+    }
+}
+
+impl TryFrom<i32> for TrackerKind {
+    type Error = ();
+    fn try_from(v: i32) -> Result<Self, Self::Error> {
+        match v {
+            0 => Ok(TrackerKind::ByteTrack),
+            1 => Ok(TrackerKind::BotSort),
+            2 => Ok(TrackerKind::StrongSort),
+            _ => Err(()),
+        }
+    }
+}
+
+/// 跟踪目标状态（对应 capi MDTrackState）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackState {
+    New = 0,
+    Tracked = 1,
+    Lost = 2,
+    Removed = 3,
+}
+
+impl TryFrom<i32> for TrackState {
+    type Error = ();
+    fn try_from(v: i32) -> Result<Self, Self::Error> {
+        match v {
+            0 => Ok(TrackState::New),
+            1 => Ok(TrackState::Tracked),
+            2 => Ok(TrackState::Lost),
+            3 => Ok(TrackState::Removed),
+            _ => Err(()),
+        }
+    }
+}
+
+/// 跟踪目标（跨帧 ID 稳定）
+#[derive(Debug, Clone)]
+pub struct TrackItem {
+    pub rect: Rect,
+    pub track_id: i32,
+    pub label_id: i32,
+    pub score: f32,
+    pub state: TrackState,
+}
+
 /// 图像平面（原始指针 + 行步长），零拷贝访问，不拥有内存
 #[derive(Debug, Clone, Copy)]
 pub struct Plane {

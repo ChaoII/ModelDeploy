@@ -3,8 +3,9 @@ use modeldeploy::{
     Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
     Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
-    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, UltralyticsDepth,
-    UltralyticsDet, UltralyticsObb, UltralyticsPose, UltralyticsSeg, UltralyticsSem,
+    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, Tracker,
+    TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
+    UltralyticsSeg, UltralyticsSem,
 };
 
 fn test_data(rel: &str) -> String {
@@ -514,5 +515,57 @@ fn test_tts() -> Result<()> {
         dir, dir, dir, dir, dir, dir, dir);
     let model = Kokoro::new(&path, &opt)?;
     assert!(model.is_ready());
+    Ok(())
+}
+
+// ═══ 多目标跟踪器（纯 CPU 无模型依赖） ═══
+
+#[test]
+fn test_tracker_byte_track_stable_id() -> Result<()> {
+    use modeldeploy::Rect;
+
+    let mut tracker = Tracker::new(TrackerKind::ByteTrack)?;
+    assert_eq!(tracker.kind(), TrackerKind::ByteTrack);
+
+    let boxes = vec![Rect { x: 100.0, y: 100.0, width: 50.0, height: 100.0 }];
+    let scores = vec![0.9f32];
+    let label_ids = vec![0i32];
+
+    // 帧 1：新出现目标
+    let frame1 = tracker.update(&boxes, &scores, &label_ids)?;
+    assert!(!frame1.is_empty(), "frame1 应产生跟踪目标");
+    let id1 = frame1[0].track_id;
+
+    // 帧 2：目标轻微移动，ID 应保持稳定
+    let boxes2 = vec![Rect { x: 112.0, y: 104.0, width: 50.0, height: 100.0 }];
+    let frame2 = tracker.update(&boxes2, &scores, &label_ids)?;
+    assert!(!frame2.is_empty(), "frame2 应产生跟踪目标");
+    let id2 = frame2[0].track_id;
+
+    assert_eq!(id1, id2, "跟踪 ID 跨帧应稳定");
+    Ok(())
+}
+
+#[test]
+fn test_tracker_set_param_and_reset() -> Result<()> {
+    use modeldeploy::Rect;
+
+    let mut tracker = Tracker::new(TrackerKind::ByteTrack)?;
+    // 命名参数设置
+    tracker.set_param("track_thresh", 0.5)?;
+    tracker.set_param("max_age", 30.0)?;
+    // 未知名参数应报错
+    assert!(tracker.set_param("no_such_param", 1.0).is_err());
+
+    let boxes = vec![Rect { x: 10.0, y: 10.0, width: 40.0, height: 80.0 }];
+    let scores = vec![0.9f32];
+    let label_ids = vec![0i32];
+    let f1 = tracker.update(&boxes, &scores, &label_ids)?;
+    assert!(!f1.is_empty());
+
+    // reset 后仍能继续跟踪
+    tracker.reset()?;
+    let f2 = tracker.update(&boxes, &scores, &label_ids)?;
+    assert!(!f2.is_empty());
     Ok(())
 }
