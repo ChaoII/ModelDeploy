@@ -7,6 +7,7 @@
 #include "vision/tracking/matching/hungarian.h"
 #include "vision/tracking/matching/kalman_filter.h"
 #include "vision/tracking/bytetrack.h"
+#include "vision/tracking/reid_extractor.h"
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tracking;
 using namespace Catch;
@@ -139,6 +140,40 @@ TEST_CASE("ByteTrack: low-IoU object not merged into existing track id", "[track
     REQUIRE(f3[0].track_id != 0);            // b is not the old a-track
     REQUIRE(f3[0].track_id == 1);            // b got a fresh distinct track id
 }
+TEST_CASE("ReidExtractor: uninitialized returns empty", "[tracking]") {
+    ReidExtractor re;
+    ImageData dummy;
+    REQUIRE(re.extract(dummy).empty());
+}
+
+TEST_CASE("ReidExtractor: l2 normalize unit", "[tracking]") {
+    ReidExtractor re;
+    auto n = re.l2_normalize({3.0f, 4.0f}); // norm=5 -> {0.6,0.8}
+    REQUIRE(n.size() == 2);
+    REQUIRE(std::abs(n[0] - 0.6f) < 1e-5f);
+    REQUIRE(std::abs(n[1] - 0.8f) < 1e-5f);
+}
+
+TEST_CASE("ReidExtractor: zero-norm l2 normalize returns unchanged", "[tracking]") {
+    ReidExtractor re;
+    auto n = re.l2_normalize({0.0f, 0.0f});
+    REQUIRE(n.size() == 2);
+    REQUIRE(n[0] == 0.0f);
+    REQUIRE(n[1] == 0.0f);
+    // no NaN produced
+    REQUIRE(std::isfinite(n[0]));
+    REQUIRE(std::isfinite(n[1]));
+}
+
+TEST_CASE("ReidExtractor: missing model file fails init", "[tracking]") {
+    ReidExtractor re;
+    modeldeploy::RuntimeOption opt;
+    opt.use_cpu();
+    opt.use_ort_backend();
+    REQUIRE_FALSE(re.init("nonexistent_model.onnx", opt));
+    REQUIRE_FALSE(re.is_initialized());
+}
+
 TEST_CASE("ByteTrack: two low-overlap objects keep distinct stable ids", "[tracking]") {
     ByteTracker tr;
     Detection a{{0,0,10,10},0.9f,0};
