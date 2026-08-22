@@ -783,6 +783,11 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!mh->model) return fail_init("UltralyticsPose");
             break;
         }
+        case MD_MODEL_HAND: {
+            mh->model = make_model<hand::HandKeypoint>(model_path, opt, "HandKeypoint", &err);
+            if (!mh->model) return fail_init("HandKeypoint");
+            break;
+        }
         case MD_MODEL_OBB: {
             mh->model = make_model<detection::UltralyticsObb>(model_path, opt, "UltralyticsObb", &err);
             if (!mh->model) return fail_init("UltralyticsObb");
@@ -962,6 +967,7 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_DETECTION: delete static_cast<detection::UltralyticsDet*>(model); break;
         case MD_MODEL_CLASSIFICATION: delete static_cast<classification::Classification*>(model); break;
         case MD_MODEL_POSE: delete static_cast<detection::UltralyticsPose*>(model); break;
+        case MD_MODEL_HAND: delete static_cast<hand::HandKeypoint*>(model); break;
         case MD_MODEL_OBB: delete static_cast<detection::UltralyticsObb*>(model); break;
         case MD_MODEL_INSTANCE_SEG: delete static_cast<detection::UltralyticsSeg*>(model); break;
         case MD_MODEL_SEM_SEG: delete static_cast<detection::UltralyticsSem*>(model); break;
@@ -1017,6 +1023,7 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_DETECTION: cloned = static_cast<detection::UltralyticsDet*>(src->model)->clone().release(); break;
         case MD_MODEL_CLASSIFICATION: cloned = static_cast<classification::Classification*>(src->model)->clone().release(); break;
         case MD_MODEL_POSE: cloned = static_cast<detection::UltralyticsPose*>(src->model)->clone().release(); break;
+        case MD_MODEL_HAND: cloned = static_cast<hand::HandKeypoint*>(src->model)->clone().release(); break;
         case MD_MODEL_OBB: cloned = static_cast<detection::UltralyticsObb*>(src->model)->clone().release(); break;
         case MD_MODEL_INSTANCE_SEG: cloned = static_cast<detection::UltralyticsSeg*>(src->model)->clone().release(); break;
         case MD_MODEL_SEM_SEG: cloned = static_cast<detection::UltralyticsSem*>(src->model)->clone().release(); break;
@@ -1069,6 +1076,7 @@ MDStatus md_model_set_input_size(MDModelHandle handle, int w, int h) {
         case MD_MODEL_DETECTION: static_cast<detection::UltralyticsDet*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_CLASSIFICATION: static_cast<classification::Classification*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_POSE: static_cast<detection::UltralyticsPose*>(mh->model)->get_preprocessor().set_size(size); break;
+        case MD_MODEL_HAND: static_cast<hand::HandKeypoint*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_OBB: static_cast<detection::UltralyticsObb*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_INSTANCE_SEG: static_cast<detection::UltralyticsSeg*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_SEM_SEG: static_cast<detection::UltralyticsSem*>(mh->model)->get_preprocessor().set_size(size); break;
@@ -1181,6 +1189,7 @@ const char* kind_param_names(MDModelKind kind) {
         case MD_MODEL_OBB:
             return "conf_threshold|nms_threshold";
         case MD_MODEL_POSE:
+        case MD_MODEL_HAND:
             return "conf_threshold|nms_threshold|keypoints_num";
         case MD_MODEL_INSTANCE_SEG:
             return "conf_threshold|nms_threshold|mask_threshold";
@@ -1213,10 +1222,11 @@ char param_type_of(MDModelKind kind, const char* name) {
     switch (kind) {
         case MD_MODEL_DETECTION:
         case MD_MODEL_POSE:
+        case MD_MODEL_HAND:
         case MD_MODEL_OBB:
         case MD_MODEL_INSTANCE_SEG:
             if (is_det) return PT_D;
-            if (kind == MD_MODEL_POSE && std::strcmp(name, "keypoints_num") == 0) return PT_I;
+            if ((kind == MD_MODEL_POSE || kind == MD_MODEL_HAND) && std::strcmp(name, "keypoints_num") == 0) return PT_I;
             if (kind == MD_MODEL_INSTANCE_SEG && std::strcmp(name, "mask_threshold") == 0) return PT_D;
             return 0;
         case MD_MODEL_CLASSIFICATION:
@@ -1296,6 +1306,13 @@ int apply_model_param(md_model_handle* mh, const char* name, char req_type,
         }
         case MD_MODEL_POSE: {
             auto* pm = static_cast<detection::UltralyticsPose*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
+            else pm->get_postprocessor().set_keypoints_num((int)i);
+            break;
+        }
+        case MD_MODEL_HAND: {
+            auto* pm = static_cast<hand::HandKeypoint*>(const_cast<void*>(m));
             if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
             else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
             else pm->get_postprocessor().set_keypoints_num((int)i);
@@ -1515,6 +1532,14 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
             auto* m = static_cast<detection::UltralyticsPose*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
             if (!m->predict(image, &d->v)) return predict_fail("pose");
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_HAND: {
+            auto* m = static_cast<hand::HandKeypoint*>(mh->model);
+            auto* d = new ResultData<KeyPointsResult>();
+            if (!m->predict(image, &d->v)) return predict_fail("hand");
             rh->kind = MD_RES_POSE;
             rh->data = d;
             break;
@@ -1776,6 +1801,18 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("pose");
+                d->v.push_back(std::move(r));
+            }
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_HAND: {
+            auto* m = static_cast<hand::HandKeypoint*>(mh->model);
+            auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            for (size_t i = 0; i < n; ++i) {
+                std::vector<KeyPointsResult> r;
+                if (!m->predict(image_at(i), &r)) return predict_fail("hand");
                 d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_POSE;

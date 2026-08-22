@@ -39,6 +39,8 @@ namespace modeldeploy::vision::hand {
             return pose_.get_postprocessor();
         }
 
+        bool is_initialized() const { return pose_.is_initialized(); }
+
         std::unique_ptr<HandKeypoint> clone() const;
 
     private:

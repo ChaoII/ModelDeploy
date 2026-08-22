@@ -177,6 +177,71 @@ TEST_CASE("capi model set param + introspection", "[capi]") {
     CHECK(md_model_param_type(MD_MODEL_DETECTION, nullptr, &t) == MD_ERR_NULL_POINTER);
 }
 
+// hand：MD_MODEL_HAND 契约。参数自省部分无模型即可验证（[capi]）；
+// create/predict 需 hand_pose.onnx（外链 modelscope，缺失则优雅跳过）。
+TEST_CASE("capi hand keypoints contract (MD_MODEL_HAND)", "[capi]") {
+    // 自省：hand 与 pose 同参数表，含 keypoints_num（int）
+    const char* names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_HAND, &names) == MD_OK);
+    CHECK(names);
+    CHECK(std::string(names).find("keypoints_num") != std::string::npos);
+    char t = 0;
+    REQUIRE(md_model_param_type(MD_MODEL_HAND, "keypoints_num", &t) == MD_OK);
+    CHECK(t == 'I');
+
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string modelfile = data_dir + "/test_models/onnx/hand_pose.onnx";
+    const std::string imgf = data_dir + "/test_images/bus.jpg";
+    if (!std::filesystem::exists(modelfile) || !std::filesystem::exists(imgf)) {
+        WARN("hand_pose.onnx 权重缺失（外链 modelscope），跳过 create/predict");
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle hand = nullptr;
+    REQUIRE(md_model_create(&hand, MD_MODEL_HAND, modelfile.c_str(), opt) == MD_OK);
+    REQUIRE(hand != nullptr);
+    md_option_destroy(opt);
+
+    // keypoints_num 端到端 setter（int 类型）
+    CHECK(md_model_set_param_i(hand, "keypoints_num", 21) == MD_OK);
+    CHECK(md_model_set_param_d(hand, "conf_threshold", 0.3) == MD_OK);
+    CHECK(md_model_set_param_d(hand, "keypoints_num", 21.0) == MD_ERR_INVALID_TYPE);
+
+    // clone 深拷贝可用
+    MDModelHandle clone = nullptr;
+    REQUIRE(md_model_clone(hand, &clone) == MD_OK);
+    REQUIRE(clone != nullptr);
+
+    // predict 走 pose 结果机制（KeyPointsResult → MD_RES_POSE）
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_file(&img, imgf.c_str()) == MD_OK);
+    MDResultHandle res = nullptr;
+    REQUIRE(md_model_predict(clone, img, &res) == MD_OK);
+    MDResultKind kind = (MDResultKind)-1;
+    REQUIRE(md_result_kind(res, &kind) == MD_OK);
+    CHECK(kind == MD_RES_POSE);
+    const MDPoseItem* items = nullptr;
+    size_t cnt = 0;
+    REQUIRE(md_result_pose(res, &items, &cnt) == MD_OK);
+    if (cnt > 0) {
+        const MDPoint3* kps = nullptr;
+        size_t kn = 0;
+        REQUIRE(md_result_keypoints(res, 0, &kps, &kn) == MD_OK);
+        CHECK(kn == 21);
+    }
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(clone);
+    md_model_destroy(hand);
+}
+
 // 端到端 setter：需可加载的检测模型（[model] 标签，CI 有模型时执行）
 TEST_CASE("capi detection param setter on loaded model", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
