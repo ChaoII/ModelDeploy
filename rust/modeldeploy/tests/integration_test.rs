@@ -1,8 +1,8 @@
 use anyhow::Result;
 use modeldeploy::{
     BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
-    Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
-    LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
+    HandKeypoint, Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel,
+    LprPipeline, LprRecognizerModel, PaddleOCR, PedestrianAttribute, RecognizerModel,
     RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, Tracker,
     TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
     UltralyticsSeg, UltralyticsSem,
@@ -165,6 +165,23 @@ fn test_pose() -> Result<()> {
     let poses = model.predict(&img)?;
     assert!(!poses.is_empty());
     assert!(poses[0].keypoints.len() > 0);
+    Ok(())
+}
+
+#[test]
+fn test_hand() -> Result<()> {
+    let path = test_data("test_models/onnx/hand_pose.onnx");
+    if !std::path::Path::new(&path).exists() {
+        eprintln!("SKIP: hand_pose.onnx not present in test_data");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let model = HandKeypoint::new(&path, &opt)?;
+    assert!(model.is_ready());
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let hands = model.predict(&img)?;
+    assert!(!hands.is_empty(), "should detect a hand");
+    assert!(!hands[0].keypoints.is_empty());
     Ok(())
 }
 

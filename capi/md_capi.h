@@ -96,6 +96,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_ASR,
     MD_MODEL_TTS,
     MD_MODEL_FACE_AS_SECOND,
+    MD_MODEL_HAND,
     MD_MODEL_COUNT
 } MDModelKind;
 

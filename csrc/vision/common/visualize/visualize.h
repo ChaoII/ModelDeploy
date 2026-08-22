@@ -59,6 +59,12 @@ namespace modeldeploy::vision {
         int landmark_radius = 4, double alpha = 0.15,
         bool save_result = false, bool draw_lines = false);
 
+    MODELDEPLOY_CXX_EXPORT ImageData vis_hand(
+        ImageData& image, const std::vector<KeyPointsResult>& result,
+        const std::string& font_path, int font_size = 14,
+        int landmark_radius = 4, double alpha = 0.15,
+        bool save_result = false);
+
     MODELDEPLOY_CXX_EXPORT ImageData vis_attr(
         ImageData& image, const std::vector<AttributeResult>& result, double threshold = 0.5,
         const std::unordered_map<int, std::string>& label_map = {},

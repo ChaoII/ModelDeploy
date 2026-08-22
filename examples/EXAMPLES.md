@@ -83,6 +83,7 @@ cmake --build build
 | `demo_pedestrian_attribute_cxx` | 行人属性 | `pedestrian_attr_out.jpg` |
 | `demo_tracking_ort_cpu` | 多目标跟踪（det→track→可视化，ByteTracker + 对比 BoT-SORT） | `result_tracking_ort_cpu.jpg`（画框 + 稳定 track_id） |
 | `demo_barcode` | 条码/二维码（纯 CV，零 DNN，跨全部后端） | 打印每码 `[FORMAT] text (score, is_qr)`，示例 `[QR Code] https://example.com/MD` |
+| `demo_hand` | 手部关键点 | 打印检测到的手数、每手 box/score/关键点数 |
 
 > **跟踪 demo**：无真实视频时用单张测试图（`test_detection1.jpg` 等）模拟多帧序列——把同一批检测框按帧做轻微确定性抖动连续送入追踪器，展示同一物体在帧间保持**稳定 track_id**。逐帧打印 track 数量，并统计"稳定物体数（每个物体跨帧只使用单一 track_id）"。
 

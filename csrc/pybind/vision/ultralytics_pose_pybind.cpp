@@ -66,7 +66,12 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsPosePostprocessor::set_conf_threshold)
             .def_property("nms_threshold",
                           &detection::UltralyticsPosePostprocessor::get_nms_threshold,
-                          &detection::UltralyticsPosePostprocessor::set_nms_threshold);
+                          &detection::UltralyticsPosePostprocessor::set_nms_threshold)
+            .def("set_keypoints_num",
+                 &detection::UltralyticsPosePostprocessor::set_keypoints_num,
+                 pybind11::arg("num"))
+            .def("get_keypoints_num",
+                 &detection::UltralyticsPosePostprocessor::get_keypoints_num);
 
         pybind11::class_<detection::UltralyticsPose, BaseModel>(m, "UltralyticsPose")
             .def(pybind11::init<std::string, RuntimeOption>())

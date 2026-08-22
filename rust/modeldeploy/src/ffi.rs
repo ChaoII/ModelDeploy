@@ -63,6 +63,8 @@ pub enum MDModelKind {
     PED_ATTR,
     ASR,
     TTS,
+    FACE_AS_SECOND,
+    HAND,
 }
 
 /// 结果类型（MDResultKind）
