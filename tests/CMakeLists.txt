@@ -18,16 +18,23 @@ set(TEST_SOURCES
     test_processor_accuracy.cpp
     test_insightface.cpp
     test_pipelines.cpp
-    test_nv12_batch_preproc.cpp
     test_benchmark_insightface.cpp
-    test_benchmark_yolo26n.cpp
     test_encryption.cpp
     test_tracking.cpp
     test_barcode.cpp
+    test_hand.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
 )
+
+# GPU-only 测试源：仅当 CUDA 启用时编译（否则 CPU 下 cuda_runtime.h 缺失导致编译失败）
+if(WITH_GPU)
+    list(APPEND TEST_SOURCES
+        test_nv12_batch_preproc.cpp
+        test_benchmark_yolo26n.cpp
+    )
+endif()
 
 add_executable(test_modeldeploy ${TEST_SOURCES})
 target_link_libraries(test_modeldeploy PRIVATE
