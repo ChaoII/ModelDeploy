@@ -6,7 +6,10 @@
 
 **Architecture:** 新增 `csrc/vision/barcode/`（BarcodeResult 结构 + BarcodeReader ZXing 封装 + BarcodeDetector 外观类），捆绑 `third_party/zxing-cpp` 静态库 PRIVATE 链接进 SDK SHARED 库（仿 cppjieba/samplerate 模式）。新源文件被现有的 `GLOB_RECURSE VISION_SOURCE/PYBIND_SOURCE/CAPI_SOURCE` 自动收集，无需改收集列表。绑定与测试逐一镜像已合入的 tracking 模块范式。
 
-**Tech Stack:** C++17、ZXing-C++（v2.3.0，纯 C++ 离线编译，无外部解码依赖）、OpenCV（仅用于 demo/可视化或读图，BarcodeDetector 本身不依赖 OpenCV 解码）、pybind11、CAPI、C# P/Invoke、Rust extern "C"、Catch2。
+**Tech Stack:** C++17、ZXing-C++（v3.1.1，纯 C++ 离线编译，无外部解码依赖）、OpenCV（仅用于 demo/可视化或读图，BarcodeDetector 本身不依赖 OpenCV 解码）、pybind11、CAPI、C# P/Invoke、Rust extern "C"、Catch2。
+
+> 版本说明：使用 ZXing-C++ **v3.1.1**（最新稳定版，非早期计划中的 v2.3.0）。v3 API 与 v2 差异较大：
+> 头文件位于 `core/src/`（`ReadBarcode.h`），命名空间 `ZXing`，`ReadBarcodes(const ImageView&, const ReaderOptions&)` 返回 `std::vector<Barcode>`；格式集合为 `BarcodeFormats`，`ReaderOptions.setFormats(...)/setTryHarder(...)`；`ImageView` 原生支持 `ImageFormat::BGR`（无需手动 BGR→RGB）；目标名 `ZXing`（别名 `ZXing::ZXing`）。下文 Task 1/3 已按 v3 修正。
 
 参考设计：`docs/superpowers/specs/2026-08-22-barcode-qr-design.md`（设计定稿）。
 参考范本（已合入 main）：`csrc/vision/tracking/**`、`csrc/pybind/vision/tracking_pybind.cpp`、`capi/md_capi.{h,cpp}` 中 `md_tracker_*`、`csharp/ModelDeploy/Tracker.cs`、`rust/modeldeploy/src/tracker.rs`、`examples/demo_tracking/**`、`tests/test_tracking.cpp`。
@@ -28,27 +31,29 @@
 ### Task 1: 捆绑 ZXing-C++ 依赖 + BUILD_BARCODE 选项
 
 **Files:**
-- Create: `third_party/zxing-cpp/`（ZXing-C++ v2.3.0 源码，在树内捆绑）
+- Create: `third_party/zxing-cpp/`（ZXing-C++ v3.1.1 源码，在树内捆绑）
 - Modify: `CMakeLists.txt`（新增 BUILD_BARCODE 块，仿 BUILD_AUDIO 行 205-220）
 
 **Interfaces:**
 - Consumes: 无。
-- Produces: CMake 目标 `zxing`（静态库）+ include 目录 `third_party/zxing-cpp/wrappers/`（ZXing/ReadBarcode.h 所在），供后续任务 `#include <ZXing/ReadBarcode.h>`。
+- Produces: CMake 目标 `ZXing`（静态库，别名 `ZXing::ZXing`）+ include 目录 `third_party/zxing-cpp/core/src/`（`ReadBarcode.h` 所在），供后续任务 `#include "ReadBarcode.h"` 并 `namespace ZXing`。
 
 - [ ] **Step 1: 下载并放入 zxing-cpp 源码**
 
-将 ZXing-C++ v2.3.0 源码放至 `third_party/zxing-cpp/`。若从 zip 解压，保证结构为：
+将 ZXing-C++ **v3.1.1** 源码放至 `third_party/zxing-cpp/`。源码结构（在树内捆绑整个仓库即可）：
 ```
 third_party/zxing-cpp/
-├── core/src/            # 解码核心源码
-├── wrappers/common/     # 通用头（ReadBarcode.h 等）
+├── core/src/                  # ZXing 源码 + ReadBarcode.h（v3 头文件在 core/src）
+├── wrappers/                  # 各语言 wrapper（本项目不用，保留即可）
 ├── CMakeLists.txt
+├── core/CMakeLists.txt
 └── LICENSE
 ```
-（若仓库允许，也可按 modelscope `openvc.cmake` 的 FetchContent 模式从
-`https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master` 下载 `zxing-cpp_2.3.0.zip`——但优先在树内捆绑，确定性更高。）
+获取方式：GitHub 下载 v3.1.1 zip
+（`https://codeload.github.com/zxing-cpp/zxing-cpp/zip/refs/tags/v3.1.1`），解压后把
+`zxing-cpp-3.1.1/*` 内容放入 `third_party/zxing-cpp/`。gzip/其他语言封装目录无需删除（保留不动）。
 
-> 说明：若采用 FetchContent，则本任务改为新增 `cmake/zxing.cmake`（仿 `cmake/opencv.cmake` FetchContent 模式），并在根 CMakeLists 的 BUILD_BARCODE 块 `include()`。二选一，实现时保持一致。
+> 若 git clone 走代理失败，用上面的 codeload zip URL（已确认可下载）。
 
 - [ ] **Step 2: 在根 CMakeLists.txt 增加 BUILD_BARCODE 选项**
 
@@ -63,30 +68,36 @@ option(BUILD_BARCODE  "Enable barcode/QR recognition (ZXing-C++)" ON)
 ```cmake
 if (BUILD_BARCODE)
     add_definitions(-DBUILD_BARCODE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(ZXING_WRITERS OFF CACHE STRING "" FORCE)
+    set(ZXING_READERS ON CACHE STRING "" FORCE)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/zxing-cpp EXCLUDE_FROM_ALL)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/zxing-cpp/wrappers/common)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/zxing-cpp/core/src)
-    list(APPEND PRIVATE_DEPENDS zxing)
+    list(APPEND PRIVATE_DEPENDS ZXing)
 endif ()
 ```
-> 说明：ZXing-C++ 的 CMake 会产出 `zxing` 目标并已带自己的 include 目录（`wrappers/common`）；`include_directories` 为防御性补充，确保 `#include <ZXing/ReadBarcode.h>` 可解析。`zxing` 作为 `PRIVATE_DEPENDS` 静态链接进 SDK 共享库（仿 `samplerate`）。若 ZXing-C++ 的 CMakeLists 需要 `BUILD_EXAMPLES OFF` 等开关，参考其 README/CMake 设置 `set(... CACHE BOOL "" FORCE)` 抑制（仿 BUILD_AUDIO 对 samplerate 的 `BUILD_TESTING OFF` 处理）。
+> 说明：ZXing-C++ v3.1.1 的 CMake 产出目标 `ZXing`（别名 `ZXing::ZXing`/`ZXing::Core`）。
+> `core/CMakeLists.txt` 的 `add_library(ZXing ...)` 定义读取库；禁用 `ZXING_WRITERS`（本项目只用
+> 读取），`ZXING_READERS ON`。`include_directories(${...}/core/src)` 让 `#include "ReadBarcode.h"` 可解析。
+> `ZXing` 作为 `PRIVATE_DEPENDS` 静态链接进 SDK 共享库（仿 `samplerate`）。若其 CMake 需抑制测试/
+> 其它选项，用 `set(... CACHE ... FORCE)` 处理（此处已禁用 BUILD_TESTING/ZXING_WRITERS）。
 
 - [ ] **Step 4: 配置验证**
 
-用 build_tdc_gpu（Ninja+MSVC，Windows）做一次最小配置确认 zxing 目标存在且被链接。用 .bat 包裹 vcvars64：
+用 build_tdc_gpu（Ninja+MSVC，Windows）做一次最小配置确认 ZXing 目标存在且被链接。用 .bat 包裹 vcvars64：
 ```bat
 @echo off
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" >nul
 cmake -S . -B build_tdc_gpu -G Ninja -DBUILD_TESTS=ON -DWITH_GPU=ON
 cmake --build build_tdc_gpu --config Release --parallel
 ```
-Expected: 配置成功，`zxing` 被编译并链接入 `ModelDeploySDK`；无报错。若报 `zxing` 目标未定义，检查 ZXing-C++ CMake 目标名（可能是 `ZXing::ZXing` 或 `zxing`），据此调整 `PRIVATE_DEPENDS`。
+Expected: 配置成功，`ZXing` 被编译并链接入 `ModelDeploySDK`；无报错。若报 `ZXing` 目标未定义，检查实际目标名（可能是 `ZXing`），据此调整 `PRIVATE_DEPENDS`。
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add third_party/zxing-cpp CMakeLists.txt
-git commit -m "build(barcode): vendor ZXing-C++ and add BUILD_BARCODE option"
+git commit -m "build(barcode): vendor ZXing-C++ v3.1.1 and add BUILD_BARCODE option"
 ```
 
 ---
@@ -174,123 +185,118 @@ namespace modeldeploy::vision::barcode {
     class BarcodeReader {
     public:
         BarcodeReader() = delete;
-        /*! 解码图片中的所有码。img 可为 BGR(3通道) 或 单通道(灰度)。
-         *  若为 BGR 且 convert_bgr_to_rgb=true，内部先转 RGB 再送 ZXing。 */
+        /*! 解码图片中的所有码。img 须为 CPU 的 packed 格式（PKG_BGR_U8 / PKG_RGB_U8 /
+         *  PKG_BGRA_U8 / GRAY_U8），其它类型（NV12/NV21/I420/planar/设备类型）返回空。
+         *  定义见 vision/common/image_data.h 的 ImageData（用方法 width()/height()/channels()/
+         *  type()/plane(i)），并用 MdImageType 映射到 ZXing ImageFormat。 */
         static std::vector<BarcodeResult> read(const ImageData& img,
                                                Formats formats = FMT_ALL,
-                                               bool convert_bgr_to_rgb = true);
+                                               bool convert_bgr_to_rgb = false);
     };
 }
 ```
 
-- [ ] **Step 2: 写实现（ZXing 封装）**
+- [ ] **Step 2: 写实现（ZXing v3 封装）**
 
 ```cpp
 #include "vision/barcode/barcode_reader.h"
 #include <string>
-#include <ZXing/ReadBarcode.h>
+#include "ReadBarcode.h"
+#include "vision/common/basic_types.h"   // MdImageType
 
 namespace modeldeploy::vision::barcode {
     namespace {
-        zxing::BarcodeFormat to_zxing_format(Formats f) {
-            using namespace zxing;
+        ZXing::BarcodeFormat to_zxing_format(Formats f) {
             switch (f) {
-                case FMT_QR_CODE:     return BarcodeFormat::QRCode;
-                case FMT_DATA_MATRIX: return BarcodeFormat::DataMatrix;
-                case FMT_AZTEC:       return BarcodeFormat::Aztec;
-                case FMT_EAN_8:       return BarcodeFormat::EAN8;
-                case FMT_EAN_13:      return BarcodeFormat::EAN13;
-                case FMT_UPC_A:       return BarcodeFormat::UPCA;
-                case FMT_UPC_E:       return BarcodeFormat::UPCE;
-                case FMT_CODE_128:    return BarcodeFormat::Code128;
-                case FMT_CODE_39:     return BarcodeFormat::Code39;
-                case FMT_CODE_93:     return BarcodeFormat::Code93;
-                case FMT_ITF:         return BarcodeFormat::ITF;
-                case FMT_CODABAR:     return BarcodeFormat::Codabar;
-                default:              return BarcodeFormat::None;
+                case FMT_QR_CODE:     return ZXing::BarcodeFormat::QRCode;
+                case FMT_DATA_MATRIX: return ZXing::BarcodeFormat::DataMatrix;
+                case FMT_AZTEC:       return ZXing::BarcodeFormat::Aztec;
+                case FMT_EAN_8:       return ZXing::BarcodeFormat::EAN8;
+                case FMT_EAN_13:      return ZXing::BarcodeFormat::EAN13;
+                case FMT_UPC_A:       return ZXing::BarcodeFormat::UPCA;
+                case FMT_UPC_E:       return ZXing::BarcodeFormat::UPCE;
+                case FMT_CODE_128:    return ZXing::BarcodeFormat::Code128;
+                case FMT_CODE_39:     return ZXing::BarcodeFormat::Code39;
+                case FMT_CODE_93:     return ZXing::BarcodeFormat::Code93;
+                case FMT_ITF:         return ZXing::BarcodeFormat::ITF;
+                case FMT_CODABAR:     return ZXing::BarcodeFormat::Codabar;
+                default:              return ZXing::BarcodeFormat::None;
             }
         }
-        std::string format_name(zxing::BarcodeFormat f) {
-            return zxing::ToString(f);
+        // MdImageType -> ZXing ImageFormat。仅支持 CPU packed/GRAY；否则返回 None。
+        ZXing::ImageFormat to_zxing_format(MdImageType t, int channels_packed) {
+            switch (t) {
+                case MdImageType::GRAY_U8:      return ZXing::ImageFormat::Lum;
+                case MdImageType::PKG_BGR_U8:   return ZXing::ImageFormat::BGR;
+                case MdImageType::PKG_RGB_U8:   return ZXing::ImageFormat::RGB;
+                case MdImageType::PKG_BGRA_U8:  return ZXing::ImageFormat::BGRA;
+                default: return ZXing::ImageFormat::None;
+            }
         }
-        bool is_qr_format(zxing::BarcodeFormat f) {
-            return f == zxing::BarcodeFormat::QRCode;
+        std::string format_name(ZXing::BarcodeFormat f) {
+            return std::string(ZXing::ToString(f));
         }
-        Point2f to_pt(const zxing::PointI& p) { return {float(p.x), float(p.y)}; }
+        bool is_qr_format(ZXing::BarcodeFormat f) {
+            return f == ZXing::BarcodeFormat::QRCode || f == ZXing::BarcodeFormat::MicroQRCode;
+        }
+        Point2f to_pt(const ZXing::PointI& p) { return {static_cast<float>(p.x), static_cast<float>(p.y)}; }
     }
 
     std::vector<BarcodeResult> BarcodeReader::read(const ImageData& img,
                                                    Formats formats,
                                                    bool convert_bgr_to_rgb) {
         std::vector<BarcodeResult> out;
-        if (!img.data || img.width == 0 || img.height == 0) return out;
+        (void)convert_bgr_to_rgb;   // 兼容参数：v3 直接原生支持 BGR，无需手动转换
+        if (img.empty() || img.device() != Device::CPU) return out;
+        auto plane = img.plane(0);
+        if (!plane.data) return out;
 
-        zxing::BarcodeFormats zformats = zxing::BarcodeFormat::None;
+        ZXing::ImageFormat zfmt = to_zxing_format(img.type(), img.channels());
+        if (zfmt == ZXing::ImageFormat::None) return out;   // 不支持的布局
+
+        // 组装 BarcodeFormats 集合
+        ZXing::BarcodeFormats zformats;
         for (uint32_t bit = 0; bit < 32; ++bit) {
             if (formats & (1u << bit)) {
                 auto f = to_zxing_format(1u << bit);
-                if (f != zxing::BarcodeFormat::None) zformats |= f;
+                if (f != ZXing::BarcodeFormat::None) zformats |= f;
             }
         }
-        zxing::DecodeHints hints;
-        hints.setFormats(zformats);
-        hints.setTryHarder(true);
+        ZXing::ReaderOptions options;
+        options.setFormats(zformats).setTryHarder(true);
 
-        zxing::ImageView view;
-        if (img.channels == 3 && convert_bgr_to_rgb && img.format == "BGR") {
-            // BGR -> RGB 逐像素重排（ImageData 需提供像素访问；见下注）
-            std::vector<uint8_t> rgb(img.width * img.height * 3);
-            const uint8_t* src = static_cast<const uint8_t*>(img.data);
-            for (size_t i = 0; i < static_cast<size_t>(img.width * img.height); ++i) {
-                rgb[3 * i + 0] = src[3 * i + 2];
-                rgb[3 * i + 1] = src[3 * i + 1];
-                rgb[3 * i + 2] = src[3 * i + 0];
-            }
-            view = zxing::ImageView(rgb.data(), img.width, img.height,
-                                    zxing::ImageFormat::RGB, img.width * 3);
-            auto results = zxing::ReadBarcodes(view, hints);
-            for (auto& r : results) {
-                if (!r.isValid()) continue;
-                BarcodeResult br;
-                br.text = r.text();
-                br.format = format_name(r.format());
-                br.is_qr = is_qr_format(r.format());
-                br.score = r.isValid() ? 1.0f : 0.0f;
-                auto pos = r.position();
-                br.quad[0] = to_pt(pos.topLeft());
-                br.quad[1] = to_pt(pos.topRight());
-                br.quad[2] = to_pt(pos.bottomRight());
-                br.quad[3] = to_pt(pos.bottomLeft());
-                out.push_back(br);
-            }
-        } else {
-            // 灰度直送
-            using zxing::ImageFormat;
-            ImageFormat fmt = (img.channels == 4) ? ImageFormat::RGBA
-                             : (img.channels == 3) ? ImageFormat::BGR   // 非 BGR 标记则按 3ch
-                             : ImageFormat::Lum;
-            view = zxing::ImageView(img.data, img.width, img.height, fmt, img.width * img.channels);
-            auto results = zxing::ReadBarcodes(view, hints);
-            for (auto& r : results) {
-                if (!r.isValid()) continue;
-                BarcodeResult br;
-                br.text = r.text();
-                br.format = format_name(r.format());
-                br.is_qr = is_qr_format(r.format());
-                br.score = 1.0f;
-                auto pos = r.position();
-                br.quad[0] = to_pt(pos.topLeft());
-                br.quad[1] = to_pt(pos.topRight());
-                br.quad[2] = to_pt(pos.bottomRight());
-                br.quad[3] = to_pt(pos.bottomLeft());
-                out.push_back(br);
-            }
+        int row_stride = plane.step > 0 ? plane.step : img.width() * img.channels();
+        ZXing::ImageView view(plane.data, img.width(), img.height(), zfmt, row_stride);
+
+        auto results = ZXing::ReadBarcodes(view, options);
+        for (auto& r : results) {
+            if (!r.isValid()) continue;
+            BarcodeResult br;
+            br.text = r.text();
+            br.format = format_name(r.format());
+            br.is_qr = is_qr_format(r.format());
+            br.score = 1.0f;
+            auto pos = r.position();
+            br.quad[0] = to_pt(pos.topLeft());
+            br.quad[1] = to_pt(pos.topRight());
+            br.quad[2] = to_pt(pos.bottomRight());
+            br.quad[3] = to_pt(pos.bottomLeft());
+            out.push_back(br);
         }
         return out;
     }
 }
 ```
-> **实现注意**：`ImageData` 的实际像素布局/`format` 字段请以 `vision/common/image_data.h` 为准核对。若 `ImageData` 恒为 BGR 3 通道，则统一走 BGR→RGB 分支，无需 `format` 分支。key 点：ZXing `ImageView(data, w, h, format, stride)`。若简化，可固定 `BarcodeDetector` 输入先转成 RGB `cv::Mat` 再读，从而只保留 RGB/灰度两条路径，避免依赖 `ImageData.format` 字符串。实现时以"读得正确"为准，可适度简化本函数内部结构（保持对外签名不变）。
+> **实现注意**：
+> - `ImageData` 的实际 API 在 `vision/common/image_data.h`：方法 `width()/height()/channels()/type()/
+>   format()/device()/empty()/plane(i)`，`plane(i)` 返回 `Plane{const uint8_t* data; int step;}`。
+>   `MdImageType` 枚举在 `vision/common/basic_types.h`。
+> - `ImageData::plane(0)` 对 packed 格式返回单平面数据；`plane.step` 为行字节数（0 则回退
+>   `width*channels`）。
+> - `ZXing::BarcodeFormat::MicroQRCode` 存在（v3 有），`is_qr_format` 用 `||` 判断。
+> - `BarcodeFormats zformats; zformats |= f;` 逐格式 OR 进集合；若编译报错，改为收集
+>   `std::vector<ZXing::BarcodeFormat>` 后一次性构造 `BarcodeFormats`（v3 支持从 vector&& 构造）。
+> - `ReaderOptions` 链式 setter OK。读得正确即可，结构可适度简化，保持对外签名不变。
 
 - [ ] **Step 3: 单元验证（编译）**
 
@@ -357,7 +363,7 @@ namespace modeldeploy::vision::barcode {
     void BarcodeDetector::set_formats(Formats formats) { formats_ = formats; }
 
     std::vector<BarcodeResult> BarcodeDetector::detect(const ImageData& img) const {
-        return BarcodeReader::read(img, formats_, /*convert_bgr_to_rgb=*/true);
+        return BarcodeReader::read(img, formats_, /*convert_bgr_to_rgb=*/false);
     }
 }
 ```
@@ -383,7 +389,8 @@ git commit -m "feat(barcode): BarcodeDetector facade"
 
 - [ ] **Step 1: 写测试**
 
-测试生成 QR 样本：用 OpenCV `cv::QRCodeEncoder`（OpenCV ≥5 可用）在内存生成灰度/彩色 QR，或读仓库内样本图。本模块纯 CV，无需后端/模型。
+测试读取 `test_data/qr_sample.png`（已生成：330x330，解码文本 `https://example.com/MD`）。
+本模块纯 CV，无需后端/模型。**不要用 `cv::QRCodeEncoder`**（捆绑的 OpenCV 5 无 objdetect 模块）。
 
 ```cpp
 #include "catch2/catch_test_macros.hpp"
@@ -396,42 +403,20 @@ using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::barcode;
 
 namespace {
-    // 用 OpenCV 生成一个 QR 灰度图，转 ImageData。
-    ImageData make_qr_image(const std::string& payload = "https://example.com/MD") {
-        cv::QRCodeEncoder::Params p{};
-        cv::Ptr<cv::QRCodeEncoder> enc = cv::QRCodeEncoder::create(p);
-        cv::Mat qr = enc->encode(payload);   // 单通道灰度，>=21x21
-        cv::Mat canvas;
-        int border = 40, scale = 8;
-        int W = qr.cols * scale + 2 * border;
-        int H = qr.rows * scale + 2 * border;
-        canvas.create(H, W, CV_8UC1);
-        canvas.setTo(255);
-        qr.copyTo(canvas(cv::Rect(border, border, qr.cols * scale, qr.rows * scale)));
-        // 放大灰度（最近邻）
-        cv::Mat big;
-        cv::resize(canvas, big, cv::Size(), (double)W / canvas.cols, (double)H / canvas.rows, cv::INTER_NEAREST);
-        (void)big;
-
-        cv::Mat gray;
-        if (qr.type() == CV_8UC3) cv::cvtColor(qr, gray, cv::COLOR_BGR2GRAY);
-        else gray = qr.clone();
-
-        ImageData img;
-        img.width = canvas.cols;
-        img.height = canvas.rows;
-        img.channels = 1;
-        img.data = canvas.data;
-        return img;
+    // 读取 test_data/qr_sample.png（解码文本 https://example.com/MD），转 ImageData。
+    // TEST_DATA_DIR 是 test 运行时注入的环境变量（=仓库根）。
+    ImageData read_qr_image() {
+        const char* dir = std::getenv("TEST_DATA_DIR");
+        std::string path = (dir ? std::string(dir) : std::string("./test_data")) + "/qr_sample.png";
+        cv::Mat img = cv::imread(path, cv::IMREAD_COLOR);   // BGR
+        REQUIRE(!img.empty());
+        return ImageData(img);   // ImageData 有 explicit ImageData(const cv::Mat&)，内部转 BGR
     }
 }
 
-TEST_CASE("BarcodeDetector decodes a generated QR", "[barcode]") {
+TEST_CASE("BarcodeDetector decodes a sample QR", "[barcode]") {
     BarcodeDetector det;
-    // 上面 make_qr_image 用 canvas（含边框）放大后解码。
-    // 说明：QRCodeEncoder 输出已含 quiet zone，为可靠解码建议 canvas=qr 直接使用；
-    //       此处用一个能稳定解码的样本来断言。
-    ImageData img = make_qr_image();
+    ImageData img = read_qr_image();
     auto res = det.detect(img);
     REQUIRE(!res.empty());
     bool found = false;
@@ -444,7 +429,7 @@ TEST_CASE("BarcodeDetector decodes a generated QR", "[barcode]") {
 TEST_CASE("BarcodeDetector honors format restriction", "[barcode]") {
     BarcodeDetector det;
     det.set_formats(FMT_CODE_128);   // 只允许 Code128
-    ImageData img = make_qr_image();  // 内容是 QR
+    ImageData img = read_qr_image(); // 内容是 QR
     auto res = det.detect(img);
     // 限制为 Code128 时不应解码出 QR
     for (auto& r : res) {
@@ -452,7 +437,10 @@ TEST_CASE("BarcodeDetector honors format restriction", "[barcode]") {
     }
 }
 ```
-> **实现注意**：QR 样本生成/读取的正确性与稳定性是实现时必须验证的关键点。OpenCV ≥5 的 `cv::QRCodeEncoder` 可用则内存生成；若不可用，则改为在 `test_data/` 放一张已知 QR 样本图，用 `cv::imread` 读取并断言解码文本。**确保生成的码能稳定解码、断言文本精确匹配**，否则测试会假失败。`ImageData` 的 `data`（`const void*`）、`width/height/channels` 字段按 `image_data.h` 实际签名赋值。
+> 实现注意：`TEST_DATA_DIR` 是 tests/CMakeLists.txt 通过 add_test 的 ENVIRONMENT 注入的
+> **环境变量**（值=`${CMAKE_SOURCE_DIR}`），不是编译期宏。测试运行时用
+> `std::getenv("TEST_DATA_DIR")` 读取（若为 null 则回退到 `./test_data`），拼出 `qr_sample.png` 路径
+> 后 `cv::imread`。`ImageData` 的 `data`/`width/height/channels` 字段按 `image_data.h` 实际签名赋值。
 
 - [ ] **Step 2: 在 TEST_SOURCES 注册**
 
@@ -1023,12 +1011,9 @@ git commit -m "feat(rust): BarcodeDetector binding + test"
 #include "vision/common/image_data.h"
 #include "vision/barcode/barcode.h"
 
-// 将 cv::Mat 转 ImageData 的辅助（按 image_data.h 签名）
+// 将 cv::Mat 转 ImageData（ImageData 有 explicit ImageData(const cv::Mat&)）
 static modeldeploy::vision::ImageData mat_to_image(const cv::Mat& img) {
-    modeldeploy::vision::ImageData im;
-    im.width = img.cols; im.height = img.rows; im.channels = img.channels();
-    im.data = img.data;
-    return im;
+    return modeldeploy::vision::ImageData(img);
 }
 
 int main(int argc, char** argv) {
