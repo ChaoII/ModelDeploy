@@ -1,4 +1,5 @@
 #include "vision/hand/hand.h"
+#include "vision/common/visualize/visualize.h"
 
 namespace modeldeploy::vision::hand {
     HandKeypoint::HandKeypoint(const std::string& model_file, const RuntimeOption& option)
@@ -21,7 +22,9 @@ namespace modeldeploy::vision::hand {
     bool HandKeypoint::draw_result(ImageData& img,
                                    const std::vector<KeyPointsResult>& results,
                                    double threshold) {
-        return pose_.draw_result(img, results, threshold);
+        (void)threshold;
+        img = vis_hand(img, results, "", 14, 4, 0.15, false);
+        return true;
     }
 
     std::unique_ptr<HandKeypoint> HandKeypoint::clone() const {
