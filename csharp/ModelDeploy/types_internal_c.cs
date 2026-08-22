@@ -60,6 +60,13 @@ namespace ModelDeploy
             MD_MODEL_TTS
         }
 
+        public enum MDTrackerKind
+        {
+            MD_TRACKER_BYTETRACK = 0,
+            MD_TRACKER_BOTSORT = 1,
+            MD_TRACKER_STRONGSORT = 2
+        }
+
         public enum MDResultKind
         {
             MD_RES_DETECTION = 0,
@@ -140,6 +147,18 @@ namespace ModelDeploy
             public float x, y, w, h;
             public float score;
             public int label_id;
+        }
+
+        /* ==================== 多目标跟踪（Tracker） ==================== */
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDTrackItem
+        {
+            public float x, y, w, h;
+            public int track_id;
+            public int label_id;
+            public float score;
+            public int state;   /* MDTrackState: New/Tracked/Lost/Removed */
         }
 
         [StructLayout(LayoutKind.Sequential)]

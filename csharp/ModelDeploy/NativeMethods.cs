@@ -389,5 +389,27 @@ string path);
             ref MDDrawOptions options);
 
         #endregion
+
+        #region 多目标跟踪
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_tracker_create(MDTrackerKind kind, out IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void md_tracker_destroy(IntPtr handle);
+
+        // out 为调用方分配的缓冲（容量 = 进入时 *out_count，size_t）；不足时返回 MD_ERR_INVALID_ARGUMENT 且 *out_count 置为需要数。
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_tracker_update(IntPtr handle, MDBox[] boxes,
+            float[] scores, int[] labelIds, UIntPtr n,
+            [Out] MDTrackItem[] outItems, ref UIntPtr outCount);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_tracker_set_params(IntPtr handle, string name, double value);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_tracker_reset(IntPtr handle);
+
+        #endregion
     }
 }
