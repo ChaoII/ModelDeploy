@@ -521,6 +521,32 @@ MD_CAPI_EXPORT MDStatus md_tracker_set_params(MDTrackerHandle h, const char* nam
 
 MD_CAPI_EXPORT MDStatus md_tracker_reset(MDTrackerHandle h);
 
+/* ==================== 条码 / 二维码识别 ==================== */
+
+/* 单个条码 / 二维码解码结果（blittable，供 C#/Rust 直接镜像） */
+typedef struct MD_BarcodeItem {
+    char text[256];      /* 解码文本 UTF-8 */
+    char format[16];     /* 格式，如 "QR_CODE" */
+    float quad[8];       /* 4 点坐标 (x0,y0,x1,y1,x2,y2,x3,y3)，左上起顺时针 */
+    float score;
+    int32_t is_qr;
+} MD_BarcodeItem;
+
+typedef struct md_barcode_handle* MDBarcodeHandle;
+
+/* 创建条码识别器（纯 CV，无模型依赖）。formats 默认 FMT_ALL。 */
+MD_CAPI_EXPORT MDStatus md_barcode_create(MDBarcodeHandle* out);
+MD_CAPI_EXPORT void md_barcode_destroy(MDBarcodeHandle h);
+
+/* 限定解码格式子集（FMT_* 位或，见 C++ Formats） */
+MD_CAPI_EXPORT MDStatus md_barcode_set_formats(MDBarcodeHandle h, uint32_t formats);
+
+/* 检测并解码图片中的所有码。
+ * 容量查询：items==nullptr 时置 *count 为需要数（不写入），返回 MD_OK；
+ * 否则 *count 进入时为 items 数组容量，返回时置为实际写入数（写入 min(cap,need) 条）。 */
+MD_CAPI_EXPORT MDStatus md_barcode_detect(MDBarcodeHandle h, MDImageHandle img,
+                                          MD_BarcodeItem* items, uint32_t* count);
+
 /* ==================== 绘制（对 MDImageHandle 就地绘制） ==================== */
 
 MD_CAPI_EXPORT MDStatus md_draw_rect(MDImageHandle, float x, float y, float w, float h,

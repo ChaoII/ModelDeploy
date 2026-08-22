@@ -37,6 +37,7 @@
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 #include "csrc/vision/lpr/lpr_det/lpr_det.h"
 #include "csrc/vision/lpr/lpr_rec/lpr_rec.h"
+#include "csrc/vision/barcode/barcode.h"
 #include "csrc/vision/tracking/base_tracker.h"
 #include "csrc/vision/tracking/bytetrack.h"
 #include "csrc/vision/tracking/botsort.h"
@@ -109,6 +110,12 @@ struct md_tracker_handle {
     MDTrackerKind kind = MD_TRACKER_BYTETRACK;
     std::unique_ptr<modeldeploy::vision::tracking::BaseTracker> tracker;
     TrackerParams params;
+};
+
+/* 条码识别器句柄：持有无状态 BarcodeDetector（纯 CV，detect 不推进状态） */
+struct md_barcode_handle {
+    modeldeploy::vision::barcode::BarcodeDetector det;
+    uint32_t formats = modeldeploy::vision::barcode::FMT_ALL;
 };
 
 namespace {
@@ -3461,5 +3468,60 @@ MDStatus md_tracker_reset(MDTrackerHandle h) {
     auto* th = static_cast<md_tracker_handle*>(h);
     if (!th || !th->tracker) { set_error("md_tracker_reset: handle is null"); return MD_ERR_NULL_POINTER; }
     th->tracker->reset();
+    return MD_OK;
+}
+
+/* ==================== 条码 / 二维码识别 ==================== */
+
+MDStatus md_barcode_create(MDBarcodeHandle* out) {
+    if (!out) { set_error("md_barcode_create: out is null"); return MD_ERR_NULL_POINTER; }
+    auto* h = new md_barcode_handle();
+    h->formats = modeldeploy::vision::barcode::FMT_ALL;
+    h->det.set_formats(h->formats);
+    *out = h;
+    return MD_OK;
+}
+
+void md_barcode_destroy(MDBarcodeHandle h) {
+    delete static_cast<md_barcode_handle*>(h);
+}
+
+MDStatus md_barcode_set_formats(MDBarcodeHandle h, uint32_t formats) {
+    if (!h) { set_error("md_barcode_set_formats: h is null"); return MD_ERR_NULL_POINTER; }
+    auto* bh = static_cast<md_barcode_handle*>(h);
+    bh->formats = formats;
+    bh->det.set_formats(formats);
+    return MD_OK;
+}
+
+/* 无状态 detect：不推进任何状态，故容量查询与写入可安全用同一调用（纯函数）。
+ * 容量查询：items==nullptr 时仅置 *count 为需要数，返回 MD_OK。 */
+MDStatus md_barcode_detect(MDBarcodeHandle h, MDImageHandle img,
+                           MD_BarcodeItem* items, uint32_t* count) {
+    if (!h || !img || !count) {
+        set_error("md_barcode_detect: null argument");
+        return MD_ERR_NULL_POINTER;
+    }
+    const modeldeploy::vision::ImageData image =
+        handle_to_image(static_cast<md_image_handle*>(img));
+    auto res = static_cast<md_barcode_handle*>(h)->det.detect(image);
+    const uint32_t need = static_cast<uint32_t>(res.size());
+    if (items == nullptr) { *count = need; return MD_OK; }  // 容量查询
+    const uint32_t cap = *count;
+    const uint32_t n = std::min(cap, need);
+    for (uint32_t i = 0; i < n; ++i) {
+        const auto& r = res[i];
+        MD_BarcodeItem& it = items[i];
+        memset(&it, 0, sizeof(it));
+        memcpy(it.text, r.text.c_str(), std::min<size_t>(r.text.size(), sizeof(it.text) - 1));
+        memcpy(it.format, r.format.c_str(), std::min<size_t>(r.format.size(), sizeof(it.format) - 1));
+        for (int k = 0; k < 4; ++k) {
+            it.quad[2 * k] = r.quad[k].x;
+            it.quad[2 * k + 1] = r.quad[k].y;
+        }
+        it.score = r.score;
+        it.is_qr = r.is_qr ? 1 : 0;
+    }
+    *count = n;
     return MD_OK;
 }

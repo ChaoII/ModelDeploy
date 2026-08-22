@@ -1120,3 +1120,64 @@ TEST_CASE("capi tracker no double-advance keeps lost track id", "[capi]") {
 
     md_tracker_destroy(h);
 }
+
+// 定位 test_data/qr_sample.png（解码文本 https://example.com/MD）的路径。
+// TEST_DATA_DIR 是 test 运行时注入的环境变量（=仓库根），回退到 ./test_data。
+std::string barcode_qr_path() {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string dir = env && *env ? std::string(env) : ".";
+    return dir + "/test_data/qr_sample.png";
+}
+
+TEST_CASE("capi barcode create/destroy + null guards", "[capi]") {
+    MDBarcodeHandle b = nullptr;
+    REQUIRE(md_barcode_create(&b) == MD_OK);
+    REQUIRE(b != nullptr);
+
+    // null 传入 → NULL_POINTER
+    CHECK(md_barcode_create(nullptr) == MD_ERR_NULL_POINTER);
+    CHECK(md_barcode_set_formats(nullptr, 0) == MD_ERR_NULL_POINTER);
+    CHECK(md_barcode_detect(nullptr, nullptr, nullptr, nullptr) == MD_ERR_NULL_POINTER);
+
+    md_barcode_destroy(b);
+}
+
+TEST_CASE("capi barcode detect decodes a sample QR", "[capi]") {
+    const std::string path = barcode_qr_path();
+    if (!std::filesystem::exists(path)) {
+        REQUIRE(false);
+        return;
+    }
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_file(&img, path.c_str()) == MD_OK);
+    REQUIRE(img != nullptr);
+
+    MDBarcodeHandle b = nullptr;
+    REQUIRE(md_barcode_create(&b) == MD_OK);
+
+    // 容量查询：items==nullptr 时返回需要数，不崩溃
+    uint32_t need = 0;
+    REQUIRE(md_barcode_detect(b, img, nullptr, &need) == MD_OK);
+    REQUIRE(need >= 1);
+
+    // 预分配并写入
+    std::vector<MD_BarcodeItem> items(need);
+    uint32_t cap = need;
+    REQUIRE(md_barcode_detect(b, img, items.data(), &cap) == MD_OK);
+    REQUIRE(cap >= 1);
+
+    bool found = false;
+    for (uint32_t i = 0; i < cap; ++i) {
+        if (items[i].is_qr && std::string(items[i].text) == "https://example.com/MD") {
+            found = true;
+            CHECK(items[i].format[0] != '\0');   // 格式名非空（ZXing 如 "QR Code"）
+            CHECK(items[i].quad[0] >= 0.f);   // 四点坐标合理（左上角）
+            CHECK(items[i].score >= 0.f);
+            break;
+        }
+    }
+    REQUIRE(found);
+
+    md_barcode_destroy(b);
+    md_image_destroy(img);
+}
