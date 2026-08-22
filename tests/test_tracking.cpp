@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <utility>
 #include <vector>
 #include "vision/tracking/base_tracker.h"
 #include "vision/tracking/matching/iou_matching.h"
@@ -488,4 +489,115 @@ TEST_CASE("MotLoader: detects ID switch when a track swaps GT identity", "[track
 
     auto m = compute_clear(seq, preds);
     REQUIRE(m.id_switches >= 1);
+}
+
+// ---------------------------------------------------------------------------
+// Task 8: synthetic MOT end-to-end across ByteTrack / BoT-SORT / StrongSORT.
+//
+// Builds a synthetic two-object, 30-frame sequence in memory (no file on disk).
+// Both objects move smoothly and stay far apart so IoU matching is unambiguous.
+// A brief 2-frame occlusion drops object 1's detections mid-sequence; GT still
+// carries the object (as in a real MOT benchmark), so the tracker must keep the
+// Lost track within max_age=30 and re-associate the SAME track id on reappear.
+// ---------------------------------------------------------------------------
+namespace {
+// Deterministic small jitter in {-1, 0, +1} based on frame index (reproducible,
+// no PRNG state) so the synthetic path is smooth but not pixel-perfect-clean.
+inline float synthetic_jitter(int frame) {
+    return static_cast<float>(((frame * 7 + 3) % 3) - 1);
+}
+
+// Occlusion window (frame indices, 0-based) for the synthetic sequence.
+constexpr int kOccStart = 12;
+constexpr int kOccLen = 2;       // frames [kOccStart, kOccStart + kOccLen)
+constexpr int kPostOcc = kOccStart + kOccLen;  // first frame after occlusion
+
+modeldeploy::vision::tracking::MotSequence make_synthetic_sequence(int frames = 30,
+                                                                   bool with_occlusion = true) {
+    using modeldeploy::vision::tracking::MotFrame;
+    using modeldeploy::vision::tracking::MotSequence;
+    using modeldeploy::vision::tracking::Detection;
+    MotSequence seq;
+    seq.num_gt_ids = 2;
+    for (int i = 0; i < frames; ++i) {
+        MotFrame fr;
+        fr.frame_id = i;
+        // Object 0: moves right (~2px/frame) at fixed y=100.
+        const Rect2f b0{20.0f + 2.0f * i + synthetic_jitter(i), 100.0f, 20.0f, 40.0f};
+        // Object 1: moves downward (~2px/frame) at fixed x=300, well separated.
+        const Rect2f b1{300.0f, 20.0f + 2.0f * i + synthetic_jitter(i + 1), 20.0f, 40.0f};
+        fr.gt_boxes = {b0, b1};
+        fr.gt_ids = {0, 1};
+
+        Detection d0; d0.box = b0; d0.score = 0.9f; d0.label_id = 0;
+        Detection d1; d1.box = b1; d1.score = 0.9f; d1.label_id = 0;
+        fr.dets.push_back(d0);
+        const bool occluded = with_occlusion && i >= kOccStart && i < kOccStart + kOccLen;
+        if (!occluded) fr.dets.push_back(d1);
+        seq.frames.push_back(std::move(fr));
+    }
+    return seq;
+}
+
+struct TrackerRun {
+    Metrics metrics;
+    int distinct_ids = 0;   // number of distinct track ids over the whole run
+    int pre_occ_id = -1;    // object-1 (x > 200) id just before the occlusion
+    int post_occ_id = -1;   // object-1 (x > 200) id right after the occlusion
+};
+
+template <typename Tracker>
+TrackerRun run_tracker(const MotSequence& seq) {
+    Tracker tr;
+    std::vector<std::vector<TrackResult>> preds;
+    preds.reserve(seq.frames.size());
+    for (const auto& fr : seq.frames) preds.push_back(tr.update(fr.dets));
+
+    TrackerRun r;
+    r.metrics = compute_clear(seq, preds);
+
+    std::vector<int> all_ids;
+    for (const auto& p : preds)
+        for (const auto& t : p) all_ids.push_back(t.track_id);
+    std::sort(all_ids.begin(), all_ids.end());
+    all_ids.erase(std::unique(all_ids.begin(), all_ids.end()), all_ids.end());
+    r.distinct_ids = static_cast<int>(all_ids.size());
+
+    // Identify object 1 by its x position (object 1 stays at x=300; object 0 is
+    // near x<=100). Require its pre-/post-occlusion track id to be identical.
+    for (const auto& t : preds[static_cast<size_t>(kOccStart - 1)])
+        if (t.box.x > 200.0f) r.pre_occ_id = t.track_id;
+    for (const auto& t : preds[static_cast<size_t>(kPostOcc)])
+        if (t.box.x > 200.0f) r.post_occ_id = t.track_id;
+    return r;
+}
+}  // namespace
+
+TEST_CASE("Tracking: synthetic MOT e2e across ByteTrack/BoT-SORT/StrongSORT", "[tracking]") {
+    const auto seq = make_synthetic_sequence();
+
+    auto check = [&seq](const char* name, const TrackerRun& r) {
+        INFO(name);
+        // Near-perfect tracking on an unambiguous, well-separated sequence. The
+        // 2-frame occlusion drops object 1's detection, contributing 2 FN out of
+        // 60 GT -> MOTA = 1 - 2/60 = 0.9667 (robustly above 0.95).
+        REQUIRE(r.metrics.mota >= 0.95f);
+        REQUIRE(r.metrics.idf1 >= 0.90f);
+        REQUIRE(r.metrics.hota >= 0.85f);
+        REQUIRE(r.metrics.num_fp <= 2);
+        // Exactly two persistent objects, so the whole run must produce only the
+        // pair of stable track ids (allow 3 only if a tracker spins up a spurious
+        // id on occlusion — but think <= 2).
+        REQUIRE(r.distinct_ids >= 2);
+        REQUIRE(r.distinct_ids <= 3);
+        // The occluded object must keep its id across the gap (Lost track within
+        // max_age=30 is re-associated, not re-initialized as a new track).
+        REQUIRE(r.pre_occ_id >= 0);
+        REQUIRE(r.post_occ_id >= 0);
+        REQUIRE(r.pre_occ_id == r.post_occ_id);
+    };
+
+    check("ByteTracker", run_tracker<ByteTracker>(seq));
+    check("BotSortTracker", run_tracker<BotSortTracker>(seq));
+    check("StrongSortTracker", run_tracker<StrongSortTracker>(seq));
 }
