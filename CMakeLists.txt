@@ -308,7 +308,8 @@ if (BUILD_PYTHON)
     find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
     # pybind 音频绑定依赖 BUILD_AUDIO（cppjieba 等），关闭时排除
     if (NOT BUILD_AUDIO)
-        list(REMOVE_ITEM PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/kokoro_pybind.cpp)
+        list(REMOVE_ITEM PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/kokoro_pybind.cpp
+                ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/speaker_verify_pybind.cpp)
     endif ()
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
     pybind11_add_module(modeldeploy ${PYBIND_SOURCE})

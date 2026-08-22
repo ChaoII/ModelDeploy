@@ -11,6 +11,7 @@ namespace modeldeploy::vision {
 
 namespace modeldeploy::audio {
     void bind_kokoro(pybind11::module&);
+    void bind_speaker_verify(pybind11::module&);
 }
 
 
@@ -39,6 +40,7 @@ namespace modeldeploy {
         auto audio_module =
             m.def_submodule("audio", "Audio module of Modeldeploy.");
         audio::bind_kokoro(audio_module);
+        audio::bind_speaker_verify(audio_module);
 #endif
     }
 }
