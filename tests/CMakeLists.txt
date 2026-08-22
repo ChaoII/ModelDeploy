@@ -24,6 +24,7 @@ set(TEST_SOURCES
     test_encryption.cpp
     test_tracking.cpp
     test_barcode.cpp
+    test_reid.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
