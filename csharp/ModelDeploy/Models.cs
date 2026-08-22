@@ -443,6 +443,26 @@ namespace ModelDeploy.Models
         }
     }
 
+    public sealed class ReIdModel : BaseModel
+    {
+        private ReIdModel(IntPtr handle) : base(MDModelKind.MD_MODEL_REID, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public ReIdModel Clone() => new ReIdModel(CloneNative());
+
+        public ReIdModel(string modelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_REID, modelPath, opt) { }
+
+        public ReIdResult Predict(VisionImage image)
+        {
+            using var r = new ResultReader(PredictNative(image.Handle));
+            var status = md_result_reid_embedding(r.Result, UIntPtr.Zero, out var emb, out var n);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"ReID getter failed: {GetLastError()}");
+            return new ReIdResult { Embedding = ResultReader.ReadFloats(emb, n) };
+        }
+    }
+
     public sealed class FaceAgeModel : BaseModel
     {
         private FaceAgeModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_AGE, handle) { }

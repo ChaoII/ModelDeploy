@@ -57,7 +57,9 @@ namespace ModelDeploy
             MD_MODEL_LPR_PIPELINE,
             MD_MODEL_PED_ATTR,
             MD_MODEL_ASR,
-            MD_MODEL_TTS
+            MD_MODEL_TTS,
+            MD_MODEL_FACE_AS_SECOND,
+            MD_MODEL_REID
         }
 
         public enum MDTrackerKind
