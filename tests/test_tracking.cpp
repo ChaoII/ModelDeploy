@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include <algorithm>
+#include <cmath>
 #include <vector>
 #include "vision/tracking/base_tracker.h"
 #include "vision/tracking/matching/iou_matching.h"
@@ -214,4 +215,80 @@ TEST_CASE("BoT-SORT: EMA feature tracking keeps id amid appearance drift", "[tra
     auto r1 = tr.update({Detection{{2,2,20,20},0.9f,0,f1}});
     auto r2 = tr.update({Detection{{4,4,20,20},0.9f,0,f2}});
     REQUIRE(r2.size()==1);
+}
+
+// This test is deliberately DISCRIMINATING: a pure-IoU implementation FAILS it,
+// but the fused IoU+appearance cost passes it. Frame 1 seeds one track (id0)
+// with feature {1,0,0}. Frame 2 presents two detections near the SAME spot: the
+// true object B (feature {1,0,0}, slightly offset box) and a foreign object C
+// (feature {0,1,0}) whose box sits EXACTLY on the track's predicted position, so
+// C has the *better* IoU with id0. Pure IoU would thereby match the foreign C to
+// id0 (wrong); the fused cost uses the ~0 cosine distance to keep B on id0.
+TEST_CASE("BoT-SORT: appearance prevents foreign feature from stealing track id", "[tracking]") {
+    BotSortTracker tr; // frame==nullptr -> CMC is a no-op (identity)
+    Detection a{{100,100,20,20},0.9f,0,{1.0f,0.0f,0.0f}};
+    auto f1 = tr.update({a}); // seeds id0 with feature {1,0,0}
+    REQUIRE(f1.size() == 1);
+    REQUIRE(f1[0].track_id == 0);
+
+    // True object B: same appearance, slight box offset (IoU(track,B) < 1).
+    Detection b{{102,102,20,20},0.9f,0,{1.0f,0.0f,0.0f}};
+    // Foreign object C: different appearance, box exactly on predicted position
+    // (IoU(track,C) == 1 > IoU(track,B)) so pure IoU would wrongly pick C.
+    Detection c{{100,100,20,20},0.9f,0,{0.0f,1.0f,0.0f}};
+    auto f2 = tr.update({b, c});
+    REQUIRE(f2.size() == 2);                      // two distinct objects
+    REQUIRE(f2[0].track_id != f2[1].track_id);
+
+    // The true-feature {1,0,0} object must still own id0 (appearance beat IoU).
+    bool true_on_id0 = false;
+    bool foreign_seen = false;
+    for (const auto& r : f2) {
+        if (r.feature.size() >= 2 && r.feature[0] > 0.9f) {   // ~{1,0,0}
+            REQUIRE(r.track_id == 0);
+            true_on_id0 = true;
+        }
+        if (r.feature.size() >= 2 && r.feature[1] > 0.9f) {   // ~{0,1,0}
+            foreign_seen = true;
+        }
+    }
+    REQUIRE(true_on_id0);
+    REQUIRE(foreign_seen);
+
+    // Re-feed the pair on frame 3: id0 stays glued to the true appearance.
+    auto f3 = tr.update({b, c});
+    REQUIRE(f3.size() == 2);
+    for (const auto& r : f3) {
+        if (r.feature.size() >= 2 && r.feature[0] > 0.9f) {
+            REQUIRE(r.track_id == 0);
+        }
+    }
+}
+
+// DISCRIMINATING against "copy latest det feature" implementations: asserts the
+// EMA actually blends. Frame 1 seeds id0's EMA = A = {1,0,0}. Frame 2 matches a
+// single det B = {0,1,0}. ema_alpha = 0.9 => blended pre-normalize v = 0.9*A +
+// 0.1*B = {0.9, 0.1, 0}, then renormalized. A pure "copy latest" would give B;
+// "no averaging" would give A; this asserts the actual average.
+TEST_CASE("BoT-SORT: EMA feature is blended, not copied", "[tracking]") {
+    BotSortTracker tr;
+    std::vector<float> A{1.0f, 0.0f, 0.0f};
+    std::vector<float> B{0.0f, 1.0f, 0.0f};
+    auto f1 = tr.update({Detection{{0,0,20,20},0.9f,0,A}});
+    REQUIRE(f1.size() == 1);
+    REQUIRE(f1[0].track_id == 0);
+    auto f2 = tr.update({Detection{{2,2,20,20},0.9f,0,B}});
+    REQUIRE(f2.size() == 1);
+    REQUIRE(f2[0].track_id == 0);
+
+    const float alpha = 0.9f; // default ema_alpha_
+    const float e0 = alpha * 1.0f + (1.0f - alpha) * 0.0f; // 0.9
+    const float e1 = alpha * 0.0f + (1.0f - alpha) * 1.0f; // 0.1
+    const float e2 = 0.0f;
+    const float norm = std::sqrt(e0 * e0 + e1 * e1 + e2 * e2);
+
+    REQUIRE(f2[0].feature.size() == 3);
+    REQUIRE(f2[0].feature[0] == Approx(e0 / norm).margin(1e-3f));
+    REQUIRE(f2[0].feature[1] == Approx(e1 / norm).margin(1e-3f));
+    REQUIRE(f2[0].feature[2] == Approx(0.0f).margin(1e-3f));
 }
