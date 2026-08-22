@@ -96,6 +96,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_ASR,
     MD_MODEL_TTS,
     MD_MODEL_FACE_AS_SECOND,
+    MD_MODEL_REID,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -277,7 +278,8 @@ typedef enum MD_RESULT_KIND {
     MD_RES_GENDER,
     MD_RES_ASR,
     MD_RES_TTS,
-    MD_RES_ANTISPOOF
+    MD_RES_ANTISPOOF,
+    MD_RES_REID
 } MDResultKind;
 MD_CAPI_EXPORT MDStatus md_result_kind(MDResultHandle, MDResultKind* out);
 /* 结果对应的图内实例数（人脸数/文本行数/目标数等；单值结果恒为 1） */
@@ -381,6 +383,10 @@ MD_CAPI_EXPORT MDStatus md_result_face_kps(MDResultHandle, size_t i, const MDPoi
 MD_CAPI_EXPORT MDStatus md_result_face_embedding(MDResultHandle, size_t i,
                                   const float** embedding, size_t* emb_n);
 
+/* ReID（行人重识别 512-d embedding 单列，i 为实例序号） */
+MD_CAPI_EXPORT MDStatus md_result_reid_embedding(MDResultHandle, size_t i,
+                                  const float** embedding, size_t* emb_n);
+
 /* InsightFace 完整分析 */
 MD_CAPI_EXPORT MDStatus md_result_insightface(MDResultHandle, const MDInsightFaceItem** items, size_t* count);
 MD_CAPI_EXPORT MDStatus md_result_insightface_kps(MDResultHandle, size_t i, const MDPoint** kps, size_t* n);
@@ -441,6 +447,8 @@ MD_CAPI_EXPORT MDStatus md_result_face_batch(MDResultHandle, size_t img_i, const
 MD_CAPI_EXPORT MDStatus md_result_face_kps_batch(MDResultHandle, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n);
 /* FaceRec（每图一个 embedding） */
 MD_CAPI_EXPORT MDStatus md_result_face_embedding_batch(MDResultHandle, size_t img_i, const float** embedding, size_t* emb_n);
+/* ReID（每图一个 512-d embedding） */
+MD_CAPI_EXPORT MDStatus md_result_reid_embedding_batch(MDResultHandle, size_t img_i, const float** embedding, size_t* emb_n);
 /* InsightFace（完整分析，按图） */
 MD_CAPI_EXPORT MDStatus md_result_insightface_batch(MDResultHandle, size_t img_i, const MDInsightFaceItem** items, size_t* count);
 MD_CAPI_EXPORT MDStatus md_result_insightface_kps_batch(MDResultHandle, size_t img_i, size_t item_j, const MDPoint** kps, size_t* n);

@@ -10,9 +10,11 @@
 // 注：真正的设备 NV12 帧由 md_image_from_device_nv12 + md_model_predict 产出，需模型文件（[model] 标签，CI 下载）。
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include "capi/md_capi.h"
 
+#include <cmath>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
@@ -915,6 +917,68 @@ TEST_CASE("capi age batch getters + single-getter compat (real model, guarded)",
     md_image_destroy(a);
     md_image_destroy(b);
     md_model_destroy(age);
+}
+
+// Task 4：ReID (OSNet) 契约 —— 512-d embedding getter（模型存在才行，缺权重 SKIP，[capi]）
+TEST_CASE("capi reid embedding getter (real model, guarded)", "[capi]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string model_file = data_dir + "/test_models/onnx/osnet_x1_0.onnx";
+    if (!std::filesystem::exists(model_file)) {
+        WARN("OSNet model not found; skipping reid capi test. "
+             "Download test_data from modelscope: "
+             "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps");
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle reid = nullptr;
+    REQUIRE(md_model_create(&reid, MD_MODEL_REID, model_file.c_str(), opt) == MD_OK);
+    REQUIRE(reid != nullptr);
+    md_option_destroy(opt);
+
+    // OSNet 输入 128x256（HxW），纯灰 BGR 图
+    MDImageHandle img = nullptr;
+    const int w = 128, h = 256;
+    auto bgr = make_gray_bgr(w, h);
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+
+    MDResultHandle res = nullptr;
+    REQUIRE(md_model_predict(reid, img, &res) == MD_OK);
+    REQUIRE(res != nullptr);
+
+    MDResultKind kind = MD_RES_DETECTION;
+    REQUIRE(md_result_kind(res, &kind) == MD_OK);
+    CHECK(kind == MD_RES_REID);
+
+    const float* emb = nullptr;
+    size_t emb_n = 0;
+    REQUIRE(md_result_reid_embedding(res, 0, &emb, &emb_n) == MD_OK);
+    CHECK(emb_n == 512);
+    CHECK(emb != nullptr);
+    if (emb && emb_n == 512) {
+        double n2 = 0.0;
+        for (size_t k = 0; k < emb_n; ++k) n2 += (double)emb[k] * emb[k];
+        CHECK(std::sqrt(n2) == Catch::Approx(1.0).margin(1e-3));
+    }
+
+    // kind 不匹配 → INVALID_ARGUMENT，不崩
+    CHECK(md_result_face_embedding(res, 0, &emb, &emb_n) == MD_ERR_INVALID_ARGUMENT);
+
+    // 批量 getter：单图
+    const float* bemb = nullptr;
+    size_t b_n = 0;
+    REQUIRE(md_result_reid_embedding_batch(res, 0, &bemb, &b_n) == MD_OK);
+    CHECK(b_n == 512);
+    CHECK(bemb != nullptr);
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(reid);
 }
 
 // Task 10：C API 跟踪器 —— 纯 CPU 无模型依赖（[capi]）

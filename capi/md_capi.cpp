@@ -813,6 +813,11 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!mh->model) return fail_init("SeetaFaceID");
             break;
         }
+        case MD_MODEL_REID: {
+            mh->model = make_model<reid::ReID>(model_path, opt, "ReID", &err);
+            if (!mh->model) return fail_init("ReID");
+            break;
+        }
         case MD_MODEL_FACE_AGE: {
             mh->model = make_model<face::SeetaFaceAge>(model_path, opt, "SeetaFaceAge", &err);
             if (!mh->model) return fail_init("SeetaFaceAge");
@@ -968,6 +973,7 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_DEPTH: delete static_cast<detection::UltralyticsDepth*>(model); break;
         case MD_MODEL_FACE_DET: delete static_cast<face::Scrfd*>(model); break;
         case MD_MODEL_FACE_REC: delete static_cast<face::SeetaFaceID*>(model); break;
+        case MD_MODEL_REID: delete static_cast<reid::ReID*>(model); break;
         case MD_MODEL_FACE_AGE: delete static_cast<face::SeetaFaceAge*>(model); break;
         case MD_MODEL_FACE_GENDER: delete static_cast<face::SeetaFaceGender*>(model); break;
         case MD_MODEL_FACE_AS: delete static_cast<face::SeetaFaceAsFirst*>(model); break;
@@ -1023,6 +1029,7 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_DEPTH: cloned = static_cast<detection::UltralyticsDepth*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_DET: cloned = static_cast<face::Scrfd*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_REC: cloned = static_cast<face::SeetaFaceID*>(src->model)->clone().release(); break;
+        case MD_MODEL_REID: cloned = static_cast<reid::ReID*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_AGE: cloned = static_cast<face::SeetaFaceAge*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_GENDER: cloned = static_cast<face::SeetaFaceGender*>(src->model)->clone().release(); break;
         case MD_MODEL_FACE_REC_PIPELINE: cloned = static_cast<face::FaceRecognizerPipeline*>(src->model)->clone().release(); break;
@@ -1569,6 +1576,16 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
             rh->data = d;
             break;
         }
+        case MD_MODEL_REID: {
+            auto* m = static_cast<reid::ReID*>(mh->model);
+            auto* d = new ResultData<ReIdResult>();
+            std::vector<ReIdResult> r;
+            if (!m->predict(image, &r)) return predict_fail("reid");
+            for (auto& e : r) d->v.push_back(std::move(e));
+            rh->kind = MD_RES_REID;
+            rh->data = d;
+            break;
+        }
         case MD_MODEL_FACE_AGE: {
             auto* m = static_cast<face::SeetaFaceAge*>(mh->model);
             auto* d = new SingleResult<int>();
@@ -1851,6 +1868,18 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
                 d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_FACE_REC;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_REID: {
+            auto* m = static_cast<reid::ReID*>(mh->model);
+            auto* d = new ResultData<ReIdResult>();
+            for (size_t i = 0; i < n; ++i) {
+                std::vector<ReIdResult> r;
+                if (!m->predict(image_at(i), &r)) return predict_fail("reid");
+                for (auto& e : r) d->v.push_back(std::move(e));
+            }
+            rh->kind = MD_RES_REID;
             rh->data = d;
             break;
         }
@@ -2430,6 +2459,18 @@ MDStatus md_result_face_embedding(MDResultHandle h, size_t i,
     return MD_OK;
 }
 
+MDStatus md_result_reid_embedding(MDResultHandle h, size_t i,
+                                  const float** embedding, size_t* emb_n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_REID) return MD_ERR_INVALID_ARGUMENT;
+    auto* origin = raw_result<ReIdResult>(rh);
+    if (!origin || i >= origin->v.size()) return MD_ERR_INVALID_ARGUMENT;
+    if (emb_n) *emb_n = origin->v[i].embedding.size();
+    if (embedding) *embedding = origin->v[i].embedding.data();
+    return MD_OK;
+}
+
 MDStatus md_result_insightface(MDResultHandle h, const MDInsightFaceItem** items, size_t* count) {
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !items || !count) return MD_ERR_NULL_POINTER;
@@ -2885,6 +2926,17 @@ MDStatus md_result_face_embedding_batch(MDResultHandle h, size_t img_i, const fl
     if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
     if (rh->kind != MD_RES_FACE_REC) return MD_ERR_INVALID_ARGUMENT;
     auto* d = dynamic_cast<ResultData<FaceRecognitionResult>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!d || img_i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
+    *emb_n = d->v[img_i].embedding.size();
+    *embedding = d->v[img_i].embedding.data();
+    return MD_OK;
+}
+
+MDStatus md_result_reid_embedding_batch(MDResultHandle h, size_t img_i, const float** embedding, size_t* emb_n) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_REID) return MD_ERR_INVALID_ARGUMENT;
+    auto* d = dynamic_cast<ResultData<ReIdResult>*>(static_cast<ResultDataBase*>(rh->data));
     if (!d || img_i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
     *emb_n = d->v[img_i].embedding.size();
     *embedding = d->v[img_i].embedding.data();
