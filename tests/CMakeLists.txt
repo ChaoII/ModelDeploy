@@ -25,6 +25,7 @@ set(TEST_SOURCES
     test_barcode.cpp
     test_hand.cpp
     test_cv_tools.cpp
+    test_cv_solutions.cpp
     test_landmark.cpp
     test_action.cpp
     test_reid.cpp

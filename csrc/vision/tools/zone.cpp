@@ -3,7 +3,7 @@
 
 namespace modeldeploy::vision::tool {
 static bool side_in(const Point2f& a, const Point2f& b, const Point2f& p) {
-    return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) > 0.0f;
+    return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) < 0.0f;
 }
 bool LineZone::trigger(const Point2f& p) {
     const bool in = side_in(a_, b_, p);
