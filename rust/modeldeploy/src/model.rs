@@ -1463,6 +1463,41 @@ impl SpeakerVerify {
     }
 }
 
+/// 对应 C++ FormulaRecognizer（文档公式识别 → LaTeX 字符串）
+pub struct FormulaRecognizer {
+    inner: Model,
+}
+
+unsafe impl Send for FormulaRecognizer {}
+unsafe impl Sync for FormulaRecognizer {}
+
+impl FormulaRecognizer {
+    pub fn new(model_path: &str, option: &RuntimeOption) -> Result<Self, MdError> {
+        Ok(Self {
+            inner: Model::new(ModelKind::FormulaRecognizer, model_path, option)?,
+        })
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn clone(&self) -> Result<Self, MdError> {
+        Ok(Self {
+            inner: self.inner.clone()?,
+        })
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.inner.is_ready()
+    }
+
+    /// 识别公式并返回 LaTeX 字符串（经 md_model_predict 拿结果句柄，借用指针立即复制）
+    pub fn predict(&self, image: &Image) -> Result<String, MdError> {
+        let result = self.inner.predict(image)?;
+        let mut latex: *const libc::c_char = ptr::null();
+        check_status(unsafe { ffi::md_result_formula(result.handle, 0, &mut latex) })?;
+        Ok(unsafe { cstr_to_string(latex) })
+    }
+}
+
 /// 对应 C++ SpeakerGallery（纯内存声纹库：label → l2 归一化 embedding，余弦 top-k 匹配）。
 /// C++ 侧为纯内存类、不经 CAPI，故 Rust 以等价数据结构纯 Rust 复刻（无 C ABI 依赖）。
 pub struct SpeakerGallery {

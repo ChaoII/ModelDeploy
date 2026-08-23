@@ -196,6 +196,7 @@ pub enum ModelKind {
     Tts,
     ReId,
     SpeakerVerify,
+    FormulaRecognizer,
 }
 
 impl ModelKind {
@@ -230,6 +231,7 @@ impl ModelKind {
             ModelKind::Tts => TTS,
             ModelKind::ReId => REID,
             ModelKind::SpeakerVerify => SPEAKER_VERIFY,
+            ModelKind::FormulaRecognizer => FORMULA_RECOGNIZER,
         }
     }
 }

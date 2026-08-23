@@ -12,8 +12,8 @@ pub use barcode::BarcodeDetector;
 pub use error::MdError;
 pub use image::Image;
 pub use model::{
-    Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel, HandKeypoint,
-    InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
+    Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel, FormulaRecognizer,
+    HandKeypoint, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, OcrClassifierModel, PaddleOCR, PedestrianAttribute, RawResult,
     RecognizerModel, ReID, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice,
     SpeakerGallery, SpeakerVerify,

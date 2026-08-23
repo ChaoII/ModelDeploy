@@ -1,12 +1,11 @@
 use anyhow::Result;
 use modeldeploy::{
     BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
-    HandKeypoint, Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel,
-    LprPipeline, LprRecognizerModel, PaddleOCR, PedestrianAttribute, ReID, RecognizerModel,
-    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, SpeakerGallery,
-    SpeakerVerify,
-    Tracker, TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
-    UltralyticsSeg, UltralyticsSem,
+    FormulaRecognizer, HandKeypoint, Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro,
+    LprDetectionModel, LprPipeline, LprRecognizerModel, PaddleOCR, PedestrianAttribute, ReID,
+    RecognizerModel, RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice,
+    SpeakerGallery, SpeakerVerify, Tracker, TrackerKind, UltralyticsDepth, UltralyticsDet,
+    UltralyticsObb, UltralyticsPose, UltralyticsSeg, UltralyticsSem,
 };
 
 fn test_data(rel: &str) -> String {
@@ -297,8 +296,25 @@ fn test_speaker_verify() -> Result<()> {
     Ok(())
 }
 
-// ═══ SpeakerGallery（纯内存，无权重依赖，恒定通过） ═══
+// ═══ FormulaRecognizer（文档公式识别，需权重；缺失则跳过） ═══
 
+#[test]
+fn test_formula_recognizer() -> Result<()> {
+    let model_path = test_data("test_models/onnx/formula_recognizer/formula_recognizer.onnx");
+    if !std::path::Path::new(&model_path).exists() {
+        eprintln!("FormulaRecognizer model not found; skipping formula recognizer test.");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let model = FormulaRecognizer::new(&model_path, &opt)?;
+    assert!(model.is_ready());
+    let img = Image::read(&test_img("test_formula.png"))?;
+    let latex = model.predict(&img)?;
+    assert!(!latex.is_empty(), "should return a non-empty LaTeX string");
+    Ok(())
+}
+
+// ═══ SpeakerGallery（纯内存，无权重依赖，恒定通过） ═══
 #[test]
 fn test_speaker_gallery() -> Result<()> {
     let mut g = SpeakerGallery::new();

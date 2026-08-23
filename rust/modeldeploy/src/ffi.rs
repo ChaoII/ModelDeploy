@@ -67,6 +67,7 @@ pub enum MDModelKind {
     HAND,
     REID,
     SPEAKER_VERIFY,
+    FORMULA_RECOGNIZER,
 }
 
 /// 结果类型（MDResultKind）
@@ -435,6 +436,8 @@ extern "C" {
     pub fn md_result_gender(h: MDResultHandle, gender: *mut c_int) -> MDStatus;
     pub fn md_result_gender_batch(h: MDResultHandle, items: *mut *const c_int, count: *mut usize) -> MDStatus;
     pub fn md_result_ocr_batch_count(h: MDResultHandle, n: *mut usize) -> MDStatus;
+    // FormulaRecognizer：单块 LaTeX（借用指针归结果句柄所有，立即复制）
+    pub fn md_result_formula(h: MDResultHandle, i: usize, latex: *mut *const c_char) -> MDStatus;
 
     // ── 2D 批量结果 getter（按图索引 img，逐图取项数组） ──
     pub fn md_result_detection_batch(h: MDResultHandle, img: usize, items: *mut *const MDDetectionItem, count: *mut usize) -> MDStatus;
