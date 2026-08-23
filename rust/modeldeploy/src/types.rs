@@ -195,6 +195,7 @@ pub enum ModelKind {
     Asr,
     Tts,
     ReId,
+    SpeakerVerify,
 }
 
 impl ModelKind {
@@ -228,6 +229,7 @@ impl ModelKind {
             ModelKind::Asr => ASR,
             ModelKind::Tts => TTS,
             ModelKind::ReId => REID,
+            ModelKind::SpeakerVerify => SPEAKER_VERIFY,
         }
     }
 }

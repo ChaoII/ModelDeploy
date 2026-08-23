@@ -1420,6 +1420,49 @@ impl Kokoro {
     }
 }
 
+/// 对应 C++ SpeakerVerify（声纹 embedding 提取）
+pub struct SpeakerVerify {
+    inner: Model,
+}
+
+unsafe impl Send for SpeakerVerify {}
+unsafe impl Sync for SpeakerVerify {}
+
+impl SpeakerVerify {
+    pub fn new(model_path: &str, option: &RuntimeOption) -> Result<Self, MdError> {
+        Ok(Self {
+            inner: Model::new(ModelKind::SpeakerVerify, model_path, option)?,
+        })
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn clone(&self) -> Result<Self, MdError> {
+        Ok(Self {
+            inner: self.inner.clone()?,
+        })
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.inner.is_ready()
+    }
+
+    /// 提取说话人 embedding（借用指针立即复制，安全）
+    pub fn predict(&self, samples: &[f32]) -> Result<Vec<f32>, MdError> {
+        let mut emb: *const f32 = ptr::null();
+        let mut n = 0usize;
+        check_status(unsafe {
+            ffi::md_audio_speaker_embed(
+                self.inner.handle,
+                samples.as_ptr(),
+                samples.len(),
+                &mut emb,
+                &mut n,
+            )
+        })?;
+        Ok(read_f32(emb, n))
+    }
+}
+
 fn slice_items<T>(ptr: *const T, n: usize) -> &'static [T] {
     if n == 0 || ptr.is_null() {
         &[]

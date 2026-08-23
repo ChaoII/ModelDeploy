@@ -3,8 +3,8 @@ use modeldeploy::{
     BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
     HandKeypoint, Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel,
     LprPipeline, LprRecognizerModel, PaddleOCR, PedestrianAttribute, ReID, RecognizerModel,
-    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, Tracker,
-    TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
+    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, SpeakerVerify,
+    Tracker, TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
     UltralyticsSeg, UltralyticsSem,
 };
 
@@ -275,6 +275,24 @@ fn test_reid() -> Result<()> {
     let img = Image::from_bgr24(&bgr, 256, 128)?;
     let rec = model.predict(&img)?;
     assert_eq!(rec[0].embedding.len(), 512);
+    Ok(())
+}
+
+// ═══ SpeakerVerify（声纹，需 ecapa 权重；缺失则跳过） ═══
+
+#[test]
+fn test_speaker_verify() -> Result<()> {
+    let model_path = test_data("test_models/onnx/speaker/ecapa_tdnn.onnx");
+    if !std::path::Path::new(&model_path).exists() {
+        eprintln!("ECAPA model not found; skipping speaker verify test.");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let model = SpeakerVerify::new(&model_path, &opt)?;
+    assert!(model.is_ready());
+    let samples = vec![0.0f32; 16000];
+    let emb = model.predict(&samples)?;
+    assert!(!emb.is_empty(), "should produce a non-empty speaker embedding");
     Ok(())
 }
 

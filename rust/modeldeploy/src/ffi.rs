@@ -66,6 +66,7 @@ pub enum MDModelKind {
     FACE_AS_SECOND,
     HAND,
     REID,
+    SPEAKER_VERIFY,
 }
 
 /// 结果类型（MDResultKind）
@@ -393,6 +394,8 @@ extern "C" {
     pub fn md_audio_asr(h: MDModelHandle, samples: *const c_float, n: usize, sample_rate: c_int, text: *mut *const c_char) -> MDStatus;
     pub fn md_audio_tts(h: MDModelHandle, text: *const c_char, voice: *const c_char, speed: c_float,
         sample_rate: *mut c_int, audio: *mut *const c_float, audio_n: *mut usize) -> MDStatus;
+    pub fn md_audio_speaker_embed(h: MDModelHandle, samples: *const c_float, n: usize,
+        embedding: *mut *const c_float, emb_n: *mut usize) -> MDStatus;
     pub fn md_wav_save(samples: *const c_float, n: usize, sample_rate: c_int, path: *const c_char) -> MDStatus;
 
     // ── 结果 ──
