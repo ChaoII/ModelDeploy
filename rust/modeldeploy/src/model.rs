@@ -1463,6 +1463,72 @@ impl SpeakerVerify {
     }
 }
 
+/// 对应 C++ SpeakerGallery（纯内存声纹库：label → l2 归一化 embedding，余弦 top-k 匹配）。
+/// C++ 侧为纯内存类、不经 CAPI，故 Rust 以等价数据结构纯 Rust 复刻（无 C ABI 依赖）。
+pub struct SpeakerGallery {
+    gallery: std::collections::HashMap<String, Vec<f32>>,
+}
+
+impl Default for SpeakerGallery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SpeakerGallery {
+    pub fn new() -> Self {
+        Self {
+            gallery: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.gallery.clear();
+    }
+
+    /// 登记说话人 embedding（内部按 label 覆盖，存 l2 归一化结果，与 C++ 语义一致）。
+    pub fn enroll(&mut self, label: &str, embedding: &[f32]) {
+        self.gallery.insert(label.to_string(), speaker_l2_normalize(embedding));
+    }
+
+    /// 移除 label；返回值镜像 C++ 的 `std::vector<bool>`（成功移除返回 [true]）。
+    pub fn remove(&mut self, label: &str) -> Vec<bool> {
+        vec![self.gallery.remove(label).is_some()]
+    }
+
+    /// 余弦 top-k 匹配（降序；query 先 l2 归一化再点积）。`match` 为保留字，故用 `r#match`。
+    pub fn r#match(&self, embedding: &[f32], k: usize) -> Vec<(String, f32)> {
+        let q = speaker_l2_normalize(embedding);
+        let mut scored: Vec<(String, f32)> = self
+            .gallery
+            .iter()
+            .map(|(label, ref_emb)| (label.clone(), speaker_cosine(&q, ref_emb)))
+            .collect();
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        scored.truncate(k);
+        scored
+    }
+
+    pub fn size(&self) -> usize {
+        self.gallery.len()
+    }
+}
+
+fn speaker_l2_normalize(v: &[f32]) -> Vec<f32> {
+    let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        v.iter().map(|x| x / norm).collect()
+    } else {
+        v.to_vec()
+    }
+}
+
+fn speaker_cosine(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+}
+
 fn slice_items<T>(ptr: *const T, n: usize) -> &'static [T] {
     if n == 0 || ptr.is_null() {
         &[]

@@ -3,7 +3,8 @@ use modeldeploy::{
     BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
     HandKeypoint, Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel,
     LprPipeline, LprRecognizerModel, PaddleOCR, PedestrianAttribute, ReID, RecognizerModel,
-    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, SpeakerVerify,
+    RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice, SpeakerGallery,
+    SpeakerVerify,
     Tracker, TrackerKind, UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose,
     UltralyticsSeg, UltralyticsSem,
 };
@@ -293,6 +294,44 @@ fn test_speaker_verify() -> Result<()> {
     let samples = vec![0.0f32; 16000];
     let emb = model.predict(&samples)?;
     assert!(!emb.is_empty(), "should produce a non-empty speaker embedding");
+    Ok(())
+}
+
+// ═══ SpeakerGallery（纯内存，无权重依赖，恒定通过） ═══
+
+#[test]
+fn test_speaker_gallery() -> Result<()> {
+    let mut g = SpeakerGallery::new();
+    // 相互正交的向量，便于判定匹配顺序。
+    let a = vec![1.0f32, 0.0, 0.0];
+    let b = vec![0.0f32, 1.0, 0.0];
+    let c = vec![0.0f32, 0.0, 1.0];
+    g.enroll("alice", &a);
+    g.enroll("bob", &b);
+    g.enroll("carol", &c);
+    assert_eq!(g.size(), 3);
+
+    // 对齐 alice 的（近）同一向量 → 应把 alice 排第一，且按余弦降序。
+    let matches = g.r#match(&[1.0f32, 0.05, 0.02], 3);
+    assert_eq!(matches.len(), 3);
+    assert_eq!(matches[0].0, "alice");
+    assert!(matches[0].1 >= matches[1].1);
+    assert!(matches[1].1 >= matches[2].1);
+
+    // k 截断。
+    let top1 = g.r#match(&[1.0f32, 0.05, 0.02], 1);
+    assert_eq!(top1.len(), 1);
+    assert_eq!(top1[0].0, "alice");
+
+    // 归一化后自身与自身余弦 = 1。
+    assert!((g.r#match(&[2.0f32, 0.0, 0.0], 1)[0].1 - 1.0).abs() < 1e-5);
+
+    // remove / clear。
+    assert_eq!(g.remove("bob"), vec![true]);
+    assert_eq!(g.size(), 2);
+    assert_eq!(g.remove("bob"), vec![false]);
+    g.clear();
+    assert_eq!(g.size(), 0);
     Ok(())
 }
 

@@ -16,7 +16,7 @@ pub use model::{
     InsightFaceAnalysis, InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline,
     LprRecognizerModel, OcrClassifierModel, PaddleOCR, PedestrianAttribute, RawResult,
     RecognizerModel, ReID, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice,
-    SpeakerVerify,
+    SpeakerGallery, SpeakerVerify,
     UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose, UltralyticsSeg,
     UltralyticsSem,
 };
