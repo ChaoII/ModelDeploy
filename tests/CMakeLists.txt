@@ -52,7 +52,7 @@ target_include_directories(test_modeldeploy PRIVATE
 
 # 视频解码测试（仅 BUILD_VIDEO；测试源由 Task 6 提供）
 if (BUILD_VIDEO AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_video_decoder.cpp")
-    list(APPEND TEST_SOURCES test_video_decoder.cpp)
+    target_sources(test_modeldeploy PRIVATE test_video_decoder.cpp)
     target_include_directories(test_modeldeploy PRIVATE ${FFMPEG_INCLUDE_DIR})
     target_link_libraries(test_modeldeploy PRIVATE ${FFMPEG_LIBS})
 endif ()
