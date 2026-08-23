@@ -31,6 +31,35 @@ namespace ModelDeploy.Models
                 throw new InvalidOperationException($"ASR predict failed: {GetLastError()}");
             return new AsrResult { Text = ResultReader.ReadString(text) ?? string.Empty };
         }
+
+        static AsrResult ToResult(in MDAsrResult r) => new AsrResult
+        {
+            Text = ResultReader.ReadString(r.text) ?? string.Empty,
+            Language = ResultReader.ReadString(r.language) ?? string.Empty,
+            Emotion = ResultReader.ReadString(r.emotion) ?? string.Empty,
+            Event = ResultReader.ReadString(r.@event) ?? string.Empty,
+            Task = ResultReader.ReadString(r.task) ?? string.Empty,
+            Itn = r.itn != 0,
+            NoSpeech = r.nospeech != 0,
+        };
+
+        /// <summary>结构化识别（SenseVoice 复任务标签），从 wav 文件。</summary>
+        public AsrResult PredictWavStructured(string wavPath)
+        {
+            var status = md_audio_asr_wav_result(_handle, wavPath, out var r);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"ASR structured failed: {GetLastError()}");
+            return ToResult(in r);
+        }
+
+        /// <summary>结构化识别（SenseVoice 复任务标签），从 PCM 浮点采样。</summary>
+        public AsrResult PredictStructured(float[] samples, int sampleRate)
+        {
+            var status = md_audio_asr_result(_handle, samples, new UIntPtr((uint)samples.Length), sampleRate, out var r);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"ASR structured failed: {GetLastError()}");
+            return ToResult(in r);
+        }
     }
 
     /// <summary>Kokoro TTS。modelPath 格式: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir</summary>

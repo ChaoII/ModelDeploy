@@ -174,6 +174,12 @@ namespace ModelDeploy.Results
     public sealed class AsrResult
     {
         public string Text { get; set; } = string.Empty;
+        public string Language { get; set; } = string.Empty;
+        public string Emotion { get; set; } = string.Empty;
+        public string Event { get; set; } = string.Empty;
+        public string Task { get; set; } = string.Empty;
+        public bool Itn { get; set; }
+        public bool NoSpeech { get; set; }
         public override string ToString() => $"ASR('{Text}')";
     }
 

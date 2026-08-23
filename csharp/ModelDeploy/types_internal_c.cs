@@ -150,6 +150,18 @@ namespace ModelDeploy
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct MDAsrResult
+        {
+            public IntPtr text;
+            public IntPtr language;
+            public IntPtr emotion;
+            public IntPtr @event;
+            public IntPtr task;
+            public int itn;
+            public int nospeech;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct MDLabelItem
         {
             public int id;

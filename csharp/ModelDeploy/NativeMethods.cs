@@ -189,6 +189,14 @@ string wavPath, out IntPtr text);
             out IntPtr text);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_asr_wav_result(IntPtr handle,
+            string wavPath, out MDAsrResult result);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_asr_result(IntPtr handle, float[] samples, UIntPtr n,
+            int sampleRate, out MDAsrResult result);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_audio_tts(IntPtr handle,
 IntPtr text,
 IntPtr voice, float speed,

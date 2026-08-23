@@ -36,6 +36,23 @@ public class CapiAudioTests
     }
 
     [Test]
+    public void Asr_PredictWavStructured_ReturnsLabels()
+    {
+        var dir = Path.Combine(ModelRoot, "sense_voice");
+        var model = string.Join("|",
+            Path.Combine(dir, "model.int8.onnx"),
+            Path.Combine(dir, "tokens.txt"));
+        var wav = Path.Combine(dir, "test_wavs", "zh.wav");
+        if (!Has(Path.Combine(dir, "model.int8.onnx")) || !Has(wav)) Assert.Ignore("model/wav not found");
+
+        using var asr = new SenseVoiceModel(model, CpuOrt());
+        var result = asr.PredictWavStructured(wav);
+        Assert.That(result.Text, Is.Not.Empty);
+        Assert.That(result.Language, Is.EqualTo("zh"));
+        Assert.That(result.Event, Is.EqualTo("Speech"));
+    }
+
+    [Test]
     public void Kokoro_Create_LoadsModel()
     {
         // 注意：Kokoro predict 需 s2t_map.bin/t2s_map.bin（测试数据未携带），此处仅验证模型可加载。
