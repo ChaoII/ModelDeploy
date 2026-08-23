@@ -218,6 +218,18 @@ public class AllModelsTests
     }
 
     [Test]
+    public void SpeakerVerify_Works()
+    {
+        var model = Path.Combine(ModelRoot, "speaker_verify", "ecapa.onnx");
+        if (!Has(model)) Assert.Ignore("data missing");
+        var samples = new float[16000];
+        samples[0] = 0.5f;
+        using var m = new SpeakerVerifyModel(model, CpuOrt());
+        var emb = m.Predict(samples);
+        Assert.That(emb.Length, Is.GreaterThan(0));
+    }
+
+    [Test]
     public void FaceAge_Works()
     {
         var model = Path.Combine(ModelRoot, "face", "age_predictor.onnx");

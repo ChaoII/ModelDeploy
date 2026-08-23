@@ -535,6 +535,29 @@ namespace ModelDeploy.Models
         }
     }
 
+    public sealed class SpeakerVerifyModel : BaseModel
+    {
+        private SpeakerVerifyModel(IntPtr handle) : base(MDModelKind.MD_MODEL_SPEAKER_VERIFY, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public SpeakerVerifyModel Clone() => new SpeakerVerifyModel(CloneNative());
+
+        public SpeakerVerifyModel(string modelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_SPEAKER_VERIFY, modelPath, opt) { }
+
+        /// <summary>从 PCM 浮点音频提取说话人 embedding（约 1s @16k 即足够）。
+        /// embedding 为借用指针，本方法以 Marshal.Copy 立即复制，无悬垂。</summary>
+        public float[] Predict(float[] samples)
+        {
+            if (samples == null) throw new ArgumentNullException(nameof(samples));
+            var status = md_audio_speaker_embed(_handle, samples, new UIntPtr((uint)samples.Length),
+                out var embedding, out var embN);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Speaker embed failed: {GetLastError()}");
+            return ResultReader.ReadFloats(embedding, embN);
+        }
+    }
+
     public sealed class FaceAgeModel : BaseModel
     {
         private FaceAgeModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FACE_AGE, handle) { }

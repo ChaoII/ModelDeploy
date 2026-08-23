@@ -60,7 +60,8 @@ namespace ModelDeploy
             MD_MODEL_TTS,
             MD_MODEL_FACE_AS_SECOND,
             MD_MODEL_HAND,
-            MD_MODEL_REID
+            MD_MODEL_REID,
+            MD_MODEL_SPEAKER_VERIFY
         }
 
         public enum MDTrackerKind

@@ -194,6 +194,12 @@ IntPtr text,
 IntPtr voice, float speed,
             out int sampleRate, out IntPtr audio, out UIntPtr audioN);
 
+        // 声纹（SpeakerVerify）：提取说话人 embedding。返回的 embedding 为借用指针
+        // （归模型句柄所有），调用方用 Marshal.Copy 立即复制，勿阻塞/复用。
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_speaker_embed(IntPtr handle, float[] samples, UIntPtr n,
+            out IntPtr embedding, out UIntPtr embN);
+
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_wav_save(float[] samples, UIntPtr n, int sampleRate,
 string path);
