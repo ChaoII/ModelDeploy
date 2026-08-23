@@ -4,6 +4,7 @@
 #include "vision/tools/zone.h"
 #include "vision/tools/annotator.h"
 #include "vision/tools/metrics.h"
+#include "vision/tools/slicer.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tool;
@@ -100,4 +101,30 @@ TEST_CASE("Metrics counts and scores on tiny sample", "[cv_tools]") {
     REQUIRE(s.recall == Catch::Approx(1.0));
     REQUIRE(s.f1 == Catch::Approx(2.0 * 0.5 * 1.0 / 1.5).margin(1e-6));
     REQUIRE(s.map50 > 0.0);
+}
+
+TEST_CASE("Slicer tiles a large image", "[cv_tools]") {
+    std::vector<uint8_t> pixels(100 * 100 * 3, 0);
+    ImageData img = ImageData::from_raw(pixels.data(), 100, 100, MdImageType::PKG_BGR_U8, true);
+    InferenceSlicer slicer(60, 60, 10);
+    auto tiles = slicer.slice(img);
+    REQUIRE(tiles.size() >= 4);
+    REQUIRE(tiles[0].tile.width() == 60);
+    REQUIRE(tiles[0].offset.x == 0.0f);
+}
+
+TEST_CASE("Slicer reassembles mapped boxes", "[cv_tools]") {
+    InferenceSlicer slicer(50, 50, 0);
+    std::vector<uint8_t> pixels(100 * 100 * 3, 0);
+    ImageData img = ImageData::from_raw(pixels.data(), 100, 100, MdImageType::PKG_BGR_U8, true);
+    auto tiles = slicer.slice(img);
+    Detections per; per.boxes = {Rect2f(0,0,10,10)}; per.confidence={0.9f}; per.class_id={0};
+    std::vector<Detections> per_slice(tiles.size());
+    per_slice[3] = per;  // 右下 tile 的局部框
+    ImageData out; std::vector<Rect2f> mapped;
+    reassemble(tiles, per_slice, &out, &mapped);
+    REQUIRE(out.width() == 100);
+    REQUIRE(mapped.size() == 1);
+    REQUIRE(mapped[0].x == Catch::Approx(50.0f));  // tile offset (50,50)
+    REQUIRE(mapped[0].y == Catch::Approx(50.0f));
 }
