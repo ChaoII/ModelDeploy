@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "vision/tools/detections.h"
+#include "vision/tools/zone.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tool;
@@ -40,4 +41,23 @@ TEST_CASE("Detections from_track maps tracker_id", "[cv_tools]") {
     REQUIRE(d.class_id[0] == 2);
     REQUIRE(d.confidence[0] == Catch::Approx(0.8f));
     REQUIRE(d.boxes[1].x == Catch::Approx(9.0f));
+}
+
+TEST_CASE("LineZone counts crossing once", "[cv_tools]") {
+    LineZone z(Point2f(5, 0), Point2f(5, 10));
+    REQUIRE(z.trigger_count() == 0);
+    REQUIRE(z.trigger(Point2f(0, 5)) == false); // out 侧
+    REQUIRE(z.trigger(Point2f(8, 5)) == true);  // 跨到 in → 计数
+    REQUIRE(z.trigger_count() == 1);
+    REQUIRE(z.trigger(Point2f(9, 5)) == false); // 仍在 in
+    z.reset();
+    REQUIRE(z.trigger_count() == 0);
+}
+
+TEST_CASE("PolygonZone contains + current_count", "[cv_tools]") {
+    PolygonZone z({Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)});
+    REQUIRE(z.contains(Point2f(5,5)));
+    REQUIRE_FALSE(z.contains(Point2f(20,20)));
+    z.update({Point2f(2,2), Point2f(50,50)});
+    REQUIRE(z.current_count() == 1);
 }
