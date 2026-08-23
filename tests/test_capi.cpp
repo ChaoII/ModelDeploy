@@ -1396,3 +1396,73 @@ TEST_CASE("capi formula recognizer enum + create error path", "[capi]") {
         return;
     }
 }
+
+// TSN / ST-GCN（MD_MODEL_TSN / MD_MODEL_ST_GCN）：「枚举 + 错误路径」契约。
+// 模型缺失时 guard 跳过真推理，仅验证枚举/空参数/加载失败路径（CI 安全，无需模型文件）。
+TEST_CASE("capi action (TSN/ST_GCN) enum + error path", "[capi]") {
+    // 新枚举值有效且位于 FORMULA_RECOGNIZER 之后、COUNT 之前
+    STATIC_REQUIRE(MD_MODEL_TSN > MD_MODEL_FORMULA_RECOGNIZER);
+    STATIC_REQUIRE(MD_MODEL_TSN < MD_MODEL_COUNT);
+    STATIC_REQUIRE(MD_MODEL_ST_GCN > MD_MODEL_TSN);
+    STATIC_REQUIRE(MD_MODEL_ST_GCN < MD_MODEL_COUNT);
+
+    // 空入参路径（不需模型即校验）：null 入参 → NULL_POINTER
+    MDResultHandle res = nullptr;
+    MDImageHandle dummy = nullptr;
+    CHECK(md_model_predict_sequence(nullptr, nullptr, 0, &res) == MD_ERR_NULL_POINTER);
+    CHECK(md_model_predict_sequence(nullptr, &dummy, 1, &res) == MD_ERR_NULL_POINTER);
+    CHECK(md_model_predict_skeleton(nullptr, nullptr, 0, 0, 0, &res) == MD_ERR_NULL_POINTER);
+
+    // 加载失败路径：指向不存在的模型 → create 报错，不产生句柄
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle tsn = nullptr;
+    CHECK(md_model_create(&tsn, MD_MODEL_TSN, "nonexistent_tsn.onnx", opt) == MD_ERR_MODEL_INIT);
+    CHECK(tsn == nullptr);
+    MDModelHandle stg = nullptr;
+    CHECK(md_model_create(&stg, MD_MODEL_ST_GCN, "nonexistent_stgcn.onnx", opt) == MD_ERR_MODEL_INIT);
+    CHECK(stg == nullptr);
+    // 缺路径（空串）→ INVALID_ARGUMENT
+    CHECK(md_model_create(&tsn, MD_MODEL_TSN, "", opt) == MD_ERR_INVALID_ARGUMENT);
+    md_option_destroy(opt);
+
+    // 模型文件缺失 → 跳过加载类断言（真推理需外链模型）
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string tsn_file = data_dir + "/test_models/onnx/action/tsn.onnx";
+    const std::string stg_file = data_dir + "/test_models/onnx/action/stgcn.onnx";
+    if (!std::filesystem::exists(tsn_file) || !std::filesystem::exists(stg_file)) {
+        WARN("action tsn/stgcn 权重缺失（外链 modelscope），跳过 create/predict 真加载");
+        return;
+    }
+
+    // 真加载：create 成功后再走 predict 错误路径（空入参）与正确 kind 守卫
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    REQUIRE(md_model_create(&tsn, MD_MODEL_TSN, tsn_file.c_str(), opt) == MD_OK);
+    REQUIRE(tsn != nullptr);
+    REQUIRE(md_model_create(&stg, MD_MODEL_ST_GCN, stg_file.c_str(), opt) == MD_OK);
+    REQUIRE(stg != nullptr);
+    md_option_destroy(opt);
+
+    // TSN 句柄上调用 skeleton → UNSUPPORTED；ST_GCN 上调用 sequence → UNSUPPORTED（kind 守卫）
+    MDImageHandle frame = nullptr;
+    const int w = 224, h = 224;
+    auto rgb = make_gray_bgr(w, h);
+    REQUIRE(md_image_from_bgr24(&frame, rgb.data(), w, h) == MD_OK);
+    MDImageHandle frames[1] = {frame};
+    std::vector<float> joints(4 * 4 * 2);  // T*V*C = 4*4*2
+    CHECK(md_model_predict_sequence(stg, frames, 1, &res) == MD_ERR_UNSUPPORTED_TYPE);
+    CHECK(md_model_predict_skeleton(tsn, joints.data(), 4, 4, 2, &res) == MD_ERR_UNSUPPORTED_TYPE);
+    // 正确 kind 下空入参 → INVALID_ARGUMENT
+    CHECK(md_model_predict_sequence(tsn, nullptr, 0, &res) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_model_predict_skeleton(stg, nullptr, 0, 0, 0, &res) == MD_ERR_INVALID_ARGUMENT);
+    md_image_destroy(frame);
+
+    md_model_destroy(stg);
+    md_model_destroy(tsn);
+}

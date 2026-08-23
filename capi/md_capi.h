@@ -100,6 +100,8 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_REID,
     MD_MODEL_SPEAKER_VERIFY,
     MD_MODEL_FORMULA_RECOGNIZER,
+    MD_MODEL_TSN,
+    MD_MODEL_ST_GCN,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -241,6 +243,13 @@ MD_CAPI_EXPORT MDStatus md_model_predict(MDModelHandle, MDImageHandle, MDResultH
 /* 批量推理（多图，仅支持的模型） */
 MD_CAPI_EXPORT MDStatus md_model_predict_batch(MDModelHandle, MDImageHandle* imgs, size_t n,
                                 MDResultHandle* out);
+
+/* 动作识别：TSN 帧序列（多图）推理，结果 kind=MD_RES_CLASSIFICATION（复用 md_result_classification） */
+MD_CAPI_EXPORT MDStatus md_model_predict_sequence(MDModelHandle h, MDImageHandle* frames, size_t n,
+                                  MDResultHandle* out);
+/* 动作识别：ST-GCN 骨骼序列推理（joints 为 T*V*C 行主序），结果 kind=MD_RES_CLASSIFICATION */
+MD_CAPI_EXPORT MDStatus md_model_predict_skeleton(MDModelHandle h, const float* joints,
+                                  size_t T, size_t V, size_t C, MDResultHandle* out);
 
 /* ==================== 音频（ASR / TTS） ==================== */
 

@@ -50,6 +50,8 @@
 #include "csrc/utils/wave_helper.h"
 #include "csrc/utils/utils.h"
 #include "csrc/core/md_log.h"
+#include "csrc/vision/action/tsn.h"
+#include "csrc/vision/action/st_gcn.h"
 
 #ifdef BUILD_AUDIO
 #include "csrc/audio/asr/sense_voice.h"
@@ -910,6 +912,22 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!m->is_initialized()) return fail_init("FormulaRecognizer");
             break;
         }
+        case MD_MODEL_TSN: {
+            if (!need_parts(1, "tsn")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new action::TSN(parts[0], opt);
+            mh->model = m;
+            if (!m->is_initialized()) return fail_init("TSN");
+            break;
+        }
+        case MD_MODEL_ST_GCN: {
+            if (!need_parts(1, "st-gcn")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new action::StGcn(parts[0], opt);
+            mh->model = m;
+            if (!m->is_initialized()) return fail_init("StGcn");
+            break;
+        }
         case MD_MODEL_LPR_DET: {
             mh->model = make_model<lpr::LprDetection>(model_path, opt, "LprDetection", &err);
             if (!mh->model) return fail_init("LprDetection");
@@ -1012,6 +1030,8 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_OCR_DET: delete static_cast<ocr::DBDetector*>(model); break;
         case MD_MODEL_OCR_REC: delete static_cast<ocr::Recognizer*>(model); break;
         case MD_MODEL_FORMULA_RECOGNIZER: delete static_cast<ocr::FormulaRecognizer*>(model); break;
+        case MD_MODEL_TSN: delete static_cast<action::TSN*>(model); break;
+        case MD_MODEL_ST_GCN: delete static_cast<action::StGcn*>(model); break;
         case MD_MODEL_OCR_CLS: delete static_cast<ocr::Classifier*>(model); break;
         case MD_MODEL_LPR_DET: delete static_cast<lpr::LprDetection*>(model); break;
         case MD_MODEL_LPR_REC: delete static_cast<lpr::LprRecognizer*>(model); break;
@@ -1071,6 +1091,8 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_OCR_DET: cloned = static_cast<ocr::DBDetector*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR_REC: cloned = static_cast<ocr::Recognizer*>(src->model)->clone().release(); break;
         case MD_MODEL_FORMULA_RECOGNIZER: cloned = static_cast<ocr::FormulaRecognizer*>(src->model)->clone().release(); break;
+        case MD_MODEL_TSN: cloned = static_cast<action::TSN*>(src->model)->clone().release(); break;
+        case MD_MODEL_ST_GCN: cloned = static_cast<action::StGcn*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR_CLS: cloned = static_cast<ocr::Classifier*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_DET: cloned = static_cast<lpr::LprDetection*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_REC: cloned = static_cast<lpr::LprRecognizer*>(src->model)->clone().release(); break;
@@ -2130,6 +2152,84 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
 
     *out = rh;
     return MD_OK;
+}
+
+// 把动作识别模型的类别 scores 装填为 MD_RES_CLASSIFICATION 结果句柄
+//（label_ids = 0..N-1，scores = 原始类别得分；复用既有 md_result_classification 读取）。
+static MDStatus emit_action_classification(MDModelHandle h, std::vector<float>&& scores,
+                                           MDResultHandle* out) {
+    auto* d = new ResultData<ClassifyResult>();
+    ClassifyResult r;
+    r.scores = std::move(scores);
+    r.label_ids.reserve(r.scores.size());
+    for (size_t i = 0; i < r.scores.size(); ++i)
+        r.label_ids.push_back(static_cast<int32_t>(i));
+    d->v.push_back(std::move(r));
+    auto* rh = new md_result_handle();
+    rh->kind = MD_RES_CLASSIFICATION;
+    rh->data = d;
+    *out = rh;
+    return MD_OK;
+}
+
+/* ==================== 动作识别（TSN / ST-GCN） ==================== */
+
+MDStatus md_model_predict_sequence(MDModelHandle h, MDImageHandle* frames, size_t n,
+                                   MDResultHandle* out) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !out) return MD_ERR_NULL_POINTER;
+    if (!mh->ready) return MD_ERR_MODEL_INIT;
+    if (mh->kind != MD_MODEL_TSN) {
+        set_error("md_model_predict_sequence: only MD_MODEL_TSN supports sequence predict");
+        return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    if (!frames || n == 0) {
+        set_error("md_model_predict_sequence: null/empty frames");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    auto* m = static_cast<action::TSN*>(mh->model);
+    std::vector<ImageData> imgs;
+    imgs.reserve(n);
+    for (size_t i = 0; i < n; ++i)
+        imgs.push_back(handle_to_image(static_cast<md_image_handle*>(frames[i])));
+    std::vector<float> scores;
+    if (!m->predict(imgs, &scores)) {
+        set_error("md_model_predict_sequence: TSN predict failed");
+        return MD_ERR_MODEL_PREDICT;
+    }
+    return emit_action_classification(h, std::move(scores), out);
+}
+
+MDStatus md_model_predict_skeleton(MDModelHandle h, const float* joints,
+                                   size_t T, size_t V, size_t C, MDResultHandle* out) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !out) return MD_ERR_NULL_POINTER;
+    if (!mh->ready) return MD_ERR_MODEL_INIT;
+    if (mh->kind != MD_MODEL_ST_GCN) {
+        set_error("md_model_predict_skeleton: only MD_MODEL_ST_GCN supports skeleton predict");
+        return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    if (!joints || T == 0 || V == 0 || C == 0 || C > 3) {
+        set_error("md_model_predict_skeleton: null joints or invalid T/V/C");
+        return MD_ERR_INVALID_ARGUMENT;
+    }
+    auto* m = static_cast<action::StGcn*>(mh->model);
+    // joints 为 T*V*C 行主序（第 t 帧第 v 关节的 C 个坐标）→ KeyPointSeq
+    action::KeyPointSeq seq;
+    seq.frames.resize(T);
+    for (size_t t = 0; t < T; ++t) {
+        seq.frames[t].resize(V);
+        for (size_t v = 0; v < V; ++v) {
+            const float* j = joints + (t * V + v) * C;
+            seq.frames[t][v] = modeldeploy::vision::Point3f(j[0], C > 1 ? j[1] : 0.0f, C > 2 ? j[2] : 0.0f);
+        }
+    }
+    std::vector<float> scores;
+    if (!m->predict(seq, &scores)) {
+        set_error("md_model_predict_skeleton: StGcn predict failed");
+        return MD_ERR_MODEL_PREDICT;
+    }
+    return emit_action_classification(h, std::move(scores), out);
 }
 
 /* ==================== 音频 ==================== */
