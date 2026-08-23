@@ -1,13 +1,17 @@
+pub mod audio;
 pub mod barcode;
 pub mod error;
 pub mod ffi;
 pub mod image;
 pub mod model;
+pub mod nlp;
 pub mod runtime;
+pub mod solution;
 pub mod tracker;
 pub mod types;
 
-// 重新导出常用类型
+// ���µ�����������
+pub use audio::{resample, SpeakerSearch};
 pub use barcode::BarcodeDetector;
 pub use error::MdError;
 pub use image::Image;
@@ -19,6 +23,8 @@ pub use model::{
     SeetaFaceID, SenseVoice, SpeakerGallery, SpeakerVerify, UltralyticsDepth, UltralyticsDet,
     UltralyticsObb, UltralyticsPose, UltralyticsSeg, UltralyticsSem, VehicleKeypoint,
 };
+pub use nlp::{split_sentences as nlp_split_sentences, stats as nlp_stats, NlpClassifier};
 pub use runtime::RuntimeOption;
+pub use solution::{iou as vision_iou, Heatmap, ObjectCounter};
 pub use tracker::Tracker;
 pub use types::*;

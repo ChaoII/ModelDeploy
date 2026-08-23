@@ -769,3 +769,50 @@ fn test_tracker_no_double_advance_keeps_lost_id() -> Result<()> {
     );
     Ok(())
 }
+
+// ═══ CV 解决方案（无权重） ═══
+
+#[test]
+fn test_cv_solution() -> Result<()> {
+    use modeldeploy::{vision_iou, ObjectCounter};
+    let counter = ObjectCounter::new()?;
+    counter.set_line((5.0, 0.0), (5.0, 10.0))?;
+    // 框中心 x=1（线左）
+    counter.update(&[0.0, 4.0, 2.0, 2.0], &[0], &[1])?;
+    let (i0, _o0) = counter.hline()?;
+    assert_eq!(i0, 0);
+    // 框中心 x=9（线右）
+    counter.update(&[8.0, 4.0, 2.0, 2.0], &[0], &[1])?;
+    let (i1, _o1) = counter.hline()?;
+    assert_eq!(i1, 1);
+    let iou = vision_iou(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, 10.0, 10.0)?;
+    assert!((iou - 1.0).abs() < 1e-5);
+    Ok(())
+}
+
+// ═══ 音频解决方案（无权重） ═══
+
+#[test]
+fn test_audio_speaker_search() -> Result<()> {
+    use modeldeploy::{resample, SpeakerSearch};
+    let search = SpeakerSearch::new()?;
+    search.enroll("alice", &[1.0, 0.0, 0.0])?;
+    let best = search.match_top(&[0.99, 0.1, 0.0])?;
+    assert_eq!(best, "alice");
+    let out = resample(&vec![0.0f32; 800], 8000, 16000)?;
+    assert!(out.len() == 1600);
+    Ok(())
+}
+
+// ═══ NLP 工具（无权重） ═══
+
+#[test]
+fn test_nlp_tools() -> Result<()> {
+    use modeldeploy::{nlp_split_sentences, nlp_stats};
+    let sents = nlp_split_sentences("hello world")?;
+    assert_eq!(sents, vec!["hello world"]);
+    let (chars, words, _sents) = nlp_stats("a b c")?;
+    assert_eq!(words, 3);
+    assert_eq!(chars, 5);
+    Ok(())
+}

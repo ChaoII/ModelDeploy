@@ -72,6 +72,27 @@ pub enum MDModelKind {
     // 此处仅包装关键点模型，故显式对齐 CAPI 数值。
     VEHICLE_KEYPOINT = 33,
     FACE_LANDMARK = 34,
+    TEXT_CLASSIFIER = 35,
+}
+
+/// 视觉解决方案类型（MD_SOLUTION_KIND）
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MDSolutionKind {
+    ObjectCounter = 0,
+    Heatmap,
+    Speed,
+    Distance,
+    Workout,
+    Parking,
+}
+
+/// 音频解决方案类型（MD_AUDIO_SOLUTION_KIND）
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MDAudioSolutionKind {
+    SpeakerSearch = 0,
+    TtsBatcher,
 }
 
 /// 结果类型（MDResultKind）
@@ -128,6 +149,8 @@ pub type MDResultHandle = *mut c_void;
 pub type MDOptionHandle = *mut c_void;
 pub type MDTrackerHandle = *mut c_void;
 pub type MDBarcodeHandle = *mut c_void;
+pub type MDSolutionHandle = *mut c_void;
+pub type MDAudioSolutionHandle = *mut c_void;
 
 // ════════════════════════════════════════════════════════════════
 // 通用几何 / 颜色 / blittable 结构
@@ -496,4 +519,38 @@ extern "C" {
     pub fn md_barcode_set_formats(h: MDBarcodeHandle, formats: c_uint) -> MDStatus;
     pub fn md_barcode_detect(h: MDBarcodeHandle, img: MDImageHandle,
         items: *mut MDBarcodeItem, count: *mut c_uint) -> MDStatus;
+
+    // ── 视觉解决方案（vision::solution / tool） ──
+    pub fn md_solution_create(out: *mut MDSolutionHandle, kind: c_int) -> MDStatus;
+    pub fn md_solution_destroy(h: MDSolutionHandle) -> MDStatus;
+    pub fn md_solution_object_counter_set_line(h: MDSolutionHandle,
+        ax: c_float, ay: c_float, bx: c_float, by: c_float) -> MDStatus;
+    pub fn md_solution_object_counter_update(h: MDSolutionHandle, boxes: *const c_float,
+        n: usize, label_ids: *const c_int, track_ids: *const c_int) -> MDStatus;
+    pub fn md_solution_object_counter_hline(h: MDSolutionHandle,
+        in_count: *mut c_int, out_count: *mut c_int) -> MDStatus;
+    pub fn md_solution_heatmap_set_size(h: MDSolutionHandle, w: c_int, hh: c_int) -> MDStatus;
+    pub fn md_solution_heatmap_update(h: MDSolutionHandle, boxes: *const c_float, n: usize,
+        frame_w: c_int, frame_h: c_int) -> MDStatus;
+    pub fn md_solution_heatmap_peak(h: MDSolutionHandle, x: *mut c_int, y: *mut c_int) -> MDStatus;
+    pub fn md_vision_iou4(ax: c_float, ay: c_float, aw: c_float, ah: c_float,
+        bx: c_float, by: c_float, bw: c_float, bh: c_float, out: *mut c_float) -> MDStatus;
+
+    // ── 音频解决方案（audio::solution / tool） ──
+    pub fn md_audio_solution_create(out: *mut MDAudioSolutionHandle, kind: c_int) -> MDStatus;
+    pub fn md_audio_solution_destroy(h: MDAudioSolutionHandle) -> MDStatus;
+    pub fn md_audio_speaker_search_enroll(h: MDAudioSolutionHandle, label: *const c_char,
+        emb: *const c_float, n: usize) -> MDStatus;
+    pub fn md_audio_speaker_search_match(h: MDAudioSolutionHandle, emb: *const c_float,
+        n: usize, k: c_int, best_label: *mut *const c_char, best_score: *mut c_float) -> MDStatus;
+    pub fn md_audio_resample(input: *const c_float, n: usize, in_sr: c_int, out_sr: c_int,
+        output: *mut *const c_float, out_n: *mut usize) -> MDStatus;
+
+    // ── NLP 工具 / TextClassifier ──
+    pub fn md_nlp_split_sent(text: *const c_char, sents: *mut *const *const c_char,
+        n: *mut usize) -> MDStatus;
+    pub fn md_nlp_stats(text: *const c_char, chars: *mut usize, words: *mut usize,
+        sents: *mut usize) -> MDStatus;
+    pub fn md_nlp_classify(h: MDModelHandle, text: *const c_char,
+        label: *mut c_int, score: *mut c_float) -> MDStatus;
 }

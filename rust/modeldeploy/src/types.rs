@@ -199,6 +199,7 @@ pub enum ModelKind {
     FormulaRecognizer,
     VehicleKeypoint,
     FaceLandmark,
+    TextClassifier,
 }
 
 impl ModelKind {
@@ -236,6 +237,7 @@ impl ModelKind {
             ModelKind::FormulaRecognizer => FORMULA_RECOGNIZER,
             ModelKind::VehicleKeypoint => VEHICLE_KEYPOINT,
             ModelKind::FaceLandmark => FACE_LANDMARK,
+            ModelKind::TextClassifier => TEXT_CLASSIFIER,
         }
     }
 }
