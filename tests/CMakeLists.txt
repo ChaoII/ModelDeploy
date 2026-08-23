@@ -50,6 +50,13 @@ target_include_directories(test_modeldeploy PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/application/third_party)   # nlohmann json
 
+# 视频解码测试（仅 BUILD_VIDEO；测试源由 Task 6 提供）
+if (BUILD_VIDEO AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_video_decoder.cpp")
+    list(APPEND TEST_SOURCES test_video_decoder.cpp)
+    target_include_directories(test_modeldeploy PRIVATE ${FFMPEG_INCLUDE_DIR})
+    target_link_libraries(test_modeldeploy PRIVATE ${FFMPEG_LIBS})
+endif ()
+
 # === 回归基线收集工具 ===
 add_executable(baseline_collect baseline_collect.cpp baseline_utils.cpp)
 target_link_libraries(baseline_collect PRIVATE

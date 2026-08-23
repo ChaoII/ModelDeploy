@@ -21,6 +21,7 @@ option(BUILD_EXAMPLES "build examples" ON)
 option(BUILD_TESTS "build tests" OFF)
 option(BUILD_BENCHMARK "build benchmarks" OFF)
 option(BUILD_SURVEILLANCE "build AI surveillance application" OFF)
+option(BUILD_VIDEO "build video decoder module (requires FFmpeg and BUILD_VISION)" OFF)
 option(BUILD_ENCRYPTION "enable model encryption/decryption (requires OpenSSL)" ON)
 option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
@@ -115,13 +116,14 @@ file(GLOB_RECURSE SOPHGO_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/cs
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/sophgo/*.cpp)
 file(GLOB_RECURSE VISION_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
+file(GLOB_RECURSE VIDEO_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/video/*.cpp)
 file(GLOB_RECURSE PYBIND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/pybind/*.cpp)
 file(GLOB_RECURSE CUDA_SOURCE CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cpp)
 
-list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${SOPHGO_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE} ${CUDA_SOURCE})
+list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${SOPHGO_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE} ${CUDA_SOURCE} ${VIDEO_SOURCE})
 
 if (WITH_GPU)
     add_definitions(-DWITH_GPU)
@@ -218,6 +220,19 @@ if (BUILD_AUDIO)
     list(APPEND ALL_SOURCE ${AUDIO_SOURCE})
     # 音频静态依赖 PRIVATE 链接（打进共享库，导出时无需第三方 target）
     list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core cppjieba)
+endif ()
+
+# ── VIDEO ──────────────────────────────────
+if (BUILD_VIDEO)
+    if (NOT BUILD_VISION)
+        message(FATAL_ERROR "BUILD_VIDEO requires BUILD_VISION=ON (VideoDecoder returns vision::ImageData)")
+    endif ()
+    include("${CMAKE_SOURCE_DIR}/cmake/ffmpeg.cmake")
+endif ()
+if (BUILD_VIDEO)
+    add_definitions(-DBUILD_VIDEO)
+    list(APPEND ALL_SOURCE ${VIDEO_SOURCE})
+    list(APPEND DEPENDS ${FFMPEG_LIBS})
 endif ()
 
 if (BUILD_BARCODE)
