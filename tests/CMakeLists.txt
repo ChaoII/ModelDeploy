@@ -25,6 +25,8 @@ set(TEST_SOURCES
     test_hand.cpp
     test_reid.cpp
     test_speaker_verify.cpp
+    test_formula_recognition.cpp
+    test_doc_to_markdown.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
