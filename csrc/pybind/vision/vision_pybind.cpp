@@ -42,6 +42,8 @@ namespace modeldeploy::vision {
     void bind_formula_recognizer(const pybind11::module&);
     void bind_action(pybind11::module&);
     void bind_landmark(pybind11::module&);
+void bind_solutions(pybind11::module&);
+void bind_tools(pybind11::module&);
 
 
 
@@ -83,5 +85,9 @@ namespace modeldeploy::vision {
         bind_formula_recognizer(m);
         bind_action(m);
         bind_landmark(m);
+        auto solutions_m = m.def_submodule("solutions", "CV solutions");
+        auto tools_m = m.def_submodule("tools", "CV tools");
+        bind_solutions(solutions_m);
+        bind_tools(tools_m);
     }
 }
