@@ -18,6 +18,7 @@ set(TEST_SOURCES
     test_processor_accuracy.cpp
     test_insightface.cpp
     test_pipelines.cpp
+    test_pipeline.cpp
     test_benchmark_insightface.cpp
     test_encryption.cpp
     test_tracking.cpp
