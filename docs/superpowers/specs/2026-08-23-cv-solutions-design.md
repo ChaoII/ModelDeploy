@@ -3,7 +3,7 @@
 - 日期：2026-08-23
 - 状态：已批准（brainstorming 一次规划）
 - 路线：Item 11（新增，紧随 Item 4/5/7/6/8 之后）
-- 核心目标：借鉴 Ultralytics Solutions / supervision，在既有 C++ SDK（已有检测/分割/姿态/跟踪 ByteTrack/视频解码/关键点/动作能力）之上，编排出一层**面向真实应用场景的解决方案**，让 SDK 不再是空洞的底层推理壳，并充分发挥 C++ 性能。
+- 核心目标：借鉴 Ultralytics Solutions / supervision，在既有 C++ SDK（已有检测/分割/姿态/跟踪 ByteTrack/视频解码/关键点/动作能力）之上，编排出一层**面向真实应用场景的解决方案** + 一层**可复用 CV 工具**，让 SDK 不再是空洞的底层推理壳，并充分发挥 C++ 性能。
 
 ---
 
@@ -35,7 +35,9 @@
 - 不做 Security Email 报警（依赖邮件服务，与应用无关）。
 - 不做 Similarity Search-CLIP（需新 CLIP 权重 + 向量索引，超范围）。
 - 不做 3D 测距 / 相机标定外参（除像素→米线性标定外不做相机模型）。
-- 不做跟踪算法创新（复用现有 ByteTrack；SORT 为可选轻量补充）。
+- 不做 supervision 的 Python 生态专属（converters 多源导入、PyTorch VLM、notebook、数据集 YOLO/COCO/VOC 互转）——超出 C++ SDK 价值，明确排除。
+
+> 借鉴来源说明：Ultralytics Solutions 提供「业务方案」编排；supervision 提供「细粒度工具层」（标注器/几何/数据结构/指标）。本 Item 两者**都取**，形成「解决方案层（§3）+ 工具层（§4）」双结构，让 SDK 既有可落地场景，又有可复用工具，不空洞。
 
 ## 3. 架构与组件
 
@@ -67,8 +69,30 @@ csrc/vision/solutions/
 - 裁剪/模糊、停车吃 `Detection` 框（不需跟踪）。
 - 绘制复用现有 `vis_*` / opencv。
 
+## 4. 工具层（supervision 借鉴，`csrc/vision/tools/`，命名空间 `modeldeploy::vision::tool`）
+
+supervision 的细粒度工具层，全部纯 C++/OpenCV、无模型依赖、可独立单测。
+
+```
+csrc/vision/tools/
+    detections.h/.cpp        # 统一 Detections 容器（box/class/conf/mask/track_id）+ IoU/NMS/Boxes/Polygons 工具
+    annotator.h/.cpp         # Annotator 标注器族：BoundingBox/KeyPoint/Trace/Label/Blur/Pixelate/Ellipse/Halo/RoundBox + 组合
+    zone.h/.cpp              # LineZone（跨线）/ PolygonZone（多边形区域）几何抽象
+    metrics.h/.cpp           # mAP/Precision/Recall/F1 评测指标
+    slicer.h/.cpp            # Inference Slicer 大图切片（小目标检测）
+    smoother.h/.cpp          # Detection Smoother 检测抖动平滑
+```
+
+- **Detections**：统一容器 `Detections{ boxes[], class_id[], confidence[], masks?, tracker_id[] }`，配 `iou()`/`nms()`/`filter_by_class()`/`filter_by_zone()` 等工具——作为检测结果的标准载体，可被 Solutions 层共用。
+- **Annotator**：`Annotator`（叠加画布，仿 supervision）+ `BoundingBoxAnnotator`/`KeyPointAnnotator`/`TraceAnnotator`(轨迹线)/`LabelAnnotator`/`BlurAnnotator`/`PixelateAnnotator`/`EllipseAnnotator`/`HaloAnnotator`/`RoundBoxAnnotator` + 组合器，绘制到 `ImageData`。是可视化最大增量。
+- **Zone**：`LineZone{trigger_count, crossing_logic, reset()}`（跨线 in/out 计数基元）与 `PolygonZone{count_in_zone, contains(), current_count()}`（多边形区域计数/过滤基元），计数/停车/过滤复用。
+- **Metrics**：`mAP/Precision/Recall/F1`（对齐 `common_values` + 混淆矩阵），供真实权重 benchmark 与测试判定。
+- **Slicer**：`InferenceSlicer{slice_image()->(tiles, offsets), override_detections}`——大图切块 + 拼回，小目标检测。
+- **Smoother**：`DetectionSmoother{update(detections)->smoothed}` 时序指数/EMA 抖动抑制。
+
 ## 4. Python（pybind）
 - `csrc/pybind/vision/solutions_pybind.cpp`：`vision.solutions` 子模块，绑定各方案类（构造/配置/update/draw/结果读取）。
+- `csrc/pybind/vision/tools_pybind.cpp`：`vision.tools` 子模块，绑定 Detections/IoU/NMS/Annotator/Zone/Metrics/Slicer/Smoother。
 - 注册进 `vision_pybind.cpp`（append 到既有之后），BUILD_VISION 门控。
 
 ## 5. CAPI
@@ -76,11 +100,12 @@ csrc/vision/solutions/
 - **第一里程碑全 6 面一次做齐**（C++/Python/CAPI/C#/Rust/demo+tests，用户已确认）。
 
 ## 6. C# / Rust
-- 薄封装（若 CAPI 落地则顺带；否则降级 YAGNI）。
+- 薄封装（随 CAPI）。
 
 ## 7. demo + docs
 - `examples/demo_solutions/`：一个综合 demo，读视频/摄像头 → 检测 + ByteTrack → 计数/测速/热力图叠加 → 窗口显示；Workout/Parking 各做独立小 demo。
-- README/EXAMPLES.md 能力行加「CV Solutions 应用方案（计数/热力图/测速/停车/健身等）」。
+- `examples/demo_tools/`（可选）：展示 Annotator/Zone/Metrics 工具用法。
+- README/EXAMPLES.md 能力行加「CV Solutions 应用方案（计数/热力图/测速/停车/健身等）+ CV Tools（标注器/区域/评测）」。
 
 ## 8. 测试
 - `tests/test_solutions.cpp`（`[solutions]`）：每个方案用**合成轨迹/合成检测**做确定性断言（无权重）：
@@ -90,28 +115,30 @@ csrc/vision/solutions/
   - 裁剪/模糊：合成单框 → 断言尺寸/掩码。
   - 停车：合成框 vs 位元区域 → 断言占用状态。
   - 健身：合成肘角 → 断言动作计数。
+- `tests/test_tools.cpp`（`[tools]`）：Detections 的 IoU/NMS/filter 确定性断言；Zone 跨线/区域计数；Metrics 小样本 mAP/P/R/F1；Slicer 切块大小；Smoother 收敛。
 - 真实权重路径（若有视频/模型）可选，无权重 SKIP。
 
 ## 9. 交付矩阵
 
 | 面 | 覆盖 |
 |----|------|
-| C++ 核心 | ✅（9 方案） |
-| Python | ✅（vision.solutions） |
+| C++ 核心 | ✅（9 方案 + 6 工具） |
+| Python | ✅（vision.solutions + vision.tools） |
 | CAPI | ✅（solution 句柄） |
 | C#/Rust | ✅（随 CAPI 薄封装） |
-| demo+docs+tests | ✅ |
+| demo+docs+tests | ✅（[solutions] + [tools]） |
 
 ## 10. 已知限制 / 假设
 - 计数/测速精度依赖跟踪器稳定性（ByteTrack 已就位，作为限定）。
 - 测速需合理时间戳（VideoDecoder 提供 pts_ms）+ 像素→米标定（用户提供 meter_per_pixel）。
 - 健身计数基于肘/肩/腕角度阈值，为启发式（对齐 Ultralytics Workouts 简化版）。
 - 停车需要用户定义位元区域。
+- 工具层借鉴 supervision 语义，但为 C++ 原创实现（非移植 python 代码）。
 
 ## 11. 成功标准
-- 各方案 C++ 类编译 + `[solutions]` 合成轨迹确定性测试通过（无权重也可验证）。
+- 各方案/工具 C++ 类编译 + `[solutions]`/`[tools]` 合成确定性测试通过（无权重也可验证）。
 - demo_solutions 综合演示（计数/热力图/测速叠加）可跑（真实视频或摄像头）。
-- SDK 从「底层推理」升级为「有应用场景方案」，补齐与 Ultralytics Solutions 的对应关系。
+- SDK 从「底层推理」升级为「有应用场景方案 + 可复用工具」，补齐与 Ultralytics Solutions / supervision 的对应关系。
 
 ## 12. 对「SOTA 权重/真实测试」的安排
 - 本 Item 聚焦应用层，不引入新 SOTA 权重；复用 yolo26n/姿态等已有真实权重点跑综合 demo。
