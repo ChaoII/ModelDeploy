@@ -3,6 +3,7 @@
 #include "vision/tools/detections.h"
 #include "vision/tools/zone.h"
 #include "vision/tools/annotator.h"
+#include "vision/tools/metrics.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tool;
@@ -86,4 +87,17 @@ TEST_CASE("draw_box_labels draws boxes", "[cv_tools]") {
     cv::Mat m;
     REQUIRE(frame.asMat(&m));
     REQUIRE(m.at<cv::Vec3b>(2, 2)[2] == 255);
+}
+
+TEST_CASE("Metrics counts and scores on tiny sample", "[cv_tools]") {
+    std::vector<Rect2f> preds = {Rect2f(0,0,10,10), Rect2f(50,50,10,10)};
+    std::vector<float> scores = {0.9f, 0.3f};
+    std::vector<Rect2f> gt = {Rect2f(0,0,10,10)};
+    auto mc = count_tp_fp_fn(preds, scores, gt, 0.5);
+    REQUIRE(mc.tp == 1); REQUIRE(mc.fp == 1); REQUIRE(mc.fn == 0);
+    auto s = evaluate_metrics(preds, scores, gt, 0.5);
+    REQUIRE(s.precision == Catch::Approx(0.5));
+    REQUIRE(s.recall == Catch::Approx(1.0));
+    REQUIRE(s.f1 == Catch::Approx(2.0 * 0.5 * 1.0 / 1.5).margin(1e-6));
+    REQUIRE(s.map50 > 0.0);
 }
