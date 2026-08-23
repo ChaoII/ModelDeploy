@@ -2,6 +2,8 @@
 #include <catch2/catch_approx.hpp>
 #include "vision/solutions/object_counter.h"
 #include "vision/solutions/heatmap.h"
+#include "vision/solutions/speed_estimator.h"
+#include "vision/solutions/distance_estimator.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::solution;
@@ -45,4 +47,28 @@ TEST_CASE("Heatmap accumulates at centroids", "[cv_solution]") {
     REQUIRE(p.second == 4);
     REQUIRE(hm.heat_at(4, 4) == Catch::Approx(2.0f).margin(1e-5f));
     REQUIRE(hm.heat_at(0, 0) == Catch::Approx(0.0f));
+}
+
+TEST_CASE("SpeedEstimator displacement over timestamp", "[cv_solution]") {
+    SpeedEstimator se;
+    se.set_meter_per_pixel(0.01f);
+    std::vector<TrackResult> t(1); t[0].track_id = 1; t[0].box = Rect2f(0,0,10,10);
+    se.update(t, 0.0);
+    t[0].box = Rect2f(10,0,10,10); // 质心移动 10px
+    se.update(t, 1000.0);
+    REQUIRE(se.speeds_px_per_s()[1] == Catch::Approx(10.0f).margin(1e-3f));
+    REQUIRE(se.speeds_m_s()[1] == Catch::Approx(0.1f).margin(1e-3f));
+}
+
+TEST_CASE("DistanceEstimator pair distances", "[cv_solution]") {
+    DistanceEstimator de;
+    de.set_meter_per_pixel(0.5f);
+    std::vector<TrackResult> t(2);
+    t[0].track_id = 1; t[0].box = Rect2f(0,0,1,1);   // 质心 (0.5,0.5)
+    t[1].track_id = 2; t[1].box = Rect2f(5,0,1,1);   // 质心 (5.5,0.5)
+    auto d = de.pair_distances_px(t);
+    REQUIRE(d.size() == 1);
+    REQUIRE(d[0].second == Catch::Approx(5.0f).margin(1e-3f));
+    auto dm = de.pair_distances_m(t);
+    REQUIRE(dm[0].second == Catch::Approx(2.5f).margin(1e-3f));
 }
