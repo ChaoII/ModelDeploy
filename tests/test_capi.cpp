@@ -1621,3 +1621,13 @@ TEST_CASE("audio solution + tool capi", "[capi]") {
     REQUIRE(md_audio_resample(in, 800, 8000, 16000, &rout, &rn) == MD_OK);
     REQUIRE(rn == 1600);
 }
+
+TEST_CASE("nlp tool capi", "[capi]") {
+    size_t n = 0; const char** s = nullptr;
+    REQUIRE(md_nlp_split_sent("你好。世界！", &s, &n) == MD_OK);
+    REQUIRE(n == 2);
+    size_t chars = 0, words = 0, sents = 0;
+    REQUIRE(md_nlp_stats("hello world 你好", &chars, &words, &sents) == MD_OK);
+    REQUIRE(words == 3);
+    REQUIRE(sents == 1);
+}

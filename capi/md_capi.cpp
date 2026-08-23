@@ -70,6 +70,13 @@
 #include "csrc/audio/tools/audio_meta.h"
 #include "csrc/audio/solutions/speaker_search.h"
 #include "csrc/audio/solutions/tts_batcher.h"
+#ifdef BUILD_NLP
+#include "csrc/nlp/solutions/text_classifier.h"
+#include "csrc/nlp/tools/splitter.h"
+#include "csrc/nlp/tools/keywords.h"
+#include "csrc/nlp/tools/stats.h"
+#include "csrc/nlp/tools/tokenizer.h"
+#endif
 #endif
 
 /* ---------------- 句柄实现（全局命名空间，与 md_capi.h 前向声明对应） ---------------- */
@@ -951,6 +958,18 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!mh->model) return fail_init("FaceLandmark");
             break;
         }
+#ifdef BUILD_NLP
+        case MD_MODEL_TEXT_CLASSIFIER: {
+            if (!need_parts(1, "text-classifier")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new nlp::solution::TextClassifier(parts[0], opt);
+            mh->model = m;
+            if (!m->is_initialized()) return fail_init("TextClassifier");
+            break;
+        }
+#else
+        case MD_MODEL_TEXT_CLASSIFIER: return MD_ERR_UNSUPPORTED_TYPE;
+#endif
         case MD_MODEL_LPR_DET: {
             mh->model = make_model<lpr::LprDetection>(model_path, opt, "LprDetection", &err);
             if (!mh->model) return fail_init("LprDetection");
@@ -1062,6 +1081,9 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_LPR_REC: delete static_cast<lpr::LprRecognizer*>(model); break;
         case MD_MODEL_LPR_PIPELINE: delete static_cast<lpr::LprPipeline*>(model); break;
         case MD_MODEL_PED_ATTR: delete static_cast<pipeline::PedestrianAttribute*>(model); break;
+#ifdef BUILD_NLP
+        case MD_MODEL_TEXT_CLASSIFIER: delete static_cast<nlp::solution::TextClassifier*>(model); break;
+#endif
 #ifdef BUILD_AUDIO
         case MD_MODEL_ASR: delete static_cast<audio::asr::SenseVoice*>(model); break;
         case MD_MODEL_TTS: delete static_cast<audio::tts::Kokoro*>(model); break;
@@ -1125,6 +1147,9 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_LPR_REC: cloned = static_cast<lpr::LprRecognizer*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_PIPELINE: cloned = static_cast<lpr::LprPipeline*>(src->model)->clone().release(); break;
         case MD_MODEL_PED_ATTR: cloned = static_cast<pipeline::PedestrianAttribute*>(src->model)->clone().release(); break;
+#ifdef BUILD_NLP
+        case MD_MODEL_TEXT_CLASSIFIER: cloned = static_cast<nlp::solution::TextClassifier*>(src->model)->clone().release(); break;
+#endif
 #ifdef BUILD_AUDIO
         case MD_MODEL_ASR: cloned = static_cast<audio::asr::SenseVoice*>(src->model)->clone().release(); break;
         case MD_MODEL_TTS: cloned = static_cast<audio::tts::Kokoro*>(src->model)->clone().release(); break;
@@ -4087,5 +4112,83 @@ MDStatus md_audio_meta(const char* wav, int* sample_rate, int* channels, int* bi
     return MD_OK;
 #else
     (void)wav; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+/* ==================== NLP 工具 / TextClassifier ==================== */
+
+static std::vector<std::string> g_nlp_sents;
+static std::vector<std::vector<char>> g_nlp_ptrs;
+static std::vector<std::string> g_nlp_toks;
+static std::vector<int> g_nlp_counts;
+static std::vector<std::string> g_nlp_kwords;
+static std::vector<const char*> g_nlp_p;
+
+MDStatus md_nlp_split_sent(const char* text, const char*** sents, size_t* n) {
+    if (!text || !sents || !n) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_NLP
+    g_nlp_sents = nlp::tool::Splitter::split_sentences(text);
+    g_nlp_ptrs.clear();
+    for (auto& s : g_nlp_sents) { g_nlp_ptrs.emplace_back(s.begin(), s.end()); g_nlp_ptrs.back().push_back('\0'); }
+    g_nlp_p.clear(); for (auto& v : g_nlp_ptrs) g_nlp_p.push_back(v.data());
+    *sents = g_nlp_p.data(); *n = g_nlp_p.size();
+    return MD_OK;
+#else
+    (void)text; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_nlp_stats(const char* text, size_t* chars, size_t* words, size_t* sents) {
+    if (!text || !chars || !words || !sents) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_NLP
+    std::string s(text);
+    *chars = nlp::tool::Stats::char_count(s);
+    *words = nlp::tool::Stats::word_count(s);
+    *sents = nlp::tool::Stats::sentence_count(s);
+    return MD_OK;
+#else
+    (void)text; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_nlp_keywords(const char* text, int k, const char*** words, int** counts, size_t* n) {
+    if (!text || !words || !counts || !n) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_NLP
+    auto r = nlp::tool::Keywords::top(std::string(text), k);
+    g_nlp_kwords.clear(); g_nlp_counts.clear();
+    for (auto& kv : r) { g_nlp_kwords.push_back(kv.first); g_nlp_counts.push_back(kv.second); }
+    g_nlp_p.clear(); for (auto& s : g_nlp_kwords) g_nlp_p.push_back(s.c_str());
+    *words = g_nlp_p.data(); *counts = g_nlp_counts.data(); *n = g_nlp_p.size();
+    return MD_OK;
+#else
+    (void)text; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_nlp_tokenize(const char* text, const char* dict_dir, const char*** toks, size_t* n) {
+    if (!text || !dict_dir || !toks || !n) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_NLP
+    nlp::tool::Tokenizer tok(dict_dir);
+    if (!tok.is_loaded()) return MD_ERR_MODEL_INIT;
+    auto r = tok.tokenize(std::string(text), "mix");
+    g_nlp_toks = r;
+    g_nlp_p.clear(); for (auto& s : g_nlp_toks) g_nlp_p.push_back(s.c_str());
+    *toks = g_nlp_p.data(); *n = g_nlp_p.size();
+    return MD_OK;
+#else
+    (void)text; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_nlp_classify(MDModelHandle h, const char* text, int* label, float* score) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !text || !label || !score) return MD_ERR_NULL_POINTER;
+    if (!mh->ready || mh->kind != MD_MODEL_TEXT_CLASSIFIER) return MD_ERR_INVALID_ARGUMENT;
+#ifdef BUILD_NLP
+    auto* m = static_cast<nlp::solution::TextClassifier*>(mh->model);
+    if (!m->predict(text, label, score)) { set_error("md_nlp_classify: predict failed"); return MD_ERR_MODEL_PREDICT; }
+    return MD_OK;
+#else
+    (void)text; return MD_ERR_UNSUPPORTED_TYPE;
 #endif
 }

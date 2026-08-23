@@ -106,6 +106,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_ST_GCN,
     MD_MODEL_VEHICLE_KEYPOINT,
     MD_MODEL_FACE_LANDMARK,
+    MD_MODEL_TEXT_CLASSIFIER,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -654,6 +655,14 @@ MD_CAPI_EXPORT MDStatus md_audio_resample(const float* in, size_t n, int in_sr, 
                                           float** out, size_t* out_n);
 MD_CAPI_EXPORT MDStatus md_audio_meta(const char* wav, int* sample_rate, int* channels, int* bits,
                                       uint32_t* duration_ms);
+
+/* ==================== NLP 工具（nlp::tool / text classifier） ==================== */
+
+MD_CAPI_EXPORT MDStatus md_nlp_split_sent(const char* text, const char*** sents, size_t* n);
+MD_CAPI_EXPORT MDStatus md_nlp_stats(const char* text, size_t* chars, size_t* words, size_t* sents);
+MD_CAPI_EXPORT MDStatus md_nlp_keywords(const char* text, int k, const char*** words, int** counts, size_t* n);
+MD_CAPI_EXPORT MDStatus md_nlp_tokenize(const char* text, const char* dict_dir, const char*** toks, size_t* n);
+MD_CAPI_EXPORT MDStatus md_nlp_classify(MDModelHandle h, const char* text, int* label, float* score);
 
 #ifdef __cplusplus
 }
