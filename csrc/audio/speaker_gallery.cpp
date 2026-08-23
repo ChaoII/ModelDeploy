@@ -8,13 +8,7 @@ namespace modeldeploy::audio {
     }
 
     std::vector<bool> SpeakerGallery::remove(const std::string& label) {
-        std::vector<bool> ok{ false };
-        auto it = gallery_.find(label);
-        if (it != gallery_.end()) {
-            gallery_.erase(it);
-            ok[0] = true;
-        }
-        return ok;
+        return {gallery_.erase(label) > 0};
     }
 
     std::vector<std::pair<std::string, float>>
@@ -27,7 +21,7 @@ namespace modeldeploy::audio {
         }
         std::sort(scored.begin(), scored.end(),
                   [](const auto& a, const auto& b) { return a.second > b.second; });
-        if (scored.size() > static_cast<size_t>(k)) scored.resize(k);
+        if (k > 0 && static_cast<size_t>(k) < scored.size()) scored.resize(k);
         return scored;
     }
 } // namespace modeldeploy::audio
