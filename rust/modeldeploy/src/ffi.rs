@@ -68,6 +68,10 @@ pub enum MDModelKind {
     REID,
     SPEAKER_VERIFY,
     FORMULA_RECOGNIZER,
+    // CAPI 在 FORMULA_RECOGNIZER(=30) 与 VEHICLE_KEYPOINT 之间还有 TSN(=31)/ST_GCN(=32)，
+    // 此处仅包装关键点模型，故显式对齐 CAPI 数值。
+    VEHICLE_KEYPOINT = 33,
+    FACE_LANDMARK = 34,
 }
 
 /// 结果类型（MDResultKind）

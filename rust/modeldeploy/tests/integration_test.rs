@@ -1,11 +1,12 @@
 use anyhow::Result;
 use modeldeploy::{
-    BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceRecognizerPipelineModel,
-    FormulaRecognizer, HandKeypoint, Image, InsightFaceAnalysis, InsightFaceDetModel, Kokoro,
-    LprDetectionModel, LprPipeline, LprRecognizerModel, PaddleOCR, PedestrianAttribute, ReID,
-    RecognizerModel, RuntimeOption, Scrfd, SeetaFaceAge, SeetaFaceGender, SeetaFaceID, SenseVoice,
-    SpeakerGallery, SpeakerVerify, Tracker, TrackerKind, UltralyticsDepth, UltralyticsDet,
-    UltralyticsObb, UltralyticsPose, UltralyticsSeg, UltralyticsSem,
+    BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceLandmark,
+    FaceRecognizerPipelineModel, FormulaRecognizer, HandKeypoint, Image, InsightFaceAnalysis,
+    InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline, LprRecognizerModel, PaddleOCR,
+    PedestrianAttribute, ReID, RecognizerModel, RuntimeOption, Scrfd, SeetaFaceAge,
+    SeetaFaceGender, SeetaFaceID, SenseVoice, SpeakerGallery, SpeakerVerify, Tracker, TrackerKind,
+    UltralyticsDepth, UltralyticsDet, UltralyticsObb, UltralyticsPose, UltralyticsSeg,
+    UltralyticsSem, VehicleKeypoint,
 };
 
 fn test_data(rel: &str) -> String {
@@ -182,6 +183,40 @@ fn test_hand() -> Result<()> {
     let hands = model.predict(&img)?;
     assert!(!hands.is_empty(), "should detect a hand");
     assert!(!hands[0].keypoints.is_empty());
+    Ok(())
+}
+
+#[test]
+fn test_vehicle_keypoint() -> Result<()> {
+    let path = test_data("test_models/onnx/vehicle_keypoint.onnx");
+    if !std::path::Path::new(&path).exists() {
+        eprintln!("SKIP: vehicle_keypoint.onnx not present in test_data");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let model = VehicleKeypoint::new(&path, &opt)?;
+    assert!(model.is_ready());
+    let img = Image::read(&test_img("bus.jpg"))?;
+    let r = model.predict(&img)?;
+    assert!(!r.is_empty());
+    assert!(r[0].keypoints.len() > 0);
+    Ok(())
+}
+
+#[test]
+fn test_face_landmark() -> Result<()> {
+    let path = test_data("test_models/onnx/2d106det.onnx");
+    if !std::path::Path::new(&path).exists() {
+        eprintln!("SKIP: 2d106det.onnx not present in test_data");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let model = FaceLandmark::new(&path, &opt)?;
+    assert!(model.is_ready());
+    let img = Image::read(&test_img("face.jpg"))?;
+    let r = model.predict(&img)?;
+    assert!(!r.is_empty());
+    assert_eq!(r[0].keypoints.len(), 106);
     Ok(())
 }
 

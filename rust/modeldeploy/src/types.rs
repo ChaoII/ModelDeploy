@@ -197,6 +197,8 @@ pub enum ModelKind {
     ReId,
     SpeakerVerify,
     FormulaRecognizer,
+    VehicleKeypoint,
+    FaceLandmark,
 }
 
 impl ModelKind {
@@ -232,6 +234,8 @@ impl ModelKind {
             ModelKind::ReId => REID,
             ModelKind::SpeakerVerify => SPEAKER_VERIFY,
             ModelKind::FormulaRecognizer => FORMULA_RECOGNIZER,
+            ModelKind::VehicleKeypoint => VEHICLE_KEYPOINT,
+            ModelKind::FaceLandmark => FACE_LANDMARK,
         }
     }
 }

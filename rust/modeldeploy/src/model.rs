@@ -1257,6 +1257,12 @@ impl ResultType for UltralyticsPose {
 impl ResultType for HandKeypoint {
     type Item = Pose;
 }
+impl ResultType for VehicleKeypoint {
+    type Item = Pose;
+}
+impl ResultType for FaceLandmark {
+    type Item = Pose;
+}
 impl ResultType for UltralyticsObb {
     type Item = Obb;
 }
@@ -1301,6 +1307,8 @@ model_wrapper!(UltralyticsDet, ModelKind::Detection, RawResult::detection, RawRe
 model_wrapper!(Classification, ModelKind::Classification, RawResult::classification, RawResult::classification_batch);
 model_wrapper!(UltralyticsPose, ModelKind::Pose, RawResult::pose, RawResult::pose_batch);
 model_wrapper!(HandKeypoint, ModelKind::Hand, RawResult::pose, RawResult::pose_batch);
+model_wrapper!(VehicleKeypoint, ModelKind::VehicleKeypoint, RawResult::pose, RawResult::pose_batch);
+model_wrapper!(FaceLandmark, ModelKind::FaceLandmark, RawResult::pose, RawResult::pose_batch);
 model_wrapper!(UltralyticsObb, ModelKind::Obb, RawResult::obb, RawResult::obb_batch);
 model_wrapper!(UltralyticsSeg, ModelKind::InstanceSeg, RawResult::instance_seg, RawResult::instance_seg_batch);
 model_wrapper!(UltralyticsSem, ModelKind::SemSeg, |r: &RawResult| r.sem_seg().map(|s| vec![s]), |r: &RawResult| r.sem_seg_batch());
