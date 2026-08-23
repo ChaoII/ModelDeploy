@@ -45,7 +45,7 @@ void bind_pipeline(pybind11::module& m) {
     // Dag：节点由 Planner 建立；Python 侧主要 get_node + build + execute
     py::class_<Dag>(m, "Dag")
         .def(py::init<>())
-        .def("get_node", &Dag::get_node, py::return_value_policy::reference)
+        .def("get_node", &Dag::get_node, py::return_value_policy::reference_internal)
         .def("connect", &Dag::connect)
         .def("build", &Dag::build)
         .def("execute", &Dag::execute)
