@@ -33,6 +33,7 @@
 #include "csrc/vision/ocr/ppocr.h"
 #include "csrc/vision/ocr/dbdetector.h"
 #include "csrc/vision/ocr/recognizer.h"
+#include "csrc/vision/ocr/formula_recognition.h"
 #include "csrc/vision/ocr/classifier.h"
 #include "csrc/vision/lpr/lpr_pipeline/lpr_pipeline.h"
 #include "csrc/vision/lpr/lpr_det/lpr_det.h"
@@ -901,6 +902,14 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!mh->model) return fail_init("Classifier");
             break;
         }
+        case MD_MODEL_FORMULA_RECOGNIZER: {
+            if (!need_parts(1, "formula-recognizer")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new ocr::FormulaRecognizer(parts[0], parts.size() > 1 ? parts[1] : "", opt);
+            mh->model = m;
+            if (!m->is_initialized()) return fail_init("FormulaRecognizer");
+            break;
+        }
         case MD_MODEL_LPR_DET: {
             mh->model = make_model<lpr::LprDetection>(model_path, opt, "LprDetection", &err);
             if (!mh->model) return fail_init("LprDetection");
@@ -1002,6 +1011,7 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_OCR: delete static_cast<ocr::PaddleOCR*>(model); break;
         case MD_MODEL_OCR_DET: delete static_cast<ocr::DBDetector*>(model); break;
         case MD_MODEL_OCR_REC: delete static_cast<ocr::Recognizer*>(model); break;
+        case MD_MODEL_FORMULA_RECOGNIZER: delete static_cast<ocr::FormulaRecognizer*>(model); break;
         case MD_MODEL_OCR_CLS: delete static_cast<ocr::Classifier*>(model); break;
         case MD_MODEL_LPR_DET: delete static_cast<lpr::LprDetection*>(model); break;
         case MD_MODEL_LPR_REC: delete static_cast<lpr::LprRecognizer*>(model); break;
@@ -1060,6 +1070,7 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_OCR: cloned = static_cast<ocr::PaddleOCR*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR_DET: cloned = static_cast<ocr::DBDetector*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR_REC: cloned = static_cast<ocr::Recognizer*>(src->model)->clone().release(); break;
+        case MD_MODEL_FORMULA_RECOGNIZER: cloned = static_cast<ocr::FormulaRecognizer*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR_CLS: cloned = static_cast<ocr::Classifier*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_DET: cloned = static_cast<lpr::LprDetection*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_REC: cloned = static_cast<lpr::LprRecognizer*>(src->model)->clone().release(); break;
@@ -1731,6 +1742,14 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
             auto* d = new SingleResult<OCRResult>();
             if (!m->predict(image, &d->value)) return predict_fail("ocr cls");
             rh->kind = MD_RES_OCR;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_FORMULA_RECOGNIZER: {
+            auto* m = static_cast<ocr::FormulaRecognizer*>(mh->model);
+            auto* d = new SingleResult<std::string>();
+            if (!m->predict(image, &d->value)) return predict_fail("formula recognize");
+            rh->kind = MD_RES_FORMULA;
             rh->data = d;
             break;
         }
@@ -2700,6 +2719,18 @@ MDStatus md_result_ocr_cls(MDResultHandle h, size_t i, int* cls_label, float* cl
     }
     if (cls_label) *cls_label = label;
     if (cls_score) *cls_score = score;
+    return MD_OK;
+}
+
+/* FormulaRecognizer：返回单块 LaTeX（借用指针归结果句柄所有，生命周期同 md_result_plate/ocr 文本） */
+MDStatus md_result_formula(MDResultHandle h, size_t i, const char** latex) {
+    auto* rh = static_cast<md_result_handle*>(h);
+    if (!rh || !latex) return MD_ERR_NULL_POINTER;
+    if (rh->kind != MD_RES_FORMULA) return MD_ERR_INVALID_ARGUMENT;
+    auto* s = dynamic_cast<SingleResult<std::string>*>(static_cast<ResultDataBase*>(rh->data));
+    if (!s) return MD_ERR_INVALID_ARGUMENT;
+    if (i != 0) return MD_ERR_INVALID_ARGUMENT;
+    *latex = s->value.c_str();
     return MD_OK;
 }
 

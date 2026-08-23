@@ -1360,3 +1360,39 @@ TEST_CASE("capi speaker verify enum + embed entry", "[capi]") {
     md_model_destroy(clone);
     md_model_destroy(sv);
 }
+
+// FormulaRecognizer（MD_MODEL_FORMULA_RECOGNIZER）：「枚举 + 错误路径」契约。
+// 模型缺失时 guard 跳过真推理，仅验证枚举/空参数/加载失败路径（CI 安全，无需模型文件）。
+TEST_CASE("capi formula recognizer enum + create error path", "[capi]") {
+    // 新枚举值有效且位于 SPEAKER_VERIFY 之后、COUNT 之前
+    STATIC_REQUIRE(MD_MODEL_FORMULA_RECOGNIZER > MD_MODEL_SPEAKER_VERIFY);
+    STATIC_REQUIRE(MD_MODEL_FORMULA_RECOGNIZER < MD_MODEL_COUNT);
+
+    // 空入参路径（不需模型即校验）
+    const char* latex = nullptr;
+    CHECK(md_result_formula(nullptr, 0, &latex) == MD_ERR_NULL_POINTER);
+    CHECK(md_result_formula((MDResultHandle)(uintptr_t)1, 0, nullptr) == MD_ERR_NULL_POINTER);
+
+    // 加载失败路径：指向不存在的模型 → create 报错，不产生句柄
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle f = nullptr;
+    // dict 可选：仅模型路径（1 部分）
+    CHECK(md_model_create(&f, MD_MODEL_FORMULA_RECOGNIZER, "nonexistent_formula.onnx", opt) == MD_ERR_MODEL_INIT);
+    CHECK(f == nullptr);
+    // 缺路径（空串）→ INVALID_ARGUMENT
+    CHECK(md_model_create(&f, MD_MODEL_FORMULA_RECOGNIZER, "", opt) == MD_ERR_INVALID_ARGUMENT);
+    md_option_destroy(opt);
+
+    // 模型文件缺失 → 跳过加载类断言（真推理需外链模型）
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string modelfile = data_dir + "/test_models/onnx/formula_recognition/formula_rec.onnx";
+    if (!std::filesystem::exists(modelfile)) {
+        WARN("formula_rec.onnx 缺失（外链 modelscope），跳过 create/predict 真加载");
+        return;
+    }
+}

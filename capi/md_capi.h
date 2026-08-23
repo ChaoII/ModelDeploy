@@ -99,6 +99,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_HAND,
     MD_MODEL_REID,
     MD_MODEL_SPEAKER_VERIFY,
+    MD_MODEL_FORMULA_RECOGNIZER,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -286,7 +287,8 @@ typedef enum MD_RESULT_KIND {
     MD_RES_ASR,
     MD_RES_TTS,
     MD_RES_ANTISPOOF,
-    MD_RES_REID
+    MD_RES_REID,
+    MD_RES_FORMULA
 } MDResultKind;
 MD_CAPI_EXPORT MDStatus md_result_kind(MDResultHandle, MDResultKind* out);
 /* 结果对应的图内实例数（人脸数/文本行数/目标数等；单值结果恒为 1） */
@@ -410,6 +412,9 @@ MD_CAPI_EXPORT MDStatus md_result_ocr_batch_count(MDResultHandle, size_t* n);
 
 /* OCR 方向分类（cls 子模型结果：label + score） */
 MD_CAPI_EXPORT MDStatus md_result_ocr_cls(MDResultHandle, size_t i, int* cls_label, float* cls_score);
+
+/* FormulaRecognizer（单块 LaTeX 文本；借用指针归结果句柄所有，随 md_result_destroy 失效） */
+MD_CAPI_EXPORT MDStatus md_result_formula(MDResultHandle, size_t i, const char** latex);
 
 /* LPR（plate 单列） */
 MD_CAPI_EXPORT MDStatus md_result_lpr(MDResultHandle, const MDLprItem** items, size_t* count);
