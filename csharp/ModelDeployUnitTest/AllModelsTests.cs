@@ -131,6 +131,33 @@ public class AllModelsTests
     }
 
     [Test]
+    public void VehicleKeypoint_Works()
+    {
+        var model = Path.Combine(ModelRoot, "vehicle_keypoint.onnx");
+        var img = Path.Combine(ImageRoot, "bus.jpg");
+        if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
+        using var vi = VisionImage.Read(img);
+        using var m = new VehicleKeypointModel(model, CpuOrt());
+        m.SetKeypointsNum(4);
+        var r = m.Predict(vi);
+        Assert.That(r, Is.Not.Empty);
+        Assert.That(r[0].KeyPoints.Length, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void FaceLandmark_Works()
+    {
+        var model = Path.Combine(ModelRoot, "2d106det.onnx");
+        var img = Path.Combine(ImageRoot, "face.jpg");
+        if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
+        using var vi = VisionImage.Read(img);
+        using var m = new FaceLandmarkModel(model, CpuOrt());
+        var r = m.Predict(vi);
+        Assert.That(r, Is.Not.Empty);
+        Assert.That(r[0].KeyPoints.Length, Is.EqualTo(106));
+    }
+
+    [Test]
     public void Obb_Works()
     {
         var model = Path.Combine(ModelRoot, "yolo11n", "yolo11n-obb.onnx");

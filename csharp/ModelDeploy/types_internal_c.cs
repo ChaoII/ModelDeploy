@@ -62,7 +62,11 @@ namespace ModelDeploy
             MD_MODEL_HAND,
             MD_MODEL_REID,
             MD_MODEL_SPEAKER_VERIFY,
-            MD_MODEL_FORMULA_RECOGNIZER
+            MD_MODEL_FORMULA_RECOGNIZER,
+            // CAPI 在 FORMULA_RECOGNIZER(=30) 之后还有 TSN(=31)/ST_GCN(=32)，此处仅包装
+            // VEHICLE_KEYPOINT/FACE_LANDMARK，故显式对齐 CAPI 数值。
+            MD_MODEL_VEHICLE_KEYPOINT = 33,
+            MD_MODEL_FACE_LANDMARK = 34
         }
 
         public enum MDTrackerKind
