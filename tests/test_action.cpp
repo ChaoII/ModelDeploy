@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "csrc/vision/action/tsn.h"
+#include "csrc/vision/action/st_gcn.h"
 #include "csrc/core/tensor.h"
 
 using namespace modeldeploy;
@@ -46,4 +47,32 @@ TEST_CASE("TSN postprocess sanity", "[action]") {
     REQUIRE(scores.size() == 3);
     // postprocess 仅原样透传 scores（argmax 由 CAPI/上层取）。校验透传。
     REQUIRE(scores[1] == Catch::Approx(0.7f).margin(1e-5f));
+}
+
+// 无权重路径
+TEST_CASE("StGcn construction without weights", "[action]") {
+    StGcn m("nonexistent_stgcn.onnx");
+    REQUIRE_FALSE(m.is_initialized());
+}
+
+// assemble_skeleton 纯计算：2 帧 × 3 关节(x,y) → [1,2,T,V]
+TEST_CASE("StGcn assemble_skeleton builds [1,C,T,V]", "[action]") {
+    const int64_t V = 3, C = 2, T = 2;
+    KeyPointSeq seq;
+    seq.frames = {
+        { {Point3f(0.f, 0.f, 0.f), Point3f(1.f, 0.f, 0.f), Point3f(0.5f, 1.f, 0.f)} },
+        { {Point3f(1.f, 1.f, 0.f), Point3f(0.f, 1.f, 0.f), Point3f(1.f, 0.f, 0.f)} },
+    };
+    Tensor out;
+    REQUIRE(StGcn::assemble_skeleton(seq, V, C, &out));
+    REQUIRE(out.get_rank() == 4);
+    REQUIRE(out.shape() == std::vector<int64_t>({1, C, T, V}));
+    const float* p = static_cast<const float*>(out.data());
+    // 维度顺序 [C][T][V]：C=0 (x), C=1 (y)。实现：坐标先平移 cx/cy=127 再除以 127。
+    // t=0 关节0 x=0.0 -> p[0]
+    REQUIRE(p[0] == Catch::Approx(-1.0f).margin(1e-5f));
+    // t=0 关节1 x=1.0 -> p[1]
+    REQUIRE(p[1] == Catch::Approx((1.0f - 127.0f) / 127.0f).margin(1e-5f));
+    // t=0 关节0 y=0.0 -> C=1 起始索引 2*V
+    REQUIRE(p[2 * V] == Catch::Approx((0.0f - 127.0f) / 127.0f).margin(1e-5f));
 }
