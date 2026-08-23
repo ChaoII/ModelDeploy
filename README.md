@@ -1,6 +1,6 @@
 # ModelDeploy
 
-多后端推理 SDK（OnnxRuntime / TensorRT / MNN / Sophgo TPU），支持检测/分割/姿态/手部关键点/人脸/OCR/车牌/行人属性/行人 Re-ID/条码二维码/语音/声纹(说话人验证)/文档理解(版面分析+公式识别→Markdown)/Pipeline DAG 编排/视频解码(FFmpeg,BUILD_VIDEO) 等模型与能力，提供 C++ / Python / C / C# / Rust 绑定。
+多后端推理 SDK（OnnxRuntime / TensorRT / MNN / Sophgo TPU），支持检测/分割/姿态/手部关键点/人脸/OCR/车牌/行人属性/行人 Re-ID/条码二维码/语音/声纹(说话人验证)/文档理解(版面分析+公式识别→Markdown)/Pipeline DAG 编排/视频解码(FFmpeg,BUILD_VIDEO)/视频动作识别(TSN/ST-GCN) 等模型与能力，提供 C++ / Python / C / C# / Rust 绑定。
 
 > **文档中心**：[docs/README.md](./docs/README.md) — 快速开始 / 架构 / 后端 / 模型 / 预处理 / 性能优化 / 多语言 API
 
