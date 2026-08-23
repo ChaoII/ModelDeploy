@@ -34,6 +34,19 @@ static void run_asr(void) {
         const char* text = NULL;
         check("predict_wav", md_audio_asr_wav(m, "test_data/test_models/onnx/sense_voice/test_wavs/zh.wav", &text));
         printf("  recognized: '%s'\n", text ? text : "(null)");
+
+        /* 结构化结果（SenseVoice 复任务标签） */
+        MDAsrResult r;
+        memset(&r, 0, sizeof(r));
+        check("predict_wav_result",
+              md_audio_asr_wav_result(m, "test_data/test_models/onnx/sense_voice/test_wavs/zh.wav", &r));
+        printf("  result: lang='%s' emot='%s' event='%s' task='%s' itn=%d nospeech=%d text='%s'\n",
+               r.language ? r.language : "", r.emotion ? r.emotion : "",
+               r.event ? r.event : "", r.task ? r.task : "", r.itn, r.nospeech,
+               r.text ? r.text : "");
+        if (!r.language || strcmp(r.language, "zh") != 0) { printf("  [FAIL] expected lang=zh\n"); fails++; }
+        if (!r.text || strlen(r.text) == 0) { printf("  [FAIL] empty text\n"); fails++; }
+
         /* 用识别出的文本合成测试 wav 落盘（生成 0.2s 正弦波验证 wav 写出） */
         float tone[4800];
         for (int i = 0; i < 4800; ++i) tone[i] = 0.1f * (float)((i * 440) % 22050) / 22050.0f;

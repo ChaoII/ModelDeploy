@@ -265,6 +265,25 @@ MD_CAPI_EXPORT MDStatus md_audio_asr_wav(MDModelHandle, const char* wav_path, co
 MD_CAPI_EXPORT MDStatus md_audio_asr(MDModelHandle, const float* samples, size_t n, int sample_rate,
                       const char** text);
 
+/* ASR 结构化结果（SenseVoice 复任务标签）。字符串归模型句柄所有，无需释放，
+ * 随 md_model_destroy / 下次 predict 覆盖前有效。 */
+typedef struct MDAsrResult {
+    const char* text;      /* 纯净识别文本 */
+    const char* language;  /* 语种："zh"/"en"/"ja"/"ko"...（无则空串） */
+    const char* emotion;   /* 情感："NEUTRAL"/"HAPPY"...（无则空串） */
+    const char* event;     /* 事件/类别："Speech"/"Music"...（无则空串） */
+    const char* task;      /* 任务："ASR"/"AED"/"SER"/"nospeech"（无则空串） */
+    int itn;               /* 是否 withitn（模型已做逆文本归一化） */
+    int nospeech;          /* 是否检测到 <|nospeech|> */
+} MDAsrResult;
+
+/* ASR：结构化（SenseVoice 复任务标签），从 wav 文件 */
+MD_CAPI_EXPORT MDStatus md_audio_asr_wav_result(MDModelHandle, const char* wav_path, MDAsrResult* out);
+
+/* ASR：结构化（SenseVoice 复任务标签），从 PCM 浮点采样 */
+MD_CAPI_EXPORT MDStatus md_audio_asr_result(MDModelHandle, const float* samples, size_t n,
+                              int sample_rate, MDAsrResult* out);
+
 /* TTS：文本合成音频（零拷贝返回库内 buffer；audio 归结果内部，随 md_model_destroy 释放前有效） */
 MD_CAPI_EXPORT MDStatus md_audio_tts(MDModelHandle, const char* text, const char* voice, float speed,
                       int* sample_rate, const float** audio, size_t* audio_n);

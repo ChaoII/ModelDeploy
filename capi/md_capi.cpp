@@ -101,6 +101,8 @@ struct md_model_handle {
     modeldeploy::RuntimeOption opt;     // 创建时的配置（clone 复用）
     std::vector<float> audio_buf;       // TTS 输出暂存（零拷贝借用）
     std::string text_buf;               // ASR 输出暂存（零拷贝借用）
+    std::string asr_lang_, asr_emotion_, asr_event_, asr_task_;  // ASR 结构化标签暂存
+    bool asr_itn_ = false, asr_nospeech_ = false;
     std::shared_ptr<std::vector<float>> speaker_embed;  // 声纹 embedding 暂存（借用指针，随句柄存活）
     ~md_model_handle();
 };
@@ -2381,6 +2383,58 @@ MDStatus md_audio_asr(MDModelHandle h, const float* samples, size_t n, int sampl
     return MD_OK;
 #else
     set_error("md_audio_asr: built without BUILD_AUDIO");
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+static MDStatus fill_asr_result(audio::asr::SenseVoice* m, const std::vector<float>& data,
+                                md_model_handle* mh, MDAsrResult* out) {
+    audio::asr::SenseVoiceResult r;
+    if (!m->predict(data, &r)) { set_error("md_audio_asr*_result: asr predict failed"); return MD_ERR_MODEL_PREDICT; }
+    mh->text_buf = r.text;
+    mh->asr_lang_ = r.language;
+    mh->asr_emotion_ = r.emotion;
+    mh->asr_event_ = r.event;
+    mh->asr_task_ = r.task;
+    mh->asr_itn_ = r.itn;
+    mh->asr_nospeech_ = r.nospeech;
+    out->text = mh->text_buf.c_str();
+    out->language = mh->asr_lang_.empty() ? "" : mh->asr_lang_.c_str();
+    out->emotion = mh->asr_emotion_.empty() ? "" : mh->asr_emotion_.c_str();
+    out->event = mh->asr_event_.empty() ? "" : mh->asr_event_.c_str();
+    out->task = mh->asr_task_.empty() ? "" : mh->asr_task_.c_str();
+    out->itn = mh->asr_itn_ ? 1 : 0;
+    out->nospeech = mh->asr_nospeech_ ? 1 : 0;
+    return MD_OK;
+}
+
+MDStatus md_audio_asr_wav_result(MDModelHandle h, const char* wav_path, MDAsrResult* out) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !wav_path || !out) return MD_ERR_NULL_POINTER;
+    if (!mh->ready || mh->kind != MD_MODEL_ASR) return MD_ERR_INVALID_ARGUMENT;
+#ifdef BUILD_AUDIO
+    std::vector<float> data;
+    int sr = 0;
+    if (!load_wav(wav_path, &sr, data)) { set_error_fmt("md_audio_asr_wav_result: cannot decode '%s'", wav_path); return MD_ERR_AUDIO_DECODE; }
+    return fill_asr_result(static_cast<audio::asr::SenseVoice*>(mh->model), data, mh, out);
+#else
+    (void)wav_path; (void)out;
+    set_error("md_audio_asr_wav_result: built without BUILD_AUDIO");
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_asr_result(MDModelHandle h, const float* samples, size_t n, int sample_rate,
+                             MDAsrResult* out) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !samples || !out) return MD_ERR_NULL_POINTER;
+    if (!mh->ready || mh->kind != MD_MODEL_ASR) return MD_ERR_INVALID_ARGUMENT;
+    (void)sample_rate;
+#ifdef BUILD_AUDIO
+    std::vector<float> data(samples, samples + n);
+    return fill_asr_result(static_cast<audio::asr::SenseVoice*>(mh->model), data, mh, out);
+#else
+    set_error("md_audio_asr_result: built without BUILD_AUDIO");
     return MD_ERR_UNSUPPORTED_TYPE;
 #endif
 }
