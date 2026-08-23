@@ -1526,7 +1526,7 @@ fn speaker_l2_normalize(v: &[f32]) -> Vec<f32> {
 }
 
 fn speaker_cosine(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum::<f32>().max(0.0f32)
 }
 
 fn slice_items<T>(ptr: *const T, n: usize) -> &'static [T] {
