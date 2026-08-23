@@ -66,6 +66,7 @@ typedef struct md_image_handle* MDImageHandle;
 typedef struct md_result_handle* MDResultHandle;
 typedef struct md_option_handle* MDOptionHandle;
 typedef struct md_solution_handle* MDSolutionHandle;
+typedef struct md_audio_solution_handle* MDAudioSolutionHandle;
 
 /* ==================== 模型类型 ==================== */
 
@@ -636,6 +637,23 @@ MD_CAPI_EXPORT MDStatus md_solution_heatmap_update(MDSolutionHandle h, const flo
 MD_CAPI_EXPORT MDStatus md_solution_heatmap_peak(MDSolutionHandle h, int* x, int* y);
 MD_CAPI_EXPORT MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
                                        float bx, float by, float bw, float bh, float* out);
+
+/* ==================== 音频解决方案（audio::solution/tool） ==================== */
+
+typedef enum MD_AUDIO_SOLUTION_KIND {
+    MD_AUDIO_SPEAKER_SEARCH = 0,
+    MD_AUDIO_TTS_BATCHER,
+} MDAudioSolutionKind;
+
+MD_CAPI_EXPORT MDStatus md_audio_solution_create(MDAudioSolutionHandle* out, MDAudioSolutionKind kind);
+MD_CAPI_EXPORT MDStatus md_audio_solution_destroy(MDAudioSolutionHandle);
+MD_CAPI_EXPORT MDStatus md_audio_speaker_search_enroll(MDAudioSolutionHandle, const char* label, const float* emb, size_t n);
+MD_CAPI_EXPORT MDStatus md_audio_speaker_search_match(MDAudioSolutionHandle, const float* emb, size_t n, int k,
+                                                      const char** best_label, float* best_score);
+MD_CAPI_EXPORT MDStatus md_audio_resample(const float* in, size_t n, int in_sr, int out_sr,
+                                          float** out, size_t* out_n);
+MD_CAPI_EXPORT MDStatus md_audio_meta(const char* wav, int* sample_rate, int* channels, int* bits,
+                                      uint32_t* duration_ms);
 
 #ifdef __cplusplus
 }

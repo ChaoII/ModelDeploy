@@ -66,6 +66,10 @@
 #include "csrc/audio/asr/sense_voice.h"
 #include "csrc/audio/tts/kokoro.h"
 #include "csrc/audio/speaker_verify/ecapa.h"
+#include "csrc/audio/tools/resampler.h"
+#include "csrc/audio/tools/audio_meta.h"
+#include "csrc/audio/solutions/speaker_search.h"
+#include "csrc/audio/solutions/tts_batcher.h"
 #endif
 
 /* ---------------- 句柄实现（全局命名空间，与 md_capi.h 前向声明对应） ---------------- */
@@ -3997,5 +4001,91 @@ MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
 #else
     (void)ax;(void)ay;(void)aw;(void)ah;(void)bx;(void)by;(void)bw;(void)bh;
     return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+/* ==================== 音频解决方案（audio::solution / tool） ==================== */
+
+static std::vector<float> g_resample_buf;
+
+struct md_audio_solution_handle { MDAudioSolutionKind kind; void* obj; };
+
+MDStatus md_audio_solution_create(MDAudioSolutionHandle* out, MDAudioSolutionKind kind) {
+    if (!out) return MD_ERR_NULL_POINTER;
+    auto* h = new md_audio_solution_handle(); h->kind = kind;
+#ifdef BUILD_AUDIO
+    switch (kind) {
+      case MD_AUDIO_SPEAKER_SEARCH: h->obj = new audio::solution::SpeakerSearch(); break;
+      case MD_AUDIO_TTS_BATCHER:    h->obj = new audio::solution::TTSBatcher(); break;
+      default: delete h; return MD_ERR_INVALID_ARGUMENT;
+    }
+    *out = h; return MD_OK;
+#else
+    delete h; set_error("built without BUILD_AUDIO"); return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_solution_destroy(MDAudioSolutionHandle h) {
+    if (!h) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_AUDIO
+    switch (h->kind) {
+      case MD_AUDIO_SPEAKER_SEARCH: delete static_cast<audio::solution::SpeakerSearch*>(h->obj); break;
+      case MD_AUDIO_TTS_BATCHER:    delete static_cast<audio::solution::TTSBatcher*>(h->obj); break;
+      default: break;
+    }
+#endif
+    delete h; return MD_OK;
+}
+
+MDStatus md_audio_speaker_search_enroll(MDAudioSolutionHandle h, const char* label,
+                                        const float* emb, size_t n) {
+    if (!h || !label || !emb || n == 0) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_AUDIO
+    if (h->kind != MD_AUDIO_SPEAKER_SEARCH) return MD_ERR_INVALID_ARGUMENT;
+    static_cast<audio::solution::SpeakerSearch*>(h->obj)->enroll(label, std::vector<float>(emb, emb + n));
+    return MD_OK;
+#else
+    (void)label;(void)emb;(void)n; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_speaker_search_match(MDAudioSolutionHandle h, const float* emb, size_t n, int k,
+                                       const char** best_label, float* best_score) {
+    if (!h || !emb || n == 0 || !best_label || !best_score) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_AUDIO
+    if (h->kind != MD_AUDIO_SPEAKER_SEARCH) return MD_ERR_INVALID_ARGUMENT;
+    auto r = static_cast<audio::solution::SpeakerSearch*>(h->obj)->match(std::vector<float>(emb, emb + n), k);
+    if (r.empty()) return MD_ERR_MODEL_PREDICT;
+    static std::string g_label;
+    g_label = r[0].first;
+    *best_label = g_label.c_str();
+    *best_score = r[0].second;
+    return MD_OK;
+#else
+    (void)emb;(void)n;(void)k;(void)best_label;(void)best_score; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_resample(const float* in, size_t n, int in_sr, int out_sr,
+                           float** out, size_t* out_n) {
+    if (!in || !out || !out_n || n == 0 || in_sr <= 0 || out_sr <= 0) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_AUDIO
+    g_resample_buf = audio::tool::Resampler::resample(std::vector<float>(in, in + n), in_sr, out_sr);
+    *out = g_resample_buf.data(); *out_n = g_resample_buf.size();
+    return MD_OK;
+#else
+    (void)in_sr;(void)out_sr; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_meta(const char* wav, int* sample_rate, int* channels, int* bits, uint32_t* duration_ms) {
+    if (!wav || !sample_rate || !channels || !bits || !duration_ms) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_AUDIO
+    auto meta = audio::tool::parse_meta(wav);
+    *sample_rate = meta.sample_rate; *channels = meta.channels;
+    *bits = meta.bits; *duration_ms = meta.duration_ms;
+    return MD_OK;
+#else
+    (void)wav; return MD_ERR_UNSUPPORTED_TYPE;
 #endif
 }

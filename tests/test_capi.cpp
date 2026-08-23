@@ -19,6 +19,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <algorithm>
+#include <string>
 #include <vector>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgproc.hpp>
@@ -1601,4 +1603,21 @@ TEST_CASE("cv solution + tool capi", "[capi]") {
     float iou = 0;
     REQUIRE(md_vision_iou4(0,0,10,10, 0,0,10,10, &iou) == MD_OK);
     REQUIRE(iou == Catch::Approx(1.0f).margin(1e-5f));
+}
+
+TEST_CASE("audio solution + tool capi", "[capi]") {
+    MDAudioSolutionHandle ah = nullptr;
+    REQUIRE(md_audio_solution_create(&ah, MD_AUDIO_SPEAKER_SEARCH) == MD_OK);
+    float e1[3] = {1.0f, 0.0f, 0.0f};
+    REQUIRE(md_audio_speaker_search_enroll(ah, "alice", e1, 3) == MD_OK);
+    float e2[3] = {0.99f, 0.1f, 0.0f};
+    const char* label = nullptr; float score = 0;
+    REQUIRE(md_audio_speaker_search_match(ah, e2, 3, 1, &label, &score) == MD_OK);
+    REQUIRE(std::string(label) == "alice");
+    REQUIRE(md_audio_solution_destroy(ah) == MD_OK);
+
+    float in[800]; std::fill(in, in + 800, 0.5f);
+    float* rout = nullptr; size_t rn = 0;
+    REQUIRE(md_audio_resample(in, 800, 8000, 16000, &rout, &rn) == MD_OK);
+    REQUIRE(rn == 1600);
 }
