@@ -15,6 +15,10 @@ namespace modeldeploy::audio {
 }
 
 
+namespace modeldeploy::pipeline {
+    void bind_pipeline(pybind11::module&);
+}
+
 namespace modeldeploy {
     void bind_tensor(pybind11::module&);
     void bind_runtime(pybind11::module&);
@@ -28,6 +32,10 @@ namespace modeldeploy {
         bind_tensor(m);
         bind_runtime(m);
         bind_base_model(m);
+
+        auto pipeline_module =
+            m.def_submodule("pipeline", "Pipeline DAG module of Modeldeploy.");
+        pipeline::bind_pipeline(pipeline_module);
 
 
 #ifdef BUILD_VISION
