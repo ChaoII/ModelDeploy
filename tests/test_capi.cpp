@@ -1466,3 +1466,120 @@ TEST_CASE("capi action (TSN/ST_GCN) enum + error path", "[capi]") {
     md_model_destroy(stg);
     md_model_destroy(tsn);
 }
+
+// VehicleKeypoint / FaceLandmark（MD_MODEL_VEHICLE_KEYPOINT / MD_MODEL_FACE_LANDMARK）：
+// 结果复用 MD_RES_POSE（KeyPointsResult）形态；Vehicle 支持 keypoints_num/conf/nms 参数 + set_input_size，
+// Face 不支持 set_param/set_size。「枚举 + 空参 + 错误路径」契约模型缺失即可验证（CI 安全）。
+TEST_CASE("capi vehicle keypoint / face landmark enum + error path", "[capi]") {
+    // 新枚举值有效且位于 ST_GCN 之后、COUNT 之前
+    STATIC_REQUIRE(MD_MODEL_VEHICLE_KEYPOINT > MD_MODEL_ST_GCN);
+    STATIC_REQUIRE(MD_MODEL_VEHICLE_KEYPOINT < MD_MODEL_COUNT);
+    STATIC_REQUIRE(MD_MODEL_FACE_LANDMARK > MD_MODEL_VEHICLE_KEYPOINT);
+    STATIC_REQUIRE(MD_MODEL_FACE_LANDMARK < MD_MODEL_COUNT);
+
+    // 自省：Vehicle 与 pose/hand 同参数表，含 keypoints_num（int）
+    const char* names = nullptr;
+    REQUIRE(md_model_param_names(MD_MODEL_VEHICLE_KEYPOINT, &names) == MD_OK);
+    CHECK(names);
+    CHECK(std::string(names).find("keypoints_num") != std::string::npos);
+    char t = 0;
+    REQUIRE(md_model_param_type(MD_MODEL_VEHICLE_KEYPOINT, "keypoints_num", &t) == MD_OK);
+    CHECK(t == 'I');
+    // Face 无参数表
+    CHECK(md_model_param_names(MD_MODEL_FACE_LANDMARK, &names) == MD_OK);
+    CHECK((!names || !*names));
+
+    // 空入参路径（不需模型即校验）
+    MDResultHandle res = nullptr;
+    MDImageHandle img = nullptr;
+    MDModelHandle h = nullptr;
+    CHECK(md_model_predict(nullptr, img, &res) == MD_ERR_NULL_POINTER);
+    CHECK(md_model_predict_batch(nullptr, nullptr, 0, &res) == MD_ERR_NULL_POINTER);
+
+    // 加载失败路径：不存在的模型 → create 报错，不产生句柄
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    CHECK(md_model_create(&h, MD_MODEL_VEHICLE_KEYPOINT, "nonexistent_vehicle_keypoint.onnx", opt) == MD_ERR_MODEL_INIT);
+    CHECK(h == nullptr);
+    CHECK(md_model_create(&h, MD_MODEL_FACE_LANDMARK, "nonexistent_2d106det.onnx", opt) == MD_ERR_MODEL_INIT);
+    CHECK(h == nullptr);
+    // 缺路径（空串）→ INVALID_ARGUMENT
+    CHECK(md_model_create(&h, MD_MODEL_VEHICLE_KEYPOINT, "", opt) == MD_ERR_INVALID_ARGUMENT);
+    CHECK(md_model_create(&h, MD_MODEL_FACE_LANDMARK, "", opt) == MD_ERR_INVALID_ARGUMENT);
+    md_option_destroy(opt);
+
+    // 模型文件缺失 → 跳过加载类断言（真推理需外链模型）
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string veh_file = data_dir + "/test_models/onnx/vehicle_keypoint.onnx";
+    const std::string face_file = data_dir + "/test_models/onnx/2d106det.onnx";
+    const std::string imgf = data_dir + "/test_images/bus.jpg";
+    if (!std::filesystem::exists(veh_file) || !std::filesystem::exists(imgf)) {
+        WARN("vehicle_keypoint.onnx 权重缺失（外链 modelscope），跳过真加载/predict/result 断言");
+        return;
+    }
+
+    // 真加载：Vehicle create + set_param_i(keypoints_num) 端到端 + result 形态 = MD_RES_POSE
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+    MDModelHandle veh = nullptr;
+    REQUIRE(md_model_create(&veh, MD_MODEL_VEHICLE_KEYPOINT, veh_file.c_str(), opt) == MD_OK);
+    REQUIRE(veh != nullptr);
+    // 独立模型暴露 preprocessor，set_input_size 应 OK（Vehicle 镜像 HAND）
+    CHECK(md_model_set_input_size(veh, 640, 640) == MD_OK);
+    CHECK(md_model_set_param_i(veh, "keypoints_num", 8) == MD_OK);
+    CHECK(md_model_set_param_d(veh, "conf_threshold", 0.3) == MD_OK);
+    CHECK(md_model_set_param_d(veh, "keypoints_num", 8.0) == MD_ERR_INVALID_TYPE);
+    // Face 不支持 set_param → 在已加载语句外由 param_type_of 上报空表（上面已校验），
+    // 此处经 apply_model_param 的 decl_type==0 路径验证：仅 Vehicle 有参数。
+
+    // clone + predict → MD_RES_POSE + md_result_keypoints
+    MDModelHandle clone = nullptr;
+    REQUIRE(md_model_clone(veh, &clone) == MD_OK);
+    REQUIRE(clone != nullptr);
+    MDImageHandle im = nullptr;
+    REQUIRE(md_image_from_file(&im, imgf.c_str()) == MD_OK);
+    REQUIRE(md_model_predict(clone, im, &res) == MD_OK);
+    MDResultKind kind = (MDResultKind)-1;
+    REQUIRE(md_result_kind(res, &kind) == MD_OK);
+    CHECK(kind == MD_RES_POSE);
+    const MDPoseItem* items = nullptr;
+    size_t cnt = 0;
+    REQUIRE(md_result_pose(res, &items, &cnt) == MD_OK);
+    if (cnt > 0) {
+        const MDPoint3* kps = nullptr;
+        size_t kn = 0;
+        REQUIRE(md_result_keypoints(res, 0, &kps, &kn) == MD_OK);
+        CHECK(kn == 8);
+    }
+    md_result_destroy(res);
+    md_image_destroy(im);
+    md_model_destroy(clone);
+
+    // FaceLandmark create + predict → MD_RES_POSE（106 点）
+    if (std::filesystem::exists(face_file)) {
+        MDModelHandle face = nullptr;
+        REQUIRE(md_model_create(&face, MD_MODEL_FACE_LANDMARK, face_file.c_str(), opt) == MD_OK);
+        REQUIRE(face != nullptr);
+        // Face 无 preprocessor 尺寸开关/参数 setter：set_input_size 应报 UNSUPPORTED_TYPE
+        CHECK(md_model_set_input_size(face, 192, 192) == MD_ERR_UNSUPPORTED_TYPE);
+        CHECK(md_model_set_param_i(face, "keypoints_num", 106) == MD_ERR_INVALID_ARGUMENT);
+        MDImageHandle fi = nullptr;
+        REQUIRE(md_image_from_file(&fi, imgf.c_str()) == MD_OK);
+        REQUIRE(md_model_predict(face, fi, &res) == MD_OK);
+        REQUIRE(md_result_kind(res, &kind) == MD_OK);
+        CHECK(kind == MD_RES_POSE);
+        md_result_destroy(res);
+        md_image_destroy(fi);
+        md_model_destroy(face);
+    } else {
+        WARN("2d106det.onnx 权重缺失，跳过 FaceLandmark 真加载/predict 断言");
+    }
+
+    md_option_destroy(opt);
+    md_model_destroy(veh);
+}

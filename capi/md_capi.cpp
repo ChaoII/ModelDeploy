@@ -52,6 +52,8 @@
 #include "csrc/core/md_log.h"
 #include "csrc/vision/action/tsn.h"
 #include "csrc/vision/action/st_gcn.h"
+#include "csrc/vision/landmark/vehicle_keypoint.h"
+#include "csrc/vision/landmark/face_landmark.h"
 
 #ifdef BUILD_AUDIO
 #include "csrc/audio/asr/sense_voice.h"
@@ -928,6 +930,16 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!m->is_initialized()) return fail_init("StGcn");
             break;
         }
+        case MD_MODEL_VEHICLE_KEYPOINT: {
+            mh->model = make_model<landmark::VehicleKeypoint>(model_path, opt, "VehicleKeypoint", &err);
+            if (!mh->model) return fail_init("VehicleKeypoint");
+            break;
+        }
+        case MD_MODEL_FACE_LANDMARK: {
+            mh->model = make_model<landmark::FaceLandmark>(model_path, opt, "FaceLandmark", &err);
+            if (!mh->model) return fail_init("FaceLandmark");
+            break;
+        }
         case MD_MODEL_LPR_DET: {
             mh->model = make_model<lpr::LprDetection>(model_path, opt, "LprDetection", &err);
             if (!mh->model) return fail_init("LprDetection");
@@ -1032,6 +1044,8 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_FORMULA_RECOGNIZER: delete static_cast<ocr::FormulaRecognizer*>(model); break;
         case MD_MODEL_TSN: delete static_cast<action::TSN*>(model); break;
         case MD_MODEL_ST_GCN: delete static_cast<action::StGcn*>(model); break;
+        case MD_MODEL_VEHICLE_KEYPOINT: delete static_cast<landmark::VehicleKeypoint*>(model); break;
+        case MD_MODEL_FACE_LANDMARK: delete static_cast<landmark::FaceLandmark*>(model); break;
         case MD_MODEL_OCR_CLS: delete static_cast<ocr::Classifier*>(model); break;
         case MD_MODEL_LPR_DET: delete static_cast<lpr::LprDetection*>(model); break;
         case MD_MODEL_LPR_REC: delete static_cast<lpr::LprRecognizer*>(model); break;
@@ -1093,6 +1107,8 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_FORMULA_RECOGNIZER: cloned = static_cast<ocr::FormulaRecognizer*>(src->model)->clone().release(); break;
         case MD_MODEL_TSN: cloned = static_cast<action::TSN*>(src->model)->clone().release(); break;
         case MD_MODEL_ST_GCN: cloned = static_cast<action::StGcn*>(src->model)->clone().release(); break;
+        case MD_MODEL_VEHICLE_KEYPOINT: cloned = static_cast<landmark::VehicleKeypoint*>(src->model)->clone().release(); break;
+        case MD_MODEL_FACE_LANDMARK: cloned = static_cast<landmark::FaceLandmark*>(src->model)->clone().release(); break;
         case MD_MODEL_OCR_CLS: cloned = static_cast<ocr::Classifier*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_DET: cloned = static_cast<lpr::LprDetection*>(src->model)->clone().release(); break;
         case MD_MODEL_LPR_REC: cloned = static_cast<lpr::LprRecognizer*>(src->model)->clone().release(); break;
@@ -1130,6 +1146,7 @@ MDStatus md_model_set_input_size(MDModelHandle handle, int w, int h) {
         case MD_MODEL_CLASSIFICATION: static_cast<classification::Classification*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_POSE: static_cast<detection::UltralyticsPose*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_HAND: static_cast<hand::HandKeypoint*>(mh->model)->get_preprocessor().set_size(size); break;
+        case MD_MODEL_VEHICLE_KEYPOINT: static_cast<landmark::VehicleKeypoint*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_OBB: static_cast<detection::UltralyticsObb*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_INSTANCE_SEG: static_cast<detection::UltralyticsSeg*>(mh->model)->get_preprocessor().set_size(size); break;
         case MD_MODEL_SEM_SEG: static_cast<detection::UltralyticsSem*>(mh->model)->get_preprocessor().set_size(size); break;
@@ -1243,6 +1260,7 @@ const char* kind_param_names(MDModelKind kind) {
             return "conf_threshold|nms_threshold";
         case MD_MODEL_POSE:
         case MD_MODEL_HAND:
+        case MD_MODEL_VEHICLE_KEYPOINT:
             return "conf_threshold|nms_threshold|keypoints_num";
         case MD_MODEL_INSTANCE_SEG:
             return "conf_threshold|nms_threshold|mask_threshold";
@@ -1276,10 +1294,12 @@ char param_type_of(MDModelKind kind, const char* name) {
         case MD_MODEL_DETECTION:
         case MD_MODEL_POSE:
         case MD_MODEL_HAND:
+        case MD_MODEL_VEHICLE_KEYPOINT:
         case MD_MODEL_OBB:
         case MD_MODEL_INSTANCE_SEG:
             if (is_det) return PT_D;
-            if ((kind == MD_MODEL_POSE || kind == MD_MODEL_HAND) && std::strcmp(name, "keypoints_num") == 0) return PT_I;
+            if ((kind == MD_MODEL_POSE || kind == MD_MODEL_HAND || kind == MD_MODEL_VEHICLE_KEYPOINT) &&
+                std::strcmp(name, "keypoints_num") == 0) return PT_I;
             if (kind == MD_MODEL_INSTANCE_SEG && std::strcmp(name, "mask_threshold") == 0) return PT_D;
             return 0;
         case MD_MODEL_CLASSIFICATION:
@@ -1366,6 +1386,13 @@ int apply_model_param(md_model_handle* mh, const char* name, char req_type,
         }
         case MD_MODEL_HAND: {
             auto* pm = static_cast<hand::HandKeypoint*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
+            else pm->get_postprocessor().set_keypoints_num((int)i);
+            break;
+        }
+        case MD_MODEL_VEHICLE_KEYPOINT: {
+            auto* pm = static_cast<landmark::VehicleKeypoint*>(const_cast<void*>(m));
             if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
             else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
             else pm->get_postprocessor().set_keypoints_num((int)i);
@@ -1593,6 +1620,22 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
             auto* m = static_cast<hand::HandKeypoint*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
             if (!m->predict(image, &d->v)) return predict_fail("hand");
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_VEHICLE_KEYPOINT: {
+            auto* m = static_cast<landmark::VehicleKeypoint*>(mh->model);
+            auto* d = new ResultData<KeyPointsResult>();
+            if (!m->predict(image, &d->v)) return predict_fail("vehicle_keypoint");
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_FACE_LANDMARK: {
+            auto* m = static_cast<landmark::FaceLandmark*>(mh->model);
+            auto* d = new ResultData<KeyPointsResult>();
+            if (!m->predict(image, &d->v)) return predict_fail("face_landmark");
             rh->kind = MD_RES_POSE;
             rh->data = d;
             break;
@@ -1884,6 +1927,30 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("hand");
+                d->v.push_back(std::move(r));
+            }
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_VEHICLE_KEYPOINT: {
+            auto* m = static_cast<landmark::VehicleKeypoint*>(mh->model);
+            auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            for (size_t i = 0; i < n; ++i) {
+                std::vector<KeyPointsResult> r;
+                if (!m->predict(image_at(i), &r)) return predict_fail("vehicle_keypoint");
+                d->v.push_back(std::move(r));
+            }
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_FACE_LANDMARK: {
+            auto* m = static_cast<landmark::FaceLandmark*>(mh->model);
+            auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            for (size_t i = 0; i < n; ++i) {
+                std::vector<KeyPointsResult> r;
+                if (!m->predict(image_at(i), &r)) return predict_fail("face_landmark");
                 d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_POSE;
