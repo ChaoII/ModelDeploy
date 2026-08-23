@@ -62,7 +62,9 @@ void bind_pipeline(pybind11::module& m) {
         }, py::arg("name"), py::arg("type"), py::arg("fn"))
         .def("build", [](Planner& p, const std::string& spec) { return p.build(spec); });
 
-    m.attr("__doc__") = "Pipeline DAG orchestration module.";
+    m.attr("__doc__") =
+        "通用 DAG 编排。DSL: \"A -> B -> C\" (顺序), \"{A,B} -> C\" (fan-in), "
+        "\"A -> {B,C}\" (fan-out)。端口固定命名为 in/out。";
 }
 
 } // namespace modeldeploy::pipeline
