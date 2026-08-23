@@ -278,6 +278,9 @@ string path);
             out IntPtr pose, out UIntPtr n);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_result_formula(IntPtr handle, UIntPtr i, out IntPtr latex);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_result_ocr(IntPtr handle, UIntPtr i, out IntPtr quad,
             out IntPtr text, out float score);
 

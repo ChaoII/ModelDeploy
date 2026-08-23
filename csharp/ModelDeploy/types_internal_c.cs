@@ -61,7 +61,8 @@ namespace ModelDeploy
             MD_MODEL_FACE_AS_SECOND,
             MD_MODEL_HAND,
             MD_MODEL_REID,
-            MD_MODEL_SPEAKER_VERIFY
+            MD_MODEL_SPEAKER_VERIFY,
+            MD_MODEL_FORMULA_RECOGNIZER
         }
 
         public enum MDTrackerKind
@@ -89,7 +90,10 @@ namespace ModelDeploy
             MD_RES_AGE,
             MD_RES_GENDER,
             MD_RES_ASR,
-            MD_RES_TTS
+            MD_RES_TTS,
+            MD_RES_ANTISPOOF,
+            MD_RES_REID,
+            MD_RES_FORMULA
         }
 
         /* ==================== 通用几何 / 颜色（blittable） ==================== */

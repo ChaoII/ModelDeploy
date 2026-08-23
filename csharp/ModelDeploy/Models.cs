@@ -957,6 +957,29 @@ namespace ModelDeploy.Models
         }
     }
 
+    /// <summary>公式识别模型（对应 C++ FormulaRecognizer）。modelPath 为 model.onnx[|dict.txt]，
+    /// dict 可为 `model.onnx|dict.txt` 形式；LaTeX 字符串由结果句柄返回（借用指针，立即复制）。</summary>
+    public sealed class FormulaRecognizerModel : BaseModel
+    {
+        private FormulaRecognizerModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FORMULA_RECOGNIZER, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public FormulaRecognizerModel Clone() => new FormulaRecognizerModel(CloneNative());
+
+        public FormulaRecognizerModel(string modelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_FORMULA_RECOGNIZER, modelPath, opt) { }
+
+        /// <summary>识别图像中的公式，返回 LaTeX 字符串。</summary>
+        public string Predict(VisionImage image)
+        {
+            using var r = new ResultReader(PredictNative(image.Handle));
+            var status = md_result_formula(r.Result, UIntPtr.Zero, out var latex);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"Formula getter failed: {GetLastError()}");
+            return ResultReader.ReadString(latex) ?? string.Empty;
+        }
+    }
+
     /// <summary>OCR 方向分类子模型（对应 C++ Classifier）。modelPath 为 cls.onnx。</summary>
     public sealed class OcrClassifierModel : BaseModel
     {

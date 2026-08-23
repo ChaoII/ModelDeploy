@@ -315,6 +315,20 @@ public class AllModelsTests
     }
 
     [Test]
+    public void FormulaRecog_Works()
+    {
+        var model = string.Join("|",
+            Path.Combine(ModelRoot, "formula_rec.onnx"),
+            Path.Combine(GetTestDataDir(), "test_data", "ppocrv4_dict.txt"));
+        var img = Path.Combine(ImageRoot, "test_ocr.png");
+        if (!Has(Path.Combine(ModelRoot, "formula_rec.onnx")) || !Has(img)) Assert.Ignore("data missing");
+        using var vi = VisionImage.Read(img);
+        using var m = new FormulaRecognizerModel(model, CpuOrt());
+        var latex = m.Predict(vi);
+        Assert.That(latex, Is.Not.Null);
+    }
+
+    [Test]
     public void Lpr_Works()
     {
         var det = Path.Combine(ModelRoot, "yolov5plate.onnx");
