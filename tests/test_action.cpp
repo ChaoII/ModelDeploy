@@ -76,3 +76,23 @@ TEST_CASE("StGcn assemble_skeleton builds [1,C,T,V]", "[action]") {
     // t=0 关节0 y=0.0 -> C=1 起始索引 2*V
     REQUIRE(p[2 * V] == Catch::Approx((0.0f - 127.0f) / 127.0f).margin(1e-5f));
 }
+
+// BGR-to-RGB conversion check (regression for unconditional COLOR_BGR2RGB).
+TEST_CASE("TSN assemble_frames converts BGR to RGB", "[action]") {
+    const int64_t H = 2, W = 2, T = 1;
+    std::vector<ImageData> frames;
+    std::vector<uint8_t> pixels(static_cast<size_t>(H) * W * 3);
+    for (size_t i = 0; i < pixels.size(); i += 3) {
+        pixels[i] = 30;      // B
+        pixels[i + 1] = 120; // G
+        pixels[i + 2] = 255; // R
+    }
+    frames.emplace_back(ImageData::from_raw(pixels.data(), static_cast<int>(H), static_cast<int>(W),
+                                            MdImageType::PKG_BGR_U8, true));
+    Tensor out;
+    REQUIRE(TSN::assemble_frames(frames, T, H, W, &out));
+    const float* p = static_cast<const float*>(out.data());
+    REQUIRE(p[0] == Catch::Approx(255.0f / 255.0f).margin(1e-5f));       // R after conversion
+    REQUIRE(p[H * W] == Catch::Approx(120.0f / 255.0f).margin(1e-5f));   // G
+    REQUIRE(p[2 * H * W] == Catch::Approx(30.0f / 255.0f).margin(1e-5f));// B
+}

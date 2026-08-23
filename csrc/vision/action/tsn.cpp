@@ -1,6 +1,5 @@
 #include "vision/action/tsn.h"
 #include <algorithm>
-#include <cstring>
 #include <opencv2/imgproc.hpp>
 #include "core/md_log.h"
 
@@ -41,7 +40,7 @@ bool TSN::initialize() {
 
 bool TSN::assemble_frames(const std::vector<ImageData>& frames, int64_t T,
                           int64_t H, int64_t W, Tensor* out) {
-    // 均匀采样 T 帧（不足则循环填充到 T）
+    // 均匀采样 T 帧
     const size_t K = frames.size();
     if (K == 0 || T <= 0 || H <= 0 || W <= 0) return false;
     std::vector<int> idxs;
@@ -59,8 +58,13 @@ bool TSN::assemble_frames(const std::vector<ImageData>& frames, int64_t T,
         cv::Mat src;
         if (!f.asMat(&src) || src.empty()) return false;
         cv::Mat rgb, resized;
-        if (src.channels() == 3 && src.type() == CV_8UC3)
+        const MdImageType ptype = f.type();
+        const bool is_bgr = ptype == MdImageType::PKG_BGR_U8 || ptype == MdImageType::PLA_BGR_U8;
+        const bool is_rgb = ptype == MdImageType::PKG_RGB_U8 || ptype == MdImageType::PLA_RGB_U8;
+        if (src.channels() == 3 && src.type() == CV_8UC3 && is_bgr)
             cv::cvtColor(src, rgb, cv::COLOR_BGR2RGB);
+        else if (src.channels() == 3 && src.type() == CV_8UC3 && is_rgb)
+            rgb = src;
         else if (src.channels() == 1)
             cv::cvtColor(src, rgb, cv::COLOR_GRAY2RGB);
         else
