@@ -41,6 +41,7 @@ namespace modeldeploy::vision {
     void bind_reid(const pybind11::module&);
     void bind_formula_recognizer(const pybind11::module&);
     void bind_action(pybind11::module&);
+    void bind_landmark(pybind11::module&);
 
 
 
@@ -81,5 +82,6 @@ namespace modeldeploy::vision {
         bind_reid(m);
         bind_formula_recognizer(m);
         bind_action(m);
+        bind_landmark(m);
     }
 }
