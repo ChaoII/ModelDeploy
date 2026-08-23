@@ -256,6 +256,58 @@ impl Model {
         Ok(unsafe { cstr_to_string(text) })
     }
 
+    fn asr_result_from(raw: &ffi::MDAsrResult) -> AsrResult {
+        let s = |p: *const libc::c_char| {
+            if p.is_null() {
+                String::new()
+            } else {
+                unsafe { cstr_to_string(p) }
+            }
+        };
+        AsrResult {
+            text: s(raw.text),
+            language: s(raw.language),
+            emotion: s(raw.emotion),
+            event: s(raw.event),
+            task: s(raw.task),
+            itn: raw.itn != 0,
+            nospeech: raw.nospeech != 0,
+        }
+    }
+
+    /// ASR：从 wav 文件识别（结构化 SenseVoice 复任务标签）
+    pub fn asr_wav_result(&self, wav_path: &str) -> Result<AsrResult, MdError> {
+        let cpath = CString::new(wav_path).map_err(|_| MdError::InvalidArgument("wav".into()))?;
+        let mut raw = ffi::MDAsrResult {
+            text: ptr::null(),
+            language: ptr::null(),
+            emotion: ptr::null(),
+            event: ptr::null(),
+            task: ptr::null(),
+            itn: 0,
+            nospeech: 0,
+        };
+        check_status(unsafe { ffi::md_audio_asr_wav_result(self.handle, cpath.as_ptr(), &mut raw) })?;
+        Ok(Self::asr_result_from(&raw))
+    }
+
+    /// ASR：从 PCM float 采样识别（结构化 SenseVoice 复任务标签）
+    pub fn asr_result(&self, samples: &[f32], sample_rate: i32) -> Result<AsrResult, MdError> {
+        let mut raw = ffi::MDAsrResult {
+            text: ptr::null(),
+            language: ptr::null(),
+            emotion: ptr::null(),
+            event: ptr::null(),
+            task: ptr::null(),
+            itn: 0,
+            nospeech: 0,
+        };
+        check_status(unsafe {
+            ffi::md_audio_asr_result(self.handle, samples.as_ptr(), samples.len(), sample_rate, &mut raw)
+        })?;
+        Ok(Self::asr_result_from(&raw))
+    }
+
     /// TTS：文本合成音频
     pub fn tts(&self, text: &str, voice: &str, speed: f32) -> Result<TtsAudio, MdError> {
         let ctext = CString::new(text).map_err(|_| MdError::InvalidArgument("text".into()))?;
@@ -1392,6 +1444,16 @@ impl SenseVoice {
     /// 从 PCM float 采样识别文本
     pub fn predict(&self, samples: &[f32], sample_rate: i32) -> Result<String, MdError> {
         self.inner.asr(samples, sample_rate)
+    }
+
+    /// 结构化识别（SenseVoice 复任务标签），从 wav 文件
+    pub fn predict_wav_structured(&self, wav_path: &str) -> Result<AsrResult, MdError> {
+        self.inner.asr_wav_result(wav_path)
+    }
+
+    /// 结构化识别（SenseVoice 复任务标签），从 PCM float 采样
+    pub fn predict_structured(&self, samples: &[f32], sample_rate: i32) -> Result<AsrResult, MdError> {
+        self.inner.asr_result(samples, sample_rate)
     }
 }
 

@@ -651,6 +651,21 @@ fn test_asr() -> Result<()> {
 
 #[test]
 #[ignore = "requires build_audio SDK with audio module"]
+fn test_asr_structured() -> Result<()> {
+    let opt = cpu_opt()?;
+    let dir = test_data("test_models/onnx/sense_voice");
+    let path = format!("{}/model.int8.onnx|{}/tokens.txt", dir, dir);
+    let model = SenseVoice::new(&path, &opt)?;
+    let wav = format!("{}/test_wavs/zh.wav", dir);
+    let r = model.predict_wav_structured(&wav)?;
+    assert!(!r.text.is_empty());
+    assert_eq!(r.language, "zh");
+    assert_eq!(r.event, "Speech");
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires build_audio SDK with audio module"]
 fn test_tts() -> Result<()> {
     let opt = cpu_opt()?;
     let dir = test_data("test_models/onnx/kokoro_v1_1");

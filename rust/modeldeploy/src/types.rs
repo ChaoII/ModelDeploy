@@ -158,6 +158,18 @@ pub struct AsrText {
     pub text: String,
 }
 
+/// ASR 结构化结果（SenseVoice 复任务标签）
+#[derive(Debug, Clone)]
+pub struct AsrResult {
+    pub text: String,
+    pub language: String,
+    pub emotion: String,
+    pub event: String,
+    pub task: String,
+    pub itn: bool,
+    pub nospeech: bool,
+}
+
 /// TTS 合成结果
 #[derive(Debug, Clone)]
 pub struct TtsAudio {

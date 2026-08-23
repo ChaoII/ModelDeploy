@@ -167,6 +167,18 @@ pub struct MDBox {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct MDAsrResult {
+    pub text: *const c_char,
+    pub language: *const c_char,
+    pub emotion: *const c_char,
+    pub event: *const c_char,
+    pub task: *const c_char,
+    pub itn: c_int,
+    pub nospeech: c_int,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct MDPoint {
     pub x: c_float,
     pub y: c_float,
@@ -420,6 +432,9 @@ extern "C" {
     // ── 音频 ──
     pub fn md_audio_asr_wav(h: MDModelHandle, wav: *const c_char, text: *mut *const c_char) -> MDStatus;
     pub fn md_audio_asr(h: MDModelHandle, samples: *const c_float, n: usize, sample_rate: c_int, text: *mut *const c_char) -> MDStatus;
+    pub fn md_audio_asr_wav_result(h: MDModelHandle, wav: *const c_char, out: *mut MDAsrResult) -> MDStatus;
+    pub fn md_audio_asr_result(h: MDModelHandle, samples: *const c_float, n: usize, sample_rate: c_int,
+                               out: *mut MDAsrResult) -> MDStatus;
     pub fn md_audio_tts(h: MDModelHandle, text: *const c_char, voice: *const c_char, speed: c_float,
         sample_rate: *mut c_int, audio: *mut *const c_float, audio_n: *mut usize) -> MDStatus;
     pub fn md_audio_speaker_embed(h: MDModelHandle, samples: *const c_float, n: usize,
