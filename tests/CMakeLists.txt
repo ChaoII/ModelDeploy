@@ -27,6 +27,7 @@ set(TEST_SOURCES
     test_cv_tools.cpp
     test_cv_solutions.cpp
     test_audio_tools.cpp
+    test_audio_solutions.cpp
     test_landmark.cpp
     test_action.cpp
     test_reid.cpp
