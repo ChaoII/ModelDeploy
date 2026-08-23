@@ -10,6 +10,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/frame.h>
+#include <libswscale/swscale.h>
 }
 
 namespace modeldeploy::video {
@@ -32,12 +33,17 @@ public:
 
 private:
     void cleanup();
+    // 把 frame_（非 NV12）经 swscale 转成 NV12 存到 sws_frame_；成功返回 true
+    bool convert_to_nv12();
 
     AVFormatContext* fmt_ctx_ = nullptr;
     AVCodecContext* dec_ctx_ = nullptr;
     int video_stream_idx_ = -1;
     AVPacket* pkt_ = nullptr;
     AVFrame* frame_ = nullptr;    // 解码器输出帧（被 next 内 ref 到 owner）
+    AVFrame* sws_frame_ = nullptr;  // swscale 转换目标（NV12），持有自有 buffer
+    SwsContext* sws_ctx_ = nullptr; // swscale 上下文（源格式变化时重建）
+    int sws_src_fmt_ = -1;          // sws_ctx_ 对应的源像素格式
     int width_ = 0;
     int height_ = 0;
     double fps_ = 25.0;
