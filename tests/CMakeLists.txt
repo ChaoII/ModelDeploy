@@ -24,6 +24,7 @@ set(TEST_SOURCES
     test_tracking.cpp
     test_barcode.cpp
     test_hand.cpp
+    test_action.cpp
     test_reid.cpp
     test_speaker_verify.cpp
     test_formula_recognition.cpp
