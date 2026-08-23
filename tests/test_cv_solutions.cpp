@@ -1,9 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <opencv2/opencv.hpp>
 #include "vision/solutions/object_counter.h"
 #include "vision/solutions/heatmap.h"
 #include "vision/solutions/speed_estimator.h"
 #include "vision/solutions/distance_estimator.h"
+#include "vision/solutions/object_cropper.h"
+#include "vision/solutions/object_blur.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::solution;
@@ -71,4 +74,27 @@ TEST_CASE("DistanceEstimator pair distances", "[cv_solution]") {
     REQUIRE(d[0].second == Catch::Approx(5.0f).margin(1e-3f));
     auto dm = de.pair_distances_m(t);
     REQUIRE(dm[0].second == Catch::Approx(2.5f).margin(1e-3f));
+}
+
+TEST_CASE("ObjectCropper extracts ROI", "[cv_solution]") {
+    std::vector<uint8_t> pixels(20 * 20 * 3, 0);
+    ImageData img = ImageData::from_raw(pixels.data(), 20, 20, MdImageType::PKG_BGR_U8, true);
+    ObjectCropper cr;
+    ImageData out;
+    cr.crop(img, Rect2f(2, 2, 10, 8), &out);
+    REQUIRE(out.width() == 10);
+    REQUIRE(out.height() == 8);
+}
+
+TEST_CASE("ObjectBlur blurs region only", "[cv_solution]") {
+    cv::Mat m(20, 20, CV_8UC3, cv::Scalar(0, 0, 0));
+    cv::rectangle(m, cv::Rect(5, 5, 10, 10), cv::Scalar(255, 255, 255), cv::FILLED);
+    ImageData img(m);
+    ObjectBlur bl(11);
+    ImageData out;
+    bl.blur(img, Rect2f(5, 5, 10, 10), &out);
+    cv::Mat om;
+    REQUIRE(out.asMat(&om));
+    REQUIRE(om.at<cv::Vec3b>(10, 10)[0] < 255);   // 框内中值被模糊
+    REQUIRE(om.at<cv::Vec3b>(1, 1)[0] == 0);      // 框外角不受影响
 }
