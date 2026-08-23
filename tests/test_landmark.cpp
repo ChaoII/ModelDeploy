@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "vision/landmark/vehicle_keypoint.h"
+#include "vision/landmark/face_landmark.h"
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::vision;
@@ -16,6 +17,12 @@ namespace {
         const char* dir = std::getenv("TEST_DATA_DIR");
         const fs::path base = (dir && *dir) ? fs::path(dir) / "test_data" : fs::current_path() / "test_data";
         return base / "test_models" / "onnx" / "vehicle_keypoint.onnx";
+    }
+
+    fs::path face_model_path() {
+        const char* dir = std::getenv("TEST_DATA_DIR");
+        const fs::path base = (dir && *dir) ? fs::path(dir) / "test_data" : fs::current_path() / "test_data";
+        return base / "test_models" / "onnx" / "2d106det.onnx";
     }
 }
 
@@ -48,4 +55,28 @@ TEST_CASE("VehicleKeypoint set_keypoints_num override", "[landmark]") {
 TEST_CASE("VehicleKeypoint construction without weights", "[landmark]") {
     landmark::VehicleKeypoint model("nonexistent_vehicle_keypoint.onnx");
     REQUIRE_FALSE(model.is_initialized());
+}
+
+TEST_CASE("FaceLandmark construction without weights", "[landmark]") {
+    landmark::FaceLandmark model("nonexistent_2d106det.onnx");
+    REQUIRE_FALSE(model.is_initialized());
+}
+
+TEST_CASE("FaceLandmark predict produces 106 keypoints", "[landmark]") {
+    auto modelfile = face_model_path();
+    if (!fs::exists(modelfile)) {
+        WARN("2d106det.onnx 权重缺失（外链 modelscope），跳过 predict 主路径");
+        return;
+    }
+    modeldeploy::RuntimeOption opt;
+    opt.use_cpu();
+    landmark::FaceLandmark model(modelfile.string(), opt);
+
+    cv::Mat canvas(192, 192, CV_8UC3, cv::Scalar(128, 128, 128));
+    ImageData img(canvas);
+    std::vector<KeyPointsResult> results;
+    REQUIRE(model.predict(img, &results));
+    REQUIRE_FALSE(results.empty());
+    REQUIRE(results.front().keypoints.size() == 106);
+    REQUIRE(results.front().box.width > 0);
 }
