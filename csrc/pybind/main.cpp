@@ -16,6 +16,11 @@ namespace modeldeploy::audio {
     void bind_tools(pybind11::module&);
 }
 
+namespace modeldeploy::nlp {
+    void bind_tools(pybind11::module&);
+    void bind_solutions(pybind11::module&);
+}
+
 
 namespace modeldeploy::pipeline {
     void bind_pipeline(pybind11::module&);
@@ -66,6 +71,14 @@ namespace modeldeploy {
         auto audio_tools_m = audio_module.def_submodule("tools", "Audio tools");
         audio::bind_solutions(audio_solutions_m);
         audio::bind_tools(audio_tools_m);
+#endif
+
+#ifdef BUILD_NLP
+        auto nlp_module = m.def_submodule("nlp", "NLP module of Modeldeploy.");
+        auto nlp_solutions_m = nlp_module.def_submodule("solutions", "NLP solutions");
+        auto nlp_tools_m = nlp_module.def_submodule("tools", "NLP tools");
+        nlp::bind_tools(nlp_tools_m);
+        nlp::bind_solutions(nlp_solutions_m);
 #endif
     }
 }
