@@ -39,6 +39,7 @@ namespace modeldeploy::vision {
     void bind_barcode(const pybind11::module&);
     void bind_hand(const pybind11::module&);
     void bind_reid(const pybind11::module&);
+    void bind_formula_recognizer(const pybind11::module&);
 
 
 
@@ -77,5 +78,6 @@ namespace modeldeploy::vision {
         bind_barcode(m);
         bind_hand(m);
         bind_reid(m);
+        bind_formula_recognizer(m);
     }
 }

@@ -22,10 +22,12 @@ namespace modeldeploy::vision::ocr {
     public:
         DocToMarkdown() = default;
 
-        void set_layout(std::unique_ptr<StructureV2Layout> l) { layout_ = std::move(l); }
-        void set_table(std::unique_ptr<PPStructureV2Table> t) { table_ = std::move(t); }
-        void set_formula(std::unique_ptr<FormulaRecognizer> f) { formula_ = std::move(f); }
-        void set_ocr(std::unique_ptr<PaddleOCR> o) { ocr_ = std::move(o); }
+        // Non-owning borrow: sub-models stay alive on the caller's side (e.g. the
+        // Python bound instances). The orchestration only reads from them.
+        void set_layout(StructureV2Layout* l) { layout_ = l; }
+        void set_table(PPStructureV2Table* t) { table_ = t; }
+        void set_formula(FormulaRecognizer* f) { formula_ = f; }
+        void set_ocr(PaddleOCR* o) { ocr_ = o; }
 
         // CDLA label_id -> region type name (self-maintained; postprocessor has no names)
         enum class RegionType { TEXT, TITLE, TABLE, FORMULA, FIGURE, OTHER };
@@ -37,9 +39,9 @@ namespace modeldeploy::vision::ocr {
         static RegionType label_to_region(int32_t label_id);
         static void append_markdown(std::string* md, const std::string& text, RegionType type);
 
-        std::unique_ptr<StructureV2Layout> layout_;
-        std::unique_ptr<PPStructureV2Table> table_;
-        std::unique_ptr<FormulaRecognizer> formula_;
-        std::unique_ptr<PaddleOCR> ocr_;
+        StructureV2Layout* layout_ = nullptr;
+        PPStructureV2Table* table_ = nullptr;
+        FormulaRecognizer* formula_ = nullptr;
+        PaddleOCR* ocr_ = nullptr;
     };
 } // namespace modeldeploy::vision::ocr
