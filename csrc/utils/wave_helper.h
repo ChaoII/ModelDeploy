@@ -90,7 +90,7 @@ struct WaveHeader {
     int32_t sub_chunk2_size; // size of sub_chunk2
 };
 
-bool load_wav_file(const char* filename, int32_t* sampling_rate,
+inline bool load_wav_file(const char* filename, int32_t* sampling_rate,
                    std::vector<float>& data) {
     WaveHeader header{};
     std::ifstream is(filename, std::ifstream::binary);
