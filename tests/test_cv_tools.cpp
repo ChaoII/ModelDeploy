@@ -2,6 +2,7 @@
 #include <catch2/catch_approx.hpp>
 #include "vision/tools/detections.h"
 #include "vision/tools/zone.h"
+#include "vision/tools/annotator.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tool;
@@ -60,4 +61,29 @@ TEST_CASE("PolygonZone contains + current_count", "[cv_tools]") {
     REQUIRE_FALSE(z.contains(Point2f(20,20)));
     z.update({Point2f(2,2), Point2f(50,50)});
     REQUIRE(z.current_count() == 1);
+}
+
+static ImageData make_canvas(int w, int h) {
+    std::vector<uint8_t> pixels(static_cast<size_t>(w) * h * 3, 0);
+    return ImageData::from_raw(pixels.data(), w, h, MdImageType::PKG_BGR_U8, true);
+}
+
+TEST_CASE("Annotator draws rectangle on canvas", "[cv_tools]") {
+    ImageData frame = make_canvas(20, 20);
+    Annotator ann(&frame);
+    ann.rectangle(Rect2f(2, 2, 10, 10), cv::Scalar(0, 0, 255), 2);
+    ann.text("obj", Point2f(2, 2), cv::Scalar(255, 255, 255), 0.5);
+    cv::Mat m;
+    REQUIRE(frame.asMat(&m));
+    REQUIRE(m.at<cv::Vec3b>(3, 3)[2] == 255); // 边框上红通道
+}
+
+TEST_CASE("draw_box_labels draws boxes", "[cv_tools]") {
+    ImageData frame = make_canvas(30, 30);
+    Detections d;
+    d.boxes = {Rect2f(1, 1, 5, 5)}; d.class_id = {0}; d.confidence = {0.9f};
+    draw_box_labels(d, &frame, {{0, "person"}});
+    cv::Mat m;
+    REQUIRE(frame.asMat(&m));
+    REQUIRE(m.at<cv::Vec3b>(2, 2)[2] == 255);
 }
