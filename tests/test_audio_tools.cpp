@@ -58,3 +58,37 @@ TEST_CASE("Fbank produces frames x bins non-degenerate", "[audio_tools]") {
     for (const auto& row : frames) for (float v : row) energy += v * v;
     REQUIRE(energy > 0.0f);
 }
+#include "audio/tools/waveform.h"
+
+TEST_CASE("Spectrum single tone peak bin", "[audio_tools]") {
+    const size_t N = 1024;
+    std::vector<float> s(N);
+    for (size_t i = 0; i < N; ++i) s[i] = std::sin(2 * 3.14159265f * 100.0f * (i / 1024.0f));
+    Spectrum sp(1024);
+    auto mag = sp.magnitudes(s);
+    REQUIRE(mag.size() == N / 2 + 1);
+    size_t best = 0; float maxv = -1;
+    for (size_t k = 0; k < mag.size(); ++k) if (mag[k] > maxv) { maxv = mag[k]; best = k; }
+    REQUIRE((size_t)(std::abs((long)((int)best - 100))) <= 2);
+}
+
+TEST_CASE("Waveform downsample reduces length", "[audio_tools]") {
+    std::vector<float> s(4000, 0.5f);
+    auto d = Waveform::downsample(s, 200);
+    REQUIRE(d.size() <= 200);
+}
+#include "audio/tools/vad_segment.h"
+
+TEST_CASE("VadSegment splits speech vs silence", "[audio_tools]") {
+    const int sr = 16000;
+    std::vector<float> sig;
+    auto tone = [&](float amp, float dur_s){ for (int i = 0; i < (int)(sr*dur_s); ++i) sig.push_back(amp * std::sin(2*3.14159265f*440.0f*(i/(double)sr))); };
+    auto silence = [&](float dur_s){ sig.resize(sig.size() + (size_t)(sr*dur_s), 0.0f); };
+    tone(0.9f, 1.0f); silence(0.5f); tone(0.9f, 1.0f);
+    VadSegment vad(sr, 0.01f, 200, 200);
+    vad.feed(sig);
+    auto segs = vad.segments();
+    REQUIRE(segs.size() >= 2);
+    REQUIRE(segs[0].samples.size() > 0);
+    REQUIRE(segs[1].start_ms > segs[0].end_ms);
+}
