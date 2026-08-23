@@ -5,6 +5,7 @@
 #include "vision/tools/annotator.h"
 #include "vision/tools/metrics.h"
 #include "vision/tools/slicer.h"
+#include "vision/tools/smoother.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::tool;
@@ -127,4 +128,18 @@ TEST_CASE("Slicer reassembles mapped boxes", "[cv_tools]") {
     REQUIRE(mapped.size() == 1);
     REQUIRE(mapped[0].x == Catch::Approx(50.0f));  // tile offset (50,50)
     REQUIRE(mapped[0].y == Catch::Approx(50.0f));
+}
+
+TEST_CASE("Smoother EMA converges", "[cv_tools]") {
+    Detections in;
+    in.boxes = {Rect2f(10,20,30,40)}; in.confidence = {0.9f}; in.class_id = {0}; in.tracker_id = {1};
+    DetectionSmoother sm(0.5);
+    auto a = sm.update(in);
+    REQUIRE(a.boxes[0].x == Catch::Approx(10.0f));
+    in.boxes[0] = Rect2f(20,20,30,40);
+    auto b = sm.update(in);
+    REQUIRE((b.boxes[0].x > 10.0f && b.boxes[0].x < 20.0f)); // 首->15
+    for (int i = 0; i < 10; ++i) sm.update(in);
+    auto c = sm.update(in);
+    REQUIRE(c.boxes[0].x == Catch::Approx(20.0f).margin(0.05f));
 }
