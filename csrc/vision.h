@@ -3,10 +3,13 @@
 //
 #pragma once
 
+#include "vision/ocr/doc_to_markdown.h"
+#include "vision/ocr/formula_recognition.h"
 #include "vision/ocr/ppocr.h"
-#include "vision/ocr/recognizer.h"
-#include "vision/ocr/structurev2_table.h"
 #include "vision/ocr/ppstructurev2_table.h"
+#include "vision/ocr/recognizer.h"
+#include "vision/ocr/structurev2_layout.h"
+#include "vision/ocr/structurev2_table.h"
 #include "vision/detection/ultralytics_det.h"
 #include "vision/obb/ultralytics_obb.h"
 #include "vision/pose/ultralytics_pose.h"
