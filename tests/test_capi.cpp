@@ -1583,3 +1583,22 @@ TEST_CASE("capi vehicle keypoint / face landmark enum + error path", "[capi]") {
     md_option_destroy(opt);
     md_model_destroy(veh);
 }
+
+TEST_CASE("cv solution + tool capi", "[capi]") {
+    MDSolutionHandle h = nullptr;
+    REQUIRE(md_solution_create(&h, MD_SOLUTION_OBJECT_COUNTER) == MD_OK);
+    REQUIRE(md_solution_object_counter_set_line(h, 5.0f, 0.0f, 5.0f, 10.0f) == MD_OK);
+    float b1[4] = {0,4,2,2}; int lid[1] = {0}; int tid[1] = {1};
+    REQUIRE(md_solution_object_counter_update(h, b1, 1, lid, tid) == MD_OK);
+    int in = -1, oc = -1;
+    REQUIRE(md_solution_object_counter_hline(h, &in, &oc) == MD_OK);
+    REQUIRE(in == 0);
+    float b2[4] = {8,4,2,2};
+    REQUIRE(md_solution_object_counter_update(h, b2, 1, lid, tid) == MD_OK);
+    REQUIRE(md_solution_object_counter_hline(h, &in, &oc) == MD_OK);
+    REQUIRE(in == 1);
+    REQUIRE(md_solution_destroy(h) == MD_OK);
+    float iou = 0;
+    REQUIRE(md_vision_iou4(0,0,10,10, 0,0,10,10, &iou) == MD_OK);
+    REQUIRE(iou == Catch::Approx(1.0f).margin(1e-5f));
+}

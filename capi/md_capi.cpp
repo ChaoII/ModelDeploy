@@ -40,6 +40,13 @@
 #include "csrc/vision/lpr/lpr_rec/lpr_rec.h"
 #include "csrc/vision/barcode/barcode.h"
 #include "csrc/vision/tracking/base_tracker.h"
+#include "csrc/vision/tools/detections.h"
+#include "csrc/vision/solutions/object_counter.h"
+#include "csrc/vision/solutions/heatmap.h"
+#include "csrc/vision/solutions/speed_estimator.h"
+#include "csrc/vision/solutions/distance_estimator.h"
+#include "csrc/vision/solutions/workout_monitor.h"
+#include "csrc/vision/solutions/parking_manager.h"
 #include "csrc/vision/tracking/bytetrack.h"
 #include "csrc/vision/tracking/botsort.h"
 #include "csrc/vision/tracking/strongsort.h"
@@ -3850,4 +3857,145 @@ MDStatus md_barcode_detect(MDBarcodeHandle h, MDImageHandle img,
     }
     *count = n;
     return MD_OK;
+}
+
+/* ==================== 解决方案（vision::solution / tool） ==================== */
+
+struct md_solution_handle {
+    MDSolutionKind kind;
+    void* obj;
+};
+
+MDStatus md_solution_create(MDSolutionHandle* out, MDSolutionKind kind) {
+    if (!out) return MD_ERR_NULL_POINTER;
+    auto* h = new md_solution_handle();
+    h->kind = kind;
+#ifdef BUILD_VISION
+    switch (kind) {
+      case MD_SOLUTION_OBJECT_COUNTER: h->obj = new vision::solution::ObjectCounter(); break;
+      case MD_SOLUTION_HEATMAP:        h->obj = new vision::solution::Heatmap(); break;
+      case MD_SOLUTION_SPEED:          h->obj = new vision::solution::SpeedEstimator(); break;
+      case MD_SOLUTION_DISTANCE:       h->obj = new vision::solution::DistanceEstimator(); break;
+      case MD_SOLUTION_WORKOUT:        h->obj = new vision::solution::WorkoutMonitor(); break;
+      case MD_SOLUTION_PARKING:        h->obj = new vision::solution::ParkingManager(); break;
+      default: delete h; return MD_ERR_INVALID_ARGUMENT;
+    }
+    *out = h;
+    return MD_OK;
+#else
+    delete h; set_error("built without BUILD_VISION"); return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_destroy(MDSolutionHandle h) {
+    if (!h) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    switch (h->kind) {
+      case MD_SOLUTION_OBJECT_COUNTER: delete static_cast<vision::solution::ObjectCounter*>(h->obj); break;
+      case MD_SOLUTION_HEATMAP:        delete static_cast<vision::solution::Heatmap*>(h->obj); break;
+      case MD_SOLUTION_SPEED:          delete static_cast<vision::solution::SpeedEstimator*>(h->obj); break;
+      case MD_SOLUTION_DISTANCE:       delete static_cast<vision::solution::DistanceEstimator*>(h->obj); break;
+      case MD_SOLUTION_WORKOUT:        delete static_cast<vision::solution::WorkoutMonitor*>(h->obj); break;
+      case MD_SOLUTION_PARKING:        delete static_cast<vision::solution::ParkingManager*>(h->obj); break;
+      default: break;
+    }
+#endif
+    delete h;
+    return MD_OK;
+}
+
+MDStatus md_solution_object_counter_set_line(MDSolutionHandle h, float ax, float ay, float bx, float by) {
+    if (!h) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_OBJECT_COUNTER) return MD_ERR_INVALID_ARGUMENT;
+    static_cast<vision::solution::ObjectCounter*>(h->obj)
+        ->set_line(vision::Point2f(ax, ay), vision::Point2f(bx, by));
+    return MD_OK;
+#else
+    (void)ax;(void)ay;(void)bx;(void)by; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_object_counter_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                           const int* label_ids, const int* track_ids) {
+    if (!h || !boxes || n == 0 || !label_ids || !track_ids) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_OBJECT_COUNTER) return MD_ERR_INVALID_ARGUMENT;
+    auto* c = static_cast<vision::solution::ObjectCounter*>(h->obj);
+    std::vector<tracking::TrackResult> tracks(n);
+    for (size_t i = 0; i < n; ++i) {
+        tracks[i].track_id = track_ids[i];
+        tracks[i].box = vision::Rect2f(boxes[i*4+0], boxes[i*4+1], boxes[i*4+2], boxes[i*4+3]);
+        tracks[i].label_id = label_ids[i];
+        tracks[i].score = 1.0f;
+    }
+    c->update(tracks);
+    return MD_OK;
+#else
+    (void)boxes;(void)n;(void)label_ids;(void)track_ids; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_object_counter_hline(MDSolutionHandle h, int* in, int* out_count) {
+    if (!h || !in || !out_count) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_OBJECT_COUNTER) return MD_ERR_INVALID_ARGUMENT;
+    auto st = static_cast<vision::solution::ObjectCounter*>(h->obj)->stats();
+    *in = st.line_in; *out_count = st.line_out;
+    return MD_OK;
+#else
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_heatmap_set_size(MDSolutionHandle h, int w, int hh) {
+    if (!h) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_HEATMAP) return MD_ERR_INVALID_ARGUMENT;
+    static_cast<vision::solution::Heatmap*>(h->obj)->set_size(w, hh);
+    return MD_OK;
+#else
+    (void)w;(void)hh; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_heatmap_update(MDSolutionHandle h, const float* boxes, size_t n, int frame_w, int frame_h) {
+    if (!h || !boxes || n == 0) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_HEATMAP) return MD_ERR_INVALID_ARGUMENT;
+    auto* hm = static_cast<vision::solution::Heatmap*>(h->obj);
+    std::vector<tracking::TrackResult> tracks(n);
+    for (size_t i = 0; i < n; ++i) {
+        tracks[i].track_id = (int)i;
+        tracks[i].box = vision::Rect2f(boxes[i*4+0], boxes[i*4+1], boxes[i*4+2], boxes[i*4+3]);
+    }
+    hm->update(tracks, frame_w, frame_h);
+    return MD_OK;
+#else
+    (void)boxes;(void)n;(void)frame_w;(void)frame_h; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_heatmap_peak(MDSolutionHandle h, int* x, int* y) {
+    if (!h || !x || !y) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_HEATMAP) return MD_ERR_INVALID_ARGUMENT;
+    auto p = static_cast<vision::solution::Heatmap*>(h->obj)->peak();
+    *x = p.first; *y = p.second;
+    return MD_OK;
+#else
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
+                        float bx, float by, float bw, float bh, float* out) {
+    if (!out) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    *out = vision::tool::iou(vision::Rect2f(ax,ay,aw,ah), vision::Rect2f(bx,by,bw,bh));
+    return MD_OK;
+#else
+    (void)ax;(void)ay;(void)aw;(void)ah;(void)bx;(void)by;(void)bw;(void)bh;
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
 }

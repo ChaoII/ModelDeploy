@@ -65,6 +65,7 @@ typedef struct md_model_handle* MDModelHandle;
 typedef struct md_image_handle* MDImageHandle;
 typedef struct md_result_handle* MDResultHandle;
 typedef struct md_option_handle* MDOptionHandle;
+typedef struct md_solution_handle* MDSolutionHandle;
 
 /* ==================== 模型类型 ==================== */
 
@@ -611,6 +612,30 @@ typedef struct MDDrawOptions {
  *               ocr / lpr / attr / classification；其余返回 MD_ERR_UNSUPPORTED_TYPE。
  * 注意：绘制需在结果句柄存活期间调用（Predict 返回的结果对象持有句柄，绘制前请勿释放）。 */
 MD_CAPI_EXPORT MDStatus md_draw_result(MDImageHandle, MDResultHandle, const MDDrawOptions* opt);
+
+/* ==================== 解决方案（vision::solution/tool） ==================== */
+
+typedef enum MD_SOLUTION_KIND {
+    MD_SOLUTION_OBJECT_COUNTER = 0,
+    MD_SOLUTION_HEATMAP,
+    MD_SOLUTION_SPEED,
+    MD_SOLUTION_DISTANCE,
+    MD_SOLUTION_WORKOUT,
+    MD_SOLUTION_PARKING,
+} MDSolutionKind;
+
+MD_CAPI_EXPORT MDStatus md_solution_create(MDSolutionHandle* out, MDSolutionKind kind);
+MD_CAPI_EXPORT MDStatus md_solution_destroy(MDSolutionHandle);
+MD_CAPI_EXPORT MDStatus md_solution_object_counter_set_line(MDSolutionHandle h, float ax, float ay, float bx, float by);
+MD_CAPI_EXPORT MDStatus md_solution_object_counter_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                                          const int* label_ids, const int* track_ids);
+MD_CAPI_EXPORT MDStatus md_solution_object_counter_hline(MDSolutionHandle h, int* in, int* out_count);
+MD_CAPI_EXPORT MDStatus md_solution_heatmap_set_size(MDSolutionHandle h, int w, int hh);
+MD_CAPI_EXPORT MDStatus md_solution_heatmap_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                                   int frame_w, int frame_h);
+MD_CAPI_EXPORT MDStatus md_solution_heatmap_peak(MDSolutionHandle h, int* x, int* y);
+MD_CAPI_EXPORT MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
+                                       float bx, float by, float bw, float bh, float* out);
 
 #ifdef __cplusplus
 }
