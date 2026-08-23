@@ -90,6 +90,12 @@ cmake --build build
 | `demo_action` | 视频动作识别（TSN，RGB 帧，VideoDecoder 抽帧） | `onnx/tsn/*.onnx` | 视频 mp4 | 打印 top3 动作 label+score（用法 `demo_action <tsn.onnx> <video.mp4>`） |
 | `demo_action_skeleton` | 骨架动作识别（ST-GCN，VideoDecoder + UltralyticsPose 提关键点） | `onnx/stgcn/*.onnx|pose.onnx` | 视频 mp4 | 打印动作 label+score（用法 `demo_action_skeleton <stgcn.onnx> <pose.onnx> <video.mp4>`） |
 | `demo_landmark` | 关键点扩展（车辆关键点 / 面部 Landmark 106 点） | `onnx/vehicle_keypoint/*.onnx|onnx/2d106det/*.onnx` | 图片 jpg | 打印各类键点数量与坐标（用法 `demo_landmark <vehicle.onnx|none> <face.onnx|none> <image.jpg>`，`none` 跳过对应模型） |
+| `demo_tools` | CV 纯工具（Annotator 可视化 / LineZone / PolygonZone / Metrics mAP） | 无 | 图片（输出路径） | `demo_tools <out.png>`，合成画布演示 draw_box_labels + 区域/线计数 + metrics，无需权重 |
+| `demo_solutions` | CV 解决方案（ObjectCounter 跨线计数 / Heatmap 热力图 / SpeedEstimator 测速 / ParkingManager 车位） | 无 | 合成轨迹 | 打印 line_in/out、热力峰点、速度 m/s、车位占用，无需权重 |
+| `demo_nlp` | NLP 工具（分句 / 关键词 / 统计）+ 可选 BERT 文本分类 | `onnx/bert/*.onnx` 可选 | 文本 | `demo_nlp [bert.onnx] [text]`，无 onnx 时演示 Splitter/Keywords/Stats，有 onnx 时输出分类 (label, score) |
+| `demo_diarization` | 说话人分段（VAD 切段骨架） | 无 | 音频 wav 可选 | `demo_diarization [input.wav]`，合成/读取音频 -> 打印 [start_ms, end_ms] 段 |
+| `demo_stream_stt` | 流式语音识别骨架（分块 push + on_text 回调） | 无 | 合成音频 | 分块推送 -> run_once 打印 VAD 分段，缺 SenseVoice 权重不崩 |
+| `demo_tts_batch` | TTS 批处理队列（enqueue/dequeue_all） | 无 | 文本 | 注入 mock 合成器演示队列：打印每条音频长度 |
 
 > **跟踪 demo**：无真实视频时用单张测试图（`test_detection1.jpg` 等）模拟多帧序列——把同一批检测框按帧做轻微确定性抖动连续送入追踪器，展示同一物体在帧间保持**稳定 track_id**。逐帧打印 track 数量，并统计"稳定物体数（每个物体跨帧只使用单一 track_id）"。
 

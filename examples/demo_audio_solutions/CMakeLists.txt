@@ -1,0 +1,6 @@
+add_executable(demo_diarization demo_diarization.cpp)
+add_executable(demo_stream_stt demo_stream_stt.cpp)
+add_executable(demo_tts_batch demo_tts_batch.cpp)
+target_link_libraries(demo_diarization PRIVATE ${LIBRARY_NAME})
+target_link_libraries(demo_stream_stt PRIVATE ${LIBRARY_NAME})
+target_link_libraries(demo_tts_batch PRIVATE ${LIBRARY_NAME})
