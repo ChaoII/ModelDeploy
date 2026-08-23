@@ -28,8 +28,6 @@ set(TEST_SOURCES
     test_cv_solutions.cpp
     test_audio_tools.cpp
     test_audio_solutions.cpp
-    test_nlp_tools.cpp
-    test_nlp_solutions.cpp
     test_landmark.cpp
     test_action.cpp
     test_reid.cpp
@@ -40,6 +38,14 @@ set(TEST_SOURCES
     baseline_utils.cpp
     utils.cpp
 )
+
+# NLP 测试仅当 BUILD_NLP 打开时参与编译（NLP 扩展可独立隔离）。
+if(BUILD_NLP)
+    list(APPEND TEST_SOURCES
+        test_nlp_tools.cpp
+        test_nlp_solutions.cpp
+    )
+endif()
 
 # GPU-only 测试源：仅当 CUDA 启用时编译（否则 CPU 下 cuda_runtime.h 缺失导致编译失败）
 if(WITH_GPU)

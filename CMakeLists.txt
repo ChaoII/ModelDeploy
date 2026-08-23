@@ -221,12 +221,16 @@ if (BUILD_AUDIO)
 endif ()
 
 # ── NLP ──────────────────────────────────────
+# cppjieba 同时被音频（Kokoro TTS 分词）与 NLP 使用，需在任一启用时构建；
+# 但 -DBUILD_NLP 宏仅在 BUILD_NLP 打开时定义，保证 NLP 扩展（pybind/capi/tests）可独立隔离。
 if (BUILD_AUDIO OR BUILD_NLP)
-    add_definitions(-DBUILD_NLP)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cppjieba)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
     include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include)
     list(APPEND PRIVATE_DEPENDS cppjieba)
+endif ()
+if (BUILD_NLP)
+    add_definitions(-DBUILD_NLP)
 endif ()
 
 # ── VIDEO ──────────────────────────────────

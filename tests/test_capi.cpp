@@ -1622,6 +1622,7 @@ TEST_CASE("audio solution + tool capi", "[capi]") {
     REQUIRE(rn == 1600);
 }
 
+#ifdef BUILD_NLP
 TEST_CASE("nlp tool capi", "[capi]") {
     size_t n = 0; const char** s = nullptr;
     REQUIRE(md_nlp_split_sent("你好。世界！", &s, &n) == MD_OK);
@@ -1631,3 +1632,4 @@ TEST_CASE("nlp tool capi", "[capi]") {
     REQUIRE(words == 3);
     REQUIRE(sents == 1);
 }
+#endif
