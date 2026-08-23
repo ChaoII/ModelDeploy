@@ -7,6 +7,9 @@
 #include "vision/solutions/distance_estimator.h"
 #include "vision/solutions/object_cropper.h"
 #include "vision/solutions/object_blur.h"
+#include "vision/solutions/workout_monitor.h"
+#include "vision/solutions/parking_manager.h"
+#include "vision/solutions/vision_eye.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::solution;
@@ -97,4 +100,36 @@ TEST_CASE("ObjectBlur blurs region only", "[cv_solution]") {
     REQUIRE(out.asMat(&om));
     REQUIRE(om.at<cv::Vec3b>(10, 10)[0] < 255);   // 框内中值被模糊
     REQUIRE(om.at<cv::Vec3b>(1, 1)[0] == 0);      // 框外角不受影响
+}
+
+TEST_CASE("WorkoutMonitor angles and rep count", "[cv_solution]") {
+    WorkoutMonitor wm(70.0f, 120.0f);
+    REQUIRE(WorkoutMonitor::angle(Point3f(0,0,0), Point3f(1,1,0), Point3f(2,0,0)) == Catch::Approx(90.0f).margin(1e-2f));
+    wm.update(135.0f); REQUIRE(wm.reps() == 0); // 高于 max 且未先下蹲
+    wm.update(50.0f);                           // 下蹲：angle < min_
+    wm.update(130.0f); REQUIRE(wm.reps() == 1); // 伸直：> max 且下蹲过 → 记一次
+}
+
+TEST_CASE("ParkingManager occupancy per slot", "[cv_solution]") {
+    ParkingManager pm;
+    pm.set_slots({
+        {Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)},
+        {Point2f(20,0), Point2f(30,0), Point2f(30,10), Point2f(20,10)}
+    });
+    std::vector<TrackResult> t(1); t[0].track_id = 1; t[0].box = Rect2f(2,2,2,2);
+    pm.update(t);
+    auto occ = pm.occupancy();
+    REQUIRE(occ.size() == 2);
+    REQUIRE(occ[0] == true);
+    REQUIRE(occ[1] == false);
+}
+
+TEST_CASE("VisionEye maps centroid to eye point", "[cv_solution]") {
+    VisionEye ve(100.0f);
+    auto e = ve.map_to_eye(Point2f(50, 200), 100.0f);
+    REQUIRE(e.x == Catch::Approx(50.0f));
+    REQUIRE(e.y == Catch::Approx(100.0f));
+    ve.add(Point2f(50, 200));
+    REQUIRE(ve.eyes().size() == 1);
+    REQUIRE(ve.eyes()[0].x == Catch::Approx(50.0f));
 }
