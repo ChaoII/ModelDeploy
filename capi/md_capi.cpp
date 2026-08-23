@@ -53,6 +53,7 @@
 #ifdef BUILD_AUDIO
 #include "csrc/audio/asr/sense_voice.h"
 #include "csrc/audio/tts/kokoro.h"
+#include "csrc/audio/speaker_verify/ecapa.h"
 #endif
 
 /* ---------------- 句柄实现（全局命名空间，与 md_capi.h 前向声明对应） ---------------- */
@@ -77,6 +78,7 @@ struct md_model_handle {
     modeldeploy::RuntimeOption opt;     // 创建时的配置（clone 复用）
     std::vector<float> audio_buf;       // TTS 输出暂存（零拷贝借用）
     std::string text_buf;               // ASR 输出暂存（零拷贝借用）
+    std::shared_ptr<std::vector<float>> speaker_embed;  // 声纹 embedding 暂存（借用指针，随句柄存活）
     ~md_model_handle();
 };
 
@@ -946,9 +948,18 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!m->is_initialized()) return fail_init("Kokoro");
             break;
         }
+        case MD_MODEL_SPEAKER_VERIFY: {
+            if (!need_parts(1, "speaker-verify")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new audio::speaker_verify::SpeakerVerify(parts[0], opt);
+            mh->model = m;
+            if (!m->is_initialized()) return fail_init("SpeakerVerify");
+            break;
+        }
 #else
         case MD_MODEL_ASR:
         case MD_MODEL_TTS:
+        case MD_MODEL_SPEAKER_VERIFY:
             set_error_fmt("md_model_create: kind %d (audio) requires BUILD_AUDIO", (int)kind);
             delete mh;
             return MD_ERR_UNSUPPORTED_TYPE;
@@ -999,6 +1010,7 @@ md_model_handle::~md_model_handle() {
 #ifdef BUILD_AUDIO
         case MD_MODEL_ASR: delete static_cast<audio::asr::SenseVoice*>(model); break;
         case MD_MODEL_TTS: delete static_cast<audio::tts::Kokoro*>(model); break;
+        case MD_MODEL_SPEAKER_VERIFY: delete static_cast<audio::speaker_verify::SpeakerVerify*>(model); break;
 #endif
         default: break;
     }
@@ -1056,6 +1068,7 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
 #ifdef BUILD_AUDIO
         case MD_MODEL_ASR: cloned = static_cast<audio::asr::SenseVoice*>(src->model)->clone().release(); break;
         case MD_MODEL_TTS: cloned = static_cast<audio::tts::Kokoro*>(src->model)->clone().release(); break;
+        case MD_MODEL_SPEAKER_VERIFY: cloned = static_cast<audio::speaker_verify::SpeakerVerify*>(src->model)->clone().release(); break;
 #endif
         default: break;
     }
@@ -2165,6 +2178,32 @@ MDStatus md_audio_tts(MDModelHandle h, const char* text, const char* voice, floa
 #else
     (void)text; (void)voice; (void)speed; (void)sample_rate; (void)audio; (void)audio_n;
     set_error("md_audio_tts: built without BUILD_AUDIO");
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_speaker_embed(MDModelHandle h, const float* samples, size_t n,
+                                const float** embedding, size_t* emb_n) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !samples || !embedding || !emb_n) return MD_ERR_NULL_POINTER;
+    if (n == 0) return MD_ERR_INVALID_ARGUMENT;
+    if (!mh->ready || mh->kind != MD_MODEL_SPEAKER_VERIFY) return MD_ERR_INVALID_ARGUMENT;
+#ifdef BUILD_AUDIO
+    auto* m = static_cast<audio::speaker_verify::SpeakerVerify*>(mh->model);
+    // 借用指针生命周期：embedding 存入模型句柄私有 shared_ptr（镜像 reid/result 结果容器持有
+    // std::shared_ptr<std::vector<float>> 的所有权方式），由 md_model_destroy 释放，返回指针稳定。
+    auto emb = std::make_shared<std::vector<float>>();
+    if (!m->predict(std::vector<float>(samples, samples + n), emb.get())) {
+        set_error("md_audio_speaker_embed: speaker embed predict failed");
+        return MD_ERR_MODEL_PREDICT;
+    }
+    mh->speaker_embed = std::move(emb);
+    *embedding = mh->speaker_embed->data();
+    *emb_n = mh->speaker_embed->size();
+    return MD_OK;
+#else
+    (void)samples; (void)n; (void)embedding; (void)emb_n;
+    set_error("md_audio_speaker_embed: built without BUILD_AUDIO");
     return MD_ERR_UNSUPPORTED_TYPE;
 #endif
 }

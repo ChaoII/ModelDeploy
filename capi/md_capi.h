@@ -98,6 +98,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_FACE_AS_SECOND,
     MD_MODEL_HAND,
     MD_MODEL_REID,
+    MD_MODEL_SPEAKER_VERIFY,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -252,6 +253,11 @@ MD_CAPI_EXPORT MDStatus md_audio_asr(MDModelHandle, const float* samples, size_t
 /* TTS：文本合成音频（零拷贝返回库内 buffer；audio 归结果内部，随 md_model_destroy 释放前有效） */
 MD_CAPI_EXPORT MDStatus md_audio_tts(MDModelHandle, const char* text, const char* voice, float speed,
                       int* sample_rate, const float** audio, size_t* audio_n);
+
+/* 声纹（SpeakerVerify）：提取说话人 embedding（借用指针；embedding 归模型句柄内部，
+ * 随 md_model_destroy 释放 / 下次 predict 覆盖前有效，与 TTS/ASR 暂存区生命周期一致） */
+MD_CAPI_EXPORT MDStatus md_audio_speaker_embed(MDModelHandle, const float* samples, size_t n,
+                              const float** embedding, size_t* emb_n);
 
 /* wav 落盘辅助 */
 MD_CAPI_EXPORT MDStatus md_wav_save(const float* samples, size_t n, int sample_rate, const char* path);

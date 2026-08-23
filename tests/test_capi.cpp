@@ -1310,3 +1310,53 @@ TEST_CASE("capi barcode detect decodes a sample QR", "[capi]") {
     md_barcode_destroy(b);
     md_image_destroy(img);
 }
+
+// 声纹（MD_MODEL_SPEAKER_VERIFY）：「枚举创建 + 入口」契约。
+// 模型缺失时 guard 跳过真推理，仅验证枚举/空参数/错误路径（CI 安全，无需模型文件）。
+TEST_CASE("capi speaker verify enum + embed entry", "[capi]") {
+    // 新枚举值有效且位于 REID 之后、COUNT 之前
+    STATIC_REQUIRE(MD_MODEL_SPEAKER_VERIFY > MD_MODEL_REID);
+    STATIC_REQUIRE(MD_MODEL_SPEAKER_VERIFY < MD_MODEL_COUNT);
+
+    // 空/非法入参路径（不需模型即校验）
+    float dummy_samp[16] = {0.f};
+    const float* emb = nullptr;
+    size_t emb_n = 0;
+    CHECK(md_audio_speaker_embed(nullptr, dummy_samp, 16, &emb, &emb_n) == MD_ERR_NULL_POINTER);
+    CHECK(md_audio_speaker_embed((MDModelHandle)(uintptr_t)1, nullptr, 16, &emb, &emb_n) == MD_ERR_NULL_POINTER);
+    CHECK(md_audio_speaker_embed((MDModelHandle)(uintptr_t)1, dummy_samp, 0, &emb, &emb_n) == MD_ERR_INVALID_ARGUMENT);
+
+    // 模型文件缺失 → 跳过加载类断言（加载与推理需外链模型）
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string modelfile = data_dir + "/test_models/onnx/speaker_verify/ecapa.onnx";
+    if (!std::filesystem::exists(modelfile)) {
+        WARN("speaker_verify ecapa.onnx 缺失（外链 modelscope），跳过 create/predict");
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU);
+
+    MDModelHandle sv = nullptr;
+    REQUIRE(md_model_create(&sv, MD_MODEL_SPEAKER_VERIFY, modelfile.c_str(), opt) == MD_OK);
+    REQUIRE(sv != nullptr);
+    md_option_destroy(opt);
+
+    // clone 深拷贝可用
+    MDModelHandle clone = nullptr;
+    REQUIRE(md_model_clone(sv, &clone) == MD_OK);
+    REQUIRE(clone != nullptr);
+
+    // 取一段语音（约 1s @16k zeros）推断 embedding，验证借用指针维度>0 且指针稳定
+    std::vector<float> samples(16000, 0.f);
+    samples[0] = 0.5f;
+    REQUIRE(md_audio_speaker_embed(clone, samples.data(), samples.size(), &emb, &emb_n) == MD_OK);
+    REQUIRE(emb != nullptr);
+    CHECK(emb_n > 0);
+
+    md_model_destroy(clone);
+    md_model_destroy(sv);
+}
