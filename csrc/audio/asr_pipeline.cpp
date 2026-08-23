@@ -52,6 +52,26 @@ namespace modeldeploy::audio {
         th_ = std::thread(&AAsr::run, this);
     }
 
+    AAsr::AAsr(const std::string& asr_onnx,
+               const std::string& tokens,
+               const std::string& vad_onnx,
+               const std::string& stream_encoder,
+               const std::string& stream_decoder,
+               const std::string& stream_tokens,
+               float offline_conf_threshold) {
+        running_ = true;
+        conf_threshold_ = offline_conf_threshold;
+        modeldeploy::RuntimeOption option;
+        option.use_gpu(0);
+        sense_voice_ = std::make_unique<asr::SenseVoice>(asr_onnx, tokens, option);
+        vad_ = std::make_unique<vad::SileroVAD>(vad_onnx, option);
+        if (!stream_encoder.empty() && !stream_decoder.empty() && !stream_tokens.empty()) {
+            streaming_ = std::make_unique<asr::ParaformerStreamingAsr>(
+                stream_encoder, stream_decoder, stream_tokens, 16000, 2);
+        }
+        th_ = std::thread(&AAsr::run, this);
+    }
+
     AAsr::~AAsr() {
         running_ = false;
         th_.join();
@@ -72,8 +92,31 @@ namespace modeldeploy::audio {
         running_.store(true);
     }
 
+    void AAsr::emit_final() {
+        std::string final;
+        float conf = 0.f;
+        if (streaming_) {
+            // 句末：flush 末尾短块，取累积流式置信度与全文
+            streaming_->input_finished();
+            asr::StreamingAsrResult r;
+            streaming_->decode(true, &r);
+            conf = r.confidence;
+        }
+        if (streaming_ && streaming_->is_initialized() &&
+            conf >= conf_threshold_ && !streaming_->text().empty()) {
+            final = streaming_->text();          // 流式足够置信 → 免离线
+        } else {
+            sense_voice_->predict(cur_wav_, &final);  // 离线精修
+        }
+        if (on_asr_) {
+            on_asr_(final);
+        }
+        cur_wav_.clear();
+    }
+
     void AAsr::run() {
         int idx = 0;
+        bool in_segment = false;
         while (running_.load()) {
             std::vector<float> data;
             {
@@ -92,38 +135,38 @@ namespace modeldeploy::audio {
             if (data.size() == 512) {
                 std::string trigger;
                 vad_->predict(data, &trigger);
-                if (trigger != "none") {
-                    std::cout << 512 * idx++ << " " << trigger << std::endl;
-                }
-                // for asr detect
+                // for asr detect: int16 量纲
                 std::transform(data.begin(), data.end(), data.begin(),
                                [](const float x) { return x * 32768.0f; });
+
                 if (trigger == "start") {
-                    // detect voice
-                    cur_wav_.insert(cur_wav_.end(), data.begin(), data.end());
-                }
-                else if (trigger == "end") {
-                    // detect silence
-                    cur_wav_.insert(cur_wav_.end(), data.begin(), data.end());
-                    std::string result;
-                    sense_voice_->predict(cur_wav_, &result);
-                    if (on_asr_) {
-                        on_asr_(result);
-                    }
+                    in_segment = true;
                     cur_wav_.clear();
+                    if (streaming_) streaming_->reset();
                 }
-                else if (!cur_wav_.empty()) {
+
+                if (in_segment) {
                     cur_wav_.insert(cur_wav_.end(), data.begin(), data.end());
+                    // 流式实时部分结果
+                    if (streaming_) {
+                        streaming_->accept_waveform(data);
+                        asr::StreamingAsrResult part;
+                        streaming_->decode(false, &part);
+                        if (on_asr_partial_ && !part.text.empty()) {
+                            on_asr_partial_(streaming_->text());
+                        }
+                    }
+                }
+
+                if (trigger == "end") {
+                    emit_final();
+                    in_segment = false;
                 }
             }
         }
 
-        if (!cur_wav_.empty()) {
-            std::string result;
-            sense_voice_->predict(cur_wav_, &result);
-            if (on_asr_) {
-                on_asr_(result);
-            }
+        if (in_segment && !cur_wav_.empty()) {
+            emit_final();
         }
         std::cout << "Asr run exit" << std::endl;
     }
