@@ -66,7 +66,18 @@ namespace ModelDeploy
             // CAPI 在 FORMULA_RECOGNIZER(=30) 之后还有 TSN(=31)/ST_GCN(=32)，此处仅包装
             // VEHICLE_KEYPOINT/FACE_LANDMARK，故显式对齐 CAPI 数值。
             MD_MODEL_VEHICLE_KEYPOINT = 33,
-            MD_MODEL_FACE_LANDMARK = 34
+            MD_MODEL_FACE_LANDMARK = 34,
+            MD_MODEL_TEXT_CLASSIFIER = 35
+        }
+
+        public enum MDSolutionKind
+        {
+            MD_SOLUTION_OBJECT_COUNTER = 0,
+            MD_SOLUTION_HEATMAP,
+            MD_SOLUTION_SPEED,
+            MD_SOLUTION_DISTANCE,
+            MD_SOLUTION_WORKOUT,
+            MD_SOLUTION_PARKING
         }
 
         public enum MDTrackerKind

@@ -448,5 +448,37 @@ string path);
         internal static extern MDStatus md_tracker_reset(IntPtr handle);
 
         #endregion
+
+        #region 解决方案（vision::solution / tool）
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_create(out IntPtr handle, MDSolutionKind kind);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_destroy(IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_object_counter_set_line(IntPtr handle, float ax, float ay, float bx, float by);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_object_counter_update(IntPtr handle, float[] boxes, UIntPtr n, int[] labelIds, int[] trackIds);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_object_counter_hline(IntPtr handle, out int inCount, out int outCount);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_heatmap_set_size(IntPtr handle, int w, int h);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_heatmap_update(IntPtr handle, float[] boxes, UIntPtr n, int frameW, int frameH);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_heatmap_peak(IntPtr handle, out int x, out int y);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
+            float bx, float by, float bw, float bh, out float iou);
+
+        #endregion
     }
 }
