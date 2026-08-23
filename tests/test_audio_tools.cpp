@@ -22,3 +22,26 @@ TEST_CASE("WavIO write then read roundtrip", "[audio_tools]") {
     REQUIRE(meta.bits == 16);
     std::remove(path.c_str());
 }
+#include "audio/tools/resampler.h"
+
+TEST_CASE("Resampler 8k->16k doubles length, frequency preserved", "[audio_tools]") {
+    std::vector<float> sine(800);
+    for (size_t i = 0; i < sine.size(); ++i) sine[i] = std::sin(2 * 3.14159265f * 1000.0f * (i / 8000.0f));
+    auto out = Resampler::resample(sine, 8000, 16000);
+    REQUIRE(out.size() == sine.size() * 2);
+    const float* p = out.data();
+    const size_t N = out.size();
+    const double target = (double)N * 1000.0 / 16000.0;
+    double best1 = 0.0, best2 = 0.0; size_t bestb = 0;
+    for (size_t k = 0; k < N / 2; ++k) {
+        double re = 0, im = 0;
+        for (size_t i = 0; i < N; ++i) {
+            const double a = 2 * 3.14159265 * k * i / N;
+            re += p[i] * std::cos(a); im -= p[i] * std::sin(a);
+        }
+        const double e = re * re + im * im;
+        if (e > best2) { best2 = best1; best1 = e; bestb = k; }
+        (void)best2;
+    }
+    REQUIRE(std::abs((double)(int)bestb - target) <= 2);
+}
