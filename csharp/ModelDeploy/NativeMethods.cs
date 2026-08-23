@@ -480,5 +480,39 @@ string path);
             float bx, float by, float bw, float bh, out float iou);
 
         #endregion
+
+        #region 音频解决方案（audio::solution / tool）
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_solution_create(out IntPtr handle, MDAudioSolutionKind kind);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_solution_destroy(IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_speaker_search_enroll(IntPtr handle, IntPtr label, float[] emb, UIntPtr n);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_speaker_search_match(IntPtr handle, float[] emb, UIntPtr n, int k,
+            out IntPtr bestLabel, out float bestScore);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_resample(float[] input, UIntPtr n, int inSr, int outSr,
+            out IntPtr output, out UIntPtr outN);
+
+        #endregion
+
+        #region NLP 工具 / TextClassifier
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_nlp_split_sent(IntPtr text, out IntPtr sents, out UIntPtr n);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_nlp_stats(IntPtr text, out UIntPtr chars, out UIntPtr words, out UIntPtr sents);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_nlp_classify(IntPtr handle, IntPtr text, out int label, out float score);
+
+        #endregion
     }
 }

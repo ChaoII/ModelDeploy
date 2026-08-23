@@ -80,6 +80,12 @@ namespace ModelDeploy
             MD_SOLUTION_PARKING
         }
 
+        public enum MDAudioSolutionKind
+        {
+            MD_AUDIO_SPEAKER_SEARCH = 0,
+            MD_AUDIO_TTS_BATCHER
+        }
+
         public enum MDTrackerKind
         {
             MD_TRACKER_BYTETRACK = 0,
