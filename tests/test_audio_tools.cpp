@@ -45,3 +45,16 @@ TEST_CASE("Resampler 8k->16k doubles length, frequency preserved", "[audio_tools
     }
     REQUIRE(std::abs((double)(int)bestb - target) <= 2);
 }
+#include "audio/tools/fbank.h"
+
+TEST_CASE("Fbank produces frames x bins non-degenerate", "[audio_tools]") {
+    Fbank fb(16000, 80);
+    std::vector<float> s(16000);
+    for (size_t i = 0; i < s.size(); ++i) s[i] = 0.5f * std::sin(2 * 3.14159265f * 440.0f * (i / 16000.0f));
+    auto frames = fb.compute(s);
+    REQUIRE_FALSE(frames.empty());
+    REQUIRE(frames[0].size() == 80);
+    float energy = 0;
+    for (const auto& row : frames) for (float v : row) energy += v * v;
+    REQUIRE(energy > 0.0f);
+}
