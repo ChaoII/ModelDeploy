@@ -2,9 +2,11 @@
 #include "csrc/pipeline/node.h"
 #include "csrc/pipeline/edge.h"
 #include "csrc/pipeline/dag.h"
+#include "csrc/pipeline/planner.h"
 #include <algorithm>
 #include <any>
 #include <deque>
+#include <functional>
 #include <memory>
 
 using namespace modeldeploy::pipeline;
@@ -136,4 +138,58 @@ TEST_CASE("Dag exec order given by topo sort", "[pipeline]") {
     REQUIRE(ia < ib);
     REQUIRE(ia < ic);
     REQUIRE(dag.execute());
+}
+
+TEST_CASE("Planner sequential DSL", "[pipeline]") {
+    Planner p;
+    p.register_model("d", [](const std::string& inst) { return std::make_unique<DoubleNode>(inst); });
+    auto dag = p.build("d -> d");   // 实例名 d, d_1
+    REQUIRE(dag != nullptr);
+    dag->get_node("d")->set_input("in", std::any(3));
+    REQUIRE(dag->build());
+    REQUIRE(dag->execute());
+    REQUIRE(dag->execution_order().size() == 2);
+    REQUIRE(std::any_cast<int>(dag->get_node("d_1")->get_output("out")) == 12);
+}
+
+TEST_CASE("Planner fan-out DSL", "[pipeline]") {
+    Planner p;
+    p.register_model("d", [](const std::string& inst) { return std::make_unique<DoubleNode>(inst); });
+    auto dag = p.build("d -> {d, d}");   // d, d_1, d_2
+    REQUIRE(dag != nullptr);
+    dag->get_node("d")->set_input("in", std::any(5));
+    REQUIRE(dag->build());
+    REQUIRE(dag->execute());
+    REQUIRE(dag->execution_order().size() == 3);
+    REQUIRE(std::any_cast<int>(dag->get_node("d_1")->get_output("out")) == 20);
+    REQUIRE(std::any_cast<int>(dag->get_node("d_2")->get_output("out")) == 20);
+}
+
+TEST_CASE("Planner fan-in DSL", "[pipeline]") {
+    Planner p;
+    p.register_model("id", [](const std::string& inst) { return std::make_unique<IdentityNode>(inst); });
+    // AddNode: in + in1 两个 int 输入，输出和
+    struct AddNode : Node {
+        AddNode(std::string n) : Node(std::move(n), {{"in", "int"}, {"in1", "int"}}, {{"out", "int"}}) {}
+        bool run() override {
+            int a, b;
+            if (!get_in<int>("in", &a) || !get_in<int>("in1", &b)) return false;
+            set_out<int>("out", a + b);
+            return true;
+        }
+    };
+    p.register_model("add", [](const std::string& inst) { return std::make_unique<AddNode>(inst); });
+    auto dag = p.build("{id, id} -> add");   // id, id_1, add
+    REQUIRE(dag != nullptr);
+    dag->get_node("id")->set_input("in", std::any(1));
+    dag->get_node("id_1")->set_input("in", std::any(2));
+    REQUIRE(dag->build());
+    REQUIRE(dag->execute());
+    REQUIRE(dag->execution_order().size() == 3);
+    REQUIRE(std::any_cast<int>(dag->get_node("add")->get_output("out")) == 3);
+}
+
+TEST_CASE("Planner unknown model returns nullptr", "[pipeline]") {
+    Planner p;
+    REQUIRE(p.build("ghost -> d") == nullptr);
 }
