@@ -32,19 +32,19 @@ namespace modeldeploy::vision {
             .def("set_layout",
                  [](ocr::DocToMarkdown& self, ocr::StructureV2Layout& layout) {
                      self.set_layout(&layout);
-                 }, pybind11::arg("layout"))
+                 }, pybind11::arg("layout"), pybind11::keep_alive<1, 2>())
             .def("set_table",
                  [](ocr::DocToMarkdown& self, ocr::PPStructureV2Table& table) {
                      self.set_table(&table);
-                 }, pybind11::arg("table"))
+                 }, pybind11::arg("table"), pybind11::keep_alive<1, 2>())
             .def("set_formula",
                  [](ocr::DocToMarkdown& self, ocr::FormulaRecognizer& formula) {
                      self.set_formula(&formula);
-                 }, pybind11::arg("formula"))
+                 }, pybind11::arg("formula"), pybind11::keep_alive<1, 2>())
             .def("set_ocr",
                  [](ocr::DocToMarkdown& self, ocr::PaddleOCR& ocr) {
                      self.set_ocr(&ocr);
-                 }, pybind11::arg("ocr"))
+                 }, pybind11::arg("ocr"), pybind11::keep_alive<1, 2>())
             .def("predict",
                  [](ocr::DocToMarkdown& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
@@ -57,4 +57,4 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("image"))
             .def("ready", &ocr::DocToMarkdown::ready);
     }
-} // namespace modeldeploy
+} // namespace modeldeploy::vision
