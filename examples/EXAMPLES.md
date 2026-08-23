@@ -86,6 +86,7 @@ cmake --build build
 | `demo_hand` | 手部关键点 | 打印检测到的手数、每手 box/score/关键点数 |
 | `demo_reid` | 行人 Re-ID（OSNet，512-d embedding + 内存 ReIdGallery） | 打印两图 embedding 维度 + gallery 大小 + `match(imgB,1) -> label A/B score`（用法 `demo_reid <model> <imgA> <imgB>`） |
 | `demo_speaker` | 声纹/说话人验证（ECAPA-TDNN，192-d embedding + 内存 SpeakerGallery；纯音频，无需 OpenCV） | 打印两支语音 embedding 维度 + gallery 大小 + `match(B,1) -> label score`（用法 `demo_speaker <model.onnx> <wavA> <wavB>`，B 后可跟更多 wav） |
+| `demo_doc` | 文档理解（layout + 公式/OCR/表格 → Markdown） | 打印整页图转换后的 Markdown（公式 `$...$`、表格嵌 HTML）（用法 `demo_doc <layout.onnx> <image> [<formula.onnx> [dict]] [--ocr det cls rec dict] [--table det rec table rec_label table_char]`） |
 
 > **跟踪 demo**：无真实视频时用单张测试图（`test_detection1.jpg` 等）模拟多帧序列——把同一批检测框按帧做轻微确定性抖动连续送入追踪器，展示同一物体在帧间保持**稳定 track_id**。逐帧打印 track 数量，并统计"稳定物体数（每个物体跨帧只使用单一 track_id）"。
 
