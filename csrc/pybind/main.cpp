@@ -19,6 +19,12 @@ namespace modeldeploy::pipeline {
     void bind_pipeline(pybind11::module&);
 }
 
+#if defined(BUILD_VIDEO) && defined(BUILD_VISION)
+namespace modeldeploy::video {
+    void bind_video(pybind11::module&);
+}
+#endif
+
 namespace modeldeploy {
     void bind_tensor(pybind11::module&);
     void bind_runtime(pybind11::module&);
@@ -37,6 +43,11 @@ namespace modeldeploy {
             m.def_submodule("pipeline", "Pipeline DAG module of Modeldeploy.");
         pipeline::bind_pipeline(pipeline_module);
 
+#if defined(BUILD_VIDEO) && defined(BUILD_VISION)
+        auto video_module =
+            m.def_submodule("video", "Video decode module of Modeldeploy.");
+        video::bind_video(video_module);
+#endif
 
 #ifdef BUILD_VISION
         auto vision_module =
