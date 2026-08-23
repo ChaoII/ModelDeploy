@@ -28,7 +28,7 @@
 6. **Object Cropping + Blurring 裁剪/模糊**：按框裁剪 ROI + 隐私高斯模糊原图区域。
 7. **Workouts Monitoring 健身监测**：基于姿态关键点角度（肩-肘-腕）做动作计数（仰卧起坐/开合跳/深蹲雏形）。
 8. **Parking Management 停车管理**：位元区域定义 + 垂直框占用判定 → available/filled slot。
-9. **VisionEye 可视化映射**（可选，若时间允许）：质心到"眼点"连线轨迹可视化。
+9. **VisionEye 可视化映射**：质心到"眼点"连线轨迹可视化（用户已确认全做）。
 
 ### Out-of-Scope（明确不做，YAGNI）
 - 不做 Streamlit 前端 / Analytics 图表渲染（偏前端，C++ 侧无价值）。
@@ -72,8 +72,8 @@ csrc/vision/solutions/
 - 注册进 `vision_pybind.cpp`（append 到既有之后），BUILD_VISION 门控。
 
 ## 5. CAPI
-- 复用既有模型句柄体系还是新建 `solution` 句柄？**倾向新建轻量 `solution` C 风格句柄**（`md_solution_object_counter` 等），输入 track/detection 数组 → 输出结果。成本低、便于 C#/Rust 消费。
-- 若工作量过大，CAPI/C#/Rust 可降级为 YAGNI（仅 C++/pybind/demo），在 plan 中明确。
+- 新建轻量 `solution` C 风格句柄（`md_solution_object_counter` 等）：输入 track/detection 数组 → 输出结果。便于 C#/Rust 消费。
+- **第一里程碑全 6 面一次做齐**（C++/Python/CAPI/C#/Rust/demo+tests，用户已确认）。
 
 ## 6. C# / Rust
 - 薄封装（若 CAPI 落地则顺带；否则降级 YAGNI）。
@@ -98,8 +98,8 @@ csrc/vision/solutions/
 |----|------|
 | C++ 核心 | ✅（9 方案） |
 | Python | ✅（vision.solutions） |
-| CAPI | ◐（可选，plan 裁量） |
-| C#/Rust | ◐（若 CAPI 则随带；否则 YAGNI） |
+| CAPI | ✅（solution 句柄） |
+| C#/Rust | ✅（随 CAPI 薄封装） |
 | demo+docs+tests | ✅ |
 
 ## 10. 已知限制 / 假设
