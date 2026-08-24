@@ -8,3 +8,5 @@
 - `image_data_issue_register.md` — ImageData 问题登记簿
 - `optimization_prd.md` — 20 路 25FPS 性能优化 PRD
 - `performance_analysis_2026.md` — 全模型性能分析报告（2026-08）
+- `benchmark_20stream.md` — 20 路视频内部性能测试基准（2026-08-10）
+- `sophgo_cross_build_and_test.md` — 算能 TPU 交叉编译/上传/设备测试 SOP（AGENTS.md 触发词调用）

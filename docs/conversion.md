@@ -1,6 +1,6 @@
 # ModelDeploy 模型转换与量化
 
-汇总将模型转换/量化为各后端可用格式的完整方法。四种后端与模型格式详见 [后端详解](./backends.md)；算能 TPU 交叉编译与部署实战见 [Sophgo 说明](./sophgo_cross_build_and_test.md)。
+汇总将模型转换/量化为各后端可用格式的完整方法。四种后端与模型格式详见 [后端详解](./backends.md)；Sophgo 转换命令详见下方第 4 节与 [`tools/docker/sophgo/`](../tools/docker/sophgo)。
 
 ## 1. OnnxRuntime 混合精度
 

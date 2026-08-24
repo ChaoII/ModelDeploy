@@ -87,5 +87,4 @@ int main() {
 | 多语言 API | [docs/api/README.md](./docs/api/README.md) |
 | 模型加密 | [docs/encryption.md](./docs/encryption.md) |
 | 多线程 | [docs/multi_thread.md](./docs/multi_thread.md) |
-| Sophgo TPU | [docs/sophgo_cross_build_and_test.md](./docs/sophgo_cross_build_and_test.md) |
 | 示例 | [examples/EXAMPLES.md](./examples/EXAMPLES.md) |
