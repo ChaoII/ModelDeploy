@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "pybind/utils/utils.h"
 #include "audio/asr/sense_voice.h"
 
 namespace modeldeploy {
@@ -16,7 +17,12 @@ void bind_sense_voice(pybind11::module& m) {
         .def_readwrite("nospeech", &asr::SenseVoiceResult::nospeech);
 
     pybind11::class_<asr::SenseVoice>(m, "SenseVoice")
-        .def(pybind11::init<const std::string&, const std::string&, const RuntimeOption&>(),
+        .def(pybind11::init([](const std::filesystem::path& model_file,
+                               const std::filesystem::path& token_path_str,
+                               const RuntimeOption& custom_option) {
+                 return std::make_unique<asr::SenseVoice>(
+                     model_file.string(), token_path_str.string(), custom_option);
+             }),
              pybind11::arg("model_file"), pybind11::arg("token_path_str"),
              pybind11::arg("custom_option") = RuntimeOption())
         .def("name", &asr::SenseVoice::name)

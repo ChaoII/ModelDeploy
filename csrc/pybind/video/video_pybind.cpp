@@ -8,6 +8,7 @@
 
 #if defined(BUILD_VIDEO) && defined(BUILD_VISION)
 #include "csrc/video/video_decoder.h"
+#include "pybind/utils/utils.h"
 
 namespace py = pybind11;
 
@@ -16,7 +17,9 @@ namespace modeldeploy::video {
 void bind_video(pybind11::module& m) {
     py::class_<VideoDecoder>(m, "VideoDecoder")
         .def(py::init<>())
-        .def("open", &VideoDecoder::open, pybind11::arg("url"))
+        .def("open", [](VideoDecoder& d, const std::filesystem::path& url) {
+            return d.open(url.string());
+        }, pybind11::arg("url"))
         .def("next", [](VideoDecoder& d) {
             modeldeploy::vision::ImageData f;
             uint64_t pts = 0;
