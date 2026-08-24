@@ -62,9 +62,10 @@ def build_labelme(basename, height, width, detections):
 
 
 def label_dataset(src_dir, people_dir, nopeople_dir, model_path,
-                  conf=0.25, size=1280):
+                  conf=0.25, size=1280, keep_labels=None):
     """对 src_dir 内图片推理，写 labelme json 并把图片移动到对应分类目录。
 
+    keep_labels: 只统计/标注这些 label_id（COCO person=0），其余类别忽略。
     返回 {'people': n, 'nopeople': n, 'skipped': [files]}
     """
     import cv2
@@ -77,7 +78,7 @@ def label_dataset(src_dir, people_dir, nopeople_dir, model_path,
     option = modeldeploy.RuntimeOption()
     model = modeldeploy.vision.UltralyticsDet(str(model_path), option)
     model.postprocessor.conf_threshold = conf
-    model.preprocessor.size = [size, size]  # 该模型为 1280 letterbox；静态 batch=1
+    model.preprocessor.size = [size, size]  # 静态 batch=1
 
     files = sorted(
         f for f in os.listdir(src_dir)
@@ -96,6 +97,8 @@ def label_dataset(src_dir, people_dir, nopeople_dir, model_path,
             continue
         h, w = img.shape[:2]
         dets = model.predict(img)  # 静态 batch=1，逐张推理
+        if keep_labels:
+            dets = [d for d in dets if d.label_id in keep_labels]
         has_person = any(d.score >= conf for d in dets)
         target_dir = people_dir if has_person else nopeople_dir
         doc = build_labelme(name, h, w, dets)
@@ -114,17 +117,20 @@ def label_dataset(src_dir, people_dir, nopeople_dir, model_path,
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="按 zhgd_det 模型把图片按是否有人分目录并生成 labelme json 标注。")
+        description="按检测模型把图片按是否有人分目录并生成 labelme json 标注。")
     parser.add_argument("--src", required=True, help="待处理的图片目录")
     parser.add_argument("--people", required=True, help="'有人的' 输出目录")
     parser.add_argument("--nopeople", required=True, help="'没人的' 输出目录")
-    parser.add_argument("--model", required=True, help="zhgd_det onnx 模型路径")
+    parser.add_argument("--model", required=True, help="检测 onnx 模型路径")
     parser.add_argument("--conf", type=float, default=0.25, help="置信度阈值")
     parser.add_argument("--size", type=int, default=1280, help="letterbox 输入尺寸")
+    parser.add_argument("--classes", default="0",
+                        help="只统计/标注这些类别的逗号分隔 label_id（默认 0=person）")
     args = parser.parse_args(argv)
 
+    keep = {int(x) for x in args.classes.split(",") if x.strip()}
     stats = label_dataset(args.src, args.people, args.nopeople,
-                          args.model, args.conf, args.size)
+                          args.model, args.conf, args.size, keep)
     print("\n完成: 有人的=%d 没人的=%d 跳过=%d" %
           (stats["people"], stats["nopeople"], len(stats["skipped"])))
     if stats["skipped"]:
