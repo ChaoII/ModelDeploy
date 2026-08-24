@@ -66,7 +66,7 @@ if(BUILD_VIDEO)
         test_video_ffmpeg_decode.cpp
         test_video_ffmpeg_encode.cpp)
     if(ENABLE_GSTREAMER)
-        list(APPEND TEST_SOURCES test_video_gst_decode.cpp)
+        list(APPEND TEST_SOURCES test_video_gst_decode.cpp test_video_gst_encode.cpp)
     endif()
 endif()
 

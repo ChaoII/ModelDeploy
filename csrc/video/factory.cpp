@@ -6,6 +6,7 @@
 #include "csrc/video/video_common.h"
 #ifdef ENABLE_GSTREAMER
 #include "csrc/video/backend/gst_decoder.h"
+#include "csrc/video/backend/gst_encoder.h"
 #endif
 
 namespace modeldeploy::video {
@@ -28,7 +29,9 @@ std::shared_ptr<DecoderBackend> create_decoder_backend(const VideoDecoderConfig&
 }
 
 std::shared_ptr<EncoderBackend> create_encoder_backend(const VideoEncoderConfig& cfg) {
-    if (cfg.backend == CodecBackend::GStreamer) return nullptr;  // Task6 接入
+#ifdef ENABLE_GSTREAMER
+    if (cfg.backend == CodecBackend::GStreamer) return std::make_shared<GstEncoder>(cfg);
+#endif
     return std::make_shared<FfmpegEncoder>(cfg);                 // Task4 FFmpeg 软编
 }
 
