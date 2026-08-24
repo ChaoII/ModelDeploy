@@ -369,6 +369,27 @@ if (BUILD_PYTHON)
             LIBRARY DESTINATION modeldeploy)
     install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
     install(FILES ${CMAKE_SOURCE_DIR}/python/modeldeploy/__init__.py DESTINATION modeldeploy)
+    # 构建期用 pybind11-stubgen 生成 .pyi 存根，写回 staging 的 modeldeploy/，随 wheel 发布。
+    # stubgen 失败只告警不阻断构建（PYI_STUBGEN_OK 检查）。
+    if (DEFINED Python_EXECUTABLE AND EXISTS "${Python_EXECUTABLE}")
+        install(CODE "
+            set(_stub_cmd \"${Python_EXECUTABLE}\")
+            set(_stub_root \"\${CMAKE_INSTALL_PREFIX}\")
+            if(WIN32)
+                execute_process(COMMAND cmd /c set \"PYTHONPATH=${_stub_root};%PYTHONPATH%\" \\& \"${_stub_cmd}\" -m pybind11_stubgen modeldeploy --output-dir \"${_stub_root}\"
+                    RESULT_VARIABLE _stubgen_rv) 
+            else()
+                execute_process(COMMAND \"${_stub_cmd}\" -m pybind11_stubgen modeldeploy --output-dir \"${_stub_root}\"
+                    WORKING_DIRECTORY \"${_stub_root}\"
+                    RESULT_VARIABLE _stubgen_rv)
+            endif()
+            if(NOT _stubgen_rv EQUAL 0)
+                message(WARNING \"pybind11-stubgen failed (rc=\${_stubgen_rv}); wheel will be built without .pyi stubs.\")
+            endif()
+        ")
+    else()
+        message(WARNING "Python_EXECUTABLE undefined; skipping pyi stub generation.")
+    endif()
 endif ()
 
 if (BUILD_EXAMPLES)
