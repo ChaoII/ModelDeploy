@@ -17,22 +17,25 @@ TEST_CASE("VideoDecoder opens and grabs NV12 frames", "[video]") {
     if (!file_exists(p)) {
         SKIP("no test video; set MD_TEST_VIDEO to a local mp4");
     }
-    VideoDecoder dec;
-    REQUIRE(dec.open(p));
-    REQUIRE(dec.width() > 0);
-    REQUIRE(dec.height() > 0);
-    REQUIRE(dec.fps() > 0.0);
+    VideoDecoderConfig cfg;
+    cfg.backend = CodecBackend::FFmpeg;
+    auto dec = VideoDecoder::create(cfg);
+    REQUIRE(dec != nullptr);
+    std::string err;
+    REQUIRE(dec->open(p, &err));
+    REQUIRE(dec->width() > 0);
+    REQUIRE(dec->height() > 0);
+    REQUIRE(dec->fps() > 0);
 
-    ImageData frame;
-    uint64_t pts = 0;
+    VideoFrame frame;
     int got = 0;
-    while (got < 5 && dec.next(&frame, &pts)) {
-        REQUIRE_FALSE(frame.empty());
-        REQUIRE(frame.width() == dec.width());
-        REQUIRE(frame.height() == dec.height());
+    while (got < 5 && dec->read_one_frame(&frame, &err)) {
+        REQUIRE_FALSE(frame.image.empty());
+        REQUIRE(frame.image.width() == dec->width());
+        REQUIRE(frame.image.height() == dec->height());
         ++got;
     }
     REQUIRE(got > 0);           // 至少抽到一帧
-    REQUIRE(frame.plane_count() >= 1);
-    dec.close();
+    REQUIRE(frame.image.plane_count() >= 1);
+    dec->close();
 }

@@ -20,6 +20,8 @@ public:
     virtual void stop() = 0;
     virtual void set_device_only(bool v) = 0;
     virtual int fps() const = 0;
+    virtual int width() const = 0;
+    virtual int height() const = 0;
     virtual VideoStats& stats() = 0;
     virtual void close() = 0;
     virtual std::string last_error() const = 0;
