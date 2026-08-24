@@ -6,11 +6,12 @@ namespace modeldeploy::audio {
     void bind_speaker_verify(pybind11::module& m) {
         pybind11::class_<speaker_verify::SpeakerVerify, BaseModel>(m, "SpeakerVerify")
             .def(pybind11::init([](const std::filesystem::path& model_file,
-                                   const RuntimeOption& option) {
+                                   pybind11::object option_obj) {
+                     RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                      return std::make_unique<speaker_verify::SpeakerVerify>(
                          model_file.string(), option);
                  }),
-                 pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption())
+                 pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none())
             .def("predict",
                  [](speaker_verify::SpeakerVerify& self, const std::vector<float>& samples) {
                      std::vector<float> emb;

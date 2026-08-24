@@ -24,9 +24,10 @@ namespace modeldeploy::vision {
 
         pybind11::class_<action::TSN>(action_m, "TSN",
                                       "TSN 动作识别：多帧 RGB -> 时序聚合 -> 类别 scores。")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<action::TSN>(model_file.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption(),
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none(),
                  "构造 TSN 模型；无权重时 is_initialized()==False。")
             .def("predict",
                  [](action::TSN& self, const std::vector<ImageData>& frames) {
@@ -41,9 +42,10 @@ namespace modeldeploy::vision {
 
         pybind11::class_<action::StGcn>(action_m, "StGcn",
                                         "ST-GCN 骨骼动作识别：骨骼序列 -> 图卷积 -> 类别 scores。")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<action::StGcn>(model_file.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption(),
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none(),
                  "构造 StGcn 模型；无权重时 is_initialized()==False。")
             .def("predict",
                  [](action::StGcn& self, const action::KeyPointSeq& seq) {

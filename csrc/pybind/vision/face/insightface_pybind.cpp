@@ -33,9 +33,10 @@ namespace modeldeploy::vision {
                           &face::InsightFaceDetPreprocessor::set_size);
 
         pybind11::class_<face::InsightFaceDet, BaseModel>(m, "InsightFaceDet")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceDet>(model_file.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption())
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none())
             .def("predict",
                  [](face::InsightFaceDet& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
@@ -48,9 +49,10 @@ namespace modeldeploy::vision {
 
         // 关键点模型
         pybind11::class_<face::InsightFaceLandmark, BaseModel>(m, "InsightFaceLandmark")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceLandmark>(model_file.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption())
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none())
             .def("predict_2d106",
                  [](face::InsightFaceLandmark& self, const pybind11::array& image,
                     const std::array<float, 4>& bbox) {
@@ -71,9 +73,10 @@ namespace modeldeploy::vision {
 
         // 识别模型
         pybind11::class_<face::InsightFaceRecognition, BaseModel>(m, "InsightFaceRecognition")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceRecognition>(model_file.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption())
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none())
             .def("predict",
                  [](face::InsightFaceRecognition& self, const pybind11::array& image,
                     const std::vector<std::array<float, 2>>& kps) {
@@ -85,9 +88,10 @@ namespace modeldeploy::vision {
 
         // 性别年龄模型
         pybind11::class_<face::InsightFaceGenderAge, BaseModel>(m, "InsightFaceGenderAge")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceGenderAge>(model_file.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption())
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none())
             .def("predict_gender_age",
                  [](face::InsightFaceGenderAge& self, const pybind11::array& image,
                     const std::array<float, 4>& bbox) {
@@ -99,16 +103,18 @@ namespace modeldeploy::vision {
 
         // 综合 pipeline
         pybind11::class_<face::InsightFaceAnalysis>(m, "InsightFaceAnalysis")
-            .def(pybind11::init([](const std::filesystem::path& det_model, const std::filesystem::path& rec_model, const std::filesystem::path& lmk2d_model, const std::filesystem::path& lmk3d_model, const RuntimeOption& option, const std::filesystem::path& genderage_model) {
+            .def(pybind11::init([](const std::filesystem::path& det_model, const std::filesystem::path& rec_model, const std::filesystem::path& lmk2d_model, const std::filesystem::path& lmk3d_model, pybind11::object option_obj, const std::filesystem::path& genderage_model) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceAnalysis>(det_model.string(), rec_model.string(), lmk2d_model.string(), lmk3d_model.string(), option, genderage_model.string());
             }), pybind11::arg("det_model"), pybind11::arg("rec_model"),
                  pybind11::arg("lmk2d_model"), pybind11::arg("lmk3d_model"),
-                 pybind11::arg("option") = RuntimeOption(),
+                 pybind11::arg("option") = pybind11::none(),
                  pybind11::arg("genderage_model") = std::filesystem::path())
             .def_static("create_from_dir",
-                        [](const std::filesystem::path& model_dir, const RuntimeOption& option) {
+                        [](const std::filesystem::path& model_dir, pybind11::object option_obj) {
+                            RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                             return face::InsightFaceAnalysis::create_from_dir(model_dir.string(), option);
-                        }, pybind11::arg("model_dir"), pybind11::arg("option") = RuntimeOption())
+                        }, pybind11::arg("model_dir"), pybind11::arg("option") = pybind11::none())
             .def("analyze",
                  [](face::InsightFaceAnalysis& self, const pybind11::array& image,
                     bool with_2d106, bool with_3d68, bool with_recognition, bool with_genderage) {

@@ -10,12 +10,13 @@ namespace modeldeploy::vision {
     void bind_formula_recognizer(const pybind11::module& m) {
         // FormulaRecognizer: cropped formula image -> LaTeX string
         pybind11::class_<ocr::FormulaRecognizer, BaseModel>(m, "FormulaRecognizer")
-            .def(pybind11::init([](const std::filesystem::path& model_file, const std::filesystem::path& char_dict_path, const RuntimeOption& option) {
+            .def(pybind11::init([](const std::filesystem::path& model_file, const std::filesystem::path& char_dict_path, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<ocr::FormulaRecognizer>(model_file.string(), char_dict_path.string(), option);
             }),
                  pybind11::arg("model_file"),
                  pybind11::arg("char_dict_path") = "",
-                 pybind11::arg("option") = RuntimeOption())
+                 pybind11::arg("option") = pybind11::none())
             .def("predict",
                  [](ocr::FormulaRecognizer& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);
