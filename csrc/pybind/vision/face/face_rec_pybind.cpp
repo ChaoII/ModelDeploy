@@ -59,7 +59,7 @@ namespace modeldeploy::vision {
         pybind11::class_<face::SeetaFaceID, BaseModel>(m, "SeetaFaceID")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<face::SeetaFaceID>(model_file.string(), option);
-            }), pybind11::arg("model_file"))
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def("predict",
                  [](face::SeetaFaceID& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);

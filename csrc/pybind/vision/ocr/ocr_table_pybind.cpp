@@ -70,7 +70,7 @@ namespace modeldeploy::vision {
                 m, "StructureV2Table")
             .def(pybind11::init([](const std::filesystem::path& model_file, const std::filesystem::path& table_char_dict_path, const RuntimeOption& option) {
                 return std::make_unique<ocr::StructureV2Table>(model_file.string(), table_char_dict_path.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("table_char_dict_path"))
+            }), pybind11::arg("model_file"), pybind11::arg("table_char_dict_path"), pybind11::arg("option"))
             .def(pybind11::init<>())
             .def_property_readonly("preprocessor",
                                    &ocr::StructureV2Table::get_preprocessor)

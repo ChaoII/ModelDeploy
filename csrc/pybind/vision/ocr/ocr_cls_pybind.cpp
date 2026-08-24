@@ -72,7 +72,7 @@ namespace modeldeploy::vision {
         pybind11::class_<ocr::Classifier, BaseModel>(m, "Classifier")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<ocr::Classifier>(model_file.string(), option);
-            }), pybind11::arg("model_file"))
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def(pybind11::init<>())
             .def_property_readonly("preprocessor",
                                    &ocr::Classifier::get_preprocessor)

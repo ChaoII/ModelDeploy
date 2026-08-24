@@ -75,7 +75,7 @@ namespace modeldeploy::vision {
         pybind11::class_<ocr::Recognizer, BaseModel>(m, "Recognizer")
             .def(pybind11::init([](const std::filesystem::path& model_file, const std::filesystem::path& label_path, const RuntimeOption& option) {
                 return std::make_unique<ocr::Recognizer>(model_file.string(), label_path.string(), option);
-            }), pybind11::arg("model_file"), pybind11::arg("label_path"))
+            }), pybind11::arg("model_file"), pybind11::arg("label_path"), pybind11::arg("option"))
             .def(pybind11::init<>())
             .def_property_readonly("preprocessor",
                                    &ocr::Recognizer::get_preprocessor)
