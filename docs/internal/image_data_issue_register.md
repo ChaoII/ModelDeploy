@@ -4,7 +4,7 @@
 - 分支：`capi-v2`
 - **审计基线 HEAD：`65baa31`**（统一平面存储改造完成后的当前 HEAD；下文行号均相对此提交；改代码后行号会漂移，复核时先对照基线）
 - 审计范围：`csrc/vision/common/image_data.h/.cpp` 及其消费方（processors / capi / application / pybind / tests）
-- 审计方法：逐行代码审计 + `git diff e000f75~1..HEAD` 改造前后对照 + 设计 spec（`docs/superpowers/specs/2026-08-17-image-data-multidevice-rewrite-design.md`）逐条核对 + 全仓库消费方 grep
+- 审计方法：逐行代码审计 + `git diff e000f75~1..HEAD` 改造前后对照 + 设计 spec（`.superpowers/specs/2026-08-17-image-data-multidevice-rewrite-design.md`）逐条核对 + 全仓库消费方 grep
 - 严重度定义：
   - **P0 严重**：错误结果 / 崩溃 / 数据竞争（已发生或必然发生）
   - **P1 严重**：API 契约违例 / 架构原则断裂（后续必然踩中）

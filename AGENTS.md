@@ -86,3 +86,8 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 两个 GitHub Actions 工作流：
 - `build_wheel.yml` — 在 ubuntu/windows 上运行 `python -m build`，Python 3.12–3.13，无测试
 - `build_release.yml` — 完整 cmake 构建 + `ctest`（CPU）；GPU 任务仅编译，无测试。标签 `v*` 触发 GitHub Release 上传
+
+## 开发过程文档（superpowers）
+
+- **覆盖技能默认路径**：superpowers 的 design spec / 实施计划默认写 `docs/superpowers/`，但本仓库约定改到仓库根 **`.superpowers/`**：spec 存 `.superpowers/specs/`，plan 存 `.superpowers/plans/`（`docs/` 只放面向使用者的公开文档）。
+- 这些是开发者过程产物，不进入 `docs/` 公开导航，`tools/check_docs_links.ps1` 不扫描。

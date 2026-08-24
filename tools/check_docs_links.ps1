@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # 校验用户文档内相对 .md 链接目标是否存在。
-# 扫描范围：README.md、examples/EXAMPLES.md、docs/（排除内部开发计划 docs/superpowers/）。
+# 扫描范围：README.md、examples/EXAMPLES.md、docs/（公开文档）与 docs/api、docs/internal；不含根目录 .superpowers/ 开发过程文档。
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
