@@ -24,8 +24,8 @@ TEST_CASE("create_decoder_backend 对 GStreamer 返回空(未启用)", "[video][
     }
 }
 
-TEST_CASE("create_encoder_backend 对 FFmpeg 返回空(骨架未填充)", "[video][factory]") {
+TEST_CASE("create_encoder_backend 对 FFmpeg 返回后端(已填充)", "[video][factory]") {
     VideoEncoderConfig cfg;
     auto b = create_encoder_backend(cfg);
-    REQUIRE(b == nullptr);  // Task3-6 填充真实后端前，骨架一律返回空
+    REQUIRE(b != nullptr);  // Task4 起 FFmpeg 软编后端返回非空
 }

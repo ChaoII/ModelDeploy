@@ -53,7 +53,8 @@ if(BUILD_VIDEO)
     list(APPEND TEST_SOURCES
         test_video_core.cpp
         test_video_factory.cpp
-        test_video_ffmpeg_decode.cpp)
+        test_video_ffmpeg_decode.cpp
+        test_video_ffmpeg_encode.cpp)
 endif()
 
 # GPU-only 测试源：仅当 CUDA 启用时编译（否则 CPU 下 cuda_runtime.h 缺失导致编译失败）
