@@ -373,16 +373,10 @@ if (BUILD_PYTHON)
     # stubgen 失败只告警不阻断构建（PYI_STUBGEN_OK 检查）。
     if (DEFINED Python_EXECUTABLE AND EXISTS "${Python_EXECUTABLE}")
         install(CODE "
-            set(_stub_cmd \"${Python_EXECUTABLE}\")
             set(_stub_root \"\${CMAKE_INSTALL_PREFIX}\")
-            if(WIN32)
-                execute_process(COMMAND cmd /c set \"PYTHONPATH=${_stub_root};%PYTHONPATH%\" \\& \"${_stub_cmd}\" -m pybind11_stubgen modeldeploy --output-dir \"${_stub_root}\"
-                    RESULT_VARIABLE _stubgen_rv) 
-            else()
-                execute_process(COMMAND \"${_stub_cmd}\" -m pybind11_stubgen modeldeploy --output-dir \"${_stub_root}\"
-                    WORKING_DIRECTORY \"${_stub_root}\"
-                    RESULT_VARIABLE _stubgen_rv)
-            endif()
+            execute_process(COMMAND \"${Python_EXECUTABLE}\" -m pybind11_stubgen modeldeploy --output-dir \"\${_stub_root}\"
+                WORKING_DIRECTORY \"\${_stub_root}\"
+                RESULT_VARIABLE _stubgen_rv)
             if(NOT _stubgen_rv EQUAL 0)
                 message(WARNING \"pybind11-stubgen failed (rc=\${_stubgen_rv}); wheel will be built without .pyi stubs.\")
             endif()
