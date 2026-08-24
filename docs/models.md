@@ -405,6 +405,8 @@ ECAPA-TDNN 输出 192-d 说话人 embedding，配合内存 `SpeakerGallery` 验�
 | 流式识别 `StreamingStt` | `audio/solutions/streaming_stt.h` | 分块 push + 回调 |
 | TTS 批处理 `TtsBatcher` | `audio/solutions/tts_batcher.h` | enqueue/dequeue_all |
 
+> 各方案详细文档（应用场景 / 使用方式 / 算法原理）见 [解决方案总览](./solutions.md)。
+
 **示例**：`examples/demo_audio_solutions/demo_diarization.cpp`、`demo_stream_stt.cpp`、`demo_tts_batch.cpp`。
 
 ## 21. NLP（jieba 分词 / 分类）
@@ -451,7 +453,9 @@ ECAPA-TDNN 输出 192-d 说话人 embedding，配合内存 `SpeakerGallery` 验�
 | 针孔/鹰眼 | `VisionEye` | 基于视平线的透视变换可视化（`VisionEye(eye_level_y)`） |
 | 健身动作计数 | `WorkoutMonitor` | 锻炼动作计数/监测 |
 
-> 以上 `DistanceEstimator / ObjectBlur / ObjectCropper / VisionEye / WorkoutMonitor` 均为纯 C++ 解决方案层（`csrc/vision/solutions/`），暂无独立 demo；另有两个通用工具类 `InferenceSlicer`（大图切块推理）与 `DetectionSmoother`（检测结果时域平滑），见 `csrc/vision/tools/{slicer,smoother}.h`。
+> 以上均为纯 C++ 解决方案层（`csrc/vision/solutions/`）；`DistanceEstimator / ObjectBlur / ObjectCropper / VisionEye` 暂无独立 demo。通用工具类（`Annotator / Detections / Metrics / InferenceSlicer / DetectionSmoother / Zone`）见 `csrc/vision/tools/`。
+
+> 各方案与工具的详细文档（应用场景 / 使用方式 / 效果 / 原理 / 算法）见 [解决方案总览](./solutions.md) 与 [工具总览](./tools.md)。
 
 **示例**：`examples/demo_solutions/demo_solutions.cpp`（ObjectCounter/Heatmap/SpeedEstimator/ParkingManager）；CV 纯工具（Annotator/LineZone/PolygonZone/Metrics mAP）见 `examples/demo_tools/demo_tools.cpp`。
 
