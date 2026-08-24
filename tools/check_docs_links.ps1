@@ -1,13 +1,11 @@
 #!/usr/bin/env pwsh
 # 校验用户文档内相对 .md 链接目标是否存在。
-# 扫描范围：README.md、examples/EXAMPLES.md、docs/（公开文档）与 docs/api、docs/internal；不含根目录 .superpowers/ 开发过程文档。
+# 扫描范围：README.md、examples/EXAMPLES.md、docs/ 顶层与 docs/api；不含根目录 .superpowers/ 开发过程文档。
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 $files = @()
-foreach ($d in @("docs/api", "docs/internal")) {
-    if (Test-Path (Join-Path $root $d)) { $files += Get-ChildItem -Path (Join-Path $root $d) -Filter *.md }
-}
+if (Test-Path (Join-Path $root "docs/api")) { $files += Get-ChildItem -Path (Join-Path $root "docs/api") -Filter *.md }
 $files += Get-ChildItem -Path (Join-Path $root "docs") -Filter *.md
 $files += Get-Item (Join-Path $root "README.md")
 $files += Get-Item (Join-Path $root "examples/EXAMPLES.md")
