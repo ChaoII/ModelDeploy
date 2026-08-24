@@ -348,6 +348,12 @@ if (BUILD_PYTHON)
         list(REMOVE_ITEM PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/kokoro_pybind.cpp
                 ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/speaker_verify_pybind.cpp)
     endif ()
+    # pybind NLP 绑定依赖 BUILD_NLP；关闭时排除，否则 SDK 侧 nlp/tools/*.cpp
+    # 在 #if defined(BUILD_NLP) 下为空、符号缺失，pyd 链接会报 LNK2001（如 Tokenizer）
+    if (NOT BUILD_NLP)
+        file(GLOB _MD_PYBIND_NLP_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/nlp/*.cpp)
+        list(REMOVE_ITEM PYBIND_SOURCE ${_MD_PYBIND_NLP_SOURCE})
+    endif ()
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
     pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
     target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
