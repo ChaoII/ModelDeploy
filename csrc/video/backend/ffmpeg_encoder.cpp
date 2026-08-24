@@ -35,6 +35,7 @@ bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
     }
     if (!init_encoder(w, h, cfg_.fps)) {
         set_err(err, "encoder-open-fail");
+        cleanup();  // init_encoder 部分分配的资源在此统一释放，避免滞留
         return false;
     }
     if (!open_output(url)) {
@@ -126,6 +127,11 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
         set_err(err, "not-opened");
         return false;
     }
+    // 防越界：输入尺寸必须与 open 时一致，否则 sws_scale 按 w_×h_ 读取会越界
+    if (image.width() != w_ || image.height() != h_) {
+        set_err(err, "dimension-mismatch");
+        return false;
+    }
     auto t0 = std::chrono::steady_clock::now();
     // 取 CPU BGR 平面（packed 单平面，stride 可能含对齐；PKG_BGR_U8 每像素 3 字节）
     auto p = image.plane(0);
@@ -138,12 +144,20 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
         return false;
     }
     if (!sws_) {
+        // 注意：此 FFmpeg 的 SWS_CS_* 用低位值，不能放入 sws_getContext 的 flags（会与算法位冲突如
+        // "Exactly one scaler algorithm must be chosen"）。因此用 BILINEAR 建上下文后，
+        // 再通过 sws_setColorspaceDetails 显式把目标 YUV 矩阵设为 BT.709 limited，使其与
+        // 编码器/帧元数据声明的 BT.709 一致——否则 RGB→YUV 默认走 BT.601，彩色内容会偏色
+        // （纯灰测试掩盖了这一点）。
         sws_ = sws_getContext(w_, h_, AV_PIX_FMT_BGR24, w_, h_, AV_PIX_FMT_YUV420P,
                               SWS_BILINEAR, nullptr, nullptr, nullptr);
         if (!sws_) {
             set_err(err, "sws-init-fail");
             return false;
         }
+        const int* bt709 = sws_getCoefficients(SWS_CS_ITU709);
+        const int* def = sws_getCoefficients(SWS_CS_DEFAULT);
+        sws_setColorspaceDetails(sws_, def, 1, bt709, 0, 0, 1 << 16, 1 << 16);
     }
     const uint8_t* src[1] = {p.data};
     int src_stride[1] = {p.step};
@@ -160,7 +174,11 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
             av_packet_rescale_ts(pkt_, enc_->time_base, st_->time_base);
             pkt_->stream_index = st_->index;
         }
-        if (fmt_) av_interleaved_write_frame(fmt_, pkt_);
+        if (fmt_ && av_interleaved_write_frame(fmt_, pkt_) < 0) {
+            av_packet_unref(pkt_);
+            set_err(err, "mux-write-fail");
+            return false;
+        }
         stats_.frames_out++;
         av_packet_unref(pkt_);
     }
