@@ -15,7 +15,8 @@
 #include <string>
 #include <vector>
 
-#include "onnxruntime_cxx_api.h"
+#include "runtime/runtime.h"
+#include "runtime/runtime_option.h"
 #include "kaldi-native-fbank/csrc/feature-fbank.h"
 #include "kaldi-native-fbank/csrc/online-feature.h"
 
@@ -23,7 +24,7 @@ namespace modeldeploy::audio::asr {
 
     namespace {
 
-        // tokens.txt: 每行一个符号，id = 行号（第 0 行一般是 <blank>）
+        // tokens.txt: 每行 "<symbol> <id>"
         class BasicSymbolTable {
         public:
             bool Load(const std::string& path) {
@@ -33,7 +34,6 @@ namespace modeldeploy::audio::asr {
                 while (std::getline(in, line)) {
                     if (!line.empty() && line.back() == '\r') line.pop_back();
                     if (line.empty()) continue;
-                    // 格式: "<symbol> <id>"（符号可能含空格？末列是整数 id）
                     auto sp = line.rfind(' ');
                     if (sp == std::string::npos) return false;
                     int32_t sym_id = std::stoi(line.substr(sp + 1));
@@ -87,47 +87,31 @@ namespace modeldeploy::audio::asr {
             return text;
         }
 
-        inline std::vector<std::string> ParseNames(Ort::Session& sess,
-                                                   size_t count,
-                                                   Ort::AllocatorWithDefaultOptions& alloc) {
-            std::vector<std::string> names;
-            names.reserve(count);
-            for (size_t i = 0; i < count; ++i) {
-                auto ptr = sess.GetInputNameAllocated(i, alloc);
-                names.emplace_back(ptr.get());
+        // 自有 CPU Tensor + memcpy（对齐 SDK 惯例，避免 set_data 模板未实例化问题）
+        inline Tensor MakeFloatTensor(const std::vector<float>& data,
+                                      const std::vector<int64_t>& shape) {
+            Tensor t(shape, DataType::FP32, Device::CPU);
+            if (!data.empty()) {
+                std::memcpy(t.data(), data.data(), data.size() * sizeof(float));
             }
-            return names;
+            return t;
         }
 
-        inline std::vector<std::string> ParseOutNames(Ort::Session& sess,
-                                                      size_t count,
-                                                      Ort::AllocatorWithDefaultOptions& alloc) {
-            std::vector<std::string> names;
-            names.reserve(count);
-            for (size_t i = 0; i < count; ++i) {
-                auto ptr = sess.GetOutputNameAllocated(i, alloc);
-                names.emplace_back(ptr.get());
-            }
-            return names;
+        inline Tensor MakeInt32Tensor(int32_t value) {
+            Tensor t({1}, DataType::INT32, Device::CPU);
+            std::memcpy(t.data(), &value, sizeof(int32_t));
+            return t;
         }
 
-        // 把 const char* 名字数组指向上面解析出的 std::string 存储
-        inline void MakePtrArray(const std::vector<std::string>& names,
-                                 std::vector<const char*>* ptrs) {
-            ptrs->clear();
-            ptrs->reserve(names.size());
-            for (const auto& n : names) ptrs->push_back(n.c_str());
-        }
+        constexpr int64_t kMelDim = 80;
 
     } // namespace
 
     class ParaformerStreamingAsr::Impl {
     public:
-        // 流式 paraformer 常量（对齐 sherpa online-paraformer）
         static constexpr int32_t kChunkSize = 61;
         static constexpr int32_t kLeftChunk = 5;
         static constexpr int32_t kRightChunk = 3;
-        static constexpr int32_t kFeatDim = 80;
 
         Impl(const std::string& encoder_onnx,
              const std::string& decoder_onnx,
@@ -135,99 +119,33 @@ namespace modeldeploy::audio::asr {
              int32_t sample_rate,
              int32_t num_threads,
              float threshold)
-            : sample_rate_(sample_rate),
-              threshold_(threshold),
-              env_(ORT_LOGGING_LEVEL_WARNING, "MD-ParaformerStreaming") {
-            sess_opts_.SetIntraOpNumThreads(num_threads > 0 ? num_threads : 1);
-            sess_opts_.SetGraphOptimizationLevel(ORT_ENABLE_ALL);
-            try {
-                encoder_sess_ = std::make_unique<Ort::Session>(
-                    env_, encoder_onnx.c_str(), sess_opts_);
-                decoder_sess_ = std::make_unique<Ort::Session>(
-                    env_, decoder_onnx.c_str(), sess_opts_);
-
-                Ort::AllocatorWithDefaultOptions alloc;
-                encoder_in_strings_ = ParseNames(*encoder_sess_, encoder_sess_->GetInputCount(), alloc);
-                encoder_out_strings_ = ParseOutNames(*encoder_sess_, encoder_sess_->GetOutputCount(), alloc);
-                decoder_in_strings_ = ParseNames(*decoder_sess_, decoder_sess_->GetInputCount(), alloc);
-                decoder_out_strings_ = ParseOutNames(*decoder_sess_, decoder_sess_->GetOutputCount(), alloc);
-                MakePtrArray(encoder_in_strings_, &encoder_in_names_);
-                MakePtrArray(encoder_out_strings_, &encoder_out_names_);
-                MakePtrArray(decoder_in_strings_, &decoder_in_names_);
-                MakePtrArray(decoder_out_strings_, &decoder_out_names_);
-
-                initialized_ = ReadMetadata() && token_table_.Load(tokens_txt);
-                if (initialized_) ResetFbank();
-            } catch (const std::exception& e) {
-                std::cerr << "[ParaformerStreamingAsr] init error: " << e.what() << std::endl;
-                initialized_ = false;
+            : sample_rate_(sample_rate), threshold_(threshold) {
+            RuntimeOption eopt, dopt;
+            eopt.set_model_path(encoder_onnx);
+            dopt.set_model_path(decoder_onnx);
+            if (num_threads > 0) {
+                eopt.set_cpu_thread_num(num_threads);
+                dopt.set_cpu_thread_num(num_threads);
             }
+            // 走 SDK 统一 Runtime：多后端可插拔（当前 ORT CPU）
+            // 注意：Runtime::is_initialized() 对 ORT 不可靠（OrtBackend 遮蔽了
+            // BaseBackend::initialized_），以 init() 返回值判定。
+            const bool enc_ok = encoder_rt_.init(eopt);
+            const bool dec_ok = decoder_rt_.init(dopt);
+            if (!enc_ok || !dec_ok) {
+                initialized_ = false;
+                return;
+            }
+
+            initialized_ = ReadMetadata() && token_table_.Load(tokens_txt);
+            if (initialized_) ResetFbank();
         }
 
         ~Impl() = default;
 
-        bool is_initialized() const { return initialized_; }
+        [[nodiscard]] bool is_initialized() const { return initialized_; }
 
-        bool ReadMetadata() {
-            Ort::AllocatorWithDefaultOptions alloc;
-            Ort::ModelMetadata meta = encoder_sess_->GetModelMetadata();
-
-            auto lookup = [&](const char* key, std::string* out) -> bool {
-                auto v = meta.LookupCustomMetadataMapAllocated(key, alloc);
-                if (!v) return false;
-                *out = v.get();
-                return true;
-            };
-
-            auto read_int = [&lookup](const char* key, int32_t* out) -> bool {
-                std::string s;
-                if (!lookup(key, &s)) return false;
-                try { *out = std::stoi(s); } catch (...) { return false; }
-                return true;
-            };
-            auto read_vec = [&lookup](const char* key, std::vector<float>* out) -> bool {
-                std::string s;
-                if (!lookup(key, &s)) return false;
-                std::vector<float> v;
-                size_t pos = 0;
-                while (pos < s.size()) {
-                    size_t comma = s.find(',', pos);
-                    std::string tok = s.substr(
-                        pos, comma == std::string::npos ? std::string::npos : comma - pos);
-                    try { v.push_back(std::stof(tok)); } catch (...) { return false; }
-                    if (comma == std::string::npos) break;
-                    pos = comma + 1;
-                }
-                *out = std::move(v);
-                return true;
-            };
-
-            read_int("vocab_size", &vocab_size_);
-            read_int("lfr_window_size", &lfr_window_size_);
-            read_int("lfr_window_shift", &lfr_window_shift_);
-            if (!read_int("encoder_output_size", &encoder_output_size_)) {
-                std::cerr << "[ParaformerStreamingAsr] no encoder_output_size\n";
-                return false;
-            }
-            read_int("decoder_num_blocks", &decoder_num_blocks_);
-            read_int("decoder_kernel_size", &decoder_kernel_size_);
-            if (!read_vec("neg_mean", &neg_mean_)) {
-                std::cerr << "[ParaformerStreamingAsr] no neg_mean\n";
-                return false;
-            }
-            if (!read_vec("inv_stddev", &inv_stddev_)) {
-                std::cerr << "[ParaformerStreamingAsr] no inv_stddev\n";
-                return false;
-            }
-            float scale = std::sqrt(static_cast<float>(encoder_output_size_));
-            for (auto& f : inv_stddev_) f *= scale;
-            if (decoder_num_blocks_ <= 0 || decoder_kernel_size_ <= 1) {
-                std::cerr << "[ParaformerStreamingAsr] bad decoder meta\n";
-                return false;
-            }
-            return true;
-        }
-
+        // ---- preprocess 阶段：在线 FBank ----
         void ResetFbank() {
             knf::FbankOptions opts;
             opts.frame_opts.dither = 0.0f;
@@ -236,7 +154,7 @@ namespace modeldeploy::audio::asr {
             opts.frame_opts.samp_freq = static_cast<float>(sample_rate_);
             opts.frame_opts.frame_shift_ms = 10.0f;
             opts.frame_opts.frame_length_ms = 25.0f;
-            opts.mel_opts.num_bins = kFeatDim;
+            opts.mel_opts.num_bins = kMelDim;
             opts.mel_opts.low_freq = 20.0f;
             opts.mel_opts.high_freq = 0.0f;
             fbank_ = std::make_unique<knf::OnlineFbank>(opts);
@@ -252,77 +170,91 @@ namespace modeldeploy::audio::asr {
             alpha_cache_ = 0.f;
             fired_alpha_ = 0.f;
             running_confidence_ = 0.f;
+            short_final_done_ = false;
         }
 
         void accept_waveform(const std::vector<float>& samples) {
             if (!initialized_ || samples.empty()) return;
             fbank_->AcceptWaveform(static_cast<float>(sample_rate_),
-                                   samples.data(), static_cast<int32_t>(samples.size()));
+                                   samples.data(),
+                                   static_cast<int32_t>(samples.size()));
         }
 
         void input_finished() { if (fbank_) fbank_->InputFinished(); }
 
+        // ---- 解码总入口 ----
         bool DecodeStep(bool is_final, std::vector<int32_t>& new_tokens,
                         float& confidence, bool& out_final) {
             if (!initialized_) return false;
-            if (is_final && short_final_done_) {
-                out_final = true;
-                return false;
-            }
+            // 语义：调用者标记 is_final 即视为段结束（即使末块不解码出新 token）
+            if (is_final) out_final = true;
+            if (is_final && short_final_done_) return false;
 
-            int32_t start_processed = frames_processed_;
-            int32_t available = fbank_->NumFramesReady() - frames_processed_;
-            // 非 final：帧数不足一个 chunk 时先等待（对齐 sherpa IsReady），
-            // 不提前推进，避免小片喂入时误处理/越界。
+            const int32_t start_processed = frames_processed_;
+            const int32_t available = fbank_->NumFramesReady() - frames_processed_;
             if (!is_final && available < kChunkSize) return false;
-            bool short_final = is_final && available < kChunkSize;
+            const bool short_final = is_final && available < kChunkSize;
 
-            std::vector<float> frames =
-                GetFrames(frames_processed_, short_final ? available : kChunkSize);
+            // 取帧 + LFR/CMVN/PositionalEncoding → 输入 Tensor
+            std::vector<float> lfr = preprocess_feature(short_final, available);
+            if (lfr.empty()) return false;
 
-            if (short_final) {                frames.resize(static_cast<size_t>(kChunkSize) * kFeatDim, 0.0f);
+            const int32_t num_frames = static_cast<int32_t>(lfr.size()) /
+                                       static_cast<int32_t>(neg_mean_.size());
+            Tensor features = MakeFloatTensor(
+                lfr, {1, num_frames, static_cast<int64_t>(neg_mean_.size())});
+            Tensor features_len = MakeInt32Tensor(num_frames);
+
+            // encode + CIF 聚合（把 candidate 合并成 acoustic_embedding）
+            Tensor encoder_out, encoder_out_len, alpha;
+            if (!RunEncoder(features, features_len, &encoder_out, &encoder_out_len, &alpha))
+                return false;
+
+            std::vector<float> acoustic;
+            if (!CifAggregate(alpha, encoder_out, &acoustic)) return false;
+
+            const int32_t num_tokens =
+                static_cast<int32_t>(acoustic.size()) / static_cast<int32_t>(encoder_out.shape()[2]);
+            Tensor ac = MakeFloatTensor(acoustic,
+                                        {1, num_tokens, encoder_out.shape()[2]});
+            Tensor ac_len = MakeInt32Tensor(num_tokens);
+
+            // decode：encoder_out / len + acoustic + states
+            if (!RunDecoder(encoder_out, encoder_out_len, ac, ac_len, new_tokens))
+                return false;
+
+            confidence = running_confidence_;
+            return true;
+        }
+
+        // 取帧 + LFR + CMVN + PositionalEncoding（preprocess 后半段）
+        std::vector<float> preprocess_feature(bool short_final, int32_t available) {
+            std::vector<float> frames = GetFrames(
+                frames_processed_, short_final ? available : kChunkSize);
+            if (frames.empty() && !short_final) return {};
+            if (short_final) {
+                frames.resize(static_cast<size_t>(kChunkSize) * kMelDim, 0.0f);
                 frames_processed_ += available;
                 short_final_done_ = true;
             } else {
                 frames_processed_ += kChunkSize - 1;
             }
 
-            if (frames.empty()) return false;
-
-            int32_t t_offset = start_processed / lfr_window_shift_;
+            const int32_t t_offset = (frames_processed_ - (short_final ? available
+                                                                       : (kChunkSize - 1))) /
+                                     lfr_window_shift_;
             std::vector<float> lfr = ApplyLFR(frames);
             ApplyCMVN(lfr);
             PositionalEncoding(lfr, t_offset);
 
-            int32_t feat_dim = static_cast<int32_t>(neg_mean_.size());
+            const int32_t feat_dim = static_cast<int32_t>(neg_mean_.size());
             if (feat_cache_.empty()) {
-                feat_cache_.resize(
-                    static_cast<size_t>(kLeftChunk + kRightChunk) * feat_dim, 0.0f);
+                feat_cache_.resize(static_cast<size_t>(kLeftChunk + kRightChunk) * feat_dim, 0.0f);
             }
             lfr.insert(lfr.begin(), feat_cache_.begin(), feat_cache_.end());
             std::copy(lfr.end() - static_cast<ptrdiff_t>(feat_cache_.size()),
                       lfr.end(), feat_cache_.begin());
-
-            int32_t num_frames = static_cast<int32_t>(lfr.size()) / feat_dim;
-            auto mem = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
-
-            std::array<int64_t, 3> x_shape{1, num_frames, feat_dim};
-            Ort::Value x = Ort::Value::CreateTensor(
-                mem, lfr.data(), lfr.size(), x_shape.data(), x_shape.size());
-            std::array<int64_t, 1> len_shape{1};
-            int32_t len_val = num_frames;
-            Ort::Value x_len = Ort::Value::CreateTensor(
-                mem, &len_val, 1, len_shape.data(), len_shape.size());
-
-            std::array<Ort::Value, 2> enc_in = {std::move(x), std::move(x_len)};
-            std::vector<Ort::Value> enc_out = encoder_sess_->Run(
-                {}, encoder_in_names_.data(), enc_in.data(), enc_in.size(),
-                encoder_out_names_.data(), encoder_out_names_.size());
-
-            bool ok = RunDecoder(enc_out, new_tokens, confidence, out_final);
-            confidence = running_confidence_;  // 累积置信度（末步无新 token 也保底）
-            if (is_final) out_final = true;  // final 标记的调用即视为段结束
-            return ok;
+            return lfr;
         }
 
         std::vector<float> GetFrames(int32_t frame_index, int32_t n) {
@@ -330,25 +262,25 @@ namespace modeldeploy::audio::asr {
             const int32_t ready = fbank_->NumFramesReady();
             if (frame_index >= ready) return out;
             int32_t m = std::min<int32_t>(n, ready - frame_index);
-            out.reserve(static_cast<size_t>(m) * kFeatDim);
+            out.reserve(static_cast<size_t>(m) * kMelDim);
             for (int32_t i = 0; i < m; ++i) {
                 const float* p = fbank_->GetFrame(frame_index + i);
-                out.insert(out.end(), p, p + kFeatDim);
+                out.insert(out.end(), p, p + kMelDim);
             }
             return out;
         }
 
         std::vector<float> ApplyLFR(const std::vector<float>& in) {
-            int32_t in_frames = static_cast<int32_t>(in.size()) / kFeatDim;
+            int32_t in_frames = static_cast<int32_t>(in.size()) / kMelDim;
             int32_t out_frames = (in_frames - lfr_window_size_) / lfr_window_shift_ + 1;
-            int32_t out_dim = kFeatDim * lfr_window_size_;
+            int32_t out_dim = kMelDim * lfr_window_size_;
             std::vector<float> out(static_cast<size_t>(out_frames) * out_dim);
             const float* p_in = in.data();
             float* p_out = out.data();
             for (int32_t i = 0; i < out_frames; ++i) {
                 std::copy(p_in, p_in + out_dim, p_out);
                 p_out += out_dim;
-                p_in += lfr_window_shift_ * kFeatDim;
+                p_in += lfr_window_shift_ * kMelDim;
             }
             return out;
         }
@@ -365,7 +297,7 @@ namespace modeldeploy::audio::asr {
         }
 
         void PositionalEncoding(std::vector<float>& v, int32_t t_offset) {
-            int32_t feat_dim = kFeatDim * lfr_window_size_;
+            int32_t feat_dim = kMelDim * lfr_window_size_;
             int32_t T = static_cast<int32_t>(v.size()) / feat_dim;
             constexpr float kScale = -0.03301197265941284f;
             for (int32_t t = 0; t < T; ++t) {
@@ -379,25 +311,34 @@ namespace modeldeploy::audio::asr {
             }
         }
 
-        bool RunDecoder(std::vector<Ort::Value>& enc_out,
-                        std::vector<int32_t>& new_tokens,
-                        float& confidence, bool& out_final) {
-            const float* p_enc = enc_out[0].GetTensorData<float>();
-            auto enc_shape = enc_out[0].GetTensorTypeAndShapeInfo().GetShape();
-            int32_t enc_frames = static_cast<int32_t>(enc_shape[1]);
-            int32_t hidden = static_cast<int32_t>(enc_shape[2]);
+        // ---- encode：走 encoder Runtime ----
+        bool RunEncoder(const Tensor& features, const Tensor& features_len,
+                        Tensor* encoder_out, Tensor* encoder_out_len, Tensor* alpha) {
+            std::vector<Tensor> in = {features, features_len};
+            std::vector<Tensor> out;
+            if (!encoder_rt_.infer(in, &out) || out.size() < 3) return false;
+            *encoder_out = out[0];
+            *encoder_out_len = out[1];
+            *alpha = out[2];
+            return true;
+        }
 
-            float* p_alpha = enc_out[2].GetTensorMutableData<float>();
-            int32_t a_frames = static_cast<int32_t>(
-                enc_out[2].GetTensorTypeAndShapeInfo().GetShape()[1]);
+        // CIF 搜索：把 encoder_out 按 alpha 聚合为 acoustic_embedding
+        bool CifAggregate(Tensor& alpha, const Tensor& encoder_out,
+                          std::vector<float>* acoustic) {
+            const int32_t hidden = static_cast<int32_t>(encoder_out.shape()[2]);
+            const int32_t a_frames = static_cast<int32_t>(alpha.shape()[1]);
+            float* p_alpha = static_cast<float*>(alpha.data());
             std::fill(p_alpha, p_alpha + std::min<int32_t>(kLeftChunk, a_frames), 0.0f);
             if (a_frames > kRightChunk) {
                 std::fill(p_alpha + a_frames - kRightChunk, p_alpha + a_frames, 0.0f);
             }
+            const float* p_enc = static_cast<const float*>(encoder_out.data());
 
             if (initial_hidden_.empty()) initial_hidden_.resize(static_cast<size_t>(hidden));
-            std::vector<float> acoustic;
-            acoustic.reserve(static_cast<size_t>(a_frames) * hidden);
+            std::vector<float>& ac = *acoustic;
+            ac.clear();
+            ac.reserve(static_cast<size_t>(a_frames) * hidden);
 
             float integrate = alpha_cache_;
             for (int32_t i = 0; i < a_frames; ++i) {
@@ -405,99 +346,121 @@ namespace modeldeploy::audio::asr {
                 float a = p_alpha[i];
                 if (integrate + a < threshold_) {
                     integrate += a;
-                    for (int32_t d = 0; d < hidden; ++d)
-                        initial_hidden_[d] += a * r[d];
+                    for (int32_t d = 0; d < hidden; ++d) initial_hidden_[d] += a * r[d];
                     continue;
                 }
                 float need = threshold_ - integrate;
                 fired_alpha_ += need;
-                for (int32_t d = 0; d < hidden; ++d)
-                    initial_hidden_[d] += need * r[d];
-                acoustic.insert(acoustic.end(), initial_hidden_.begin(), initial_hidden_.end());
+                for (int32_t d = 0; d < hidden; ++d) initial_hidden_[d] += need * r[d];
+                ac.insert(ac.end(), initial_hidden_.begin(), initial_hidden_.end());
                 integrate += a - threshold_;
-                for (int32_t d = 0; d < hidden; ++d)
-                    initial_hidden_[d] = integrate * r[d];
+                for (int32_t d = 0; d < hidden; ++d) initial_hidden_[d] = integrate * r[d];
             }
             alpha_cache_ = integrate;
+            return !ac.empty();
+        }
 
-            if (acoustic.empty()) return false;
+        // ---- decode：走 decoder Runtime，状态 Tensor 往返 ----
+        bool RunDecoder(const Tensor& encoder_out, const Tensor& encoder_out_len,
+                        const Tensor& acoustic, const Tensor& acoustic_len,
+                        std::vector<int32_t>& new_tokens) {
+            const int32_t hidden = static_cast<int32_t>(encoder_out.shape()[2]);
+            const int32_t num_tokens = static_cast<int32_t>(acoustic.shape()[1]);
 
-            int32_t num_tokens = static_cast<int32_t>(acoustic.size()) / hidden;
-            auto mem = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
-
-            // 首次：初始化 decoder 每 block 的状态缓存（零），对齐 sherpa
+            // 首次：初始化每 block 状态缓存（零）
             if (states_.empty()) {
-                std::array<int64_t, 3> shp{1, encoder_output_size_,
-                                           decoder_kernel_size_ - 1};
-                int32_t nbytes = static_cast<int32_t>(shp[0] * shp[1] * shp[2]);
-                Ort::AllocatorWithDefaultOptions alloc2;
+                std::vector<int64_t> shp{1, encoder_output_size_,
+                                         decoder_kernel_size_ - 1};
                 states_.reserve(static_cast<size_t>(decoder_num_blocks_));
                 for (int32_t b = 0; b < decoder_num_blocks_; ++b) {
-                    Ort::Value st = Ort::Value::CreateTensor<float>(
-                        alloc2, shp.data(), shp.size());
-                    memset(st.GetTensorMutableData<float>(), 0,
-                           sizeof(float) * nbytes);
+                    Tensor st(shp, DataType::FP32, Device::CPU);
+                    std::memset(st.data(), 0, st.byte_size());
                     states_.push_back(std::move(st));
                 }
             }
 
-            std::array<int64_t, 3> ac_shape{1, num_tokens, hidden};
-            Ort::Value ac = Ort::Value::CreateTensor(
-                mem, acoustic.data(), acoustic.size(), ac_shape.data(), ac_shape.size());
-            std::array<int64_t, 1> ac_len_shape{1};
-            Ort::Value ac_len = Ort::Value::CreateTensor(
-                mem, &num_tokens, 1, ac_len_shape.data(), ac_len_shape.size());
+            std::vector<Tensor> in;
+            in.reserve(4 + states_.size());
+            in.push_back(encoder_out);
+            in.push_back(encoder_out_len);
+            in.push_back(acoustic);
+            in.push_back(acoustic_len);
+            for (const auto& st : states_) in.push_back(st);
 
-            // decoder 输入按顺序：encoder_out, encoder_out_len, acoustic_embedding,
-            // acoustic_embedding_length, states...
-            std::vector<Ort::Value> dec_in;
-            dec_in.reserve(4 + states_.size());
-            std::array<int64_t, 3> enc_shape2{0, 0, 0};
-            std::copy_n(enc_shape.begin(),
-                        std::min<size_t>(enc_shape.size(), 3), enc_shape2.begin());
-            Ort::Value cout = Ort::Value::CreateTensor(
-                mem, const_cast<float*>(p_enc), Numel(enc_shape),
-                enc_shape2.data(), enc_shape2.size());
-            std::array<int64_t, 1> len_shape{1};
-            int32_t len_val = enc_frames;
-            Ort::Value cout_len = Ort::Value::CreateTensor(
-                mem, &len_val, 1, len_shape.data(), len_shape.size());
-            dec_in.push_back(std::move(cout));
-            dec_in.push_back(std::move(cout_len));
-            dec_in.push_back(std::move(ac));
-            dec_in.push_back(std::move(ac_len));
-            for (auto& s : states_) dec_in.push_back(std::move(s));
+            std::vector<Tensor> out;
+            if (!decoder_rt_.infer(in, &out)) return false;
 
-            std::vector<Ort::Value> dec_out = decoder_sess_->Run(
-                {}, decoder_in_names_.data(), dec_in.data(), dec_in.size(),
-                decoder_out_names_.data(), decoder_out_names_.size());
+            // 解析输出：末尾 decoder_num_blocks_ 个为状态，前一(int64)为 sample_ids
+            const size_t n_out = out.size();
+            const size_t n_state = static_cast<size_t>(decoder_num_blocks_);
+            if (n_out < 2 + n_state) return false;
 
-            states_.clear();
-            states_.reserve(static_cast<size_t>(decoder_num_blocks_));
-            for (size_t i = 2; i < dec_out.size(); ++i) {
-                states_.push_back(std::move(dec_out[i]));
+            Tensor& sample_ids_t = out[n_out - n_state - 1];
+            new_tokens.clear();
+            if (sample_ids_t.dtype() == DataType::INT64) {
+                const int64_t* ids = static_cast<const int64_t*>(sample_ids_t.data());
+                for (int32_t i = 0; i < num_tokens; ++i) {
+                    int32_t t = static_cast<int32_t>(ids[i]);
+                    if (t == 0) continue;
+                    all_tokens_.push_back(t);
+                    new_tokens.push_back(t);
+                }
             }
 
-            const int64_t* sample_ids = dec_out[1].GetTensorData<int64_t>();
-            new_tokens.clear();
-            for (int32_t i = 0; i < num_tokens; ++i) {
-                int32_t t = static_cast<int32_t>(sample_ids[i]);
-                if (t == 0) continue;
-                all_tokens_.push_back(t);
-                new_tokens.push_back(t);
+            states_.clear();
+            for (size_t i = n_out - n_state; i < n_out; ++i) {
+                states_.push_back(std::move(out[i]));
             }
 
             float denom = fired_alpha_ + alpha_cache_;
             running_confidence_ = (denom > 0.f) ? (fired_alpha_ / denom) : 0.f;
-            confidence = running_confidence_;
-            out_final = short_final_done_;
             return true;
         }
 
-        static inline size_t Numel(const std::vector<int64_t>& shape) {
+        static inline size_t NumelShape(const std::vector<int64_t>& s) {
             size_t n = 1;
-            for (auto d : shape) n *= static_cast<size_t>(std::max<int64_t>(d, 1));
+            for (auto d : s) n *= static_cast<size_t>(d);
             return n;
+        }
+
+        bool ReadMetadata() {
+            auto map = encoder_rt_.get_custom_meta_data();
+            auto read_int = [&map](const char* key, int32_t* out) -> bool {
+                auto it = map.find(key);
+                if (it == map.end()) return false;
+                try { *out = std::stoi(it->second); } catch (...) { return false; }
+                return true;
+            };
+            auto read_vec = [&map](const char* key, std::vector<float>* out) -> bool {
+                auto it = map.find(key);
+                if (it == map.end()) return false;
+                std::vector<float> v;
+                std::string s = it->second;
+                size_t pos = 0;
+                while (pos < s.size()) {
+                    size_t comma = s.find(',', pos);
+                    std::string tok = s.substr(
+                        pos, comma == std::string::npos ? std::string::npos : comma - pos);
+                    try { v.push_back(std::stof(tok)); } catch (...) { return false; }
+                    if (comma == std::string::npos) break;
+                    pos = comma + 1;
+                }
+                *out = std::move(v);
+                return true;
+            };
+
+            read_int("vocab_size", &vocab_size_);
+            read_int("lfr_window_size", &lfr_window_size_);
+            read_int("lfr_window_shift", &lfr_window_shift_);
+            if (!read_int("encoder_output_size", &encoder_output_size_)) return false;
+            read_int("decoder_num_blocks", &decoder_num_blocks_);
+            read_int("decoder_kernel_size", &decoder_kernel_size_);
+            if (!read_vec("neg_mean", &neg_mean_)) return false;
+            if (!read_vec("inv_stddev", &inv_stddev_)) return false;
+            float scale = std::sqrt(static_cast<float>(encoder_output_size_));
+            for (auto& f : inv_stddev_) f *= scale;
+            if (decoder_num_blocks_ <= 0 || decoder_kernel_size_ <= 1) return false;
+            return true;
         }
 
         const std::vector<int32_t>& all_tokens() const { return all_tokens_; }
@@ -508,10 +471,10 @@ namespace modeldeploy::audio::asr {
     private:
         int32_t sample_rate_;
         float threshold_;
-        Ort::Env env_;
-        Ort::SessionOptions sess_opts_;
-        std::unique_ptr<Ort::Session> encoder_sess_;
-        std::unique_ptr<Ort::Session> decoder_sess_;
+
+        Runtime encoder_rt_;
+        Runtime decoder_rt_;
+
         bool initialized_ = false;
         bool short_final_done_ = false;
 
@@ -529,23 +492,13 @@ namespace modeldeploy::audio::asr {
         int32_t frames_processed_ = 0;
         std::vector<float> feat_cache_;
         std::vector<float> initial_hidden_;
-        std::vector<Ort::Value> states_;
+        std::vector<Tensor> states_;
         std::vector<int32_t> all_tokens_;
         float alpha_cache_ = 0.f;
         float fired_alpha_ = 0.f;
         float running_confidence_ = 0.f;
 
         BasicSymbolTable token_table_;
-
-        std::vector<const char*> encoder_in_names_;
-        std::vector<const char*> encoder_out_names_;
-        std::vector<const char*> decoder_in_names_;
-        std::vector<const char*> decoder_out_names_;
-
-        std::vector<std::string> encoder_in_strings_;
-        std::vector<std::string> encoder_out_strings_;
-        std::vector<std::string> decoder_in_strings_;
-        std::vector<std::string> decoder_out_strings_;
     };
 
     ParaformerStreamingAsr::ParaformerStreamingAsr(
