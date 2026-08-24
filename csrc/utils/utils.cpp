@@ -66,7 +66,7 @@ namespace modeldeploy {
     }
 #ifdef _WIN32
     std::wstring to_wstring(const std::string& str) {
-        const unsigned len = str.size() + 1; // +1 for the null terminator
+        const unsigned len = static_cast<unsigned>(str.size() + 1); // +1 for the null terminator
         std::wstring w_str(len, 0);
         size_t converted_chars = 0;
         if (const errno_t err = mbstowcs_s(&converted_chars, w_str.data(), len, str.c_str(), _TRUNCATE); err != 0) {
@@ -127,7 +127,7 @@ namespace modeldeploy {
             if (base64_str[in_] == '=' || base64_chars.find(base64_str[in_]) == std::string::npos) {
                 break;
             }
-            char_array_4[i++] = base64_chars.find(base64_str[in_]);
+            char_array_4[i++] = static_cast<unsigned char>(base64_chars.find(base64_str[in_]));
             if (i == 4) {
                 char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
                 char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
@@ -210,7 +210,7 @@ namespace modeldeploy {
         for (size_t i = 0; i < vec.size(); ++i) {
             if (vec[i] > max_value) {
                 max_value = vec[i];
-                max_index = i;
+                max_index = static_cast<int>(i);
             }
         }
         return max_index;

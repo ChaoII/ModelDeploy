@@ -75,23 +75,22 @@ if (POLICY CMP0169)
 endif ()
 
 
+# /utf-8 对 C 与 CXX 都生效（samplerate 等 C 源文件否则触发 C4819 文件代码页刷屏）
 if (MSVC)
+    add_compile_options(/utf-8)
     add_compile_options(
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4819>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4251>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/utf-8>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/W3>")
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>")
     add_definitions(-DMD_CXX_EXPORT)
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
     endif ()
 else ()
-    # GCC/Clang：开启常用警告（不含 -Werror，避免存量代码直接失败）
+    # GCC/Clang：第三方库已通过 md_silence_external 静默，自有代码的告警级别在
+    # ModelDeploySDK 目标上单独开启（见 md_warn_own），避免告警选项向下泄漏到第三方。
     add_compile_options(
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wall>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wextra>"
             "$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
     # SIMD 优化（仅 x86_64；aarch64 用 NEON/SVE，编译器自动启用，-mavx2 不适用）
     if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
@@ -101,9 +100,31 @@ else ()
     endif ()
 endif ()
 
+# 对第三方库自身目标静默全部警告（如 zxing/kaldi/samplerate/Catch2 自带的 -Wall、-Wextra、/W4 等）。
+# 目标添加了目录级警告选项，target 级 -w(/w) 追加在命令行末尾可将其覆盖。
+function(md_silence_external target)
+    if (TARGET ${target})
+        if (MSVC)
+            target_compile_options(${target} PRIVATE /w)
+        elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(${target} PRIVATE -w)
+        endif ()
+    endif ()
+endfunction()
+
+# 对自有 SDK 代码开启合理告警级别（不含 -Werror）。target 级生效，避免泄漏到第三方。
+function(md_warn_own target)
+    if (MSVC)
+        target_compile_options(${target} PRIVATE /W3)
+    elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE -Wall -Wextra)
+    endif ()
+endfunction()
+
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/csrc)
-include_directories(${CMAKE_SOURCE_DIR}/third_party)
+# 第三方头一律按系统头处理：自有代码编译时不再泄漏第三方头文件内的警告
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party)
 
 
 file(GLOB_RECURSE ALL_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/*.cpp)
@@ -207,11 +228,13 @@ if (BUILD_AUDIO)
     add_definitions(-DBUILD_AUDIO)
     set(BUILD_TESTING OFF CACHE BOOL "Disable testing for samplerate" FORCE)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/samplerate)
+    md_silence_external(samplerate)
     set(KALDI_NATIVE_FBANK_BUILD_PYTHON OFF CACHE BOOL "Disable Python binding for kaldi-native-fbank" FORCE)
     set(KALDI_NATIVE_FBANK_BUILD_TESTS OFF CACHE BOOL "Disable testing for kaldi-native-fbank" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "With shared library for kaldi-native-fbank" FORCE)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank EXCLUDE_FROM_ALL)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
+    md_silence_external(kaldi-native-fbank-core)
+    include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party/kaldi_native_fbank)
     list(APPEND ALL_SOURCE ${AUDIO_SOURCE})
     # 音频静态依赖 PRIVATE 链接（打进共享库，导出时无需第三方 target）
     list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core)
@@ -235,8 +258,8 @@ endif ()
 # 但 -DBUILD_NLP 宏仅在 BUILD_NLP 打开时定义，保证 NLP 扩展（pybind/capi/tests）可独立隔离。
 if (BUILD_AUDIO OR BUILD_NLP)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cppjieba)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include)
+    include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
+    include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include)
     list(APPEND PRIVATE_DEPENDS cppjieba)
 endif ()
 if (BUILD_NLP)
@@ -270,9 +293,10 @@ if (BUILD_BARCODE)
     set(_md_prev_cxx_std "${CMAKE_CXX_STANDARD}")
     set(CMAKE_CXX_STANDARD 20)
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/zxing-cpp EXCLUDE_FROM_ALL)
+    md_silence_external(ZXing)
     set(CMAKE_CXX_STANDARD "${_md_prev_cxx_std}")
     unset(_md_prev_cxx_std)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/zxing-cpp/core/src)
+    include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/third_party/zxing-cpp/core/src)
     list(APPEND PRIVATE_DEPENDS ZXing)
 endif ()
 
@@ -309,6 +333,7 @@ add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
 set_target_properties(${LIBRARY_NAME} PROPERTIES
         VERSION ${MD_VERSION}
         SOVERSION ${MD_VERSION_MAJOR})
+md_warn_own(${LIBRARY_NAME})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS} PRIVATE ${PRIVATE_DEPENDS})
 # Sophgo 平台 jpg 变暗修复：whole-archive 逻辑定义在 cmake/opencv.cmake（MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE）
 if (NOT "${MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE}" STREQUAL "")

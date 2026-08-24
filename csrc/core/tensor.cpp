@@ -705,7 +705,7 @@ namespace modeldeploy {
 
         size_t index = 0;
         for (size_t i = 0; i < indices.size(); ++i) {
-            if (indices[i] >= shape_[i]) {
+            if (indices[i] >= static_cast<size_t>(shape_[i])) {
                 throw std::out_of_range("Index out of range");
             }
             index += indices[i] * strides_[i];
