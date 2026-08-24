@@ -34,8 +34,14 @@ void bind_tools(pybind11::module& m) {
         .value("Lightweight", tool::ItnBackend::Lightweight)
         .value("WeText", tool::ItnBackend::WeText);
     pybind11::class_<tool::ItnEngine>(m, "ItnEngine")
-        .def(pybind11::init<tool::ItnBackend>(),
-             pybind11::arg("backend") = tool::ItnBackend::Lightweight)
+        // 枚举默认值无法被 stubgen 解析，改用 none 兜底（与 RuntimeOption 一致）
+        .def(pybind11::init([](pybind11::object backend_obj) {
+                 tool::ItnBackend backend = pybind11::none().equal(backend_obj)
+                                                ? tool::ItnBackend::Lightweight
+                                                : backend_obj.cast<tool::ItnBackend>();
+                 return std::make_unique<tool::ItnEngine>(backend);
+             }),
+             pybind11::arg("backend") = pybind11::none())
         .def("normalize", &tool::ItnEngine::normalize, pybind11::arg("text"))
         .def_property_readonly("backend", &tool::ItnEngine::backend);
 

@@ -49,7 +49,9 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("inputs"), pybind11::arg("records"));
 
         pybind11::class_<detection::UltralyticsDepth, BaseModel>(m, "UltralyticsDepth")
-            .def(pybind11::init<std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<detection::UltralyticsDepth>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def("predict",
                  [](detection::UltralyticsDepth& self, pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);

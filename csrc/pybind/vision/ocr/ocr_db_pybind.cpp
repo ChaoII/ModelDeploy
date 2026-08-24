@@ -83,7 +83,9 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("inputs"), pybind11::arg("batch_det_img_info"));
 
         pybind11::class_<ocr::DBDetector, BaseModel>(m, "DBDetector")
-            .def(pybind11::init<std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<ocr::DBDetector>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def(pybind11::init<>())
             .def_property_readonly("preprocessor",
                                    &ocr::DBDetector::get_preprocessor)

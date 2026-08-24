@@ -20,8 +20,10 @@ namespace modeldeploy::vision {
         pybind11::class_<landmark::VehicleKeypoint>(landmark_m, "VehicleKeypoint",
                                                     "车辆关键点识别（默认 4 车轮关键点，薄封装 UltralyticsPose，"
                                                     "可 set_keypoints_num 泛化点数）。")
-            .def(pybind11::init<const std::string&, const RuntimeOption&>(),
-                 pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption(),
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
+                return std::make_unique<landmark::VehicleKeypoint>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none(),
                  "构造 VehicleKeypoint；无权重时 is_initialized()==False。")
             .def("predict",
                  [](landmark::VehicleKeypoint& self, const pybind11::array& im) {
@@ -62,8 +64,10 @@ namespace modeldeploy::vision {
 
         pybind11::class_<landmark::FaceLandmark>(landmark_m, "FaceLandmark",
                                                  "面部 Landmark 独立访问（InsightFace 2d106，106 点）。")
-            .def(pybind11::init<const std::string&, const RuntimeOption&>(),
-                 pybind11::arg("model_file"), pybind11::arg("option") = RuntimeOption(),
+            .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
+                RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
+                return std::make_unique<landmark::FaceLandmark>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option") = pybind11::none(),
                  "构造 FaceLandmark；无权重时 is_initialized()==False。")
             .def("predict",
                  [](landmark::FaceLandmark& self, const pybind11::array& im) {

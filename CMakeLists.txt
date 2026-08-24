@@ -373,6 +373,12 @@ if (BUILD_PYTHON)
         list(REMOVE_ITEM PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/kokoro_pybind.cpp
                 ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/speaker_verify_pybind.cpp)
     endif ()
+    # pybind NLP 绑定依赖 BUILD_NLP；关闭时排除，否则 SDK 侧 nlp/tools/*.cpp
+    # 在 #if defined(BUILD_NLP) 下为空、符号缺失，pyd 链接会报 LNK2001（如 Tokenizer）
+    if (NOT BUILD_NLP)
+        file(GLOB _MD_PYBIND_NLP_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/nlp/*.cpp)
+        list(REMOVE_ITEM PYBIND_SOURCE ${_MD_PYBIND_NLP_SOURCE})
+    endif ()
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")
     pybind11_add_module(modeldeploy ${PYBIND_SOURCE})
     target_link_libraries(modeldeploy PUBLIC ${LIBRARY_NAME})
@@ -394,6 +400,21 @@ if (BUILD_PYTHON)
             LIBRARY DESTINATION modeldeploy)
     install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
     install(FILES ${CMAKE_SOURCE_DIR}/python/modeldeploy/__init__.py DESTINATION modeldeploy)
+    # 构建期用 pybind11-stubgen 生成 .pyi 存根，写回 staging 的 modeldeploy/，随 wheel 发布。
+    # stubgen 失败只告警不阻断构建（失败时 _stubgen_rv 非 0，降级为 warning）。
+    if (DEFINED Python_EXECUTABLE AND EXISTS "${Python_EXECUTABLE}")
+        install(CODE "
+            set(_stub_root \"\${CMAKE_INSTALL_PREFIX}\")
+            execute_process(COMMAND \"${Python_EXECUTABLE}\" -m pybind11_stubgen modeldeploy --output-dir \"\${_stub_root}\"
+                WORKING_DIRECTORY \"\${_stub_root}\"
+                RESULT_VARIABLE _stubgen_rv)
+            if(NOT _stubgen_rv EQUAL 0)
+                message(WARNING \"pybind11-stubgen failed (rc=\${_stubgen_rv}); wheel will be built without .pyi stubs.\")
+            endif()
+        ")
+    else()
+        message(WARNING "Python_EXECUTABLE undefined; skipping pyi stub generation.")
+    endif()
 endif ()
 
 if (BUILD_EXAMPLES)

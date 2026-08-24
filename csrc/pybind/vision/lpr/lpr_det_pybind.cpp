@@ -80,7 +80,9 @@ namespace modeldeploy::vision {
                           &lpr::LprDetPostprocessor::set_landmarks_per_card);
 
         pybind11::class_<lpr::LprDetection, BaseModel>(m, "LprDetection")
-            .def(pybind11::init<std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<lpr::LprDetection>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def("predict",
                  [](lpr::LprDetection& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);

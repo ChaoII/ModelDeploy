@@ -9,7 +9,9 @@
 namespace modeldeploy::vision {
     void bind_as_pipeline(const pybind11::module& m) {
         pybind11::class_<face::SeetaFaceAsPipeline, BaseModel>(m, "SeetaFaceAsPipeline")
-            .def(pybind11::init<std::string, std::string, std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& face_det_model_file, const std::filesystem::path& first_model_file, const std::filesystem::path& second_model_file, const RuntimeOption& option) {
+                return std::make_unique<face::SeetaFaceAsPipeline>(face_det_model_file.string(), first_model_file.string(), second_model_file.string(), option);
+            }), pybind11::arg("face_det_model_file"), pybind11::arg("first_model_file"), pybind11::arg("second_model_file"), pybind11::arg("option"))
             .def("predict",
                   [](const face::SeetaFaceAsPipeline& self, pybind11::array& image, const float fuse_threshold,
                      const float clarity_threshold) {

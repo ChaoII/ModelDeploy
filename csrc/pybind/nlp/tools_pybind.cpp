@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "pybind/utils/utils.h"
 #include "nlp/tools/tokenizer.h"
 #include "nlp/tools/splitter.h"
 #include "nlp/tools/keywords.h"
@@ -10,7 +11,10 @@ namespace nlp {
 
 void bind_tools(pybind11::module& m) {
     pybind11::class_<tool::Tokenizer>(m, "Tokenizer")
-        .def(pybind11::init<const std::string&>())
+        .def(pybind11::init([](const std::filesystem::path& dict_dir) {
+                 return std::make_unique<tool::Tokenizer>(dict_dir.string());
+             }),
+             pybind11::arg("dict_dir"))
         .def("tokenize", &tool::Tokenizer::tokenize, pybind11::arg("text"), pybind11::arg("mode") = "mix")
         .def("is_loaded", &tool::Tokenizer::is_loaded);
     pybind11::class_<tool::Splitter>(m, "Splitter")

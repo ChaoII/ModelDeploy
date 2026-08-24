@@ -12,6 +12,8 @@
 #include <type_traits>
 #include <core/md_log.h>
 #include "vision/common/struct.h"
+#include <filesystem>
+#include <Python.h>
 
 
 namespace modeldeploy {
@@ -67,3 +69,56 @@ namespace modeldeploy {
 
 
 } // namespace modeldeploy
+
+// pybind11/detail 命名空间内定义 std::filesystem::path 的 type caster，
+// 使绑定形参 std::filesystem::path 同时接受 str/bytes/os.PathLike(pathlib.Path)。
+// 放在 modeldeploy 命名空间闭合之后。
+PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
+PYBIND11_NAMESPACE_BEGIN(detail)
+template <>
+struct type_caster<std::filesystem::path> {
+public:
+    PYBIND11_TYPE_CASTER(std::filesystem::path, const_name("os.PathLike[str]"));
+
+    bool load(handle src, bool) {
+        // PyOS_FSPath 接受 str/bytes 和任何有 __fspath__ 的对象(pathlib.Path)
+        PyObject* fspath = PyOS_FSPath(src.ptr());
+        if (!fspath) {
+            PyErr_Clear();
+            return false;
+        }
+        // 统一转成 UTF-8 字符串（str 直接；bytes 解码）
+        Py_ssize_t size = 0;
+        const char* data = nullptr;
+        if (PyUnicode_Check(fspath)) {
+            data = PyUnicode_AsUTF8AndSize(fspath, &size);
+            if (!data) {
+                Py_DECREF(fspath);
+                PyErr_Clear();
+                return false;
+            }
+        } else if (PyBytes_Check(fspath)) {
+            // 3.13 移除 2 参 getter（PyBytes_AsStringAndSize(obj,&size)），
+            // 改用所有版本均有的 3 参形式：成功返回 0 并填充 buffer/size。
+            char* buffer = nullptr;
+            if (PyBytes_AsStringAndSize(fspath, &buffer, &size) != 0) {
+                Py_DECREF(fspath);
+                PyErr_Clear();
+                return false;
+            }
+            data = buffer;
+        } else {
+            Py_DECREF(fspath);
+            return false;
+        }
+        value = std::filesystem::path(std::string(data, size));
+        Py_DECREF(fspath);
+        return true;
+    }
+
+    static handle cast(const std::filesystem::path& src, return_value_policy, handle) {
+        return PyUnicode_FromString(src.string().c_str());
+    }
+};
+PYBIND11_NAMESPACE_END(detail)
+PYBIND11_NAMESPACE_END(PYBIND11_NAMESPACE)

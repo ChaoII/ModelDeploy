@@ -11,8 +11,9 @@
 namespace modeldeploy::vision {
     void bind_hand(const pybind11::module& m) {
         pybind11::class_<hand::HandKeypoint>(m, "HandKeypoint")
-            .def(pybind11::init<const std::string&, const RuntimeOption&>(),
-                 pybind11::arg("model_file"), pybind11::arg("option"))
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<hand::HandKeypoint>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def("predict",
                  [](hand::HandKeypoint& self, const pybind11::array& im) {
                      auto cv = pyarray_to_cv_mat(im);
