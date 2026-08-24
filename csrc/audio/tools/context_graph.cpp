@@ -19,7 +19,7 @@ void check_size(size_t got, size_t expected, const char* what) {
 void ContextGraph::Build(const std::vector<std::vector<int32_t>>& token_ids,
                          const std::vector<float>& scores,
                          const std::vector<std::string>& phrases,
-                         const std::vector<float>& ac_thresholds) const {
+                         const std::vector<float>& ac_thresholds) {
     if (!scores.empty()) check_size(token_ids.size(), scores.size(), "scores");
     if (!phrases.empty()) check_size(token_ids.size(), phrases.size(), "phrases");
     if (!ac_thresholds.empty()) check_size(token_ids.size(), ac_thresholds.size(), "ac_thresholds");
@@ -117,7 +117,7 @@ std::pair<bool, const ContextState*> ContextGraph::IsMatched(const ContextState*
     return std::make_pair(status, node);
 }
 
-void ContextGraph::FillFailOutput() const {
+void ContextGraph::FillFailOutput() {
     std::queue<const ContextState*> node_queue;
     for (const auto& kv : root_->next) {
         kv.second->fail = root_.get();

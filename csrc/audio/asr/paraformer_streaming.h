@@ -12,7 +12,11 @@
 #include "csrc/base_model.h"
 
 namespace knf {
-    class OnlineFbank;
+    // OnlineFbank 是 OnlineGenericBaseFeature<FbankComputer> 的别名（见 kaldi-native-fbank
+    // csrc/online-feature.h），别名无法前向声明，改为前向声明其底层模板与参数类型。
+    template <typename Computer>
+    class OnlineGenericBaseFeature;
+    class FbankComputer;
 }
 
 namespace modeldeploy::audio::asr {
@@ -148,7 +152,7 @@ namespace modeldeploy::audio::asr {
         std::vector<float> inv_stddev_;
 
         // ---- 在线特征器 ----
-        std::unique_ptr<knf::OnlineFbank> fbank_;
+        std::unique_ptr<knf::OnlineGenericBaseFeature<knf::FbankComputer>> fbank_;
 
         // ---- 流状态 ----
         int32_t frames_processed_ = 0;

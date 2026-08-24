@@ -11,6 +11,12 @@ requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "Aichao", email = "849453582@qq.com" }]
 
+[project.scripts]
+md-person-label = "modeldeploy.tools.person_label:main"
+
+[project.optional-dependencies]
+label = ["opencv-python"]
+
 [tool.scikit-build]
 cmake.version = ">=3.15"
 # scikit-build-core 用的是多配置生成器里面如果使用了CMAKE_BUILD_TYPE变量会接收不到
@@ -25,6 +31,13 @@ cmake.define.BUILD_PYTHON = "ON"
 cmake.define.BUILD_CAPI = "OFF"
 cmake.define.BUILD_EXAMPLES = "OFF"
 cmake.define.BUILD_TESTS = "OFF"
+cmake.define.BUILD_VISION = "ON"
+cmake.define.BUILD_AUDIO = "ON"
+cmake.define.BUILD_BARCODE = "ON"
+cmake.define.BUILD_NLP = "ON"
+cmake.define.BUILD_VIDEO = "OFF"
+cmake.define.ENABLE_WETEXT = "OFF"
+cmake.define.BUILD_ENCRYPTION = { env = "BUILD_ENCRYPTION", default = "OFF" }
 cmake.args = ["-G", "Ninja"]
 
 wheel.packages = ["python/modeldeploy"]

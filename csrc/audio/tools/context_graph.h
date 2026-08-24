@@ -34,6 +34,10 @@ struct MODELDEPLOY_CXX_EXPORT ContextState {
     const ContextState* output = nullptr;
 
     ContextState() = default;
+    ContextState(const ContextState&) = delete;
+    ContextState& operator=(const ContextState&) = delete;
+    ContextState(ContextState&&) = default;
+    ContextState& operator=(ContextState&&) = default;
     ContextState(int32_t token, float token_score, float node_score,
                  float output_score, int32_t level = 0, float ac_threshold = 0.0f,
                  bool is_end = false, const std::string& phrase = {})
@@ -81,8 +85,8 @@ private:
     void Build(const std::vector<std::vector<int32_t>>& token_ids,
                const std::vector<float>& scores,
                const std::vector<std::string>& phrases,
-               const std::vector<float>& ac_thresholds) const;
-    void FillFailOutput() const;
+               const std::vector<float>& ac_thresholds);
+    void FillFailOutput();
 };
 
 } // namespace modeldeploy::audio::tool
