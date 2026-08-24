@@ -274,4 +274,117 @@ std::vector<std::pair<int,int>> segments = vad.predict(pcm_data, sample_rate);
 | GPU 加速 | 转 `.engine`（TRT） |
 | TPU 部署 | 转 `.bmodel`（Sophgo） |
 
-各模型导出/转换教程见 [README](../../README.md) 与 [后端详解](./backends.md)。
+各模型导出/转换教程见 [模型转换与量化](./conversion.md) 与 [后端详解](./backends.md)。
+
+## 15. 多目标跟踪（Tracking）
+
+在检测结果基础上做跨帧目标跟踪，输出稳定 `track_id`。基础类 `BaseTracker`，实现 `ByteTracker` / `BoTSORT` / `StrongSORT`。
+
+```cpp
+// 头文件: #include "modeldeploy/tracking.h"
+// 用法见示例: examples/demo_tracking/demo_tracking_ort_cpu.cpp
+```
+
+- `ByteTracker`：轻量、适合实时；`BaseTracker` 提供 `update(detections)` 返回带 track_id 的轨迹。
+- 与 `UltralyticsDet` 配合：det → track → 可视化，跨帧保持稳定 `track_id`。
+- **示例**：`examples/demo_tracking/`（`demo_tracking_ort_cpu.cpp` 演示 det→track→可视化整体流程）。
+
+## 16. 视频动作识别（Video Action Recognition）
+
+基于视频帧序列的动作分类。两类模型：
+
+- **TSN**（RGB 帧，配合 `VideoDecoder` 抽帧）：`vision::action::TSN`
+- **ST-GCN**（骨架，`UltralyticsPose` 提关键点后输入）：`vision::action::StGcn`
+
+```cpp
+// TSN: examples/demo_action/demo_action.cpp
+// ST-GCN 骨架: examples/demo_action/demo_action_skeleton.cpp
+```
+
+- **示例**：`examples/demo_action/`（输入 mp4 视频，输出 top 动作 label+score）。
+
+## 17. 文档理解（Document Understanding → Markdown）
+
+版面分析 `StructureV2Layout` 定位版面/公式/表格，配合 OCR 与表格识别输出整页 Markdown：
+公式以 `$...$`、表格以 HTML 呈现。
+
+```cpp
+// 完整管线见: examples/demo_doc/demo_doc.cpp
+// 用法: demo_doc <layout.onnx> <image> [<formula.onnx> [dict]] [--ocr ...] [--table ...]
+```
+
+- **示例**：`examples/demo_doc/demo_doc.cpp`。
+
+## 18. 行人 Re-ID（Person Re-Identification）
+
+`vision::reid::ReID` 基于 OSNet 输出 512-d 行人特征，配合内存 `ReIdGallery` 做检索匹配。
+
+```cpp
+// 用法: examples/demo_reid/demo_reid.cpp <model> <imgA> <imgB>
+```
+
+- **示例**：`examples/demo_reid/demo_reid.cpp`（输出 embedding 维度 + gallery 匹配 label/score）。
+
+## 19. 声纹验证（Speaker Verification）
+
+ECAPA-TDNN 输出 192-d 说话人 embedding，配合内存 `SpeakerGallery` 验证/检索。
+
+```cpp
+// 纯音频，无需 OpenCV。用法: examples/demo_speaker/demo_speaker.cpp <model.onnx> <wavA> <wavB>
+```
+
+- **示例**：`examples/demo_speaker/demo_speaker.cpp`（输出两段语音 embedding 维度 + gallery 匹配 label/score）。
+
+## 20. 音频解决方案（音频方案）
+
+提供常用音频场景的预组装方案：
+
+| 方案 | 头文件 | 说明 |
+|------|--------|------|
+| 说话人分段 `SpeakerDiarization` | `audio/solutions/speaker_diarization.h` | VAD 切段 |
+| 说话人检索 `SpeakerSearch` | `audio/solutions/speaker_search.h` | 声纹检索 |
+| 流式识别 `StreamingStt` | `audio/solutions/streaming_stt.h` | 分块 push + 回调 |
+| TTS 批处理 `TtsBatcher` | `audio/solutions/tts_batcher.h` | enqueue/dequeue_all |
+
+**示例**：`examples/demo_audio_solutions/demo_diarization.cpp`、`demo_stream_stt.cpp`、`demo_tts_batch.cpp`。
+
+## 21. NLP（jieba 分词 / 分类）
+
+基于 jieba 的中文处理工具与可选 BERT 文本分类（ONNX）。
+
+```cpp
+// 纯工具: Splitter / Keywords / Stats / Tokenizer / Normalizer
+// 文本分类: nlp::TextClassifier("bert.onnx", option)
+// 用法: examples/demo_nlp/demo_nlp.cpp [bert.onnx] [text]
+```
+
+**示例**：`examples/demo_nlp/demo_nlp.cpp`。
+
+## 22. 条码 / 二维码（Barcode / QR）
+
+`vision::barcode::BarcodeDetector` 纯 CV 识别（零 DNN，跨全部后端），输出格式、文本、分数与是否二维码。
+
+```cpp
+// 用法: examples/demo_barcode/demo_barcode.cpp
+// 输出形如: [QR Code] https://example.com/MD (score, is_qr)
+```
+
+**示例**：`examples/demo_barcode/demo_barcode.cpp`。
+
+## 23. 手部关键点 / 关键点扩展
+
+- **手部关键点** `vision::hand::HandKeypoint`：检测手 + 关键点。示例 `examples/demo_hand/demo_hand.cpp`。
+- **关键点扩展**：车辆关键点、面部 Landmark 106 点。示例 `examples/demo_landmark/demo_landmark.cpp`（`demo_landmark <vehicle.onnx|none> <face.onnx|none> <image.jpg>`）。
+
+## 24. CV 解决方案（场景方案）
+
+基于 `SolutionBase` 的预组装视觉场景方案，无需自带权重、多为纯算法：
+
+| 方案 | 类 | 说明 |
+|------|----|------|
+| 跨线计数 | `ObjectCounter` | 统计 line_in/line_out 与类别计数 |
+| 热力图 | `Heatmap` | 生成密度热力峰 |
+| 测速 | `SpeedEstimator` | 估算移动速度 m/s |
+| 车位管理 | `ParkingManager` | 车位占用判定 |
+
+**示例**：`examples/demo_solutions/demo_solutions.cpp`；CV 纯工具（Annotator/LineZone/PolygonZone/Metrics mAP）见 `examples/demo_tools/demo_tools.cpp`。
