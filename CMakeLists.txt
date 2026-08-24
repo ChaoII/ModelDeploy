@@ -10,7 +10,7 @@ set(PRIVATE_DEPENDS "")
 message("==================${CMAKE_BUILD_TYPE}===================")
 option(ENABLE_ORT "enable ort backend" ON)
 option(ENABLE_MNN "enable mnn backend" ON)
-option(ENABLE_TRT "enable mnn backend" OFF)
+option(ENABLE_TRT "enable trt backend" OFF)
 option(ENABLE_SOPHGO "enable sophgo backend (Linux + SOPHON-Sail)" OFF)
 option(ENABLE_WETEXT "enable WeTextProcessing ITN backend (requires OpenFst + we-text-processing)" OFF)
 option(BUILD_AUDIO "build asr tts vad sr" ON)
@@ -25,9 +25,8 @@ option(BUILD_BENCHMARK "build benchmarks" OFF)
 option(BUILD_SURVEILLANCE "build AI surveillance application" OFF)
 option(BUILD_VIDEO "build video decoder module (requires FFmpeg and BUILD_VISION)" OFF)
 option(BUILD_ENCRYPTION "enable model encryption/decryption (requires OpenSSL)" ON)
-option(WITH_STATIC_CRT "build for mt" OFF)
 option(WITH_GPU "Enable GPU" ON)
-option(BUILD_ON_JETSON "Whether to build fastdeploy on Nvidia Jetson" OFF)
+option(BUILD_ON_JETSON "Whether to build ModelDeploy on Nvidia Jetson" OFF)
 
 if (NOT BUILD_ON_JETSON)
     if (EXISTS "/etc/nv_tegra_release")
@@ -77,9 +76,6 @@ endif ()
 
 
 if (MSVC)
-    if (WITH_STATIC_CRT)
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
-    endif ()
     add_compile_options(
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4819>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"

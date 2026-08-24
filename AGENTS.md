@@ -67,7 +67,6 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | `BUILD_TESTS` | OFF | Catch2 测试二进制 |
 | `BUILD_ENCRYPTION` | ON | 需要 OpenSSL；未找到时静默禁用 |
 | `ENABLE_WETEXT` | OFF | 可选 WeTextProcessing ITN 后端（覆盖最全，需 OpenFst + `-DWETEXT_INCLUDE_DIR`）；未找到时 ITN 退化到内置轻量实现 |
-| `WITH_STATIC_CRT` | OFF | MSVC MT 运行时替代 MD |
 
 ## 注意事项
 
