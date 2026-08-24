@@ -138,6 +138,28 @@ rec.cls_batch_size = 8;
 
 **示例**：`examples/demo_face/`（demo_face_det / rec / age / gender / as_pipeline / rec_pipeline）
 
+### 6.1 InsightFace（Buffalo 系列全流程）
+
+`InsightFaceAnalysis` 从模型目录加载 InsightFace Buffalo 全家桶（det + 2d106 + 3d68 + recognition），一次 `analyze` 输出检测框/关键点/106/68 点/姿态/特征，适合人脸注册与比对。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+// 从 buffalo_l 模型目录加载全流水线
+auto analysis = modeldeploy::vision::face::InsightFaceAnalysis::create_from_dir(
+    "test_data/test_models/onnx/insightface/buffalo_l");
+if (!analysis || !analysis->is_initialized()) return -1;
+
+auto img = modeldeploy::ImageData::imread("test.jpg");
+std::vector<modeldeploy::vision::face::InsightFaceResult> results;
+if (!analysis->analyze(img, &results)) return -1;
+// results[i]: {bbox, det_score, kps, landmark_2d_106, landmark_3d_68, pose, embedding}
+```
+
+也可单独使用子模型 `InsightFaceDet` / `InsightFaceGenderAge` / `InsightFaceLandmark` / `InsightFaceRecognition`（均位于 `modeldeploy::vision::face`，继承 `BaseModel`）。
+
+**示例**：`examples/demo_face/demo_insightface_cxx.cpp`（`demo_insightface_cxx <model_dir> <image>`）
+
 ## 7. 车牌识别（License Plate）
 
 | 模型类 | 功能 |
@@ -195,6 +217,21 @@ table.predict(img, &result);
 
 **示例**：`examples/demo_ocr/`
 
+### 8.4 公式识别（Formula → LaTeX）
+
+`FormulaRecognizer` 输入裁剪后的公式图，输出 LaTeX 字符串，需字符/词表 dict（CTC `[batch, seq, num_class]` 输出）。常用于文档理解管线一键出 LaTeX。
+
+```cpp
+auto formula = modeldeploy::vision::ocr::FormulaRecognizer(
+    "formula.onnx", "formula_dict.txt", option);
+std::string latex;
+if (formula.predict(im, &latex)) {
+    std::cout << latex << std::endl;  // 如 "\frac{a}{b}"
+}
+```
+
+**示例**：文档理解整体流程见 `examples/demo_doc/demo_doc.cpp`。
+
 ## 9. 行人属性（Pedestrian Attribute）
 
 ### 9.1 PedestrianAttribute
@@ -231,6 +268,28 @@ asr.predict(pcm_data, [](const std::string& text){ /* 回调 */ });
 ```
 
 **示例**：`examples/demo_audio/demo_sense_voice_cxx.cpp`
+
+### 10.3 ParaformerStreamingAsr（流式，仅 C++）
+
+基于 Paraformer 的流式识别（在线 FBank + chunk 解码），分块喂波形、逐块解码输出文本。
+
+```cpp
+modeldeploy::audio::asr::ParaformerStreamingAsr asr(
+    "encoder.onnx", "decoder.onnx", "tokens.txt", /*sample_rate=*/16000, /*num_threads=*/2);
+
+asr.reset();
+asr.accept_waveform(samples0);          // 可多次喂入 16k float 样本块
+asr.accept_waveform(samples1);
+
+modeldeploy::audio::asr::StreamingAsrResult r;
+bool new_tok = asr.decode(/*is_final=*/false, &r);   // 逐步解码
+// r.text 为本步新增文本；asr.text() 为累计全文
+
+asr.input_finished();
+asr.decode(/*is_final=*/true, &r);      // flush 末尾
+```
+
+> **当前仅 C++**（无 pybind / 独立示例 demo）。
 
 ## 11. 语音合成（TTS）
 
@@ -386,5 +445,73 @@ ECAPA-TDNN 输出 192-d 说话人 embedding，配合内存 `SpeakerGallery` 验�
 | 热力图 | `Heatmap` | 生成密度热力峰 |
 | 测速 | `SpeedEstimator` | 估算移动速度 m/s |
 | 车位管理 | `ParkingManager` | 车位占用判定 |
+| 距离估计 | `DistanceEstimator` | 基于水平面的像素→距离估计 |
+| 目标模糊 | `ObjectBlur` | 对指定目标做马赛克/模糊 |
+| 目标裁剪 | `ObjectCropper` | 按检测框裁剪目标图 |
+| 针孔/鹰眼 | `VisionEye` | 基于视平线的透视变换可视化（`VisionEye(eye_level_y)`） |
+| 健身动作计数 | `WorkoutMonitor` | 锻炼动作计数/监测 |
 
-**示例**：`examples/demo_solutions/demo_solutions.cpp`；CV 纯工具（Annotator/LineZone/PolygonZone/Metrics mAP）见 `examples/demo_tools/demo_tools.cpp`。
+> 以上 `DistanceEstimator / ObjectBlur / ObjectCropper / VisionEye / WorkoutMonitor` 均为纯 C++ 解决方案层（`csrc/vision/solutions/`），暂无独立 demo；另有两个通用工具类 `InferenceSlicer`（大图切块推理）与 `DetectionSmoother`（检测结果时域平滑），见 `csrc/vision/tools/{slicer,smoother}.h`。
+
+**示例**：`examples/demo_solutions/demo_solutions.cpp`（ObjectCounter/Heatmap/SpeedEstimator/ParkingManager）；CV 纯工具（Annotator/LineZone/PolygonZone/Metrics mAP）见 `examples/demo_tools/demo_tools.cpp`。
+
+## 25. 语义分割（Semantic Segmentation）
+
+`UltralyticsSem` 输出逐像素类别，配合 Cityscapes 调色板可视化。
+
+```cpp
+auto m = modeldeploy::vision::detection::UltralyticsSem("yolo26n-sem.onnx", option);
+auto im = modeldeploy::ImageData::imread("test_sem_540.jpg");
+
+modeldeploy::vision::SemSegResult res;
+m->predict(im, &res);   // res: {labels, shape, num_classes}
+auto vis = modeldeploy::vision::vis_sem(im, res, label_map, 0.5, true);
+vis.imwrite("sem_out.jpg");
+```
+
+**示例**：`examples/demo_sem/`（`demo_sem_ort_cpu.cpp` 等全后端矩阵）
+
+## 26. 深度估计（Depth Estimation）
+
+`UltralyticsDepth` 输出逐像素单目深度（log 空间经 `exp` 还原为米），`vis_depth` 用 JET 伪彩色。
+
+```cpp
+auto m = modeldeploy::vision::detection::UltralyticsDepth("yolo26n-depth.onnx", option);
+modeldeploy::vision::DepthResult res;
+m->predict(im, &res);   // res: {depth, shape}
+auto vis = modeldeploy::vision::vis_depth(im, res, true, false);
+vis.imwrite("depth_out.jpg");
+```
+
+**示例**：`examples/demo_depth/`（全后端矩阵）
+
+## 27. 文本正则化（ITN / Inverse Text Normalization）
+
+把数字/量词等口语化内容转写为文字（ASR 后处理常用）。
+
+```cpp
+// modeldeploy::audio::tool
+modeldeploy::audio::tool::InverseTextNormalizer itn;
+std::string out = itn.normalize("2024年3月5日");   // 输出中文数字/量词文字
+```
+
+> **当前仅 C++**（无 pybind / 示例 demo）。
+
+## 28. 视频解码（VideoDecoder）
+
+FFmpeg 软解（h264/hevc → NV12），供视频动作识别等场景逐帧读取。
+
+```cpp
+// modeldeploy::video
+modeldeploy::video::VideoDecoder dec;
+if (dec.open("test.mp4")) {
+    modeldeploy::vision::ImageData frame;   // NV12 CPU
+    uint64_t pts_ms = 0;
+    while (dec.next(&frame, &pts_ms)) {
+        // 处理每一帧；dec.width()/height()/fps() 可得元信息
+    }
+    dec.close();
+}
+```
+
+> 需要 `BUILD_VIDEO=ON`（FFmpeg）。示例见 `examples/demo_action/demo_action.cpp`（配合 TSN 动作识别）。

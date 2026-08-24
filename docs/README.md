@@ -59,17 +59,30 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 |------|--------|---------|
 | 目标检测 | `UltralyticsDet` | 全部 |
 | 实例分割 | `UltralyticsSeg` | 全部 |
+| **语义分割** | `UltralyticsSem` | 全部 |
+| **深度估计** | `UltralyticsDepth` | 全部 |
 | 姿态估计 | `UltralyticsPose` | 全部 |
 | 旋转框检测 | `UltralyticsObb` | 全部 |
 | 图像分类 | `Classification` | 全部 |
-| 人脸检测 | `Scrfd` | 全部 |
-| 人脸识别 | `SeetaFaceID` / `FaceRecognizerPipeline` | 全部 |
+| 人脸检测 | `Scrfd` / `InsightFaceDet` | 全部 |
+| 人脸识别 | `SeetaFaceID` / `FaceRecognizerPipeline` / `InsightFaceRecognition` | 全部 |
+| 人脸分析 | `InsightFaceAnalysis` | 全部 |
 | 人脸年龄/性别 | `SeetaFaceAge` / `SeetaFaceGender` | 全部 |
 | 人脸防伪 | `SeetaFaceAsPipeline` | 全部 |
 | 车牌识别 | `LprPipeline` | 全部 |
 | 文字识别 OCR | `PaddleOCR` / `PPStructureV2Table` | 全部 |
+| **公式识别** | `FormulaRecognizer` | 全部 |
+| 文档理解(→Markdown) | `StructureV2Layout` + OCR + 表格 | 全部 |
 | 行人属性 | `PedestrianAttribute` | 全部 |
-| 语音识别 | `SenseVoice` / `AAsr` | 全部 |
+| **多目标跟踪** | `ByteTracker` / `BotSortTracker` / `StrongSortTracker` | 全部 |
+| **视频动作识别** | `TSN` / `StGcn` | 全部 |
+| **行人 Re-ID** | `ReID` (OSNet) | 全部 |
+| **声纹验证** | `SpeakerVerify` (ECAPA) | 全部 |
+| **条码/二维码** | `BarcodeDetector` | 全部 |
+| **手部关键点** | `HandKeypoint` | 全部 |
+| **CV 解决方案** | `ObjectCounter` / `Heatmap` / `SpeedEstimator` / `ParkingManager` 等 | 全部 |
+| **NLP** | `TextClassifier` / 分词 / 分句 / 关键词 | 全部 |
+| 语音识别 | `SenseVoice` / `AAsr` / `ParaformerStreamingAsr` | 全部 |
 | 语音合成 | `Kokoro` | 全部 |
 | VAD | `SileroVAD` | 全部 |
 
