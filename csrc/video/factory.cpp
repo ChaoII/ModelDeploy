@@ -22,16 +22,24 @@ VideoCodecCapabilities query_video_capabilities() {
 }
 
 std::shared_ptr<DecoderBackend> create_decoder_backend(const VideoDecoderConfig& cfg) {
+    if (cfg.backend == CodecBackend::GStreamer) {
 #ifdef ENABLE_GSTREAMER
-    if (cfg.backend == CodecBackend::GStreamer) return std::make_shared<GstDecoder>(cfg);
+        return std::make_shared<GstDecoder>(cfg);
+#else
+        return nullptr;  // 请求的 GStreamer 后端未启用：返回空，由上层回退/报错，而非静默给 FFmpeg
 #endif
+    }
     return std::make_shared<FfmpegDecoder>(cfg);
 }
 
 std::shared_ptr<EncoderBackend> create_encoder_backend(const VideoEncoderConfig& cfg) {
+    if (cfg.backend == CodecBackend::GStreamer) {
 #ifdef ENABLE_GSTREAMER
-    if (cfg.backend == CodecBackend::GStreamer) return std::make_shared<GstEncoder>(cfg);
+        return std::make_shared<GstEncoder>(cfg);
+#else
+        return nullptr;  // 同上：GStreamer 未启用时不回退 FFmpeg
 #endif
+    }
     return std::make_shared<FfmpegEncoder>(cfg);                 // Task4 FFmpeg 软编
 }
 
