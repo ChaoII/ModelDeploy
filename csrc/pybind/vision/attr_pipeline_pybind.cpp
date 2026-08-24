@@ -8,8 +8,13 @@
 namespace modeldeploy::vision {
     void bind_attr_pipeline(const pybind11::module& m) {
         pybind11::class_<pipeline::PedestrianAttribute, BaseModel>(m, "PedestrianAttribute")
-            .def(pybind11::init<std::string, std::string, RuntimeOption>(),
-                 pybind11::arg("det_model_path"),
+            .def(pybind11::init([](const std::filesystem::path& det_model_path,
+                                   const std::filesystem::path& cls_model_path,
+                                   const RuntimeOption& option) {
+                return std::make_unique<pipeline::PedestrianAttribute>(det_model_path.string(),
+                                                                       cls_model_path.string(),
+                                                                       option);
+            }), pybind11::arg("det_model_path"),
                  pybind11::arg("cls_model_path"),
                  pybind11::arg("option"))
             .def("predict",

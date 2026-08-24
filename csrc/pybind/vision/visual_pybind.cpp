@@ -12,14 +12,14 @@ namespace modeldeploy::vision {
                             const ClassifyResult& result,
                             const int top_k,
                             const float threshold,
-                            const std::string& font_path = "",
+                            const std::filesystem::path& font_path = "",
                             const int font_size = 14,
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto im = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(im);
                   const auto vis_im = vis_cls(image_data, result, top_k,
-                                              threshold, font_path, font_size, alpha, save_result);
+                                              threshold, font_path.string(), font_size, alpha, save_result);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
@@ -37,13 +37,13 @@ namespace modeldeploy::vision {
                             const std::vector<DetectionResult>& result,
                             const double threshold = 0.5,
                             const std::unordered_map<int, std::string>& label_map = {},
-                            const std::string& font_path = "",
+                            const std::filesystem::path& font_path = "",
                             const int font_size = 14,
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto im = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(im);
-                  const ImageData vis_im = vis_det(image_data, result, threshold, label_map, font_path,
+                  const ImageData vis_im = vis_det(image_data, result, threshold, label_map, font_path.string(),
                                                    font_size, alpha, save_result);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
@@ -61,13 +61,13 @@ namespace modeldeploy::vision {
         m.def("vis_iseg", [](const pybind11::array& im_data,
                              const std::vector<InstanceSegResult>& result,
                              const double threshold = 0.5,
-                             const std::string& font_path = "",
+                             const std::filesystem::path& font_path = "",
                              const int font_size = 14,
                              const double alpha = 0.5,
                              const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
-                  const ImageData vis_im = vis_iseg(image_data, result, threshold, font_path,
+                  const ImageData vis_im = vis_iseg(image_data, result, threshold, font_path.string(),
                                                     font_size, alpha, save_result);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
@@ -82,11 +82,11 @@ namespace modeldeploy::vision {
               pybind11::arg("save_result") = false);
         m.def("vis_obb", [](const pybind11::array& im_data, const std::vector<ObbResult>& result,
                             const double threshold = 0.5,
-                            const std::string& font_path = "", const int font_size = 14,
+                            const std::filesystem::path& font_path = "", const int font_size = 14,
                             const double alpha = 0.5, const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
-                  const ImageData vis_im = vis_obb(image_data, result, threshold, font_path,
+                  const ImageData vis_im = vis_obb(image_data, result, threshold, font_path.string(),
                                                    font_size, alpha, save_result);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
@@ -102,13 +102,13 @@ namespace modeldeploy::vision {
 
         m.def("vis_ocr", [](const pybind11::array& im_data,
                             const OCRResult& result,
-                            const std::string& font_path = "",
+                            const std::filesystem::path& font_path = "",
                             const int font_size = 14,
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
-                  const ImageData vis_im = vis_ocr(image_data, result, font_path, font_size, alpha, save_result);
+                  const ImageData vis_im = vis_ocr(image_data, result, font_path.string(), font_size, alpha, save_result);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
                   return cv_mat_to_pyarray(mat);
@@ -122,14 +122,14 @@ namespace modeldeploy::vision {
 
         m.def("vis_lpr", [](const pybind11::array& im_data,
                             const std::vector<LprResult>& result,
-                            const std::string& font_path = "",
+                            const std::filesystem::path& font_path = "",
                             const int font_size = 14,
                             const int landmark_radius = 4,
                             const double alpha = 0.5,
                             const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
-                  const ImageData vis_im = vis_lpr(image_data, result, font_path, font_size,
+                  const ImageData vis_im = vis_lpr(image_data, result, font_path.string(), font_size,
                                                    landmark_radius, alpha, save_result);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
@@ -145,7 +145,7 @@ namespace modeldeploy::vision {
 
         m.def("vis_keypoints", [](const pybind11::array& im_data,
                                   const std::vector<KeyPointsResult>& result,
-                                  const std::string& font_path = "",
+                                  const std::filesystem::path& font_path = "",
                                   const int font_size = 14,
                                   const int landmark_radius = 4,
                                   const double alpha = 0.5,
@@ -153,7 +153,7 @@ namespace modeldeploy::vision {
                                   const bool draw_lines = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
-                  const ImageData vis_im = vis_keypoints(image_data, result, font_path, font_size, landmark_radius,
+                  const ImageData vis_im = vis_keypoints(image_data, result, font_path.string(), font_size, landmark_radius,
                                                          alpha, save_result, draw_lines);
                   cv::Mat mat;
                   vis_im.asMat(&mat);
@@ -172,7 +172,7 @@ namespace modeldeploy::vision {
                              const std::vector<AttributeResult>& result,
                              const float threshold = 0.5f,
                              const std::unordered_map<int, std::string>& label_map = {},
-                             const std::string& font_path = "",
+                             const std::filesystem::path& font_path = "",
                              const int font_size = 14,
                              const double alpha = 0.5,
                              const bool save_result = false,
@@ -180,7 +180,7 @@ namespace modeldeploy::vision {
                              const bool show_attr = true) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
-                  const ImageData vis_im = vis_attr(image_data, result, threshold, label_map, font_path, font_size,
+                  const ImageData vis_im = vis_attr(image_data, result, threshold, label_map, font_path.string(), font_size,
                                                     alpha, save_result, abnormal_ids, show_attr);
                   cv::Mat mat;
                   vis_im.asMat(&mat);

@@ -13,8 +13,9 @@ namespace modeldeploy::vision {
             .def_readwrite("embedding", &ReIdResult::embedding);
 
         pybind11::class_<reid::ReID>(m, "ReID")
-            .def(pybind11::init<const std::string&, const RuntimeOption&>(),
-                 pybind11::arg("model_file"), pybind11::arg("option"))
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<reid::ReID>(model_file.string(), option);
+            }), pybind11::arg("model_file"), pybind11::arg("option"))
             .def("predict",
                  [](reid::ReID& self, const pybind11::array& im) {
                      const auto cv = pyarray_to_cv_mat(im);
