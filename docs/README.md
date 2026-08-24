@@ -17,6 +17,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 |------|------|
 | [架构设计](./architecture.md) | 目录结构、`BaseModel` / `RuntimeOption` / `Tensor` / `ImageData` 核心抽象、推理链路 |
 | [RuntimeOption 配置详解](./runtime_option.md) | 全部后端选择、设备选择、精度、线程、动态 shape 等配置项 |
+| [模型转换/量化](./conversion.md) | 混合精度、动态量化、TRT engine、Sophgo bmodel 转换 |
 | [预处理详解](./preprocess.md) | `ImageData` 图像类型、预处理算子、CPU/CUDA/BMCV 硬件加速、零拷贝链路 |
 
 ### 后端

@@ -58,6 +58,17 @@ cmake --install build
 
 > **MSVC 注意**：根 `CMakeLists.txt` 已自动为 SDK 设置 `/utf-8` 编译选项，无需手动加。
 
+## 2.5 拉取测试数据与模型
+
+```bash
+# Windows
+powershell -ExecutionPolicy Bypass -File tools/fetch_test_data.ps1
+# Linux/macOS
+bash tools/fetch_test_data.sh
+```
+
+脚本从 modelscope 拉取 `test_data.zip` 并解压到仓库根 `test_data/`（含测试图片 `test_images/` 与测试模型 `test_models/`）。重新下载加 `-Force` / `--force`。
+
 ## 3. 编写第一个检测程序
 
 ### 3.1 创建工程
