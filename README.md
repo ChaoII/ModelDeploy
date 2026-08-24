@@ -1,289 +1,91 @@
 # ModelDeploy
 
-多后端推理 SDK（OnnxRuntime / TensorRT / MNN / Sophgo TPU），支持检测/分割/姿态/手部关键点/面部 Landmark/车辆关键点/人脸/OCR/车牌/行人属性/行人 Re-ID/条码二维码/语音/声纹(说话人验证)/文档理解(版面分析+公式识别→Markdown)/Pipeline DAG 编排/视频解码(FFmpeg,BUILD_VIDEO)/视频动作识别(TSN/ST-GCN) 等模型与能力，并提供通用工具层与场景解决方案（对象计数/热力图/测速/车位/说话人检索/语音分段/TTS 批处理）与 **NLP（jieba 分词 / 分句 / 关键词 / 统计 + BERT 文本分类 ONNX）**，提供 C++ / Python / C / C# / Rust 绑定。
+多后端推理 SDK（OnnxRuntime / TensorRT / MNN / Sophgo TPU），支持检测/分割/姿态/OBB/分类/人脸/OCR/车牌/行人属性/Re-ID/条码二维码/语音(ASR/TTS/VAD)/声纹/文档理解(→Markdown)/跟踪/视频动作识别/NLP 等模型与能力，并提供 C++ / Python / C / C# / Rust 五种绑定。一套代码统一调用四种后端。
 
-> **文档中心**：[docs/README.md](./docs/README.md) — 快速开始 / 架构 / 后端 / 模型 / 预处理 / 性能优化 / 多语言 API
+> 完整文档见 **文档中心 [docs/README.md](./docs/README.md)**。
 
-#### 1.编译
+## 功能亮点
+
+- **多后端统一 API**：`RuntimeOption` 一键切换 OnnxRuntime / TensorRT / MNN / Sophgo(算能 TPU)
+- **AI 视觉**：检测/分割/姿态/OBB/分类/深度/语义分割/人脸/车牌/OCR/行人属性/Re-ID/手势/条码二维码
+- **AI 音频**：ASR(SenseVoice)/TTS(Kokoro)/VAD/声纹验证/说话人分段
+- **文档理解**：版面分析 + 公式/OCR/表格 → Markdown
+- **视频**：解码 + 动作识别(TSN/ST-GCN) + 多目标跟踪
+- **NLP**：jieba 分词/分句/关键词/统计 + BERT 文本分类
+- **解决方案层**：对象计数/热力图/测速/车位管理/说话人检索/流式 STT/TTS 批处理
+- **模型加密**：AES-256-CBC 防模型权重泄露
+- **多语言绑定**：C++ / Python / C / C# / Rust
+
+## 快速开始
 
 ```bash
-# 拉取源码
-git clone https://github.com/ChaoII/ModelDeploy.git
-# 配置生成 如果是msvc 请打开x64 Native Tools Command Prompt for VS 2022 终端 为了加速编译最好使用Ninja生成器
-cmake -S . -B build -G Ninja -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=OFF -DBUILD_PYTHON=OFF -DENABLE_MNN=OFF -DENABLE_ORT=ON -DENABLE_TRT=OFF -DWITH_GPU=OFF -DCMAKE_INSTALL_PREFIX=install
-# 编译
+git clone https://github.com/ChaoII/ModelDeploy.git && cd ModelDeploy
+# Windows 用 "x64 Native Tools Command Prompt for VS 2022"; 推荐 Ninja
+cmake -S . -B build -G Ninja -DBUILD_AUDIO=ON -DBUILD_VISION=ON \
+      -DBUILD_CAPI=OFF -DBUILD_PYTHON=OFF -DENABLE_MNN=OFF \
+      -DENABLE_ORT=ON -DENABLE_TRT=OFF -DWITH_GPU=OFF
 cmake --build build --config Release --parallel
-# 安装
 cmake --install build
-
-# 如果需要编译python wheel包
-pip install build
-python -m build
 ```
 
-在生成pybind文件后运行 `pybind11-stubgen modeldelploy` 可生成pyi的接口文档
+安装后生成 `install/`（`include/` + `lib/`）。详细编译选项与第一个程序见 [快速开始](./docs/quickstart.md)。
 
-#### 2.模型加密
-
-ModelDeploy采用AES-256-CBC实现模型加密功能（基于 OpenSSL / BCrypt）
-
-##### 2.1 模型加密文件格式：
-
-- [4字节] 魔数 "MDEN (ModelDeploy Encrypted)
-- [4字节] 版本号 (当前为1
-- [4字节] 模型格式字符串长度
-- [N字节] 模型格式字符串 (如 "onnx", "mnn", "engine")
-- [4字节] 模型原始字节的CRC32校验和
-- [4字节] 加密数据长度
-- [N字节] 加密后的模型数据(AES-256-CBC + SHA-256 密钥派生)
-
-##### 2.2 模型加密方法：
+### 拉取测试数据
 
 ```bash
-model_encrypted encrypt input_model_path output_model_path password [format(mnn onnx engine)]
-# 例如：
-# 写入模型格式，ModelDeploy可以读取加密后的模型自动选择推理后端
-model_encrypted encrypt yolo11n.onnx yolo11n_nms.mdenc 123456 onnx
+# Windows
+powershell -ExecutionPolicy Bypass -File tools/fetch_test_data.ps1
+# Linux/macOS
+bash tools/fetch_test_data.sh
 ```
 
-##### 2.3 加密模型的使用
+### 最小检测示例
 
-加密模型的使用与未加密模型的使用方式基本一致，在RuntimeOption中设置秘钥即可
-
-```c++
-modeldeploy::RuntimeOption option;
-option.password = "123456";
-modeldeploy::vision::detection::UltralyticsDet yolo11_det("yolo11n.mdenc", option);
-...
-```
-
-**注意：**
-
-1. `msvc`项目默认为`MD`版本，当使用`MT`版本静态库时，需要在`CMakeLists.txt`中修改如下：
-2. 安装完成后会自动将ModelDeploySDK的后端依赖拷贝到lib目录中，比如开启`ort`，`mnn` 就会将`MNN.dll`和`onnxruntime.dll`
-   拷贝进lib目录下
-3. `ModelDeploySDK`需要完整的`c++17`标准支持的编译器进行编译
-4. 对于使用`onnxruntime`后端`GPU`时，`windows`系统需要`windows10`、`windows11`、`windows server 2022` 及
-   `windows server 2025`，其它系统请自行测试
-5. `ModelDeploySDK`内置的`opencv`和`onnxruntime`静态库依赖是在`visual studio 2022` 和 `ubuntu 24.04`上编译，如果出现错误，请自行编译依赖
-6. `ModelDeploySDK` 全部是基于`64`位系统来的，`2025`年了不要再用`32`位系统了
-
-#### 2.使用方法(以windows为例)
-
-编译并安装完成后会生成一个目录`install`, 包含一个`include`和`lib`子目录，其中`include`目录包含头文件，`lib`目录包含动态库和符号文件
-
-- 创建一个新cmake项目`test_modeldeploy`,`CMakeLists.txt`文件中添加modeldeploy的头文件路径和库文件路径
-
-```cmake
-CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
-PROJECT(test_modeldeploy C CXX)
-# 注意modeldeploy需要完整的c++17标准支持
-set(CMAKE_CXX_STANDARD 17)
-# msvc中必须添加该编译选项,不然会出现一堆该死的编码问题
-if (MSVC)
-    add_compile_options(/utf-8)
-endif ()
-# 设置modeldeploy的头文件目录和库文件牡蛎
-set(MD_DIR "E:/CLionProjects/ModelDeploy/build/install")
-set(MD_INC_DIR "${MD_DIR}/include")
-set(MD_LIB_DIR "${MD_DIR}/lib")
-include_directories(${MD_INC_DIR})
-link_directories(${MD_LIB_DIR})
-# 添加可执行文件和依赖的库，很高兴的告诉大家在1.6版本后，ModelDeploySDK对OpenCV的接口进行封装(ImageData类)，
-# 在依赖ModelDeploySDk时，无需依赖本地的OpenCV
-add_executable(test_modeldeploy ${PROJECT_SOURCE_DIR}/main.cpp)
-target_link_libraries(test_modeldeploy ModelDeploySDK)
-```
-
-- 创建一个main.cpp文件，并添加以下代码
-
-```c++
+```cpp
 #include "modeldeploy/vision.h"
-
 int main() {
     modeldeploy::RuntimeOption option;
-    // 使用GPU后CPU线程基本无效，请自行测试
-    option.set_cpu_thread_num(10);
-    option.use_gpu(0);
-    // onnxruntime 后端可以开启TRTProviderExecutor
-    option.use_trt_backend();
-    // 开启fp16支持
-    option.enable_fp16 = true;
-    option.enable_trt = true;
-    option.ort_option.trt_engine_cache_path = "./trt_engine";
-    // 注意：trt后端需要提前准备trtexec生成的.engine文件，我个人觉得在使用onnx模型时，
-    // 需要提前使用trtexec生成.engine文件，在线build engine太费时间，参数还不好调整
-    modeldeploy::vision::detection::UltralyticsDet yolo11_det("./yolo11n_nms_dyn.engine",option);
-    auto img = modeldeploy::ImageData::imread("./test_person.jpg");
+    option.use_ort_backend(); option.use_cpu();
+    auto det = modeldeploy::vision::detection::UltralyticsDet("yolo11n.onnx", option);
+    det.get_preprocessor().set_size({640, 640});
+    auto img = modeldeploy::ImageData::imread("test.jpg");
     std::vector<modeldeploy::vision::DetectionResult> result;
-    yolo11_det.get_preprocessor().set_size({320, 320});
-    int warming_up_count = 10;
-    for (int i = 0; i < warming_up_count; ++i) {
-        yolo11_det.predict(img, &result);
-    }
-    // 性能测试
-    TimerArray timers;
-    int loop_count = 100;
-    for (int i = 0; i < loop_count; ++i) {
-        yolo11_det.predict(img, &result, &timers);
-    }
-    timers.print_benchmark();
-    const auto vis_image =
-        modeldeploy::vision::vis_det(img, result, 0.3, "../../test_data/msyh.ttc", 12, 0.3,true);
-    vis_image.show("vis");
+    det.predict(img, &result);
+    return 0;
 }
 ```
 
-```python
-import time
-import cv2
-import modeldeploy
+## 支持矩阵
 
-runtime_option = modeldeploy.RuntimeOption()
-runtime_option.use_gpu()
-runtime_option.use_trt_backend()
-model = modeldeploy.vision.PedestrianAttribute(
-    "../test_data/test_models/trt/zhgd_det_20251219.engine",
-    "../test_data/test_models/trt/zhgd_ml.engine", runtime_option)
-model.cls_batch_size = 8
-model.det_input_size = [1280, 1280]
-model.set_det_threshold(0.5)
-model.cls_input_size = [192, 256]
-image = cv2.imread("../test_data/test_images/test_pedestrian_attribute1.jpg")
-loop_count = 100
-start_time = time.time()
-for _ in range(loop_count):
-    results = model.predict(image)
-end_time = time.time()
-print(f"{loop_count} loops, {end_time - start_time} seconds, {loop_count / (end_time - start_time)} FPS")
-```
+| 后端 | 格式 | CPU | CUDA | OpenCL | TPU |
+|------|------|-----|------|--------|-----|
+| OnnxRuntime | `.onnx` | ✅ | ✅ | ✅ | — |
+| TensorRT | `.engine`/`.onnx` | — | ✅ | — | — |
+| MNN | `.mnn` | ✅ | ✅ | ✅ | — |
+| Sophgo | `.bmodel` | — | — | — | ✅ (BM1688/CV186X) |
 
-更多示例请查看[example](./examples)
+## 路线图
 
-#### 3.OnnxRuntime使用混合精度推理
+- [x] 重构 `Tensor` 支持 CUDA
+- [x] Python / C# 绑定
+- [x] Pipeline DAG 编排、视频解码、多目标跟踪、动作识别、文档理解、Re-ID、声纹、解决方案层
+- [x] 多后端（ORT/TRT/MNN/Sophgo）统一 API + 模型加密
+- [ ] 更多 CUDA 预处理函数
 
-将fp32模型转换为fp16模型，在输入输出插入cast算子，将fp32转换为fp16，然后将输出参数从fp16转化为fp32
-其实我个人觉得没必要，用OnnxRuntime推理时用GPU就老老实实用trt provider，开启pf32会自动生成fp16的engine
+## 更多文档
 
-```python
-import onnx
-from onnxconverter_common import float16
-
-# 加载原始 FP32 模型
-model = onnx.load("model_fp32.onnx")
-# 转为混合精度：内部节点为 float16，但输入/输出保持 float32
-model_mixed = float16.convert_float_to_float16(
-    model,
-    keep_io_types=True
-)
-# 保存新模型
-onnx.save(model_mixed, "model_mixed.onnx")
-```
-
-#### 4.OnnxRRuntime模型量化减小体积
-
-此处仅为减小模型体积，使用uint8动态量化
-
-```python
-from onnxruntime.quantization import QuantType, quantize_dynamic
-
-# 模型路径
-model_fp32 = 'model_fp32.onnx'
-model_quant_dynamic = 'model_quant_dynamic.onnx'
-
-# 动态量化
-quantize_dynamic(
-    model_input=model_fp32,  # 输入模型
-    # op_types_to_quantize=["Conv"],
-    reduce_range=True,
-    model_output=model_quant_dynamic,  # 输出模型
-    per_channel=True,
-    weight_type=QuantType.QUInt8,  # 参数类型 Int8 / UInt8
-)
-```
-
-#### 5.trt engine生成
-
-# 以下只是一个示例，更多参数请自行翻阅官网
-
-```bash
-trtexec --onnx=yolo11n_nms.onnx ^
-        --saveEngine=yolo11n_nms_dyn.engine ^
-        --fp16 ^
-        --minShapes=images:1x3x320x320 ^
-        --optShapes=images:1x3x640x640 ^
-        --maxShapes=images:4x3x1280x1280
-```
-
-#### 6. bmodel生成(算能 Sophgo TPU)
-
-Sophgo 后端(`ENABLE_SOPHGO=ON`)加载的是 `.bmodel` 文件(基于 tpu-mlir 从 ONNX 转换)，已在 BM1688 SOC 上验证通过。转换工具见 [`tools/docker/sophgo/`](./tools/docker/sophgo)，步骤如下：
-
-```bash
-# 1. 准备 tpu-mlir 1.27 转换环境(Docker)
-cd tools/docker/sophgo
-#    先将 tpu_mlir-1.27-py3-none-any.whl 与 tpu-mlir-resource.tar 放入该目录(从算能官方 SDK 获取)
-./build_docker.sh                      # 构建镜像 tpuc_dev:1.27
-
-# F16（精度无损，简单，体积 ~10MB）
-docker run --rm -it -v <onnx目录>:/conv tpuc_dev:1.27 bash /conv/convert.sh \
-    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
-    --chip bm1688 --quantize F16 --out yolo11n_bm1688.bmodel
-
-# INT8（体积 ~25% 更小，TPU 上快 3~5 倍，需校准；可先用 F16 跑通再接 INT8）
-docker run --rm -it \
-    -v <onnx目录>:/conv -v <校准图片目录>:/cali_img \
-    tpuc_dev:1.27 bash /conv/convert.sh \
-    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
-    --chip bm1688 --quantize INT8 --cali_images /cali_img --cali_num 100 \
-    --out yolo11n_bm1688_int8.bmodel
-
-# INT8 + 混合精度量化表（检测头输出 [B,5,N]=[cx,cy,w,h,score] 时推荐：
-#   纯 INT8 会把 score 通道压成全 0 导致无检出，用 qtable 让 score 尾部算子保持 F16）
-docker run --rm -it \
-    -v <onnx目录>:/conv -v <校准图片目录>:/cali_img -v tools/docker/sophgo:/tpuconf \
-    tpuc_dev:1.27 bash /conv/convert.sh \
-    --onnx yolo11n.onnx --name yolo11n --shapes "[[1,3,640,640]]" \
-    --chip bm1688 --quantize INT8 --cali_images /cali_img --cali_num 100 \
-    --qtable /tpuconf/qtable_f16.txt \
-    --out yolo11n_bm1688_int8.bmodel
-```
-
-`convert.sh` 内部等价于：
-
-**注意：**
-
-1. `tpu-mlir 1.27` 对带 NMS 的 ONNX 有 Gather 算子转换 bug，**务必先把 NMS 从图中去掉**(用 onnxsim 或脚本裁剪为原始检测头输出)，NMS 由 SDK 侧 `run_without_nms`(含 sigmoid + 无效框过滤)完成
-2. 无 NMS 模型输出原始检测头，**需用 SDK 默认预处理(letterbox + `/255` 归一化到 `[0,1]`)**，无需也不应调用 `set_normalize(false)`；无 NMS 模型建议置信度阈值取 0.5 以上，0.25 会带出大量低分候选
-3. bmodel 输入尺寸在转换时由 `--shapes` 固定(如 `[[1,3,1280,1280]]`)，SDK 端需 `preprocessor.set_size(...)` 与之匹配
-4. `--quantize` 支持 `F16`(默认推荐)/`BF16`/`INT8`(需校准，见 `--cali_*` 参数)；`--chip` 支持 `bm1688`/`cv186x`
-5. **INT8 校准**：`convert.sh` 支持从图片目录自动生成校准数据(`--cali_images`)或直接给预处理 npy 列表(`--cali_data_list`)，内部依次执行 `model_transform → run_calibration → model_deploy`；校准需 50~200 张有代表性的图
-6. **检测头置信度通道被量化压死**：单类无 NMS 模型输出 `[B,5,N]`，坐标(0~640)与 score(0~1) 动态范围差数百倍，纯 INT8 会共用输出张量尺度把 score 压成全 0 → 无检出。用 `--qtable qtable_f16.txt`(混合精度) 解决，体积/速度仍接近纯 INT8
-
-验证与精度：服务器上 `bmrt_test --bmodel yolo11n_bm1688.bmodel` 可跑通；本仓库实测 BM1688 上 yolo11n(无 NMS, 1280 输入, 行人图, 阈值 0.6) TPU 3 框(label=person, score≈0.70) 与 ORT 一致。INT8+混合精度(zhgd_without_nms_640)在 BM1688 上推理 **3.7ms**(F16 15.7ms，提速约 4.3×)，检测框与 F16 基本一致；已提供 INT8 示例 `test_data/test_models/sophgo/zhgd_without_nms_640_int8.bmodel`。
-
-```c++
-modeldeploy::RuntimeOption option;
-option.use_sophgo_backend(0);
-option.sophgo_option.bmodel_path = "./yolo11n_without_nms_bm1688.bmodel";
-modeldeploy::vision::detection::UltralyticsDet yolo11_det(option.sophgo_option.bmodel_path, option);
-yolo11_det.get_preprocessor().set_size({1280, 1280});  // 与 bmodel 输入尺寸一致
-yolo11_det.get_postprocessor().set_conf_threshold(0.6f);
-// 预处理保持 SDK 默认(letterbox + /255)，无需 set_normalize(false)
-```
-
-#### 7. 路线图
-
-- [x] 重构`Tensor`支持`CUDA`
-- [x] 添加`ModelDeploy`的`Python`接口
-- [x] 添加`ModelDeploy`的`C#`接口
-- [x] 重构`ImageData`为`MdImage`, 支持常用的预处理比如`BGR->RGB`, `Cast` ,`HWC->CHW`, `Resize`, `Normalize`, `LetterBox`
-- [ ] 添加更多的`cuda`预处理函数
-
-#### 8. 模型配置
-##### 8.1 通用配置
-##### 8.2 模型输入配置
-##### 8.3 模型输出配置
-
-
-
+| 主题 | 文档 |
+|------|------|
+| 文档中心(总导航) | [docs/README.md](./docs/README.md) |
+| 快速开始(构建/首个程序) | [docs/quickstart.md](./docs/quickstart.md) |
+| 架构 | [docs/architecture.md](./docs/architecture.md) |
+| 后端详解 | [docs/backends.md](./docs/backends.md) |
+| 模型转换/量化 | [docs/conversion.md](./docs/conversion.md) |
+| 模型详解 | [docs/models.md](./docs/models.md) |
+| 预处理 | [docs/preprocess.md](./docs/preprocess.md) |
+| 性能优化 | [docs/performance.md](./docs/performance.md) |
+| 多语言 API | [docs/api/README.md](./docs/api/README.md) |
+| 模型加密 | [docs/encryption.md](./docs/encryption.md) |
+| 多线程 | [docs/multi_thread.md](./docs/multi_thread.md) |
+| Sophgo TPU | [docs/sophgo_cross_build_and_test.md](./docs/sophgo_cross_build_and_test.md) |
+| 示例 | [examples/EXAMPLES.md](./examples/EXAMPLES.md) |
