@@ -6,7 +6,7 @@ sys.path.insert(0, PKG_ROOT)
 
 import modeldeploy
 from modeldeploy import RuntimeOption
-import modeldeploy.vision as vision
+vision = modeldeploy.vision
 
 
 def test_runtime_option_path():
