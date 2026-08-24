@@ -82,8 +82,12 @@ namespace modeldeploy {
 
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")
             .def(pybind11::init())
-            .def("set_model_path", &RuntimeOption::set_model_path, pybind11::arg("model_path"),
-                 pybind11::arg("password") = "")
+            .def("set_model_path",
+                 [](RuntimeOption& self, const std::filesystem::path& model_path,
+                    const std::string& password) {
+                     self.set_model_path(model_path.string(), password);
+                 },
+                 pybind11::arg("model_path"), pybind11::arg("password") = "")
             .def("use_gpu", &RuntimeOption::use_gpu, pybind11::arg("device_id") = 0)
             .def("use_cpu", &RuntimeOption::use_cpu)
             .def("set_cpu_thread_num", &RuntimeOption::set_cpu_thread_num, pybind11::arg("thread_num") = -1)
