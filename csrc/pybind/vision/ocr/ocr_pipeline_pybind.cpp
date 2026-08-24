@@ -8,7 +8,9 @@
 namespace modeldeploy::vision {
     void bind_ocr_pipeline(const pybind11::module& m) {
         pybind11::class_<ocr::PaddleOCR, BaseModel>(m, "PaddleOCR")
-            .def(pybind11::init<std::string, std::string, std::string, std::string, RuntimeOption>(),
+            .def(pybind11::init([](const std::filesystem::path& det_model_path, const std::filesystem::path& cls_model_path, const std::filesystem::path& rec_model_path, const std::filesystem::path& dict_path, const RuntimeOption& option) {
+                return std::make_unique<ocr::PaddleOCR>(det_model_path.string(), cls_model_path.string(), rec_model_path.string(), dict_path.string(), option);
+            }),
                  pybind11::arg("det_model_path"),
                  pybind11::arg("cls_model_path"),
                  pybind11::arg("rec_model_path"),

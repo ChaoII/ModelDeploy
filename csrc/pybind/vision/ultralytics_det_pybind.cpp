@@ -67,7 +67,9 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsPostprocessor::set_nms_threshold);
 
         pybind11::class_<detection::UltralyticsDet, BaseModel>(m, "UltralyticsDet")
-            .def(pybind11::init<std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<detection::UltralyticsDet>(model_file.string(), option);
+            }), pybind11::arg("model_file"))
             .def("predict",
                  [](detection::UltralyticsDet& self, const pybind11::array& image) {
                      const auto mat = pyarray_to_cv_mat(image);

@@ -83,7 +83,9 @@ namespace modeldeploy::vision {
 
         pybind11::class_<ocr::StructureV2Layout, BaseModel>(
                 m, "StructureV2Layout")
-            .def(pybind11::init<std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<ocr::StructureV2Layout>(model_file.string(), option);
+            }), pybind11::arg("model_file"))
             .def(pybind11::init<>())
             .def_property_readonly("preprocessor",
                                    &ocr::StructureV2Layout::get_preprocessor)
@@ -108,7 +110,9 @@ namespace modeldeploy::vision {
                 return results;
             }, pybind11::arg("images"));
         pybind11::class_<ocr::StructureV2SERViLayoutXLMModel, BaseModel>(m, "StructureV2SERViLayoutXLMModel")
-            .def(pybind11::init<std::string, RuntimeOption>())
+            .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
+                return std::make_unique<ocr::StructureV2SERViLayoutXLMModel>(model_file.string(), option);
+            }), pybind11::arg("model_file"))
             .def("predict",
                  [](ocr::StructureV2SERViLayoutXLMModel& self,
                     pybind11::array& image) {
