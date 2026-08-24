@@ -39,7 +39,6 @@ namespace modeldeploy {
         [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const override;
 
     private:
-        bool initialized_ = false;
         std::shared_ptr<MNN::Express::Executor::RuntimeManager> rtmgr_;
         MnnBackendOption option_;
         std::string model_buffer_;

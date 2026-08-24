@@ -46,7 +46,6 @@ namespace modeldeploy {
                                            int device_id = -1) override;
 
     private:
-        bool initialized_ = false;
         TrtBackendOption option_;
         std::shared_ptr<nvinfer1::ICudaEngine> engine_;
         std::shared_ptr<nvinfer1::IExecutionContext> context_;

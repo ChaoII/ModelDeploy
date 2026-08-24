@@ -121,6 +121,10 @@ namespace modeldeploy::audio::asr {
              float threshold)
             : sample_rate_(sample_rate), threshold_(threshold) {
             RuntimeOption eopt, dopt;
+            // 流式 Paraformer 仅支持 ORT（状态化 decoder 多后端未实现），硬性钉死并守卫，
+            // 避免误走 MNN/TRT 等其它后端。
+            eopt.use_ort_backend();
+            dopt.use_ort_backend();
             eopt.set_model_path(encoder_onnx);
             dopt.set_model_path(decoder_onnx);
             if (num_threads > 0) {

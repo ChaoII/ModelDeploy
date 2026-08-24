@@ -53,7 +53,6 @@ namespace modeldeploy {
         std::unique_ptr<Ort::IoBinding> binding_;
         std::vector<OrtValueInfo> inputs_desc_;
         std::vector<OrtValueInfo> outputs_desc_;
-        bool initialized_ = false;
         std::string model_file_name_;
         std::string model_buffer_;
         OrtBackendOption option_;
