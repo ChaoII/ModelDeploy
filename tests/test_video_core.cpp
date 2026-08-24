@@ -25,9 +25,13 @@ TEST_CASE("VideoEncoderConfig 链式 setter 与 validate", "[video][core]") {
     cfg.set_fps(30).set_bitrate_kbps(2500).set_codec("libx264").set_format("mp4");
     std::string err;
     REQUIRE(cfg.validate(&err));
-    VideoEncoderConfig bad;
-    bad.set_fps(0).set_format("unknown_fmt");
-    REQUIRE_FALSE(bad.validate(&err));
+    VideoEncoderConfig bad_fps;
+    bad_fps.set_fps(0).set_format("mp4");
+    REQUIRE_FALSE(bad_fps.validate(&err));
+
+    VideoEncoderConfig bad_format;
+    bad_format.set_fps(30).set_format("unknown_fmt");
+    REQUIRE_FALSE(bad_format.validate(&err));
 }
 
 TEST_CASE("适配器由平面视图构造 NV12 ImageData", "[video][core]") {
