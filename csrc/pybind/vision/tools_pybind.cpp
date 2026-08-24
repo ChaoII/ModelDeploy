@@ -62,6 +62,13 @@ void bind_tools(pybind11::module& m) {
         }))
         .def("contains", [](PolygonZone& z, const pybind11::handle& p) { return z.contains(pt2f(p)); })
         .def("current_count", &PolygonZone::current_count);
+    // 绑定结果结构体，使 evaluate_metrics 返回类型可被 stubgen 解析
+    pybind11::class_<MetricsScores>(m, "MetricsScores")
+        .def(pybind11::init<>())
+        .def_readonly("precision", &MetricsScores::precision)
+        .def_readonly("recall", &MetricsScores::recall)
+        .def_readonly("f1", &MetricsScores::f1)
+        .def_readonly("map50", &MetricsScores::map50);
     m.def("evaluate_metrics", &evaluate_metrics);
 }
 

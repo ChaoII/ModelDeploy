@@ -4,6 +4,7 @@
 
 #include "pybind/utils/utils.h"
 #include "vision/face/insightface/face_analysis.h"
+#include "vision/face/insightface/scrfd/insightface_scrfd_postprocessor.h"
 
 namespace modeldeploy::vision {
     void bind_insightface(const pybind11::module& m) {
@@ -31,6 +32,11 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def_property("size", &face::InsightFaceDetPreprocessor::get_size,
                           &face::InsightFaceDetPreprocessor::set_size);
+
+        // 绑定后处理类型，使 InsightFaceDet.postprocessor 返回类型可被 stubgen 解析
+        pybind11::class_<face::InsightFaceDetPostprocessor>(m, "InsightFaceDetPostprocessor")
+            .def(pybind11::init<>())
+            .def_readwrite("nms_thresh", &face::InsightFaceDetPostprocessor::nms_thresh_);
 
         pybind11::class_<face::InsightFaceDet, BaseModel>(m, "InsightFaceDet")
             .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
