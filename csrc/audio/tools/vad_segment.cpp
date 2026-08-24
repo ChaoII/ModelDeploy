@@ -43,4 +43,22 @@ std::vector<Seg> VadSegment::segments() const {
     flush();
     return merged;
 }
+
+std::vector<Seg> VadSegment::consume() {
+    auto segs = segments();
+    if (!segs.empty()) {
+        const int win = sr_ / 100;
+        size_t keep_from = 0;
+        for (const auto& s : segs) {
+            // s.end_ms 是 10ms 的整数倍，对应样本位置 = end_ms/10 * win
+            const size_t end_sample = (size_t)(s.end_ms / 10) * (size_t)win;
+            if (end_sample > keep_from) keep_from = end_sample;
+        }
+        if (keep_from > 0) {
+            const size_t erase_n = std::min(keep_from, buf_.size());
+            buf_.erase(buf_.begin(), buf_.begin() + (long)erase_n);
+        }
+    }
+    return segs;
+}
 } // namespace modeldeploy::audio::tool

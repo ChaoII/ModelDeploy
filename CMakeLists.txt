@@ -12,6 +12,7 @@ option(ENABLE_ORT "enable ort backend" ON)
 option(ENABLE_MNN "enable mnn backend" ON)
 option(ENABLE_TRT "enable mnn backend" OFF)
 option(ENABLE_SOPHGO "enable sophgo backend (Linux + SOPHON-Sail)" OFF)
+option(ENABLE_WETEXT "enable WeTextProcessing ITN backend (requires OpenFst + we-text-processing)" OFF)
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_NLP "build nlp module (jieba tokenizer + text tools)" OFF)
 option(BUILD_VISION "build vision module" ON)
@@ -218,6 +219,19 @@ if (BUILD_AUDIO)
     list(APPEND ALL_SOURCE ${AUDIO_SOURCE})
     # 音频静态依赖 PRIVATE 链接（打进共享库，导出时无需第三方 target）
     list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core)
+    if (ENABLE_WETEXT)
+        # 可选 WeTextProcessing ITN 后端（覆盖最全）；需第三方 OpenFst + we-text-processing。
+        # 通过 WETEXT_INCLUDE_DIR / WETEXT_FST_DIR 传入 include 与模型目录。
+        find_path(WETEXT_INCLUDE_DIR "we-text-processing/csrc/cn_itn_processor.h")
+        if (WETEXT_INCLUDE_DIR)
+            include_directories(${WETEXT_INCLUDE_DIR})
+            add_definitions(-DMODELDEPLOY_HAS_WETEXT)
+            message(STATUS "WeTextProcessing ITN backend: ENABLED")
+        else ()
+            message(WARNING "ENABLE_WETEXT=ON 但未找到 WeTextProcessing 头文件，ITN 退化到轻量实现。"
+                            "请设置 -DWETEXT_INCLUDE_DIR=<we-text-processing 根目录>")
+        endif ()
+    endif ()
 endif ()
 
 # ── NLP ──────────────────────────────────────

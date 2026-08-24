@@ -14,7 +14,8 @@ void bind_solutions(pybind11::module& m) {
         .def("match", &solution::SpeakerSearch::match, pybind11::arg("embedding"), pybind11::arg("k") = 1);
     pybind11::class_<solution::TTSBatcher>(m, "TTSBatcher")
         .def(pybind11::init<>())
-        .def("enqueue", &solution::TTSBatcher::enqueue)
+        .def("enqueue", [](solution::TTSBatcher& b, const std::string& text) { b.enqueue(text); },
+             pybind11::arg("text"))
         .def("dequeue_all", &solution::TTSBatcher::dequeue_all);
 }
 

@@ -11,6 +11,16 @@ public:
     void reset() { buf_.clear(); }
     void feed(const std::vector<float>& samples) { buf_.insert(buf_.end(), samples.begin(), samples.end()); }
     std::vector<Seg> segments() const;
+
+    // 返回当前所有“已就绪”语音段，并从缓冲中移除已消费的前缀，
+    // 仅保留末尾未成段的尾部（含尾随静音），供流式场景不重复转写。
+    std::vector<Seg> consume();
+
+    // 流结束时调用：追加一段静音，使末尾仍在开口的语音段能闭合并被切出。
+    void finish() {
+        const int tail = sr_ * min_silence_ / 1000;
+        buf_.insert(buf_.end(), tail, 0.0f);
+    }
 private:
     int sr_;
     float thr_;

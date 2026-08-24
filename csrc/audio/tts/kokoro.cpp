@@ -128,21 +128,10 @@ namespace modeldeploy::audio::tts {
         //     std::regex re(p.first, std::regex::ECMAScript);
         //     text = std::regex_replace(text, re, p.second);
         // }
-        std::cout << termcolor::blue << "source char bytes is:" << std::endl;
-        for (unsigned char c : text) {
-            std::cout << std::uppercase // 大写 A-F
-                << std::hex // 十六进制格式
-                << std::setw(2) // 宽度 2
-                << std::setfill('0') // 不足补0
-                << static_cast<int>(c) << " "; // 注意强转为 int
-        }
-        std::cout << std::dec << std::endl; // 恢复为十进制
-        std::cout << termcolor::magenta << "source text is:\n" << text << termcolor::reset << std::endl;
-        // 此处用到了模型deploy的text_normalizer
+        // 中文标点断句交由 text_normalizer_ 处理
         const std::wstring ws_text = utf8_to_wstring(text);
         const std::wstring ws_normalized_text = text_normalizer_->normalize_sentence(ws_text);
         text = wstring_to_string(ws_normalized_text);
-        std::cout << termcolor::cyan << "normalization text is:\n" << text << termcolor::reset << std::endl;
         const std::vector<std::string> parts = split_ch_eng(text);
         std::vector<std::string> tokens;
         for (const auto& sent : parts) {
@@ -187,7 +176,12 @@ namespace modeldeploy::audio::tts {
         std::vector<int64_t> token_ids;
         token_ids.push_back(0);
         for (auto& str : tokens) {
-            token_ids.push_back(token2id_[str]);
+            const auto it = token2id_.find(str);
+            if (it == token2id_.end()) {
+                MD_LOG_WARN << "skip token (OOV):" << str << std::endl;
+                continue;
+            }
+            token_ids.push_back(it->second);
         }
         if (token_ids.size() > max_len_) {
             token_ids.resize(max_len_);

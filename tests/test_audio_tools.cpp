@@ -1,10 +1,85 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include "audio/tools/wav_io.h"
 #include "audio/tools/audio_meta.h"
+#include "audio/tools/itn.h"
+#include "audio/tools/hotword.h"
+#include "audio/tools/itn_engine.h"
 using namespace modeldeploy::audio::tool;
+
+TEST_CASE("ITN normalizes Chinese spoken numbers", "[audio_tools]") {
+    InverseTextNormalizer itn;
+    REQUIRE(itn.normalize("一百二十三") == "123");
+    REQUIRE(itn.normalize("三千零四") == "3004");
+    REQUIRE(itn.normalize("十二") == "12");
+    REQUIRE(itn.normalize("二十五") == "25");
+    REQUIRE(itn.normalize("一百零三万") == "103万");
+    REQUIRE(itn.normalize("两千万") == "2000万");
+    REQUIRE(itn.normalize("十二亿七千二百万") == "12亿7200万");
+    REQUIRE(itn.normalize("三点一四") == "3.14");
+    REQUIRE(itn.normalize("百分之五") == "5%");
+    REQUIRE(itn.normalize("二零二四年五月九日") == "2024年5月9日");
+    REQUIRE(itn.normalize("五月九日") == "5月9日");
+    REQUIRE(itn.normalize("五点半") == "5:30");
+    REQUIRE(itn.normalize("九点零五分") == "9:05");
+    REQUIRE(itn.normalize("第八") == "第8");
+    // 模糊词保留（单字/不在数字词里）
+    REQUIRE(itn.normalize("十几个人") == "十几个人");
+}
+
+TEST_CASE("ItnEngine routes to lightweight backend by default", "[audio_tools]") {
+    ItnEngine eng;
+    REQUIRE(eng.backend() == ItnBackend::Lightweight);
+    REQUIRE(eng.normalize("一百二十三") == "123");
+    REQUIRE(eng.normalize("九点零五分") == "9:05");
+}
+
+TEST_CASE("HotwordContext scan matches CJK substring and ASCII word boundaries", "[audio_tools]") {
+    HotwordContext ctx;
+    ctx.add("导航", 2.0f);
+    ctx.add("the", 1.0f);
+    auto found = ctx.scan("打开导航去the north");
+    REQUIRE(found.size() == 2);
+    auto it = std::find_if(found.begin(), found.end(), [](const FoundHotword& h){ return h.word == "导航"; });
+    REQUIRE(it != found.end());
+    REQUIRE(it->count == 1);
+    REQUIRE(it->weight == Catch::Approx(2.0f));
+}
+
+TEST_CASE("HotwordContext score via ContextGraph boosts matched text", "[audio_tools]") {
+    HotwordContext ctx;
+    ctx.add("会议", 3.0f);
+    auto g = build_context_graph(ctx, tokenize_chars);
+    REQUIRE(score(*g, tokenize_chars, "会议室") > score(*g, tokenize_chars, "普通场所"));
+    HotwordContext empty;
+    auto g0 = build_context_graph(empty, tokenize_chars);
+    REQUIRE(score(*g0, tokenize_chars, "会议室") == Catch::Approx(0.0f));
+}
+
+TEST_CASE("HotwordContext rescore reorders hypotheses by context biasing", "[audio_tools]") {
+    HotwordContext ctx;
+    ctx.add("天气", 5.0f);
+    std::vector<Hypothesis> hyps = {
+        {"今天很热", 10.0f},
+        {"今天天气不错", 8.0f},
+        {"天气", 6.0f},
+    };
+    auto ranked = rescore(std::move(hyps), ctx, tokenize_chars, 1.0f);
+    REQUIRE(ranked.size() == 3);
+    REQUIRE(ranked[0].text == "今天天气不错"); // 8 + boost
+    REQUIRE(ranked[1].text == "天气");         // 6 + boost
+    REQUIRE(ranked[2].text == "今天很热");     // 10 + 0
+}
+
+TEST_CASE("HotwordContext highlight wraps matched hotwords", "[audio_tools]") {
+    HotwordContext ctx;
+    ctx.add("天窗", 1.0f);
+    ctx.add("天气", 1.0f);
+    REQUIRE(ctx.highlight("今天天气晴") == "今天[天气]晴");
+}
 
 TEST_CASE("WavIO write then read roundtrip", "[audio_tools]") {
     std::vector<float> sine(1600);
