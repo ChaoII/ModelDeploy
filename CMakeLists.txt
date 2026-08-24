@@ -370,7 +370,7 @@ if (BUILD_PYTHON)
     install(FILES ${EXTRA_DLLS} DESTINATION modeldeploy)  # 使用 install 而非 copy
     install(FILES ${CMAKE_SOURCE_DIR}/python/modeldeploy/__init__.py DESTINATION modeldeploy)
     # 构建期用 pybind11-stubgen 生成 .pyi 存根，写回 staging 的 modeldeploy/，随 wheel 发布。
-    # stubgen 失败只告警不阻断构建（PYI_STUBGEN_OK 检查）。
+    # stubgen 失败只告警不阻断构建（失败时 _stubgen_rv 非 0，降级为 warning）。
     if (DEFINED Python_EXECUTABLE AND EXISTS "${Python_EXECUTABLE}")
         install(CODE "
             set(_stub_root \"\${CMAKE_INSTALL_PREFIX}\")

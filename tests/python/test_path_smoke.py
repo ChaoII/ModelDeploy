@@ -21,8 +21,8 @@ def test_vision_ctor_path():
     opt = RuntimeOption()
     opt.use_cpu()
     try:
-        m = vision.UltralyticsDet(str(pathlib.Path("nonexistent.onnx")), opt)
-        print("det_ctor_str OK (loaded),", type(m).__name__)
+        m = vision.UltralyticsDet(pathlib.Path("nonexistent.onnx"), opt)
+        print("det_ctor_path OK (loaded),", type(m).__name__)
     except Exception as e:
         # 若因找不到模型文件而抛异常，说明类型转换已通过（非 TypeError）
         assert "Path" not in str(type(e).__name__) and not isinstance(e, TypeError), e
