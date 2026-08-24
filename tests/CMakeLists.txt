@@ -12,7 +12,6 @@ set(TEST_SOURCES
     test_core.cpp
     test_bugfix.cpp
     test_image_data.cpp
-    test_capi.cpp
     test_vision_models.cpp
     test_obb_nms.cpp
     test_processor_accuracy.cpp
@@ -26,19 +25,30 @@ set(TEST_SOURCES
     test_hand.cpp
     test_cv_tools.cpp
     test_cv_solutions.cpp
-    test_audio_tools.cpp
-    test_audio_solutions.cpp
-    test_paraformer_streaming.cpp
     test_landmark.cpp
     test_action.cpp
     test_reid.cpp
-    test_speaker_verify.cpp
     test_formula_recognition.cpp
     test_doc_to_markdown.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
 )
+
+# CAPI 测试：仅当 BUILD_CAPI 打开时参与编译（否则 capi/md_capi.h 缺失 + 库中无 CAPI 符号）。
+if(BUILD_CAPI)
+    list(APPEND TEST_SOURCES test_capi.cpp)
+endif()
+
+# 音频测试：仅当 BUILD_AUDIO 打开时参与编译（依赖 cppjieba、audio/* 源；关闭时库中无对应实现导致链接失败）。
+if(BUILD_AUDIO)
+    list(APPEND TEST_SOURCES
+        test_audio_tools.cpp
+        test_audio_solutions.cpp
+        test_paraformer_streaming.cpp
+        test_speaker_verify.cpp
+    )
+endif()
 
 # NLP 测试仅当 BUILD_NLP 打开时参与编译（NLP 扩展可独立隔离）。
 if(BUILD_NLP)
