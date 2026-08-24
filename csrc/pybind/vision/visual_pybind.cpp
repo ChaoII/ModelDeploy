@@ -14,7 +14,7 @@ namespace modeldeploy::vision {
                             const float threshold,
                             const std::filesystem::path& font_path = "",
                             const int font_size = 14,
-                            const double alpha = 0.5,
+                            const double alpha = 0.15,
                             const bool save_result = false) {
                   const auto im = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(im);
@@ -39,7 +39,7 @@ namespace modeldeploy::vision {
                             const std::unordered_map<int, std::string>& label_map = {},
                             const std::filesystem::path& font_path = "",
                             const int font_size = 14,
-                            const double alpha = 0.5,
+                            const double alpha = 0.15,
                             const bool save_result = false) {
                   const auto im = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(im);
@@ -63,7 +63,7 @@ namespace modeldeploy::vision {
                              const double threshold = 0.5,
                              const std::filesystem::path& font_path = "",
                              const int font_size = 14,
-                             const double alpha = 0.5,
+                             const double alpha = 0.15,
                              const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
@@ -83,7 +83,7 @@ namespace modeldeploy::vision {
         m.def("vis_obb", [](const pybind11::array& im_data, const std::vector<ObbResult>& result,
                             const double threshold = 0.5,
                             const std::filesystem::path& font_path = "", const int font_size = 14,
-                            const double alpha = 0.5, const bool save_result = false) {
+                            const double alpha = 0.15, const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
                   const ImageData vis_im = vis_obb(image_data, result, threshold, font_path.string(),
@@ -104,7 +104,7 @@ namespace modeldeploy::vision {
                             const OCRResult& result,
                             const std::filesystem::path& font_path = "",
                             const int font_size = 14,
-                            const double alpha = 0.5,
+                            const double alpha = 0.15,
                             const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
@@ -125,7 +125,7 @@ namespace modeldeploy::vision {
                             const std::filesystem::path& font_path = "",
                             const int font_size = 14,
                             const int landmark_radius = 4,
-                            const double alpha = 0.5,
+                            const double alpha = 0.15,
                             const bool save_result = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
                   auto image_data = ImageData(cv_image);
@@ -148,7 +148,7 @@ namespace modeldeploy::vision {
                                   const std::filesystem::path& font_path = "",
                                   const int font_size = 14,
                                   const int landmark_radius = 4,
-                                  const double alpha = 0.5,
+                                  const double alpha = 0.15,
                                   const bool save_result = false,
                                   const bool draw_lines = false) {
                   const auto cv_image = pyarray_to_cv_mat(im_data);
@@ -174,7 +174,7 @@ namespace modeldeploy::vision {
                              const std::unordered_map<int, std::string>& label_map = {},
                              const std::filesystem::path& font_path = "",
                              const int font_size = 14,
-                             const double alpha = 0.5,
+                             const double alpha = 0.15,
                              const bool save_result = false,
                              const std::vector<int>& abnormal_ids = {},
                              const bool show_attr = true) {
