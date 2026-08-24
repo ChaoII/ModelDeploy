@@ -50,7 +50,7 @@ trtexec --onnx=yolo11n.onnx ^
 
 ## 4. bmodel 生成（算能 Sophgo TPU）
 
-基于 tpu-mlir 将 ONNX 转 `.bmodel`，工具见 [`tools/docker/sophgo/`](../../tools/docker/sophgo)。先准备 tpu-mlir 1.27 环境：
+基于 tpu-mlir 将 ONNX 转 `.bmodel`，工具见 [`tools/docker/sophgo/`](../tools/docker/sophgo)。先准备 tpu-mlir 1.27 环境：
 
 ```bash
 cd tools/docker/sophgo

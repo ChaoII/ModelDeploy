@@ -9,7 +9,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | 文档 | 内容 |
 |------|------|
 | [快速开始](./quickstart.md) | 从源码构建、第一个检测程序、完整示例 |
-| [README](../../README.md) | 构建命令、模型加密、混合精度、TRT/Sophgo 模型转换 |
+| [README](../README.md) | 项目概述、快速开始、支持矩阵 |
 
 ### 核心概念
 
@@ -39,7 +39,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | [性能优化指南](./performance.md) | 推理提速、多线程与 clone、零拷贝、后端选型、实测数据 |
 | [多语言 API](./api/README.md) | C++ / Python / C / C# / Rust 绑定概览 |
 | [模型加密](./encryption.md) | AES-256-CBC 模型加密与解密模型使用 |
-| [多线程推理](../../docs/multi_thread.md) | `clone()` 多线程并发详解 |
+| [多线程推理](./multi_thread.md) | `clone()` 多线程并发详解 |
 | [Triton 推理服务](../examples/serving/) | Triton 部署（preprocess → pipeline → postprocess） |
 
 ## 支持矩阵
@@ -88,4 +88,4 @@ std::vector<modeldeploy::vision::DetectionResult> result;
 det.predict(img, &result);
 ```
 
-更多示例见 [examples](../../examples/)，构建与模型转换见 [README](../../README.md)。
+更多示例见 [examples](../examples/)，构建与模型转换见 [README](../README.md)。

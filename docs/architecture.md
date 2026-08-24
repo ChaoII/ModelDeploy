@@ -146,4 +146,4 @@ public:
 - 核心依赖：OpenCV（内置静态库）、各后端推理库（onnxruntime / TensorRT / MNN / libsophon）
 - 无外部运行时依赖（SDK 自带 OpenCV、pybind11、Catch2 等）
 
-构建命令见 [README](../../README.md) 或 [快速开始](./quickstart.md)。
+构建命令见 [README](../README.md) 或 [快速开始](./quickstart.md)。

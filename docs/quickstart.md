@@ -211,7 +211,7 @@ print(results)
 | 人脸/OCR/车牌 | `examples/demo_face` / `demo_ocr` / `demo_lpr` |
 | 模型加密工具 | `examples/tools/model_encrypted.cpp` |
 
-完整示例列表见 [README](../../README.md) 或 `examples/` 目录。
+完整示例列表见 [README](../README.md) 或 `examples/` 目录。
 
 ## 7. 常见问题
 

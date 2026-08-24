@@ -178,7 +178,7 @@ det.get_preprocessor().set_size({1280, 1280});  // 与 bmodel 输入一致
 
 ### 5.4 bmodel 生成
 
-bmodel 由 ONNX 经 tpu-mlir 转换，见 [README](../../README.md#6-bmodel生成算能-sophgo-tpu) 和 [`tools/docker/sophgo/`](../../tools/docker/sophgo)：
+bmodel 由 ONNX 经 tpu-mlir 转换，见 [模型转换与量化](./conversion.md#4-bmodel生成算能-sophgo-tpu) 和 [`tools/docker/sophgo/`](../tools/docker/sophgo)：
 
 ```bash
 cd tools/docker/sophgo
@@ -200,7 +200,7 @@ docker run --rm -it \
 
 > **注意**：tpu-mlir 对带 NMS 的 ONNX 有转换 bug，**转换前先把 NMS 从图中去掉**，NMS 由 SDK 后处理完成。模型输入需保持 SDK 默认的 letterbox + `/255` 归一化（即 `[0,1]`），**不要** `set_normalize(false)`。
 
-INT8 量化精度：输出 cosine 相似度 ~0.9999（vs ONNX F32），NMS 后检测框与 ORT 一致；校准数据建议 50~200 张训练集/现场抽样图（`--cali_method` 可选 kl/mse/max 等）。转换与校准的完整参数见 [`tools/docker/sophgo/README.md`](../../tools/docker/sophgo/README.md)。
+INT8 量化精度：输出 cosine 相似度 ~0.9999（vs ONNX F32），NMS 后检测框与 ORT 一致；校准数据建议 50~200 张训练集/现场抽样图（`--cali_method` 可选 kl/mse/max 等）。转换与校准的完整参数见 [`tools/docker/sophgo/README.md`](../tools/docker/sophgo/README.md)。
 
 > **分类模型 INT8 量化注意**（实测 yolo11n-cls，BM1688）：纯 INT8 量化的 1000 类分类会出现 **top-1 漂移**（如 111.jpg 上 top1 从 769→662，test_obb1.jpg 477→705），原因是 **backbone 前段（model.0~model.2 的 stem conv + C3 block）量化误差被后层放大**，与分类头（Gemm/Softmax）无关（头层设 F16 无改善）。**用混合量化把 `model.0~model.2` 保持 F16 即可完全恢复 top-1 精度**（代价：推理 ~0.45ms→1.07ms）。qtable 见 `tools/docker/sophgo/qtable_yolo11n-cls.txt`，本地已生成 `yolo11n-cls_int8.bmodel` 即混合量化版本。
 >
