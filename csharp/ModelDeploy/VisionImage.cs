@@ -89,6 +89,23 @@ namespace ModelDeploy
             throw new ArgumentOutOfRangeException(nameof(i));
         }
 
+        /// <summary>
+        /// 校验裸指针是否为指定设备内存（底层 md_ptr_validate_device）。
+        /// CPU：非空→true/空→InvalidOperationException；GPU/TPU（未实现）→NotSupportedException。
+        /// </summary>
+        public static bool ValidatePointerDevice(IntPtr ptr, Device dev, int deviceId = 0)
+        {
+            var st = md_ptr_validate_device(ptr, (int)dev, deviceId);
+            switch (st)
+            {
+                case MDStatus.MD_OK: return true;
+                case MDStatus.MD_ERR_INVALID_ARGUMENT:
+                    throw new InvalidOperationException($"ValidatePointerDevice failed: {BaseModel.GetLastError()}");
+                default:
+                    throw new NotSupportedException($"ValidatePointerDevice not supported for device {dev}: {BaseModel.GetLastError()}");
+            }
+        }
+
         public static VisionImage Read(string path)
         {
             var status = md_image_from_file(out var h, path);
