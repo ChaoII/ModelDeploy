@@ -512,7 +512,7 @@ MDStatus md_option_set_config(MDOptionHandle h, const char* ns, const char* key,
         if (k == "inter_op_num_threads" && parse_int(value, i)) { o->opt.ort_option.inter_op_num_threads = i; return MD_OK; }
         if (k == "execution_mode" && parse_int(value, i)) { o->opt.ort_option.execution_mode = i; return MD_OK; }
         if (k == "log_severity_level" && parse_int(value, i)) { o->opt.ort_option.log_severity_level = i; return MD_OK; }
-        if (k == "enable_trt" && parse_bool(value, b)) { o->opt.ort_option.enable_trt = b; return MD_OK; }
+        if (k == "enable_trt" && parse_bool(value, b)) { o->opt.enable_trt = b; o->opt.ort_option.enable_trt = b; return MD_OK; }
         if (k == "trt_engine_cache_path") { o->opt.ort_option.trt_engine_cache_path = value; return MD_OK; }
         if (k == "optimized_model_filepath") { o->opt.ort_option.optimized_model_filepath = value; return MD_OK; }
         if (k == "trt_min_shape") { o->opt.ort_option.trt_min_shape = value; return MD_OK; }
