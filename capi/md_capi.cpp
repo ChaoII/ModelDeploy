@@ -491,7 +491,11 @@ bool set_trt_shape(modeldeploy::TrtBackendOption& o, const char* value) {
         if (i2 == std::string::npos) { opt = rest.substr(i1 + 1); }
         else { opt = rest.substr(i1 + 1, i2 - i1 - 1); max = rest.substr(i2 + 1); }
     }
-    o.set_shape(name, parse_shape_vec(min), parse_shape_vec(opt), parse_shape_vec(max));
+    o.min_shape[name]  = parse_shape_vec(min);
+    o.opt_shape[name]  = parse_shape_vec(opt);
+    o.max_shape[name]  = parse_shape_vec(max);
+    if (o.opt_shape[name].empty()) o.opt_shape[name] = o.min_shape[name];
+    if (o.max_shape[name].empty()) o.max_shape[name] = o.opt_shape[name];
     return true;
 }
 
@@ -528,7 +532,10 @@ MDStatus md_option_set_config(MDOptionHandle h, const char* ns, const char* key,
         if (k == "enable_log_info" && parse_bool(value, b)) { o->opt.trt_option.enable_log_info = b; return MD_OK; }
         if (k == "enable_pinned_memory" && parse_bool(value, b)) { o->opt.trt_option.enable_pinned_memory = b; return MD_OK; }
         if (k == "cache_file_path") { o->opt.trt_option.cache_file_path = value; return MD_OK; }
-        if (k == "min_shape" || k == "opt_shape" || k == "max_shape") { set_trt_shape(o->opt.trt_option, value); return MD_OK; }
+        if (k == "min_shape" || k == "opt_shape" || k == "max_shape") {
+            if (set_trt_shape(o->opt.trt_option, value)) return MD_OK;
+            /* invalid value: fall through to the unknown-key error below */
+        }
     } else if (!strcmp(ns, "sophgo")) {
         if (k == "bmodel_path") { o->opt.sophgo_option.bmodel_path = value; return MD_OK; }
         if (k == "use_device_input" && parse_bool(value, b)) { o->opt.sophgo_option.use_device_input = b; return MD_OK; }
