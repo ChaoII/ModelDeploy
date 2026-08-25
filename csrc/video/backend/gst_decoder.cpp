@@ -133,13 +133,8 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
     }
     GstSample* sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink_), GST_SECOND);
     if (!sample) {
-        // 本地文件解码结束：appsink sink pad 的 last-flow-return 为 EOS
-        bool eos = false;
-        GstPad* sinkpad = gst_element_get_static_pad(appsink_, "sink");
-        if (sinkpad) {
-            eos = gst_pad_get_last_flow_return(sinkpad) == GST_FLOW_EOS;
-            gst_object_unref(sinkpad);
-        }
+        // 本地文件解码结束：appsink is-eos 为真；否则为瞬态拉取失败（可重连）
+        bool eos = gst_app_sink_is_eos(GST_APP_SINK(appsink_));
         set_err(err, eos ? "eof" : "pull-sample-fail");
         return false;
     }

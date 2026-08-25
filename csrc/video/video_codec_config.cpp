@@ -25,6 +25,10 @@ bool VideoDecoderConfig::validate(std::string* err) const {
         if (err) *err = "timeout_us must be > 0";
         return false;
     }
+    if (async_queue_size <= 0) {
+        if (err) *err = "async_queue_size must be > 0";
+        return false;
+    }
     return true;
 }
 
@@ -43,6 +47,10 @@ bool VideoEncoderConfig::validate(std::string* err) const {
     }
     if (!known_format(format)) {
         if (err) *err = "unknown format: " + format;
+        return false;
+    }
+    if (async_queue_size <= 0) {
+        if (err) *err = "async_queue_size must be > 0";
         return false;
     }
     return true;

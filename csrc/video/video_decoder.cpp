@@ -12,66 +12,46 @@ std::shared_ptr<VideoDecoder> VideoDecoder::create(const VideoDecoderConfig& cfg
         if (err) *err = "backend unavailable";
         return nullptr;
     }
-    return std::shared_ptr<VideoDecoder>(new VideoDecoder(std::move(backend)));
+    return std::shared_ptr<VideoDecoder>(new VideoDecoder(std::move(backend), cfg));
 }
 
-VideoDecoder::VideoDecoder(std::shared_ptr<DecoderBackend> b)
-    : backend_(std::move(b)) {}
+VideoDecoder::VideoDecoder(std::shared_ptr<DecoderBackend> b, const VideoDecoderConfig& cfg)
+    : pipeline_(std::move(b), cfg) {}
 
 VideoDecoder::~VideoDecoder() { close(); }
 
 bool VideoDecoder::open(const std::string& url, std::string* err) {
-    state_ = State::Opening;
-    bool ok = backend_ ? backend_->open(url, err) : false;
-    if (!ok && err && err->empty()) *err = "not-initialized";
-    state_ = ok ? State::Running : State::Error;
-    return ok;
+    return pipeline_.open(url, err);
 }
 
 bool VideoDecoder::read_one_frame(VideoFrame* out, std::string* err) {
-    if (!backend_) return false;
-    bool ok = backend_->read_one_frame(out, err);
-    if (!ok) state_ = State::Eof;
-    return ok;
+    return pipeline_.read_one_frame(out, err);
 }
 
-void VideoDecoder::set_callback(FrameCallback cb) {
-    if (backend_) backend_->set_callback(std::move(cb));
-}
+void VideoDecoder::set_callback(FrameCallback cb) { pipeline_.set_callback(std::move(cb)); }
 
-bool VideoDecoder::start(std::string* err) {
-    if (!backend_) return false;
-    bool ok = backend_->start(err);
-    state_ = ok ? State::Running : State::Error;
-    return ok;
-}
+bool VideoDecoder::start(std::string* err) { return pipeline_.start(err); }
 
-void VideoDecoder::stop() {
-    if (backend_) backend_->stop();
-    state_ = State::Idle;
-}
+void VideoDecoder::stop() { pipeline_.stop(); }
 
-void VideoDecoder::set_device_only(bool v) {
-    if (backend_) backend_->set_device_only(v);
-}
+void VideoDecoder::set_device_only(bool v) { pipeline_.set_device_only(v); }
 
-State VideoDecoder::state() const { return state_; }
+State VideoDecoder::state() const { return pipeline_.state(); }
 
-const VideoStats& VideoDecoder::stats() const { return backend_->stats(); }
+const VideoStats& VideoDecoder::stats() const { return pipeline_.stats(); }
 
-int VideoDecoder::fps() const { return backend_ ? backend_->fps() : 0; }
+std::string VideoDecoder::last_error() const { return pipeline_.last_error(); }
 
-int VideoDecoder::width() const { return backend_ ? backend_->width() : 0; }
+int VideoDecoder::fps() const { return pipeline_.fps(); }
 
-int VideoDecoder::height() const { return backend_ ? backend_->height() : 0; }
+int VideoDecoder::width() const { return pipeline_.width(); }
 
-void VideoDecoder::close() {
-    if (backend_) {
-        backend_->close();
-        state_ = State::Closed;
-    } else {
-        state_ = State::Idle;
-    }
-}
+int VideoDecoder::height() const { return pipeline_.height(); }
+
+void VideoDecoder::close() { pipeline_.close(); }
+
+uint64_t VideoDecoder::pool_hits() const { return pipeline_.pool_hits(); }
+
+uint64_t VideoDecoder::pool_returns() const { return pipeline_.pool_returns(); }
 
 } // namespace modeldeploy::video
