@@ -20,7 +20,9 @@ public:
     ~VideoEncoder();
 
     bool open(const std::string& url, int w, int h, int src_fps, std::string* err = nullptr);
-    // 编码一帧（CPU BGR/设备 NV12 + 可选 pts_ms）到输出容器；失败返回 false
+    // 编码一帧（CPU BGR/设备 NV12 + 可选 pts_ms）到输出容器；失败返回 false。
+    // GPU（device==Device::GPU）输入：SDK 借用调用方设备平面直通编码、不持有其生命周期，
+    // 调用方必须保证这些平面在 close() 之前有效。CPU 输入由 SDK 拷贝，无此约束。
     bool encode(const VideoFrame& frame, std::string* err = nullptr);
     bool encode_async(const modeldeploy::vision::ImageData& image);
     bool start_async(std::string* err = nullptr);
