@@ -84,13 +84,25 @@ bool GstEncoder::nvh264enc_available() {
     return true;
 }
 
+#ifdef ENABLE_VAAPI
+bool GstEncoder::vaapih264enc_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    GstElementFactory* f = gst_element_factory_find("vaapih264enc");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+#endif
+
 // 决议本次会话的编码元素：
 //   codec=="nvh264enc" → 硬编（不可用则报错 no-nvh264enc）
+//   codec=="vaapih264enc" → VAAPI 硬编（不可用则报错 no-vaapih264enc；仅 ENABLE_VAAPI 编译时支持）
 //   codec=="x264enc"/空 → 软编 x264enc
-//   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则硬编，否则回退软编
-//   VAAPI/Sophgo：本期仅作为可接受配置值 + 由 H0 探测上报（有 vaapih264enc/h264_vaapi 会列出），
-//   未实现实际帧路径；auto 下显式 HwAccel::Vaapi/Sophgo 一律回退软编 x264enc。
-//   其余名称（libx264 / h264_nvenc / vaapih264enc 等 GStreamer 不支持的）→ unsupported-codec。
+//   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则 nv 硬编；否则 hw_accel∈{Auto,Vaapi} 且
+//     vaapih264enc 存在则 VAAPI 硬编；否则回退软编 x264enc
+//   Sophgo：GStreamer 无对应编码插件（未实现/未验证），显式 Sophgo 走 unsupported-codec fail-closed。
+//   其余名称（libx264 / h264_nvenc 等 GStreamer 不支持的）→ unsupported-codec。
 int GstEncoder::resolve_encoder(std::string* err) {
     const std::string& codec = cfg_.codec;
     int choice = -1;
@@ -98,9 +110,22 @@ int GstEncoder::resolve_encoder(std::string* err) {
         choice = 1;
     } else if (codec == "x264enc" || codec.empty()) {
         choice = 0;
+#ifdef ENABLE_VAAPI
+    } else if (codec == "vaapih264enc") {
+        choice = 2;
+#endif
     } else if (codec == "auto") {
-        const bool want_hw = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda);
-        choice = (want_hw && nvh264enc_available()) ? 1 : 0;
+        const bool want_nv = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda);
+        if (want_nv && nvh264enc_available()) {
+            choice = 1;
+#ifdef ENABLE_VAAPI
+        } else if ((cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Vaapi) &&
+                   vaapih264enc_available()) {
+            choice = 2;
+#endif
+        } else {
+            choice = 0;
+        }
     } else {
         set_err(err, "unsupported-codec");
         return -1;
@@ -109,6 +134,12 @@ int GstEncoder::resolve_encoder(std::string* err) {
         set_err(err, "no-nvh264enc");
         return -1;
     }
+#ifdef ENABLE_VAAPI
+    if (choice == 2 && !vaapih264enc_available()) {
+        set_err(err, "no-vaapih264enc");
+        return -1;
+    }
+#endif
     if (choice == 0 && !gstreamer_x264_available()) {
         set_err(err, "no-x264enc");
         return -1;
@@ -119,6 +150,9 @@ int GstEncoder::resolve_encoder(std::string* err) {
         return -1;
     }
     encoder_is_nv_ = (choice == 1);
+#ifdef ENABLE_VAAPI
+    encoder_is_vaapi_ = (choice == 2);
+#endif
     return choice;
 }
 
@@ -176,6 +210,15 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
         encoder_part = " nvh264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
                        " gop-size=" + std::to_string(cfg_.gop) +
                        (cfg_.low_latency ? " zerolatency=true" : "");
+#ifdef ENABLE_VAAPI
+    } else if (enc == 2) {
+        // vaapih264enc：bitrate 单位 kbit/sec；GOP 关键帧间隔属性名因 gst-vaapi 版本而异
+        // （key-int-max / gop-size），此处用 key-int-max，真机联调时按实际插件核对（VERIFY）。
+        // 未在本机验证（需 Linux VAAPI + gst-vaapi）。
+        encoder_part = " vaapih264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
+                       " key-int-max=" + std::to_string(cfg_.gop) +
+                       (cfg_.low_latency ? " low-latency=true" : "");
+#endif
     } else {
         encoder_part = " x264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
                        " speed-preset=" + (cfg_.preset.empty() ? "ultrafast" : cfg_.preset) +
@@ -440,6 +483,10 @@ void GstEncoder::teardown() {
     fps_ = 0;
     pts_ = 0;
     opened_ = false;
+    encoder_is_nv_ = false;
+#ifdef ENABLE_VAAPI
+    encoder_is_vaapi_ = false;
+#endif
 }
 
 void GstEncoder::set_err(std::string* err, const std::string& msg) {

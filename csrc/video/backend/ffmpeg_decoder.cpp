@@ -4,6 +4,10 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/rational.h>
+#if defined(ENABLE_VAAPI)
+// VAAPI 硬件上下文头：仅在编译 VAAPI 路径时引入（其依赖 libva 头，Linux 环境才有）
+#include <libavutil/hwcontext_vaapi.h>
+#endif
 }
 
 namespace modeldeploy::video {
@@ -53,6 +57,33 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
     for (unsigned i = 0; i < fmt_->nb_streams; ++i) {
         auto* cp = fmt_->streams[i]->codecpar;
         if (cp->codec_type != AVMEDIA_TYPE_VIDEO) continue;
+        // Sophgo 显式请求：video 模块未接线 Sophgo 解码栈。真实硬解需 sophon-mw（bm_video_decode），
+        // 而当前 cmake/sophgo.cmake 仅提供推理 SDK（bmrt/bmcv/bmlib）；现有 Sophgo 解码器
+        // （application/sophgo_decoder.cpp）属 BUILD_SURVEILLANCE 独立目标，未链接进 SDK。
+        // 故此处 fail-closed（不静默软解），明确标注未实现/未验证（需 TPU + sophon-mw 集成）。
+        if (cfg_.hw_accel == HwAccel::Sophgo) {
+            set_err(err, "sophgo-decode-requires-sophonmw");
+            cleanup();
+            state_ = State::Error;
+            return false;
+        }
+#ifndef ENABLE_VAAPI
+        // VAAPI 未编译（本机构建默认不启用）：显式请求 Vaapi → fail-closed，不静默软解；
+        // 与"已编译但无可用 VAAPI 设备"的 vaapi-unavailable 语义一致。
+        if (cfg_.hw_accel == HwAccel::Vaapi) {
+            set_err(err, "vaapi-unavailable");
+            cleanup();
+            state_ = State::Error;
+            return false;
+        }
+#endif
+        // VAAPI 解码输出统一 hw→CPU NV12 交付，无法保持设备帧 → 不支持 device_only 直通
+        if (cfg_.device_only && cfg_.hw_accel == HwAccel::Vaapi) {
+            set_err(err, "vaapi-device-only-unsupported");
+            cleanup();
+            state_ = State::Error;
+            return false;
+        }
         // 硬解选择：仅已显式/自动请求 CUDA 且未强制软解时尝试 CUVID；否则（含降级）回软解。
         bool used_hw = false;
         bool want_hw = !force_soft_ &&
@@ -87,6 +118,31 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
                 err_ = "hw-decoder-not-found-fallback-soft";  // 无对应 CUVID 名/解码器：降级软解
             }
         }
+#ifdef ENABLE_VAAPI
+        // VAAPI 硬解（非设备直通，输出 hw→CPU NV12）：仅在 CUDA 未选中且未强制软解时尝试。
+        // 显式 Vaapi 失败 → fail-closed（不静默软解）；Auto 失败 → 留给下方软解回退。
+        // 未在本机验证（需 Linux VAAPI + libva）。
+        if (!used_hw && !force_soft_ && !cfg_.device_only &&
+            (cfg_.hw_accel == HwAccel::Vaapi || cfg_.hw_accel == HwAccel::Auto)) {
+            const std::string vaapi_name = vaapi_hw_decoder_name(cp->codec_id);
+            const AVCodec* vc = vaapi_name.empty()
+                                    ? nullptr
+                                    : avcodec_find_decoder_by_name(vaapi_name.c_str());
+            if (vc && setup_vaapi_device_decoder(cp, vc)) {
+                used_hw = true;
+                vaapi_active_ = true;
+            } else {
+                if (cfg_.hw_accel == HwAccel::Vaapi) {
+                    // 显式 Vaapi：fail-closed，不静默降级软解（与设备直通语义一致）
+                    set_err(err, "vaapi-unavailable");
+                    cleanup();
+                    state_ = State::Error;
+                    return false;
+                }
+                err_ = "vaapi-unavailable-fallback-soft";  // Auto：降级软解
+            }
+        }
+#endif
         // 设备直通模式不提供软解回退：解码器打开为设备帧是硬性要求，失败即整体失败。
         if (cfg_.device_only) {
             if (!used_hw) {
@@ -148,6 +204,34 @@ bool FfmpegDecoder::read_one_frame_locked(VideoFrame* out, std::string* err) {
     while (true) {
         int ret = avcodec_receive_frame(ctx_, frame_);
         if (ret == 0) {
+#ifdef ENABLE_VAAPI
+            if (vaapi_active_) {
+                // VAAPI 硬件帧（AV_PIX_FMT_VAAPI）→ 转移到 CPU NV12，经 IPlaneView 交付。
+                // VAAPI 帧无法直接以设备指针进 ImageData，统一做 hw→CPU 传输。未在本机验证（需 Linux VAAPI）。
+                if (!vaapi_transfer_to_nv12()) {
+                    set_err(err, "vaapi-transfer-fail");
+                    return false;
+                }
+                std::shared_ptr<AVFrame> owned(av_frame_alloc(),
+                                               [](AVFrame* f) { av_frame_free(&f); });
+                if (av_frame_ref(owned.get(), sws_frame_) < 0) {
+                    set_err(err, "ref-fail");
+                    return false;
+                }
+                IPlaneView v{owned->data[0], owned->linesize[0],
+                             owned->data[1], owned->linesize[1],
+                             (int)owned->width, (int)owned->height, Device::CPU, owned};
+                out->image = make_image_from_planes_view(v);
+                auto* st = fmt_->streams[vstream_];
+                out->pts_ms = (frame_->pts == AV_NOPTS_VALUE)
+                                  ? 0
+                                  : static_cast<uint64_t>(
+                                        av_rescale_q(frame_->pts, st->time_base, AVRational{1, 1000}));
+                stats_.frames_out++;
+                delivered_frames_++;
+                return true;
+            }
+#endif
             if (device_only_active_) {
                 // 设备直通：解码帧必须是 AV_PIX_FMT_CUDA（CUDA 设备内存，NV12 双平面）。
                 // data[0]=Y / data[1]=UV 为设备可寻址指针，linesize[] 为各平面步长，不回主机。
@@ -280,6 +364,79 @@ bool FfmpegDecoder::setup_cuda_device_decoder(AVCodecParameters* cp, const AVCod
     return true;
 }
 
+#ifdef ENABLE_VAAPI
+std::string FfmpegDecoder::vaapi_hw_decoder_name(int codec_id) const {
+    switch (codec_id) {
+        case AV_CODEC_ID_H264: return "h264_vaapi";
+        case AV_CODEC_ID_HEVC: return "hevc_vaapi";
+        default: return "";  // 其它编解码器无 VAAPI 硬解名
+    }
+}
+
+// VAAPI 硬解：创建 VAAPI 设备上下文 + NV12 hw 帧上下文，挂到解码器再打开。
+// 参考 FFmpeg vaapi_transcode / hw_decode 的标准模式。未在本机验证（需 Linux VAAPI + libva）。
+bool FfmpegDecoder::setup_vaapi_device_decoder(AVCodecParameters* cp, const AVCodec* hwc) {
+    AVBufferRef* hwdev = nullptr;
+    // 以设备名空串让 libva 自动选一个可用 DRM/X11/EGL 展示连接；失败即无 VAAPI 可用
+    if (av_hwdevice_ctx_create(&hwdev, AV_HWDEVICE_TYPE_VAAPI, nullptr, nullptr, 0) != 0)
+        return false;
+    vaapi_hw_ctx_ = hwdev;
+
+    ctx_ = avcodec_alloc_context3(hwc);
+    if (!ctx_) return false;
+    avcodec_parameters_to_context(ctx_, cp);
+    ctx_->hw_device_ctx = av_buffer_ref(vaapi_hw_ctx_);
+    if (!ctx_->hw_device_ctx) return false;
+
+    // 建 hw 帧上下文：format=VAAPI、sw_format=NV12，供 hw→CPU 传输使用。
+    // 让解码器填充参数（pix_fmt 等），再按实际需用 NV12。
+    if (avcodec_open2(ctx_, hwc, nullptr) != 0) {
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    AVBufferRef* hwfr = av_hwframe_ctx_alloc(ctx_->hw_device_ctx);
+    if (!hwfr) {
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    AVHWFramesContext* fc = (AVHWFramesContext*)hwfr->data;
+    fc->format = AV_PIX_FMT_VAAPI;
+    fc->sw_format = AV_PIX_FMT_NV12;
+    fc->width = cp->width;
+    fc->height = cp->height;
+    fc->initial_pool_size = 12;  // 解码器实际参考 get_format 协商，此处给足池避免阻塞
+    if (av_hwframe_ctx_init(hwfr) < 0) {
+        av_buffer_unref(&hwfr);
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    vaapi_hw_frames_ = hwfr;
+    return true;
+}
+
+// VAAPI 硬件帧 → CPU NV12 转移：复用 sws_frame_ 作为目标（分配 NV12 buffer），
+// av_hwframe_transfer_data 按 sw_format（NV12）完成设备→主机拷贝。
+bool FfmpegDecoder::vaapi_transfer_to_nv12() {
+    if (frame_->format != AV_PIX_FMT_VAAPI) return false;
+    if (!sws_frame_) sws_frame_ = av_frame_alloc();
+    if (!sws_frame_) return false;
+    if (!sws_frame_->buf[0]) {
+        sws_frame_->format = AV_PIX_FMT_NV12;
+        sws_frame_->width = w_;
+        sws_frame_->height = h_;
+        sws_frame_->hw_frames_ctx = av_buffer_ref(vaapi_hw_frames_);
+        if (av_frame_get_buffer(sws_frame_, 0) < 0) return false;
+    }
+    if (av_hwframe_transfer_data(sws_frame_, frame_, 0) < 0) return false;
+    sws_frame_->width = w_;
+    sws_frame_->height = h_;
+    return true;
+}
+#endif // ENABLE_VAAPI
+
 bool FfmpegDecoder::convert_to_nv12() {
     if (!sws_frame_) sws_frame_ = av_frame_alloc();
     if (!sws_frame_) return false;
@@ -367,6 +524,13 @@ void FfmpegDecoder::cleanup() {
     opened_ = false;
     used_hw_ = false;
     device_only_active_ = false;
+#ifdef ENABLE_VAAPI
+    if (vaapi_hw_frames_) av_buffer_unref(&vaapi_hw_frames_);
+    vaapi_hw_frames_ = nullptr;
+    if (vaapi_hw_ctx_) av_buffer_unref(&vaapi_hw_ctx_);
+    vaapi_hw_ctx_ = nullptr;
+    vaapi_active_ = false;
+#endif
 }
 
 void FfmpegDecoder::set_err(std::string* err, const std::string& msg) {

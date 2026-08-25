@@ -3,6 +3,10 @@
 extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/hwcontext.h>
+#if defined(ENABLE_VAAPI)
+// VAAPI 硬件上下文头：仅在编译 VAAPI 路径时引入（依赖 libva 头，Linux 环境才有）
+#include <libavutil/hwcontext_vaapi.h>
+#endif
 // 仅当 CUDA 驱动头可用（gstcuda 探测到 CUDA include 目录）时启用设备编解码的 D2D 路径。
 // 用 CUDA 驱动 API（cuda.h / nvcuda.dll）而非 cudart 运行时，最小化链接依赖。
 #ifdef MODELDEPLOY_CUDA_DRV
@@ -57,31 +61,49 @@ bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
 }
 
 bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
-    struct Opt { std::string name; bool hw; };
+    // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi)
+    struct Opt { std::string name; int kind; };
     std::vector<Opt> candidates;
     if (cfg_.codec == "auto") {
-        // auto：hw_accel ∈ {Auto, Cuda} 且 nvenc 存在 → 优先 nvenc；否则（或 nvenc 打开失败）回退 libx264
-        const bool want_hw = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda) &&
-                             avcodec_find_encoder_by_name("h264_nvenc") != nullptr;
-        if (want_hw) candidates.push_back({"h264_nvenc", true});
-        candidates.push_back({"libx264", false});
+        // auto：hw_accel ∈ {Auto, Cuda} 且 nvenc 存在 → 优先 nvenc；hw_accel ∈ {Auto,Vaapi} 且
+        // VAAPI 编译开启 → 尝试 h264_vaapi；否则（或打开失败）回退 libx264
+        const bool want_nvenc = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda) &&
+                                avcodec_find_encoder_by_name("h264_nvenc") != nullptr;
+        if (want_nvenc) candidates.push_back({"h264_nvenc", 1});
+#ifdef ENABLE_VAAPI
+        if (!want_nvenc &&
+            (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Vaapi) &&
+            avcodec_find_encoder_by_name("h264_vaapi") != nullptr)
+            candidates.push_back({"h264_vaapi", 2});
+#endif
+        candidates.push_back({"libx264", 0});
     } else if (cfg_.codec == "h264_nvenc") {
-        candidates.push_back({"h264_nvenc", true});
+        candidates.push_back({"h264_nvenc", 1});
     } else if (cfg_.codec == "libx264") {
-        candidates.push_back({"libx264", false});
+        candidates.push_back({"libx264", 0});
+#ifdef ENABLE_VAAPI
+    } else if (cfg_.codec == "vaapih264enc" || cfg_.codec == "h264_vaapi") {
+        // VAAPI 编码器（GStreamer 名 vaapih264enc 与 FFmpeg 名 h264_vaapi 都映射到 FFmpeg h264_vaapi）
+        candidates.push_back({"h264_vaapi", 2});
+#endif
     } else {
-        // 其它名称（含 GStreamer 名 nvh264enc/x264enc 等）在 FFmpeg 编码器里不支持，由 H4/GStreamer 编码器接
+        // 其它名称（含 GStreamer 名 nvh264enc/x264enc 等；VAAPI 未编译时的 vaapih264enc 等）
+        // 在 FFmpeg 编码器里不支持，由 GStreamer 编码器接；VAAPI 未编译则明确 unsupported-codec。
         set_err(err, "unsupported-codec");
         return false;
     }
     for (const auto& o : candidates) {
         if (!avcodec_find_encoder_by_name(o.name.c_str())) continue;
-        if (configure_encoder(o.name, o.hw, w, h, fps)) {
-            used_hw_ = o.hw;
+        if (configure_encoder(o.name, o.kind, w, h, fps)) {
+            used_hw_ = (o.kind != 0);
+#ifdef ENABLE_VAAPI
+            vaapi_active_ = (o.kind == 2);
+#endif
             return true;
         }
-        // 候选打开失败：显式 h264_nvenc 必须报错（不静默换软编）；auto 时继续尝试下一候选（软编回退）
-        if (cfg_.codec == "h264_nvenc") {
+        // 候选打开失败：显式 nvenc/vaapi 必须报错（不静默换软编）；auto 时继续尝试下一候选（软编回退）
+        if (cfg_.codec == "h264_nvenc" || cfg_.codec == "vaapih264enc" ||
+            cfg_.codec == "h264_vaapi") {
             set_err(err, "encoder-open-fail");
             return false;
         }
@@ -90,7 +112,7 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
     return false;
 }
 
-bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, int h, int fps) {
+bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, int h, int fps) {
     const AVCodec* codec = avcodec_find_encoder_by_name(name.c_str());
     if (!codec) return false;
     enc_ = avcodec_alloc_context3(codec);
@@ -99,11 +121,17 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
     enc_->height = h;
     enc_->time_base = {1, fps};
     enc_->framerate = {fps, 1};
+    const bool hw = (kind != 0);
+#ifdef ENABLE_VAAPI
+    const bool vaapi = (kind == 2);
+#else
+    const bool vaapi = false;
+#endif
     // GPU 直接编码：enc 输入 pix_fmt 为 CUDA（吃设备 NV12 hw frame）；
-    // 软编 libx264 用 YUV420P，普通 nvenc（CPU NV12 上传）用 NV12。
-    const bool gpu_direct = hw && cfg_.gpu_direct_input;
-    const AVPixelFormat enc_fmt = hw ? (gpu_direct ? AV_PIX_FMT_CUDA : AV_PIX_FMT_NV12)
-                                     : AV_PIX_FMT_YUV420P;
+    // 软编 libx264 用 YUV420P，普通 nvenc（CPU NV12 上传）与 VAAPI 均用 NV12。
+    const bool gpu_direct = (kind == 1) && cfg_.gpu_direct_input;
+    const AVPixelFormat enc_fmt = kind == 1 ? (gpu_direct ? AV_PIX_FMT_CUDA : AV_PIX_FMT_NV12)
+                                            : (vaapi ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P);
     enc_->pix_fmt = enc_fmt;
     enc_->gop_size = cfg_.gop;
     enc_->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
@@ -114,21 +142,41 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
     enc_->color_primaries = AVCOL_PRI_BT709;
     enc_->color_trc = AVCOL_TRC_BT709;
     if (hw) {
-        // NVENC：GPU 直编（gpu_direct）须在 open 前挂上 CUDA hw_frames_ctx，nvenc 依据
-        // avctx->hw_frames_ctx 取 CUDA 设备上下文并注册输入资源。普通 nvenc（CPU NV12 上传）
-        // 不设 hw ctx，由 FFmpeg 自建 CUDA 设备。
-        if (gpu_direct) {
-            if (!setup_cuda_hw_frames(w, h)) {
+        if (kind == 1) {
+            // NVENC：GPU 直编（gpu_direct）须在 open 前挂上 CUDA hw_frames_ctx，nvenc 依据
+            // avctx->hw_frames_ctx 取 CUDA 设备上下文并注册输入资源。普通 nvenc（CPU NV12 上传）
+            // 不设 hw ctx，由 FFmpeg 自建 CUDA 设备。
+            if (gpu_direct) {
+                if (!setup_cuda_hw_frames(w, h)) {
+                    avcodec_free_context(&enc_);
+                    enc_ = nullptr;
+                    return false;
+                }
+                enc_->hw_frames_ctx = av_buffer_ref(hw_frames_ctx_);
+                if (!enc_->hw_frames_ctx) {
+                    avcodec_free_context(&enc_);
+                    enc_ = nullptr;
+                    return false;
+                }
+            }
+        } else {  // VAAPI：挂 VAAPI hw 帧上下文（format=VAAPI, sw_format=NV12）
+#ifdef ENABLE_VAAPI
+            if (!setup_vaapi_hw_frames(w, h)) {
                 avcodec_free_context(&enc_);
                 enc_ = nullptr;
                 return false;
             }
-            enc_->hw_frames_ctx = av_buffer_ref(hw_frames_ctx_);
+            enc_->hw_frames_ctx = av_buffer_ref(vaapi_hw_frames_);
             if (!enc_->hw_frames_ctx) {
                 avcodec_free_context(&enc_);
                 enc_ = nullptr;
                 return false;
             }
+#else
+            avcodec_free_context(&enc_);
+            enc_ = nullptr;
+            return false;
+#endif
         }
     } else {
         enc_->profile = FF_PROFILE_H264_MAIN;
@@ -144,7 +192,7 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
         enc_ = nullptr;
         return false;
     }
-    // sws 输出的 CPU 中间/帧格式：nvenc（含 GPU 直编）输入 CPU 平面为 NV12，软编为 YUV420P
+    // sws 输出的 CPU 中间/帧格式：nvenc（含 GPU 直编）与 VAAPI 输入 CPU 平面为 NV12，软编为 YUV420P
     const AVPixelFormat cpu_fmt = hw ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P;
     dst_fmt_ = cpu_fmt;
     frame_ = av_frame_alloc();
@@ -180,6 +228,75 @@ bool FfmpegEncoder::setup_cuda_hw_frames(int w, int h) {
     hw_frames_ctx_ = fr;
     return true;
 }
+
+#ifdef ENABLE_VAAPI
+// VAAPI：创建设备上下文 + NV12 hw帧上下文（format=VAAPI, sw_format=NV12），供 h264_vaapi 输入。
+// 未在本机验证（需 Linux VAAPI + libva）。
+bool FfmpegEncoder::setup_vaapi_hw_frames(int w, int h) {
+    if (av_hwdevice_ctx_create(&vaapi_hw_ctx_, AV_HWDEVICE_TYPE_VAAPI, nullptr, nullptr, 0) != 0)
+        return false;
+    AVBufferRef* fr = av_hwframe_ctx_alloc(vaapi_hw_ctx_);
+    if (!fr) return false;
+    AVHWFramesContext* fc = (AVHWFramesContext*)fr->data;
+    fc->format = AV_PIX_FMT_VAAPI;
+    fc->sw_format = AV_PIX_FMT_NV12;
+    fc->width = w;
+    fc->height = h;
+    fc->initial_pool_size = 12;
+    if (av_hwframe_ctx_init(fr) < 0) {
+        av_buffer_unref(&fr);
+        return false;
+    }
+    vaapi_hw_frames_ = fr;
+    return true;
+}
+
+// 把 CPU NV12 帧（frame_）上传为 VAAPI hw 帧并送入编码器，做收包写出循环。
+bool FfmpegEncoder::send_vaapi_frame(std::string* err) {
+    if (!enc_ || !frame_ || !pkt_) {
+        set_err(err, "not-opened");
+        return false;
+    }
+    AVFrame* hw = av_frame_alloc();
+    if (!hw) {
+        set_err(err, "frame-alloc-fail");
+        return false;
+    }
+    if (av_hwframe_get_buffer(vaapi_hw_frames_, hw, 0) < 0) {
+        av_frame_free(&hw);
+        set_err(err, "hwframe-alloc-fail");
+        return false;
+    }
+    if (av_hwframe_transfer_data(hw, frame_, 0) < 0) {  // CPU NV12 → VAAPI hw 帧
+        av_frame_free(&hw);
+        set_err(err, "hwframe-upload-fail");
+        return false;
+    }
+    hw->pts = pts_++;
+    stats_.frames_in++;
+    if (avcodec_send_frame(enc_, hw) < 0) {
+        av_frame_free(&hw);
+        set_err(err, "send-frame-fail");
+        return false;
+    }
+    while (avcodec_receive_packet(enc_, pkt_) == 0) {
+        if (st_) {
+            av_packet_rescale_ts(pkt_, enc_->time_base, st_->time_base);
+            pkt_->stream_index = st_->index;
+        }
+        if (fmt_ && av_interleaved_write_frame(fmt_, pkt_) < 0) {
+            av_packet_unref(pkt_);
+            av_frame_free(&hw);
+            set_err(err, "mux-write-fail");
+            return false;
+        }
+        stats_.frames_out++;
+        av_packet_unref(pkt_);
+    }
+    av_frame_free(&hw);
+    return true;
+}
+#endif // ENABLE_VAAPI
 
 bool FfmpegEncoder::open_output(const std::string& url) {
     // 根据 cfg.format 或 URL 选择封装/输出格式
@@ -257,6 +374,18 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
     const uint8_t* src[1] = {p.data};
     int src_stride[1] = {p.step};
     sws_scale(sws_, src, src_stride, 0, h_, frame_->data, frame_->linesize);
+
+#ifdef ENABLE_VAAPI
+    // VAAPI 硬编：CPU NV12 经 av_hwframe_transfer_data 上传为 VAAPI hw 帧后送入编码器
+    // （send_vaapi_frame 内部维护 pts_/stats_）。未在本机验证（需 Linux VAAPI）。
+    if (vaapi_active_) {
+        auto t0 = std::chrono::steady_clock::now();
+        bool ok = send_vaapi_frame(err);
+        auto t1 = std::chrono::steady_clock::now();
+        stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+        return ok;
+    }
+#endif
 
     frame_->pts = pts_++;
     stats_.frames_in++;
@@ -469,6 +598,13 @@ void FfmpegEncoder::cleanup() {
     hw_frames_ctx_ = nullptr;
     if (hw_device_ctx_) av_buffer_unref(&hw_device_ctx_);
     hw_device_ctx_ = nullptr;
+#ifdef ENABLE_VAAPI
+    if (vaapi_hw_frames_) av_buffer_unref(&vaapi_hw_frames_);
+    vaapi_hw_frames_ = nullptr;
+    if (vaapi_hw_ctx_) av_buffer_unref(&vaapi_hw_ctx_);
+    vaapi_hw_ctx_ = nullptr;
+    vaapi_active_ = false;
+#endif
     header_ = false;
     opened_ = false;
     pts_ = 0;

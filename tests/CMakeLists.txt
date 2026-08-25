@@ -71,6 +71,8 @@ if(BUILD_VIDEO)
     if(ENABLE_GSTREAMER)
         list(APPEND TEST_SOURCES test_video_gst_decode.cpp test_video_gst_encode.cpp)
     endif()
+    # VAAPI/Sophgo 硬件路径：配置/选择/回退决策本机可测；真实硬件路径由 tag 门控
+    list(APPEND TEST_SOURCES test_video_hw_paths.cpp)
 endif()
 
 # GPU-only 测试源：仅当 CUDA 启用时编译（否则 CPU 下 cuda_runtime.h 缺失导致编译失败）

@@ -74,6 +74,20 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         state_ = State::Error;
         return false;
     }
+    // Sophgo：GStreamer 无对应解码插件（未实现/未验证），fail-closed 不静默软解。
+    if (cfg_.hw_accel == HwAccel::Sophgo) {
+        set_err(err, "sophgo-decode-requires-sophonmw");
+        state_ = State::Error;
+        return false;
+    }
+#ifndef ENABLE_VAAPI
+    // VAAPI 未编译（默认）：显式请求 Vaapi → fail-closed，不静默软解。
+    if (cfg_.hw_accel == HwAccel::Vaapi) {
+        set_err(err, "vaapi-unavailable");
+        state_ = State::Error;
+        return false;
+    }
+#endif
     // 设备直通：解码输出保持 CUDA 设备帧（nvh264dec → CUDA memory）
     if (cfg_.device_only && (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
 #ifdef HAVE_GSTCUDA
@@ -90,6 +104,29 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         return false;
 #endif
     }
+#ifdef ENABLE_VAAPI
+    // VAAPI 硬解（显式 Vaapi 或 Auto）：filesrc→h264parse→vaapih264dec→videoconvert→appsink(NV12)。
+    // 显式 Vaapi 失败 → fail-closed；Auto 失败/无插件 → 落在下方软解。未在本机验证（需 Linux VAAPI）。
+    if (!cfg_.device_only &&
+        (cfg_.hw_accel == HwAccel::Vaapi || cfg_.hw_accel == HwAccel::Auto)) {
+        if (!vaapih264dec_available()) {
+            if (cfg_.hw_accel == HwAccel::Vaapi) {
+                set_err(err, "vaapi-unavailable");
+                state_ = State::Error;
+                return false;
+            }
+        } else if (!build_vaapi_pipeline_locked(url, err)) {
+            if (cfg_.hw_accel == HwAccel::Vaapi) {
+                state_ = State::Error;
+                return false;
+            }
+        } else {
+            opened_ = true;
+            state_ = State::Running;
+            return true;
+        }
+    }
+#endif
     std::string launch = "filesrc location=\"" + url +
                          "\" ! decodebin ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
@@ -160,6 +197,48 @@ bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::strin
     return true;
 }
 #endif // HAVE_GSTCUDA
+
+#ifdef ENABLE_VAAPI
+bool GstDecoder::vaapih264dec_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    GstElementFactory* f = gst_element_factory_find("vaapih264dec");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+// VAAPI 硬解码管道：显式 vaapih264dec → videoconvert → appsink(NV12)，输出主机 NV12，
+// 复用软解 read 路径（device_only_active_ 保持 false）。未在本机验证（需 Linux VAAPI + gst-vaapi）。
+bool GstDecoder::build_vaapi_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    std::string launch = "filesrc location=\"" + url +
+                         "\" ! h264parse ! vaapih264dec ! videoconvert "
+                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "vaapi-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    vaapi_active_ = true;
+    return true;
+}
+#endif // ENABLE_VAAPI
 
 bool GstDecoder::query_caps_locked(int timeout_ms) {
     if (!appsink_) return false;
@@ -327,6 +406,9 @@ void GstDecoder::cleanup() {
     fps_ = 0.0;
     opened_ = false;
     device_only_active_ = false;
+#ifdef ENABLE_VAAPI
+    vaapi_active_ = false;
+#endif
 }
 
 void GstDecoder::close_pipeline() {

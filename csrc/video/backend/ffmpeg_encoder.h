@@ -37,9 +37,16 @@ public:
 
 private:
     bool init_encoder(int w, int h, int fps, std::string* err);
-    bool configure_encoder(const std::string& name, bool hw, int w, int h, int fps);
+    // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi)
+    bool configure_encoder(const std::string& name, int kind, int w, int h, int fps);
     bool setup_cuda_hw_frames(int w, int h);
     bool d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h, AVFrame* hw);
+#ifdef ENABLE_VAAPI
+    // 创建 VAAPI 设备上下文 + NV12 hw 帧上下文；成功置 vaapi_hw_ctx_/vaapi_hw_frames_
+    bool setup_vaapi_hw_frames(int w, int h);
+    // 把 CPU NV12 帧上传为 VAAPI hw 帧并送入编码器（发送/收包循环）。未在本机验证（需 Linux VAAPI）。
+    bool send_vaapi_frame(std::string* err);
+#endif
     bool open_output(const std::string& url);
     void cleanup();
     void set_err(std::string* err, const std::string& msg);
@@ -56,10 +63,15 @@ private:
     // GPU 直接编码（nvenc + CUDA hw_frames_ctx）：设备 NV12 指针直编会话资源
     AVBufferRef* hw_device_ctx_ = nullptr;  // CUDA 设备上下文
     AVBufferRef* hw_frames_ctx_ = nullptr;  // CUDA hw帧上下文（format=CUDA, sw_format=NV12）
+#ifdef ENABLE_VAAPI
+    AVBufferRef* vaapi_hw_ctx_ = nullptr;     // VAAPI 设备上下文
+    AVBufferRef* vaapi_hw_frames_ = nullptr;  // VAAPI hw帧上下文（format=VAAPI, sw_format=NV12）
+    bool vaapi_active_ = false;               // 本次会话是否实际用 VAAPI 硬编
+#endif
     AVPixelFormat dst_fmt_ = AV_PIX_FMT_YUV420P;  // sws 输出/编码器输入 pix_fmt（随编码器）
     bool header_ = false;
     bool opened_ = false;
-    bool used_hw_ = false;  // 本次会话是否实际用到 NVENC 编码器
+    bool used_hw_ = false;  // 本次会话是否实际用到硬件（NVENC/VAAPI）编码器
     VideoStats stats_;
     std::string err_;
 };

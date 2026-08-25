@@ -49,6 +49,13 @@ private:
     // 设备直通：构建 nvh264dec → CUDA memory → appsink(memory:CUDAMemory) 管道；成功置 device_only_active_
     bool build_device_pipeline_locked(const std::string& url, std::string* err);
 #endif
+#ifdef ENABLE_VAAPI
+    // 静态探测：vaapih264dec 插件可实例化（未在本机验证，需 Linux GStreamer vaapi 插件）
+    static bool vaapih264dec_available();
+    // VAAPI 硬解：filesrc → h264parse → vaapih264dec → videoconvert → appsink(NV12)，输出 CPU NV12。
+    // 复用软解 read 路径（device_only_active_ 保持 false）。未在本机验证（需 Linux VAAPI）。
+    bool build_vaapi_pipeline_locked(const std::string& url, std::string* err);
+#endif
     void set_err(std::string* err, const std::string& msg);
 
 #ifdef ENABLE_GSTREAMER
@@ -64,6 +71,9 @@ private:
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
     bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
+#ifdef ENABLE_VAAPI
+    bool vaapi_active_ = false;  // 本次会话是否实际用 VAAPI 硬解
+#endif
 };
 
 } // namespace modeldeploy::video

@@ -38,16 +38,26 @@ public:
     std::string last_error() const override;
     void close() override;
 
-    // 本次会话是否实际启用了硬件（nvh264enc）编码器；false 表示走了软编（x264enc）
-    bool used_hw() const { return encoder_is_nv_; }
+    // 本次会话是否实际启用了硬件（nvh264enc / vaapih264enc）编码器；false 表示走了软编（x264enc）
+    bool used_hw() const {
+#ifdef ENABLE_VAAPI
+        return encoder_is_nv_ || encoder_is_vaapi_;
+#else
+        return encoder_is_nv_;
+#endif
+    }
 
     // 静态探测：gst_init 一次 + 检查编码所需插件（appsrc/x264enc/mp4mux 等）可实例化
     static bool gstreamer_x264_available();
     // 静态探测：nvcodec 硬编插件 nvh264enc 可实例化（复用 H0 同款 gst_element_factory_find 检查）
     static bool nvh264enc_available();
+#ifdef ENABLE_VAAPI
+    // 静态探测：vaapih264enc 插件可实例化（未在本机验证，需 Linux GStreamer vaapi 插件）
+    static bool vaapih264enc_available();
+#endif
 
 private:
-    // 决议本次会话用的编码元素：0=软编 x264enc，1=硬编 nvh264enc，-1=错误（err 已设置）
+    // 决议本次会话用的编码元素：0=软编 x264enc，1=硬编 nvh264enc，2=VAAPI vaapih264enc，-1=错误（err 已设置）
     int resolve_encoder(std::string* err);
     void build_pipeline(const std::string& url, int w, int h, int fps, int enc);
     bool start_pipeline(std::string* err);
@@ -62,7 +72,10 @@ private:
     VideoEncoderConfig cfg_;
     int w_ = 0, h_ = 0, fps_ = 0;
     uint64_t pts_ = 0;
-    bool encoder_is_nv_ = false;  // 本次会话是否实际用了 nvh264enc 硬编
+    bool encoder_is_nv_ = false;      // 本次会话是否实际用了 nvh264enc 硬编
+#ifdef ENABLE_VAAPI
+    bool encoder_is_vaapi_ = false;   // 本次会话是否实际用了 vaapih264enc 硬编
+#endif
     VideoStats stats_;
     std::string err_;
     std::mutex mtx_;

@@ -55,6 +55,17 @@ private:
     // 设备直通：以 CUDA 硬件设备上下文打开 hwc（h264_cuvid 等），使解码输出 AV_PIX_FMT_CUDA 设备帧。
     // 成功返回 true 且 ctx_ 持有 hw_device_ctx 引用；否则返回 false（不留下 ctx_）。
     bool setup_cuda_device_decoder(AVCodecParameters* cp, const AVCodec* hwc);
+#ifdef ENABLE_VAAPI
+    // 依据 codec_id 映射 VAAPI 硬解名（h264_vaapi/hevc_vaapi）；其它返回空串
+    std::string vaapi_hw_decoder_name(int codec_id) const;
+    // 以 VAAPI 硬件设备上下文打开 hwc（h264_vaapi 等），并创建 sw_format=NV12 的 hw 帧上下文。
+    // 成功返回 true 且 ctx_ 持有 vaapi_hw_ctx_/vaapi_hw_frames_ 引用；否则返回 false（不留下 ctx_）。
+    // 未在本机验证（需 Linux VAAPI + libva）。
+    bool setup_vaapi_device_decoder(AVCodecParameters* cp, const AVCodec* hwc);
+    // 把 frame_（VAAPI 硬件帧）经 av_hwframe_transfer_data 转移到 CPU NV12（存 sws_frame_）。
+    // VAAPI 帧无法直接以设备指针交付 IPlaneView，故统一 hw→CPU NV12 后再交付。未在本机验证。
+    bool vaapi_transfer_to_nv12();
+#endif
     // 把 frame_（非 NV12）经 swscale 转成 NV12 存到 sws_frame_；成功返回 true
     bool convert_to_nv12();
     void set_err(std::string* err, const std::string& msg);
@@ -78,6 +89,11 @@ private:
     std::atomic<bool> opened_{false};
     bool used_hw_ = false;  // 本次会话是否实际起到硬件（CUVID）解码
     bool device_only_active_ = false;  // 设备直通模式：解码输出保持 GPU 设备帧（AV_PIX_FMT_CUDA）
+#ifdef ENABLE_VAAPI
+    AVBufferRef* vaapi_hw_ctx_ = nullptr;     // VAAPI 硬件设备上下文（libavutil hwcontext_vaapi）
+    AVBufferRef* vaapi_hw_frames_ = nullptr;  // VAAPI hw 帧上下文（format=VAAPI, sw_format=NV12）
+    bool vaapi_active_ = false;               // 本次会话是否实际用 VAAPI 硬解
+#endif
     bool force_soft_ = false;            // 强制软解标志（运行期回退重开时置位，跳过硬件选择）
     bool hw_fallback_done_ = false;      // 运行期 0 帧回退软解是否已发生（至多一次）
     uint64_t delivered_frames_ = 0;      // 本次会话已交付的帧数（每次成功交付时同步 +1）

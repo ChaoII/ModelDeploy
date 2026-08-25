@@ -12,6 +12,7 @@ option(ENABLE_ORT "enable ort backend" ON)
 option(ENABLE_MNN "enable mnn backend" ON)
 option(ENABLE_TRT "enable trt backend" OFF)
 option(ENABLE_SOPHGO "enable sophgo backend (Linux + SOPHON-Sail)" OFF)
+option(ENABLE_VAAPI "enable VAAPI hardware video path (Linux + libva; compile-gated, only affects video backends)" OFF)
 option(ENABLE_WETEXT "enable WeTextProcessing ITN backend (requires OpenFst + we-text-processing)" OFF)
 option(BUILD_AUDIO "build asr tts vad sr" ON)
 option(BUILD_NLP "build nlp module (jieba tokenizer + text tools)" OFF)
@@ -312,6 +313,14 @@ if (BUILD_VIDEO)
         endif ()
         include_directories(${GSTREAMER_INCLUDE_DIR})
         list(APPEND DEPENDS ${GSTREAMER_LIBS})
+    endif ()
+    # VAAPI 硬解/硬编（Linux + libva，仅编译门控）：默认 OFF，Windows 不定义该宏，相关代码不参与编译。
+    # VAAPI 的设备上下文由 FFmpeg 的 libavutil hwcontext_vaapi / GStreamer vaapi 插件承载，
+    # libva 由 FFmpeg/GStreamer 自身链接，故此处只需控制编译宏，不额外 find libva。
+    # Sophgo 硬解需 sophon-mw（bm_video_decode），当前 cmake/sophgo.cmake 仅提供推理 SDK（bmrt/bmcv/bmlib），
+    # 故 Sophgo 真实帧路径在本模块内未接线（仅命中/校验/fail-closed，见 backend 实现注释）。
+    if (ENABLE_VAAPI)
+        add_definitions(-DENABLE_VAAPI)
     endif ()
 endif ()
 
