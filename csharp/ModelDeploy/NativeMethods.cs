@@ -54,7 +54,7 @@ namespace ModelDeploy
         internal static extern MDStatus md_option_set_model_path(IntPtr opt, IntPtr path, IntPtr pwd);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern MDStatus md_option_set_model_buffer(IntPtr opt, byte[] data, int len, IntPtr fmt);
+        internal static extern MDStatus md_option_set_model_buffer(IntPtr opt, byte[] data, UIntPtr len, IntPtr fmt);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_option_set_config(IntPtr opt, IntPtr ns, IntPtr key, IntPtr value);

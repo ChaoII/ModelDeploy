@@ -58,8 +58,9 @@ namespace ModelDeploy
         public RuntimeOption SetModelBuffer(byte[] data, string? fmt = null)
         {
             Check();
+            if (data == null) throw new ArgumentNullException(nameof(data));
             var f = ToUtf8(fmt);
-            try { ThrowOnError(NativeMethods.md_option_set_model_buffer(Handle, data, data.Length, f)); }
+            try { ThrowOnError(NativeMethods.md_option_set_model_buffer(Handle, data, (UIntPtr)data.Length, f)); }
             finally { FreeUtf8(f); }
             return this;
         }
