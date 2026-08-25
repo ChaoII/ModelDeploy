@@ -408,6 +408,64 @@ TEST_CASE("capi option device id setter", "[capi]") {
     md_option_destroy(opt);
 }
 
+// ============ Task 9：RuntimeOption config/device/password 用例（无模型文件，CI 安全） ============
+
+// md_option_set_config：知名 ns+key → MD_OK
+TEST_CASE("capiruntimeoption_config_ok", "[capi]") {
+    MDOptionHandle h = nullptr;
+    REQUIRE(md_option_create(&h) == MD_OK);
+    MDStatus st = md_option_set_config(h, "ort", "trt_engine_cache_path", "./t");
+    REQUIRE(st == MD_OK);
+    md_option_destroy(h);
+}
+
+// md_option_set_config：未知 ns 必须报 INVALID_ARGUMENT（不崩、不改状态）
+TEST_CASE("capiruntimeoption_config_badns", "[capi]") {
+    MDOptionHandle h = nullptr;
+    REQUIRE(md_option_create(&h) == MD_OK);
+    MDStatus st = md_option_set_config(h, "bogus", "k", "v");
+    REQUIRE(st == MD_ERR_INVALID_ARGUMENT);
+    md_option_destroy(h);
+}
+
+// md_option_set_device：GPU + 设备号选择成功（无 getter，实际选卡在 Task 10 运行时验证）
+TEST_CASE("capiruntimeoption_device_set", "[capi]") {
+    MDOptionHandle h = nullptr;
+    REQUIRE(md_option_create(&h) == MD_OK);
+    MDStatus st = md_option_set_device(h, MD_DEV_GPU, 1);
+    REQUIRE(st == MD_OK);
+    md_option_destroy(h);
+}
+
+// md_option_set_config：trt min_shape 合法串（name:min;opt;max）→ MD_OK
+TEST_CASE("capiruntimeoption_shape_ok", "[capi]") {
+    MDOptionHandle h = nullptr;
+    REQUIRE(md_option_create(&h) == MD_OK);
+    MDStatus st = md_option_set_config(h, "trt", "min_shape", "x:1;1,3,640,640;1,3,640,640");
+    REQUIRE(st == MD_OK);
+    md_option_destroy(h);
+}
+
+// md_option_set_config：trt min_shape 缺冒号的不合法串必须报 INVALID_ARGUMENT（早期修复回归）
+TEST_CASE("capiruntimeoption_shape_bad", "[capi]") {
+    MDOptionHandle h = nullptr;
+    REQUIRE(md_option_create(&h) == MD_OK);
+    MDStatus st = md_option_set_config(h, "trt", "min_shape", "no-colon");
+    REQUIRE(st == MD_ERR_INVALID_ARGUMENT);
+    md_option_destroy(h);
+}
+
+// md_option_set_password + md_option_set_model_path：仅存储字段，设定时不读模型文件 → 均 MD_OK
+TEST_CASE("capiruntimeoption_password_path", "[capi]") {
+    MDOptionHandle h = nullptr;
+    REQUIRE(md_option_create(&h) == MD_OK);
+    MDStatus s1 = md_option_set_password(h, "k");
+    REQUIRE(s1 == MD_OK);
+    MDStatus s2 = md_option_set_model_path(h, "some_model.onnx", "");
+    REQUIRE(s2 == MD_OK);
+    md_option_destroy(h);
+}
+
 TEST_CASE("capi face anti-spoof enum + spoof getter guards", "[capi]") {
     // 新增 kind 在合法枚举范围内（不越界、不撞 MD_MODEL_COUNT）
     CHECK(static_cast<int>(MD_MODEL_FACE_AS_SECOND) < static_cast<int>(MD_MODEL_COUNT));
