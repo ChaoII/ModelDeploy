@@ -1,6 +1,7 @@
 #include "catch2/catch_test_macros.hpp"
 #include "csrc/video/video_encoder.h"
 #include "csrc/video/video_decoder.h"
+#include "csrc/video/video_frame.h"
 #include "csrc/video/factory.h"
 #include "csrc/video/backend/ffmpeg_encoder.h"
 #include "csrc/video/backend/gst_encoder.h"
@@ -73,9 +74,15 @@ TEST_CASE("FFmpeg encode_from_gpu_nv12 设备指针直编 nvenc → soft 回读"
     REQUIRE(ok);
     REQUIRE(ff->used_hw());  // 确实决议出 nvenc 硬编直编
 
-    // 设备 NV12 指针直编（不做主机往返）
+    modeldeploy::vision::ImageData::Plane planes[2] = {{d_y, W}, {d_uv, W}};
+    auto dev_owner = std::shared_ptr<void>(dev, [](void* p) { cudaFree(p); });
+    modeldeploy::vision::ImageData gpu_nv12 = modeldeploy::vision::ImageData::from_planes(
+        planes, 2, MdImageType::NV12, W, H, modeldeploy::Device::GPU, dev_owner);
+    REQUIRE(gpu_nv12.device() == modeldeploy::Device::GPU);
+
+    // 设备 NV12 平面（device=GPU）直编，不做主机往返
     for (int i = 0; i < 24; ++i) {
-        REQUIRE(enc->encode_from_gpu_nv12(d_y, d_uv, W, H, &err));
+        REQUIRE(enc->encode(VideoFrame{gpu_nv12}, &err));
     }
     enc->close();
 
@@ -89,8 +96,6 @@ TEST_CASE("FFmpeg encode_from_gpu_nv12 设备指针直编 nvenc → soft 回读"
     VideoFrame f;
     while (dec->read_one_frame(&f, &err)) ++cnt;
     REQUIRE(cnt > 0);
-
-    cudaFree(dev);
 }
 
 // ── GStreamer：nvh264enc 吃 CUDA memory（包装设备 NV12 指针）直编 → soft 回读 ────
@@ -124,8 +129,14 @@ TEST_CASE("GStreamer encode_from_gpu_nv12 CUDA memory 直编 nvh264enc → soft 
     auto gst = std::dynamic_pointer_cast<GstEncoder>(enc);
     REQUIRE(gst->used_hw());
 
+    modeldeploy::vision::ImageData::Plane planes[2] = {{d_y, W}, {d_uv, W}};
+    auto dev_owner = std::shared_ptr<void>(dev, [](void* p) { cudaFree(p); });
+    modeldeploy::vision::ImageData gpu_nv12 = modeldeploy::vision::ImageData::from_planes(
+        planes, 2, MdImageType::NV12, W, H, modeldeploy::Device::GPU, dev_owner);
+    REQUIRE(gpu_nv12.device() == modeldeploy::Device::GPU);
+
     for (int i = 0; i < 24; ++i) {
-        REQUIRE(enc->encode_from_gpu_nv12(d_y, d_uv, W, H, &err));
+        REQUIRE(enc->encode(VideoFrame{gpu_nv12}, &err));
     }
     enc->close();
 
@@ -139,8 +150,6 @@ TEST_CASE("GStreamer encode_from_gpu_nv12 CUDA memory 直编 nvh264enc → soft 
     VideoFrame f;
     while (dec->read_one_frame(&f, &err)) ++cnt;
     REQUIRE(cnt > 0);
-
-    cudaFree(dev);
 }
 #endif
 #endif

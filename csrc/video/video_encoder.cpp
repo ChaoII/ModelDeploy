@@ -28,17 +28,9 @@ bool VideoEncoder::open(const std::string& url, int w, int h, int src_fps, std::
     return ok;
 }
 
-bool VideoEncoder::encode(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool VideoEncoder::encode(const VideoFrame& frame, std::string* err) {
     if (!backend_) return false;
-    bool ok = backend_->encode(image, err);
-    if (!ok) state_ = State::Error;
-    return ok;
-}
-
-bool VideoEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                        std::string* err) {
-    if (!backend_) return false;
-    bool ok = backend_->encode_from_gpu_nv12(d_y, d_uv, w, h, err);
+    bool ok = backend_->encode(frame, err);
     if (!ok) state_ = State::Error;
     return ok;
 }

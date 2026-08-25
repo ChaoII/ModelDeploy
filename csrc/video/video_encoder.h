@@ -2,6 +2,7 @@
 
 #include "csrc/video/video_common.h"
 #include "csrc/video/video_codec_config.h"
+#include "csrc/video/video_frame.h"
 #include "vision/common/image_data.h"
 #include <memory>
 #include <string>
@@ -19,10 +20,8 @@ public:
     ~VideoEncoder();
 
     bool open(const std::string& url, int w, int h, int src_fps, std::string* err = nullptr);
-    // 编码一帧 CPU BGR ImageData 到输出容器；失败返回 false
-    bool encode(const modeldeploy::vision::ImageData& image, std::string* err = nullptr);
-    bool encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                              std::string* err = nullptr);
+    // 编码一帧（CPU BGR/设备 NV12 + 可选 pts_ms）到输出容器；失败返回 false
+    bool encode(const VideoFrame& frame, std::string* err = nullptr);
     bool encode_async(const modeldeploy::vision::ImageData& image);
     bool start_async(std::string* err = nullptr);
     void stop_async();

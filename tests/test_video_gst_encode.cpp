@@ -23,7 +23,7 @@ TEST_CASE("GStreamer x264enc 编码 mp4 → 回读验证", "[video][gst][integra
     memset(bgr, 128, sizeof(bgr));
     auto img = modeldeploy::vision::ImageData::from_raw(bgr, 64, 64, MdImageType::PKG_BGR_U8,
                                                         true);
-    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(img, &err));
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
     enc->close();
     // 用 Task5 GStreamer 解码器/FFmpeg 解码器回读 gst_out.mp4 验证帧数
     VideoDecoderConfig dcfg;
@@ -61,7 +61,7 @@ TEST_CASE("GStreamer nvh264enc 硬编 → mp4 回读", "[video][hw][gpu][integra
     uint8_t bgr[W * H * 3];
     memset(bgr, 128, sizeof(bgr));
     auto img = modeldeploy::vision::ImageData::from_raw(bgr, W, H, MdImageType::PKG_BGR_U8, true);
-    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(img, &err));
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
     enc->close();
     // 软解回读验证产物可解码
     VideoDecoderConfig dcfg;

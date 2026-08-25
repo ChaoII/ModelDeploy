@@ -34,9 +34,7 @@ public:
     bool runtime_available() const override;
     bool open(const std::string& url, int w, int h, int src_fps,
               const VideoEncoderConfig& c, std::string* err) override;
-    bool encode(const modeldeploy::vision::ImageData& image, std::string* err) override;
-    bool encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                              std::string* err) override;
+    bool encode(const VideoFrame& frame, std::string* err) override;
     bool encode_async(const modeldeploy::vision::ImageData& image) override;
     bool start_async(std::string* err) override;
     void stop_async() override;
@@ -70,8 +68,8 @@ private:
     bool start_pipeline(std::string* err);
     // GPU 直编（gpu_direct_input）专用：以 CUDA memory 包装设备 NV12 指针并推入 appsrc。
     // 返回 false 且 err 已设置。
-    bool encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                   std::string* err);
+    bool encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err);  // x264/软编 + BGR 打包
+    bool encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err);  // CUDA memory 直编
     void wait_eos_and_stop();  // 刷 EOS 后等待 EOS/错误消息（带超时）并停管道
     void teardown();           // 停管道并释放 pipeline/appsrc/bus
     void set_err(std::string* err, const std::string& msg);

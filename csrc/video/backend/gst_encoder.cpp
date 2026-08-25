@@ -274,8 +274,40 @@ bool GstEncoder::start_pipeline(std::string* err) {
     return true;
 }
 
-bool GstEncoder::encode(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool GstEncoder::encode(const VideoFrame& frame, std::string* err) {
     std::lock_guard<std::mutex> lk(mtx_);
+    if (!opened_ || !pipeline_ || !appsrc_) {
+        set_err(err, "not-opened");
+        return false;
+    }
+    const auto& image = frame.image;
+    if (image.width() != w_ || image.height() != h_) {
+        set_err(err, "dimension-mismatch");
+        return false;
+    }
+    switch (image.device()) {
+        case modeldeploy::Device::GPU:
+            if (!cfg_.gpu_direct_input || !encoder_is_nv_) {
+                set_err(err, "not-gpu-direct");
+                return false;
+            }
+            return encode_gpu(image, err);
+        case modeldeploy::Device::CPU:
+            if (cfg_.gpu_direct_input && encoder_is_nv_) {
+                set_err(err, "cpu-encode-not-in-gpu-direct");
+                return false;
+            }
+            return encode_cpu(image, err);
+        case modeldeploy::Device::TPU:
+            set_err(err, "device-tpu-unavailable");
+            return false;
+        default:
+            set_err(err, "unsupported-device");
+            return false;
+    }
+}
+
+bool GstEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err) {
     if (!opened_ || !pipeline_ || !appsrc_) {
         set_err(err, "not-opened");
         return false;
@@ -322,14 +354,7 @@ bool GstEncoder::encode(const modeldeploy::vision::ImageData& image, std::string
     return true;
 }
 
-bool GstEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                      std::string* err) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    return encode_from_gpu_nv12_impl(d_y, d_uv, w, h, err);
-}
-
-bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                           std::string* err) {
+bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err) {
 #ifdef HAVE_GSTCUDA
     if (!opened_ || !pipeline_ || !appsrc_ || !encoder_is_nv_) {
         set_err(err, "not-opened");
@@ -339,14 +364,18 @@ bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_
         set_err(err, "not-gpu-direct");
         return false;
     }
-    if (w != w_ || h != h_) {
+    if (image.width() != w_ || image.height() != h_) {
         set_err(err, "dimension-mismatch");
         return false;
     }
-    if (!d_y || !d_uv) {
-        set_err(err, "no-device-plane");
+    auto py = image.plane(0);
+    auto puv = image.plane(1);
+    if (!py.data || !puv.data || py.step != w_ || puv.step != w_) {
+        set_err(err, py.data && puv.data ? "device-step-mismatch" : "no-device-plane");
         return false;
     }
+    const uint8_t* d_y = py.data;
+    const uint8_t* d_uv = puv.data;
     // 会话内 gstcuda 上下文与 allocator（同一 GPU）——成员持有、teardown 释放，避免进程级状态污染
     if (!cuda_ctx_) {
         cuda_ctx_ = gst_cuda_context_new(0);
@@ -367,7 +396,7 @@ bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_
     // 紧凑连续设备 NV12（单块，base=d_y）→ GStreamer CUDA memory（memory:CUDAMemory）
     GstVideoInfo vi;
     gst_video_info_init(&vi);
-    gst_video_info_set_format(&vi, GST_VIDEO_FORMAT_NV12, w, h);
+    gst_video_info_set_format(&vi, GST_VIDEO_FORMAT_NV12, w_, h_);
     vi.fps_n = fps_;
     vi.fps_d = 1;
     GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc_, cuda_ctx_, nullptr, &vi,
@@ -394,10 +423,7 @@ bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_
     stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
     return true;
 #else
-    (void)d_y;
-    (void)d_uv;
-    (void)w;
-    (void)h;
+    (void)image;
     set_err(err, "device-encode-unsupported");
     return false;
 #endif
@@ -405,7 +431,7 @@ bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_
 
 bool GstEncoder::encode_async(const modeldeploy::vision::ImageData& image) {
     // Phase1 最小实现：无独立异步线程，退化为同步编码
-    return encode(image, nullptr);
+    return encode(VideoFrame{image, 0}, nullptr);
 }
 
 bool GstEncoder::start_async(std::string* err) {

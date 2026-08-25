@@ -21,9 +21,7 @@ public:
     bool runtime_available() const override;
     bool open(const std::string& url, int w, int h, int src_fps,
               const VideoEncoderConfig& c, std::string* err) override;
-    bool encode(const modeldeploy::vision::ImageData& image, std::string* err) override;
-    bool encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                              std::string* err) override;
+    bool encode(const VideoFrame& frame, std::string* err) override;
     bool encode_async(const modeldeploy::vision::ImageData& image) override;
     bool start_async(std::string* err) override;
     void stop_async() override;
@@ -39,6 +37,8 @@ private:
     bool init_encoder(int w, int h, int fps, std::string* err);
     // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi)
     bool configure_encoder(const std::string& name, int kind, int w, int h, int fps);
+    bool encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err);  // 软编（CPU BGR）
+    bool encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err);  // NVENC CUDA 直通
     bool setup_cuda_hw_frames(int w, int h);
     bool d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h, AVFrame* hw);
 #ifdef ENABLE_VAAPI

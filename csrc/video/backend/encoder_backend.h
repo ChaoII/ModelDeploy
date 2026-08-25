@@ -1,5 +1,6 @@
 #pragma once
 #include "csrc/video/video_common.h"
+#include "csrc/video/video_frame.h"
 #include "vision/common/image_data.h"
 #include <cstdint>
 #include <string>
@@ -12,9 +13,7 @@ public:
     virtual bool runtime_available() const = 0;
     virtual bool open(const std::string& output_url, int w, int h, int src_fps,
                       const VideoEncoderConfig& cfg, std::string* err) = 0;
-    virtual bool encode(const modeldeploy::vision::ImageData& image, std::string* err) = 0;
-    virtual bool encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                      std::string* err) = 0;
+    virtual bool encode(const VideoFrame& frame, std::string* err) = 0;
     virtual bool encode_async(const modeldeploy::vision::ImageData& image) = 0;
     virtual bool start_async(std::string* err) = 0;
     virtual void stop_async() = 0;

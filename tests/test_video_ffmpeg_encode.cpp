@@ -30,7 +30,7 @@ TEST_CASE("FFmpeg libx264 编码 mp4 → 回读验证", "[video][ffmpeg][integra
     memset(bgr, 128, sizeof(bgr));
     auto img = modeldeploy::vision::ImageData::from_raw(bgr, 64, 64, MdImageType::PKG_BGR_U8,
                                                         true);
-    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(img, &err));
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
     enc->close();
     // 用 Task3 解码器回读 out.mp4 验证帧数与尺寸
     VideoDecoderConfig dcfg;
@@ -55,7 +55,7 @@ TEST_CASE("FFmpeg auto + hw_accel=None → 仍 libx264 软编并可回读", "[vi
     std::string err;
     REQUIRE(enc->open("test_data/video/soft_out.mp4", 128, 128, 25, &err));
     auto img = make_solid(128, 128);
-    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(img, &err));
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
     enc->close();
     // 软解回读：libx264 产物是 h264，能解出帧
     VideoDecoderConfig dcfg;
@@ -90,7 +90,7 @@ TEST_CASE("FFmpeg h264_nvenc 硬编（CPU NV12）→ mp4 回读", "[video][hw][g
     std::string err;
     REQUIRE(enc->open("test_data/video/nvenc_out.mp4", W, H, 25, ecfg, &err));
     auto img = make_solid(W, H);
-    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(img, &err));
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
     enc->close();
     if (ff) REQUIRE(ff->used_hw());  // 确实走了 nvenc 硬编，而非静默回退软编
     // 软解回读验证产物

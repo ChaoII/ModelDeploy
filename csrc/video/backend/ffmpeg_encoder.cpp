@@ -328,20 +328,38 @@ bool FfmpegEncoder::open_output(const std::string& url) {
     return true;
 }
 
-bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool FfmpegEncoder::encode(const VideoFrame& frame, std::string* err) {
     if (!opened_ || !enc_ || !frame_) {
         set_err(err, "not-opened");
         return false;
     }
-    // GPU 直编会话（gpu_direct_input）编码器输入为 CUDA hw 帧，CPU BGR 直送会被误读为设备指针，
-    // 故 CPU encode() 不在该会话使用（gpu 直编统一走 encode_from_gpu_nv12）。
-    if (cfg_.gpu_direct_input && used_hw_) {
-        set_err(err, "cpu-encode-not-in-gpu-direct");
-        return false;
-    }
-    // 防越界：输入尺寸必须与 open 时一致，否则 sws_scale 按 w_×h_ 读取会越界
+    const auto& image = frame.image;
     if (image.width() != w_ || image.height() != h_) {
         set_err(err, "dimension-mismatch");
+        return false;
+    }
+    switch (image.device()) {
+        case modeldeploy::Device::GPU:
+            return encode_gpu(image, err);
+        case modeldeploy::Device::CPU:
+            return encode_cpu(image, err);
+        case modeldeploy::Device::TPU:
+            set_err(err, "device-tpu-unavailable");
+            return false;
+        default:
+            set_err(err, "unsupported-device");
+            return false;
+    }
+}
+
+bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err) {
+    if (!opened_ || !enc_ || !frame_) {
+        set_err(err, "not-opened");
+        return false;
+    }
+    // GPU 直编会话编码器输入为 CUDA hw 帧，CPU BGR 直送会被误读为设备指针 → 拒绝
+    if (cfg_.gpu_direct_input && used_hw_) {
+        set_err(err, "cpu-encode-not-in-gpu-direct");
         return false;
     }
     auto t0 = std::chrono::steady_clock::now();
@@ -411,8 +429,7 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
     return true;
 }
 
-bool FfmpegEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                         std::string* err) {
+bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err) {
     if (!opened_ || !enc_ || !pkt_) {
         set_err(err, "not-opened");
         return false;
@@ -422,14 +439,18 @@ bool FfmpegEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv
         set_err(err, "not-gpu-direct");
         return false;
     }
-    if (w != w_ || h != h_) {
+    if (image.width() != w_ || image.height() != h_) {
         set_err(err, "dimension-mismatch");
         return false;
     }
-    if (!d_y || !d_uv) {
-        set_err(err, "no-device-plane");
+    auto py = image.plane(0);
+    auto puv = image.plane(1);
+    if (!py.data || !puv.data || py.step != w_ || puv.step != w_) {
+        set_err(err, py.data && puv.data ? "device-step-mismatch" : "no-device-plane");
         return false;
     }
+    const uint8_t* d_y = py.data;
+    const uint8_t* d_uv = puv.data;
 #ifndef MODELDEPLOY_CUDA_DRV
     (void)d_y;
     (void)d_uv;
@@ -450,7 +471,7 @@ bool FfmpegEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv
         set_err(err, "hwframe-alloc-fail");
         return false;
     }
-    if (!d2d_copy_nv12(d_y, d_uv, w, h, hw)) {
+    if (!d2d_copy_nv12(d_y, d_uv, w_, h_, hw)) {
         av_frame_free(&hw);
         set_err(err, "d2d-copy-fail");
         return false;
@@ -536,7 +557,9 @@ bool FfmpegEncoder::d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w
 bool FfmpegEncoder::encode_async(const modeldeploy::vision::ImageData& image) {
     // Phase1 最小实现：无独立异步线程，退化为同步编码
     if (!opened_) return false;
-    return encode(image, nullptr);
+    VideoFrame vf;
+    vf.image = image;
+    return encode(vf, nullptr);
 }
 
 bool FfmpegEncoder::start_async(std::string* err) {
