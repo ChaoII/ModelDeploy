@@ -37,8 +37,9 @@ private:
     bool init_encoder(int w, int h, int fps, std::string* err);
     // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi)
     bool configure_encoder(const std::string& name, int kind, int w, int h, int fps);
-    bool encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err);  // 软编（CPU BGR）
-    bool encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err);  // NVENC CUDA 直通
+    // pts_ms：非 0=调用方注入时间戳（毫秒）；0=内部按帧序自增（CFR）
+    bool encode_cpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms, std::string* err);  // 软编（CPU BGR）
+    bool encode_gpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms, std::string* err);  // NVENC CUDA 直通
     bool setup_cuda_hw_frames(int w, int h);
     bool d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h, AVFrame* hw);
 #ifdef ENABLE_VAAPI

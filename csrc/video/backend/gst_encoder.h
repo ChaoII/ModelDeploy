@@ -68,8 +68,9 @@ private:
     bool start_pipeline(std::string* err);
     // GPU 直编（gpu_direct_input）专用：以 CUDA memory 包装设备 NV12 指针并推入 appsrc。
     // 返回 false 且 err 已设置。
-    bool encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err);  // x264/软编 + BGR 打包
-    bool encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err);  // CUDA memory 直编
+    // pts_ms：非 0=调用方注入时间戳（毫秒）；0=内部按帧序自增（CFR）
+    bool encode_cpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms, std::string* err);  // x264/软编 + BGR 打包
+    bool encode_gpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms, std::string* err);  // CUDA memory 直编
     void wait_eos_and_stop();  // 刷 EOS 后等待 EOS/错误消息（带超时）并停管道
     void teardown();           // 停管道并释放 pipeline/appsrc/bus
     void set_err(std::string* err, const std::string& msg);

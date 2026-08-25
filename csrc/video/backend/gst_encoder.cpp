@@ -291,13 +291,13 @@ bool GstEncoder::encode(const VideoFrame& frame, std::string* err) {
                 set_err(err, "not-gpu-direct");
                 return false;
             }
-            return encode_gpu(image, err);
+            return encode_gpu(image, frame.pts_ms, err);
         case modeldeploy::Device::CPU:
             if (cfg_.gpu_direct_input && encoder_is_nv_) {
                 set_err(err, "cpu-encode-not-in-gpu-direct");
                 return false;
             }
-            return encode_cpu(image, err);
+            return encode_cpu(image, frame.pts_ms, err);
         case modeldeploy::Device::TPU:
             set_err(err, "device-tpu-unavailable");
             return false;
@@ -307,7 +307,8 @@ bool GstEncoder::encode(const VideoFrame& frame, std::string* err) {
     }
 }
 
-bool GstEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool GstEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms,
+                            std::string* err) {
     if (!opened_ || !pipeline_ || !appsrc_) {
         set_err(err, "not-opened");
         return false;
@@ -337,9 +338,10 @@ bool GstEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std::st
             memcpy(dst + (size_t)y * row_bytes, src + (size_t)y * p.step, row_bytes);
     }
     gst_buffer_unmap(buf, &map);
-    GST_BUFFER_PTS(buf) = (pts_ * GST_SECOND) / fps_;
+    if (pts_ms != 0) GST_BUFFER_PTS(buf) = pts_ms * (GST_SECOND / 1000);
+    else GST_BUFFER_PTS(buf) = (pts_ * GST_SECOND) / fps_;
     GST_BUFFER_DURATION(buf) = GST_SECOND / fps_;
-    pts_++;
+    if (pts_ms == 0) pts_++;
     stats_.frames_in++;
 
     // push 默认阻塞：内部队列满时等下游消费，形成端到端背压
@@ -354,7 +356,8 @@ bool GstEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std::st
     return true;
 }
 
-bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms,
+                            std::string* err) {
 #ifdef HAVE_GSTCUDA
     if (!opened_ || !pipeline_ || !appsrc_ || !encoder_is_nv_) {
         set_err(err, "not-opened");
@@ -407,9 +410,10 @@ bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, std::st
     }
     GstBuffer* buf = gst_buffer_new();
     gst_buffer_append_memory(buf, mem);
-    GST_BUFFER_PTS(buf) = (pts_ * GST_SECOND) / fps_;
+    if (pts_ms != 0) GST_BUFFER_PTS(buf) = pts_ms * (GST_SECOND / 1000);
+    else GST_BUFFER_PTS(buf) = (pts_ * GST_SECOND) / fps_;
     GST_BUFFER_DURATION(buf) = GST_SECOND / fps_;
-    pts_++;
+    if (pts_ms == 0) pts_++;
     stats_.frames_in++;
 
     // push 默认阻塞：队列满时等下游消费（端到端背压）

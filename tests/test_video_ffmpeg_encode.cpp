@@ -104,3 +104,36 @@ TEST_CASE("FFmpeg h264_nvenc 硬编（CPU NV12）→ mp4 回读", "[video][hw][g
     while (dec->read_one_frame(&f, &err)) ++cnt;
     REQUIRE(cnt > 0);
 }
+
+TEST_CASE("FFmpeg encode 注入外部 pts_ms → 回读时间戳非降", "[video][ffmpeg][integration]") {
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::FFmpeg;
+    ecfg.hw_accel = HwAccel::None;
+    ecfg.set_codec("libx264").set_format("mp4");
+    auto enc = create_encoder_backend(ecfg);
+    REQUIRE(enc != nullptr);
+    std::string err;
+    REQUIRE(enc->open("test_data/video/ts_inject.mp4", 64, 64, 25, ecfg, &err));
+
+    std::vector<uint8_t> bgr(64 * 64 * 3, 128);  // 中性灰
+    auto img = modeldeploy::vision::ImageData::from_raw(bgr.data(), 64, 64, MdImageType::PKG_BGR_U8, true);
+    for (uint64_t ms = 100; ms < 900; ms += 100) {
+        VideoFrame vf{img, ms};
+        REQUIRE(enc->encode(vf, &err));
+    }
+    enc->close();
+
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::FFmpeg;
+    dcfg.hw_accel = HwAccel::None;
+    auto dec = VideoDecoder::create(dcfg);
+    REQUIRE(dec->open("test_data/video/ts_inject.mp4", &err));
+    uint64_t prev = 0;
+    int cnt = 0;
+    VideoFrame f;
+    while (dec->read_one_frame(&f, &err)) {
+        if (cnt++ == 0) prev = f.pts_ms;
+        else { REQUIRE(f.pts_ms >= prev); prev = f.pts_ms; }
+    }
+    REQUIRE(cnt >= 2);
+}

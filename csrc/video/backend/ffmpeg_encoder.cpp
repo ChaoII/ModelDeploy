@@ -340,9 +340,9 @@ bool FfmpegEncoder::encode(const VideoFrame& frame, std::string* err) {
     }
     switch (image.device()) {
         case modeldeploy::Device::GPU:
-            return encode_gpu(image, err);
+            return encode_gpu(image, frame.pts_ms, err);
         case modeldeploy::Device::CPU:
-            return encode_cpu(image, err);
+            return encode_cpu(image, frame.pts_ms, err);
         case modeldeploy::Device::TPU:
             set_err(err, "device-tpu-unavailable");
             return false;
@@ -352,7 +352,8 @@ bool FfmpegEncoder::encode(const VideoFrame& frame, std::string* err) {
     }
 }
 
-bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms,
+                               std::string* err) {
     if (!opened_ || !enc_ || !frame_) {
         set_err(err, "not-opened");
         return false;
@@ -405,7 +406,12 @@ bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std:
     }
 #endif
 
-    frame_->pts = pts_++;
+    if (pts_ms != 0) {
+        AVRational ms_tb{1, 1000};  // 毫秒 → 编码器 time_base（MSVC 不支持 C 复合字面量）
+        frame_->pts = av_rescale_q((int64_t)pts_ms, ms_tb, enc_->time_base);
+    } else {
+        frame_->pts = pts_++;
+    }
     stats_.frames_in++;
     if (avcodec_send_frame(enc_, frame_) < 0) {
         set_err(err, "send-frame-fail");
@@ -429,7 +435,8 @@ bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, std:
     return true;
 }
 
-bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, std::string* err) {
+bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms,
+                               std::string* err) {
     if (!opened_ || !enc_ || !pkt_) {
         set_err(err, "not-opened");
         return false;
@@ -476,7 +483,12 @@ bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, std:
         set_err(err, "d2d-copy-fail");
         return false;
     }
-    hw->pts = pts_++;
+    if (pts_ms != 0) {
+        AVRational ms_tb{1, 1000};  // 毫秒 → 编码器 time_base（MSVC 不支持 C 复合字面量）
+        hw->pts = av_rescale_q((int64_t)pts_ms, ms_tb, enc_->time_base);
+    } else {
+        hw->pts = pts_++;
+    }
 
     stats_.frames_in++;
     if (avcodec_send_frame(enc_, hw) < 0) {
