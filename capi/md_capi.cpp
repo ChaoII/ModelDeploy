@@ -13,6 +13,10 @@
 #include <array>
 #include <algorithm>
 #include <unordered_map>
+#include <cstdlib>
+#include <sstream>
+
+#include "runtime/backends/mnn/option.h"
 
 #include <opencv2/opencv.hpp>
 #ifdef HAVE_OPENCV_HIGHGUI
@@ -424,6 +428,115 @@ MDStatus md_option_set_model_buffer(MDOptionHandle h, const uint8_t* data, size_
 
 void md_option_set_trt_engine_path(MDOptionHandle h, const char* path) {
     static_cast<md_option_handle*>(h)->opt.ort_option.trt_engine_cache_path = path ? path : "";
+}
+
+namespace {
+
+/* MNN 枚举串→int：接受名称或数字（forward_type/precision/power_mode/memory_mode/gpu_mode） */
+bool set_mnn_enum(const char* value, int& out) {
+    if (!value) return false;
+    const std::string v = value;
+    char* e = nullptr; long num = strtol(v.c_str(), &e, 10);
+    if (e && *e == '\0') { out = (int)num; return true; }
+    static const struct { const char* name; int val; } kMnn[] = {
+        {"CPU", modeldeploy::mnn::MNN_FORWARD_CPU},{"AUTO", modeldeploy::mnn::MNN_FORWARD_AUTO},
+        {"METAL", modeldeploy::mnn::MNN_FORWARD_METAL},{"CUDA", modeldeploy::mnn::MNN_FORWARD_CUDA},
+        {"OPENCL", modeldeploy::mnn::MNN_FORWARD_OPENCL},{"OPENGL", modeldeploy::mnn::MNN_FORWARD_OPENGL},
+        {"VULKAN", modeldeploy::mnn::MNN_FORWARD_VULKAN},{"NN", modeldeploy::mnn::MNN_FORWARD_NN},
+        {"TUNING_NONE", modeldeploy::mnn::MNN_GPU_TUNING_NONE},{"TUNING_HEAVY", modeldeploy::mnn::MNN_GPU_TUNING_HEAVY},
+        {"TUNING_WIDE", modeldeploy::mnn::MNN_GPU_TUNING_WIDE},{"TUNING_NORMAL", modeldeploy::mnn::MNN_GPU_TUNING_NORMAL},
+        {"TUNING_FAST", modeldeploy::mnn::MNN_GPU_TUNING_FAST},{"MEMORY_BUFFER", modeldeploy::mnn::MNN_GPU_MEMORY_BUFFER},
+        {"MEMORY_IMAGE", modeldeploy::mnn::MNN_GPU_MEMORY_IMAGE},
+        {"Memory_Normal", modeldeploy::mnn::MNN_Memory_Normal},{"Memory_High", modeldeploy::mnn::MNN_Memory_High},
+        {"Memory_Low", modeldeploy::mnn::MNN_Memory_Low},{"Power_Normal", modeldeploy::mnn::MNN_Power_Normal},
+        {"Power_High", modeldeploy::mnn::MNN_Power_High},{"Power_Low", modeldeploy::mnn::MNN_Power_Low},
+        {"Precision_Normal", modeldeploy::mnn::MNN_Precision_Normal},{"Precision_High", modeldeploy::mnn::MNN_Precision_High},
+        {"Precision_Low", modeldeploy::mnn::MNN_Precision_Low},{"Precision_Low_BF16", modeldeploy::mnn::MNN_Precision_Low_BF16},
+    };
+    for (auto& kv : kMnn) if (v == kv.name) { out = kv.val; return true; }
+    return false;
+}
+
+bool parse_int(const char* s, int& out) {
+    char* e = nullptr; long v = strtol(s, &e, 10);
+    if (!e || *e) return false; out = (int)v; return true;
+}
+
+bool parse_bool(const char* s, bool& out) {
+    if (!s) return false; std::string v = s;
+    if (v == "1" || v == "true" || v == "True") { out = true; return true; }
+    if (v == "0" || v == "false" || v == "False") { out = false; return true; }
+    return false;
+}
+
+std::vector<int32_t> parse_shape_vec(const std::string& s) {
+    std::string t = s;
+    while (!t.empty() && (t.front() == '[' || t.front() == ' ')) t.erase(t.begin());
+    while (!t.empty() && (t.back() == ']' || t.back() == ' ')) t.pop_back();
+    std::vector<int32_t> out; std::stringstream ss(t); std::string item;
+    while (std::getline(ss, item, ',')) { if (!item.empty()) out.push_back(std::atoi(item.c_str())); }
+    return out;
+}
+
+bool set_trt_shape(modeldeploy::TrtBackendOption& o, const char* value) {
+    if (!value) return false;
+    std::string s = value; size_t pos = s.find(':');
+    if (pos == std::string::npos) return false;
+    std::string name = s.substr(0, pos), rest = s.substr(pos + 1);
+    std::string min, opt, max;
+    size_t i1 = rest.find(';');
+    if (i1 == std::string::npos) { min = rest; }
+    else {
+        min = rest.substr(0, i1); size_t i2 = rest.find(';', i1 + 1);
+        if (i2 == std::string::npos) { opt = rest.substr(i1 + 1); }
+        else { opt = rest.substr(i1 + 1, i2 - i1 - 1); max = rest.substr(i2 + 1); }
+    }
+    o.set_shape(name, parse_shape_vec(min), parse_shape_vec(opt), parse_shape_vec(max));
+    return true;
+}
+
+} // namespace
+
+MDStatus md_option_set_config(MDOptionHandle h, const char* ns, const char* key, const char* value) {
+    if (!h || !ns || !key || !value) { set_error("md_option_set_config: null arg"); return MD_ERR_INVALID_ARGUMENT; }
+    auto* o = static_cast<md_option_handle*>(h);
+    const std::string k = key;
+    int i; bool b;
+    if (!strcmp(ns, "ort")) {
+        if (k == "graph_optimization_level" && parse_int(value, i)) { o->opt.ort_option.graph_optimization_level = i; return MD_OK; }
+        if (k == "intra_op_num_threads" && parse_int(value, i)) { o->opt.ort_option.intra_op_num_threads = i; return MD_OK; }
+        if (k == "inter_op_num_threads" && parse_int(value, i)) { o->opt.ort_option.inter_op_num_threads = i; return MD_OK; }
+        if (k == "execution_mode" && parse_int(value, i)) { o->opt.ort_option.execution_mode = i; return MD_OK; }
+        if (k == "log_severity_level" && parse_int(value, i)) { o->opt.ort_option.log_severity_level = i; return MD_OK; }
+        if (k == "enable_trt" && parse_bool(value, b)) { o->opt.ort_option.enable_trt = b; return MD_OK; }
+        if (k == "trt_engine_cache_path") { o->opt.ort_option.trt_engine_cache_path = value; return MD_OK; }
+        if (k == "optimized_model_filepath") { o->opt.ort_option.optimized_model_filepath = value; return MD_OK; }
+        if (k == "trt_min_shape") { o->opt.ort_option.trt_min_shape = value; return MD_OK; }
+        if (k == "trt_opt_shape") { o->opt.ort_option.trt_opt_shape = value; return MD_OK; }
+        if (k == "trt_max_shape") { o->opt.ort_option.trt_max_shape = value; return MD_OK; }
+    } else if (!strcmp(ns, "mnn")) {
+        int tmp;
+        if (k == "forward_type" && set_mnn_enum(value, tmp)) { o->opt.mnn_option.forward_type = static_cast<modeldeploy::mnn::MNNForwardType>(tmp); return MD_OK; }
+        if (k == "precision" && set_mnn_enum(value, tmp)) { o->opt.mnn_option.precision = static_cast<modeldeploy::mnn::PrecisionMode>(tmp); return MD_OK; }
+        if (k == "power_mode" && set_mnn_enum(value, tmp)) { o->opt.mnn_option.power_mode = static_cast<modeldeploy::mnn::PowerMode>(tmp); return MD_OK; }
+        if (k == "memory_mode" && set_mnn_enum(value, tmp)) { o->opt.mnn_option.memory_mode = static_cast<modeldeploy::mnn::MemoryMode>(tmp); return MD_OK; }
+        if (k == "gpu_mode" && set_mnn_enum(value, o->opt.mnn_option.gpu_mode)) return MD_OK;
+        if (k == "cache_file_path") { o->opt.mnn_option.cache_file_path = value; return MD_OK; }
+    } else if (!strcmp(ns, "trt")) {
+        if (k == "max_batch_size" && parse_int(value, i)) { o->opt.trt_option.max_batch_size = static_cast<size_t>(i); return MD_OK; }
+        if (k == "max_workspace_size") { char* e = nullptr; unsigned long long v = strtoull(value, &e, 10); if (e && !*e) { o->opt.trt_option.max_workspace_size = v; return MD_OK; } }
+        if (k == "enable_log_info" && parse_bool(value, b)) { o->opt.trt_option.enable_log_info = b; return MD_OK; }
+        if (k == "enable_pinned_memory" && parse_bool(value, b)) { o->opt.trt_option.enable_pinned_memory = b; return MD_OK; }
+        if (k == "cache_file_path") { o->opt.trt_option.cache_file_path = value; return MD_OK; }
+        if (k == "min_shape" || k == "opt_shape" || k == "max_shape") { set_trt_shape(o->opt.trt_option, value); return MD_OK; }
+    } else if (!strcmp(ns, "sophgo")) {
+        if (k == "bmodel_path") { o->opt.sophgo_option.bmodel_path = value; return MD_OK; }
+        if (k == "use_device_input" && parse_bool(value, b)) { o->opt.sophgo_option.use_device_input = b; return MD_OK; }
+    } else {
+        set_error_fmt("md_option_set_config: unknown ns '%s'", ns); return MD_ERR_INVALID_ARGUMENT;
+    }
+    set_error_fmt("md_option_set_config: unknown key '%s' in ns '%s'", key, ns);
+    return MD_ERR_INVALID_ARGUMENT;
 }
 
 /* ==================== 图像 ==================== */
