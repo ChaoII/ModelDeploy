@@ -3559,6 +3559,7 @@ MDDrawOptions default_draw_options() {
     opt.font_size = 14;
     opt.alpha = 0.15;
     opt.save_result = 0;
+    opt.show_attr = 1;
     return opt;
 }
 
@@ -3713,7 +3714,11 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
             case MD_RES_ATTR: {
                 auto* d = raw_result<AttributeResult>(rh);
                 if (!d) return MD_ERR_INVALID_ARGUMENT;
-                modeldeploy::vision::vis_attr(image, d->v, threshold, label_map, font_path, font_size, alpha, save);
+                std::vector<int> abnormal_ids;
+                if (opt.abnormal_ids && opt.abnormal_ids_size > 0)
+                    abnormal_ids.assign(opt.abnormal_ids, opt.abnormal_ids + opt.abnormal_ids_size);
+                modeldeploy::vision::vis_attr(image, d->v, threshold, label_map, font_path, font_size, alpha,
+                                              save, abnormal_ids, opt.show_attr != 0);
                 return MD_OK;
             }
             case MD_RES_CLASSIFICATION: {

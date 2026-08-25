@@ -28,6 +28,12 @@ namespace ModelDeploy
         /// <summary>是否保存绘制结果为 vis_result.jpg。</summary>
         public bool SaveResult { get; set; } = false;
 
+        /// <summary>异常对象索引列表（仅人员属性生效）：命中则该对象画红框，否则绿框（默认空=全绿）。</summary>
+        public List<int> AbnormalIds { get; set; } = new();
+
+        /// <summary>是否绘制属性文本（仅人员属性生效，默认 true）。</summary>
+        public bool ShowAttr { get; set; } = true;
+
         /// <summary>转换为原生 MDDrawOptions（label_map/font 由调用方负责 FreeNative 释放）。</summary>
         internal MDDrawOptions ToNative()
         {
@@ -37,6 +43,7 @@ namespace ModelDeploy
                 font_size = FontSize,
                 alpha = Alpha,
                 save_result = SaveResult ? 1 : 0,
+                show_attr = ShowAttr ? 1 : 0,
             };
 
             // 字体路径 -> UTF-8 指针
@@ -62,6 +69,17 @@ namespace ModelDeploy
                 native.label_map_size = new UIntPtr((uint)items.Length);
             }
 
+            // AbnormalIds -> int[]（仅 ATTR）
+            if (AbnormalIds != null && AbnormalIds.Count > 0)
+            {
+                var arr = AbnormalIds.ToArray();
+                var ids = Marshal.AllocHGlobal(sizeof(int) * arr.Length);
+                for (int j = 0; j < arr.Length; j++)
+                    Marshal.WriteInt32(IntPtr.Add(ids, j * sizeof(int)), arr[j]);
+                native.abnormal_ids = ids;
+                native.abnormal_ids_size = new UIntPtr((uint)arr.Length);
+            }
+
             return native;
         }
 
@@ -81,6 +99,11 @@ namespace ModelDeploy
                 Marshal.FreeHGlobal(native.label_map);
             }
             if (native.font_path != IntPtr.Zero) Marshal.FreeHGlobal(native.font_path);
+            if (native.abnormal_ids != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(native.abnormal_ids);
+                native.abnormal_ids = IntPtr.Zero;
+            }
         }
     }
 }

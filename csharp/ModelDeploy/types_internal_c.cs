@@ -178,6 +178,9 @@ namespace ModelDeploy
             public int font_size;
             public double alpha;
             public int save_result;
+            public IntPtr abnormal_ids;   // int*（仅 ATTR）
+            public UIntPtr abnormal_ids_size;
+            public int show_attr;         // 非 0 绘制属性文本（默认 1）
         }
 
         /* ==================== 结果项结构（blittable：数组式 getter 返回其数组） ==================== */

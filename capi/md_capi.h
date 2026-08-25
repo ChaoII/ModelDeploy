@@ -626,6 +626,10 @@ typedef struct MDDrawOptions {
     int font_size;               /* 默认 14 */
     double alpha;                /* 半透明混合系数（默认 0.15） */
     int save_result;             /* 非 0 保存 vis_result.jpg */
+    /* 以下仅对 MD_RES_ATTR 生效（透传 C++ vis_attr 最后两参） */
+    const int* abnormal_ids;     /* 异常对象索引列表（命中画红框，否则绿框），可为 NULL */
+    size_t abnormal_ids_size;    /* abnormal_ids 条数 */
+    int show_attr;               /* 非 0 绘制属性文本（默认 1） */
 } MDDrawOptions;
 
 /* 把预测结果就地绘制到图像上（内部调用 C++ vis_det/vis_obb/vis_pose/vis_ocr/...）。

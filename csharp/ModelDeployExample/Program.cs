@@ -152,7 +152,7 @@ static class Program
         Dictionary<int, string> dict = new Dictionary<int, string>
             { { 0, "傻话" }, { 1, "雷达" }, { 2, "哈拉" }, { 3, "糍粑" }, { 4, "索拉" } };
 
-        result.Draw(image, new DrawOptions { Threshold = 0.25, FontSize = 1, Alpha = 0.15, LabelMap = dict });
+        result.Draw(image, new DrawOptions { Threshold = 0.25, FontSize = 1, Alpha = 0.15, LabelMap = dict, AbnormalIds = new List<int> { 0, 1 } });
         image.Save("pedattr_annotated.jpg");
         image.Show();
         Console.WriteLine("visualized -> pedattr_annotated.jpg");
