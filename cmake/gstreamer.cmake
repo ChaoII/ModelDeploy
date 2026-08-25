@@ -35,6 +35,32 @@ if (NOT GSTREAMER_INCLUDE_DIR AND EXISTS "${GSTREAMER_ROOT}/include/gstreamer-1.
     endforeach ()
 endif ()
 
+# GStreamer CUDA（gstnvcodec / gstcuda）能力探测：GSTREAMER_HAS_CUDA=ON 时，
+# gst/cuda 头链会 include <cuda.h>/<cudaD3D11.h>（需要 CUDA 工具包 include 目录与 Windows SDK），
+# 且需链接 gstcuda-1.0。
+set(GSTREAMER_HAS_CUDA OFF)
+if (EXISTS "${GSTREAMER_ROOT}/include/gstreamer-1.0/gst/cuda/gstcudamemory.h"
+    AND EXISTS "${GSTREAMER_ROOT}/include/gstreamer-1.0/gst/video/video.h")
+    find_library(GSTREAMER_GSTCUDA_LIB NAMES gstcuda-1.0 gstcuda-1.0.lib
+            PATHS ${GSTREAMER_ROOT}/lib NO_DEFAULT_PATH)
+    # CUDA include：优先复用 WITH_GPU 已探测到的 CUDAToolkit 目录，否则退回常见默认路径。
+    if (CUDAToolkit_INCLUDE_DIRS)
+        set(GSTREAMER_CUDA_INCLUDE ${CUDAToolkit_INCLUDE_DIRS})
+    else ()
+        find_path(GSTREAMER_CUDA_INCLUDE cuda.h
+                PATHS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/include"
+                NO_DEFAULT_PATH)
+    endif ()
+    if (GSTREAMER_GSTCUDA_LIB AND GSTREAMER_CUDA_INCLUDE)
+        set(GSTREAMER_HAS_CUDA ON)
+        list(APPEND GSTREAMER_INCLUDE_DIR ${GSTREAMER_CUDA_INCLUDE})
+        list(APPEND GSTREAMER_LIBS ${GSTREAMER_GSTCUDA_LIB})
+        message(STATUS "GStreamer CUDA (gstcuda) enabled: ${GSTREAMER_CUDA_INCLUDE}")
+    else ()
+        message(STATUS "GStreamer CUDA (gstcuda) unavailable (gstCUDA lib/include not found)")
+    endif ()
+endif ()
+
 if (NOT GSTREAMER_INCLUDE_DIR OR NOT GSTREAMER_LIBS)
     message(WARNING "GStreamer not found at ${GSTREAMER_ROOT}; ENABLE_GSTREAMER disabled")
     set(ENABLE_GSTREAMER OFF)

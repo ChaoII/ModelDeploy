@@ -53,10 +53,23 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
     for (unsigned i = 0; i < fmt_->nb_streams; ++i) {
         auto* cp = fmt_->streams[i]->codecpar;
         if (cp->codec_type != AVMEDIA_TYPE_VIDEO) continue;
-        // 硬解选择：仅已显式/自动请求 CUDA、非设备直通、且未强制软解时尝试 CUVID；否则（含降级）回软解。
+        // 硬解选择：仅已显式/自动请求 CUDA 且未强制软解时尝试 CUVID；否则（含降级）回软解。
         bool used_hw = false;
-        if (!force_soft_ && !cfg_.device_only &&
-            (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
+        bool want_hw = !force_soft_ &&
+                       (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda);
+        if (want_hw && cfg_.device_only) {
+            // 设备直通：CUDA 硬解 → AV_PIX_FMT_CUDA 设备帧，绝不出主机。
+            const std::string hw_name = hw_decoder_name(cp->codec_id);
+            const AVCodec* hwc =
+                hw_name.empty() ? nullptr : avcodec_find_decoder_by_name(hw_name.c_str());
+            if (hwc && setup_cuda_device_decoder(cp, hwc)) {
+                used_hw = true;
+                device_only_active_ = true;
+            } else {
+                // 设备直通不可行（无 CUDA 硬件/解码器/设备帧输出）报设备失败，供上层 SKIP 判定。
+                err_ = "cuda-device-unavailable";
+            }
+        } else if (want_hw && !cfg_.device_only) {
             std::string hw_name = hw_decoder_name(cp->codec_id);
             const AVCodec* hwc = nullptr;
             if (!hw_name.empty()) hwc = avcodec_find_decoder_by_name(hw_name.c_str());
@@ -74,7 +87,15 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
                 err_ = "hw-decoder-not-found-fallback-soft";  // 无对应 CUVID 名/解码器：降级软解
             }
         }
-        if (!used_hw) {
+        // 设备直通模式不提供软解回退：解码器打开为设备帧是硬性要求，失败即整体失败。
+        if (cfg_.device_only) {
+            if (!used_hw) {
+                set_err(err, "cuda-device-unavailable");
+                cleanup();
+                state_ = State::Error;
+                return false;
+            }
+        } else if (!used_hw) {
             // 软解（默认路径或硬解降级）。cuvid 装不上/不存在不挂会话，回退软解。
             const AVCodec* dec = avcodec_find_decoder(cp->codec_id);
             if (!dec) {
@@ -127,6 +148,33 @@ bool FfmpegDecoder::read_one_frame_locked(VideoFrame* out, std::string* err) {
     while (true) {
         int ret = avcodec_receive_frame(ctx_, frame_);
         if (ret == 0) {
+            if (device_only_active_) {
+                // 设备直通：解码帧必须是 AV_PIX_FMT_CUDA（CUDA 设备内存，NV12 双平面）。
+                // data[0]=Y / data[1]=UV 为设备可寻址指针，linesize[] 为各平面步长，不回主机。
+                if (frame_->format != AV_PIX_FMT_CUDA || !frame_->data[0] || !frame_->data[1]) {
+                    set_err(err, "device-frame-unavailable");
+                    return false;
+                }
+                // 把 hw frame ref 到自有 owner，保证 ImageData 生命周期内设备缓冲有效
+                std::shared_ptr<AVFrame> owned(av_frame_alloc(),
+                                               [](AVFrame* f) { av_frame_free(&f); });
+                if (av_frame_ref(owned.get(), frame_) < 0) {
+                    set_err(err, "ref-fail");
+                    return false;
+                }
+                IPlaneView v{owned->data[0], owned->linesize[0],
+                             owned->data[1], owned->linesize[1],
+                             (int)owned->width, (int)owned->height, Device::GPU, owned};
+                out->image = make_image_from_planes_view(v);
+                auto* st = fmt_->streams[vstream_];
+                out->pts_ms = (frame_->pts == AV_NOPTS_VALUE)
+                                  ? 0
+                                  : static_cast<uint64_t>(
+                                        av_rescale_q(frame_->pts, st->time_base, AVRational{1, 1000}));
+                stats_.frames_out++;
+                delivered_frames_++;
+                return true;
+            }
             // 解码器输出可能是 NV12（硬解/部分软解）或 yuv420p 等。非 NV12 一律经
             // swscale 转成 NV12，避免用 data[0]/data[1] 直接构造平面时静默丢掉 V 平面。
             AVFrame* plane_src = nullptr;
@@ -170,7 +218,8 @@ bool FfmpegDecoder::read_one_frame_locked(VideoFrame* out, std::string* err) {
                 // 运行期 0 帧回退：本届确实走了硬解（used_hw_）却尚未交付任何一帧就 EOF
                 // （如 cuvid 运行时对特殊分辨率 CUDA_ERROR_NOT_SUPPORTED），且尚未回退过 →
                 // 释放当前上下文，以强制软解重开同一 URL 并继续读取（降级，不计 error_count）。
-                if (used_hw_ && delivered_frames_ == 0 && !hw_fallback_done_) {
+                // 设备直通模式下不做软解回退（device_only 要求输出设备帧）。
+                if (used_hw_ && !device_only_active_ && delivered_frames_ == 0 && !hw_fallback_done_) {
                     hw_fallback_done_ = true;      // 至多一次，防死循环
                     cleanup();                     // 已持锁：cleanup()/open_locked() 均不重复加锁
                     force_soft_ = true;            // 本次重开强制走软解
@@ -209,6 +258,26 @@ std::string FfmpegDecoder::hw_decoder_name(int codec_id) const {
         case AV_CODEC_ID_AV1: return "av1_cuvid";
         default: return "";  // 其它编解码器无 CUVID 硬解名
     }
+}
+
+bool FfmpegDecoder::setup_cuda_device_decoder(AVCodecParameters* cp, const AVCodec* hwc) {
+    AVBufferRef* hw = nullptr;
+    if (av_hwdevice_ctx_create(&hw, AV_HWDEVICE_TYPE_CUDA, nullptr, nullptr, 0) != 0) return false;
+    ctx_ = avcodec_alloc_context3(hwc);
+    if (!ctx_) {
+        av_buffer_unref(&hw);
+        return false;
+    }
+    avcodec_parameters_to_context(ctx_, cp);
+    // 挂上 CUDA 硬件设备上下文：h264_cuvid 等解码器据此输出 AV_PIX_FMT_CUDA 设备帧
+    ctx_->hw_device_ctx = av_buffer_ref(hw);
+    av_buffer_unref(&hw);  // ctx_ 持有一份引用
+    if (avcodec_open2(ctx_, hwc, nullptr) != 0) {
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    return true;
 }
 
 bool FfmpegDecoder::convert_to_nv12() {
@@ -297,6 +366,7 @@ void FfmpegDecoder::cleanup() {
     h_ = 0;
     opened_ = false;
     used_hw_ = false;
+    device_only_active_ = false;
 }
 
 void FfmpegDecoder::set_err(std::string* err, const std::string& msg) {

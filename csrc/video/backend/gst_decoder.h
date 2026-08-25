@@ -45,6 +45,10 @@ private:
     void cleanup();                 // 重置尺寸/状态（不释放管道）
     void close_pipeline();          // 停管道并释放 pipeline/appsink
     bool query_caps_locked(int timeout_ms);  // 从 appsink sink pad 的 current caps 取宽高/帧率
+#ifdef HAVE_GSTCUDA
+    // 设备直通：构建 nvh264dec → CUDA memory → appsink(memory:CUDAMemory) 管道；成功置 device_only_active_
+    bool build_device_pipeline_locked(const std::string& url, std::string* err);
+#endif
     void set_err(std::string* err, const std::string& msg);
 
 #ifdef ENABLE_GSTREAMER
@@ -59,6 +63,7 @@ private:
     std::string err_;
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
+    bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
 };
 
 } // namespace modeldeploy::video

@@ -65,7 +65,8 @@ if(BUILD_VIDEO)
         test_video_factory.cpp
         test_video_ffmpeg_decode.cpp
         test_video_ffmpeg_encode.cpp
-        test_video_pipeline.cpp)
+        test_video_pipeline.cpp
+        test_video_gpu_decode.cpp)
     if(ENABLE_GSTREAMER)
         list(APPEND TEST_SOURCES test_video_gst_decode.cpp test_video_gst_encode.cpp)
     endif()

@@ -19,6 +19,8 @@ build_tdc_gpu
 build_tdc_py
 build_linux_gpu
 build_linux_rel
+build_gpu
+build_gpu_vs
 design
 python/modeldeploy/__init__.py
 dist

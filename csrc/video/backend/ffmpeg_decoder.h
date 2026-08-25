@@ -12,6 +12,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
+#include <libavutil/hwcontext.h>
 }
 
 namespace modeldeploy::video {
@@ -51,6 +52,9 @@ private:
     void cleanup();
     // 依据 codec_id 映射 CUVID 硬解名（H264/HEVC/AV1）；其它编解码器返回空串（无硬解名）
     std::string hw_decoder_name(int codec_id) const;
+    // 设备直通：以 CUDA 硬件设备上下文打开 hwc（h264_cuvid 等），使解码输出 AV_PIX_FMT_CUDA 设备帧。
+    // 成功返回 true 且 ctx_ 持有 hw_device_ctx 引用；否则返回 false（不留下 ctx_）。
+    bool setup_cuda_device_decoder(AVCodecParameters* cp, const AVCodec* hwc);
     // 把 frame_（非 NV12）经 swscale 转成 NV12 存到 sws_frame_；成功返回 true
     bool convert_to_nv12();
     void set_err(std::string* err, const std::string& msg);
@@ -73,6 +77,7 @@ private:
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
     bool used_hw_ = false;  // 本次会话是否实际起到硬件（CUVID）解码
+    bool device_only_active_ = false;  // 设备直通模式：解码输出保持 GPU 设备帧（AV_PIX_FMT_CUDA）
     bool force_soft_ = false;            // 强制软解标志（运行期回退重开时置位，跳过硬件选择）
     bool hw_fallback_done_ = false;      // 运行期 0 帧回退软解是否已发生（至多一次）
     uint64_t delivered_frames_ = 0;      // 本次会话已交付的帧数（每次成功交付时同步 +1）

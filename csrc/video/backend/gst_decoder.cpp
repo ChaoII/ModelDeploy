@@ -6,6 +6,18 @@
 #include <gst/app/gstappsink.h>
 #include <gst/video/video.h>
 #include <chrono>
+// GStreamer CUDA 设备帧映射：gst_video_frame_map 以 GST_MAP_CUDA 把 CUDA memory 映为设备平面。
+// gst/cuda/gstcudamemory.h 链会夹带 cudaGL.h（MSVC 上与 GL/gl.h 冲突），故只引用宏值，不引该头。
+// GST_MAP_CUDA = GST_MAP_FLAG_LAST << 1（GStreamer ≤1.30 恒定）。
+#ifdef HAVE_GSTCUDA
+// GST_MAP_CUDA = GST_MAP_FLAG_LAST(1<<16) << 1 = 1<<17（GStreamer ≤1.30 恒定）
+#ifndef GST_MAP_CUDA
+#define GST_MAP_CUDA ((GstMapFlags)(GST_MAP_FLAG_LAST << 1))
+#endif
+#ifndef GST_MAP_READ_CUDA
+#define GST_MAP_READ_CUDA ((GstMapFlags)(GST_MAP_READ | GST_MAP_CUDA))
+#endif
+#endif
 #endif
 
 namespace modeldeploy::video {
@@ -62,6 +74,22 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         state_ = State::Error;
         return false;
     }
+    // 设备直通：解码输出保持 CUDA 设备帧（nvh264dec → CUDA memory）
+    if (cfg_.device_only && (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
+#ifdef HAVE_GSTCUDA
+        if (!build_device_pipeline_locked(url, err)) {
+            state_ = State::Error;
+            return false;
+        }
+        opened_ = true;
+        state_ = State::Running;
+        return true;
+#else
+        set_err(err, "nvcodec-not-supported");  // 未编译 gstnvcodec/CUDA 支持 → 能力不足
+        state_ = State::Error;
+        return false;
+#endif
+    }
     std::string launch = "filesrc location=\"" + url +
                          "\" ! decodebin ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
@@ -93,6 +121,45 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
     state_ = State::Running;
     return true;
 }
+
+#ifdef HAVE_GSTCUDA
+bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    // 检查 nvh264dec 插件可实例化；缺失 → 能力不足（SKIP 判定前缀 nvcodec-）
+    GstElementFactory* f = gst_element_factory_find("nvh264dec");
+    if (!f) {
+        set_err(err, "nvcodec-plugin-unavailable");
+        return false;
+    }
+    gst_object_unref(f);
+    // 显式 nvh264dec 解码 → 设备 CUDA memory，appsink 保持 memory:CUDAMemory（不做 D2H）。
+    std::string launch = "filesrc location=\"" + url +
+                         "\" ! h264parse ! nvh264dec "
+                         "! appsink name=sink caps=\"video/x-raw(memory:CUDAMemory),format=NV12\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "nvcodec-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    device_only_active_ = true;
+    return true;
+}
+#endif // HAVE_GSTCUDA
 
 bool GstDecoder::query_caps_locked(int timeout_ms) {
     if (!appsink_) return false;
@@ -150,6 +217,43 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
     if (GST_VIDEO_INFO_FPS_N(&info) > 0 && GST_VIDEO_INFO_FPS_D(&info) > 0)
         fps_ = static_cast<double>(GST_VIDEO_INFO_FPS_N(&info)) / GST_VIDEO_INFO_FPS_D(&info);
 
+    if (device_only_active_) {
+#ifdef HAVE_GSTCUDA
+        // 设备直通：以 GST_MAP_CUDA 把 CUDA memory 映射为设备平面（不回主机）。
+        // frame.data[0]=Y / frame.data[1]=UV 为 CUDA 设备指针，stride 为各平面步长。
+        GstVideoFrame frame;
+        if (!gst_video_frame_map(&frame, &info, buffer, GST_MAP_READ_CUDA)) {
+            set_err(err, "nvcodec-map-fail");
+            gst_sample_unref(sample);
+            return false;
+        }
+        if (!frame.data[0] || !frame.data[1]) {
+            set_err(err, "nvcodec-no-plane");
+            gst_video_frame_unmap(&frame);
+            gst_sample_unref(sample);
+            return false;
+        }
+        std::shared_ptr<void> owner(
+            frame.data[0],
+            [frame, sample](void*) mutable {
+                gst_video_frame_unmap(&frame);
+                gst_sample_unref(sample);
+            });
+        IPlaneView v{static_cast<const uint8_t*>(frame.data[0]), frame.info.stride[0],
+                     static_cast<const uint8_t*>(frame.data[1]), frame.info.stride[1],
+                     w_, h_, Device::GPU, owner};
+        out->image = make_image_from_planes_view(v);
+        out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
+                          ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
+                          : 0;
+        stats_.frames_out++;
+        return true;
+#else
+        set_err(err, "nvcodec-not-supported");
+        gst_sample_unref(sample);
+        return false;
+#endif
+    }
     GstVideoFrame frame;
     if (!gst_video_frame_map(&frame, &info, buffer, GST_MAP_READ)) {
         set_err(err, "map-fail");
@@ -222,6 +326,7 @@ void GstDecoder::cleanup() {
     h_ = 0;
     fps_ = 0.0;
     opened_ = false;
+    device_only_active_ = false;
 }
 
 void GstDecoder::close_pipeline() {
