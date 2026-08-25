@@ -137,6 +137,10 @@ MD_CAPI_EXPORT MDStatus md_option_set_backend(MDOptionHandle, MDBackend);
 MD_CAPI_EXPORT MDStatus md_option_set_cpu_threads(MDOptionHandle, int n);
 MD_CAPI_EXPORT MDStatus md_option_set_fp16(MDOptionHandle, int enable);
 MD_CAPI_EXPORT MDStatus md_option_set_external_stream(MDOptionHandle, void* stream);
+/*
+ * 加密装载会就地写入该 option handle 的 model_buffer/后端状态；带密码的 option handle
+ * 建议单模型使用，避免复用同一 handle 创建多个模型时残留污染。
+ */
 MD_CAPI_EXPORT MDStatus md_option_set_password(MDOptionHandle, const char* pwd);
 MD_CAPI_EXPORT MDStatus md_option_set_model_path(MDOptionHandle, const char* path, const char* password);
 MD_CAPI_EXPORT MDStatus md_option_set_model_buffer(MDOptionHandle, const uint8_t* data, size_t len, const char* fmt);
@@ -202,6 +206,7 @@ MD_CAPI_EXPORT MDStatus md_image_plane_ptrs(MDImageHandle, MDDevice* dev, void**
  *      insightface:  det.onnx|rec.onnx|lmk2d.onnx|lmk3d.onnx[|genderage.onnx]
  *      ASR:        model.onnx|tokens.txt
  *      TTS:        model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
+ *  - 加密：本期仅支持单段（不含 '|' 分隔符）加密模型；多段管子模型的加密尚未生效，仅单段可靠。
  */
 MD_CAPI_EXPORT MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
                          const char* model_path, const MDOptionHandle opt);
