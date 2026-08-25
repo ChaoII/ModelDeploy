@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using ModelDeploy;
-using ModelDeploy;
 using ModelDeploy.Models;
 
 namespace TestModelDeploy;
@@ -22,7 +21,8 @@ static class Program
 
         // 绘制：矩形 + 多边形 + 文本（就地修改图像）
         Draw.DrawRect(image, 100, 100, 200, 200, 255, 0, 0, 0.5f);
-        Draw.DrawPolygon(image, new float[] { 300, 300, 380, 320, 350, 400, 290, 380 }, new float[] { 300, 300, 320, 380, 400, 350, 380, 290 }, 0, 255, 0, 0.5f);
+        Draw.DrawPolygon(image, new float[] { 300, 300, 380, 320, 350, 400, 290, 380 },
+            new float[] { 300, 300, 320, 380, 400, 350, 380, 290 }, 0, 255, 0, 0.5f);
         Draw.DrawText(image, 100, 340, "Hello ModelDeploy", null, 24, 255, 255, 255);
 
         // 克隆 + 裁剪
@@ -54,8 +54,8 @@ static class Program
         det.SetConfThreshold(0.4);
         det.SetNmsThreshold(0.45);
         Console.WriteLine("params: " + string.Join(", ", det.ParamNames())
-            + " | conf_threshold type=" + det.ParamType("conf_threshold")
-            + " nms_threshold type=" + det.ParamType("nms_threshold"));
+                                     + " | conf_threshold type=" + det.ParamType("conf_threshold")
+                                     + " nms_threshold type=" + det.ParamType("nms_threshold"));
 
         // 纯推理：Prediction<T> 同时是可枚举的列表（读结果）
         using var result = det.Predict(image);
@@ -128,6 +128,36 @@ static class Program
             Console.WriteLine(r);
     }
 
+    static void TestPedestrianAttribute()
+    {
+        var dir = Path.Combine(TestDataPath, "test_models/onnx");
+        // 两参重载：det 模型路径 + 分类模型路径（内部拼成 capi 的 "det|cls"；onnx/engine/mnn 皆可）
+        using var ped = new PedestrianAttributeModel(
+            Path.Combine(dir, "zhgd_det.onnx"),
+            Path.Combine(dir, "zhgd_ml.onnx"),
+            CpuOrt());
+        ped.SetInputSize(1280, 1280);
+        ped.SetClsInputSize(192, 256);
+        ped.SetClsBatchSize(8); // >0 固定 / -1 自动；Sophgo batch=1 静态
+        ped.SetDetThreshold(0.25);
+
+        using var image = VisionImage.Read(
+            Path.Combine(TestDataPath, "test_images/test_pedestrian_attribute_scale.jpg"));
+        using var result = ped.Predict(image); // Prediction<AttributeResult>
+        Console.WriteLine($"persons: {result.Count}");
+        foreach (var r in result)
+            Console.WriteLine($"  {r.Box} score={r.BoxScore:F3} attrs=[{string.Join(", ", r.AttrScores)}]");
+        // 绘制：句柄直达 C++ vis_attr（框 + 属性文本），就地在 image 上画
+
+        Dictionary<int, string> dict = new Dictionary<int, string>
+            { { 0, "傻话" }, { 1, "雷达" }, { 2, "哈拉" }, { 3, "糍粑" }, { 4, "索拉" } };
+
+        result.Draw(image, new DrawOptions { Threshold = 0.25, FontSize = 1, Alpha = 0.15, LabelMap = dict });
+        image.Save("pedattr_annotated.jpg");
+        image.Show();
+        Console.WriteLine("visualized -> pedattr_annotated.jpg");
+    }
+
     static void TestSenseVoice()
     {
         var dir = Path.Combine(TestDataPath, "test_models/onnx/sense_voice");
@@ -158,7 +188,8 @@ static class Program
 
     static void Main(string[] args)
     {
-        TestDetection();
+        // TestDetection();
+        TestPedestrianAttribute();
         // TestImage();
         // TestClassification();
         // TestPose();

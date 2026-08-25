@@ -7,7 +7,7 @@
         <Nullable>enable</Nullable>
         <RootNamespace>TestModelDeploy</RootNamespace>
         <!-- SDK 构建目录：默认视觉版（build_tdc），音频版传 -p:ModelDeploySdkDir=build_audio -->
-        <ModelDeploySdkDir Condition="'$(ModelDeploySdkDir)'==''">build_tdc</ModelDeploySdkDir>
+        <ModelDeploySdkDir Condition="'$(ModelDeploySdkDir)'==''">build</ModelDeploySdkDir>
     </PropertyGroup>
 
     <ItemGroup>
