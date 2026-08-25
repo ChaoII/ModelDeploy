@@ -42,6 +42,12 @@ public:
     bool used_hw() const { return used_hw_; }
 
 private:
+    // 打开核心逻辑：假设调用方已持有 mtx_（open()/close() 加锁后调用；运行期回退在锁内直呼）。
+    // reset_fallback==true（外部全新 open）时复位 delivered_frames_ 与 hw_fallback_done_；
+    // 内部运行期回退重开传 false，保留"只回退一次"语义。
+    bool open_locked(const std::string& url, std::string* err, bool reset_fallback);
+    // 读一帧核心逻辑：假设调用方已持有 mtx_（read_one_frame 加锁后调用）。回退重开后自行重入。
+    bool read_one_frame_locked(VideoFrame* out, std::string* err);
     void cleanup();
     // 依据 codec_id 映射 CUVID 硬解名（H264/HEVC/AV1）；其它编解码器返回空串（无硬解名）
     std::string hw_decoder_name(int codec_id) const;
@@ -63,9 +69,13 @@ private:
     double fps_ = 25.0;
     VideoStats stats_;
     std::string err_;
+    std::string url_;       // 当前已打开的 URL（运行期 0 帧回退需重开同一地址）
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
     bool used_hw_ = false;  // 本次会话是否实际起到硬件（CUVID）解码
+    bool force_soft_ = false;            // 强制软解标志（运行期回退重开时置位，跳过硬件选择）
+    bool hw_fallback_done_ = false;      // 运行期 0 帧回退软解是否已发生（至多一次）
+    uint64_t delivered_frames_ = 0;      // 本次会话已交付的帧数（每次成功交付时同步 +1）
 };
 
 } // namespace modeldeploy::video

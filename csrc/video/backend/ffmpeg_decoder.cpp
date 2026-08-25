@@ -19,7 +19,18 @@ bool FfmpegDecoder::runtime_available() const { return true; }
 
 bool FfmpegDecoder::open(const std::string& url, std::string* err) {
     std::lock_guard<std::mutex> lk(mtx_);
+    force_soft_ = false;  // 外部全新 open：复位强制软解标志（允许重新走硬件）
+    return open_locked(url, err, /*reset_fallback=*/true);
+}
+
+// 打开核心：假设调用方已持有 mtx_。force_soft_ 为 true 时强制走软解路径（运行期回退重开）。
+bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool reset_fallback) {
     cleanup();
+    if (reset_fallback) {
+        delivered_frames_ = 0;
+        hw_fallback_done_ = false;
+    }
+    url_ = url;
     AVDictionary* opts = nullptr;
     std::string timeout_str = std::to_string(cfg_.timeout_us);
     av_dict_set(&opts, "stimeout", timeout_str.c_str(), 0);
@@ -42,9 +53,9 @@ bool FfmpegDecoder::open(const std::string& url, std::string* err) {
     for (unsigned i = 0; i < fmt_->nb_streams; ++i) {
         auto* cp = fmt_->streams[i]->codecpar;
         if (cp->codec_type != AVMEDIA_TYPE_VIDEO) continue;
-        // 硬解选择：仅已显式/自动请求 CUDA 且非设备直通时尝试 CUVID；否则（含降级）回软解。
+        // 硬解选择：仅已显式/自动请求 CUDA、非设备直通、且未强制软解时尝试 CUVID；否则（含降级）回软解。
         bool used_hw = false;
-        if (!cfg_.device_only &&
+        if (!force_soft_ && !cfg_.device_only &&
             (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
             std::string hw_name = hw_decoder_name(cp->codec_id);
             const AVCodec* hwc = nullptr;
@@ -103,6 +114,12 @@ bool FfmpegDecoder::open(const std::string& url, std::string* err) {
 
 bool FfmpegDecoder::read_one_frame(VideoFrame* out, std::string* err) {
     std::lock_guard<std::mutex> lk(mtx_);
+    return read_one_frame_locked(out, err);
+}
+
+// 读一帧核心：假设调用方已持有 mtx_。读到 EOF 且本届走硬解但尚未交付任何帧时，
+// （至多一次）自动重开为软解并重入本函数继续读取，透明救回"硬解 0 帧"场景。
+bool FfmpegDecoder::read_one_frame_locked(VideoFrame* out, std::string* err) {
     if (!opened_ || !fmt_ || !ctx_ || !out) {
         set_err(err, "not-opened");
         return false;
@@ -143,12 +160,29 @@ bool FfmpegDecoder::read_one_frame(VideoFrame* out, std::string* err) {
                               : static_cast<uint64_t>(
                                     av_rescale_q(frame_->pts, st->time_base, AVRational{1, 1000}));
             stats_.frames_out++;
+            delivered_frames_++;
             return true;
         }
         if (ret == AVERROR(EAGAIN)) {
             av_packet_unref(pkt_);
             int r = av_read_frame(fmt_, pkt_);
             if (r < 0) {  // EOF/错误（本地文件正常结束）
+                // 运行期 0 帧回退：本届确实走了硬解（used_hw_）却尚未交付任何一帧就 EOF
+                // （如 cuvid 运行时对特殊分辨率 CUDA_ERROR_NOT_SUPPORTED），且尚未回退过 →
+                // 释放当前上下文，以强制软解重开同一 URL 并继续读取（降级，不计 error_count）。
+                if (used_hw_ && delivered_frames_ == 0 && !hw_fallback_done_) {
+                    hw_fallback_done_ = true;      // 至多一次，防死循环
+                    cleanup();                     // 已持锁：cleanup()/open_locked() 均不重复加锁
+                    force_soft_ = true;            // 本次重开强制走软解
+                    std::string reopen_err;
+                    if (!open_locked(url_, &reopen_err, /*reset_fallback=*/false)) {
+                        err_ = "hw-fallback-reopen-fail";
+                        if (err) *err = err_;
+                        return false;
+                    }
+                    // 重开成功（软解）：重入继续读取，把软解结果交付给调用方
+                    return read_one_frame_locked(out, err);
+                }
                 set_err(err, "eof");
                 return false;
             }
