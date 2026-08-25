@@ -893,6 +893,10 @@ namespace ModelDeploy.Models
         public LprModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_LPR_PIPELINE, modelPath, opt) { }
 
+        /// <summary>两参重载：车牌检测模型路径 + 识别模型路径，内部拼成 capi 要求的 "det|rec"。</summary>
+        public LprModel(string detModelPath, string recModelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_LPR_PIPELINE, JoinPath(detModelPath, recModelPath), opt) { }
+
         public Prediction<LprResult> Predict(VisionImage image)
             => MakePrediction(image, ReadLpr);
 
@@ -964,6 +968,10 @@ namespace ModelDeploy.Models
 
         public PedestrianAttributeModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_PED_ATTR, modelPath, opt) { }
+
+        /// <summary>两参重载：det 模型路径 + 分类模型路径，内部拼成 capi 要求的 "det|cls"。</summary>
+        public PedestrianAttributeModel(string detModelPath, string clsModelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_PED_ATTR, JoinPath(detModelPath, clsModelPath), opt) { }
 
         public Prediction<AttributeResult> Predict(VisionImage image)
             => MakePrediction(image, ReadAttribute);
@@ -1253,6 +1261,10 @@ namespace ModelDeploy.Models
         public FaceRecognizerPipelineModel Clone() => new FaceRecognizerPipelineModel(CloneNative());
         public FaceRecognizerPipelineModel(string modelPath, RuntimeOption opt = null)
             : base(MDModelKind.MD_MODEL_FACE_REC_PIPELINE, modelPath, opt) { }
+
+        /// <summary>两参重载：人脸检测模型路径 + 识别模型路径，内部拼成 capi 要求的 "det|rec"。</summary>
+        public FaceRecognizerPipelineModel(string detModelPath, string recModelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_FACE_REC_PIPELINE, JoinPath(detModelPath, recModelPath), opt) { }
 
         public Prediction<FaceRecResult> Predict(VisionImage image)
             => MakePrediction(image, ReadFaceRec);

@@ -60,6 +60,19 @@ namespace ModelDeploy
         protected MDModelKind _kind;
         private bool _disposed;
 
+        /// <summary>把多模型管线路径用 '|' 拼成一个字符串（capi 约定）。过滤空段，便于调用端隐藏分隔符。</summary>
+        protected static string JoinPath(params string[] parts)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var p in parts)
+            {
+                if (string.IsNullOrEmpty(p)) continue;
+                if (sb.Length > 0) sb.Append('|');
+                sb.Append(p);
+            }
+            return sb.ToString();
+        }
+
         protected BaseModel(MDModelKind kind, string modelPath, RuntimeOption opt = null)
         {
             _kind = kind;
