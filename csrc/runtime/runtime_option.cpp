@@ -11,7 +11,7 @@
 
 namespace modeldeploy {
     // 格式 → 唯一后端映射（加密模型严格按此对应）
-    static Backend backend_for_format(const std::string& fmt) {
+    Backend RuntimeOption::backend_for_format(const std::string& fmt) {
         if (fmt == "onnx")  return Backend::ORT;
         if (fmt == "mnn")   return Backend::MNN;
         if (fmt == "engine") return Backend::TRT;

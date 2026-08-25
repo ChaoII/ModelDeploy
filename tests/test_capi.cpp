@@ -205,7 +205,7 @@ TEST_CASE("capi hand keypoints contract (MD_MODEL_HAND)", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle hand = nullptr;
     REQUIRE(md_model_create(&hand, MD_MODEL_HAND, modelfile.c_str(), opt) == MD_OK);
@@ -256,7 +256,7 @@ TEST_CASE("capi detection param setter on loaded model", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle det = nullptr;
     REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, modelfile.c_str(), opt) == MD_OK);
@@ -285,7 +285,7 @@ TEST_CASE("capi ped-attr cls batch size setter", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle ped = nullptr;
     const std::string joined = det + "|" + ml;
@@ -327,7 +327,7 @@ TEST_CASE("capi lpr-det setter + introspection", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     MDModelHandle det = nullptr;
     REQUIRE(md_model_create(&det, MD_MODEL_LPR_DET, model.c_str(), opt) == MD_OK);
     REQUIRE(det != nullptr);
@@ -356,7 +356,7 @@ TEST_CASE("capi ocr setter batch + shape", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     MDModelHandle detm = nullptr;
     REQUIRE(md_model_create(&detm, MD_MODEL_OCR_DET, det.c_str(), opt) == MD_OK);
     REQUIRE(detm != nullptr);
@@ -397,15 +397,13 @@ TEST_CASE("capi option device id setter", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
 
-    // 默认；set_device 与 set_device_id 独立调用均须不崩溃、可重复设置
-    md_option_set_device(opt, MD_DEV_CPU);
-    md_option_set_device_id(opt, 0);
-    md_option_set_device(opt, MD_DEV_GPU);
-    md_option_set_device_id(opt, 1);
-    md_option_set_device_id(opt, 2);
+    // 默认；set_device 一步设置设备+设备号，须不崩溃、可重复设置
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+    md_option_set_device(opt, MD_DEV_GPU, 1);
+    md_option_set_device(opt, MD_DEV_GPU, 2);
     // 负数收敛为 0（内部），仍可调用
-    md_option_set_device_id(opt, -1);
-    md_option_set_device_id(opt, 3);
+    md_option_set_device(opt, MD_DEV_GPU, -1);
+    md_option_set_device(opt, MD_DEV_GPU, 3);
 
     md_option_destroy(opt);
 }
@@ -423,7 +421,7 @@ TEST_CASE("capi face anti-spoof enum + spoof getter guards", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     MDModelHandle m = nullptr;
     CHECK(md_model_create(&m, MD_MODEL_FACE_AS, "no_such_fas.onnx", opt) != MD_OK);
     md_option_destroy(opt);
@@ -440,7 +438,7 @@ TEST_CASE("capi face anti-spoof inference (first)", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle as = nullptr;
     REQUIRE(md_model_create(&as, MD_MODEL_FACE_AS, model.c_str(), opt) == MD_OK);
@@ -606,7 +604,7 @@ TEST_CASE("capi result getters are idempotent and standalone-safe", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDImageHandle img = nullptr;
     REQUIRE(md_image_from_file(&img, imgf.c_str()) == MD_OK);
@@ -691,7 +689,7 @@ TEST_CASE("capi batch result is per-image grouped (2D)", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle det = nullptr;
     REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, det_file.c_str(), opt) == MD_OK);
@@ -842,7 +840,7 @@ TEST_CASE("capi predict_batch detection flattens both images", "[model]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle det = nullptr;
     REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, det_file.c_str(), opt) == MD_OK);
@@ -940,7 +938,7 @@ TEST_CASE("capi age batch getters + single-getter compat (real model, guarded)",
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle age = nullptr;
     REQUIRE(md_model_create(&age, MD_MODEL_FACE_AGE, age_file.c_str(), opt) == MD_OK);
@@ -1001,7 +999,7 @@ TEST_CASE("capi reid embedding getter (real model, guarded)", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle reid = nullptr;
     REQUIRE(md_model_create(&reid, MD_MODEL_REID, model_file.c_str(), opt) == MD_OK);
@@ -1340,7 +1338,7 @@ TEST_CASE("capi speaker verify enum + embed entry", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle sv = nullptr;
     REQUIRE(md_model_create(&sv, MD_MODEL_SPEAKER_VERIFY, modelfile.c_str(), opt) == MD_OK);
@@ -1379,7 +1377,7 @@ TEST_CASE("capi formula recognizer enum + create error path", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle f = nullptr;
     // dict 可选：仅模型路径（1 部分）
@@ -1419,7 +1417,7 @@ TEST_CASE("capi action (TSN/ST_GCN) enum + error path", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle tsn = nullptr;
     CHECK(md_model_create(&tsn, MD_MODEL_TSN, "nonexistent_tsn.onnx", opt) == MD_ERR_MODEL_INIT);
@@ -1444,7 +1442,7 @@ TEST_CASE("capi action (TSN/ST_GCN) enum + error path", "[capi]") {
     // 真加载：create 成功后再走 predict 错误路径（空入参）与正确 kind 守卫
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     REQUIRE(md_model_create(&tsn, MD_MODEL_TSN, tsn_file.c_str(), opt) == MD_OK);
     REQUIRE(tsn != nullptr);
     REQUIRE(md_model_create(&stg, MD_MODEL_ST_GCN, stg_file.c_str(), opt) == MD_OK);
@@ -1502,7 +1500,7 @@ TEST_CASE("capi vehicle keypoint / face landmark enum + error path", "[capi]") {
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     CHECK(md_model_create(&h, MD_MODEL_VEHICLE_KEYPOINT, "nonexistent_vehicle_keypoint.onnx", opt) == MD_ERR_MODEL_INIT);
     CHECK(h == nullptr);
@@ -1527,7 +1525,7 @@ TEST_CASE("capi vehicle keypoint / face landmark enum + error path", "[capi]") {
     // 真加载：Vehicle create + set_param_i(keypoints_num) 端到端 + result 形态 = MD_RES_POSE
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     MDModelHandle veh = nullptr;
     REQUIRE(md_model_create(&veh, MD_MODEL_VEHICLE_KEYPOINT, veh_file.c_str(), opt) == MD_OK);
     REQUIRE(veh != nullptr);

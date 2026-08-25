@@ -4,7 +4,7 @@ int main() {
     MDOptionHandle opt = nullptr;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     md_option_set_cpu_threads(opt, 4);
 
     MDModelHandle model = nullptr;

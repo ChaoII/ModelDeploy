@@ -57,6 +57,7 @@
 #include "csrc/utils/wave_helper.h"
 #include "csrc/utils/utils.h"
 #include "csrc/core/md_log.h"
+#include "csrc/encryption/encryption.h"
 #include "csrc/vision/action/tsn.h"
 #include "csrc/vision/action/st_gcn.h"
 #include "csrc/vision/landmark/vehicle_keypoint.h"
@@ -347,49 +348,78 @@ void md_option_destroy(MDOptionHandle h) {
     delete static_cast<md_option_handle*>(h);
 }
 
-void md_option_apply_device_(md_option_handle* o) {
-    switch (o->device) {
-        case MD_DEV_CPU: o->opt.use_cpu(); break;
-        case MD_DEV_GPU: o->opt.use_gpu(o->device_id); break;
-        case MD_DEV_TPU: o->opt.use_sophgo_backend(o->device_id); break;
-        default:
-            // OPENCL/VULKAN 为预留未实现枚举：明确报错，避免调用方误以为已启用
-            set_error_fmt("md_option_set_device: device %d is reserved/not implemented", (int)o->device);
-            break;
-    }
-}
-
-void md_option_set_device(MDOptionHandle h, MDDevice d) {
+MDStatus md_option_set_device(MDOptionHandle h, MDDevice d, int device_id) {
     auto* o = static_cast<md_option_handle*>(h);
+    if (device_id < 0) device_id = 0;
     o->device = d;
-    md_option_apply_device_(o);
+    o->device_id = device_id;
+    switch (d) {
+        case MD_DEV_CPU: o->opt.set_device(Device::CPU, 0); break;
+        case MD_DEV_GPU: o->opt.set_device(Device::GPU, device_id); break;
+        case MD_DEV_TPU: o->opt.set_device(Device::TPU, device_id); break;
+        default:
+            set_error_fmt("md_option_set_device: device %d is reserved/not implemented", (int)d);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    if (o->opt.backend == Backend::SOPHGO) { o->opt.use_sophgo_backend(); }
+    return MD_OK;
 }
 
-void md_option_set_device_id(MDOptionHandle h, int id) {
-    auto* o = static_cast<md_option_handle*>(h);
-    if (id < 0) id = 0;
-    o->device_id = id;
-    // 已设过 device 时立即生效，否则等 set_device 应用
-    md_option_apply_device_(o);
-}
-
-void md_option_set_backend(MDOptionHandle h, MDBackend b) {
+MDStatus md_option_set_backend(MDOptionHandle h, MDBackend b) {
     auto* o = static_cast<md_option_handle*>(h);
     switch (b) {
         case MD_BK_ORT: o->opt.use_ort_backend(); break;
         case MD_BK_MNN: o->opt.use_mnn_backend(); break;
         case MD_BK_TRT: o->opt.use_trt_backend(); break;
-        case MD_BK_SOPHGO: o->opt.use_sophgo_backend(0); break;
+        case MD_BK_SOPHGO: o->opt.use_sophgo_backend(); break;
+        default: set_error("md_option_set_backend: unknown backend"); return MD_ERR_INVALID_ARGUMENT;
     }
     o->backend_explicit = true;
+    return MD_OK;
 }
 
-void md_option_set_cpu_threads(MDOptionHandle h, int n) {
+MDStatus md_option_set_cpu_threads(MDOptionHandle h, int n) {
     static_cast<md_option_handle*>(h)->opt.set_cpu_thread_num(n);
+    return MD_OK;
 }
 
-void md_option_set_fp16(MDOptionHandle h, int enable) {
+MDStatus md_option_set_fp16(MDOptionHandle h, int enable) {
     static_cast<md_option_handle*>(h)->opt.enable_fp16 = enable != 0;
+    return MD_OK;
+}
+
+MDStatus md_option_set_external_stream(MDOptionHandle h, void* s) {
+    static_cast<md_option_handle*>(h)->opt.set_external_stream(s);
+    return MD_OK;
+}
+
+MDStatus md_option_set_password(MDOptionHandle h, const char* pwd) {
+    if (!pwd) { set_error("md_option_set_password: null"); return MD_ERR_INVALID_ARGUMENT; }
+    static_cast<md_option_handle*>(h)->opt.set_password(pwd);
+    return MD_OK;
+}
+
+MDStatus md_option_set_model_path(MDOptionHandle h, const char* path, const char* password) {
+    if (!path || !*path) { set_error("md_option_set_model_path: empty"); return MD_ERR_INVALID_ARGUMENT; }
+    // 立即解密/自动选后端；不显式设则用先前 set_password 存的密钥
+    static_cast<md_option_handle*>(h)->opt.set_model_path(path, password ? password : "");
+    return MD_OK;
+}
+
+MDStatus md_option_set_model_buffer(MDOptionHandle h, const uint8_t* data, size_t len, const char* fmt) {
+    if (!data || len == 0) { set_error("md_option_set_model_buffer: empty"); return MD_ERR_INVALID_ARGUMENT; }
+    auto* o = static_cast<md_option_handle*>(h);
+    o->opt.model_from_memory = true;
+    std::string buf(reinterpret_cast<const char*>(data), len);
+    o->opt.model_buffer = buf;
+    o->opt.ort_option.model_buffer = buf; o->opt.ort_option.model_from_memory = true;
+    o->opt.mnn_option.model_buffer = buf; o->opt.mnn_option.model_from_memory = true;
+    o->opt.trt_option.model_buffer = buf; o->opt.trt_option.model_from_memory = true;
+    if (fmt) {
+        Backend b = RuntimeOption::backend_for_format(fmt);
+        if (b != Backend::NONE && o->opt.backend != b) o->opt.backend = b;
+    }
+    return MD_OK;
 }
 
 void md_option_set_trt_engine_path(MDOptionHandle h, const char* path) {
@@ -780,6 +810,16 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
     mh->name = model_path;
 
     const RuntimeOption& opt = opt_h ? static_cast<const md_option_handle*>(opt_h)->opt : RuntimeOption();
+
+    if (opt_h) {
+        auto* o = static_cast<const md_option_handle*>(opt_h);
+        auto& opt_mut = const_cast<RuntimeOption&>(o->opt);
+        if (!opt_mut.password.empty() && is_encrypted_model_file(split_path(model_path)[0])) {
+            opt_mut.set_model_path(model_path, opt_mut.password);
+        }
+        opt_mut.validate();
+    }
+
     mh->opt = opt;
     std::string err;
     auto fail_init = [&](const char* what) {

@@ -45,7 +45,7 @@ cmake --build build
 
 > **防伪 kind**：`MD_MODEL_FACE_AS` = `SeetaFaceAsFirst`（被动防伪），`MD_MODEL_FACE_AS_SECOND` = `SeetaFaceAsSecond`，`MD_MODEL_FACE_AS_PIPELINE` = `scrfd|first|second` 管线。结果经 `md_result_spoof(res, i, &label)` 读取，label 0=REAL / 1=FUZZY / 2=SPOOF。
 
-> **设备选择**：除 `md_option_set_device(opt, MD_DEV_* )` 外，可用 `md_option_set_device_id(opt, id)` 指定多卡/多 TPU 的设备号（GPU/TPU 生效，CPU 忽略；默认 0）。
+> **设备选择**：`md_option_set_device(opt, MD_DEV_*, device_id)` 一步设置设备与设备号（GPU/TPU 生效，CPU 忽略；默认 0）。
 
 ---
 

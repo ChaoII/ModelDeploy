@@ -25,7 +25,7 @@ static void run_asr(void) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     md_option_set_cpu_threads(opt, 4);
 
     MDModelHandle m = NULL;
@@ -66,7 +66,7 @@ static void run_tts(void) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     md_option_set_cpu_threads(opt, 4);
 
     MDModelHandle m = NULL;

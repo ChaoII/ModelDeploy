@@ -132,12 +132,16 @@ typedef enum MD_BACKEND {
 MD_CAPI_EXPORT MDStatus md_option_create(MDOptionHandle* out);
 MD_CAPI_EXPORT void md_option_destroy(MDOptionHandle);
 
-MD_CAPI_EXPORT void md_option_set_device(MDOptionHandle, MDDevice);
-MD_CAPI_EXPORT void md_option_set_device_id(MDOptionHandle, int device_id);
-MD_CAPI_EXPORT void md_option_set_backend(MDOptionHandle, MDBackend);
-MD_CAPI_EXPORT void md_option_set_cpu_threads(MDOptionHandle, int n);
-MD_CAPI_EXPORT void md_option_set_fp16(MDOptionHandle, int enable);
-MD_CAPI_EXPORT void md_option_set_trt_engine_path(MDOptionHandle, const char* path);
+MD_CAPI_EXPORT MDStatus md_option_set_device(MDOptionHandle, MDDevice, int device_id);
+MD_CAPI_EXPORT MDStatus md_option_set_backend(MDOptionHandle, MDBackend);
+MD_CAPI_EXPORT MDStatus md_option_set_cpu_threads(MDOptionHandle, int n);
+MD_CAPI_EXPORT MDStatus md_option_set_fp16(MDOptionHandle, int enable);
+MD_CAPI_EXPORT MDStatus md_option_set_external_stream(MDOptionHandle, void* stream);
+MD_CAPI_EXPORT MDStatus md_option_set_password(MDOptionHandle, const char* pwd);
+MD_CAPI_EXPORT MDStatus md_option_set_model_path(MDOptionHandle, const char* path, const char* password);
+MD_CAPI_EXPORT MDStatus md_option_set_model_buffer(MDOptionHandle, const uint8_t* data, size_t len, const char* fmt);
+MD_CAPI_EXPORT MDStatus md_option_set_config(MDOptionHandle, const char* ns, const char* key, const char* value);
+MD_CAPI_EXPORT void md_option_set_trt_engine_path(MDOptionHandle, const char* path);  /* 保留，向后兼容 */
 
 /* ==================== 图像 ==================== */
 

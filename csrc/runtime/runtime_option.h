@@ -15,6 +15,9 @@ namespace modeldeploy {
     struct MODELDEPLOY_CXX_EXPORT RuntimeOption {
         void set_model_path(const std::string& model_path, const std::string& password = "");
 
+        // 格式 → 唯一后端映射（capi md_option_set_model_buffer 用）
+        static Backend backend_for_format(const std::string& fmt);
+
         // 设备：唯一入口，device + id 一步设置
         void set_device(Device dev, int device_id = 0);
         // 以下为废弃转发（兼容旧代码），新代码请用 set_device

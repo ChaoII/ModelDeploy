@@ -21,7 +21,7 @@ static void run_det(const char* model_path, const char* img) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     md_option_set_cpu_threads(opt, 4);
 
     MDModelHandle m = NULL;
@@ -54,7 +54,7 @@ static void run_cls(const char* model_path, const char* img) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle m = NULL;
     check("create", md_model_create(&m, MD_MODEL_CLASSIFICATION, model_path, opt));
@@ -84,7 +84,7 @@ static void run_pose(const char* model_path, const char* img) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle m = NULL;
     check("create", md_model_create(&m, MD_MODEL_POSE, model_path, opt));
@@ -120,7 +120,7 @@ static void run_obb(const char* model_path, const char* img) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle m = NULL;
     check("create", md_model_create(&m, MD_MODEL_OBB, model_path, opt));
@@ -152,7 +152,7 @@ static void run_seg(const char* model_path, const char* img) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
 
     MDModelHandle m = NULL;
     check("create", md_model_create(&m, MD_MODEL_INSTANCE_SEG, model_path, opt));
@@ -192,7 +192,7 @@ static void run_insightface(void) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     md_option_set_cpu_threads(opt, 4);
 
     MDModelHandle m = NULL;
@@ -235,7 +235,7 @@ static void run_ocr(const char* model_dir, const char* img) {
     MDOptionHandle opt = NULL;
     md_option_create(&opt);
     md_option_set_backend(opt, MD_BK_ORT);
-    md_option_set_device(opt, MD_DEV_CPU);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
     md_option_set_cpu_threads(opt, 4);
 
     MDModelHandle m = NULL;
