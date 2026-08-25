@@ -347,19 +347,17 @@ bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_
         set_err(err, "no-device-plane");
         return false;
     }
-    // 会话内缓存的 gstcuda 上下文与 allocator（同一 GPU）
-    static GstCudaContext* cuda_ctx = nullptr;
-    static GstCudaAllocator* cuda_alloc = nullptr;
-    if (!cuda_ctx) {
-        cuda_ctx = gst_cuda_context_new(0);
-        if (!cuda_ctx) {
+    // 会话内 gstcuda 上下文与 allocator（同一 GPU）——成员持有、teardown 释放，避免进程级状态污染
+    if (!cuda_ctx_) {
+        cuda_ctx_ = gst_cuda_context_new(0);
+        if (!cuda_ctx_) {
             set_err(err, "cuda-ctx-fail");
             return false;
         }
     }
-    if (!cuda_alloc) {
-        cuda_alloc = GST_CUDA_ALLOCATOR(g_object_new(gst_cuda_allocator_get_type(), NULL));
-        if (!cuda_alloc) {
+    if (!cuda_alloc_) {
+        cuda_alloc_ = GST_CUDA_ALLOCATOR(g_object_new(gst_cuda_allocator_get_type(), NULL));
+        if (!cuda_alloc_) {
             set_err(err, "cuda-alloc-fail");
             return false;
         }
@@ -372,7 +370,7 @@ bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_
     gst_video_info_set_format(&vi, GST_VIDEO_FORMAT_NV12, w, h);
     vi.fps_n = fps_;
     vi.fps_d = 1;
-    GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc, cuda_ctx, nullptr, &vi,
+    GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc_, cuda_ctx_, nullptr, &vi,
                                                       (CUdeviceptr)d_y, nullptr, nullptr);
     if (!mem) {
         set_err(err, "cuda-wrap-fail");
@@ -478,6 +476,11 @@ void GstEncoder::teardown() {
         gst_object_unref(pipeline_);
         pipeline_ = nullptr;
     }
+#ifdef HAVE_GSTCUDA
+    // 释放会话 GPU 直编状态：不跨会话保留 CUDA 上下文，避免污染同进程后续管道
+    if (cuda_alloc_) { gst_object_unref(cuda_alloc_); cuda_alloc_ = nullptr; }
+    if (cuda_ctx_) { gst_object_unref(cuda_ctx_); cuda_ctx_ = nullptr; }
+#endif
     w_ = 0;
     h_ = 0;
     fps_ = 0;

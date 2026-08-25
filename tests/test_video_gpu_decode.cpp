@@ -93,7 +93,7 @@ TEST_CASE("FFmpeg device_only=false 输出仍为 CPU 帧 (device==CPU)", "[video
 
 // ── GStreamer ──────────────────────────────────────────────────────────────
 
-TEST_CASE("GStreamer device_only=true 解码输出 GPU 设备帧 (device==GPU)", "[video][gpu][gst][integration]") {
+TEST_CASE("GStreamer device_only=true 解码输出 GPU 设备帧 (device==GPU)", "[video][gpu][gst][gst-cuda][integration]") {
     if (!has_clip()) SKIP("no test clip; place at test_data/video/clip.h264");
 
     VideoDecoderConfig cfg;
@@ -127,7 +127,7 @@ TEST_CASE("GStreamer device_only=true 解码输出 GPU 设备帧 (device==GPU)",
     d->close();
 }
 
-TEST_CASE("GStreamer device_only=false 输出仍为 CPU 帧 (device==CPU)", "[video][gpu][gst][integration]") {
+TEST_CASE("GStreamer device_only=false 输出仍为 CPU 帧 (device==CPU)", "[video][gpu][gst][gst-cuda][integration]") {
     if (!has_clip()) SKIP("no test clip; place at test_data/video/clip.h264");
 
     VideoDecoderConfig cfg;

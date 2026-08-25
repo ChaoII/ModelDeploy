@@ -12,6 +12,13 @@
 #include <gst/gst.h>
 #endif
 
+// GPU 直编（CUDA memory）用：仅声明 Opaque 指针，避免把 gst/cuda 头暴露给本头（其夹带 cudaGL.h 与 GL/gl.h 冲突）。
+// HAVE_GSTCUDA 由 cmake 在探测到 gstcuda 时定义；未定义时本类不携带任何 CUDA 状态。
+#ifdef HAVE_GSTCUDA
+struct _GstCudaContext;
+struct _GstCudaAllocator;
+#endif
+
 namespace modeldeploy::video {
 
 // GStreamer 编码后端：CPU BGR → appsrc → videoconvert → (x264enc|nvh264enc) → h264parse → mp4mux → filesink。
@@ -85,6 +92,12 @@ private:
     GstElement* pipeline_ = nullptr;
     GstElement* appsrc_ = nullptr;
     GstBus* bus_ = nullptr;
+#endif
+#ifdef HAVE_GSTCUDA
+    // 会话内 CUDA 上下文/分配器（GPU 直编专用）。作为成员而非进程级 static：
+    // 避免在 DLL/测试进程生命期里全局持有，防止污染同进程后建的 nvh264enc 管道。
+    _GstCudaContext* cuda_ctx_ = nullptr;
+    _GstCudaAllocator* cuda_alloc_ = nullptr;
 #endif
 };
 

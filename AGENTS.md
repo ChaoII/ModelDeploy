@@ -34,6 +34,14 @@ cd build && ctest -C Release --output-on-failure
 ./test_modeldeploy ~[gpu]   # 排除 GPU
 ```
 
+视频编解码测试分组（`[video]` 套件，沿用 `~[gpu]` 约定）：
+- 常规（软编/软解 + 无 CUDA 互操的硬编）：`test_modeldeploy "[video]~[gpu]"`。
+- **GStreamer CUDA 互操隔离**：GStreamer 一旦在进程内创建 CUDA context（`gst_cuda_context_new` / CUDA memory），其 nvcodec 会对本进程**余下所有** `nvh264enc` 管道全局注册 CUDA 缓冲，致后续 mp4 缺 moov、软解打开失败——该进程级状态**不可逆**。故带 `[gst-cuda]` 标签的用例（GStreamer 解码 device_only GPU + CUDA memory 直编，共 3 用例）**必须单独进程**运行：
+  - `test_modeldeploy "[video][gpu]~[gst-cuda]"`（GPU 非 CUDA 互操部分）
+  - `test_modeldeploy "[video][gst-cuda]"`（GStreamer CUDA 互操，独进程）
+
+这是 GStreamer–CUDA 的进程级限制，非 SDK 逻辑缺陷。
+
 测试数据需单独下载：`curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip`
 
 ## 架构

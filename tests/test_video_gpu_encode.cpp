@@ -96,7 +96,7 @@ TEST_CASE("FFmpeg encode_from_gpu_nv12 设备指针直编 nvenc → soft 回读"
 // ── GStreamer：nvh264enc 吃 CUDA memory（包装设备 NV12 指针）直编 → soft 回读 ────
 #if defined(ENABLE_GSTREAMER) && defined(HAVE_GSTCUDA)
 TEST_CASE("GStreamer encode_from_gpu_nv12 CUDA memory 直编 nvh264enc → soft 回读",
-          "[video][gpu][gst][integration]") {
+          "[video][gpu][gst][gst-cuda][integration]") {
     if (!has_gpu_nvenc()) SKIP("no nvenc in this environment");
     const int W = 192, H = 144;
 
