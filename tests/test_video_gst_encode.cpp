@@ -26,6 +26,7 @@ TEST_CASE("GStreamer x264enc 编码 mp4 → 回读验证", "[video][gst][integra
     // 用 Task5 GStreamer 解码器/FFmpeg 解码器回读 gst_out.mp4 验证帧数
     VideoDecoderConfig dcfg;
     dcfg.backend = CodecBackend::FFmpeg;
+    dcfg.hw_accel = HwAccel::None;  // 本用例验证 GStreamer 编码产物可解码，固定软解（低分辨率 cuvid 可能不支持）
     auto dec = VideoDecoder::create(dcfg);
     REQUIRE(dec != nullptr);
     REQUIRE(dec->open("test_data/video/gst_out.mp4", &err));

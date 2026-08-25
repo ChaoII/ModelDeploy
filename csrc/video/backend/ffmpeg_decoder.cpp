@@ -42,22 +42,47 @@ bool FfmpegDecoder::open(const std::string& url, std::string* err) {
     for (unsigned i = 0; i < fmt_->nb_streams; ++i) {
         auto* cp = fmt_->streams[i]->codecpar;
         if (cp->codec_type != AVMEDIA_TYPE_VIDEO) continue;
-        const AVCodec* dec = avcodec_find_decoder(cp->codec_id);   // 仅软解
-        if (!dec) {
-            set_err(err, "no-soft-decoder");
-            cleanup();
-            state_ = State::Error;
-            return false;
+        // 硬解选择：仅已显式/自动请求 CUDA 且非设备直通时尝试 CUVID；否则（含降级）回软解。
+        bool used_hw = false;
+        if (!cfg_.device_only &&
+            (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
+            std::string hw_name = hw_decoder_name(cp->codec_id);
+            const AVCodec* hwc = nullptr;
+            if (!hw_name.empty()) hwc = avcodec_find_decoder_by_name(hw_name.c_str());
+            if (hwc) {
+                ctx_ = avcodec_alloc_context3(hwc);
+                avcodec_parameters_to_context(ctx_, cp);
+                if (avcodec_open2(ctx_, hwc, nullptr) == 0) {
+                    used_hw = true;  // 硬解成功：h264_cuvid 直接输出 CPU NV12，走 IPlaneView 分支
+                } else {
+                    avcodec_free_context(&ctx_);
+                    ctx_ = nullptr;
+                    err_ = "hw-decoder-open-fail-fallback-soft";  // 降级：不计 error_count
+                }
+            } else {
+                err_ = "hw-decoder-not-found-fallback-soft";  // 无对应 CUVID 名/解码器：降级软解
+            }
         }
+        if (!used_hw) {
+            // 软解（默认路径或硬解降级）。cuvid 装不上/不存在不挂会话，回退软解。
+            const AVCodec* dec = avcodec_find_decoder(cp->codec_id);
+            if (!dec) {
+                set_err(err, "no-soft-decoder");
+                cleanup();
+                state_ = State::Error;
+                return false;
+            }
+            ctx_ = avcodec_alloc_context3(dec);
+            avcodec_parameters_to_context(ctx_, cp);
+            if (avcodec_open2(ctx_, dec, nullptr) < 0) {
+                set_err(err, "decoder-open-fail");
+                cleanup();
+                state_ = State::Error;
+                return false;
+            }
+        }
+        used_hw_ = used_hw;
         vstream_ = static_cast<int>(i);
-        ctx_ = avcodec_alloc_context3(dec);
-        avcodec_parameters_to_context(ctx_, cp);
-        if (avcodec_open2(ctx_, dec, nullptr) < 0) {
-            set_err(err, "decoder-open-fail");
-            cleanup();
-            state_ = State::Error;
-            return false;
-        }
         w_ = cp->width;
         h_ = cp->height;
         auto* st = fmt_->streams[i];
@@ -140,6 +165,15 @@ bool FfmpegDecoder::read_one_frame(VideoFrame* out, std::string* err) {
         }
         set_err(err, "receive-frame-error");
         return false;
+    }
+}
+
+std::string FfmpegDecoder::hw_decoder_name(int codec_id) const {
+    switch (codec_id) {
+        case AV_CODEC_ID_H264: return "h264_cuvid";
+        case AV_CODEC_ID_HEVC: return "hevc_cuvid";
+        case AV_CODEC_ID_AV1: return "av1_cuvid";
+        default: return "";  // 其它编解码器无 CUVID 硬解名
     }
 }
 
@@ -228,6 +262,7 @@ void FfmpegDecoder::cleanup() {
     w_ = 0;
     h_ = 0;
     opened_ = false;
+    used_hw_ = false;
 }
 
 void FfmpegDecoder::set_err(std::string* err, const std::string& msg) {

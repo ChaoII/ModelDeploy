@@ -38,8 +38,13 @@ public:
     std::string last_error() const override;
     void close() override;
 
+    // 本次会话是否实际使用了硬件（CUVID 名）解码器；false 表示走了软解（含硬解不可用的降级）
+    bool used_hw() const { return used_hw_; }
+
 private:
     void cleanup();
+    // 依据 codec_id 映射 CUVID 硬解名（H264/HEVC/AV1）；其它编解码器返回空串（无硬解名）
+    std::string hw_decoder_name(int codec_id) const;
     // 把 frame_（非 NV12）经 swscale 转成 NV12 存到 sws_frame_；成功返回 true
     bool convert_to_nv12();
     void set_err(std::string* err, const std::string& msg);
@@ -60,6 +65,7 @@ private:
     std::string err_;
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
+    bool used_hw_ = false;  // 本次会话是否实际起到硬件（CUVID）解码
 };
 
 } // namespace modeldeploy::video
