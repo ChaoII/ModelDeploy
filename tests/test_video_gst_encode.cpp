@@ -2,6 +2,8 @@
 #include "csrc/video/video_encoder.h"
 #include "csrc/video/video_decoder.h"
 #include "csrc/video/factory.h"
+#include "csrc/video/backend/gst_encoder.h"
+#include <algorithm>
 #include <cstring>
 
 using namespace modeldeploy::video;
@@ -35,4 +37,41 @@ TEST_CASE("GStreamer x264enc 编码 mp4 → 回读验证", "[video][gst][integra
     while (dec->read_one_frame(&f, &err)) ++cnt;
     REQUIRE(cnt > 0);
     REQUIRE(cnt <= 32 + 5);  // 容忍首帧延迟误差
+}
+
+// nvh264enc 硬编：能力具备才跑（nvh264enc 在 hw_encoders），软解回读>0 帧。
+// 本卡 NVENC 最小宽=146（H3 实测），用 192×144 稳定稳妥。
+TEST_CASE("GStreamer nvh264enc 硬编 → mp4 回读", "[video][hw][gpu][integration]") {
+    auto cap = query_video_capabilities();
+    bool nv = std::find(cap.hw_encoders.begin(), cap.hw_encoders.end(), "nvh264enc") !=
+              cap.hw_encoders.end();
+    if (!nv) SKIP("no nvh264enc encoder in this environment");
+    const int W = 192, H = 144;
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::GStreamer;
+    ecfg.hw_accel = HwAccel::Cuda;
+    ecfg.set_codec("auto").set_format("mp4");
+    auto enc = create_encoder_backend(ecfg);
+    if (!enc) SKIP("no GStreamer encoder");  // runtime_available 需 x264enc
+    auto gst = std::dynamic_pointer_cast<GstEncoder>(enc);
+    std::string err;
+    REQUIRE(enc->open("test_data/video/gst_nv_out.mp4", W, H, 25, ecfg, &err));
+    REQUIRE(gst != nullptr);
+    REQUIRE(gst->used_hw());  // auto+Cuda 且 nvh264enc 存在 → 必须真正走 nv 硬编，而非静默回退 x264
+    uint8_t bgr[W * H * 3];
+    memset(bgr, 128, sizeof(bgr));
+    auto img = modeldeploy::vision::ImageData::from_raw(bgr, W, H, MdImageType::PKG_BGR_U8, true);
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(img, &err));
+    enc->close();
+    // 软解回读验证产物可解码
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::FFmpeg;
+    dcfg.hw_accel = HwAccel::None;
+    auto dec = VideoDecoder::create(dcfg);
+    REQUIRE(dec != nullptr);
+    REQUIRE(dec->open("test_data/video/gst_nv_out.mp4", &err));
+    int cnt = 0;
+    VideoFrame f;
+    while (dec->read_one_frame(&f, &err)) ++cnt;
+    REQUIRE(cnt > 0);
 }

@@ -14,10 +14,11 @@
 
 namespace modeldeploy::video {
 
-// GStreamer 软编后端（x264enc）：CPU BGR → appsrc → videoconvert → x264enc → mp4mux → filesink。
-// 用 gst_app_src_push_buffer 阻塞推帧形成背压；close 时刷 EOS 并等 mp4mux 收尾写出 moov 再停管道。
-// 本类经 factory 在 DLL 内以 make_shared 实例化，返回 shared_ptr<EncoderBackend> 给外部，
-// 无需导出（与 EncoderBackend 接口一致，均不导出）。
+// GStreamer 编码后端：CPU BGR → appsrc → videoconvert → (x264enc|nvh264enc) → h264parse → mp4mux → filesink。
+// open() 依据 hw_accel∈{Auto,Cuda} 且 nvh264enc 可实例化（或显式 codec=nvh264enc）决议用 nv 硬编，
+// 否则回退软编 x264enc。用 gst_app_src_push_buffer 阻塞推帧形成背压；close 时刷 EOS 并等
+// mp4mux 收尾写出 moov 再停管道。本类经 factory 在 DLL 内以 make_shared 实例化，返回
+// shared_ptr<EncoderBackend> 给外部，无需导出（与 EncoderBackend 接口一致，均不导出）。
 class GstEncoder : public EncoderBackend {
 public:
     explicit GstEncoder(const VideoEncoderConfig& cfg);
@@ -37,11 +38,18 @@ public:
     std::string last_error() const override;
     void close() override;
 
+    // 本次会话是否实际启用了硬件（nvh264enc）编码器；false 表示走了软编（x264enc）
+    bool used_hw() const { return encoder_is_nv_; }
+
     // 静态探测：gst_init 一次 + 检查编码所需插件（appsrc/x264enc/mp4mux 等）可实例化
     static bool gstreamer_x264_available();
+    // 静态探测：nvcodec 硬编插件 nvh264enc 可实例化（复用 H0 同款 gst_element_factory_find 检查）
+    static bool nvh264enc_available();
 
 private:
-    void build_pipeline(const std::string& url, int w, int h, int fps);
+    // 决议本次会话用的编码元素：0=软编 x264enc，1=硬编 nvh264enc，-1=错误（err 已设置）
+    int resolve_encoder(std::string* err);
+    void build_pipeline(const std::string& url, int w, int h, int fps, int enc);
     bool start_pipeline(std::string* err);
     void wait_eos_and_stop();  // 刷 EOS 后等待 EOS/错误消息（带超时）并停管道
     void teardown();           // 停管道并释放 pipeline/appsrc/bus
@@ -50,6 +58,7 @@ private:
     VideoEncoderConfig cfg_;
     int w_ = 0, h_ = 0, fps_ = 0;
     uint64_t pts_ = 0;
+    bool encoder_is_nv_ = false;  // 本次会话是否实际用了 nvh264enc 硬编
     VideoStats stats_;
     std::string err_;
     std::mutex mtx_;

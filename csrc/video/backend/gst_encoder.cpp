@@ -52,6 +52,50 @@ bool GstEncoder::gstreamer_x264_available() {
     return ok;
 }
 
+bool GstEncoder::nvh264enc_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // 与 H0 probe_gstreamer_hw() 同款检查（gst_element_factory_find("nvh264enc")），
+    // 仅此一次探测即可，无需在 gst_encoder 内重复自探整链。
+    GstElementFactory* f = gst_element_factory_find("nvh264enc");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+// 决议本次会话的编码元素：
+//   codec=="nvh264enc" → 硬编（不可用则报错 no-nvh264enc）
+//   codec=="x264enc"/空 → 软编 x264enc
+//   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则硬编，否则回退软编
+//   VAAPI/Sophgo：本期仅作为可接受配置值 + 由 H0 探测上报（有 vaapih264enc/h264_vaapi 会列出），
+//   未实现实际帧路径；auto 下显式 HwAccel::Vaapi/Sophgo 一律回退软编 x264enc。
+//   其余名称（libx264 / h264_nvenc / vaapih264enc 等 GStreamer 不支持的）→ unsupported-codec。
+int GstEncoder::resolve_encoder(std::string* err) {
+    const std::string& codec = cfg_.codec;
+    int choice = -1;
+    if (codec == "nvh264enc") {
+        choice = 1;
+    } else if (codec == "x264enc" || codec.empty()) {
+        choice = 0;
+    } else if (codec == "auto") {
+        const bool want_hw = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda);
+        choice = (want_hw && nvh264enc_available()) ? 1 : 0;
+    } else {
+        set_err(err, "unsupported-codec");
+        return -1;
+    }
+    if (choice == 1 && !nvh264enc_available()) {
+        set_err(err, "no-nvh264enc");
+        return -1;
+    }
+    if (choice == 0 && !gstreamer_x264_available()) {
+        set_err(err, "no-x264enc");
+        return -1;
+    }
+    encoder_is_nv_ = (choice == 1);
+    return choice;
+}
+
 bool GstEncoder::open(const std::string& url, int w, int h, int src_fps,
                       const VideoEncoderConfig& c, std::string* err) {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -77,11 +121,12 @@ bool GstEncoder::open(const std::string& url, int w, int h, int src_fps,
         set_err(err, "gst-init-fail");
         return false;
     }
-    if (!gstreamer_x264_available()) {
-        set_err(err, "no-x264enc");
+    const int enc = resolve_encoder(err);
+    if (enc < 0) {
+        teardown();
         return false;
     }
-    build_pipeline(url, w, h, cfg_.fps);
+    build_pipeline(url, w, h, cfg_.fps, enc);
     if (!pipeline_ || !appsrc_) {
         set_err(err, "parse-launch-fail");
         teardown();
@@ -95,13 +140,24 @@ bool GstEncoder::open(const std::string& url, int w, int h, int src_fps,
     return true;
 }
 
-void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps) {
-    // BGR 经 videoconvert 转 I420 供 x264enc；mp4mux 需在源 EOS 后才写出 moov
+void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, int enc) {
+    // BGR 经 videoconvert 转 I420/NV12 供编码器；mp4mux 需在源 EOS 后才写出 moov
+    std::string encoder_part;
+    if (enc == 1) {
+        // nvh264enc：bitrate 单位是 kbit/sec（与 cfg_.bitrate_kbps 一致，勿当 bps）；
+        // GOP 属性名是 gop-size（非 x264 的 key-int-max）；preset/tune 为枚举且版本差异大，
+        // 不套 x264 的 ultrafast/zerolatency 名称（会报 Undefined constant），交给 nvcodec 默认。
+        encoder_part = " nvh264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
+                       " gop-size=" + std::to_string(cfg_.gop) +
+                       (cfg_.low_latency ? " zerolatency=true" : "");
+    } else {
+        encoder_part = " x264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
+                       " speed-preset=" + (cfg_.preset.empty() ? "ultrafast" : cfg_.preset) +
+                       " tune=zerolatency key-int-max=" + std::to_string(cfg_.gop);
+    }
     std::string launch =
         "appsrc name=src format=time "
-        "! videoconvert ! x264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
-        " speed-preset=" + (cfg_.preset.empty() ? "ultrafast" : cfg_.preset) +
-        " tune=zerolatency key-int-max=" + std::to_string(cfg_.gop) +
+        "! videoconvert !" + encoder_part +
         " ! h264parse ! mp4mux ! filesink location=\"" + url + "\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
