@@ -42,6 +42,9 @@ cd build && ctest -C Release --output-on-failure
 
 这是 GStreamer–CUDA 的进程级限制，非 SDK 逻辑缺陷。
 
+编码输入统一为 `encode(const VideoFrame&)`：按 `ImageData::device()` 路由（CPU 软编 /
+GPU CUDA 直通 / TPU 占位 fail-closed），`pts_ms` 可注入外部时间戳（0=内部按 fps 自增）。
+
 测试数据需单独下载：`curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip`
 
 ## 架构
