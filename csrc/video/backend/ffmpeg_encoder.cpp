@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include <chrono>
+#include <vector>
 
 namespace modeldeploy::video {
 
@@ -29,12 +30,13 @@ bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
         set_err(err, "invalid-dimension");
         return false;
     }
-    if (!runtime_available()) {
+    // 仅 libx264 可用性兜底检查（显式 h264_nvenc 在 init_encoder 内自行判定，不在此拦截）
+    bool want_nvenc = (cfg_.codec == "h264_nvenc");
+    if (!want_nvenc && !runtime_available()) {
         set_err(err, "no-libx264");
         return false;
     }
-    if (!init_encoder(w, h, cfg_.fps)) {
-        set_err(err, "encoder-open-fail");
+    if (!init_encoder(w, h, cfg_.fps, err)) {
         cleanup();  // init_encoder 部分分配的资源在此统一释放，避免滞留
         return false;
     }
@@ -47,8 +49,42 @@ bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
     return true;
 }
 
-bool FfmpegEncoder::init_encoder(int w, int h, int fps) {
-    const AVCodec* codec = avcodec_find_encoder_by_name("libx264");
+bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
+    struct Opt { std::string name; bool hw; };
+    std::vector<Opt> candidates;
+    if (cfg_.codec == "auto") {
+        // auto：hw_accel ∈ {Auto, Cuda} 且 nvenc 存在 → 优先 nvenc；否则（或 nvenc 打开失败）回退 libx264
+        const bool want_hw = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda) &&
+                             avcodec_find_encoder_by_name("h264_nvenc") != nullptr;
+        if (want_hw) candidates.push_back({"h264_nvenc", true});
+        candidates.push_back({"libx264", false});
+    } else if (cfg_.codec == "h264_nvenc") {
+        candidates.push_back({"h264_nvenc", true});
+    } else if (cfg_.codec == "libx264") {
+        candidates.push_back({"libx264", false});
+    } else {
+        // 其它名称（含 GStreamer 名 nvh264enc/x264enc 等）在 FFmpeg 编码器里不支持，由 H4/GStreamer 编码器接
+        set_err(err, "unsupported-codec");
+        return false;
+    }
+    for (const auto& o : candidates) {
+        if (!avcodec_find_encoder_by_name(o.name.c_str())) continue;
+        if (configure_encoder(o.name, o.hw, w, h, fps)) {
+            used_hw_ = o.hw;
+            return true;
+        }
+        // 候选打开失败：显式 h264_nvenc 必须报错（不静默换软编）；auto 时继续尝试下一候选（软编回退）
+        if (cfg_.codec == "h264_nvenc") {
+            set_err(err, "encoder-open-fail");
+            return false;
+        }
+    }
+    set_err(err, "encoder-open-fail");
+    return false;
+}
+
+bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, int h, int fps) {
+    const AVCodec* codec = avcodec_find_encoder_by_name(name.c_str());
     if (!codec) return false;
     enc_ = avcodec_alloc_context3(codec);
     if (!enc_) return false;
@@ -56,7 +92,8 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps) {
     enc_->height = h;
     enc_->time_base = {1, fps};
     enc_->framerate = {fps, 1};
-    enc_->pix_fmt = AV_PIX_FMT_YUV420P;
+    const AVPixelFormat fmt = hw ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P;
+    enc_->pix_fmt = fmt;
     enc_->gop_size = cfg_.gop;
     enc_->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
     enc_->max_b_frames = cfg_.max_b_frames;
@@ -65,21 +102,28 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps) {
     enc_->colorspace = AVCOL_SPC_BT709;
     enc_->color_primaries = AVCOL_PRI_BT709;
     enc_->color_trc = AVCOL_TRC_BT709;
-    enc_->profile = FF_PROFILE_H264_MAIN;
-    enc_->level = 41;
-    av_opt_set(enc_->priv_data, "preset",
-               cfg_.preset.empty() ? "ultrafast" : cfg_.preset.c_str(), 0);
-    if (cfg_.low_latency) {
-        av_opt_set(enc_->priv_data, "tune", "zerolatency", 0);
+    if (hw) {
+        // NVENC 私有属性与 libx264 不同（无 ultrafast/zerolatency）；默认 preset="ultrafast" 是 x264 专用，
+        // 直接套用会让 nvenc 报 "Undefined constant"。此处不硬设 nvenc preset/tune，留 FFmpeg 默认，
+        // 避免版本相关差异；显式低延迟/预设由上层后续精细配置。
+    } else {
+        enc_->profile = FF_PROFILE_H264_MAIN;
+        enc_->level = 41;
+        av_opt_set(enc_->priv_data, "preset",
+                   cfg_.preset.empty() ? "ultrafast" : cfg_.preset.c_str(), 0);
+        if (cfg_.low_latency) {
+            av_opt_set(enc_->priv_data, "tune", "zerolatency", 0);
+        }
     }
     if (avcodec_open2(enc_, codec, nullptr) < 0) {
         avcodec_free_context(&enc_);
         enc_ = nullptr;
         return false;
     }
+    dst_fmt_ = fmt;
     frame_ = av_frame_alloc();
     if (!frame_) return false;
-    frame_->format = AV_PIX_FMT_YUV420P;
+    frame_->format = fmt;
     frame_->width = w;
     frame_->height = h;
     frame_->color_range = AVCOL_RANGE_MPEG;
@@ -149,7 +193,7 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
         // 再通过 sws_setColorspaceDetails 显式把目标 YUV 矩阵设为 BT.709 limited，使其与
         // 编码器/帧元数据声明的 BT.709 一致——否则 RGB→YUV 默认走 BT.601，彩色内容会偏色
         // （纯灰测试掩盖了这一点）。
-        sws_ = sws_getContext(w_, h_, AV_PIX_FMT_BGR24, w_, h_, AV_PIX_FMT_YUV420P,
+        sws_ = sws_getContext(w_, h_, AV_PIX_FMT_BGR24, w_, h_, dst_fmt_,
                               SWS_BILINEAR, nullptr, nullptr, nullptr);
         if (!sws_) {
             set_err(err, "sws-init-fail");

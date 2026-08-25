@@ -32,8 +32,12 @@ public:
     std::string last_error() const override;
     void close() override;
 
+    // 本次会话是否实际启用了硬件（NVENC）编码器；false 表示走了软编（libx264）
+    bool used_hw() const { return used_hw_; }
+
 private:
-    bool init_encoder(int w, int h, int fps);
+    bool init_encoder(int w, int h, int fps, std::string* err);
+    bool configure_encoder(const std::string& name, bool hw, int w, int h, int fps);
     bool open_output(const std::string& url);
     void cleanup();
     void set_err(std::string* err, const std::string& msg);
@@ -47,8 +51,10 @@ private:
     SwsContext* sws_ = nullptr;
     AVFrame* frame_ = nullptr;
     AVPacket* pkt_ = nullptr;
+    AVPixelFormat dst_fmt_ = AV_PIX_FMT_YUV420P;  // sws 输出/编码器输入 pix_fmt（随编码器）
     bool header_ = false;
     bool opened_ = false;
+    bool used_hw_ = false;  // 本次会话是否实际用到 NVENC 编码器
     VideoStats stats_;
     std::string err_;
 };
