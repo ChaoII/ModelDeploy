@@ -33,16 +33,31 @@ namespace ModelDeploy
         internal static extern void md_option_destroy(IntPtr handle);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void md_option_set_device(IntPtr handle, int device);
+        internal static extern MDStatus md_option_set_device(IntPtr opt, int dev, int device_id);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void md_option_set_backend(IntPtr handle, int backend);
+        internal static extern MDStatus md_option_set_backend(IntPtr opt, int backend);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void md_option_set_cpu_threads(IntPtr handle, int n);
+        internal static extern MDStatus md_option_set_cpu_threads(IntPtr opt, int n);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void md_option_set_fp16(IntPtr handle, int enable);
+        internal static extern MDStatus md_option_set_fp16(IntPtr opt, int enable);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_option_set_external_stream(IntPtr opt, IntPtr s);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_option_set_password(IntPtr opt, IntPtr pwd);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_option_set_model_path(IntPtr opt, IntPtr path, IntPtr pwd);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_option_set_model_buffer(IntPtr opt, byte[] data, int len, IntPtr fmt);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_option_set_config(IntPtr opt, IntPtr ns, IntPtr key, IntPtr value);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void md_option_set_trt_engine_path(IntPtr handle,

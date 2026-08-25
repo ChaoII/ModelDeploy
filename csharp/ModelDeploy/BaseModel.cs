@@ -9,7 +9,7 @@ namespace ModelDeploy
     /// <summary>
     /// capi 运行时选项（链式 setter，替代 v1 的 MDRuntimeOption 结构体直译）。
     /// </summary>
-    public sealed class RuntimeOption
+    public sealed class RuntimeOption : IDisposable
     {
         internal IntPtr Handle { get; private set; }
         private bool _ownsHandle;
@@ -29,15 +29,75 @@ namespace ModelDeploy
             _ownsHandle = owns;
         }
 
-        public RuntimeOption UseOrt() { md_option_set_backend(Handle, 0); return this; }
-        public RuntimeOption UseMnn() { md_option_set_backend(Handle, 1); return this; }
-        public RuntimeOption UseTrt() { md_option_set_backend(Handle, 2); return this; }
-        public RuntimeOption UseSophgo() { md_option_set_backend(Handle, 3); return this; }
+        public RuntimeOption UseOrt() { return SetBackend(Backend.ORT); }
+        public RuntimeOption UseMnn() { return SetBackend(Backend.MNN); }
+        public RuntimeOption UseTrt() { return SetBackend(Backend.TRT); }
+        public RuntimeOption UseSophgo() { return SetBackend(Backend.SOPHGO); }
 
-        public RuntimeOption SetDevice(Device d) { md_option_set_device(Handle, (int)d); return this; }
-        public RuntimeOption SetCpuThreads(int n) { md_option_set_cpu_threads(Handle, n); return this; }
-        public RuntimeOption SetFp16(bool enable) { md_option_set_fp16(Handle, enable ? 1 : 0); return this; }
-        public RuntimeOption SetTrtEnginePath(string path) { md_option_set_trt_engine_path(Handle, path); return this; }
+        public RuntimeOption SetDevice(Device dev, int deviceId = 0)
+        { Check(); ThrowOnError(NativeMethods.md_option_set_device(Handle, (int)dev, deviceId)); return this; }
+        public RuntimeOption SetBackend(Backend b) { Check(); ThrowOnError(NativeMethods.md_option_set_backend(Handle, (int)b)); return this; }
+        public RuntimeOption SetCpuThreads(int n) { Check(); ThrowOnError(NativeMethods.md_option_set_cpu_threads(Handle, n)); return this; }
+        public RuntimeOption SetFp16(bool v) { Check(); ThrowOnError(NativeMethods.md_option_set_fp16(Handle, v ? 1 : 0)); return this; }
+        public RuntimeOption SetPassword(string pwd)
+        {
+            Check();
+            var p = ToUtf8(pwd);
+            try { ThrowOnError(NativeMethods.md_option_set_password(Handle, p)); }
+            finally { FreeUtf8(p); }
+            return this;
+        }
+        public RuntimeOption SetModelPath(string path, string? password = null)
+        {
+            Check();
+            var p = ToUtf8(path); var pw = ToUtf8(password);
+            try { ThrowOnError(NativeMethods.md_option_set_model_path(Handle, p, pw)); }
+            finally { FreeUtf8(p); FreeUtf8(pw); }
+            return this;
+        }
+        public RuntimeOption SetModelBuffer(byte[] data, string? fmt = null)
+        {
+            Check();
+            var f = ToUtf8(fmt);
+            try { ThrowOnError(NativeMethods.md_option_set_model_buffer(Handle, data, data.Length, f)); }
+            finally { FreeUtf8(f); }
+            return this;
+        }
+        public RuntimeOption SetConfig(string ns, string key, string value)
+        {
+            Check();
+            var n = ToUtf8(ns); var k = ToUtf8(key); var v = ToUtf8(value);
+            try { ThrowOnError(NativeMethods.md_option_set_config(Handle, n, k, v)); }
+            finally { FreeUtf8(n); FreeUtf8(k); FreeUtf8(v); }
+            return this;
+        }
+        public RuntimeOption SetTrtEnginePath(string path) { Check(); md_option_set_trt_engine_path(Handle, path); return this; }
+
+        private void Check()
+        {
+            if (Handle == IntPtr.Zero)
+                throw new InvalidOperationException("RuntimeOption handle is invalid (zero).");
+        }
+
+        private void ThrowOnError(MDStatus status)
+        {
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"RuntimeOption native call failed: {GetLastError()}");
+        }
+
+        private static string GetLastError()
+        {
+            var ptr = md_get_last_error();
+            return ptr == IntPtr.Zero ? string.Empty : Utf8Helper.Read(ptr);
+        }
+
+        private static IntPtr ToUtf8(string? s)
+            => string.IsNullOrEmpty(s) ? IntPtr.Zero : Utf8Helper.Alloc(s);
+
+        private static void FreeUtf8(IntPtr p)
+        {
+            if (p != IntPtr.Zero) Marshal.FreeHGlobal(p);
+        }
 
         public void Dispose()
         {
