@@ -44,21 +44,26 @@ int main(int argc, char** argv) {
     }
 
 #ifdef BUILD_VIDEO
-    md::video::VideoDecoder dec;
-    if (!dec.open(argv[2])) {
-        std::printf("cannot open video: %s\n", argv[2]);
+    md::video::VideoDecoderConfig vcfg;
+    auto dec = md::video::VideoDecoder::create(vcfg);
+    if (!dec) {
+        std::printf("cannot create video decoder\n");
+        return 1;
+    }
+    std::string verr;
+    if (!dec->open(argv[2], &verr)) {
+        std::printf("cannot open video: %s (%s)\n", argv[2], verr.c_str());
         return 1;
     }
     std::vector<md::vision::ImageData> frames;
-    md::vision::ImageData f;
-    uint64_t pts = 0;
-    while (frames.size() < 32 && dec.next(&f, &pts)) {
+    md::video::VideoFrame vf;
+    while (frames.size() < 32 && dec->read_one_frame(&vf, &verr)) {
         // VideoDecoder 抽帧为 CPU NV12 → 转 PKG_BGR（TSN 预处理内部再转 RGB）
         md::vision::ImageData bgr =
-            md::vision::ImageData::cvt_color(f, ColorConvertType::CVT_NV122PKG_BGR);
+            md::vision::ImageData::cvt_color(vf.image, ColorConvertType::CVT_NV122PKG_BGR);
         if (!bgr.empty()) frames.push_back(bgr);
     }
-    dec.close();
+    dec->close();
     if (frames.empty()) {
         std::printf("no frames decoded\n");
         return 1;

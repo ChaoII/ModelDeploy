@@ -38,21 +38,26 @@ int main(int argc, char** argv) {
     }
 
 #ifdef BUILD_VIDEO
-    md::video::VideoDecoder dec;
-    if (!dec.open(argv[3])) {
-        std::printf("cannot open video: %s\n", argv[3]);
+    md::video::VideoDecoderConfig vcfg;
+    auto dec = md::video::VideoDecoder::create(vcfg);
+    if (!dec) {
+        std::printf("cannot create video decoder\n");
         return 1;
     }
-    md::vision::ImageData f;
-    uint64_t pts = 0;
+    std::string verr;
+    if (!dec->open(argv[3], &verr)) {
+        std::printf("cannot open video: %s (%s)\n", argv[3], verr.c_str());
+        return 1;
+    }
+    md::video::VideoFrame vf;
     md::vision::action::KeyPointSeq seq;
-    while (seq.frames.size() < 24 && dec.next(&f, &pts)) {
+    while (seq.frames.size() < 24 && dec->read_one_frame(&vf, &verr)) {
         std::vector<md::vision::KeyPointsResult> kps;
-        if (pose.predict(f, &kps) && !kps.empty()) {
+        if (pose.predict(vf.image, &kps) && !kps.empty()) {
             seq.frames.push_back(kps[0].keypoints);
         }
     }
-    dec.close();
+    dec->close();
 #else
     std::printf("BUILD_VIDEO off: demo_action_skeleton requires the video decoder\n");
     return 1;
