@@ -71,10 +71,11 @@ namespace {
             MD_LOG_ERROR << "SophgoBackend is already initialized." << std::endl;
             return false;
         }
+        const_cast<RuntimeOption&>(option).validate();
         auto engine = std::make_shared<SophgoBackend::Engine>();
         engine->bmodel_path = option.sophgo_option.bmodel_path.empty()
             ? option.model_file : option.sophgo_option.bmodel_path;
-        const int device_id = option.sophgo_option.device_id;
+        const int device_id = option.device_id;
 
         bm_handle_t h = nullptr;
         if (bm_dev_request(&h, device_id) != BM_SUCCESS) {

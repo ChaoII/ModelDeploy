@@ -16,6 +16,7 @@ namespace modeldeploy {
 
 
     bool TrtBackend::init(const RuntimeOption& option) {
+        const_cast<RuntimeOption&>(option).validate();
         if (option.device != Device::GPU) {
             MD_LOG_ERROR << "TrtBackend only supports Device::GPU, but now it's "
                 << option.device << "." << std::endl;

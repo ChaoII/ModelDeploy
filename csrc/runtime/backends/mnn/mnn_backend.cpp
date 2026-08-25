@@ -65,6 +65,7 @@ namespace modeldeploy {
 
 
     bool MnnBackend::init(const RuntimeOption& runtime_option) {
+        const_cast<RuntimeOption&>(runtime_option).validate();
         if (initialized_) {
             MD_LOG_ERROR << "MnnBackend is already initialized, cannot initialize again."
                 << std::endl;

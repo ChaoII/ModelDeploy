@@ -117,6 +117,37 @@ namespace modeldeploy {
     }
 
 
+    void RuntimeOption::validate() {
+        switch (backend) {
+            case Backend::TRT:
+                if (device != Device::GPU)
+                    MD_LOG_FATAL << "TRT backend requires GPU device (call set_device(Device::GPU, id))." << std::endl;
+                trt_option.gpu_id = device_id;
+                trt_option.enable_fp16 = enable_fp16;
+                break;
+            case Backend::ORT:
+                ort_option.device = device;
+                ort_option.device_id = device_id;
+                ort_option.enable_fp16 = enable_fp16;
+                break;
+            case Backend::MNN:
+                if (device == Device::OPENCL || device == Device::VULKAN) {
+                    mnn_option.forward_type =
+                        (device == Device::OPENCL) ? modeldeploy::mnn::MNN_FORWARD_OPENCL
+                                                   : modeldeploy::mnn::MNN_FORWARD_VULKAN;
+                }
+                mnn_option.device_id = device_id;
+                mnn_option.cpu_thread_num = cpu_thread_num;
+                break;
+            case Backend::SOPHGO:
+                device = Device::TPU;
+                sophgo_option.device_id = device_id;
+                break;
+            default:
+                break;
+        }
+    }
+
     void RuntimeOption::set_device(const Device dev, const int device_id) {
         this->device = dev;
         this->device_id = device_id;
