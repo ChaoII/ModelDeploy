@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <ostream>
+
 namespace modeldeploy {
     enum Backend {
         ORT,
