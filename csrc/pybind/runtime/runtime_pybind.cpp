@@ -88,13 +88,14 @@ namespace modeldeploy {
                      self.set_model_path(model_path.string(), password);
                  },
                  pybind11::arg("model_path"), pybind11::arg("password") = "")
+            .def("set_device", &RuntimeOption::set_device, pybind11::arg("device"), pybind11::arg("device_id") = 0)
             .def("use_gpu", &RuntimeOption::use_gpu, pybind11::arg("device_id") = 0)
             .def("use_cpu", &RuntimeOption::use_cpu)
             .def("set_cpu_thread_num", &RuntimeOption::set_cpu_thread_num, pybind11::arg("thread_num") = -1)
             .def("use_ort_backend", &RuntimeOption::use_ort_backend)
             .def("use_mnn_backend", &RuntimeOption::use_mnn_backend)
             .def("use_trt_backend", &RuntimeOption::use_trt_backend)
-            .def("use_sophgo_backend", &RuntimeOption::use_sophgo_backend, pybind11::arg("device_id") = 0)
+            .def("use_sophgo_backend", &RuntimeOption::use_sophgo_backend)
             // 不暴露给python
             // .def_readwrite("ort_option", &RuntimeOption::ort_option)
             // .def("set_external_stream", &RuntimeOption::set_external_stream,
