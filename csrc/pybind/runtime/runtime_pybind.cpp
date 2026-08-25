@@ -6,6 +6,7 @@
 #include "pybind/utils/utils.h"
 #include "runtime/runtime.h"
 #include "core/enum_variables.h"
+#include "core/device_validate.h"
 
 namespace modeldeploy {
     std::vector<pybind11::array>
@@ -65,6 +66,18 @@ namespace modeldeploy {
     }
 
     void bind_runtime(pybind11::module& m) {
+        m.def("validate_ptr_device",
+              [](std::uintptr_t ptr, int dev, int device_id) {
+                  DeviceValidateCode code;
+                  const bool ok = modeldeploy::validate_pointer_device(
+                      reinterpret_cast<void*>(ptr), static_cast<Device>(dev), device_id, &code);
+                  if (!ok && code == DeviceValidateCode::Unsupported) {
+                      throw pybind11::not_implemented_error("device not supported for pointer validation");
+                  }
+                  return ok;
+              },
+              pybind11::arg("ptr"), pybind11::arg("device"), pybind11::arg("device_id") = 0);
+
         pybind11::enum_<Device>(m, "Device")
             .value("CPU", Device::CPU)
             .value("GPU", Device::GPU)
