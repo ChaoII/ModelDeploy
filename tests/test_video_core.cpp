@@ -17,6 +17,7 @@ TEST_CASE("VideoFrame 内嵌 ImageData + pts", "[video][core]") {
 TEST_CASE("CodecBackend / HwAccel 字符串往返", "[video][core]") {
     REQUIRE(backend_to_string(CodecBackend::FFmpeg) == "ffmpeg");
     REQUIRE(backend_to_string(CodecBackend::GStreamer) == "gstreamer");
+    REQUIRE(backend_to_string(CodecBackend::Auto) == "auto");
     REQUIRE(hwaccel_to_string(HwAccel::Auto) == "auto");
 }
 

@@ -4,9 +4,14 @@
 
 namespace modeldeploy::video {
 // 解码/编码后端
-enum class CodecBackend { FFmpeg, GStreamer };
+enum class CodecBackend { Auto, FFmpeg, GStreamer };
 inline std::string backend_to_string(CodecBackend b) {
-    return b == CodecBackend::FFmpeg ? "ffmpeg" : "gstreamer";
+    switch (b) {
+        case CodecBackend::Auto: return "auto";
+        case CodecBackend::FFmpeg: return "ffmpeg";
+        case CodecBackend::GStreamer: return "gstreamer";
+    }
+    return "unknown";
 }
 // 硬件加速策略
 enum class HwAccel { Auto, None, Cuda, Vaapi, Sophgo };

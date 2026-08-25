@@ -3,7 +3,9 @@
 #include "csrc/video/backend/encoder_backend.h"
 #include "csrc/video/backend/ffmpeg_decoder.h"
 #include "csrc/video/backend/ffmpeg_encoder.h"
+#include "csrc/video/hw_probe.h"
 #include "csrc/video/video_common.h"
+#include <algorithm>
 #ifdef ENABLE_GSTREAMER
 #include "csrc/video/backend/gst_decoder.h"
 #include "csrc/video/backend/gst_encoder.h"
@@ -18,6 +20,17 @@ VideoCodecCapabilities query_video_capabilities() {
 #ifdef ENABLE_GSTREAMER
     cap.gstreamer_available = GstDecoder::gstreamer_available();
 #endif
+    // 硬件能力由 hw_probe 真实探测填充（去重拼接 FFmpeg + GStreamer 两源）
+    auto f = probe_ffmpeg_hw();
+    cap.hw_decoders = std::move(f.decoders);
+    cap.hw_encoders = std::move(f.encoders);
+    auto g = probe_gstreamer_hw();
+    for (const auto& n : g.decoders)
+        if (std::find(cap.hw_decoders.begin(), cap.hw_decoders.end(), n) == cap.hw_decoders.end())
+            cap.hw_decoders.push_back(n);
+    for (const auto& n : g.encoders)
+        if (std::find(cap.hw_encoders.begin(), cap.hw_encoders.end(), n) == cap.hw_encoders.end())
+            cap.hw_encoders.push_back(n);
     return cap;
 }
 
