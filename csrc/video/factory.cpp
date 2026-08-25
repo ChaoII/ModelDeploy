@@ -13,6 +13,44 @@
 
 namespace modeldeploy::video {
 
+namespace {
+
+// Auto 候选序：FFmpeg → GStreamer。仅返回"已编译且运行时可用"的后端；两者都不可用返 nullptr。
+// 通过临时实例 + runtime_available() 判定，不改动 runtime_available() 本身语义。
+std::shared_ptr<DecoderBackend> pick_available_decoder(const VideoDecoderConfig& cfg) {
+#ifdef ENABLE_FFMPEG
+    {
+        auto d = std::make_shared<FfmpegDecoder>(cfg);
+        if (d->runtime_available()) return d;
+    }
+#endif
+#ifdef ENABLE_GSTREAMER
+    {
+        auto d = std::make_shared<GstDecoder>(cfg);
+        if (d->runtime_available()) return d;
+    }
+#endif
+    return nullptr;
+}
+
+std::shared_ptr<EncoderBackend> pick_available_encoder(const VideoEncoderConfig& cfg) {
+#ifdef ENABLE_FFMPEG
+    {
+        auto e = std::make_shared<FfmpegEncoder>(cfg);
+        if (e->runtime_available()) return e;
+    }
+#endif
+#ifdef ENABLE_GSTREAMER
+    {
+        auto e = std::make_shared<GstEncoder>(cfg);
+        if (e->runtime_available()) return e;
+    }
+#endif
+    return nullptr;
+}
+
+}  // namespace
+
 VideoCodecCapabilities query_video_capabilities() {
     VideoCodecCapabilities cap;
     // FFmpeg 随 BUILD_VIDEO 编译；GStreamer 运行时可用性由插件探测决定
@@ -35,25 +73,51 @@ VideoCodecCapabilities query_video_capabilities() {
 }
 
 std::shared_ptr<DecoderBackend> create_decoder_backend(const VideoDecoderConfig& cfg) {
+    // Auto：候选序 FFmpeg→GStreamer，只选"已编译且运行时可用"者；均不可用返回 nullptr（由门面报后端不可用）
+    if (cfg.backend == CodecBackend::Auto)
+        return pick_available_decoder(cfg);
+
+    // 显式 GStreamer：已编译且运行时可用→返回；已编译但不可用→返回空（不静默换 FFmpeg）；
+    // 未编译（ENABLE_GSTREAMER=OFF）→返回空，保持 Phase1 收尾语义。
     if (cfg.backend == CodecBackend::GStreamer) {
 #ifdef ENABLE_GSTREAMER
-        return std::make_shared<GstDecoder>(cfg);
+        auto d = std::make_shared<GstDecoder>(cfg);
+        if (d->runtime_available()) return d;
+        return nullptr;  // 已编译但运行时不可用：不静默换后端
 #else
         return nullptr;  // 请求的 GStreamer 后端未启用：返回空，由上层回退/报错，而非静默给 FFmpeg
 #endif
     }
-    return std::make_shared<FfmpegDecoder>(cfg);
+    // 显式 FFmpeg（默认）：已编译且运行时可用→返回；不可用→返回空（不静默换）
+#ifdef ENABLE_FFMPEG
+    auto d = std::make_shared<FfmpegDecoder>(cfg);
+    if (d->runtime_available()) return d;
+    return nullptr;
+#else
+    return nullptr;
+#endif
 }
 
 std::shared_ptr<EncoderBackend> create_encoder_backend(const VideoEncoderConfig& cfg) {
+    if (cfg.backend == CodecBackend::Auto)
+        return pick_available_encoder(cfg);
+
     if (cfg.backend == CodecBackend::GStreamer) {
 #ifdef ENABLE_GSTREAMER
-        return std::make_shared<GstEncoder>(cfg);
+        auto e = std::make_shared<GstEncoder>(cfg);
+        if (e->runtime_available()) return e;
+        return nullptr;
 #else
         return nullptr;  // 同上：GStreamer 未启用时不回退 FFmpeg
 #endif
     }
-    return std::make_shared<FfmpegEncoder>(cfg);                 // Task4 FFmpeg 软编
+#ifdef ENABLE_FFMPEG
+    auto e = std::make_shared<FfmpegEncoder>(cfg);
+    if (e->runtime_available()) return e;
+    return nullptr;
+#else
+    return nullptr;
+#endif
 }
 
 } // namespace modeldeploy::video

@@ -1,7 +1,11 @@
 #include "catch2/catch_test_macros.hpp"
 #include "csrc/video/factory.h"
+#include "csrc/video/backend/decoder_backend.h"
+#include "csrc/video/backend/encoder_backend.h"
 #include "csrc/video/video_codec_config.h"
 #include "csrc/video/video_common.h"
+#include "csrc/video/video_decoder.h"
+#include "csrc/video/video_encoder.h"
 #include <algorithm>
 #include <vector>
 
@@ -71,5 +75,57 @@ TEST_CASE("GStreamer 后端能力与工厂一致", "[video][factory]") {
     auto cap = query_video_capabilities();
     check_backend_consistency(cap, CodecBackend::GStreamer, CodecBackend::GStreamer,
                               cap.gstreamer_available);
+}
+
+TEST_CASE("Auto 后端在本环境创建非空解码/编码后端", "[video][factory]") {
+    // 本构建 FFmpeg 随 BUILD_VIDEO 编译且运行时可用（libx264/软解齐备）→ Auto 应能建出后端
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::Auto;
+    auto db = create_decoder_backend(dcfg);
+    REQUIRE(db != nullptr);
+    REQUIRE(db->runtime_available());
+
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::Auto;
+    auto eb = create_encoder_backend(ecfg);
+    REQUIRE(eb != nullptr);
+    REQUIRE(eb->runtime_available());
+}
+
+TEST_CASE("Auto 门面 create 能成功建后端", "[video][factory]") {
+    auto cap = query_video_capabilities();
+    if (!cap.ffmpeg_available && !cap.gstreamer_available)
+        SKIP("无任何可用后端，Auto 无法建后端");
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::Auto;
+    auto vd = VideoDecoder::create(dcfg);
+    REQUIRE(vd != nullptr);
+
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::Auto;
+    auto ve = VideoEncoder::create(ecfg);
+    REQUIRE(ve != nullptr);
+}
+
+TEST_CASE("Auto 按候选序选出的后端运行时必可用", "[video][factory][autofallback]") {
+    // factory 只返抽象指针不可 dynamic_cast；改为断言：Auto 选出的后端 runtime_available() 必为 true。
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::Auto;
+    auto db = create_decoder_backend(dcfg);
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::Auto;
+    auto eb = create_encoder_backend(ecfg);
+
+    auto cap = query_video_capabilities();
+    if (!cap.ffmpeg_available && !cap.gstreamer_available) {
+        // 理论场景：两者都不可用 → 返回空而非崩溃。当前构建必然落到非空分支（FFmpeg 可用）。
+        REQUIRE(db == nullptr);
+        REQUIRE(eb == nullptr);
+    } else {
+        REQUIRE(db != nullptr);
+        REQUIRE(db->runtime_available());
+        REQUIRE(eb != nullptr);
+        REQUIRE(eb->runtime_available());
+    }
 }
 
