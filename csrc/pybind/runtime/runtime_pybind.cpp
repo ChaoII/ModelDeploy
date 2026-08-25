@@ -2,6 +2,8 @@
 // Created by aichao on 2025/6/12.
 //
 
+#include <cstdint>
+
 #include "utils/utils.h"
 #include "pybind/utils/utils.h"
 #include "runtime/runtime.h"

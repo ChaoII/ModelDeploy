@@ -91,7 +91,7 @@ namespace ModelDeploy
 
         /// <summary>
         /// 校验裸指针是否为指定设备内存（底层 md_ptr_validate_device）。
-        /// CPU：非空→true/空→InvalidOperationException；GPU/TPU（未实现）→NotSupportedException。
+        /// CPU：非空→true/空→InvalidOperationException；GPU（未编 CUDA 时）/TPU→NotSupportedException。
         /// </summary>
         public static bool ValidatePointerDevice(IntPtr ptr, Device dev, int deviceId = 0)
         {

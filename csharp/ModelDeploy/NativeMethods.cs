@@ -136,7 +136,7 @@ string ext, out IntPtr buf, out UIntPtr n);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_image_plane_ptrs(IntPtr handle, out int dev, out IntPtr y, out IntPtr uv);
 
-        // 裸指针设备归属校验：CPU 非空→OK；CPU 空→INVALID_ARGUMENT；GPU/TPU（未实现）→UNSUPPORTED_TYPE
+        // 裸指针设备归属校验：CPU 非空→OK；CPU 空→INVALID_ARGUMENT；GPU（未编 CUDA 时）/TPU→UNSUPPORTED_TYPE
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_ptr_validate_device(IntPtr ptr, int dev, int device_id);
 
