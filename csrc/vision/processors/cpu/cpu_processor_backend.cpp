@@ -13,6 +13,9 @@
 #include "vision/utils.h"
 #include "vision/face/face_det/scrfd_preproc.h"
 #include <algorithm>
+#include <cstring>
+#include <memory>
+#include <vector>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -103,6 +106,9 @@ namespace modeldeploy::vision {
     bool CpuProcessorBackend::crop(const ImageData& image, float x, float y,
                                    float w, float h, ImageData* out) {
         if (!out || w <= 0 || h <= 0) return false;
+        if (image.type() == MdImageType::NV12 && image.plane_count() >= 2) {
+            return crop_nv12(image, x, y, w, h, out);
+        }
         cv::Mat src;
         if (!image.asMat(&src)) return false;
         cv::Rect2f cv_rect(x, y, w, h);
@@ -112,6 +118,37 @@ namespace modeldeploy::vision {
         if (cropped.empty()) return false;
         *out = ImageData(std::move(cropped));
         return true;
+    }
+
+    // NV12 双平面裁剪：Y/UV 各取子矩形（UV 需偶数坐标对齐），输出仍是 NV12 两平面。
+    bool CpuProcessorBackend::crop_nv12(const ImageData& image, float x, float y,
+                                        float w, float h, ImageData* out) {
+        const int iw = image.width(), ih = image.height();
+        int x0 = static_cast<int>(x), y0 = static_cast<int>(y);
+        int x1 = static_cast<int>(x + w), y1 = static_cast<int>(y + h);
+        if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
+        if (x1 > iw) x1 = iw; if (y1 > ih) y1 = ih;
+        if (x1 <= x0 || y1 <= y0) return false;
+        x0 &= ~1; y0 &= ~1; x1 &= ~1; y1 &= ~1;   // UV 采样偶数对齐
+        if (x1 <= x0 || y1 <= y0) return false;
+        const int cw = x1 - x0, ch = y1 - y0;     // 均为偶数
+        const auto py = image.plane(0);
+        const auto puv = image.plane(1);
+        const int step_y = py.step > 0 ? py.step : iw;
+        const int step_uv = puv.step > 0 ? puv.step : iw;
+        struct Nv12CropBuf { std::vector<uint8_t> y, uv; };
+        auto holder = std::make_shared<Nv12CropBuf>();
+        holder->y.resize(static_cast<size_t>(cw) * ch);
+        holder->uv.resize(static_cast<size_t>(cw) * (ch / 2));  // 每行 cw 字节(交错)，ch/2 行
+        for (int j = 0; j < ch; ++j)
+            std::memcpy(holder->y.data() + static_cast<size_t>(j) * cw,
+                        py.data + static_cast<size_t>(y0 + j) * step_y + x0, cw);
+        for (int j = 0; j < ch / 2; ++j)
+            std::memcpy(holder->uv.data() + static_cast<size_t>(j) * cw,
+                        puv.data + static_cast<size_t>(y0 / 2 + j) * step_uv + x0, cw);
+        ImageData::Plane pl[2] = {{holder->y.data(), cw}, {holder->uv.data(), cw}};
+        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, cw, ch, Device::CPU, holder);
+        return !out->empty();
     }
 
     bool CpuProcessorBackend::rotate(const ImageData& image, RotateFlags flag, ImageData* out) {

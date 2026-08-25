@@ -28,10 +28,11 @@ namespace modeldeploy::vision {
     class MODELDEPLOY_CXX_EXPORT VisionProcessorBackend {
     public:
         // 是否支持在指定设备上执行某图像算子。
-        // CPU→全支持；GPU/TPU→仅 Preprocess/Draw（其余 op 前置 fast-fail，不建 backend）。
+        // CPU→全支持；GPU→Preprocess/Draw/Crop（NV12 设备侧裁剪）已实现，其余 op 前置 fast-fail。
         static bool supports(Device d, ImageOp op) {
             if (d == Device::CPU) return true;
-            return op == ImageOp::Preprocess || op == ImageOp::Draw;
+            return op == ImageOp::Preprocess || op == ImageOp::Draw ||
+                   op == ImageOp::Crop;
         }
 
         virtual ~VisionProcessorBackend() = default;

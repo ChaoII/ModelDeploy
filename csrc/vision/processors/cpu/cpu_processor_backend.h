@@ -40,6 +40,8 @@ namespace modeldeploy::vision {
                                     float pad_val, std::vector<LetterBoxRecord>* records) override;
         bool resize(const ImageData& image, ImageData* out, int width, int height) override;
         bool crop(const ImageData& image, float x, float y, float w, float h, ImageData* out) override;
+        // NV12 双平面裁剪（输出仍为 NV12），供 ImageData::crop 内部调用
+        bool crop_nv12(const ImageData& image, float x, float y, float w, float h, ImageData* out);
         bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override;
         bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override;
         bool rotate_crop(const ImageData& image, std::array<float, 8> box, ImageData* out) override;

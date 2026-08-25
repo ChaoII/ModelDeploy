@@ -2387,6 +2387,7 @@ MDStatus md_audio_asr(MDModelHandle h, const float* samples, size_t n, int sampl
 #endif
 }
 
+#ifdef BUILD_AUDIO
 static MDStatus fill_asr_result(audio::asr::SenseVoice* m, const std::vector<float>& data,
                                 md_model_handle* mh, MDAsrResult* out) {
     audio::asr::SenseVoiceResult r;
@@ -2407,6 +2408,7 @@ static MDStatus fill_asr_result(audio::asr::SenseVoice* m, const std::vector<flo
     out->nospeech = mh->asr_nospeech_ ? 1 : 0;
     return MD_OK;
 }
+#endif
 
 MDStatus md_audio_asr_wav_result(MDModelHandle h, const char* wav_path, MDAsrResult* out) {
     auto* mh = static_cast<md_model_handle*>(h);

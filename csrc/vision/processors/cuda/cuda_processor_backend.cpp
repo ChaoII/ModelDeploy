@@ -30,6 +30,47 @@ namespace modeldeploy::vision {
         }
     }
 
+    bool CudaProcessorBackend::crop(const ImageData& image, float x, float y,
+                                    float w, float h, ImageData* out) {
+        if (!out || image.type() != MdImageType::NV12 || image.plane_count() < 2) return false;
+        const int iw = image.width(), ih = image.height();
+        int x0 = static_cast<int>(x), y0 = static_cast<int>(y);
+        int x1 = static_cast<int>(x + w), y1 = static_cast<int>(y + h);
+        if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
+        if (x1 > iw) x1 = iw; if (y1 > ih) y1 = ih;
+        if (x1 <= x0 || y1 <= y0) return false;
+        x0 &= ~1; y0 &= ~1; x1 &= ~1; y1 &= ~1;   // UV 偶数对齐
+        if (x1 <= x0 || y1 <= y0) return false;
+        const int cw = x1 - x0, ch = y1 - y0;     // 偶数
+        const auto py = image.plane(0);
+        const auto puv = image.plane(1);
+        const int step_y = py.step > 0 ? py.step : iw;
+        const int step_uv = puv.step > 0 ? puv.step : iw;
+        const size_t ybytes = static_cast<size_t>(cw) * ch;
+        const size_t uvbytes = static_cast<size_t>(cw) * (ch / 2);  // 每行 cw 字节(交错)，ch/2 行
+        uint8_t* dbuf = nullptr;
+        if (cudaMalloc(&dbuf, ybytes + uvbytes) != cudaSuccess) return false;
+        // 在持久 stream 上拷贝 + 同步，避免与后续消费该裁剪块的非阻塞 stream 产生跨流竞争
+        // （同步默认流 D2D 拷贝在多次连续调用后可能与持久流 kernel 竞速）。
+        cudaStream_t cstream = get_persistent_stream(&stream_);
+        cudaMemcpy2DAsync(dbuf, static_cast<size_t>(cw),
+                          py.data + static_cast<size_t>(y0) * step_y + x0,
+                          static_cast<size_t>(step_y),
+                          static_cast<size_t>(cw), static_cast<size_t>(ch),
+                          cudaMemcpyDeviceToDevice, cstream);
+        cudaMemcpy2DAsync(dbuf + ybytes, static_cast<size_t>(cw),
+                          puv.data + static_cast<size_t>(y0 / 2) * step_uv + x0,
+                          static_cast<size_t>(step_uv),
+                          static_cast<size_t>(cw), static_cast<size_t>(ch / 2),
+                          cudaMemcpyDeviceToDevice, cstream);
+        cudaStreamSynchronize(cstream);
+        std::shared_ptr<void> owner(dbuf, [](void* p) { if (p) cudaFree(p); });
+        ImageData::Plane pl[2] = {{dbuf, cw}, {dbuf + ybytes, cw}};
+        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, cw, ch,
+                                      Device::GPU, std::move(owner));
+        return !out->empty();
+    }
+
     bool CudaProcessorBackend::yolo_preprocess(const ImageData& image, Tensor* out,
                                                const std::vector<int>& dst_size,
                                                float pad_val, LetterBoxRecord* record) {
@@ -76,6 +117,16 @@ namespace modeldeploy::vision {
         const std::vector<float>& alpha,
         const std::vector<float>& beta,
         bool swap_rb, float pad_value) {
+        // NV12 双平面源 → NV12 融合 kernel（一次 launch：crop/resize + YUV2BGR + norm→CHW）
+        if (image.type() == MdImageType::NV12 && image.plane_count() >= 2) {
+            return fused_preprocess_nv12_cuda(image.plane(0).data, image.plane(1).data,
+                                              {image.width(), image.height()},
+                                              image.plane(0).step, image.plane(1).step,
+                                              out, dst_size,
+                                              origin_x, origin_y, scale_x, scale_y,
+                                              alpha, beta, swap_rb, pad_value,
+                                              get_persistent_stream(&stream_), &out_pool_);
+        }
         return fused_preprocess_cuda(image.plane(0).data, {image.width(), image.height()},
                                      out, dst_size,
                                      origin_x, origin_y, scale_x, scale_y,
@@ -112,6 +163,23 @@ namespace modeldeploy::vision {
         const std::vector<float>& scales_x, const std::vector<float>& scales_y,
         const std::vector<float>& alpha, const std::vector<float>& beta,
         bool swap_rb, float pad_value) {
+        // 全 NV12 批（device/host 混合亦可）→ 单次 NV12 融合 kernel
+        if (!images.empty()) {
+            bool all_nv12 = true;
+            for (const auto& im : images) {
+                if (im.type() != MdImageType::NV12 || im.plane_count() < 2) {
+                    all_nv12 = false;
+                    break;
+                }
+            }
+            if (all_nv12) {
+                return fused_preprocess_nv12_batch_cuda(images, out, dst_size,
+                                                        origins_x, origins_y,
+                                                        scales_x, scales_y,
+                                                        alpha, beta, swap_rb, pad_value,
+                                                        get_persistent_stream(&stream_), &out_pool_);
+            }
+        }
         return fused_preprocess_batch_cuda(images, out, dst_size, origins_x, origins_y,
                                            scales_x, scales_y, alpha, beta, swap_rb, pad_value,
                                            get_persistent_stream(&stream_), &out_pool_);

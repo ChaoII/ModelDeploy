@@ -67,4 +67,32 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
                       cudaStream_t stream = nullptr,
                       CudaOutputBufferPool* dst_pool = nullptr);
 
+// NV12 双平面融合预处理（crop/resize -> YUV2BGR -> normalize -> CHW，一次 launch）。
+// 语义与 fused_preprocess_cuda 一致，源为 Y/UV 两平面；host/device 指针自动识别。
+bool fused_preprocess_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
+                                const std::vector<int>& src_size,
+                                int step_y, int step_uv,
+                                Tensor* out,
+                                const std::vector<int>& dst_size,
+                                float origin_x, float origin_y,
+                                float scale_x, float scale_y,
+                                const std::vector<float>& alpha,
+                                const std::vector<float>& beta,
+                                bool swap_rb, float pad_value,
+                                cudaStream_t stream = nullptr,
+                                CudaOutputBufferPool* dst_pool = nullptr);
+
+bool fused_preprocess_nv12_batch_cuda(const std::vector<ImageData>& images,
+                                      Tensor* out,
+                                      const std::vector<int>& dst_size,
+                                      const std::vector<float>& origins_x,
+                                      const std::vector<float>& origins_y,
+                                      const std::vector<float>& scales_x,
+                                      const std::vector<float>& scales_y,
+                                      const std::vector<float>& alpha,
+                                      const std::vector<float>& beta,
+                                      bool swap_rb, float pad_value,
+                                      cudaStream_t stream = nullptr,
+                                      CudaOutputBufferPool* dst_pool = nullptr);
+
 } // namespace modeldeploy::vision

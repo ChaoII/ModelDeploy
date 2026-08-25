@@ -11,6 +11,9 @@
 #include "vision/common/image_data.h"
 #include "vision/processors/processor_factory.h"
 #include <opencv2/opencv.hpp>
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#endif
 
 
 namespace modeldeploy::vision {
@@ -117,8 +120,10 @@ namespace modeldeploy::vision {
     }
 
     // 逐平面搬运（尊重源步长，去处源数据填充），用于 clone / toCpu 深拷贝。
+    // 设备(GPU)源用 cudaMemcpy2D 做 D2H；CPU 源用 std::memcpy。
     static void copy_planes_like(const ImageDataImpl* src, ImageDataImpl* dst) {
         const size_t n = (std::min)(src->nplanes, dst->nplanes);
+        const bool src_on_gpu = (src->device == Device::GPU);
         for (size_t i = 0; i < n; ++i) {
             size_t rows = static_cast<size_t>(src->h);
             size_t stride = static_cast<size_t>(src->w) * static_cast<size_t>(src->ch);
@@ -134,9 +139,22 @@ namespace modeldeploy::vision {
             uint8_t* d = const_cast<uint8_t*>(dst->planes[i].data);
             const int step_src = src->planes[i].step > 0 ? src->planes[i].step : static_cast<int>(stride);
             const int step_dst = dst->planes[i].step;
-            for (size_t r = 0; r < rows; ++r)
-                std::memcpy(d + static_cast<size_t>(r) * step_dst,
-                            s + static_cast<size_t>(r) * step_src, stride);
+            if (src_on_gpu) {
+#ifdef WITH_GPU
+                const cudaError_t err = cudaMemcpy2D(d, step_dst, s, step_src,
+                                                     stride, rows, cudaMemcpyDeviceToHost);
+                if (err != cudaSuccess) {
+                    MD_LOG_WARN << "copy_planes_like: cudaMemcpy2D failed: "
+                                << cudaGetErrorString(err) << std::endl;
+                }
+#else
+                (void)rows; (void)stride; (void)step_src; (void)step_dst;
+#endif
+            } else {
+                for (size_t r = 0; r < rows; ++r)
+                    std::memcpy(d + static_cast<size_t>(r) * step_dst,
+                                s + static_cast<size_t>(r) * step_src, stride);
+            }
         }
     }
 

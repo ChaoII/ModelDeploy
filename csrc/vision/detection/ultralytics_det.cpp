@@ -90,6 +90,19 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsDet::batch_predict(const std::vector<ImageData>& images,
                                        std::vector<std::vector<DetectionResult>>* results,
                                        TimerArray* timers) {
+        // 单帧 NV12/NV21 或设备帧 → 走零拷贝 NV12 单帧路径（predict_single_nv12）。
+        // 否则单帧会落入 preprocess() → yolo_preprocess（把 plane(0) 当打包 BGR），
+        // 对 NV12 帧即错读 Y 平面 → 检测结果错误甚至越界段错误。
+        if (images.size() == 1) {
+            const auto& im = images[0];
+            if (im.format() == MdImageType::NV12 || im.format() == MdImageType::NV21 ||
+                im.device() != Device::CPU) {
+                results->clear();
+                results->resize(1);
+                LetterBoxRecord lbr;
+                return predict_single_nv12(im, &(*results)[0], &lbr, timers);
+            }
+        }
         std::vector<LetterBoxRecord> letter_box_records;
         if (timers) timers->pre_timer.start();
         if (!preprocessor_.run(images, &reused_input_tensors_, &letter_box_records)) {
