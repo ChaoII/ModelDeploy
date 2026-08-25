@@ -117,19 +117,13 @@ namespace modeldeploy {
     }
 
 
-    void RuntimeOption::use_cpu() { device = Device::CPU; }
-
-
-    void RuntimeOption::use_gpu(const int gpu_id) {
-        device = Device::GPU;
-        device_id = gpu_id;
-    }
-
-    void RuntimeOption::use_opencl(const int device_id) {
-        device = Device::OPENCL;
+    void RuntimeOption::set_device(const Device dev, const int device_id) {
+        this->device = dev;
         this->device_id = device_id;
     }
-
+    void RuntimeOption::use_cpu() { set_device(Device::CPU, 0); }
+    void RuntimeOption::use_gpu(const int gpu_id) { set_device(Device::GPU, gpu_id); }
+    void RuntimeOption::use_opencl(const int device_id) { set_device(Device::OPENCL, device_id); }
 
     void RuntimeOption::set_external_stream(void* external_stream) {
         ort_option.external_stream = external_stream;
@@ -165,12 +159,10 @@ namespace modeldeploy {
 #endif
     }
 
-    void RuntimeOption::use_sophgo_backend(const int device_id) {
+    void RuntimeOption::use_sophgo_backend() {
 #ifdef ENABLE_SOPHGO
         backend = Backend::SOPHGO;
         device = Device::TPU;
-        this->device_id = device_id;
-        sophgo_option.device_id = device_id;
 #else
         MD_LOG_FATAL << "The ModelDeploy didn't compile with SOPHGO backend." << std::endl;
 #endif
