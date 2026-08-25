@@ -7,7 +7,7 @@ fn test_data(rel: &str) -> String {
 
 fn main() -> Result<()> {
     let mut opt = RuntimeOption::new()?;
-    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU).set_cpu_threads(4);
+    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU, 0)?.set_cpu_threads(4)?;
 
     let model = UltralyticsDet::new(&test_data("test_models/onnx/yolo11n/yolo11n.onnx"), &opt)?;
     let img = Image::read(&test_data("test_images/test_detection0.jpg"))?;

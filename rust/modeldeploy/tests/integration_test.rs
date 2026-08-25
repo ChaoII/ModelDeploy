@@ -19,7 +19,9 @@ fn test_img(rel: &str) -> String {
 
 fn cpu_opt() -> Result<RuntimeOption> {
     let mut opt = RuntimeOption::new()?;
-    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU).set_cpu_threads(4);
+    opt.use_ort()
+        .set_device(modeldeploy::ffi::MDDevice::CPU, 0)?
+        .set_cpu_threads(4)?;
     Ok(opt)
 }
 

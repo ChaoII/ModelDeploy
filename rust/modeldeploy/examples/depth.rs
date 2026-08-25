@@ -7,7 +7,7 @@ fn test_data(rel: &str) -> String {
 
 fn main() -> Result<()> {
     let mut opt = RuntimeOption::new()?;
-    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU);
+    opt.use_ort().set_device(modeldeploy::ffi::MDDevice::CPU, 0)?;
     let model = UltralyticsDepth::new(&test_data("test_models/onnx/yolo26n/yolo26n-depth.onnx"), &opt)?;
     let img = Image::read(&test_data("test_images/bus.jpg"))?;
     let depth = model.predict(&img)?;

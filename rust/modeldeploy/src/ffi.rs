@@ -377,10 +377,15 @@ extern "C" {
     // ── 选项 ──
     pub fn md_option_create(out: *mut MDOptionHandle) -> MDStatus;
     pub fn md_option_destroy(h: MDOptionHandle);
-    pub fn md_option_set_device(h: MDOptionHandle, d: MDDevice);
-    pub fn md_option_set_backend(h: MDOptionHandle, b: MDBackend);
-    pub fn md_option_set_cpu_threads(h: MDOptionHandle, n: c_int);
-    pub fn md_option_set_fp16(h: MDOptionHandle, enable: c_int);
+    pub fn md_option_set_device(h: MDOptionHandle, d: MDDevice, device_id: c_int) -> MDStatus;
+    pub fn md_option_set_backend(h: MDOptionHandle, b: MDBackend) -> MDStatus;
+    pub fn md_option_set_cpu_threads(h: MDOptionHandle, n: c_int) -> MDStatus;
+    pub fn md_option_set_fp16(h: MDOptionHandle, enable: c_int) -> MDStatus;
+    pub fn md_option_set_external_stream(h: MDOptionHandle, stream: *mut c_void) -> MDStatus;
+    pub fn md_option_set_password(h: MDOptionHandle, pwd: *const c_char) -> MDStatus;
+    pub fn md_option_set_model_path(h: MDOptionHandle, path: *const c_char, pwd: *const c_char) -> MDStatus;
+    pub fn md_option_set_model_buffer(h: MDOptionHandle, data: *const u8, len: usize, fmt: *const c_char) -> MDStatus;
+    pub fn md_option_set_config(h: MDOptionHandle, ns: *const c_char, key: *const c_char, val: *const c_char) -> MDStatus;
     pub fn md_option_set_trt_engine_path(h: MDOptionHandle, path: *const c_char);
 
     // ── 图像 ──
