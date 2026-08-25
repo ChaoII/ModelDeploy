@@ -25,6 +25,9 @@
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#endif
 
 namespace {
 
@@ -1687,5 +1690,30 @@ TEST_CASE("nlp tool capi", "[capi]") {
     REQUIRE(md_nlp_stats("hello world 你好", &chars, &words, &sents) == MD_OK);
     REQUIRE(words == 3);
     REQUIRE(sents == 1);
+}
+#endif
+
+TEST_CASE("capi validate ptr CPU", "[capi]") {
+    unsigned char tmp = 1;
+    REQUIRE(md_ptr_validate_device(&tmp, MD_DEV_CPU, 0) == MD_OK);
+    REQUIRE(md_ptr_validate_device(nullptr, MD_DEV_CPU, 0) == MD_ERR_INVALID_ARGUMENT);
+    REQUIRE(md_ptr_validate_device(nullptr, MD_DEV_CPU, 2) == MD_ERR_INVALID_ARGUMENT);
+}
+TEST_CASE("capi validate ptr unsupported devices", "[capi]") {
+    unsigned char tmp = 1;
+    REQUIRE(md_ptr_validate_device(&tmp, MD_DEV_TPU, 0) == MD_ERR_UNSUPPORTED_TYPE);
+    REQUIRE(md_ptr_validate_device(&tmp, MD_DEV_OPENCL, 0) == MD_ERR_UNSUPPORTED_TYPE);
+    REQUIRE(md_ptr_validate_device(&tmp, MD_DEV_VULKAN, 0) == MD_ERR_UNSUPPORTED_TYPE);
+}
+#ifdef WITH_GPU
+TEST_CASE("capi validate ptr GPU", "[capi][gpu]") {
+    void* d = nullptr;
+    if (cudaMalloc(&d, 1024) != cudaSuccess) return;  // no card skip
+    int dev = 0; cudaGetDevice(&dev);
+    REQUIRE(md_ptr_validate_device(d, MD_DEV_GPU, dev) == MD_OK);
+    REQUIRE(md_ptr_validate_device(d, MD_DEV_GPU, dev + 1) == MD_ERR_INVALID_ARGUMENT);
+    unsigned char host = 1;
+    REQUIRE(md_ptr_validate_device(&host, MD_DEV_GPU, dev) == MD_ERR_INVALID_ARGUMENT);
+    cudaFree(d);
 }
 #endif

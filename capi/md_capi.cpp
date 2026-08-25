@@ -18,6 +18,8 @@
 
 #include "runtime/backends/mnn/option.h"
 
+#include "core/device_validate.h"
+
 #include <opencv2/opencv.hpp>
 #ifdef HAVE_OPENCV_HIGHGUI
 #include <opencv2/highgui.hpp>
@@ -428,6 +430,30 @@ MDStatus md_option_set_model_buffer(MDOptionHandle h, const uint8_t* data, size_
 
 void md_option_set_trt_engine_path(MDOptionHandle h, const char* path) {
     static_cast<md_option_handle*>(h)->opt.ort_option.trt_engine_cache_path = path ? path : "";
+}
+
+MDStatus md_ptr_validate_device(const void* ptr, MDDevice dev, int device_id) {
+    if (device_id < 0) device_id = 0;
+    Device d;
+    switch (dev) {
+        case MD_DEV_CPU: d = Device::CPU; break;
+        case MD_DEV_GPU: d = Device::GPU; break;
+        case MD_DEV_TPU: d = Device::TPU; break;
+        default:
+            set_error_fmt("md_ptr_validate_device: device %d not supported for pointer validation", (int)dev);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    DeviceValidateCode code;
+    modeldeploy::validate_pointer_device(ptr, d, device_id, &code);
+    switch (code) {
+        case DeviceValidateCode::Ok: return MD_OK;
+        case DeviceValidateCode::Invalid:
+            set_error("md_ptr_validate_device: pointer is not valid/device memory for the claimed device");
+            return MD_ERR_INVALID_ARGUMENT;
+        default:
+            set_error_fmt("md_ptr_validate_device: device %d not supported for pointer validation", (int)dev);
+            return MD_ERR_UNSUPPORTED_TYPE;
+    }
 }
 
 namespace {

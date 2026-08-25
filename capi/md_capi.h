@@ -147,6 +147,12 @@ MD_CAPI_EXPORT MDStatus md_option_set_model_buffer(MDOptionHandle, const uint8_t
 MD_CAPI_EXPORT MDStatus md_option_set_config(MDOptionHandle, const char* ns, const char* key, const char* value);
 MD_CAPI_EXPORT void md_option_set_trt_engine_path(MDOptionHandle, const char* path);  /* 保留，向后兼容 */
 
+/* 设备归属校验：校验裸指针是否属于所声明的设备。
+ *  - CPU：非空 → MD_OK；空 → MD_ERR_INVALID_ARGUMENT。
+ *  - GPU：设备内存且 driver_id 相符 → MD_OK，否则 MD_ERR_INVALID_ARGUMENT。
+ *  - TPU/OPENCL/VULKAN：本入口不支持 → MD_ERR_UNSUPPORTED_TYPE。 */
+MD_CAPI_EXPORT MDStatus md_ptr_validate_device(const void* ptr, MDDevice dev, int device_id);
+
 /* ==================== 图像 ==================== */
 
 /* 从文件读图（库内解码 + 分配，调用方只需 destroy） */
