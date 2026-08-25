@@ -38,6 +38,9 @@ struct VideoEncoderConfig : VideoCodecConfig {
     std::string format = "auto"; // auto/rtsp/rtmp/flv/mp4
     int max_b_frames = 0;
     bool low_latency = true;
+    // GPU 直接编码：true 时（配合 hw_accel=Cuda 且 nvenc/nvh264enc）encode_from_gpu_nv12
+    // 吃设备 NV12 指针直编，不做主机往返。仅设备路径使用，CPU encode() 不受影响。
+    bool gpu_direct_input = false;
 
     VideoEncoderConfig& set_fps(int v) { fps = v; return *this; }
     VideoEncoderConfig& set_bitrate_kbps(int v) { bitrate_kbps = v; return *this; }

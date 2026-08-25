@@ -4,6 +4,7 @@
 #ifdef ENABLE_GSTREAMER
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
+#include <gst/video/video.h>
 #include <chrono>
 #include <cstring>
 #endif
@@ -11,6 +12,26 @@
 namespace modeldeploy::video {
 
 #ifdef ENABLE_GSTREAMER
+
+// GPU 直编：把设备 NV12 指针包装为 GStreamer CUDA memory（CUDAMemory）喂给 nvh264enc。
+// gst/cuda/gstcudamemory.h 链会夹带 cudaGL.h（MSVC 上与 GL/gl.h 冲突），故只手工声明用到的
+// 几个 gstcuda 符号 + 引用 cuda.h（CUdeviceptr/CUcontext），避开冲突头。
+#ifdef HAVE_GSTCUDA
+#include <cuda.h>
+extern "C" {
+typedef struct _GstCudaContext GstCudaContext;
+typedef struct _GstCudaStream GstCudaStream;
+typedef struct _GstCudaAllocator GstCudaAllocator;
+GType gst_cuda_context_get_type(void);
+GstCudaContext* gst_cuda_context_new(guint device_id);
+GType gst_cuda_allocator_get_type(void);
+GstMemory* gst_cuda_allocator_alloc_wrapped(GstCudaAllocator* allocator, GstCudaContext* context,
+                                            GstCudaStream* stream, const GstVideoInfo* info,
+                                            CUdeviceptr dev_ptr, gpointer user_data,
+                                            GDestroyNotify notify);
+#define GST_CUDA_ALLOCATOR(obj) ((GstCudaAllocator*)(obj))
+}
+#endif // HAVE_GSTCUDA
 
 using modeldeploy::vision::ImageData;
 
@@ -92,6 +113,11 @@ int GstEncoder::resolve_encoder(std::string* err) {
         set_err(err, "no-x264enc");
         return -1;
     }
+    // GPU 直编（gpu_direct_input）只能走 nvh264enc 设备路径（CUDA memory 直编）
+    if (cfg_.gpu_direct_input && choice != 1) {
+        set_err(err, "gpu-direct-needs-nvh264enc");
+        return -1;
+    }
     encoder_is_nv_ = (choice == 1);
     return choice;
 }
@@ -155,10 +181,18 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
                        " speed-preset=" + (cfg_.preset.empty() ? "ultrafast" : cfg_.preset) +
                        " tune=zerolatency key-int-max=" + std::to_string(cfg_.gop);
     }
-    std::string launch =
-        "appsrc name=src format=time "
-        "! videoconvert !" + encoder_part +
-        " ! h264parse ! mp4mux ! filesink location=\"" + url + "\"";
+    // GPU 直编（gpu_direct_input）：设备 NV12 CUDA memory 直接进 nvh264enc，无需 videoconvert
+    const bool gpu_direct = cfg_.gpu_direct_input && (enc == 1);
+    std::string launch;
+    if (gpu_direct) {
+        launch = "appsrc name=src format=time "
+                 "! video/x-raw(memory:CUDAMemory),format=NV12 !" + encoder_part +
+                 " ! h264parse ! mp4mux ! filesink location=\"" + url + "\"";
+    } else {
+        launch = "appsrc name=src format=time "
+                 "! videoconvert !" + encoder_part +
+                 " ! h264parse ! mp4mux ! filesink location=\"" + url + "\"";
+    }
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
     if (gerr) g_error_free(gerr);
@@ -166,9 +200,17 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     appsrc_ = gst_bin_get_by_name(GST_BIN(pipeline_), "src");
     if (!appsrc_) return;
 
-    GstCaps* caps = gst_caps_new_simple(
-        "video/x-raw", "format", G_TYPE_STRING, "BGR", "width", G_TYPE_INT, w, "height",
-        G_TYPE_INT, h, "framerate", GST_TYPE_FRACTION, fps, 1, nullptr);
+    GstCaps* caps;
+    if (gpu_direct) {
+        caps = gst_caps_from_string(
+            ("video/x-raw(memory:CUDAMemory),format=NV12,width=" + std::to_string(w) +
+             ",height=" + std::to_string(h) + ",framerate=" + std::to_string(fps) + "/1")
+                .c_str());
+    } else {
+        caps = gst_caps_new_simple(
+            "video/x-raw", "format", G_TYPE_STRING, "BGR", "width", G_TYPE_INT, w, "height",
+            G_TYPE_INT, h, "framerate", GST_TYPE_FRACTION, fps, 1, nullptr);
+    }
     gst_app_src_set_caps(GST_APP_SRC(appsrc_), caps);
     gst_caps_unref(caps);
 
@@ -177,7 +219,7 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     // 缓冲/背压策略：max-buffers + max-bytes 设上限；leaky 保持默认 none →
     // 队列满时 gst_app_src_push_buffer 阻塞推帧（天然背压，不丢帧，保证回读帧数精确）。
     gst_app_src_set_max_buffers(GST_APP_SRC(appsrc_), (guint)cfg_.async_queue_size);
-    gst_app_src_set_max_bytes(GST_APP_SRC(appsrc_), (guint64)w * h * 3 * cfg_.async_queue_size);
+    gst_app_src_set_max_bytes(GST_APP_SRC(appsrc_), (guint64)w * h * 3 / 2 * cfg_.async_queue_size);
 }
 
 bool GstEncoder::start_pipeline(std::string* err) {
@@ -239,12 +281,85 @@ bool GstEncoder::encode(const modeldeploy::vision::ImageData& image, std::string
 
 bool GstEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
                                       std::string* err) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return encode_from_gpu_nv12_impl(d_y, d_uv, w, h, err);
+}
+
+bool GstEncoder::encode_from_gpu_nv12_impl(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
+                                           std::string* err) {
+#ifdef HAVE_GSTCUDA
+    if (!opened_ || !pipeline_ || !appsrc_ || !encoder_is_nv_) {
+        set_err(err, "not-opened");
+        return false;
+    }
+    if (!cfg_.gpu_direct_input) {
+        set_err(err, "not-gpu-direct");
+        return false;
+    }
+    if (w != w_ || h != h_) {
+        set_err(err, "dimension-mismatch");
+        return false;
+    }
+    if (!d_y || !d_uv) {
+        set_err(err, "no-device-plane");
+        return false;
+    }
+    // 会话内缓存的 gstcuda 上下文与 allocator（同一 GPU）
+    static GstCudaContext* cuda_ctx = nullptr;
+    static GstCudaAllocator* cuda_alloc = nullptr;
+    if (!cuda_ctx) {
+        cuda_ctx = gst_cuda_context_new(0);
+        if (!cuda_ctx) {
+            set_err(err, "cuda-ctx-fail");
+            return false;
+        }
+    }
+    if (!cuda_alloc) {
+        cuda_alloc = GST_CUDA_ALLOCATOR(g_object_new(gst_cuda_allocator_get_type(), NULL));
+        if (!cuda_alloc) {
+            set_err(err, "cuda-alloc-fail");
+            return false;
+        }
+    }
+
+    auto t0 = std::chrono::steady_clock::now();
+    // 紧凑连续设备 NV12（单块，base=d_y）→ GStreamer CUDA memory（memory:CUDAMemory）
+    GstVideoInfo vi;
+    gst_video_info_init(&vi);
+    gst_video_info_set_format(&vi, GST_VIDEO_FORMAT_NV12, w, h);
+    vi.fps_n = fps_;
+    vi.fps_d = 1;
+    GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc, cuda_ctx, nullptr, &vi,
+                                                      (CUdeviceptr)d_y, nullptr, nullptr);
+    if (!mem) {
+        set_err(err, "cuda-wrap-fail");
+        return false;
+    }
+    GstBuffer* buf = gst_buffer_new();
+    gst_buffer_append_memory(buf, mem);
+    GST_BUFFER_PTS(buf) = (pts_ * GST_SECOND) / fps_;
+    GST_BUFFER_DURATION(buf) = GST_SECOND / fps_;
+    pts_++;
+    stats_.frames_in++;
+
+    // push 默认阻塞：队列满时等下游消费（端到端背压）
+    GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(appsrc_), buf);
+    if (ret != GST_FLOW_OK) {
+        set_err(err, "push-fail");
+        return false;
+    }
+    stats_.frames_out++;
+    auto t1 = std::chrono::steady_clock::now();
+    stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    return true;
+#else
     (void)d_y;
     (void)d_uv;
     (void)w;
     (void)h;
-    set_err(err, "not-implemented-yet");  // GPU 路径归 Phase 2 硬件任务
+    set_err(err, "device-encode-unsupported");
     return false;
+#endif
 }
 
 bool GstEncoder::encode_async(const modeldeploy::vision::ImageData& image) {

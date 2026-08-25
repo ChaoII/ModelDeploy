@@ -2,6 +2,13 @@
 
 extern "C" {
 #include <libavutil/opt.h>
+#include <libavutil/hwcontext.h>
+// 仅当 CUDA 驱动头可用（gstcuda 探测到 CUDA include 目录）时启用设备编解码的 D2D 路径。
+// 用 CUDA 驱动 API（cuda.h / nvcuda.dll）而非 cudart 运行时，最小化链接依赖。
+#ifdef MODELDEPLOY_CUDA_DRV
+#include <libavutil/hwcontext_cuda.h>
+#include <cuda.h>
+#endif
 }
 
 #include <chrono>
@@ -92,8 +99,12 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
     enc_->height = h;
     enc_->time_base = {1, fps};
     enc_->framerate = {fps, 1};
-    const AVPixelFormat fmt = hw ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P;
-    enc_->pix_fmt = fmt;
+    // GPU 直接编码：enc 输入 pix_fmt 为 CUDA（吃设备 NV12 hw frame）；
+    // 软编 libx264 用 YUV420P，普通 nvenc（CPU NV12 上传）用 NV12。
+    const bool gpu_direct = hw && cfg_.gpu_direct_input;
+    const AVPixelFormat enc_fmt = hw ? (gpu_direct ? AV_PIX_FMT_CUDA : AV_PIX_FMT_NV12)
+                                     : AV_PIX_FMT_YUV420P;
+    enc_->pix_fmt = enc_fmt;
     enc_->gop_size = cfg_.gop;
     enc_->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
     enc_->max_b_frames = cfg_.max_b_frames;
@@ -103,9 +114,22 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
     enc_->color_primaries = AVCOL_PRI_BT709;
     enc_->color_trc = AVCOL_TRC_BT709;
     if (hw) {
-        // NVENC 私有属性与 libx264 不同（无 ultrafast/zerolatency）；默认 preset="ultrafast" 是 x264 专用，
-        // 直接套用会让 nvenc 报 "Undefined constant"。此处不硬设 nvenc preset/tune，留 FFmpeg 默认，
-        // 避免版本相关差异；显式低延迟/预设由上层后续精细配置。
+        // NVENC：GPU 直编（gpu_direct）须在 open 前挂上 CUDA hw_frames_ctx，nvenc 依据
+        // avctx->hw_frames_ctx 取 CUDA 设备上下文并注册输入资源。普通 nvenc（CPU NV12 上传）
+        // 不设 hw ctx，由 FFmpeg 自建 CUDA 设备。
+        if (gpu_direct) {
+            if (!setup_cuda_hw_frames(w, h)) {
+                avcodec_free_context(&enc_);
+                enc_ = nullptr;
+                return false;
+            }
+            enc_->hw_frames_ctx = av_buffer_ref(hw_frames_ctx_);
+            if (!enc_->hw_frames_ctx) {
+                avcodec_free_context(&enc_);
+                enc_ = nullptr;
+                return false;
+            }
+        }
     } else {
         enc_->profile = FF_PROFILE_H264_MAIN;
         enc_->level = 41;
@@ -120,10 +144,12 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
         enc_ = nullptr;
         return false;
     }
-    dst_fmt_ = fmt;
+    // sws 输出的 CPU 中间/帧格式：nvenc（含 GPU 直编）输入 CPU 平面为 NV12，软编为 YUV420P
+    const AVPixelFormat cpu_fmt = hw ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P;
+    dst_fmt_ = cpu_fmt;
     frame_ = av_frame_alloc();
     if (!frame_) return false;
-    frame_->format = fmt;
+    frame_->format = cpu_fmt;
     frame_->width = w;
     frame_->height = h;
     frame_->color_range = AVCOL_RANGE_MPEG;
@@ -133,6 +159,25 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, bool hw, int w, i
     if (av_frame_get_buffer(frame_, 32) < 0) return false;
     pkt_ = av_packet_alloc();
     if (!pkt_) return false;
+    return true;
+}
+
+// GPU 直接编码：创建 CUDA 设备上下文 + CUDA hw帧上下文（format=CUDA, sw_format=NV12）。
+bool FfmpegEncoder::setup_cuda_hw_frames(int w, int h) {
+    if (av_hwdevice_ctx_create(&hw_device_ctx_, AV_HWDEVICE_TYPE_CUDA, nullptr, nullptr, 0) != 0)
+        return false;
+    AVBufferRef* fr = av_hwframe_ctx_alloc(hw_device_ctx_);
+    if (!fr) return false;
+    AVHWFramesContext* fc = (AVHWFramesContext*)fr->data;
+    fc->format = AV_PIX_FMT_CUDA;
+    fc->sw_format = AV_PIX_FMT_NV12;
+    fc->width = w;
+    fc->height = h;
+    if (av_hwframe_ctx_init(fr) < 0) {
+        av_buffer_unref(&fr);
+        return false;
+    }
+    hw_frames_ctx_ = fr;
     return true;
 }
 
@@ -169,6 +214,12 @@ bool FfmpegEncoder::open_output(const std::string& url) {
 bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::string* err) {
     if (!opened_ || !enc_ || !frame_) {
         set_err(err, "not-opened");
+        return false;
+    }
+    // GPU 直编会话（gpu_direct_input）编码器输入为 CUDA hw 帧，CPU BGR 直送会被误读为设备指针，
+    // 故 CPU encode() 不在该会话使用（gpu 直编统一走 encode_from_gpu_nv12）。
+    if (cfg_.gpu_direct_input && used_hw_) {
+        set_err(err, "cpu-encode-not-in-gpu-direct");
         return false;
     }
     // 防越界：输入尺寸必须与 open 时一致，否则 sws_scale 按 w_×h_ 读取会越界
@@ -233,12 +284,124 @@ bool FfmpegEncoder::encode(const modeldeploy::vision::ImageData& image, std::str
 
 bool FfmpegEncoder::encode_from_gpu_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
                                          std::string* err) {
+    if (!opened_ || !enc_ || !pkt_) {
+        set_err(err, "not-opened");
+        return false;
+    }
+    // GPU 直编是独立设备会话：需 open 时以 gpu_direct_input 决议出 nvenc + CUDA hw 帧上下文
+    if (!cfg_.gpu_direct_input || !used_hw_ || !hw_frames_ctx_) {
+        set_err(err, "not-gpu-direct");
+        return false;
+    }
+    if (w != w_ || h != h_) {
+        set_err(err, "dimension-mismatch");
+        return false;
+    }
+    if (!d_y || !d_uv) {
+        set_err(err, "no-device-plane");
+        return false;
+    }
+#ifndef MODELDEPLOY_CUDA_DRV
     (void)d_y;
     (void)d_uv;
-    (void)w;
-    (void)h;
-    set_err(err, "not-implemented-yet");  // GPU 路径归 Phase 2 硬件任务
+    set_err(err, "device-encode-unsupported");
     return false;
+#else
+    auto t0 = std::chrono::steady_clock::now();
+    // 从编码器自己的 CUDA hw帧上下文分配一帧设备内存（与 nvenc 同上下文，注册必然成功）。
+    // 上层传入的设备指针可能来自其它 CUDA 上下文/驱动（如 cudaMalloc primary ctx），不能直接注册；
+    // 故用 cuMemcpy2D 做一次 D2D 拷贝（device→device，含不同 pitch 的 2D 拷贝），不落主机。
+    AVFrame* hw = av_frame_alloc();
+    if (!hw) {
+        set_err(err, "frame-alloc-fail");
+        return false;
+    }
+    if (av_hwframe_get_buffer(hw_frames_ctx_, hw, 0) < 0) {
+        av_frame_free(&hw);
+        set_err(err, "hwframe-alloc-fail");
+        return false;
+    }
+    if (!d2d_copy_nv12(d_y, d_uv, w, h, hw)) {
+        av_frame_free(&hw);
+        set_err(err, "d2d-copy-fail");
+        return false;
+    }
+    hw->pts = pts_++;
+
+    stats_.frames_in++;
+    if (avcodec_send_frame(enc_, hw) < 0) {
+        av_frame_free(&hw);
+        set_err(err, "send-frame-fail");
+        return false;
+    }
+    while (avcodec_receive_packet(enc_, pkt_) == 0) {
+        if (st_) {
+            av_packet_rescale_ts(pkt_, enc_->time_base, st_->time_base);
+            pkt_->stream_index = st_->index;
+        }
+        if (fmt_ && av_interleaved_write_frame(fmt_, pkt_) < 0) {
+            av_packet_unref(pkt_);
+            av_frame_free(&hw);
+            set_err(err, "mux-write-fail");
+            return false;
+        }
+        stats_.frames_out++;
+        av_packet_unref(pkt_);
+    }
+    av_frame_free(&hw);
+    auto t1 = std::chrono::steady_clock::now();
+    stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    return true;
+#endif
+}
+
+// 设备→设备的 NV12 2D 拷贝（Y/UV 各一次 cuMemcpy2D）。源紧凑连续（pitch=w），
+// 目标为 FFmpeg CUDA hw 帧（pitch=linesize，可能含对齐）。在当前 CUDA 上下文≠编码器上下文时
+// 也成立：设备指针在整张卡上共享地址空间。返回是否全部拷贝成功。
+bool FfmpegEncoder::d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
+                                  AVFrame* hw) {
+#ifdef MODELDEPLOY_CUDA_DRV
+    AVHWDeviceContext* dev = (AVHWDeviceContext*)hw_device_ctx_->data;
+    if (!dev || !dev->hwctx) return false;
+    AVCUDADeviceContext* cu = (AVCUDADeviceContext*)dev->hwctx;
+    CUcontext dummy = nullptr;
+    if (cuCtxPushCurrent(cu->cuda_ctx) != CUDA_SUCCESS) return false;
+
+    CUresult r = CUDA_SUCCESS;
+    const auto copy_plane = [&](CUdeviceptr dst, size_t dst_pitch, const uint8_t* src,
+                                size_t src_pitch, size_t width_bytes, size_t rows) {
+        CUDA_MEMCPY2D cp = {};
+        cp.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+        cp.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+        cp.srcDevice = (CUdeviceptr)src;
+        cp.srcPitch = src_pitch;
+        cp.srcXInBytes = 0;
+        cp.srcY = 0;
+        cp.dstDevice = dst;
+        cp.dstPitch = dst_pitch;
+        cp.dstXInBytes = 0;
+        cp.dstY = 0;
+        cp.WidthInBytes = width_bytes;
+        cp.Height = rows;
+        return cuMemcpy2D(&cp) == CUDA_SUCCESS;
+    };
+    r = copy_plane((CUdeviceptr)hw->data[0], (size_t)hw->linesize[0], d_y, (size_t)w, (size_t)w,
+                   (size_t)h)
+            ? CUDA_SUCCESS
+            : CUDA_ERROR_UNKNOWN;
+    if (r == CUDA_SUCCESS) {
+        if (!copy_plane((CUdeviceptr)hw->data[1], (size_t)hw->linesize[1], d_uv, (size_t)w,
+                        (size_t)w, (size_t)(h / 2)))
+            r = CUDA_ERROR_UNKNOWN;
+    }
+    cuCtxPopCurrent(&dummy);
+    return r == CUDA_SUCCESS;
+#else
+    (void)d_y;
+    (void)d_uv;
+    (void)hw;
+    return false;
+#endif
 }
 
 bool FfmpegEncoder::encode_async(const modeldeploy::vision::ImageData& image) {
@@ -302,6 +465,10 @@ void FfmpegEncoder::cleanup() {
     st_ = nullptr;
     if (enc_) avcodec_free_context(&enc_);
     enc_ = nullptr;
+    if (hw_frames_ctx_) av_buffer_unref(&hw_frames_ctx_);
+    hw_frames_ctx_ = nullptr;
+    if (hw_device_ctx_) av_buffer_unref(&hw_device_ctx_);
+    hw_device_ctx_ = nullptr;
     header_ = false;
     opened_ = false;
     pts_ = 0;

@@ -66,7 +66,8 @@ if(BUILD_VIDEO)
         test_video_ffmpeg_decode.cpp
         test_video_ffmpeg_encode.cpp
         test_video_pipeline.cpp
-        test_video_gpu_decode.cpp)
+        test_video_gpu_decode.cpp
+        test_video_gpu_encode.cpp)
     if(ENABLE_GSTREAMER)
         list(APPEND TEST_SOURCES test_video_gst_decode.cpp test_video_gst_encode.cpp)
     endif()
@@ -95,6 +96,31 @@ if (BUILD_VIDEO AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_video_decoder.cpp")
     target_include_directories(test_modeldeploy PRIVATE ${FFMPEG_INCLUDE_DIR})
     target_link_libraries(test_modeldeploy PRIVATE ${FFMPEG_LIBS})
 endif ()
+
+# 视频 GPU 直编测试用 FFmpeg 分配设备 NV12 源 + GStreamer CUDA memory 包装，
+# 需直接链接 FFmpeg/GStreamer 符号（DLL 不复导出第三方符号）。
+if(BUILD_VIDEO AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_video_gpu_encode.cpp")
+    target_include_directories(test_modeldeploy PRIVATE ${FFMPEG_INCLUDE_DIR} ${GSTREAMER_INCLUDE_DIR})
+    if(ENABLE_FFMPEG)
+        target_link_libraries(test_modeldeploy PRIVATE ${FFMPEG_LIBS})
+    endif()
+    if(ENABLE_GSTREAMER)
+        target_link_libraries(test_modeldeploy PRIVATE ${GSTREAMER_LIBS})
+    endif()
+    # 设备 NV12 源用 cudaMalloc：CUDA 可用（gstcuda 或 WITH_GPU）时定义测试宏并链接 cudart。
+    # 否则该测试文件整体 SKIP（不引 cuda_runtime.h 到 CPU 构建）。
+    if(GSTREAMER_HAS_CUDA OR WITH_GPU)
+        target_compile_definitions(test_modeldeploy PRIVATE MODELDEPLOY_TEST_CUDA)
+        set(_cuda_lib_dir "${CUDAToolkit_LIBRARY_DIR}")
+        if(NOT _cuda_lib_dir)
+            set(_cuda_lib_dir "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64")
+        endif()
+        if(EXISTS "${_cuda_lib_dir}/cudart.lib")
+            target_link_libraries(test_modeldeploy PRIVATE "${_cuda_lib_dir}/cudart.lib")
+        endif()
+        unset(_cuda_lib_dir)
+    endif()
+endif()
 
 # === 回归基线收集工具 ===
 add_executable(baseline_collect baseline_collect.cpp baseline_utils.cpp)

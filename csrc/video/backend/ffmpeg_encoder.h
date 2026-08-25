@@ -38,6 +38,8 @@ public:
 private:
     bool init_encoder(int w, int h, int fps, std::string* err);
     bool configure_encoder(const std::string& name, bool hw, int w, int h, int fps);
+    bool setup_cuda_hw_frames(int w, int h);
+    bool d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h, AVFrame* hw);
     bool open_output(const std::string& url);
     void cleanup();
     void set_err(std::string* err, const std::string& msg);
@@ -51,6 +53,9 @@ private:
     SwsContext* sws_ = nullptr;
     AVFrame* frame_ = nullptr;
     AVPacket* pkt_ = nullptr;
+    // GPU 直接编码（nvenc + CUDA hw_frames_ctx）：设备 NV12 指针直编会话资源
+    AVBufferRef* hw_device_ctx_ = nullptr;  // CUDA 设备上下文
+    AVBufferRef* hw_frames_ctx_ = nullptr;  // CUDA hw帧上下文（format=CUDA, sw_format=NV12）
     AVPixelFormat dst_fmt_ = AV_PIX_FMT_YUV420P;  // sws 输出/编码器输入 pix_fmt（随编码器）
     bool header_ = false;
     bool opened_ = false;
