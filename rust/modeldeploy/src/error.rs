@@ -30,6 +30,9 @@ pub enum MdError {
     #[error("后端不可用")]
     UnsupportedBackend,
 
+    #[error("设备不支持: {0}")]
+    Unsupported(&'static str),
+
     #[error("内存分配失败")]
     OutOfMemory,
 

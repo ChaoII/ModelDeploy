@@ -387,6 +387,8 @@ extern "C" {
     pub fn md_option_set_model_buffer(h: MDOptionHandle, data: *const u8, len: usize, fmt: *const c_char) -> MDStatus;
     pub fn md_option_set_config(h: MDOptionHandle, ns: *const c_char, key: *const c_char, val: *const c_char) -> MDStatus;
     pub fn md_option_set_trt_engine_path(h: MDOptionHandle, path: *const c_char);
+    // 校验裸指针是否为指定设备内存（CPU 非空→OK、空/CUDA 归属不符→INVALID_ARGUMENT、不支持的设备→UNSUPPORTED_TYPE）
+    pub fn md_ptr_validate_device(ptr: *const c_void, dev: MDDevice, device_id: c_int) -> MDStatus;
 
     // ── 图像 ──
     pub fn md_image_from_file(out: *mut MDImageHandle, path: *const c_char) -> MDStatus;

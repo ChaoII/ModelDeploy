@@ -101,6 +101,27 @@ impl RuntimeOption {
         }
         self
     }
+
+    /// 校验裸指针是否为指定设备的内存。
+    ///
+    /// 返回 `Ok(true)` 表示指针归属匹配；`Ok(false)` 表示指针在该设备下无效
+    /// （如 null 或 CUDA 设备归属不符）；`Err` 表示该设备不支持指针校验（如 TPU）。
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    pub fn validate_ptr_device(
+        &self,
+        ptr: *const std::ffi::c_void,
+        dev: ffi::MDDevice,
+        device_id: i32,
+    ) -> Result<bool, MdError> {
+        let st = unsafe { ffi::md_ptr_validate_device(ptr, dev, device_id) };
+        match st {
+            ffi::MDStatus::OK => Ok(true),
+            ffi::MDStatus::ERR_INVALID_ARGUMENT => Ok(false),
+            _ => Err(MdError::Unsupported(
+                "device not supported for pointer validation",
+            )),
+        }
+    }
 }
 
 impl Drop for RuntimeOption {
