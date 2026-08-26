@@ -398,6 +398,42 @@ namespace modeldeploy::vision {
         return true;
     }
 
+    std::vector<uint8_t> ImageData::to_native_bytes() const {
+        ImageData cpu;
+        if (device() != Device::CPU) {
+            if (!toCpu(&cpu)) { set_last_error("to_native_bytes: 设备回读失败"); return {}; }
+        } else {
+            cpu = *this;
+        }
+        if (cpu.empty()) { set_last_error("to_native_bytes: 空图像"); return {}; }
+        const int w = cpu.width(), h = cpu.height();
+        const auto fmt = cpu.type();
+        const size_t total = cpu.bytes();
+        if (total == 0) { set_last_error("to_native_bytes: 零字节"); return {}; }
+
+        auto plane_rows = [&](size_t i) -> int {
+            if (fmt == MdImageType::NV12 || fmt == MdImageType::NV21) return i == 0 ? h : h / 2;
+            if (fmt == MdImageType::I420) return i == 0 ? h : h / 2;
+            return h;  // packed / planar / gray
+        };
+
+        std::vector<uint8_t> out(total);
+        size_t off = 0;
+        for (size_t i = 0; i < cpu.plane_count(); ++i) {
+            const Plane p = cpu.plane(i);
+            if (!p.data) continue;
+            const int rows = plane_rows(i);
+            const int step = p.step > 0 ? p.step : w;
+            const size_t rowbytes = static_cast<size_t>(p.step > 0 ? p.step : w);
+            for (int r = 0; r < rows && off < total; ++r) {
+                const size_t n = (off + rowbytes <= total) ? rowbytes : (total - off);
+                std::memcpy(out.data() + off, p.data + static_cast<size_t>(r) * step, n);
+                off += n;
+            }
+        }
+        return out;
+    }
+
     const char* ImageData::last_error() {
         return g_last_error_msg.empty() ? nullptr : g_last_error_msg.c_str();
     }

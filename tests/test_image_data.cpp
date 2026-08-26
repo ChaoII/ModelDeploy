@@ -1031,5 +1031,45 @@ TEST_CASE("image_data: YUV ops explicitly reject NV21/I420 (no silent garbage)",
     }
 }
 
+TEST_CASE("to_native_bytes PKG_BGR_U8 single plane", "[image_data]") {
+    int w = 4, h = 3;
+    std::vector<uint8_t> src(static_cast<size_t>(w) * h * 3);
+    for (size_t i = 0; i < src.size(); ++i) src[i] = static_cast<uint8_t>(i);
+    auto img = modeldeploy::vision::ImageData::from_bgr24(src.data(), w, h);
+    REQUIRE(img.type() == MdImageType::PKG_BGR_U8);
+    auto nb = img.to_native_bytes();
+    REQUIRE(nb.size() == src.size());
+    REQUIRE(std::memcmp(nb.data(), src.data(), src.size()) == 0);
+}
 
+TEST_CASE("to_native_bytes NV12 concat y+uv", "[image_data]") {
+    int w = 4, h = 2;
+    size_t yN = static_cast<size_t>(w) * h;
+    size_t uvN = static_cast<size_t>(w) * (h / 2);
+    std::vector<uint8_t> y(yN), uv(uvN);
+    for (size_t i = 0; i < y.size(); ++i) { y[i] = (uint8_t)(10 + i); }
+    for (size_t i = 0; i < uv.size(); ++i) { uv[i] = (uint8_t)(20 + i); }
+    modeldeploy::vision::ImageData::Plane pl[2] = {{y.data(), w}, {uv.data(), w}};
+    auto img = modeldeploy::vision::ImageData::from_planes(pl, 2, MdImageType::NV12, w, h);
+    auto nb = img.to_native_bytes();
+    REQUIRE(nb.size() == yN + uvN);
+    REQUIRE(std::memcmp(nb.data(), y.data(), yN) == 0);
+    REQUIRE(std::memcmp(nb.data() + yN, uv.data(), uvN) == 0);
+}
+
+TEST_CASE("to_native_bytes I420 three planes", "[image_data]") {
+    int w = 4, h = 4;
+    size_t yN = static_cast<size_t>(w) * h;
+    size_t uvN = yN / 4;
+    std::vector<uint8_t> y(yN), u(uvN), v(uvN);
+    for (size_t i = 0; i < yN; ++i) y[i] = (uint8_t)i;
+    for (size_t i = 0; i < uvN; ++i) { u[i] = (uint8_t)(0xA0 + i); v[i] = (uint8_t)(0xB0 + i); }
+    modeldeploy::vision::ImageData::Plane pl[3] = {{y.data(), w}, {u.data(), w / 2}, {v.data(), w / 2}};
+    auto img = modeldeploy::vision::ImageData::from_planes(pl, 3, MdImageType::I420, w, h);
+    auto nb = img.to_native_bytes();
+    REQUIRE(nb.size() == yN + 2 * uvN);
+    REQUIRE(std::memcmp(nb.data(), y.data(), yN) == 0);
+    REQUIRE(std::memcmp(nb.data() + yN, u.data(), uvN) == 0);
+    REQUIRE(std::memcmp(nb.data() + yN + uvN, v.data(), uvN) == 0);
+}
 

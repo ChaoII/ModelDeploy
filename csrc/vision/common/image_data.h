@@ -61,6 +61,8 @@ namespace modeldeploy::vision {
         [[nodiscard]] bool toCpu(ImageData* out) const;
         // 仅 device()==CPU 的 mat 有效（借用）；否则 false
         [[nodiscard]] bool asMat(cv::Mat* out) const;
+        // 原生连续主机字节（自动对设备图像回读；失败返回空 vector 并置 last_error）
+        [[nodiscard]] std::vector<uint8_t> to_native_bytes() const;
         // thread_local 错误通道（每操作起始清空，失败写入；成功返回 nullptr）
         static const char* last_error();
 
