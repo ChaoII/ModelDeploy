@@ -58,6 +58,46 @@ TEST_CASE("cuda draw_line nv12 (semantic)", "[gpu]") {
     cudaFree(d_y); cudaFree(d_uv);
 }
 
+TEST_CASE("cuda vis_pose_nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+
+    const mv::ImageData::Plane planes[2] = {{d_y, w}, {d_uv, w}};
+    mv::ImageData frame = mv::ImageData::from_planes(planes, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+
+    // 单 person:两可见关键点(左/右肩,skel {6,7})连成一条骨架线段;其余低置信不画
+    mv::KeyPointsResult r;
+    r.label_id = 0;
+    r.score = 0.9f;
+    r.box = {8.0f, 8.0f, 16.0f, 16.0f};
+    r.keypoints.assign(17, mv::Point3f(0, 0, 0.0f));
+    r.keypoints[5] = mv::Point3f(20.0f, 20.0f, 1.0f);   // 左肩(COCO 1-indexed=6)
+    r.keypoints[6] = mv::Point3f(30.0f, 20.0f, 1.0f);   // 右肩(COCO 1-indexed=7)
+    r.keypoints[10] = mv::Point3f(50.0f, 40.0f, 0.0f);  // 低置信点(框外)
+    std::vector<mv::KeyPointsResult> results{r};
+
+    mv::VisionProcessorBackend::VisOptions opt;
+    opt.alpha = 1.0;
+    opt.threshold = 0.5;
+
+    mv::CudaProcessorBackend backend;
+    REQUIRE(backend.vis_pose_nv12(frame, results, opt));
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    REQUIRE(back[12 * w + 12] != 128);      // 框内被填充
+    REQUIRE(back[20 * w + 25] != 128);      // 骨架线段中点(25,20)被画
+    REQUIRE(back[40 * w + 50] == 128);      // 低置信点不画
+    cudaFree(d_y); cudaFree(d_uv);
+}
+
 TEST_CASE("cuda draw_text_cjk nv12 (semantic)", "[gpu]") {
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);

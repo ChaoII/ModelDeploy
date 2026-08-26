@@ -50,6 +50,76 @@ struct Nv12View {
     }
     bool ok() const { return y != nullptr; }
 };
+
+// COCO-17 骨架(1-indexed,端点做 -1);limb/kpt 色索引入 PosePaletteRgb
+constexpr int kPoseSkeleton[19][2] = {
+    {16,14},{14,12},{17,15},{15,13},{12,13},{6,12},{7,13},{6,7},{6,8},{7,9},
+    {8,10},{9,11},{2,3},{1,2},{1,3},{2,4},{3,5},{4,6},{5,7}
+};
+constexpr int kPoseLimbColor[19] = {9,9,9,9,7,7,7,0,0,0,0,0,16,16,16,16,16,16,16};
+constexpr int kPoseKptColor[17] = {16,16,16,16,16,0,0,0,0,0,0,9,9,9,9,9,9};
+// 20 色 pose 调色板(RGB 序,由 CPU BGR 转置)
+constexpr uint8_t kPosePaletteRgb[20][3] = {
+    {0,128,255},{51,153,255},{102,178,255},{0,230,230},{255,153,255},{255,204,153},
+    {255,102,255},{255,51,255},{255,178,102},{255,153,51},{153,153,255},{102,102,255},
+    {51,51,255},{153,255,153},{102,255,102},{51,255,51},{0,255,0},{255,0,0},
+    {0,0,255},{255,255,255}
+};
+// MediaPipe 21 点骨架(0-indexed,20 条)
+constexpr int kHandSkeleton[20][2] = {
+    {1,2},{2,3},{3,4},{0,5},{5,6},{6,7},{7,8},{5,9},{9,10},{10,11},{11,12},
+    {9,13},{13,14},{14,15},{15,16},{13,17},{17,18},{18,19},{19,20},{0,17}
+};
+// 21 点 hand 调色板(RGB 序,每关键点一个颜色)
+constexpr uint8_t kHandPaletteRgb[21][3] = {
+    {255,0,0},{255,85,0},{255,170,0},{255,255,0},{170,255,0},{85,255,0},
+    {0,255,0},{0,255,85},{0,255,170},{0,255,255},{0,170,255},{0,85,255},
+    {0,0,255},{85,0,255},{170,0,255},{255,0,255},{255,0,170},{255,0,85},
+    {255,0,0},{170,0,0},{0,255,0}
+};
+
+void draw_kpts(Nv12View& v, cudaStream_t s, const std::vector<modeldeploy::vision::Point3f>& kpts,
+               const uint8_t (*palette)[3], const int* kpt_color,
+               int nkpt_color, int radius, bool draw_lines,
+               const int (*skeleton)[2], int nskeleton, const int* limb_color) {
+    for (size_t j = 0; j < kpts.size(); ++j) {
+        if (kpts[j].z < 0.5f) continue;
+        int ci = kpt_color ? kpt_color[j % nkpt_color] % 20 : static_cast<int>(j) % 20;
+        float xs[1] = { kpts[j].x }, ys[1] = { kpts[j].y };
+        modeldeploy::vision::draw_points_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                             xs, ys, 1, palette[ci][0], palette[ci][1], palette[ci][2],
+                             radius, s);
+    }
+    if (!draw_lines || !skeleton) return;
+    for (int j = 0; j < nskeleton; ++j) {
+        const int a = skeleton[j][0] - 1, b = skeleton[j][1] - 1;   // 骨骼表 1-indexed → 0-indexed
+        if (a < 0 || b < 0 || a >= (int)kpts.size() || b >= (int)kpts.size()) continue;
+        if (kpts[a].z < 0.5f || kpts[b].z < 0.5f) continue;
+        const uint8_t* c = palette[(limb_color ? limb_color[j] : 0) % 20];
+        modeldeploy::vision::draw_line_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                           kpts[a].x, kpts[a].y, kpts[b].x, kpts[b].y,
+                           c[0], c[1], c[2], 2, s);
+    }
+}
+
+void draw_kpts_hand(Nv12View& v, cudaStream_t s, const std::vector<modeldeploy::vision::Point3f>& kpts) {
+    for (size_t j = 0; j < kpts.size(); ++j) {
+        if (kpts[j].z < 0.5f) continue;
+        const uint8_t* c = kHandPaletteRgb[j % 21];
+        float xs[1] = { kpts[j].x }, ys[1] = { kpts[j].y };
+        modeldeploy::vision::draw_points_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                             xs, ys, 1, c[0], c[1], c[2], 3, s);
+    }
+    for (int j = 0; j < 20; ++j) {
+        const int a = kHandSkeleton[j][0], b = kHandSkeleton[j][1];
+        if (a >= (int)kpts.size() || b >= (int)kpts.size()) continue;
+        if (kpts[a].z < 0.5f || kpts[b].z < 0.5f) continue;
+        const uint8_t* c = kHandPaletteRgb[a % 21];
+        modeldeploy::vision::draw_line_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                           kpts[a].x, kpts[a].y, kpts[b].x, kpts[b].y,
+                           c[0], c[1], c[2], 2, s);
+    }
+}
 }  // namespace
 
 namespace modeldeploy::vision {
@@ -382,27 +452,137 @@ namespace modeldeploy::vision {
     bool CudaProcessorBackend::vis_pose_nv12(ImageData& frame,
                                              const std::vector<KeyPointsResult>& result,
                                              const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    (int)r.box.x, (int)r.box.y,
+                                    (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
+                                    c[0], c[1], c[2], alpha, s) && ok;
+            ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    r.box.x, r.box.y, r.box.width, r.box.height,
+                                    c[0], c[1], c[2], 2, s) && ok;
+            std::string label = "score: " + score_str(r.score);
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
+                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            draw_kpts(v, s, r.keypoints, kPosePaletteRgb, kPoseKptColor, 17, 3, true,
+                      kPoseSkeleton, 19, kPoseLimbColor);
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_keypoints_nv12(ImageData& frame,
                                                   const std::vector<KeyPointsResult>& result,
                                                   const VisionProcessorBackend::VisOptions& opt,
                                                   bool draw_lines) {
-        (void)frame; (void)result; (void)opt; (void)draw_lines; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    (int)r.box.x, (int)r.box.y,
+                                    (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
+                                    c[0], c[1], c[2], alpha, s) && ok;
+            ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    r.box.x, r.box.y, r.box.width, r.box.height,
+                                    c[0], c[1], c[2], 2, s) && ok;
+            std::string label = "score: " + score_str(r.score);
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
+                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            draw_kpts(v, s, r.keypoints, kPosePaletteRgb, nullptr, 1, 3, draw_lines, nullptr, 0, nullptr);
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_hand_nv12(ImageData& frame,
                                              const std::vector<KeyPointsResult>& result,
                                              const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    (int)r.box.x, (int)r.box.y,
+                                    (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
+                                    c[0], c[1], c[2], alpha, s) && ok;
+            ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    r.box.x, r.box.y, r.box.width, r.box.height,
+                                    c[0], c[1], c[2], 2, s) && ok;
+            std::string label = "score: " + score_str(r.score);
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
+                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            draw_kpts_hand(v, s, r.keypoints);
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_ocr_nv12(ImageData& frame, const OCRResult& result,
                                             const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (size_t i = 0; i < result.boxes.size(); ++i) {
+            const auto& b = result.boxes[i];
+            std::vector<float> xs(4), ys(4);
+            for (int k = 0; k < 4; ++k) { xs[k] = static_cast<float>(b[k * 2]); ys[k] = static_cast<float>(b[k * 2 + 1]); }
+            ok = fill_polygon_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                       xs.data(), ys.data(), 4, 66, 135, 245, alpha, s) && ok;
+            ok = draw_polygon_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                       xs.data(), ys.data(), 4, 66, 135, 245, 2, s) && ok;
+            if (i < result.text.size() && !result.text[i].empty()) {
+                ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                            xs[0], std::max(0.0f, ys[0] - 16.0f),
+                                            result.text[i].c_str(), 255, 255, 255, 1,
+                                            static_cast<int>(result.text[i].size()) + 4, s) && ok;
+            }
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_lpr_nv12(ImageData& frame,
                                             const std::vector<LprResult>& result,
                                             const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    (int)r.box.x, (int)r.box.y,
+                                    (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
+                                    c[0], c[1], c[2], alpha, s) && ok;
+            ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    r.box.x, r.box.y, r.box.width, r.box.height,
+                                    c[0], c[1], c[2], 2, s) && ok;
+            std::string label = r.car_plate_str + " " + r.car_plate_color + " " + score_str(r.score);
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
+                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            std::vector<float> xs, ys;
+            for (const auto& p : r.keypoints) { xs.push_back(p.x); ys.push_back(p.y); }
+            if (!xs.empty())
+                ok = draw_points_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                          xs.data(), ys.data(), (int)xs.size(),
+                                          0, 255, 0, 3, s) && ok;
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_attr_nv12(ImageData& frame,
                                              const std::vector<AttributeResult>& result,
