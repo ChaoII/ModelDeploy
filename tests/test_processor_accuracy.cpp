@@ -12,7 +12,7 @@
 
 #include "csrc/vision.h"
 #include "csrc/vision/processors/processor_factory.h"
-#include "csrc/vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
+#include "csrc/vision/processors/cpu/ocr_det_preprocess.h"
 #include "csrc/vision/processors/cpu/cpu_processor_backend.h"
 #include "csrc/vision/processors/cpu/simd/fused_preproc_simd.h"
 #ifdef WITH_GPU
@@ -36,7 +36,7 @@ namespace {
         return ImageData::from_raw(buf.data(), w, h, MdImageType::PKG_BGR_U8, true);
     }
 
-    // fused_preprocess 标量参考实现（与 kernel 同一映射：src=(dst-origin)/scale，越界写 pad(仿射后)）
+    // fused_preprocess_common 标量参考实现（与 kernel 同一映射：src=(dst-origin)/scale，越界写 pad(仿射后)）
     void fused_ref(const uint8_t* src, int src_w, int src_h,
                    float* dst, int dst_w, int dst_h,
                    float ox, float oy, float sx, float sy,
@@ -89,8 +89,8 @@ namespace {
     }
 } // namespace
 
-// ==================== fused_preprocess：标量 ref vs SIMD vs CUDA ====================
-TEST_CASE("Processor accuracy: fused_preprocess scalar vs SIMD", "[processor_accuracy]") {
+// ==================== fused_preprocess_common：标量 ref vs SIMD vs CUDA ====================
+TEST_CASE("Processor accuracy: fused_preprocess_common scalar vs SIMD", "[processor_accuracy]") {
     const int src_w = 320, src_h = 240;
     auto img = make_test_image(src_w, src_h);
     const std::vector<int> dst{224, 224};
@@ -116,7 +116,7 @@ TEST_CASE("Processor accuracy: fused_preprocess scalar vs SIMD", "[processor_acc
     REQUIRE(nd == 0);
 }
 
-TEST_CASE("Processor accuracy: fused_preprocess CPU vs CUDA", "[processor_accuracy][gpu]") {
+TEST_CASE("Processor accuracy: fused_preprocess_common CPU vs CUDA", "[processor_accuracy][gpu]") {
 #ifdef WITH_GPU
     const int src_w = 320, src_h = 240;
     auto img = make_test_image(src_w, src_h);
@@ -132,13 +132,13 @@ TEST_CASE("Processor accuracy: fused_preprocess CPU vs CUDA", "[processor_accura
     // CUDA backend
     auto backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
     Tensor cuda_t;
-    REQUIRE(backend->fused_preprocess(img, &cuda_t, dst, ox, oy, sx, sy,
+    REQUIRE(backend->fused_preprocess_common(img, &cuda_t, dst, ox, oy, sx, sy,
                                       std::vector<float>(alpha, alpha + 3),
                                       std::vector<float>(beta, beta + 3), true, 0.0f));
     // CPU backend（SIMD）
     auto cpu_backend = create_processor_backend(Device::CPU, Backend::ORT, 0);
     Tensor cpu_t;
-    REQUIRE(cpu_backend->fused_preprocess(img, &cpu_t, dst, ox, oy, sx, sy,
+    REQUIRE(cpu_backend->fused_preprocess_common(img, &cpu_t, dst, ox, oy, sx, sy,
                                           std::vector<float>(alpha, alpha + 3),
                                           std::vector<float>(beta, beta + 3), true, 0.0f));
     // GPU -> host
@@ -251,8 +251,8 @@ TEST_CASE("Processor accuracy: scrfd_preprocess CPU vs CUDA", "[processor_accura
 #endif
 }
 
-// ============ fused_preprocess_batch：CPU(SIMD) vs 逐图 与 CUDA(3D grid) ============
-TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA", "[processor_accuracy][gpu]") {
+// ============ fused_preprocess_common_batch：CPU(SIMD) vs 逐图 与 CUDA(3D grid) ============
+TEST_CASE("Processor accuracy: fused_preprocess_common_batch CPU vs per-image vs CUDA", "[processor_accuracy][gpu]") {
     std::vector<ImageData> imgs = {
         make_test_image(160, 100),
         make_test_image(240, 120),
@@ -271,13 +271,13 @@ TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA",
 
     auto cpu_backend = create_processor_backend(Device::CPU, Backend::ORT, 0);
     Tensor batch_cpu;
-    REQUIRE(cpu_backend->fused_preprocess_batch(imgs, &batch_cpu, dst, oxs, oys, sxs, sys,
+    REQUIRE(cpu_backend->fused_preprocess_common_batch(imgs, &batch_cpu, dst, oxs, oys, sxs, sys,
                                                 alpha, beta, true, 0.0f));
 
     // batch == 逐图拼接（正确性）：手写拼接参考（concat 已从 core 移除）
     std::vector<Tensor> singles(3);
     for (int i = 0; i < 3; ++i) {
-        REQUIRE(cpu_backend->fused_preprocess(imgs[i], &singles[i], dst, oxs[i], oys[i], sxs[i], sys[i],
+        REQUIRE(cpu_backend->fused_preprocess_common(imgs[i], &singles[i], dst, oxs[i], oys[i], sxs[i], sys[i],
                                               alpha, beta, true, 0.0f));
     }
     // 手工拼接 singles 到 [3,3,h,w]
@@ -295,7 +295,7 @@ TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA",
     // CPU(SIMD) vs CUDA(3D grid)
     auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
     Tensor batch_cuda;
-    REQUIRE(cuda_backend->fused_preprocess_batch(imgs, &batch_cuda, dst, oxs, oys, sxs, sys,
+    REQUIRE(cuda_backend->fused_preprocess_common_batch(imgs, &batch_cuda, dst, oxs, oys, sxs, sys,
                                                  alpha, beta, true, 0.0f));
     std::vector<float> host(batch_cuda.byte_size() / sizeof(float));
     cudaMemcpy(host.data(), batch_cuda.data(), batch_cuda.byte_size(), cudaMemcpyDeviceToHost);
@@ -305,8 +305,8 @@ TEST_CASE("Processor accuracy: fused_preprocess_batch CPU vs per-image vs CUDA",
 #endif
 }
 
-// ============ OCR det fusion_resize_pad_normalize_permute：CPU(SIMD) vs CUDA ============
-TEST_CASE("Processor accuracy: ocr det fusion_resize_pad_normalize_permute CPU vs CUDA", "[processor_accuracy][gpu]") {
+// ============ OCR det ocr_det_preprocess：CPU(SIMD) vs CUDA ============
+TEST_CASE("Processor accuracy: ocr det ocr_det_preprocess CPU vs CUDA", "[processor_accuracy][gpu]") {
     std::vector<ImageData> imgs = {
         make_test_image(320, 160),
         make_test_image(200, 240),
@@ -328,12 +328,12 @@ TEST_CASE("Processor accuracy: ocr det fusion_resize_pad_normalize_permute CPU v
     const std::vector<float> std_v = {0.229f, 0.224f, 0.225f};
 
     Tensor cpu_t;
-    REQUIRE(fusion_resize_pad_normalize_permute_cpu(imgs, &cpu_t, resize_sizes, dst, mean, std_v, 0.0f));
+    REQUIRE(ocr_det_preprocess_cpu(imgs, &cpu_t, resize_sizes, dst, mean, std_v, 0.0f));
 
 #ifdef WITH_GPU
     auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
     Tensor cuda_t;
-    REQUIRE(cuda_backend->fusion_resize_pad_normalize_permute(imgs, &cuda_t, resize_sizes, dst, mean, std_v, 0.0f));
+    REQUIRE(cuda_backend->ocr_det_preprocess(imgs, &cuda_t, resize_sizes, dst, mean, std_v, 0.0f));
     std::vector<float> host(cuda_t.byte_size() / sizeof(float));
     cudaMemcpy(host.data(), cuda_t.data(), cuda_t.byte_size(), cudaMemcpyDeviceToHost);
     Tensor cuda_host(host.data(), cuda_t.shape(), DataType::FP32, Device::CPU);
@@ -375,7 +375,7 @@ TEST_CASE("Processor accuracy: fused_color_matrix BGR2YCrCb vs OpenCV", "[proces
     const float bias[3] = { 0.0f, 128.0f, 128.0f };
     Tensor out;
     // center_crop 224 from 256：scale=1, origin=-16
-    REQUIRE(backend->fused_color_matrix_preprocess(ref_image, &out, {224, 224},
+    REQUIRE(backend->fused_preprocess_color_matrix(ref_image, &out, {224, 224},
                                                    -16.0f, -16.0f, 1.0f, 1.0f,
                                                    mat, bias, 0.0f));
     REQUIRE(out.shape() == std::vector<int64_t>({1, 3, 224, 224}));

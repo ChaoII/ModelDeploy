@@ -114,7 +114,7 @@ namespace modeldeploy::vision::pipeline {
             attr_result.resize(det_result.size());
             if (is_nv12) {
                 // NV12 直通：直接双平面 crop（device→device / host→host 由对应后端完成），
-                // 分类器 fused_preprocess(CUDA) 走 NV12 融合 kernel（YUV2BGR+resize+norm），
+                // 分类器 fused_preprocess_common(CUDA) 走 NV12 融合 kernel（YUV2BGR+resize+norm），
                 // 无整帧转换、无 D2H。分类器对 NV12 走同一 origin/scale 融合路径。
                 for (size_t i_box = 0; i_box < det_result.size(); ++i_box) {
                     image_list[i_box] = img.crop(det_result[i_box].box);
@@ -129,7 +129,7 @@ namespace modeldeploy::vision::pipeline {
                     image_list[i_box] = img.crop(det_result[i_box].box);
                 }
             }
-            // NV12：交由分类器 fused_preprocess 在融合中完成 YUV2BGR+resize+norm；打包源同原逻辑。
+            // NV12：交由分类器 fused_preprocess_common 在融合中完成 YUV2BGR+resize+norm；打包源同原逻辑。
             // 这里只需保证 image_list 是分类器可接受格式（NV12 或 BGR 均由 fused 处理）。
             for (size_t start_index = 0; start_index < image_list.size(); start_index += cls_batch_size_) {
                 const size_t end_index = std::min(start_index + cls_batch_size_, image_list.size());

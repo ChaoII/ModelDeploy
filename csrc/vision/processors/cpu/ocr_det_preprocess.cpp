@@ -2,12 +2,12 @@
 // Created by aichao on 2025/7/22.
 //
 
-#include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
+#include "vision/processors/cpu/ocr_det_preprocess.h"
 #include "vision/processors/cpu/simd/fused_preproc_simd.h"
 
 
 namespace modeldeploy::vision {
-    bool fusion_resize_pad_normalize_permute_cpu(
+    bool ocr_det_preprocess_cpu(
         const std::vector<ImageData>& images, Tensor* output,
         const std::vector<std::array<int, 2>>& resize_sizes,
         const std::vector<int>& dst_size,

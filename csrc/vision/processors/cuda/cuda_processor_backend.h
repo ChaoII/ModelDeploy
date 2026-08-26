@@ -21,7 +21,7 @@ namespace modeldeploy::vision {
                               const std::vector<int>& dst_size,
                               float pad_val, LetterBoxRecord* record,
                               Device src_device = Device::CPU) override;
-        bool fused_preprocess(
+        bool fused_preprocess_common(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,
             float origin_x, float origin_y,
@@ -33,7 +33,7 @@ namespace modeldeploy::vision {
                                    const std::vector<int>& dst_size,
                                    float pad_val,
                                    std::vector<LetterBoxRecord>* records) override;
-        bool fused_preprocess_batch(
+        bool fused_preprocess_common_batch(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<int>& dst_size,
             const std::vector<float>& origins_x, const std::vector<float>& origins_y,
@@ -47,7 +47,7 @@ namespace modeldeploy::vision {
                                     const std::vector<int>& dst_size,
                                     float pad_val,
                                     std::vector<LetterBoxRecord>* records) override;
-        bool fusion_resize_pad_normalize_permute(
+        bool ocr_det_preprocess(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<std::array<int, 2>>& resize_sizes,
             const std::vector<int>& dst_size,

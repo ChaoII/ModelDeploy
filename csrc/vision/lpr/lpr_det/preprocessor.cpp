@@ -31,7 +31,7 @@ namespace modeldeploy::vision::lpr {
         const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
         // pad 114 在仿射后空间（归一化）：114/255
         const float pad_norm = padding_value_[0] / 255.0f;
-        if (!backend_->fused_preprocess(*image, output, size_,
+        if (!backend_->fused_preprocess_common(*image, output, size_,
                                         origin_x, origin_y, scale_x, scale_y,
                                         alpha, beta, true, pad_norm)) return false;
         return true;
@@ -61,7 +61,7 @@ namespace modeldeploy::vision::lpr {
                                               &oxs[i], &oys[i], &sxs[i], &sys[i]);
         }
         const float pad_norm = padding_value_[0] / 255.0f;
-        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+        if (!backend_->fused_preprocess_common_batch(*images, &(*outputs)[0], size_,
                                               oxs, oys, sxs, sys,
                                               {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f},
                                               {0.0f, 0.0f, 0.0f}, true, pad_norm)) {

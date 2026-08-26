@@ -25,7 +25,7 @@ namespace modeldeploy::vision {
                                    const std::vector<int>& dst_size,
                                    float pad_val,
                                    std::vector<LetterBoxRecord>* records) override;
-        bool fused_preprocess_batch(
+        bool fused_preprocess_common_batch(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<int>& dst_size,
             const std::vector<float>& origins_x, const std::vector<float>& origins_y,
@@ -45,7 +45,7 @@ namespace modeldeploy::vision {
         bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override;
         bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override;
         bool rotate_crop(const ImageData& image, std::array<float, 8> box, ImageData* out) override;
-        bool fusion_resize_pad_normalize_permute(
+        bool ocr_det_preprocess(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<std::array<int, 2>>& resize_sizes,
             const std::vector<int>& dst_size,
@@ -53,7 +53,7 @@ namespace modeldeploy::vision {
             float pad_value) override;
         bool nv12_to_bgr(const uint8_t* y, const uint8_t* uv,
                          int width, int height, ImageData* out) override;
-        bool fused_preprocess(
+        bool fused_preprocess_common(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,
             float origin_x, float origin_y,
@@ -69,7 +69,7 @@ namespace modeldeploy::vision {
             const std::vector<float>& alpha,
             const std::vector<float>& beta,
             bool swap_rb, float pad_value) override;
-        bool fused_color_matrix_preprocess(
+        bool fused_preprocess_color_matrix(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,
             float origin_x, float origin_y,

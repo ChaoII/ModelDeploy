@@ -5,7 +5,7 @@
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/ocr/det_preprocessor.h"
-#include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
+#include "vision/processors/cpu/ocr_det_preprocess.h"
 #include "vision/ocr/utils/ocr_utils.h"
 
 namespace modeldeploy::vision::ocr {
@@ -59,7 +59,7 @@ namespace modeldeploy::vision::ocr {
         }
         outputs->resize(1);
 
-        return backend_->fusion_resize_pad_normalize_permute(
+        return backend_->ocr_det_preprocess(
             image_batch, &(*outputs)[0], resize_sizes,
             {max_resize_w, max_resize_h}, mean_, std_, pad_value_);
     }

@@ -44,7 +44,7 @@ namespace modeldeploy::vision::ocr {
             const int dst_h = batch_layout_img_info_[0][3];
             const float scale_x = static_cast<float>(dst_w) / image->width();
             const float scale_y = static_cast<float>(dst_h) / image->height();
-            if (!backend_->fused_preprocess(*image, &(*outputs)[0], {dst_w, dst_h},
+            if (!backend_->fused_preprocess_common(*image, &(*outputs)[0], {dst_w, dst_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, false, 0.0f)) return false;
             return true;
@@ -67,7 +67,7 @@ namespace modeldeploy::vision::ocr {
             sxs[i] = static_cast<float>(dst_w) / image->width();
             sys[i] = static_cast<float>(dst_h) / image->height();
         }
-        if (!backend_->fused_preprocess_batch(*image_batch, &(*outputs)[0], {dst_w, dst_h},
+        if (!backend_->fused_preprocess_common_batch(*image_batch, &(*outputs)[0], {dst_w, dst_h},
                                               oxs, oys, sxs, sys,
                                               alpha, beta, false, 0.0f)) return false;
         return true;

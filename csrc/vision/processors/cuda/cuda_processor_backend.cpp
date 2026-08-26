@@ -109,7 +109,7 @@ namespace modeldeploy::vision {
                                            &out_pool_, get_persistent_stream(&stream_));
     }
 
-    bool CudaProcessorBackend::fused_preprocess(
+    bool CudaProcessorBackend::fused_preprocess_common(
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,
         float origin_x, float origin_y,
@@ -119,7 +119,7 @@ namespace modeldeploy::vision {
         bool swap_rb, float pad_value) {
         // NV12 双平面源 → NV12 融合 kernel（一次 launch：crop/resize + YUV2BGR + norm→CHW）
         if (image.type() == MdImageType::NV12 && image.plane_count() >= 2) {
-            return fused_preprocess_nv12_cuda(image.plane(0).data, image.plane(1).data,
+            return fused_preprocess_common_nv12_cuda(image.plane(0).data, image.plane(1).data,
                                               {image.width(), image.height()},
                                               image.plane(0).step, image.plane(1).step,
                                               out, dst_size,
@@ -127,7 +127,7 @@ namespace modeldeploy::vision {
                                               alpha, beta, swap_rb, pad_value,
                                               get_persistent_stream(&stream_), &out_pool_);
         }
-        return fused_preprocess_cuda(image.plane(0).data, {image.width(), image.height()},
+        return fused_preprocess_common_cuda(image.plane(0).data, {image.width(), image.height()},
                                      out, dst_size,
                                      origin_x, origin_y, scale_x, scale_y,
                                      alpha, beta, swap_rb, pad_value,
@@ -156,7 +156,7 @@ namespace modeldeploy::vision {
                                           get_persistent_stream(&stream_), &out_pool_);
     }
 
-    bool CudaProcessorBackend::fused_preprocess_batch(
+    bool CudaProcessorBackend::fused_preprocess_common_batch(
         const std::vector<ImageData>& images, Tensor* out,
         const std::vector<int>& dst_size,
         const std::vector<float>& origins_x, const std::vector<float>& origins_y,
@@ -173,19 +173,19 @@ namespace modeldeploy::vision {
                 }
             }
             if (all_nv12) {
-                return fused_preprocess_nv12_batch_cuda(images, out, dst_size,
+                return fused_preprocess_common_nv12_batch_cuda(images, out, dst_size,
                                                         origins_x, origins_y,
                                                         scales_x, scales_y,
                                                         alpha, beta, swap_rb, pad_value,
                                                         get_persistent_stream(&stream_), &out_pool_);
             }
         }
-        return fused_preprocess_batch_cuda(images, out, dst_size, origins_x, origins_y,
+        return fused_preprocess_common_batch_cuda(images, out, dst_size, origins_x, origins_y,
                                            scales_x, scales_y, alpha, beta, swap_rb, pad_value,
                                            get_persistent_stream(&stream_), &out_pool_);
     }
 
-    bool CudaProcessorBackend::fusion_resize_pad_normalize_permute(
+    bool CudaProcessorBackend::ocr_det_preprocess(
         const std::vector<ImageData>& images, Tensor* out,
         const std::vector<std::array<int, 2>>& resize_sizes,
         const std::vector<int>& dst_size,
@@ -206,7 +206,7 @@ namespace modeldeploy::vision {
             pad_value * alpha[1] + beta[1],
             pad_value * alpha[2] + beta[2]
         };
-        return fusion_rpnp_cuda(images, out, resize_sizes, dst_size,
+        return ocr_det_preprocess_cuda(images, out, resize_sizes, dst_size,
                                 std::vector<float>(alpha, alpha + 3),
                                 std::vector<float>(beta, beta + 3), pad,
                                 get_persistent_stream(&stream_), &out_pool_);

@@ -3,7 +3,7 @@
 // Sophgo BMCV 融合预处理 + 设备内存零拷贝。
 //
 // 设计：SophgoProcessorBackend 继承 CpuProcessorBackend，仅覆写 yolo_preprocess /
-// fused_preprocess / yolo_preprocess_nv12 三条 BMCV 硬件路径，其余算子自动回退 CPU。
+// fused_preprocess_common / yolo_preprocess_nv12 三条 BMCV 硬件路径，其余算子自动回退 CPU。
 // 硬件路径产出 Device::TPU Tensor（数据在自持的输入设备内存 in_mem_ 上），
 // 交给 SophgoBackend::infer() 后识别 Device::TPU 输入跳过 H2D 直接 launch（零拷贝）。
 // BMCV 调用失败或未编译 ENABLE_SOPHGO 时，回退到 CPU 实现（产出 CPU Tensor）。
@@ -85,7 +85,7 @@ namespace modeldeploy::vision {
         return true;
     }
 
-    bool SophgoProcessorBackend::fused_preprocess(
+    bool SophgoProcessorBackend::fused_preprocess_common(
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,
         float origin_x, float origin_y,
@@ -122,12 +122,12 @@ namespace modeldeploy::vision {
                     if (st == 0 && finish_tpu_tensor(out, dst_w, dst_h)) {
                         return true;
                     }
-                    MD_LOG_ERROR << "SophgoProcessorBackend: BMCV fused_preprocess failed (st="
+                    MD_LOG_ERROR << "SophgoProcessorBackend: BMCV fused_preprocess_common failed (st="
                         << st << "), fallback to CPU." << std::endl;
                 }
             }
         }
-        return CpuProcessorBackend::fused_preprocess(
+        return CpuProcessorBackend::fused_preprocess_common(
             image, out, dst_size, origin_x, origin_y, scale_x, scale_y,
             alpha, beta, swap_rb, pad_value);
     }
@@ -136,7 +136,7 @@ namespace modeldeploy::vision {
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,
         float pad_val, LetterBoxRecord* record) {
-        // letterbox 参数在 host 计算，映射到 fused_preprocess 的 origin/scale，走 BMCV 融合路径
+        // letterbox 参数在 host 计算，映射到 fused_preprocess_common 的 origin/scale，走 BMCV 融合路径
         const float src_w = static_cast<float>(image.width());
         const float src_h = static_cast<float>(image.height());
         const float dst_w = static_cast<float>(dst_size[0]);
@@ -149,8 +149,8 @@ namespace modeldeploy::vision {
         *record = {src_w, src_h, dst_w, dst_h, pad_w, pad_h, scale};
         const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector<float> beta = {0.0f, 0.0f, 0.0f};
-        // CPU fused 的 pad_value 是输出空间(归一化后)；fused_preprocess 会按 alpha 还原
-        return fused_preprocess(image, out, dst_size, pad_w, pad_h, scale, scale,
+        // CPU fused 的 pad_value 是输出空间(归一化后)；fused_preprocess_common 会按 alpha 还原
+        return fused_preprocess_common(image, out, dst_size, pad_w, pad_h, scale, scale,
                                 alpha, beta, true, pad_val / 255.0f);
     }
 

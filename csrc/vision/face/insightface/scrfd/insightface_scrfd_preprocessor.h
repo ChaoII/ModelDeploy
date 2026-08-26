@@ -1,6 +1,6 @@
 //
 // insightface buffalo_l det_10g 前处理。
-// 复用 VisionProcessorBackend（fused_preprocess 最近邻），多后端天然支持。
+// 复用 VisionProcessorBackend（fused_preprocess_common 最近邻），多后端天然支持。
 // 与 python insightface SCRFD._detect_candidates 对齐：等比例缩放 + 左上放置 + pad 0。
 //
 #pragma once

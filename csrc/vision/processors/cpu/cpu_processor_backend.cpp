@@ -7,7 +7,7 @@
 #include "vision/processors/cpu/simd/fused_preproc_simd.h"
 #include "vision/processors/cpu/yolo_preproc.h"
 #include "vision/processors/cpu/nv12_to_bgr.h"
-#include "vision/processors/cpu/fusion_resize_pad_normalize_permute.h"
+#include "vision/processors/cpu/ocr_det_preprocess.h"
 #include "vision/processors/cpu/draw_nv12.h"
 #include "vision/common/convert.h"
 #include "vision/utils.h"
@@ -31,7 +31,7 @@ namespace modeldeploy::vision {
         utils::letter_box_to_fused_params(*record, &ox, &oy, &sx, &sy);
         constexpr float alpha[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         constexpr float beta[3] = {0.0f, 0.0f, 0.0f};
-        return fused_preprocess(image, out, dst_size, ox, oy, sx, sy,
+        return fused_preprocess_common(image, out, dst_size, ox, oy, sx, sy,
                                 std::vector<float>(alpha, alpha + 3),
                                 std::vector<float>(beta, beta + 3),
                                 true, pad_val / 255.0f);
@@ -61,7 +61,7 @@ namespace modeldeploy::vision {
         utils::letter_box_to_fused_params(*record, &ox, &oy, &sx, &sy);
         const float alpha[3] = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         const float beta[3] = {-127.5f / 128.0f, -127.5f / 128.0f, -127.5f / 128.0f};
-        return fused_preprocess(image, out, dst_size, ox, oy, sx, sy,
+        return fused_preprocess_common(image, out, dst_size, ox, oy, sx, sy,
                                 std::vector<float>(alpha, alpha + 3),
                                 std::vector<float>(beta, beta + 3),
                                 true, pad_val / 128.0f - 127.5f / 128.0f);
@@ -84,7 +84,7 @@ namespace modeldeploy::vision {
         }
         const float alpha[3] = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         const float beta[3] = {-127.5f / 128.0f, -127.5f / 128.0f, -127.5f / 128.0f};
-        return fused_preprocess_batch(images, out, dst_size,
+        return fused_preprocess_common_batch(images, out, dst_size,
                                       oxs, oys, sxs, sys,
                                       std::vector<float>(alpha, alpha + 3),
                                       std::vector<float>(beta, beta + 3),
@@ -338,13 +338,13 @@ namespace modeldeploy::vision {
         return true;
     }
 
-    bool CpuProcessorBackend::fusion_resize_pad_normalize_permute(
+    bool CpuProcessorBackend::ocr_det_preprocess(
         const std::vector<ImageData>& images, Tensor* out,
         const std::vector<std::array<int, 2>>& resize_sizes,
         const std::vector<int>& dst_size,
         const std::vector<float>& mean, const std::vector<float>& std,
         float pad_value) {
-        return fusion_resize_pad_normalize_permute_cpu(
+        return ocr_det_preprocess_cpu(
             images, out, resize_sizes, dst_size, mean, std, pad_value);
     }
 
@@ -414,14 +414,14 @@ namespace modeldeploy::vision {
         }
         const float alpha[3] = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const float beta[3] = {0.0f, 0.0f, 0.0f};
-        return fused_preprocess_batch(imgs, out, dst_size,
+        return fused_preprocess_common_batch(imgs, out, dst_size,
                                       oxs, oys, sxs, sys,
                                       std::vector<float>(alpha, alpha + 3),
                                       std::vector<float>(beta, beta + 3),
                                       true, pad_val / 255.0f);
     }
 
-    bool CpuProcessorBackend::fused_preprocess_batch(
+    bool CpuProcessorBackend::fused_preprocess_common_batch(
         const std::vector<ImageData>& images, Tensor* out,
         const std::vector<int>& dst_size,
         const std::vector<float>& origins_x, const std::vector<float>& origins_y,
@@ -445,7 +445,7 @@ namespace modeldeploy::vision {
         return true;
     }
 
-    bool CpuProcessorBackend::fused_preprocess(
+    bool CpuProcessorBackend::fused_preprocess_common(
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,
         float origin_x, float origin_y,
@@ -497,7 +497,7 @@ namespace modeldeploy::vision {
         return true;
     }
 
-    bool CpuProcessorBackend::fused_color_matrix_preprocess(
+    bool CpuProcessorBackend::fused_preprocess_color_matrix(
         const ImageData& image, Tensor* out,
         const std::vector<int>& dst_size,
         float origin_x, float origin_y,

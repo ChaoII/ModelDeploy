@@ -56,7 +56,7 @@ namespace modeldeploy::vision::classification {
         float ox, oy, sx, sy;
         calc_params(image->width(), image->height(), dst_w, dst_h,
                     enable_center_crop_, &ox, &oy, &sx, &sy);
-        if (!backend_->fused_preprocess(*image, output, {dst_w, dst_h},
+        if (!backend_->fused_preprocess_common(*image, output, {dst_w, dst_h},
                                         ox, oy, sx, sy,
                                         cls_alpha(), cls_beta(), true, 0.0f)) return false;
         return true;
@@ -87,7 +87,7 @@ namespace modeldeploy::vision::classification {
             calc_params((*images)[i].width(), (*images)[i].height(), dst_w, dst_h,
                         enable_center_crop_, &oxs[i], &oys[i], &sxs[i], &sys[i]);
         }
-        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0],
+        if (!backend_->fused_preprocess_common_batch(*images, &(*outputs)[0],
                                               {dst_w, dst_h},
                                               oxs, oys, sxs, sys,
                                               cls_alpha(), cls_beta(), true, 0.0f)) {

@@ -68,7 +68,7 @@ namespace modeldeploy::vision::ocr {
             }
             const float scale_x = static_cast<float>(resize_w) / image.width();
             const float scale_y = static_cast<float>(img_h) / image.height();
-            if (!backend_->fused_preprocess(image, &(*outputs)[0], {batch_max_w, img_h},
+            if (!backend_->fused_preprocess_common(image, &(*outputs)[0], {batch_max_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha, beta, true, pad_norm)) return false;
             return true;
@@ -90,7 +90,7 @@ namespace modeldeploy::vision::ocr {
         }
         // Only have 1 output Tensor.
         outputs->resize(1);
-        if (!backend_->fused_preprocess_batch(image_batch, &(*outputs)[0], {batch_max_w, img_h},
+        if (!backend_->fused_preprocess_common_batch(image_batch, &(*outputs)[0], {batch_max_w, img_h},
                                               oxs, oys, sxs, sys,
                                               alpha, beta, true, pad_norm)) return false;
         return true;

@@ -54,7 +54,7 @@ namespace modeldeploy::vision::utils {
 
     void nms(std::vector<KeyPointsResult>* result, float iou_threshold);
 
-    // LetterBoxRecord -> fused_preprocess 映射参数。
+    // LetterBoxRecord -> fused_preprocess_common 映射参数。
     // fused 约定 src = (dst - origin)/scale；letterbox 中 src = (dst - pad)/scale，
     // 故 origin = (pad_w, pad_h)，scale 各轴取 letterbox scale。
     inline void letter_box_to_fused_params(const LetterBoxRecord& record,
