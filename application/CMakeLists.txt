@@ -38,6 +38,7 @@ set(APP_SOURCES
         infer_group.cpp
         draw_engine.cpp
         stream_encoder.cpp
+        video_source.cpp
         http_server.cpp
         perf_stats.cpp
         frame_pool.cpp
@@ -79,7 +80,8 @@ if (BUILD_SURVEILLANCE_TESTS)
             tests/test_pipeline.cpp
             tests/test_pipeline_manager.cpp
             tests/test_http_server.cpp
-            tests/test_video_codec.cpp)
+            tests/test_video_codec.cpp
+            tests/test_video_source.cpp)
     add_executable(surveillance_test ${TEST_SOURCES} ${APP_SOURCES})
     target_include_directories(surveillance_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
