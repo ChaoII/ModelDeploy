@@ -78,9 +78,10 @@ if (POLICY CMP0169)
 endif ()
 
 
-# /utf-8 对 C 与 CXX 都生效（samplerate 等 C 源文件否则触发 C4819 文件代码页刷屏）
+# /utf-8 对 C 与 CXX 都生效（samplerate 等 C 源文件否则触发 C4819 文件代码页刷屏）；
+# 不作用到 CUDA（nvcc 裸 /utf-8 会触发 single-input 报错，CUDA 经下方 -Xcompiler /utf-8 传入）
 if (MSVC)
-    add_compile_options(/utf-8)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>")
     add_compile_options(
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4819>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"
@@ -116,9 +117,10 @@ function(md_silence_external target)
 endfunction()
 
 # 对自有 SDK 代码开启合理告警级别（不含 -Werror）。target 级生效，避免泄漏到第三方。
+# /W3 仅作用 C/CXX；作用到 CUDA 会让 nvcc 报 single-input 致命错（CUDA 无独立告警级别需求）。
 function(md_warn_own target)
     if (MSVC)
-        target_compile_options(${target} PRIVATE /W3)
+        target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/W3>")
     elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${target} PRIVATE -Wall -Wextra)
     endif ()

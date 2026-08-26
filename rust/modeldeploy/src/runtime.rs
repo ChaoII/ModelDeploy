@@ -61,6 +61,7 @@ impl RuntimeOption {
         Ok(self)
     }
 
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn set_external_stream(&mut self, stream: *mut std::ffi::c_void) -> Result<&mut Self, MdError> {
         check_status(unsafe { ffi::md_option_set_external_stream(self.handle, stream) })?;
         Ok(self)

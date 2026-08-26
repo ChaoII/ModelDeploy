@@ -86,7 +86,8 @@ impl Drop for Heatmap {
     }
 }
 
-/// 纯工具：两个矩形（x,y,w,h）的交并比。
+/// 纯工具：两个矩形（x,y,w,h）的交并比。8 个坐标参数语义独立，属不可避免的参数数量。
+#[allow(clippy::too_many_arguments)]
 pub fn iou(ax: f32, ay: f32, aw: f32, ah: f32, bx: f32, by: f32, bw: f32, bh: f32) -> Result<f32, MdError> {
     let mut out = 0.0f32;
     check_status(unsafe { ffi::md_vision_iou4(ax, ay, aw, ah, bx, by, bw, bh, &mut out) })?;
