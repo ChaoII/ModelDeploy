@@ -54,3 +54,29 @@ TEST_CASE("cuda draw_line nv12 (semantic)", "[gpu]") {
     REQUIRE(back[0] == 128);   // 线外不变
     cudaFree(d_y); cudaFree(d_uv);
 }
+
+TEST_CASE("cuda draw_text_cjk nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    const char* txt = "\xE4\xB8\xAD" "A\xE4\xB8\xAD";  // "中A中"
+    REQUIRE(modeldeploy::vision::draw_text_cjk_nv12_gpu(d_y, d_uv, w, h, w, w,
+                                                        0.0f, 0.0f, txt, 255, 255, 255, 1, 16, nullptr));
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    int written = 0;
+    for (auto v : back) if (v != 128) ++written;
+    REQUIRE(written > 100);   // 至少画出若干字形像素(非空文本)
+    // 首字符"中"位于 0..16;msyh 垂直居中致顶部若干行空白,故检查第一个 16x16 单元内是否有被写像素
+    bool first_char_written = false;
+    for (int y = 0; y < 16 && y < h; ++y)
+        for (int x = 0; x < 16 && x < w; ++x)
+            if (back[y * w + x] != 128) first_char_written = true;
+    REQUIRE(first_char_written);
+    cudaFree(d_y); cudaFree(d_uv);
+}

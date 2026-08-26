@@ -62,4 +62,10 @@ namespace modeldeploy::vision {
         float x0, float y0, float x1, float y1,
         uint8_t r, uint8_t g, uint8_t b, int thickness,
         cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool draw_text_cjk_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        float x, float yo, const char* text,
+        uint8_t r, uint8_t g, uint8_t b, int font_size, int max_chars,
+        cudaStream_t stream = nullptr);
 }

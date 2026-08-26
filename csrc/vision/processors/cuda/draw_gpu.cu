@@ -1,6 +1,10 @@
 #include "vision/processors/cuda/draw_gpu.cuh"
+#include "vision/processors/cuda/cjk_font.h"
+#include "vision/processors/cuda/cjk_font_util.h"
+#include "vision/processors/cuda/cjk_font_device.h"
 #include <cuda_runtime.h>
 #include <cstring>
+#include <vector>
 
 namespace modeldeploy::vision {
     // 公共领域 8x16 VGA 字体位图（ASCII 0x20-0x7E），来自 dhepper/font8x8 (font8x16_basic, CC0)
@@ -596,6 +600,35 @@ namespace modeldeploy::vision {
         }
     }
 
+    // 每字形一个 block;线程映射 16x16 字形像素;font_size 放大写出
+    __global__ void kernel_draw_text_cjk_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                               int step_y, int step_uv,
+                                               const uint8_t* font, const int16_t* glyphs,
+                                               int nchars, int base_x, int base_y, int font_size,
+                                               uint8_t yy, uint8_t uu, uint8_t vv) {
+        const int ci = blockIdx.x;
+        if (ci >= nchars) return;
+        const int col = threadIdx.x;   // 0..15
+        const int prow = threadIdx.y;  // 0..15
+        const int gi = glyphs[ci];
+        if (gi < 0) return;
+        const uint8_t* g = font + static_cast<size_t>(gi) * 32;  // 32 bytes per glyph
+        const int byte_idx = prow * 2 + (col >= 8 ? 1 : 0);
+        const uint8_t bits = g[byte_idx];
+        if (!(bits & (0x80U >> (col & 7)))) return;
+        const int x0 = base_x + ci * 16 * font_size + col * font_size;
+        const int y0 = base_y + prow * font_size;
+        for (int sy = 0; sy < font_size; ++sy) {
+            const int py = y0 + sy;
+            if (py < 0 || py >= h) continue;
+            for (int sx = 0; sx < font_size; ++sx) {
+                const int px = x0 + sx;
+                if (px < 0 || px >= w) continue;
+                place_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv);
+            }
+        }
+    }
+
     // ── host 包装：创建/复用流，网格遍历绘制区域像素 ──
     static cudaStream_t acquire_stream(cudaStream_t user, bool* owned) {
         *owned = false;
@@ -713,6 +746,53 @@ namespace modeldeploy::vision {
         }
         cudaError_t sync = cudaStreamSynchronize(s);
         if (d_text) cudaFree(d_text);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
+    bool draw_text_cjk_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                                float xx, float yo, const char* text,
+                                uint8_t r, uint8_t g, uint8_t b, int font_size, int max_chars,
+                                cudaStream_t stream) {
+        if (!y || !text || w <= 0 || h <= 0) return false;
+        if (font_size <= 0) font_size = 1;
+        if (max_chars <= 0) max_chars = 128;
+        uint8_t yy, uu, vv; rgb_to_yuv_601(r, g, b, &yy, &uu, &vv);
+        // host 解码 UTF-8 → 字形下标数组(未命中回退 '.')
+        std::vector<int16_t> glyphs;
+        glyphs.reserve(max_chars);
+        int i = 0; const int dot = cjk_lookup(0x2E);
+        while (glyphs.size() < static_cast<size_t>(max_chars)) {
+            if (!text[i]) break;
+            uint32_t cp = 0;
+            const int len = utf8_to_cp(text + i, &cp);
+            if (len <= 0) { i += 1; continue; }
+            int gi = cjk_lookup(cp);
+            if (gi < 0) gi = dot;
+            glyphs.push_back(static_cast<int16_t>(gi));
+            i += len;
+        }
+        if (glyphs.empty()) return true;
+        // 设备字形位图(懒上传)
+        const uint8_t* font = cjk_device_glyphs();
+        if (!font) return false;
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        int16_t* d_glyphs = nullptr;
+        const size_t sz = glyphs.size() * sizeof(int16_t);
+        cudaError_t err = cudaMalloc(&d_glyphs, sz);
+        if (err == cudaSuccess)
+            err = cudaMemcpyAsync(d_glyphs, glyphs.data(), sz, cudaMemcpyHostToDevice, s);
+        if (err == cudaSuccess) {
+            dim3 block(16, 16);
+            dim3 grid(static_cast<unsigned>(glyphs.size()));
+            kernel_draw_text_cjk_nv12<<<grid, block, 0, s>>>(
+                y, uv, w, h, step_y, step_uv, font, d_glyphs,
+                static_cast<int>(glyphs.size()),
+                static_cast<int>(xx), static_cast<int>(yo), font_size, yy, uu, vv);
+            err = cudaGetLastError();
+        }
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (d_glyphs) cudaFree(d_glyphs);
         if (owned) cudaStreamDestroy(s);
         return err == cudaSuccess && sync == cudaSuccess;
     }
