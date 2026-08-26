@@ -59,6 +59,7 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["output_url"] = cfg.output_url;
     j["preview_url"] = cfg.preview_url;
     j["enable_preview"] = cfg.enable_preview;
+    j["topology"] = cfg.topology;
 
     j["decoder"]["reconnect_delay_ms"] = cfg.decoder.reconnect_delay_ms;
     j["decoder"]["max_reconnects"] = cfg.decoder.max_reconnects;
@@ -68,6 +69,9 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["decoder"]["device_only"] = cfg.decoder.device_only;
 
     j["encoder"]["fps"] = cfg.encoder.fps;
+    j["encoder"]["out_width"] = cfg.encoder.out_width;
+    j["encoder"]["out_height"] = cfg.encoder.out_height;
+    j["encoder"]["out_fps"] = cfg.encoder.out_fps;
     j["encoder"]["bitrate_kbps"] = cfg.encoder.bitrate_kbps;
     j["encoder"]["gop"] = cfg.encoder.gop;
     j["encoder"]["codec"] = cfg.encoder.codec;
@@ -108,6 +112,7 @@ TaskConfig task_config_from_json(const json& j) {
     if (j.contains("preview_url") && j["preview_url"].is_string()) cfg.preview_url = j["preview_url"];
     if (j.contains("enable_preview") && j["enable_preview"].is_boolean()) cfg.enable_preview = j["enable_preview"];
     else if (j.contains("enable_preview") && j["enable_preview"].is_number()) cfg.enable_preview = j["enable_preview"].get<int>() != 0;
+    cfg.topology = j.value("topology", std::string("per_channel"));
 
     if (j.contains("decoder") && j["decoder"].is_object()) {
         auto& d = j["decoder"];
@@ -122,6 +127,9 @@ TaskConfig task_config_from_json(const json& j) {
     if (j.contains("encoder") && j["encoder"].is_object()) {
         auto& e = j["encoder"];
         if (e.contains("fps")) cfg.encoder.fps = e["fps"];
+        if (e.contains("out_width")) cfg.encoder.out_width = e["out_width"];
+        if (e.contains("out_height")) cfg.encoder.out_height = e["out_height"];
+        if (e.contains("out_fps")) cfg.encoder.out_fps = e["out_fps"];
         if (e.contains("bitrate_kbps")) cfg.encoder.bitrate_kbps = e["bitrate_kbps"];
         if (e.contains("gop")) cfg.encoder.gop = e["gop"];
         if (e.contains("codec") && e["codec"].is_string()) cfg.encoder.codec = e["codec"];
