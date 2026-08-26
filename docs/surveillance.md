@@ -160,23 +160,49 @@ encode（GPU 直编 D2D，编码器以设备帧为输入，h264_nvenc）
 
 以下为 `TaskConfig` 关键字段的 JSON 片段（完整结构见 `config.cpp` 的序列化）。
 
-### 5.1 NVIDIA 桌面 / Jetson（GPU 直通）
+### 5.1 NVIDIA 桌面（GPU 直通）
 
 ```jsonc
 {
   "decoder": {
-    "hw_accel": "cuda",        // CUDA 硬解
+    "hw_accel": "cuda",        // CUDA 硬解（FFmpeg/GStreamer CUDAMemory，真 GPU 直通）
     "device_only": true,       // 跳过 D2H，仅暴露设备指针（GPU 直通）
     "rtsp_transport": "tcp"
   },
   "encoder": {
-    "codec": "h264_nvenc",     // Jetson 亦可用 "auto" / "nvh264enc"
+    "codec": "h264_nvenc",     // GPU 直编
     "format": "flv",
     "bitrate_kbps": 2500,
     "gop": 12
   }
 }
 ```
+
+### 5.4 Jetson L4T（硬件解码/编码，host NV12）
+
+```jsonc
+{
+  "decoder": {
+    "hw_accel": "cuda",        // 映射到 L4T nvv4l2decoder 硬件解码
+    "backend": "gstreamer",    // Jetson 用 GStreamer 后端（FFmpeg 缺 libnvcuvid）
+    "device_only": true,       // L4T 零拷贝不可得，自动降级为 nvv4l2decoder→nvvidconv→host NV12
+    "rtsp_transport": "tcp"
+  },
+  "encoder": {
+    "codec": "nvv4l2h264enc",  // L4T V4L2 硬件编码（吃 host 帧）
+    "format": "flv",
+    "bitrate_kbps": 2500,
+    "gop": 12
+  }
+}
+```
+
+**Jetson L4T 平台说明（真机实测 2026-08-27，Orin）**：
+- L4T **无 gstcuda / nvh264dec**，且 SDK 的 GPU CUDAMemory 直通依赖 gstcuda → Jetson 上**真·GPU 零拷贝需 DeepStream NvDS-buffer 集成**（本 SDK 不含），目前**不可得**。
+- 退而求其次（已实测生效）：`nvv4l2decoder`（硬件解码）→ `nvvidconv` → **host NV12**，`ImageData` 原生支持（2 平面 Y/UV、`Device::CPU`）。Orin 统一内存无 PCIe，推理前一次 host→CUDA 拷贝开销可忽略（1080p ≈15µs/帧）。
+- 编码 `nvv4l2h264enc` 直接吃 host NV12/BGR（V4L2），无需回设备。
+- **实测（640×480 本地文件）**：解码 ≈**28.8 fps**（源 30fps，实时）；编码 **nvv4l2h264enc ≈205 fps**（远超 25fps 目标）。
+- 启用 `backend="gstreamer"` 时，应用 `video_codec::backend_from_string("gstreamer")` 映射到 SDK `CodecBackend::GStreamer`，SDK 在 L4T 自动选 `nvv4l2decoder`+nvvidconv 路径（`gst_decoder.cpp`，`HAVE_NVBUF`）。
 
 ### 5.2 CPU（全软编软解）
 
