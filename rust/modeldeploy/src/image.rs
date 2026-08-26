@@ -103,6 +103,23 @@ impl Image {
         }
     }
 
+    pub fn to_native_bytes(&self) -> Result<Vec<u8>, MdError> {
+        let mut buf: *const u8 = std::ptr::null();
+        let mut n: usize = 0;
+        check_status(unsafe { ffi::md_image_to_host_bytes(self.handle, &mut buf, &mut n, std::ptr::null_mut()) })?;
+        if buf.is_null() { return Err(MdError::UnsupportedType); }
+        Ok(unsafe { std::slice::from_raw_parts(buf, n) }.to_vec())
+    }
+
+    pub fn plane_bytes(&self, i: usize) -> Result<Vec<u8>, MdError> {
+        let mut buf: *const u8 = std::ptr::null();
+        let mut n: usize = 0;
+        let mut step: std::os::raw::c_int = 0;
+        check_status(unsafe { ffi::md_image_plane_bytes(self.handle, i as std::os::raw::c_int, &mut buf, &mut n, &mut step) })?;
+        if buf.is_null() { return Err(MdError::UnsupportedType); }
+        Ok(unsafe { std::slice::from_raw_parts(buf, n) }.to_vec())
+    }
+
     /// 便捷方法：Y/UV 平面指针 + 所在设备（仅对 NV12/NV21 帧有效）。基于 plane()/device()。
     pub fn plane_ptrs(&self) -> Result<(ffi::MDDevice, *const u8, *const u8), MdError> {
         Ok((

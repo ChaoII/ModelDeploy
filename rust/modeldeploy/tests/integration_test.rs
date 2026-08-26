@@ -98,6 +98,23 @@ fn test_image_from_bgr24() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn image_to_native_bytes_len() {
+    let img = Image::from_bgr24(&vec![0u8; 4 * 3 * 3], 4, 3).unwrap();
+    let nb = img.to_native_bytes().unwrap();
+    assert_eq!(nb.len(), 4 * 3 * 3);
+}
+
+#[test]
+fn image_plane_bytes_nv12() {
+    let y = vec![1u8; 4 * 2];
+    let uv = vec![2u8; 4 * 1];
+    let img = Image::from_nv12(&y, &uv, 4, 2, 0, 0).unwrap();
+    assert_eq!(img.plane_bytes(0).unwrap().len(), 4 * 2);
+    assert_eq!(img.plane_bytes(1).unwrap().len(), 4 * 1);
+    assert!(img.plane_bytes(2).is_err());
+}
+
 // ═══ Detection ═══
 
 #[test]

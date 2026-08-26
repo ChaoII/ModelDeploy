@@ -478,6 +478,8 @@ extern "C" {
     // 取 NV12 帧平面指针（dev 返回帧所在设备；仅对 NV12 有效，CPU BGR 图返回 UNSUPPORTED_TYPE）
     pub fn md_image_plane_ptrs(h: MDImageHandle, dev: *mut MDDevice,
         y: *mut *mut c_void, uv: *mut *mut c_void) -> MDStatus;
+    pub fn md_image_to_host_bytes(h: MDImageHandle, buf: *mut *const u8, n: *mut usize, format: *mut c_int) -> MDStatus;
+    pub fn md_image_plane_bytes(h: MDImageHandle, i: c_int, buf: *mut *const u8, n: *mut usize, step: *mut c_int) -> MDStatus;
 
     // ── 模型 ──
     pub fn md_model_create(out: *mut MDModelHandle, kind: MDModelKind,
