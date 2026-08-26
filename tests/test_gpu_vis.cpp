@@ -2,6 +2,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cuda_runtime.h>
 #include <vector>
+#include "vision/common/image_data.h"
+#include "vision/common/result.h"
+#include "vision/processors/cuda/cuda_processor_backend.h"
 #include "vision/processors/cuda/draw_gpu.cuh"
 namespace mv = modeldeploy::vision;
 TEST_CASE("cjk_font: lookup and utf8", "[cjkfont][core]") {
@@ -78,5 +81,43 @@ TEST_CASE("cuda draw_text_cjk nv12 (semantic)", "[gpu]") {
         for (int x = 0; x < 16 && x < w; ++x)
             if (back[y * w + x] != 128) first_char_written = true;
     REQUIRE(first_char_written);
+    cudaFree(d_y); cudaFree(d_uv);
+}
+
+TEST_CASE("cuda vis_det_nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+
+    // 构造一个 NV12 设备 ImageData(借用 d_y/d_uv,Device::GPU)
+    const mv::ImageData::Plane planes[2] = {{d_y, w}, {d_uv, w}};
+    mv::ImageData frame = mv::ImageData::from_planes(planes, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+
+    mv::DetectionResult det;
+    det.label_id = 0;
+    det.score = 0.9f;
+    det.box = {8.0f, 8.0f, 16.0f, 16.0f};
+    std::vector<mv::DetectionResult> results{det};
+
+    mv::VisionProcessorBackend::VisOptions opt;
+    opt.alpha = 1.0;            // 全幅直写,回读断言确定
+    opt.threshold = 0.5;
+
+    mv::CudaProcessorBackend backend;
+    REQUIRE(backend.vis_det_nv12(frame, results, opt));
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    // 框内像素被填充色改写(label 0 调色板 {230,159,0} → Y≠128)
+    REQUIRE(back[12 * w + 16] != 128);
+    // 框外保留原值
+    REQUIRE(back[0] == 128);
+    REQUIRE(back[47 * w + 40] == 128);
     cudaFree(d_y); cudaFree(d_uv);
 }

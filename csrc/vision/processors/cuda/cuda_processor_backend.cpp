@@ -8,7 +8,49 @@
 #include "vision/processors/cuda/fused_preproc.cuh"
 #include "vision/processors/cuda/scrfd_preproc.cuh"
 #include "vision/processors/cuda/draw_gpu.cuh"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <string>
+#include <unordered_map>
 #include <vector>
+
+namespace {
+// 与 CPU vis_* 确定性对齐的类调色板(RGB 序;20 色,label_id%20 取)
+constexpr uint8_t kClassPalette[20][3] = {
+    {230, 159, 0}, {86, 180, 233}, {0, 158, 115}, {240, 228, 66},
+    {0, 114, 178}, {213, 94, 0}, {204, 121, 167}, {255, 157, 0},
+    {35, 105, 153}, {166, 86, 40}, {247, 129, 191}, {120, 87, 156},
+    {255, 154, 161}, {107, 174, 214}, {222, 125, 44}, {152, 78, 163},
+    {191, 119, 0}, {32, 74, 135}, {204, 154, 72}, {188, 143, 143}
+};
+
+std::string label_name(const modeldeploy::vision::VisionProcessorBackend::VisOptions& opt, int label_id) {
+    auto it = opt.label_map.find(label_id);
+    if (it != opt.label_map.end() && !it->second.empty()) return it->second;
+    return std::to_string(label_id);
+}
+std::string score_str(float score) {
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%.2f", score);
+    return std::string(buf);
+}
+struct Nv12View {
+    uint8_t* y = nullptr;
+    uint8_t* uv = nullptr;
+    int w = 0, h = 0, step_y = 0, step_uv = 0;
+    explicit Nv12View(modeldeploy::vision::ImageData& f) {
+        if (f.type() != MdImageType::NV12 || f.plane_count() < 2) return;
+        const auto p0 = f.plane(0), p1 = f.plane(1);
+        y = const_cast<uint8_t*>(p0.data);
+        uv = const_cast<uint8_t*>(p1.data);
+        w = f.width(); h = f.height();
+        step_y = p0.step > 0 ? p0.step : w;
+        step_uv = p1.step > 0 ? p1.step : w;
+    }
+    bool ok() const { return y != nullptr; }
+};
+}  // namespace
 
 namespace modeldeploy::vision {
     // 惰性创建并返回持久 CUDA stream（backend 生命周期内复用）
@@ -271,16 +313,71 @@ namespace modeldeploy::vision {
                                   get_persistent_stream(&stream_));
     }
 
-    // ── 设备侧高层可视化（暂为空实现，后续任务替换为真实实现）──
+    // ── 设备侧高层可视化（几何类已实现；其余桩暂保留，后续任务替换）──
     bool CudaProcessorBackend::vis_det_nv12(ImageData& frame,
                                             const std::vector<DetectionResult>& result,
                                             const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const int x0 = static_cast<int>(r.box.x), y0 = static_cast<int>(r.box.y);
+            const int x1 = x0 + static_cast<int>(r.box.width), y1 = y0 + static_cast<int>(r.box.height);
+            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    x0, y0, x1, y1, c[0], c[1], c[2], alpha, s) && ok;
+            ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    r.box.x, r.box.y, r.box.width, r.box.height,
+                                    c[0], c[1], c[2], 2, s) && ok;
+            std::string label = label_name(opt, r.label_id) + ": " + score_str(r.score);
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
+                                        255, 255, 255, 1, static_cast<int>(label.size()) + 4, s) && ok;
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_obb_nv12(ImageData& frame,
                                             const std::vector<ObbResult>& result,
                                             const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        const float alpha = static_cast<float>(opt.alpha);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            // 旋转矩形 → 4 角点(OpenCV RotatedRect 约定:angle 为度数,绕中心逆时针)
+            const double ang = r.rotated_box.angle * 3.14159265358979323846 / 180.0;
+            const float cs = static_cast<float>(std::cos(ang));
+            const float sn = static_cast<float>(std::sin(ang));
+            const float hw = r.rotated_box.width * 0.5f, hh = r.rotated_box.height * 0.5f;
+            const float cx = r.rotated_box.xc, cy = r.rotated_box.yc;
+            float pts[4][2] = {
+                {-hw, -hh}, {hw, -hh}, {hw, hh}, {-hw, hh}
+            };
+            std::vector<Point2f> poly(4);
+            for (int i = 0; i < 4; ++i) {
+                poly[i].x = cx + pts[i][0] * cs - pts[i][1] * sn;
+                poly[i].y = cy + pts[i][0] * sn + pts[i][1] * cs;
+            }
+            std::vector<float> xs(4), ys(4);
+            for (int i = 0; i < 4; ++i) { xs[i] = poly[i].x; ys[i] = poly[i].y; }
+            ok = fill_polygon_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                       xs.data(), ys.data(), 4,
+                                       c[0], c[1], c[2], alpha, s) && ok;
+            ok = draw_polygon_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                       xs.data(), ys.data(), 4,
+                                       c[0], c[1], c[2], 2, s) && ok;
+            std::string label = std::to_string(r.label_id) + ": " + score_str(r.score);
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        poly[1].x, poly[1].y - 16.0f, label.c_str(),
+                                        255, 255, 255, 1, static_cast<int>(label.size()) + 4, s) && ok;
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_pose_nv12(ImageData& frame,
                                              const std::vector<KeyPointsResult>& result,
@@ -312,12 +409,68 @@ namespace modeldeploy::vision {
                                              const VisionProcessorBackend::VisOptions& opt,
                                              const std::vector<int>& abnormal_ids,
                                              bool show_attr) {
-        (void)frame; (void)result; (void)opt; (void)abnormal_ids; (void)show_attr; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        bool ok = true;
+        std::unordered_map<int, bool> abnormal;
+        for (int id : abnormal_ids) abnormal[id] = true;
+        int obj_idx = 0;
+        for (const auto& r : result) {
+            const bool is_abnormal = abnormal.count(obj_idx) > 0 && abnormal[obj_idx];
+            // 颜色语义对齐 CPU vis_attr.cpp:OpenCV BGR 下 Scalar(0,0,255)=红 → abnormal;
+            // Scalar(0,255,0)=绿 → 正常。故数组(RGB 序)abnormal=红(255,0,0)、正常=绿(0,255,0)。
+            uint8_t c[3];
+            if (is_abnormal) {
+                c[0] = 255; c[1] = 0; c[2] = 0;      // 红
+            } else {
+                c[0] = 0; c[1] = 255; c[2] = 0;      // 绿
+            }
+            if (r.box_score >= opt.threshold) {
+                ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        r.box.x, r.box.y, r.box.width, r.box.height,
+                                        c[0], c[1], c[2], 2, s) && ok;
+                if (show_attr) {
+                    for (size_t i = 0; i < r.attr_scores.size(); ++i) {
+                        std::string a = label_name(opt, static_cast<int>(i)) + ": " + score_str(r.attr_scores[i]);
+                        const float ty = r.box.y + static_cast<float>((int)i + 1) * 16.0f;
+                        ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                                    r.box.x, ty, a.c_str(),
+                                                    255, 255, 255, 1, static_cast<int>(a.size()) + 4, s) && ok;
+                    }
+                }
+            }
+            ++obj_idx;
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_cls_nv12(ImageData& frame, const ClassifyResult& result,
                                             const VisionProcessorBackend::VisOptions& opt,
                                             int top_k) {
-        (void)frame; (void)result; (void)opt; (void)top_k; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        if (top_k <= 0) top_k = 1;
+        const int margin = 5;
+        bool ok = true;
+        int drawn = 0;
+        const size_t n = std::min(result.label_ids.size(), result.scores.size());
+        for (size_t i = 0; i < n && drawn < top_k; ++i) {
+            if (result.scores[i] < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[result.label_ids[i] % 20];
+            const float y = static_cast<float>(margin + drawn * 16);
+            std::string label = std::to_string(result.label_ids[i]) + ": " + score_str(result.scores[i]);
+            // 半透明底色块 + 白字
+            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    0, static_cast<int>(y) - 2, static_cast<int>(label.size()) * 16,
+                                    static_cast<int>(y) + 14,
+                                    c[0], c[1], c[2], 0.6f, s) && ok;
+            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                        static_cast<float>(margin), y, label.c_str(),
+                                        255, 255, 255, 1, static_cast<int>(label.size()) + 4, s) && ok;
+            ++drawn;
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_iseg_nv12(ImageData& frame,
                                              const std::vector<InstanceSegResult>& result,
