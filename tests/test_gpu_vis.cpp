@@ -161,3 +161,24 @@ TEST_CASE("cuda vis_det_nv12 (semantic)", "[gpu]") {
     REQUIRE(back[47 * w + 40] == 128);
     cudaFree(d_y); cudaFree(d_uv);
 }
+
+TEST_CASE("cuda overlay_labels nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr; uint8_t* d_lbl = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    // labels 8x8 全类别 0;class0 RGB(128,64,128) BT.601 全幅 Y≈94;alpha=1 直写
+    const int lw = 8, lh = 8;
+    std::vector<uint8_t> lbl(static_cast<size_t>(lw) * lh, 0);
+    REQUIRE(cudaMalloc(&d_lbl, lbl.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_lbl, lbl.data(), lbl.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(modeldeploy::vision::overlay_labels_nv12_gpu(d_y, d_uv, w, h, w, w, d_lbl, lw, lh, 1.0f, nullptr));
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    REQUIRE((back[0] >= 92 && back[0] <= 96));
+    cudaFree(d_y); cudaFree(d_uv); cudaFree(d_lbl);
+}

@@ -865,4 +865,135 @@ namespace modeldeploy::vision {
         if (owned) cudaStreamDestroy(s);
         return err == cudaSuccess && sync == cudaSuccess;
     }
+
+    // ════════════════ 语义标签 / 深度 / 实例掩膜 叠加内核 ════════════════
+
+    // Cityscapes 19 色(RGB 序,由 CPU vis_sem.cpp 的 cv::Vec3b BGR 转置)
+    constexpr uint8_t kCityscapesRgb[19][3] = {
+        {128,64,128},{244,35,232},{70,70,70},{102,102,156},{190,153,153},{153,153,153},
+        {250,170,30},{220,220,0},{107,142,35},{152,251,152},{70,130,180},{220,20,60},
+        {255,0,0},{0,0,142},{0,0,70},{0,60,100},{0,80,100},{0,0,230},{119,11,32}
+    };
+    __constant__ uint8_t g_cityscapes_dev[19 * 3];
+    // 懒上传一次到 __constant__;返回 bool
+    bool cityscapes_uploaded() {
+        static bool ok = false;
+        if (!ok) ok = cudaMemcpyToSymbol(g_cityscapes_dev, kCityscapesRgb, sizeof(kCityscapesRgb),
+                                         0, cudaMemcpyHostToDevice) == cudaSuccess;
+        return ok;
+    }
+    // JET 伪彩(OpenCV COLORMAP_JET ≈ 分段近似),v in [0,255]
+    __device__ __forceinline__ void jet_color(uint8_t v, uint8_t* rgb) {
+        const float x = v * (1.0f / 255.0f);
+        float r = fmaxf(0.0f, fminf(1.0f, 1.5f - fabsf(4.0f * x - 3.0f)));
+        float g = fmaxf(0.0f, fminf(1.0f, 1.5f - fabsf(4.0f * x - 2.0f)));
+        float b = fmaxf(0.0f, fminf(1.0f, 1.5f - fabsf(4.0f * x - 1.0f)));
+        rgb[0] = static_cast<uint8_t>(r * 255.0f + 0.5f);
+        rgb[1] = static_cast<uint8_t>(g * 255.0f + 0.5f);
+        rgb[2] = static_cast<uint8_t>(b * 255.0f + 0.5f);
+    }
+
+    __global__ void kernel_overlay_labels_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                                int step_y, int step_uv,
+                                                const uint8_t* labels, int lw, int lh, float alpha) {
+        const int px = blockIdx.x * blockDim.x + threadIdx.x;
+        const int py = blockIdx.y * blockDim.y + threadIdx.y;
+        if (px >= w || py >= h) return;
+        const int lx = static_cast<int>((static_cast<long long>(px) * lw) / w);
+        const int ly = static_cast<int>((static_cast<long long>(py) * lh) / h);
+        const int cls = labels[static_cast<size_t>(ly) * lw + lx];
+        const int ci = cls >= 0 && cls < 19 ? cls : 0;
+        const uint8_t* c = g_cityscapes_dev + ci * 3;
+        uint8_t yy, uu, vv; rgb_to_yuv_601(c[0], c[1], c[2], &yy, &uu, &vv);
+        blend_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv, alpha);
+    }
+
+    __global__ void kernel_overlay_depth_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                               int step_y, int step_uv,
+                                               const uint8_t* depth8, int dw, int dh,
+                                               bool colorize, float alpha) {
+        const int px = blockIdx.x * blockDim.x + threadIdx.x;
+        const int py = blockIdx.y * blockDim.y + threadIdx.y;
+        if (px >= w || py >= h) return;
+        const int dx = static_cast<int>((static_cast<long long>(px) * dw) / w);
+        const int dy = static_cast<int>((static_cast<long long>(py) * dh) / h);
+        const uint8_t v8 = depth8[static_cast<size_t>(dy) * dw + dx];
+        uint8_t c[3];
+        if (colorize) {
+            jet_color(v8, c);
+        } else {
+            // 灰色半透明:灰 = v8, alpha 控制
+            c[0] = c[1] = c[2] = v8;
+        }
+        uint8_t yy, uu, vv; rgb_to_yuv_601(c[0], c[1], c[2], &yy, &uu, &vv);
+        blend_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv, alpha);
+    }
+
+    __global__ void kernel_overlay_mask_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                              int step_y, int step_uv,
+                                              int bx0, int by0, int bw, int bh,
+                                              const uint8_t* mask, int mw, int mh,
+                                              uint8_t yy, uint8_t uu, uint8_t vv, float alpha) {
+        const int px = blockIdx.x * blockDim.x + threadIdx.x;
+        const int py = blockIdx.y * blockDim.y + threadIdx.y;
+        if (px >= w || py >= h) return;
+        if (px < bx0 || px >= bx0 + bw || py < by0 || py >= by0 + bh) return;
+        const int mx = mw > 0 ? static_cast<int>((static_cast<long long>(px - bx0) * mw) / bw) : 0;
+        const int my = mh > 0 ? static_cast<int>((static_cast<long long>(py - by0) * mh) / bh) : 0;
+        if (mask[static_cast<size_t>(my) * mw + mx] != 0)
+            blend_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv, alpha);
+    }
+
+    bool overlay_labels_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                                 const uint8_t* d_labels, int lw, int lh, float alpha, cudaStream_t stream) {
+        if (!y || (!uv && h > 1) || w <= 0 || h <= 0 || !d_labels || lw <= 0 || lh <= 0) return false;
+        if (alpha < 0.0f) return false;
+        if (alpha > 1.0f) alpha = 1.0f;
+        if (!cityscapes_uploaded()) return false;
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        dim3 block(32, 4);
+        dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+        kernel_overlay_labels_nv12<<<grid, block, 0, s>>>(
+            y, uv, w, h, step_y, step_uv, d_labels, lw, lh, alpha);
+        cudaError_t err = cudaGetLastError();
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
+    bool overlay_depth_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                                const uint8_t* d_depth8, int dw, int dh, bool colorize, float alpha,
+                                cudaStream_t stream) {
+        if (!y || (!uv && h > 1) || w <= 0 || h <= 0 || !d_depth8 || dw <= 0 || dh <= 0) return false;
+        if (alpha < 0.0f) return false;
+        if (alpha > 1.0f) alpha = 1.0f;
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        dim3 block(32, 4);
+        dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+        kernel_overlay_depth_nv12<<<grid, block, 0, s>>>(
+            y, uv, w, h, step_y, step_uv, d_depth8, dw, dh, colorize, alpha);
+        cudaError_t err = cudaGetLastError();
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
+    bool overlay_mask_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                               int bx0, int by0, int bw, int bh,
+                               const uint8_t* d_mask, int mw, int mh,
+                               uint8_t r, uint8_t g, uint8_t b, float alpha, cudaStream_t stream) {
+        if (!y || (!uv && h > 1) || w <= 0 || h <= 0 || !d_mask || mw <= 0 || mh <= 0) return false;
+        if (alpha < 0.0f) return false;
+        if (alpha > 1.0f) alpha = 1.0f;
+        uint8_t yy, uu, vv; rgb_to_yuv_601(r, g, b, &yy, &uu, &vv);
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        dim3 block(32, 4);
+        dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+        kernel_overlay_mask_nv12<<<grid, block, 0, s>>>(
+            y, uv, w, h, step_y, step_uv, bx0, by0, bw, bh, d_mask, mw, mh, yy, uu, vv, alpha);
+        cudaError_t err = cudaGetLastError();
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
 }

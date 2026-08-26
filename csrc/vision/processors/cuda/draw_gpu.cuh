@@ -68,4 +68,21 @@ namespace modeldeploy::vision {
         float x, float yo, const char* text,
         uint8_t r, uint8_t g, uint8_t b, int font_size, int max_chars,
         cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool overlay_labels_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        const uint8_t* d_labels, int lw, int lh, float alpha,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool overlay_depth_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        const uint8_t* d_depth8, int dw, int dh, bool colorize, float alpha,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool overlay_mask_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        int bx0, int by0, int bw, int bh,
+        const uint8_t* d_mask, int mw, int mh,
+        uint8_t r, uint8_t g, uint8_t b, float alpha,
+        cudaStream_t stream = nullptr);
 }
