@@ -66,6 +66,7 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["decoder"]["timeout_us"] = cfg.decoder.timeout_us;
     j["decoder"]["rtsp_transport"] = cfg.decoder.rtsp_transport;
     j["decoder"]["hw_accel"] = cfg.decoder.hw_accel;
+    j["decoder"]["backend"] = cfg.decoder.backend;
     j["decoder"]["device_only"] = cfg.decoder.device_only;
 
     j["encoder"]["fps"] = cfg.encoder.fps;
@@ -75,6 +76,7 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["encoder"]["bitrate_kbps"] = cfg.encoder.bitrate_kbps;
     j["encoder"]["gop"] = cfg.encoder.gop;
     j["encoder"]["codec"] = cfg.encoder.codec;
+    j["encoder"]["backend"] = cfg.encoder.backend;
     j["encoder"]["preset"] = cfg.encoder.preset;
     j["encoder"]["tune"] = cfg.encoder.tune;
     j["encoder"]["format"] = cfg.encoder.format;
@@ -121,6 +123,7 @@ TaskConfig task_config_from_json(const json& j) {
         if (d.contains("timeout_us")) cfg.decoder.timeout_us = d["timeout_us"];
         if (d.contains("rtsp_transport") && d["rtsp_transport"].is_string()) cfg.decoder.rtsp_transport = d["rtsp_transport"];
         if (d.contains("hw_accel") && d["hw_accel"].is_string()) cfg.decoder.hw_accel = d["hw_accel"];
+        if (d.contains("backend") && d["backend"].is_string()) cfg.decoder.backend = d["backend"];
         if (d.contains("device_only") && d["device_only"].is_boolean()) cfg.decoder.device_only = d["device_only"];
     }
 
@@ -133,6 +136,7 @@ TaskConfig task_config_from_json(const json& j) {
         if (e.contains("bitrate_kbps")) cfg.encoder.bitrate_kbps = e["bitrate_kbps"];
         if (e.contains("gop")) cfg.encoder.gop = e["gop"];
         if (e.contains("codec") && e["codec"].is_string()) cfg.encoder.codec = e["codec"];
+        if (e.contains("backend") && e["backend"].is_string()) cfg.encoder.backend = e["backend"];
         if (e.contains("preset") && e["preset"].is_string()) cfg.encoder.preset = e["preset"];
         if (e.contains("tune") && e["tune"].is_string()) cfg.encoder.tune = e["tune"];
         if (e.contains("format") && e["format"].is_string()) cfg.encoder.format = e["format"];
@@ -169,3 +173,4 @@ TaskConfig task_config_from_json(const json& j) {
     }
     return cfg;
 }
+

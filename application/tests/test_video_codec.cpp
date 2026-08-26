@@ -19,6 +19,15 @@ TEST_CASE("HwAccel map", "[video_codec]") {
     REQUIRE(hw_from_string("junk") == mv::HwAccel::Auto);
 }
 
+TEST_CASE("Backend map", "[video_codec]") {
+    namespace mv = modeldeploy::video;
+    REQUIRE(backend_from_string("gstreamer") == mv::CodecBackend::GStreamer);
+    REQUIRE(backend_from_string("ffmpeg") == mv::CodecBackend::FFmpeg);
+    REQUIRE(backend_from_string("") == mv::CodecBackend::FFmpeg);
+    REQUIRE(backend_from_string("auto") == mv::CodecBackend::Auto);
+    REQUIRE(backend_from_string("junk") == mv::CodecBackend::Auto);
+}
+
 TEST_CASE("decoder config mapping", "[video_codec]") {
     DecoderConfig dc;
     dc.reconnect_delay_ms = 1000;
@@ -26,6 +35,7 @@ TEST_CASE("decoder config mapping", "[video_codec]") {
     dc.timeout_us = 5000000;
     dc.rtsp_transport = "udp";
     dc.hw_accel = "cuda";
+    dc.backend = "gstreamer";
     dc.device_only = true;
     modeldeploy::video::VideoDecoderConfig sdk;
     video_codec_fill_decoder(&sdk, dc);
@@ -34,6 +44,7 @@ TEST_CASE("decoder config mapping", "[video_codec]") {
     REQUIRE(sdk.timeout_us == 5000000);
     REQUIRE(sdk.rtsp_transport == "udp");
     REQUIRE(sdk.hw_accel == modeldeploy::video::HwAccel::Cuda);
+    REQUIRE(sdk.backend == modeldeploy::video::CodecBackend::GStreamer);
     REQUIRE(sdk.device_only == true);
 }
 
