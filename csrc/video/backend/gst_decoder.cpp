@@ -361,53 +361,13 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
 
 #ifdef HAVE_NVBUF
     if (l4t_device_active_) {
-        // Jetson L4T 零拷贝：NvBufSurface* 位于 GST_MAP_READ 的 64 字节目录头 offset 24（真机实证）。
-        // NvBufSurfaceMap(READ) 得到 Orin 统一内存指针（CPU/设备共享）作设备帧平面。
-        NvBufSurface* surf = nullptr;
-        {
-            GstMapInfo hdr;
-            if (!gst_buffer_map(buffer, &hdr, GST_MAP_READ)) {
-                set_err(err, "nvcodec-map-fail");
-                gst_sample_unref(sample);
-                return false;
-            }
-            memcpy(&surf, (char*)hdr.data + 24, sizeof(surf));
-            gst_buffer_unmap(buffer, &hdr);
-        }
-        if (!surf || surf->numFilled < 1) {
-            set_err(err, "nvcodec-no-plane");
-            gst_sample_unref(sample);
-            return false;
-        }
-        if (NvBufSurfaceMap(surf, 0, -1, NVBUF_MAP_READ) != 0) {
-            set_err(err, "nvcodec-map-fail");
-            gst_sample_unref(sample);
-            return false;
-        }
-        NvBufSurfaceParams* p = &surf->surfaceList[0];
-        const uint8_t* y = (const uint8_t*)p->mappedAddr.addr[0];
-        const uint8_t* uv = (const uint8_t*)p->mappedAddr.addr[1];
-        if (!y || !uv) {
-            NvBufSurfaceUnMap(surf, 0, -1);
-            set_err(err, "nvcodec-no-plane");
-            gst_sample_unref(sample);
-            return false;
-        }
-        int sy = (int)p->planeParams.pitch[0];
-        int su = (int)p->planeParams.pitch[1];
-        std::shared_ptr<void> owner(
-            (void*)y,
-            [surf, sample](void*) mutable {
-                NvBufSurfaceUnMap(surf, 0, -1);
-                gst_sample_unref(sample);
-            });
-        IPlaneView v{y, sy, uv, su, w_, h_, Device::GPU, owner};
-        out->image = make_image_from_planes_view(v);
-        out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
-                          ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
-                          : 0;
-        stats_.frames_out++;
-        return true;
+        // 真机实证：nvv4l2decoder 的 surface-array 帧，其 buffer 头内指针并非可直接使用的公开
+        // NvBufSurface（读取即崩），且 NvBufSurfaceFromFd 对解码器 surface 无效。零拷贝帧提取依赖
+        // DeepStream/私有 nvmm buffer-pool 集成（本 SDK 不含）。在正确提取方案确认前 fail-closed，
+        // 返回明确错误而非崩溃/静默软解。
+        set_err(err, "l4t-nvbuf-extract-unsupported");
+        gst_sample_unref(sample);
+        return false;
     }
 #endif
 
