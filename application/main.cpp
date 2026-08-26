@@ -70,11 +70,6 @@ int main(int argc, char* argv[]) {
     // 加载持久化数据
     mgr.load_from_directory(g_data_dir);
 
-    // 接线批量推理（模型库已在 load_from_directory 中加载，注册到 BatchScheduler）
-    if (!mgr.start_batch_scheduler()) {
-        std::cerr << "[Main] Failed to start batch scheduler, falling back to per-frame inference" << std::endl;
-    }
-
     HttpServer server(mgr, "0.0.0.0", port);
     if (!server.start()) {
         std::cerr << "[Main] Failed to start HTTP server" << std::endl;

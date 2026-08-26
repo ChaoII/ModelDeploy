@@ -50,13 +50,10 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
     return opt;
 }
 
-PipelineManager::PipelineManager() {
-    // BatchScheduler 不自动启动，需要时手动调用 start_batch_scheduler()
-}
+PipelineManager::PipelineManager() {}
 
 PipelineManager::~PipelineManager() {
     stop_all();
-    stop_batch_scheduler();
 }
 
 // ── 模型工厂（prototype 缓存 + clone 共享 Runtime） ──
@@ -162,9 +159,7 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
         return this->create_engine(mcfg);
     };
 
-    // 解码器通过 StreamHub 共享：相同 url+config 的多路任务复用同一解码器
-    // 推理走 BatchScheduler 批量路径（start_batch_scheduler 启动后生效）
-                            pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, std::move(factory));
+    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, std::move(factory));
     dirty_ = true;
     std::cout << "[Manager] Task created: " << cfg.id << std::endl;
     return true;
@@ -324,21 +319,6 @@ void PipelineManager::stop_all() {
     }
     pipelines_.clear();
     dirty_ = true;
-}
-
-bool PipelineManager::start_batch_scheduler() {
-    bool ok = batch_scheduler_.start();
-    if (ok) {
-        // Register all models from the library
-        for (const auto& m : model_library_) {
-            batch_scheduler_.register_model(m);
-        }
-    }
-    return ok;
-}
-
-void PipelineManager::stop_batch_scheduler() {
-    batch_scheduler_.stop();
 }
 
 // ── 模型库管理 ──
