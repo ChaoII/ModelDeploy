@@ -344,7 +344,7 @@ TEST_CASE("Tensor allocate buffer reuse", "[core]") {
     // 第一次 allocate
     t.allocate({3, 64, 64}, DataType::FP32);
     void* p1 = t.data();
-    // 带 batch 维，与 {3,64,64} 不同（模拟 fused_preprocess 修复前 expand_dim 场景）
+    // 带 batch 维，与 {3,64,64} 不同（模拟 fused_preprocess_common 修复前 expand_dim 场景）
     t.allocate({1, 3, 64, 64}, DataType::FP32);
     void* p2 = t.data();
     // 再次 allocate 相同 shape {1,3,64,64}，应复用 buffer（指针不变）

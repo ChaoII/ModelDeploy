@@ -12,7 +12,7 @@
 
 
 namespace modeldeploy::vision {
-    MODELDEPLOY_CXX_EXPORT bool fusion_resize_pad_normalize_permute_cpu(
+    MODELDEPLOY_CXX_EXPORT bool ocr_det_preprocess_cpu(
         const std::vector<ImageData>&, Tensor* output,
         const std::vector<std::array<int, 2>>& resize_sizes,
         const std::vector<int>& dst_size,

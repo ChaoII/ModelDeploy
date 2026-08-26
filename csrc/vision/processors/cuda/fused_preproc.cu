@@ -106,7 +106,7 @@ __global__ void kernel_fused_preproc(
     dst[2 * plane_size + dst_idx] = v2 * alpha2 + beta2;
 }
 
-bool fused_preprocess_cuda(const uint8_t* src,
+bool fused_preprocess_common_cuda(const uint8_t* src,
                            const std::vector<int>& src_size,
                            Tensor* out,
                            const std::vector<int>& dst_size,
@@ -243,7 +243,7 @@ __global__ void kernel_fused_preproc_batch(
     dst_b[2 * plane + dst_idx] = v2 * alpha2 + beta2;
 }
 
-bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
+bool fused_preprocess_common_batch_cuda(const std::vector<ImageData>& images,
                                  Tensor* out,
                                  const std::vector<int>& dst_size,
                                  const std::vector<float>& origins_x,
@@ -455,7 +455,7 @@ struct Nv12BatchWorkspace {
 };
 static thread_local Nv12BatchWorkspace nv12_ws;
 
-bool fused_preprocess_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
+bool fused_preprocess_common_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
                                 const std::vector<int>& src_size,
                                 int step_y, int step_uv,
                                 Tensor* out,
@@ -523,7 +523,7 @@ bool fused_preprocess_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
     return true;
 }
 
-bool fused_preprocess_nv12_batch_cuda(const std::vector<ImageData>& images,
+bool fused_preprocess_common_nv12_batch_cuda(const std::vector<ImageData>& images,
                                       Tensor* out,
                                       const std::vector<int>& dst_size,
                                       const std::vector<float>& origins_x,
@@ -695,7 +695,7 @@ __global__ void kernel_fusion_rpnp_batch(
     dst_b[2 * plane + idx] = bb * alpha2 + beta2;
 }
 
-bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
+bool ocr_det_preprocess_cuda(const std::vector<ImageData>& images,
                       Tensor* out,
                       const std::vector<std::array<int, 2>>& resize_sizes,
                       const std::vector<int>& dst_size,

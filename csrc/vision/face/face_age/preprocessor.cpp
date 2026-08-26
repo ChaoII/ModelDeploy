@@ -41,7 +41,7 @@ namespace modeldeploy::vision::face {
             scale = 256.0f / in->width();
             origin = -4.0f;
         }
-        if (!backend_->fused_preprocess(*in, output, size_,
+        if (!backend_->fused_preprocess_common(*in, output, size_,
                                         origin, origin, scale, scale,
                                         {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
                                         false, 0.0f)) return false;
@@ -76,7 +76,7 @@ namespace modeldeploy::vision::face {
                 scales[i] = 256.0f / w;
             }
         }
-        if (!backend_->fused_preprocess_batch(images, &(*outputs)[0], size_,
+        if (!backend_->fused_preprocess_common_batch(images, &(*outputs)[0], size_,
                                               origins, origins, scales, scales,
                                               {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
                                               false, 0.0f)) {

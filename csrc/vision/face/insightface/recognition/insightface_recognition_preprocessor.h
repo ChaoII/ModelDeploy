@@ -1,7 +1,7 @@
 //
 // insightface buffalo_l w600k_r50 前处理。
 // norm_crop（Umeyama 相似变换 + warpAffine 到 112）+ (x-127.5)/127.5 + swapRB。
-// norm_crop 含旋转，架构 fused_preprocess 不支持旋转，故 preprocessor 内用 OpenCV warpAffine。
+// norm_crop 含旋转，架构 fused_preprocess_common 不支持旋转，故 preprocessor 内用 OpenCV warpAffine。
 //
 #pragma once
 

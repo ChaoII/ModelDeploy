@@ -42,7 +42,7 @@ namespace modeldeploy::vision::ocr {
             else resize_w = static_cast<int>(ceilf(static_cast<float>(img_h) * ratio));
             const float scale_x = static_cast<float>(resize_w) / src_w;
             const float scale_y = static_cast<float>(img_h) / src_h;
-            if (!backend_->fused_preprocess(image, &(*outputs)[0], {img_w, img_h},
+            if (!backend_->fused_preprocess_common(image, &(*outputs)[0], {img_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
                                             alpha(), beta(), false, 0.0f)) return false;
             return true;
@@ -60,7 +60,7 @@ namespace modeldeploy::vision::ocr {
             sxs[i] = static_cast<float>(resize_w) / src_w;
             sys[i] = static_cast<float>(img_h) / src_h;
         }
-        if (!backend_->fused_preprocess_batch(image_batch, &(*outputs)[0], {img_w, img_h},
+        if (!backend_->fused_preprocess_common_batch(image_batch, &(*outputs)[0], {img_w, img_h},
                                               oxs, oys, sxs, sys,
                                               alpha(), beta(), false, 0.0f)) return false;
         return true;

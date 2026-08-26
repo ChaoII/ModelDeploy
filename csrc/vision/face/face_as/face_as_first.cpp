@@ -58,7 +58,7 @@ namespace modeldeploy::vision::face {
         };
         const float bias[3] = { 0.0f, 128.0165f, 127.9938f };
 
-        if (!backend_->fused_color_matrix_preprocess(*image, output, size_,
+        if (!backend_->fused_preprocess_color_matrix(*image, output, size_,
                                                      ox, oy, sx, sy, mat, bias, 0.0f)) {
             MD_LOG_ERROR << "Failed to fused color matrix preprocess." << std::endl;
             return false;

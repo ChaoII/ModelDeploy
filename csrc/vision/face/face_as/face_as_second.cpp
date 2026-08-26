@@ -34,7 +34,7 @@ namespace modeldeploy::vision::face {
         const float scale_y = static_cast<float>(src_h) / size_[1];
         const std::vector<float> alpha = {1.0f / 128.0f, 1.0f / 128.0f, 1.0f / 128.0f};
         const std::vector<float> beta = {-1.0f, -1.0f, -1.0f};
-        if (!backend_->fused_preprocess(*image, output, size_,
+        if (!backend_->fused_preprocess_common(*image, output, size_,
                                         0.0f, 0.0f, scale_x, scale_y,
                                         alpha, beta, false, 0.0f)) {
             MD_LOG_ERROR << "Failed to fused preprocess." << std::endl;

@@ -1,6 +1,6 @@
 //
 // insightface buffalo_l landmark 前处理。
-// 复用 VisionProcessorBackend（fused_preprocess），多后端天然支持。
+// 复用 VisionProcessorBackend（fused_preprocess_common），多后端天然支持。
 // 以 bbox 中心 transform（scale=192/(max(w,h)*1.5)）裁剪到 192x192。
 //
 #pragma once

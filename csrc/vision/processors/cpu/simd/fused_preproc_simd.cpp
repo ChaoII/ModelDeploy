@@ -32,7 +32,7 @@
 namespace modeldeploy::vision {
 namespace {
 
-// 标量兜底内核（与 CpuProcessorBackend::fused_preprocess 原逻辑一致）
+// 标量兜底内核（与 CpuProcessorBackend::fused_preprocess_common 原逻辑一致）
 void fused_preproc_scalar(const uint8_t* src, int src_w, int src_h,
                           float* dst, int dst_w, int dst_h,
                           float origin_x, float origin_y,

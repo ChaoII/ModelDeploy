@@ -15,7 +15,7 @@ namespace modeldeploy::vision::face {
         const int src_h = image->height();
         const float scale_x = static_cast<float>(size_[0]) / src_w;  // 112/src_w
         const float scale_y = static_cast<float>(size_[1]) / src_h;
-        if (!backend_->fused_preprocess(*image, output, size_,
+        if (!backend_->fused_preprocess_common(*image, output, size_,
                                         0.0f, 0.0f, scale_x, scale_y,
                                         {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
                                         false, 0.0f)) return false;
@@ -44,7 +44,7 @@ namespace modeldeploy::vision::face {
             sxs[i] = static_cast<float>(size_[0]) / (*images)[i].width();
             sys[i] = static_cast<float>(size_[1]) / (*images)[i].height();
         }
-        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+        if (!backend_->fused_preprocess_common_batch(*images, &(*outputs)[0], size_,
                                               oxs, oys, sxs, sys,
                                               {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
                                               false, 0.0f)) {

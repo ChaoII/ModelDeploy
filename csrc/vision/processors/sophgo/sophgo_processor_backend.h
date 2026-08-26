@@ -8,7 +8,7 @@
 
 namespace modeldeploy::vision {
     // Sophgo 算能 TPU 预处理后端：BMCV（letterbox/仿射/通道重排/NV12）+ 设备内存零拷贝。
-    // 继承 CpuProcessorBackend：只有 yolo_preprocess / fused_preprocess / yolo_preprocess_nv12
+    // 继承 CpuProcessorBackend：只有 yolo_preprocess / fused_preprocess_common / yolo_preprocess_nv12
     // 用 BMCV 硬件实现并产出 Device::TPU Tensor（零拷贝直接喂 SophgoBackend::infer），
     // 其余算子自动回退到 CPU 实现；BMCV 调用失败时同样回退 CPU。
     // 仅在 ENABLE_SOPHGO 编译。
@@ -24,7 +24,7 @@ namespace modeldeploy::vision {
                                    const std::vector<int>& dst_size,
                                    float pad_val,
                                    std::vector<LetterBoxRecord>* records) override;
-        bool fused_preprocess(const ImageData& image, Tensor* out,
+        bool fused_preprocess_common(const ImageData& image, Tensor* out,
                               const std::vector<int>& dst_size,
                               float origin_x, float origin_y,
                               float scale_x, float scale_y,

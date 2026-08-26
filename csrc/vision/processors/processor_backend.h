@@ -59,7 +59,7 @@ namespace modeldeploy::vision {
 
         // 整批通用融合预处理（batch>1 一次 kernel）：每图独立 origin/scale，共享 alpha/beta/swap_rb/pad
         // 输出 [batch, 3, dst_h, dst_w]（dst 尺寸 batch 内统一）
-        virtual bool fused_preprocess_batch(
+        virtual bool fused_preprocess_common_batch(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<int>& dst_size,
             const std::vector<float>& origins_x, const std::vector<float>& origins_y,
@@ -103,7 +103,7 @@ namespace modeldeploy::vision {
         }
 
         // 整批融合算子（OCR det 用：resize+pad+normalize+permute，batch 内统一 pad）
-        virtual bool fusion_resize_pad_normalize_permute(
+        virtual bool ocr_det_preprocess(
             const std::vector<ImageData>& images, Tensor* out,
             const std::vector<std::array<int, 2>>& resize_sizes,
             const std::vector<int>& dst_size,
@@ -130,7 +130,7 @@ namespace modeldeploy::vision {
         //   - letterbox: origin = pad offset, scale = letterbox scale
         //   - center_crop: origin = crop origin, scale = dst/crop
         // alpha/beta 已合并 1/255 与 normalize：out_c = src_c * alpha[c] + beta[c]
-        virtual bool fused_preprocess(
+        virtual bool fused_preprocess_common(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,
             float origin_x, float origin_y,
@@ -139,7 +139,7 @@ namespace modeldeploy::vision {
             const std::vector<float>& beta,
             bool swap_rb, float pad_value) = 0;
 
-        // 双线性插值融合预处理：与 fused_preprocess 同映射，但采样用双线性插值。
+        // 双线性插值融合预处理：与 fused_preprocess_common 同映射，但采样用双线性插值。
         // 用于需要与 python cv2 INTER_LINEAR 对齐的场景（如 insightface）。
         virtual bool fused_preprocess_bilinear(
             const ImageData& image, Tensor* out,
@@ -158,7 +158,7 @@ namespace modeldeploy::vision {
         // 通用融合预处理（颜色矩阵版）：采样/裁剪 + 3x3 颜色矩阵 + 偏置 + 写 CHW FP32。
         // 可表达 BGR2YCrCb / BGR2RGB 等任意 3x3 线性颜色变换 + 每通道偏置。
         // 默认返回 false（未实现后端可覆盖或走 CPU 兜底）。
-        virtual bool fused_color_matrix_preprocess(
+        virtual bool fused_preprocess_color_matrix(
             const ImageData& image, Tensor* out,
             const std::vector<int>& dst_size,
             float origin_x, float origin_y,

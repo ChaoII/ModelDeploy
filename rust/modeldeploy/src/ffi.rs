@@ -31,6 +31,8 @@ pub enum MDStatus {
     ERR_NOT_IMPLEMENTED,
     ERR_AUDIO_DECODE,
     ERR_INVALID_TYPE,
+    ERR_VIDEO_DECODE,
+    ERR_VIDEO_ENCODE,
 }
 
 /// 模型类型（MDModelKind）
@@ -151,6 +153,10 @@ pub type MDTrackerHandle = *mut c_void;
 pub type MDBarcodeHandle = *mut c_void;
 pub type MDSolutionHandle = *mut c_void;
 pub type MDAudioSolutionHandle = *mut c_void;
+pub type MDVideoConfigHandle = *mut c_void;
+pub type MDVideoDecoderHandle = *mut c_void;
+pub type MDVideoEncoderHandle = *mut c_void;
+pub type MDVideoCapabilitiesHandle = *mut c_void;
 
 // ════════════════════════════════════════════════════════════════
 // 通用几何 / 颜色 / blittable 结构
@@ -367,6 +373,64 @@ pub struct MDDrawOptions {
 }
 
 // ════════════════════════════════════════════════════════════════
+// 视频编解码枚举 / 结构 / 回调（对应 capi md_video_*）
+// ════════════════════════════════════════════════════════════════
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MDCodecBackend {
+    Auto = 0,
+    FFmpeg = 1,
+    GStreamer = 2,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MDHwAccel {
+    Auto = 0,
+    None = 1,
+    Cuda = 2,
+    Vaapi = 3,
+    Sophgo = 4,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MDBackpressure {
+    Block = 0,
+    Drop = 1,
+    OverwriteOldest = 2,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MDVideoState {
+    Idle = 0,
+    Opening = 1,
+    Running = 2,
+    Reconnecting = 3,
+    Eof = 4,
+    Error = 5,
+    Closed = 6,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MDVideoStats {
+    pub frames_in: u64,
+    pub frames_out: u64,
+    pub dropped: u64,
+    pub avg_decode_ms: f64,
+    pub avg_encode_ms: f64,
+    pub reconnect_count: u64,
+    pub error_count: u64,
+}
+
+/// 异步解码回调：frame 归接收方所有，用后必须 md_image_destroy（对齐 C++ 移动交付语义）。
+pub type MDVideoFrameCb =
+    unsafe extern "C" fn(frame: MDImageHandle, pts_ms: u64, userdata: *mut c_void);
+
+// ════════════════════════════════════════════════════════════════
 // extern "C" 函数声明
 // ════════════════════════════════════════════════════════════════
 
@@ -575,4 +639,69 @@ extern "C" {
         sents: *mut usize) -> MDStatus;
     pub fn md_nlp_classify(h: MDModelHandle, text: *const c_char,
         label: *mut c_int, score: *mut c_float) -> MDStatus;
+
+    // ── 视频编解码（md_video_*） ──
+    pub fn md_video_config_create(out: *mut MDVideoConfigHandle) -> MDStatus;
+    pub fn md_video_config_destroy(cfg: MDVideoConfigHandle);
+    pub fn md_video_config_set_backend(cfg: MDVideoConfigHandle, b: MDCodecBackend) -> MDStatus;
+    pub fn md_video_config_set_hw_accel(cfg: MDVideoConfigHandle, h: MDHwAccel) -> MDStatus;
+    pub fn md_video_config_set_backpressure(cfg: MDVideoConfigHandle, bp: MDBackpressure) -> MDStatus;
+    pub fn md_video_config_set_device_only(cfg: MDVideoConfigHandle, enable: c_int) -> MDStatus;
+    pub fn md_video_config_set_async_queue_size(cfg: MDVideoConfigHandle, n: c_int) -> MDStatus;
+    pub fn md_video_config_set_pooling(cfg: MDVideoConfigHandle, enable: c_int) -> MDStatus;
+    pub fn md_video_config_set_reconnect_delay_ms(cfg: MDVideoConfigHandle, ms: c_int) -> MDStatus;
+    pub fn md_video_config_set_max_reconnects(cfg: MDVideoConfigHandle, n: c_int) -> MDStatus;
+    pub fn md_video_config_set_timeout_us(cfg: MDVideoConfigHandle, us: c_int) -> MDStatus;
+    pub fn md_video_config_set_rtsp_transport(cfg: MDVideoConfigHandle, t: *const c_char) -> MDStatus;
+    pub fn md_video_config_set_fps(cfg: MDVideoConfigHandle, fps: c_int) -> MDStatus;
+    pub fn md_video_config_set_bitrate_kbps(cfg: MDVideoConfigHandle, kbps: c_int) -> MDStatus;
+    pub fn md_video_config_set_gop(cfg: MDVideoConfigHandle, gop: c_int) -> MDStatus;
+    pub fn md_video_config_set_codec(cfg: MDVideoConfigHandle, codec: *const c_char) -> MDStatus;
+    pub fn md_video_config_set_preset(cfg: MDVideoConfigHandle, preset: *const c_char) -> MDStatus;
+    pub fn md_video_config_set_format(cfg: MDVideoConfigHandle, fmt: *const c_char) -> MDStatus;
+    pub fn md_video_config_set_max_b_frames(cfg: MDVideoConfigHandle, n: c_int) -> MDStatus;
+    pub fn md_video_config_set_low_latency(cfg: MDVideoConfigHandle, enable: c_int) -> MDStatus;
+    pub fn md_video_config_set_gpu_direct_input(cfg: MDVideoConfigHandle, enable: c_int) -> MDStatus;
+
+    pub fn md_video_capabilities_create(out: *mut MDVideoCapabilitiesHandle) -> MDStatus;
+    pub fn md_video_capabilities_destroy(h: MDVideoCapabilitiesHandle);
+    pub fn md_video_capabilities_ffmpeg(h: MDVideoCapabilitiesHandle, out: *mut c_int) -> MDStatus;
+    pub fn md_video_capabilities_gstreamer(h: MDVideoCapabilitiesHandle, out: *mut c_int) -> MDStatus;
+    pub fn md_video_capabilities_hw_decoder_count(h: MDVideoCapabilitiesHandle, out: *mut usize) -> MDStatus;
+    pub fn md_video_capabilities_hw_decoder(h: MDVideoCapabilitiesHandle, i: usize, name: *mut *const c_char) -> MDStatus;
+    pub fn md_video_capabilities_hw_encoder_count(h: MDVideoCapabilitiesHandle, out: *mut usize) -> MDStatus;
+    pub fn md_video_capabilities_hw_encoder(h: MDVideoCapabilitiesHandle, i: usize, name: *mut *const c_char) -> MDStatus;
+
+    pub fn md_video_decoder_create(cfg: MDVideoConfigHandle, out: *mut MDVideoDecoderHandle) -> MDStatus;
+    pub fn md_video_decoder_destroy(h: MDVideoDecoderHandle);
+    pub fn md_video_decoder_open(h: MDVideoDecoderHandle, url: *const c_char) -> MDStatus;
+    pub fn md_video_decoder_read_frame(h: MDVideoDecoderHandle, out: *mut MDImageHandle,
+        pts_ms: *mut u64) -> MDStatus;
+    pub fn md_video_decoder_set_callback(h: MDVideoDecoderHandle, cb: MDVideoFrameCb,
+        userdata: *mut c_void) -> MDStatus;
+    pub fn md_video_decoder_start(h: MDVideoDecoderHandle) -> MDStatus;
+    pub fn md_video_decoder_stop(h: MDVideoDecoderHandle);
+    pub fn md_video_decoder_set_device_only(h: MDVideoDecoderHandle, enable: c_int) -> MDStatus;
+    pub fn md_video_decoder_state(h: MDVideoDecoderHandle, out: *mut MDVideoState) -> MDStatus;
+    pub fn md_video_decoder_stats(h: MDVideoDecoderHandle, out: *mut MDVideoStats) -> MDStatus;
+    pub fn md_video_decoder_last_error(h: MDVideoDecoderHandle) -> *const c_char;
+    pub fn md_video_decoder_size(h: MDVideoDecoderHandle, w: *mut c_int, height: *mut c_int,
+        fps: *mut c_int) -> MDStatus;
+    pub fn md_video_decoder_close(h: MDVideoDecoderHandle);
+    pub fn md_video_decoder_pool_hits(h: MDVideoDecoderHandle, out: *mut u64) -> MDStatus;
+    pub fn md_video_decoder_pool_returns(h: MDVideoDecoderHandle, out: *mut u64) -> MDStatus;
+
+    pub fn md_video_encoder_create(cfg: MDVideoConfigHandle, out: *mut MDVideoEncoderHandle) -> MDStatus;
+    pub fn md_video_encoder_destroy(h: MDVideoEncoderHandle);
+    pub fn md_video_encoder_open(h: MDVideoEncoderHandle, url: *const c_char, w: c_int,
+        height: c_int, src_fps: c_int) -> MDStatus;
+    pub fn md_video_encoder_encode(h: MDVideoEncoderHandle, img: MDImageHandle, pts_ms: u64) -> MDStatus;
+    pub fn md_video_encoder_encode_async(h: MDVideoEncoderHandle, img: MDImageHandle) -> MDStatus;
+    pub fn md_video_encoder_start_async(h: MDVideoEncoderHandle) -> MDStatus;
+    pub fn md_video_encoder_stop_async(h: MDVideoEncoderHandle);
+    pub fn md_video_encoder_has_permanently_failed(h: MDVideoEncoderHandle, out: *mut c_int) -> MDStatus;
+    pub fn md_video_encoder_state(h: MDVideoEncoderHandle, out: *mut MDVideoState) -> MDStatus;
+    pub fn md_video_encoder_stats(h: MDVideoEncoderHandle, out: *mut MDVideoStats) -> MDStatus;
+    pub fn md_video_encoder_last_error(h: MDVideoEncoderHandle) -> *const c_char;
+    pub fn md_video_encoder_close(h: MDVideoEncoderHandle);
 }

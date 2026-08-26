@@ -28,7 +28,7 @@ namespace modeldeploy::vision {
 // @param swap_rb   [In] true 表示 BGR->RGB 通道交换（输出 C0=R）
 // @param pad_value [In] 源坐标越界时的填充值（letterbox 或 OCR 右/下 pad）
 // @param stream    [In] 可选 CUDA stream
-bool fused_preprocess_cuda(const uint8_t* src,
+bool fused_preprocess_common_cuda(const uint8_t* src,
                            const std::vector<int>& src_size,
                            Tensor* out,
                            const std::vector<int>& dst_size,
@@ -43,7 +43,7 @@ bool fused_preprocess_cuda(const uint8_t* src,
 
 // ����ͨ���ں�Ԥ������3D grid һ�� launch����ÿͼ���� origin/scale������ alpha/beta/swap/pad
 // ��� [batch, 3, dst_h, dst_w] FP32 GPU��dst �ߴ� batch ��ͳһ
-bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
+bool fused_preprocess_common_batch_cuda(const std::vector<ImageData>& images,
                                  Tensor* out,
                                  const std::vector<int>& dst_size,
                                  const std::vector<float>& origins_x,
@@ -57,7 +57,7 @@ bool fused_preprocess_batch_cuda(const std::vector<ImageData>& images,
                                  CudaOutputBufferPool* dst_pool = nullptr);
 
 // OCR det��resize + pad(right/bottom) + swap + affine��pad ��ͨ���������ռ䣩
-bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
+bool ocr_det_preprocess_cuda(const std::vector<ImageData>& images,
                       Tensor* out,
                       const std::vector<std::array<int, 2>>& resize_sizes,
                       const std::vector<int>& dst_size,
@@ -68,8 +68,8 @@ bool fusion_rpnp_cuda(const std::vector<ImageData>& images,
                       CudaOutputBufferPool* dst_pool = nullptr);
 
 // NV12 双平面融合预处理（crop/resize -> YUV2BGR -> normalize -> CHW，一次 launch）。
-// 语义与 fused_preprocess_cuda 一致，源为 Y/UV 两平面；host/device 指针自动识别。
-bool fused_preprocess_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
+// 语义与 fused_preprocess_common_cuda 一致，源为 Y/UV 两平面；host/device 指针自动识别。
+bool fused_preprocess_common_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
                                 const std::vector<int>& src_size,
                                 int step_y, int step_uv,
                                 Tensor* out,
@@ -82,7 +82,7 @@ bool fused_preprocess_nv12_cuda(const uint8_t* src_y, const uint8_t* src_uv,
                                 cudaStream_t stream = nullptr,
                                 CudaOutputBufferPool* dst_pool = nullptr);
 
-bool fused_preprocess_nv12_batch_cuda(const std::vector<ImageData>& images,
+bool fused_preprocess_common_nv12_batch_cuda(const std::vector<ImageData>& images,
                                       Tensor* out,
                                       const std::vector<int>& dst_size,
                                       const std::vector<float>& origins_x,

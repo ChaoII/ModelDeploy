@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <cstdlib>
+#include <functional>
 #include <sstream>
 
 #include "runtime/backends/mnn/option.h"
@@ -4437,5 +4438,751 @@ MDStatus md_nlp_classify(MDModelHandle h, const char* text, int* label, float* s
     return MD_OK;
 #else
     (void)text; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+/* ==================== 视频编解码（VideoDecoder / VideoEncoder） ==================== */
+#ifdef BUILD_VIDEO
+#include "csrc/video/video_decoder.h"
+#include "csrc/video/video_encoder.h"
+#include "csrc/video/video_codec_config.h"
+#include "csrc/video/video_common.h"
+#include "csrc/video/factory.h"
+
+struct md_video_config_handle {
+    modeldeploy::video::VideoDecoderConfig dec;
+    modeldeploy::video::VideoEncoderConfig enc;
+};
+struct md_video_decoder_handle {
+    std::shared_ptr<modeldeploy::video::VideoDecoder> dec;
+    std::function<void(modeldeploy::video::VideoFrame&&)> cb_wrapper;
+};
+struct md_video_encoder_handle {
+    std::shared_ptr<modeldeploy::video::VideoEncoder> enc;
+};
+struct md_video_capabilities_handle {
+    modeldeploy::video::VideoCodecCapabilities cap;
+};
+
+static MDImageHandle make_video_image_handle(modeldeploy::vision::ImageData&& img) {
+    auto* hi = new md_image_handle();
+    hi->width = img.width();
+    hi->height = img.height();
+    hi->data = nullptr;
+    hi->owns_data = false;
+    hi->image = std::move(img);
+    return hi;
+}
+
+static MDVideoState to_md_state(modeldeploy::video::State st) {
+    switch (st) {
+        case modeldeploy::video::State::Idle:         return MD_VST_IDLE;
+        case modeldeploy::video::State::Opening:      return MD_VST_OPENING;
+        case modeldeploy::video::State::Running:      return MD_VST_RUNNING;
+        case modeldeploy::video::State::Reconnecting: return MD_VST_RECONNECTING;
+        case modeldeploy::video::State::Eof:          return MD_VST_EOF;
+        case modeldeploy::video::State::Error:        return MD_VST_ERROR;
+        case modeldeploy::video::State::Closed:       return MD_VST_CLOSED;
+    }
+    return MD_VST_IDLE;
+}
+
+static void fill_md_stats(const modeldeploy::video::VideoStats& s, MDVideoStats* out) {
+    out->frames_in       = s.frames_in;
+    out->frames_out      = s.frames_out;
+    out->dropped         = s.dropped;
+    out->avg_decode_ms   = s.avg_decode_ms;
+    out->avg_encode_ms   = s.avg_encode_ms;
+    out->reconnect_count = s.reconnect_count;
+    out->error_count     = s.error_count;
+}
+#endif /* BUILD_VIDEO */
+
+/* ---- 配置 ---- */
+MDStatus md_video_config_create(MDVideoConfigHandle* out) {
+#ifdef BUILD_VIDEO
+    if (!out) { set_error("md_video_config_create: out is null"); return MD_ERR_NULL_POINTER; }
+    *out = new md_video_config_handle();
+    return MD_OK;
+#else
+    (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_config_destroy(MDVideoConfigHandle cfg) {
+#ifdef BUILD_VIDEO
+    delete static_cast<md_video_config_handle*>(cfg);
+#else
+    (void)cfg;
+#endif
+}
+
+static md_video_config_handle* video_cfg(MDVideoConfigHandle cfg, const char* fn) {
+    auto* c = static_cast<md_video_config_handle*>(cfg);
+    if (!c) set_error("(null config)");
+    (void)fn;
+    return c;
+}
+
+MDStatus md_video_config_set_backend(MDVideoConfigHandle cfg, MDCodecBackend b) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "backend");
+    if (!c) return MD_ERR_NULL_POINTER;
+    modeldeploy::video::CodecBackend bk;
+    switch (b) {
+        case MD_CODEC_FFMPEG:     bk = modeldeploy::video::CodecBackend::FFmpeg; break;
+        case MD_CODEC_GSTREAMER:  bk = modeldeploy::video::CodecBackend::GStreamer; break;
+        default:                  bk = modeldeploy::video::CodecBackend::Auto; break;
+    }
+    c->dec.backend = bk; c->enc.backend = bk;
+    return MD_OK;
+#else
+    (void)cfg; (void)b; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_hw_accel(MDVideoConfigHandle cfg, MDHwAccel h) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "hw_accel");
+    if (!c) return MD_ERR_NULL_POINTER;
+    modeldeploy::video::HwAccel ha;
+    switch (h) {
+        case MD_HW_NONE:    ha = modeldeploy::video::HwAccel::None; break;
+        case MD_HW_CUDA:    ha = modeldeploy::video::HwAccel::Cuda; break;
+        case MD_HW_VAAPI:   ha = modeldeploy::video::HwAccel::Vaapi; break;
+        case MD_HW_SOPHGO:  ha = modeldeploy::video::HwAccel::Sophgo; break;
+        default:            ha = modeldeploy::video::HwAccel::Auto; break;
+    }
+    c->dec.hw_accel = ha; c->enc.hw_accel = ha;
+    return MD_OK;
+#else
+    (void)cfg; (void)h; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_backpressure(MDVideoConfigHandle cfg, MDBackpressure bp) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "backpressure");
+    if (!c) return MD_ERR_NULL_POINTER;
+    modeldeploy::video::Backpressure b;
+    switch (bp) {
+        case MD_BP_DROP:              b = modeldeploy::video::Backpressure::Drop; break;
+        case MD_BP_OVERWRITE_OLDEST:  b = modeldeploy::video::Backpressure::OverwriteOldest; break;
+        default:                      b = modeldeploy::video::Backpressure::Block; break;
+    }
+    c->dec.backpressure = b; c->enc.backpressure = b;
+    return MD_OK;
+#else
+    (void)cfg; (void)bp; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_device_only(MDVideoConfigHandle cfg, int enable) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "device_only");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->dec.device_only = enable != 0; c->enc.device_only = enable != 0;
+    return MD_OK;
+#else
+    (void)cfg; (void)enable; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_async_queue_size(MDVideoConfigHandle cfg, int n) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "async_queue_size");
+    if (!c) return MD_ERR_NULL_POINTER;
+    if (n <= 0) { set_error("async_queue_size must be > 0"); return MD_ERR_INVALID_ARGUMENT; }
+    c->dec.async_queue_size = n; c->enc.async_queue_size = n;
+    return MD_OK;
+#else
+    (void)cfg; (void)n; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_pooling(MDVideoConfigHandle cfg, int enable) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "pooling");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->dec.pooling = enable != 0; c->enc.pooling = enable != 0;
+    return MD_OK;
+#else
+    (void)cfg; (void)enable; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_reconnect_delay_ms(MDVideoConfigHandle cfg, int ms) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "reconnect_delay_ms");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->dec.reconnect_delay_ms = ms; c->enc.reconnect_delay_ms = ms;
+    return MD_OK;
+#else
+    (void)cfg; (void)ms; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_max_reconnects(MDVideoConfigHandle cfg, int n) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "max_reconnects");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->dec.max_reconnects = n; c->enc.max_reconnects = n;
+    return MD_OK;
+#else
+    (void)cfg; (void)n; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_timeout_us(MDVideoConfigHandle cfg, int us) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "timeout_us");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->dec.timeout_us = us; c->enc.timeout_us = us;
+    return MD_OK;
+#else
+    (void)cfg; (void)us; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_rtsp_transport(MDVideoConfigHandle cfg, const char* t) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "rtsp_transport");
+    if (!c) return MD_ERR_NULL_POINTER;
+    if (!t) { set_error("rtsp_transport is null"); return MD_ERR_NULL_POINTER; }
+    c->dec.rtsp_transport = t; c->enc.rtsp_transport = t;
+    return MD_OK;
+#else
+    (void)cfg; (void)t; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_fps(MDVideoConfigHandle cfg, int fps) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "fps");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->enc.fps = fps;
+    return MD_OK;
+#else
+    (void)cfg; (void)fps; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_bitrate_kbps(MDVideoConfigHandle cfg, int kbps) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "bitrate_kbps");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->enc.bitrate_kbps = kbps;
+    return MD_OK;
+#else
+    (void)cfg; (void)kbps; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_gop(MDVideoConfigHandle cfg, int gop) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "gop");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->enc.gop = gop;
+    return MD_OK;
+#else
+    (void)cfg; (void)gop; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_codec(MDVideoConfigHandle cfg, const char* codec) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "codec");
+    if (!c) return MD_ERR_NULL_POINTER;
+    if (!codec) { set_error("codec is null"); return MD_ERR_NULL_POINTER; }
+    c->enc.codec = codec;
+    return MD_OK;
+#else
+    (void)cfg; (void)codec; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_preset(MDVideoConfigHandle cfg, const char* preset) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "preset");
+    if (!c) return MD_ERR_NULL_POINTER;
+    if (!preset) { set_error("preset is null"); return MD_ERR_NULL_POINTER; }
+    c->enc.preset = preset;
+    return MD_OK;
+#else
+    (void)cfg; (void)preset; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_format(MDVideoConfigHandle cfg, const char* fmt) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "format");
+    if (!c) return MD_ERR_NULL_POINTER;
+    if (!fmt) { set_error("format is null"); return MD_ERR_NULL_POINTER; }
+    c->enc.format = fmt;
+    return MD_OK;
+#else
+    (void)cfg; (void)fmt; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_max_b_frames(MDVideoConfigHandle cfg, int n) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "max_b_frames");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->enc.max_b_frames = n;
+    return MD_OK;
+#else
+    (void)cfg; (void)n; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_low_latency(MDVideoConfigHandle cfg, int enable) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "low_latency");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->enc.low_latency = enable != 0;
+    return MD_OK;
+#else
+    (void)cfg; (void)enable; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_config_set_gpu_direct_input(MDVideoConfigHandle cfg, int enable) {
+#ifdef BUILD_VIDEO
+    auto* c = video_cfg(cfg, "gpu_direct_input");
+    if (!c) return MD_ERR_NULL_POINTER;
+    c->enc.gpu_direct_input = enable != 0;
+    return MD_OK;
+#else
+    (void)cfg; (void)enable; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+/* ---- 能力探测 ---- */
+MDStatus md_video_capabilities_create(MDVideoCapabilitiesHandle* out) {
+#ifdef BUILD_VIDEO
+    if (!out) { set_error("md_video_capabilities_create: out is null"); return MD_ERR_NULL_POINTER; }
+    auto* h = new md_video_capabilities_handle();
+    h->cap = modeldeploy::video::query_video_capabilities();
+    *out = h;
+    return MD_OK;
+#else
+    (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_capabilities_destroy(MDVideoCapabilitiesHandle h) {
+#ifdef BUILD_VIDEO
+    delete static_cast<md_video_capabilities_handle*>(h);
+#else
+    (void)h;
+#endif
+}
+
+MDStatus md_video_capabilities_ffmpeg(MDVideoCapabilitiesHandle h, int* out) {
+#ifdef BUILD_VIDEO
+    auto* ch = static_cast<md_video_capabilities_handle*>(h);
+    if (!ch || !out) return MD_ERR_NULL_POINTER;
+    *out = ch->cap.ffmpeg_available ? 1 : 0;
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_capabilities_gstreamer(MDVideoCapabilitiesHandle h, int* out) {
+#ifdef BUILD_VIDEO
+    auto* ch = static_cast<md_video_capabilities_handle*>(h);
+    if (!ch || !out) return MD_ERR_NULL_POINTER;
+    *out = ch->cap.gstreamer_available ? 1 : 0;
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_capabilities_hw_decoder_count(MDVideoCapabilitiesHandle h, size_t* out) {
+#ifdef BUILD_VIDEO
+    auto* ch = static_cast<md_video_capabilities_handle*>(h);
+    if (!ch || !out) return MD_ERR_NULL_POINTER;
+    *out = ch->cap.hw_decoders.size();
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_capabilities_hw_decoder(MDVideoCapabilitiesHandle h, size_t i, const char** name) {
+#ifdef BUILD_VIDEO
+    auto* ch = static_cast<md_video_capabilities_handle*>(h);
+    if (!ch || !name) return MD_ERR_NULL_POINTER;
+    if (i >= ch->cap.hw_decoders.size()) { set_error("hw_decoder index out of range"); return MD_ERR_INVALID_ARGUMENT; }
+    *name = ch->cap.hw_decoders[i].c_str();
+    return MD_OK;
+#else
+    (void)h; (void)i; (void)name; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_capabilities_hw_encoder_count(MDVideoCapabilitiesHandle h, size_t* out) {
+#ifdef BUILD_VIDEO
+    auto* ch = static_cast<md_video_capabilities_handle*>(h);
+    if (!ch || !out) return MD_ERR_NULL_POINTER;
+    *out = ch->cap.hw_encoders.size();
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_capabilities_hw_encoder(MDVideoCapabilitiesHandle h, size_t i, const char** name) {
+#ifdef BUILD_VIDEO
+    auto* ch = static_cast<md_video_capabilities_handle*>(h);
+    if (!ch || !name) return MD_ERR_NULL_POINTER;
+    if (i >= ch->cap.hw_encoders.size()) { set_error("hw_encoder index out of range"); return MD_ERR_INVALID_ARGUMENT; }
+    *name = ch->cap.hw_encoders[i].c_str();
+    return MD_OK;
+#else
+    (void)h; (void)i; (void)name; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+/* ---- 解码器 ---- */
+MDStatus md_video_decoder_create(MDVideoConfigHandle cfg, MDVideoDecoderHandle* out) {
+#ifdef BUILD_VIDEO
+    if (!out) { set_error("md_video_decoder_create: out is null"); return MD_ERR_NULL_POINTER; }
+    auto* c = video_cfg(cfg, "decoder_create");
+    if (!c) return MD_ERR_NULL_POINTER;
+    std::string err;
+    auto dec = modeldeploy::video::VideoDecoder::create(c->dec, &err);
+    if (!dec) {
+        set_error(err.empty() ? "video decoder backend unavailable" : err.c_str());
+        return MD_ERR_UNSUPPORTED_BACKEND;
+    }
+    auto* h = new md_video_decoder_handle();
+    h->dec = std::move(dec);
+    *out = h;
+    return MD_OK;
+#else
+    (void)cfg; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_decoder_destroy(MDVideoDecoderHandle h) {
+#ifdef BUILD_VIDEO
+    delete static_cast<md_video_decoder_handle*>(h);
+#else
+    (void)h;
+#endif
+}
+
+MDStatus md_video_decoder_open(MDVideoDecoderHandle h, const char* url) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !url) return MD_ERR_NULL_POINTER;
+    if (!*url) { set_error("url is empty"); return MD_ERR_INVALID_ARGUMENT; }
+    std::string err;
+    if (!vh->dec->open(url, &err)) {
+        set_error(err.empty() ? "video open failed" : err.c_str());
+        return MD_ERR_VIDEO_DECODE;
+    }
+    return MD_OK;
+#else
+    (void)h; (void)url; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_decoder_read_frame(MDVideoDecoderHandle h, MDImageHandle* out, uint64_t* pts_ms) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    modeldeploy::video::VideoFrame vf;
+    std::string err;
+    if (!vh->dec->read_one_frame(&vf, &err)) {
+        set_error(err.empty() ? "md_video_decoder_read_frame: eof/error" : err.c_str());
+        return MD_ERR_VIDEO_DECODE;
+    }
+    *out = make_video_image_handle(std::move(vf.image));
+    if (pts_ms) *pts_ms = vf.pts_ms;
+    return MD_OK;
+#else
+    (void)h; (void)out; (void)pts_ms; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_decoder_set_callback(MDVideoDecoderHandle h, MDVideoFrameCb cb, void* userdata) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !cb) return MD_ERR_NULL_POINTER;
+    vh->cb_wrapper = [cb, userdata](modeldeploy::video::VideoFrame&& vf) {
+        MDImageHandle img = make_video_image_handle(std::move(vf.image));
+        cb(img, vf.pts_ms, userdata);
+    };
+    vh->dec->set_callback(vh->cb_wrapper);
+    return MD_OK;
+#else
+    (void)h; (void)cb; (void)userdata; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_decoder_start(MDVideoDecoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh) return MD_ERR_NULL_POINTER;
+    std::string err;
+    if (!vh->dec->start(&err)) {
+        set_error(err.empty() ? "video start failed" : err.c_str());
+        return MD_ERR_MODEL_INIT;
+    }
+    return MD_OK;
+#else
+    (void)h; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_decoder_stop(MDVideoDecoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (vh) vh->dec->stop();
+#else
+    (void)h;
+#endif
+}
+
+MDStatus md_video_decoder_set_device_only(MDVideoDecoderHandle h, int enable) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh) return MD_ERR_NULL_POINTER;
+    vh->dec->set_device_only(enable != 0);
+    return MD_OK;
+#else
+    (void)h; (void)enable; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_decoder_state(MDVideoDecoderHandle h, MDVideoState* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    *out = to_md_state(vh->dec->state());
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_decoder_stats(MDVideoDecoderHandle h, MDVideoStats* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    fill_md_stats(vh->dec->stats(), out);
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+const char* md_video_decoder_last_error(MDVideoDecoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    return (vh && vh->dec) ? vh->dec->last_error().c_str() : "";
+#else
+    (void)h; return "";
+#endif
+}
+
+MDStatus md_video_decoder_size(MDVideoDecoderHandle h, int* w, int* h_out, int* fps) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh) return MD_ERR_NULL_POINTER;
+    if (w) *w = vh->dec->width();
+    if (h_out) *h_out = vh->dec->height();
+    if (fps) *fps = vh->dec->fps();
+    return MD_OK;
+#else
+    (void)h; (void)w; (void)h_out; (void)fps; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_decoder_close(MDVideoDecoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (vh) vh->dec->close();
+#else
+    (void)h;
+#endif
+}
+
+MDStatus md_video_decoder_pool_hits(MDVideoDecoderHandle h, uint64_t* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    *out = vh->dec->pool_hits();
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_decoder_pool_returns(MDVideoDecoderHandle h, uint64_t* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_decoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    *out = vh->dec->pool_returns();
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+/* ---- 编码器 ---- */
+MDStatus md_video_encoder_create(MDVideoConfigHandle cfg, MDVideoEncoderHandle* out) {
+#ifdef BUILD_VIDEO
+    if (!out) { set_error("md_video_encoder_create: out is null"); return MD_ERR_NULL_POINTER; }
+    auto* c = video_cfg(cfg, "encoder_create");
+    if (!c) return MD_ERR_NULL_POINTER;
+    std::string err;
+    auto enc = modeldeploy::video::VideoEncoder::create(c->enc, &err);
+    if (!enc) {
+        set_error(err.empty() ? "video encoder backend unavailable" : err.c_str());
+        return MD_ERR_UNSUPPORTED_BACKEND;
+    }
+    auto* h = new md_video_encoder_handle();
+    h->enc = std::move(enc);
+    *out = h;
+    return MD_OK;
+#else
+    (void)cfg; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_encoder_destroy(MDVideoEncoderHandle h) {
+#ifdef BUILD_VIDEO
+    delete static_cast<md_video_encoder_handle*>(h);
+#else
+    (void)h;
+#endif
+}
+
+MDStatus md_video_encoder_open(MDVideoEncoderHandle h, const char* url, int w, int h_out, int src_fps) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (!vh || !url) return MD_ERR_NULL_POINTER;
+    std::string err;
+    if (!vh->enc->open(url, w, h_out, src_fps, &err)) {
+        set_error(err.empty() ? "video encoder open failed" : err.c_str());
+        return MD_ERR_VIDEO_ENCODE;
+    }
+    return MD_OK;
+#else
+    (void)h; (void)url; (void)w; (void)h_out; (void)src_fps; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_encoder_encode(MDVideoEncoderHandle h, MDImageHandle img, uint64_t pts_ms) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    auto* hi = static_cast<md_image_handle*>(img);
+    if (!vh || !hi) return MD_ERR_NULL_POINTER;
+    modeldeploy::video::VideoFrame vf;
+    vf.image = hi->image;
+    vf.pts_ms = pts_ms;
+    std::string err;
+    if (!vh->enc->encode(vf, &err)) {
+        set_error(err.empty() ? "video encode failed" : err.c_str());
+        return MD_ERR_VIDEO_ENCODE;
+    }
+    return MD_OK;
+#else
+    (void)h; (void)img; (void)pts_ms; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_encoder_encode_async(MDVideoEncoderHandle h, MDImageHandle img) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    auto* hi = static_cast<md_image_handle*>(img);
+    if (!vh || !hi) return MD_ERR_NULL_POINTER;
+    if (!vh->enc->encode_async(hi->image)) {
+        set_error("video encode_async failed");
+        return MD_ERR_VIDEO_ENCODE;
+    }
+    return MD_OK;
+#else
+    (void)h; (void)img; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_encoder_start_async(MDVideoEncoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (!vh) return MD_ERR_NULL_POINTER;
+    std::string err;
+    if (!vh->enc->start_async(&err)) {
+        set_error(err.empty() ? "video start_async failed" : err.c_str());
+        return MD_ERR_VIDEO_ENCODE;
+    }
+    return MD_OK;
+#else
+    (void)h; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+void md_video_encoder_stop_async(MDVideoEncoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (vh) vh->enc->stop_async();
+#else
+    (void)h;
+#endif
+}
+
+MDStatus md_video_encoder_has_permanently_failed(MDVideoEncoderHandle h, int* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    *out = vh->enc->has_permanently_failed() ? 1 : 0;
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_encoder_state(MDVideoEncoderHandle h, MDVideoState* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    *out = to_md_state(vh->enc->state());
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+MDStatus md_video_encoder_stats(MDVideoEncoderHandle h, MDVideoStats* out) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (!vh || !out) return MD_ERR_NULL_POINTER;
+    fill_md_stats(vh->enc->stats(), out);
+    return MD_OK;
+#else
+    (void)h; (void)out; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
+#endif
+}
+
+const char* md_video_encoder_last_error(MDVideoEncoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    return (vh && vh->enc) ? vh->enc->last_error().c_str() : "";
+#else
+    (void)h; return "";
+#endif
+}
+
+void md_video_encoder_close(MDVideoEncoderHandle h) {
+#ifdef BUILD_VIDEO
+    auto* vh = static_cast<md_video_encoder_handle*>(h);
+    if (vh) vh->enc->close();
+#else
+    (void)h;
 #endif
 }

@@ -26,7 +26,7 @@ namespace modeldeploy::vision::face {
         const int src2_w = in->width();
         const float scale = 256.0f / src2_w;
         const float origin = -4.0f;
-        if (!backend_->fused_preprocess(*in, output, size_,  // {248, 248}
+        if (!backend_->fused_preprocess_common(*in, output, size_,  // {248, 248}
                                         origin, origin, scale, scale,
                                         {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
                                         true, 0.0f)) return false;  // swap_rb=true (BGR2RGB)
@@ -49,7 +49,7 @@ namespace modeldeploy::vision::face {
         const int n = static_cast<int>(images->size());
         std::vector<float> origins(n, -4.0f), scales(n);
         for (int i = 0; i < n; ++i) scales[i] = 256.0f / (*images)[i].width();
-        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+        if (!backend_->fused_preprocess_common_batch(*images, &(*outputs)[0], size_,
                                               origins, origins, scales, scales,
                                               {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f},
                                               true, 0.0f)) {

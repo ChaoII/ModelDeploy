@@ -27,7 +27,57 @@ namespace ModelDeploy
             MD_ERR_IMAGE_DECODE,
             MD_ERR_BUSY,
             MD_ERR_NOT_IMPLEMENTED,
-            MD_ERR_AUDIO_DECODE
+            MD_ERR_AUDIO_DECODE,
+            MD_ERR_INVALID_TYPE,
+            MD_ERR_VIDEO_DECODE,
+            MD_ERR_VIDEO_ENCODE
+        }
+
+        /* ---- 视频编解码枚举（与 md_capi.h 对应） ---- */
+        public enum MDCodecBackend
+        {
+            MD_CODEC_AUTO = 0,
+            MD_CODEC_FFMPEG = 1,
+            MD_CODEC_GSTREAMER = 2
+        }
+
+        public enum MDHwAccel
+        {
+            MD_HW_AUTO = 0,
+            MD_HW_NONE = 1,
+            MD_HW_CUDA = 2,
+            MD_HW_VAAPI = 3,
+            MD_HW_SOPHGO = 4
+        }
+
+        public enum MDBackpressure
+        {
+            MD_BP_BLOCK = 0,
+            MD_BP_DROP = 1,
+            MD_BP_OVERWRITE_OLDEST = 2
+        }
+
+        public enum MDVideoState
+        {
+            MD_VST_IDLE = 0,
+            MD_VST_OPENING = 1,
+            MD_VST_RUNNING = 2,
+            MD_VST_RECONNECTING = 3,
+            MD_VST_EOF = 4,
+            MD_VST_ERROR = 5,
+            MD_VST_CLOSED = 6
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MDVideoStats
+        {
+            public ulong frames_in;
+            public ulong frames_out;
+            public ulong dropped;
+            public double avg_decode_ms;
+            public double avg_encode_ms;
+            public ulong reconnect_count;
+            public ulong error_count;
         }
 
         public enum MDModelKind

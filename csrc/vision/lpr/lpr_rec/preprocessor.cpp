@@ -20,7 +20,7 @@ namespace modeldeploy::vision::lpr {
         const float scale_y = static_cast<float>(size_[1]) / src_h;  // 48/src_h
         const std::vector<float> alpha = {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f};
         const std::vector<float> beta = {-0.588f, -0.588f, -0.588f};
-        if (!backend_->fused_preprocess(*image, output, size_,
+        if (!backend_->fused_preprocess_common(*image, output, size_,
                                         0.0f, 0.0f, scale_x, scale_y,
                                         alpha, beta, true, 0.0f)) return false;
         return true;
@@ -45,7 +45,7 @@ namespace modeldeploy::vision::lpr {
             sxs[i] = static_cast<float>(size_[0]) / (*images)[i].width();
             sys[i] = static_cast<float>(size_[1]) / (*images)[i].height();
         }
-        if (!backend_->fused_preprocess_batch(*images, &(*outputs)[0], size_,
+        if (!backend_->fused_preprocess_common_batch(*images, &(*outputs)[0], size_,
                                               oxs, oys, sxs, sys,
                                               {1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f},
                                               {-0.588f, -0.588f, -0.588f}, true, 0.0f)) {
