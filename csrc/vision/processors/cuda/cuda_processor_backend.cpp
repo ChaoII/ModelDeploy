@@ -270,4 +270,67 @@ namespace modeldeploy::vision {
                                   static_cast<uint8_t>(b), font_size,
                                   get_persistent_stream(&stream_));
     }
+
+    // ── 设备侧高层可视化（暂为空实现，后续任务替换为真实实现）──
+    bool CudaProcessorBackend::vis_det_nv12(ImageData& frame,
+                                            const std::vector<DetectionResult>& result,
+                                            const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_obb_nv12(ImageData& frame,
+                                            const std::vector<ObbResult>& result,
+                                            const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_pose_nv12(ImageData& frame,
+                                             const std::vector<KeyPointsResult>& result,
+                                             const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_keypoints_nv12(ImageData& frame,
+                                                  const std::vector<KeyPointsResult>& result,
+                                                  const VisionProcessorBackend::VisOptions& opt,
+                                                  bool draw_lines) {
+        (void)frame; (void)result; (void)opt; (void)draw_lines; return false;
+    }
+    bool CudaProcessorBackend::vis_hand_nv12(ImageData& frame,
+                                             const std::vector<KeyPointsResult>& result,
+                                             const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_ocr_nv12(ImageData& frame, const OCRResult& result,
+                                            const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_lpr_nv12(ImageData& frame,
+                                            const std::vector<LprResult>& result,
+                                            const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_attr_nv12(ImageData& frame,
+                                             const std::vector<AttributeResult>& result,
+                                             const VisionProcessorBackend::VisOptions& opt,
+                                             const std::vector<int>& abnormal_ids,
+                                             bool show_attr) {
+        (void)frame; (void)result; (void)opt; (void)abnormal_ids; (void)show_attr; return false;
+    }
+    bool CudaProcessorBackend::vis_cls_nv12(ImageData& frame, const ClassifyResult& result,
+                                            const VisionProcessorBackend::VisOptions& opt,
+                                            int top_k) {
+        (void)frame; (void)result; (void)opt; (void)top_k; return false;
+    }
+    bool CudaProcessorBackend::vis_iseg_nv12(ImageData& frame,
+                                             const std::vector<InstanceSegResult>& result,
+                                             const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_sem_nv12(ImageData& frame, const SemSegResult& result,
+                                            const VisionProcessorBackend::VisOptions& opt) {
+        (void)frame; (void)result; (void)opt; return false;
+    }
+    bool CudaProcessorBackend::vis_depth_nv12(ImageData& frame, const DepthResult& result,
+                                              const VisionProcessorBackend::VisOptions& opt,
+                                              bool colorize) {
+        (void)frame; (void)result; (void)opt; (void)colorize; return false;
+    }
 } // namespace modeldeploy::vision

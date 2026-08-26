@@ -4,6 +4,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 #include "core/tensor.h"
 #include "core/enum_variables.h"
@@ -202,6 +204,64 @@ namespace modeldeploy::vision {
             (void)frame; (void)x; (void)y; (void)text;
             (void)r; (void)g; (void)b; (void)font_size;
             return false;
+        }
+
+        // ── 设备侧高层可视化(设备 NV12 就地绘制,语义与 CPU vis_* 一致)──
+        struct VisOptions {
+            double threshold = 0.5;
+            int font_size = 14;
+            double alpha = 0.15;
+            std::unordered_map<int, std::string> label_map;
+            std::string font_path;   // 对 device 方法忽略
+            bool save_result = false; // 对 device 方法忽略
+        };
+
+        virtual bool vis_det_nv12(ImageData& frame, const std::vector<DetectionResult>& result,
+                                  const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_obb_nv12(ImageData& frame, const std::vector<ObbResult>& result,
+                                  const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_pose_nv12(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                                   const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_keypoints_nv12(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                                        const VisOptions& opt, bool draw_lines) {
+            (void)frame; (void)result; (void)opt; (void)draw_lines; return false;
+        }
+        virtual bool vis_hand_nv12(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                                   const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_ocr_nv12(ImageData& frame, const OCRResult& result, const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_lpr_nv12(ImageData& frame, const std::vector<LprResult>& result,
+                                  const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_attr_nv12(ImageData& frame, const std::vector<AttributeResult>& result,
+                                   const VisOptions& opt, const std::vector<int>& abnormal_ids,
+                                   bool show_attr) {
+            (void)frame; (void)result; (void)opt; (void)abnormal_ids; (void)show_attr; return false;
+        }
+        virtual bool vis_cls_nv12(ImageData& frame, const ClassifyResult& result,
+                                  const VisOptions& opt, int top_k) {
+            (void)frame; (void)result; (void)opt; (void)top_k; return false;
+        }
+        virtual bool vis_iseg_nv12(ImageData& frame, const std::vector<InstanceSegResult>& result,
+                                   const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_sem_nv12(ImageData& frame, const SemSegResult& result, const VisOptions& opt) {
+            (void)frame; (void)result; (void)opt; return false;
+        }
+        virtual bool vis_depth_nv12(ImageData& frame, const DepthResult& result,
+                                    const VisOptions& opt, bool colorize) {
+            (void)frame; (void)result; (void)opt; (void)colorize; return false;
         }
     };
 } // namespace modeldeploy::vision
