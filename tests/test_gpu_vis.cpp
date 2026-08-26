@@ -182,3 +182,33 @@ TEST_CASE("cuda overlay_labels nv12 (semantic)", "[gpu]") {
     REQUIRE((back[0] >= 92 && back[0] <= 96));
     cudaFree(d_y); cudaFree(d_uv); cudaFree(d_lbl);
 }
+
+TEST_CASE("cuda vis_sem_nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    const mv::ImageData::Plane planes[2] = {{d_y, w}, {d_uv, w}};
+    mv::ImageData frame = mv::ImageData::from_planes(planes, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+
+    // 8x8 labels 全 0 → class0 全帧叠加(移色 Y≈94),经 backend 就地写设备帧
+    mv::SemSegResult sem;
+    sem.shape = {8, 8};
+    sem.labels.assign(64, 0);
+    mv::VisionProcessorBackend::VisOptions opt;
+    opt.alpha = 1.0;
+
+    mv::CudaProcessorBackend backend;
+    REQUIRE(backend.vis_sem_nv12(frame, sem, opt));
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    REQUIRE((back[0] >= 92 && back[0] <= 96));   // 全帧被 class0 覆盖
+    REQUIRE(back[10 * w + 20] != 128);
+    cudaFree(d_y); cudaFree(d_uv);
+}

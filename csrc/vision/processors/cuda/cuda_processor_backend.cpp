@@ -655,15 +655,88 @@ namespace modeldeploy::vision {
     bool CudaProcessorBackend::vis_iseg_nv12(ImageData& frame,
                                              const std::vector<InstanceSegResult>& result,
                                              const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        bool ok = true;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            const uint8_t* c = kClassPalette[r.label_id % 20];
+            ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                    r.box.x, r.box.y, r.box.width, r.box.height,
+                                    c[0], c[1], c[2], 2, s) && ok;
+            if (r.mask.shape.size() == 2) {
+                const size_t mh = static_cast<size_t>(r.mask.shape[0]);
+                const size_t mw = static_cast<size_t>(r.mask.shape[1]);
+                if (mw > 0 && mh > 0 && r.mask.buffer.size() >= mw * mh) {
+                    uint8_t* d = nullptr;
+                    if (cudaMalloc(&d, mw * mh) == cudaSuccess) {
+                        if (cudaMemcpyAsync(d, r.mask.buffer.data(), mw * mh,
+                                            cudaMemcpyHostToDevice, s) == cudaSuccess)
+                            ok = overlay_mask_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                                       static_cast<int>(r.box.x),
+                                                       static_cast<int>(r.box.y),
+                                                       static_cast<int>(r.box.width),
+                                                       static_cast<int>(r.box.height),
+                                                       d, static_cast<int>(mw), static_cast<int>(mh),
+                                                       c[0], c[1], c[2], 0.5f, s) && ok;
+                        cudaFree(d);
+                    }
+                }
+            }
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_sem_nv12(ImageData& frame, const SemSegResult& result,
                                             const VisionProcessorBackend::VisOptions& opt) {
-        (void)frame; (void)result; (void)opt; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        if (result.shape.size() != 2) return false;
+        const size_t h = static_cast<size_t>(result.shape[0]);
+        const size_t w = static_cast<size_t>(result.shape[1]);
+        if (w == 0 || h == 0 || result.labels.size() < w * h) return false;
+        cudaStream_t s = get_persistent_stream(&stream_);
+        uint8_t* d_labels = nullptr;
+        bool ok = false;
+        const size_t n = w * h;
+        if (cudaMalloc(&d_labels, n) == cudaSuccess) {
+            if (cudaMemcpyAsync(d_labels, result.labels.data(), n, cudaMemcpyHostToDevice, s) == cudaSuccess)
+                ok = overlay_labels_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                             d_labels, static_cast<int>(w), static_cast<int>(h),
+                                             static_cast<float>(opt.alpha), s);
+            cudaFree(d_labels);
+        }
+        return ok;
     }
     bool CudaProcessorBackend::vis_depth_nv12(ImageData& frame, const DepthResult& result,
                                               const VisionProcessorBackend::VisOptions& opt,
                                               bool colorize) {
-        (void)frame; (void)result; (void)opt; (void)colorize; return false;
+        Nv12View v(frame);
+        if (!v.ok()) return false;
+        if (result.shape.size() != 2) return false;
+        const size_t h = static_cast<size_t>(result.shape[0]);
+        const size_t w = static_cast<size_t>(result.shape[1]);
+        const size_t n = w * h;
+        if (w == 0 || h == 0 || result.depth.size() < n) return false;
+        float mn = result.depth[0], mx = result.depth[0];
+        for (size_t i = 0; i < n; ++i) {
+            if (result.depth[i] < mn) mn = result.depth[i];
+            if (result.depth[i] > mx) mx = result.depth[i];
+        }
+        const float range = (mx - mn) > 1e-6f ? (mx - mn) : 1.0f;
+        std::vector<uint8_t> d8(n);
+        for (size_t i = 0; i < n; ++i)
+            d8[i] = static_cast<uint8_t>((result.depth[i] - mn) / range * 255.0f);
+        cudaStream_t s = get_persistent_stream(&stream_);
+        uint8_t* d = nullptr;
+        bool ok = false;
+        if (cudaMalloc(&d, n) == cudaSuccess) {
+            if (cudaMemcpyAsync(d, d8.data(), n, cudaMemcpyHostToDevice, s) == cudaSuccess)
+                ok = overlay_depth_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                            d, static_cast<int>(w), static_cast<int>(h),
+                                            colorize, static_cast<float>(opt.alpha), s);
+            cudaFree(d);
+        }
+        return ok;
     }
 } // namespace modeldeploy::vision
