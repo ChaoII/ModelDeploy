@@ -30,20 +30,14 @@ set(APP_SOURCES
         config.cpp
         pipeline_manager.cpp
         pipeline.cpp
-        stream_decoder.cpp
-        sophgo_decoder.cpp
         video_codec.cpp
         video_sink.cpp
-        stream_hub.cpp
         inference_engine.cpp
         infer_group.cpp
         draw_engine.cpp
-        stream_encoder.cpp
         video_source.cpp
         http_server.cpp
         perf_stats.cpp
-        frame_pool.cpp
-        batch_scheduler.cpp
 )
 
 add_executable(surveillance ${APP_SOURCES})
@@ -72,12 +66,9 @@ if (BUILD_SURVEILLANCE_TESTS)
     list(FILTER APP_SOURCES EXCLUDE REGEX "main\\.cpp$")
     set(TEST_SOURCES tests/test_config.cpp
             tests/test_perf_stats.cpp
-            tests/test_frame_pool.cpp
-            tests/test_stream_decoder.cpp
             tests/test_inference_engine.cpp
             tests/test_infer_group.cpp
             tests/test_draw_engine.cpp
-            tests/test_stream_encoder.cpp
             tests/test_pipeline.cpp
             tests/test_pipeline_manager.cpp
             tests/test_http_server.cpp
