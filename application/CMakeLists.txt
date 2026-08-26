@@ -32,6 +32,7 @@ set(APP_SOURCES
         pipeline.cpp
         stream_decoder.cpp
         sophgo_decoder.cpp
+        video_codec.cpp
         stream_hub.cpp
         inference_engine.cpp
         infer_group.cpp
@@ -77,7 +78,8 @@ if (BUILD_SURVEILLANCE_TESTS)
             tests/test_stream_encoder.cpp
             tests/test_pipeline.cpp
             tests/test_pipeline_manager.cpp
-            tests/test_http_server.cpp)
+            tests/test_http_server.cpp
+            tests/test_video_codec.cpp)
     add_executable(surveillance_test ${TEST_SOURCES} ${APP_SOURCES})
     target_include_directories(surveillance_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
