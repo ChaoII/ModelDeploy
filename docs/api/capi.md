@@ -37,7 +37,7 @@ md_free_detection_model(model);
 | 车牌 | `md_create_lpr_*_model` |
 | OCR | `md_create_ocr_model` / `md_ocr_model_predict` |
 | 行人属性 | `md_create_attr_model` / `md_attr_predict` |
-| 图像 | `md_read_image` / `md_save_image` / `md_from_bgr24` 等 |
+| 图像 | `md_read_image` / `md_save_image` / `md_from_bgr24` / `md_image_to_host_bytes` / `md_image_plane_bytes` 等 |
 | 绘制 | `md_draw_rect` / `md_draw_polygon` / `md_draw_text` |
 | 视频 | `md_video_*`（解码/编码，见下） |
 

@@ -35,6 +35,19 @@ cargo run --example detection
 cargo run --example video_decode -- demo.mp4 100
 ```
 
+## 图像原始字节（`Image`）
+
+`Image` 提供原生格式的宿主字节读取（`format()` / `width()` / `height()` / `plane_count()` 见 `Image`）：
+
+```rust
+let raw: Vec<u8> = img.to_native_bytes()?;   // 整幅原生连续字节；GPU 设备帧自动回读
+let y:  Vec<u8>  = img.plane_bytes(0)?;      // 第 0 平面（NV12 的 Y）
+let uv: Vec<u8>  = img.plane_bytes(1)?;      // 第 1 平面（NV12 的 UV）
+```
+
+- `to_native_bytes()` 布局随 `format()` 而定：BGR24=`w*h*3`；NV12=`w*h + w*h/2`；I420=`w*h + w*h/4 + w*h/4`。
+- 平面越界 / 不支持类型返回 `Err`；方法立即把缓冲拷贝进自有 `Vec<u8>`。
+
 ## 视频编解码（`video`）
 
 `video` 模块等价于 C++ `modeldeploy::video`（解码+编码全功能，经 C API `md_video_*` 承载）。主要公开类型：

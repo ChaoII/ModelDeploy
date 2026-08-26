@@ -49,6 +49,19 @@ img.empty();        // 是否为空
 img.clone();        // 深拷贝
 ```
 
+### 1.4 原生连续字节访问
+
+`to_native_bytes()` 返回图像在**原生格式**下的连续主机字节（打包格式 BGR24=w·h·3；NV12=[w·h]+[w·h/2]；I420=[w·h]+[w·h/4]+[w·h/4]），供调用方交给其它编解码接口：
+
+```cpp
+std::vector<uint8_t> raw = img.to_native_bytes();   // 设备图像自动回读主机
+```
+
+- 图像在 GPU 等设备时内部先 `toCpu` 深拷贝回读；TPU 等不可读设备返回空 vector 并置 `last_error`。
+- 布局与 `plane()` 的 `step` 一致，逐行拼接。
+
+> 与之相对，`imencode`/`imwrite` 产出的 JPEG/BMP 等是带文件头/压缩的编码字节，不是原始像素；要拿原始像素交给别的接口编码，用 `to_native_bytes()`。
+
 ## 2. 预处理算子
 
 ### 2.1 基础算子

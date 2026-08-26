@@ -35,6 +35,21 @@ cd ModelDeployExample/bin/Debug/net9.0
 - `ModelDeployExample` — 示例
 - `ModelDeployUnitTest` — 单元测试
 
+## 图像原始字节（`VisionImage`）
+
+`VisionImage` 提供原生格式的宿主字节读取（`Type`/`Width`/`Height` 见 `VisionImage` 属性）：
+
+```csharp
+byte[] raw = img.ToNativeBytes();     // 整幅原生连续字节；GPU 设备帧自动回读主机
+byte[] y   = img.GetPlaneBytes(0);    // 第 0 平面（NV12 的 Y）
+byte[] uv  = img.GetPlaneBytes(1);    // 第 1 平面（NV12 的 UV）
+```
+
+- `ToNativeBytes()` 布局随 `Type` 而定：BGR24=`Width*Height*3`；NV12=`w*h + w*h/2`；I420=`w*h + w*h/4 + w*h/4`。
+- 平面越界抛 `InvalidOperationException`；不支持的类型/设备（如 TPU）抛 `NotSupportedException`。
+- 两方法立即将原生缓冲拷贝为托管 `byte[]`（指针在下次调用即失效）。
+- 与既有 `ToByteArray()`（编码为 **BMP** 文件字节，含 54 字节头）不同，上面拿到的是**原始像素**，可直接交给其它编解码接口。
+
 ## 视频编解码（`Video`）
 
 `ModelDeploy` 命名空间下的视频封装等价于 C++ `modeldeploy::video`（解码+编码全功能，经 C API 承载），类均实现 `IDisposable`，析构自动释放底层句柄。
