@@ -79,6 +79,9 @@ json HttpServer::task_status_to_json(const TaskStatus& ts) {
         models.push_back(m);
     }
     j["models"] = models;
+    // stats 由 PerfStats::to_json() 生成：既有字段（frames/elapsed_sec/fps/avg_*）保持不变，
+    // Task 7 起叠加 SDK 编解码统计（sdk_frames_*/sdk_dropped/sdk_reconnect_count/sdk_avg_*）；
+    // 旧的 batch_avg_* 已由每管道 SDK 统计取代（保持 HTTP 契约稳定）。
     try {
         j["stats"] = json::parse(ts.stats_json);
     } catch (...) {

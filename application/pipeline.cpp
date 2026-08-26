@@ -299,6 +299,15 @@ void Pipeline::detect_loop() {
         int64_t draw_us  = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
         int64_t enc_us   = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
         stats_.record_frame(0, infer_us, draw_us, enc_us);
+
+        // 摄入 SDK 编解码统计（轻量：src_/sink_ 已聚合的标量拷贝；解码侧帧率快照）
+        {
+            const auto sst = src_.stats();
+            const auto kst = sink_.stats();
+            stats_.ingest_sdk(sst.frames_in, sst.frames_out, sst.dropped,
+                              sst.avg_decode_ms, sst.reconnect_count,
+                              kst.avg_encode_ms);
+        }
         t_last = t3;
     }
 }
