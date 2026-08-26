@@ -50,10 +50,10 @@ private:
     bool build_device_pipeline_locked(const std::string& url, std::string* err);
 #endif
 #ifdef HAVE_NVBUF
-    // Jetson L4T：构建 nvv4l2decoder → NvBufSurface(surface-array) → appsink(NVMM) 零拷贝管道；
-    // 经 NvBufSurfaceMap 取 Orin 统一内存指针作设备帧。成功置 l4t_device_active_
+    // Jetson L4T：nvv4l2decoder 硬件解码 + nvvidconv → 主机 NV12（GStreamer 标准取帧，L4T 无 CUDA 零拷贝，
+    // 故转主机帧；decode 仍硬件加速）。复用软解 read 路径（device_only_active_ 保持 false）。
     static bool nvv4l2decoder_available();
-    bool build_l4t_device_pipeline_locked(const std::string& url, std::string* err);
+    bool build_hwdecode_pipeline_locked(const std::string& url, std::string* err);
 #endif
 #ifdef ENABLE_VAAPI
     // 静态探测：vaapih264dec 插件可实例化（未在本机验证，需 Linux GStreamer vaapi 插件）
@@ -78,7 +78,7 @@ private:
     std::atomic<bool> opened_{false};
     bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
 #ifdef HAVE_NVBUF
-    bool l4t_device_active_ = false;   // Jetson L4T NvBufSurface 设备直通模式
+    bool l4t_hw_active_ = false;   // Jetson L4T 硬件解码（nvv4l2decoder → nvvidconv → 主机 NV12）
 #endif
 #ifdef ENABLE_VAAPI
     bool vaapi_active_ = false;  // 本次会话是否实际用 VAAPI 硬解

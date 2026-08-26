@@ -97,9 +97,11 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
     // 设备直通：解码输出保持 CUDA 设备帧（nvh264dec → CUDA memory）
     if (cfg_.device_only && (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
 #ifdef HAVE_NVBUF
-        // Jetson L4T：优先走 nvv4l2decoder → NvBufSurface 零拷贝（L4T 无 gstcuda/nvh264dec）
+        // Jetson L4T：nvv4l2decoder 硬件解码 + nvvidconv → 主机 NV12（GStreamer 标准取帧）。
+        // L4T 无 CUDA 零拷贝（NvBufSurface 提取依赖私有 nvmm buffer-pool，本 SDK 不含），故 convert
+        // 为主机 NV12、decode 仍硬件加速。device_only 在 L4T 亦走此路径（零拷贝不可得）。
         if (nvv4l2decoder_available()) {
-            if (!build_l4t_device_pipeline_locked(url, err)) {
+            if (!build_hwdecode_pipeline_locked(url, err)) {
                 state_ = State::Error;
                 return false;
             }
@@ -227,15 +229,13 @@ bool GstDecoder::nvv4l2decoder_available() {
     return true;
 }
 
-// Jetson L4T 设备直通：nvv4l2decoder 输出 NvBufSurface(surface-array)，read 时 NvBufSurfaceMap 取
-// Orin 统一内存指针（CPU/设备共享），零拷贝流进 ImageData(GPU)。NvBufSurface* 位于 GST_MAP_READ 的
-// 64 字节目录头 offset 24 处（真机探针实证）。
-bool GstDecoder::build_l4t_device_pipeline_locked(const std::string& url, std::string* err) {
+// Jetson L4T 硬件解码：nvv4l2decoder（真硬解）→ nvvidconv → appsink(主机 NV12)。
+// L4T 无 CUDA 零拷贝，故以 nvvidconv 转为标准主机 NV12，复用下方软解 read 路径（device_only_active_ 保持 false）。
+bool GstDecoder::build_hwdecode_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
     std::string launch = "filesrc location=\"" + url +
-                         "\" ! h264parse ! nvv4l2decoder "
-                         "! appsink name=sink caps=\"video/x-raw(memory:NVMM),format=NV12,"
-                         "nvbuf-memory-type=nvbuf-mem-surface-array\"";
+                         "\" ! h264parse ! nvv4l2decoder ! nvvidconv "
+                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
     if (!pipeline_ || gerr) {
@@ -256,7 +256,7 @@ bool GstDecoder::build_l4t_device_pipeline_locked(const std::string& url, std::s
         return false;
     }
     query_caps_locked(5000);
-    l4t_device_active_ = true;
+    l4t_hw_active_ = true;
     return true;
 }
 #endif // HAVE_NVBUF
@@ -360,15 +360,7 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
         fps_ = static_cast<double>(GST_VIDEO_INFO_FPS_N(&info)) / GST_VIDEO_INFO_FPS_D(&info);
 
 #ifdef HAVE_NVBUF
-    if (l4t_device_active_) {
-        // 真机实证：nvv4l2decoder 的 surface-array 帧，其 buffer 头内指针并非可直接使用的公开
-        // NvBufSurface（读取即崩），且 NvBufSurfaceFromFd 对解码器 surface 无效。零拷贝帧提取依赖
-        // DeepStream/私有 nvmm buffer-pool 集成（本 SDK 不含）。在正确提取方案确认前 fail-closed，
-        // 返回明确错误而非崩溃/静默软解。
-        set_err(err, "l4t-nvbuf-extract-unsupported");
-        gst_sample_unref(sample);
-        return false;
-    }
+    // L4T 硬件解码（nvv4l2decoder→nvvidconv→主机 NV12）复用下方软解 read 路径（device_only_active_=false）。
 #endif
 
     if (device_only_active_) {
@@ -482,7 +474,7 @@ void GstDecoder::cleanup() {
     opened_ = false;
     device_only_active_ = false;
 #ifdef HAVE_NVBUF
-    l4t_device_active_ = false;
+    l4t_hw_active_ = false;
 #endif
 #ifdef ENABLE_VAAPI
     vaapi_active_ = false;
