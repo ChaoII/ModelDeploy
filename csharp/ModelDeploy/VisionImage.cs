@@ -244,6 +244,36 @@ namespace ModelDeploy
             return ResultReader.ReadBytes(buf, n);
         }
 
+        private static void CheckImageBytesStatus(MDStatus st, string what)
+        {
+            switch (st)
+            {
+                case MDStatus.MD_OK: return;
+                case MDStatus.MD_ERR_UNSUPPORTED_TYPE:
+                    throw new NotSupportedException($"{what} unsupported for this image type/device: {BaseModel.GetLastError()}");
+                default:
+                    throw new InvalidOperationException($"{what} failed: {BaseModel.GetLastError()}");
+            }
+        }
+
+        public byte[] ToNativeBytes()
+        {
+            var st = md_image_to_host_bytes(Handle, out var buf, out var n, out _);
+            CheckImageBytesStatus(st, "ToNativeBytes");
+            var bytes = new byte[(int)n];
+            System.Runtime.InteropServices.Marshal.Copy(buf, bytes, 0, (int)n);
+            return bytes;
+        }
+
+        public byte[] GetPlaneBytes(int i)
+        {
+            var st = md_image_plane_bytes(Handle, i, out var buf, out var n, out _);
+            CheckImageBytesStatus(st, "GetPlaneBytes");
+            var bytes = new byte[(int)n];
+            System.Runtime.InteropServices.Marshal.Copy(buf, bytes, 0, (int)n);
+            return bytes;
+        }
+
         /// <summary>返回 BGR 字节数组（引用图像内部数据，需在本对象存活期间使用）。</summary>
         public byte[] ToByteArray()
         {

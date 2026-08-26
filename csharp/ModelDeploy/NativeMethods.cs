@@ -140,6 +140,13 @@ string ext, out IntPtr buf, out UIntPtr n);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern MDStatus md_ptr_validate_device(IntPtr ptr, int dev, int device_id);
 
+        // 取整图/单平面的原生连续主机字节（buf 由库内部持有，立即 Marshal.Copy 复制）
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_to_host_bytes(IntPtr h, out IntPtr buf, out UIntPtr n, out int format);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_image_plane_bytes(IntPtr h, int i, out IntPtr buf, out UIntPtr n, out int step);
+
         #endregion
 
         #region 模型

@@ -95,6 +95,35 @@ public class CapiVisionTests
         Assert.That(vi.GetPlane(0).Step, Is.EqualTo(w));
     }
 
+    // ==================== ToNativeBytes / GetPlaneBytes ====================
+
+    [Test]
+    public void ToNativeBytes_Bgr24_ReturnsRawBytes() {
+        var data = new byte[4 * 3 * 3];
+        for (int i = 0; i < data.Length; i++) data[i] = (byte)i;
+        using var img = VisionImage.FromBgr24Data(data, 4, 3);
+        var nb = img.ToNativeBytes();
+        Assert.That(nb, Is.EqualTo(data));
+    }
+
+    [Test]
+    public void ToNativeBytes_Nv12_ReturnsYPlusUv() {
+        int w = 4, h = 2;
+        var y = new byte[w * h];
+        var uv = new byte[w * (h / 2)];
+        for (int i = 0; i < uv.Length; i++) uv[i] = (byte)i;
+        using var img = VisionImage.FromNv12Data(y, uv, w, h, 0, 0);
+        var nb = img.ToNativeBytes();
+        Assert.That(nb.Length, Is.EqualTo(w * h + uv.Length));
+    }
+
+    [Test]
+    public void GetPlaneBytes_Bgr24_SinglePlane_AndOob_Throws() {
+        using var img = VisionImage.FromBgr24Data(new byte[4 * 3 * 3], 4, 3);
+        Assert.That(img.GetPlaneBytes(0).Length, Is.EqualTo(4 * 3 * 3));
+        Assert.Throws<InvalidOperationException>(() => img.GetPlaneBytes(1));
+    }
+
     [Test]
     public void VisionImage_Read_TypeIsBgr()
     {
