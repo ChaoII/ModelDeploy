@@ -60,3 +60,7 @@ path = "examples/face_gender.rs"
 [[example]]
 name = "face_rec"
 path = "examples/face_rec.rs"
+
+[[example]]
+name = "video_decode"
+path = "examples/video_decode.rs"

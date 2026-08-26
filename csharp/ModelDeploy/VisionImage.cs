@@ -158,6 +158,13 @@ namespace ModelDeploy
             }
         }
 
+        /// <summary>包装一个已有的自有原生图像句柄（如视频解码帧）。本对象负责其生命周期，Dispose 释放。</summary>
+        public static VisionImage FromHandle(IntPtr handle)
+        {
+            if (handle == IntPtr.Zero) throw new ArgumentNullException(nameof(handle));
+            return new VisionImage(handle);
+        }
+
         public static VisionImage FromYuv420PData(byte[] data, int w, int h)
         {
             var status = md_image_from_yuv420p(out var hh, data, w, h);

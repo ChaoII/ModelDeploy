@@ -42,6 +42,12 @@ pub enum MdError {
     #[error("音频解码失败")]
     AudioDecode,
 
+    #[error("视频解码失败: {0}")]
+    VideoDecode(String),
+
+    #[error("视频编码失败: {0}")]
+    VideoEncode(String),
+
     #[error("功能未实现")]
     NotImplemented,
 
@@ -74,6 +80,8 @@ impl MdError {
             MDStatus::ERR_IMAGE_DECODE => MdError::ImageDecode,
             MDStatus::ERR_BUSY => MdError::Busy,
             MDStatus::ERR_AUDIO_DECODE => MdError::AudioDecode,
+            MDStatus::ERR_VIDEO_DECODE => MdError::VideoDecode(msg("video decode")),
+            MDStatus::ERR_VIDEO_ENCODE => MdError::VideoEncode(msg("video encode")),
             MDStatus::ERR_NOT_IMPLEMENTED => MdError::NotImplemented,
         }
     }

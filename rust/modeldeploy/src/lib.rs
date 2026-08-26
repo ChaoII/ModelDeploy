@@ -9,6 +9,7 @@ pub mod runtime;
 pub mod solution;
 pub mod tracker;
 pub mod types;
+pub mod video;
 
 // ���µ�����������
 pub use audio::{resample, SpeakerSearch};
@@ -28,3 +29,4 @@ pub use runtime::RuntimeOption;
 pub use solution::{iou as vision_iou, Heatmap, ObjectCounter};
 pub use tracker::Tracker;
 pub use types::*;
+pub use video::{Backpressure, CodecBackend, HwAccel, VideoCapabilities, VideoConfig, VideoDecoder, VideoEncoder, VideoFrame, VideoState, VideoStats};

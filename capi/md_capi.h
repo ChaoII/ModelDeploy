@@ -53,7 +53,9 @@ typedef enum MD_STATUS {
     MD_ERR_BUSY,                /* 句柄并发使用（检测到非单线程） */
     MD_ERR_NOT_IMPLEMENTED,     /* 功能未实现 */
     MD_ERR_AUDIO_DECODE,        /* 音频解码失败 */
-    MD_ERR_INVALID_TYPE         /* 参数类型不匹配 */
+    MD_ERR_INVALID_TYPE,        /* 参数类型不匹配 */
+    MD_ERR_VIDEO_DECODE,        /* 视频解码失败 */
+    MD_ERR_VIDEO_ENCODE         /* 视频编码失败 */
 } MDStatus;
 
 /* 线程安全地获取最近一次错误信息（thread_local，返回空串表示无错误） */
@@ -682,6 +684,135 @@ MD_CAPI_EXPORT MDStatus md_nlp_stats(const char* text, size_t* chars, size_t* wo
 MD_CAPI_EXPORT MDStatus md_nlp_keywords(const char* text, int k, const char*** words, int** counts, size_t* n);
 MD_CAPI_EXPORT MDStatus md_nlp_tokenize(const char* text, const char* dict_dir, const char*** toks, size_t* n);
 MD_CAPI_EXPORT MDStatus md_nlp_classify(MDModelHandle h, const char* text, int* label, float* score);
+
+/* ==================== 视频编解码（VideoDecoder / VideoEncoder） ====================
+ * 与 C++ video 模块全功能对齐：解码（同步 + 异步回调 + 设备直通 + 状态/统计/重连）、
+ * 编码（open/encode/encode_async + 状态/统计）。帧跨边界采用所有权转移：
+ * read_frame / 异步回调交付的 MDImageHandle 自持解码帧（含设备 NV12 显存），
+ * 调用方用后必须 md_image_destroy；同步读返回的句柄同样由调用方释放。
+ * 本模块需 SDK 以 BUILD_VIDEO=ON 构建；未构建时各函数返回 MD_ERR_BACKEND_UNAVAILABLE。 */
+
+typedef enum MD_CODEC_BACKEND {
+    MD_CODEC_AUTO = 0,
+    MD_CODEC_FFMPEG = 1,
+    MD_CODEC_GSTREAMER = 2
+} MDCodecBackend;
+
+typedef enum MD_HWACCEL {
+    MD_HW_AUTO = 0,
+    MD_HW_NONE = 1,
+    MD_HW_CUDA = 2,
+    MD_HW_VAAPI = 3,
+    MD_HW_SOPHGO = 4
+} MDHwAccel;
+
+typedef enum MD_BACKPRESSURE {
+    MD_BP_BLOCK = 0,
+    MD_BP_DROP = 1,
+    MD_BP_OVERWRITE_OLDEST = 2
+} MDBackpressure;
+
+typedef enum MD_VIDEO_STATE {
+    MD_VST_IDLE = 0,
+    MD_VST_OPENING = 1,
+    MD_VST_RUNNING = 2,
+    MD_VST_RECONNECTING = 3,
+    MD_VST_EOF = 4,
+    MD_VST_ERROR = 5,
+    MD_VST_CLOSED = 6
+} MDVideoState;
+
+typedef struct md_video_config_handle*      MDVideoConfigHandle;
+typedef struct md_video_decoder_handle*     MDVideoDecoderHandle;
+typedef struct md_video_encoder_handle*     MDVideoEncoderHandle;
+typedef struct md_video_capabilities_handle* MDVideoCapabilitiesHandle;
+
+/* 异步解码回调：frame 归接收方所有，用后须 md_image_destroy（对齐 C++ 移动交付语义） */
+typedef void (*MDVideoFrameCb)(MDImageHandle frame, uint64_t pts_ms, void* userdata);
+
+/* 编解码统计（与 C++ VideoStats 一致） */
+typedef struct MDVideoStats {
+    uint64_t frames_in;
+    uint64_t frames_out;
+    uint64_t dropped;
+    double avg_decode_ms;
+    double avg_encode_ms;
+    uint64_t reconnect_count;
+    uint64_t error_count;
+} MDVideoStats;
+
+/* ---- 配置（不透明句柄，覆盖解码+编码全部字段） ---- */
+MD_CAPI_EXPORT MDStatus md_video_config_create(MDVideoConfigHandle* out);
+MD_CAPI_EXPORT void    md_video_config_destroy(MDVideoConfigHandle cfg);
+
+MD_CAPI_EXPORT MDStatus md_video_config_set_backend(MDVideoConfigHandle cfg, MDCodecBackend b);
+MD_CAPI_EXPORT MDStatus md_video_config_set_hw_accel(MDVideoConfigHandle cfg, MDHwAccel h);
+MD_CAPI_EXPORT MDStatus md_video_config_set_backpressure(MDVideoConfigHandle cfg, MDBackpressure bp);
+MD_CAPI_EXPORT MDStatus md_video_config_set_device_only(MDVideoConfigHandle cfg, int enable);
+MD_CAPI_EXPORT MDStatus md_video_config_set_async_queue_size(MDVideoConfigHandle cfg, int n);
+MD_CAPI_EXPORT MDStatus md_video_config_set_pooling(MDVideoConfigHandle cfg, int enable);
+MD_CAPI_EXPORT MDStatus md_video_config_set_reconnect_delay_ms(MDVideoConfigHandle cfg, int ms);
+MD_CAPI_EXPORT MDStatus md_video_config_set_max_reconnects(MDVideoConfigHandle cfg, int n);
+MD_CAPI_EXPORT MDStatus md_video_config_set_timeout_us(MDVideoConfigHandle cfg, int us);
+MD_CAPI_EXPORT MDStatus md_video_config_set_rtsp_transport(MDVideoConfigHandle cfg, const char* t);
+/* 编码专用 */
+MD_CAPI_EXPORT MDStatus md_video_config_set_fps(MDVideoConfigHandle cfg, int fps);
+MD_CAPI_EXPORT MDStatus md_video_config_set_bitrate_kbps(MDVideoConfigHandle cfg, int kbps);
+MD_CAPI_EXPORT MDStatus md_video_config_set_gop(MDVideoConfigHandle cfg, int gop);
+MD_CAPI_EXPORT MDStatus md_video_config_set_codec(MDVideoConfigHandle cfg, const char* codec);
+MD_CAPI_EXPORT MDStatus md_video_config_set_preset(MDVideoConfigHandle cfg, const char* preset);
+MD_CAPI_EXPORT MDStatus md_video_config_set_format(MDVideoConfigHandle cfg, const char* fmt);
+MD_CAPI_EXPORT MDStatus md_video_config_set_max_b_frames(MDVideoConfigHandle cfg, int n);
+MD_CAPI_EXPORT MDStatus md_video_config_set_low_latency(MDVideoConfigHandle cfg, int enable);
+MD_CAPI_EXPORT MDStatus md_video_config_set_gpu_direct_input(MDVideoConfigHandle cfg, int enable);
+
+/* ---- 能力探测 ---- */
+MD_CAPI_EXPORT MDStatus md_video_capabilities_create(MDVideoCapabilitiesHandle* out);
+MD_CAPI_EXPORT void    md_video_capabilities_destroy(MDVideoCapabilitiesHandle h);
+MD_CAPI_EXPORT MDStatus md_video_capabilities_ffmpeg(MDVideoCapabilitiesHandle h, int* out);
+MD_CAPI_EXPORT MDStatus md_video_capabilities_gstreamer(MDVideoCapabilitiesHandle h, int* out);
+MD_CAPI_EXPORT MDStatus md_video_capabilities_hw_decoder_count(MDVideoCapabilitiesHandle h, size_t* out);
+MD_CAPI_EXPORT MDStatus md_video_capabilities_hw_decoder(MDVideoCapabilitiesHandle h, size_t i, const char** name);
+MD_CAPI_EXPORT MDStatus md_video_capabilities_hw_encoder_count(MDVideoCapabilitiesHandle h, size_t* out);
+MD_CAPI_EXPORT MDStatus md_video_capabilities_hw_encoder(MDVideoCapabilitiesHandle h, size_t i, const char** name);
+
+/* ---- 解码器 VideoDecoder ---- */
+MD_CAPI_EXPORT MDStatus md_video_decoder_create(MDVideoConfigHandle cfg, MDVideoDecoderHandle* out);
+MD_CAPI_EXPORT void    md_video_decoder_destroy(MDVideoDecoderHandle h);
+
+MD_CAPI_EXPORT MDStatus md_video_decoder_open(MDVideoDecoderHandle h, const char* url);
+/* 同步抽一帧：*out 为自持帧句柄（CPU/设备 NV12），用后 md_image_destroy；EOF/失败返回错误 */
+MD_CAPI_EXPORT MDStatus md_video_decoder_read_frame(MDVideoDecoderHandle h, MDImageHandle* out, uint64_t* pts_ms);
+/* 异步：注册回调（跨线程投递，frame 归回调接收方所有须 destroy），start 启动、stop 停止 */
+MD_CAPI_EXPORT MDStatus md_video_decoder_set_callback(MDVideoDecoderHandle h, MDVideoFrameCb cb, void* userdata);
+MD_CAPI_EXPORT MDStatus md_video_decoder_start(MDVideoDecoderHandle h);
+MD_CAPI_EXPORT void    md_video_decoder_stop(MDVideoDecoderHandle h);
+
+MD_CAPI_EXPORT MDStatus md_video_decoder_set_device_only(MDVideoDecoderHandle h, int enable);
+MD_CAPI_EXPORT MDStatus md_video_decoder_state(MDVideoDecoderHandle h, MDVideoState* out);
+MD_CAPI_EXPORT MDStatus md_video_decoder_stats(MDVideoDecoderHandle h, MDVideoStats* out);
+MD_CAPI_EXPORT const char* md_video_decoder_last_error(MDVideoDecoderHandle h);
+MD_CAPI_EXPORT MDStatus md_video_decoder_size(MDVideoDecoderHandle h, int* w, int* height, int* fps);
+MD_CAPI_EXPORT void    md_video_decoder_close(MDVideoDecoderHandle h);
+/* 测试可观测：缓冲池命中/归还；dropped/reconnect_count 经 stats */
+MD_CAPI_EXPORT MDStatus md_video_decoder_pool_hits(MDVideoDecoderHandle h, uint64_t* out);
+MD_CAPI_EXPORT MDStatus md_video_decoder_pool_returns(MDVideoDecoderHandle h, uint64_t* out);
+
+/* ---- 编码器 VideoEncoder ---- */
+MD_CAPI_EXPORT MDStatus md_video_encoder_create(MDVideoConfigHandle cfg, MDVideoEncoderHandle* out);
+MD_CAPI_EXPORT void    md_video_encoder_destroy(MDVideoEncoderHandle h);
+
+MD_CAPI_EXPORT MDStatus md_video_encoder_open(MDVideoEncoderHandle h, const char* url, int w, int height, int src_fps);
+/* 编码一帧（输入 img 的生命周期须覆盖本次调用；GPU 输入按 cfg 直通直编） */
+MD_CAPI_EXPORT MDStatus md_video_encoder_encode(MDVideoEncoderHandle h, MDImageHandle img, uint64_t pts_ms);
+MD_CAPI_EXPORT MDStatus md_video_encoder_encode_async(MDVideoEncoderHandle h, MDImageHandle img);
+MD_CAPI_EXPORT MDStatus md_video_encoder_start_async(MDVideoEncoderHandle h);
+MD_CAPI_EXPORT void    md_video_encoder_stop_async(MDVideoEncoderHandle h);
+MD_CAPI_EXPORT MDStatus md_video_encoder_has_permanently_failed(MDVideoEncoderHandle h, int* out);
+MD_CAPI_EXPORT MDStatus md_video_encoder_state(MDVideoEncoderHandle h, MDVideoState* out);
+MD_CAPI_EXPORT MDStatus md_video_encoder_stats(MDVideoEncoderHandle h, MDVideoStats* out);
+MD_CAPI_EXPORT const char* md_video_encoder_last_error(MDVideoEncoderHandle h);
+MD_CAPI_EXPORT void    md_video_encoder_close(MDVideoEncoderHandle h);
 
 #ifdef __cplusplus
 }
