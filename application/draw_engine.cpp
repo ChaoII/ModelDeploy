@@ -61,40 +61,6 @@ void DrawEngine::draw_face(ImageData& image, const InferResult& result) {
     vis_keypoints(image, kp_results, cfg_.font_path, 12, 3, 0.15, false, false);
 }
 
-namespace {
-    // 与 vis_det 一致的 label_id → BGR 颜色（确定性调色板，GPU 内核使用）
-    // 按 GpuDrawBox 字段顺序 r,g,b 写入：rgb[0]=R, rgb[1]=G, rgb[2]=B
-    void color_for_label(int label_id, uint8_t* rgb) {
-        static const uint8_t palette[8][3] = {
-            {0, 0, 255},       // red
-            {0, 255, 0},       // green
-            {255, 0, 0},       // blue
-            {0, 255, 255},     // yellow
-            {255, 0, 255},     // magenta
-            {255, 255, 0},     // cyan
-            {0, 165, 255},     // orange
-            {255, 128, 0},     // violet
-        };
-        const auto* c = palette[static_cast<unsigned>(label_id % 8)];
-        rgb[0] = c[2];   // r
-        rgb[1] = c[1];   // g
-        rgb[2] = c[0];   // b
-    }
-
-    std::string format_label(const DetectionBox& b, bool show_label, bool show_score) {
-        std::string label;
-        if (show_label) {
-            label = b.label_name.empty() ? std::to_string(b.label_id) : b.label_name;
-        }
-        if (show_score) {
-            if (!label.empty()) label += ": ";
-            label += std::to_string(b.score).substr(0, 4);
-        }
-        if (label.size() > 31) label.resize(31);
-        return label;
-    }
-}
-
 bool DrawEngine::draw_gpu(ImageData& image,
                           const std::vector<InferResult>& results,
                           bool show_label, bool show_score) {
@@ -138,22 +104,40 @@ bool DrawEngine::draw_gpu(ImageData& image,
     }
 
     bool any = false;
-    uint8_t rgb[3];
-    const float threshold = show_score ? 0.0f : 0.5f;   // 与 draw_detection 阈值一致
+    // 高层设备绘制:与 CPU vis_* 语义一致(整框填充 + 类色 + 标签 + 阈值)
+    VisionProcessorBackend::VisOptions vo;
+    vo.threshold = show_score ? 0.0 : 0.5;
+    vo.alpha = 0.15;
     for (const auto& r : results) {
         if (r.type == "detection") {
+            std::vector<DetectionResult> dets;
+            dets.reserve(r.boxes.size());
             for (const auto& b : r.boxes) {
-                if (b.score < threshold) continue;
-                color_for_label(b.label_id, rgb);
-                backend->draw_rect_nv12(image, b.x, b.y, b.w, b.h,
-                                        rgb[0], rgb[1], rgb[2], 2);
-                if (show_label) {
-                    const std::string label = format_label(b, show_label, show_score);
-                    backend->draw_text_nv12(image, b.x, std::max(0.0f, b.y - 16), label,
-                                            255, 255, 255, 1);
-                }
-                any = true;
+                if (b.score < vo.threshold) continue;
+                DetectionResult dr;
+                dr.box = {b.x, b.y, b.w, b.h};
+                dr.score = b.score;
+                dr.label_id = b.label_id;
+                if (!b.label_name.empty()) vo.label_map[b.label_id] = b.label_name;
+                dets.push_back(std::move(dr));
             }
+            if (!dets.empty() && backend->vis_det_nv12(image, dets, vo)) any = true;
+        } else if (r.type == "face_detection") {
+            std::vector<KeyPointsResult> kps;
+            kps.reserve(r.boxes.size());
+            for (size_t i = 0; i < r.boxes.size(); ++i) {
+                const auto& b = r.boxes[i];
+                if (b.score < vo.threshold) continue;
+                KeyPointsResult kp;
+                kp.box = {b.x, b.y, b.w, b.h};
+                kp.score = b.score;
+                kp.label_id = b.label_id;
+                if (i < r.keypoints.size()) {
+                    for (const auto& p : r.keypoints[i]) kp.keypoints.emplace_back(p.x, p.y, 0.0f);
+                }
+                kps.push_back(std::move(kp));
+            }
+            if (!kps.empty() && backend->vis_keypoints_nv12(image, kps, vo, false)) any = true;
         }
     }
     return any || results.empty();
