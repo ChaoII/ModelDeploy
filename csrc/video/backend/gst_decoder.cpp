@@ -6,6 +6,7 @@
 #include <gst/app/gstappsink.h>
 #include <gst/video/video.h>
 #include <chrono>
+#include <cstring>
 // GStreamer CUDA 设备帧映射：gst_video_frame_map 以 GST_MAP_CUDA 把 CUDA memory 映为设备平面。
 // gst/cuda/gstcudamemory.h 链会夹带 cudaGL.h（MSVC 上与 GL/gl.h 冲突），故只引用宏值，不引该头。
 // GST_MAP_CUDA = GST_MAP_FLAG_LAST << 1（GStreamer ≤1.30 恒定）。
@@ -17,6 +18,11 @@
 #ifndef GST_MAP_READ_CUDA
 #define GST_MAP_READ_CUDA ((GstMapFlags)(GST_MAP_READ | GST_MAP_CUDA))
 #endif
+#endif
+// Jetson L4T：NvBufSurface 零拷贝。nvbufsurface.h 由 cmake/gstreamer.cmake 探测
+// /usr/src/jetson_multimedia_api/include 提供，仅 L4T 构建定义 HAVE_NVBUF 时引入。
+#ifdef HAVE_NVBUF
+#include "nvbufsurface.h"
 #endif
 #endif
 
@@ -90,6 +96,18 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
 #endif
     // 设备直通：解码输出保持 CUDA 设备帧（nvh264dec → CUDA memory）
     if (cfg_.device_only && (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
+#ifdef HAVE_NVBUF
+        // Jetson L4T：优先走 nvv4l2decoder → NvBufSurface 零拷贝（L4T 无 gstcuda/nvh264dec）
+        if (nvv4l2decoder_available()) {
+            if (!build_l4t_device_pipeline_locked(url, err)) {
+                state_ = State::Error;
+                return false;
+            }
+            opened_ = true;
+            state_ = State::Running;
+            return true;
+        }
+#endif
 #ifdef HAVE_GSTCUDA
         if (!build_device_pipeline_locked(url, err)) {
             state_ = State::Error;
@@ -198,6 +216,51 @@ bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::strin
 }
 #endif // HAVE_GSTCUDA
 
+#ifdef HAVE_NVBUF
+bool GstDecoder::nvv4l2decoder_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // Jetson L4T V4L2 解码器（gst-nvvideo4linux2）；桌面 gst-plugins-bad 无此插件名，因此只在 L4T 命中选择。
+    GstElementFactory* f = gst_element_factory_find("nvv4l2decoder");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+// Jetson L4T 设备直通：nvv4l2decoder 输出 NvBufSurface(surface-array)，read 时 NvBufSurfaceMap 取
+// Orin 统一内存指针（CPU/设备共享），零拷贝流进 ImageData(GPU)。NvBufSurface* 位于 GST_MAP_READ 的
+// 64 字节目录头 offset 24 处（真机探针实证）。
+bool GstDecoder::build_l4t_device_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    std::string launch = "filesrc location=\"" + url +
+                         "\" ! h264parse ! nvv4l2decoder "
+                         "! appsink name=sink caps=\"video/x-raw(memory:NVMM),format=NV12,"
+                         "nvbuf-memory-type=nvbuf-mem-surface-array\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "nvcodec-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    l4t_device_active_ = true;
+    return true;
+}
+#endif // HAVE_NVBUF
+
 #ifdef ENABLE_VAAPI
 bool GstDecoder::vaapih264dec_available() {
     md_gst_init_once();
@@ -295,6 +358,58 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
     h_ = GST_VIDEO_INFO_HEIGHT(&info);
     if (GST_VIDEO_INFO_FPS_N(&info) > 0 && GST_VIDEO_INFO_FPS_D(&info) > 0)
         fps_ = static_cast<double>(GST_VIDEO_INFO_FPS_N(&info)) / GST_VIDEO_INFO_FPS_D(&info);
+
+#ifdef HAVE_NVBUF
+    if (l4t_device_active_) {
+        // Jetson L4T 零拷贝：NvBufSurface* 位于 GST_MAP_READ 的 64 字节目录头 offset 24（真机实证）。
+        // NvBufSurfaceMap(READ) 得到 Orin 统一内存指针（CPU/设备共享）作设备帧平面。
+        NvBufSurface* surf = nullptr;
+        {
+            GstMapInfo hdr;
+            if (!gst_buffer_map(buffer, &hdr, GST_MAP_READ)) {
+                set_err(err, "nvcodec-map-fail");
+                gst_sample_unref(sample);
+                return false;
+            }
+            memcpy(&surf, (char*)hdr.data + 24, sizeof(surf));
+            gst_buffer_unmap(buffer, &hdr);
+        }
+        if (!surf || surf->numFilled < 1) {
+            set_err(err, "nvcodec-no-plane");
+            gst_sample_unref(sample);
+            return false;
+        }
+        if (NvBufSurfaceMap(surf, 0, -1, NVBUF_MAP_READ) != 0) {
+            set_err(err, "nvcodec-map-fail");
+            gst_sample_unref(sample);
+            return false;
+        }
+        NvBufSurfaceParams* p = &surf->surfaceList[0];
+        const uint8_t* y = (const uint8_t*)p->mappedAddr.addr[0];
+        const uint8_t* uv = (const uint8_t*)p->mappedAddr.addr[1];
+        if (!y || !uv) {
+            NvBufSurfaceUnMap(surf, 0, -1);
+            set_err(err, "nvcodec-no-plane");
+            gst_sample_unref(sample);
+            return false;
+        }
+        int sy = (int)p->planeParams.pitch[0];
+        int su = (int)p->planeParams.pitch[1];
+        std::shared_ptr<void> owner(
+            (void*)y,
+            [surf, sample](void*) mutable {
+                NvBufSurfaceUnMap(surf, 0, -1);
+                gst_sample_unref(sample);
+            });
+        IPlaneView v{y, sy, uv, su, w_, h_, Device::GPU, owner};
+        out->image = make_image_from_planes_view(v);
+        out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
+                          ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
+                          : 0;
+        stats_.frames_out++;
+        return true;
+    }
+#endif
 
     if (device_only_active_) {
 #ifdef HAVE_GSTCUDA
@@ -406,6 +521,9 @@ void GstDecoder::cleanup() {
     fps_ = 0.0;
     opened_ = false;
     device_only_active_ = false;
+#ifdef HAVE_NVBUF
+    l4t_device_active_ = false;
+#endif
 #ifdef ENABLE_VAAPI
     vaapi_active_ = false;
 #endif

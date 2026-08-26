@@ -61,6 +61,26 @@ if (EXISTS "${GSTREAMER_ROOT}/include/gstreamer-1.0/gst/cuda/gstcudamemory.h"
     endif ()
 endif ()
 
+# Jetson L4T NvBufSurface（nvv4l2decoder 零拷贝设备直通）能力探测：GSTREAMER_HAS_NVBUF=ON 时
+# gst_decoder 编译 L4T 分支（引入 /usr/src/jetson_multimedia_api/include 与 libnvbufsurface）。
+# 仅 Linux/L4T（Jetson）可能命中；桌面/Windows 不会误启。
+set(GSTREAMER_HAS_NVBUF OFF)
+if (NOT WIN32 AND GSTREAMER_INCLUDE_DIR)
+    find_path(NVBUF_INCLUDE_DIR nvbufsurface.h
+            PATHS "/usr/src/jetson_multimedia_api/include" NO_DEFAULT_PATH)
+    find_library(NVBUF_LIBRARY NAMES nvbufsurface
+            PATHS "/usr/lib/aarch64-linux-gnu/tegra" "/usr/lib/aarch64-linux-gnu"
+                  "/usr/local/lib" "/usr/lib" NO_DEFAULT_PATH)
+    if (NVBUF_INCLUDE_DIR AND NVBUF_LIBRARY)
+        set(GSTREAMER_HAS_NVBUF ON)
+        list(APPEND GSTREAMER_INCLUDE_DIR ${NVBUF_INCLUDE_DIR})
+        list(APPEND GSTREAMER_LIBS ${NVBUF_LIBRARY})
+        message(STATUS "GStreamer L4T NvBufSurface (nvbufsurface) enabled: ${NVBUF_INCLUDE_DIR}")
+    else ()
+        message(STATUS "GStreamer L4T NvBufSurface unavailable (nvbufsurface.h/lib not found)")
+    endif ()
+endif ()
+
 if (NOT GSTREAMER_INCLUDE_DIR OR NOT GSTREAMER_LIBS)
     message(WARNING "GStreamer not found at ${GSTREAMER_ROOT}; ENABLE_GSTREAMER disabled")
     set(ENABLE_GSTREAMER OFF)
