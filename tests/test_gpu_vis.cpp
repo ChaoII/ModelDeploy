@@ -212,3 +212,68 @@ TEST_CASE("cuda vis_sem_nv12 (semantic)", "[gpu]") {
     REQUIRE(back[10 * w + 20] != 128);
     cudaFree(d_y); cudaFree(d_uv);
 }
+
+TEST_CASE("cuda vis_depth_nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    const mv::ImageData::Plane planes[2] = {{d_y, w}, {d_uv, w}};
+    mv::ImageData frame = mv::ImageData::from_planes(planes, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+
+    mv::DepthResult dep;
+    dep.shape = {h, w};
+    dep.depth.assign(static_cast<size_t>(w) * h, 0.0f);
+    for (size_t i = 0; i < dep.depth.size(); ++i) dep.depth[i] = static_cast<float>(i);  // 非平 → 归一化富 0..255
+
+    mv::VisionProcessorBackend::VisOptions opt;
+    opt.alpha = 1.0;
+    mv::CudaProcessorBackend backend;
+    REQUIRE(backend.vis_depth_nv12(frame, dep, opt, true));
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    bool changed = false;
+    for (auto v : back) if (v != 128) { changed = true; break; }
+    REQUIRE(changed);   // 深度伪彩确实写入
+    cudaFree(d_y); cudaFree(d_uv);
+}
+
+TEST_CASE("cuda vis_iseg_nv12 (semantic)", "[gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    const mv::ImageData::Plane planes[2] = {{d_y, w}, {d_uv, w}};
+    mv::ImageData frame = mv::ImageData::from_planes(planes, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+
+    mv::InstanceSegResult inst;
+    inst.label_id = 0;
+    inst.score = 0.9f;
+    inst.box = {8.0f, 8.0f, 32.0f, 32.0f};
+    inst.mask.shape = {16, 16};
+    inst.mask.buffer.assign(static_cast<size_t>(16) * 16, 1);  // 全 1 → 整框着色
+    std::vector<mv::InstanceSegResult> results{inst};
+
+    mv::VisionProcessorBackend::VisOptions opt;
+    opt.alpha = 1.0;
+    opt.threshold = 0.5;
+    mv::CudaProcessorBackend backend;
+    REQUIRE(backend.vis_iseg_nv12(frame, results, opt));
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    std::vector<uint8_t> back(y_host.size());
+    REQUIRE(cudaMemcpy(back.data(), d_y, y_host.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    REQUIRE(back[16 * w + 16] != 128);   // 框内被 mask 着色
+    REQUIRE(back[0] == 128);             // 框外不变
+    cudaFree(d_y); cudaFree(d_uv);
+}
