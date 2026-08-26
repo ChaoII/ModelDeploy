@@ -116,6 +116,10 @@ private:
     /// 按模型名取置信度阈值（缺省 0.5）
     double model_threshold(const std::string& name) const;
 
+    /// 非 detection（face/classification）结果标注到帧（DrawEngine；NV12 就地/回环绘制）
+    void draw_non_det(modeldeploy::vision::ImageData& frame,
+                      const std::vector<InferResult>& results);
+
     /// 资源安全释放（仅在所有线程结束后调用）
     void release_resources();
 };

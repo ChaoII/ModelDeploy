@@ -59,8 +59,10 @@ bool InferGroup::empty() const {
 
 bool InferGroup::run_models(
     const ImageData& frame,
-    std::vector<std::pair<std::string, std::vector<DetectionResult>>>* sdk_dets) {
+    std::vector<std::pair<std::string, std::vector<DetectionResult>>>* sdk_dets,
+    std::vector<std::pair<std::string, InferResult>>* non_det) {
     if (sdk_dets) sdk_dets->clear();
+    if (non_det) non_det->clear();
     bool any = false;
     for (auto& e : engines_) {
         const auto& mc = e->config();
@@ -72,6 +74,7 @@ bool InferGroup::run_models(
         } else {
             InferResult r;
             if (!e->infer(frame, &r)) continue;
+            if (non_det) non_det->push_back({mc.name, std::move(r)});
             any = true;
         }
     }
@@ -80,4 +83,11 @@ bool InferGroup::run_models(
 
 modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
     return find_det_model(engines_, name);
+}
+
+const ModelConfig* InferGroup::config_of(const std::string& name) const {
+    for (const auto& e : engines_) {
+        if (e->config().name == name) return &e->config();
+    }
+    return nullptr;
 }

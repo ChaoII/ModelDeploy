@@ -42,6 +42,21 @@ TEST_CASE("InferGroup add nonexistent model fails", "[infer_group]") {
     REQUIRE(g.empty());
 }
 
+TEST_CASE("InferGroup config_of returns nullptr when empty", "[infer_group]") {
+    InferGroup g;
+    REQUIRE(g.config_of("det") == nullptr);
+}
+
+TEST_CASE("InferGroup run_models with non_det out-param", "[infer_group]") {
+    InferGroup g;
+    auto img = tiny_image();
+    std::vector<std::pair<std::string, std::vector<DetectionResult>>> dets;
+    std::vector<std::pair<std::string, InferResult>> non_det;
+    REQUIRE_FALSE(g.run_models(img, &dets, &non_det));
+    REQUIRE(dets.empty());
+    REQUIRE(non_det.empty());
+}
+
 TEST_CASE("InferGroup det_model on empty returns nullptr", "[infer_group]") {
     InferGroup g;
     REQUIRE(g.det_model("det") == nullptr);

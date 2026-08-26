@@ -1,5 +1,6 @@
 #include "pipeline.hpp"
 #include <iostream>
+#include <cstring>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -46,6 +47,7 @@ bool Pipeline::start() {
     if (infer_group_.empty()) {
         std::cerr << "[Pipeline] " << cfg_.id << " no models loaded (preview only)" << std::endl;
     }
+    draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
 
     // 1) SDK 解码源（open 同步完成，之后回调异步）
     std::string err;
@@ -161,7 +163,66 @@ double Pipeline::model_threshold(const std::string& name) const {
     for (const auto& m : cfg_.models) {
         if (m.name == name) return m.confidence_threshold;
     }
+    // 动态 add_model 加入的模型不在 cfg_.models：回退查 InferGroup 引擎配置
+    const auto* mc = infer_group_.config_of(name);
+    if (mc) return mc->confidence_threshold;
     return 0.5;
+}
+
+namespace {
+// CPU packed BGR → 主机 NV12（重建自有缓冲的 ImageData，供编码路径）
+modeldeploy::vision::ImageData bgr_to_nv12_host(const modeldeploy::vision::ImageData& bgr) {
+    cv::Mat mat;
+    if (!bgr.asMat(&mat)) return {};
+    const int W = mat.cols, H = mat.rows;
+    if (W <= 0 || H <= 0 || (W & 1) || (H & 1)) return {};
+    cv::Mat i420;
+    cv::cvtColor(mat, i420, cv::COLOR_BGR2YUV_I420);
+    const size_t ysize = static_cast<size_t>(W) * static_cast<size_t>(H);
+    const size_t usize = ysize / 4;
+    const uint8_t* y = i420.data;
+    const uint8_t* u = y + ysize;
+    const uint8_t* v = u + usize;
+    auto holder = std::make_shared<std::vector<uint8_t>>(ysize + ysize / 2);
+    std::memcpy(holder->data(), y, ysize);
+    uint8_t* uv = holder->data() + ysize;
+    const int h2 = H / 2, w2 = W / 2;
+    for (int r = 0; r < h2; ++r) {
+        for (int c = 0; c < w2; ++c) {
+            uv[r * W + 2 * c]     = u[r * w2 + c];
+            uv[r * W + 2 * c + 1] = v[r * w2 + c];
+        }
+    }
+    modeldeploy::vision::ImageData::Plane pl[2] = {
+        {holder->data(), W},
+        {holder->data() + ysize, W},
+    };
+    std::shared_ptr<void> owner(holder, holder->data());
+    return modeldeploy::vision::ImageData::from_planes(
+        pl, 2, MdImageType::NV12, W, H, modeldeploy::Device::CPU, owner);
+}
+}
+
+void Pipeline::draw_non_det(ImageData& frame, const std::vector<InferResult>& results) {
+    if (!draw_engine_ || results.empty() || frame.empty()) return;
+    // host NV12：DrawEngine CPU draw()（vis_det/vis_keypoints 保留 face 关键点/标签格式）需
+    // BGR packed → 转 BGR 标注后重建 NV12 交付编码（face/classification 呈现到输出帧）。
+    if (frame.type() == MdImageType::NV12 && frame.plane_count() >= 2 &&
+        frame.device() == modeldeploy::Device::CPU) {
+        ImageData bgr = ImageData::cvt_color(frame, ColorConvertType::CVT_NV122PKG_BGR);
+        if (bgr.empty()) return;
+        draw_engine_->draw(bgr, results);
+        ImageData nv12 = bgr_to_nv12_host(bgr);
+        if (!nv12.empty()) frame = std::move(nv12);
+        return;
+    }
+    // device NV12：draw_gpu 就地零拷贝（不破坏 GPU 直编 D2D）
+    if (frame.type() == MdImageType::NV12 && frame.plane_count() >= 2) {
+        draw_engine_->draw_gpu(frame, results, cfg_.draw.show_label, cfg_.draw.show_score);
+        return;
+    }
+    // 其它（packed BGR 等）：CPU draw()
+    draw_engine_->draw(frame, results);
 }
 
 void Pipeline::update_snapshot(const ImageData& frame, int64_t& counter) {
@@ -182,6 +243,7 @@ void Pipeline::update_snapshot(const ImageData& frame, int64_t& counter) {
 
 void Pipeline::detect_loop() {
     int64_t snapshot_counter = 0;
+    bool encode_failed_reported = false;
     auto t_last = std::chrono::steady_clock::now();
     while (running_.load()) {
         modeldeploy::video::VideoFrame f;
@@ -200,10 +262,18 @@ void Pipeline::detect_loop() {
 
         // 推理 + 绘制，均在 frame.image（设备 NV12）上零拷贝
         std::vector<std::pair<std::string, std::vector<DetectionResult>>> sdk_dets;
-        infer_group_.run_models(f.image, &sdk_dets);
+        std::vector<std::pair<std::string, InferResult>> non_det;
+        infer_group_.run_models(f.image, &sdk_dets, &non_det);
         for (auto& [name, dets] : sdk_dets) {
             auto* det = infer_group_.det_model(name);
             if (det) det->draw_result(f.image, dets, model_threshold(name));
+        }
+        // 非 detection（face/classification）标注到输出帧（DrawEngine）
+        if (!non_det.empty()) {
+            std::vector<InferResult> res;
+            res.reserve(non_det.size());
+            for (auto& [name, r] : non_det) res.push_back(std::move(r));
+            draw_non_det(f.image, res);
         }
         last_frame_pts_ = static_cast<int64_t>(f.pts_ms);
 
@@ -211,7 +281,12 @@ void Pipeline::detect_loop() {
 
         // 预览编码（encode_async；GPU 直编 D2D）
         if (cfg_.enable_preview && !cfg_.output_url.empty()) {
-            (void)sink_.encode(f.image);
+            if (!sink_.encode(f.image) || sink_.has_failed()) {
+                if (!encode_failed_reported) {
+                    encode_failed_reported = true;
+                    set_init_error("encode failed: " + sink_.last_error());
+                }
+            }
         }
 
         auto t2 = std::chrono::steady_clock::now();
