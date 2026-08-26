@@ -26,6 +26,8 @@ modeldeploy::video::State VideoSource::state() const {
 }
 std::string VideoSource::last_error() const { return dec_ ? dec_->last_error() : ""; }
 int VideoSource::fps() const { return dec_ ? dec_->fps() : 0; }
+int VideoSource::width() const { return dec_ ? dec_->width() : 0; }
+int VideoSource::height() const { return dec_ ? dec_->height() : 0; }
 const modeldeploy::video::VideoStats& VideoSource::stats() const {
     static const modeldeploy::video::VideoStats kEmpty{};
     return dec_ ? dec_->stats() : kEmpty;

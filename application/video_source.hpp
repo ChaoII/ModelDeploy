@@ -22,6 +22,8 @@ public:
     std::string last_error() const;
     const modeldeploy::video::VideoStats& stats() const;
     int fps() const;
+    int width() const;
+    int height() const;
 
 private:
     std::shared_ptr<modeldeploy::video::VideoDecoder> dec_;
