@@ -44,4 +44,22 @@ namespace modeldeploy::vision {
         float x, float yo, const char* text,
         uint8_t r, uint8_t g, uint8_t b, int font_size,
         cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool fill_rect_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        int x0, int y0, int x1, int y1,
+        uint8_t r, uint8_t g, uint8_t b, float alpha,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool fill_polygon_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        const float* xs, const float* ys, int npts,
+        uint8_t r, uint8_t g, uint8_t b, float alpha,
+        cudaStream_t stream = nullptr);
+
+    MODELDEPLOY_CXX_EXPORT bool draw_line_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        float x0, float y0, float x1, float y1,
+        uint8_t r, uint8_t g, uint8_t b, int thickness,
+        cudaStream_t stream = nullptr);
 }

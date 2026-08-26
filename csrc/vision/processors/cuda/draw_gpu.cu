@@ -466,6 +466,72 @@ namespace modeldeploy::vision {
         return sqrtf(dx * dx + dy * dy);
     }
 
+    __device__ __forceinline__ uint8_t blend_y(uint8_t cur, uint8_t newc, float alpha) {
+        return static_cast<uint8_t>(cur * (1.0f - alpha) + newc * alpha + 0.5f);
+    }
+    // 按 alpha 混合写入单个像素(Y + 关联 UV,同色良性竞争,与现有 place_nv12 一致)
+    __device__ __forceinline__ void blend_nv12(uint8_t* y, uint8_t* uv,
+                                                int w, int h, int step_y, int step_uv,
+                                                int px, int py, uint8_t yy, uint8_t uu, uint8_t vv,
+                                                float alpha) {
+        if (px < 0 || py < 0 || px >= w || py >= h) return;
+        uint8_t* pyy = y + static_cast<size_t>(py) * step_y + px;
+        *pyy = blend_y(*pyy, yy, alpha);
+        const int ux = px >> 1, uy = py >> 1;
+        if (uy < 0 || uy >= h / 2 || ux < 0 || ux >= w / 2) return;
+        uint8_t* p = uv + static_cast<size_t>(uy) * step_uv + static_cast<size_t>(ux) * 2;
+        p[0] = blend_y(p[0], uu, alpha);
+        p[1] = blend_y(p[1], vv, alpha);
+    }
+
+    // 点在多边形内(even-odd)
+    __device__ __forceinline__ bool point_in_poly(float px, float py,
+                                                   const float* xs, const float* ys, int npts) {
+        bool inside = false;
+        for (int i = 0, j = npts - 1; i < npts; j = i++) {
+            const bool yi = ys[i] > py, yj = ys[j] > py;
+            if (yi != yj) {
+                const float xc = (xs[j] - xs[i]) * (py - ys[i]) / (ys[j] - ys[i]) + xs[i];
+                if (px < xc) inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    __global__ void kernel_fill_rect_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                           int step_y, int step_uv,
+                                           int x0, int y0, int x1, int y1,
+                                           uint8_t yy, uint8_t uu, uint8_t vv, float alpha) {
+        const int px = blockIdx.x * blockDim.x + threadIdx.x;
+        const int py = blockIdx.y * blockDim.y + threadIdx.y;
+        if (px >= w || py >= h) return;
+        if (px >= x0 && px < x1 && py >= y0 && py < y1)
+            blend_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv, alpha);
+    }
+
+    __global__ void kernel_fill_polygon_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                              int step_y, int step_uv,
+                                              const float* xs, const float* ys, int npts,
+                                              uint8_t yy, uint8_t uu, uint8_t vv, float alpha) {
+        const int px = blockIdx.x * blockDim.x + threadIdx.x;
+        const int py = blockIdx.y * blockDim.y + threadIdx.y;
+        if (px >= w || py >= h) return;
+        if (point_in_poly(static_cast<float>(px) + 0.5f, static_cast<float>(py) + 0.5f, xs, ys, npts))
+            blend_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv, alpha);
+    }
+
+    __global__ void kernel_draw_line_nv12(uint8_t* y, uint8_t* uv, int w, int h,
+                                           int step_y, int step_uv,
+                                           float ax, float ay, float bx, float by, float half,
+                                           uint8_t yy, uint8_t uu, uint8_t vv) {
+        const int px = blockIdx.x * blockDim.x + threadIdx.x;
+        const int py = blockIdx.y * blockDim.y + threadIdx.y;
+        if (px >= w || py >= h) return;
+        const float d = dist_to_segment(static_cast<float>(px) + 0.5f,
+                                        static_cast<float>(py) + 0.5f, ax, ay, bx, by);
+        if (d <= half) place_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv);
+    }
+
     __global__ void kernel_draw_polygon_nv12(uint8_t* __restrict__ y, uint8_t* __restrict__ uv,
                                              int w, int h, int step_y, int step_uv,
                                              const float* __restrict__ xs, const float* __restrict__ ys,
@@ -647,6 +713,75 @@ namespace modeldeploy::vision {
         }
         cudaError_t sync = cudaStreamSynchronize(s);
         if (d_text) cudaFree(d_text);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
+    bool fill_rect_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                            int x0, int y0, int x1, int y1,
+                            uint8_t r, uint8_t g, uint8_t b, float alpha, cudaStream_t stream) {
+        if (!y || (!uv && h > 1) || w <= 0 || h <= 0) return false;
+        if (alpha < 0.0f) return false;
+        if (alpha > 1.0f) alpha = 1.0f;
+        uint8_t yy, uu, vv; rgb_to_yuv_601(r, g, b, &yy, &uu, &vv);
+        if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
+        if (x1 > w) x1 = w; if (y1 > h) y1 = h;
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        cudaError_t err = cudaSuccess;
+        if (x1 > x0 && y1 > y0) {
+            dim3 block(32, 4);
+            dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+            kernel_fill_rect_nv12<<<grid, block, 0, s>>>(
+                y, uv, w, h, step_y, step_uv, x0, y0, x1, y1, yy, uu, vv, alpha);
+            err = cudaGetLastError();
+        }
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
+    bool fill_polygon_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                               const float* xs, const float* ys, int npts,
+                               uint8_t r, uint8_t g, uint8_t b, float alpha, cudaStream_t stream) {
+        if (!y || (!uv && h > 1) || w <= 0 || h <= 0 || !xs || !ys || npts < 3) return false;
+        if (alpha < 0.0f) return false;
+        if (alpha > 1.0f) alpha = 1.0f;
+        uint8_t yy, uu, vv; rgb_to_yuv_601(r, g, b, &yy, &uu, &vv);
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        float* d_xs = nullptr; float* d_ys = nullptr;
+        const size_t sz = static_cast<size_t>(npts) * sizeof(float);
+        cudaError_t err = cudaMalloc(&d_xs, sz);
+        if (err == cudaSuccess) err = cudaMalloc(&d_ys, sz);
+        if (err == cudaSuccess) err = cudaMemcpyAsync(d_xs, xs, sz, cudaMemcpyHostToDevice, s);
+        if (err == cudaSuccess) err = cudaMemcpyAsync(d_ys, ys, sz, cudaMemcpyHostToDevice, s);
+        if (err == cudaSuccess) {
+            dim3 block(32, 4);
+            dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+            kernel_fill_polygon_nv12<<<grid, block, 0, s>>>(
+                y, uv, w, h, step_y, step_uv, d_xs, d_ys, npts, yy, uu, vv, alpha);
+            err = cudaGetLastError();
+        }
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (d_xs) cudaFree(d_xs);
+        if (d_ys) cudaFree(d_ys);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
+    bool draw_line_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                            float ax, float ay, float bx, float by,
+                            uint8_t r, uint8_t g, uint8_t b, int thickness, cudaStream_t stream) {
+        if (!y || (!uv && h > 1) || w <= 0 || h <= 0) return false;
+        uint8_t yy, uu, vv; rgb_to_yuv_601(r, g, b, &yy, &uu, &vv);
+        if (thickness <= 0) thickness = 1;
+        const float half = thickness * 0.5f;
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        dim3 block(32, 4);
+        dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+        kernel_draw_line_nv12<<<grid, block, 0, s>>>(
+            y, uv, w, h, step_y, step_uv, ax, ay, bx, by, half, yy, uu, vv);
+        cudaError_t err = cudaGetLastError();
+        cudaError_t sync = cudaStreamSynchronize(s);
         if (owned) cudaStreamDestroy(s);
         return err == cudaSuccess && sync == cudaSuccess;
     }
