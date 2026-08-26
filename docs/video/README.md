@@ -57,4 +57,39 @@ cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
 | 容器 | mp4 / flv / rtmp / rtsp |
 | 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
 
+## 设备侧 NV12 可视化（GPU 就地绘制）
+
+支持「解码 → 设备 NV12 就地绘制 → GPU 直编」的全设备流水线，免 D2H/H2D 往返：
+
+- `VisionProcessorBackend` 提供高层设备接口 `vis_*_nv12`（det/obb/pose/keypoints/hand/ocr/lpr/attr/cls/iseg/sem/depth），
+  语义与 CPU `vis_*` 一致（框/骨架/四边形/文本/调色板/半透明/字体），就地写设备 NV12 帧。
+- **CUDA 后端**已实现：自研 CUDA 内核（填充矩形/多边形、线段、CJK 位图文本、语义/深度/实例 mask 叠加），
+  内置 CJK 位图字库（由 `tools/gen_cjk_font.py` 从 ttf 生成，无需运行时字体/FreeType）。
+- C API `md_draw_result` 对设备 NV12 帧自动走此路径；设备后端不可用且回退 CPU 无法绘设备内存时返回 `MD_ERR_NOT_IMPLEMENTED`。
+- 文本用内置 16px 位图（`font_size=1` 缩放），`node.font_path`/`save_result` 对设备路径忽略。
+
+**Sophgo(TPU)**:设备接口已声明于 `SophgoProcessorBackend`,bmcv 实现与真机验证待 `.243` 构建容器可用后补（见 AGENTS.md 的 TPU 约定）。
+
+## 构建要点
+
+```bash
+cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
+      -DENABLE_FFMPEG=ON -DENABLE_GSTREAMER=OFF ...
+```
+
+- `BUILD_VIDEO=ON` 必须配 `BUILD_VISION=ON`；FFmpeg 或 GStreamer 至少一个。
+- 需要 FFmpeg/GStreamer 开发库，找不到时 `BUILD_VIDEO` 自动关闭。
+
+## 支持矩阵
+
+| 项 | 取值 |
+|----|------|
+| 后端 | FFmpeg（默认）、GStreamer、Auto |
+| 硬件加速 | Auto / None / Cuda / Vaapi / Sophgo |
+| 解码硬解 | `h264_cuvid` `hevc_cuvid` `av1_cuvid`、VAAPI、GStreamer `nvcodec` |
+| 编码 | `libx264` `x264enc`（软）、`h264_nvenc` `nvh264enc` `vaapih264enc`（硬） |
+| 设备绘制 | CUDA 全部 `vis_*_nv12`；Sophgo 待补 |
+| 容器 | mp4 / flv / rtmp / rtsp |
+| 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
+
 > 返回 [文档中心](../README.md)
