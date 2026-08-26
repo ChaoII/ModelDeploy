@@ -13,6 +13,7 @@
 #include <catch2/catch_approx.hpp>
 
 #include "capi/md_capi.h"
+#include "csrc/vision/common/basic_types.h"
 
 #include <cmath>
 #include <cstring>
@@ -1717,3 +1718,47 @@ TEST_CASE("capi validate ptr GPU", "[capi][gpu]") {
     cudaFree(d);
 }
 #endif
+
+// Task 2：capi to_host_bytes / plane_bytes —— 暴露 ImageData::to_native_bytes 的原生连续字节。
+// 注：capi 头无 MdImageType 枚举（纯 C），用 C++ 端 md_capi 内部同源枚举值；MD_IMAGE 类型数值
+// 由 md_image_info 契约给出（PKG_BGR_U8=22）。NV12 两平面用 md_image_from_nv12_owned（保留 NV12
+// 类型），md_image_from_nv12 会转 CPU BGR 单平面。
+TEST_CASE("capi to_host_bytes BGR24", "[capi]") {
+    int w = 4, h = 3;
+    std::vector<unsigned char> bgr(static_cast<size_t>(w) * h * 3);
+    for (size_t i = 0; i < bgr.size(); ++i) bgr[i] = static_cast<unsigned char>(i);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+    const unsigned char* buf = nullptr; size_t n = 0; int fmt = -1;
+    REQUIRE(md_image_to_host_bytes(img, &buf, &n, &fmt) == MD_OK);
+    REQUIRE(n == bgr.size());
+    REQUIRE(fmt == static_cast<int>(MdImageType::PKG_BGR_U8));
+    REQUIRE(std::memcmp(buf, bgr.data(), n) == 0);
+    md_image_destroy(img);
+}
+
+TEST_CASE("capi plane_bytes BGR24/NV12", "[capi]") {
+    int w = 4, h = 2;
+    std::vector<unsigned char> bgr(static_cast<size_t>(w) * h * 3, 7);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_bgr24(&img, bgr.data(), w, h) == MD_OK);
+    const unsigned char* buf = nullptr; size_t n = 0; int step = 0;
+    REQUIRE(md_image_plane_bytes(img, 0, &buf, &n, &step) == MD_OK);
+    REQUIRE(n == bgr.size());
+    REQUIRE(step == w * 3);
+    REQUIRE(md_image_plane_bytes(img, 1, &buf, &n, &step) == MD_ERR_INVALID_ARGUMENT);
+    md_image_destroy(img);
+
+    std::vector<unsigned char> y(static_cast<size_t>(w) * h, 1);
+    std::vector<unsigned char> uv(static_cast<size_t>(w) * (h / 2), 2);
+    MDImageHandle nv = nullptr;
+    REQUIRE(md_image_from_nv12_owned(&nv, y.data(), uv.data(), w, h, 0, 0) == MD_OK);
+    const unsigned char* p0 = nullptr; size_t n0 = 0; int s0 = 0;
+    const unsigned char* p1 = nullptr; size_t n1 = 0; int s1 = 0;
+    REQUIRE(md_image_plane_bytes(nv, 0, &p0, &n0, &s0) == MD_OK);
+    REQUIRE(md_image_plane_bytes(nv, 1, &p1, &n1, &s1) == MD_OK);
+    REQUIRE(n0 == y.size()); REQUIRE(s0 == w);
+    REQUIRE(n1 == uv.size()); REQUIRE(s1 == w);
+    REQUIRE(md_image_plane_bytes(nv, 2, &p0, &n0, &s0) == MD_ERR_INVALID_ARGUMENT);
+    md_image_destroy(nv);
+}

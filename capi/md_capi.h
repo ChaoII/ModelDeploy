@@ -186,6 +186,9 @@ MD_CAPI_EXPORT MDStatus md_image_save(MDImageHandle, const char* path);
 MD_CAPI_EXPORT MDStatus md_image_encode(MDImageHandle, const char* ext,
                          const unsigned char** buf, size_t* n);
 
+MD_CAPI_EXPORT MDStatus md_image_to_host_bytes(MDImageHandle, const unsigned char** buf, size_t* n, int* format);
+MD_CAPI_EXPORT MDStatus md_image_plane_bytes(MDImageHandle, int i, const unsigned char** buf, size_t* n, int* step);
+
 MD_CAPI_EXPORT void md_image_destroy(MDImageHandle);
 
 /* 图像尺寸查询 */

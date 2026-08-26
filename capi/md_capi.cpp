@@ -97,6 +97,7 @@ struct md_image_handle {
     unsigned char* data = nullptr;
     modeldeploy::vision::ImageData image;  // 统一描述：CPU BGR（包 data）或设备 NV12 帧（零拷贝借用）
     std::unique_ptr<std::vector<unsigned char>> encoded;  // encode 输出暂存
+    std::unique_ptr<std::vector<unsigned char>> native;   // to_host_bytes 输出暂存
     ~md_image_handle() { if (owns_data) delete[] data; }
 };
 
@@ -881,6 +882,69 @@ MDStatus md_image_encode(MDImageHandle h, const char* ext,
     *buf = encoded->data();
     *n = encoded->size();
     hi->encoded = std::move(encoded);
+    return MD_OK;
+}
+
+namespace {
+    // to_native_bytes 缓冲中平面 i 的几何：偏移/字节数/行距。单平面情形 size/step 由调用方回填。
+    bool image_plane_geometry(const MdImageType fmt, int w, int h,
+                              size_t i, size_t* off, size_t* size, int* step) {
+        const size_t wh = static_cast<size_t>(w) * static_cast<size_t>(h);
+        if (i == 0) *off = 0;
+        if (fmt == MdImageType::NV12 || fmt == MdImageType::NV21) {
+            if (i > 1) return false;
+            if (i == 1) *off = wh;
+            *size = (i == 0) ? wh : wh / 2;
+            *step = w;
+            return true;
+        }
+        if (fmt == MdImageType::I420) {
+            if (i > 2) return false;
+            if (i == 1) *off = wh;
+            else if (i == 2) *off = wh + wh / 4;
+            *size = (i == 0) ? wh : wh / 4;
+            *step = (i == 0) ? w : w / 2;
+            return true;
+        }
+        return (i == 0);  // packed/gray/planar：单平面视图，size/step 由调用方回填
+    }
+}
+
+MDStatus md_image_to_host_bytes(MDImageHandle h, const unsigned char** buf, size_t* n, int* format) {
+    auto* hi = static_cast<md_image_handle*>(h);
+    if (!hi || !buf || !n) return MD_ERR_NULL_POINTER;
+    auto bytes = hi->image.to_native_bytes();
+    if (bytes.empty()) return MD_ERR_UNSUPPORTED_TYPE;
+    if (!hi->native) hi->native = std::make_unique<std::vector<unsigned char>>();
+    *hi->native = std::move(bytes);
+    *buf = hi->native->data();
+    *n = hi->native->size();
+    if (format) *format = static_cast<int>(hi->image.type());
+    return MD_OK;
+}
+
+MDStatus md_image_plane_bytes(MDImageHandle h, int i, const unsigned char** buf, size_t* n, int* step) {
+    auto* hi = static_cast<md_image_handle*>(h);
+    if (!hi || !buf || !n || !step) return MD_ERR_NULL_POINTER;
+    if (i < 0 || static_cast<size_t>(i) >= hi->image.plane_count()) return MD_ERR_INVALID_ARGUMENT;
+    const unsigned char* whole = nullptr; size_t whole_n = 0;
+    MDStatus st = md_image_to_host_bytes(h, &whole, &whole_n, nullptr);
+    if (st != MD_OK) return st;
+    size_t off = 0, size = 0; int row_step = 0;
+    if (!image_plane_geometry(hi->image.type(), hi->width, hi->height,
+                              static_cast<size_t>(i), &off, &size, &row_step)) {
+        return MD_ERR_UNSUPPORTED_TYPE;
+    }
+    const auto np = hi->image.plane_count();
+    if (np == 1) {  // packed/gray/planar 单平面
+        *buf = whole;
+        *n = whole_n;
+        *step = hi->image.plane(0).step > 0 ? hi->image.plane(0).step : hi->width;
+    } else {        // NV12/NV21/I420 多平面
+        *buf = whole + off;
+        *n = size;
+        *step = row_step;
+    }
     return MD_OK;
 }
 
