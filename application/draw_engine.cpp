@@ -61,6 +61,39 @@ void DrawEngine::draw_face(ImageData& image, const InferResult& result) {
     vis_keypoints(image, kp_results, cfg_.font_path, 12, 3, 0.15, false, false);
 }
 
+namespace {
+    // 与 vis_det 一致的 label_id → RGB 颜色（确定性调色板；CPU NV12 primitive 路径使用）
+    void color_for_label(int label_id, uint8_t* rgb) {
+        static const uint8_t palette[8][3] = {
+            {0, 0, 255},       // red
+            {0, 255, 0},       // green
+            {255, 0, 0},       // blue
+            {0, 255, 255},     // yellow
+            {255, 0, 255},     // magenta
+            {255, 255, 0},     // cyan
+            {0, 165, 255},     // orange
+            {255, 128, 0},     // violet
+        };
+        const auto* c = palette[static_cast<unsigned>(label_id % 8)];
+        rgb[0] = c[2];   // r
+        rgb[1] = c[1];   // g
+        rgb[2] = c[0];   // b
+    }
+
+    std::string format_label(const DetectionBox& b, bool show_label, bool show_score) {
+        std::string label;
+        if (show_label) {
+            label = b.label_name.empty() ? std::to_string(b.label_id) : b.label_name;
+        }
+        if (show_score) {
+            if (!label.empty()) label += ": ";
+            label += std::to_string(b.score).substr(0, 4);
+        }
+        if (label.size() > 31) label.resize(31);
+        return label;
+    }
+}
+
 bool DrawEngine::draw_gpu(ImageData& image,
                           const std::vector<InferResult>& results,
                           bool show_label, bool show_score) {
@@ -103,8 +136,30 @@ bool DrawEngine::draw_gpu(ImageData& image,
         if (!device_ready) return false;
     }
 
+    // CPU NV12：走 primitive 路径（CpuProcessorBackend 仅实现 draw_rect_nv12/draw_text_nv12，
+    // 无 vis_det_nv12/vis_keypoints_nv12 → 高层路径会返回 false 且什么都不画，属回归）。
+    if (device == modeldeploy::Device::CPU) {
+        bool any = false;
+        uint8_t rgb[3];
+        const float threshold = show_score ? 0.0f : 0.5f;   // 与 draw_detection 阈值一致
+        for (const auto& r : results) {
+            if (r.type != "detection") continue;
+            for (const auto& b : r.boxes) {
+                if (b.score < threshold) continue;
+                color_for_label(b.label_id, rgb);
+                backend->draw_rect_nv12(image, b.x, b.y, b.w, b.h, rgb[0], rgb[1], rgb[2], 2);
+                if (show_label) {
+                    const std::string label = format_label(b, show_label, show_score);
+                    backend->draw_text_nv12(image, b.x, std::max(0.0f, b.y - 16), label, 255, 255, 255, 1);
+                }
+                any = true;
+            }
+        }
+        return any || results.empty();
+    }
+
+    // 设备（GPU/TPU）NV12：高层设备绘制，与 CPU vis_* 语义一致（整框填充 + 类色 + 标签 + 阈值）
     bool any = false;
-    // 高层设备绘制:与 CPU vis_* 语义一致(整框填充 + 类色 + 标签 + 阈值)
     VisionProcessorBackend::VisOptions vo;
     vo.threshold = show_score ? 0.0 : 0.5;
     vo.alpha = 0.15;

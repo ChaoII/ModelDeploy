@@ -3867,7 +3867,8 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
             return MD_ERR_NOT_IMPLEMENTED;
         }
         // 设备分支：就地绘制，不实现 D2H 存图（save_result/font_path 对设备绘制忽略）。
-        // iseg/sem/depth 的 device 方法现为桩（返回 false），阶段 2 填实后自然转 MD_OK。
+        // iseg/sem/depth 的 CUDA device 方法已实现；Sophgo 等其他设备后端若未实现该
+        // vis_*_nv12 仍会返回 false 并转 MD_ERR_INVALID_ARGUMENT。
         modeldeploy::vision::VisionProcessorBackend::VisOptions vo;
         vo.threshold = threshold;
         vo.font_size = font_size;
@@ -3933,8 +3934,9 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
             }
             case MD_RES_CLASSIFICATION: {
                 auto* d = raw_result<ClassifyResult>(rh);
-                if (d && !d->v.empty()) {
-                    ok = draw_backend->vis_cls_nv12(image, d->v[0], vo, 1);
+                if (d) {
+                    // 空分类结果与 CPU 分支一致视为无绘制的成功，而非错误。
+                    ok = d->v.empty() ? true : draw_backend->vis_cls_nv12(image, d->v[0], vo, 1);
                 }
                 break;
             }

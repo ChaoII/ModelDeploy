@@ -24,6 +24,8 @@ constexpr uint8_t kClassPalette[20][3] = {
     {255, 154, 161}, {107, 174, 214}, {222, 125, 44}, {152, 78, 163},
     {191, 119, 0}, {32, 74, 135}, {204, 154, 72}, {188, 143, 143}
 };
+// label_id 可能为负（无效类别）→ C++ % 结果也为负，`label_id % 20` 会前越界读数组；钳到 [0,20)
+static inline int palette_idx(int label_id) { return label_id >= 0 ? label_id % 20 : 0; }
 
 std::string label_name(const modeldeploy::vision::VisionProcessorBackend::VisOptions& opt, int label_id) {
     auto it = opt.label_map.find(label_id);
@@ -394,7 +396,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             const int x0 = static_cast<int>(r.box.x), y0 = static_cast<int>(r.box.y);
             const int x1 = x0 + static_cast<int>(r.box.width), y1 = y0 + static_cast<int>(r.box.height);
             ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
@@ -419,7 +421,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             // 旋转矩形 → 4 角点(OpenCV RotatedRect 约定:angle 为度数,绕中心逆时针)
             const double ang = r.rotated_box.angle * 3.14159265358979323846 / 180.0;
             const float cs = static_cast<float>(std::cos(ang));
@@ -459,7 +461,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                     (int)r.box.x, (int)r.box.y,
                                     (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
@@ -487,7 +489,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                     (int)r.box.x, (int)r.box.y,
                                     (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
@@ -513,7 +515,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                     (int)r.box.x, (int)r.box.y,
                                     (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
@@ -563,7 +565,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                     (int)r.box.x, (int)r.box.y,
                                     (int)(r.box.x + r.box.width), (int)(r.box.y + r.box.height),
@@ -637,7 +639,7 @@ namespace modeldeploy::vision {
         const size_t n = std::min(result.label_ids.size(), result.scores.size());
         for (size_t i = 0; i < n && drawn < top_k; ++i) {
             if (result.scores[i] < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[result.label_ids[i] % 20];
+            const uint8_t* c = kClassPalette[palette_idx(result.label_ids[i])];
             const float y = static_cast<float>(margin + drawn * 16);
             std::string label = std::to_string(result.label_ids[i]) + ": " + score_str(result.scores[i]);
             // 半透明底色块 + 白字
@@ -661,7 +663,7 @@ namespace modeldeploy::vision {
         bool ok = true;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
-            const uint8_t* c = kClassPalette[r.label_id % 20];
+            const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
             ok = draw_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                     r.box.x, r.box.y, r.box.width, r.box.height,
                                     c[0], c[1], c[2], 2, s) && ok;
