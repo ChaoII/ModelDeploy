@@ -61,7 +61,7 @@ bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
 }
 
 bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
-    // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi)
+    // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi), 3=算能 BM(h264_bm/h265_bm)
     struct Opt { std::string name; int kind; };
     std::vector<Opt> candidates;
     if (cfg_.codec == "auto") {
@@ -81,6 +81,9 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
         candidates.push_back({"h264_nvenc", 1});
     } else if (cfg_.codec == "libx264") {
         candidates.push_back({"libx264", 0});
+    } else if (cfg_.codec == "h264_bm" || cfg_.codec == "h265_bm" || cfg_.codec == "hevc_bm") {
+        // 算能 BM 硬件编码器（仅当 SDK 链接 sophon-ffmpeg 时 avcodec 存在；NV12 输入）
+        candidates.push_back({cfg_.codec, 3});
 #ifdef ENABLE_VAAPI
     } else if (cfg_.codec == "vaapih264enc" || cfg_.codec == "h264_vaapi") {
         // VAAPI 编码器（GStreamer 名 vaapih264enc 与 FFmpeg 名 h264_vaapi 都映射到 FFmpeg h264_vaapi）
@@ -103,7 +106,8 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
         }
         // 候选打开失败：显式 nvenc/vaapi 必须报错（不静默换软编）；auto 时继续尝试下一候选（软编回退）
         if (cfg_.codec == "h264_nvenc" || cfg_.codec == "vaapih264enc" ||
-            cfg_.codec == "h264_vaapi") {
+            cfg_.codec == "h264_vaapi" || cfg_.codec == "h264_bm" ||
+            cfg_.codec == "h265_bm" || cfg_.codec == "hevc_bm") {
             set_err(err, "encoder-open-fail");
             return false;
         }
@@ -121,7 +125,9 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
     enc_->height = h;
     enc_->time_base = {1, fps};
     enc_->framerate = {fps, 1};
-    const bool hw = (kind != 0);
+    // BM（kind 3）是普通 libavcodec 硬件编码器：吃 CPU NV12 帧，无需 hw_frames_ctx。
+    // hw 特指需要 hw_frames_ctx 挂设备上下文的标准（NVENC/VAAPI）。
+    const bool hw = (kind == 1 || kind == 2);
 #ifdef ENABLE_VAAPI
     const bool vaapi = (kind == 2);
 #else
@@ -131,7 +137,7 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
     // 软编 libx264 用 YUV420P，普通 nvenc（CPU NV12 上传）与 VAAPI 均用 NV12。
     const bool gpu_direct = (kind == 1) && cfg_.gpu_direct_input;
     const AVPixelFormat enc_fmt = kind == 1 ? (gpu_direct ? AV_PIX_FMT_CUDA : AV_PIX_FMT_NV12)
-                                            : (vaapi ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P);
+                                            : ((kind == 3 || vaapi) ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P);
     enc_->pix_fmt = enc_fmt;
     enc_->gop_size = cfg_.gop;
     enc_->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
@@ -178,7 +184,7 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
             return false;
 #endif
         }
-    } else {
+    } else if (kind == 0) {  // 软编 libx264：preset / zerolatency
         enc_->profile = FF_PROFILE_H264_MAIN;
         enc_->level = 41;
         av_opt_set(enc_->priv_data, "preset",
@@ -192,8 +198,8 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
         enc_ = nullptr;
         return false;
     }
-    // sws 输出的 CPU 中间/帧格式：nvenc（含 GPU 直编）与 VAAPI 输入 CPU 平面为 NV12，软编为 YUV420P
-    const AVPixelFormat cpu_fmt = hw ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P;
+    // sws 输出的 CPU 中间/帧格式：nvenc（含 GPU 直编）、BM 与 VAAPI 输入 CPU 平面为 NV12，软编为 YUV420P
+    const AVPixelFormat cpu_fmt = (kind == 0) ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_NV12;
     dst_fmt_ = cpu_fmt;
     frame_ = av_frame_alloc();
     if (!frame_) return false;

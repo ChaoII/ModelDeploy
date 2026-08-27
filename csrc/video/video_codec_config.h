@@ -33,7 +33,7 @@ struct VideoEncoderConfig : VideoCodecConfig {
     int fps = 0;                 // 0=自动
     int bitrate_kbps = 2500;
     int gop = 12;
-    std::string codec = "auto";  // auto/libx264/x264enc/h264_nvenc/nvh264enc/vaapih264enc
+    std::string codec = "auto";  // auto/libx264/x264enc/h264_nvenc/nvh264enc/vaapih264enc/h264_bm/h265_bm
     std::string preset = "ultrafast";
     std::string format = "auto"; // auto/rtsp/rtmp/flv/mp4
     int max_b_frames = 0;
