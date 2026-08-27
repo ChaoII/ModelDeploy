@@ -52,8 +52,8 @@ public:
 #endif
     }
 
-    // 静态探测：gst_init 一次 + 检查编码所需插件（appsrc/x264enc/mp4mux 等）可实例化
-    static bool gstreamer_x264_available();
+    // 静态探测：gst_init 一次 + 检查编码所需插件（appsrc/videoconvert/x264enc/mp4mux 等）可实例化
+    static bool x264_and_mux_available();
     // 静态探测：nvcodec 硬编插件 nvh264enc 可实例化（复用 H0 同款 gst_element_factory_find 检查）
     static bool nvh264enc_available();
     // 静态探测：Jetson L4T V4L2 硬编插件 nvv4l2h264enc 可实例化（桌面 gst-plugins-bad 无此插件）

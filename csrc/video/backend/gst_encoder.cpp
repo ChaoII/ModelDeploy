@@ -56,9 +56,17 @@ GstEncoder::~GstEncoder() {
     teardown();
 }
 
-bool GstEncoder::runtime_available() const { return gstreamer_x264_available(); }
+bool GstEncoder::runtime_available() const {
+    // 任一编码元素可用即视为后端可用：软编 x264enc、nvh264enc、L4T nvv4l2h264enc、算能 bmh264enc。
+    // 不同平台 gstreamer 的编码插件集不同（如 Sophgo linaro 可能无 x264enc 但有 bmh264enc）。
+    if (x264_and_mux_available()) return true;
+    if (nvh264enc_available() ||
+        nvv4l2h264enc_available() ||
+        bmh264enc_available()) return true;
+    return false;
+}
 
-bool GstEncoder::gstreamer_x264_available() {
+bool GstEncoder::x264_and_mux_available() {
     md_gst_init_once();
     if (!g_gst_initialized.load()) return false;
     bool ok = true;
@@ -179,7 +187,7 @@ int GstEncoder::resolve_encoder(std::string* err) {
         return -1;
     }
 #endif
-    if (choice == 0 && !gstreamer_x264_available()) {
+    if (choice == 0 && !x264_and_mux_available()) {
         set_err(err, "no-x264enc");
         return -1;
     }
