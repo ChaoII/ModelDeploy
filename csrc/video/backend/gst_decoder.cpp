@@ -245,8 +245,22 @@ bool GstDecoder::bmdec_available() {
 // （device_only_active_ 保持 false，bm_hw_active_ 标记本次会话为 BM 硬解）。底层 BM VPU 硬件解码。
 bool GstDecoder::build_bm_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
-    std::string launch = "filesrc location=\"" + url +
-                         "\" ! h264parse ! bmdec ! videoconvert "
+    // bmdec 只吃 byte-stream 的裸 H264。mp4/mov 容器（文件 magic 4 字节偏移处为 "ftyp"）须先
+    // qtdemux 拆容器转成 byte-stream；裸 h264/.264/.h264 流则直接 h264parse。
+    bool mp4_container = false;
+    {
+        FILE* f = fopen(url.c_str(), "rb");
+        if (f) {
+            unsigned char magic[8] = {0};
+            size_t got = fread(magic, 1, 8, f);
+            fclose(f);
+            if (got >= 8 && magic[4] == 'f' && magic[5] == 't' && magic[6] == 'y' && magic[7] == 'p')
+                mp4_container = true;
+        }
+    }
+    std::string launch = "filesrc location=\"" + url + "\" ! " +
+                         (mp4_container ? "qtdemux ! " : "") +
+                         "h264parse ! bmdec ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
