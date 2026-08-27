@@ -227,16 +227,32 @@ encode（GPU 直编 D2D，编码器以设备帧为输入，h264_nvenc）
 ```jsonc
 {
   "decoder": {
-    "hw_accel": "sophgo",      // 映射为 SDK Auto，由平台选择硬件加速路径
+    "hw_accel": "sophgo",
+    "backend": "gstreamer",
     "device_only": false
   },
   "encoder": {
-    "codec": "libx264",        // TPU 侧建议软编，避免额外硬件编码依赖
-    "format": "flv",
+    "codec": "bmh264enc",       // 或 libx264 软编；bmh264enc 为 Sophgo BM VPU 硬编
+    "format": "mp4",
     "bitrate_kbps": 2500
   }
 }
 ```
+
+> **Sophgo 原生硬件编解码（GStreamer bmcodec）**：SDK 的 GStreamer 后端在 Sophgo 上接线
+> `bmdec`（VPU 硬解 → 主机 NV12）与 `bmh264enc`（BM VPU 硬编）。需运行期设置
+> `GST_PLUGIN_PATH=/opt/sophon/sophon-gstreamer_2.2.0/lib`，且 SDK 构建需 `-DENABLE_GSTREAMER=ON`
+> （Sophgo 系统 gstreamer dev 齐全）。
+>
+> 真机实测（1080p30 源 / linaro，sophgo cache，`zhgd_int8` 模型）：
+> - 独立：bmh264enc 硬编 **86.9fps**（11.5ms/帧）；bmdec 硬解 **25fps 实时**（1500/1500 帧，39.9ms/帧 appsink 节拍）。
+> - 全链路：硬解(39.9ms,appsink 节拍) + TPU 推理(12.4ms) + 硬编(1.2ms)，**fps≈25 实时**，SDK 零丢弃。
+>
+> 说明：
+> - `bmdec` 解码帧是 GBM/DMA-BUF 宿主映射内存，BMCV 逐个访问其 host 映射极慢（前处理 66ms）；SDK
+>   `read_one_frame` 对主机 NV12 **无条件拷入紧致连续堆缓冲**（GBM 帧 66→8.4ms；软解 CPU 帧另多 ~1-2ms，
+>   可忽略），消除该瓶颈。
+> - 后端收到 `hw_accel=Auto` 时，decodebin 在 Sophgo 会自动选中 bmdec 产 GBM 帧——同样受益于上述堆拷贝。
 
 > **Sophgo 分类模型注意**：Sophgo int8 bmodel 多属 batch=1 静态形状，分类模型在 SDK 侧需
 > `set_cls_batch_size(1)`（AGENTS 约定），否则静态 batch 不匹配会推理失败。
