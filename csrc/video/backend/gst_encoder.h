@@ -43,12 +43,12 @@ public:
     std::string last_error() const override;
     void close() override;
 
-    // 本次会话是否实际启用了硬件（nvh264enc / nvv4l2h264enc / vaapih264enc）编码器；false 表示软编（x264enc）
+    // 本次会话是否实际启用了硬件（nvh264enc / nvv4l2h264enc / bmh264enc / vaapih264enc）编码器；false 表示软编（x264enc）
     bool used_hw() const {
 #ifdef ENABLE_VAAPI
-        return encoder_is_nv_ || encoder_is_l4t_ || encoder_is_vaapi_;
+        return encoder_is_nv_ || encoder_is_l4t_ || encoder_is_vaapi_ || encoder_is_bm_;
 #else
-        return encoder_is_nv_ || encoder_is_l4t_;
+        return encoder_is_nv_ || encoder_is_l4t_ || encoder_is_bm_;
 #endif
     }
 
@@ -58,6 +58,8 @@ public:
     static bool nvh264enc_available();
     // 静态探测：Jetson L4T V4L2 硬编插件 nvv4l2h264enc 可实例化（桌面 gst-plugins-bad 无此插件）
     static bool nvv4l2h264enc_available();
+    // 静态探测：算能 BM H264 硬编插件 bmh264enc（SOPHGO）可实例化（sophon-gstreamer）
+    static bool bmh264enc_available();
 #ifdef ENABLE_VAAPI
     // 静态探测：vaapih264enc 插件可实例化（未在本机验证，需 Linux GStreamer vaapi 插件）
     static bool vaapih264enc_available();
@@ -83,6 +85,7 @@ private:
     uint64_t pts_ = 0;
     bool encoder_is_nv_ = false;      // 本次会话是否实际用了 nvh264enc 硬编
     bool encoder_is_l4t_ = false;     // 本次会话是否实际用了 nvv4l2h264enc（Jetson L4T V4L2）硬编
+    bool encoder_is_bm_ = false;      // 本次会话是否实际用了 bmh264enc（算能 SOPHGO）硬编
 #ifdef ENABLE_VAAPI
     bool encoder_is_vaapi_ = false;   // 本次会话是否实际用了 vaapih264enc 硬编
 #endif
