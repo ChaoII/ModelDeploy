@@ -474,43 +474,26 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
         gst_sample_unref(sample);
         return false;
     }
-    if (bm_hw_active_) {
-        // 算能 BM 硬解（bmdec）：解码缓冲是 GBM/DMA-BUF 映射内存，下游 BMCV 逐次访问其 host
-        // 映射极慢（实测 BMCV 前处理 66ms vs 普通堆 8.6ms）。故拷进自有连续堆缓冲（~3MB memcpy
-        // ≈1-2ms），BMCV 立即回到正常速度；拷贝后可直接 unmap，无需 owner 保活映射缓冲。
-        const int W = w_, H = h_;
-        const size_t ysz = static_cast<size_t>(W) * H;
-        const size_t uvsz = static_cast<size_t>(W) * H / 2;
-        auto buf = std::shared_ptr<uint8_t>(new uint8_t[ysz + uvsz], [](uint8_t* p) { delete[] p; });
-        uint8_t* dst = buf.get();
-        const uint8_t* sy = static_cast<const uint8_t*>(frame.data[0]);
-        const uint8_t* su = static_cast<const uint8_t*>(frame.data[1]);
-        const int sy_step = frame.info.stride[0];
-        const int su_step = frame.info.stride[1];
-        for (int r = 0; r < H; ++r) memcpy(dst + r * W, sy + r * sy_step, W);
-        for (int r = 0; r < H / 2; ++r) memcpy(dst + ysz + r * W, su + r * su_step, W);
-        gst_video_frame_unmap(&frame);
-        gst_sample_unref(sample);
-        modeldeploy::vision::ImageData::Plane pl[2] = { {dst, W}, {dst + static_cast<ptrdiff_t>(ysz), W} };
-        out->image = modeldeploy::vision::ImageData::from_planes(pl, 2, MdImageType::NV12,
-                                                                 W, H, Device::CPU, buf);
-        out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
-                          ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
-                          : 0;
-        stats_.frames_out++;
-        return true;
-    }
-    // owner 在 ImageData 生命周期内保活映射的缓冲；最后一次引用释放时 unmap + 释放 sample。
-    std::shared_ptr<void> owner(
-        frame.data[0],
-        [frame, sample](void*) mutable {
-            gst_video_frame_unmap(&frame);
-            gst_sample_unref(sample);
-        });
-    IPlaneView v{static_cast<const uint8_t*>(frame.data[0]), frame.info.stride[0],
-                 static_cast<const uint8_t*>(frame.data[1]), frame.info.stride[1],
-                 w_, h_, Device::CPU, owner};
-    out->image = make_image_from_planes_view(v);
+    // 标准主机 NV12 取帧：统一拷入自有连续堆缓冲。原因：bmdec（GBM/DMA-BUF）解码缓冲的
+    // host 映射被下游 BMCV 逐次访问极慢（实测 BMCV 前处理 66ms vs 普通堆 8.6ms）；软解
+    // decodebin 在部分平台亦会自动选中 bmdec 产出 GBM 帧。故无论来源统一拷为紧致堆缓冲，
+    // BMCV 立即回到正常速度，且无需 owner 保活映射缓冲（~3MB memcpy ≈1-2ms 可忽略）。
+    const int W = w_, H = h_;
+    const size_t ysz = static_cast<size_t>(W) * H;
+    const size_t uvsz = static_cast<size_t>(W) * H / 2;
+    auto buf = std::shared_ptr<uint8_t>(new uint8_t[ysz + uvsz], [](uint8_t* p) { delete[] p; });
+    uint8_t* dst = buf.get();
+    const uint8_t* sy = static_cast<const uint8_t*>(frame.data[0]);
+    const uint8_t* su = static_cast<const uint8_t*>(frame.data[1]);
+    const int sy_step = frame.info.stride[0];
+    const int su_step = frame.info.stride[1];
+    for (int r = 0; r < H; ++r) memcpy(dst + r * W, sy + r * sy_step, W);
+    for (int r = 0; r < H / 2; ++r) memcpy(dst + ysz + r * W, su + r * su_step, W);
+    gst_video_frame_unmap(&frame);
+    gst_sample_unref(sample);
+    modeldeploy::vision::ImageData::Plane pl[2] = { {dst, W}, {dst + static_cast<ptrdiff_t>(ysz), W} };
+    out->image = modeldeploy::vision::ImageData::from_planes(pl, 2, MdImageType::NV12,
+                                                             W, H, Device::CPU, buf);
     out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
                       ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
                       : 0;
