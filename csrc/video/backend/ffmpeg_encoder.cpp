@@ -25,7 +25,12 @@ FfmpegEncoder::FfmpegEncoder(const VideoEncoderConfig& cfg) : cfg_(cfg) {}
 FfmpegEncoder::~FfmpegEncoder() { cleanup(); }
 
 bool FfmpegEncoder::runtime_available() const {
-    return avcodec_find_encoder_by_name("libx264") != nullptr;
+    // 任一候选编码器可用即视为后端可用：软编 libx264、NVENC、OPMEDIA(h264_sophon)、BM 硬编等。
+    // 不同平台 ffmpeg 内置的编码器集不同（如 sophon-ffmpeg 无 libx264 但有 h264_bm）。
+    const char* names[] = {"libx264", "h264_nvenc", "h264_v4l2m2m", "h264_bm", "h265_bm", "h264_sophon"};
+    for (const char* n : names)
+        if (avcodec_find_encoder_by_name(n) != nullptr) return true;
+    return false;
 }
 
 bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
