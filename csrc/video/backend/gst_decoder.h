@@ -82,9 +82,9 @@ private:
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
     bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
+    bool bm_hw_active_ = false;        // 算能 SOPHGO BM 硬件解码（bmdec → 主机 NV12）
 #ifdef HAVE_NVBUF
     bool l4t_hw_active_ = false;   // Jetson L4T 硬件解码（nvv4l2decoder → nvvidconv → 主机 NV12）
-    bool bm_hw_active_ = false;    // 算能 SOPHGO BM 硬件解码（bmdec → 主机 NV12）
 #endif
 #ifdef ENABLE_VAAPI
     bool vaapi_active_ = false;  // 本次会话是否实际用 VAAPI 硬解
