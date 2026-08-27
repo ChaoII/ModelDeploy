@@ -12,6 +12,7 @@ EncodeTopology parse_topology(const std::string& s) {
 
 HwAccel hw_from_string(const std::string& dev) {
     if (dev == "cuda") return HwAccel::Cuda;
+    if (dev == "sophgo") return HwAccel::Sophgo;
     if (dev == "none" || dev.empty()) return HwAccel::None;
     return HwAccel::Auto;
 }

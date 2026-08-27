@@ -80,9 +80,19 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         state_ = State::Error;
         return false;
     }
-    // Sophgo：GStreamer 无对应解码插件（未实现/未验证），fail-closed 不静默软解。
+    // 算能 SOPHGO：BM VPU 硬件解码（bmdec → videoconvert → 主机 NV12，复用软解 read 路径）。
+    // 显式 Sophgo 失败/无 bmdec → fail-closed，不静默软解。
     if (cfg_.hw_accel == HwAccel::Sophgo) {
-        set_err(err, "sophgo-decode-requires-sophonmw");
+        if (bmdec_available()) {
+            if (build_bm_pipeline_locked(url, err)) {
+                opened_ = true;
+                state_ = State::Running;
+                return true;
+            }
+            state_ = State::Error;
+            return false;
+        }
+        set_err(err, "no-bmdec");
         state_ = State::Error;
         return false;
     }
@@ -217,6 +227,50 @@ bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::strin
     return true;
 }
 #endif // HAVE_GSTCUDA
+
+// 算能 SOPHGO BM 硬解探测。
+bool GstDecoder::bmdec_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // 算能 BM 硬件解码插件（sophon-gstreamer bmcodec 库，运行时须 GST_PLUGIN_PATH 指向
+    // /opt/sophon/sophon-gstreamer_*/lib）。桌面 gstreamer 无此插件。
+    GstElementFactory* f = gst_element_factory_find("bmdec");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+// 算能 SOPHGO BM 硬件解码：filesrc→h264parse→bmdec→videoconvert→appsink(主机 NV12)。
+// bmdec 输出标准主机帧（forcem=NV12），经 videoconvert 归一为 NV12，复用软解 read 路径
+// （device_only_active_ 保持 false，bm_hw_active_ 标记本次会话为 BM 硬解）。底层 BM VPU 硬件解码。
+bool GstDecoder::build_bm_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    std::string launch = "filesrc location=\"" + url +
+                         "\" ! h264parse ! bmdec ! videoconvert "
+                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "bmdec-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    bm_hw_active_ = true;
+    return true;
+}
 
 #ifdef HAVE_NVBUF
 bool GstDecoder::nvv4l2decoder_available() {
@@ -473,6 +527,7 @@ void GstDecoder::cleanup() {
     fps_ = 0.0;
     opened_ = false;
     device_only_active_ = false;
+    bm_hw_active_ = false;
 #ifdef HAVE_NVBUF
     l4t_hw_active_ = false;
 #endif

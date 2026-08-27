@@ -62,6 +62,11 @@ private:
     // 复用软解 read 路径（device_only_active_ 保持 false）。未在本机验证（需 Linux VAAPI）。
     bool build_vaapi_pipeline_locked(const std::string& url, std::string* err);
 #endif
+    // 算能 SOPHGO BM 硬解探测：bmdec 插件可实例化（sophon-gstreamer bmcodec）。
+    static bool bmdec_available();
+    // 算能 SOPHGO BM 硬解：filesrc→h264parse→bmdec→videoconvert→appsink(主机 NV12)，
+    // 复用软解 read 路径（device_only_active_ 保持 false），底层 BM VPU 硬件解码。
+    bool build_bm_pipeline_locked(const std::string& url, std::string* err);
     void set_err(std::string* err, const std::string& msg);
 
 #ifdef ENABLE_GSTREAMER
@@ -79,6 +84,7 @@ private:
     bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
 #ifdef HAVE_NVBUF
     bool l4t_hw_active_ = false;   // Jetson L4T 硬件解码（nvv4l2decoder → nvvidconv → 主机 NV12）
+    bool bm_hw_active_ = false;    // 算能 SOPHGO BM 硬件解码（bmdec → 主机 NV12）
 #endif
 #ifdef ENABLE_VAAPI
     bool vaapi_active_ = false;  // 本次会话是否实际用 VAAPI 硬解
