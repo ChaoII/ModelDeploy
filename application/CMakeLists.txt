@@ -8,7 +8,7 @@ endif ()
 message(STATUS "Building AI Surveillance Application")
 
 # ── FFmpeg ──────────────────────────────────
-set(FFMPEG_ROOT "E:/develop/ffmpeg" CACHE PATH "FFmpeg installation root")
+set(FFMPEG_ROOT "E:/develop/ffmpeg" CACHE PATH "FFmpeg installation root (Windows)")
 find_path(FFMPEG_INCLUDE_DIR libavcodec/avcodec.h PATHS ${FFMPEG_ROOT}/include NO_DEFAULT_PATH)
 foreach (lib avcodec avformat avutil avdevice swscale)
     find_library(FFMPEG_${lib}_LIBRARY NAMES ${lib} ${lib}.lib
@@ -17,8 +17,19 @@ foreach (lib avcodec avformat avutil avdevice swscale)
         list(APPEND FFMPEG_LIBS ${FFMPEG_${lib}_LIBRARY})
     endif ()
 endforeach ()
+# 非 Windows（Linux/Jetson/Sophgo）回退到 pkg-config 系统 FFmpeg
 if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
-    message(FATAL_ERROR "FFmpeg not found at ${FFMPEG_ROOT}")
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(FFMPEG QUIET libavcodec libavformat libavutil libswscale)
+        if (FFMPEG_FOUND)
+            set(FFMPEG_INCLUDE_DIR "${FFMPEG_INCLUDE_DIRS}")
+            set(FFMPEG_LIBS "${FFMPEG_LIBRARIES}")
+        endif ()
+    endif ()
+endif ()
+if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
+    message(FATAL_ERROR "FFmpeg not found (Windows: set FFMPEG_ROOT; Linux: install libav*-dev)")
 endif ()
 
 # cpp-httplib + nlohmann-json (header-only)
@@ -46,14 +57,18 @@ target_include_directories(surveillance PRIVATE
         ${HTTPLIB_INCLUDE_DIR}
         ${FFMPEG_INCLUDE_DIR}
         ${OpenCV_INCLUDE_DIRS}
-        ${CUDAToolkit_INCLUDE_DIRS}
 )
+if (WITH_GPU)
+    target_include_directories(surveillance PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+endif ()
 target_link_libraries(surveillance PRIVATE
         ${LIBRARY_NAME}
         ${OpenCV_LIBS}
         ${FFMPEG_LIBS}
-        CUDA::cudart
 )
+if (WITH_GPU)
+    target_link_libraries(surveillance PRIVATE CUDA::cudart)
+endif ()
 
 # ── 测试（可选） ──────────────────────────────
 option(BUILD_SURVEILLANCE_TESTS "build surveillance tests" OFF)
@@ -81,11 +96,16 @@ if (BUILD_SURVEILLANCE_TESTS)
             ${HTTPLIB_INCLUDE_DIR}
             ${FFMPEG_INCLUDE_DIR}
             ${OpenCV_INCLUDE_DIRS}
-            ${CUDAToolkit_INCLUDE_DIRS}
     )
+    if (WITH_GPU)
+        target_include_directories(surveillance_test PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+    endif ()
     target_link_libraries(surveillance_test PRIVATE
             ${LIBRARY_NAME} ${OpenCV_LIBS} ${FFMPEG_LIBS}
-            CUDA::cudart Catch2::Catch2WithMain
+            Catch2::Catch2WithMain
     )
+    if (WITH_GPU)
+        target_link_libraries(surveillance_test PRIVATE CUDA::cudart)
+    endif ()
     add_test(NAME surveillance_test COMMAND surveillance_test)
 endif ()

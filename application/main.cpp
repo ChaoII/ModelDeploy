@@ -4,7 +4,9 @@
 #include <csignal>
 #include <cstdlib>
 #include <thread>
+#ifdef WITH_GPU
 #include <cuda_runtime.h>
+#endif
 #include <filesystem>
 
 #ifdef _WIN32
@@ -61,8 +63,9 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
-
+#ifdef WITH_GPU
     cudaSetDevice(0);
+#endif
 
     PipelineManager mgr;
     g_mgr = &mgr;
