@@ -492,7 +492,7 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
         gst_video_frame_unmap(&frame);
         gst_sample_unref(sample);
         modeldeploy::vision::ImageData::Plane pl[2] = { {dst, W}, {dst + static_cast<ptrdiff_t>(ysz), W} };
-        out->image = modeldeploy::vision::ImageData::from_planes(pl, 2, modeldeploy::vision::MdImageType::NV12,
+        out->image = modeldeploy::vision::ImageData::from_planes(pl, 2, MdImageType::NV12,
                                                                  W, H, Device::CPU, buf);
         out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
                           ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
