@@ -8,17 +8,11 @@ endif ()
 message(STATUS "Building AI Surveillance Application")
 
 # ── FFmpeg ──────────────────────────────────
-set(FFMPEG_ROOT "E:/develop/ffmpeg" CACHE PATH "FFmpeg installation root (Windows)")
-find_path(FFMPEG_INCLUDE_DIR libavcodec/avcodec.h PATHS ${FFMPEG_ROOT}/include NO_DEFAULT_PATH)
-foreach (lib avcodec avformat avutil avdevice swscale)
-    find_library(FFMPEG_${lib}_LIBRARY NAMES ${lib} ${lib}.lib
-            PATHS ${FFMPEG_ROOT}/lib NO_DEFAULT_PATH)
-    if (FFMPEG_${lib}_LIBRARY)
-        list(APPEND FFMPEG_LIBS ${FFMPEG_${lib}_LIBRARY})
-    endif ()
-endforeach ()
-# 非 Windows（Linux/Jetson/Sophgo）回退到 pkg-config 系统 FFmpeg
-if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
+# 统一来源（SDK 设计的核心）：直接复用 SDK 侧 cmake/ffmpeg.cmake 已解析的
+# FFMPEG_INCLUDE_DIR / FFMPEG_LIBS，app 不再各自 find 一套 —— 同一进程内只一个 ffmpeg，
+# 规避双 libavcodec 符号冲突；平台差异（桌面备选 / Jetson / Sophgo-sophon-ffmpeg）由 SDK 层选。
+# 仅当 SDK 未启用视频（BUILD_VIDEO=OFF）时兜底 pkg-config。
+if (NOT FFMPEG_LIBS)
     find_package(PkgConfig QUIET)
     if (PkgConfig_FOUND)
         pkg_check_modules(FFMPEG QUIET libavcodec libavformat libavutil libswscale)
@@ -28,8 +22,8 @@ if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
         endif ()
     endif ()
 endif ()
-if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
-    message(FATAL_ERROR "FFmpeg not found (Windows: set FFMPEG_ROOT; Linux: install libav*-dev)")
+if (NOT FFMPEG_LIBS)
+    message(FATAL_ERROR "FFmpeg not found (SDK video module should provide FFMPEG_LIBS)")
 endif ()
 
 # cpp-httplib + nlohmann-json (header-only)
