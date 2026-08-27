@@ -36,6 +36,9 @@ static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
         }
     } else if (cfg.backend == "mnn") {
         opt.use_mnn_backend();
+    } else if (cfg.backend == "sophgo" || cfg.device == "tpu") {
+        opt.use_sophgo_backend();
+        opt.device_id = 0;   // use_sophgo_backend() 默认 device_id=-1，须显式 0
     } else {
         opt.use_ort_backend();
         if (cfg.device == "gpu") {
