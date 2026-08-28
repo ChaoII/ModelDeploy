@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 #include "utils/utils.h"
 #include "runtime/runtime_option.h"
 #include "encryption/encryption.h"
@@ -41,14 +42,14 @@ namespace modeldeploy {
                 decrypt_password = this->password;
             }
             if (!read_encrypted_model_to_buffer(model_path, decrypt_password, &buffer, &encrypted_format)) {
-                MD_LOG_FATAL << "Model decryption failed. Check password (set via option.password) "
-                    << "or that the file is not corrupted." << std::endl;
+                throw std::runtime_error("Model decryption failed. Check password (set via option.password) "
+                    "or that the file is not corrupted.");
             }
 
             // 加密模型必须使用与之匹配的唯一后端
             Backend required = backend_for_format(encrypted_format);
             if (required == Backend::NONE) {
-                MD_LOG_FATAL << "Unknown encrypted model format: " << encrypted_format << std::endl;
+                throw std::runtime_error("Unknown encrypted model format: " + encrypted_format);
             }
 #ifdef ENABLE_MNN
             if (required == Backend::MNN && backend != Backend::MNN) {
