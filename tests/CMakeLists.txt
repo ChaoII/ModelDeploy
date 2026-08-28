@@ -94,6 +94,30 @@ target_include_directories(test_modeldeploy PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/application/third_party)   # nlohmann json
 
+# 设备侧 vis 渲染存图工具（真实图像 → NV12 → 各 vis 绘制 → 回读 PNG）
+# CPU 端 NV12 图元绘制性能基准（无 GPU 依赖）
+add_executable(test_bench_vis_cpu test_bench_vis_cpu.cpp)
+target_link_libraries(test_bench_vis_cpu PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS})
+target_include_directories(test_bench_vis_cpu PRIVATE ${CMAKE_SOURCE_DIR})
+
+if(WITH_GPU)
+    add_executable(render_vis_gpu render_vis_gpu.cpp)
+    target_link_libraries(render_vis_gpu PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS})
+    target_include_directories(render_vis_gpu PRIVATE ${CMAKE_SOURCE_DIR})
+    set(_cu_dir "${CUDAToolkit_LIBRARY_DIR}")
+    if(NOT _cu_dir)
+        set(_cu_dir "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64")
+    endif()
+    if(EXISTS "${_cu_dir}/cudart.lib")
+        target_link_libraries(render_vis_gpu PRIVATE "${_cu_dir}/cudart.lib")
+    endif()
+
+    # 整体(全场景,含 D2H 拷贝)可视化绘制基准：设备端绘制 vs 主机绘制
+    add_executable(test_bench_vis_holistic test_bench_vis_holistic.cpp)
+    target_link_libraries(test_bench_vis_holistic PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS} "${_cu_dir}/cudart.lib")
+    target_include_directories(test_bench_vis_holistic PRIVATE ${CMAKE_SOURCE_DIR})
+endif()
+
 # 视频解码测试（仅 BUILD_VIDEO；测试源由 Task 6 提供）
 if (BUILD_VIDEO AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_video_decoder.cpp")
     target_sources(test_modeldeploy PRIVATE test_video_decoder.cpp)

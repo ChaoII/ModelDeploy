@@ -68,7 +68,13 @@ cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
 - C API `md_draw_result` 对设备 NV12 帧自动走此路径；设备后端不可用且回退 CPU 无法绘设备内存时返回 `MD_ERR_NOT_IMPLEMENTED`。
 - 文本用内置 16px 位图（`font_size=1` 缩放），`node.font_path`/`save_result` 对设备路径忽略。
 
-**Sophgo(TPU)**:设备接口已声明于 `SophgoProcessorBackend`,bmcv 实现与真机验证待 `.243` 构建容器可用后补（见 AGENTS.md 的 TPU 约定）。
+**Sophgo(TPU)**:`SophgoProcessorBackend` 已实现全部 12 个 `vis_*_nv12`（经 `bmcv_bridge` 调 bmcv 原语，
+在 `.243` 的 `tpuc_dev` 容器交叉编译、`.70`（BM1688）真机验证通过）。受 bmcv 能力约束，与 CUDA 相比按能力近似：
+- **无 alpha / 无任意多边形填充 / 无 colormap** → 框仅外轮廓（`draw_rectangle`/`draw_polygon`），点画小方框，
+  姿态/手/关键点的多点与骨架聚合成单次 `draw_points`/`draw_lines`（单色近似，降低 VPSS 通道压力）。
+- **文本仅 ASCII**（`bmcv_image_put_text`）→ 中文 label 退化为 `id: score`，OCR/车牌文本过滤非 ASCII。
+- `vis_sem_nv12` / `vis_depth_nv12` 返回 false（bmcv 无逐像素 colormap 叠加）。
+- BM1688 的 VPSS 要求 NV12 帧 stride 256 字节对齐（`step == width` 时需 width 为 256 的倍数）。
 
 ## 构建要点
 
@@ -88,7 +94,7 @@ cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
 | 硬件加速 | Auto / None / Cuda / Vaapi / Sophgo |
 | 解码硬解 | `h264_cuvid` `hevc_cuvid` `av1_cuvid`、VAAPI、GStreamer `nvcodec` |
 | 编码 | `libx264` `x264enc`（软）、`h264_nvenc` `nvh264enc` `vaapih264enc`（硬） |
-| 设备绘制 | CUDA 全部 `vis_*_nv12`；Sophgo 待补 |
+| 设备绘制 | CUDA 全部 `vis_*_nv12`；Sophgo 全部 `vis_*_nv12`（bmcv 近似，真机验证） |
 | 容器 | mp4 / flv / rtmp / rtsp |
 | 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
 
