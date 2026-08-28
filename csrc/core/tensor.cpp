@@ -75,6 +75,8 @@ namespace modeldeploy {
         }
         data_ = data;
         size_ = size;
+        // 非拷贝共享：内存归属外部调用方，绝不能沿用原 deleter（可能是内部 free）释放外部非 malloc 内存。
+        deleter_ = nullptr;
         return true;
     }
 
@@ -436,6 +438,10 @@ namespace modeldeploy {
     }
 
     Tensor Tensor::clone() const {
+        // 非连续视图（transpose/slice）须先物化连续，避免按逻辑连续整块 memcpy 越界/乱序。
+        if (!is_contiguous()) {
+            return contiguous();
+        }
         Tensor result(shape_, dtype_);
         std::memcpy(result.data_ptr_, data_ptr_, calculate_total_size());
         return result;
