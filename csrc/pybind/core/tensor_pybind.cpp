@@ -44,9 +44,8 @@ namespace modeldeploy {
                                 tensor_data_type = DataType::INT64;
                             }
                             else {
-                                MD_LOG_FATAL <<
-                                    "FDTensor.from_external_data, datatype " << data_type << " is not supported." <<
-                                    std::endl;
+                                throw std::runtime_error(
+                                    "FDTensor.from_external_data, datatype " + data_type + " is not supported.");
                             }
                             void* data_ptr = nullptr;
                             data_ptr = reinterpret_cast<void*>(data_addr);
