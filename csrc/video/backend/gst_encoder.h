@@ -90,6 +90,7 @@ private:
     bool encoder_is_vaapi_ = false;   // 本次会话是否实际用了 vaapih264enc 硬编
 #endif
     VideoStats stats_;
+    double encode_avg_sum_ = 0.0;   // 编码耗时累计（供除以帧数得到真实平均）
     std::string err_;
     std::mutex mtx_;
     std::atomic<bool> opened_{false};

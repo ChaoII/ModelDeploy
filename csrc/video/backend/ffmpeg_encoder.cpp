@@ -412,7 +412,8 @@ bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, uint
         auto t0 = std::chrono::steady_clock::now();
         bool ok = send_vaapi_frame(err);
         auto t1 = std::chrono::steady_clock::now();
-        stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+        encode_avg_sum_ += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    stats_.avg_encode_ms = stats_.frames_in > 0 ? encode_avg_sum_ / static_cast<double>(stats_.frames_in) : 0.0;
         return ok;
     }
 #endif
@@ -442,7 +443,8 @@ bool FfmpegEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, uint
         av_packet_unref(pkt_);
     }
     auto t1 = std::chrono::steady_clock::now();
-    stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    encode_avg_sum_ += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    stats_.avg_encode_ms = stats_.frames_in > 0 ? encode_avg_sum_ / static_cast<double>(stats_.frames_in) : 0.0;
     return true;
 }
 
@@ -523,7 +525,8 @@ bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint
     }
     av_frame_free(&hw);
     auto t1 = std::chrono::steady_clock::now();
-    stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    encode_avg_sum_ += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    stats_.avg_encode_ms = stats_.frames_in > 0 ? encode_avg_sum_ / static_cast<double>(stats_.frames_in) : 0.0;
     return true;
 #endif
 }
