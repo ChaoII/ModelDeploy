@@ -57,4 +57,45 @@ cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
 | 容器 | mp4 / flv / rtmp / rtsp |
 | 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
 
+## 设备侧 NV12 可视化（GPU 就地绘制）
+
+支持「解码 → 设备 NV12 就地绘制 → GPU 直编」的全设备流水线，免 D2H/H2D 往返：
+
+- `VisionProcessorBackend` 提供高层设备接口 `vis_*_nv12`（det/obb/pose/keypoints/hand/ocr/lpr/attr/cls/iseg/sem/depth），
+  语义与 CPU `vis_*` 一致（框/骨架/四边形/文本/调色板/半透明/字体），就地写设备 NV12 帧。
+- **CUDA 后端**已实现：自研 CUDA 内核（填充矩形/多边形、线段、CJK 位图文本、语义/深度/实例 mask 叠加），
+  内置 CJK 位图字库（由 `tools/gen_cjk_font.py` 从 ttf 生成，无需运行时字体/FreeType）。
+- C API `md_draw_result` 对设备 NV12 帧自动走此路径；设备后端不可用且回退 CPU 无法绘设备内存时返回 `MD_ERR_NOT_IMPLEMENTED`。
+- 文本用内置 16px 位图（`font_size=1` 缩放），`node.font_path`/`save_result` 对设备路径忽略。
+
+**Sophgo(TPU)**:`SophgoProcessorBackend` 已实现全部 12 个 `vis_*_nv12`（经 `bmcv_bridge` 调 bmcv 原语，
+在 `.243` 的 `tpuc_dev` 容器交叉编译、`.70`（BM1688）真机验证通过）。受 bmcv 能力约束，与 CUDA 相比按能力近似：
+- **无 alpha / 无任意多边形填充 / 无 colormap** → 框仅外轮廓（`draw_rectangle`/`draw_polygon`），点画小方框，
+  姿态/手/关键点的多点与骨架聚合成单次 `draw_points`/`draw_lines`（单色近似，降低 VPSS 通道压力）。
+- **文本仅 ASCII**（`bmcv_image_put_text`）→ 中文 label 退化为 `id: score`，OCR/车牌文本过滤非 ASCII。
+- `vis_sem_nv12` / `vis_depth_nv12` 返回 false（bmcv 无逐像素 colormap 叠加）。
+- BM1688 的 VPSS 要求 NV12 帧 stride 256 字节对齐（`step == width` 时需 width 为 256 的倍数）。
+
+## 构建要点
+
+```bash
+cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
+      -DENABLE_FFMPEG=ON -DENABLE_GSTREAMER=OFF ...
+```
+
+- `BUILD_VIDEO=ON` 必须配 `BUILD_VISION=ON`；FFmpeg 或 GStreamer 至少一个。
+- 需要 FFmpeg/GStreamer 开发库，找不到时 `BUILD_VIDEO` 自动关闭。
+
+## 支持矩阵
+
+| 项 | 取值 |
+|----|------|
+| 后端 | FFmpeg（默认）、GStreamer、Auto |
+| 硬件加速 | Auto / None / Cuda / Vaapi / Sophgo |
+| 解码硬解 | `h264_cuvid` `hevc_cuvid` `av1_cuvid`、VAAPI、GStreamer `nvcodec` |
+| 编码 | `libx264` `x264enc`（软）、`h264_nvenc` `nvh264enc` `vaapih264enc`（硬） |
+| 设备绘制 | CUDA 全部 `vis_*_nv12`；Sophgo 全部 `vis_*_nv12`（bmcv 近似，真机验证） |
+| 容器 | mp4 / flv / rtmp / rtsp |
+| 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
+
 > 返回 [文档中心](../README.md)

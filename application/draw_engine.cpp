@@ -62,8 +62,7 @@ void DrawEngine::draw_face(ImageData& image, const InferResult& result) {
 }
 
 namespace {
-    // 与 vis_det 一致的 label_id → BGR 颜色（确定性调色板，GPU 内核使用）
-    // 按 GpuDrawBox 字段顺序 r,g,b 写入：rgb[0]=R, rgb[1]=G, rgb[2]=B
+    // 与 vis_det 一致的 label_id → RGB 颜色（确定性调色板；CPU NV12 primitive 路径使用）
     void color_for_label(int label_id, uint8_t* rgb) {
         static const uint8_t palette[8][3] = {
             {0, 0, 255},       // red
@@ -137,23 +136,63 @@ bool DrawEngine::draw_gpu(ImageData& image,
         if (!device_ready) return false;
     }
 
-    bool any = false;
-    uint8_t rgb[3];
-    const float threshold = show_score ? 0.0f : 0.5f;   // 与 draw_detection 阈值一致
-    for (const auto& r : results) {
-        if (r.type == "detection") {
+    // CPU NV12：走 primitive 路径（CpuProcessorBackend 仅实现 draw_rect_nv12/draw_text_nv12，
+    // 无 vis_det_nv12/vis_keypoints_nv12 → 高层路径会返回 false 且什么都不画，属回归）。
+    if (device == modeldeploy::Device::CPU) {
+        bool any = false;
+        uint8_t rgb[3];
+        const float threshold = show_score ? 0.0f : 0.5f;   // 与 draw_detection 阈值一致
+        for (const auto& r : results) {
+            if (r.type != "detection") continue;
             for (const auto& b : r.boxes) {
                 if (b.score < threshold) continue;
                 color_for_label(b.label_id, rgb);
-                backend->draw_rect_nv12(image, b.x, b.y, b.w, b.h,
-                                        rgb[0], rgb[1], rgb[2], 2);
+                backend->draw_rect_nv12(image, b.x, b.y, b.w, b.h, rgb[0], rgb[1], rgb[2], 2);
                 if (show_label) {
                     const std::string label = format_label(b, show_label, show_score);
-                    backend->draw_text_nv12(image, b.x, std::max(0.0f, b.y - 16), label,
-                                            255, 255, 255, 1);
+                    backend->draw_text_nv12(image, b.x, std::max(0.0f, b.y - 16), label, 255, 255, 255, 1);
                 }
                 any = true;
             }
+        }
+        return any || results.empty();
+    }
+
+    // 设备（GPU/TPU）NV12：高层设备绘制，与 CPU vis_* 语义一致（整框填充 + 类色 + 标签 + 阈值）
+    bool any = false;
+    VisionProcessorBackend::VisOptions vo;
+    vo.threshold = show_score ? 0.0 : 0.5;
+    vo.alpha = 0.15;
+    for (const auto& r : results) {
+        if (r.type == "detection") {
+            std::vector<DetectionResult> dets;
+            dets.reserve(r.boxes.size());
+            for (const auto& b : r.boxes) {
+                if (b.score < vo.threshold) continue;
+                DetectionResult dr;
+                dr.box = {b.x, b.y, b.w, b.h};
+                dr.score = b.score;
+                dr.label_id = b.label_id;
+                if (!b.label_name.empty()) vo.label_map[b.label_id] = b.label_name;
+                dets.push_back(std::move(dr));
+            }
+            if (!dets.empty() && backend->vis_det_nv12(image, dets, vo)) any = true;
+        } else if (r.type == "face_detection") {
+            std::vector<KeyPointsResult> kps;
+            kps.reserve(r.boxes.size());
+            for (size_t i = 0; i < r.boxes.size(); ++i) {
+                const auto& b = r.boxes[i];
+                if (b.score < vo.threshold) continue;
+                KeyPointsResult kp;
+                kp.box = {b.x, b.y, b.w, b.h};
+                kp.score = b.score;
+                kp.label_id = b.label_id;
+                if (i < r.keypoints.size()) {
+                    for (const auto& p : r.keypoints[i]) kp.keypoints.emplace_back(p.x, p.y, 0.0f);
+                }
+                kps.push_back(std::move(kp));
+            }
+            if (!kps.empty() && backend->vis_keypoints_nv12(image, kps, vo, false)) any = true;
         }
     }
     return any || results.empty();

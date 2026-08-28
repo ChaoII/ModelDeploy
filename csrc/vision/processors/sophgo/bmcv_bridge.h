@@ -44,4 +44,9 @@ namespace modeldeploy::vision {
     int md_bmcv_draw_text_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
                                int x, int y, const char* text,
                                int r, int g, int b, int font_size);
+    // 任意线段组（骨骼/骨架）：ns 段，第 i 段端点 (sx[i],sy[i])→(ex[i],ey[i])，同一颜色。
+    int md_bmcv_draw_lines_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                                const float* sx, const float* sy,
+                                const float* ex, const float* ey, int ns,
+                                int r, int g, int b, int thickness);
 } // namespace modeldeploy::vision

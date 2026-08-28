@@ -271,7 +271,9 @@ namespace modeldeploy::vision {
         bm_status_t st = attach_nv12_image(hd, y_mem, uv_mem, w, h, &img);
         if (st != BM_SUCCESS) return -1;
         if (radius <= 0) radius = 1;
-        // 每个点绘制一个边长 = 2*radius 的小方块（用 fill_rectangle 填充整块）
+        // 每个点绘制一个边长 = 2*radius 的小方块外圈。注意：不用 bmcv_image_fill_rectangle——
+        // 其在 BM1688(vpss 路径)对两平面 attach 的 NV12 帧会报地址错误/卡死，故用
+        // bmcv_image_draw_rectangle 画空心方框近似“点”（与“按能力近似”一致）。
         std::vector<bmcv_rect_t> rects(npts);
         for (int i = 0; i < npts; ++i) {
             const int cx = static_cast<int>(xs[i]);
@@ -285,7 +287,8 @@ namespace modeldeploy::vision {
             rects[i].crop_w = static_cast<unsigned int>(std::max(x1 - x0, 0));
             rects[i].crop_h = static_cast<unsigned int>(std::max(y1 - y0, 0));
         }
-        st = bmcv_image_fill_rectangle(hd, img, npts, rects.data(),
+        const int thickness = std::max(1, radius >= 3 ? 2 : 1);
+        st = bmcv_image_draw_rectangle(hd, img, npts, rects.data(), thickness,
                                        static_cast<unsigned char>(r),
                                        static_cast<unsigned char>(g),
                                        static_cast<unsigned char>(b));
@@ -310,6 +313,30 @@ namespace modeldeploy::vision {
         // font_size 语义对齐 CPU/CUDA（近似映射：scale = font_size*2，thickness=2）
         const float font_scale = static_cast<float>(font_size) * 2.0f;
         st = bmcv_image_put_text(hd, img, text, org, color, font_scale, 2);
+        bm_image_detach(img);
+        bm_image_destroy(&img);
+        return st == BM_SUCCESS ? 0 : -1;
+    }
+
+    int md_bmcv_draw_lines_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
+                                const float* sx, const float* sy,
+                                const float* ex, const float* ey, int ns,
+                                int r, int g, int b, int thickness) {
+        if (!sx || !sy || !ex || !ey || ns < 1) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        bm_image img{};
+        bm_status_t st = attach_nv12_image(hd, y_mem, uv_mem, w, h, &img);
+        if (st != BM_SUCCESS) return -1;
+        if (thickness <= 0) thickness = 1;
+        std::vector<bmcv_point_t> start(ns), end(ns);
+        for (int i = 0; i < ns; ++i) {
+            start[i] = {static_cast<int>(sx[i]), static_cast<int>(sy[i])};
+            end[i] = {static_cast<int>(ex[i]), static_cast<int>(ey[i])};
+        }
+        bmcv_color_t color{static_cast<unsigned char>(r),
+                           static_cast<unsigned char>(g),
+                           static_cast<unsigned char>(b)};
+        st = bmcv_image_draw_lines(hd, img, start.data(), end.data(), ns, color, thickness);
         bm_image_detach(img);
         bm_image_destroy(&img);
         return st == BM_SUCCESS ? 0 : -1;
