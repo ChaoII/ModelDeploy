@@ -54,6 +54,7 @@ namespace modeldeploy {
         std::unique_ptr<nvinfer1::IBuilder> builder_;
         std::unique_ptr<nvinfer1::INetworkDefinition> network_;
         cudaStream_t stream_{};
+        bool owns_stream_ = false;                      // 是否为后端自建 stream（析构时只销毁自建的）
         std::vector<TrtValueInfo> inputs_desc_;
         std::vector<TrtValueInfo> outputs_desc_;
         std::string model_buffer_;
