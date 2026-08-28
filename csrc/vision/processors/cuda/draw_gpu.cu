@@ -629,6 +629,22 @@ namespace modeldeploy::vision {
         }
     }
 
+    // 主机经 OpenCV(cv::FontFace)渲染出的 BGR 文本标签 sprite → 逐像素 BGR→YUV 直写进 NV12。
+    // sprite 为不透明(BGR),故直接覆盖目标像素(与 CPU draw_rectangle_and_text 的不透明标签一致)。
+    __global__ void kernel_blit_bgr_nv12(uint8_t* __restrict__ y, uint8_t* __restrict__ uv,
+                                         int w, int h, int step_y, int step_uv,
+                                         const uint8_t* __restrict__ bgr, int sw, int sh, int sstep,
+                                         int ox, int oy) {
+        for (int j = blockIdx.y * blockDim.y + threadIdx.y; j < sh; j += gridDim.y * blockDim.y) {
+            for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < sw; i += gridDim.x * blockDim.x) {
+                const size_t p = static_cast<size_t>(j) * sstep + static_cast<size_t>(i) * 3;
+                uint8_t yy, uu, vv;
+                rgb_to_yuv_601(bgr[p + 2], bgr[p + 1], bgr[p], &yy, &uu, &vv);
+                place_nv12(y, uv, w, h, step_y, step_uv, ox + i, oy + j, yy, uu, vv);
+            }
+        }
+    }
+
     // ── host 包装：创建/复用流，网格遍历绘制区域像素 ──
     static cudaStream_t acquire_stream(cudaStream_t user, bool* owned) {
         *owned = false;
@@ -797,6 +813,29 @@ namespace modeldeploy::vision {
         return err == cudaSuccess && sync == cudaSuccess;
     }
 
+    bool blit_bgr_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                           const uint8_t* bgr /* host BGR, 连续 3 通道 */, int sw, int sh, int sstep,
+                           int ox, int oy, cudaStream_t stream) {
+        if (!y || !bgr || w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return false;
+        bool owned; cudaStream_t s = acquire_stream(stream, &owned);
+        cudaError_t err = cudaSuccess;
+        uint8_t* d_bgr = nullptr;
+        const size_t sz = static_cast<size_t>(sh) * sstep;
+        err = cudaMalloc(&d_bgr, sz);
+        if (err == cudaSuccess) err = cudaMemcpyAsync(d_bgr, bgr, sz, cudaMemcpyHostToDevice, s);
+        if (err == cudaSuccess) {
+            dim3 block(16, 16);
+            dim3 grid((sw + block.x - 1) / block.x, (sh + block.y - 1) / block.y);
+            kernel_blit_bgr_nv12<<<grid, block, 0, s>>>(
+                y, uv, w, h, step_y, step_uv, d_bgr, sw, sh, sstep, ox, oy);
+            err = cudaGetLastError();
+        }
+        cudaError_t sync = cudaStreamSynchronize(s);
+        if (d_bgr) cudaFree(d_bgr);
+        if (owned) cudaStreamDestroy(s);
+        return err == cudaSuccess && sync == cudaSuccess;
+    }
+
     bool fill_rect_nv12_gpu(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
                             int x0, int y0, int x1, int y1,
                             uint8_t r, uint8_t g, uint8_t b, float alpha, cudaStream_t stream) {
@@ -915,6 +954,7 @@ namespace modeldeploy::vision {
         const int px = blockIdx.x * blockDim.x + threadIdx.x;
         const int py = blockIdx.y * blockDim.y + threadIdx.y;
         if (px >= w || py >= h) return;
+        // Y：逐像素取色并混合（每个像素独立，无竞争）
         const int dx = static_cast<int>((static_cast<long long>(px) * dw) / w);
         const int dy = static_cast<int>((static_cast<long long>(py) * dh) / h);
         const uint8_t v8 = depth8[static_cast<size_t>(dy) * dw + dx];
@@ -922,11 +962,34 @@ namespace modeldeploy::vision {
         if (colorize) {
             jet_color(v8, c);
         } else {
-            // 灰色半透明:灰 = v8, alpha 控制
-            c[0] = c[1] = c[2] = v8;
+            c[0] = c[1] = c[2] = v8;   // 灰色半透明
         }
         uint8_t yy, uu, vv; rgb_to_yuv_601(c[0], c[1], c[2], &yy, &uu, &vv);
-        blend_nv12(y, uv, w, h, step_y, step_uv, px, py, yy, uu, vv, alpha);
+        y[static_cast<size_t>(py) * step_y + px] =
+            blend_y(y[static_cast<size_t>(py) * step_y + px], yy, alpha);
+        // UV：NV12 每 2x2 共享一份 chroma，故只由块左上角像素用块内平均色写一次，
+        // 避免逐像素不同颜色对半分辨率 UV 的竞争（此前产生横向扫描条纹）。
+        if ((px & 1) == 0 && (py & 1) == 0 && px + 1 < w && py + 1 < h) {
+            int rb = 0, gb = 0, bb = 0;
+#pragma unroll
+            for (int j = 0; j < 2; ++j)
+#pragma unroll
+                for (int i = 0; i < 2; ++i) {
+                    const int bx = static_cast<int>((static_cast<long long>(px + i) * dw) / w);
+                    const int by = static_cast<int>((static_cast<long long>(py + j) * dh) / h);
+                    const uint8_t bv = depth8[static_cast<size_t>(by) * dw + bx];
+                    uint8_t bc[3];
+                    if (colorize) jet_color(bv, bc); else bc[0] = bc[1] = bc[2] = bv;
+                    rb += bc[0]; gb += bc[1]; bb += bc[2];
+                }
+            uint8_t buu, bvv, byy;
+            rgb_to_yuv_601(static_cast<uint8_t>(rb >> 2), static_cast<uint8_t>(gb >> 2),
+                           static_cast<uint8_t>(bb >> 2), &byy, &buu, &bvv);
+            const int ux = px >> 1, uy = py >> 1;
+            uint8_t* p = uv + static_cast<size_t>(uy) * step_uv + static_cast<size_t>(ux) * 2;
+            p[0] = blend_y(p[0], buu, alpha);
+            p[1] = blend_y(p[1], bvv, alpha);
+        }
     }
 
     __global__ void kernel_overlay_mask_nv12(uint8_t* y, uint8_t* uv, int w, int h,

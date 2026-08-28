@@ -69,6 +69,12 @@ namespace modeldeploy::vision {
         uint8_t r, uint8_t g, uint8_t b, int font_size, int max_chars,
         cudaStream_t stream = nullptr);
 
+    // 主机 OpenCV 渲染出的 BGR 文本标签 sprite → BGR→YUV 直写 NV12（不透明，按 ox,oy 锚定左上角）
+    MODELDEPLOY_CXX_EXPORT bool blit_bgr_nv12_gpu(
+        uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+        const uint8_t* bgr, int sw, int sh, int sstep,
+        int ox, int oy, cudaStream_t stream = nullptr);
+
     MODELDEPLOY_CXX_EXPORT bool overlay_labels_nv12_gpu(
         uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
         const uint8_t* d_labels, int lw, int lh, float alpha,

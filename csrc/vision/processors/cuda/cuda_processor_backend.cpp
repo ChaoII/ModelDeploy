@@ -8,6 +8,9 @@
 #include "vision/processors/cuda/fused_preproc.cuh"
 #include "vision/processors/cuda/scrfd_preproc.cuh"
 #include "vision/processors/cuda/draw_gpu.cuh"
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/geometry/2d.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -37,6 +40,126 @@ std::string score_str(float score) {
     std::snprintf(buf, sizeof(buf), "%.2f", score);
     return std::string(buf);
 }
+
+// ── 标签绘制：优先用 OpenCV(cv::FontFace/真 TTF/UTF-8/抗锯齿/字号颜色)，无 font_path 时回退 8x16 位图 ──
+constexpr int   kLabelFontPx   = 30;      // OpenCV 文本像素高度
+constexpr float kLabelBgAlpha  = 0.75f;
+static inline bool label_is_ascii(const std::string& s) {
+    for (unsigned char ch : s) if (ch < 0x20 || ch > 0x7E) return false;
+    return true;
+}
+static inline int label_char_w(bool ascii, int fs) { return (ascii ? 8 : 16) * fs; }
+static inline int label_bitmap_fs(int font_px) { return std::max(1, font_px / 16); }
+
+// 用 OpenCV(cv::FontFace)把标签(不透明压暗底块 + 白字,抗锯齿)渲染成紧贴墨迹的 BGR sprite。
+// 返回独立自持(已 clone)的 sprite；失败/字体缺失返回空 Mat。
+static cv::Mat render_text_sprite(const std::string& text, const uint8_t* bgr_tag, int font_px,
+                                  const std::string& font_path) {
+    cv::Mat empty;
+    if (text.empty() || font_path.empty()) return empty;
+    static std::unordered_map<std::string, cv::FontFace> font_cache;
+    auto it = font_cache.find(font_path);
+    if (it == font_cache.end())
+        it = font_cache.emplace(font_path, cv::FontFace(font_path)).first;
+    const int cw = static_cast<int>(text.size()) * (font_px + 6) + 64;
+    const int ch = 2 * font_px + 32;
+    // 压暗底色保证白字在亮色(黄等)上也可读；bgr_tag 按设备约定为 (R,G,B)，cv::Scalar 为 (B,G,R)
+    static constexpr double kTagDark = 0.60;
+    const uint8_t bg_b = static_cast<uint8_t>(std::lround(bgr_tag[2] * kTagDark));
+    const uint8_t bg_g = static_cast<uint8_t>(std::lround(bgr_tag[1] * kTagDark));
+    const uint8_t bg_r = static_cast<uint8_t>(std::lround(bgr_tag[0] * kTagDark));
+    cv::Mat canvas(ch, cw, CV_8UC3, cv::Scalar(bg_b, bg_g, bg_r));
+    cv::putText(canvas, text, cv::Point(8, font_px + 14), cv::Scalar(255, 255, 255),
+                it->second, font_px, 600);
+    // 墨迹掩码：任一通道 != 底色即视为文本(含 AA 边缘；canvas 底色为压暗后 BGR: bg_b,bg_g,bg_r)
+    cv::Mat mask = cv::Mat::zeros(ch, cw, CV_8UC1);
+    for (int i = 0; i < cw * ch; ++i) {
+        const uint8_t* p = canvas.data + i * 3;
+        mask.data[i] = (p[0] != bg_b || p[1] != bg_g || p[2] != bg_r) ? 255 : 0;
+    }
+    cv::Rect bbox = cv::boundingRect(mask);
+    if (bbox.width <= 0 || bbox.height <= 0) return empty;
+    const int pad = 3;
+    int x0 = std::max(0, bbox.x - pad), y0 = std::max(0, bbox.y - pad);
+    int x1 = std::min(cw, bbox.x + bbox.width + pad), y1 = std::min(ch, bbox.y + bbox.height + pad);
+    return canvas(cv::Rect(x0, y0, x1 - x0, y1 - y0)).clone();
+}
+
+// 把 host sprite blit 到 NV12 指定 top-left（只夹取），并确保 src 步长正确。
+static bool blit_sprite(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                        cudaStream_t s, const cv::Mat& sprite, int ox, int oy) {
+    if (sprite.empty()) return false;
+    if (ox + sprite.cols > w) ox = std::max(0, w - sprite.cols);
+    if (oy + sprite.rows > h) oy = std::max(0, h - sprite.rows);
+    if (ox < 0) ox = 0; if (oy < 0) oy = 0;
+    return modeldeploy::vision::blit_bgr_nv12_gpu(y, uv, w, h, step_y, step_uv,
+                                                  sprite.data, sprite.cols, sprite.rows,
+                                                  static_cast<int>(sprite.step), ox, oy, s);
+}
+
+// 渲染 label sprite，并把其底边压到检测框顶边框上(重叠 overlap px，消除视觉空隙)；上方放不下则折入框内顶部。
+static bool blit_sprite_above_box(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                                  cudaStream_t s, const std::string& text, const uint8_t* rgb,
+                                  int font_px, const std::string& font_path,
+                                  float box_x, float box_y, int overlap) {
+    const cv::Mat sp = render_text_sprite(text, rgb, font_px, font_path);
+    if (sp.empty()) return false;
+    // 底边 = 框顶 + overlap(压住边框厚度)，故无可见间隙
+    int by = static_cast<int>(box_y) - sp.rows + overlap;
+    if (by < 0) by = static_cast<int>(box_y) + 2;
+    return blit_sprite(y, uv, w, h, step_y, step_uv, s, sp, static_cast<int>(box_x), by);
+}
+
+// 绘制一个带底块的标签条；x,y 为底块 top-left（只夹取，不自动移动）。
+static bool draw_label_tag(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                           cudaStream_t s, int x, int y_pos, const std::string& text,
+                           const uint8_t* rgb, int font_px, const std::string& font_path) {
+    if (text.empty()) return true;
+    const cv::Mat sp = render_text_sprite(text, rgb, font_px, font_path);
+    if (!sp.empty())
+        return blit_sprite(y, uv, w, h, step_y, step_uv, s, sp, x, y_pos);
+    // 位图回退
+    const bool ascii = label_is_ascii(text);
+    const int fs = label_bitmap_fs(font_px);
+    const int charw = label_char_w(ascii, fs);
+    const int th = 16 * fs;
+    const int tw = static_cast<int>(text.size()) * charw;
+    int bx = x, by = y_pos;
+    if (bx < 2) bx = 2;
+    if (bx + tw + 4 > w - 2) bx = std::max(2, w - 4 - tw);
+    if (by < 0) by = 0;
+    if (by + th + 2 > h - 2) by = std::max(0, h - th - 2);
+    bool ok = modeldeploy::vision::fill_rect_nv12_gpu(y, uv, w, h, step_y, step_uv,
+                                 bx - 2, by - 2, bx + tw + 2, by + th,
+                                 rgb ? rgb[0] : 0, rgb ? rgb[1] : 0, rgb ? rgb[2] : 0,
+                                 kLabelBgAlpha, s);
+    if (ascii)
+        ok = modeldeploy::vision::draw_text_nv12_gpu(y, uv, w, h, step_y, step_uv, (float)bx, (float)by,
+                                text.c_str(), 255, 255, 255, fs, s) && ok;
+    else
+        ok = modeldeploy::vision::draw_text_cjk_nv12_gpu(y, uv, w, h, step_y, step_uv, (float)bx, (float)by,
+                                    text.c_str(), 255, 255, 255, fs,
+                                    static_cast<int>(text.size()) + 4, s) && ok;
+    return ok;
+}
+
+// 在检测框左上角排放标签：优先框上方，底边与框顶留 2px；上方放不下则折入框内顶部。
+static bool draw_box_label(uint8_t* y, uint8_t* uv, int w, int h, int step_y, int step_uv,
+                           cudaStream_t s, float box_x, float box_y, const std::string& text,
+                           const uint8_t* rgb, int font_px, const std::string& font_path) {
+    constexpr int kOverlap = 2;   // 底边压住 2px 顶边框，消除间隙
+    if (blit_sprite_above_box(y, uv, w, h, step_y, step_uv, s, text, rgb, font_px, font_path,
+                              box_x, box_y, kOverlap))
+        return true;
+    // 位图回退：按估算高度贴框顶
+    const int th = 16 * label_bitmap_fs(font_px);
+    int by = static_cast<int>(box_y) - th + kOverlap;
+    if (by < 0) by = static_cast<int>(box_y) + 3;
+    return draw_label_tag(y, uv, w, h, step_y, step_uv, s,
+                          static_cast<int>(box_x), by, text, rgb, font_px, font_path);
+}
+
+
 struct Nv12View {
     uint8_t* y = nullptr;
     uint8_t* uv = nullptr;
@@ -405,9 +528,8 @@ namespace modeldeploy::vision {
                                     r.box.x, r.box.y, r.box.width, r.box.height,
                                     c[0], c[1], c[2], 2, s) && ok;
             std::string label = label_name(opt, r.label_id) + ": " + score_str(r.score);
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
-                                        255, 255, 255, 1, static_cast<int>(label.size()) + 4, s) && ok;
+            ok = draw_box_label(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                r.box.x, r.box.y, label, c, kLabelFontPx, opt.font_path) && ok;
         }
         return ok;
     }
@@ -445,9 +567,9 @@ namespace modeldeploy::vision {
                                        xs.data(), ys.data(), 4,
                                        c[0], c[1], c[2], 2, s) && ok;
             std::string label = std::to_string(r.label_id) + ": " + score_str(r.score);
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        poly[1].x, poly[1].y - 16.0f, label.c_str(),
-                                        255, 255, 255, 1, static_cast<int>(label.size()) + 4, s) && ok;
+            const float obb_top = *std::min_element(ys.begin(), ys.end());
+            ok = draw_box_label(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                poly[1].x, obb_top, label, c, kLabelFontPx, opt.font_path) && ok;
         }
         return ok;
     }
@@ -470,9 +592,8 @@ namespace modeldeploy::vision {
                                     r.box.x, r.box.y, r.box.width, r.box.height,
                                     c[0], c[1], c[2], 2, s) && ok;
             std::string label = "score: " + score_str(r.score);
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
-                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            ok = draw_box_label(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                r.box.x, r.box.y, label, c, kLabelFontPx, opt.font_path) && ok;
             draw_kpts(v, s, r.keypoints, kPosePaletteRgb, kPoseKptColor, 17, 3, true,
                       kPoseSkeleton, 19, kPoseLimbColor);
         }
@@ -498,9 +619,8 @@ namespace modeldeploy::vision {
                                     r.box.x, r.box.y, r.box.width, r.box.height,
                                     c[0], c[1], c[2], 2, s) && ok;
             std::string label = "score: " + score_str(r.score);
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
-                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            ok = draw_box_label(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                r.box.x, r.box.y, label, c, kLabelFontPx, opt.font_path) && ok;
             draw_kpts(v, s, r.keypoints, kPosePaletteRgb, nullptr, 1, 3, draw_lines, nullptr, 0, nullptr);
         }
         return ok;
@@ -524,9 +644,8 @@ namespace modeldeploy::vision {
                                     r.box.x, r.box.y, r.box.width, r.box.height,
                                     c[0], c[1], c[2], 2, s) && ok;
             std::string label = "score: " + score_str(r.score);
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
-                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            ok = draw_box_label(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                r.box.x, r.box.y, label, c, kLabelFontPx, opt.font_path) && ok;
             draw_kpts_hand(v, s, r.keypoints);
         }
         return ok;
@@ -547,10 +666,11 @@ namespace modeldeploy::vision {
             ok = draw_polygon_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                        xs.data(), ys.data(), 4, 66, 135, 245, 2, s) && ok;
             if (i < result.text.size() && !result.text[i].empty()) {
-                ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                            xs[0], std::max(0.0f, ys[0] - 16.0f),
-                                            result.text[i].c_str(), 255, 255, 255, 1,
-                                            static_cast<int>(result.text[i].size()) + 4, s) && ok;
+                static const uint8_t kOcrBlue[3] = {66, 135, 245};
+                const float top = *std::min_element(ys.begin(), ys.end());
+                ok = blit_sprite_above_box(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                           result.text[i], kOcrBlue, kLabelFontPx, opt.font_path,
+                                           xs[0], top, 2) && ok;
             }
         }
         return ok;
@@ -574,9 +694,8 @@ namespace modeldeploy::vision {
                                     r.box.x, r.box.y, r.box.width, r.box.height,
                                     c[0], c[1], c[2], 2, s) && ok;
             std::string label = r.car_plate_str + " " + r.car_plate_color + " " + score_str(r.score);
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        r.box.x, std::max(0.0f, r.box.y - 16.0f), label.c_str(),
-                                        255, 255, 255, 1, (int)label.size() + 4, s) && ok;
+            ok = draw_box_label(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                r.box.x, r.box.y, label, c, kLabelFontPx, opt.font_path) && ok;
             std::vector<float> xs, ys;
             for (const auto& p : r.keypoints) { xs.push_back(p.x); ys.push_back(p.y); }
             if (!xs.empty())
@@ -613,12 +732,13 @@ namespace modeldeploy::vision {
                                         r.box.x, r.box.y, r.box.width, r.box.height,
                                         c[0], c[1], c[2], 2, s) && ok;
                 if (show_attr) {
+                    const int th = kLabelFontPx;
                     for (size_t i = 0; i < r.attr_scores.size(); ++i) {
                         std::string a = label_name(opt, static_cast<int>(i)) + ": " + score_str(r.attr_scores[i]);
-                        const float ty = r.box.y + static_cast<float>((int)i + 1) * 16.0f;
-                        ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                                    r.box.x, ty, a.c_str(),
-                                                    255, 255, 255, 1, static_cast<int>(a.size()) + 4, s) && ok;
+                        const int by = static_cast<int>(r.box.y) + 2 + static_cast<int>(i) * (th + 4);
+                        ok = draw_label_tag(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                            static_cast<int>(r.box.x) + 2, by, a, c,
+                                            kLabelFontPx, opt.font_path) && ok;
                     }
                 }
             }
@@ -640,16 +760,10 @@ namespace modeldeploy::vision {
         for (size_t i = 0; i < n && drawn < top_k; ++i) {
             if (result.scores[i] < opt.threshold) continue;
             const uint8_t* c = kClassPalette[palette_idx(result.label_ids[i])];
-            const float y = static_cast<float>(margin + drawn * 16);
+            const int y = margin + drawn * (kLabelFontPx + 4);
             std::string label = std::to_string(result.label_ids[i]) + ": " + score_str(result.scores[i]);
-            // 半透明底色块 + 白字
-            ok = fill_rect_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                    0, static_cast<int>(y) - 2, static_cast<int>(label.size()) * 16,
-                                    static_cast<int>(y) + 14,
-                                    c[0], c[1], c[2], 0.6f, s) && ok;
-            ok = draw_text_cjk_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                        static_cast<float>(margin), y, label.c_str(),
-                                        255, 255, 255, 1, static_cast<int>(label.size()) + 4, s) && ok;
+            ok = draw_label_tag(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv, s,
+                                margin, y, label, c, kLabelFontPx, opt.font_path) && ok;
             ++drawn;
         }
         return ok;
