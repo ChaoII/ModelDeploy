@@ -101,17 +101,46 @@ namespace modeldeploy::audio::asr {
             const std::string& tokens_txt,
             int32_t sample_rate,
             int32_t num_threads,
-            float threshold)
-        : sample_rate_(sample_rate), num_threads_(num_threads), threshold_(threshold),
-          decoder_onnx_(decoder_onnx), tokens_txt_(tokens_txt) {
+            float threshold) {
+        RuntimeOption req;
+        req.use_ort_backend();
+        req.set_model_path(encoder_onnx);
+        if (num_threads > 0) req.set_cpu_thread_num(num_threads);
+        init_from(req, decoder_onnx, tokens_txt, sample_rate, num_threads, threshold);
+    }
+
+    ParaformerStreamingAsr::ParaformerStreamingAsr(
+            const RuntimeOption& runtime_option,
+            const std::string& decoder_onnx,
+            const std::string& tokens_txt,
+            int32_t sample_rate,
+            int32_t num_threads,
+            float threshold) {
+        init_from(runtime_option, decoder_onnx, tokens_txt, sample_rate, num_threads, threshold);
+    }
+
+    void ParaformerStreamingAsr::init_from(const RuntimeOption& runtime_option,
+                                           const std::string& decoder_onnx,
+                                           const std::string& tokens_txt,
+                                           int32_t sample_rate, int32_t num_threads,
+                                           float threshold) {
+        sample_rate_ = sample_rate;
+        num_threads_ = num_threads;
+        threshold_ = threshold;
+        decoder_onnx_ = decoder_onnx;
+        tokens_txt_ = tokens_txt;
         // base runtime_option 承载 encoder 配置（继承 BaseModel，encoder 走统一 runtime_）
-        // 流式 Paraformer 仅支持 ORT（状态化 decoder 多后端未实现），硬性钉死并守卫，
-        // 避免误走 MNN/TRT 等其它后端。
-        runtime_option.use_ort_backend();
-        runtime_option.set_model_path(encoder_onnx);
-        if (num_threads_ > 0) {
-            runtime_option.set_cpu_thread_num(num_threads_);
+        this->runtime_option = runtime_option;
+        // 流式 Paraformer 仅支持 ORT（状态化 decoder 多后端未实现）。显式校验并明确报错，
+        // 避免"静默钳制 ORT"或误走 MNN/TRT 等其它后端而产生不可诊断的加载错误。
+        if (this->runtime_option.backend != Backend::ORT) {
+            MD_LOG_ERROR << "ParaformerStreamingAsr(encoder) 仅支持 ORT 后端(状态化 decoder 多后端未实现);"
+                         << " 请调用 runtime_option.use_ort_backend()。当前 backend="
+                         << static_cast<int>(this->runtime_option.backend) << std::endl;
+            initialized_ = false;
+            return;
         }
+        this->runtime_option.use_ort_backend();
         initialized_ = initialize();
     }
 
@@ -144,9 +173,14 @@ namespace modeldeploy::audio::asr {
             MD_LOG_ERROR << "ParaformerStreamingAsr: encoder runtime init failed." << std::endl;
             return false;
         }
-        // decoder：独立 Runtime（状态化，仅 ORT）
+        // decoder：独立 Runtime（状态化，仅 ORT）。
+        // 结构上 decoder 恒为 ORT（无用户后端注入）；此处显式守卫，若未来支撑多后端需同步放开。
         RuntimeOption dopt;
         dopt.use_ort_backend();
+        if (dopt.backend != Backend::ORT) {
+            MD_LOG_ERROR << "ParaformerStreamingAsr(decoder) 仅支持 ORT 后端(状态化多后端未实现)。" << std::endl;
+            return false;
+        }
         dopt.set_model_path(decoder_onnx_);
         if (num_threads_ > 0) {
             dopt.set_cpu_thread_num(num_threads_);

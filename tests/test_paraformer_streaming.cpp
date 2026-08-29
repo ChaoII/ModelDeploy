@@ -76,3 +76,14 @@ TEST_CASE("ParaformerStreaming transcribes real wav via streaming", "[audio_asr]
     REQUIRE(final.is_final);              // flush 后应标记 final
     REQUIRE(partials.size() <= full.size());  // 部分结果不会比全文长
 }
+
+// A3：非 ORT 后端必须明确失败，而非静默钳制 ORT 或产生不可诊断的加载错误。
+// 后端校验发生在加载任何模型之前，因此无需测试数据、可脱机运行。
+TEST_CASE("ParaformerStreaming rejects non-ORT backend with clear error", "[audio_asr]") {
+    modeldeploy::RuntimeOption ro;
+    ro.use_mnn_backend();                 // 故意选非 ORT
+    ro.set_model_path("encoder.int8.onnx");  // 任意路径；校验先于文件加载
+    ParaformerStreamingAsr asr(ro, "decoder.int8.onnx", "tokens.txt");
+    // 非 ORT 后端必须在加载任何模型前明确失败。
+    REQUIRE_FALSE(asr.is_initialized());
+}
