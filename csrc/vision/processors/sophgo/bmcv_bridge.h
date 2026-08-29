@@ -5,6 +5,7 @@
 //
 #pragma once
 #include <cstdint>
+#include <memory>
 
 namespace modeldeploy::vision {
     // BGR/RGB(swap_rb) letterbox + alpha/beta 仿射，FP32 CHW 结果直接写入 dev_mem（bm_device_mem_t*，
@@ -49,4 +50,26 @@ namespace modeldeploy::vision {
                                 const float* sx, const float* sy,
                                 const float* ex, const float* ey, int ns,
                                 int r, int g, int b, int thickness);
+
+    // ── TPU 设备帧中间算子（显存→显存，输出新分配设备内存，零拷贝）──
+    // y_mem/uv_mem: 源 NV12 设备平面地址（Device::TPU）。输出设备内存由本函数分配，
+    // 经 *owner 保活（出参 ImageData 持有；析构时释放设备显存，需 bm_handle_t 故由本层封装）。
+    // 成功返回 0 并写出设备地址/尺寸与 owner；失败返回非 0（不分配，调用方 fail-closed 返回 false）。
+    //
+    // crop：现成 NV12 就地裁剪，输出仍为 NV12（两平面）。
+    int md_bmcv_crop_nv12_devmem(void* handle, void* y_mem, void* uv_mem,
+                                 int src_w, int src_h,
+                                 float x, float y, float w, float h,
+                                 void** out_y, void** out_uv, int* out_w, int* out_h,
+                                 std::shared_ptr<void>* owner);
+    // rotate：flag 0=90, 1=180, 2=270（与 RotateFlags 数值一致）；输出仍为 NV12，90/270 时 W/H 互换。
+    int md_bmcv_rotate_nv12_devmem(void* handle, void* y_mem, void* uv_mem,
+                                   int src_w, int src_h, int flag,
+                                   void** out_y, void** out_uv, int* out_w, int* out_h,
+                                   std::shared_ptr<void>* owner);
+    // cvt_color：cvt_kind 0=PKG_BGR, 1=PLA_BGR, 2=GRAY；输出为单平面设备内存，地址经 out_data 返回。
+    int md_bmcv_cvtcolor_nv12_devmem(void* handle, void* y_mem, void* uv_mem,
+                                     int src_w, int src_h, int cvt_kind,
+                                     void** out_data, int* out_w, int* out_h,
+                                     std::shared_ptr<void>* owner);
 } // namespace modeldeploy::vision

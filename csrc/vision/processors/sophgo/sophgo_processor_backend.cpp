@@ -478,6 +478,26 @@ namespace modeldeploy::vision {
         return false;
     }
 
+    // ── 中间图像算子：TPU 设备帧在显存上就地执行，输出保持 Device::TPU（零拷贝）。
+    // 非 TPU / 平面不连续 / BMCV 失败 → return false（ImageData 置 last_error，不静默回退 CPU）。
+    bool SophgoProcessorBackend::crop(const ImageData& image, float x, float y,
+                                      float w, float h, ImageData* out) {
+        if (!out) return false;
+        uint8_t* py = nullptr; uint8_t* puv = nullptr; int sw = 0, sh = 0;
+        if (!tpu_nv12_planes(handle_, image, &py, &puv, &sw, &sh)) return false;
+        void* oy = nullptr; void* ouv = nullptr; int ow = 0, oh = 0;
+        std::shared_ptr<void> owner;
+        const int st = md_bmcv_crop_nv12_devmem(
+            handle_, py, puv, sw, sh, x, y, w, h, &oy, &ouv, &ow, &oh, &owner);
+        if (st != 0 || !oy || !ouv || !owner) {
+            return false;
+        }
+        ImageData::Plane pl[2] = {{reinterpret_cast<const uint8_t*>(oy), ow},
+                                  {reinterpret_cast<const uint8_t*>(ouv), ow}};
+        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, ow, oh, Device::TPU, owner);
+        return !out->empty();
+    }
+
     // ── 设备侧高层可视化：BMCV 按能力近似实现（阶段 3）──
     // 说明：bmcv 无 alpha 半透明 → 填充为不透明；无任意多边形填充 → obb/OCR 仅外轮廓；
     // put_text 仅 ASCII → 中文/非 ASCII 文本退化为 id:score 或过滤；sem/depth 无 colormap → 返回 false。

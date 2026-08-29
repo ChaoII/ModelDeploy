@@ -81,20 +81,12 @@ namespace modeldeploy::vision {
         bool vis_depth_nv12(ImageData& frame, const DepthResult& result,
                             const VisionProcessorBackend::VisOptions& opt, bool colorize) override;
 
-        // ── 中间图像算子：设备帧未实现 → 返回 false（ImageData 置 last_error，不静默回退 CPU）──
+        // ── 中间图像算子：TPU 设备帧在显存上就地实现（BMVC 硬路径），输出保持 Device::TPU 零拷贝。
+        // 非 TPU / 平面不连续 / BMCV 失败 → 返回 false（ImageData 置 last_error，不静默回退 CPU）。
         bool crop(const ImageData& image, float x, float y, float w, float h,
-                  ImageData* out) override {
-            (void)image; (void)x; (void)y; (void)w; (void)h; (void)out;
-            return false;
-        }
-        bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override {
-            (void)image; (void)flag; (void)out;
-            return false;
-        }
-        bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override {
-            (void)image; (void)type; (void)out;
-            return false;
-        }
+                  ImageData* out) override;
+        bool rotate(const ImageData& image, RotateFlags flag, ImageData* out) override;
+        bool cvt_color(const ImageData& image, ColorConvertType type, ImageData* out) override;
 
     private:
         // 确保已分配可容纳单张 dst 尺寸图像的设备内存（bm_device_mem_t* 或 nullptr）
