@@ -30,6 +30,9 @@ namespace modeldeploy {
         else if (option.device == Device::OPENCL) {
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_OPENCL);
         }
+        else if (option.device == Device::VULKAN) {
+            config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_VULKAN);
+        }
         else {
             MD_LOG_WARN << "Unsupported device: " << option.device << " switch to Auto." << std::endl;
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_AUTO);
