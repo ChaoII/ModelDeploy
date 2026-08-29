@@ -59,18 +59,24 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["output_url"] = cfg.output_url;
     j["preview_url"] = cfg.preview_url;
     j["enable_preview"] = cfg.enable_preview;
+    j["topology"] = cfg.topology;
 
     j["decoder"]["reconnect_delay_ms"] = cfg.decoder.reconnect_delay_ms;
     j["decoder"]["max_reconnects"] = cfg.decoder.max_reconnects;
     j["decoder"]["timeout_us"] = cfg.decoder.timeout_us;
     j["decoder"]["rtsp_transport"] = cfg.decoder.rtsp_transport;
     j["decoder"]["hw_accel"] = cfg.decoder.hw_accel;
+    j["decoder"]["backend"] = cfg.decoder.backend;
     j["decoder"]["device_only"] = cfg.decoder.device_only;
 
     j["encoder"]["fps"] = cfg.encoder.fps;
+    j["encoder"]["out_width"] = cfg.encoder.out_width;
+    j["encoder"]["out_height"] = cfg.encoder.out_height;
+    j["encoder"]["out_fps"] = cfg.encoder.out_fps;
     j["encoder"]["bitrate_kbps"] = cfg.encoder.bitrate_kbps;
     j["encoder"]["gop"] = cfg.encoder.gop;
     j["encoder"]["codec"] = cfg.encoder.codec;
+    j["encoder"]["backend"] = cfg.encoder.backend;
     j["encoder"]["preset"] = cfg.encoder.preset;
     j["encoder"]["tune"] = cfg.encoder.tune;
     j["encoder"]["format"] = cfg.encoder.format;
@@ -108,6 +114,7 @@ TaskConfig task_config_from_json(const json& j) {
     if (j.contains("preview_url") && j["preview_url"].is_string()) cfg.preview_url = j["preview_url"];
     if (j.contains("enable_preview") && j["enable_preview"].is_boolean()) cfg.enable_preview = j["enable_preview"];
     else if (j.contains("enable_preview") && j["enable_preview"].is_number()) cfg.enable_preview = j["enable_preview"].get<int>() != 0;
+    cfg.topology = j.value("topology", std::string("per_channel"));
 
     if (j.contains("decoder") && j["decoder"].is_object()) {
         auto& d = j["decoder"];
@@ -116,15 +123,20 @@ TaskConfig task_config_from_json(const json& j) {
         if (d.contains("timeout_us")) cfg.decoder.timeout_us = d["timeout_us"];
         if (d.contains("rtsp_transport") && d["rtsp_transport"].is_string()) cfg.decoder.rtsp_transport = d["rtsp_transport"];
         if (d.contains("hw_accel") && d["hw_accel"].is_string()) cfg.decoder.hw_accel = d["hw_accel"];
+        if (d.contains("backend") && d["backend"].is_string()) cfg.decoder.backend = d["backend"];
         if (d.contains("device_only") && d["device_only"].is_boolean()) cfg.decoder.device_only = d["device_only"];
     }
 
     if (j.contains("encoder") && j["encoder"].is_object()) {
         auto& e = j["encoder"];
         if (e.contains("fps")) cfg.encoder.fps = e["fps"];
+        if (e.contains("out_width")) cfg.encoder.out_width = e["out_width"];
+        if (e.contains("out_height")) cfg.encoder.out_height = e["out_height"];
+        if (e.contains("out_fps")) cfg.encoder.out_fps = e["out_fps"];
         if (e.contains("bitrate_kbps")) cfg.encoder.bitrate_kbps = e["bitrate_kbps"];
         if (e.contains("gop")) cfg.encoder.gop = e["gop"];
         if (e.contains("codec") && e["codec"].is_string()) cfg.encoder.codec = e["codec"];
+        if (e.contains("backend") && e["backend"].is_string()) cfg.encoder.backend = e["backend"];
         if (e.contains("preset") && e["preset"].is_string()) cfg.encoder.preset = e["preset"];
         if (e.contains("tune") && e["tune"].is_string()) cfg.encoder.tune = e["tune"];
         if (e.contains("format") && e["format"].is_string()) cfg.encoder.format = e["format"];
@@ -161,3 +173,4 @@ TaskConfig task_config_from_json(const json& j) {
     }
     return cfg;
 }
+

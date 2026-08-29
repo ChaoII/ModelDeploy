@@ -56,9 +56,17 @@ GstEncoder::~GstEncoder() {
     teardown();
 }
 
-bool GstEncoder::runtime_available() const { return gstreamer_x264_available(); }
+bool GstEncoder::runtime_available() const {
+    // 任一编码元素可用即视为后端可用：软编 x264enc、nvh264enc、L4T nvv4l2h264enc、算能 bmh264enc。
+    // 不同平台 gstreamer 的编码插件集不同（如 Sophgo linaro 可能无 x264enc 但有 bmh264enc）。
+    if (x264_and_mux_available()) return true;
+    if (nvh264enc_available() ||
+        nvv4l2h264enc_available() ||
+        bmh264enc_available()) return true;
+    return false;
+}
 
-bool GstEncoder::gstreamer_x264_available() {
+bool GstEncoder::x264_and_mux_available() {
     md_gst_init_once();
     if (!g_gst_initialized.load()) return false;
     bool ok = true;
@@ -95,12 +103,37 @@ bool GstEncoder::vaapih264enc_available() {
 }
 #endif
 
+bool GstEncoder::nvv4l2h264enc_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // Jetson L4T 的 nvv4l2h264enc（gst-nvvideo4linux2）。桌面 gst-plugins-bad 无此插件名，
+    // 故桌面/CUDA 场景仍走 nvh264enc；本探测用于 L4T 上 CPU 主机帧→V4L2 硬编码。
+    GstElementFactory* f = gst_element_factory_find("nvv4l2h264enc");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+bool GstEncoder::bmh264enc_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // 算能 SOPHGO BM H264 硬件编码器插件（sophon-gstreamer bmcodec 库，运行时须
+    // GST_PLUGIN_PATH 指向 /opt/sophon/sophon-gstreamer_*/lib）。桌面 gstreamer 无此插件。
+    GstElementFactory* f = gst_element_factory_find("bmh264enc");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
 // 决议本次会话的编码元素：
-//   codec=="nvh264enc" → 硬编（不可用则报错 no-nvh264enc）
+//   codec=="nvh264enc" → 硬编 nvcodec（不可用则报错 no-nvh264enc）
+//   codec=="nvv4l2h264enc" → Jetson L4T V4L2 硬编（不可用则报错 no-nvv4l2h264enc）
+//   codec=="bmh264enc" → 算能 SOPHGO BM 硬编（不可用则报错 no-bmh264enc）
 //   codec=="vaapih264enc" → VAAPI 硬编（不可用则报错 no-vaapih264enc；仅 ENABLE_VAAPI 编译时支持）
 //   codec=="x264enc"/空 → 软编 x264enc
-//   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则 nv 硬编；否则 hw_accel∈{Auto,Vaapi} 且
-//     vaapih264enc 存在则 VAAPI 硬编；否则回退软编 x264enc
+//   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则 nv 硬编（优先，支持 GPU-direct）；
+//     否则 hw_accel∈{Auto,Cuda} 且 nvv4l2h264enc 存在则 L4T V4L2 硬编（CPU 帧）；否则 hw_accel∈{Auto,Vaapi}
+//     且 vaapih264enc 存在则 VAAPI 硬编；否则回退软编 x264enc
 //   Sophgo：GStreamer 无对应编码插件（未实现/未验证），显式 Sophgo 走 unsupported-codec fail-closed。
 //   其余名称（libx264 / h264_nvenc 等 GStreamer 不支持的）→ unsupported-codec。
 int GstEncoder::resolve_encoder(std::string* err) {
@@ -108,6 +141,10 @@ int GstEncoder::resolve_encoder(std::string* err) {
     int choice = -1;
     if (codec == "nvh264enc") {
         choice = 1;
+    } else if (codec == "nvv4l2h264enc") {
+        choice = 3;
+    } else if (codec == "bmh264enc") {
+        choice = 4;
     } else if (codec == "x264enc" || codec.empty()) {
         choice = 0;
 #ifdef ENABLE_VAAPI
@@ -118,6 +155,8 @@ int GstEncoder::resolve_encoder(std::string* err) {
         const bool want_nv = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda);
         if (want_nv && nvh264enc_available()) {
             choice = 1;
+        } else if (want_nv && nvv4l2h264enc_available()) {
+            choice = 3;
 #ifdef ENABLE_VAAPI
         } else if ((cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Vaapi) &&
                    vaapih264enc_available()) {
@@ -134,22 +173,33 @@ int GstEncoder::resolve_encoder(std::string* err) {
         set_err(err, "no-nvh264enc");
         return -1;
     }
+    if (choice == 3 && !nvv4l2h264enc_available()) {
+        set_err(err, "no-nvv4l2h264enc");
+        return -1;
+    }
+    if (choice == 4 && !bmh264enc_available()) {
+        set_err(err, "no-bmh264enc");
+        return -1;
+    }
 #ifdef ENABLE_VAAPI
     if (choice == 2 && !vaapih264enc_available()) {
         set_err(err, "no-vaapih264enc");
         return -1;
     }
 #endif
-    if (choice == 0 && !gstreamer_x264_available()) {
+    if (choice == 0 && !x264_and_mux_available()) {
         set_err(err, "no-x264enc");
         return -1;
     }
-    // GPU 直编（gpu_direct_input）只能走 nvh264enc 设备路径（CUDA memory 直编）
+    // GPU 直编（gpu_direct_input）只能走 nvh264enc 的 CUDA memory 设备路径；
+    // L4T nvv4l2h264enc（choice 3）走 V4L2，不接 CUDAMemory，故 gpu_direct 时禁用它。
     if (cfg_.gpu_direct_input && choice != 1) {
         set_err(err, "gpu-direct-needs-nvh264enc");
         return -1;
     }
     encoder_is_nv_ = (choice == 1);
+    encoder_is_l4t_ = (choice == 3);
+    encoder_is_bm_ = (choice == 4);
 #ifdef ENABLE_VAAPI
     encoder_is_vaapi_ = (choice == 2);
 #endif
@@ -210,6 +260,17 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
         encoder_part = " nvh264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
                        " gop-size=" + std::to_string(cfg_.gop) +
                        (cfg_.low_latency ? " zerolatency=true" : "");
+    } else if (enc == 3) {
+        // Jetson L4T nvv4l2h264enc：bitrate 单位 kbit/sec（VERIFY：随 L4T 版本可能为 bps）、
+        // GOP 关键帧间隔属性名是 iframeinterval；经 videoconvert 由 CPU 主机帧（BGR→NV12）喂入。
+        encoder_part = " nvv4l2h264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
+                       " iframeinterval=" + std::to_string(cfg_.gop) +
+                       (cfg_.low_latency ? " control-rate=2" : "");
+    } else if (enc == 4) {
+        // 算能 SOPHGO BM H264 硬编（bmh264enc）：bps 单位是 bit/sec（非 kbit），GOP 属性名 gop。
+        // 经 videoconvert 由 CPU 主机帧（BGR→NV12）喂入。底层 BM VPU 硬件编码。
+        encoder_part = " bmh264enc bps=" + std::to_string(cfg_.bitrate_kbps * 1000) +
+                       " gop=" + std::to_string(cfg_.gop);
 #ifdef ENABLE_VAAPI
     } else if (enc == 2) {
         // vaapih264enc：bitrate 单位 kbit/sec；GOP 关键帧间隔属性名因 gst-vaapi 版本而异
@@ -352,7 +413,8 @@ bool GstEncoder::encode_cpu(const modeldeploy::vision::ImageData& image, uint64_
     }
     stats_.frames_out++;
     auto t1 = std::chrono::steady_clock::now();
-    stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    encode_avg_sum_ += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    stats_.avg_encode_ms = stats_.frames_in > 0 ? encode_avg_sum_ / static_cast<double>(stats_.frames_in) : 0.0;
     return true;
 }
 
@@ -424,7 +486,8 @@ bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint64_
     }
     stats_.frames_out++;
     auto t1 = std::chrono::steady_clock::now();
-    stats_.avg_encode_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    encode_avg_sum_ += std::chrono::duration<double, std::milli>(t1 - t0).count();
+    stats_.avg_encode_ms = stats_.frames_in > 0 ? encode_avg_sum_ / static_cast<double>(stats_.frames_in) : 0.0;
     return true;
 #else
     (void)image;
@@ -517,6 +580,8 @@ void GstEncoder::teardown() {
     pts_ = 0;
     opened_ = false;
     encoder_is_nv_ = false;
+    encoder_is_l4t_ = false;
+    encoder_is_bm_ = false;
 #ifdef ENABLE_VAAPI
     encoder_is_vaapi_ = false;
 #endif

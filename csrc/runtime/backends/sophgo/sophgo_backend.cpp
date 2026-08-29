@@ -62,6 +62,8 @@ namespace {
             cached_out_mems_ = nullptr;
         }
         io_cached_ = false;
+        delete static_cast<bm_misc_info*>(misc_info_);
+        misc_info_ = nullptr;
         // engine_ 为 shared_ptr：最后一个引用析构时自动 bmrt_destroy + bm_dev_free。
         engine_.reset();
     }
@@ -75,7 +77,10 @@ namespace {
         auto engine = std::make_shared<SophgoBackend::Engine>();
         engine->bmodel_path = option.sophgo_option.bmodel_path.empty()
             ? option.model_file : option.sophgo_option.bmodel_path;
-        const int device_id = option.device_id;
+        // device_id 默认 -1（use_sophgo_backend 只设 TPU 不动它），bm_dev_request(-1) 会失败，
+        // 此处兜底为 0 号设备，避免“默认配置无法初始化”的坑。
+        const int device_id = (option.device_id >= 0) ? option.device_id
+                              : (option.sophgo_option.device_id >= 0 ? option.sophgo_option.device_id : 0);
 
         bm_handle_t h = nullptr;
         if (bm_dev_request(&h, device_id) != BM_SUCCESS) {
@@ -83,9 +88,11 @@ namespace {
             return false;
         }
         engine->handle = static_cast<void*>(h);
-        static bm_misc_info m{};
-        bm_get_misc_info(h, &m);
-        misc_info_ = &m;
+        // 每实例各自持有 bm_misc_info，避免进程级 static 被多实例/多线程争写读到陈旧值。
+        delete static_cast<bm_misc_info*>(misc_info_);
+        auto* m = new bm_misc_info{};
+        bm_get_misc_info(h, m);
+        misc_info_ = m;
 
         void* bmrt = bmrt_create(h);
         if (!bmrt) {
@@ -203,23 +210,72 @@ namespace {
             // 输出 shape/dtype 以 bmodel 静态信息为准（bmrt_launch_tensor 可能改写 out_t[i]）
             const auto os = info->stages[0].output_shapes[i];
             std::vector<int64_t> shape64(os.dims, os.dims + os.num_dims);
-            outputs_desc_[i].dtype = bm_dtype_to_md(info->output_dtypes[i]);
-            (*outputs)[i].allocate(shape64, outputs_desc_[i].dtype, Device::CPU, outputs_desc_[i].name);
-            if (is_soc && out_t[i].dtype == BM_FLOAT32) {
+            const bm_data_type_t od = info->output_dtypes[i];
+            outputs_desc_[i].dtype = bm_dtype_to_md(od);
+            (*outputs)[i].allocate(shape64, DataType::FP32, Device::CPU, outputs_desc_[i].name);
+            const uint8_t* src = nullptr;
+            std::vector<uint8_t> scratch;
+            if (is_soc) {
                 unsigned long long addr = 0;
                 if (bm_mem_mmap_device_mem(h, &out_t[i].device_mem, &addr) != BM_SUCCESS ||
                     bm_mem_invalidate_device_mem(h, &out_t[i].device_mem) != BM_SUCCESS) {
                     MD_LOG_ERROR << "[SophgoBackend] mmap output failed." << std::endl;
                     return false;
                 }
-                memcpy((*outputs)[i].data(), reinterpret_cast<void*>(addr),
-                       static_cast<size_t>(bm_mem_get_device_size(out_t[i].device_mem)));
+                scratch.assign(reinterpret_cast<uint8_t*>(addr),
+                               reinterpret_cast<uint8_t*>(addr) +
+                                   static_cast<size_t>(bm_mem_get_device_size(out_t[i].device_mem)));
                 bm_mem_unmap_device_mem(h, reinterpret_cast<void*>(addr),
                                         bm_mem_get_device_size(out_t[i].device_mem));
+                src = scratch.data();
             } else {
-                if (bm_memcpy_d2s(h, (*outputs)[i].data(), out_t[i].device_mem) != BM_SUCCESS) {
+                scratch.resize(static_cast<size_t>(bm_mem_get_device_size(out_t[i].device_mem)));
+                if (bm_memcpy_d2s(h, scratch.data(), out_t[i].device_mem) != BM_SUCCESS) {
                     MD_LOG_ERROR << "[SophgoBackend] bm_memcpy_d2s(output) failed." << std::endl;
                     return false;
+                }
+                src = scratch.data();
+            }
+            // 统一成 FP32 结果（Data 层无 FP16/BF16 类型）。SOC/PIce 均先取原始字节再转主机。
+            float* dst = reinterpret_cast<float*>((*outputs)[i].data());
+            if (od == BM_FLOAT16) {
+                const uint16_t* p16 = reinterpret_cast<const uint16_t*>(src);
+                const size_t n = bm_mem_get_device_size(out_t[i].device_mem) / 2;
+                for (size_t k = 0; k < n; ++k) {
+                    const uint32_t u = p16[k];
+                    const uint32_t s = (u & 0x8000u) << 16;
+                    const uint32_t e = (u & 0x7c00u);
+                    const uint32_t m = (u & 0x03ffu);
+                    uint32_t bits = 0;
+                    if (e == 0) {  // 零或次正规
+                        if (m == 0) bits = s;
+                        else {  // 次正规 → 正规
+                            uint32_t mm = m;
+                            int re = 127 - 15 + 1;
+                            while (!(mm & 0x400u)) { mm <<= 1; --re; }
+                            bits = s | (static_cast<uint32_t>(re) << 23) | ((mm & 0x3ffu) << 13);
+                        }
+                    } else if (e == 0x7c00u) {  // inf / nan
+                        bits = s | 0x7f800000u | (m << 13);
+                    } else {  // 正规
+                        bits = s | ((e + (127 - 15)) << 23) | (m << 13);
+                    }
+                    dst[k] = *reinterpret_cast<float*>(&bits);
+                }
+            } else if (od == BM_BFLOAT16) {
+                const uint16_t* p16 = reinterpret_cast<const uint16_t*>(src);
+                const size_t n = bm_mem_get_device_size(out_t[i].device_mem) / 2;
+                for (size_t k = 0; k < n; ++k) {
+                    const uint32_t bits = static_cast<uint32_t>(p16[k]) << 16;
+                    dst[k] = *reinterpret_cast<const float*>(&bits);
+                }
+            } else {
+                // FP32/int8 等原始字节数与 FP32 输出字节数一致（int8 亦按 numel 扩展，见下）
+                const size_t raw = static_cast<size_t>(bm_mem_get_device_size(out_t[i].device_mem));
+                if (raw >= (*outputs)[i].byte_size()) {
+                    memcpy(dst, src, (*outputs)[i].byte_size());
+                } else {
+                    memcpy(dst, src, raw);
                 }
             }
         }

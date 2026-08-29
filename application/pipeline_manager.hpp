@@ -7,8 +7,6 @@
 
 #include "config.hpp"
 #include "pipeline.hpp"
-#include "stream_hub.hpp"
-#include "batch_scheduler.hpp"
 
 /// 任务状态摘要
 struct TaskStatus {
@@ -71,11 +69,6 @@ public:
     /// 停止所有任务
     void stop_all();
 
-    /// 启动/停止 BatchScheduler
-    bool start_batch_scheduler();
-    void stop_batch_scheduler();
-    BatchScheduler* batch_scheduler() { return &batch_scheduler_; }
-
     // ── 持久化 ──
     /// 从目录加载模型库与任务配置
     bool load_from_directory(const std::string& dir);
@@ -103,11 +96,9 @@ public:
 
 private:
     mutable std::mutex mtx_;
-    BatchScheduler batch_scheduler_{8, 4};
     std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
     std::vector<ModelConfig> model_library_;
     std::atomic<bool> dirty_{false};
-    StreamHub stream_hub_;
 
     // 模型 prototype 缓存：只加载一次，后续 clone（共享 Runtime）
     struct ModelPrototype {

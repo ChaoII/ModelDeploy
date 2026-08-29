@@ -1,122 +1,87 @@
 #include <catch2/catch_test_macros.hpp>
 #include "infer_group.hpp"
-#include <opencv2/core.hpp>
+#include "csrc/vision/common/image_data.h"
+#include <fstream>
+#include <vector>
 
-TEST_CASE("InferGroup construct/destroy", "[infer_group]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
-    InferGroup group(cfg);
-    REQUIRE_FALSE(group.ready());
+using modeldeploy::vision::ImageData;
+using modeldeploy::vision::DetectionResult;
+
+static ImageData tiny_image() {
+    std::vector<uint8_t> buf(16 * 16 * 3, 0);
+    return ImageData::from_raw(buf.data(), 16, 16, MdImageType::PKG_BGR_U8, true);
 }
 
-TEST_CASE("InferGroup init without models", "[infer_group]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
-    InferGroup group(cfg);
-    REQUIRE_FALSE(group.init());
-    REQUIRE_FALSE(group.ready());
+TEST_CASE("InferGroup empty by default", "[infer_group]") {
+    InferGroup g;
+    REQUIRE(g.empty());
 }
 
-TEST_CASE("InferGroup init with nonexistent model", "[infer_group]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
+TEST_CASE("InferGroup run_models on empty returns false", "[infer_group]") {
+    InferGroup g;
+    auto img = tiny_image();
+    std::vector<std::pair<std::string, std::vector<DetectionResult>>> dets;
+    REQUIRE_FALSE(g.run_models(img, &dets));
+    REQUIRE(dets.empty());
+}
+
+TEST_CASE("InferGroup remove/clear on empty is safe", "[infer_group]") {
+    InferGroup g;
+    REQUIRE_FALSE(g.remove_model("nonexistent"));
+    g.clear();
+    REQUIRE(g.empty());
+}
+
+TEST_CASE("InferGroup add nonexistent model fails", "[infer_group]") {
+    InferGroup g;
     ModelConfig m;
     m.name = "det";
     m.type = "detection";
     m.path = "/nonexistent.onnx";
-    cfg.models.push_back(m);
-    InferGroup group(cfg);
-    REQUIRE_FALSE(group.init());
+    REQUIRE_FALSE(g.add_model(m, nullptr));
+    REQUIRE(g.empty());
 }
 
-TEST_CASE("InferGroup batch_only mode", "[infer_group][gpu]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
-    {
-        // 无模型：batch_only 仍不应 ready（models 为空 → gpu 直通 false）
-        InferGroup g0(cfg, nullptr, true);
-        REQUIRE_FALSE(g0.init());
+TEST_CASE("InferGroup config_of returns nullptr when empty", "[infer_group]") {
+    InferGroup g;
+    REQUIRE(g.config_of("det") == nullptr);
+}
+
+TEST_CASE("InferGroup run_models with non_det out-param", "[infer_group]") {
+    InferGroup g;
+    auto img = tiny_image();
+    std::vector<std::pair<std::string, std::vector<DetectionResult>>> dets;
+    std::vector<std::pair<std::string, InferResult>> non_det;
+    REQUIRE_FALSE(g.run_models(img, &dets, &non_det));
+    REQUIRE(dets.empty());
+    REQUIRE(non_det.empty());
+}
+
+TEST_CASE("InferGroup det_model on empty returns nullptr", "[infer_group]") {
+    InferGroup g;
+    REQUIRE(g.det_model("det") == nullptr);
+}
+
+TEST_CASE("InferGroup load_models empty returns true", "[infer_group]") {
+    InferGroup g;
+    REQUIRE(g.load_models({}, nullptr));
+    REQUIRE(g.empty());
+}
+
+// 集成：需要真实检测模型文件，无 test_data 时跳过
+TEST_CASE("InferGroup real detection model integration", "[infer_group][integration]") {
+    const std::string model = "E:/CLionProjects/ModelDeploy/test_data/test_models/yolo11n_nms.onnx";
+    if (!std::ifstream(model).good()) {
+        SKIP("real detection model absent; skipping integration");
     }
-    // 全 detection + gpu + 无 ROI → gpu_nv12_ready 为 true
+    InferGroup g;
     ModelConfig m;
-    m.name = "det";
+    m.name = "yolo11n";
     m.type = "detection";
-    m.device = "gpu";
-    m.path = "/nonexistent.onnx";   // batch_only 不建引擎，路径无关
-    cfg.models.push_back(m);
-    {
-        InferGroup g(cfg, nullptr, true);
-        REQUIRE(g.init());
-        REQUIRE(g.batch_only());
-        REQUIRE(g.ready());
-        REQUIRE(g.gpu_nv12_ready());
-        // run_models 被调用 → 记错返回 0
-        std::vector<InferResult> results;
-        REQUIRE(g.run_models(nullptr, nullptr, nullptr, nullptr, 640, 640, 640, 640, &results) == 0);
-        // add/remove/update 均返回 false
-        REQUIRE_FALSE(g.add_model(m));
-        REQUIRE_FALSE(g.remove_model("det"));
-        REQUIRE_FALSE(g.update_model("det", m));
-    }
-    // 含非 detection → gpu_nv12_ready 为 false
-    {
-        ModelConfig ocr = m;
-        ocr.name = "ocr";
-        ocr.type = "ocr";
-        cfg.models.push_back(ocr);
-        InferGroup g(cfg, nullptr, true);
-        REQUIRE(g.init());
-        REQUIRE_FALSE(g.gpu_nv12_ready());
-    }
-}
-
-TEST_CASE("InferGroup add/remove model dynamic", "[infer_group]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
-    cfg.models.push_back({"det", "detection", "/m/yolo.onnx"});
-    InferGroup group(cfg);
-    // init will fail but add_model should work independently
-    ModelConfig m2;
-    m2.name = "face";
-    m2.type = "detection";
-    m2.path = "/m/face.onnx";
-    // Can't test full flow without real models, just check no crash
-    // REQUIRE_FALSE(group.add_model(m2));  // will fail (no real file), but shouldn't crash
-    // REQUIRE_FALSE(group.remove_model("nonexistent"));
-}
-
-TEST_CASE("InferGroup update model config", "[infer_group]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
-    InferGroup group(cfg);
-    ModelConfig m;
-    m.name = "det";
-    // should not crash
-    REQUIRE_FALSE(group.update_model("det", m));
-}
-
-TEST_CASE("InferGroup concurrent model ops do not deadlock", "[infer_group][stress]") {
-    TaskConfig cfg;
-    cfg.input_url = "rtsp://in";
-    cfg.output_url = "rtsp://out";
-    for (int round = 0; round < 8; ++round) {
-        auto group = std::make_unique<InferGroup>(cfg);
-        ModelConfig m;
-        m.name = "det";
-        m.type = "detection";
-        m.path = "/nonexistent.onnx";
-        // 并发 add/remove/update：models_mtx_ 串行化，不应死锁/崩溃
-        std::thread t1([&] { for (int i = 0; i < 30; ++i) group->add_model(m); });
-        std::thread t2([&] { for (int i = 0; i < 30; ++i) group->remove_model("det"); });
-        std::thread t3([&] { for (int i = 0; i < 30; ++i) group->update_model("det", m); });
-        t1.join(); t2.join(); t3.join();
-        group.reset();  // 析构：stop_workers + warmup join，不应挂死
-    }
-    REQUIRE(true);
+    m.path = model;
+    m.device = "cpu";
+    m.input_size = {640, 640};
+    REQUIRE(g.add_model(m, nullptr));
+    REQUIRE_FALSE(g.empty());
+    REQUIRE(g.det_model("yolo11n") != nullptr);
 }

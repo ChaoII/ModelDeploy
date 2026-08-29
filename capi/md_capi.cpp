@@ -3866,25 +3866,104 @@ MDStatus md_draw_result(MDImageHandle img, MDResultHandle res, const MDDrawOptio
                           (int)image.device());
             return MD_ERR_NOT_IMPLEMENTED;
         }
+        // 设备分支：就地绘制，不实现 D2H 存图（save_result/font_path 对设备绘制忽略）。
+        // iseg/sem/depth 的 CUDA device 方法已实现；Sophgo 等其他设备后端若未实现该
+        // vis_*_nv12 仍会返回 false 并转 MD_ERR_INVALID_ARGUMENT。
+        modeldeploy::vision::VisionProcessorBackend::VisOptions vo;
+        vo.threshold = threshold;
+        vo.font_size = font_size;
+        vo.alpha = alpha;
+        vo.label_map = label_map;
         bool ok = false;
         switch (rh->kind) {
             case MD_RES_DETECTION: {
                 auto* d = raw_result<DetectionResult>(rh);
-                if (!d) return MD_ERR_INVALID_ARGUMENT;
-                for (const auto& r : d->v) {
-                    if (r.score < threshold) continue;
-                    const auto& box = r.box;
-                    ok = draw_backend->draw_rect_nv12(image, box.x, box.y, box.width, box.height,
-                                                      255, 0, 0, 2) || ok;
-                    ok = draw_backend->draw_text_nv12(image, box.x, box.y - 16,
-                                                      std::to_string(r.label_id), 255, 255, 255, 1) || ok;
+                if (d) ok = draw_backend->vis_det_nv12(image, d->v, vo);
+                break;
+            }
+            case MD_RES_OBB: {
+                auto* d = raw_result<ObbResult>(rh);
+                if (d) ok = draw_backend->vis_obb_nv12(image, d->v, vo);
+                break;
+            }
+            case MD_RES_POSE: {
+                auto* d = raw_result<KeyPointsResult>(rh);
+                if (d) ok = draw_backend->vis_pose_nv12(image, d->v, vo);
+                break;
+            }
+            case MD_RES_FACE: {
+                auto* d = raw_result<KeyPointsResult>(rh);
+                if (d) ok = draw_backend->vis_keypoints_nv12(image, d->v, vo, false);
+                break;
+            }
+            case MD_RES_INSIGHTFACE: {
+                auto* d = raw_result<face::InsightFaceResult>(rh);
+                if (d) {
+                    std::vector<KeyPointsResult> kpr;
+                    kpr.reserve(d->v.size());
+                    for (const auto& r : d->v) {
+                        KeyPointsResult kp;
+                        kp.box = Rect2f{r.bbox[0], r.bbox[1], r.bbox[2] - r.bbox[0], r.bbox[3] - r.bbox[1]};
+                        kp.score = r.det_score;
+                        for (const auto& p : r.kps) kp.keypoints.emplace_back(p[0], p[1], 0.f);
+                        kpr.push_back(std::move(kp));
+                    }
+                    ok = draw_backend->vis_keypoints_nv12(image, kpr, vo, false);
                 }
-                return ok ? MD_OK : MD_ERR_INVALID_ARGUMENT;
+                break;
+            }
+            case MD_RES_OCR: {
+                auto* d = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data));
+                if (d) ok = draw_backend->vis_ocr_nv12(image, d->value, vo);
+                break;
+            }
+            case MD_RES_LPR: {
+                auto* d = raw_result<LprResult>(rh);
+                if (d) ok = draw_backend->vis_lpr_nv12(image, d->v, vo);
+                break;
+            }
+            case MD_RES_ATTR: {
+                auto* d = raw_result<AttributeResult>(rh);
+                if (d) {
+                    std::vector<int> ab;
+                    if (opt.abnormal_ids && opt.abnormal_ids_size > 0)
+                        ab.assign(opt.abnormal_ids, opt.abnormal_ids + opt.abnormal_ids_size);
+                    ok = draw_backend->vis_attr_nv12(image, d->v, vo, ab, opt.show_attr != 0);
+                }
+                break;
+            }
+            case MD_RES_CLASSIFICATION: {
+                auto* d = raw_result<ClassifyResult>(rh);
+                if (d) {
+                    // 空分类结果与 CPU 分支一致视为无绘制的成功，而非错误。
+                    ok = d->v.empty() ? true : draw_backend->vis_cls_nv12(image, d->v[0], vo, 1);
+                }
+                break;
+            }
+            case MD_RES_INSTANCE_SEG: {
+                auto* d = raw_result<InstanceSegResult>(rh);
+                if (d) ok = draw_backend->vis_iseg_nv12(image, d->v, vo);
+                break;
+            }
+            case MD_RES_SEM_SEG: {
+                auto* d = dynamic_cast<SingleResult<SemSegResult>*>(static_cast<ResultDataBase*>(rh->data));
+                if (d) ok = draw_backend->vis_sem_nv12(image, d->value, vo);
+                break;
+            }
+            case MD_RES_DEPTH: {
+                auto* d = dynamic_cast<SingleResult<DepthResult>*>(static_cast<ResultDataBase*>(rh->data));
+                if (d) ok = draw_backend->vis_depth_nv12(image, d->value, vo, true);
+                break;
             }
             default:
-                set_error_fmt("md_draw_result: device draw for kind %d not yet implemented", (int)rh->kind);
-                return MD_ERR_NOT_IMPLEMENTED;
+                set_error_fmt("md_draw_result: unsupported result kind %d for device draw", (int)rh->kind);
+                return MD_ERR_UNSUPPORTED_TYPE;
         }
+        if (!ok) {
+            set_error("md_draw_result: device draw failed");
+            return MD_ERR_INVALID_ARGUMENT;
+        }
+        return MD_OK;
     }
 
     try {

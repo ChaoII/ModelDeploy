@@ -65,3 +65,23 @@ TEST_CASE("Config all fields", "[config]") {
     REQUIRE(cfg.models[0].labels.size() == 2);
     REQUIRE(cfg.models[0].labels[0] == "person");
 }
+
+TEST_CASE("encoder out dims + topology roundtrip", "[config]") {
+    TaskConfig cfg;
+    cfg.id = "t1";
+    cfg.topology = "mosaic";
+    cfg.encoder.out_width = 1280;
+    cfg.encoder.out_height = 720;
+    cfg.encoder.out_fps = 25;
+    auto j = task_config_to_json(cfg);
+    auto back = task_config_from_json(j);
+    REQUIRE(back.topology == "mosaic");
+    REQUIRE(back.encoder.out_width == 1280);
+    REQUIRE(back.encoder.out_height == 720);
+    REQUIRE(back.encoder.out_fps == 25);
+}
+
+TEST_CASE("topology backward compat default", "[config]") {
+    TaskConfig cfg2;
+    REQUIRE(cfg2.topology == "per_channel");
+}

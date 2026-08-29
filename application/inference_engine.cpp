@@ -44,6 +44,11 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     else if (cfg.backend == "mnn") {
         opt.use_mnn_backend();
     }
+    // ── Sophgo（算能 TPU）后端 ──
+    else if (cfg.backend == "sophgo" || cfg.device == "tpu") {
+        opt.use_sophgo_backend();
+        opt.device_id = 0;   // use_sophgo_backend() 默认 device_id=-1，须显式 0（否则 bm_dev_request(-1) 失败）
+    }
     // ── ORT 后端（默认）—— GPU 走 CUDA EP（首次即快速可用）；TRT EP 在线构建需数分钟，
     // 需要时显式用 backend="trt" + .engine 文件走纯 TRT 后端（见上） ──
     else {

@@ -24,11 +24,21 @@ namespace modeldeploy {
         }
         option_ = option.trt_option;
         option_.model_file = option.model_file;
-        option_.gpu_id = option.device_id;
+        // 请求的设备号可能非法（含调用方传入未初始化值）；钳制回退到 0，避免 cudaSetDevice 失败
+        int num = 0;
+        cudaGetDeviceCount(&num);
+        int gpu = (option.device_id < 0) ? 0 : option.device_id;
+        if (gpu >= num || num <= 0) {
+            MD_LOG_WARN << "Requested CUDA device " << gpu
+                << " is invalid (device count=" << num << "); falling back to device 0." << std::endl;
+            gpu = 0;
+        }
+        option_.gpu_id = gpu;
         option_.enable_fp16 = option.enable_fp16; // 同步用户设置的 FP16 标志
         const cudaError_t error = cudaSetDevice(option_.gpu_id);
         if (error != cudaSuccess) {
-            MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
+            MD_LOG_ERROR << "Failed to set CUDA device " << option_.gpu_id << ": " << error
+                << " (" << cudaGetErrorString(error) << ")" << std::endl;
             return false;
         }
         // 记录实际要加载的模型路径（可能是原始文件，也可能是 memory buffer 的临时文件）
@@ -237,6 +247,7 @@ namespace modeldeploy {
             if (cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking) != 0) {
                 MD_LOG_FATAL << "Cannot call cudaStreamCreate()." << std::endl;
             }
+            owns_stream_ = true;
             return load_trt_cache(model_buffer_);
         }
         else {
@@ -252,16 +263,19 @@ namespace modeldeploy {
             if (cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking) != 0) {
                 MD_LOG_FATAL << "Cannot call cudaStreamCreate()." << std::endl;
             }
+            owns_stream_ = true;
             return load_trt_cache(model_buffer_);
         }
     }
 
     TrtBackend::~TrtBackend() {
-        // 重要：必须按照正确的顺序销毁对象
-        if (stream_ != nullptr && option_.external_stream != nullptr) {
+        // 重要：必须按照正确的顺序销毁对象。
+        // 只销毁后端自建的 stream；借用的外部 stream 归属调用方，绝不销毁。
+        if (owns_stream_ && stream_ != nullptr) {
             cudaStreamSynchronize(stream_);
             cudaStreamDestroy(stream_);
             stream_ = nullptr;
+            owns_stream_ = false;
         }
         // 1. 首先销毁执行上下文
         context_.reset();
@@ -407,7 +421,9 @@ namespace modeldeploy {
             auto name = outputs_desc_[j].name;
             nvinfer1::Dims dims = context_->getTensorShape(name.c_str());
             std::vector<int64_t> shape(dims.d, dims.d + dims.nbDims);
-            (*outputs)[j].allocate(shape, DataType::FP32, Device::CPU, name);
+            // 用输出真实 dtype 分配主机缓冲，避免 FP16/INT8 引擎按 FP32 分配/拷贝导致越界读。
+            const DataType out_dtype = trt_dtype_to_md_dtype(outputs_desc_[j].dtype);
+            (*outputs)[j].allocate(shape, out_dtype, Device::CPU, name);
             const void* device_buffer = context_->getTensorAddress(name.c_str());
             cudaMemcpyAsync((*outputs)[j].data(), device_buffer, (*outputs)[j].byte_size(),
                             cudaMemcpyDeviceToHost, stream_);
@@ -465,17 +481,32 @@ namespace modeldeploy {
 
     std::unique_ptr<BaseBackend> TrtBackend::clone(const RuntimeOption& runtime_option,
                                                    void* stream, const int device_id) {
+        (void)runtime_option;  // 模型引擎以 model_buffer_ 复用，无需重新读盘
         auto new_backend = std::make_unique<TrtBackend>();
-        if (device_id > 0 && device_id != option_.gpu_id) {
-            auto clone_option = option_;
-            clone_option.gpu_id = device_id;
-            clone_option.external_stream = stream;
-            std::string model_buffer;
-            if (!read_binary_from_file(runtime_option.model_file, &model_buffer)) {
-                MD_LOG_FATAL << "Fail to read binary from model file while cloning TrtBackend" << std::endl;
+        // 克隆到新设备（且不是 -1/同设备）：完全重建 runtime + engine + context + stream，
+        // 避免在未初始化（runtime_==nullptr）的新后端上直接反序列化导致空指针崩溃。
+        if (device_id != -1 && device_id != option_.gpu_id) {
+            new_backend->option_ = option_;
+            new_backend->option_.gpu_id = device_id;
+            new_backend->option_.external_stream = stream;
+            new_backend->model_buffer_ = model_buffer_;
+            if (cudaSetDevice(device_id) != cudaSuccess) {
+                MD_LOG_ERROR << "Cannot call cudaSetDevice() while cloning to device " << device_id << "." << std::endl;
+                return nullptr;
             }
-            if (!new_backend->load_trt_cache(model_buffer)) {
-                MD_LOG_FATAL << "Clone model from engine file initialize TrtBackend." << std::endl;
+            if (stream) {
+                new_backend->stream_ = static_cast<cudaStream_t>(stream);
+            } else {
+                if (cudaStreamCreateWithFlags(&new_backend->stream_, cudaStreamNonBlocking) != cudaSuccess) {
+                    MD_LOG_ERROR << "Cannot call cudaStreamCreate() while cloning." << std::endl;
+                    return nullptr;
+                }
+                new_backend->owns_stream_ = true;
+            }
+            new_backend->runtime_.reset(nvinfer1::createInferRuntime(*MDTrtLogger::get()));
+            if (!new_backend->load_trt_cache(new_backend->model_buffer_)) {
+                MD_LOG_ERROR << "Failed to deserialize engine while cloning to device " << device_id << "." << std::endl;
+                return nullptr;
             }
             return new_backend;
         }
@@ -492,6 +523,7 @@ namespace modeldeploy {
                 MD_LOG_ERROR << "Cant not call cudaStreamCreate()." << std::endl;
                 return nullptr;
             }
+            new_backend->owns_stream_ = true;
         }
 
         new_backend->engine_ = engine_;

@@ -74,6 +74,7 @@ private:
     bool opened_ = false;
     bool used_hw_ = false;  // 本次会话是否实际用到硬件（NVENC/VAAPI）编码器
     VideoStats stats_;
+    double encode_avg_sum_ = 0.0;   // 编码耗时累计（供除以帧数得到真实平均）
     std::string err_;
 };
 

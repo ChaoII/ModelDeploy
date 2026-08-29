@@ -3,8 +3,7 @@
 #include <memory>
 #include <atomic>
 #include <thread>
-#include <chrono>
-#include <queue>
+#include <deque>
 #include <mutex>
 #include <condition_variable>
 #include <vector>
@@ -12,68 +11,28 @@
 
 #include "config.hpp"
 #include "perf_stats.hpp"
-#include "stream_decoder.hpp"
-#include "stream_hub.hpp"
 #include "infer_group.hpp"
 #include "draw_engine.hpp"
-#include "stream_encoder.hpp"
-#include "batch_scheduler.hpp"
+#include "video_source.hpp"
+#include "video_sink.hpp"
 
 namespace modeldeploy { namespace vision { class ImageData; } }
 
-/// 解码段→推理段 的待处理帧（持有 NV12 数据所有权或共享指针）
-struct PendingFrame {
-    std::shared_ptr<BroadcastFrame> shared_frame; // StreamHub 共享解码器
-    std::vector<uint8_t> nv12_data;               // 独占解码器：自有 NV12 缓冲
-    int width = 0, height = 0;
-    int64_t pts = 0;
-    double wall_time_sec = 0.0; // 帧到达解码段的墙钟时刻（用于实时丢帧判断）
-    // CUVID 硬解 GPU 帧（零拷贝直通 GPU 预处理）
-    // gpu_nv12 持 GPU buffer 所有权（D2D copy 自 cuvid 复用帧，析构自动 cudaFree）
-    std::shared_ptr<uint8_t> gpu_nv12;
-    const uint8_t* y_plane_device = nullptr;
-    const uint8_t* uv_plane_device = nullptr;
-
-    const uint8_t* y_ptr() const {
-        if (shared_frame) return shared_frame->nv12_data.data();
-        return nv12_data.data();
-    }
-    const uint8_t* uv_ptr() const {
-        size_t y_size = static_cast<size_t>(height) * width;
-        if (shared_frame) return shared_frame->nv12_data.data() + y_size;
-        return nv12_data.data() + y_size;
-    }
-};
-
-/// 推理段→编码段 的已处理帧（已绘制 BGR ImageData）
-struct EncodedFrame {
-    modeldeploy::vision::ImageData bgr_image;
-    int width = 0, height = 0;
-    int64_t pts = 0;
-    // P3 GPU 编码：上游若已产生 GPU BGR（设备指针）则编码段走 encode_from_gpu。
-    // 调用方必须保证 device buffer 生命周期覆盖编码线程消费完成
-    const uint8_t* gpu_bgr = nullptr;
-    // 设备 NV12 快照（紧凑 YUV NV12，step==width）。持所有权，覆盖 encode_loop 消费完成。
-    std::shared_ptr<uint8_t> gpu_nv12;
-};
-
-/// 单路视频流水线：三段异步流水线
-/// 解码线程 (decode) ──[in_queue]──> 推理+绘制线程 (process) ──[out_queue]──> 编码线程 (encode)
-/// 各段独立速率，慢端通过队列丢老帧实现背压，互不拖累
+/// 单路视频流水线：SDK 解码(async)→有界队列→单检测线程(推理+绘制+编码)→SDK 编码(async)
+/// 解码为 SDK 异步 + 缓冲池；检测循环为每帧串行关键路径（detect+draw+encode < 40ms 以达 25fps）。
+/// 背压由有界队列在满时丢最旧帧实现（保最新、控延迟）。
 class Pipeline {
 public:
     using ModelFactory = std::function<std::unique_ptr<InferenceEngine>(const ModelConfig&)>;
 
-    explicit Pipeline(TaskConfig cfg, StreamHub* hub = nullptr,
-                      ModelFactory model_factory = nullptr,
-                      BatchScheduler* batch_scheduler = nullptr);
+    explicit Pipeline(TaskConfig cfg, ModelFactory factory = nullptr);
     ~Pipeline();
 
     bool start();
     void stop();
     bool is_running() const { return running_.load(); }
     bool is_initialized() const { return initialized_.load(); }
-    // 线程安全：多线程读写 init_error_（decode/encode/HTTP）
+    // 线程安全：多线程读写 init_error_（detect/HTTP）
     std::string init_error() const;
     void set_init_error(const std::string& msg);
 
@@ -104,17 +63,13 @@ public:
 
 private:
     TaskConfig cfg_;
-    StreamHub* hub_ = nullptr;
     ModelFactory model_factory_;
-    BatchScheduler* batch_scheduler_ = nullptr;
-    std::shared_ptr<SharedSource> shared_source_;
-    uint64_t shared_token_ = 0;
-    std::unique_ptr<StreamDecoder> decoder_;
-    std::unique_ptr<InferGroup> infer_group_;
-    std::unique_ptr<DrawEngine> draw_engine_;
-    std::unique_ptr<StreamEncoder> encoder_;
+    InferGroup infer_group_;
+    std::unique_ptr<DrawEngine> draw_engine_;   // 非 detection（face/classification）CPU 标注
+    VideoSource src_;
+    VideoSink sink_;
     PerfStats stats_;
-    std::atomic<bool> encoder_opened_{false};
+
     std::atomic<bool> initialized_{false};
     mutable std::mutex init_error_mtx_;
     std::string init_error_;
@@ -124,7 +79,7 @@ private:
     std::shared_ptr<modeldeploy::vision::ImageData> latest_bgr_;
     int snapshot_interval_ = 2;
 
-    // 最新检测框缓存：跳推理帧复用上次结果绘制，保持源帧率编码画面有框
+    // 最新检测结果缓存（保留成员：供跳帧复用绘制的扩展）
     std::vector<InferResult> cached_results_;
 
     // 源流帧率（从解码器自动检测）
@@ -134,45 +89,36 @@ private:
     std::atomic<bool> stopped_{true};       // 防止重复 stop
     // start/stop 生命周期互斥：防止 stop 在线程创建完成前 join（未 join 的 thread 析构会 std::terminate）
     std::mutex lifecycle_mtx_;
-    std::thread decode_thread_;
-    std::thread process_thread_;
-    std::thread encode_thread_;
+    std::thread detect_thread_;
 
-    // 生命周期令牌：SharedSource 在途回调持有其强引用；release_resources 时置 false，
-    // 保证任务析构后解码线程的快照回调不再触碰 this（防 use-after-free）
+    // 生命周期令牌：解码回调持有其强引用；release_resources 时置 false，
+    // 保证任务析构后解码线程的在途回调不再触碰 this（防 use-after-free）
     std::shared_ptr<std::atomic<bool>> alive_token_;
 
-    // ── 解码段 → 推理段 ──
-    std::queue<PendingFrame> in_queue_;
-    std::mutex in_mtx_;
-    std::condition_variable in_cv_;
-    size_t in_max_size_ = 3;
-    bool block_on_in_full_ = false;
+    // ── 解码回调 → 检测循环 的有界队列（满时丢最旧帧保帧率） ──
+    std::deque<modeldeploy::video::VideoFrame> det_queue_;
+    std::mutex det_mtx_;
+    std::condition_variable det_cv_;
+    size_t det_max_size_ = 3;
 
-    // ── 推理段 → 编码段 ──
-    std::queue<EncodedFrame> out_queue_;
-    std::mutex out_mtx_;
-    std::condition_variable out_cv_;
-    size_t out_max_size_ = 3;
-
-    // ── 解码段统计 ──
-    std::atomic<int64_t> last_decode_us_{0};
-    std::atomic<int64_t> last_infer_us_{0};
-    std::atomic<int64_t> last_encode_us_{0};
+    // 最近处理帧的毫秒时间戳（SDR 解码帧）
     std::atomic<int64_t> last_frame_pts_{0};
 
-    size_t calc_in_queue_size() const;
+    /// 检测循环（应用单线程关键路径）
+    void detect_loop();
 
-    /// 解码回调（StreamHub 模式）
-    bool on_shared_frame(const std::shared_ptr<BroadcastFrame>& frame);
+    /// 解码回调向有界队列推帧
+    void push_detect_frame(modeldeploy::video::VideoFrame&& f);
 
-    /// 三段循环
-    void decode_loop();
-    void process_loop();
-    void encode_loop();
+    /// 低频快照生成（对设备帧回读 CPU；不占 25fps 关键路径）
+    void update_snapshot(const modeldeploy::vision::ImageData& frame, int64_t& counter);
 
-    /// 推送一帧到 in_queue_（解码段调用）
-    void push_in_queue(PendingFrame&& pf);
+    /// 按模型名取置信度阈值（缺省 0.5）
+    double model_threshold(const std::string& name) const;
+
+    /// 非 detection（face/classification）结果标注到帧（DrawEngine；NV12 就地/回环绘制）
+    void draw_non_det(modeldeploy::vision::ImageData& frame,
+                      const std::vector<InferResult>& results);
 
     /// 资源安全释放（仅在所有线程结束后调用）
     void release_resources();

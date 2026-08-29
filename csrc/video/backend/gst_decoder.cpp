@@ -6,6 +6,7 @@
 #include <gst/app/gstappsink.h>
 #include <gst/video/video.h>
 #include <chrono>
+#include <cstring>
 // GStreamer CUDA 设备帧映射：gst_video_frame_map 以 GST_MAP_CUDA 把 CUDA memory 映为设备平面。
 // gst/cuda/gstcudamemory.h 链会夹带 cudaGL.h（MSVC 上与 GL/gl.h 冲突），故只引用宏值，不引该头。
 // GST_MAP_CUDA = GST_MAP_FLAG_LAST << 1（GStreamer ≤1.30 恒定）。
@@ -17,6 +18,11 @@
 #ifndef GST_MAP_READ_CUDA
 #define GST_MAP_READ_CUDA ((GstMapFlags)(GST_MAP_READ | GST_MAP_CUDA))
 #endif
+#endif
+// Jetson L4T：NvBufSurface 零拷贝。nvbufsurface.h 由 cmake/gstreamer.cmake 探测
+// /usr/src/jetson_multimedia_api/include 提供，仅 L4T 构建定义 HAVE_NVBUF 时引入。
+#ifdef HAVE_NVBUF
+#include "nvbufsurface.h"
 #endif
 #endif
 
@@ -74,9 +80,19 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         state_ = State::Error;
         return false;
     }
-    // Sophgo：GStreamer 无对应解码插件（未实现/未验证），fail-closed 不静默软解。
+    // 算能 SOPHGO：BM VPU 硬件解码（bmdec → videoconvert → 主机 NV12，复用软解 read 路径）。
+    // 显式 Sophgo 失败/无 bmdec → fail-closed，不静默软解。
     if (cfg_.hw_accel == HwAccel::Sophgo) {
-        set_err(err, "sophgo-decode-requires-sophonmw");
+        if (bmdec_available()) {
+            if (build_bm_pipeline_locked(url, err)) {
+                opened_ = true;
+                state_ = State::Running;
+                return true;
+            }
+            state_ = State::Error;
+            return false;
+        }
+        set_err(err, "no-bmdec");
         state_ = State::Error;
         return false;
     }
@@ -90,6 +106,20 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
 #endif
     // 设备直通：解码输出保持 CUDA 设备帧（nvh264dec → CUDA memory）
     if (cfg_.device_only && (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda)) {
+#ifdef HAVE_NVBUF
+        // Jetson L4T：nvv4l2decoder 硬件解码 + nvvidconv → 主机 NV12（GStreamer 标准取帧）。
+        // L4T 无 CUDA 零拷贝（NvBufSurface 提取依赖私有 nvmm buffer-pool，本 SDK 不含），故 convert
+        // 为主机 NV12、decode 仍硬件加速。device_only 在 L4T 亦走此路径（零拷贝不可得）。
+        if (nvv4l2decoder_available()) {
+            if (!build_hwdecode_pipeline_locked(url, err)) {
+                state_ = State::Error;
+                return false;
+            }
+            opened_ = true;
+            state_ = State::Running;
+            return true;
+        }
+#endif
 #ifdef HAVE_GSTCUDA
         if (!build_device_pipeline_locked(url, err)) {
             state_ = State::Error;
@@ -198,6 +228,107 @@ bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::strin
 }
 #endif // HAVE_GSTCUDA
 
+// 算能 SOPHGO BM 硬解探测。
+bool GstDecoder::bmdec_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // 算能 BM 硬件解码插件（sophon-gstreamer bmcodec 库，运行时须 GST_PLUGIN_PATH 指向
+    // /opt/sophon/sophon-gstreamer_*/lib）。桌面 gstreamer 无此插件。
+    GstElementFactory* f = gst_element_factory_find("bmdec");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+// 算能 SOPHGO BM 硬件解码：filesrc→h264parse→bmdec→videoconvert→appsink(主机 NV12)。
+// bmdec 输出标准主机帧（forcem=NV12），经 videoconvert 归一为 NV12，复用软解 read 路径
+// （device_only_active_ 保持 false，bm_hw_active_ 标记本次会话为 BM 硬解）。底层 BM VPU 硬件解码。
+bool GstDecoder::build_bm_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    // bmdec 只吃 byte-stream 的裸 H264。mp4/mov 容器（文件 magic 4 字节偏移处为 "ftyp"）须先
+    // qtdemux 拆容器转成 byte-stream；裸 h264/.264/.h264 流则直接 h264parse。
+    bool mp4_container = false;
+    {
+        FILE* f = fopen(url.c_str(), "rb");
+        if (f) {
+            unsigned char magic[8] = {0};
+            size_t got = fread(magic, 1, 8, f);
+            fclose(f);
+            if (got >= 8 && magic[4] == 'f' && magic[5] == 't' && magic[6] == 'y' && magic[7] == 'p')
+                mp4_container = true;
+        }
+    }
+    std::string launch = "filesrc location=\"" + url + "\" ! " +
+                         (mp4_container ? "qtdemux ! " : "") +
+                         "h264parse ! bmdec ! videoconvert "
+                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "bmdec-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    bm_hw_active_ = true;
+    return true;
+}
+
+#ifdef HAVE_NVBUF
+bool GstDecoder::nvv4l2decoder_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    // Jetson L4T V4L2 解码器（gst-nvvideo4linux2）；桌面 gst-plugins-bad 无此插件名，因此只在 L4T 命中选择。
+    GstElementFactory* f = gst_element_factory_find("nvv4l2decoder");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+// Jetson L4T 硬件解码：nvv4l2decoder（真硬解）→ nvvidconv → appsink(主机 NV12)。
+// L4T 无 CUDA 零拷贝，故以 nvvidconv 转为标准主机 NV12，复用下方软解 read 路径（device_only_active_ 保持 false）。
+bool GstDecoder::build_hwdecode_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    std::string launch = "filesrc location=\"" + url +
+                         "\" ! h264parse ! nvv4l2decoder ! nvvidconv "
+                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "nvcodec-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    l4t_hw_active_ = true;
+    return true;
+}
+#endif // HAVE_NVBUF
+
 #ifdef ENABLE_VAAPI
 bool GstDecoder::vaapih264dec_available() {
     md_gst_init_once();
@@ -296,6 +427,10 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
     if (GST_VIDEO_INFO_FPS_N(&info) > 0 && GST_VIDEO_INFO_FPS_D(&info) > 0)
         fps_ = static_cast<double>(GST_VIDEO_INFO_FPS_N(&info)) / GST_VIDEO_INFO_FPS_D(&info);
 
+#ifdef HAVE_NVBUF
+    // L4T 硬件解码（nvv4l2decoder→nvvidconv→主机 NV12）复用下方软解 read 路径（device_only_active_=false）。
+#endif
+
     if (device_only_active_) {
 #ifdef HAVE_GSTCUDA
         // 设备直通：以 GST_MAP_CUDA 把 CUDA memory 映射为设备平面（不回主机）。
@@ -339,17 +474,26 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
         gst_sample_unref(sample);
         return false;
     }
-    // owner 在 ImageData 生命周期内保活映射的缓冲；最后一次引用释放时 unmap + 释放 sample。
-    std::shared_ptr<void> owner(
-        frame.data[0],
-        [frame, sample](void*) mutable {
-            gst_video_frame_unmap(&frame);
-            gst_sample_unref(sample);
-        });
-    IPlaneView v{static_cast<const uint8_t*>(frame.data[0]), frame.info.stride[0],
-                 static_cast<const uint8_t*>(frame.data[1]), frame.info.stride[1],
-                 w_, h_, Device::CPU, owner};
-    out->image = make_image_from_planes_view(v);
+    // 标准主机 NV12 取帧：统一拷入自有连续堆缓冲。原因：bmdec（GBM/DMA-BUF）解码缓冲的
+    // host 映射被下游 BMCV 逐次访问极慢（实测 BMCV 前处理 66ms vs 普通堆 8.6ms）；软解
+    // decodebin 在部分平台亦会自动选中 bmdec 产出 GBM 帧。故无论来源统一拷为紧致堆缓冲，
+    // BMCV 立即回到正常速度，且无需 owner 保活映射缓冲（~3MB memcpy ≈1-2ms 可忽略）。
+    const int W = w_, H = h_;
+    const size_t ysz = static_cast<size_t>(W) * H;
+    const size_t uvsz = static_cast<size_t>(W) * H / 2;
+    auto buf = std::shared_ptr<uint8_t>(new uint8_t[ysz + uvsz], [](uint8_t* p) { delete[] p; });
+    uint8_t* dst = buf.get();
+    const uint8_t* sy = static_cast<const uint8_t*>(frame.data[0]);
+    const uint8_t* su = static_cast<const uint8_t*>(frame.data[1]);
+    const int sy_step = frame.info.stride[0];
+    const int su_step = frame.info.stride[1];
+    for (int r = 0; r < H; ++r) memcpy(dst + r * W, sy + r * sy_step, W);
+    for (int r = 0; r < H / 2; ++r) memcpy(dst + ysz + r * W, su + r * su_step, W);
+    gst_video_frame_unmap(&frame);
+    gst_sample_unref(sample);
+    modeldeploy::vision::ImageData::Plane pl[2] = { {dst, W}, {dst + static_cast<ptrdiff_t>(ysz), W} };
+    out->image = modeldeploy::vision::ImageData::from_planes(pl, 2, MdImageType::NV12,
+                                                             W, H, Device::CPU, buf);
     out->pts_ms = (GST_BUFFER_PTS_IS_VALID(buffer))
                       ? static_cast<uint64_t>(GST_BUFFER_PTS(buffer) / GST_MSECOND)
                       : 0;
@@ -406,6 +550,10 @@ void GstDecoder::cleanup() {
     fps_ = 0.0;
     opened_ = false;
     device_only_active_ = false;
+    bm_hw_active_ = false;
+#ifdef HAVE_NVBUF
+    l4t_hw_active_ = false;
+#endif
 #ifdef ENABLE_VAAPI
     vaapi_active_ = false;
 #endif

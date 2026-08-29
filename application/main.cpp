@@ -4,7 +4,9 @@
 #include <csignal>
 #include <cstdlib>
 #include <thread>
+#ifdef WITH_GPU
 #include <cuda_runtime.h>
+#endif
 #include <filesystem>
 
 #ifdef _WIN32
@@ -61,19 +63,15 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
-
+#ifdef WITH_GPU
     cudaSetDevice(0);
+#endif
 
     PipelineManager mgr;
     g_mgr = &mgr;
 
     // 加载持久化数据
     mgr.load_from_directory(g_data_dir);
-
-    // 接线批量推理（模型库已在 load_from_directory 中加载，注册到 BatchScheduler）
-    if (!mgr.start_batch_scheduler()) {
-        std::cerr << "[Main] Failed to start batch scheduler, falling back to per-frame inference" << std::endl;
-    }
 
     HttpServer server(mgr, "0.0.0.0", port);
     if (!server.start()) {

@@ -49,6 +49,12 @@ private:
     // 设备直通：构建 nvh264dec → CUDA memory → appsink(memory:CUDAMemory) 管道；成功置 device_only_active_
     bool build_device_pipeline_locked(const std::string& url, std::string* err);
 #endif
+#ifdef HAVE_NVBUF
+    // Jetson L4T：nvv4l2decoder 硬件解码 + nvvidconv → 主机 NV12（GStreamer 标准取帧，L4T 无 CUDA 零拷贝，
+    // 故转主机帧；decode 仍硬件加速）。复用软解 read 路径（device_only_active_ 保持 false）。
+    static bool nvv4l2decoder_available();
+    bool build_hwdecode_pipeline_locked(const std::string& url, std::string* err);
+#endif
 #ifdef ENABLE_VAAPI
     // 静态探测：vaapih264dec 插件可实例化（未在本机验证，需 Linux GStreamer vaapi 插件）
     static bool vaapih264dec_available();
@@ -56,6 +62,11 @@ private:
     // 复用软解 read 路径（device_only_active_ 保持 false）。未在本机验证（需 Linux VAAPI）。
     bool build_vaapi_pipeline_locked(const std::string& url, std::string* err);
 #endif
+    // 算能 SOPHGO BM 硬解探测：bmdec 插件可实例化（sophon-gstreamer bmcodec）。
+    static bool bmdec_available();
+    // 算能 SOPHGO BM 硬解：filesrc→h264parse→bmdec→videoconvert→appsink(主机 NV12)，
+    // 复用软解 read 路径（device_only_active_ 保持 false），底层 BM VPU 硬件解码。
+    bool build_bm_pipeline_locked(const std::string& url, std::string* err);
     void set_err(std::string* err, const std::string& msg);
 
 #ifdef ENABLE_GSTREAMER
@@ -71,6 +82,10 @@ private:
     std::mutex mtx_;
     std::atomic<bool> opened_{false};
     bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
+    bool bm_hw_active_ = false;        // 算能 SOPHGO BM 硬件解码（bmdec → 主机 NV12）
+#ifdef HAVE_NVBUF
+    bool l4t_hw_active_ = false;   // Jetson L4T 硬件解码（nvv4l2decoder → nvvidconv → 主机 NV12）
+#endif
 #ifdef ENABLE_VAAPI
     bool vaapi_active_ = false;  // 本次会话是否实际用 VAAPI 硬解
 #endif

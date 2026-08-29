@@ -48,11 +48,31 @@ namespace modeldeploy::vision {
                     if (y.ndim() != 1 || !(y.dtype().is(pybind11::dtype::of<uint8_t>()))) {
                         throw std::runtime_error("from_nv12: y must be a 1-D uint8 numpy array");
                     }
+                    if (!uv.is_none() && uv.ndim() != 0 &&
+                        (uv.ndim() != 1 || !(uv.dtype().is(pybind11::dtype::of<uint8_t>())))) {
+                        throw std::runtime_error("from_nv12: uv must be a 1-D uint8 numpy array (or None)");
+                    }
+                    if (w <= 0 || h <= 0) {
+                        throw std::runtime_error("from_nv12: width/height must be positive");
+                    }
                     if (step_y <= 0) step_y = w;
+                    if (step_uv <= 0) step_uv = w;
                     const size_t y_bytes = static_cast<size_t>(step_y) * static_cast<size_t>(h);
                     const size_t uv_bytes = (uv.is_none() || uv.ndim() == 0)
                         ? 0
-                        : static_cast<size_t>(step_uv > 0 ? step_uv : w) * (static_cast<size_t>(h) / 2);
+                        : static_cast<size_t>(step_uv) * (static_cast<size_t>(h) / 2);
+                    // 校验 numpy 实际元素数足够，避免越界读
+                    if (y.request().size < y_bytes) {
+                        throw std::runtime_error(
+                            "from_nv12: y array too small (need step_y*h=" + std::to_string(y_bytes) +
+                            " bytes, got " + std::to_string(y.request().size) + ")");
+                    }
+                    const bool uv_present = !(uv.is_none() || uv.ndim() == 0);
+                    if (uv_present && uv.request().size < uv_bytes) {
+                        throw std::runtime_error(
+                            "from_nv12: uv array too small (need step_uv*(h/2)=" + std::to_string(uv_bytes) +
+                            " bytes, got " + std::to_string(uv.request().size) + ")");
+                    }
                     void* ybuf = y.request().ptr;
                     const uint8_t* uvptr = (uv.is_none() || uv.ndim() == 0) ? nullptr
                         : static_cast<const uint8_t*>(uv.request().ptr);

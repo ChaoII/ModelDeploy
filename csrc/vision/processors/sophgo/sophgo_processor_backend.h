@@ -54,6 +54,33 @@ namespace modeldeploy::vision {
                             float x, float y, const std::string& text,
                             float r, float g, float b, int font_size) override;
 
+        // ── 设备侧高层可视化（实现留到阶段 3）──
+        bool vis_det_nv12(ImageData& frame, const std::vector<DetectionResult>& result,
+                          const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_obb_nv12(ImageData& frame, const std::vector<ObbResult>& result,
+                          const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_pose_nv12(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                           const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_keypoints_nv12(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                                const VisionProcessorBackend::VisOptions& opt, bool draw_lines) override;
+        bool vis_hand_nv12(ImageData& frame, const std::vector<KeyPointsResult>& result,
+                           const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_ocr_nv12(ImageData& frame, const OCRResult& result,
+                          const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_lpr_nv12(ImageData& frame, const std::vector<LprResult>& result,
+                          const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_attr_nv12(ImageData& frame, const std::vector<AttributeResult>& result,
+                           const VisionProcessorBackend::VisOptions& opt,
+                           const std::vector<int>& abnormal_ids, bool show_attr) override;
+        bool vis_cls_nv12(ImageData& frame, const ClassifyResult& result,
+                          const VisionProcessorBackend::VisOptions& opt, int top_k) override;
+        bool vis_iseg_nv12(ImageData& frame, const std::vector<InstanceSegResult>& result,
+                           const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_sem_nv12(ImageData& frame, const SemSegResult& result,
+                          const VisionProcessorBackend::VisOptions& opt) override;
+        bool vis_depth_nv12(ImageData& frame, const DepthResult& result,
+                            const VisionProcessorBackend::VisOptions& opt, bool colorize) override;
+
         // ── 中间图像算子：设备帧未实现 → 返回 false（ImageData 置 last_error，不静默回退 CPU）──
         bool crop(const ImageData& image, float x, float y, float w, float h,
                   ImageData* out) override {

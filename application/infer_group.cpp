@@ -1,433 +1,93 @@
 #include "infer_group.hpp"
-#include "csrc/vision/common/image_data.h"
 #include <iostream>
-#include <opencv2/opencv.hpp>
-#include <cuda_runtime.h>
-
-#ifdef WITH_GPU
-#include "csrc/vision/processors/cuda/nv12_to_bgr.cuh"
-#endif
 
 using namespace modeldeploy::vision;
 
-InferGroup::InferGroup(const TaskConfig& cfg, ModelFactory factory, bool batch_only)
-    : cfg_(cfg), factory_(factory), frame_pool_(32), batch_only_(batch_only) {
-}
-
-std::shared_ptr<uint8_t> InferGroup::acquire_device_buffer(size_t bytes) {
-    uint8_t* p = frame_pool_.acquire(bytes);
-    if (!p) return nullptr;
-    return std::shared_ptr<uint8_t>(p, [this](uint8_t* q) { frame_pool_.release(q); });
-}
-
-InferGroup::~InferGroup() {
-    stop_workers();
-    if (warmup_thread_.joinable()) warmup_thread_.join();
-    engines_.clear();
-}
-
-static std::unique_ptr<InferenceEngine> make_engine(
-    const ModelConfig& mcfg, InferGroup::ModelFactory& factory) {
-    if (factory) {
-        auto eng = factory(mcfg);
-        if (eng && eng->is_loaded()) return eng;
+namespace {
+modeldeploy::vision::detection::UltralyticsDet* find_det_model(
+    std::vector<std::unique_ptr<InferenceEngine>>& engines, const std::string& name) {
+    for (auto& e : engines) {
+        if (e->config().name == name) return e->det_model();
     }
-    auto eng = std::make_unique<InferenceEngine>();
-    if (eng->load(mcfg)) return eng;
     return nullptr;
 }
-
-bool InferGroup::init() {
-    if (batch_only_) {
-        // batch-only：不建引擎/不 warmup，gpu_nv12_ready_ 直接按 cfg 计算
-        if (cfg_.models.empty()) return false;
-        gpu_nv12_ready_ = true;
-        for (const auto& mcfg : cfg_.models) {
-            if (mcfg.type != "detection" || mcfg.device != "gpu" ||
-                mcfg.roi[2] > 0 || mcfg.roi[3] > 0) {
-                gpu_nv12_ready_ = false;
-                break;
-            }
-        }
-        std::cout << "[InferGroup] batch_only mode, gpu_nv12_ready_="
-                  << (gpu_nv12_ready_ ? "true" : "false")
-                  << " models=" << cfg_.models.size() << std::endl;
-        initialized_ = true;
-        return true;
-    }
-    for (const auto& mcfg : cfg_.models) {
-        auto engine = make_engine(mcfg, factory_);
-        if (!engine) {
-            std::cerr << "[InferGroup] Failed to init model: " << mcfg.name << std::endl;
-            return false;
-        }
-        engines_.push_back(std::move(engine));
-        frame_counters_.push_back(0);
-    }
-    if (engines_.empty()) return false;
-    // GPU NV12 直通：所有模型 detection + gpu + 无 ROI
-    recompute_gpu_ready();
-    std::cout << "[InferGroup] gpu_nv12_ready_=" << (gpu_nv12_ready_ ? "true" : "false")
-              << " engines=" << engines_.size() << std::endl;
-    start_workers();
-
-    // Warm-up 移入后台线程：TRT 首次编译可耗时 30-60s，若在解码线程同步执行，
-    // stop() join 解码线程会阻塞数十秒（任务停止/删除时 HTTP 全卡）。
-    std::cout << "[InferGroup] Warming up " << engines_.size() << " model(s) in background..."
-              << std::endl;
-    start_warmup();
-
-    initialized_ = true;
-    return true;
 }
 
-void InferGroup::start_warmup() {
-    if (warmup_thread_.joinable()) return;
-    warmup_thread_ = std::thread([this]() {
-        cudaSetDevice(0);
-        std::lock_guard<std::mutex> lock(models_mtx_);
-        for (size_t i = 0; i < engines_.size(); ++i) {
-            const auto& engine = engines_[i];
-            const auto& mcfg = engine->config();
-            int w = mcfg.input_size.size() == 2 ? mcfg.input_size[0] : 640;
-            int h = mcfg.input_size.size() == 2 ? mcfg.input_size[1] : 640;
-            auto dummy = ImageData::from_raw(std::vector<uint8_t>(h * w * 3, 0).data(),
-                                              w, h, MdImageType::PKG_BGR_U8, true);
-            InferResult dummy_result;
-            auto t0 = std::chrono::steady_clock::now();
-            engine->infer(dummy, &dummy_result);
-            auto t1 = std::chrono::steady_clock::now();
-            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-            std::cout << "[InferGroup] Warm-up done: " << mcfg.name << " (" << ms << "ms)" << std::endl;
+bool InferGroup::load_models(const std::vector<ModelConfig>& mcfgs, ModelFactory factory) {
+    clear();
+    bool all_ok = true;
+    for (const auto& mcfg : mcfgs) {
+        if (!add_model(mcfg, factory)) {
+            std::cerr << "[InferGroup] Failed to load model: " << mcfg.name << std::endl;
+            all_ok = false;
         }
-    });
+    }
+    return all_ok;
 }
 
-bool InferGroup::ready() const {
-    return initialized_.load();
-}
-
-bool InferGroup::all_cuda_preproc() const {
-    for (const auto& eng : engines_) {
-        const auto& type = eng->config().type;
-        if (type == "detection") {
-            // Detection models have use_cuda_preproc via UltralyticsPreprocessor
-            // Checked indirectly: if device == "gpu" and cuda_preproc was set
-            if (eng->config().device != "gpu") return false;
-        } else if (type == "face_detection") {
-            if (eng->config().device != "gpu") return false;
-        } else {
-            // Unknown model type — can't guarantee CUDA preproc
-            return false;
-        }
+bool InferGroup::add_model(const ModelConfig& mcfg, ModelFactory factory) {
+    std::unique_ptr<InferenceEngine> engine;
+    if (factory) {
+        engine = factory(mcfg);
+        if (engine && !engine->is_loaded()) engine.reset();
     }
-    return !engines_.empty();
-}
-
-void InferGroup::worker_loop(Worker* w) {
-    cudaSetDevice(0); // 与主线程同 CUDA context
-    for (;;) {
-        std::function<void()> task;
-        {
-            std::unique_lock<std::mutex> lock(w->mtx);
-            w->cv_in.wait(lock, [w]() { return w->has_task || w->stop; });
-            if (w->stop && !w->has_task) return;
-            task = std::move(w->task);
-            w->has_task = false;
-        }
-        try { task(); } catch (...) {}
-        {
-            std::lock_guard<std::mutex> lock(w->mtx);
-            w->done = true;
-        }
-        w->cv_out.notify_one();
+    if (!engine) {
+        engine = std::make_unique<InferenceEngine>();
+        if (!engine->load(mcfg)) return false;
     }
-}
-
-void InferGroup::start_workers() {
-    workers_.clear();
-    workers_.reserve(engines_.size());
-    for (size_t i = 0; i < engines_.size(); ++i) {
-        auto w = std::make_unique<Worker>();
-        Worker* wp = w.get();
-        w->thread = std::thread([this, wp]() { this->worker_loop(wp); });
-        workers_.push_back(std::move(w));
-    }
-}
-
-void InferGroup::stop_workers() {
-    for (auto& w : workers_) {
-        {
-            std::lock_guard<std::mutex> lock(w->mtx);
-            w->stop = true;
-        }
-        w->cv_in.notify_one();
-    }
-    for (auto& w : workers_) {
-        if (w->thread.joinable()) w->thread.join();
-    }
-    workers_.clear();
-}
-
-int InferGroup::run_models(uint8_t* y_plane, uint8_t* uv_plane,
-                              const uint8_t* y_device, const uint8_t* uv_device,
-                              int width, int height, int y_step, int uv_step,
-                              std::vector<InferResult>* results,
-                              ImageData* frame_out, bool need_bgr) {
-    if (!initialized_) return 0;
-    if (batch_only_) {
-        std::cerr << "[InferGroup] run_models called in batch_only mode (no engines built); "
-                  << "inference must go through BatchScheduler." << std::endl;
-        return 0;
-    }
-    // 全程持模型锁：与 add/remove/update_model 串行化，防止遍历 engines_/workers_ 时被改写
-    std::lock_guard<std::mutex> lock(models_mtx_);
-    results->clear();
-
-    const size_t y_size = static_cast<size_t>(height) * width;
-    const size_t uv_size = y_size / 2;
-    const size_t total = y_size + uv_size;
-
-    // 紧凑连续 NV12 直接使用（零拷贝），仅在非紧凑行距时才落到本地缓冲。
-    // GPU 直通（device NV12 已提供）：完全跳过 host NV12 处理
-    const uint8_t* y_src = y_plane;
-    const uint8_t* uv_src = uv_plane;
-    const bool gpu_direct = gpu_nv12_ready_ && y_device && uv_device;
-    if (!gpu_direct &&
-        !(y_step == width && uv_step == width && y_plane && uv_plane)) {
-        if (last_w_ != width || last_h_ != height || nv12_buf_.size() != total) {
-            nv12_buf_.resize(total);
-            last_w_ = width;
-            last_h_ = height;
-        }
-        std::memcpy(nv12_buf_.data(), y_plane, y_size);
-        std::memcpy(nv12_buf_.data() + y_size, uv_plane, uv_size);
-        y_src = nv12_buf_.data();
-        uv_src = nv12_buf_.data() + y_size;
-    }
-
-    // 预先判断是否有任一模型需要处理本帧（计数器 + 间隔检查）
-    // 使用临时变量记录，避免下面 dispatch 循环重复 increment
-    std::vector<bool> need_process(engines_.size(), false);
-    bool any_needs_process = false;
-    for (size_t i = 0; i < engines_.size(); ++i) {
-        bool should = (++frame_counters_[i]) % engines_[i]->config().interval == 0;
-        need_process[i] = should;
-        if (should) any_needs_process = true;
-    }
-
-    // BGR 生成：预览路/CPU 推理需要；GPU 直通 + 非预览路可跳过（省一次 GPU 往返 + host 拷贝）
-    ImageData bgr_image;
-    const bool need_bgr_img = need_bgr || !gpu_nv12_ready_;
-    if (need_bgr_img) {
-#ifdef WITH_GPU
-        const size_t bgr_size = static_cast<size_t>(height) * width * 3;
-        if (bgr_buf_.size() < bgr_size) bgr_buf_.resize(bgr_size);
-        // GPU-direct 路径：BGR 直接从设备 NV12 生成，避免 host NV12 → GPU 的 H2D 上传
-        const bool dev_nv12 = y_device && uv_device;
-        const uint8_t* bgr_y = dev_nv12 ? y_device : y_src;
-        const uint8_t* bgr_uv = dev_nv12 ? uv_device : uv_src;
-        const int bgr_step_y = dev_nv12 ? y_step : width;
-        const int bgr_step_uv = dev_nv12 ? uv_step : width;
-        nv12_to_bgr_cuda(bgr_y, bgr_uv,
-                          width, height, bgr_step_y, bgr_step_uv,
-                          bgr_buf_.data());
-        bgr_image = ImageData::from_raw(bgr_buf_.data(), width, height,
-                                              MdImageType::PKG_BGR_U8, true); // copy=true：独立所有权，防跨队列缓冲别名竞争
-#else
-        auto nv12_image = ImageData::from_raw(y_src, width, height, MdImageType::NV12, true);
-        bgr_image = ImageData::cvt_color(nv12_image, ColorConvertType::CVT_NV122PKG_BGR);
-#endif
-        if (frame_out)
-            *frame_out = bgr_image;
-    }
-
-    // 所有模型跳推理 → 输出 BGR 但不输出结果
-    if (!any_needs_process) {
-        return 0;
-    }
-
-    // ── GPU NV12 直通：NV12 → GPU letterbox/normalize → 推理 → 后处理，全程不落 host BGR ──
-    // device 指针优先（零拷贝），否则 host NV12（yolo_preprocess_nv12_cuda 自动上传）
-    const uint8_t* gy = y_device ? y_device : y_src;
-    const uint8_t* guv = uv_device ? uv_device : uv_src;
-    if (gpu_nv12_ready_ && gy && guv) {
-        struct GpuTask {
-            size_t index;
-            InferResult result;
-            int64_t dt_us = 0;
-            bool used = false;
-        };
-        std::vector<GpuTask> tasks(engines_.size());
-        for (size_t i = 0; i < engines_.size(); ++i) {
-            if (!need_process[i]) continue;
-            tasks[i].index = i;
-            tasks[i].used = true;
-        }
-        const int sw = width, sh = height, sy = y_step, suv = uv_step;
-        for (size_t i = 0; i < tasks.size(); ++i) {
-            if (!tasks[i].used) continue;
-            auto& w = workers_[i];
-            auto& engine = engines_[i];
-            GpuTask* tp = &tasks[i];
-            Worker* wp = w.get();
-            {
-                std::lock_guard<std::mutex> lock(w->mtx);
-                w->done = false;
-                w->has_task = true;
-                w->task = [&engine, tp, gy, guv, sw, sh, sy, suv, wp]() {
-                    auto t0 = std::chrono::steady_clock::now();
-                    engine->infer_nv12(gy, guv, sw, sh, sy, suv, &tp->result);
-                    tp->dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                        std::chrono::steady_clock::now() - t0).count();
-                    wp->infer_acc_us += tp->dt_us;
-                    if (++wp->infer_cnt % 50 == 0) {
-                        printf("[GPU-DIRECT] avg_infer=%6.2fms (50 frames)\n",
-                               static_cast<double>(wp->infer_acc_us) / wp->infer_cnt / 1000.0);
-                        fflush(stdout);
-                        wp->infer_acc_us = 0; wp->infer_cnt = 0;
-                    }
-                };
-            }
-            w->cv_in.notify_one();
-        }
-        for (size_t i = 0; i < tasks.size(); ++i) {
-            if (!tasks[i].used) continue;
-            auto& w = workers_[i];
-            std::unique_lock<std::mutex> lock(w->mtx);
-            w->cv_out.wait(lock, [&w]() { return w->done; });
-        }
-        int ran_count = 0;
-        for (auto& task : tasks) {
-            if (!task.used) continue;
-            ++ran_count;
-            if (!task.result.boxes.empty())
-                results->push_back(std::move(task.result));
-            stats_.record_frame(0, task.dt_us, 0, 0);
-        }
-        return ran_count;
-    }
-
-    struct ModelTask {
-        size_t index;
-        ImageData input;
-        InferResult result;
-        int64_t dt_us = 0;
-        bool used = false;
-    };
-    std::vector<ModelTask> tasks(engines_.size());
-
-    for (size_t i = 0; i < engines_.size(); ++i) {
-        if (!need_process[i]) continue;
-        auto& engine = engines_[i];
-        const auto& mcfg = engine->config();
-        ImageData input_image = bgr_image;
-        if (mcfg.roi[2] > 0 && mcfg.roi[3] > 0) {
-            Rect2f roi_rect = {static_cast<float>(mcfg.roi[0]),
-                               static_cast<float>(mcfg.roi[1]),
-                               static_cast<float>(mcfg.roi[2]),
-                               static_cast<float>(mcfg.roi[3])};
-            input_image = bgr_image.crop(roi_rect);
-            if (input_image.empty()) continue;
-        }
-        tasks[i].index = i;
-        tasks[i].input = std::move(input_image);
-        tasks[i].used = true;
-    }
-
-    for (size_t i = 0; i < tasks.size(); ++i) {
-        if (!tasks[i].used) continue;
-        auto& w = workers_[i];
-        auto& engine = engines_[i];
-        ModelTask* tp = &tasks[i];
-        {
-            std::lock_guard<std::mutex> lock(w->mtx);
-            w->done = false;
-            w->has_task = true;
-            w->task = [&engine, tp]() {
-                auto t0 = std::chrono::steady_clock::now();
-                engine->infer(tp->input, &tp->result);
-                tp->dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::steady_clock::now() - t0).count();
-            };
-        }
-        w->cv_in.notify_one();
-    }
-
-    for (size_t i = 0; i < tasks.size(); ++i) {
-        if (!tasks[i].used) continue;
-        auto& w = workers_[i];
-        std::unique_lock<std::mutex> lock(w->mtx);
-        w->cv_out.wait(lock, [&w]() { return w->done; });
-    }
-
-    int ran_count = 0;
-    for (auto& task : tasks) {
-        if (!task.used) continue;
-        ++ran_count;
-        if (!task.result.boxes.empty())
-            results->push_back(std::move(task.result));
-        stats_.record_frame(0, task.dt_us, 0, 0);
-    }
-
-    return ran_count;
-}
-
-bool InferGroup::add_model(const ModelConfig& mcfg) {
-    if (batch_only_) return false;
-    std::lock_guard<std::mutex> lock(models_mtx_);
-    auto engine = std::make_unique<InferenceEngine>();
-    if (!engine->load(mcfg)) return false;
-    // 重启 worker 池以匹配新模型数量
-    stop_workers();
     engines_.push_back(std::move(engine));
-    frame_counters_.push_back(0);
-    start_workers();
-    recompute_gpu_ready();
     return true;
 }
 
 bool InferGroup::remove_model(const std::string& name) {
-    if (batch_only_) return false;
-    std::lock_guard<std::mutex> lock(models_mtx_);
-    for (size_t i = 0; i < engines_.size(); ++i) {
-        if (engines_[i]->config().name == name) {
-            stop_workers();
-            engines_.erase(engines_.begin() + i);
-            frame_counters_.erase(frame_counters_.begin() + i);
-            start_workers();
-            recompute_gpu_ready();
+    for (auto it = engines_.begin(); it != engines_.end(); ++it) {
+        if ((*it)->config().name == name) {
+            engines_.erase(it);
             return true;
         }
     }
     return false;
 }
 
-bool InferGroup::update_model(const std::string& name, const ModelConfig& mcfg) {
-    if (batch_only_) return false;
-    std::lock_guard<std::mutex> lock(models_mtx_);
-    for (auto& eng : engines_) {
-        if (eng->config().name == name) {
-            stop_workers();
-            eng->unload();
-            bool ok = eng->load(mcfg);
-            start_workers();
-            recompute_gpu_ready();
-            return ok;
-        }
-    }
-    return false;
+void InferGroup::clear() {
+    engines_.clear();
 }
 
-void InferGroup::recompute_gpu_ready() {
-    // GPU NV12 直通：所有模型 detection + gpu + 无 ROI
-    gpu_nv12_ready_ = !engines_.empty();
-    for (const auto& eng : engines_) {
-        const auto& mcfg = eng->config();
-        if (mcfg.type != "detection" || mcfg.device != "gpu" ||
-            mcfg.roi[2] > 0 || mcfg.roi[3] > 0) {
-            gpu_nv12_ready_ = false;
-            break;
+bool InferGroup::empty() const {
+    return engines_.empty();
+}
+
+bool InferGroup::run_models(
+    const ImageData& frame,
+    std::vector<std::pair<std::string, std::vector<DetectionResult>>>* sdk_dets,
+    std::vector<std::pair<std::string, InferResult>>* non_det) {
+    if (sdk_dets) sdk_dets->clear();
+    if (non_det) non_det->clear();
+    bool any = false;
+    for (auto& e : engines_) {
+        const auto& mc = e->config();
+        if (mc.type == "detection" && e->det_model()) {
+            std::vector<DetectionResult> dets;
+            if (!e->det_model()->predict(frame, &dets)) continue;
+            if (sdk_dets) sdk_dets->push_back({mc.name, std::move(dets)});
+            any = true;
+        } else {
+            InferResult r;
+            if (!e->infer(frame, &r)) continue;
+            if (non_det) non_det->push_back({mc.name, std::move(r)});
+            any = true;
         }
     }
+    return any;
+}
+
+modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
+    return find_det_model(engines_, name);
+}
+
+const ModelConfig* InferGroup::config_of(const std::string& name) const {
+    for (const auto& e : engines_) {
+        if (e->config().name == name) return &e->config();
+    }
+    return nullptr;
 }

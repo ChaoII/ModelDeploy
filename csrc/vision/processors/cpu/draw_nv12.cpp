@@ -31,8 +31,10 @@ namespace {
         uint8_t yy, uu, vv;
         rgb_to_yuv(r, g, b, &yy, &uu, &vv);
         y[static_cast<size_t>(yc) * step_y + x] = yy;
-        // UV 平面按 2x2 像素共享一个 UV，NV12 中为 Cb Cr 交错布局
+        // UV 平面按 2x2 像素共享一个 UV，NV12 中为 Cb Cr 交错布局；
+        // 奇数宽/高的最右/最下行没有对应的 chroma 块，须钳制避免越界写。
         const int ux = x >> 1, uy = yc >> 1;
+        if (ux >= (w >> 1) || uy >= (h >> 1)) return;
         uv[static_cast<size_t>(uy) * step_uv + ux * 2] = uu;
         uv[static_cast<size_t>(uy) * step_uv + ux * 2 + 1] = vv;
     }

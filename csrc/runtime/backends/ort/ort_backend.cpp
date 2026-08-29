@@ -294,19 +294,19 @@ namespace modeldeploy {
 
     std::unique_ptr<BaseBackend> OrtBackend::clone(const RuntimeOption& runtime_option,
                                                    void* stream, const int device_id) {
+        (void)runtime_option;  // 模型缓冲复用 model_buffer_，无需重新读盘
         auto new_backend = std::make_unique<OrtBackend>();
-        // 克隆到新设备，那就是完全重建
-        if (device_id > 0 && device_id != option_.device_id) {
+        // 克隆到新设备（且不是 -1/同设备）：完全重建 Session，并把设备/流/精度配置真正传入。
+        if (device_id != -1 && device_id != option_.device_id) {
             auto clone_option = option_;
             clone_option.device_id = device_id;
             clone_option.external_stream = stream;
-            std::string model_buffer;
-            if (!read_binary_from_file(runtime_option.model_file, &model_buffer)) {
-                MD_LOG_FATAL << "Fail to read binary from model file while cloning TrtBackend" << std::endl;
+            if (!new_backend->init_from_onnx(model_buffer_, clone_option)) {
+                MD_LOG_ERROR << "Failed to reinitialize ORT session when cloning to device "
+                             << device_id << "." << std::endl;
+                return nullptr;
             }
-            if (!new_backend->init_from_onnx(model_buffer)) {
-                MD_LOG_FATAL << "Clone model from engine file initialize TrtBackend." << std::endl;
-            }
+            new_backend->option_ = clone_option;
             return new_backend;
         }
         // 共享 Session、model_buffer、输入输出描述

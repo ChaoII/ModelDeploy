@@ -1762,3 +1762,68 @@ TEST_CASE("capi plane_bytes BGR24/NV12", "[capi]") {
     REQUIRE(md_image_plane_bytes(nv, 2, &p0, &n0, &s0) == MD_ERR_INVALID_ARGUMENT);
     md_image_destroy(nv);
 }
+
+// Task 7：md_draw_result 设备分支按 kind 分发到 vis_*_nv12。GPU 设备 NV12 帧（真显存）
+// + 检测模型 predict 产出 DetectionResult 后断言 MD_OK；无 GPU 后端的设备（TPU）断言
+// MD_ERR_NOT_IMPLEMENTED（保持"后端真正就绪"检查）。模型文件缺失时跳过（CI 下载后执行）。
+#ifdef WITH_GPU
+TEST_CASE("capi md_draw_result device NV12 dispatch detection", "[gpu][model][capi]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string det_file = data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx";
+    const std::string imgf = data_dir + "/test_images/bus.jpg";
+    if (!std::filesystem::exists(det_file) || !std::filesystem::exists(imgf)) return;
+    if (cudaSetDevice(0) != cudaSuccess) return;  // 无卡跳过
+
+    // 真显存的 GPU 设备 NV12 帧
+    const int w = 320, h = 320;
+    uint8_t *dy = nullptr, *duv = nullptr;
+    if (cudaMalloc(&dy, (size_t)w * h) != cudaSuccess) return;
+    if (cudaMalloc(&duv, (size_t)w * (h / 2)) != cudaSuccess) { cudaFree(dy); return; }
+    cudaMemset(dy, 128, (size_t)w * h);
+    cudaMemset(duv, 128, (size_t)w * (h / 2));
+    MDImageHandle dev = nullptr;
+    REQUIRE(md_image_from_device_nv12(&dev, dy, duv, w, h, w, w, MD_DEV_GPU) == MD_OK);
+    REQUIRE(dev != nullptr);
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_GPU, 0);
+
+    MDModelHandle det = nullptr;
+    MDStatus cs = md_model_create(&det, MD_MODEL_DETECTION, det_file.c_str(), opt);
+    md_option_destroy(opt);
+
+    MDImageHandle src = nullptr;
+    REQUIRE(md_image_from_file(&src, imgf.c_str()) == MD_OK);
+
+    // GPU 检测模型可用时跑端到端：device NV12 帧推理结果就地绘制
+    MDResultHandle res = nullptr;
+    MDStatus pred = MD_ERR_INVALID_ARGUMENT;
+    if (cs == MD_OK && det) pred = md_model_predict(det, dev, &res);
+
+    if (pred == MD_OK && res) {
+        MDResultKind kind = MD_RES_DETECTION;
+        REQUIRE(md_result_kind(res, &kind) == MD_OK);
+        CHECK(kind == MD_RES_DETECTION);
+        CHECK(md_draw_result(dev, res, nullptr) == MD_OK);  // vis_det_nv12 正常返回 → MD_OK
+    }
+
+    // 无 GPU 后端的设备（TPU）在 WITH_GPU 构建下无 Sophgo 后端 → 后端未就绪 → NOT_IMPLEMENTED
+    MDImageHandle tpu = nullptr;
+    REQUIRE(md_image_from_device_nv12(&tpu, dy, duv, w, h, w, w, MD_DEV_TPU) == MD_OK);
+    REQUIRE(tpu != nullptr);
+    if (pred == MD_OK && res) {
+        CHECK(md_draw_result(tpu, res, nullptr) == MD_ERR_NOT_IMPLEMENTED);
+    }
+
+    if (det) md_model_destroy(det);
+    if (res) md_result_destroy(res);
+    md_image_destroy(src);
+    md_image_destroy(dev);
+    md_image_destroy(tpu);
+    cudaFree(dy);
+    cudaFree(duv);
+}
+#endif

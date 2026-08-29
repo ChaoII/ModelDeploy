@@ -210,9 +210,17 @@ void bind_video(pybind11::module& m) {
             }
             return ok;
         })
-        .def("stop", &VideoDecoder::stop)
+        // stop/close 会在内部 join 解码线程；若此处持 GIL 而回调线程正等 GIL 跑 cb，会双向死锁。
+        // 故 join 期间释放 GIL，让回调线程能取到 GIL 完成 cb 并退出。
+        .def("stop", [](VideoDecoder& d) {
+            py::gil_scoped_release rel;
+            d.stop();
+        })
         .def("set_device_only", &VideoDecoder::set_device_only, pybind11::arg("enable"))
-        .def("close", &VideoDecoder::close)
+        .def("close", [](VideoDecoder& d) {
+            py::gil_scoped_release rel;
+            d.close();
+        })
         .def_property_readonly("width", &VideoDecoder::width)
         .def_property_readonly("height", &VideoDecoder::height)
         .def_property_readonly("fps", &VideoDecoder::fps)

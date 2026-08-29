@@ -194,7 +194,7 @@ TEST_CASE("Manager model library CRUD", "[manager]") {
     REQUIRE(mgr.list_models().empty());
 }
 
-TEST_CASE("create_task wires batch scheduler", "[manager]") {
+TEST_CASE("create_task wires pipeline", "[manager]") {
     PipelineManager mgr;
     // 注册一个模型（指向不存在的文件也 OK，只测接线不测加载）
     TaskConfig cfg;
@@ -209,8 +209,7 @@ TEST_CASE("create_task wires batch scheduler", "[manager]") {
     mc.device = "gpu";
     cfg.models.push_back(mc);
     std::string err;
-    // 不实际启动（无 GPU 文件也能构造），只验证接线后 create_task 不崩溃且不传 nullptr
+    // 不实际启动（无 GPU 文件也能构造），只验证接线后 create_task 不崩溃
     REQUIRE(mgr.create_task(cfg, &err));
-    REQUIRE(mgr.batch_scheduler() != nullptr);
     REQUIRE(mgr.task_count() == 1);
 }

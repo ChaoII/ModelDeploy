@@ -26,8 +26,8 @@ namespace modeldeploy {
             dt = pybind11::dtype::of<int8_t>();
         }
         else {
-            MD_LOG_FATAL << "The function doesn't support data type of %s." << datatype_to_string(md_dtype) <<
-                std::endl;
+            throw std::runtime_error(std::string("The function doesn't support data type of ") +
+                                     datatype_to_string(md_dtype) + ".");
         }
         return dt;
     }
@@ -51,8 +51,8 @@ namespace modeldeploy {
         if (np_dtype.is(pybind11::dtype::of<int8_t>())) {
             return DataType::INT8;
         }
-        MD_LOG_FATAL
-            << "numpy_data_type_to_md_data_type() only support int8/int32/int64/float32/float64 now." << std::endl;
+        throw std::runtime_error(
+            "numpy_data_type_to_md_data_type() only support int8/int32/int64/float32/float64 now.");
         return DataType::FP32;
     }
 
@@ -135,8 +135,8 @@ namespace modeldeploy {
         if (np_dtype.is(pybind11::dtype::of<float>())) {
             return CV_32F;
         }
-        MD_LOG_FATAL <<
-            "numpy_data_type_to_open_cv_type() only support int32/int8/uint8/float32 now." << std::endl;
+        throw std::runtime_error(
+            "numpy_data_type_to_open_cv_type() only support int32/int8/uint8/float32 now.");
         return CV_8U;
     }
 
@@ -153,8 +153,8 @@ namespace modeldeploy {
         if (pybind11::isinstance<pybind11::array_t<std::float_t>>(pyarray)) {
             return CV_32F;
         }
-        MD_LOG_FATAL <<
-            "numpy_data_type_to_open_cv_type_v2() only support int32/int8/uint8/float32 now." << std::endl;
+        throw std::runtime_error(
+            "numpy_data_type_to_open_cv_type_v2() only support int32/int8/uint8/float32 now.");
         return CV_8U;
     }
 

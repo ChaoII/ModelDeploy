@@ -1,37 +1,14 @@
 #include "pipeline.hpp"
 #include <iostream>
 #include <cstring>
-#include <cuda_runtime.h>
-#include <windows.h>
-#include <eh.h>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
 using namespace modeldeploy::vision;
 
-static bool is_network_url(const std::string& url) {
-    return url.find("rtsp://") == 0 || url.find("rtmp://") == 0 ||
-           url.find("http://") == 0 || url.find("https://") == 0 ||
-           url.find("udp://") == 0 || url.find("tcp://") == 0;
-}
-
-Pipeline::Pipeline(TaskConfig cfg, StreamHub* hub, ModelFactory model_factory, BatchScheduler* batch_scheduler)
+Pipeline::Pipeline(TaskConfig cfg, ModelFactory factory)
     : cfg_(std::move(cfg)),
-      hub_(hub),
-      model_factory_(std::move(model_factory)),
-      batch_scheduler_(batch_scheduler),
-      block_on_in_full_(!is_network_url(cfg_.input_url)) {
-    in_max_size_ = calc_in_queue_size();
-    out_max_size_ = 3;
-}
-
-size_t Pipeline::calc_in_queue_size() const {
-    // 网络流：小队列保持低延迟，丢老帧
-    // 文件源：大队列吃满吞吐
-    if (is_network_url(cfg_.input_url)) {
-        return 2; // 只缓 2 帧，足以掩盖偶发抖动
-    }
-    return 8;
+      model_factory_(std::move(factory)) {
 }
 
 std::string Pipeline::init_error() const {
@@ -51,34 +28,87 @@ Pipeline::~Pipeline() {
 bool Pipeline::start() {
     // 生命周期锁：防止 stop 在线程创建完成前 join（未 join 的 thread 析构会 std::terminate）
     std::lock_guard<std::mutex> lock(lifecycle_mtx_);
-    // CAS：并发 start 只允许一个进入，避免重复创建 decode 线程
+    // CAS：并发 start 只允许一个进入
     bool expected = false;
     if (!running_.compare_exchange_strong(expected, true)) return true;
-    // 上一轮线程已结束（否则 running_ 为 true，CAS 不会成功）；join 清理残留句柄，
-    // 否则覆盖 joinable 的 thread 会 std::terminate（并发 start 排队场景）
-    if (decode_thread_.joinable())  decode_thread_.join();
-    if (process_thread_.joinable()) process_thread_.join();
-    if (encode_thread_.joinable())  encode_thread_.join();
+    // 上一轮线程已结束（否则 running_ 为 true，CAS 不会成功）；join 清理残留句柄
+    if (detect_thread_.joinable()) detect_thread_.join();
     stopped_ = false;
     initialized_ = false;
     alive_token_ = std::make_shared<std::atomic<bool>>(true);
     set_init_error("");
+    {
+        std::lock_guard<std::mutex> dl(det_mtx_);
+        det_queue_.clear();
+    }
 
-    // 三段流水线主线程
-    decode_thread_ = std::thread([this]() {
+    // 模型加载：失败不阻断预览（预览可推原帧）
+    infer_group_.load_models(cfg_.models, model_factory_);
+    if (infer_group_.empty()) {
+        std::cerr << "[Pipeline] " << cfg_.id << " no models loaded (preview only)" << std::endl;
+    }
+    draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
+
+    // 1) SDK 解码源（open 同步完成，之后回调异步）
+    std::string err;
+    if (!src_.open(cfg_.input_url, cfg_.decoder, &err)) {
+        set_init_error("Decoder open failed: " + cfg_.input_url + " (" + err + ")");
+        std::cerr << "[Pipeline] " << init_error() << std::endl;
+        running_ = false;
+        return true;
+    }
+    source_fps_ = src_.fps();
+    if (source_fps_ <= 0) source_fps_ = 25;
+
+    src_.set_callback([this, alive = alive_token_](modeldeploy::video::VideoFrame&& f) {
+        // 任务已销毁/停止：跳过（解码线程可能在任务析构后在途调用此回调）
+        if (!alive || !alive->load()) return;
+        if (!running_.load()) return;
+        this->push_detect_frame(std::move(f));
+    });
+    if (!src_.start(&err)) {
+        set_init_error("Decoder start failed: " + err);
+        std::cerr << "[Pipeline] " << init_error() << std::endl;
+        src_.close();
+        running_ = false;
+        return true;
+    }
+
+    // 2) 预览编码段（GPU-direct 门控：源 CUDA 硬解设备帧 + 设备专用 + 硬编容器）
+    if (cfg_.enable_preview && !cfg_.output_url.empty()) {
+        const bool src_gpu = (cfg_.decoder.hw_accel == "cuda");
+        const bool nvenc_codec = (cfg_.encoder.codec == "auto" || cfg_.encoder.codec == "h264_nvenc"
+                                  || cfg_.encoder.codec == "nvh264enc");
+        const bool gpu_direct = src_gpu && cfg_.decoder.device_only && nvenc_codec;
+        if (!sink_.open(cfg_.output_url, src_.width(), src_.height(), source_fps_,
+                        cfg_.encoder, gpu_direct, &err)) {
+            set_init_error("Encoder open failed: " + cfg_.output_url + " (" + err + ")");
+            std::cerr << "[Pipeline] " << init_error() << std::endl;
+            src_.stop();
+            running_ = false;
+            return true;
+        }
+        sink_.start_async(&err);
+    }
+
+    // 3) 检测线程（单线程关键路径）
+    detect_thread_ = std::thread([this]() {
         try {
-            decode_loop();
+            detect_loop();
         } catch (const std::exception& e) {
             set_init_error(e.what());
-            std::cerr << "[Pipeline-decode] Fatal: " << e.what() << std::endl;
+            std::cerr << "[Pipeline-detect] Fatal: " << e.what() << std::endl;
         } catch (...) {
-            set_init_error("decode unknown error");
-            std::cerr << "[Pipeline-decode] Fatal: unknown" << std::endl;
+            set_init_error("detect unknown error");
+            std::cerr << "[Pipeline-detect] Fatal: unknown" << std::endl;
         }
         running_ = false;
-        in_cv_.notify_all();
-        out_cv_.notify_all();
+        det_cv_.notify_all();
     });
+
+    initialized_ = true;
+    stats_.start();
+    std::cout << "[Pipeline] Running: " << cfg_.id << " source_fps=" << source_fps_ << std::endl;
     return true;
 }
 
@@ -91,514 +121,194 @@ void Pipeline::stop() {
     if (!running_.compare_exchange_strong(expected, false)) {
         running_ = false;
     }
-    in_cv_.notify_all();
-    out_cv_.notify_all();
-    if (decode_thread_.joinable())  decode_thread_.join();
-    if (process_thread_.joinable()) process_thread_.join();
-    if (encode_thread_.joinable())  encode_thread_.join();
+    // 先停解码源（停止回调线程，不再入队），再唤醒检测线程退出
+    src_.stop();
+    det_cv_.notify_all();
+    if (detect_thread_.joinable()) detect_thread_.join();
+    sink_.stop_async();   // 排空待编码帧
+    sink_.close();
     release_resources();
     stats_.print();
 }
 
 void Pipeline::release_resources() {
-    // 先失效生命周期令牌：此后任何在途的共享源回调都会跳过，不再触碰 this
+    // 先失效生命周期令牌：此后任何在途的解码回调都会跳过，不再触碰 this
     if (alive_token_) *alive_token_ = false;
-    if (shared_source_ && shared_token_) {
-        shared_source_->unsubscribe(shared_token_);
-        shared_token_ = 0;
-    }
-    shared_source_.reset();
-    decoder_.reset();
-    infer_group_.reset();
+    src_.close();
+    sink_.close();
+    infer_group_.clear();
     draw_engine_.reset();
-    if (encoder_) {
-        encoder_->close();
-        encoder_.reset();
-    }
-    encoder_opened_ = false;
     initialized_ = false;
     cached_results_.clear();
 
     {
-        std::lock_guard<std::mutex> lock(in_mtx_);
-        std::queue<PendingFrame> empty;
-        in_queue_.swap(empty);
+        std::lock_guard<std::mutex> lock(det_mtx_);
+        det_queue_.clear();
     }
     {
-        std::lock_guard<std::mutex> lock(out_mtx_);
-        std::queue<EncodedFrame> empty;
-        out_queue_.swap(empty);
+        std::lock_guard<std::mutex> lock(snapshot_mtx_);
+        latest_bgr_.reset();
     }
 }
 
-// ── 解码回调（StreamHub 模式：跨 pipeline 共享解码器） ──
-
-bool Pipeline::on_shared_frame(const std::shared_ptr<BroadcastFrame>& frame) {
-    if (!running_.load() || !frame) return false;
-    PendingFrame pf;
-    pf.width = frame->width;
-    pf.height = frame->height;
-    pf.pts = frame->pts;
-    pf.wall_time_sec = std::chrono::duration<double>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    pf.shared_frame = frame;
-    push_in_queue(std::move(pf));
-    return running_.load();
+void Pipeline::push_detect_frame(modeldeploy::video::VideoFrame&& f) {
+    std::lock_guard<std::mutex> lock(det_mtx_);
+    // 有界队列满则丢最旧帧（保最新、控延迟）
+    if (det_queue_.size() >= det_max_size_) det_queue_.pop_front();
+    det_queue_.push_back(std::move(f));
+    det_cv_.notify_one();
 }
 
-void Pipeline::push_in_queue(PendingFrame&& pf) {
-    std::unique_lock<std::mutex> lock(in_mtx_);
-    if (in_queue_.size() >= in_max_size_) {
-        if (block_on_in_full_) {
-            // 文件源：等待消费，避免丢帧
-            in_cv_.wait_for(lock, std::chrono::milliseconds(200),
-                [this]() { return in_queue_.size() < in_max_size_ || !running_.load(); });
-            if (!running_.load() || in_queue_.size() >= in_max_size_) return;
-        } else {
-            // 网络流：丢最旧的，保最新（保头丢尾，确保延迟可控）
-            in_queue_.pop();
+double Pipeline::model_threshold(const std::string& name) const {
+    for (const auto& m : cfg_.models) {
+        if (m.name == name) return m.confidence_threshold;
+    }
+    // 动态 add_model 加入的模型不在 cfg_.models：回退查 InferGroup 引擎配置
+    const auto* mc = infer_group_.config_of(name);
+    if (mc) return mc->confidence_threshold;
+    return 0.5;
+}
+
+namespace {
+// CPU packed BGR → 主机 NV12（重建自有缓冲的 ImageData，供编码路径）
+modeldeploy::vision::ImageData bgr_to_nv12_host(const modeldeploy::vision::ImageData& bgr) {
+    cv::Mat mat;
+    if (!bgr.asMat(&mat)) return {};
+    const int W = mat.cols, H = mat.rows;
+    if (W <= 0 || H <= 0 || (W & 1) || (H & 1)) return {};
+    cv::Mat i420;
+    cv::cvtColor(mat, i420, cv::COLOR_BGR2YUV_I420);
+    const size_t ysize = static_cast<size_t>(W) * static_cast<size_t>(H);
+    const size_t usize = ysize / 4;
+    const uint8_t* y = i420.data;
+    const uint8_t* u = y + ysize;
+    const uint8_t* v = u + usize;
+    auto holder = std::make_shared<std::vector<uint8_t>>(ysize + ysize / 2);
+    std::memcpy(holder->data(), y, ysize);
+    uint8_t* uv = holder->data() + ysize;
+    const int h2 = H / 2, w2 = W / 2;
+    for (int r = 0; r < h2; ++r) {
+        for (int c = 0; c < w2; ++c) {
+            uv[r * W + 2 * c]     = u[r * w2 + c];
+            uv[r * W + 2 * c + 1] = v[r * w2 + c];
         }
     }
-    in_queue_.push(std::move(pf));
-    lock.unlock();
-    in_cv_.notify_one();
+    modeldeploy::vision::ImageData::Plane pl[2] = {
+        {holder->data(), W},
+        {holder->data() + ysize, W},
+    };
+    std::shared_ptr<void> owner(holder, holder->data());
+    return modeldeploy::vision::ImageData::from_planes(
+        pl, 2, MdImageType::NV12, W, H, modeldeploy::Device::CPU, owner);
+}
 }
 
-// ── 解码段（解码线程） ──
-
-static void seh_translater(unsigned int, struct _EXCEPTION_POINTERS*) {
-    throw std::runtime_error("SEH exception");
-}
-
-void Pipeline::decode_loop() {
-    _set_se_translator(seh_translater);
-    cudaSetDevice(0);
-
-    // ── 1) 初始化推理组 + 绘制 ──
-    // 有 BatchScheduler 时走 batch_only：本组不建引擎（省 20× TRT context），
-    // 推理统一由批调度经唯一 prototype 完成。
-    infer_group_ = std::make_unique<InferGroup>(cfg_, model_factory_, batch_scheduler_ != nullptr);
-    if (!infer_group_->init()) {
-        set_init_error("InferGroup init failed");
-        std::cerr << "[Pipeline] " << init_error() << std::endl;
-        running_ = false;
+void Pipeline::draw_non_det(ImageData& frame, const std::vector<InferResult>& results) {
+    if (!draw_engine_ || results.empty() || frame.empty()) return;
+    // host NV12：DrawEngine CPU draw()（vis_det/vis_keypoints 保留 face 关键点/标签格式）需
+    // BGR packed → 转 BGR 标注后重建 NV12 交付编码（face/classification 呈现到输出帧）。
+    if (frame.type() == MdImageType::NV12 && frame.plane_count() >= 2 &&
+        frame.device() == modeldeploy::Device::CPU) {
+        ImageData bgr = ImageData::cvt_color(frame, ColorConvertType::CVT_NV122PKG_BGR);
+        if (bgr.empty()) return;
+        draw_engine_->draw(bgr, results);
+        ImageData nv12 = bgr_to_nv12_host(bgr);
+        if (!nv12.empty()) frame = std::move(nv12);
         return;
     }
-    draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
-    if (cfg_.enable_preview) {
-        encoder_ = std::make_unique<StreamEncoder>(cfg_.encoder);
+    // device NV12：draw_gpu 就地零拷贝（不破坏 GPU 直编 D2D）
+    if (frame.type() == MdImageType::NV12 && frame.plane_count() >= 2) {
+        draw_engine_->draw_gpu(frame, results, cfg_.draw.show_label, cfg_.draw.show_score);
+        return;
     }
-
-    // ── 2) 启动推理线程 ──
-    process_thread_ = std::thread([this]() {
-        cudaSetDevice(0);
-        _set_se_translator(seh_translater);
-        try { process_loop(); }
-        catch (const std::exception& e) { std::cerr << "[Pipeline-process] " << e.what() << std::endl; }
-        catch (...) { std::cerr << "[Pipeline-process] unknown" << std::endl; }
-        out_cv_.notify_all();
-    });
-    if (cfg_.enable_preview) {
-        encode_thread_ = std::thread([this]() {
-            _set_se_translator(seh_translater);
-            try { encode_loop(); }
-            catch (const std::exception& e) { std::cerr << "[Pipeline-encode] " << e.what() << std::endl; }
-            catch (...) { std::cerr << "[Pipeline-encode] unknown" << std::endl; }
-        });
-    }
-
-    // ── 3) 解码：StreamHub 共享 or 独占 ──
-    if (hub_ && is_network_url(cfg_.input_url)) {
-        shared_source_ = hub_->acquire(cfg_.input_url, cfg_.decoder);
-        if (!shared_source_) {
-            set_init_error("StreamHub acquire failed");
-            running_ = false;
-            return;
-        }
-        shared_token_ = shared_source_->subscribe(
-            [this, alive = alive_token_](const std::shared_ptr<BroadcastFrame>& f) {
-                // 任务已销毁/停止：跳过（解码线程可能在任务析构后在途调用此回调）
-                if (!alive || !alive->load()) return false;
-                return this->on_shared_frame(f);
-            }
-        );
-        if (!shared_source_->is_initialized()) {
-            set_init_error(shared_source_->init_error());
-            std::cerr << "[Pipeline] " << init_error() << std::endl;
-            running_ = false;
-            return;
-        }
-        initialized_ = true;
-        source_fps_ = shared_source_->fps();
-        std::cout << "[Pipeline] " << cfg_.id << " -> shared source fps=" << source_fps_ << std::endl;
-        initialized_ = true;
-        std::cout << "[Pipeline] Running (shared): " << cfg_.id << std::endl;
-        stats_.start();
-        while (running_.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    } else {
-        decoder_ = std::make_unique<StreamDecoder>(cfg_.decoder);
-        if (!decoder_->open(cfg_.input_url)) {
-            set_init_error("Decoder open failed: " + cfg_.input_url);
-            std::cerr << "[Pipeline] " << init_error() << std::endl;
-            running_ = false;
-            return;
-        }
-        decoder_->set_device_only(cfg_.decoder.device_only);
-        source_fps_ = decoder_->fps();
-        std::cout << "[Pipeline] Source FPS: " << source_fps_ << std::endl;
-        initialized_ = true;
-        std::cout << "[Pipeline] Running (own): " << cfg_.id << std::endl;
-        stats_.start();
-
-        DecodedFrame raw;
-        while (running_.load() && decoder_->read_one_frame(&raw)) {
-            auto dec_t0 = std::chrono::steady_clock::now();
-            PendingFrame pf;
-            pf.width = raw.width;
-            pf.height = raw.height;
-            pf.pts = raw.pts;
-            pf.wall_time_sec = std::chrono::duration<double>(
-                dec_t0.time_since_epoch()).count();
-            const size_t y_size = static_cast<size_t>(raw.height) * raw.width;
-            const size_t uv_size = y_size / 2;
-
-#ifdef WITH_GPU
-            // CUVID 硬解 GPU 帧 → PendingFrame 持久设备缓冲（D2D 拷贝，零 PCIe 往返）。
-            // 设备指针仅当下有效（read_hw_frame_ 下次 read_one_frame 即被 unref 复用），
-            // 拷贝到 pf.gpu_nv12 后指针跨队列/pipeline 生命周期安全。
-            // 仅当 InferGroup 可走 GPU-direct（全 detection+gpu+无 ROI）时启用。
-            // 批模式亦受益：设备 NV12 池块指针一次 D2D 后提交批调度，后续零拷贝。
-            const bool gpu_path = infer_group_->gpu_nv12_ready() &&
-                                  raw.y_plane_device && raw.uv_plane_device;
-            if (gpu_path) {
-                auto dbuf = infer_group_->acquire_device_buffer(y_size + uv_size);
-                bool ok = dbuf && raw.y_step_device >= raw.width &&
-                          raw.uv_step_device >= raw.width;
-                if (!dbuf) {
-                    // cudaMalloc 失败会使 CUDA 运行时错误粘滞，后续分配全部失败；
-                    // 回退 host 路径前清掉，避免 GPU 路径被永久降级。
-                    cudaGetLastError();
-                }
-                if (ok) {
-                    const cudaError_t ey = cudaMemcpy2D(
-                        dbuf.get(), raw.width,
-                        raw.y_plane_device, raw.y_step_device,
-                        raw.width, raw.height, cudaMemcpyDeviceToDevice);
-                    const cudaError_t euv = cudaMemcpy2D(
-                        dbuf.get() + y_size, raw.width,
-                        raw.uv_plane_device, raw.uv_step_device,
-                        raw.width, raw.height / 2, cudaMemcpyDeviceToDevice);
-                    ok = (ey == cudaSuccess && euv == cudaSuccess);
-                    if (!ok) {
-                        // D2D 失败同样会留下粘滞错误，先清除再回退 host 路径
-                        cudaGetLastError();
-                        std::cerr << "[Pipeline] D2D NV12 copy failed: Y="
-                                  << cudaGetErrorString(ey) << " UV="
-                                  << cudaGetErrorString(euv)
-                                  << " (falling back to host NV12)" << std::endl;
-                    }
-                }
-                if (ok) {
-                    pf.gpu_nv12 = std::move(dbuf);
-                    pf.y_plane_device = pf.gpu_nv12.get();
-                    pf.uv_plane_device = pf.gpu_nv12.get() + y_size;
-                }
-            }
-#endif
-            // 硬解帧仍需落 host NV12（供预览/快照/非 GPU 路径回退）；
-            // GPU-direct 路径（gpu_path 已填充 gpu_nv12）跳过，实现全 GPU 零拷贝。
-            // device_only 且无 GPU-direct 缓冲时（无 host 平面）直接丢弃，避免空指针拷贝。
-            if (!pf.gpu_nv12 && raw.y_plane) {
-                pf.nv12_data.resize(y_size + uv_size);
-                uint8_t* dst = pf.nv12_data.data();
-                if (raw.y_step == raw.width && raw.uv_step == raw.width) {
-                    std::memcpy(dst, raw.y_plane, y_size + uv_size);
-                } else {
-                    for (int row = 0; row < raw.height; ++row)
-                        std::memcpy(dst + row * raw.width,
-                                    raw.y_plane + row * raw.y_step, raw.width);
-                    const int uv_h = raw.height / 2;
-                    for (int row = 0; row < uv_h; ++row)
-                        std::memcpy(dst + y_size + row * raw.width,
-                                    raw.uv_plane + row * raw.uv_step, raw.width);
-                }
-            }
-            auto dec_t1 = std::chrono::steady_clock::now();
-            last_decode_us_ = std::chrono::duration_cast<std::chrono::microseconds>(dec_t1 - dec_t0).count();
-            push_in_queue(std::move(pf));
-        }
-    }
-
-    // 通知后续段退出
-    running_ = false;
-    in_cv_.notify_all();
-    out_cv_.notify_all();
-    if (decoder_) decoder_->stop();
+    // 其它（packed BGR 等）：CPU draw()
+    draw_engine_->draw(frame, results);
 }
 
-// ── 推理+绘制段（推理线程） ──
+void Pipeline::update_snapshot(const ImageData& frame, int64_t& counter) {
+    if (++counter % snapshot_interval_ != 0) return;
+    ImageData snap;
+    if (frame.device() != modeldeploy::Device::CPU) {
+        // 设备帧：toCpu 做深拷贝，脱离解码池复用缓冲的生命周期
+        if (!frame.toCpu(&snap)) return;
+    } else {
+        // CPU 帧：toCpu 仅浅 clone 共享解码池缓冲，需深拷贝独立所有权
+        snap = frame.clone();
+    }
+    std::lock_guard<std::mutex> lock(snapshot_mtx_);
+    latest_bgr_ = std::make_shared<ImageData>(std::move(snap));
+}
 
-void Pipeline::process_loop() {
+// ── 检测循环（应用单线程关键路径：detect + draw + encode_async） ──
+
+void Pipeline::detect_loop() {
     int64_t snapshot_counter = 0;
-    bool has_cached_results = false;
+    bool encode_failed_reported = false;
     auto t_last = std::chrono::steady_clock::now();
     while (running_.load()) {
-        PendingFrame pf;
+        modeldeploy::video::VideoFrame f;
         {
-            std::unique_lock<std::mutex> lock(in_mtx_);
-            in_cv_.wait(lock, [this]() {
-                return !in_queue_.empty() || !running_.load();
+            std::unique_lock<std::mutex> lock(det_mtx_);
+            det_cv_.wait(lock, [this]() {
+                return !det_queue_.empty() || !running_.load();
             });
-            if (!running_.load() && in_queue_.empty()) break;
-            if (in_queue_.empty()) continue;
-            pf = std::move(in_queue_.front());
-            in_queue_.pop();
-            lock.unlock();
-            in_cv_.notify_one();
-        }
-
-        // 丢弃过期帧
-        if (pf.wall_time_sec > 0) {
-            int cur_fps = source_fps_;
-            if (cur_fps <= 0) cur_fps = 25;
-            double now_sec = std::chrono::duration<double>(
-                std::chrono::steady_clock::now().time_since_epoch()).count();
-            if (now_sec - pf.wall_time_sec > 2.0 / cur_fps) {
-                continue;
-            }
+            if (!running_.load() && det_queue_.empty()) break;
+            if (det_queue_.empty()) continue;
+            f = std::move(det_queue_.front());
+            det_queue_.pop_front();
         }
 
         auto t0 = std::chrono::steady_clock::now();
-        std::vector<InferResult> results;
-        ImageData bgr_image;
-        bool ran_inference = false;
-        int models_ran = 0;
-        // 批路径预览：设备 NV12 输出（含绘制），编码段直用
-        std::shared_ptr<uint8_t> out_nv12;
-        int out_nvw = 0, out_nvh = 0;
 
-        if (batch_scheduler_) {
-            BatchRequest req;
-            req.pipeline_id = cfg_.id;
-            req.y_plane = const_cast<uint8_t*>(pf.y_ptr());
-            req.uv_plane = const_cast<uint8_t*>(pf.uv_ptr());
-            req.width = pf.width;
-            req.height = pf.height;
-            req.need_nv12 = cfg_.enable_preview;
-            // 设备 NV12 直通（CUVID 持久缓冲池块）：批 kernel 零拷贝直用设备指针
-            if (pf.gpu_nv12 && pf.y_plane_device && pf.uv_plane_device) {
-                req.gpu_nv12 = pf.gpu_nv12;
-                req.y_device = pf.y_plane_device;
-                req.uv_device = pf.uv_plane_device;
-                req.y_step_device = pf.width;   // 池块紧凑，step==width
-                req.uv_step_device = pf.width;
-            }
-            req.model_names.reserve(cfg_.models.size());
-            for (const auto& m : cfg_.models) {
-                req.model_names.push_back(m.name);
-            }
-            auto future = batch_scheduler_->submit(req);
-            // 轮询等结果：sleep 而非 yield，避免空转打满单核 CPU
-            auto wait0 = std::chrono::steady_clock::now();
-            while (!future->ready) {
-                std::this_thread::sleep_for(std::chrono::microseconds(200));
-            }
-            auto wait1 = std::chrono::steady_clock::now();
-            results = std::move(future->results);
-            bgr_image = std::move(future->bgr_image);
-            ran_inference = !results.empty();
-            last_infer_us_ = std::chrono::duration_cast<std::chrono::microseconds>(wait1 - wait0).count();
-            // 预览：设备 NV12 输出（含绘制）进编码段；无法力不需要 BGR
-            if (future->nv12_gpu) {
-                out_nv12 = future->nv12_gpu;
-                out_nvw = future->width;
-                out_nvh = future->height;
-            }
-        } else {
-            models_ran = infer_group_->run_models(
-                const_cast<uint8_t*>(pf.y_ptr()),
-                const_cast<uint8_t*>(pf.uv_ptr()),
-                pf.y_plane_device, pf.uv_plane_device,   // P4: CUVID 持久设备缓冲指针
-                pf.width, pf.height, pf.width, pf.width,
-                &results, &bgr_image, cfg_.enable_preview);
-            ran_inference = models_ran > 0;
-            auto t1_local = std::chrono::steady_clock::now();
-            last_infer_us_ = std::chrono::duration_cast<std::chrono::microseconds>(t1_local - t0).count();
+        // 推理 + 绘制，均在 frame.image（设备 NV12）上零拷贝
+        std::vector<std::pair<std::string, std::vector<DetectionResult>>> sdk_dets;
+        std::vector<std::pair<std::string, InferResult>> non_det;
+        infer_group_.run_models(f.image, &sdk_dets, &non_det);
+        for (auto& [name, dets] : sdk_dets) {
+            auto* det = infer_group_.det_model(name);
+            if (det) det->draw_result(f.image, dets, model_threshold(name));
         }
+        // 非 detection（face/classification）标注到输出帧（DrawEngine）
+        if (!non_det.empty()) {
+            std::vector<InferResult> res;
+            res.reserve(non_det.size());
+            for (auto& [name, r] : non_det) res.push_back(std::move(r));
+            draw_non_det(f.image, res);
+        }
+        last_frame_pts_ = static_cast<int64_t>(f.pts_ms);
+
         auto t1 = std::chrono::steady_clock::now();
 
-        // 更新缓存：有检测结果时更新，无检测结果时清空
-        if (!results.empty()) {
-            cached_results_ = results;
-            has_cached_results = true;
-        } else if (ran_inference) {
-            // 推理跑了但无结果 → 清空缓存，后续帧不再画旧框
-            cached_results_.clear();
-            has_cached_results = false;
+        // 预览编码（encode_async；GPU 直编 D2D）
+        if (cfg_.enable_preview && !cfg_.output_url.empty()) {
+            if (!sink_.encode(f.image) || sink_.has_failed()) {
+                if (!encode_failed_reported) {
+                    encode_failed_reported = true;
+                    set_init_error("encode failed: " + sink_.last_error());
+                }
+            }
         }
 
-        // 非预览路：跳过绘制和编码
-        if (!cfg_.enable_preview) {
-            if (!bgr_image.empty() && ++snapshot_counter % snapshot_interval_ == 0) {
-                std::lock_guard<std::mutex> lock(snapshot_mtx_);
-                latest_bgr_ = std::make_shared<ImageData>(bgr_image);
-            }
-            int64_t infer_us = last_infer_us_.load();
-            if (infer_us <= 0) infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-            stats_.record_frame(last_decode_us_.load(), infer_us, 0, 0);
-            continue;
-        }
-
-        // 预览路：始终绘制（首次推理前无缓存也不画框，首次推理后有缓存则复用）
-        if (!bgr_image.empty()) {
-            // GPU 绘制：任一模型配置 device=gpu 且 use_gpu_draw 时启用；CUDA 不可用自动回退 CPU
-            bool use_gpu_draw = false;
-            for (const auto& m : cfg_.models) {
-                if (m.device == "gpu" && m.use_gpu_draw) { use_gpu_draw = true; break; }
-            }
-            const auto draw = [this, use_gpu_draw](ImageData& img,
-                                                   const std::vector<InferResult>& res) {
-                if (use_gpu_draw && draw_engine_->draw_gpu(img, res)) return;
-                draw_engine_->draw(img, res);
-            };
-            if (!results.empty()) {
-                draw(bgr_image, results);
-            } else if (has_cached_results) {
-                draw(bgr_image, cached_results_);
-            }
-        }
         auto t2 = std::chrono::steady_clock::now();
-        if (bgr_image.empty() && !out_nv12) continue;
 
-        if (out_nv12) {
-            // 设备 NV12 直接预览：检测框就地绘制到设备缓冲（零拷贝），再进编码段
-            ImageData::Plane pl[2] = {
-                {out_nv12.get(), out_nvw ? out_nvw : pf.width},
-                {out_nv12.get() + (size_t)(out_nvw ? out_nvw : pf.width) *
-                                              (out_nvh ? out_nvh : pf.height),
-                 out_nvw ? out_nvw : pf.width}};
-            {
-                ImageData dnv12 = ImageData::from_planes(
-                    pl, 2, MdImageType::NV12, out_nvw ? out_nvw : pf.width,
-                    out_nvh ? out_nvh : pf.height, modeldeploy::Device::GPU, out_nv12);
-                const std::vector<InferResult>* draw_set = nullptr;
-                if (!results.empty()) draw_set = &results;
-                else if (has_cached_results) draw_set = &cached_results_;
-                if (draw_set) draw_engine_->draw_gpu(dnv12, *draw_set,
-                                                     cfg_.draw.show_label, cfg_.draw.show_score);
-            }
-            EncodedFrame ef;
-            ef.gpu_nv12 = std::move(out_nv12);
-            ef.width = out_nvw ? out_nvw : pf.width;
-            ef.height = out_nvh ? out_nvh : pf.height;
-            ef.pts = pf.pts;
-            {
-                std::unique_lock<std::mutex> lock(out_mtx_);
-                if (out_queue_.size() >= out_max_size_) out_queue_.pop();
-                out_queue_.push(std::move(ef));
-                lock.unlock();
-                out_cv_.notify_one();
-            }
-            int64_t infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-            stats_.record_frame(last_decode_us_.load(), infer_us, 0, last_encode_us_.load());
-            t_last = t2;
-            continue;
-        }
+        // 低频快照（不占每帧关键路径）
+        update_snapshot(f.image, snapshot_counter);
 
-        if (++snapshot_counter % snapshot_interval_ == 0) {
-            std::lock_guard<std::mutex> lock(snapshot_mtx_);
-            latest_bgr_ = std::make_shared<ImageData>(bgr_image);
-        }
-
-        EncodedFrame ef;
-        ef.bgr_image = std::move(bgr_image);
-        ef.width = pf.width;
-        ef.height = pf.height;
-        ef.pts = pf.pts;
-
-        {
-            std::unique_lock<std::mutex> lock(out_mtx_);
-            if (out_queue_.size() >= out_max_size_) {
-                out_queue_.pop();
-            }
-            out_queue_.push(std::move(ef));
-            lock.unlock();
-            out_cv_.notify_one();
-        }
-
+        auto t3 = std::chrono::steady_clock::now();
         int64_t infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-        int64_t draw_us = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-        stats_.record_frame(last_decode_us_.load(), infer_us, draw_us, last_encode_us_.load());
-        t_last = t2;
-    }
-}
+        int64_t draw_us  = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+        int64_t enc_us   = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
+        stats_.record_frame(0, infer_us, draw_us, enc_us);
 
-// ── 编码段（编码线程） ──
-
-void Pipeline::encode_loop() {
-    while (running_.load() || !out_queue_.empty()) {
-        // 推流永久失败（地址被占用等）→ 仅设置错误信息，不改 running_
-        // 由前端检测 init_error 后调用 /stop 接口统一停止
-        if (encoder_ && encoder_->has_permanently_failed()) {
-            set_init_error(encoder_->last_error());
-            std::cerr << "[Pipeline:" << cfg_.id << "] Encoder permanently failed: "
-                      << encoder_->last_error() << std::endl;
-            break;
-        }
-
-        EncodedFrame ef;
+        // 摄入 SDK 编解码统计（轻量：src_/sink_ 已聚合的标量拷贝；解码侧帧率快照）
         {
-            std::unique_lock<std::mutex> lock(out_mtx_);
-            out_cv_.wait_for(lock, std::chrono::milliseconds(100),
-                [this]() { return !out_queue_.empty() || !running_.load(); });
-            if (out_queue_.empty()) {
-                if (!running_.load()) break;
-                continue;
-            }
-            ef = std::move(out_queue_.front());
-            out_queue_.pop();
+            const auto sst = src_.stats();
+            const auto kst = sink_.stats();
+            stats_.ingest_sdk(sst.frames_in, sst.frames_out, sst.dropped,
+                              sst.avg_decode_ms, sst.reconnect_count,
+                              kst.avg_encode_ms);
         }
-
-        if (!encoder_opened_.load()) {
-            if (!encoder_->open(cfg_.output_url, ef.width, ef.height, source_fps_)) {
-                if (encoder_->has_permanently_failed()) {
-                    set_init_error(encoder_->last_error());
-                    std::cerr << "[Pipeline:" << cfg_.id << "] " << init_error() << std::endl;
-                    break;
-                }
-                static auto last_enc_err_ = std::chrono::steady_clock::now();
-                auto now = std::chrono::steady_clock::now();
-                if (now - last_enc_err_ > std::chrono::seconds(5)) {
-                    std::cerr << "[Pipeline:" << cfg_.id << "] Encoder open failed: " << cfg_.output_url << std::endl;
-                    last_enc_err_ = now;
-                }
-                continue;
-            }
-            encoder_opened_ = true;
-        }
-
-        int64_t enc_us;
-#ifdef WITH_GPU
-        // 优先级：设备 NV12（全 GPU 零拷贝）→ GPU BGR（旧）→ CPU BGR
-        if (ef.gpu_nv12) {
-            auto e0 = std::chrono::steady_clock::now();
-            encoder_->encode_from_gpu_nv12(ef.gpu_nv12.get(), ef.width, ef.height);
-            auto e1 = std::chrono::steady_clock::now();
-            enc_us = std::chrono::duration_cast<std::chrono::microseconds>(e1 - e0).count();
-            ef.gpu_nv12.reset();
-        } else if (ef.gpu_bgr) {
-            auto e0 = std::chrono::steady_clock::now();
-            encoder_->encode_from_gpu(ef.gpu_bgr, ef.width, ef.height);
-            auto e1 = std::chrono::steady_clock::now();
-            enc_us = std::chrono::duration_cast<std::chrono::microseconds>(e1 - e0).count();
-        } else
-#endif
-        {
-            enc_us = encoder_->encode_timed(ef.bgr_image);
-        }
-        last_encode_us_ = enc_us;
+        t_last = t3;
     }
 }
 
@@ -620,19 +330,22 @@ bool Pipeline::update_config(const TaskConfig& cfg) {
     return true;
 }
 
+void Pipeline::update_preview_mode(bool enable) {
+    cfg_.enable_preview = enable;
+}
+
 bool Pipeline::add_model(const ModelConfig& mcfg) {
-    if (!infer_group_) return false;
-    return infer_group_->add_model(mcfg);
+    return infer_group_.add_model(mcfg, model_factory_);
 }
 
 bool Pipeline::remove_model(const std::string& name) {
-    if (!infer_group_) return false;
-    return infer_group_->remove_model(name);
+    return infer_group_.remove_model(name);
 }
 
 bool Pipeline::update_model(const std::string& name, const ModelConfig& mcfg) {
-    if (!infer_group_) return false;
-    return infer_group_->update_model(name, mcfg);
+    // 新 InferGroup 无原位 update：先删旧、再加新（等价语义）
+    infer_group_.remove_model(name);
+    return infer_group_.add_model(mcfg, model_factory_);
 }
 
 bool Pipeline::latest_bgr_snapshot(std::shared_ptr<ImageData>* out) const {
@@ -653,7 +366,7 @@ bool Pipeline::encode_jpeg(const std::shared_ptr<ImageData>& snap,
     if (cpu.type() == MdImageType::NV12) {
         cpu = ImageData::cvt_color(cpu, ColorConvertType::CVT_NV122PKG_BGR);
     }
-    cpu.asMat(&mat);
+    (void)cpu.asMat(&mat);
     if (mat.empty()) return false;
     cv::Mat bgr;
     if (mat.channels() == 4) cv::cvtColor(mat, bgr, cv::COLOR_BGRA2BGR);

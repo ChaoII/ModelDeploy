@@ -130,6 +130,12 @@ static class Program
 
     static void TestPedestrianAttribute()
     {
+        static RuntimeOption CpuOrt() =>
+            new RuntimeOption().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
+
+        // var opt = new RuntimeOption();
+        // opt.UseOrt();
+
         var dir = Path.Combine(TestDataPath, "test_models/onnx");
         // 两参重载：det 模型路径 + 分类模型路径（内部拼成 capi 的 "det|cls"；onnx/engine/mnn 皆可）
         using var ped = new PedestrianAttributeModel(
@@ -140,7 +146,6 @@ static class Program
         ped.SetClsInputSize(192, 256);
         ped.SetClsBatchSize(8); // >0 固定 / -1 自动；Sophgo batch=1 静态
         ped.SetDetThreshold(0.25);
-
         using var image = VisionImage.Read(
             Path.Combine(TestDataPath, "test_images/test_pedestrian_attribute_scale.jpg"));
         using var result = ped.Predict(image); // Prediction<AttributeResult>
@@ -152,7 +157,12 @@ static class Program
         Dictionary<int, string> dict = new Dictionary<int, string>
             { { 0, "傻话" }, { 1, "雷达" }, { 2, "哈拉" }, { 3, "糍粑" }, { 4, "索拉" } };
 
-        result.Draw(image, new DrawOptions { Threshold = 0.25, FontSize = 10, Alpha = 0.15, LabelMap = dict, AbnormalIds = new List<int> { 0, 1 },ShowAttr = false});
+        result.Draw(image,
+            new DrawOptions
+            {
+                Threshold = 0.25, FontSize = 10, Alpha = 0.15, LabelMap = dict, AbnormalIds = new List<int> { 0, 1 },
+                ShowAttr = false
+            });
         image.Save("pedattr_annotated.jpg");
         image.Show();
         Console.WriteLine("visualized -> pedattr_annotated.jpg");

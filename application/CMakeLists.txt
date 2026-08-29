@@ -8,17 +8,22 @@ endif ()
 message(STATUS "Building AI Surveillance Application")
 
 # ── FFmpeg ──────────────────────────────────
-set(FFMPEG_ROOT "E:/develop/ffmpeg" CACHE PATH "FFmpeg installation root")
-find_path(FFMPEG_INCLUDE_DIR libavcodec/avcodec.h PATHS ${FFMPEG_ROOT}/include NO_DEFAULT_PATH)
-foreach (lib avcodec avformat avutil avdevice swscale)
-    find_library(FFMPEG_${lib}_LIBRARY NAMES ${lib} ${lib}.lib
-            PATHS ${FFMPEG_ROOT}/lib NO_DEFAULT_PATH)
-    if (FFMPEG_${lib}_LIBRARY)
-        list(APPEND FFMPEG_LIBS ${FFMPEG_${lib}_LIBRARY})
+# 统一来源（SDK 设计的核心）：直接复用 SDK 侧 cmake/ffmpeg.cmake 已解析的
+# FFMPEG_INCLUDE_DIR / FFMPEG_LIBS，app 不再各自 find 一套 —— 同一进程内只一个 ffmpeg，
+# 规避双 libavcodec 符号冲突；平台差异（桌面备选 / Jetson / Sophgo-sophon-ffmpeg）由 SDK 层选。
+# 仅当 SDK 未启用视频（BUILD_VIDEO=OFF）时兜底 pkg-config。
+if (NOT FFMPEG_LIBS)
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(FFMPEG QUIET libavcodec libavformat libavutil libswscale)
+        if (FFMPEG_FOUND)
+            set(FFMPEG_INCLUDE_DIR "${FFMPEG_INCLUDE_DIRS}")
+            set(FFMPEG_LIBS "${FFMPEG_LIBRARIES}")
+        endif ()
     endif ()
-endforeach ()
-if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
-    message(FATAL_ERROR "FFmpeg not found at ${FFMPEG_ROOT}")
+endif ()
+if (NOT FFMPEG_LIBS)
+    message(FATAL_ERROR "FFmpeg not found (SDK video module should provide FFMPEG_LIBS)")
 endif ()
 
 # cpp-httplib + nlohmann-json (header-only)
@@ -30,17 +35,14 @@ set(APP_SOURCES
         config.cpp
         pipeline_manager.cpp
         pipeline.cpp
-        stream_decoder.cpp
-        sophgo_decoder.cpp
-        stream_hub.cpp
+        video_codec.cpp
+        video_sink.cpp
         inference_engine.cpp
         infer_group.cpp
         draw_engine.cpp
-        stream_encoder.cpp
+        video_source.cpp
         http_server.cpp
         perf_stats.cpp
-        frame_pool.cpp
-        batch_scheduler.cpp
 )
 
 add_executable(surveillance ${APP_SOURCES})
@@ -49,14 +51,18 @@ target_include_directories(surveillance PRIVATE
         ${HTTPLIB_INCLUDE_DIR}
         ${FFMPEG_INCLUDE_DIR}
         ${OpenCV_INCLUDE_DIRS}
-        ${CUDAToolkit_INCLUDE_DIRS}
 )
+if (WITH_GPU)
+    target_include_directories(surveillance PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+endif ()
 target_link_libraries(surveillance PRIVATE
         ${LIBRARY_NAME}
         ${OpenCV_LIBS}
         ${FFMPEG_LIBS}
-        CUDA::cudart
 )
+if (WITH_GPU)
+    target_link_libraries(surveillance PRIVATE CUDA::cudart)
+endif ()
 
 # ── 测试（可选） ──────────────────────────────
 option(BUILD_SURVEILLANCE_TESTS "build surveillance tests" OFF)
@@ -69,26 +75,31 @@ if (BUILD_SURVEILLANCE_TESTS)
     list(FILTER APP_SOURCES EXCLUDE REGEX "main\\.cpp$")
     set(TEST_SOURCES tests/test_config.cpp
             tests/test_perf_stats.cpp
-            tests/test_frame_pool.cpp
-            tests/test_stream_decoder.cpp
             tests/test_inference_engine.cpp
             tests/test_infer_group.cpp
             tests/test_draw_engine.cpp
-            tests/test_stream_encoder.cpp
             tests/test_pipeline.cpp
             tests/test_pipeline_manager.cpp
-            tests/test_http_server.cpp)
+            tests/test_http_server.cpp
+            tests/test_video_codec.cpp
+            tests/test_video_source.cpp
+            tests/test_video_sink.cpp)
     add_executable(surveillance_test ${TEST_SOURCES} ${APP_SOURCES})
     target_include_directories(surveillance_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${HTTPLIB_INCLUDE_DIR}
             ${FFMPEG_INCLUDE_DIR}
             ${OpenCV_INCLUDE_DIRS}
-            ${CUDAToolkit_INCLUDE_DIRS}
     )
+    if (WITH_GPU)
+        target_include_directories(surveillance_test PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+    endif ()
     target_link_libraries(surveillance_test PRIVATE
             ${LIBRARY_NAME} ${OpenCV_LIBS} ${FFMPEG_LIBS}
-            CUDA::cudart Catch2::Catch2WithMain
+            Catch2::Catch2WithMain
     )
+    if (WITH_GPU)
+        target_link_libraries(surveillance_test PRIVATE CUDA::cudart)
+    endif ()
     add_test(NAME surveillance_test COMMAND surveillance_test)
 endif ()

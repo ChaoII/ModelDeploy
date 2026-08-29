@@ -642,7 +642,10 @@ namespace modeldeploy::vision {
         else {
             // 零拷贝：把 plane(0) 按该内存所属 device（CPU/GPU/TPU）包装成 Tensor，共享外部内存，不做任何拷贝。
             // 设备帧的 plane(0).data 指向设备内存，故产出设备 Tensor，绝无 H2D/D2H。
-            tensor->from_external_memory(const_cast<uint8_t*>(plane(0).data), shape, dtype, nullptr, device());
+            // 用 shared deleter 持有本图像副本（共享 Impl，保活 owner/平面内存），避免 ImageData 析构后 Tensor 悬垂。
+            auto keep = std::make_shared<ImageData>(*this);
+            tensor->from_external_memory(const_cast<uint8_t*>(plane(0).data), shape, dtype,
+                                         [keep](void*) mutable { keep.reset(); }, device());
         }
     }
 
