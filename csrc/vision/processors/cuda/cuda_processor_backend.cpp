@@ -285,8 +285,11 @@ namespace modeldeploy::vision {
         const int step_uv = puv.step > 0 ? puv.step : iw;
         const size_t ybytes = static_cast<size_t>(cw) * ch;
         const size_t uvbytes = static_cast<size_t>(cw) * (ch / 2);  // 每行 cw 字节(交错)，ch/2 行
-        uint8_t* dbuf = nullptr;
-        if (cudaMalloc(&dbuf, ybytes + uvbytes) != cudaSuccess) return false;
+        // 复用输出缓冲池，消除每帧 cudaMalloc/cudaFree 的分配/释放开销。
+        // 注意 CudaOutputBufferPool 为单缓冲：本调用持有期间不得再次 acquire，调用方须在
+        // 下次 acquire（下一次 crop/preprocess）之前完成本次裁剪结果的消费。
+        uint8_t* dbuf = reinterpret_cast<uint8_t*>(out_pool_.acquire(ybytes + uvbytes));
+        if (!dbuf) return false;
         // 在持久 stream 上拷贝 + 同步，避免与后续消费该裁剪块的非阻塞 stream 产生跨流竞争
         // （同步默认流 D2D 拷贝在多次连续调用后可能与持久流 kernel 竞速）。
         cudaStream_t cstream = get_persistent_stream(&stream_);
@@ -301,10 +304,9 @@ namespace modeldeploy::vision {
                           static_cast<size_t>(cw), static_cast<size_t>(ch / 2),
                           cudaMemcpyDeviceToDevice, cstream);
         cudaStreamSynchronize(cstream);
-        std::shared_ptr<void> owner(dbuf, [](void* p) { if (p) cudaFree(p); });
+        // from_planes 空 owner = 借用（缓冲由 out_pool_ 持有，后端析构统一释放）
         ImageData::Plane pl[2] = {{dbuf, cw}, {dbuf + ybytes, cw}};
-        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, cw, ch,
-                                      Device::GPU, std::move(owner));
+        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, cw, ch, Device::GPU);
         return !out->empty();
     }
 
