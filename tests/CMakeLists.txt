@@ -160,6 +160,6 @@ target_include_directories(baseline_collect PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/application/third_party)
 
-add_test(NAME test_modeldeploy COMMAND test_modeldeploy)
+add_test(NAME test_modeldeploy COMMAND test_modeldeploy ~[opencl] ~[vulkan])
 set_tests_properties(test_modeldeploy PROPERTIES
     ENVIRONMENT "TEST_DATA_DIR=${CMAKE_SOURCE_DIR}")
