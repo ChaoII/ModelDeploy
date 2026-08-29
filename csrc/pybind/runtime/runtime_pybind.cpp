@@ -74,7 +74,9 @@ namespace modeldeploy {
                   const bool ok = modeldeploy::validate_pointer_device(
                       reinterpret_cast<void*>(ptr), static_cast<Device>(dev), device_id, &code);
                   if (!ok && code == DeviceValidateCode::Unsupported) {
-                      throw pybind11::not_implemented_error("device not supported for pointer validation");
+                      PyErr_SetString(PyExc_NotImplementedError,
+                                      "device not supported for pointer validation");
+                      throw pybind11::error_already_set();
                   }
                   return ok;
               },
