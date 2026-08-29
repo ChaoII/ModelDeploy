@@ -24,11 +24,21 @@ namespace modeldeploy {
         }
         option_ = option.trt_option;
         option_.model_file = option.model_file;
-        option_.gpu_id = option.device_id;
+        // 请求的设备号可能非法（含调用方传入未初始化值）；钳制回退到 0，避免 cudaSetDevice 失败
+        int num = 0;
+        cudaGetDeviceCount(&num);
+        int gpu = (option.device_id < 0) ? 0 : option.device_id;
+        if (gpu >= num || num <= 0) {
+            MD_LOG_WARN << "Requested CUDA device " << gpu
+                << " is invalid (device count=" << num << "); falling back to device 0." << std::endl;
+            gpu = 0;
+        }
+        option_.gpu_id = gpu;
         option_.enable_fp16 = option.enable_fp16; // 同步用户设置的 FP16 标志
         const cudaError_t error = cudaSetDevice(option_.gpu_id);
         if (error != cudaSuccess) {
-            MD_LOG_ERROR << "Failed to set CUDA device: " << error << std::endl;
+            MD_LOG_ERROR << "Failed to set CUDA device " << option_.gpu_id << ": " << error
+                << " (" << cudaGetErrorString(error) << ")" << std::endl;
             return false;
         }
         // 记录实际要加载的模型路径（可能是原始文件，也可能是 memory buffer 的临时文件）
