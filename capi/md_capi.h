@@ -119,8 +119,8 @@ typedef enum MD_DEVICE {
     MD_DEV_CPU = 0,
     MD_DEV_GPU = 1,
     MD_DEV_TPU = 2,
-    MD_DEV_OPENCL = 3,  /* 预留，未实现：md_option_set_device 会报错而非静默忽略 */
-    MD_DEV_VULKAN = 4   /* 预留，未实现：md_option_set_device 会报错而非静默忽略 */
+    MD_DEV_OPENCL = 3,  /* 经 MNN 后端支持（需先 set_backend(MNN)），非预留 */
+    MD_DEV_VULKAN = 4   /* 经 MNN 后端支持（需先 set_backend(MNN)），非预留 */
 } MDDevice;
 
 typedef enum MD_BACKEND {

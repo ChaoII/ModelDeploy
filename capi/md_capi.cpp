@@ -365,8 +365,10 @@ MDStatus md_option_set_device(MDOptionHandle h, MDDevice d, int device_id) {
         case MD_DEV_CPU: o->opt.set_device(Device::CPU, 0); break;
         case MD_DEV_GPU: o->opt.set_device(Device::GPU, device_id); break;
         case MD_DEV_TPU: o->opt.set_device(Device::TPU, device_id); break;
+        case MD_DEV_OPENCL: o->opt.set_device(Device::OPENCL, device_id); break;
+        case MD_DEV_VULKAN: o->opt.set_device(Device::VULKAN, device_id); break;
         default:
-            set_error_fmt("md_option_set_device: device %d is reserved/not implemented", (int)d);
+            set_error_fmt("md_option_set_device: device %d is not supported", (int)d);
             return MD_ERR_UNSUPPORTED_TYPE;
     }
     if (o->opt.backend == Backend::SOPHGO) { o->opt.use_sophgo_backend(); }

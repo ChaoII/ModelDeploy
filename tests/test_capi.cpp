@@ -1827,3 +1827,13 @@ TEST_CASE("capi md_draw_result device NV12 dispatch detection", "[gpu][model][ca
     cudaFree(duv);
 }
 #endif
+
+TEST_CASE("md_option_set_device accepts OPENCL and VULKAN", "[capi]") {
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_MNN);
+    REQUIRE(md_option_set_device(opt, MD_DEV_OPENCL, 0) == MD_OK);
+    REQUIRE(md_option_set_device(opt, MD_DEV_VULKAN, 0) == MD_OK);
+    md_option_destroy(opt);
+}
+
