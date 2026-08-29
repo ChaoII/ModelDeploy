@@ -30,11 +30,14 @@ namespace modeldeploy::vision {
     class MODELDEPLOY_CXX_EXPORT VisionProcessorBackend {
     public:
         // 是否支持在指定设备上执行某图像算子。
-        // CPU→全支持；GPU→Preprocess/Draw/Crop（NV12 设备侧裁剪）已实现，其余 op 前置 fast-fail。
+        // CPU→全支持；GPU→Preprocess/Draw/Crop（NV12 设备侧裁剪）已实现，其余 op 前置 fast-fail；
+        // 设备帧(TPU)→放行中间算子(Rotate/Resize/CvtColor)由 SophgoProcessorBackend 就地实现，
+        // 未实现时仍返回 false（ImageData 置 last_error，不静默回退 CPU）。
         static bool supports(Device d, ImageOp op) {
             if (d == Device::CPU) return true;
             return op == ImageOp::Preprocess || op == ImageOp::Draw ||
-                   op == ImageOp::Crop;
+                   op == ImageOp::Crop || op == ImageOp::Rotate ||
+                   op == ImageOp::Resize || op == ImageOp::CvtColor;
         }
 
         virtual ~VisionProcessorBackend() = default;
