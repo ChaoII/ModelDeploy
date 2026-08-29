@@ -85,6 +85,13 @@ if(WITH_GPU)
     )
 endif()
 
+# Sophgo(TPU) 设备帧中间算子测试：仅当 ENABLE_SOPHGO 且找到 libsophon 时编译
+# （测试直接调用 bm_dev_request / bmcv_*，需链接 SOPHON 库）。
+if(ENABLE_SOPHGO AND SOPHGO_FOUND)
+    list(APPEND TEST_SOURCES test_sophgo_device_ops.cpp)
+    target_link_libraries(test_modeldeploy PRIVATE ${SOPHGO_LIBS})
+endif()
+
 add_executable(test_modeldeploy ${TEST_SOURCES})
 target_link_libraries(test_modeldeploy PRIVATE
     ${LIBRARY_NAME}
