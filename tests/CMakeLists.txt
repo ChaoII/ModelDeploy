@@ -10,6 +10,7 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/t
 
 set(TEST_SOURCES
     test_core.cpp
+    test_mnn_device.cpp
     test_ptr_validate.cpp
     test_bugfix.cpp
     test_image_data.cpp
