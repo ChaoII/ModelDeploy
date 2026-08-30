@@ -519,3 +519,22 @@ if (dec.open("test.mp4")) {
 ```
 
 > 需要 `BUILD_VIDEO=ON`（FFmpeg）。示例见 `examples/demo_action/demo_action.cpp`（配合 TSN 动作识别）。
+
+## 29. 轻量分割一切（FastSAM）
+
+`FastSam` 复用 `InstanceSegResult` 消费路径，一次性输出 box + mask（对齐 `UltralyticsSeg`），
+后处理产出 `InstanceSegResult{box, mask(二值图), label_id, score}`。
+
+```cpp
+auto m = modeldeploy::vision::seg::FastSam("fastsam-s.onnx", option);
+m.get_preprocessor().set_size({1024, 1024});
+
+std::vector<modeldeploy::vision::InstanceSegResult> result;
+m.predict(img, &result);
+// result[i]: {box, mask(二值图), label_id, score}
+```
+
+mask 以 `Mask` 结构保存（shape `{h, w}`，uint8 0/1），可用 `vis_iseg` 可视化。
+> 静态分割（无提示词/框/点），面向"分割一切"轻量部署场景；MobileSAM 的两段式（编码器+解码器）本轮未接入。
+
+**示例**：`examples/demo_sam/demo_fastsam.cpp`
