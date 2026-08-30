@@ -67,7 +67,8 @@ TEST_CASE("FastSAM predict_with_prompts filters by bbox and point", "[seg]") {
         const int h = r.mask.shape.size() >= 2 ? (int)r.mask.shape[0] : 0;
         const int w = r.mask.shape.size() >= 2 ? (int)r.mask.shape[1] : 0;
         int mx = (int)(pc.x - r.box.x), my = (int)(pc.y - r.box.y);
-        CHECK(mx >= 0 && my >= 0 && mx < w && my < h);
+        const bool in_box = (mx >= 0) && (my >= 0) && (mx < w) && (my < h);
+        CHECK(in_box);
     }
 
     seg::FastSamPrompts empty;
