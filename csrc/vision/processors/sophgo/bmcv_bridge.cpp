@@ -6,6 +6,7 @@
 #include "bmcv_bridge.h"
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 #include <vector>
 
@@ -206,6 +207,33 @@ namespace modeldeploy::vision {
             if (st != BM_SUCCESS) bm_image_destroy(img);
             return st;
         }
+
+        // 分配连续 NV12 输出设备内存（Y + UV 紧邻）并 attach 到 img（FORMAT_NV12, w x h_img）。
+        // 成功返回 BM_SUCCESS 并写出设备基址 base（Y 平面）与保活 owner；失败时内部清理并返回错误码。
+        bm_status_t alloc_attach_nv12_out(bm_handle_t h, int w, int h_img, bm_image* img,
+                                          void** base, std::shared_ptr<void>* owner) {
+            const size_t y_sz = static_cast<size_t>(h_img) * w;
+            const size_t uv_sz = y_sz / 2;
+            const size_t tot = y_sz + uv_sz;
+            bm_device_mem_t dm{};
+            bm_status_t st = bm_malloc_device_byte(h, &dm, static_cast<unsigned int>(tot));
+            if (st != BM_SUCCESS) return st;
+            const unsigned long long addr = bm_mem_get_device_addr(dm);
+            bm_device_mem_t planes[2]{};
+            bm_mem_set_device_addr(&planes[0], addr);
+            bm_mem_set_device_size(&planes[0], static_cast<unsigned int>(y_sz));
+            bm_mem_set_device_addr(&planes[1], addr + y_sz);
+            bm_mem_set_device_size(&planes[1], static_cast<unsigned int>(uv_sz));
+            st = bm_image_create(h, h_img, w, FORMAT_NV12, DATA_TYPE_EXT_1N_BYTE, img, nullptr);
+            if (st != BM_SUCCESS) { bm_free_device(h, dm); return st; }
+            st = bm_image_attach(*img, planes);
+            if (st != BM_SUCCESS) { bm_image_destroy(img); bm_free_device(h, dm); return st; }
+            *base = reinterpret_cast<void*>(addr);
+            // owner 保活并释放设备显存；平面内存由本 owner 统一管理。
+            *owner = std::shared_ptr<void>(*base,
+                                           [h, dm](void*) mutable { bm_free_device(h, dm); });
+            return BM_SUCCESS;
+        }
     } // namespace
 
     int md_bmcv_draw_rect_nv12(void* handle, void* y_mem, void* uv_mem, int w, int h,
@@ -340,5 +368,141 @@ namespace modeldeploy::vision {
         bm_image_detach(img);
         bm_image_destroy(&img);
         return st == BM_SUCCESS ? 0 : -1;
+    }
+
+    // ── TPU 设备帧中间算子（显存→显存，输出新分配设备内存，零拷贝）──
+    // 完整 BMCV 调用以 libsophon 真实 API 为准实现；本机无 Sophgo 环境无法编译/验证，
+    // 需在 Sophgo 设备 + ENABLE_SOPHGO 下由 tests/test_sophgo_device_ops.cpp 集成验收。
+
+    int md_bmcv_crop_nv12_devmem(void* handle, void* y_mem, void* uv_mem,
+                                 int src_w, int src_h,
+                                 float x, float y, float w, float h,
+                                 void** out_y, void** out_uv, int* out_w, int* out_h,
+                                 std::shared_ptr<void>* owner) {
+        if (!handle || !y_mem || !uv_mem || !out_y || !out_uv || !out_w || !out_h || !owner ||
+            src_w <= 0 || src_h <= 0 || w <= 0 || h <= 0) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        int x0 = static_cast<int>(std::floor(x)), y0 = static_cast<int>(std::floor(y));
+        int x1 = static_cast<int>(std::ceil(x + w)), y1 = static_cast<int>(std::ceil(y + h));
+        x0 = std::max(0, x0); y0 = std::max(0, y0);
+        x1 = std::min(src_w, x1); y1 = std::min(src_h, y1);
+        x0 &= ~1; y0 &= ~1; x1 &= ~1; y1 &= ~1;   // NV12 UV 采样偶数对齐
+        const int cw = x1 - x0, ch = y1 - y0;
+        if (cw <= 0 || ch <= 0 || (cw & 1) || (ch & 1)) return -1;
+
+        bm_image in{}, out{};
+        bm_status_t st = BM_SUCCESS;
+        void* base = nullptr;
+        do {
+            st = attach_nv12_image(hd, y_mem, uv_mem, src_w, src_h, &in);
+            if (st != BM_SUCCESS) break;
+            st = alloc_attach_nv12_out(hd, cw, ch, &out, &base, owner);
+            if (st != BM_SUCCESS) break;
+            bmcv_rect_t crop = {static_cast<unsigned>(x0), static_cast<unsigned>(y0),
+                                static_cast<unsigned>(cw), static_cast<unsigned>(ch)};
+            bmcv_padding_attr_t pad = {0, 0, static_cast<unsigned>(cw), static_cast<unsigned>(ch),
+                                       0, 0, 0, 1};
+            st = bmcv_image_vpp_convert_padding(hd, 1, &in, &out, &pad, &crop);
+        } while (false);
+        bm_image_destroy(&in);
+        bm_image_destroy(&out);
+        if (st != BM_SUCCESS) {
+            owner->reset();   // 释放已分配设备显存，避免泄漏
+            return -1;
+        }
+        *out_y = base;
+        *out_uv = reinterpret_cast<void*>(reinterpret_cast<unsigned char*>(base) +
+                                          static_cast<size_t>(ch) * cw);
+        *out_w = cw;
+        *out_h = ch;
+        return 0;
+    }
+
+    int md_bmcv_rotate_nv12_devmem(void* handle, void* y_mem, void* uv_mem,
+                                   int src_w, int src_h, int flag,
+                                   void** out_y, void** out_uv, int* out_w, int* out_h,
+                                   std::shared_ptr<void>* owner) {
+        if (!handle || !y_mem || !uv_mem || !out_y || !out_uv || !out_w || !out_h || !owner ||
+            src_w <= 0 || src_h <= 0 || flag < 0 || flag > 2) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        const bool swap = (flag != 1);   // 90/270 交换 W/H，180 不变
+        const int o_w = swap ? src_h : src_w;
+        const int o_h = swap ? src_w : src_h;
+        bmcv_rotate_t angle;
+        switch (flag) {
+        case 0: angle = BMCV_ROTATE_90; break;
+        case 1: angle = BMCV_ROTATE_180; break;
+        default: angle = BMCV_ROTATE_270; break;
+        }
+        bm_image in{}, out{};
+        bm_status_t st = BM_SUCCESS;
+        void* base = nullptr;
+        do {
+            st = attach_nv12_image(hd, y_mem, uv_mem, src_w, src_h, &in);
+            if (st != BM_SUCCESS) break;
+            st = alloc_attach_nv12_out(hd, o_w, o_h, &out, &base, owner);
+            if (st != BM_SUCCESS) break;
+            st = bmcv_image_rotate(hd, in, &out, angle);
+        } while (false);
+        bm_image_destroy(&in);
+        bm_image_destroy(&out);
+        if (st != BM_SUCCESS) {
+            owner->reset();
+            return -1;
+        }
+        *out_y = base;
+        *out_uv = reinterpret_cast<void*>(reinterpret_cast<unsigned char*>(base) +
+                                          static_cast<size_t>(o_h) * o_w);
+        *out_w = o_w;
+        *out_h = o_h;
+        return 0;
+    }
+
+    int md_bmcv_cvtcolor_nv12_devmem(void* handle, void* y_mem, void* uv_mem,
+                                     int src_w, int src_h, int cvt_kind,
+                                     void** out_data, int* out_w, int* out_h,
+                                     std::shared_ptr<void>* owner) {
+        if (!handle || !y_mem || !uv_mem || !out_data || !out_w || !out_h || !owner ||
+            src_w <= 0 || src_h <= 0 || cvt_kind < 0 || cvt_kind > 2) return -1;
+        bm_handle_t hd = static_cast<bm_handle_t>(handle);
+        bm_image_format_ext out_fmt;
+        switch (cvt_kind) {
+        case 0: out_fmt = FORMAT_BGR_PACKED; break;
+        case 1: out_fmt = FORMAT_BGR_PLANAR; break;
+        default: out_fmt = FORMAT_GRAY; break;
+        }
+        const size_t out_bytes = (cvt_kind == 2)
+                                     ? static_cast<size_t>(src_w) * src_h
+                                     : static_cast<size_t>(src_w) * src_h * 3;
+        bm_image in{}, out{};
+        bm_status_t st = BM_SUCCESS;
+        void* base = nullptr;
+        do {
+            st = attach_nv12_image(hd, y_mem, uv_mem, src_w, src_h, &in);
+            if (st != BM_SUCCESS) break;
+            bm_device_mem_t dm{};
+            st = bm_malloc_device_byte(hd, &dm, static_cast<unsigned int>(out_bytes));
+            if (st != BM_SUCCESS) break;
+            const unsigned long long addr = bm_mem_get_device_addr(dm);
+            st = bm_image_create(hd, src_h, src_w, out_fmt, DATA_TYPE_EXT_1N_BYTE, &out, nullptr);
+            if (st != BM_SUCCESS) { bm_free_device(hd, dm); break; }
+            st = bm_image_attach(out, &dm);
+            if (st != BM_SUCCESS) { bm_image_destroy(&out); bm_free_device(hd, dm); break; }
+            base = reinterpret_cast<void*>(addr);
+            bmcv_convert_to_attr ct = {1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f};
+            st = bmcv_image_convert_to(hd, 1, ct, &in, &out);
+            *owner = std::shared_ptr<void>(base,
+                                           [hd, dm](void*) mutable { bm_free_device(hd, dm); });
+        } while (false);
+        bm_image_destroy(&in);
+        bm_image_destroy(&out);
+        if (st != BM_SUCCESS) {
+            owner->reset();
+            return -1;
+        }
+        *out_data = base;
+        *out_w = src_w;
+        *out_h = src_h;
+        return 0;
     }
 } // namespace modeldeploy::vision

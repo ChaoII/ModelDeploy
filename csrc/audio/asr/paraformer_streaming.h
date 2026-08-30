@@ -71,6 +71,16 @@ namespace modeldeploy::audio::asr {
                 int32_t num_threads = 2,
                 float threshold = 1.0f);
 
+        // 与默认构造等价的运行时选项重载：调用方可传入全自定义 RuntimeOption（需设置 encoder
+        // 模型路径与 use_ort_backend()）。流式 Paraformer 仅支持 ORT——非 ORT 后端会校验失败并明确报错。
+        ParaformerStreamingAsr(
+                const RuntimeOption& runtime_option,
+                const std::string& decoder_onnx,
+                const std::string& tokens_txt,
+                int32_t sample_rate = 16000,
+                int32_t num_threads = 2,
+                float threshold = 1.0f);
+
         ~ParaformerStreamingAsr() override;
 
         [[nodiscard]] std::string name() const override { return "ParaformerStreamingAsr"; }
@@ -100,6 +110,10 @@ namespace modeldeploy::audio::asr {
         bool init_runtime() override;
 
     private:
+        // 两个构造器的公共入口：承载 encoder 的 runtime_option + decoder/tokens 路径，校验后端并初始化。
+        void init_from(const RuntimeOption& runtime_option,
+                       const std::string& decoder_onnx, const std::string& tokens_txt,
+                       int32_t sample_rate, int32_t num_threads, float threshold);
         // ---- preprocess 阶段：在线 FBank ----
         void ResetFbank();
 

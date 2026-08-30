@@ -291,6 +291,28 @@ asr.decode(/*is_final=*/true, &r);      // flush 末尾
 
 > **当前仅 C++**（无 pybind / 独立示例 demo）。
 
+**后端约束（A3 结论）**：流式 Paraformer **基于 ORT**。其 decoder 为**状态化**模型（encoder/decoder 双 Runtime，
+decoder 每步携带上一块的 hidden state 往返），多后端未实现。针对 MNN 的评估结论：MNN 对像 decoder 这般
+每块由应用自持状态 Tensor 并显式往返的状态化图块缺乏等价、可移植的表达（onnx→MNN 转换对包含动态
+`com.microsoft` 风格状态输入/输出的图不保证保真），因此**不支持 MNN 后端**。使用非 ORT 后端（如
+`RuntimeOption` 传入 `use_mnn_backend()`）会在**加载任何模型之前**明确报错并返回初始化失败（绝不静默钳制
+为 ORT，也不会产生不可诊断的 ORT 加载混淆错误）：
+
+```
+ParaformerStreamingAsr(encoder) 仅支持 ORT 后端(状态化 decoder 多后端未实现);
+请调用 runtime_option.use_ort_backend()。当前 backend=<Backend 枚举值>
+```
+
+如需自定义 encoder 运行时选项，可使用 `RuntimeOption` 构造重载：
+
+```cpp
+modeldeploy::RuntimeOption ro;
+ro.use_ort_backend();                      // 必须是 ORT，否则初始化明确失败
+ro.set_model_path("encoder.onnx");
+ro.set_cpu_thread_num(2);
+modeldeploy::audio::asr::ParaformerStreamingAsr asr(ro, "decoder.onnx", "tokens.txt");
+```
+
 ## 11. 语音合成（TTS）
 
 ### 11.1 Kokoro
