@@ -1890,3 +1890,52 @@ TEST_CASE("capi fastsam predict + prompt", "[capi][seg]") {
     md_result_destroy(res2); md_result_destroy(res);
     md_image_destroy(img); md_model_destroy(h);
 }
+
+// 失败路径泄漏修复断言（Task 1）：predict 失败时 new 出的 ResultData 已挂到 rh->data，
+// 随 md_result_handle 析构一并释放，不再泄漏。需可加载的检测模型；缺失则 WARN 跳过。
+TEST_CASE("capi predict fail after destroy releases", "[capi]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string candidates[] = {
+        data_dir + "/test_models/onnx/yolo11n.onnx",
+        data_dir + "/test_models/onnx/yolo26n/yolo26n.onnx",
+    };
+    std::string modelfile;
+    for (const auto& c : candidates)
+        if (std::filesystem::exists(c)) { modelfile = c; break; }
+    if (modelfile.empty()) {
+        WARN("capi predict fail: 检测模型缺失（外链 modelscope），跳过失败路径断言");
+        return;
+    }
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+    MDModelHandle det = nullptr;
+    REQUIRE(md_model_create(&det, MD_MODEL_DETECTION, modelfile.c_str(), opt) == MD_OK);
+    md_option_destroy(opt);
+
+    // 能走到 m->predict 且返回 false 的输入：NV12 CPU 帧仅 1 平面（uv=null）→ predict_single_nv12 早退 false。
+    // 修复后失败路径应返回非 MD_OK，且内部分配的 ResultData 随 rh 析构释放，此处不应泄漏/崩溃。
+    const int w = 16, h = 16;
+    std::vector<unsigned char> y(static_cast<size_t>(w) * h, 128);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_device_nv12(&img, y.data(), nullptr, w, h, w, w, MD_DEV_CPU) == MD_OK);
+
+    MDResultHandle res = nullptr;
+    const MDStatus s = md_model_predict(det, img, &res);
+    if (s == MD_OK) md_result_destroy(res);  // 兜底：意外成功时不让 res 泄漏
+    CHECK(s != MD_OK);
+    CHECK(res == nullptr);
+
+    MDResultHandle resb = nullptr;
+    MDImageHandle one[1] = {img};
+    const MDStatus sb = md_model_predict_batch(det, one, 1, &resb);
+    if (sb == MD_OK) md_result_destroy(resb);
+    CHECK(sb != MD_OK);
+    CHECK(resb == nullptr);
+
+    md_image_destroy(img);
+    md_model_destroy(det);
+}
