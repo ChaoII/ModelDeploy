@@ -668,6 +668,9 @@ typedef enum MD_SOLUTION_KIND {
     MD_SOLUTION_WORKOUT,
     MD_SOLUTION_PARKING,
     MD_SOLUTION_FALL_DETECT,
+    MD_SOLUTION_REGION_COUNTER,
+    MD_SOLUTION_QUEUE,
+    MD_SOLUTION_TRACK_ZONE,
 } MDSolutionKind;
 
 MD_CAPI_EXPORT MDStatus md_solution_create(MDSolutionHandle* out, MDSolutionKind kind);
@@ -682,6 +685,24 @@ MD_CAPI_EXPORT MDStatus md_solution_heatmap_update(MDSolutionHandle h, const flo
 MD_CAPI_EXPORT MDStatus md_solution_heatmap_peak(MDSolutionHandle h, int* x, int* y);
 MD_CAPI_EXPORT MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
                                        float bx, float by, float bw, float bh, float* out);
+
+/* RegionCounter：命名区域计数（多边形 xy 为 float[n*2]，boxes 为 float[n*4] (x,y,w,h)） */
+MD_CAPI_EXPORT MDStatus md_solution_region_counter_add(MDSolutionHandle h, const char* name, const float* xy, size_t n);
+MD_CAPI_EXPORT MDStatus md_solution_region_counter_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                                          const int* track_ids, const int* label_ids);
+MD_CAPI_EXPORT int md_solution_region_counter_count(MDSolutionHandle h, const char* name);
+
+/* QueueManager：排队区域计数（每帧统计区域内目标数） */
+MD_CAPI_EXPORT MDStatus md_solution_queue_set_region(MDSolutionHandle h, const float* xy, size_t n);
+MD_CAPI_EXPORT MDStatus md_solution_queue_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                                 const int* track_ids, const int* label_ids);
+MD_CAPI_EXPORT int md_solution_queue_count(MDSolutionHandle h);
+
+/* TrackZone：仅保留区域内轨迹并计数 */
+MD_CAPI_EXPORT MDStatus md_solution_track_zone_set_region(MDSolutionHandle h, const float* xy, size_t n);
+MD_CAPI_EXPORT MDStatus md_solution_track_zone_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                                      const int* track_ids, const int* label_ids);
+MD_CAPI_EXPORT int md_solution_track_zone_count(MDSolutionHandle h);
 
 /* ==================== 音频解决方案（audio::solution/tool） ==================== */
 
