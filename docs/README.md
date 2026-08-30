@@ -94,7 +94,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | **CV 解决方案** | `ObjectCounter` / `Heatmap` / `SpeedEstimator` / `ParkingManager` 等 | 全部 |
 | **NLP** | `TextClassifier` / 分词 / 分句 / 关键词 | 全部 |
 | 语音识别 | `SenseVoice` / `AAsr` / `ParaformerStreamingAsr` | 全部 |
-| 语音合成 | `Kokoro` | 全部 |
+| 语音合成 | `Kokoro` / `Audio8` / `Qwen3Tts` | 全部 |
 | VAD | `SileroVAD` | 全部 |
 
 ## 快速入口

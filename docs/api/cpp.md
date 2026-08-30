@@ -43,9 +43,41 @@ det.predict(img, &result);
 | 人脸 | `vision::face::Scrfd` / `InsightFaceAnalysis` | 见 [models-人脸](../models.md#6-人脸face) |
 | 车牌 | `vision::lpr::LprPipeline` | 见 [models-车牌](../models.md#7-车牌识别license-plate) |
 | ASR | `audio::asr::SenseVoice` | 见 [models-语音](../models.md#10-语音识别asr) |
-| TTS | `audio::tts::Kokoro` | 见 [models-TTS](../models.md#11-语音合成tts) |
+| TTS（Kokoro） | `audio::tts::Kokoro` | 见 [models-TTS](../models.md#11-语音合成tts) |
+| TTS（Audio8） | `audio::tts::Audio8` | 见 [models-Audio8](../models.md#112-audio8audio8-tts-preview-06b) |
+| TTS（Qwen3） | `audio::tts::Qwen3Tts` | 见 [models-Qwen3](../models.md#113-qwen3-ttsqwen3-tts-tokenizer-12hz-06b) |
 
 > 各类模型完整 API 见 [models.md](../models.md)；后端/设备切换见 [RuntimeOption](../runtime_option.md) 与 [后端详解](../backends.md)。
+
+### TTS 类签名
+
+三个 TTS 模型均继承 `audio::tts::ITtsModel`，统一提供 `predict` / `predict_stream` / `get_sample_rate`（`predict_stream` 的 `cb` 签名 `bool(const float*, int, float progress)`，返回 `false` 中止；`chunk_frames == 0` 等价一次性合成）。
+
+- `audio::tts::Kokoro(model_onnx, tokens, lexicons, voices_bin, jieba_dir, norm_dir, opt)` —— 24kHz，`predict(text, voice, speed, &audio)`。
+- `audio::tts::Audio8` —— **无 voices 参数**；默认构造后 `Load(model_dir, opt)`（`model_dir` 指向 `audio8_preview` 根目录，`voice` 来自 `{model_dir}/voices/`），**44100Hz**，`predict(text, voice, speed, &audio)`。
+- `audio::tts::Qwen3Tts(model_dir, opt)` —— 24kHz，`predict(text, voice_or_speaker, speed, &audio)`；`clone(text, ref_audio, ref_text, lang, &audio)`（返回 `false` 表示失败，非法 `lang` / 参考音频无法编码等）。
+
+```cpp
+modeldeploy::RuntimeOption option;
+option.use_ort_backend(); option.use_cpu();
+
+// Audio8：44.1kHz；voice 来自 {model_dir}/voices/
+modeldeploy::audio::tts::Audio8 audio8;
+audio8.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);
+std::vector<float> a8;
+audio8.predict("你好，世界。", "demo", 1.0f, &a8);
+
+// Qwen3：24kHz；预置说话人或声音克隆
+modeldeploy::audio::tts::Qwen3Tts qwen3("{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b", option);
+std::vector<float> q3;
+qwen3.predict("你好，世界。", "Vivian", 1.0f, &q3);
+std::vector<float> clone;
+qwen3.clone("你好，这是声音克隆。", "ref.wav", "参考音频的文本", "auto", &clone);
+
+// 三模型统一流式合成
+audio8.predict_stream("你好，世界。", "demo", 1.0f, 480,
+    [](const float* samples, int n, float progress) -> bool { return true; });
+```
 
 ## 设备与设备帧
 

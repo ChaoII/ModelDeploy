@@ -39,6 +39,39 @@ cd ModelDeployExample/bin/Debug/net9.0
 - `ModelDeployExample` — 示例
 - `ModelDeployUnitTest` — 单元测试
 
+## TTS（Kokoro / Audio8 / Qwen3）
+
+命名空间 `ModelDeploy.Models`，三个模型均返回 `TtsResult { Audio (float[]), SampleRate }`；`KokoroModel` 另有 `SaveWav(result, path)` 落盘（Audio8/Qwen3 可用 `SampleRate` + `Audio` 自行写 wav）。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var opt = new MDRuntimeOption();
+opt.UseOrtBackend(); opt.UseCpu();
+
+// Kokoro：24kHz。modelPath 格式: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
+var kokoro = new KokoroModel("kokoro.onnx|tokens.txt|...", opt);
+kokoro.SaveWav(kokoro.Predict("你好，世界。", "zf_001"), "kokoro.wav");
+
+// Audio8：44.1kHz。modelDir 指向 audio8_preview 根目录，voice 来自 {model_dir}/voices/（无 voices 参数）
+var audio8 = new Audio8Model("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", opt);
+var r1 = audio8.Predict("你好，世界。", "demo");
+Console.WriteLine(audio8.SampleRate);   // 44100（Predict/PredictStream 后刷新）
+
+// Qwen3：24kHz。预置说话人 + 声音克隆
+var qwen3 = new Qwen3TtsModel("{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b", opt);
+var r2 = qwen3.Predict("你好，世界。", "Vivian");
+var r3 = qwen3.Clone("你好，这是声音克隆。", "ref.wav", "参考音频的文本");   // lang 缺省 "auto"
+
+// 三模型统一流式：PredictStream 逐块回调 onChunk(samples, progress)，同时返回整段音频
+// chunkFrames <= 0 等价一次性合成（单次回调整段）
+var r4 = audio8.PredictStream("你好，世界。", "demo", 1.0f, 480,
+    (samples, progress) => Console.WriteLine($"progress={progress:P0} chunk={samples.Length}"));
+```
+
+`Audio8Model` / `Qwen3TtsModel` 均提供 `Predict(text, voice, speed=1.0f)`、`PredictStream(text, voice, speed, chunkFrames, onChunk)` 与 `Clone()`（深拷贝实例，多线程用）；**声音克隆 `Clone(text, refAudio, refText, lang=null)` 仅 `Qwen3TtsModel` 支持**，其余模型调用会报错。
+
 ## 图像原始字节（`VisionImage`）
 
 `VisionImage` 提供原生格式的宿主字节读取（`Type`/`Width`/`Height` 见 `VisionImage` 属性）：

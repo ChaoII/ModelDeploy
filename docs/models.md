@@ -327,6 +327,100 @@ audio.save_wav("out.wav");
 
 **示例**：`examples/demo_audio/demo_kokoro_cxx.cpp`
 
+### 11.2 Audio8（Audio8-TTS-Preview-0.6B）
+
+Audio8-TTS-Preview-0.6B（DualAR + 内置 codec）的 ONNX 移植，**44.1kHz** 输出。AR 主模型为 int4 量化、codec 为 fp16（需 onnxruntime ≥ 1.29，Windows CPU 构建默认 1.29.0 经 FetchContent 拉取自 ModelScope）。`speed` 官方无此参数，预留但不影响合成。
+
+**模型目录结构**（`{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview/`）：
+
+| 文件/目录 | 说明 |
+|------|------|
+| `runtime_manifest.json` | 运行时配置（精度、采样率、层数、codec 等） |
+| `slow_ar_int4.onnx`(+`.data`) | AR slow 主模型（int4） |
+| `fast_ar_int4.onnx`(+`.data`) | AR fast 模型（int4） |
+| `codec_decoder_fp16.onnx`(+`.data`) | 内置 44.1kHz codec 解码器（fp16） |
+| `tokenizer/tokenizer.json` | 文本 tokenizer |
+| `voices/` | 注册 voice（`codes.npy` + `meta.json`，如 `demo`） |
+| `registration/` | 可选：新 voice 注册用（codec_encoder + registration_manifest.json） |
+
+**API 用法**（`model_dir` 指向 `audio8_preview` 根目录，`opt` 仅用 `cpu_thread_num`）：
+
+```cpp
+modeldeploy::RuntimeOption option;
+modeldeploy::audio::tts::Audio8 tts;
+tts.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);
+
+std::vector<float> audio;
+tts.predict("你好，世界。", "demo", 1.0f, &audio);   // voice 来自 {model_dir}/voices/
+// audio 为 44.1kHz 单声道；tts.get_sample_rate() == 44100
+```
+
+```python
+tts = modeldeploy.audio.Audio8("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option)
+audio = tts.predict("你好，世界。", "demo", 1.0)      # 返回 float32 列表
+print(tts.sample_rate)                                 # 44100
+```
+
+**voice 语义**：使用 `{model_dir}/voices/` 下已注册的 voice（内置 `demo`）；新增声音需按官方 Audio8_TTS 的 registration 流程注册后再合成。
+
+**超长文本**：超过 `max_seq_len` 上限时 `predict` 返回 `false` + 错误日志（拒绝截断）。长文本推荐用 `predict_stream` 流式合成（滑动窗口 + guard 逐块回调）。
+
+**示例**：`examples/demo_audio/demo_audio8_cxx.cpp`、流式见 `demo_tts_stream_cxx.cpp`。
+**模型下载**：`tools/tts/download_tts_models.ps1`（模型根目录可经环境变量 `MODELDEPLOY_TTS_MODELS_DIR` 配置）。
+
+### 11.3 Qwen3-TTS（Qwen3-TTS-Tokenizer-12Hz 0.6B）
+
+Qwen3-TTS-12Hz 0.6B 的多子模型 LLM 管线移植（text_project / codec_embed / code_predictor / talker / speaker_encoder / tokenizer12hz 等，共 9+ 个 ORT session），**24kHz** 输出，权重全 fp16/fp32。支持预置说话人合成与**声音克隆**。
+
+**模型目录结构**（`{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b/`）：
+
+| 文件/目录 | 说明 |
+|------|------|
+| `onnx_kv_06b/` | 子模型 ONNX（`talker_prefill.onnx`、`talker_decode.onnx`、`text_project.onnx`、`codec_embed.onnx`、`code_predictor*`、`speaker_encoder.onnx`、`tokenizer12hz_*.onnx` 等） |
+| `models/Qwen3-TTS-12Hz-0.6B-Base/` | tokenizer（`config.json` / `vocab.json` / `merges.txt` / `tokenizer_config.json`） |
+
+**API 用法**：
+
+```cpp
+modeldeploy::RuntimeOption option;
+modeldeploy::audio::tts::Qwen3Tts tts("{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b", option);
+
+std::vector<float> audio;
+tts.predict("你好，世界。", "Vivian", 1.0f, &audio);   // 预置说话人，24kHz
+
+// 声音克隆（Base 模型）：ref_audio 为参考音频 wav，ref_text 为参考文本，lang 为语言白名单
+std::vector<float> clone_audio;
+bool ok = tts.clone("你好，这是声音克隆。", "ref.wav", "参考音频的文本", "auto", &clone_audio);
+// ok == false 表示失败（非法 lang / 参考音频无法编码等）
+```
+
+```python
+tts = modeldeploy.audio.Qwen3Tts("{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b", option)
+audio = tts.predict("你好，世界。", "Vivian", 1.0)               # 24kHz float32
+clone_audio = tts.clone("你好，这是声音克隆。", "ref.wav", "参考音频的文本", "auto")
+```
+
+**voice/speaker 语义**：预置说话人来自 sherpa README 映射（如 `Vivian` / `Serena` / `Uncle_Fu` / `Dylan` / `Eric` / `Ryan` / `Aiden` / `Ono_Anna` / `Sohee`，可用 `get_supported_speakers()` 查询）；Base 模型也可仅用于默认说话人名解析。`clone` 需提供 `ref_audio`（wav 路径）+ `ref_text` + `lang`（`codec_language_id` 白名单，含 `"auto"`，可用 `get_supported_languages()` 查询）。
+
+**超长文本**：超过 2048 token 上限时 `predict` 返回 `false` + 错误日志（拒绝截断）。长文本推荐用 `predict_stream` 流式合成。
+
+**示例**：`examples/demo_audio/demo_qwen3_tts_cxx.cpp`（`--clone <ref_audio> <ref_text> [lang]`）、流式见 `demo_tts_stream_cxx.cpp`。
+**模型下载**：`tools/tts/download_tts_models.ps1`（模型根目录可经环境变量 `MODELDEPLOY_TTS_MODELS_DIR` 配置）。
+
+### 11.4 统一流式合成（predict_stream）
+
+三模型（Kokoro / Audio8 / Qwen3）均实现 `ITtsModel::predict_stream(text, voice, speed, chunk_frames, cb)`：`chunk_frames == 0` 等价一次性合成（单次回调整段）；`> 0` 时按块回调，`cb` 返回 `false` 立即中止。
+
+```cpp
+tts.predict_stream("你好，世界。", "demo", 1.0f, 480,
+    [](const float* samples, int n, float progress) -> bool {
+        // samples: 当前块（n 个 mono float 采样），progress: [0,1]
+        return true;
+    });
+```
+
+**示例**：`examples/demo_audio/demo_tts_stream_cxx.cpp`（Kokoro+Audio8+Qwen3 一次跑通，回调打印 progress 与块长）。
+
 ## 12. VAD（语音活动检测）
 
 ### 12.1 SileroVAD

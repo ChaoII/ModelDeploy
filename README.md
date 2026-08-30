@@ -8,7 +8,7 @@
 
 - **多后端统一 API**：`RuntimeOption` 一键切换 OnnxRuntime / TensorRT / MNN / Sophgo(算能 TPU)
 - **AI 视觉**：检测/分割/姿态/OBB/分类/深度/语义分割/人脸/车牌/OCR/行人属性/Re-ID/手势/条码二维码
-- **AI 音频**：ASR(SenseVoice)/TTS(Kokoro)/VAD/声纹验证/说话人分段
+- **AI 音频**：ASR(SenseVoice)/TTS(Kokoro、Audio8、Qwen3-TTS)/VAD/声纹验证/说话人分段
 - **文档理解**：版面分析 + 公式/OCR/表格 → Markdown
 - **视频**：解码 + 动作识别(TSN/ST-GCN) + 多目标跟踪
 - **NLP**：jieba 分词/分句/关键词/统计 + BERT 文本分类
