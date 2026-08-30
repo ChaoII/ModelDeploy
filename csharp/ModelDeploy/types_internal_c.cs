@@ -127,7 +127,11 @@ namespace ModelDeploy
             MD_SOLUTION_SPEED,
             MD_SOLUTION_DISTANCE,
             MD_SOLUTION_WORKOUT,
-            MD_SOLUTION_PARKING
+            MD_SOLUTION_PARKING,
+            MD_SOLUTION_FALL_DETECT,
+            MD_SOLUTION_REGION_COUNTER,
+            MD_SOLUTION_QUEUE,
+            MD_SOLUTION_TRACK_ZONE
         }
 
         public enum MDAudioSolutionKind

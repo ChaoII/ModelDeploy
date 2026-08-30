@@ -38,4 +38,47 @@ public class CapisolutionTests
     {
         Assert.That(Tool.Iou(0, 0, 10, 10, 0, 0, 10, 10), Is.EqualTo(1.0f).Within(1e-5f));
     }
+
+    [Test]
+    public void RegionCounter_CountsInsidePolygon()
+    {
+        var poly = new float[] { 0, 0, 10, 0, 10, 10, 0, 10 };
+        // 框中心 (3,3) 在区域内；(51,51) 在区域外
+        var boxes = new float[] { 2, 2, 2, 2, 50, 50, 2, 2 };
+        var ids = new[] { 1, 2 };
+        var labels = new[] { 0, 0 };
+
+        using var rc = new RegionCounter();
+        rc.AddRegion("A", poly);
+        rc.Update(boxes, ids, labels);
+        Assert.That(rc.Count("A"), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void QueueManager_CountsInsideRegion()
+    {
+        var poly = new float[] { 0, 0, 10, 0, 10, 10, 0, 10 };
+        var boxes = new float[] { 2, 2, 2, 2, 50, 50, 2, 2 };
+        var ids = new[] { 1, 2 };
+        var labels = new[] { 0, 0 };
+
+        using var q = new QueueManager();
+        q.SetRegion(poly);
+        q.Update(boxes, ids, labels);
+        Assert.That(q.Count(), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TrackZone_CountsInsideRegion()
+    {
+        var poly = new float[] { 0, 0, 10, 0, 10, 10, 0, 10 };
+        var boxes = new float[] { 2, 2, 2, 2, 50, 50, 2, 2 };
+        var ids = new[] { 1, 2 };
+        var labels = new[] { 0, 0 };
+
+        using var tz = new TrackZone();
+        tz.SetRegion(poly);
+        tz.Update(boxes, ids, labels);
+        Assert.That(tz.Count(), Is.EqualTo(1));
+    }
 }
