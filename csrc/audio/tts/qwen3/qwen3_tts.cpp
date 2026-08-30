@@ -200,6 +200,9 @@ std::string PathJoin(const std::string& dir, const std::string& name) {
 
 }  // namespace
 
+Qwen3Tts::Qwen3Tts() = default;
+Qwen3Tts::~Qwen3Tts() = default;
+
 Qwen3Tts::Qwen3Tts(const std::string& model_dir, const RuntimeOption& opt) {
     init(model_dir, opt);
 }

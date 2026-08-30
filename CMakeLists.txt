@@ -424,7 +424,9 @@ if (BUILD_PYTHON)
     # pybind 音频绑定依赖 BUILD_AUDIO（cppjieba 等），关闭时排除
     if (NOT BUILD_AUDIO)
         list(REMOVE_ITEM PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/kokoro_pybind.cpp
-                ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/speaker_verify_pybind.cpp)
+                ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/speaker_verify_pybind.cpp
+                ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/audio8_pybind.cpp
+                ${CMAKE_SOURCE_DIR}/csrc/pybind/audio/qwen3_tts_pybind.cpp)
     endif ()
     # pybind NLP 绑定依赖 BUILD_NLP；关闭时排除，否则 SDK 侧 nlp/tools/*.cpp
     # 在 #if defined(BUILD_NLP) 下为空、符号缺失，pyd 链接会报 LNK2001（如 Tokenizer）

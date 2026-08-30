@@ -14,9 +14,10 @@ namespace modeldeploy::audio::tts {
 
 // Qwen3-TTS-Tokenizer-12Hz 0.6B（多子模型 LLM 管线），24kHz 输出。
 // 派生自 ITtsModel（chunk_frames==0 表示一次性合成）。
-class Qwen3Tts : public ITtsModel {
+class MODELDEPLOY_CXX_EXPORT Qwen3Tts : public ITtsModel {
 public:
-    Qwen3Tts() = default;
+    Qwen3Tts();
+    ~Qwen3Tts() override;
     Qwen3Tts(const std::string& model_dir, const RuntimeOption& opt);
 
     bool init(const std::string& model_dir, const RuntimeOption& opt);

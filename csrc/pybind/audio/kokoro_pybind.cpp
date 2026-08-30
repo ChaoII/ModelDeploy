@@ -27,12 +27,26 @@ namespace modeldeploy::audio {
                  pybind11::arg("jieba_dir"),
                  pybind11::arg("text_normalization_dir"),
                  pybind11::arg("option"))
-            .def("predict",
-                 [](tts::Kokoro& self, const std::string& text, const std::string& voice, const float speed) {
-                     std::vector<float> out_audio;
-                     self.predict(text, voice, speed, &out_audio);
-                     return out_audio;
-                 }, pybind11::arg("text"), pybind11::arg("voice"), pybind11::arg("speed"))
+             .def("predict",
+                  [](tts::Kokoro& self, const std::string& text, const std::string& voice, const float speed) {
+                      std::vector<float> out_audio;
+                      self.predict(text, voice, speed, &out_audio);
+                      return out_audio;
+                  }, pybind11::arg("text"), pybind11::arg("voice"), pybind11::arg("speed"))
+            .def("predict_stream",
+                 [](tts::Kokoro& self, const std::string& text, const std::string& voice,
+                    float speed, int chunk_frames) {
+                     pybind11::list chunks;
+                     self.predict_stream(text, voice, speed, chunk_frames,
+                         [&](const float* s, int n, float) {
+                             std::vector<float> copy(s, s + n);
+                             chunks.append(pybind11::array_t<float>(copy.size(), copy.data()));
+                             return true;
+                         });
+                     return chunks;
+                 },
+                 pybind11::arg("text"), pybind11::arg("voice"), pybind11::arg("speed") = 1.0f,
+                 pybind11::arg("chunk_frames") = 24)
             .def_property("sample_rate", &tts::Kokoro::get_sample_rate, &tts::Kokoro::set_sample_rate);
     }
 } // modeldeploy::audio
