@@ -1665,6 +1665,7 @@ TEST_CASE("cv solution + tool capi", "[capi]") {
     REQUIRE(iou == Catch::Approx(1.0f).margin(1e-5f));
 }
 
+#ifdef BUILD_AUDIO
 TEST_CASE("audio solution + tool capi", "[capi]") {
     MDAudioSolutionHandle ah = nullptr;
     REQUIRE(md_audio_solution_create(&ah, MD_AUDIO_SPEAKER_SEARCH) == MD_OK);
@@ -1681,6 +1682,7 @@ TEST_CASE("audio solution + tool capi", "[capi]") {
     REQUIRE(md_audio_resample(in, 800, 8000, 16000, &rout, &rn) == MD_OK);
     REQUIRE(rn == 1600);
 }
+#endif
 
 #ifdef BUILD_NLP
 TEST_CASE("nlp tool capi", "[capi]") {
