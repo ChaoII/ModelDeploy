@@ -22,6 +22,7 @@ set(TEST_SOURCES
     test_pipeline.cpp
     test_benchmark_insightface.cpp
     test_encryption.cpp
+    test_encryption_e2e.cpp
     test_tracking.cpp
     test_barcode.cpp
     test_hand.cpp
