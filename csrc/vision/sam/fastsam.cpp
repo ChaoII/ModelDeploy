@@ -1,5 +1,9 @@
+#include <algorithm>
+#include <set>
+
 #include "core/md_log.h"
 #include "vision/sam/fastsam.h"
+#include "vision/utils.h"
 
 namespace modeldeploy::vision::seg {
     FastSam::FastSam(const std::string& model_file, const RuntimeOption& custom_option) {
@@ -26,6 +30,43 @@ namespace modeldeploy::vision::seg {
             return false;
         }
         *result = std::move(results[0]);
+        return true;
+    }
+
+    bool FastSam::predict_with_prompts(const ImageData& image, const FastSamPrompts& prompts,
+                                       std::vector<InstanceSegResult>* result, TimerArray* timers) {
+        std::vector<InstanceSegResult> all;
+        if (!predict(image, &all, timers)) return false;
+        if (prompts.empty()) { *result = std::move(all); return true; }
+
+        auto mask_hit = [](const InstanceSegResult& r, float px, float py) -> bool {
+            if (r.mask.shape.size() < 2) return false;
+            const int h = (int)r.mask.shape[0], w = (int)r.mask.shape[1];
+            if (h <= 0 || w <= 0) return false;
+            const int mx = (int)(px - r.box.x), my = (int)(py - r.box.y);
+            if (mx < 0 || my < 0 || mx >= w || my >= h) return false;
+            return r.mask.buffer[my * w + mx] != 0;
+        };
+
+        std::set<int> keep;
+        for (const auto& q : prompts.bboxes) {
+            int best = -1; float biou = 0.0f;
+            for (int i = 0; i < (int)all.size(); ++i) {
+                const float v = utils::iou_rects(q, all[i].box);
+                if (v > biou) { biou = v; best = i; }
+            }
+            if (best >= 0 && biou > 0.0f) keep.insert(best);
+        }
+        for (size_t k = 0; k < prompts.points.size(); ++k) {
+            const bool fg = (k < prompts.point_labels.size()) ? (prompts.point_labels[k] != 0) : true;
+            const Point2f& p = prompts.points[k];
+            for (int i = 0; i < (int)all.size(); ++i) {
+                if (!mask_hit(all[i], p.x, p.y)) continue;
+                if (fg) keep.insert(i); else keep.erase(i);
+            }
+        }
+        result->clear(); result->reserve(keep.size());
+        for (int idx : keep) result->push_back(all[idx]);
         return true;
     }
 
