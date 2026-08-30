@@ -175,8 +175,8 @@ jobs:
           # SDK 运行时依赖（onnxruntime/mnn 等 DLL/so）位于 build/bin，须加入运行路径。
           export PATH="$PWD/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/bin:$LD_LIBRARY_PATH"
-          BIN="./test_modeldeploy"
-          [ -x "$BIN" ] || BIN="./test_modeldeploy.exe"
+          BIN="./bin/test_modeldeploy"
+          [ -x "$BIN" ] || BIN="./bin/test_modeldeploy.exe"
           echo "GPU smoke binary: $BIN"
           "$BIN" "[gpu]~[gst-cuda]" || { echo "::error::[gpu]~[gst-cuda] run had failures"; exit 1; }
           echo "GPU smoke: OK (all [gpu] cases passed or gracefully skipped)"

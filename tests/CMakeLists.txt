@@ -127,7 +127,15 @@ if(WITH_GPU)
 
     # 整体(全场景,含 D2H 拷贝)可视化绘制基准：设备端绘制 vs 主机绘制
     add_executable(test_bench_vis_holistic test_bench_vis_holistic.cpp)
-    target_link_libraries(test_bench_vis_holistic PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS} "${_cu_dir}/cudart.lib")
+    # cudart: Windows 直接链 cudart.lib; Linux 链 CUDA::cudart（libcudart.so），
+    # 均不可用时降级为不链（设备端绘制例程仍可编译）。
+    if(EXISTS "${_cu_dir}/cudart.lib")
+        target_link_libraries(test_bench_vis_holistic PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS} "${_cu_dir}/cudart.lib")
+    elseif(TARGET CUDA::cudart)
+        target_link_libraries(test_bench_vis_holistic PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS} CUDA::cudart)
+    else()
+        target_link_libraries(test_bench_vis_holistic PRIVATE ${LIBRARY_NAME} ${OpenCV_LIBS})
+    endif()
     target_include_directories(test_bench_vis_holistic PRIVATE ${CMAKE_SOURCE_DIR})
 endif()
 
