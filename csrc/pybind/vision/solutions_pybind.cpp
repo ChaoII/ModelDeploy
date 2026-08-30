@@ -8,6 +8,9 @@
 #include "vision/solutions/workout_monitor.h"
 #include "vision/solutions/fall_detector.h"
 #include "vision/solutions/parking_manager.h"
+#include "vision/solutions/region_counter.h"
+#include "vision/solutions/queue_manager.h"
+#include "vision/solutions/track_zone.h"
 #include "vision/tracking/base_tracker.h"
 
 namespace modeldeploy {
@@ -63,6 +66,34 @@ void bind_solutions(pybind11::module& m) {
         .def("line_out", [](ObjectCounter& s) { return s.stats().line_out; })
         .def("class_count", [](ObjectCounter& s) { return s.stats().class_count; })
         .def("region_count", &ObjectCounter::region_count);
+    pybind11::class_<RegionCounter>(m, "RegionCounter")
+        .def(pybind11::init<>())
+        .def("add_region", [](RegionCounter& s, const std::string& name, const pybind11::iterable& pts) {
+            std::vector<Point2f> v; for (auto p : pts) v.push_back(p2f(p));
+            s.add_region(name, v);
+        }, pybind11::arg("name"), pybind11::arg("polygon"))
+        .def("set_classes", &RegionCounter::set_classes)
+        .def("update", [](RegionCounter& s, const pybind11::iterable& t) { s.update(trs(t)); })
+        .def("region_counts", &RegionCounter::region_counts)
+        .def("total_regions", &RegionCounter::total_regions);
+    pybind11::class_<QueueManager>(m, "QueueManager")
+        .def(pybind11::init<>())
+        .def("set_region", [](QueueManager& s, const pybind11::iterable& pts) {
+            std::vector<Point2f> v; for (auto p : pts) v.push_back(p2f(p));
+            s.set_region(v);
+        }, pybind11::arg("polygon"))
+        .def("set_classes", &QueueManager::set_classes)
+        .def("update", [](QueueManager& s, const pybind11::iterable& t) { s.update(trs(t)); })
+        .def("queue_count", &QueueManager::queue_count);
+    pybind11::class_<TrackZone>(m, "TrackZone")
+        .def(pybind11::init<>())
+        .def("set_region", [](TrackZone& s, const pybind11::iterable& pts) {
+            std::vector<Point2f> v; for (auto p : pts) v.push_back(p2f(p));
+            s.set_region(v);
+        }, pybind11::arg("polygon"))
+        .def("set_classes", &TrackZone::set_classes)
+        .def("update", [](TrackZone& s, const pybind11::iterable& t) { s.update(trs(t)); })
+        .def("inside_count", &TrackZone::inside_count);
     pybind11::class_<Heatmap>(m, "Heatmap")
         .def(pybind11::init<>())
         .def("set_size", &Heatmap::set_size)
