@@ -144,6 +144,12 @@ jobs:
         with:
           cuda: "12.8.1"
 
+      - name: Download test data
+        shell: bash
+        run: |
+          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
+          unzip -q test_data.zip
+
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
@@ -151,10 +157,29 @@ jobs:
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON
+          -DBUILD_TESTS=ON
           -DWITH_GPU=ON -DENABLE_TRT=OFF
 
       - name: Build
         run: cmake --build build
+
+      - name: GPU smoke (0 failures, graceful skip on device-less runner)
+        shell: bash
+        working-directory: build
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}
+        run: |
+          # GitHub-hosted runner 无真实 GPU：所有 [gpu] 用例须 WARN/return 优雅跳过，不得 FAIL。
+          # GStreamer-CUDA 互操作进程级状态不可逆：带 [gst-cuda] 的 3 用例必须独立进程运行
+          # （见 AGENTS.md），此处 CI smoke 刻意不跑 [gst-cuda]，仅跑 [gpu]~[gst-cuda] 一次。
+          # SDK 运行时依赖（onnxruntime/mnn 等 DLL/so）位于 build/bin，须加入运行路径。
+          export PATH="$PWD/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/bin:$LD_LIBRARY_PATH"
+          BIN="./test_modeldeploy"
+          [ -x "$BIN" ] || BIN="./test_modeldeploy.exe"
+          echo "GPU smoke binary: $BIN"
+          "$BIN" "[gpu]~[gst-cuda]" || { echo "::error::[gpu]~[gst-cuda] run had failures"; exit 1; }
+          echo "GPU smoke: OK (all [gpu] cases passed or gracefully skipped)"
 
       - name: Package
         shell: bash

@@ -13,6 +13,7 @@
 #include "vision/solutions/region_counter.h"
 #include "vision/solutions/queue_manager.h"
 #include "vision/solutions/track_zone.h"
+#include "test_gpu_utils.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::solution;
@@ -192,3 +193,60 @@ TEST_CASE("TrackZone keeps only tracks inside region", "[cv_solution]") {
     for (const auto& r : tz.inside_tracks()) if (r.track_id == 2) ids_ok = true;
     REQUIRE_FALSE(ids_ok);
 }
+
+// ==================== GPU 设备帧 solution 冒烟（[gpu]） ====================
+// CUDA 直通路径冒烟：真实显存 NV12 帧（ImageData::from_planes 零拷贝包装）与
+// 解决方案层（ObjectCounter/RegionCounter/QueueManager/TrackZone）共存的一次完整会话。
+// 无 CUDA 设备时 WARN 跳过（沿用 test_gpu_utils.h 约定），不进 FAIL。
+#ifdef WITH_GPU
+TEST_CASE("ObjectCounter/RegionCounter/QueueManager/TrackZone on GPU device frame (smoke)", "[gpu][cv_solution]") {
+    MD_TEST_GPU_OR_SKIP();
+
+    // 1) 真实显存的 GPU 设备 NV12 帧（CUDA 直通路径）
+    constexpr int w = 64, h = 48;
+    uint8_t* d_y = nullptr;
+    uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, static_cast<size_t>(w) * h) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, static_cast<size_t>(w) * (h / 2)) == cudaSuccess);
+    struct DevGuard { uint8_t* y; uint8_t* uv; ~DevGuard() { if (y) cudaFree(y); if (uv) cudaFree(uv); } } guard{d_y, d_uv};
+    REQUIRE(cudaMemset(d_y, 128, static_cast<size_t>(w) * h) == cudaSuccess);
+    REQUIRE(cudaMemset(d_uv, 128, static_cast<size_t>(w) * (h / 2)) == cudaSuccess);
+
+    const ImageData::Plane pl[2] = {{d_y, w}, {d_uv, w}};
+    ImageData frame = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h,
+                                             modeldeploy::Device::GPU, {});
+    REQUIRE(!frame.empty());
+    REQUIRE(frame.device() == modeldeploy::Device::GPU);      // 确为 GPU 设备帧
+    REQUIRE(frame.plane(0).data == d_y);                      // 零拷贝：仍指向显存
+    REQUIRE(frame.plane(1).data == d_uv);
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+
+    // 2) 该 GPU 帧会话下各解决方案消费同源轨道数据（TrackResult 为纯 CPU 几何数据，
+    //    此冒烟验证 solution 层与 GPU 设备帧共存于一次处理流程，计数正确）。
+    const std::vector<Point2f> region = {Point2f(0,0), Point2f(40,0), Point2f(40,40), Point2f(0,40)};
+
+    ObjectCounter counter;
+    counter.set_region(region);
+    RegionCounter rc;
+    rc.add_region("A", region);
+    QueueManager qm;
+    qm.set_region(region);
+    TrackZone tz;
+    tz.set_region(region);
+
+    std::vector<TrackResult> t(3);
+    t[0].track_id = 1; t[0].box = Rect2f(5, 5, 10, 10);    // 区域内
+    t[1].track_id = 2; t[1].box = Rect2f(10, 10, 10, 10);  // 区域内
+    t[2].track_id = 3; t[2].box = Rect2f(45, 5, 10, 10);   // 帧内、区域外（x>40）
+    counter.update(t);
+    rc.update(t);
+    qm.update(t);
+    tz.update(t);
+
+    REQUIRE(counter.region_count() == 2);
+    REQUIRE(rc.region_counts()["A"] == 2);
+    REQUIRE(qm.queue_count() == 2);
+    REQUIRE(tz.inside_count() == 2);
+    REQUIRE(frame.plane(0).data == d_y);  // 会话结束后帧仍指向显存（未发生意外回收）
+}
+#endif  // WITH_GPU

@@ -6,6 +6,7 @@
 #include "vision/common/result.h"
 #include "vision/processors/cuda/cuda_processor_backend.h"
 #include "vision/processors/cuda/draw_gpu.cuh"
+#include "test_gpu_utils.h"
 namespace mv = modeldeploy::vision;
 TEST_CASE("cjk_font: lookup and utf8", "[cjkfont][core]") {
     uint32_t cp = 0;
@@ -19,6 +20,7 @@ TEST_CASE("cjk_font: lookup and utf8", "[cjkfont][core]") {
 }
 
 TEST_CASE("cuda draw fill_rect nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -38,6 +40,7 @@ TEST_CASE("cuda draw fill_rect nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda draw_line nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -59,6 +62,7 @@ TEST_CASE("cuda draw_line nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda vis_pose_nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -99,6 +103,7 @@ TEST_CASE("cuda vis_pose_nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda draw_text_cjk nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -125,6 +130,7 @@ TEST_CASE("cuda draw_text_cjk nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda vis_det_nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -163,6 +169,7 @@ TEST_CASE("cuda vis_det_nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda overlay_labels nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -184,6 +191,7 @@ TEST_CASE("cuda overlay_labels nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda vis_sem_nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -214,6 +222,7 @@ TEST_CASE("cuda vis_sem_nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda vis_depth_nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -245,6 +254,7 @@ TEST_CASE("cuda vis_depth_nv12 (semantic)", "[gpu]") {
 }
 
 TEST_CASE("cuda vis_iseg_nv12 (semantic)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h, 128);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2), 128);
@@ -282,6 +292,7 @@ TEST_CASE("cuda vis_iseg_nv12 (semantic)", "[gpu]") {
 // CUDA 设备帧裁剪回归护栏（[regression][gpu]）：CudaProcessorBackend::crop 输出必须与
 // 独立主机参考逐字节一致。覆盖 Task2 的 out_pool_ 复用改造 —— 若裁剪长度/偏移/池复用出错会在此暴露。
 TEST_CASE("cuda crop NV12 pool-backed (regression)", "[regression][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     constexpr int w = 64, h = 48;
     std::vector<uint8_t> y_host(static_cast<size_t>(w) * h);
     std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2));

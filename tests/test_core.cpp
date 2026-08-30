@@ -5,6 +5,7 @@
 #include <cstring>
 #include "core/tensor.h"
 #include "core/enum_variables.h"
+#include "test_gpu_utils.h"
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
 #endif
@@ -296,6 +297,7 @@ TEST_CASE("Tensor GPU allocation is unsupported", "[core][gpu]") {
 }
 
 TEST_CASE("Tensor GPU external memory wrap", "[core][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     // GPU tensor 通过 from_external_memory 零拷贝包装（不拥有设备内存）
     float* gpu_buf = nullptr;
     cudaMalloc(&gpu_buf, 4 * sizeof(float));
@@ -313,6 +315,7 @@ TEST_CASE("Tensor GPU external memory wrap", "[core][gpu]") {
 }
 
 TEST_CASE("Tensor GPU copy_from_extern rejects device source", "[core][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     // 设备源拷贝由后端处理；Tensor::copy_from_extern_buffer 仅支持 CPU 源
     Tensor cpu({4}, DataType::FP32);
     REQUIRE(cpu.copy_from_extern_memory(

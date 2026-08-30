@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <vector>
 #include "vision/sam/fastsam.h"
+#include "runtime/runtime_option.h"
+#include "test_gpu_utils.h"
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::vision;
@@ -76,3 +78,34 @@ TEST_CASE("FastSAM predict_with_prompts filters by bbox and point", "[seg]") {
     REQUIRE(sam.predict_with_prompts(img, empty, &byall));
     CHECK(byall.size() == all.size());
 }
+
+// ==================== FastSAM GPU 预测（[gpu]） ====================
+// 现有 [seg] 用例均为默认 CPU RuntimeOption（纯 CPU 路径）。本用例补 ORT CUDA EP 的
+// GPU 推理覆盖：无 CUDA 设备时 WARN 跳过（沿用 test_gpu_utils.h 约定），不进 FAIL。
+#ifdef WITH_GPU
+TEST_CASE("FastSAM predict on ORT CUDA GPU device", "[gpu][seg]") {
+    MD_TEST_GPU_OR_SKIP();
+    const fs::path model = test_data_path() / "test_models" / "onnx" / "FastSAM-s.onnx";
+    if (!fs::exists(model)) {
+        SKIP("fastsam-s.onnx 测试模型缺失，跳过 FastSAM GPU 验证");
+    }
+    const fs::path img_path = test_data_path() / "test_images" / "test_detection0.jpg";
+    if (!fs::exists(img_path)) {
+        SKIP("测试图片缺失，跳过");
+    }
+
+    modeldeploy::RuntimeOption opt;
+    opt.use_gpu(0);
+    seg::FastSam sam(model.string(), opt);
+    REQUIRE(sam.is_initialized());
+
+    auto img = ImageData::imread(img_path.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<InstanceSegResult> res;
+    REQUIRE(sam.predict(img, &res));
+    REQUIRE_FALSE(res.empty());
+    REQUIRE(res[0].mask.data() != nullptr);
+    REQUIRE_FALSE(res[0].mask.shape.empty());
+}
+#endif  // WITH_GPU

@@ -12,6 +12,7 @@
 #include <cuda_runtime.h>
 #include <opencv2/opencv.hpp>
 #endif
+#include "test_gpu_utils.h"
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::vision;
@@ -228,6 +229,7 @@ namespace {
 // 端到端：真实 NV12 帧常驻 GPU 显存 → ImageData(Device::GPU) → predict() 全程零拷贝
 // CUDA 预处理 kernel 直接读 plane(0)/plane(1) 设备指针 → GPU Tensor → ORT CUDA EP 推理
 TEST_CASE("UltralyticsDet predict(ImageData) on GPU NV12 device frame (zero-copy e2e)", "[model][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
 
@@ -302,6 +304,7 @@ TEST_CASE("UltralyticsDet predict(ImageData) on GPU NV12 device frame (zero-copy
 // 模型 Clone 真共享验证（ORT/GPU）：克隆必须复用已加载的 ORT session（共享显存/权重），
 // 而非重新加载模型。用 cudaMemGetInfo 实测：克隆造成的显存增量应远小于独立再加载一份模型。
 TEST_CASE("ORT GPU model clone shares device memory (no re-load)", "[model][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     auto modelfile = model_path("onnx/yolo26n/yolo26n.onnx");
     if (!fs::exists(modelfile)) return;
     auto img = load_image("bus.jpg");
