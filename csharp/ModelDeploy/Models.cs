@@ -431,31 +431,10 @@ namespace ModelDeploy.Models
         }
     }
 
-    public sealed class InstanceSegModel : BaseModel
+    /// <summary>实例分割结果读取（InstanceSegModel 与 FastSamModel 共用）。</summary>
+    internal static class InstanceSegResultReader
     {
-        private InstanceSegModel(IntPtr handle) : base(MDModelKind.MD_MODEL_INSTANCE_SEG, handle) { }
-
-        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
-        public InstanceSegModel Clone() => new InstanceSegModel(CloneNative());
-
-        public InstanceSegModel(string modelPath, RuntimeOption opt = null)
-            : base(MDModelKind.MD_MODEL_INSTANCE_SEG, modelPath, opt) { }
-
-        public Prediction<InstanceSegResult> Predict(VisionImage image)
-            => MakePrediction(image, ReadInstanceSeg);
-
-        /// <summary>批量预测（2D）：按图返回，每图一个实例分割结果数组。</summary>
-        public IReadOnlyList<InstanceSegResult[]> PredictBatch(IEnumerable<VisionImage> images)
-            => PredictBatch2D(images, ReadInstanceSegBatch);
-
-        /// <summary>实例分割置信度阈值。</summary>
-        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
-        /// <summary>NMS 阈值。</summary>
-        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
-        /// <summary>掩码二值化阈值。</summary>
-        public void SetMaskThreshold(double v) => SetParam("mask_threshold", v);
-
-        private static InstanceSegResult[] ReadInstanceSeg(IntPtr result)
+        public static InstanceSegResult[] Read(IntPtr result)
         {
             var items = ResultReader.ReadItems<MDIsegItem>(result, md_result_instance_seg);
             var list = new List<InstanceSegResult>(items.Length);
@@ -476,7 +455,7 @@ namespace ModelDeploy.Models
             return list.ToArray();
         }
 
-        private static InstanceSegResult[] ReadInstanceSegBatch(IntPtr result, int img)
+        public static InstanceSegResult[] ReadBatch(IntPtr result, int img)
         {
             var imgU = new UIntPtr((uint)img);
             var items = ResultReader.ReadItemsBatch<MDIsegItem>(result, imgU, md_result_instance_seg_batch);
@@ -499,6 +478,31 @@ namespace ModelDeploy.Models
         }
     }
 
+    public sealed class InstanceSegModel : BaseModel
+    {
+        private InstanceSegModel(IntPtr handle) : base(MDModelKind.MD_MODEL_INSTANCE_SEG, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public InstanceSegModel Clone() => new InstanceSegModel(CloneNative());
+
+        public InstanceSegModel(string modelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_INSTANCE_SEG, modelPath, opt) { }
+
+        public Prediction<InstanceSegResult> Predict(VisionImage image)
+            => MakePrediction(image, InstanceSegResultReader.Read);
+
+        /// <summary>批量预测（2D）：按图返回，每图一个实例分割结果数组。</summary>
+        public IReadOnlyList<InstanceSegResult[]> PredictBatch(IEnumerable<VisionImage> images)
+            => PredictBatch2D(images, InstanceSegResultReader.ReadBatch);
+
+        /// <summary>实例分割置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>掩码二值化阈值。</summary>
+        public void SetMaskThreshold(double v) => SetParam("mask_threshold", v);
+    }
+
     public sealed class FastSamModel : BaseModel
     {
         private FastSamModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FASTSAM, handle) { }
@@ -510,7 +514,7 @@ namespace ModelDeploy.Models
             : base(MDModelKind.MD_MODEL_FASTSAM, modelPath, opt) { }
 
         public Prediction<InstanceSegResult> Predict(VisionImage image)
-            => MakePrediction(image, ReadInstanceSeg);
+            => MakePrediction(image, InstanceSegResultReader.Read);
 
         /// <summary>
         /// 带提示的交互式分割：bboxes 为 [x,y,w,h,...]、points 为 [x,y,...]、labels 逐点（1=前景,0=背景）。
@@ -532,7 +536,7 @@ namespace ModelDeploy.Models
                 throw new InvalidOperationException($"PredictWithPrompts failed: {GetLastError()}");
             try
             {
-                return ReadInstanceSeg(result);
+                return InstanceSegResultReader.Read(result);
             }
             finally
             {
@@ -546,27 +550,6 @@ namespace ModelDeploy.Models
         public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
         /// <summary>掩码二值化阈值。</summary>
         public void SetMaskThreshold(double v) => SetParam("mask_threshold", v);
-
-        private static InstanceSegResult[] ReadInstanceSeg(IntPtr result)
-        {
-            var items = ResultReader.ReadItems<MDIsegItem>(result, md_result_instance_seg);
-            var list = new List<InstanceSegResult>(items.Length);
-            for (int i = 0; i < items.Length; i++)
-            {
-                var it = items[i];
-                md_result_mask(result, new UIntPtr((uint)i), out var maskPtr, out var mh, out var mw);
-                list.Add(new InstanceSegResult
-                {
-                    Box = new RectF(it.x, it.y, it.w, it.h),
-                    LabelId = it.label_id,
-                    Score = it.score,
-                    Mask = ResultReader.ReadBytes(maskPtr, new UIntPtr((ulong)mh * (ulong)mw)),
-                    MaskHeight = (int)mh,
-                    MaskWidth = (int)mw
-                });
-            }
-            return list.ToArray();
-        }
     }
 
     public sealed class SemSegModel : BaseModel
