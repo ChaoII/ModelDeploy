@@ -10,6 +10,7 @@ namespace modeldeploy::vision {
     void bind_classification(const pybind11::module&);
     void bind_ultralytics_det(const pybind11::module&);
     void bind_ultralytics_iseg(const pybind11::module&);
+    void bind_fastsam(const pybind11::module&);
     void bind_ultralytics_obb(const pybind11::module&);
     void bind_ultralytics_pose(const pybind11::module&);
     void bind_ultralytics_sem(const pybind11::module&);
@@ -53,6 +54,7 @@ void bind_tools(pybind11::module&);
         bind_classification(m);
         bind_ultralytics_det(m);
         bind_ultralytics_iseg(m);
+        bind_fastsam(m);
         bind_ultralytics_obb(m);
         bind_ultralytics_pose(m);
         bind_ultralytics_sem(m);
