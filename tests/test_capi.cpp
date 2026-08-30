@@ -1864,3 +1864,27 @@ TEST_CASE("capi region/queue/trackzone count", "[capi][solution]") {
     md_solution_destroy(tz);
 }
 
+TEST_CASE("capi fastsam predict + prompt", "[capi][seg]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = (env && *env) ? std::string(env) + "/test_data" : "test_data";
+    const std::string modelf = data_dir + "/test_models/onnx/FastSAM-s.onnx";
+    const std::string imgf = data_dir + "/test_images/test_detection0.jpg";
+    if (!std::filesystem::exists(modelf) || !std::filesystem::exists(imgf)) { SKIP("FastSAM model/image missing"); }
+    MDModelHandle h = nullptr;
+    REQUIRE(md_model_create(&h, MD_MODEL_FASTSAM, modelf.c_str(), nullptr) == MD_OK);
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_file(&img, imgf.c_str()) == MD_OK);
+    MDResultHandle res = nullptr;
+    REQUIRE(md_model_predict(h, img, &res) == MD_OK);
+    const MDIsegItem* items = nullptr; size_t cnt = 0;
+    REQUIRE(md_result_instance_seg(res, &items, &cnt) == MD_OK);
+    REQUIRE(cnt > 0);
+    float box[4] = { items[0].x, items[0].y, items[0].w, items[0].h };
+    MDResultHandle res2 = nullptr;
+    REQUIRE(md_fastsam_predict_with_prompts(h, img, box, 1, nullptr, nullptr, 0, &res2) == MD_OK);
+    const MDIsegItem* items2 = nullptr; size_t cnt2 = 0;
+    REQUIRE(md_result_instance_seg(res2, &items2, &cnt2) == MD_OK);
+    CHECK(cnt2 >= 1); CHECK(cnt2 <= cnt);
+    md_result_destroy(res2); md_result_destroy(res);
+    md_image_destroy(img); md_model_destroy(h);
+}

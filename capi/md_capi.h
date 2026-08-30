@@ -109,6 +109,7 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_VEHICLE_KEYPOINT,
     MD_MODEL_FACE_LANDMARK,
     MD_MODEL_TEXT_CLASSIFIER,
+    MD_MODEL_FASTSAM,
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -268,6 +269,14 @@ MD_CAPI_EXPORT MDStatus md_model_predict(MDModelHandle, MDImageHandle, MDResultH
 /* 批量推理（多图，仅支持的模型） */
 MD_CAPI_EXPORT MDStatus md_model_predict_batch(MDModelHandle, MDImageHandle* imgs, size_t n,
                                 MDResultHandle* out);
+
+/* FastSam prompt filter. bboxes: float[nb*4] = (x,y,w,h) original px; points: float[np*2];
+ * labels: int[np] (1=fg,0=bg). Result is read with md_result_instance_seg (same layout as an
+ * MD_MODEL_INSTANCE_SEG predict). Empty prompts (nb==0 && np==0) == full predict. */
+MD_CAPI_EXPORT MDStatus md_fastsam_predict_with_prompts(MDModelHandle h, MDImageHandle img_h,
+                                                        const float* bboxes, size_t nb,
+                                                        const float* points, const int* labels, size_t np,
+                                                        MDResultHandle* out);
 
 /* 动作识别：TSN 帧序列（多图）推理，结果 kind=MD_RES_CLASSIFICATION（复用 md_result_classification） */
 MD_CAPI_EXPORT MDStatus md_model_predict_sequence(MDModelHandle h, MDImageHandle* frames, size_t n,
