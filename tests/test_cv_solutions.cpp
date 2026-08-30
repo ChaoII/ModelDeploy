@@ -12,6 +12,7 @@
 #include "vision/solutions/vision_eye.h"
 #include "vision/solutions/region_counter.h"
 #include "vision/solutions/queue_manager.h"
+#include "vision/solutions/track_zone.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::solution;
@@ -176,4 +177,18 @@ TEST_CASE("QueueManager counts tracks inside queue region per frame", "[cv_solut
     REQUIRE(qm.queue_count() == 2);
     qm.update({t[2]});
     REQUIRE(qm.queue_count() == 0);
+}
+
+TEST_CASE("TrackZone keeps only tracks inside region", "[cv_solution]") {
+    TrackZone tz;
+    tz.set_region({Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)});
+    std::vector<TrackResult> t(3);
+    t[0].track_id=1; t[0].box=Rect2f(1,1,2,2);
+    t[1].track_id=2; t[1].box=Rect2f(50,50,2,2);
+    t[2].track_id=3; t[2].box=Rect2f(4,4,2,2);
+    tz.update(t);
+    REQUIRE(tz.inside_count() == 2);
+    bool ids_ok = false;
+    for (const auto& r : tz.inside_tracks()) if (r.track_id == 2) ids_ok = true;
+    REQUIRE_FALSE(ids_ok);
 }
