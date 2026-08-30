@@ -10,6 +10,9 @@
 #include "vision/solutions/workout_monitor.h"
 #include "vision/solutions/parking_manager.h"
 #include "vision/solutions/vision_eye.h"
+#include "vision/solutions/region_counter.h"
+#include "vision/solutions/queue_manager.h"
+#include "vision/solutions/track_zone.h"
 
 using namespace modeldeploy::vision;
 using namespace modeldeploy::vision::solution;
@@ -132,4 +135,60 @@ TEST_CASE("VisionEye maps centroid to eye point", "[cv_solution]") {
     ve.add(Point2f(50, 200));
     REQUIRE(ve.eyes().size() == 1);
     REQUIRE(ve.eyes()[0].x == Catch::Approx(50.0f));
+}
+
+TEST_CASE("RegionCounter counts tracks per named region", "[cv_solution]") {
+    RegionCounter rc;
+    rc.add_region("A", {Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)});
+    rc.add_region("B", {Point2f(20,0), Point2f(30,0), Point2f(30,10), Point2f(20,10)});
+    std::vector<TrackResult> t(3);
+    t[0].track_id=1; t[0].box=Rect2f(2,2,2,2);
+    t[1].track_id=2; t[1].box=Rect2f(22,2,2,2);
+    t[2].track_id=3; t[2].box=Rect2f(100,100,2,2);
+    rc.update(t);
+    auto c = rc.region_counts();
+    REQUIRE(c["A"] == 1);
+    REQUIRE(c["B"] == 1);
+    REQUIRE(rc.total_regions() == 2);
+    rc.update({t[0]});
+    REQUIRE(rc.region_counts()["A"] == 1);
+    REQUIRE(rc.region_counts()["B"] == 0);
+}
+
+TEST_CASE("RegionCounter class filter", "[cv_solution]") {
+    RegionCounter rc;
+    rc.add_region("A", {Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)});
+    rc.set_classes({2});
+    std::vector<TrackResult> t(2);
+    t[0].track_id=1; t[0].box=Rect2f(2,2,2,2); t[0].label_id=2;
+    t[1].track_id=2; t[1].box=Rect2f(3,3,2,2); t[1].label_id=0;
+    rc.update(t);
+    REQUIRE(rc.region_counts()["A"] == 1);
+}
+
+TEST_CASE("QueueManager counts tracks inside queue region per frame", "[cv_solution]") {
+    QueueManager qm;
+    qm.set_region({Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)});
+    std::vector<TrackResult> t(3);
+    t[0].track_id=1; t[0].box=Rect2f(1,1,2,2);
+    t[1].track_id=2; t[1].box=Rect2f(4,4,2,2);
+    t[2].track_id=3; t[2].box=Rect2f(50,50,2,2);
+    qm.update(t);
+    REQUIRE(qm.queue_count() == 2);
+    qm.update({t[2]});
+    REQUIRE(qm.queue_count() == 0);
+}
+
+TEST_CASE("TrackZone keeps only tracks inside region", "[cv_solution]") {
+    TrackZone tz;
+    tz.set_region({Point2f(0,0), Point2f(10,0), Point2f(10,10), Point2f(0,10)});
+    std::vector<TrackResult> t(3);
+    t[0].track_id=1; t[0].box=Rect2f(1,1,2,2);
+    t[1].track_id=2; t[1].box=Rect2f(50,50,2,2);
+    t[2].track_id=3; t[2].box=Rect2f(4,4,2,2);
+    tz.update(t);
+    REQUIRE(tz.inside_count() == 2);
+    bool ids_ok = false;
+    for (const auto& r : tz.inside_tracks()) if (r.track_id == 2) ids_ok = true;
+    REQUIRE_FALSE(ids_ok);
 }
