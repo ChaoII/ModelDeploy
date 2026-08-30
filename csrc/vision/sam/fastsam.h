@@ -28,12 +28,12 @@ namespace modeldeploy::vision::seg {
 
         [[nodiscard]] std::unique_ptr<FastSam> clone() const;
 
-        FastSamPreprocessor& get_preprocessor() { return *preprocessor_; }
-        FastSamPostprocessor& get_postprocessor() { return *postprocessor_; }
+        FastSamPreprocessor& get_preprocessor() { return preprocessor_; }
+        FastSamPostprocessor& get_postprocessor() { return postprocessor_; }
 
     protected:
         bool initialize();
-        std::unique_ptr<FastSamPreprocessor> preprocessor_;
-        std::unique_ptr<FastSamPostprocessor> postprocessor_;
+        FastSamPreprocessor preprocessor_;
+        FastSamPostprocessor postprocessor_;
     };
 } // namespace modeldeploy::vision::seg

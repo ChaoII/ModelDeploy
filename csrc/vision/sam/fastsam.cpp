@@ -5,8 +5,6 @@ namespace modeldeploy::vision::seg {
     FastSam::FastSam(const std::string& model_file, const RuntimeOption& custom_option) {
         runtime_option = custom_option;
         runtime_option.set_model_path(model_file);
-        preprocessor_ = std::make_unique<FastSamPreprocessor>();
-        postprocessor_ = std::make_unique<FastSamPostprocessor>();
         initialized_ = initialize();
     }
 
@@ -15,7 +13,7 @@ namespace modeldeploy::vision::seg {
             MD_LOG_ERROR << "Failed to initialize modeldeploy backend." << std::endl;
             return false;
         }
-        preprocessor_->set_processor_backend(
+        preprocessor_.set_processor_backend(
             create_processor_backend(runtime_option.device, runtime_option.backend,
                                      runtime_option.device_id));
         return true;
@@ -36,7 +34,7 @@ namespace modeldeploy::vision::seg {
                                 TimerArray* timers) {
         std::vector<LetterBoxRecord> ims_info;
         if (timers) timers->pre_timer.start();
-        if (!preprocessor_->run(images, &reused_input_tensors_, &ims_info)) {
+        if (!preprocessor_.run(images, &reused_input_tensors_, &ims_info)) {
             MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
             return false;
         }
@@ -49,7 +47,7 @@ namespace modeldeploy::vision::seg {
         }
         if (timers) timers->infer_timer.stop();
         if (timers) timers->post_timer.start();
-        if (!postprocessor_->run(reused_output_tensors_, results, ims_info)) {
+        if (!postprocessor_.run(reused_output_tensors_, results, ims_info)) {
             MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
             return false;
         }
@@ -66,7 +64,7 @@ namespace modeldeploy::vision::seg {
     bool FastSam::draw_result(ImageData& frame, const std::vector<InstanceSegResult>& result,
                               double threshold) {
         if (frame.empty()) return false;
-        auto* backend = preprocessor_->get_processor_backend().get();
+        auto* backend = preprocessor_.get_processor_backend().get();
         if (!backend) return false;
         for (const auto& r : result) {
             if (r.score < threshold) continue;
