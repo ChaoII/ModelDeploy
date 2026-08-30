@@ -93,17 +93,27 @@ namespace modeldeploy::vision {
             .def_static(
                 "from_device_nv12",
                 [](const pybind11::array& y, const pybind11::array& uv,
-                   int w, int h, int step_y, int step_uv) -> ImageData {
+                   int w, int h, int step_y, int step_uv, Device dev) -> ImageData {
                     if (y.ndim() != 1 || !(y.dtype().is(pybind11::dtype::of<uint8_t>()))) {
                         throw std::runtime_error("from_device_nv12: y must be a 1-D uint8 numpy array");
                     }
+                    if (w <= 0 || h <= 0) {
+                        throw std::runtime_error("from_device_nv12: width/height must be positive");
+                    }
+                    if (step_y <= 0) step_y = w;
+                    if (step_uv <= 0) step_uv = w;
                     const uint8_t* yptr = static_cast<const uint8_t*>(y.request().ptr);
                     const uint8_t* uvptr = uv.is_none() || uv.ndim() == 0
                         ? nullptr : static_cast<const uint8_t*>(uv.request().ptr);
-                    return make_cpu_nv12(yptr, uvptr, w, h, step_y, step_uv, {});
+                    ImageData::Plane pl[2] = {
+                        {yptr, step_y},
+                        {uvptr, step_uv},
+                    };
+                    return ImageData::from_planes(pl, uvptr ? 2 : 1, MdImageType::NV12, w, h, dev);
                 },
                 pybind11::arg("y"), pybind11::arg("uv"), pybind11::arg("width"), pybind11::arg("height"),
-                pybind11::arg("step_y") = 0, pybind11::arg("step_uv") = 0)
+                pybind11::arg("step_y") = 0, pybind11::arg("step_uv") = 0,
+                pybind11::arg("dev") = Device::CPU)
 
             .def("__repr__", [](const ImageData& im) {
                 return "ImageData(width=" + std::to_string(im.width()) +
