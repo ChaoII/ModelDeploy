@@ -557,6 +557,25 @@ m.predict(img, &result);
 ```
 
 mask 以 `Mask` 结构保存（shape `{h, w}`，uint8 0/1），可用 `vis_iseg` 可视化。
-> 静态分割（无提示词/框/点），面向"分割一切"轻量部署场景；MobileSAM 的两段式（编码器+解码器）本轮未接入。
+
+`FastSam` 还提供 `predict_with_prompts`，在一次性全量输出（Everything）的基础上按提示词过滤实例，
+**不重跑网络**：
+
+- `bboxes`（`Rect2f` x/y/w/h，原图像素）：每个框取 IoU 最大的实例。
+- `points` + `point_labels`（等长，`1`=前景保留 / `0`=背景剔除）：按掩码是否命中该点保留/剔除实例。
+- 提示词为空时等价于全量 `predict`。
+
+```cpp
+modeldeploy::vision::seg::FastSamPrompts prompts;
+prompts.bboxes.push_back(modeldeploy::vision::Rect2f(100.f, 80.f, 220.f, 180.f)); // 取最匹配该框的实例
+prompts.points.push_back(modeldeploy::vision::Point2f(150.f, 130.f));
+prompts.point_labels.push_back(1); // 前景：保留掩码命中该点的实例
+std::vector<modeldeploy::vision::InstanceSegResult> result;
+m.predict_with_prompts(img, prompts, &result);
+```
+
+> 各语言绑定同名可用：Python `FastSam.predict_with_prompts`、C API `md_fastsam_predict_with_prompts`、
+> Rust `FastSam.predict_with_prompts`、C# `FastSamModel.PredictWithPrompts`。
+> MobileSAM 的两段式（编码器+解码器）本轮未接入。
 
 **示例**：`examples/demo_sam/demo_fastsam.cpp`
