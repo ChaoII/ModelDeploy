@@ -53,6 +53,7 @@ if(BUILD_AUDIO)
         test_audio_solutions.cpp
         test_paraformer_streaming.cpp
         test_speaker_verify.cpp
+        test_audio_tts.cpp
     )
 endif()
 
