@@ -26,7 +26,7 @@ pub use model::{
 };
 pub use nlp::{split_sentences as nlp_split_sentences, stats as nlp_stats, NlpClassifier};
 pub use runtime::RuntimeOption;
-pub use solution::{iou as vision_iou, Heatmap, ObjectCounter};
+pub use solution::{iou as vision_iou, Heatmap, ObjectCounter, QueueManager, RegionCounter, TrackZone};
 pub use tracker::Tracker;
 pub use types::*;
 pub use video::{Backpressure, CodecBackend, HwAccel, VideoCapabilities, VideoConfig, VideoDecoder, VideoEncoder, VideoFrame, VideoState, VideoStats};

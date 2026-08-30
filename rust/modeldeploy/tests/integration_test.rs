@@ -824,6 +824,33 @@ fn test_cv_solution() -> Result<()> {
     Ok(())
 }
 
+// ═══ 区域解决方案（无权重） ═══
+
+#[test]
+fn region_solutions_count() -> Result<()> {
+    use modeldeploy::{QueueManager, RegionCounter, TrackZone};
+    let poly = [0f32, 0.0, 10.0, 0.0, 10.0, 10.0, 0.0, 10.0];
+    let boxes = [2f32, 2.0, 2.0, 2.0, 50.0, 50.0, 2.0, 2.0];
+    let ids = [1i32, 2];
+    let labs = [0i32, 0];
+
+    let rc = RegionCounter::new()?;
+    rc.add_region("A", &poly)?;
+    rc.update(&boxes, &ids, &labs)?;
+    assert_eq!(rc.count("A"), 1);
+
+    let q = QueueManager::new()?;
+    q.set_region(&poly)?;
+    q.update(&boxes, &ids, &labs)?;
+    assert_eq!(q.count(), 1);
+
+    let tz = TrackZone::new()?;
+    tz.set_region(&poly)?;
+    tz.update(&boxes, &ids, &labs)?;
+    assert_eq!(tz.count(), 1);
+    Ok(())
+}
+
 // ═══ 音频解决方案（无权重） ═══
 
 #[test]

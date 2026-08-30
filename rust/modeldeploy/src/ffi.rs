@@ -87,6 +87,10 @@ pub enum MDSolutionKind {
     Distance,
     Workout,
     Parking,
+    FallDetect,
+    RegionCounter,
+    Queue,
+    TrackZone,
 }
 
 /// 音频解决方案类型（MD_AUDIO_SOLUTION_KIND）
@@ -623,6 +627,19 @@ extern "C" {
     pub fn md_solution_heatmap_peak(h: MDSolutionHandle, x: *mut c_int, y: *mut c_int) -> MDStatus;
     pub fn md_vision_iou4(ax: c_float, ay: c_float, aw: c_float, ah: c_float,
         bx: c_float, by: c_float, bw: c_float, bh: c_float, out: *mut c_float) -> MDStatus;
+    pub fn md_solution_region_counter_add(h: MDSolutionHandle, name: *const c_char,
+        xy: *const c_float, n: usize) -> MDStatus;
+    pub fn md_solution_region_counter_update(h: MDSolutionHandle, boxes: *const c_float,
+        n: usize, track_ids: *const c_int, label_ids: *const c_int) -> MDStatus;
+    pub fn md_solution_region_counter_count(h: MDSolutionHandle, name: *const c_char) -> c_int;
+    pub fn md_solution_queue_set_region(h: MDSolutionHandle, xy: *const c_float, n: usize) -> MDStatus;
+    pub fn md_solution_queue_update(h: MDSolutionHandle, boxes: *const c_float,
+        n: usize, track_ids: *const c_int, label_ids: *const c_int) -> MDStatus;
+    pub fn md_solution_queue_count(h: MDSolutionHandle) -> c_int;
+    pub fn md_solution_track_zone_set_region(h: MDSolutionHandle, xy: *const c_float, n: usize) -> MDStatus;
+    pub fn md_solution_track_zone_update(h: MDSolutionHandle, boxes: *const c_float,
+        n: usize, track_ids: *const c_int, label_ids: *const c_int) -> MDStatus;
+    pub fn md_solution_track_zone_count(h: MDSolutionHandle) -> c_int;
 
     // ── 音频解决方案（audio::solution / tool） ──
     pub fn md_audio_solution_create(out: *mut MDAudioSolutionHandle, kind: c_int) -> MDStatus;

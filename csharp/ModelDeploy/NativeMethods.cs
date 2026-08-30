@@ -513,6 +513,33 @@ string path);
         internal static extern MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
             float bx, float by, float bw, float bh, out float iou);
 
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_region_counter_add(IntPtr handle, string name, float[] xy, UIntPtr n);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_region_counter_update(IntPtr handle, float[] boxes, UIntPtr n, int[] trackIds, int[] labelIds);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int md_solution_region_counter_count(IntPtr handle, string name);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_queue_set_region(IntPtr handle, float[] xy, UIntPtr n);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_queue_update(IntPtr handle, float[] boxes, UIntPtr n, int[] trackIds, int[] labelIds);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int md_solution_queue_count(IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_track_zone_set_region(IntPtr handle, float[] xy, UIntPtr n);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_solution_track_zone_update(IntPtr handle, float[] boxes, UIntPtr n, int[] trackIds, int[] labelIds);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int md_solution_track_zone_count(IntPtr handle);
+
         #endregion
 
         #region 音频解决方案（audio::solution / tool）
