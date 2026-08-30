@@ -55,6 +55,9 @@
 #include "csrc/vision/solutions/workout_monitor.h"
 #include "csrc/vision/solutions/fall_detector.h"
 #include "csrc/vision/solutions/parking_manager.h"
+#include "csrc/vision/solutions/region_counter.h"
+#include "csrc/vision/solutions/queue_manager.h"
+#include "csrc/vision/solutions/track_zone.h"
 #include "csrc/vision/tracking/bytetrack.h"
 #include "csrc/vision/tracking/botsort.h"
 #include "csrc/vision/tracking/strongsort.h"
@@ -4302,6 +4305,9 @@ MDStatus md_solution_create(MDSolutionHandle* out, MDSolutionKind kind) {
       case MD_SOLUTION_WORKOUT:        h->obj = new vision::solution::WorkoutMonitor(); break;
       case MD_SOLUTION_PARKING:        h->obj = new vision::solution::ParkingManager(); break;
       case MD_SOLUTION_FALL_DETECT:    h->obj = new vision::solution::FallDetector(); break;
+      case MD_SOLUTION_REGION_COUNTER: h->obj = new vision::solution::RegionCounter(); break;
+      case MD_SOLUTION_QUEUE:          h->obj = new vision::solution::QueueManager(); break;
+      case MD_SOLUTION_TRACK_ZONE:     h->obj = new vision::solution::TrackZone(); break;
       default: delete h; return MD_ERR_INVALID_ARGUMENT;
     }
     *out = h;
@@ -4322,6 +4328,9 @@ MDStatus md_solution_destroy(MDSolutionHandle h) {
       case MD_SOLUTION_WORKOUT:        delete static_cast<vision::solution::WorkoutMonitor*>(h->obj); break;
       case MD_SOLUTION_PARKING:        delete static_cast<vision::solution::ParkingManager*>(h->obj); break;
       case MD_SOLUTION_FALL_DETECT:    delete static_cast<vision::solution::FallDetector*>(h->obj); break;
+      case MD_SOLUTION_REGION_COUNTER: delete static_cast<vision::solution::RegionCounter*>(h->obj); break;
+      case MD_SOLUTION_QUEUE:          delete static_cast<vision::solution::QueueManager*>(h->obj); break;
+      case MD_SOLUTION_TRACK_ZONE:     delete static_cast<vision::solution::TrackZone*>(h->obj); break;
       default: break;
     }
 #endif
@@ -4422,6 +4431,137 @@ MDStatus md_vision_iou4(float ax, float ay, float aw, float ah,
 #else
     (void)ax;(void)ay;(void)aw;(void)ah;(void)bx;(void)by;(void)bw;(void)bh;
     return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_region_counter_add(MDSolutionHandle h, const char* name, const float* xy, size_t n) {
+    if (!h || !name || !xy) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_REGION_COUNTER) return MD_ERR_INVALID_ARGUMENT;
+    std::vector<vision::Point2f> poly;
+    poly.reserve(n);
+    for (size_t i = 0; i < n; ++i) poly.emplace_back(xy[i*2+0], xy[i*2+1]);
+    static_cast<vision::solution::RegionCounter*>(h->obj)->add_region(name, poly);
+    return MD_OK;
+#else
+    (void)name;(void)xy;(void)n; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_region_counter_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                           const int* track_ids, const int* label_ids) {
+    if (!h || (!boxes && n)) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_REGION_COUNTER) return MD_ERR_INVALID_ARGUMENT;
+    std::vector<tracking::TrackResult> tracks(n);
+    for (size_t i = 0; i < n; ++i) {
+        tracks[i].box = vision::Rect2f(boxes[i*4+0], boxes[i*4+1], boxes[i*4+2], boxes[i*4+3]);
+        tracks[i].track_id = track_ids ? track_ids[i] : (int)i;
+        tracks[i].label_id = label_ids ? label_ids[i] : 0;
+        tracks[i].score = 1.0f;
+    }
+    static_cast<vision::solution::RegionCounter*>(h->obj)->update(tracks);
+    return MD_OK;
+#else
+    (void)boxes;(void)n;(void)track_ids;(void)label_ids; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+int md_solution_region_counter_count(MDSolutionHandle h, const char* name) {
+    if (!h || !name) return 0;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_REGION_COUNTER) return 0;
+    auto c = static_cast<vision::solution::RegionCounter*>(h->obj)->region_counts();
+    auto it = c.find(name);
+    return it == c.end() ? 0 : it->second;
+#else
+    return 0;
+#endif
+}
+
+MDStatus md_solution_queue_set_region(MDSolutionHandle h, const float* xy, size_t n) {
+    if (!h || !xy) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_QUEUE) return MD_ERR_INVALID_ARGUMENT;
+    std::vector<vision::Point2f> poly;
+    poly.reserve(n);
+    for (size_t i = 0; i < n; ++i) poly.emplace_back(xy[i*2+0], xy[i*2+1]);
+    static_cast<vision::solution::QueueManager*>(h->obj)->set_region(poly);
+    return MD_OK;
+#else
+    (void)xy;(void)n; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_queue_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                  const int* track_ids, const int* label_ids) {
+    if (!h || (!boxes && n)) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_QUEUE) return MD_ERR_INVALID_ARGUMENT;
+    std::vector<tracking::TrackResult> tracks(n);
+    for (size_t i = 0; i < n; ++i) {
+        tracks[i].box = vision::Rect2f(boxes[i*4+0], boxes[i*4+1], boxes[i*4+2], boxes[i*4+3]);
+        tracks[i].track_id = track_ids ? track_ids[i] : (int)i;
+        tracks[i].label_id = label_ids ? label_ids[i] : 0;
+        tracks[i].score = 1.0f;
+    }
+    static_cast<vision::solution::QueueManager*>(h->obj)->update(tracks);
+    return MD_OK;
+#else
+    (void)boxes;(void)n;(void)track_ids;(void)label_ids; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+int md_solution_queue_count(MDSolutionHandle h) {
+    if (!h) return 0;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_QUEUE) return 0;
+    return static_cast<vision::solution::QueueManager*>(h->obj)->queue_count();
+#else
+    return 0;
+#endif
+}
+
+MDStatus md_solution_track_zone_set_region(MDSolutionHandle h, const float* xy, size_t n) {
+    if (!h || !xy) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_TRACK_ZONE) return MD_ERR_INVALID_ARGUMENT;
+    std::vector<vision::Point2f> poly;
+    poly.reserve(n);
+    for (size_t i = 0; i < n; ++i) poly.emplace_back(xy[i*2+0], xy[i*2+1]);
+    static_cast<vision::solution::TrackZone*>(h->obj)->set_region(poly);
+    return MD_OK;
+#else
+    (void)xy;(void)n; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_solution_track_zone_update(MDSolutionHandle h, const float* boxes, size_t n,
+                                       const int* track_ids, const int* label_ids) {
+    if (!h || (!boxes && n)) return MD_ERR_NULL_POINTER;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_TRACK_ZONE) return MD_ERR_INVALID_ARGUMENT;
+    std::vector<tracking::TrackResult> tracks(n);
+    for (size_t i = 0; i < n; ++i) {
+        tracks[i].box = vision::Rect2f(boxes[i*4+0], boxes[i*4+1], boxes[i*4+2], boxes[i*4+3]);
+        tracks[i].track_id = track_ids ? track_ids[i] : (int)i;
+        tracks[i].label_id = label_ids ? label_ids[i] : 0;
+        tracks[i].score = 1.0f;
+    }
+    static_cast<vision::solution::TrackZone*>(h->obj)->update(tracks);
+    return MD_OK;
+#else
+    (void)boxes;(void)n;(void)track_ids;(void)label_ids; return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+int md_solution_track_zone_count(MDSolutionHandle h) {
+    if (!h) return 0;
+#ifdef BUILD_VISION
+    if (h->kind != MD_SOLUTION_TRACK_ZONE) return 0;
+    return static_cast<vision::solution::TrackZone*>(h->obj)->inside_count();
+#else
+    return 0;
 #endif
 }
 

@@ -1837,3 +1837,30 @@ TEST_CASE("md_option_set_device accepts OPENCL and VULKAN", "[capi]") {
     md_option_destroy(opt);
 }
 
+TEST_CASE("capi region/queue/trackzone count", "[capi][solution]") {
+    float poly[] = {0,0, 10,0, 10,10, 0,10};
+    float boxes[] = {2,2,2,2, 50,50,2,2};
+    int ids[] = {1,2}; int labs[] = {0,0};
+
+    MDSolutionHandle rc = nullptr;
+    REQUIRE(md_solution_create(&rc, MD_SOLUTION_REGION_COUNTER) == MD_OK);
+    REQUIRE(md_solution_region_counter_add(rc, "A", poly, 4) == MD_OK);
+    REQUIRE(md_solution_region_counter_update(rc, boxes, 2, ids, labs) == MD_OK);
+    CHECK(md_solution_region_counter_count(rc, "A") == 1);
+    md_solution_destroy(rc);
+
+    MDSolutionHandle q = nullptr;
+    REQUIRE(md_solution_create(&q, MD_SOLUTION_QUEUE) == MD_OK);
+    REQUIRE(md_solution_queue_set_region(q, poly, 4) == MD_OK);
+    REQUIRE(md_solution_queue_update(q, boxes, 2, ids, labs) == MD_OK);
+    CHECK(md_solution_queue_count(q) == 1);
+    md_solution_destroy(q);
+
+    MDSolutionHandle tz = nullptr;
+    REQUIRE(md_solution_create(&tz, MD_SOLUTION_TRACK_ZONE) == MD_OK);
+    REQUIRE(md_solution_track_zone_set_region(tz, poly, 4) == MD_OK);
+    REQUIRE(md_solution_track_zone_update(tz, boxes, 2, ids, labs) == MD_OK);
+    CHECK(md_solution_track_zone_count(tz) == 1);
+    md_solution_destroy(tz);
+}
+
