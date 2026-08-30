@@ -43,6 +43,18 @@ md_free_detection_model(model);
 
 编译需 `BUILD_CAPI=ON`。
 
+## 运行选项设备
+
+`md_option_set_backend` + `md_option_set_device` 组合选择推理设备（`MD_DEV_CPU/GPU/OPENCL/VULKAN/TPU`，数值 `TPU=2,OPENCL=3,VULKAN=4` 与 C#/Rust 对齐）：
+
+```c
+md_option_set_backend(opt, MD_BK_MNN);          // OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed
+md_option_set_device(opt, MD_DEV_OPENCL, 0);    // == MD_OK
+md_option_set_device(opt, MD_DEV_VULKAN, 0);    // == MD_OK
+```
+
+设备帧 NV12 零拷贝借用见 `md_image_from_device_nv12`（语义同 C++ `ImageData::from_planes(..., Device)`，`dev` 取 `MD_DEV_*`）。
+
 ## 视频编解码（`md_video_*`）
 
 视频接口经 **C API 阈值** 暴露给 C/C#/Rust，功能与 C++ `modeldeploy::video` 完全对齐。头文件 `capi/md_capi.h`（常量/句柄/enum 定义不设 `BUILD_` 守卫以保证 ABI 稳定；`.cpp` 实现 `#ifdef BUILD_VIDEO` 守卫，未编译时桩返回 `MD_ERR_UNSUPPORTED_BACKEND`）。

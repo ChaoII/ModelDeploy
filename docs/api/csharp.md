@@ -9,6 +9,10 @@ var option = new MDRuntimeOption();
 option.UseOrtBackend();
 option.UseCpu();
 
+// 设备（OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed）
+option.UseMnn().SetDevice(Device.OPENCL, 0);
+option.SetDevice(Device.VULKAN, 0);
+
 var model = new MDDetectionModel("yolo11n.onnx", option);
 model.SetInputSize(640, 640);
 

@@ -7,6 +7,10 @@ use modeldeploy::runtime::RuntimeOption;
 
 let mut option = RuntimeOption::new();
 option.ort_backend();   // 或 sophgo_backend(0)/trt_backend()/mnn_backend()
+
+// 设备（OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed）
+option.use_mnn().set_device(modeldeploy::ffi::MDDevice::OPENCL, 0)?;  // == Ok
+option.set_device(modeldeploy::ffi::MDDevice::VULKAN, 0)?;            // == Ok
 ```
 
 ## 主要模块文件

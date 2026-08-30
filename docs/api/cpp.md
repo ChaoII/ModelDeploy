@@ -47,6 +47,19 @@ det.predict(img, &result);
 
 > 各类模型完整 API 见 [models.md](../models.md)；后端/设备切换见 [RuntimeOption](../runtime_option.md) 与 [后端详解](../backends.md)。
 
+## 设备与设备帧
+
+`RuntimeOption::set_device(Device::OPENCL/VULKAN)`(需显式 `use_mnn_backend()`,否则 fail-closed）:
+
+```cpp
+modeldeploy::RuntimeOption opt;
+opt.use_mnn_backend();
+opt.set_device(modeldeploy::Device::OPENCL, 0);   // == OK
+opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
+```
+
+设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
+
 ## 4. 工程配置
 
 ```cmake

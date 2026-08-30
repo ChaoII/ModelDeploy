@@ -23,6 +23,11 @@ import modeldeploy
 option = modeldeploy.RuntimeOption()
 option.use_ort_backend()
 option.use_cpu()
+
+# 设备（OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed）
+option.use_mnn_backend()
+option.set_device(modeldeploy.Device.OPENCL, 0)
+option.set_device(modeldeploy.Device.VULKAN, 0)
 option.use_sophgo_backend(0)   # 或 Sophgo
 
 # 目标检测
@@ -36,6 +41,21 @@ results = model.predict(img)
 for r in results:
     print(r.label_id, r.score, r.box)
 ```
+
+### 设备帧 NV12（`ImageData.from_device_nv12`）
+
+零拷贝借用 host/device NV12 帧，设备语义经 `dev` 参数与 C/C/C#/Rust 对齐（缺省 CPU）：
+
+```python
+import numpy as np
+y  = np.zeros(h * step_y, dtype=np.uint8)
+uv = np.zeros((h // 2) * step_uv, dtype=np.uint8)
+# host NV12（CPU 缺省）
+img_cpu = modeldeploy.ImageData.from_device_nv12(y, uv, w, h, dev=modeldeploy.Device.CPU)
+# 设备 NV12（OPENCL/VULKAN 等，需显式 use_mnn_backend()）
+img_dev = modeldeploy.ImageData.from_device_nv12(y, uv, w, h, dev=modeldeploy.Device.OPENCL)
+```
+y/uv 指向调用方内存、不拷贝，调用方须保证缓冲在 `predict` 期间存活。
 
 ## 3. 已绑定模块
 
