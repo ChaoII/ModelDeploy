@@ -68,8 +68,9 @@ namespace modeldeploy::vision::seg {
                 if (score <= conf_threshold_) continue;
                 Rect2f box{xc - w / 2.0f, yc - h / 2.0f, w, h};
                 std::vector<float> embed(kFastSamMaskNums);
+                // 与原版 ultralytics 语义一致:mask 系数取原始值(pred[:, 6:])，不乘 score
                 for (size_t j = 0; j < kFastSamMaskNums; ++j) {
-                    embed[j] = data[(5 + j) * anchors + a] * score;
+                    embed[j] = data[(5 + j) * anchors + a];
                 }
                 mask_embeddings.push_back(std::move(embed));
                 _results.push_back({box, Mask(), 0, score});
