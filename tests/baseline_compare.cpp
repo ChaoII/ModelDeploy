@@ -122,6 +122,30 @@ TEST_CASE("yolo26n detection (ORT)", "[regression]") {
     require_no_diff(compare_detection(load_json(base)["results"], results));
 }
 
+// 裁剪/预处理链路护栏：运行 yolo26n 为检测输入的预处理（含 crop/letterbox/resize/normalize），
+// 其产出输入张量须与 `tests/baselines/ort/yolo26n.onnx.pre.json` 严格一致。
+// 基线的生成：baseline_collect --model yolo26n/yolo26n.onnx --image test_detection0.jpg \
+//   --out tests/baselines/ort --type pre --family det --backend ort
+TEST_CASE("yolo26n detection pre-tensor (ORT) guard", "[regression]") {
+    auto modelfile = model_path("yolo26n/yolo26n.onnx");
+    if (!fs::exists(modelfile)) return;
+    auto imgf = image_path("test_detection0.jpg");
+    if (!fs::exists(imgf)) return;
+    auto base = baseline_dir("ort") / "yolo26n.onnx.pre.json";
+    if (!fs::exists(base)) return;
+
+    UltralyticsDet model(modelfile.string(), cpu_option());
+    REQUIRE(model.is_initialized());
+    auto img = ImageData::imread(imgf.string());
+    REQUIRE_FALSE(img.empty());
+
+    std::vector<Tensor> inputs;
+    std::vector<LetterBoxRecord> recs;
+    REQUIRE(model.get_preprocessor().run({img}, &inputs, &recs));
+    REQUIRE_FALSE(inputs.empty());
+    require_no_diff(compare_tensor(load_json(base)["tensor"], inputs[0]));
+}
+
 TEST_CASE("yolo26n-seg segmentation (ORT)", "[regression]") {
     auto modelfile = model_path("yolo26n/yolo26n-seg.onnx");
     if (!fs::exists(modelfile)) return;

@@ -285,8 +285,11 @@ namespace modeldeploy::vision {
         const int step_uv = puv.step > 0 ? puv.step : iw;
         const size_t ybytes = static_cast<size_t>(cw) * ch;
         const size_t uvbytes = static_cast<size_t>(cw) * (ch / 2);  // 每行 cw 字节(交错)，ch/2 行
-        uint8_t* dbuf = nullptr;
-        if (cudaMalloc(&dbuf, ybytes + uvbytes) != cudaSuccess) return false;
+        // 复用输出缓冲池，消除每帧 cudaMalloc/cudaFree 的分配/释放开销。
+        // 注意 CudaOutputBufferPool 为单缓冲：本调用持有期间不得再次 acquire，调用方须在
+        // 下次 acquire（下一次 crop/preprocess）之前完成本次裁剪结果的消费。
+        uint8_t* dbuf = reinterpret_cast<uint8_t*>(out_pool_.acquire(ybytes + uvbytes));
+        if (!dbuf) return false;
         // 在持久 stream 上拷贝 + 同步，避免与后续消费该裁剪块的非阻塞 stream 产生跨流竞争
         // （同步默认流 D2D 拷贝在多次连续调用后可能与持久流 kernel 竞速）。
         cudaStream_t cstream = get_persistent_stream(&stream_);
@@ -301,10 +304,9 @@ namespace modeldeploy::vision {
                           static_cast<size_t>(cw), static_cast<size_t>(ch / 2),
                           cudaMemcpyDeviceToDevice, cstream);
         cudaStreamSynchronize(cstream);
-        std::shared_ptr<void> owner(dbuf, [](void* p) { if (p) cudaFree(p); });
+        // from_planes 空 owner = 借用（缓冲由 out_pool_ 持有，后端析构统一释放）
         ImageData::Plane pl[2] = {{dbuf, cw}, {dbuf + ybytes, cw}};
-        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, cw, ch,
-                                      Device::GPU, std::move(owner));
+        *out = ImageData::from_planes(pl, 2, MdImageType::NV12, cw, ch, Device::GPU);
         return !out->empty();
     }
 
@@ -775,6 +777,19 @@ namespace modeldeploy::vision {
         if (!v.ok()) return false;
         cudaStream_t s = get_persistent_stream(&stream_);
         bool ok = true;
+        // 一次 acquire 池缓冲（最大 mask 尺寸），跨实例复用作 H2D 上传，避免每条实例 cudaMalloc/Free。
+        // 复用缓冲在持久 stream s 上按序 memcpy→overlay，天然串行，无覆盖竞争。
+        size_t mask_max = 0;
+        for (const auto& r : result) {
+            if (r.score < opt.threshold) continue;
+            if (r.mask.shape.size() == 2) {
+                const size_t mh = static_cast<size_t>(r.mask.shape[0]);
+                const size_t mw = static_cast<size_t>(r.mask.shape[1]);
+                if (mw > 0 && mh > 0 && r.mask.buffer.size() >= mw * mh)
+                    mask_max = (mask_max > mw * mh) ? mask_max : (mw * mh);
+            }
+        }
+        uint8_t* d = mask_max ? reinterpret_cast<uint8_t*>(out_pool_.acquire(mask_max)) : nullptr;
         for (const auto& r : result) {
             if (r.score < opt.threshold) continue;
             const uint8_t* c = kClassPalette[palette_idx(r.label_id)];
@@ -784,20 +799,16 @@ namespace modeldeploy::vision {
             if (r.mask.shape.size() == 2) {
                 const size_t mh = static_cast<size_t>(r.mask.shape[0]);
                 const size_t mw = static_cast<size_t>(r.mask.shape[1]);
-                if (mw > 0 && mh > 0 && r.mask.buffer.size() >= mw * mh) {
-                    uint8_t* d = nullptr;
-                    if (cudaMalloc(&d, mw * mh) == cudaSuccess) {
-                        if (cudaMemcpyAsync(d, r.mask.buffer.data(), mw * mh,
-                                            cudaMemcpyHostToDevice, s) == cudaSuccess)
-                            ok = overlay_mask_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
-                                                       static_cast<int>(r.box.x),
-                                                       static_cast<int>(r.box.y),
-                                                       static_cast<int>(r.box.width),
-                                                       static_cast<int>(r.box.height),
-                                                       d, static_cast<int>(mw), static_cast<int>(mh),
-                                                       c[0], c[1], c[2], 0.5f, s) && ok;
-                        cudaFree(d);
-                    }
+                if (mw > 0 && mh > 0 && r.mask.buffer.size() >= mw * mh && d) {
+                    if (cudaMemcpyAsync(d, r.mask.buffer.data(), mw * mh,
+                                        cudaMemcpyHostToDevice, s) == cudaSuccess)
+                        ok = overlay_mask_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
+                                                   static_cast<int>(r.box.x),
+                                                   static_cast<int>(r.box.y),
+                                                   static_cast<int>(r.box.width),
+                                                   static_cast<int>(r.box.height),
+                                                   d, static_cast<int>(mw), static_cast<int>(mh),
+                                                   c[0], c[1], c[2], 0.5f, s) && ok;
                 }
             }
         }
@@ -812,15 +823,15 @@ namespace modeldeploy::vision {
         const size_t w = static_cast<size_t>(result.shape[1]);
         if (w == 0 || h == 0 || result.labels.size() < w * h) return false;
         cudaStream_t s = get_persistent_stream(&stream_);
-        uint8_t* d_labels = nullptr;
         bool ok = false;
         const size_t n = w * h;
-        if (cudaMalloc(&d_labels, n) == cudaSuccess) {
+        // 复用输出缓冲池做 labels H2D 上传，消除每次调用 cudaMalloc/cudaFree
+        uint8_t* d_labels = reinterpret_cast<uint8_t*>(out_pool_.acquire(n));
+        if (d_labels) {
             if (cudaMemcpyAsync(d_labels, result.labels.data(), n, cudaMemcpyHostToDevice, s) == cudaSuccess)
                 ok = overlay_labels_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                              d_labels, static_cast<int>(w), static_cast<int>(h),
                                              static_cast<float>(opt.alpha), s);
-            cudaFree(d_labels);
         }
         return ok;
     }
@@ -844,14 +855,14 @@ namespace modeldeploy::vision {
         for (size_t i = 0; i < n; ++i)
             d8[i] = static_cast<uint8_t>((result.depth[i] - mn) / range * 255.0f);
         cudaStream_t s = get_persistent_stream(&stream_);
-        uint8_t* d = nullptr;
         bool ok = false;
-        if (cudaMalloc(&d, n) == cudaSuccess) {
+        // 复用输出缓冲池做 depth H2D 上传，消除每次调用 cudaMalloc/cudaFree
+        uint8_t* d = reinterpret_cast<uint8_t*>(out_pool_.acquire(n));
+        if (d) {
             if (cudaMemcpyAsync(d, d8.data(), n, cudaMemcpyHostToDevice, s) == cudaSuccess)
                 ok = overlay_depth_nv12_gpu(v.y, v.uv, v.w, v.h, v.step_y, v.step_uv,
                                             d, static_cast<int>(w), static_cast<int>(h),
                                             colorize, static_cast<float>(opt.alpha), s);
-            cudaFree(d);
         }
         return ok;
     }

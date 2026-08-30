@@ -85,6 +85,7 @@ if(WITH_GPU)
     list(APPEND TEST_SOURCES
         test_nv12_batch_preproc.cpp
         test_benchmark_yolo26n.cpp
+        test_benchmark_clone.cpp
         test_gpu_vis.cpp
     )
 endif()

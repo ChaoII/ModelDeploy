@@ -277,3 +277,53 @@ TEST_CASE("cuda vis_iseg_nv12 (semantic)", "[gpu]") {
     REQUIRE(back[0] == 128);             // 框外不变
     cudaFree(d_y); cudaFree(d_uv);
 }
+
+//
+// CUDA 设备帧裁剪回归护栏（[regression][gpu]）：CudaProcessorBackend::crop 输出必须与
+// 独立主机参考逐字节一致。覆盖 Task2 的 out_pool_ 复用改造 —— 若裁剪长度/偏移/池复用出错会在此暴露。
+TEST_CASE("cuda crop NV12 pool-backed (regression)", "[regression][gpu]") {
+    constexpr int w = 64, h = 48;
+    std::vector<uint8_t> y_host(static_cast<size_t>(w) * h);
+    std::vector<uint8_t> uv_host(static_cast<size_t>(w) * (h / 2));
+    for (size_t i = 0; i < y_host.size(); ++i) y_host[i] = static_cast<uint8_t>((i * 7 + 3) & 0xFF);
+    for (size_t i = 0; i < uv_host.size(); ++i) uv_host[i] = static_cast<uint8_t>((i * 13 + 5) & 0xFF);
+
+    uint8_t* d_y = nullptr; uint8_t* d_uv = nullptr;
+    REQUIRE(cudaMalloc(&d_y, y_host.size()) == cudaSuccess);
+    REQUIRE(cudaMalloc(&d_uv, uv_host.size()) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_y, y_host.data(), y_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+    REQUIRE(cudaMemcpy(d_uv, uv_host.data(), uv_host.size(), cudaMemcpyHostToDevice) == cudaSuccess);
+
+    const mv::ImageData::Plane planes[2] = {{d_y, w}, {d_uv, w}};
+    mv::ImageData frame = mv::ImageData::from_planes(planes, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+
+    // 裁剪框：x=4,y=4,w=16,h=12 → x0=4,y0=4,x1=20,y1=16（全偶数），cw=16,ch=12
+    const float cx = 4.0f, cy = 4.0f, cw = 16.0f, ch = 12.0f;
+    const int iw = static_cast<int>(cw), ih = static_cast<int>(ch);
+
+    // 独立主机参考：逐行拷贝 cw 字节
+    std::vector<uint8_t> exp_y(static_cast<size_t>(iw) * ih);
+    for (int r = 0; r < ih; ++r)
+        std::memcpy(exp_y.data() + r * iw, y_host.data() + (4 + r) * w + 4, iw);
+    std::vector<uint8_t> exp_uv(static_cast<size_t>(iw) * (ih / 2));
+    for (int r = 0; r < ih / 2; ++r)
+        std::memcpy(exp_uv.data() + r * iw, uv_host.data() + (4 / 2 + r) * w + 4, iw);
+
+    mv::CudaProcessorBackend backend;  // 必须存活到读完 out（池缓冲由其持有）
+    mv::ImageData out;
+    REQUIRE(backend.crop(frame, cx, cy, cw, ch, &out));
+    REQUIRE(cudaDeviceSynchronize() == cudaSuccess);
+    REQUIRE_FALSE(out.empty());
+    REQUIRE(out.width() == iw);
+    REQUIRE(out.height() == ih);
+    REQUIRE(out.device() == modeldeploy::Device::GPU);
+
+    std::vector<uint8_t> got_y(static_cast<size_t>(iw) * ih);
+    std::vector<uint8_t> got_uv(static_cast<size_t>(iw) * (ih / 2));
+    REQUIRE(cudaMemcpy(got_y.data(), out.plane(0).data, got_y.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    REQUIRE(cudaMemcpy(got_uv.data(), out.plane(1).data, got_uv.size(), cudaMemcpyDeviceToHost) == cudaSuccess);
+    REQUIRE(std::memcmp(got_y.data(), exp_y.data(), got_y.size()) == 0);
+    REQUIRE(std::memcmp(got_uv.data(), exp_uv.data(), got_uv.size()) == 0);
+
+    cudaFree(d_y); cudaFree(d_uv);
+}
