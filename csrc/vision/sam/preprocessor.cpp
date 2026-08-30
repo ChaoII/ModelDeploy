@@ -4,7 +4,7 @@
 
 namespace modeldeploy::vision::seg {
     FastSamPreprocessor::FastSamPreprocessor() {
-        size_ = {1024, 1024};
+        size_ = {640, 640};
         padding_value_ = {114.0, 114.0, 114.0};
     }
 

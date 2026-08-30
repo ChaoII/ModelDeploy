@@ -6,7 +6,7 @@
 
 namespace modeldeploy::vision::seg {
     /*! @brief Preprocessor for FastSAM (轻量分割一切) 模型。
-     *  与 UltralyticsSegPreprocessor 结构一致：letterbox + normalize，默认输入 1024x1024。
+     *  与 UltralyticsSegPreprocessor 结构一致：letterbox + normalize，默认输入 640x640。
      */
     class MODELDEPLOY_CXX_EXPORT FastSamPreprocessor {
     public:

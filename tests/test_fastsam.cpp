@@ -16,7 +16,7 @@ fs::path test_data_path() {
 } // namespace
 
 TEST_CASE("FastSAM predict produces InstanceSegResult", "[seg]") {
-    const fs::path model = test_data_path() / "test_models" / "onnx" / "fastsam" / "fastsam-s.onnx";
+    const fs::path model = test_data_path() / "test_models" / "onnx" / "FastSAM-s.onnx";
     if (!fs::exists(model)) {
         SKIP("fastsam-s.onnx 测试模型缺失，跳过 FastSAM 运行时验证");
     }

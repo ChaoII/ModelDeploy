@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 #include "core/md_log.h"
 #include "vision/utils.h"
 #include "vision/sam/postprocessor.h"
@@ -7,7 +8,11 @@
 namespace modeldeploy::vision::seg {
     constexpr size_t kFastSamMaskNums = 32;  // mask 系数维度
 
-    FastSamPostprocessor::FastSamPostprocessor() = default;
+    FastSamPostprocessor::FastSamPostprocessor() {
+        conf_threshold_ = 0.30f;
+        nms_threshold_ = 0.40f;
+        mask_threshold_ = 0.5f;
+    }
 
     bool FastSamPostprocessor::run(
         std::vector<Tensor>& tensors, std::vector<std::vector<InstanceSegResult>>* results,
@@ -20,19 +25,22 @@ namespace modeldeploy::vision::seg {
             MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
             return false;
         }
-        // tensors[0]: [B, N, 5+32]  (x1,y1,x2,y2,score, mask_coeff[0..31])
+        // tensors[0]: [B, 37, N]  YOLO 式布局:37 = 4(xc,yc,w,h) + 1(score) + 32(mask 系数)，
+        //             N=8400 候选框放在最后一维
         // tensors[1]: [B, 32, H, W]  mask prototype
         const auto& s0 = tensors[0].shape();
         const auto& s1 = tensors[1].shape();
-        const size_t batch = s0[0];
-        const size_t num_anchors = s0[1];
-        const size_t stride = s0[2];
-        if (stride < 5 + kFastSamMaskNums) {
-            MD_LOG_ERROR << "Unexpected box-head stride: " << stride << std::endl;
+        if (s0.size() != 3 || s1.size() != 4) {
+            MD_LOG_ERROR << "Unexpected FastSAM output ranks (expect [B,37,N] + [B,32,H,W])."
+                         << std::endl;
             return false;
         }
-        if (s1.size() != 4) {
-            MD_LOG_ERROR << "Unexpected mask proto rank: " << s1.size() << std::endl;
+        const size_t batch = s0[0];
+        const size_t channels = s0[1];  // 37
+        const size_t anchors = s0[2];   // 8400
+        const size_t num_box_channels = 4;
+        if (channels < num_box_channels + 1 + kFastSamMaskNums) {
+            MD_LOG_ERROR << "Unexpected box-head channels: " << channels << std::endl;
             return false;
         }
         const int mask_c = static_cast<int>(s1[1]);
@@ -43,20 +51,26 @@ namespace modeldeploy::vision::seg {
             return false;
         }
 
-        results->resize(batch);
+        auto& values = *results;
+        values.resize(batch);
         const float* data0 = static_cast<const float*>(tensors[0].data());
         for (size_t bs = 0; bs < batch; ++bs) {
             std::vector<std::vector<float>> mask_embeddings;
             std::vector<InstanceSegResult> _results;
-            const float* data = data0 + bs * num_anchors * stride;
-            for (size_t i = 0; i < num_anchors; ++i) {
-                const float* attr = data + i * stride;
-                const float score = attr[4];
+            const float* data = data0 + bs * channels * anchors;
+            for (size_t a = 0; a < anchors; ++a) {
+                // xc, yc, w, h（相对 640 输入，需按 letterbox 回退到原图）
+                const float xc = data[0 * anchors + a];
+                const float yc = data[1 * anchors + a];
+                const float w  = data[2 * anchors + a];
+                const float h  = data[3 * anchors + a];
+                const float score = data[4 * anchors + a];
                 if (score <= conf_threshold_) continue;
-                Rect2f box{attr[0], attr[1], attr[2] - attr[0], attr[3] - attr[1]};
-                // mask 系数 × score 缩放
+                Rect2f box{xc - w / 2.0f, yc - h / 2.0f, w, h};
                 std::vector<float> embed(kFastSamMaskNums);
-                for (size_t j = 0; j < kFastSamMaskNums; ++j) embed[j] = attr[5 + j] * score;
+                for (size_t j = 0; j < kFastSamMaskNums; ++j) {
+                    embed[j] = data[(5 + j) * anchors + a] * score;
+                }
                 mask_embeddings.push_back(std::move(embed));
                 _results.push_back({box, Mask(), 0, score});
             }
@@ -87,7 +101,9 @@ namespace modeldeploy::vision::seg {
             const float pad_h_mask = pad_h / out_h * static_cast<float>(mask_h);
             const float pad_w_mask = pad_w / out_w * static_cast<float>(mask_w);
 
-            for (size_t i = 0; i < _results.size(); ++i) {
+            // 注意:utils::nms 原地重建 _results(按分数降序、仅保留),故此处直接用 _results[i]，
+            //     mask 系数仍按原始索引 indexs[i] 取(mask_embeddings 未被 nms 重排)。
+            for (int i = 0; i < num_instances; ++i) {
                 auto& box = _results[i].box;
                 float x1 = (box.x - pad_w) / scale;
                 float y1 = (box.y - pad_h) / scale;
@@ -102,8 +118,7 @@ namespace modeldeploy::vision::seg {
                 box.width = std::round(x2 - x1);
                 box.height = std::round(y2 - y1);
 
-                const cv::Mat mask_channel =
-                    matmul_result.row(static_cast<int>(i)).reshape(1, mask_h);
+                const cv::Mat mask_channel = matmul_result.row(i).reshape(1, mask_h);
                 const int _x1 = static_cast<int>(pad_w_mask);
                 const int _y1 = static_cast<int>(pad_h_mask);
                 const int _x2 = static_cast<int>(mask_w - pad_w_mask);
@@ -141,7 +156,7 @@ namespace modeldeploy::vision::seg {
                                 static_cast<size_t>(kh) * kw);
                 }
             }
-            results->at(bs) = std::move(_results);
+            values[bs] = std::move(_results);
         }
         return true;
     }
