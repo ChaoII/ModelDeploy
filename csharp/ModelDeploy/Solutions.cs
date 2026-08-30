@@ -117,6 +117,8 @@ namespace ModelDeploy.Solutions
                 throw new ArgumentNullException(nameof(boxes));
             if (ids.Length == 0 || boxes.Length < ids.Length * 4)
                 throw new ArgumentException("boxes must contain n*4 values for n boxes");
+            if (boxes.Length != 4 * ids.Length || boxes.Length != 4 * labels.Length)
+                throw new ArgumentException("boxes length must equal 4*ids.Length and 4*labels.Length");
             md_solution_region_counter_update(_handle, boxes,
                 new UIntPtr((uint)(boxes.Length / 4)), ids, labels);
         }
@@ -162,6 +164,8 @@ namespace ModelDeploy.Solutions
                 throw new ArgumentNullException(nameof(boxes));
             if (ids.Length == 0 || boxes.Length < ids.Length * 4)
                 throw new ArgumentException("boxes must contain n*4 values for n boxes");
+            if (boxes.Length != 4 * ids.Length || boxes.Length != 4 * labels.Length)
+                throw new ArgumentException("boxes length must equal 4*ids.Length and 4*labels.Length");
             md_solution_queue_update(_handle, boxes,
                 new UIntPtr((uint)(boxes.Length / 4)), ids, labels);
         }
@@ -206,6 +210,8 @@ namespace ModelDeploy.Solutions
                 throw new ArgumentNullException(nameof(boxes));
             if (ids.Length == 0 || boxes.Length < ids.Length * 4)
                 throw new ArgumentException("boxes must contain n*4 values for n boxes");
+            if (boxes.Length != 4 * ids.Length || boxes.Length != 4 * labels.Length)
+                throw new ArgumentException("boxes length must equal 4*ids.Length and 4*labels.Length");
             md_solution_track_zone_update(_handle, boxes,
                 new UIntPtr((uint)(boxes.Length / 4)), ids, labels);
         }

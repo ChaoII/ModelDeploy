@@ -4451,6 +4451,7 @@ MDStatus md_solution_region_counter_add(MDSolutionHandle h, const char* name, co
 MDStatus md_solution_region_counter_update(MDSolutionHandle h, const float* boxes, size_t n,
                                            const int* track_ids, const int* label_ids) {
     if (!h || (!boxes && n)) return MD_ERR_NULL_POINTER;
+    if (n > 0 && (!track_ids || !label_ids)) return MD_ERR_NULL_POINTER;
 #ifdef BUILD_VISION
     if (h->kind != MD_SOLUTION_REGION_COUNTER) return MD_ERR_INVALID_ARGUMENT;
     std::vector<tracking::TrackResult> tracks(n);
@@ -4496,6 +4497,7 @@ MDStatus md_solution_queue_set_region(MDSolutionHandle h, const float* xy, size_
 MDStatus md_solution_queue_update(MDSolutionHandle h, const float* boxes, size_t n,
                                   const int* track_ids, const int* label_ids) {
     if (!h || (!boxes && n)) return MD_ERR_NULL_POINTER;
+    if (n > 0 && (!track_ids || !label_ids)) return MD_ERR_NULL_POINTER;
 #ifdef BUILD_VISION
     if (h->kind != MD_SOLUTION_QUEUE) return MD_ERR_INVALID_ARGUMENT;
     std::vector<tracking::TrackResult> tracks(n);
@@ -4539,6 +4541,7 @@ MDStatus md_solution_track_zone_set_region(MDSolutionHandle h, const float* xy, 
 MDStatus md_solution_track_zone_update(MDSolutionHandle h, const float* boxes, size_t n,
                                        const int* track_ids, const int* label_ids) {
     if (!h || (!boxes && n)) return MD_ERR_NULL_POINTER;
+    if (n > 0 && (!track_ids || !label_ids)) return MD_ERR_NULL_POINTER;
 #ifdef BUILD_VISION
     if (h->kind != MD_SOLUTION_TRACK_ZONE) return MD_ERR_INVALID_ARGUMENT;
     std::vector<tracking::TrackResult> tracks(n);

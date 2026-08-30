@@ -3,6 +3,9 @@
 namespace modeldeploy::vision::solution {
 void RegionCounter::add_region(const std::string& name, const std::vector<Point2f>& polygon) {
     if (polygon.size() < 3) return;
+    for (auto& r : regions_) {
+        if (r.name == name) { r.zone = tool::PolygonZone(polygon); return; }
+    }
     regions_.push_back(Region{name, tool::PolygonZone(polygon)});
     counts_[name] = 0;
 }
