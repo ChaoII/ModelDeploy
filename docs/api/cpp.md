@@ -53,6 +53,8 @@ det.predict(img, &result);
 
 三个 TTS 模型均继承 `audio::tts::ITtsModel`，统一提供 `predict` / `predict_stream` / `get_sample_rate`（`predict_stream` 的 `cb` 签名 `bool(const float*, int, float progress)`，返回 `false` 中止；`chunk_frames == 0` 等价一次性合成）。
 
+> `chunk_frames` 单位为**模型相关**（非"秒"）：Audio8=AR 码帧（每帧 ≈ 2048 采样）、Qwen3=vq 码帧（每帧 ≈ 1920 采样）、Kokoro=UTF-8 字符数。上层应传相对小的值以观察多次音频回调（如 24/12/120）。Qwen3 在 AR 阶段还会回调 `progress` 空块（`*cb==nullptr, n==0`），消费端应跳过音频处理、仅记录进度。
+
 - `audio::tts::Kokoro(model_onnx, tokens, lexicons, voices_bin, jieba_dir, norm_dir, opt)` —— 24kHz，`predict(text, voice, speed, &audio)`。
 - `audio::tts::Audio8` —— **无 voices 参数**；默认构造后 `Load(model_dir, opt)`（`model_dir` 指向 `audio8_preview` 根目录，`voice` 来自 `{model_dir}/voices/`），**44100Hz**，`predict(text, voice, speed, &audio)`。
 - `audio::tts::Qwen3Tts(model_dir, opt)` —— 24kHz，`predict(text, voice_or_speaker, speed, &audio)`；`clone(text, ref_audio, ref_text, lang, &audio)`（返回 `false` 表示失败，非法 `lang` / 参考音频无法编码等）。

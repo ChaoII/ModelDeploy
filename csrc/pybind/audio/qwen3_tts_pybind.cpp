@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "pybind/utils/utils.h"
 #include "audio/tts/qwen3/qwen3_tts.h"
 
@@ -20,11 +22,13 @@ namespace modeldeploy::audio {
                                       const std::string& voice, float speed, int chunk_frames) {
                        pybind11::list chunks;
                        self.predict_stream(text, voice, speed, chunk_frames,
-                           [&](const float* s, int n, float) {
-                               std::vector<float> copy(s, s + n);
-                               chunks.append(pybind11::array_t<float>(copy.size(), copy.data()));
-                               return true;
-                           });
+                            [&](const float* s, int n, float) {
+                                std::vector<float> copy(s, s + n);
+                                pybind11::array_t<float> arr(copy.size());
+                                std::copy(copy.begin(), copy.end(), arr.mutable_data());
+                                chunks.append(arr);
+                                return true;
+                            });
                        return chunks;
                    },
                  pybind11::arg("text"), pybind11::arg("voice"), pybind11::arg("speed") = 1.0f,

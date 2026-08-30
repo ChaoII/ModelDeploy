@@ -2853,7 +2853,7 @@ MDStatus md_audio_tts_qwen3_clone(MDModelHandle h, const char* text,
         set_error("md_audio_tts_qwen3_clone: qwen3 clone failed");
         return MD_ERR_MODEL_PREDICT;
     }
-    if (sample_rate) *sample_rate = 24000;
+    if (sample_rate) *sample_rate = m->get_sample_rate();
     *audio = mh->audio_buf.data();
     *audio_n = mh->audio_buf.size();
     return MD_OK;

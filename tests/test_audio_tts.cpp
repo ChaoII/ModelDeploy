@@ -68,6 +68,51 @@ bool collect_stream(ITtsModel* m, const std::string& text,
         });
 }
 
+// 分块统计：audio_callbacks 仅计 n>0 的音频回调（Qwen3 progress 空块不计数）。
+struct StreamStats {
+    bool ok = false;
+    size_t audio_callbacks = 0;
+    std::vector<float> audio;
+    bool all_finite = true;
+};
+
+StreamStats collect_chunked(ITtsModel* m, const std::string& text,
+                            const std::string& voice, int chunk_frames) {
+    StreamStats st;
+    st.ok = m->predict_stream(
+        text, voice, 1.0f, chunk_frames,
+        [&st](const float* data, int n, float) {
+            if (n > 0) {
+                ++st.audio_callbacks;
+                st.audio.insert(st.audio.end(), data, data + n);
+                for (int i = 0; i < n; ++i) {
+                    if (!std::isfinite(data[i])) {
+                        st.all_finite = false;
+                        break;
+                    }
+                }
+            }
+            return true;
+        });
+    return st;
+}
+
+// 按 min_chars 个 UTF-8 字符生成重复长文本（中文字符 3 字节）。
+std::string long_sentence(int min_chars) {
+    auto n_chars = [](const std::string& s) {
+        size_t n = 0;
+        for (size_t i = 0; i < s.size(); ++i) {
+            const unsigned char c = static_cast<unsigned char>(s[i]);
+            if ((c & 0xC0) != 0x80) ++n;
+        }
+        return n;
+    };
+    std::string t;
+    const char* sent = "今天天气真不错，适合出门散步，顺便听一首喜欢的歌，放松一下心情。";
+    while (static_cast<int>(n_chars(t)) < min_chars) t += sent;
+    return t;
+}
+
 double rel_len_diff(const std::vector<float>& a, const std::vector<float>& b) {
     if (a.empty() || b.empty()) return 1.0;
     return std::fabs(static_cast<double>(a.size()) - static_cast<double>(b.size())) /
@@ -129,6 +174,26 @@ TEST_CASE("Audio8 predict_stream equals predict", "[tts][tts-audio8]") {
     REQUIRE(rel_len_diff(streamed, whole) < 0.05);
 }
 
+TEST_CASE("Audio8 predict_stream real chunking", "[tts][tts-audio8]") {
+    // 长文本 + chunk_frames=24 → 断言真实分块（滑窗 guard 持续多块）：
+    // 回调次数 >1、各块有限非空、拼接总长与 predict 相对差 <5%。
+    const auto dir = audio8_dir();
+    if (!fs::exists(dir / "runtime_manifest.json")) return;
+    modeldeploy::RuntimeOption opt;
+    Audio8 m;
+    if (!m.Load(dir.string(), opt)) return;
+    const std::string text = long_sentence(150);
+    std::vector<float> whole;
+    REQUIRE(m.predict(text, "demo", 1.0f, &whole));
+    REQUIRE_FALSE(whole.empty());
+    auto st = collect_chunked(&m, text, "demo", 24);
+    REQUIRE(st.ok);
+    REQUIRE(st.audio_callbacks > 1);
+    REQUIRE(st.all_finite);
+    REQUIRE_FALSE(st.audio.empty());
+    REQUIRE(rel_len_diff(st.audio, whole) < 0.05);
+}
+
 TEST_CASE("Qwen3Tts predict_stream equals predict", "[tts][tts-qwen3]") {
     const auto dir = qwen3_dir();
     if (!fs::exists(dir / "onnx_kv_06b")) return;
@@ -149,6 +214,30 @@ TEST_CASE("Qwen3Tts predict_stream equals predict", "[tts][tts-qwen3]") {
             continue;
         best = std::min(best, rel_len_diff(streamed, whole));
     }
+    REQUIRE(best < 0.3);
+}
+
+TEST_CASE("Qwen3Tts predict_stream real chunking", "[tts][tts-qwen3]") {
+    // chunk_frames=12（≈1s/块，12×1920 采样）→ 断言音频回调次数 >1（进度空块不计数）。
+    // 采样 thread_local 随机 → 逐次生成非确定，沿用"3 对最小差 <30%"放宽策略。
+    const auto dir = qwen3_dir();
+    if (!fs::exists(dir / "onnx_kv_06b")) return;
+    modeldeploy::RuntimeOption opt;
+    Qwen3Tts m;
+    if (!m.init(dir.string(), opt)) return;
+    const std::string text = "你好，世界！这是流式分块一致性测试，用于验证 Qwen3 的多块路径。";
+    size_t best_callbacks = 0;
+    double best = 1.0;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        std::vector<float> whole;
+        if (!m.predict(text, "Vivian", 1.0f, &whole) || whole.empty()) continue;
+        auto st = collect_chunked(&m, text, "Vivian", 12);
+        if (!st.ok || st.audio.empty()) continue;
+        REQUIRE(st.all_finite);
+        best_callbacks = std::max(best_callbacks, st.audio_callbacks);
+        best = std::min(best, rel_len_diff(st.audio, whole));
+    }
+    REQUIRE(best_callbacks > 1);
     REQUIRE(best < 0.3);
 }
 
@@ -174,6 +263,32 @@ TEST_CASE("Kokoro predict_stream equals predict", "[tts][tts-kokoro]") {
     REQUIRE(collect_stream(&koro, text, "zf_001", 120, &streamed));
     REQUIRE_FALSE(streamed.empty());
     REQUIRE(rel_len_diff(streamed, whole) < 0.05);
+}
+
+TEST_CASE("Kokoro predict_stream real chunking", "[tts][tts-kokoro]") {
+    // >120 字符 + chunk_frames=120 → split_for_synthesis 切成多个字符块 → 断言音频回调次数 >1。
+    const auto d = find_kokoro_dir();
+    if (d.empty()) return;
+    const auto model = d / "model.onnx";
+    const auto toks = d / "tokens.txt";
+    const auto voices = d / "voices.bin";
+    const auto dict = d / "dict";
+    if (!(fs::exists(toks) && fs::exists(voices) && fs::exists(dict))) return;
+    modeldeploy::RuntimeOption opt;
+    Kokoro koro(model.string(), toks.string(),
+                {(d / "lexicon-us-en.txt").string(),
+                 (d / "lexicon-zh.txt").string()},
+                voices.string(), dict.string(), d.string(), opt);
+    if (!koro.is_initialized()) return;
+    const std::string text = long_sentence(300);
+    std::vector<float> whole;
+    REQUIRE(koro.predict(text, "zf_001", 1.0f, &whole));
+    REQUIRE_FALSE(whole.empty());
+    auto st = collect_chunked(&koro, text, "zf_001", 120);
+    REQUIRE(st.ok);
+    REQUIRE(st.audio_callbacks > 1);
+    REQUIRE(st.all_finite);
+    REQUIRE_FALSE(st.audio.empty());
 }
 
 TEST_CASE("Audio8 overlong text rejected without truncation", "[tts][tts-audio8]") {

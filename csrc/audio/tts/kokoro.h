@@ -21,14 +21,14 @@ namespace modeldeploy::audio::tts
 
         [[nodiscard]] std::string name() const override { return "Kokoro"; }
 
-        virtual bool predict(const std::string& text, const std::string& voice, float speed,
-                             std::vector<float>* out_audio);
+        bool predict(const std::string& text, const std::string& voice, float speed,
+                     std::vector<float>* out_audio) override;
 
         bool predict_stream(const std::string& text, const std::string& voice, float speed,
                             int chunk_frames,
                             const std::function<bool(const float*, int, float)>& cb) override;
 
-        [[nodiscard]] int32_t get_sample_rate() const { return sample_rate_; }
+        [[nodiscard]] int32_t get_sample_rate() const override { return sample_rate_; }
 
         void set_sample_rate(const int32_t sample_rate) { sample_rate_ = sample_rate; }
 

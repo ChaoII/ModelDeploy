@@ -281,11 +281,11 @@ bool Qwen3Tts::predict_stream(
     if (!init_ok_ || !cb) return false;
     (void)voice;
     (void)speed;
-    if (chunk_frames <= 0) {
-        MD_LOG_ERROR << "Qwen3Tts::predict_stream requires chunk_frames > 0"
-                     << std::endl;
-        return false;
-    }
+    // chunk_frames <= 0 等价一次性合成（与 Audio8/Kokoro 契约一致）：
+    // GenerateTalker 内 streaming=false，AR 阶段不发进度空块，
+    // 生成完投递一次整段音频回调（progress=1.0），行为与 predict 一致。
+    GenConfig gc;
+    gc.chunk_frames = std::max(0, chunk_frames);
     const std::string formatted = "<|im_start|>assistant\n" + text +
                                   "<|im_end|>\n<|im_start|>assistant\n";
     const auto input_ids = tokenizer_.Encode(formatted);
@@ -294,8 +294,6 @@ bool Qwen3Tts::predict_stream(
                      << input_ids.size() << std::endl;
         return false;
     }
-    GenConfig gc;
-    gc.chunk_frames = chunk_frames;
     std::vector<float> audio;
     const bool ok = GenerateTalker(input_ids, gc, nullptr, cb, &audio, nullptr);
     return ok;

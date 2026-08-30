@@ -144,7 +144,8 @@ namespace ModelDeploy.Models
         }
 
         /// <summary>TTS 流式合成：逐块回调 onChunk(samples, progress)，同时返回整段音频。
-        /// chunkFrames &lt;= 0 时等价一次性合成（单次回调整段）。</summary>
+        /// chunkFrames &lt;= 0 时等价一次性合成（单次回调整段）。
+        /// Qwen3 mode B 的 AR 阶段会回调 progress 空块（n==0），本层跳过音频处理、仅上报进度。</summary>
         public TtsResult PredictStream(string text, string voice, float speed, int chunkFrames,
             Action<float[], float> onChunk)
         {
@@ -156,13 +157,16 @@ namespace ModelDeploy.Models
                 var target = GCHandle.FromIntPtr(userdata).Target as Action<float[], float>;
                 if (target != null)
                 {
-                    if (samplesPtr == IntPtr.Zero || n <= 0)
-                        target(new float[0], progress);
-                    else
+                    // n==0 为 progress 空块（Qwen3 mode B AR 阶段）：跳过音频复制、仅上报进度。
+                    if (n > 0 && samplesPtr != IntPtr.Zero)
                     {
                         var samples = new float[n];
                         Marshal.Copy(samplesPtr, samples, 0, n);
                         target(samples, progress);
+                    }
+                    else
+                    {
+                        target(Array.Empty<float>(), progress);
                     }
                 }
                 return 1;
@@ -225,7 +229,8 @@ namespace ModelDeploy.Models
         }
 
         /// <summary>TTS 流式合成：逐块回调 onChunk(samples, progress)，同时返回整段音频。
-        /// chunkFrames &lt;= 0 时等价一次性合成（单次回调整段）。</summary>
+        /// chunkFrames &lt;= 0 时等价一次性合成（单次回调整段）。
+        /// Qwen3 mode B 的 AR 阶段会回调 progress 空块（n==0），本层跳过音频处理、仅上报进度。</summary>
         public TtsResult PredictStream(string text, string voice, float speed, int chunkFrames,
             Action<float[], float> onChunk)
         {
@@ -237,13 +242,16 @@ namespace ModelDeploy.Models
                 var target = GCHandle.FromIntPtr(userdata).Target as Action<float[], float>;
                 if (target != null)
                 {
-                    if (samplesPtr == IntPtr.Zero || n <= 0)
-                        target(new float[0], progress);
-                    else
+                    // n==0 为 progress 空块（Qwen3 mode B AR 阶段）：跳过音频复制、仅上报进度。
+                    if (n > 0 && samplesPtr != IntPtr.Zero)
                     {
                         var samples = new float[n];
                         Marshal.Copy(samplesPtr, samples, 0, n);
                         target(samples, progress);
+                    }
+                    else
+                    {
+                        target(Array.Empty<float>(), progress);
                     }
                 }
                 return 1;

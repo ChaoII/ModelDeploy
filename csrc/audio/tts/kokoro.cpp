@@ -122,8 +122,6 @@ namespace modeldeploy::audio::tts {
         // chunk_frames<=0 视为未指定，用默认 120。
         const int max_chars = chunk_frames > 0 ? chunk_frames : 120;
         const auto parts = solution::TTSBatcher::split_for_synthesis(text, max_chars);
-        std::vector<float> combined;
-        combined.reserve(parts.size() * 24000 * 3);
         float progress = 0.0f;
         for (size_t i = 0; i < parts.size(); ++i) {
             const std::string& part = parts[i];
@@ -132,7 +130,6 @@ namespace modeldeploy::audio::tts {
             if (!predict(part, voice, speed, &audio)) return false;
             progress = static_cast<float>(i + 1) / static_cast<float>(parts.size());
             if (!audio.empty()) {
-                combined.insert(combined.end(), audio.begin(), audio.end());
                 if (!cb(audio.data(), static_cast<int>(audio.size()), progress)) return false;
             }
         }
