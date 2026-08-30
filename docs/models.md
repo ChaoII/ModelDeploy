@@ -574,7 +574,22 @@ std::vector<modeldeploy::vision::InstanceSegResult> result;
 m.predict_with_prompts(img, prompts, &result);
 ```
 
-> 各语言绑定同名可用：Python `FastSam.predict_with_prompts`、C API `md_fastsam_predict_with_prompts`、
+Python 侧使用同名的值对象 `FastSamPrompts`（`bboxes` = `Rect2f[]`、`points` = `Point2f[]`、
+`point_labels` = `int[]`），`predict_with_prompts(image, prompts)` 收单对象参数：
+
+```python
+import modeldeploy.vision as mv
+from modeldeploy.vision import FastSamPrompts, Rect2f, Point2f
+
+m = mv.FastSam("fastsam-s.onnx", option)
+prompts = FastSamPrompts()
+prompts.bboxes = [Rect2f(100, 80, 220, 180)]   # 取最匹配该框的实例
+prompts.points = [Point2f(150, 130)]
+prompts.point_labels = [1]                     # 1=前景保留 / 0=背景剔除
+result = m.predict_with_prompts(image, prompts)
+```
+
+> 各语言绑定同名可用：Python `FastSam.predict_with_prompts(image, prompts)`、C API `md_fastsam_predict_with_prompts`、
 > Rust `FastSam.predict_with_prompts`、C# `FastSamModel.PredictWithPrompts`。
 > MobileSAM 的两段式（编码器+解码器）本轮未接入。
 
