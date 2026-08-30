@@ -212,6 +212,7 @@ pub enum ModelKind {
     VehicleKeypoint,
     FaceLandmark,
     TextClassifier,
+    FastSam,
 }
 
 impl ModelKind {
@@ -250,6 +251,7 @@ impl ModelKind {
             ModelKind::VehicleKeypoint => VEHICLE_KEYPOINT,
             ModelKind::FaceLandmark => FACE_LANDMARK,
             ModelKind::TextClassifier => TEXT_CLASSIFIER,
+            ModelKind::FastSam => FASTSAM,
         }
     }
 }

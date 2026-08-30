@@ -202,6 +202,10 @@ string modelPath, IntPtr opt);
         internal static extern MDStatus md_model_predict_batch(IntPtr handle, IntPtr[] imgs, UIntPtr n,
             out IntPtr result);
 
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_fastsam_predict_with_prompts(IntPtr handle, IntPtr image,
+            float[] bboxes, UIntPtr nb, float[] points, int[] labels, UIntPtr np, out IntPtr result);
+
         #endregion
 
         #region 音频
