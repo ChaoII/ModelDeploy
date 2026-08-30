@@ -15,6 +15,7 @@
 #include "vision/pose/ultralytics_pose.h"
 #include "vision/hand/hand.h"
 #include "vision/iseg/ultralytics_seg.h"
+#include "vision/sam/fastsam.h"
 #include "vision/sem/ultralytics_sem.h"
 #include "vision/depth/ultralytics_depth.h"
 #include "vision/classification/classification.h"
