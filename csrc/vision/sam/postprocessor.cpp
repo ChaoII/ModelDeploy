@@ -99,57 +99,46 @@ namespace modeldeploy::vision::seg {
             const float scale = letter_box_records[bs].scale;
             const float pad_h = letter_box_records[bs].pad_h;
             const float pad_w = letter_box_records[bs].pad_w;
-            const float pad_h_mask = pad_h / out_h * static_cast<float>(mask_h);
-            const float pad_w_mask = pad_w / out_w * static_cast<float>(mask_w);
 
-            // 注意:utils::nms 原地重建 _results(按分数降序、仅保留),故此处直接用 _results[i]，
-            //     mask 系数仍按原始索引 indexs[i] 取(mask_embeddings 未被 nms 重排)。
+            // 原版语义(process_mask_native, retina 路径):把 160x160 mask 上采样到原图尺寸,
+            // 按原图 box 裁剪,保证 mask 贴合物体轮廓而非 proto 低分辨率放大后的粗块。
+            const int fh = static_cast<int>(ipt_h);
+            const int fw = static_cast<int>(ipt_w);
             for (int i = 0; i < num_instances; ++i) {
                 auto& box = _results[i].box;
-                float x1 = (box.x - pad_w) / scale;
-                float y1 = (box.y - pad_h) / scale;
-                float x2 = (box.x + box.width - pad_w) / scale;
-                float y2 = (box.y + box.height - pad_h) / scale;
-                x1 = std::clamp(x1, 0.0f, ipt_w);
-                y1 = std::clamp(y1, 0.0f, ipt_h);
-                x2 = std::clamp(x2, 0.0f, ipt_w);
-                y2 = std::clamp(y2, 0.0f, ipt_h);
-                box.x = std::round(x1);
-                box.y = std::round(y1);
-                box.width = std::round(x2 - x1);
-                box.height = std::round(y2 - y1);
+                // box(640 坐标) -> 原图坐标
+                float ox1 = (box.x - pad_w) / scale;
+                float oy1 = (box.y - pad_h) / scale;
+                float ox2 = (box.x + box.width - pad_w) / scale;
+                float oy2 = (box.y + box.height - pad_h) / scale;
+                ox1 = std::clamp(ox1, 0.0f, ipt_w);
+                oy1 = std::clamp(oy1, 0.0f, ipt_h);
+                ox2 = std::clamp(ox2, 0.0f, ipt_w);
+                oy2 = std::clamp(oy2, 0.0f, ipt_h);
+                box.x = std::round(ox1);
+                box.y = std::round(oy1);
+                box.width = std::round(ox2 - ox1);
+                box.height = std::round(oy2 - oy1);
 
-                const cv::Mat mask_channel = matmul_result.row(i).reshape(1, mask_h);
-                const int _x1 = static_cast<int>(pad_w_mask);
-                const int _y1 = static_cast<int>(pad_h_mask);
-                const int _x2 = static_cast<int>(mask_w - pad_w_mask);
-                const int _y2 = static_cast<int>(mask_h - pad_h_mask);
-                const float fw = static_cast<float>(_x2 - _x1);
-                const float fh = static_cast<float>(_y2 - _y1);
-                const float bx1 = std::clamp(box.x, 0.0f, ipt_w);
-                const float by1 = std::clamp(box.y, 0.0f, ipt_h);
-                const float bx2 = std::clamp(box.x + box.width, 0.0f, ipt_w);
-                const float by2 = std::clamp(box.y + box.height, 0.0f, ipt_h);
-                const int mx1 = static_cast<int>(_x1 + bx1 / ipt_w * fw);
-                const int my1 = static_cast<int>(_y1 + by1 / ipt_h * fh);
-                const int mx2 = static_cast<int>(_x1 + bx2 / ipt_w * fw);
-                const int my2 = static_cast<int>(_y1 + by2 / ipt_h * fh);
-                cv::Mat dest, mask;
-                if (mx2 > mx1 && my2 > my1 && box.width > 0 && box.height > 0) {
-                    cv::Rect box_roi(mx1, my1, mx2 - mx1, my2 - my1);
-                    dest = mask_channel(box_roi);
-                    cv::exp(-dest, dest);
-                    dest = 1.0 / (1.0 + dest);
-                    cv::resize(dest, mask,
-                               cv::Size(static_cast<int>(box.width), static_cast<int>(box.height)),
-                               0, 0, cv::INTER_LINEAR);
-                    mask = mask > mask_threshold_;
+                // 160x160 -> 原图 双线性上采样 + sigmoid
+                cv::Mat feat = matmul_result.row(i).reshape(1, mask_h);
+                cv::Mat feat_up;
+                cv::resize(feat, feat_up, cv::Size(fw, fh), 0, 0, cv::INTER_LINEAR);
+                cv::exp(-feat_up, feat_up);
+                feat_up = 1.0 / (1.0 + feat_up);  // sigmoid
+
+                cv::Mat mask;
+                if (box.width > 0 && box.height > 0) {
+                    cv::Rect roi(static_cast<int>(box.x), static_cast<int>(box.y),
+                                 static_cast<int>(box.width), static_cast<int>(box.height));
+                    roi &= cv::Rect(0, 0, fw, fh);
+                    cv::Mat cropped = feat_up(roi);
+                    mask = cropped > mask_threshold_;
                 } else {
-                    mask = cv::Mat::zeros(static_cast<int>(box.height),
-                                          static_cast<int>(box.width), CV_8UC1);
+                    mask = cv::Mat::zeros(0, 0, CV_8UC1);
                 }
-                const int kh = static_cast<int>(box.height);
-                const int kw = static_cast<int>(box.width);
+                const int kh = mask.rows;
+                const int kw = mask.cols;
                 _results[i].mask.resize(kh * kw);
                 _results[i].mask.shape = {kh, kw};
                 if (kh > 0 && kw > 0) {
