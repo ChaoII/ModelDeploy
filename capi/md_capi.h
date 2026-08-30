@@ -271,8 +271,8 @@ MD_CAPI_EXPORT MDStatus md_model_predict_batch(MDModelHandle, MDImageHandle* img
                                 MDResultHandle* out);
 
 /* FastSam prompt filter. bboxes: float[nb*4] = (x,y,w,h) original px; points: float[np*2];
- * labels: int[np] (1=fg,0=bg). Result is read with md_result_instance_seg (same layout as an
- * MD_MODEL_INSTANCE_SEG predict). Empty prompts (nb==0 && np==0) == full predict. */
+ * labels: int[np] (1=fg,0=bg; NULL = all foreground). Result is read with md_result_instance_seg
+ * (same layout as an MD_MODEL_INSTANCE_SEG predict). Empty prompts (nb==0 && np==0) == full predict. */
 MD_CAPI_EXPORT MDStatus md_fastsam_predict_with_prompts(MDModelHandle h, MDImageHandle img_h,
                                                         const float* bboxes, size_t nb,
                                                         const float* points, const int* labels, size_t np,
