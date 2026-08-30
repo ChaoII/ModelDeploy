@@ -184,6 +184,22 @@ public class AllModelsTests
     }
 
     [Test]
+    public void FastSam_PredictAndPrompts()
+    {
+        var model = Path.Combine(ModelRoot, "FastSAM-s.onnx");
+        var img = Path.Combine(ImageRoot, "test_detection0.jpg");
+        if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
+        using var vi = VisionImage.Read(img);
+        using var m = new FastSamModel(model, CpuOrt());
+        var all = m.Predict(vi);
+        Assert.That(all, Is.Not.Empty);
+        var b = all[0].Box;
+        var sel = m.PredictWithPrompts(vi, new[] { b.X, b.Y, b.Width, b.Height }, null, null);
+        Assert.That(sel, Is.Not.Empty);
+        Assert.That(sel.Count, Is.LessThanOrEqualTo(all.Count));
+    }
+
+    [Test]
     public void SemSeg_Works()
     {
         var model = Path.Combine(ModelRoot, "yolo26n", "yolo26n-sem.onnx");

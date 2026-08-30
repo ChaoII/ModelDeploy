@@ -117,7 +117,8 @@ namespace ModelDeploy
             // VEHICLE_KEYPOINT/FACE_LANDMARK，故显式对齐 CAPI 数值。
             MD_MODEL_VEHICLE_KEYPOINT = 33,
             MD_MODEL_FACE_LANDMARK = 34,
-            MD_MODEL_TEXT_CLASSIFIER = 35
+            MD_MODEL_TEXT_CLASSIFIER = 35,
+            MD_MODEL_FASTSAM = 36
         }
 
         public enum MDSolutionKind

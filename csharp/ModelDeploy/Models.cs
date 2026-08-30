@@ -499,6 +499,76 @@ namespace ModelDeploy.Models
         }
     }
 
+    public sealed class FastSamModel : BaseModel
+    {
+        private FastSamModel(IntPtr handle) : base(MDModelKind.MD_MODEL_FASTSAM, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public FastSamModel Clone() => new FastSamModel(CloneNative());
+
+        public FastSamModel(string modelPath, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_FASTSAM, modelPath, opt) { }
+
+        public Prediction<InstanceSegResult> Predict(VisionImage image)
+            => MakePrediction(image, ReadInstanceSeg);
+
+        /// <summary>
+        /// 带提示的交互式分割：bboxes 为 [x,y,w,h,...]、points 为 [x,y,...]、labels 逐点（1=前景,0=背景）。
+        /// 提示为空等价全图 Predict。
+        /// </summary>
+        public IReadOnlyList<InstanceSegResult> PredictWithPrompts(VisionImage image,
+            float[] bboxes, float[] points, int[] labels)
+        {
+            if (image == null) throw new ArgumentNullException(nameof(image));
+            bboxes ??= Array.Empty<float>();
+            points ??= Array.Empty<float>();
+            labels ??= Array.Empty<int>();
+            var status = md_fastsam_predict_with_prompts(
+                _handle, image.Handle,
+                bboxes, new UIntPtr((uint)(bboxes.Length / 4)),
+                points, labels, new UIntPtr((uint)(points.Length / 2)),
+                out var result);
+            if (status != MDStatus.MD_OK)
+                throw new InvalidOperationException($"PredictWithPrompts failed: {GetLastError()}");
+            try
+            {
+                return ReadInstanceSeg(result);
+            }
+            finally
+            {
+                md_result_destroy(result);
+            }
+        }
+
+        /// <summary>实例分割置信度阈值。</summary>
+        public void SetConfThreshold(double v) => SetParam("conf_threshold", v);
+        /// <summary>NMS 阈值。</summary>
+        public void SetNmsThreshold(double v) => SetParam("nms_threshold", v);
+        /// <summary>掩码二值化阈值。</summary>
+        public void SetMaskThreshold(double v) => SetParam("mask_threshold", v);
+
+        private static InstanceSegResult[] ReadInstanceSeg(IntPtr result)
+        {
+            var items = ResultReader.ReadItems<MDIsegItem>(result, md_result_instance_seg);
+            var list = new List<InstanceSegResult>(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                md_result_mask(result, new UIntPtr((uint)i), out var maskPtr, out var mh, out var mw);
+                list.Add(new InstanceSegResult
+                {
+                    Box = new RectF(it.x, it.y, it.w, it.h),
+                    LabelId = it.label_id,
+                    Score = it.score,
+                    Mask = ResultReader.ReadBytes(maskPtr, new UIntPtr((ulong)mh * (ulong)mw)),
+                    MaskHeight = (int)mh,
+                    MaskWidth = (int)mw
+                });
+            }
+            return list.ToArray();
+        }
+    }
+
     public sealed class SemSegModel : BaseModel
     {
         private SemSegModel(IntPtr handle) : base(MDModelKind.MD_MODEL_SEM_SEG, handle) { }
