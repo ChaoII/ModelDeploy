@@ -12,6 +12,14 @@ fn set_device_and_config_ok() -> Result<(), MdError> {
 }
 
 #[test]
+fn set_device_opencl_vulkan_ok() -> Result<(), MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_mnn().set_device(MDDevice::OPENCL, 0)?;
+    opt.set_device(MDDevice::VULKAN, 0)?;
+    Ok(())
+}
+
+#[test]
 fn unknown_config_namespace_err() -> Result<(), MdError> {
     let mut opt = RuntimeOption::new()?;
     let r = opt.set_config("bogus", "k", "v");

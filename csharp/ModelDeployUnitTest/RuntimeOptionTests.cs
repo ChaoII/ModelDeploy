@@ -29,4 +29,12 @@ public class RuntimeOptionTests
         using var opt = new RuntimeOption();
         Assert.Throws<InvalidOperationException>(() => opt.SetConfig("bogus", "k", "v"));
     }
+
+    [Test]
+    public void SetDevice_OpenClVulkan_OkWithMnn()
+    {
+        using var opt = new RuntimeOption();
+        opt.UseMnn().SetDevice(Device.OPENCL, 0);
+        Assert.DoesNotThrow(() => opt.SetDevice(Device.VULKAN, 0));
+    }
 }
