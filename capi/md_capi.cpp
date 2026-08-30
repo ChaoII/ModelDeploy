@@ -1906,271 +1906,271 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
         case MD_MODEL_DETECTION: {
             auto* m = static_cast<detection::UltralyticsDet*>(mh->model);
             auto* d = new ResultData<DetectionResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("detection");
             rh->kind = MD_RES_DETECTION;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("detection");
             break;
         }
         case MD_MODEL_CLASSIFICATION: {
             auto* m = static_cast<classification::Classification*>(mh->model);
             auto* d = new ResultData<ClassifyResult>();
+            rh->kind = MD_RES_CLASSIFICATION;
+            rh->data = d;
             ClassifyResult r;
             if (!m->predict(image, &r)) return predict_fail("classification");
             d->v.push_back(std::move(r));
-            rh->kind = MD_RES_CLASSIFICATION;
-            rh->data = d;
             break;
         }
         case MD_MODEL_POSE: {
             auto* m = static_cast<detection::UltralyticsPose*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("pose");
             rh->kind = MD_RES_POSE;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("pose");
             break;
         }
         case MD_MODEL_HAND: {
             auto* m = static_cast<hand::HandKeypoint*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("hand");
             rh->kind = MD_RES_POSE;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("hand");
             break;
         }
         case MD_MODEL_VEHICLE_KEYPOINT: {
             auto* m = static_cast<landmark::VehicleKeypoint*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("vehicle_keypoint");
             rh->kind = MD_RES_POSE;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("vehicle_keypoint");
             break;
         }
         case MD_MODEL_FACE_LANDMARK: {
             auto* m = static_cast<landmark::FaceLandmark*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("face_landmark");
             rh->kind = MD_RES_POSE;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("face_landmark");
             break;
         }
         case MD_MODEL_OBB: {
             auto* m = static_cast<detection::UltralyticsObb*>(mh->model);
             auto* d = new ResultData<ObbResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("obb");
             rh->kind = MD_RES_OBB;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("obb");
             break;
         }
         case MD_MODEL_INSTANCE_SEG: {
             auto* m = static_cast<detection::UltralyticsSeg*>(mh->model);
             auto* d = new ResultData<InstanceSegResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("instance seg");
             rh->kind = MD_RES_INSTANCE_SEG;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("instance seg");
             break;
         }
         case MD_MODEL_SEM_SEG: {
             auto* m = static_cast<detection::UltralyticsSem*>(mh->model);
             auto* d = new SingleResult<SemSegResult>();
-            if (!m->predict(image, &d->value)) return predict_fail("sem seg");
             rh->kind = MD_RES_SEM_SEG;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("sem seg");
             break;
         }
         case MD_MODEL_DEPTH: {
             auto* m = static_cast<detection::UltralyticsDepth*>(mh->model);
             auto* d = new SingleResult<DepthResult>();
-            if (!m->predict(image, &d->value)) return predict_fail("depth");
             rh->kind = MD_RES_DEPTH;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("depth");
             break;
         }
         case MD_MODEL_FACE_DET: {
             auto* m = static_cast<face::Scrfd*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("face det");
             rh->kind = MD_RES_FACE;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("face det");
             break;
         }
         case MD_MODEL_FACE_REC: {
             auto* m = static_cast<face::SeetaFaceID*>(mh->model);
             auto* d = new ResultData<FaceRecognitionResult>();
+            rh->kind = MD_RES_FACE_REC;
+            rh->data = d;
             FaceRecognitionResult r;
             if (!m->predict(image, &r)) return predict_fail("face rec");
             d->v.push_back(std::move(r));
-            rh->kind = MD_RES_FACE_REC;
-            rh->data = d;
             break;
         }
         case MD_MODEL_REID: {
             auto* m = static_cast<reid::ReID*>(mh->model);
             auto* d = new ResultData<ReIdResult>();
+            rh->kind = MD_RES_REID;
+            rh->data = d;
             std::vector<ReIdResult> r;
             if (!m->predict(image, &r)) return predict_fail("reid");
             for (auto& e : r) d->v.push_back(std::move(e));
-            rh->kind = MD_RES_REID;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AGE: {
             auto* m = static_cast<face::SeetaFaceAge*>(mh->model);
             auto* d = new SingleResult<int>();
+            rh->kind = MD_RES_AGE;
+            rh->data = d;
             int age = 0;
             if (!m->predict(image, &age)) return predict_fail("face age");
             d->value = age;
-            rh->kind = MD_RES_AGE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_GENDER: {
             auto* m = static_cast<face::SeetaFaceGender*>(mh->model);
             auto* d = new SingleResult<int>();
+            rh->kind = MD_RES_GENDER;
+            rh->data = d;
             int gender = 0;
             if (!m->predict(image, &gender)) return predict_fail("face gender");
             d->value = gender;
-            rh->kind = MD_RES_GENDER;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AS: {
             auto* m = static_cast<face::SeetaFaceAsFirst*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
             float score = 0.f;
             if (!m->predict(image, &score)) return predict_fail("face anti-spoof first");
             // 单幅整图被动防伪：score > 0.8 判 REAL，否则 SPOOF（与 v1 demo 一致）
             d->v.push_back(score > 0.8f ? static_cast<int>(FaceAntiSpoofResult::REAL)
                                         : static_cast<int>(FaceAntiSpoofResult::SPOOF));
-            rh->kind = MD_RES_ANTISPOOF;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AS_SECOND: {
             auto* m = static_cast<face::SeetaFaceAsSecond*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
             std::vector<std::tuple<int, float>> spoofs;
             if (!m->predict(image, &spoofs)) return predict_fail("face anti-spoof second");
             d->v.push_back(spoofs.empty() ? static_cast<int>(FaceAntiSpoofResult::REAL)
                                           : static_cast<int>(FaceAntiSpoofResult::SPOOF));
-            rh->kind = MD_RES_ANTISPOOF;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AS_PIPELINE: {
             auto* m = static_cast<face::SeetaFaceAsPipeline*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
             std::vector<FaceAntiSpoofResult> labels;
             if (!m->predict(image, &labels)) return predict_fail("face anti-spoof pipeline");
             d->v.reserve(labels.size());
             for (const auto& l : labels) d->v.push_back(static_cast<int>(l));
-            rh->kind = MD_RES_ANTISPOOF;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_REC_PIPELINE: {
             auto* m = static_cast<face::FaceRecognizerPipeline*>(mh->model);
             auto* d = new ResultData<FaceRecognitionResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("face rec pipeline");
             rh->kind = MD_RES_FACE_REC;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("face rec pipeline");
             break;
         }
         case MD_MODEL_INSIGHTFACE: {
             auto* m = static_cast<face::InsightFaceAnalysis*>(mh->model);
             auto* d = new ResultData<face::InsightFaceResult>();
-            if (!m->analyze(image, &d->v)) return predict_fail("insightface");
             rh->kind = MD_RES_INSIGHTFACE;
             rh->data = d;
+            if (!m->analyze(image, &d->v)) return predict_fail("insightface");
             break;
         }
         case MD_MODEL_INSIGHTFACE_DET: {
             auto* m = static_cast<face::InsightFaceDet*>(mh->model);
             auto* d = new ResultData<face::InsightFaceBox>();
-            if (!m->predict(image, &d->v)) return predict_fail("insightface det");
             rh->kind = MD_RES_FACE;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("insightface det");
             break;
         }
         case MD_MODEL_OCR: {
             auto* m = static_cast<ocr::PaddleOCR*>(mh->model);
             auto* d = new SingleResult<OCRResult>();
-            if (!m->predict(image, &d->value)) return predict_fail("ocr");
             rh->kind = MD_RES_OCR;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("ocr");
             break;
         }
         case MD_MODEL_OCR_DET: {
             auto* m = static_cast<ocr::DBDetector*>(mh->model);
             auto* d = new SingleResult<OCRResult>();
-            if (!m->predict(image, &d->value)) return predict_fail("ocr det");
             rh->kind = MD_RES_OCR;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("ocr det");
             break;
         }
         case MD_MODEL_OCR_REC: {
             auto* m = static_cast<ocr::Recognizer*>(mh->model);
             auto* d = new SingleResult<OCRResult>();
-            if (!m->predict(image, &d->value)) return predict_fail("ocr rec");
             rh->kind = MD_RES_OCR;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("ocr rec");
             break;
         }
         case MD_MODEL_OCR_CLS: {
             auto* m = static_cast<ocr::Classifier*>(mh->model);
             auto* d = new SingleResult<OCRResult>();
-            if (!m->predict(image, &d->value)) return predict_fail("ocr cls");
             rh->kind = MD_RES_OCR;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("ocr cls");
             break;
         }
         case MD_MODEL_FORMULA_RECOGNIZER: {
             auto* m = static_cast<ocr::FormulaRecognizer*>(mh->model);
             auto* d = new SingleResult<std::string>();
-            if (!m->predict(image, &d->value)) return predict_fail("formula recognize");
             rh->kind = MD_RES_FORMULA;
             rh->data = d;
+            if (!m->predict(image, &d->value)) return predict_fail("formula recognize");
             break;
         }
         case MD_MODEL_LPR_DET: {
             auto* m = static_cast<lpr::LprDetection*>(mh->model);
             auto* d = new ResultData<KeyPointsResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("lpr det");
             rh->kind = MD_RES_LPR;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("lpr det");
             break;
         }
         case MD_MODEL_LPR_REC: {
             auto* m = static_cast<lpr::LprRecognizer*>(mh->model);
             auto* d = new ResultData<LprResult>();
+            rh->kind = MD_RES_LPR;
+            rh->data = d;
             LprResult r;
             if (!m->predict(image, &r)) return predict_fail("lpr rec");
             d->v.push_back(std::move(r));
-            rh->kind = MD_RES_LPR;
-            rh->data = d;
             break;
         }
         case MD_MODEL_LPR_PIPELINE: {
             auto* m = static_cast<lpr::LprPipeline*>(mh->model);
             auto* d = new ResultData<LprResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("lpr pipeline");
             rh->kind = MD_RES_LPR;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("lpr pipeline");
             break;
         }
         case MD_MODEL_PED_ATTR: {
             auto* m = static_cast<pipeline::PedestrianAttribute*>(mh->model);
             auto* d = new ResultData<AttributeResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("ped attr");
             rh->kind = MD_RES_ATTR;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("ped attr");
             break;
         }
         case MD_MODEL_FASTSAM: {
             auto* m = static_cast<seg::FastSam*>(mh->model);
             auto* d = new ResultData<InstanceSegResult>();
-            if (!m->predict(image, &d->v)) return predict_fail("fastsam");
             rh->kind = MD_RES_INSTANCE_SEG;
             rh->data = d;
+            if (!m->predict(image, &d->v)) return predict_fail("fastsam");
             break;
         }
         default:
@@ -2236,194 +2236,194 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         case MD_MODEL_DETECTION: {
             auto* m = static_cast<detection::UltralyticsDet*>(mh->model);
             auto* d = new ResultData<std::vector<DetectionResult>>();
+            rh->kind = MD_RES_DETECTION;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<DetectionResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("detection");
                 d->v.push_back(std::move(r));  // 按图分组
             }
-            rh->kind = MD_RES_DETECTION;
-            rh->data = d;
             break;
         }
         case MD_MODEL_CLASSIFICATION: {
             auto* m = static_cast<classification::Classification*>(mh->model);
             auto* d = new ResultData<ClassifyResult>();
+            rh->kind = MD_RES_CLASSIFICATION;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 ClassifyResult r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("classification");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_CLASSIFICATION;
-            rh->data = d;
             break;
         }
         case MD_MODEL_POSE: {
             auto* m = static_cast<detection::UltralyticsPose*>(mh->model);
             auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("pose");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_POSE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_HAND: {
             auto* m = static_cast<hand::HandKeypoint*>(mh->model);
             auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("hand");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_POSE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_VEHICLE_KEYPOINT: {
             auto* m = static_cast<landmark::VehicleKeypoint*>(mh->model);
             auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("vehicle_keypoint");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_POSE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_LANDMARK: {
             auto* m = static_cast<landmark::FaceLandmark*>(mh->model);
             auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            rh->kind = MD_RES_POSE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("face_landmark");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_POSE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_OBB: {
             auto* m = static_cast<detection::UltralyticsObb*>(mh->model);
             auto* d = new ResultData<std::vector<ObbResult>>();
+            rh->kind = MD_RES_OBB;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<ObbResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("obb");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_OBB;
-            rh->data = d;
             break;
         }
         case MD_MODEL_INSTANCE_SEG: {
             auto* m = static_cast<detection::UltralyticsSeg*>(mh->model);
             auto* d = new ResultData<std::vector<InstanceSegResult>>();
+            rh->kind = MD_RES_INSTANCE_SEG;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<InstanceSegResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("instance seg");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_INSTANCE_SEG;
-            rh->data = d;
             break;
         }
         case MD_MODEL_SEM_SEG: {
             auto* m = static_cast<detection::UltralyticsSem*>(mh->model);
             auto* d = new ResultData<SemSegResult>();
+            rh->kind = MD_RES_SEM_SEG;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 SemSegResult r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("sem seg");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_SEM_SEG;
-            rh->data = d;
             break;
         }
         case MD_MODEL_DEPTH: {
             auto* m = static_cast<detection::UltralyticsDepth*>(mh->model);
             auto* d = new ResultData<DepthResult>();
+            rh->kind = MD_RES_DEPTH;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 DepthResult r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("depth");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_DEPTH;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_DET: {
             auto* m = static_cast<face::Scrfd*>(mh->model);
             auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            rh->kind = MD_RES_FACE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("face det");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_FACE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_REC: {
             auto* m = static_cast<face::SeetaFaceID*>(mh->model);
             auto* d = new ResultData<FaceRecognitionResult>();
+            rh->kind = MD_RES_FACE_REC;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 FaceRecognitionResult r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("face rec");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_FACE_REC;
-            rh->data = d;
             break;
         }
         case MD_MODEL_REID: {
             auto* m = static_cast<reid::ReID*>(mh->model);
             auto* d = new ResultData<ReIdResult>();
+            rh->kind = MD_RES_REID;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<ReIdResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("reid");
                 for (auto& e : r) d->v.push_back(std::move(e));
             }
-            rh->kind = MD_RES_REID;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AGE: {
             auto* m = static_cast<face::SeetaFaceAge*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_AGE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 int age = 0;
                 if (!m->predict(image_at(i), &age)) return predict_fail("face age");
                 d->v.push_back(age);
             }
-            rh->kind = MD_RES_AGE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_GENDER: {
             auto* m = static_cast<face::SeetaFaceGender*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_GENDER;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 int gender = 0;
                 if (!m->predict(image_at(i), &gender)) return predict_fail("face gender");
                 d->v.push_back(gender);
             }
-            rh->kind = MD_RES_GENDER;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AS: {
             auto* m = static_cast<face::SeetaFaceAsFirst*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 float score = 0.f;
                 if (!m->predict(image_at(i), &score)) return predict_fail("face anti-spoof first");
                 d->v.push_back(score > 0.8f ? static_cast<int>(FaceAntiSpoofResult::REAL)
                                              : static_cast<int>(FaceAntiSpoofResult::SPOOF));
             }
-            rh->kind = MD_RES_ANTISPOOF;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_AS_SECOND: {
@@ -2435,50 +2435,50 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         case MD_MODEL_FACE_AS_PIPELINE: {
             auto* m = static_cast<face::SeetaFaceAsPipeline*>(mh->model);
             auto* d = new ResultData<int>();
+            rh->kind = MD_RES_ANTISPOOF;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<FaceAntiSpoofResult> labels;
                 if (!m->predict(image_at(i), &labels)) return predict_fail("face anti-spoof pipeline");
                 d->v.reserve(d->v.size() + labels.size());
                 for (const auto& l : labels) d->v.push_back(static_cast<int>(l));
             }
-            rh->kind = MD_RES_ANTISPOOF;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FACE_REC_PIPELINE: {
             auto* m = static_cast<face::FaceRecognizerPipeline*>(mh->model);
             auto* d = new ResultData<std::vector<FaceRecognitionResult>>();
+            rh->kind = MD_RES_FACE_REC;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<FaceRecognitionResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("face rec pipeline");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_FACE_REC;
-            rh->data = d;
             break;
         }
         case MD_MODEL_INSIGHTFACE: {
             auto* m = static_cast<face::InsightFaceAnalysis*>(mh->model);
             auto* d = new ResultData<std::vector<face::InsightFaceResult>>();
+            rh->kind = MD_RES_INSIGHTFACE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<face::InsightFaceResult> r;
                 if (!m->analyze(image_at(i), &r)) return predict_fail("insightface");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_INSIGHTFACE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_INSIGHTFACE_DET: {
             auto* m = static_cast<face::InsightFaceDet*>(mh->model);
             auto* d = new ResultData<std::vector<face::InsightFaceBox>>();
+            rh->kind = MD_RES_FACE;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<face::InsightFaceBox> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("insightface det");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_FACE;
-            rh->data = d;
             break;
         }
         case MD_MODEL_OCR:
@@ -2486,6 +2486,8 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
         case MD_MODEL_OCR_REC:
         case MD_MODEL_OCR_CLS: {
             auto* d = new ResultData<OCRResult>();
+            rh->kind = MD_RES_OCR;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 OCRResult r;
                 bool ok = false;
@@ -2506,68 +2508,66 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
                 if (!ok) return predict_fail("ocr");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_OCR;
-            rh->data = d;
             break;
         }
         case MD_MODEL_LPR_DET: {
             auto* m = static_cast<lpr::LprDetection*>(mh->model);
             auto* d = new ResultData<std::vector<KeyPointsResult>>();
+            rh->kind = MD_RES_LPR;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<KeyPointsResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("lpr det");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_LPR;
-            rh->data = d;
             break;
         }
         case MD_MODEL_LPR_REC: {
             auto* m = static_cast<lpr::LprRecognizer*>(mh->model);
             auto* d = new ResultData<LprResult>();
+            rh->kind = MD_RES_LPR;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 LprResult r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("lpr rec");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_LPR;
-            rh->data = d;
             break;
         }
         case MD_MODEL_LPR_PIPELINE: {
             auto* m = static_cast<lpr::LprPipeline*>(mh->model);
             auto* d = new ResultData<std::vector<LprResult>>();
+            rh->kind = MD_RES_LPR;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<LprResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("lpr pipeline");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_LPR;
-            rh->data = d;
             break;
         }
         case MD_MODEL_PED_ATTR: {
             auto* m = static_cast<pipeline::PedestrianAttribute*>(mh->model);
             auto* d = new ResultData<std::vector<AttributeResult>>();
+            rh->kind = MD_RES_ATTR;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<AttributeResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("ped attr");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_ATTR;
-            rh->data = d;
             break;
         }
         case MD_MODEL_FASTSAM: {
             auto* m = static_cast<seg::FastSam*>(mh->model);
             auto* d = new ResultData<std::vector<InstanceSegResult>>();
+            rh->kind = MD_RES_INSTANCE_SEG;
+            rh->data = d;
             for (size_t i = 0; i < n; ++i) {
                 std::vector<InstanceSegResult> r;
                 if (!m->predict(image_at(i), &r)) return predict_fail("fastsam");
                 d->v.push_back(std::move(r));
             }
-            rh->kind = MD_RES_INSTANCE_SEG;
-            rh->data = d;
             break;
         }
         default:
