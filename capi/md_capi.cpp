@@ -78,6 +78,8 @@
 #ifdef BUILD_AUDIO
 #include "csrc/audio/asr/sense_voice.h"
 #include "csrc/audio/tts/kokoro.h"
+#include "csrc/audio/tts/audio8/audio8.h"
+#include "csrc/audio/tts/qwen3/qwen3_tts.h"
 #include "csrc/audio/speaker_verify/ecapa.h"
 #include "csrc/audio/tools/resampler.h"
 #include "csrc/audio/tools/audio_meta.h"
@@ -1277,6 +1279,22 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             if (!m->is_initialized()) return fail_init("Kokoro");
             break;
         }
+        case MD_MODEL_TTS_AUDIO8: {
+            if (!need_parts(1, "tts-audio8")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new audio::tts::Audio8();
+            mh->model = m;
+            if (!m->Load(parts[0], opt)) return fail_init("Audio8");
+            break;
+        }
+        case MD_MODEL_TTS_QWEN3: {
+            if (!need_parts(1, "tts-qwen3")) return MD_ERR_INVALID_ARGUMENT;
+            const auto parts = split_path(model_path);
+            auto* m = new audio::tts::Qwen3Tts();
+            mh->model = m;
+            if (!m->init(parts[0], opt)) return fail_init("Qwen3Tts");
+            break;
+        }
         case MD_MODEL_SPEAKER_VERIFY: {
             if (!need_parts(1, "speaker-verify")) return MD_ERR_INVALID_ARGUMENT;
             const auto parts = split_path(model_path);
@@ -1288,6 +1306,8 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
 #else
         case MD_MODEL_ASR:
         case MD_MODEL_TTS:
+        case MD_MODEL_TTS_AUDIO8:
+        case MD_MODEL_TTS_QWEN3:
         case MD_MODEL_SPEAKER_VERIFY:
             set_error_fmt("md_model_create: kind %d (audio) requires BUILD_AUDIO", (int)kind);
             delete mh;
@@ -1352,6 +1372,8 @@ md_model_handle::~md_model_handle() {
 #ifdef BUILD_AUDIO
         case MD_MODEL_ASR: delete static_cast<audio::asr::SenseVoice*>(model); break;
         case MD_MODEL_TTS: delete static_cast<audio::tts::Kokoro*>(model); break;
+        case MD_MODEL_TTS_AUDIO8: delete static_cast<audio::tts::Audio8*>(model); break;
+        case MD_MODEL_TTS_QWEN3: delete static_cast<audio::tts::Qwen3Tts*>(model); break;
         case MD_MODEL_SPEAKER_VERIFY: delete static_cast<audio::speaker_verify::SpeakerVerify*>(model); break;
 #endif
         case MD_MODEL_FASTSAM: delete static_cast<seg::FastSam*>(model); break;
@@ -1419,6 +1441,7 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
 #ifdef BUILD_AUDIO
         case MD_MODEL_ASR: cloned = static_cast<audio::asr::SenseVoice*>(src->model)->clone().release(); break;
         case MD_MODEL_TTS: cloned = static_cast<audio::tts::Kokoro*>(src->model)->clone().release(); break;
+        case MD_MODEL_TTS_AUDIO8: cloned = static_cast<audio::tts::Audio8*>(src->model)->clone().release(); break;
         case MD_MODEL_SPEAKER_VERIFY: cloned = static_cast<audio::speaker_verify::SpeakerVerify*>(src->model)->clone().release(); break;
 #endif
         case MD_MODEL_FASTSAM: cloned = static_cast<seg::FastSam*>(src->model)->clone().release(); break;
@@ -2767,9 +2790,11 @@ MDStatus md_audio_tts(MDModelHandle h, const char* text, const char* voice, floa
                       int* sample_rate, const float** audio, size_t* audio_n) {
     auto* mh = static_cast<md_model_handle*>(h);
     if (!mh || !text || !voice || !audio || !audio_n) return MD_ERR_NULL_POINTER;
-    if (!mh->ready || mh->kind != MD_MODEL_TTS) return MD_ERR_INVALID_ARGUMENT;
+    if (!mh->ready || (mh->kind != MD_MODEL_TTS && mh->kind != MD_MODEL_TTS_AUDIO8 &&
+                       mh->kind != MD_MODEL_TTS_QWEN3))
+        return MD_ERR_INVALID_ARGUMENT;
 #ifdef BUILD_AUDIO
-    auto* m = static_cast<audio::tts::Kokoro*>(mh->model);
+    auto* m = static_cast<audio::tts::ITtsModel*>(mh->model);
     if (!m->predict(text, voice, speed, &mh->audio_buf)) { set_error("md_audio_tts: tts predict failed"); return MD_ERR_MODEL_PREDICT; }
     if (sample_rate) *sample_rate = m->get_sample_rate();
     *audio = mh->audio_buf.data();
@@ -2778,6 +2803,64 @@ MDStatus md_audio_tts(MDModelHandle h, const char* text, const char* voice, floa
 #else
     (void)text; (void)voice; (void)speed; (void)sample_rate; (void)audio; (void)audio_n;
     set_error("md_audio_tts: built without BUILD_AUDIO");
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_tts_stream(MDModelHandle h, const char* text, const char* voice,
+                             float speed, int32_t chunk_frames, MDTtsAudioCb cb, void* userdata,
+                             int* sample_rate, const float** audio, size_t* audio_n) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !text || !voice || !audio || !audio_n) return MD_ERR_NULL_POINTER;
+    if (!mh->ready || (mh->kind != MD_MODEL_TTS && mh->kind != MD_MODEL_TTS_AUDIO8 &&
+                       mh->kind != MD_MODEL_TTS_QWEN3))
+        return MD_ERR_INVALID_ARGUMENT;
+#ifdef BUILD_AUDIO
+    auto* m = static_cast<audio::tts::ITtsModel*>(mh->model);
+    mh->audio_buf.clear();
+    std::function<bool(const float*, int, float)> fp =
+        [mh, cb, userdata](const float* samples, int n, float progress) -> bool {
+            if (samples && n > 0) mh->audio_buf.insert(mh->audio_buf.end(), samples, samples + n);
+            return cb ? cb(samples, n, progress, userdata) != 0 : true;
+        };
+    if (!m->predict_stream(text, voice, speed, chunk_frames, fp)) {
+        set_error("md_audio_tts_stream: tts predict_stream failed");
+        return MD_ERR_MODEL_PREDICT;
+    }
+    if (sample_rate) *sample_rate = m->get_sample_rate();
+    *audio = mh->audio_buf.data();
+    *audio_n = mh->audio_buf.size();
+    return MD_OK;
+#else
+    (void)text; (void)voice; (void)speed; (void)chunk_frames; (void)cb; (void)userdata;
+    (void)sample_rate; (void)audio; (void)audio_n;
+    set_error("md_audio_tts_stream: built without BUILD_AUDIO");
+    return MD_ERR_UNSUPPORTED_TYPE;
+#endif
+}
+
+MDStatus md_audio_tts_qwen3_clone(MDModelHandle h, const char* text,
+                                  const char* ref_audio, const char* ref_text, const char* lang,
+                                  int* sample_rate, const float** audio, size_t* audio_n) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !text || !ref_audio || !ref_text || !audio || !audio_n)
+        return MD_ERR_NULL_POINTER;
+    if (!mh->ready || mh->kind != MD_MODEL_TTS_QWEN3) return MD_ERR_INVALID_ARGUMENT;
+#ifdef BUILD_AUDIO
+    auto* m = static_cast<audio::tts::Qwen3Tts*>(mh->model);
+    const std::string lang_s = (lang && *lang) ? lang : "auto";
+    if (!m->clone(text, ref_audio, ref_text, lang_s, &mh->audio_buf)) {
+        set_error("md_audio_tts_qwen3_clone: qwen3 clone failed");
+        return MD_ERR_MODEL_PREDICT;
+    }
+    if (sample_rate) *sample_rate = 24000;
+    *audio = mh->audio_buf.data();
+    *audio_n = mh->audio_buf.size();
+    return MD_OK;
+#else
+    (void)text; (void)ref_audio; (void)ref_text; (void)lang; (void)sample_rate;
+    (void)audio; (void)audio_n;
+    set_error("md_audio_tts_qwen3_clone: built without BUILD_AUDIO");
     return MD_ERR_UNSUPPORTED_TYPE;
 #endif
 }
