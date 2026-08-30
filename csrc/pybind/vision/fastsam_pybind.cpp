@@ -13,6 +13,12 @@ namespace modeldeploy::vision {
         pybind11::class_<seg::FastSamPostprocessor>(m, "FastSamPostprocessor")
             .def(pybind11::init<>());
 
+        pybind11::class_<seg::FastSamPrompts>(m, "FastSamPrompts")
+            .def(pybind11::init<>())
+            .def_readwrite("bboxes", &seg::FastSamPrompts::bboxes)
+            .def_readwrite("points", &seg::FastSamPrompts::points)
+            .def_readwrite("point_labels", &seg::FastSamPrompts::point_labels);
+
         pybind11::class_<seg::FastSam, BaseModel>(m, "FastSam")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<seg::FastSam>(model_file.string(), option);
@@ -26,27 +32,12 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("image"))
             .def("predict_with_prompts",
                  [](seg::FastSam& self, pybind11::array& image,
-                    const std::vector<std::vector<float>>& bboxes,
-                    const std::vector<std::vector<float>>& points,
-                    const std::vector<int>& point_labels) {
+                    const seg::FastSamPrompts& prompts) {
                      const auto mat = pyarray_to_cv_mat(image);
-                     seg::FastSamPrompts prompts;
-                     for (const auto& b : bboxes) {
-                         if (b.size() >= 4) {
-                             prompts.bboxes.emplace_back(Rect2f(b[0], b[1], b[2], b[3]));
-                         }
-                     }
-                     for (const auto& p : points) {
-                         if (p.size() >= 2) {
-                             prompts.points.emplace_back(Point2f(p[0], p[1]));
-                         }
-                     }
-                     prompts.point_labels = point_labels;
                      std::vector<InstanceSegResult> result;
                      self.predict_with_prompts(ImageData(mat), prompts, &result);
                      return result;
-                 }, pybind11::arg("image"), pybind11::arg("bboxes"),
-                    pybind11::arg("points"), pybind11::arg("point_labels"))
+                 }, pybind11::arg("image"), pybind11::arg("prompts"))
             .def("batch_predict",
                  [](seg::FastSam& self, const std::vector<pybind11::array>& images) {
                      std::vector<ImageData> _images;
