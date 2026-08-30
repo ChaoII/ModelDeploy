@@ -73,6 +73,7 @@
 #include "csrc/vision/action/st_gcn.h"
 #include "csrc/vision/landmark/vehicle_keypoint.h"
 #include "csrc/vision/landmark/face_landmark.h"
+#include "csrc/vision/sam/fastsam.h"
 
 #ifdef BUILD_AUDIO
 #include "csrc/audio/asr/sense_voice.h"
@@ -1292,6 +1293,11 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
             delete mh;
             return MD_ERR_UNSUPPORTED_TYPE;
 #endif
+        case MD_MODEL_FASTSAM: {
+            mh->model = make_model<seg::FastSam>(model_path, opt, "FastSam", &err);
+            if (!mh->model) return fail_init("FastSam");
+            break;
+        }
         default:
             set_error_fmt("md_model_create: unsupported kind %d", (int)kind);
             delete mh;
@@ -1348,6 +1354,7 @@ md_model_handle::~md_model_handle() {
         case MD_MODEL_TTS: delete static_cast<audio::tts::Kokoro*>(model); break;
         case MD_MODEL_SPEAKER_VERIFY: delete static_cast<audio::speaker_verify::SpeakerVerify*>(model); break;
 #endif
+        case MD_MODEL_FASTSAM: delete static_cast<seg::FastSam*>(model); break;
         default: break;
     }
 }
@@ -1414,6 +1421,7 @@ MDStatus md_model_clone(MDModelHandle in, MDModelHandle* out) {
         case MD_MODEL_TTS: cloned = static_cast<audio::tts::Kokoro*>(src->model)->clone().release(); break;
         case MD_MODEL_SPEAKER_VERIFY: cloned = static_cast<audio::speaker_verify::SpeakerVerify*>(src->model)->clone().release(); break;
 #endif
+        case MD_MODEL_FASTSAM: cloned = static_cast<seg::FastSam*>(src->model)->clone().release(); break;
         default: break;
     }
 
@@ -1452,6 +1460,7 @@ MDStatus md_model_set_input_size(MDModelHandle handle, int w, int h) {
         case MD_MODEL_FACE_REC_PIPELINE:
             static_cast<face::FaceRecognizerPipeline*>(mh->model)->get_detector()->get_preprocessor().set_size(size);
             break;
+        case MD_MODEL_FASTSAM: static_cast<seg::FastSam*>(mh->model)->get_preprocessor().set_size(size); break;
         default:
             set_error_fmt("md_model_set_input_size: unsupported for kind %d", (int)mh->kind);
             return MD_ERR_UNSUPPORTED_TYPE;
@@ -1558,6 +1567,7 @@ const char* kind_param_names(MDModelKind kind) {
         case MD_MODEL_VEHICLE_KEYPOINT:
             return "conf_threshold|nms_threshold|keypoints_num";
         case MD_MODEL_INSTANCE_SEG:
+        case MD_MODEL_FASTSAM:
             return "conf_threshold|nms_threshold|mask_threshold";
         case MD_MODEL_CLASSIFICATION:
             return "top_k|multi_label";
@@ -1592,10 +1602,11 @@ char param_type_of(MDModelKind kind, const char* name) {
         case MD_MODEL_VEHICLE_KEYPOINT:
         case MD_MODEL_OBB:
         case MD_MODEL_INSTANCE_SEG:
+        case MD_MODEL_FASTSAM:
             if (is_det) return PT_D;
             if ((kind == MD_MODEL_POSE || kind == MD_MODEL_HAND || kind == MD_MODEL_VEHICLE_KEYPOINT) &&
                 std::strcmp(name, "keypoints_num") == 0) return PT_I;
-            if (kind == MD_MODEL_INSTANCE_SEG && std::strcmp(name, "mask_threshold") == 0) return PT_D;
+            if ((kind == MD_MODEL_INSTANCE_SEG || kind == MD_MODEL_FASTSAM) && std::strcmp(name, "mask_threshold") == 0) return PT_D;
             return 0;
         case MD_MODEL_CLASSIFICATION:
             if (std::strcmp(name, "top_k") == 0) return PT_I;
@@ -1701,6 +1712,13 @@ int apply_model_param(md_model_handle* mh, const char* name, char req_type,
         }
         case MD_MODEL_INSTANCE_SEG: {
             auto* pm = static_cast<detection::UltralyticsSeg*>(const_cast<void*>(m));
+            if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
+            else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
+            else pm->get_postprocessor().set_mask_threshold((float)d);
+            break;
+        }
+        case MD_MODEL_FASTSAM: {
+            auto* pm = static_cast<seg::FastSam*>(const_cast<void*>(m));
             if (std::strcmp(name, "conf_threshold") == 0) pm->get_postprocessor().set_conf_threshold((float)d);
             else if (std::strcmp(name, "nms_threshold") == 0) pm->get_postprocessor().set_nms_threshold((float)d);
             else pm->get_postprocessor().set_mask_threshold((float)d);
@@ -2147,12 +2165,47 @@ MDStatus md_model_predict(MDModelHandle h, MDImageHandle img_h, MDResultHandle* 
             rh->data = d;
             break;
         }
+        case MD_MODEL_FASTSAM: {
+            auto* m = static_cast<seg::FastSam*>(mh->model);
+            auto* d = new ResultData<InstanceSegResult>();
+            if (!m->predict(image, &d->v)) return predict_fail("fastsam");
+            rh->kind = MD_RES_INSTANCE_SEG;
+            rh->data = d;
+            break;
+        }
         default:
             set_error_fmt("md_model_predict: predict not implemented for kind %d", (int)mh->kind);
             delete rh;
             return MD_ERR_NOT_IMPLEMENTED;
     }
 
+    *out = rh;
+    return MD_OK;
+}
+
+MDStatus md_fastsam_predict_with_prompts(MDModelHandle h, MDImageHandle img_h,
+                                         const float* bboxes, size_t nb,
+                                         const float* points, const int* labels, size_t np,
+                                         MDResultHandle* out) {
+    auto* mh = static_cast<md_model_handle*>(h);
+    if (!mh || !img_h || !out) return MD_ERR_NULL_POINTER;
+    if (!mh->ready) return MD_ERR_MODEL_INIT;
+    if (mh->kind != MD_MODEL_FASTSAM) return MD_ERR_INVALID_ARGUMENT;
+    if ((nb && !bboxes) || (np && !points)) return MD_ERR_NULL_POINTER;
+    const ImageData image = handle_to_image(static_cast<md_image_handle*>(img_h));
+    auto* m = static_cast<seg::FastSam*>(mh->model);
+    seg::FastSamPrompts pr;
+    for (size_t i = 0; i < nb; ++i) pr.bboxes.emplace_back(Rect2f(bboxes[i*4], bboxes[i*4+1], bboxes[i*4+2], bboxes[i*4+3]));
+    for (size_t i = 0; i < np; ++i) { pr.points.emplace_back(Point2f(points[i*2], points[i*2+1])); pr.point_labels.push_back(labels ? labels[i] : 1); }
+    auto* rh = new md_result_handle();
+    auto* d = new ResultData<InstanceSegResult>();
+    if (!m->predict_with_prompts(image, pr, &d->v)) {
+        set_error_fmt("md_fastsam_predict_with_prompts failed");
+        delete d; delete rh;
+        return MD_ERR_MODEL_PREDICT;
+    }
+    rh->kind = MD_RES_INSTANCE_SEG;
+    rh->data = d;
     *out = rh;
     return MD_OK;
 }
@@ -2502,6 +2555,18 @@ MDStatus md_model_predict_batch(MDModelHandle h, MDImageHandle* imgs, size_t n,
                 d->v.push_back(std::move(r));
             }
             rh->kind = MD_RES_ATTR;
+            rh->data = d;
+            break;
+        }
+        case MD_MODEL_FASTSAM: {
+            auto* m = static_cast<seg::FastSam*>(mh->model);
+            auto* d = new ResultData<std::vector<InstanceSegResult>>();
+            for (size_t i = 0; i < n; ++i) {
+                std::vector<InstanceSegResult> r;
+                if (!m->predict(image_at(i), &r)) return predict_fail("fastsam");
+                d->v.push_back(std::move(r));
+            }
+            rh->kind = MD_RES_INSTANCE_SEG;
             rh->data = d;
             break;
         }
