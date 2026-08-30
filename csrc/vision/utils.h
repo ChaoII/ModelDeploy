@@ -35,6 +35,9 @@ namespace modeldeploy::vision::utils {
 
     cv::Rect2f rect2f_to_cv_type(Rect2f rect2f);
 
+    // 内联标量 IoU（实现见 utils.cpp）。其它子命名空间（如 seg）调用时需用 utils::iou_rects。
+    MODELDEPLOY_CXX_EXPORT float iou_rects(const Rect2f& r1, const Rect2f& r2);
+
     // 以下两个符号由 tests/test_obb_nms.cpp（链接 SDK DLL）使用，故需导出；
     // 与 utils.h 中其它供测试使用的函数（center_crop、sorted_det_results 等）保持一致。
     MODELDEPLOY_CXX_EXPORT cv::RotatedRect rotated_rect_to_cv_type(RotatedRect rotated_rect);

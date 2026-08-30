@@ -5,6 +5,15 @@
 #include "vision/sam/postprocessor.h"
 
 namespace modeldeploy::vision::seg {
+    /*! @brief FastSAM 交互式提示集合（bbox / point），用于 predict_with_prompts 过滤实例。
+     */
+    struct MODELDEPLOY_CXX_EXPORT FastSamPrompts {
+        std::vector<Rect2f> bboxes;        // (x, y, w, h), 原图像素
+        std::vector<Point2f> points;       // 原图像素
+        std::vector<int> point_labels;     // 与 points 等长; 1=前景, 0=背景
+        [[nodiscard]] bool empty() const { return bboxes.empty() && points.empty(); }
+    };
+
     /*! @brief FastSAM 轻量分割一切模型。
      *  一次性输出 box + mask（对齐 UltralyticsSeg 消费路径），后处理产出 InstanceSegResult。
      */
@@ -17,6 +26,10 @@ namespace modeldeploy::vision::seg {
 
         bool predict(const ImageData& image, std::vector<InstanceSegResult>* result,
                      TimerArray* timers = nullptr);
+
+        /// 在原 predict 基础上按 prompts（bbox 取最大 IoU 实例、point 按掩码命中保留/剔除）过滤实例。
+        bool predict_with_prompts(const ImageData& image, const FastSamPrompts& prompts,
+                                  std::vector<InstanceSegResult>* result, TimerArray* timers = nullptr);
 
         bool batch_predict(const std::vector<ImageData>& images,
                            std::vector<std::vector<InstanceSegResult>>* results,
