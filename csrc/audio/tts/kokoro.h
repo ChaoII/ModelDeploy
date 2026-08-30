@@ -4,14 +4,14 @@
 
 #pragma once
 
-#include "base_model.h"
+#include "audio/tts/tts_model.h"
 #include "cppjieba/Jieba.hpp"
 #include "audio/text_normalize/text_normalization.h"
 
 
 namespace modeldeploy::audio::tts
 {
-    class MODELDEPLOY_CXX_EXPORT Kokoro : public BaseModel {
+    class MODELDEPLOY_CXX_EXPORT Kokoro : public ITtsModel {
     public:
         Kokoro(const std::string& model_file, const std::string& token_path_str,
                const std::vector<std::string>& lexicons, const std::string& voices_bin,
@@ -23,6 +23,10 @@ namespace modeldeploy::audio::tts
 
         virtual bool predict(const std::string& text, const std::string& voice, float speed,
                              std::vector<float>* out_audio);
+
+        bool predict_stream(const std::string& text, const std::string& voice, float speed,
+                            int chunk_frames,
+                            const std::function<bool(const float*, int, float)>& cb) override;
 
         [[nodiscard]] int32_t get_sample_rate() const { return sample_rate_; }
 

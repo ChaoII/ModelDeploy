@@ -7,6 +7,7 @@
 #include <memory>
 #include "audio/tts/kokoro.h"
 #include "audio/tts/utils.h"
+#include "audio/solutions/tts_batcher.h"
 #include <tabulate/tabulate.hpp>
 
 namespace fs = std::filesystem;
@@ -110,6 +111,34 @@ namespace modeldeploy::audio::tts {
         }
         return true;
     }
+
+
+    bool Kokoro::predict_stream(const std::string& text, const std::string& voice, float speed,
+                                int chunk_frames,
+                                const std::function<bool(const float*, int, float)>& cb) {
+        if (text.empty() || !cb) return false;
+        // chunk_frames 复用为"每段合成块的目标时长近似"：StyleTTS2 架构无法真流式，
+        // 故以字符数近似（split_for_synthesis 的 max_chars 即每个分块的 UTF-8 字符上限）。
+        // chunk_frames<=0 视为未指定，用默认 120。
+        const int max_chars = chunk_frames > 0 ? chunk_frames : 120;
+        const auto parts = solution::TTSBatcher::split_for_synthesis(text, max_chars);
+        std::vector<float> combined;
+        combined.reserve(parts.size() * 24000 * 3);
+        float progress = 0.0f;
+        for (size_t i = 0; i < parts.size(); ++i) {
+            const std::string& part = parts[i];
+            if (part.empty()) continue;
+            std::vector<float> audio;
+            if (!predict(part, voice, speed, &audio)) return false;
+            progress = static_cast<float>(i + 1) / static_cast<float>(parts.size());
+            if (!audio.empty()) {
+                combined.insert(combined.end(), audio.begin(), audio.end());
+                if (!cb(audio.data(), static_cast<int>(audio.size()), progress)) return false;
+            }
+        }
+        return true;
+    }
+
 
 
     bool Kokoro::preprocess(const std::string& text_, const std::string& voice, float speed,
