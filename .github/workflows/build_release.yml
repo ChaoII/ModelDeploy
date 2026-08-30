@@ -151,10 +151,27 @@ jobs:
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON
+          -DBUILD_TESTS=ON
           -DWITH_GPU=ON -DENABLE_TRT=OFF
 
       - name: Build
         run: cmake --build build
+
+      - name: GPU smoke (0 failures, graceful skip on device-less runner)
+        shell: bash
+        working-directory: build
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}
+        run: |
+          # GitHub-hosted runner 无真实 GPU：所有 [gpu] 用例须 WARN/return 优雅跳过，不得 FAIL。
+          # GStreamer-CUDA 互操作进程级状态不可逆，先跑排除 gst-cuda 的 [gpu]~[gst-cuda]，
+          # 再在独立进程跑全量 [gpu]（内含 gst-cuda）。
+          BIN="./test_modeldeploy"
+          [ -x "$BIN" ] || BIN="./test_modeldeploy.exe"
+          echo "GPU smoke binary: $BIN"
+          "$BIN" "[gpu]~[gst-cuda]" || { echo "::error::[gpu]~[gst-cuda] run had failures"; exit 1; }
+          "$BIN" "[gpu]" || { echo "::error::[gpu] run had failures"; exit 1; }
+          echo "GPU smoke: OK (all [gpu] cases passed or gracefully skipped)"
 
       - name: Package
         shell: bash

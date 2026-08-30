@@ -18,6 +18,7 @@
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
 #endif
+#include "test_gpu_utils.h"
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -117,6 +118,7 @@ TEST_CASE("Processor accuracy: fused_preprocess_common scalar vs SIMD", "[proces
 }
 
 TEST_CASE("Processor accuracy: fused_preprocess_common CPU vs CUDA", "[processor_accuracy][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
 #ifdef WITH_GPU
     const int src_w = 320, src_h = 240;
     auto img = make_test_image(src_w, src_h);
@@ -154,6 +156,7 @@ TEST_CASE("Processor accuracy: fused_preprocess_common CPU vs CUDA", "[processor
 
 // ==================== yolo_preprocess：CPU vs CUDA ====================
 TEST_CASE("Processor accuracy: yolo_preprocess CPU vs CUDA", "[processor_accuracy][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
 #ifdef WITH_GPU
     const int src_w = 480, src_h = 270;
     auto img = make_test_image(src_w, src_h);
@@ -194,6 +197,7 @@ TEST_CASE("Processor accuracy: yolo_preprocess CPU vs CUDA", "[processor_accurac
 
 // ==================== yolo_preprocess_batch：CPU vs CUDA ====================
 TEST_CASE("Processor accuracy: yolo_preprocess_batch CPU vs CUDA", "[processor_accuracy][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
 #ifdef WITH_GPU
     auto img0 = make_test_image(480, 270);
     auto img1 = make_test_image(640, 360);
@@ -228,6 +232,7 @@ TEST_CASE("Processor accuracy: yolo_preprocess_batch CPU vs CUDA", "[processor_a
 
 // ==================== scrfd_preprocess：CPU(SIMD) vs CUDA ====================
 TEST_CASE("Processor accuracy: scrfd_preprocess CPU vs CUDA", "[processor_accuracy][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
 #ifdef WITH_GPU
     const int src_w = 256, src_h = 256;
     auto img = make_test_image(src_w, src_h);
@@ -292,7 +297,8 @@ TEST_CASE("Processor accuracy: fused_preprocess_common_batch CPU vs per-image vs
     REQUIRE(nd == 0);
 
 #ifdef WITH_GPU
-    // CPU(SIMD) vs CUDA(3D grid)
+    // CPU(SIMD) vs CUDA(3D grid)；无 CUDA 设备则跳过 CUDA 对比段（CPU 段已跑完并断言）
+    MD_TEST_GPU_OR_SKIP();
     auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
     Tensor batch_cuda;
     REQUIRE(cuda_backend->fused_preprocess_common_batch(imgs, &batch_cuda, dst, oxs, oys, sxs, sys,
@@ -331,6 +337,8 @@ TEST_CASE("Processor accuracy: ocr det ocr_det_preprocess CPU vs CUDA", "[proces
     REQUIRE(ocr_det_preprocess_cpu(imgs, &cpu_t, resize_sizes, dst, mean, std_v, 0.0f));
 
 #ifdef WITH_GPU
+    // 无 CUDA 设备则跳过 CUDA 对比段（CPU 段已跑完并断言）
+    MD_TEST_GPU_OR_SKIP();
     auto cuda_backend = create_processor_backend(Device::GPU, Backend::ORT, 0);
     Tensor cuda_t;
     REQUIRE(cuda_backend->ocr_det_preprocess(imgs, &cuda_t, resize_sizes, dst, mean, std_v, 0.0f));
@@ -395,6 +403,7 @@ TEST_CASE("Processor accuracy: fused_color_matrix BGR2YCrCb vs OpenCV", "[proces
 
 #ifdef WITH_GPU
 TEST_CASE("ImageData to_tensor device zero-copy on GPU", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const int w = 16, h = 12;
     const size_t bytes = static_cast<size_t>(w) * h * 3;
     uint8_t* dev = nullptr;
@@ -422,6 +431,7 @@ TEST_CASE("ImageData to_tensor device zero-copy on GPU", "[gpu]") {
 }
 
 TEST_CASE("GPU device NV12 frame in-place draw (zero-copy, no D2H)", "[gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const int w = 64, h = 48;
     const size_t ybytes = static_cast<size_t>(w) * h;
     const size_t uvbytes = static_cast<size_t>(w) * (h / 2);

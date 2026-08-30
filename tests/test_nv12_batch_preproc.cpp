@@ -14,6 +14,7 @@
 #include "vision/common/image_data.h"
 #include "vision/common/struct.h"
 #include "vision/processors/processor_factory.h"
+#include "test_gpu_utils.h"
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -100,6 +101,7 @@ namespace {
 
 // host NV12 帧：批 kernel（聚合 H2D） vs 逐帧 yolo_preprocess_nv12
 TEST_CASE("NV12 batch preproc: host frames vs per-frame", "[gpu][nv12]") {
+    MD_TEST_GPU_OR_SKIP();
 #ifdef WITH_GPU
     std::vector<Nv12> srcs;
     srcs.push_back(make_host_nv12(480, 270));
@@ -156,6 +158,7 @@ TEST_CASE("NV12 batch preproc: host frames vs per-frame", "[gpu][nv12]") {
 
 // device NV12 帧：批 kernel 零拷贝 vs 逐帧（设备指针）yolo_preprocess_nv12
 TEST_CASE("NV12 batch preproc: device frames vs per-frame", "[gpu][nv12]") {
+    MD_TEST_GPU_OR_SKIP();
 #ifdef WITH_GPU
     std::vector<DevNv12> devs;
     {
