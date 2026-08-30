@@ -667,6 +667,7 @@ typedef enum MD_SOLUTION_KIND {
     MD_SOLUTION_DISTANCE,
     MD_SOLUTION_WORKOUT,
     MD_SOLUTION_PARKING,
+    MD_SOLUTION_FALL_DETECT,
 } MDSolutionKind;
 
 MD_CAPI_EXPORT MDStatus md_solution_create(MDSolutionHandle* out, MDSolutionKind kind);

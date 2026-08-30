@@ -53,6 +53,7 @@
 #include "csrc/vision/solutions/speed_estimator.h"
 #include "csrc/vision/solutions/distance_estimator.h"
 #include "csrc/vision/solutions/workout_monitor.h"
+#include "csrc/vision/solutions/fall_detector.h"
 #include "csrc/vision/solutions/parking_manager.h"
 #include "csrc/vision/tracking/bytetrack.h"
 #include "csrc/vision/tracking/botsort.h"
@@ -4300,6 +4301,7 @@ MDStatus md_solution_create(MDSolutionHandle* out, MDSolutionKind kind) {
       case MD_SOLUTION_DISTANCE:       h->obj = new vision::solution::DistanceEstimator(); break;
       case MD_SOLUTION_WORKOUT:        h->obj = new vision::solution::WorkoutMonitor(); break;
       case MD_SOLUTION_PARKING:        h->obj = new vision::solution::ParkingManager(); break;
+      case MD_SOLUTION_FALL_DETECT:    h->obj = new vision::solution::FallDetector(); break;
       default: delete h; return MD_ERR_INVALID_ARGUMENT;
     }
     *out = h;
@@ -4319,6 +4321,7 @@ MDStatus md_solution_destroy(MDSolutionHandle h) {
       case MD_SOLUTION_DISTANCE:       delete static_cast<vision::solution::DistanceEstimator*>(h->obj); break;
       case MD_SOLUTION_WORKOUT:        delete static_cast<vision::solution::WorkoutMonitor*>(h->obj); break;
       case MD_SOLUTION_PARKING:        delete static_cast<vision::solution::ParkingManager*>(h->obj); break;
+      case MD_SOLUTION_FALL_DETECT:    delete static_cast<vision::solution::FallDetector*>(h->obj); break;
       default: break;
     }
 #endif

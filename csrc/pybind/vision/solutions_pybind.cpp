@@ -6,6 +6,7 @@
 #include "vision/solutions/speed_estimator.h"
 #include "vision/solutions/distance_estimator.h"
 #include "vision/solutions/workout_monitor.h"
+#include "vision/solutions/fall_detector.h"
 #include "vision/solutions/parking_manager.h"
 #include "vision/tracking/base_tracker.h"
 
@@ -97,6 +98,18 @@ void bind_solutions(pybind11::module& m) {
         })
         .def("update", [](ParkingManager& s, const pybind11::iterable& t) { s.update(trs(t)); })
         .def("occupancy", &ParkingManager::occupancy);
+    pybind11::class_<solution::FallDetector, solution::SolutionBase>(m, "FallDetector")
+        .def(pybind11::init<>())
+        .def("update",
+             [](solution::FallDetector& s, const std::vector<KeyPointsResult>& persons) {
+                 auto r = s.update(persons);
+                 // 返回 (state_int, confidence)：0=Standing 1=PreFall 2=Fallen
+                 return std::make_tuple(static_cast<int>(r.state), r.confidence);
+             })
+        .def("reset", &solution::FallDetector::reset)
+        .def_static("angle", [](const Point3f& a, const Point3f& b, const Point3f& c) {
+            return solution::FallDetector::angle(a, b, c);
+        });
 }
 
 } // namespace vision
