@@ -50,6 +50,10 @@ std::vector<tracking::TrackResult> trs(const pybind11::iterable& it) {
 
 void bind_solutions(pybind11::module& m) {
     using namespace modeldeploy::vision::solution;
+    // 基类必须先在 pybind 中注册，FallDetector 等派生类才能声明 SolutionBase 基类，
+    // 否则模块初始化时因基类未注册而中止（与 BaseModel 的注册顺序模式一致）。
+    pybind11::class_<solution::SolutionBase>(m, "SolutionBase")
+        .def("reset", &solution::SolutionBase::reset);
     pybind11::class_<ObjectCounter>(m, "ObjectCounter")
         .def(pybind11::init<>())
         .def("set_line", [](ObjectCounter& s, const pybind11::object& a, const pybind11::object& b) {

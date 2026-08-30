@@ -177,4 +177,12 @@ try:
 except Exception as e:
     raise RuntimeError(f"Modeldeploy initialized failed! Error: {e}")
 
+# pybind 子模块 sys.modules shim：把 C++ 侧注册的子模块刷进 sys.modules，
+# 使 `from modeldeploy.vision import ...` 这类导入语句（依赖 sys.modules 路径）
+# 可直接解析，无需先手动 `import modeldeploy.vision`。
+for _name in ("core", "runtime", "utils", "vision", "audio", "nlp", "video"):
+    _mod = getattr(sys.modules[__name__], _name, None)
+    if _mod is not None:
+        sys.modules[f"{__name__}.{_name}"] = _mod
+
 __version__ = get_version()

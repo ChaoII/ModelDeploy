@@ -583,7 +583,7 @@ from modeldeploy.vision import FastSamPrompts, Rect2f, Point2f
 
 m = mv.FastSam("fastsam-s.onnx", option)
 prompts = FastSamPrompts()
-prompts.bboxes = [Rect2f(100, 80, 220, 180)]   # 取最匹配该框的实例
+prompts.bboxes = [Rect2f(100, 80, 220, 180)]   # x,y,w,h；取最匹配该框的实例
 prompts.points = [Point2f(150, 130)]
 prompts.point_labels = [1]                     # 1=前景保留 / 0=背景剔除
 result = m.predict_with_prompts(image, prompts)
