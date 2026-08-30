@@ -34,5 +34,16 @@ int main() {
     auto vis = modeldeploy::vision::vis_iseg(im, res, 0.3, kFont, 14, 0.5, false);
     (void)vis.imwrite("result_fastsam.jpg");
     std::printf("done, %zu masks\n", res.size());
+
+    // bbox prompt: 用第一个检测框作为提示，只取与该框最匹配的实例（不重跑网络，对全量结果过滤）
+    if (!res.empty()) {
+        modeldeploy::vision::seg::FastSamPrompts prompts;
+        prompts.bboxes.push_back(res[0].box);
+        std::vector<modeldeploy::vision::InstanceSegResult> prompted;
+        m->predict_with_prompts(im, prompts, &prompted, nullptr);
+        std::printf("prompt(bbox of mask[0]) -> %zu masks\n", prompted.size());
+        auto vis2 = modeldeploy::vision::vis_iseg(im, prompted, 0.3, kFont, 14, 0.5, false);
+        (void)vis2.imwrite("result_fastsam_prompt.jpg");
+    }
     return 0;
 }
