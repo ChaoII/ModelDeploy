@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <vector>
 #include "vision/common/result.h"
 #include "vision/common/struct.h"
@@ -25,21 +26,21 @@ KeyPointsResult make_person(const Point3f& sh_l, const Point3f& sh_r,
 TEST_CASE("angle(): 三点共线返回 180(伸直)", "[solution][fall]") {
     FallDetector fd;
     Point3f a{0, 100, 1}, b{0, 50, 1}, c{0, 0, 1};
-    REQUIRE(fd.angle(a, b, c) == Approx(180.0f).margin(1e-2f));
+    REQUIRE(fd.angle(a, b, c) == Catch::Approx(180.0f).margin(1e-2f));
 }
 
 TEST_CASE("angle(): 竖直站立躯干倾角≈0", "[solution][fall]") {
     FallDetector fd;
     // 髋在肩正下方 → 躯干与竖直方向夹角≈0
     Point3f hip{0, 200, 1}, sh{0, 100, 1}, vref{0, 200, 1};
-    REQUIRE(fd.angle(hip, sh, vref) == Approx(0.0f).margin(1e-2f));
+    REQUIRE(fd.angle(hip, sh, vref) == Catch::Approx(0.0f).margin(1e-2f));
 }
 
 TEST_CASE("angle(): 平躺躯干倾角≈90", "[solution][fall]") {
     FallDetector fd;
     // 肩/髋同高、水平错开 → 躯干水平，相对竖直方向≈90
     Point3f hip{50, 100, 1}, sh{0, 100, 1}, vref{0, 200, 1};
-    REQUIRE(fd.angle(hip, sh, vref) == Approx(90.0f).margin(1.0f));
+    REQUIRE(fd.angle(hip, sh, vref) == Catch::Approx(90.0f).margin(1.0f));
 }
 
 TEST_CASE("update(): 站立→倒地状态推进", "[solution][fall]") {
