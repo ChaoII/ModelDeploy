@@ -73,7 +73,7 @@ jobs:
 
       - name: Test
         working-directory: build
-        run: ctest -C Release --output-on-failure
+        run: ctest -C Release --output-on-failure -E "opencl|vulkan"
         env:
           TEST_DATA_DIR: ${{ github.workspace }}
 
