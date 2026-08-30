@@ -10,7 +10,7 @@
 
 int main() {
     const char* kFont = "../../test_data/msyh.ttc";
-    const char* model = "../../test_data/test_models/onnx/fastsam/fastsam-s.onnx";
+    const char* model = "../../test_data/test_models/onnx/FastSAM-s.onnx";
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
