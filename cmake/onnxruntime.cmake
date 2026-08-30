@@ -1,4 +1,24 @@
-#
+# 允许直接使用本地 onnxruntime 包（目录需含 include/ 与 lib/，如官方 static_lib 包）。
+# 用法: -DONNXRUNTIME_ROOT="C:/path/to/onnxruntime-win-x64-static_lib-MD-Release-1.29.0"
+if (DEFINED ONNXRUNTIME_ROOT AND NOT ONNXRUNTIME_ROOT STREQUAL "")
+    message(STATUS "Using local onnxruntime package: ${ONNXRUNTIME_ROOT}")
+    include_directories(${ONNXRUNTIME_ROOT}/include)
+    link_directories(${ONNXRUNTIME_ROOT}/lib)
+    find_library(ONNXRUNTIME_LIB onnxruntime
+            PATHS "${ONNXRUNTIME_ROOT}/lib"
+            NO_DEFAULT_PATH
+    )
+    if (NOT ONNXRUNTIME_LIB)
+        message(FATAL_ERROR "onnxruntime.lib not found under ${ONNXRUNTIME_ROOT}/lib")
+    endif ()
+    add_library(onnxruntime::onnxruntime STATIC IMPORTED GLOBAL)
+    set_target_properties(onnxruntime::onnxruntime PROPERTIES
+            IMPORTED_LOCATION "${ONNXRUNTIME_LIB}"
+            INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_ROOT}/include"
+    )
+    return()
+endif ()
+
 message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
