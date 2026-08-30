@@ -10,8 +10,11 @@
 
 | 解决方案 | 职责 | 文档 |
 |---------|------|------|
-| ObjectCounter | 目标跨线 / 区域进出计数 + 类别统计 | [object_counter.md](solutions/object_counter.md) |
-| Heatmap | 目标位置密度热力图 | [heatmap.md](solutions/heatmap.md) |
+ | ObjectCounter | 目标跨线 / 区域进出计数 + 类别统计 | [object_counter.md](solutions/object_counter.md) |
+ | RegionCounter | 多命名区域逐帧在区计数 | [region_counter.md](solutions/region_counter.md) |
+ | QueueManager | 单区域排队长度（当前帧在区数） | [queue_manager.md](solutions/queue_manager.md) |
+ | TrackZone | 区域跟踪目标过滤（ROI 子集） | [track_zone.md](solutions/track_zone.md) |
+ | Heatmap | 目标位置密度热力图 | [heatmap.md](solutions/heatmap.md) |
 | SpeedEstimator | 目标运动速度估计（px/s 与 m/s） | [speed_estimator.md](solutions/speed_estimator.md) |
 | ParkingManager | 车位占用检测 | [parking_manager.md](solutions/parking_manager.md) |
 | DistanceEstimator | 目标两两距离估计（社交距离 / 防碰撞） | [distance_estimator.md](solutions/distance_estimator.md) |
