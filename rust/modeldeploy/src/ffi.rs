@@ -75,6 +75,7 @@ pub enum MDModelKind {
     VEHICLE_KEYPOINT = 33,
     FACE_LANDMARK = 34,
     TEXT_CLASSIFIER = 35,
+    FASTSAM = 36,
 }
 
 /// 视觉解决方案类型（MD_SOLUTION_KIND）
@@ -505,6 +506,9 @@ extern "C" {
     pub fn md_model_param_type(kind: MDModelKind, name: *const c_char, type_out: *mut c_char) -> MDStatus;
     pub fn md_model_predict(h: MDModelHandle, img: MDImageHandle, out: *mut MDResultHandle) -> MDStatus;
     pub fn md_model_predict_batch(h: MDModelHandle, imgs: *mut MDImageHandle, n: usize, out: *mut MDResultHandle) -> MDStatus;
+    pub fn md_fastsam_predict_with_prompts(h: MDModelHandle, img: MDImageHandle,
+        bboxes: *const c_float, nb: usize, points: *const c_float, labels: *const c_int, np: usize,
+        out: *mut MDResultHandle) -> MDStatus;
 
     // ── 音频 ──
     pub fn md_audio_asr_wav(h: MDModelHandle, wav: *const c_char, text: *mut *const c_char) -> MDStatus;

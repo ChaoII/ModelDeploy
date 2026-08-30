@@ -1321,6 +1321,9 @@ impl ResultType for UltralyticsObb {
 impl ResultType for UltralyticsSeg {
     type Item = InstanceSeg;
 }
+impl ResultType for FastSam {
+    type Item = InstanceSeg;
+}
 impl ResultType for UltralyticsSem {
     type Item = SemSeg;
 }
@@ -1363,6 +1366,7 @@ model_wrapper!(VehicleKeypoint, ModelKind::VehicleKeypoint, RawResult::pose, Raw
 model_wrapper!(FaceLandmark, ModelKind::FaceLandmark, RawResult::pose, RawResult::pose_batch);
 model_wrapper!(UltralyticsObb, ModelKind::Obb, RawResult::obb, RawResult::obb_batch);
 model_wrapper!(UltralyticsSeg, ModelKind::InstanceSeg, RawResult::instance_seg, RawResult::instance_seg_batch);
+model_wrapper!(FastSam, ModelKind::FastSam, RawResult::instance_seg, RawResult::instance_seg_batch);
 model_wrapper!(UltralyticsSem, ModelKind::SemSeg, |r: &RawResult| r.sem_seg().map(|s| vec![s]), |r: &RawResult| r.sem_seg_batch());
 model_wrapper!(UltralyticsDepth, ModelKind::Depth, |r: &RawResult| r.depth().map(|d| vec![d]), |r: &RawResult| r.depth_batch());
 model_wrapper!(Scrfd, ModelKind::FaceDet, RawResult::face_det, RawResult::face_det_batch);
@@ -1406,6 +1410,40 @@ model_wrapper!(LprDetectionModel, ModelKind::LprDet, RawResult::lpr, RawResult::
 model_wrapper!(LprRecognizerModel, ModelKind::LprRec, RawResult::lpr, RawResult::lpr_batch);
 model_wrapper!(InsightFaceDetModel, ModelKind::InsightFaceDet, RawResult::face_det, RawResult::face_det_batch);
 model_wrapper!(FaceRecognizerPipelineModel, ModelKind::FaceRecPipeline, RawResult::face_recognition_all, RawResult::face_recognition_batch);
+
+impl FastSam {
+    /// 带提示的交互式分割：bboxes 为 [x,y,w,h,...]、points 为 [x,y,...]、labels 逐点（1=前景,0=背景）。
+    /// 提示为空（nb==0 && np==0）等价全图 predict。结果句柄由本方法读取后随 RawResult 释放。
+    pub fn predict_with_prompts(
+        &self,
+        image: &Image,
+        bboxes: &[f32],
+        points: &[f32],
+        labels: &[i32],
+    ) -> Result<Vec<InstanceSeg>, MdError> {
+        let bbox_ptr = if bboxes.is_empty() { ptr::null() } else { bboxes.as_ptr() };
+        let point_ptr = if points.is_empty() { ptr::null() } else { points.as_ptr() };
+        let label_ptr = if labels.is_empty() { ptr::null() } else { labels.as_ptr() };
+        let mut raw: ffi::MDResultHandle = ptr::null_mut();
+        check_status(unsafe {
+            ffi::md_fastsam_predict_with_prompts(
+                self.inner.handle,
+                image.handle,
+                bbox_ptr,
+                bboxes.len() / 4,
+                point_ptr,
+                label_ptr,
+                points.len() / 2,
+                &mut raw,
+            )
+        })?;
+        if raw.is_null() {
+            return Err(MdError::ModelPredict("null prompt result".into()));
+        }
+        let result = RawResult { handle: raw, _kind: ModelKind::FastSam };
+        result.instance_seg()
+    }
+}
 
 // ═══ 音频模型（非 predict 形态，单独实现） ═══
 

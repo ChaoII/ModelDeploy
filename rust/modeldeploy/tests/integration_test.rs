@@ -1,7 +1,7 @@
 use anyhow::Result;
 use modeldeploy::{
     BarcodeDetector, Classification, DbDetectorModel, DrawOptions, FaceLandmark,
-    FaceRecognizerPipelineModel, FormulaRecognizer, HandKeypoint, Image, InsightFaceAnalysis,
+    FaceRecognizerPipelineModel, FastSam, FormulaRecognizer, HandKeypoint, Image, InsightFaceAnalysis,
     InsightFaceDetModel, Kokoro, LprDetectionModel, LprPipeline, LprRecognizerModel, PaddleOCR,
     PedestrianAttribute, ReID, RecognizerModel, RuntimeOption, Scrfd, SeetaFaceAge,
     SeetaFaceGender, SeetaFaceID, SenseVoice, SpeakerGallery, SpeakerVerify, Tracker, TrackerKind,
@@ -875,5 +875,28 @@ fn test_nlp_tools() -> Result<()> {
     let (chars, words, _sents) = nlp_stats("a b c")?;
     assert_eq!(words, 3);
     assert_eq!(chars, 5);
+    Ok(())
+}
+
+// ═══ FastSam（交互式分割提示） ═══
+
+#[test]
+fn fastsam_prompt() -> Result<()> {
+    let path = test_data("test_models/onnx/FastSAM-s.onnx");
+    if !std::path::Path::new(&path).exists() {
+        eprintln!("SKIP: FastSAM-s.onnx not present in test_data");
+        return Ok(());
+    }
+    let opt = cpu_opt()?;
+    let m = FastSam::new(&path, &opt)?;
+    let img = Image::read(&test_img("test_detection0.jpg"))?;
+    let all = m.predict(&img)?;
+    if all.is_empty() {
+        return Ok(());
+    }
+    let r = &all[0].rect;
+    let b = [r.x, r.y, r.width, r.height];
+    let sel = m.predict_with_prompts(&img, &b, &[], &[])?;
+    assert!(!sel.is_empty() && sel.len() <= all.len());
     Ok(())
 }
