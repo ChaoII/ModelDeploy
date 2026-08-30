@@ -118,7 +118,10 @@ namespace ModelDeploy
             MD_MODEL_VEHICLE_KEYPOINT = 33,
             MD_MODEL_FACE_LANDMARK = 34,
             MD_MODEL_TEXT_CLASSIFIER = 35,
-            MD_MODEL_FASTSAM = 36
+            MD_MODEL_FASTSAM = 36,
+            MD_MODEL_TTS_AUDIO8 = 37,
+            MD_MODEL_TTS_QWEN3 = 38,
+            MD_MODEL_COUNT
         }
 
         public enum MDSolutionKind

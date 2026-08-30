@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using ModelDeploy.types_internal_c;
 using ModelDeploy.Results;
 using static ModelDeploy.NativeMethods;
@@ -104,6 +105,200 @@ namespace ModelDeploy.Models
                 throw new InvalidOperationException($"Wav save failed: {GetLastError()}");
         }
     }
+
+    /// <summary>Audio8 TTS。modelDir 为模型目录（onnx 权重 + 配置）。</summary>
+    public sealed class Audio8Model : BaseModel
+    {
+        private Audio8Model(IntPtr handle) : base(MDModelKind.MD_MODEL_TTS_AUDIO8, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public Audio8Model Clone() => new Audio8Model(CloneNative());
+
+        /// <summary>最近一次合成采样率（Predict/PredictStream 后刷新）。</summary>
+        public int SampleRate { get; private set; }
+
+        public Audio8Model(string modelDir, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_TTS_AUDIO8, modelDir, opt) { }
+
+        public TtsResult Predict(string text, string voice, float speed = 1.0f)
+        {
+            var textPtr = Utf8.Alloc(text);
+            var voicePtr = Utf8.Alloc(voice);
+            try
+            {
+                var status = md_audio_tts(_handle, textPtr, voicePtr, speed, out var sr, out var audio, out var n);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"TTS predict failed: {GetLastError()}");
+                SampleRate = sr;
+                return new TtsResult
+                {
+                    Audio = ResultReader.ReadFloats(audio, n),
+                    SampleRate = sr
+                };
+            }
+            finally
+            {
+                Utf8.Free(textPtr);
+                Utf8.Free(voicePtr);
+            }
+        }
+
+        /// <summary>TTS 流式合成：逐块回调 onChunk(samples, progress)，同时返回整段音频。
+        /// chunkFrames &lt;= 0 时等价一次性合成（单次回调整段）。</summary>
+        public TtsResult PredictStream(string text, string voice, float speed, int chunkFrames,
+            Action<float[], float> onChunk)
+        {
+            if (onChunk == null) throw new ArgumentNullException(nameof(onChunk));
+            var textPtr = Utf8.Alloc(text);
+            var voicePtr = Utf8.Alloc(voice);
+            MDTtsAudioCb cb = (samplesPtr, n, progress, userdata) =>
+            {
+                var target = GCHandle.FromIntPtr(userdata).Target as Action<float[], float>;
+                if (target != null)
+                {
+                    if (samplesPtr == IntPtr.Zero || n <= 0)
+                        target(new float[0], progress);
+                    else
+                    {
+                        var samples = new float[n];
+                        Marshal.Copy(samplesPtr, samples, 0, n);
+                        target(samples, progress);
+                    }
+                }
+                return 1;
+            };
+            var userdata = GCHandle.Alloc(onChunk);
+            try
+            {
+                var status = md_audio_tts_stream(_handle, textPtr, voicePtr, speed, chunkFrames,
+                    cb, GCHandle.ToIntPtr(userdata), out var sr, out var audio, out var n);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"TTS stream failed: {GetLastError()}");
+                SampleRate = sr;
+                return new TtsResult
+                {
+                    Audio = ResultReader.ReadFloats(audio, n),
+                    SampleRate = sr
+                };
+            }
+            finally
+            {
+                userdata.Free();
+                Utf8.Free(textPtr);
+                Utf8.Free(voicePtr);
+                GC.KeepAlive(cb);
+            }
+        }
+    }
+
+    /// <summary>Qwen3 TTS（含声音克隆）。modelDir 为模型目录。</summary>
+    public sealed class Qwen3TtsModel : BaseModel
+    {
+        private Qwen3TtsModel(IntPtr handle) : base(MDModelKind.MD_MODEL_TTS_QWEN3, handle) { }
+
+        /// <summary>深拷贝模型（独立实例，可并行使用）。</summary>
+        public Qwen3TtsModel Clone() => new Qwen3TtsModel(CloneNative());
+
+        public Qwen3TtsModel(string modelDir, RuntimeOption opt = null)
+            : base(MDModelKind.MD_MODEL_TTS_QWEN3, modelDir, opt) { }
+
+        public TtsResult Predict(string text, string voice, float speed = 1.0f)
+        {
+            var textPtr = Utf8.Alloc(text);
+            var voicePtr = Utf8.Alloc(voice);
+            try
+            {
+                var status = md_audio_tts(_handle, textPtr, voicePtr, speed, out var sr, out var audio, out var n);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"TTS predict failed: {GetLastError()}");
+                return new TtsResult
+                {
+                    Audio = ResultReader.ReadFloats(audio, n),
+                    SampleRate = sr
+                };
+            }
+            finally
+            {
+                Utf8.Free(textPtr);
+                Utf8.Free(voicePtr);
+            }
+        }
+
+        /// <summary>TTS 流式合成：逐块回调 onChunk(samples, progress)，同时返回整段音频。
+        /// chunkFrames &lt;= 0 时等价一次性合成（单次回调整段）。</summary>
+        public TtsResult PredictStream(string text, string voice, float speed, int chunkFrames,
+            Action<float[], float> onChunk)
+        {
+            if (onChunk == null) throw new ArgumentNullException(nameof(onChunk));
+            var textPtr = Utf8.Alloc(text);
+            var voicePtr = Utf8.Alloc(voice);
+            MDTtsAudioCb cb = (samplesPtr, n, progress, userdata) =>
+            {
+                var target = GCHandle.FromIntPtr(userdata).Target as Action<float[], float>;
+                if (target != null)
+                {
+                    if (samplesPtr == IntPtr.Zero || n <= 0)
+                        target(new float[0], progress);
+                    else
+                    {
+                        var samples = new float[n];
+                        Marshal.Copy(samplesPtr, samples, 0, n);
+                        target(samples, progress);
+                    }
+                }
+                return 1;
+            };
+            var userdata = GCHandle.Alloc(onChunk);
+            try
+            {
+                var status = md_audio_tts_stream(_handle, textPtr, voicePtr, speed, chunkFrames,
+                    cb, GCHandle.ToIntPtr(userdata), out var sr, out var audio, out var n);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"TTS stream failed: {GetLastError()}");
+                return new TtsResult
+                {
+                    Audio = ResultReader.ReadFloats(audio, n),
+                    SampleRate = sr
+                };
+            }
+            finally
+            {
+                userdata.Free();
+                Utf8.Free(textPtr);
+                Utf8.Free(voicePtr);
+                GC.KeepAlive(cb);
+            }
+        }
+
+        /// <summary>声音克隆：refAudio 为参考音频 wav 路径，refText 为参考文本，lang 语言白名单
+        /// （null/空串视为 "auto"），成功返回 24kHz 克隆音频。</summary>
+        public TtsResult Clone(string text, string refAudio, string refText, string lang = null)
+        {
+            var textPtr = Utf8.Alloc(text);
+            var refAudioPtr = Utf8.Alloc(refAudio);
+            var refTextPtr = Utf8.Alloc(refText);
+            var langPtr = Utf8.Alloc(lang);
+            try
+            {
+                var status = md_audio_tts_qwen3_clone(_handle, textPtr, refAudioPtr, refTextPtr, langPtr,
+                    out var sr, out var audio, out var n);
+                if (status != MDStatus.MD_OK)
+                    throw new InvalidOperationException($"TTS clone failed: {GetLastError()}");
+                return new TtsResult
+                {
+                    Audio = ResultReader.ReadFloats(audio, n),
+                    SampleRate = sr
+                };
+            }
+            finally
+            {
+                Utf8.Free(textPtr);
+                Utf8.Free(refAudioPtr);
+                Utf8.Free(refTextPtr);
+                Utf8.Free(langPtr);
+            }
+        }
+    }
 }
 
 namespace ModelDeploy
@@ -113,6 +308,7 @@ namespace ModelDeploy
     {
         public static IntPtr Alloc(string s)
         {
+            if (string.IsNullOrEmpty(s)) return IntPtr.Zero;
             var bytes = System.Text.Encoding.UTF8.GetBytes(s);
             var ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(bytes.Length + 1);
             System.Runtime.InteropServices.Marshal.Copy(bytes, 0, ptr, bytes.Length);

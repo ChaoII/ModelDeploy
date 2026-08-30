@@ -232,6 +232,21 @@ IntPtr text,
 IntPtr voice, float speed,
             out int sampleRate, out IntPtr audio, out UIntPtr audioN);
 
+        // TTS 流式回调：samples 为当前块（n 个采样点，mono float），progress 为 [0,1] 进度；
+        // 返回非 0 继续合成，返回 0 提前中止（中止时整段缓冲仍可读，仅截断）。
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int MDTtsAudioCb(IntPtr samples, int n, float progress, IntPtr userdata);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_tts_stream(IntPtr handle, IntPtr text, IntPtr voice,
+            float speed, int chunkFrames, MDTtsAudioCb cb, IntPtr userdata,
+            out int sampleRate, out IntPtr audio, out UIntPtr audioN);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern MDStatus md_audio_tts_qwen3_clone(IntPtr handle, IntPtr text,
+            IntPtr refAudio, IntPtr refText, IntPtr lang,
+            out int sampleRate, out IntPtr audio, out UIntPtr audioN);
+
         // 声纹（SpeakerVerify）：提取说话人 embedding。返回的 embedding 为借用指针
         // （归模型句柄所有），调用方用 Marshal.Copy 立即复制，勿阻塞/复用。
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
