@@ -16,7 +16,7 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
 
     // ---- 2. 加载模型（目标检测）----
     auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("../../test_data/test_models/sophgo/yolo26n/yolo26n-int8.bmodel", opt);

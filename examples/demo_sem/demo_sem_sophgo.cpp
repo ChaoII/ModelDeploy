@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
 
     RuntimeOption option;
     if (ends_with(model, ".bmodel")) {
-        option.use_sophgo_backend(0);
+        option.use_sophgo_backend(); option.device_id = 0;
         option.sophgo_option.bmodel_path = model;
         printf("[backend] Sophgo TPU, bmodel = %s\n", model.c_str());
     } else {

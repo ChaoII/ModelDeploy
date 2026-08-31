@@ -402,7 +402,7 @@ namespace modeldeploy::vision {
                                 static_cast<unsigned>(cw), static_cast<unsigned>(ch)};
             bmcv_padding_attr_t pad = {0, 0, static_cast<unsigned>(cw), static_cast<unsigned>(ch),
                                        0, 0, 0, 1};
-            st = bmcv_image_vpp_convert_padding(hd, 1, &in, &out, &pad, &crop);
+            st = bmcv_image_vpp_convert_padding(hd, 1, in, &out, &pad, &crop);
         } while (false);
         bm_image_destroy(&in);
         bm_image_destroy(&out);
@@ -428,11 +428,11 @@ namespace modeldeploy::vision {
         const bool swap = (flag != 1);   // 90/270 交换 W/H，180 不变
         const int o_w = swap ? src_h : src_w;
         const int o_h = swap ? src_w : src_h;
-        bmcv_rotate_t angle;
+        int rotation_angle;
         switch (flag) {
-        case 0: angle = BMCV_ROTATE_90; break;
-        case 1: angle = BMCV_ROTATE_180; break;
-        default: angle = BMCV_ROTATE_270; break;
+        case 0: rotation_angle = BMCV_ROTATION_90; break;
+        case 1: rotation_angle = BMCV_ROTATION_180; break;
+        default: rotation_angle = BMCV_ROTATION_270; break;
         }
         bm_image in{}, out{};
         bm_status_t st = BM_SUCCESS;
@@ -442,7 +442,7 @@ namespace modeldeploy::vision {
             if (st != BM_SUCCESS) break;
             st = alloc_attach_nv12_out(hd, o_w, o_h, &out, &base, owner);
             if (st != BM_SUCCESS) break;
-            st = bmcv_image_rotate(hd, in, &out, angle);
+            st = bmcv_image_rotate(hd, in, out, rotation_angle);
         } while (false);
         bm_image_destroy(&in);
         bm_image_destroy(&out);

@@ -16,7 +16,7 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
 
     // ---- 2. 加载模型（人脸检测）----
     auto m = std::make_unique<modeldeploy::vision::face::Scrfd>("../../test_data/test_models/sophgo/face/scrfd_2.5g_int8.bmodel", opt);

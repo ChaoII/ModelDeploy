@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
 
     RuntimeOption option;
     if (ends_with(det_model, ".bmodel")) {
-        option.use_sophgo_backend(0);          // 不设 bmodel_path → 各子模型用自己的 model_file
+        option.use_sophgo_backend(); option.device_id = 0;          // 不设 bmodel_path → 各子模型用自己的 model_file
         printf("[backend] Sophgo TPU: det=%s\n", det_model.c_str());
     } else {
         option.use_ort_backend();
