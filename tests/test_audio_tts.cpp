@@ -14,6 +14,7 @@
 
 #include "audio/solutions/tts_batcher.h"
 #include "audio/tts/audio8/audio8.h"
+#include "audio/tts/common/ort_ep.h"
 #include "audio/tts/kokoro.h"
 #include "audio/tts/qwen3/qwen3_tts.h"
 #include "audio/tts/tts_model.h"
@@ -319,4 +320,19 @@ TEST_CASE("Qwen3Tts overlong text rejected without truncation", "[tts][tts-qwen3
     REQUIRE(audio[0] == 0.0f);
     REQUIRE(audio[1] == 0.0f);
     REQUIRE(audio[2] == 0.0f);
+}
+
+TEST_CASE("ApplyOrtCudaEp gating", "[tts][tts-common]") {
+    using namespace modeldeploy::audio::tts;
+    using modeldeploy::Device;
+    Ort::SessionOptions opts;
+    // CPU 设备：必须原样返回 false、不改 opts（之后创建 session 不会挂 CUDA）
+    CHECK_FALSE(ApplyOrtCudaEp(opts, Device::CPU, 0));
+#ifdef MD_ORT_CUDA
+    // GPU 构建（且本机 CUDA 运行库就绪）应启用
+    CHECK(ApplyOrtCudaEp(opts, Device::GPU, 0));
+#else
+    // CPU 构建：GPU 请求也回退 false
+    CHECK_FALSE(ApplyOrtCudaEp(opts, Device::GPU, 0));
+#endif
 }

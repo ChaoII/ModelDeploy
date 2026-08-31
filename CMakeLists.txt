@@ -173,6 +173,10 @@ if (WITH_GPU)
     list(APPEND DEPENDS CUDA::cudart)
 endif ()
 
+if (WITH_GPU AND ENABLE_ORT)
+    add_definitions(-DMD_ORT_CUDA)
+endif ()
+
 
 if (ENABLE_ORT)
     add_definitions(-DENABLE_ORT)
