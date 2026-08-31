@@ -11,6 +11,7 @@
 #include <onnxruntime_cxx_api.h>
 
 #include "core/md_log.h"
+#include "audio/tts/common/ort_ep.h"
 
 namespace modeldeploy::audio::tts::audio8 {
 namespace {
@@ -95,7 +96,8 @@ Audio8Runtime::Audio8Runtime() : impl_(std::make_unique<Impl>()) {}
 
 Audio8Runtime::~Audio8Runtime() = default;
 
-bool Audio8Runtime::Load(const Audio8Manifest& manifest, int32_t threads) {
+bool Audio8Runtime::Load(const Audio8Manifest& manifest, int32_t threads, Device device,
+                         int32_t device_id) {
     if (!impl_) return false;
     Impl& I = *impl_;
     I.num_layers = manifest.num_layers;
@@ -117,6 +119,8 @@ bool Audio8Runtime::Load(const Audio8Manifest& manifest, int32_t threads) {
     I.opts.SetLogSeverityLevel(3);
     if (threads > 0) I.opts.SetIntraOpNumThreads(threads);
     I.opts.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+
+    ApplyOrtCudaEp(I.opts, device, device_id);
 
     const std::string slow_path = ResolvePath(manifest.model_dir, manifest.slow_model);
     const std::string fast_path = ResolvePath(manifest.model_dir, manifest.fast_model);

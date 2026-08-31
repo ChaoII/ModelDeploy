@@ -573,7 +573,7 @@ public:
             return false;
         }
         const int32_t threads = opt.cpu_thread_num > 0 ? opt.cpu_thread_num : 0;
-        if (!runtime.Load(manifest, threads)) {
+        if (!runtime.Load(manifest, threads, opt.device, opt.device_id)) {
             MD_LOG_ERROR << "audio8: failed to load onnx runtime" << std::endl;
             return false;
         }

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "audio/tts/audio8/audio8_manifest.h"
+#include "core/enum_variables.h"
 
 namespace modeldeploy::audio::tts::audio8 {
 
@@ -22,7 +23,8 @@ public:
     Audio8Runtime(const Audio8Runtime&) = delete;
     Audio8Runtime& operator=(const Audio8Runtime&) = delete;
 
-    bool Load(const Audio8Manifest& manifest, int32_t threads);
+    bool Load(const Audio8Manifest& manifest, int32_t threads, Device device = Device::CPU,
+              int32_t device_id = 0);
 
     [[nodiscard]] bool valid() const { return loaded_; }
     [[nodiscard]] int64_t num_codebooks() const { return num_codebooks_; }
