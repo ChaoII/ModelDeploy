@@ -60,7 +60,7 @@ namespace modeldeploy::vision {
         }
         // 提取可 BMCV 就地绘制的 TPU NV12 设备平面：返回 false 时不满足
         //（非 handle/非 TPU/非 NV12/平面不连续，均不得用宿主指针写设备显存 → 不回退 CPU）。
-        static bool tpu_nv12_planes(void* handle, ImageData& frame,
+        static bool tpu_nv12_planes(void* handle, const ImageData& frame,
                                     uint8_t** y, uint8_t** uv, int* w, int* h) {
             if (!handle || frame.device() != Device::TPU ||
                 frame.type() != MdImageType::NV12 || frame.plane_count() < 2)

@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     const int nclones = argc > 4 ? atoi(argv[4]) : 4;
 
     RuntimeOption option;
-    option.use_sophgo_backend(0);
+    option.use_sophgo_backend(); option.device_id = 0;
     printf("[backend] Sophgo TPU: det=%s ml=%s clones=%d\n",
            det_model.c_str(), ml_model.c_str(), nclones);
 

@@ -16,7 +16,7 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
 
     // ---- 2. 加载模型（OCR：检测 + 方向分类 + 识别；词典统一 ppocrv6_tiny）----
     const char* dict = "../../test_data/ppocrv6_tiny_dict.txt";

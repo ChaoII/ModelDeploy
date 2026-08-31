@@ -16,7 +16,7 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
 
     // ---- 2. 加载模型（行人属性：检测 + 多标签分类）----
     auto m = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>("../../test_data/test_models/sophgo/", "../../test_data/test_models/sophgo/", opt);

@@ -294,7 +294,7 @@ TEST_CASE("InsightFace det_10g on SOPHGO backend", "[insightface][model][backend
         ? model_dir + "/det_10g_f16.bmodel" : model_dir + "/det_10g.bmodel";
 
     RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
     auto det = std::make_unique<face::InsightFaceDet>(bmodel, opt);
     REQUIRE(det->is_initialized());
     auto img = ImageData::imread(img_path);
@@ -312,7 +312,7 @@ TEST_CASE("InsightFace full pipeline on SOPHGO backend", "[insightface][model][b
     if (!std::filesystem::exists(img_path)) return;
 
     RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
     face::InsightFaceAnalysis analysis(
         model_dir + "/det_10g" + ext + ".bmodel", model_dir + "/w600k_r50" + ext + ".bmodel",
         model_dir + "/2d106det" + ext + ".bmodel", model_dir + "/1k3d68" + ext + ".bmodel",

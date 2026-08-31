@@ -178,7 +178,7 @@ static RuntimeOption bench_opt(const BenchSpec& s, int input) {
         case OpBackend::TrtEngine:
             opt.use_trt_backend(); opt.use_gpu(0); break;
         case OpBackend::Sophgo:
-            opt.use_sophgo_backend(0); break;
+            opt.use_sophgo_backend(); opt.device_id = 0; break;
     }
     return opt;
 }
@@ -818,7 +818,7 @@ TEST_CASE("Benchmark SOPHGO insightface pipeline", "[sophgo][benchmark]") {
     auto dir = bench_data_dir() / "test_models" / "sophgo" / "insightface" / "buffalo_l";
     if (!has_file(dir / "det_10g_f16.bmodel")) return;
     RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
     auto analysis = std::make_unique<face::InsightFaceAnalysis>(
         (dir / "det_10g_f16.bmodel").string(), (dir / "w600k_r50_f16.bmodel").string(),
         (dir / "2d106det_f16.bmodel").string(), (dir / "1k3d68_f16.bmodel").string(),

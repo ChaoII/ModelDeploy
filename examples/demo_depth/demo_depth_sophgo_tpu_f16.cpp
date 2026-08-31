@@ -16,7 +16,7 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_sophgo_backend(0);
+    opt.use_sophgo_backend(); opt.device_id = 0;
 
     // ---- 2. 加载模型（深度估计）----
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsDepth>("../../test_data/test_models/sophgo/yolo26n/yolo26n-depth-f16.bmodel", opt);
