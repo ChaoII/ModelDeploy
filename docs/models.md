@@ -355,7 +355,7 @@ tts.predict("你好，世界。", "demo", 1.0f, &audio);   // voice 来自 {mode
 // audio 为 44.1kHz 单声道；tts.get_sample_rate() == 44100
 ```
 
-**GPU 运行**：`option.set_device(modeldeploy::Device::GPU, 0)` 即可让 ORT 走 CUDA EP（需 GPU onnxruntime 包 + CUDA 运行库，不可用时自动回退 CPU）；本机实测同句合成约 6.7s(CPU) → 3.0s(GPU)。
+**GPU 运行**：`option.set_device(modeldeploy::Device::GPU, 0)` 即可让 ORT 走 CUDA EP（需 GPU onnxruntime 包 + CUDA 运行库，不可用时自动回退 CPU）；本机实测（RTX 4060 Ti / CUDA 13.3 / onnxruntime 1.29.0）同句合成约 6.7s(CPU) → 3.0s(GPU)。
 
 ```python
 tts = modeldeploy.audio.Audio8("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option)
@@ -396,7 +396,7 @@ bool ok = tts.clone("你好，这是声音克隆。", "ref.wav", "参考音频�
 // ok == false 表示失败（非法 lang / 参考音频无法编码等）
 ```
 
-**GPU 运行**：同样 `option.set_device(modeldeploy::Device::GPU, 0)` 启用 CUDA EP（依赖 GPU onnxruntime 包 + CUDA 运行库，不可用时自动回退 CPU）；多子模型 LLM 管线收益最大，本机实测同句合成约 35.1s(CPU) → 3.7s(GPU)。
+**GPU 运行**：同样 `option.set_device(modeldeploy::Device::GPU, 0)` 启用 CUDA EP（依赖 GPU onnxruntime 包 + CUDA 运行库，不可用时自动回退 CPU）；多子模型 LLM 管线收益最大，本机实测（RTX 4060 Ti / CUDA 13.3 / onnxruntime 1.29.0）同句合成约 35.1s(CPU) → 3.7s(GPU)。
 
 ```python
 tts = modeldeploy.audio.Qwen3Tts("{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b", option)

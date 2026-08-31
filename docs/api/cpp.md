@@ -88,11 +88,13 @@ audio8.predict_stream("你好，世界。", "demo", 1.0f, 480,
 ```cpp
 modeldeploy::RuntimeOption option;
 option.set_device(modeldeploy::Device::GPU, 0);
-modeldeploy::audio::tts::Audio8 audio8;                                  // Qwen3 同理：
-audio8.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);       // Qwen3Tts(dir, option)
+modeldeploy::audio::tts::Audio8 audio8;
+audio8.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);
+
+// Qwen3-TTS 同理：构造 Qwen3Tts 时传入同一个 option 即可启用 CUDA EP
 ```
 
-依赖 GPU 版 onnxruntime（providers 动态库 `onnxruntime_providers_cuda.dll` 等需在可执行搜索路径）+ CUDA 运行库（Windows 下 `CUDA\v13.x\bin\x64` 在 PATH）。任一不可用时打印 `CUDAExecutionProvider not available` 并**自动回退 CPU**（fail-closed，行为与 CPU 构建一致）。
+依赖 GPU 版 onnxruntime（providers 动态库 `onnxruntime_providers_cuda.dll` 等需在可执行搜索路径）+ CUDA 运行库（Windows 下 `CUDA\v13.x\bin\x64` 在 PATH）。任一不可用时打印 `CUDAExecutionProvider not available`（或 provider 初始化失败时打印 `failed to enable`）并**自动回退 CPU**（fail-closed，行为与 CPU 构建一致）。
 
 ## 设备与设备帧
 

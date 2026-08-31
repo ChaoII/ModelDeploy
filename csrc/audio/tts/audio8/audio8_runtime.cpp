@@ -10,8 +10,8 @@
 
 #include <onnxruntime_cxx_api.h>
 
-#include "core/md_log.h"
 #include "audio/tts/common/ort_ep.h"
+#include "core/md_log.h"
 
 namespace modeldeploy::audio::tts::audio8 {
 namespace {
