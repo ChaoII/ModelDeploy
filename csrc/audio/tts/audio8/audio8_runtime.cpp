@@ -10,6 +10,10 @@
 
 #include <onnxruntime_cxx_api.h>
 
+#ifdef WITH_GPU
+#include <cuda_runtime.h>
+#endif
+
 #include "audio/tts/common/ort_ep.h"
 #include "core/md_log.h"
 
@@ -371,5 +375,188 @@ void Audio8Runtime::ReserveSpeech(size_t num_frames) {
     // 预留解码缓冲（StreamWindow 由调用方管理，这里仅提示未来的帧规模）
     (void)num_frames;
 }
+
+#ifdef WITH_GPU
+
+struct Audio8Runtime::Audio8GpuState {
+    Ort::MemoryInfo cuda_mem{nullptr};
+    Ort::Allocator slow_alloc{nullptr};   // 归属:释放缓冲用(ORT arena 本身不 Free 到 CUDA 池)
+    Ort::Allocator fast_alloc{nullptr};
+    // slow:2*num_layers 个 K/V 段,每段 seg 个 fp16(cache 布局 [h][seq][d])
+    std::vector<void*> slow_kv;
+    // slow scratch:delta 输出连续区(每段 seg 个 fp16;每次按当帧 [1,h,T,d] 复用前缀)
+    std::vector<void*> slow_scratch;
+    int64_t slow_seg = 0;
+    // fast 同理
+    std::vector<void*> fast_kv;
+    std::vector<void*> fast_scratch;
+    int64_t fast_seg = 0;
+    std::unique_ptr<Ort::IoBinding> slow_binding;
+    std::unique_ptr<Ort::IoBinding> fast_binding;
+};
+
+Audio8Runtime::Audio8GpuStatePtr
+Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
+    if (!impl_ || !impl_->slow || !impl_->fast || device != Device::GPU) return {};
+    const auto provs = Ort::GetAvailableProviders();
+    if (std::find(provs.begin(), provs.end(), "CUDAExecutionProvider") == provs.end()) {
+        MD_LOG_WARN << "audio8: CUDA provider unavailable, GPU KV state disabled."
+                    << std::endl;
+        return {};
+    }
+    Impl& I = *impl_;
+    Audio8Runtime::Audio8GpuStatePtr g(new Audio8GpuState());
+    g->cuda_mem = Ort::MemoryInfo("Cuda", OrtArenaAllocator, device_id, OrtMemTypeDefault);
+    g->slow_alloc = Ort::Allocator(*I.slow, g->cuda_mem);
+    g->fast_alloc = Ort::Allocator(*I.fast, g->cuda_mem);
+    const int64_t seg = I.n_local_heads * I.max_seq_len * I.head_dim;
+    g->slow_seg = seg;
+    g->fast_seg = I.fast_n_local_heads * I.num_codebooks * I.fast_head_dim;
+    try {
+        g->slow_kv.resize(static_cast<size_t>(2 * I.num_layers));
+        g->slow_scratch.resize(static_cast<size_t>(2 * I.num_layers));
+        for (auto& p : g->slow_kv) p = g->slow_alloc.Alloc(static_cast<size_t>(seg) * 2);
+        for (auto& p : g->slow_scratch) p = g->slow_alloc.Alloc(static_cast<size_t>(seg) * 2);
+        g->fast_kv.resize(static_cast<size_t>(2 * I.num_fast_layers));
+        g->fast_scratch.resize(static_cast<size_t>(2 * I.num_fast_layers));
+        for (auto& p : g->fast_kv) p = g->fast_alloc.Alloc(static_cast<size_t>(g->fast_seg) * 2);
+        for (auto& p : g->fast_scratch) p = g->fast_alloc.Alloc(static_cast<size_t>(g->fast_seg) * 2);
+    } catch (const std::exception& e) {
+        MD_LOG_WARN << "audio8: GPU KV alloc failed: " << e.what() << std::endl;
+        return {};
+    }
+    // 初始全零(逐段,勿拼连续)
+    for (auto* p : g->slow_kv) cudaMemset(p, 0, static_cast<size_t>(seg) * 2);
+    for (auto* p : g->slow_scratch) cudaMemset(p, 0, static_cast<size_t>(seg) * 2);
+    for (auto* p : g->fast_kv) cudaMemset(p, 0, static_cast<size_t>(g->fast_seg) * 2);
+    for (auto* p : g->fast_scratch) cudaMemset(p, 0, static_cast<size_t>(g->fast_seg) * 2);
+
+    // ---- slow IoBinding:cache 输入绑一次;logits/slow_hidden 绑 CPU;delta 每帧 Value-绑 ----
+    g->slow_binding = std::make_unique<Ort::IoBinding>(*I.slow);
+    {
+        const std::array<int64_t, 4> cache_shape{1, I.n_local_heads, I.max_seq_len, I.head_dim};
+        for (int64_t i = 0; i < I.num_layers; ++i) {
+            auto kv = CreateFP16Tensor(g->cuda_mem,
+                                       static_cast<uint16_t*>(g->slow_kv[static_cast<size_t>(2 * i)]),
+                                       static_cast<size_t>(seg), cache_shape.data(), 4);
+            auto vv = CreateFP16Tensor(g->cuda_mem,
+                                       static_cast<uint16_t*>(g->slow_kv[static_cast<size_t>(2 * i + 1)]),
+                                       static_cast<size_t>(seg), cache_shape.data(), 4);
+            g->slow_binding->BindInput(("cache_key_" + std::to_string(i)).c_str(), kv);
+            g->slow_binding->BindInput(("cache_value_" + std::to_string(i)).c_str(), vv);
+        }
+        const Ort::MemoryInfo cpu_mem =
+            Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+        g->slow_binding->BindOutput("logits", cpu_mem);
+        g->slow_binding->BindOutput("slow_hidden", cpu_mem);
+    }
+    // ---- fast IoBinding ----(Task 2 填,本任务留空:fast 仅预分配,不建 binding)
+    return std::move(g);
+}
+
+bool Audio8Runtime::SlowStepGpu(Audio8GpuState* g, const std::vector<int64_t>& codes,
+                                const std::vector<int64_t>& positions,
+                                std::vector<float>* last_logits,
+                                std::vector<uint16_t>* last_hidden) {
+    if (!impl_ || !g || !impl_->slow || !last_logits || !last_hidden) return false;
+    Impl& I = *impl_;
+    const int64_t T = static_cast<int64_t>(positions.size());
+    const int64_t rows = num_codebooks_ + 1;
+    if (static_cast<int64_t>(codes.size()) != rows * T) return false;
+    if (static_cast<int64_t>(I.slow_logits_size) <= 0) I.slow_logits_size = 4097;
+    const int64_t seg = g->slow_seg;
+    std::array<int64_t, 3> codes_shape{1, rows, T};
+    std::array<int64_t, 1> pos_shape{T};
+    auto cval = Ort::Value::CreateTensor<int64_t>(
+        I.meminfo, const_cast<int64_t*>(codes.data()), codes.size(), codes_shape.data(), 3);
+    auto pval = Ort::Value::CreateTensor<int64_t>(
+        I.meminfo, const_cast<int64_t*>(positions.data()), positions.size(), pos_shape.data(), 1);
+    g->slow_binding->BindInput("codes", cval);
+    g->slow_binding->BindInput("input_pos", pval);
+    // delta 输出:每帧按 [1,h,T,d] 形状 Value 绑到 scratch(ORT 1.29 无 4 参 BindOutput)
+    {
+        const std::array<int64_t, 4> dshape{1, I.n_local_heads, T, I.head_dim};
+        const size_t dbytes = static_cast<size_t>(I.n_local_heads * T * I.head_dim) * 2;
+        for (int64_t i = 0; i < I.num_layers; ++i) {
+            auto kout = CreateFP16Tensor(g->cuda_mem, g->slow_scratch[static_cast<size_t>(2 * i)],
+                                         dbytes, dshape.data(), 4);
+            auto vout = CreateFP16Tensor(g->cuda_mem,
+                                         g->slow_scratch[static_cast<size_t>(2 * i + 1)],
+                                         dbytes, dshape.data(), 4);
+            g->slow_binding->BindOutput(("key_delta_" + std::to_string(i)).c_str(), kout);
+            g->slow_binding->BindOutput(("value_delta_" + std::to_string(i)).c_str(), vout);
+        }
+    }
+    try {
+        I.slow->Run(Ort::RunOptions{nullptr}, *g->slow_binding);
+    } catch (const Ort::Exception& e) {
+        MD_LOG_ERROR << "audio8: slow gpu run failed: " << e.what() << std::endl;
+        return false;
+    }
+    const auto outs = g->slow_binding->GetOutputValues();
+    if (outs.size() < 2 + 2 * static_cast<size_t>(I.num_layers)) return false;
+    {
+        const float* logits = outs[0].GetTensorData<float>();
+        last_logits->assign(logits, logits + I.slow_logits_size);
+    }
+    {
+        const uint16_t* hidden = outs[1].GetTensorData<uint16_t>();
+        last_hidden->assign(hidden, hidden + static_cast<size_t>(I.fast_dim));
+    }
+    // delta(已写进 scratch)按 strided 布局拷入 cache 槽位
+    const int64_t pos0 = positions[0];
+    for (int64_t i = 0; i < I.num_layers; ++i) {
+        for (int64_t h = 0; h < I.n_local_heads; ++h) {
+            for (int64_t t = 0; t < T; ++t) {
+                const int64_t dst = (h * I.max_seq_len + pos0 + t) * I.head_dim * 2;
+                const int64_t src = ((h * T + t) * I.head_dim) * 2;
+                cudaMemcpy(static_cast<char*>(g->slow_kv[static_cast<size_t>(2 * i)]) + dst,
+                           static_cast<char*>(g->slow_scratch[static_cast<size_t>(2 * i)]) + src,
+                           static_cast<size_t>(I.head_dim) * 2, cudaMemcpyDeviceToDevice);
+                cudaMemcpy(static_cast<char*>(g->slow_kv[static_cast<size_t>(2 * i + 1)]) + dst,
+                           static_cast<char*>(g->slow_scratch[static_cast<size_t>(2 * i + 1)]) + src,
+                           static_cast<size_t>(I.head_dim) * 2, cudaMemcpyDeviceToDevice);
+            }
+        }
+    }
+    return true;
+}
+
+bool Audio8Runtime::CopyGpuCacheToHost(Audio8GpuState* g, int kind, uint16_t* dst) {
+    if (!g || !dst) return false;
+    if (kind == 0) {
+        uint16_t* out = dst;
+        for (auto* p : g->slow_kv) {
+            cudaMemcpy(out, p, static_cast<size_t>(g->slow_seg) * 2, cudaMemcpyDeviceToHost);
+            out += static_cast<size_t>(g->slow_seg);
+        }
+    } else {
+        uint16_t* out = dst;
+        for (auto* p : g->fast_kv) {
+            cudaMemcpy(out, p, static_cast<size_t>(g->fast_seg) * 2, cudaMemcpyDeviceToHost);
+            out += static_cast<size_t>(g->fast_seg);
+        }
+    }
+    return true;
+}
+
+void Audio8Runtime::Audio8GpuStateDeleter::operator()(Audio8GpuState* p) const noexcept {
+    if (!p) return;
+    for (auto* buf : p->slow_kv) p->slow_alloc.Free(buf);
+    for (auto* buf : p->slow_scratch) p->slow_alloc.Free(buf);
+    for (auto* buf : p->fast_kv) p->fast_alloc.Free(buf);
+    for (auto* buf : p->fast_scratch) p->fast_alloc.Free(buf);
+    delete p;
+}
+
+#else  // !WITH_GPU
+Audio8Runtime::Audio8GpuStatePtr Audio8Runtime::MakeGpuState(Device, int32_t) { return {}; }
+bool Audio8Runtime::SlowStepGpu(Audio8GpuState*, const std::vector<int64_t>&,
+                                const std::vector<int64_t>&, std::vector<float>*,
+                                std::vector<uint16_t>*) { return false; }
+bool Audio8Runtime::FastStepGpu(Audio8GpuState*, int64_t, bool, int64_t,
+                                const std::vector<uint16_t>&, std::vector<float>*) { return false; }
+bool Audio8Runtime::CopyGpuCacheToHost(Audio8GpuState*, int, uint16_t*) { return false; }
+#endif  // WITH_GPU
 
 }  // namespace modeldeploy::audio::tts::audio8

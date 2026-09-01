@@ -14,10 +14,12 @@
 
 #include "audio/solutions/tts_batcher.h"
 #include "audio/tts/audio8/audio8.h"
+#include "audio/tts/audio8/audio8_runtime.h"
 #include "audio/tts/common/ort_ep.h"
 #include "audio/tts/kokoro.h"
 #include "audio/tts/qwen3/qwen3_tts.h"
 #include "audio/tts/tts_model.h"
+#include "tests/test_gpu_utils.h"
 #include "tests/utils.h"
 
 namespace fs = std::filesystem;
@@ -340,4 +342,52 @@ TEST_CASE("ApplyOrtCudaEp gating", "[tts][tts-common]") {
     CHECK_FALSE(ApplyOrtCudaEp(opts, Device::GPU, 0));
     CHECK_FALSE(ApplyOrtCudaEp(opts, Device::GPU, -1));
 #endif
+}
+
+TEST_CASE("Audio8 GpuState slow prefill matches CPU (spike)",
+          "[tts][tts-audio8][gpu][spike]") {
+    MD_TEST_GPU_OR_SKIP();
+    namespace a8 = modeldeploy::audio::tts::audio8;
+    const auto dir = audio8_dir();
+    if (!fs::exists(dir)) { WARN("audio8 model dir missing; skipping"); return; }
+    a8::Audio8Manifest manifest;
+    REQUIRE(a8::Audio8Manifest::FromJson((dir / "runtime_manifest.json").string(),
+                                         dir.string(), &manifest));
+
+    a8::Audio8Runtime rt;
+    REQUIRE(rt.Load(manifest, 4, modeldeploy::Device::GPU, 0));
+    auto gpu = rt.MakeGpuState(modeldeploy::Device::GPU, 0);
+    if (!gpu) { WARN("GpuState unavailable (no CUDA provider); skipping"); return; }
+
+    const int64_t rows = rt.num_codebooks() + 1;   // 11
+    const int64_t T = 6;
+    std::vector<int64_t> codes(rows * T);
+    for (size_t i = 0; i < codes.size(); ++i) codes[i] = static_cast<int64_t>(i % 4096);
+    std::vector<int64_t> positions(T);
+    for (int64_t i = 0; i < T; ++i) positions[i] = i;
+
+    const int64_t seg = manifest.n_local_heads * manifest.max_seq_len * manifest.head_dim;
+    std::vector<uint16_t> cpu_cache(static_cast<size_t>(2 * manifest.num_layers * seg), 0);
+    std::vector<float> cpu_logits, gpu_logits;
+    std::vector<uint16_t> cpu_hidden, gpu_hidden;
+    REQUIRE(rt.SlowStep(codes, positions, &cpu_cache, &cpu_logits, &cpu_hidden));
+    REQUIRE(rt.SlowStepGpu(gpu.get(), codes, positions, &gpu_logits, &gpu_hidden));
+
+    REQUIRE(gpu_logits.size() == cpu_logits.size());
+    for (size_t i = 0; i < cpu_logits.size(); ++i)
+        REQUIRE(std::fabs(gpu_logits[i] - cpu_logits[i]) < 1e-3f);
+    REQUIRE(gpu_hidden.size() == cpu_hidden.size());
+
+    // 关键 spike 断言:GPU cache 与 CPU cache 逐元素一致(验证输出绑 GPU + strided D2D 写入正确)
+    if (gpu) {
+        std::vector<uint16_t> gpu_cache(cpu_cache.size(), 0);
+        REQUIRE(rt.CopyGpuCacheToHost(gpu.get(), 0, gpu_cache.data()));
+        for (size_t i = 0; i < cpu_cache.size(); ++i) {
+            if (std::fabs(static_cast<float>(gpu_cache[i]) -
+                          static_cast<float>(cpu_cache[i])) > 2.0f) {
+                FAIL("cache mismatch at " << i << " gpu=" << gpu_cache[i]
+                     << " cpu=" << cpu_cache[i]);
+            }
+        }
+    }
 }
