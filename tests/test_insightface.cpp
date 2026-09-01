@@ -8,6 +8,7 @@
 #include <vector>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <fstream>
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -231,6 +232,7 @@ TEST_CASE("InsightFace full pipeline on MNN backend", "[insightface][model][back
     REQUIRE(has_emb);
     REQUIRE(has_ga);
 }
+
 #endif // ENABLE_MNN
 
 // ==================== TRT 后端 ====================

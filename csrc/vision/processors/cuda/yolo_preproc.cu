@@ -262,8 +262,15 @@ namespace modeldeploy::vision {
         else {
             if (ws0.capacity < src_bytes) {
                 if (ws0.d_src) cudaFree(ws0.d_src);
-                cudaMalloc(&ws0.d_src, src_bytes);
+                const cudaError_t m_err = cudaMalloc(&ws0.d_src, src_bytes);
                 ws0.capacity = src_bytes;
+                if (m_err != cudaSuccess) {
+                    MD_LOG_ERROR << "yolo_preprocess_bgr_cuda: cudaMalloc host-upload scratch failed: "
+                                 << cudaGetErrorString(m_err) << std::endl;
+                    ws0.d_src = nullptr;
+                    ws0.capacity = 0;
+                    return false;
+                }
             }
             cudaMemcpyAsync(ws0.d_src, src, src_bytes, cudaMemcpyHostToDevice, stream);
             d_src = ws0.d_src;
@@ -287,6 +294,8 @@ namespace modeldeploy::vision {
         cudaStreamSynchronize(stream);
         if (is_internal_stream) cudaStreamDestroy(stream);
         if (err != cudaSuccess) {
+            MD_LOG_ERROR << "yolo_preprocess_bgr_cuda: kernel launch/sync failed: "
+                         << cudaGetErrorString(err) << std::endl;
             return false;
         }
         // 6 增加batch维
@@ -341,16 +350,30 @@ namespace modeldeploy::vision {
         else {
             if (ws0.capacity < src_y_bytes) {
                 if (ws0.d_src) cudaFree(ws0.d_src);
-                cudaMalloc(&ws0.d_src, src_y_bytes);
+                const cudaError_t my_err = cudaMalloc(&ws0.d_src, src_y_bytes);
                 ws0.capacity = src_y_bytes;
+                if (my_err != cudaSuccess) {
+                    MD_LOG_ERROR << "yolo_preprocess_nv12_cuda: cudaMalloc Y scratch failed: "
+                                 << cudaGetErrorString(my_err) << std::endl;
+                    ws0.d_src = nullptr;
+                    ws0.capacity = 0;
+                    return false;
+                }
             }
             cudaMemcpyAsync(ws0.d_src, src_y, src_y_bytes, cudaMemcpyHostToDevice, stream);
             d_src_y = ws0.d_src;
 
             if (ws1.capacity < src_uv_bytes) {
                 if (ws1.d_src) cudaFree(ws1.d_src);
-                cudaMalloc(&ws1.d_src, src_uv_bytes);
+                const cudaError_t uv_err = cudaMalloc(&ws1.d_src, src_uv_bytes);
                 ws1.capacity = src_uv_bytes;
+                if (uv_err != cudaSuccess) {
+                    MD_LOG_ERROR << "yolo_preprocess_nv12_cuda: cudaMalloc UV scratch failed: "
+                                 << cudaGetErrorString(uv_err) << std::endl;
+                    ws1.d_src = nullptr;
+                    ws1.capacity = 0;
+                    return false;
+                }
             }
             cudaMemcpyAsync(ws1.d_src, src_uv, src_uv_bytes, cudaMemcpyHostToDevice, stream);
             d_src_uv = ws1.d_src;
@@ -377,6 +400,8 @@ namespace modeldeploy::vision {
         cudaStreamSynchronize(stream);
         if (is_internal_stream) cudaStreamDestroy(stream);
         if (err != cudaSuccess) {
+            MD_LOG_ERROR << "yolo_preprocess_nv12_cuda: kernel launch/sync failed: "
+                         << cudaGetErrorString(err) << std::endl;
             return false;
         }
         // 6 增加batch维

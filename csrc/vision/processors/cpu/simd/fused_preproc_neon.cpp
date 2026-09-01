@@ -55,6 +55,11 @@ void fused_preproc_neon(const uint8_t* src, int src_w, int src_h,
     const float32x4_t b1 = vdupq_n_f32(beta[1]);
     const float32x4_t a2 = vdupq_n_f32(alpha[2]);
     const float32x4_t b2 = vdupq_n_f32(beta[2]);
+    // pad_value 已是最终（归一化后）要写入 dst 的值；逐像素路径随后做
+    // vfmaq(raw, alpha, beta)，故需先按通道反变换 raw=(pad-beta)/alpha
+    const float pad_r_raw = (pad_value - beta[0]) / alpha[0];
+    const float pad_g_raw = (pad_value - beta[1]) / alpha[1];
+    const float pad_b_raw = (pad_value - beta[2]) / alpha[2];
 
 #pragma omp parallel for schedule(static)
     for (int y = 0; y < dst_h; ++y) {
@@ -80,7 +85,7 @@ void fused_preproc_neon(const uint8_t* src, int src_w, int src_h,
                     if (swap_rb) { r[i] = pr; g[i] = pg; b[i] = pb; }
                     else { r[i] = pb; g[i] = pg; b[i] = pr; }
                 } else {
-                    r[i] = g[i] = b[i] = pad_value;
+                    r[i] = pad_r_raw; g[i] = pad_g_raw; b[i] = pad_b_raw;
                 }
             }
             vst1q_f32(dst + 0 * plane + base + x, vfmaq_f32(b0, vld1q_f32(r), a0));
@@ -97,7 +102,7 @@ void fused_preproc_neon(const uint8_t* src, int src_w, int src_h,
                 if (swap_rb) { rv = pr; gv = pg; bv = pb; }
                 else { rv = pb; gv = pg; bv = pr; }
             } else {
-                rv = gv = bv = pad_value;
+                rv = pad_r_raw; gv = pad_g_raw; bv = pad_b_raw;
             }
             dst[0 * plane + base + x] = rv * alpha[0] + beta[0];
             dst[1 * plane + base + x] = gv * alpha[1] + beta[1];
