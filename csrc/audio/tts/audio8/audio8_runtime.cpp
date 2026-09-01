@@ -376,8 +376,9 @@ void Audio8Runtime::ReserveSpeech(size_t num_frames) {
     (void)num_frames;
 }
 
-#ifdef WITH_GPU
-
+// Audio8GpuState 结构与其 deleter 定义无条件编译(F1:否则 CPU+BUILD_TESTS 构建链接失败)。
+// 结构仅依赖 ORT 类型(Ort::MemoryInfo/Allocator/IoBinding/指针),不含 CUDA 符号;
+// CPU 构建不会构造其实例,而测试 TU 析构 Audio8GpuStatePtr 需要 deleter 符号可链接。
 struct Audio8Runtime::Audio8GpuState {
     Ort::MemoryInfo cuda_mem{nullptr};
     Ort::Allocator slow_alloc{nullptr};   // 归属:释放缓冲用(ORT arena 本身不 Free 到 CUDA 池)
@@ -394,6 +395,17 @@ struct Audio8Runtime::Audio8GpuState {
     std::unique_ptr<Ort::IoBinding> slow_binding;
     std::unique_ptr<Ort::IoBinding> fast_binding;
 };
+
+void Audio8Runtime::Audio8GpuStateDeleter::operator()(Audio8GpuState* p) const noexcept {
+    if (!p) return;
+    for (auto* buf : p->slow_kv) p->slow_alloc.Free(buf);
+    for (auto* buf : p->slow_scratch) p->slow_alloc.Free(buf);
+    for (auto* buf : p->fast_kv) p->fast_alloc.Free(buf);
+    for (auto* buf : p->fast_scratch) p->fast_alloc.Free(buf);
+    delete p;
+}
+
+#ifdef WITH_GPU
 
 Audio8Runtime::Audio8GpuStatePtr
 Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
@@ -425,11 +437,31 @@ Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
         MD_LOG_WARN << "audio8: GPU KV alloc failed: " << e.what() << std::endl;
         return {};
     }
-    // 初始全零(逐段,勿拼连续)
-    for (auto* p : g->slow_kv) cudaMemset(p, 0, static_cast<size_t>(seg) * 2);
-    for (auto* p : g->slow_scratch) cudaMemset(p, 0, static_cast<size_t>(seg) * 2);
-    for (auto* p : g->fast_kv) cudaMemset(p, 0, static_cast<size_t>(g->fast_seg) * 2);
-    for (auto* p : g->fast_scratch) cudaMemset(p, 0, static_cast<size_t>(g->fast_seg) * 2);
+    // 初始全零(逐段,勿拼连续);失败 fail-closed(F3)
+    for (auto* p : g->slow_kv) {
+        if (cudaMemset(p, 0, static_cast<size_t>(seg) * 2) != cudaSuccess) {
+            MD_LOG_WARN << "audio8: cudaMemset slow_kv failed" << std::endl;
+            return {};
+        }
+    }
+    for (auto* p : g->slow_scratch) {
+        if (cudaMemset(p, 0, static_cast<size_t>(seg) * 2) != cudaSuccess) {
+            MD_LOG_WARN << "audio8: cudaMemset slow_scratch failed" << std::endl;
+            return {};
+        }
+    }
+    for (auto* p : g->fast_kv) {
+        if (cudaMemset(p, 0, static_cast<size_t>(g->fast_seg) * 2) != cudaSuccess) {
+            MD_LOG_WARN << "audio8: cudaMemset fast_kv failed" << std::endl;
+            return {};
+        }
+    }
+    for (auto* p : g->fast_scratch) {
+        if (cudaMemset(p, 0, static_cast<size_t>(g->fast_seg) * 2) != cudaSuccess) {
+            MD_LOG_WARN << "audio8: cudaMemset fast_scratch failed" << std::endl;
+            return {};
+        }
+    }
 
     // ---- slow IoBinding:cache 输入绑一次;logits/slow_hidden 绑 CPU;delta 每帧 Value-绑 ----
     g->slow_binding = std::make_unique<Ort::IoBinding>(*I.slow);
@@ -476,13 +508,13 @@ bool Audio8Runtime::SlowStepGpu(Audio8GpuState* g, const std::vector<int64_t>& c
     // delta 输出:每帧按 [1,h,T,d] 形状 Value 绑到 scratch(ORT 1.29 无 4 参 BindOutput)
     {
         const std::array<int64_t, 4> dshape{1, I.n_local_heads, T, I.head_dim};
-        const size_t dbytes = static_cast<size_t>(I.n_local_heads * T * I.head_dim) * 2;
+        const size_t dcount = static_cast<size_t>(I.n_local_heads * T * I.head_dim);
         for (int64_t i = 0; i < I.num_layers; ++i) {
             auto kout = CreateFP16Tensor(g->cuda_mem, g->slow_scratch[static_cast<size_t>(2 * i)],
-                                         dbytes, dshape.data(), 4);
+                                         dcount, dshape.data(), 4);
             auto vout = CreateFP16Tensor(g->cuda_mem,
                                          g->slow_scratch[static_cast<size_t>(2 * i + 1)],
-                                         dbytes, dshape.data(), 4);
+                                         dcount, dshape.data(), 4);
             g->slow_binding->BindOutput(("key_delta_" + std::to_string(i)).c_str(), kout);
             g->slow_binding->BindOutput(("value_delta_" + std::to_string(i)).c_str(), vout);
         }
@@ -503,19 +535,31 @@ bool Audio8Runtime::SlowStepGpu(Audio8GpuState* g, const std::vector<int64_t>& c
         const uint16_t* hidden = outs[1].GetTensorData<uint16_t>();
         last_hidden->assign(hidden, hidden + static_cast<size_t>(I.fast_dim));
     }
-    // delta(已写进 scratch)按 strided 布局拷入 cache 槽位
+    // delta(已写进 scratch)按 strided 布局拷入 cache 槽位;失败 fail-closed(F3)
     const int64_t pos0 = positions[0];
     for (int64_t i = 0; i < I.num_layers; ++i) {
         for (int64_t h = 0; h < I.n_local_heads; ++h) {
             for (int64_t t = 0; t < T; ++t) {
                 const int64_t dst = (h * I.max_seq_len + pos0 + t) * I.head_dim * 2;
                 const int64_t src = ((h * T + t) * I.head_dim) * 2;
-                cudaMemcpy(static_cast<char*>(g->slow_kv[static_cast<size_t>(2 * i)]) + dst,
-                           static_cast<char*>(g->slow_scratch[static_cast<size_t>(2 * i)]) + src,
-                           static_cast<size_t>(I.head_dim) * 2, cudaMemcpyDeviceToDevice);
-                cudaMemcpy(static_cast<char*>(g->slow_kv[static_cast<size_t>(2 * i + 1)]) + dst,
-                           static_cast<char*>(g->slow_scratch[static_cast<size_t>(2 * i + 1)]) + src,
-                           static_cast<size_t>(I.head_dim) * 2, cudaMemcpyDeviceToDevice);
+                const cudaError_t ek = cudaMemcpy(
+                    static_cast<char*>(g->slow_kv[static_cast<size_t>(2 * i)]) + dst,
+                    static_cast<char*>(g->slow_scratch[static_cast<size_t>(2 * i)]) + src,
+                    static_cast<size_t>(I.head_dim) * 2, cudaMemcpyDeviceToDevice);
+                if (ek != cudaSuccess) {
+                    MD_LOG_ERROR << "audio8: slow gpu cache D2D key copy failed: "
+                                 << cudaGetErrorString(ek) << std::endl;
+                    return false;
+                }
+                const cudaError_t ev = cudaMemcpy(
+                    static_cast<char*>(g->slow_kv[static_cast<size_t>(2 * i + 1)]) + dst,
+                    static_cast<char*>(g->slow_scratch[static_cast<size_t>(2 * i + 1)]) + src,
+                    static_cast<size_t>(I.head_dim) * 2, cudaMemcpyDeviceToDevice);
+                if (ev != cudaSuccess) {
+                    MD_LOG_ERROR << "audio8: slow gpu cache D2D value copy failed: "
+                                 << cudaGetErrorString(ev) << std::endl;
+                    return false;
+                }
             }
         }
     }
@@ -527,26 +571,29 @@ bool Audio8Runtime::CopyGpuCacheToHost(Audio8GpuState* g, int kind, uint16_t* ds
     if (kind == 0) {
         uint16_t* out = dst;
         for (auto* p : g->slow_kv) {
-            cudaMemcpy(out, p, static_cast<size_t>(g->slow_seg) * 2, cudaMemcpyDeviceToHost);
+            const cudaError_t ce = cudaMemcpy(out, p, static_cast<size_t>(g->slow_seg) * 2,
+                                              cudaMemcpyDeviceToHost);
+            if (ce != cudaSuccess) {
+                MD_LOG_ERROR << "audio8: copy slow cache to host failed: "
+                             << cudaGetErrorString(ce) << std::endl;
+                return false;
+            }
             out += static_cast<size_t>(g->slow_seg);
         }
     } else {
         uint16_t* out = dst;
         for (auto* p : g->fast_kv) {
-            cudaMemcpy(out, p, static_cast<size_t>(g->fast_seg) * 2, cudaMemcpyDeviceToHost);
+            const cudaError_t ce = cudaMemcpy(out, p, static_cast<size_t>(g->fast_seg) * 2,
+                                              cudaMemcpyDeviceToHost);
+            if (ce != cudaSuccess) {
+                MD_LOG_ERROR << "audio8: copy fast cache to host failed: "
+                             << cudaGetErrorString(ce) << std::endl;
+                return false;
+            }
             out += static_cast<size_t>(g->fast_seg);
         }
     }
     return true;
-}
-
-void Audio8Runtime::Audio8GpuStateDeleter::operator()(Audio8GpuState* p) const noexcept {
-    if (!p) return;
-    for (auto* buf : p->slow_kv) p->slow_alloc.Free(buf);
-    for (auto* buf : p->slow_scratch) p->slow_alloc.Free(buf);
-    for (auto* buf : p->fast_kv) p->fast_alloc.Free(buf);
-    for (auto* buf : p->fast_scratch) p->fast_alloc.Free(buf);
-    delete p;
 }
 
 #else  // !WITH_GPU
