@@ -83,7 +83,7 @@ audio8.predict_stream("你好，世界。", "demo", 1.0f, 480,
 
 ### TTS 使用 CUDA 加速
 
-三个 TTS 模型均可经 `RuntimeOption::set_device(Device::GPU, 0)` 启用 ORT CUDAExecutionProvider（多子模型管线收益最明显，Qwen3 实测约 9×、Audio8 约 2×）：
+Audio8 / Qwen3 两种模型为 **GPU-only**：经 `RuntimeOption::set_device(Device::GPU, 0)` 启用 ORT CUDAExecutionProvider；设备非 GPU 或 GPU 不可用（provider 缺失 / 初始化失败）时 `Load`/`predict` **直接返回失败，不落回 CPU 慢路径**。Audio8 另在模型内用 IoBinding 让 AR 的 KV 常驻显存，消除逐帧整块主机-设备搬运（见 `[tts-rtf]` 用例）。Kokoro 不受影响，默认 CPU。
 
 ```cpp
 modeldeploy::RuntimeOption option;
@@ -94,7 +94,9 @@ audio8.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);
 // Qwen3-TTS 同理：构造 Qwen3Tts 时传入同一个 option 即可启用 CUDA EP
 ```
 
-依赖 GPU 版 onnxruntime（providers 动态库 `onnxruntime_providers_cuda.dll` 等需在可执行搜索路径）+ CUDA 运行库（Windows 下 `CUDA\v13.x\bin\x64` 在 PATH）。任一不可用时打印 `CUDAExecutionProvider not available`（或 provider 初始化失败时打印 `failed to enable`）并**自动回退 CPU**（fail-closed，行为与 CPU 构建一致）。
+**实测速度（RTX 4060 Ti，44.1/24 kHz，2026-09）**：Audio8 GPU RTF≈0.9–1.3（较 CPU 约 2.2×）；Qwen3 GPU RTF≈1.2（空闲；重载机器最高约 2.7，较 CPU 约 6–9×）。二者均未实现实时合成（RTF<1）。RTF 随文本长度/GPU/机器负载波动，以 `test_modeldeploy.exe "[tts-rtf]"` 回归门禁为准（Audio8≤1.5、Qwen3≤3.0）。
+
+依赖 GPU 版 onnxruntime（providers 动态库 `onnxruntime_providers_cuda.dll` 等需在可执行搜索路径）+ CUDA 运行库（Windows 下 `CUDA\v13.x\bin\x64` 在 PATH）。不可用时按上段 fail-closed。
 
 ## 设备与设备帧
 

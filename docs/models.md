@@ -343,10 +343,11 @@ Audio8-TTS-Preview-0.6B（DualAR + 内置 codec）的 ONNX 移植，**44.1kHz** 
 | `voices/` | 注册 voice（`codes.npy` + `meta.json`，如 `demo`） |
 | `registration/` | 可选：新 voice 注册用（codec_encoder + registration_manifest.json） |
 
-**API 用法**（`model_dir` 指向 `audio8_preview` 根目录，`opt` 可设 `cpu_thread_num`，并可 `set_device(Device::GPU, 0)` 启用 CUDA 加速）：
+**API 用法**（`model_dir` 指向 `audio8_preview` 根目录，`opt` 必须 `set_device(Device::GPU, 0)` —— Audio8 **GPU-only**）：
 
 ```cpp
 modeldeploy::RuntimeOption option;
+option.set_device(modeldeploy::Device::GPU, 0);
 modeldeploy::audio::tts::Audio8 tts;
 tts.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);
 
@@ -355,7 +356,7 @@ tts.predict("你好，世界。", "demo", 1.0f, &audio);   // voice 来自 {mode
 // audio 为 44.1kHz 单声道；tts.get_sample_rate() == 44100
 ```
 
-**GPU 运行**：`option.set_device(modeldeploy::Device::GPU, 0)` 即可让 ORT 走 CUDA EP（需 GPU onnxruntime 包 + CUDA 运行库，不可用时自动回退 CPU）；本机实测（RTX 4060 Ti / CUDA 13.3 / onnxruntime 1.29.0）同句合成约 6.7s(CPU) → 3.0s(GPU)。
+**GPU 运行（GPU-only）**：Audio8 必须 `set_device(Device::GPU, 0)`，设备非 GPU 或 CUDA 不可用时 `Load`/`predict` 直接失败（**不落回 CPU**）。AR 的 KV 经 IoBinding 常驻显存（GPU-only 低延迟路径）。本机实测（RTX 4060 Ti / CUDA 13.3 / onnxruntime 1.29.0）：同句 GPU 合成 RTF≈0.9–1.3（未实时），较 CPU 约 2.2×；以 `[tts-rtf]` 回归门禁 Audio8≤1.5 为准（RTF 随文本/负载波动）。
 
 ```python
 tts = modeldeploy.audio.Audio8("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option)
@@ -396,7 +397,7 @@ bool ok = tts.clone("你好，这是声音克隆。", "ref.wav", "参考音频�
 // ok == false 表示失败（非法 lang / 参考音频无法编码等）
 ```
 
-**GPU 运行**：同样 `option.set_device(modeldeploy::Device::GPU, 0)` 启用 CUDA EP（依赖 GPU onnxruntime 包 + CUDA 运行库，不可用时自动回退 CPU）；多子模型 LLM 管线收益最大，本机实测（RTX 4060 Ti / CUDA 13.3 / onnxruntime 1.29.0）同句合成约 35.1s(CPU) → 3.7s(GPU)。
+**GPU 运行（GPU-only）**：Qwen3-TTS 同样必须 `set_device(Device::GPU, 0)`，设备非 GPU 或 CUDA 不可用时直接失败（不落回 CPU）。多子模型 LLM 管线在 GPU 收益最大。本机实测（RTX 4060 Ti / CUDA 13.3 / onnxruntime 1.29.0）：同句 GPU 合成 RTF≈1.2（空闲；重载机器最高约 2.7），较 CPU 约 6–9×；以 `[tts-rtf]` 回归门禁 Qwen3≤3.0 为准（RTF 对机器负载敏感）。
 
 ```python
 tts = modeldeploy.audio.Qwen3Tts("{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b", option)
