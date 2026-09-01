@@ -2,6 +2,10 @@
 # 全模型 ONNX -> bmodel 批量转换（BM1688 / CV186AH），覆盖所有 vision 模型。
 # 依赖 tools/docker/sophgo/convert.sh（tpuc_dev 容器内运行）。
 #
+# 注意：本脚本为遗留批处理（平铺命名/旧产物）。规范转换入口见
+# tools/convert/models.json（单源注册表）+ tools/convert/convert_bmodel.ps1
+# （镜像目录 + <name>-int8.bmodel 命名，int8 + qtable 混合精度）。
+#
 # 用法（在 tpuc_dev 容器内）:
 #   docker run --rm -it -v <onnx目录>:/conv -v <图片目录>:/cali_img tpuc_dev:1.27 \
 #       bash /conv/convert_all.sh --onnx_dir /conv --out_dir /conv/sophgo_models \
@@ -50,12 +54,12 @@ declare -A SPECS=(
     [yolo11n_pose]="yolo11n/yolo11n-pose.onnx:images:1x3x640x640"
     [yolo11n_seg]="yolo11n/yolo11n-seg.onnx:images:1x3x640x640"
     # ---- face ----
-    [scrfd]="face/scrfd_2.5g_bnkps_shape640x640.onnx:input.1:1x3x640x640"
-    [age_predictor]="face/age_predictor.onnx:input:1x3x112x112"
-    [gender_predictor]="face/gender_predictor.onnx:input:1x3x112x112"
-    [face_recognizer]="face/face_recognizer.onnx:input:1x3x248x248"
-    [fas_first]="face/fas_first.onnx:_input_8:1x3x224x224"
-    [fas_second]="face/fas_second.onnx:_input_151:1x3x224x224"
+    [scrfd]="seetaface/scrfd_2.5g_bnkps_shape640x640.onnx:input.1:1x3x640x640"
+    [age_predictor]="seetaface/age_predictor.onnx:input:1x3x112x112"
+    [gender_predictor]="seetaface/gender_predictor.onnx:input:1x3x112x112"
+    [face_recognizer]="seetaface/face_recognizer.onnx:input:1x3x248x248"
+    [fas_first]="seetaface/fas_first.onnx:_input_8:1x3x224x224"
+    [fas_second]="seetaface/fas_second.onnx:_input_151:1x3x224x224"
     # ---- lpr ----
     [yolov5plate]="yolov5plate.onnx:input:1x3x640x640"
     [plate_recognition]="plate_recognition_color.onnx:images:1x3x48x168"

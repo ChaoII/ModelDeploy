@@ -7,7 +7,7 @@
 
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceAsFirst(
-        "../../test_data/test_models/onnx/face/fas_first.onnx");
+        "../../test_data/test_models/onnx/seetaface/fas_first.onnx");
     auto im0 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_id4.jpg");
     float result;
     if (!faceid_model.predict(im0, &result)) {

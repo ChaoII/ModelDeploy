@@ -22,7 +22,7 @@ int main() {
 
     // ---- 2. 加载模型（OCR：检测 + 方向分类 + 识别；词典统一 ppocrv6_tiny）----
     const char* dict = "../../test_data/ppocrv6_tiny_dict.txt";
-    auto m = std::make_unique<modeldeploy::vision::ocr::PaddleOCR>("../../test_data/test_models/trt/ocr/det_infer.engine", "../../test_data/test_models/trt/ocr/cls_infer.engine", "../../test_data/test_models/trt/ocr/rec_infer.engine", dict, opt);
+    auto m = std::make_unique<modeldeploy::vision::ocr::PaddleOCR>("../../test_data/test_models/trt/ocr/ppocrv6_tiny/det_infer.engine", "../../test_data/test_models/trt/ocr/ppocrv6_tiny/cls_infer.engine", "../../test_data/test_models/trt/ocr/ppocrv6_tiny/rec_infer.engine", dict, opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     m->set_rec_batch_size(8);
     m->get_detector()->get_preprocessor().set_max_side_len(1280);

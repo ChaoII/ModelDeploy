@@ -21,12 +21,9 @@ int main() {
     opt.enable_trt = true;
     opt.enable_fp16 = true;
     opt.ort_option.trt_engine_cache_path = "./trt_engine";
-    opt.set_trt_min_shape("x:1x3x640x640");
-    opt.set_trt_opt_shape("x:1x3x640x640");
-    opt.set_trt_max_shape("x:1x3x640x640");
 
     // ---- 2. 加载模型（人脸检测）----
-    auto m = std::make_unique<modeldeploy::vision::face::Scrfd>("../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx", opt);
+    auto m = std::make_unique<modeldeploy::vision::face::Scrfd>("../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     // ---- 3. 读图 ----
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");

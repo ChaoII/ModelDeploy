@@ -8,9 +8,7 @@ int main() {
     opt.use_gpu(0);
     opt.enable_trt = true;
     opt.enable_fp16 = true;
-    opt.set_trt_min_shape("x:1x3x640x640");
-    opt.set_trt_opt_shape("x:1x3x640x640");
-    opt.set_trt_max_shape("x:1x3x640x640");
+    opt.ort_option.trt_engine_cache_path = "./trt_engine";
     return run_tracking_demo(opt,
                              "../../test_data/test_models/onnx/yolo26n/yolo26n.onnx",
                              "result_tracking_ort_gpu_trt_ep.jpg",

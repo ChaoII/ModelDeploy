@@ -12,7 +12,7 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_AGE,
-                        "../../test_data/test_models/onnx/face/age_predictor.onnx", opt),
+                        "../../test_data/test_models/onnx/seetaface/age_predictor.onnx", opt),
         "create face age");
 
     MDImageHandle img = nullptr;

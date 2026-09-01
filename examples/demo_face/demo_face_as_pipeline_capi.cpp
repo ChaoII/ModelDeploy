@@ -9,9 +9,9 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_AS_PIPELINE,
-                        "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx|"
-                        "../../test_data/test_models/onnx/face/fas_first.onnx|"
-                        "../../test_data/test_models/onnx/face/fas_second.onnx", opt),
+                        "../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx|"
+                        "../../test_data/test_models/onnx/seetaface/fas_first.onnx|"
+                        "../../test_data/test_models/onnx/seetaface/fas_second.onnx", opt),
         "create face anti-spoof pipeline");
 
     MDImageHandle img = nullptr;

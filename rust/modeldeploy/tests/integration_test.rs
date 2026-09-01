@@ -294,7 +294,7 @@ fn test_depth() -> Result<()> {
 #[test]
 fn test_face_detection() -> Result<()> {
     let opt = cpu_opt()?;
-    let model = Scrfd::new(&test_data("test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx"), &opt)?;
+    let model = Scrfd::new(&test_data("test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx"), &opt)?;
     let img = Image::read(&test_img("test_face_detection4.jpg"))?;
     let faces = model.predict(&img)?;
     assert!(!faces.is_empty());
@@ -307,7 +307,7 @@ fn test_face_detection() -> Result<()> {
 #[test]
 fn test_face_recognition() -> Result<()> {
     let opt = cpu_opt()?;
-    let model = SeetaFaceID::new(&test_data("test_models/onnx/face/face_recognizer.onnx"), &opt)?;
+    let model = SeetaFaceID::new(&test_data("test_models/onnx/seetaface/face_recognizer.onnx"), &opt)?;
     let img = Image::read(&test_img("test_face_id.jpg"))?;
     let rec = model.predict(&img)?;
     assert!(rec[0].embedding.len() > 0);
@@ -410,12 +410,12 @@ fn test_speaker_gallery() -> Result<()> {
 #[test]
 fn test_face_age_gender() -> Result<()> {
     let opt = cpu_opt()?;
-    let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/face/age_predictor.onnx"), &opt)?;
+    let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/seetaface/age_predictor.onnx"), &opt)?;
     let img = Image::read(&test_img("test_face_id1.jpg"))?;
     let age: i32 = age_model.predict(&img)?;
     assert!(age >= 0);
 
-    let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/face/gender_predictor.onnx"), &opt)?;
+    let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/seetaface/gender_predictor.onnx"), &opt)?;
     let img2 = Image::read(&test_img("test_face_gender.jpg"))?;
     let gender: i32 = gender_model.predict(&img2)?;
     assert!(gender >= 0);
@@ -427,14 +427,14 @@ fn test_face_age_gender() -> Result<()> {
 #[test]
 fn face_age_gender_returns_i32() -> Result<()> {
     let opt = cpu_opt()?;
-    let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/face/age_predictor.onnx"), &opt)?;
+    let age_model = SeetaFaceAge::new(&test_data("test_models/onnx/seetaface/age_predictor.onnx"), &opt)?;
     let img = Image::read(&test_img("test_face_id1.jpg"))?;
 
     let mut _a: i32 = 0;
     _a = age_model.predict(&img)?;
     let _: Result<i32, modeldeploy::MdError> = age_model.predict(&img);
 
-    let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/face/gender_predictor.onnx"), &opt)?;
+    let gender_model = SeetaFaceGender::new(&test_data("test_models/onnx/seetaface/gender_predictor.onnx"), &opt)?;
     let img2 = Image::read(&test_img("test_face_gender.jpg"))?;
     let mut _g: i32 = 0;
     _g = gender_model.predict(&img2)?;
@@ -570,7 +570,7 @@ fn test_ocr_rec_submodel() -> Result<()> {
 #[test]
 fn test_face_rec_pipeline_submodel() -> Result<()> {
     let opt = cpu_opt()?;
-    let dir = test_data("test_models/onnx/face");
+    let dir = test_data("test_models/onnx/seetaface");
     let path = format!("{}/scrfd_2.5g_bnkps_shape640x640.onnx|{}/face_recognizer.onnx", dir, dir);
     let model = FaceRecognizerPipelineModel::new(&path, &opt)?;
     let img = Image::read(&test_img("test_face_detection4.jpg"))?;

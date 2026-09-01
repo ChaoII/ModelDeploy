@@ -12,7 +12,7 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_REC,
-                        "../../test_data/test_models/onnx/face/face_recognizer.onnx", opt),
+                        "../../test_data/test_models/onnx/seetaface/face_recognizer.onnx", opt),
         "create face rec");
 
     MDImageHandle img = nullptr;

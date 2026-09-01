@@ -324,7 +324,7 @@ TEST_CASE("Benchmark UltralyticsSem", "[all_models][benchmark]") {
 
 TEST_CASE("Benchmark Scrfd face det", "[all_models][benchmark]") {
     // onnx → ORT（GPU 下 TRT EP）；.engine → TRT backend
-    for (const auto& rel : {"onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx", "trt/scrfd_2.5g.engine"}) {
+    for (const auto& rel : {"onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx", "trt/seetaface/scrfd_2.5g_bnkps_shape640x640.engine"}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
         if (!bench_supported(rel)) continue;
@@ -353,13 +353,13 @@ TEST_CASE("Benchmark SeetaFace face models", "[all_models][benchmark]") {
     struct FaceCfg { const char* tag; const char* file; const char* trt_file; const char* img; };
     const FaceCfg cfgs[] = {
         {"face-age", "age_predictor.onnx", "", "test_face_gender.jpg"},            // age 无法转 TRT（Gemm 固定 batch）
-        {"face-gender", "gender_predictor.onnx", "gender_predictor.engine", "test_face_gender.jpg"},
-        {"face-rec", "face_recognizer.onnx", "face_recognizer.engine", "test_face_id.jpg"},
+        {"face-gender", "gender_predictor.onnx", "seetaface/gender_predictor.engine", "test_face_gender.jpg"},
+        {"face-rec", "face_recognizer.onnx", "seetaface/face_recognizer.engine", "test_face_id.jpg"},
     };
     for (const auto& c : cfgs) {
         // 遍历后端：onnx + trt engine
         std::vector<std::string> rels;
-        rels.push_back(std::string("onnx/face/") + c.file);
+        rels.push_back(std::string("onnx/seetaface/") + c.file);
         if (std::string(c.trt_file).size()) rels.push_back(std::string("trt/") + c.trt_file);
         for (const auto& rel : rels) {
             auto mp = bench_data_dir() / "test_models" / rel;
@@ -460,7 +460,7 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
     if (img.empty() || dict.empty()) return;
 
     // det（onnx + TRT backend）
-    for (const auto& rel : {std::string("onnx/ocr/ppocrv4_mobile/det_infer.onnx"), std::string("trt/ocr_det.engine")}) {
+    for (const auto& rel : {std::string("onnx/ocr/ppocrv6_tiny/det_infer.onnx"), std::string("trt/ocr/ppocrv6_tiny/det_infer.engine")}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
         if (!bench_supported(mp.string())) continue;
@@ -480,7 +480,7 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
         report(std::string("ocr-det ") + rel, runs);
     }
     // rec（onnx + TRT backend）
-    for (const auto& rel : {std::string("onnx/ocr/ppocrv4_mobile/rec_infer.onnx"), std::string("trt/ocr_rec.engine")}) {
+    for (const auto& rel : {std::string("onnx/ocr/ppocrv6_tiny/rec_infer.onnx"), std::string("trt/ocr/ppocrv6_tiny/rec_infer.engine")}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
         if (!bench_supported(mp.string())) continue;
@@ -500,7 +500,7 @@ TEST_CASE("Benchmark OCR single models", "[all_models][benchmark]") {
         report(std::string("ocr-rec ") + rel, runs);
     }
     // cls（onnx + TRT backend）
-    for (const auto& rel : {std::string("onnx/ocr/ppocrv4_mobile/cls_infer.onnx"), std::string("trt/ocr_cls.engine")}) {
+    for (const auto& rel : {std::string("onnx/ocr/ppocrv6_tiny/cls_infer.onnx"), std::string("trt/ocr/ppocrv6_tiny/cls_infer.engine")}) {
         auto mp = bench_data_dir() / "test_models" / rel;
         if (!has_file(mp)) continue;
         if (!bench_supported(mp.string())) continue;
@@ -662,10 +662,10 @@ TEST_CASE("Benchmark face recognition pipeline", "[pipeline][benchmark]") {
     // onnx（ORT CPU 基线）+ trt（TRT backend）
     for (const auto& be : {std::string("onnx"), std::string("trt")}) {
         auto sub = bench_data_dir() / "test_models" / be;
-        auto det = (be == "trt") ? (sub / "scrfd_2.5g.engine")
-                                 : (sub / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx");
-        auto rec = (be == "trt") ? (sub / "face_recognizer.engine")
-                                 : (sub / "face" / "face_recognizer.onnx");
+        auto det = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "seetaface" / "scrfd_2.5g_bnkps_shape640x640.engine")
+                                 : (sub / "seetaface" / "scrfd_2.5g_bnkps_shape640x640.onnx");
+        auto rec = (be == "trt") ? (sub / "seetaface" / "face_recognizer.engine")
+                                 : (sub / "seetaface" / "face_recognizer.onnx");
         if (!has_file(det) || !has_file(rec)) continue;
         RuntimeOption opt = bench_opt(det.string());
         face::FaceRecognizerPipeline model(det.string(), rec.string(), opt);
@@ -687,9 +687,9 @@ TEST_CASE("Benchmark face recognition pipeline", "[pipeline][benchmark]") {
 }
 
 TEST_CASE("Benchmark face anti-spoof pipeline", "[pipeline][benchmark]") {
-    auto det = bench_data_dir() / "test_models" / "onnx" / "face" / "scrfd_2.5g_bnkps_shape640x640.onnx";
-    auto first = bench_data_dir() / "test_models" / "onnx" / "face" / "fas_first.onnx";
-    auto second = bench_data_dir() / "test_models" / "onnx" / "face" / "fas_second.onnx";
+    auto det = bench_data_dir() / "test_models" / "onnx" / "seetaface" / "scrfd_2.5g_bnkps_shape640x640.onnx";
+    auto first = bench_data_dir() / "test_models" / "onnx" / "seetaface" / "fas_first.onnx";
+    auto second = bench_data_dir() / "test_models" / "onnx" / "seetaface" / "fas_second.onnx";
     if (!has_file(det) || !has_file(first) || !has_file(second)) return;
     RuntimeOption opt = bench_opt_onnx();
     face::SeetaFaceAsPipeline model(det.string(), first.string(), second.string(), opt);
@@ -747,11 +747,11 @@ TEST_CASE("Benchmark OCR pipeline", "[pipeline][benchmark]") {
     if (dict.empty()) return;
     // onnx（ORT CPU 基线）+ trt（TRT backend）
     for (const auto& be : {std::string("onnx"), std::string("trt")}) {
-        auto det = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr_det.engine")
+        auto det = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr" / "ppocrv6_tiny" / "det_infer.engine")
                                  : find_ocr_model("det", ".onnx");
-        auto cls = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr_cls.engine")
+        auto cls = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr" / "ppocrv6_tiny" / "cls_infer.engine")
                                  : find_ocr_model("cls", ".onnx");
-        auto rec = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr_rec.engine")
+        auto rec = (be == "trt") ? (bench_data_dir() / "test_models" / "trt" / "ocr" / "ppocrv6_tiny" / "rec_infer.engine")
                                  : find_ocr_model("rec", ".onnx");
         if (!has_file(det) || !has_file(cls) || !has_file(rec)) continue;
         RuntimeOption opt = bench_opt(det.string());

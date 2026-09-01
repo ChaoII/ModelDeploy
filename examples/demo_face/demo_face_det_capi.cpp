@@ -12,7 +12,7 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_DET,
-                        "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx", opt), "create face det");
+                        "../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx", opt), "create face det");
 
     // 演示新参数 API
     die(md_model_set_param_d(model, "conf_threshold", 0.4), "set conf_threshold");

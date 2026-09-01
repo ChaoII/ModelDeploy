@@ -7,7 +7,7 @@
 
 int main() {
     auto faceid_model = modeldeploy::vision::face::SeetaFaceAge(
-        "../../test_data/test_models/onnx/face/age_predictor.onnx");
+        "../../test_data/test_models/onnx/seetaface/age_predictor.onnx");
     auto im0 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_id4.jpg");
     int age = 0;
     if (!faceid_model.predict(im0, &age)) {

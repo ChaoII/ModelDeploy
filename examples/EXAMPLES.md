@@ -26,13 +26,13 @@ cmake --build build
 | `demo_obb_capi` | 旋转框 | `onnx/yolo11n/yolo11n-obb_nms.onnx` | `test_images/test_obb1.jpg` | 旋转框 + `capi_obb_out.jpg` |
 | `demo_instance_seg_capi` | 实例分割 | `onnx/yolo11n/yolo11n-seg_nms.onnx` | 图 | 分割实例 + `capi_iseg_out.jpg` |
 | `demo_classification_capi` | 分类 | `onnx/yolo11n/yolo11n-cls.onnx` | `test_images/bus.jpg` | top5 + `capi_cls_out.jpg` |
-| `demo_face_det_capi` | 人脸检测 | `onnx/face/scrfd_*.onnx` | `test_images/test_face1.jpg` | 人脸框/关键点 + `capi_face_det_out.jpg` |
-| `demo_face_age_capi` | 年龄 | `onnx/face/age_predictor.onnx` | `test_images/test_face_id1.jpg` | 打印 age |
-| `demo_face_gender_capi` | 性别 | `onnx/face/gender_predictor.onnx` | `test_images/test_face_gender.jpg` | 打印 gender |
-| `demo_face_rec_capi` | 人脸特征 | `onnx/face/face_recognizer.onnx` | `test_images/test_face_id4.jpg` | 打印 1024 维 embedding |
+| `demo_face_det_capi` | 人脸检测 | `onnx/seetaface/scrfd_*.onnx` | `test_images/test_face1.jpg` | 人脸框/关键点 + `capi_face_det_out.jpg` |
+| `demo_face_age_capi` | 年龄 | `onnx/seetaface/age_predictor.onnx` | `test_images/test_face_id1.jpg` | 打印 age |
+| `demo_face_gender_capi` | 性别 | `onnx/seetaface/gender_predictor.onnx` | `test_images/test_face_gender.jpg` | 打印 gender |
+| `demo_face_rec_capi` | 人脸特征 | `onnx/seetaface/face_recognizer.onnx` | `test_images/test_face_id4.jpg` | 打印 1024 维 embedding |
 | `demo_face_rec_pipeline_capi` | 检测+特征 | `scrfd_*.onnx|face_recognizer.onnx` | `test_images/test_face_detection4.jpg` | 打印每张脸 embedding |
-| `demo_face_as_first_capi` | 防伪(first) | `onnx/face/fas_first.onnx` | `test_images/test_face_id3.jpg` | 打印 REAL/SPOOF |
-| `demo_face_as_second_capi` | 防伪(second) | `onnx/face/fas_second.onnx` | `test_images/test_face_as_second2.jpg` | 打印 REAL/SPOOF |
+| `demo_face_as_first_capi` | 防伪(first) | `onnx/seetaface/fas_first.onnx` | `test_images/test_face_id3.jpg` | 打印 REAL/SPOOF |
+| `demo_face_as_second_capi` | 防伪(second) | `onnx/seetaface/fas_second.onnx` | `test_images/test_face_as_second2.jpg` | 打印 REAL/SPOOF |
 | `demo_face_as_pipeline_capi` | 防伪管线 | `scrfd_*.onnx|fas_first.onnx|fas_second.onnx` | `test_images/test_face_detection4.jpg` | 逐脸打印 REAL/FUZZY/SPOOF |
 | `demo_ocr_capi` | OCR 整链 | `ocr/ppocrv4_mobile/det_infer.infer|cls_infer.onnx|rec_infer.onnx|ppocrv4_dict.txt` | `test_images/test_ocr.png` | 打印行文本 + `capi_ocr_out.jpg`（演示 `det_db_box_thresh`/`cls_thresh` 参数） |
 | `demo_lpr_pipeline_capi` | 车牌管线 | `lpr/yolov5plate.onnx|plate_recognition_color.onnx` | `test_images/test_lpr_pipeline.jpg` | 打印车牌/颜色 + `capi_lpr_out.jpg` |

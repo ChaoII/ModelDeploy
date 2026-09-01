@@ -12,8 +12,8 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_REC_PIPELINE,
-                        "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx|"
-                        "../../test_data/test_models/onnx/face/face_recognizer.onnx", opt),
+                        "../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx|"
+                        "../../test_data/test_models/onnx/seetaface/face_recognizer.onnx", opt),
         "create face rec pipeline");
 
     MDImageHandle img = nullptr;
