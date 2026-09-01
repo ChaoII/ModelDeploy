@@ -21,9 +21,6 @@ int main() {
     opt.enable_trt = true;
     opt.enable_fp16 = true;
     opt.ort_option.trt_engine_cache_path = "./trt_engine";
-    opt.set_trt_min_shape("x:1x3x640x640");
-    opt.set_trt_opt_shape("x:1x3x640x640");
-    opt.set_trt_max_shape("x:1x3x640x640");
 
     // ---- 2. 加载模型（实例分割）----
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsSeg>("../../test_data/test_models/onnx/yolo26n/yolo26n-seg.onnx", opt);

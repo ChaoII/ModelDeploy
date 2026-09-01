@@ -599,7 +599,8 @@ TEST_CASE("image_data: device-frame op not supported errors (no silent cpu)", "[
     auto dev = modeldeploy::vision::ImageData::from_planes(
         pl, 2, MdImageType::NV12, 8, 4, Device::GPU);
     modeldeploy::vision::ImageData::last_error();           // 先清空
-    auto c = dev.crop({0, 0, 2, 2});
+    // GPU NV12 裁剪已实现（设备侧），但 rotate_crop 仍不受设备帧支持 → 门控 fast-fail（绝不解引用）
+    auto c = dev.rotate_crop({0, 0, 2, 2, 2, 2, 0, 0});
     CHECK(c.empty());                                       // 设备帧未实现 → 空
     CHECK(modeldeploy::vision::ImageData::last_error() != nullptr);  // 且报错
 }
@@ -682,7 +683,7 @@ TEST_CASE("image_data: supports(device,op) fast-fails device frames without buil
     using modeldeploy::vision::ImageOp;
     using modeldeploy::vision::VisionProcessorBackend;
 
-    // supports 语义：CPU→true；GPU/TPU→仅 Preprocess/Draw
+    // supports 语义：CPU→全支持；GPU→Preprocess/Draw/Crop；TPU→Preprocess/Draw/Crop/Rotate/CvtColor
     REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Crop));
     REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Rotate));
     REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Resize));
@@ -690,31 +691,30 @@ TEST_CASE("image_data: supports(device,op) fast-fails device frames without buil
     REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::RotateCrop));
     REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Preprocess));
     REQUIRE(VisionProcessorBackend::supports(Device::CPU, ImageOp::Draw));
-    // GPU/TPU 仅 Preprocess/Draw
+    // GPU：中间 op 仅 Crop（NV12 设备侧裁剪）已实现，其余 fast-fail
     REQUIRE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Preprocess));
     REQUIRE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Draw));
-    REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Crop));
+    REQUIRE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Crop));
     REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Rotate));
     REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::Resize));
     REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::CvtColor));
     REQUIRE_FALSE(VisionProcessorBackend::supports(Device::GPU, ImageOp::RotateCrop));
+    // TPU：中间 op Crop/Rotate（+CvtColor）由 Sophgo 就地实现；Resize 未实现
     REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Preprocess));
     REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Draw));
+    REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Crop));
+    REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Rotate));
+    REQUIRE(VisionProcessorBackend::supports(Device::TPU, ImageOp::CvtColor));
     REQUIRE_FALSE(VisionProcessorBackend::supports(Device::TPU, ImageOp::Resize));
 
-    // GPU NV12 设备帧（哑指针，绝不 dereference）→ 各 op fast-fail：空 + last_error（不建 backend）
+    // GPU NV12 设备帧（哑指针，绝不 dereference）→ 未实现 op 门控 fast-fail：空 + last_error（不建 backend）。
+    // Crop 已由设备侧实现（CudaProcessorBackend），不在 fast-fail 之列。
     auto* dummy_y = reinterpret_cast<uint8_t*>(uintptr_t(0x1));
     auto* dummy_uv = reinterpret_cast<uint8_t*>(uintptr_t(0x2));
     ImageData::Plane planes[2] = {{dummy_y, 8}, {dummy_uv, 8}};
     auto frame = ImageData::from_planes(planes, 2, MdImageType::NV12, 8, 4, Device::GPU);
     REQUIRE(!frame.empty());
     REQUIRE(frame.device() == Device::GPU);
-
-    // crop
-    ImageData::last_error();
-    auto c = frame.crop({0, 0, 2, 2});
-    CHECK(c.empty());
-    CHECK(ImageData::last_error() != nullptr);
 
     // rotate（就地 fast-fail → 帧清空 + last_error）
     ImageData::last_error();

@@ -71,7 +71,18 @@ namespace modeldeploy::vision::face {
         std::vector<Tensor> input_tensors{batch_tensor};
         std::vector<Tensor> output_tensors;
         if (timers) timers->infer_timer.start();
-        if (!infer(input_tensors, &output_tensors)) return false;
+        if (!infer(input_tensors, &output_tensors)) {
+            // 静态 engine（如 batch=1 的 TRT engine）无法直接接受 N>1 的 batch。
+            // 退化为逐张脸逐个推理，保证静态引擎下多脸图仍然可用。
+            if (timers) timers->infer_timer.stop();
+            MD_LOG_WARN << "Batch genderage infer failed with batch " << n
+                        << ", backend/engine may not support dynamic batch; "
+                        << "falling back to per-face inference." << std::endl;
+            for (size_t i = 0; i < n; ++i) {
+                if (!predict_gender_age(image, bboxes[i], &(*results)[i], timers)) return false;
+            }
+            return true;
+        }
         if (timers) timers->infer_timer.stop();
         if (timers) timers->post_timer.start();
         // 输出 [N,3]：每张脸 3 元素（gender 前 2、age 第 3）

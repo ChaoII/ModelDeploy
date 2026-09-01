@@ -12,7 +12,7 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_GENDER,
-                        "../../test_data/test_models/onnx/face/gender_predictor.onnx", opt),
+                        "../../test_data/test_models/onnx/seetaface/gender_predictor.onnx", opt),
         "create face gender");
 
     MDImageHandle img = nullptr;

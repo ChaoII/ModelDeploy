@@ -45,6 +45,7 @@ namespace {
         std::string type;
         std::string family;
         std::string backend = "ort";
+        int size = 0; // 0 = 默认 640
     };
 
     Args parse_args(int argc, char** argv) {
@@ -57,16 +58,21 @@ namespace {
             else if (k == "--type" && i + 1 < argc) a.type = argv[++i];
             else if (k == "--family" && i + 1 < argc) a.family = argv[++i];
             else if (k == "--backend" && i + 1 < argc) a.backend = argv[++i];
+            else if (k == "--size" && i + 1 < argc) a.size = std::atoi(argv[++i]);
         }
         return a;
     }
+
+    // 全局输入尺寸覆盖（--size），供各 Ultralytics 预处理器/推理使用
+    static int g_size = 640;
 
     void print_usage() {
         std::cerr
             << "usage: baseline_collect --model <path> --image <path> --out <dir>"
             << " --type <det|obb|seg|pose|cls|face_det|ocr_det|ocr_rec|ocr_cls|pre|raw>"
             << " [--family <det|obb|seg|pose|cls|face_det|ocr_det|ocr_rec|ocr_cls>]"
-            << " [--backend <ort|mnn|trt|sophgo>]\n";
+            << " [--backend <ort|mnn|trt|sophgo>]"
+            << " [--size <N> (input size override, default 640)]\n";
     }
 
     fs::path get_test_data() {
@@ -217,7 +223,7 @@ namespace {
     bool run_preprocessor(modeldeploy::vision::detection::UltralyticsDet& model,
                           const std::vector<ImageData>& imgs, std::vector<Tensor>* inputs) {
         auto& preproc = model.get_preprocessor();
-        preproc.set_size({640, 640});
+        preproc.set_size({g_size, g_size});
         std::vector<LetterBoxRecord> lbs;
         if (!preproc.run(imgs, inputs, &lbs)) {
             std::cerr << "error: UltralyticsDet preprocessor.run failed" << std::endl;
@@ -229,7 +235,7 @@ namespace {
     bool run_preprocessor(modeldeploy::vision::detection::UltralyticsSeg& model,
                           const std::vector<ImageData>& imgs, std::vector<Tensor>* inputs) {
         auto& preproc = model.get_preprocessor();
-        preproc.set_size({640, 640});
+        preproc.set_size({g_size, g_size});
         std::vector<LetterBoxRecord> lbs;
         if (!preproc.run(imgs, inputs, &lbs)) {
             std::cerr << "error: UltralyticsSeg preprocessor.run failed" << std::endl;
@@ -241,7 +247,7 @@ namespace {
     bool run_preprocessor(modeldeploy::vision::detection::UltralyticsPose& model,
                           const std::vector<ImageData>& imgs, std::vector<Tensor>* inputs) {
         auto& preproc = model.get_preprocessor();
-        preproc.set_size({640, 640});
+        preproc.set_size({g_size, g_size});
         std::vector<LetterBoxRecord> lbs;
         if (!preproc.run(imgs, inputs, &lbs)) {
             std::cerr << "error: UltralyticsPose preprocessor.run failed" << std::endl;
@@ -253,7 +259,7 @@ namespace {
     bool run_preprocessor(modeldeploy::vision::detection::UltralyticsObb& model,
                           const std::vector<ImageData>& imgs, std::vector<Tensor>* inputs) {
         auto& preproc = model.get_preprocessor();
-        preproc.set_size({640, 640});
+        preproc.set_size({g_size, g_size});
         std::vector<LetterBoxRecord> lbs;
         if (!preproc.run(imgs, inputs, &lbs)) {
             std::cerr << "error: UltralyticsObb preprocessor.run failed" << std::endl;
@@ -276,7 +282,7 @@ namespace {
     bool run_preprocessor(modeldeploy::vision::face::Scrfd& model,
                           const std::vector<ImageData>& imgs, std::vector<Tensor>* inputs) {
         auto& preproc = model.get_preprocessor();
-        preproc.set_size({640, 640});
+        preproc.set_size({g_size, g_size});
         std::vector<LetterBoxRecord> lbs;
         auto images = imgs; // run 接受非 const 指针
         if (!preproc.run(&images, inputs, &lbs)) {
@@ -353,6 +359,9 @@ namespace {
         if (!model.is_initialized()) {
             std::cerr << "error: failed to load model " << args.model << std::endl;
             return false;
+        }
+        if (args.size > 0) {
+            model.get_preprocessor().set_size({args.size, args.size});
         }
         const std::vector<ImageData> imgs{img};
         if (mode == "pre" || mode == "raw") {
@@ -469,6 +478,7 @@ namespace {
             print_usage();
             return 1;
         }
+        g_size = args.size > 0 ? args.size : 640;
         const ImageData img = ImageData::imread(args.image);
         if (img.empty()) {
             std::cerr << "error: cannot read image " << args.image << std::endl;

@@ -1,0 +1,32 @@
+[
+  {"key":"yolo26n","dir":"yolo26n","stem":"yolo26n","input":"images","shape":"1x3x640x640","qtable":"yolo26n.qtable"},
+  {"key":"yolo26n-cls","dir":"yolo26n","stem":"yolo26n-cls","input":"images","shape":"1x3x224x224","qtable":null},
+  {"key":"yolo26n-obb","dir":"yolo26n","stem":"yolo26n-obb","input":"images","shape":"1x3x1024x1024","qtable":null,"note":"int8 obb coords 保真 cos0.6(解码头量纲混叠),qtable 反致 coords 压 155,保持纯 int8"},
+  {"key":"yolo26n-pose","dir":"yolo26n","stem":"yolo26n-pose","input":"images","shape":"1x3x640x640","qtable":null},
+  {"key":"yolo26n-seg","dir":"yolo26n","stem":"yolo26n-seg","input":"images","shape":"1x3x640x640","qtable":"yolo26n-seg.qtable"},
+  {"key":"yolo26n-sem","dir":"yolo26n","stem":"yolo26n-sem","input":"images","shape":"1x3x640x640","qtable":null},
+  {"key":"yolo26n-depth","dir":"yolo26n","stem":"yolo26n-depth","input":"images","shape":"1x3x640x640","qtable":null},
+  {"key":"ocr-det","dir":"ocr/ppocrv6_tiny","stem":"det_infer","input":"x","shape":"1x3x960x960","qtable":null},
+  {"key":"ocr-cls","dir":"ocr/ppocrv6_tiny","stem":"cls_infer","input":"x","shape":"1x3x48x192","qtable":null},
+  {"key":"ocr-rec","dir":"ocr/ppocrv6_tiny","stem":"rec_infer","input":"x","shape":"1x3x48x320","qtable":null},
+  {"key":"lpr-det","dir":"","stem":"yolov5plate","input":"input","shape":"1x3x640x640","qtable":null},
+  {"key":"lpr-rec","dir":"","stem":"plate_recognition_color","input":"images","shape":"1x3x48x168","qtable":null},
+  {"key":"scrfd","dir":"seetaface","stem":"scrfd_2.5g_bnkps_shape640x640","input":"input.1","shape":"1x3x640x640","qtable":null},
+  {"key":"age","dir":"seetaface","stem":"age_predictor","input":"input","shape":"1x3x256x256","qtable":null},
+  {"key":"gender","dir":"seetaface","stem":"gender_predictor","input":"input","shape":"1x3x112x112","qtable":null},
+  {"key":"facerec","dir":"seetaface","stem":"face_recognizer","input":"input","shape":"1x3x248x248","qtable":null},
+  {"key":"fas1","dir":"seetaface","stem":"fas_first","input":"_input_8","shape":"1x3x224x224","qtable":null},
+  {"key":"fas2","dir":"seetaface","stem":"fas_second","input":"_input_151","shape":"1x3x300x300","qtable":null,"note":"TF-SSD 单一分辨率烘焙 Reshape 已改动态(repair_tf_ssd_reshape.py)；背骨 Conv 需输入>=300，SDK size_={300,300} 即原生分辨率"},
+  {"key":"det10g","dir":"insightface/buffalo_l","stem":"det_10g","input":"input.1","shape":"1x3x640x640","qtable":null},
+  {"key":"2d106","dir":"insightface/buffalo_l","stem":"2d106det","input":"data","shape":"1x3x192x192","qtable":null},
+  {"key":"1k3d","dir":"insightface/buffalo_l","stem":"1k3d68","input":"data","shape":"1x3x192x192","quantize":"F16","note":"int8 深度塌缩(全 F16 cos=0.999),改走 F16"},
+  {"key":"w600k","dir":"insightface/buffalo_l","stem":"w600k_r50","input":"input.1","shape":"1x3x112x112","qtable":null},
+  {"key":"genderage","dir":"insightface/buffalo_l","stem":"genderage","input":"data","shape":"1x3x96x96","qtable":null},
+  {"key":"zhgd-det","dir":"","stem":"zhgd_det","input":"images","shape":"1x3x1280x1280","qtable":null,"skip_reason":"内建 NMS/GatherND 后处理,tpu-mlir 1.27 不支持"},
+  {"key":"zhgd-ml","dir":"","stem":"zhgd_ml","input":"x","shape":"1x3x256x192","qtable":null}
+]
+
+
+
+
+

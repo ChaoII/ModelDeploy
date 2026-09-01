@@ -7,7 +7,7 @@
 
 int main() {
     auto face_antispoof_model = modeldeploy::vision::face::SeetaFaceAsSecond(
-        "../../test_data/test_models/onnx/face/fas_second.onnx");
+        "../../test_data/test_models/onnx/seetaface/fas_second.onnx");
     auto im0 = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_as_second2.jpg");
     std::vector<std::tuple<int, float>> results;
     if (!face_antispoof_model.predict(im0, &results)) {

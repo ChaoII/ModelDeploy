@@ -70,8 +70,8 @@ TEST_CASE("Pipeline LPR det+rec", "[pipeline][model]") {
 }
 
 TEST_CASE("Pipeline face recognition det+rec", "[pipeline][model]") {
-    auto det = onnx_model("face/scrfd_2.5g_bnkps_shape640x640.onnx");
-    auto rec = onnx_model("face/face_recognizer.onnx");
+    auto det = onnx_model("seetaface/scrfd_2.5g_bnkps_shape640x640.onnx");
+    auto rec = onnx_model("seetaface/face_recognizer.onnx");
     if (!has_file(det) || !has_file(rec)) return;
     modeldeploy::RuntimeOption opt;
     opt.use_cpu();
@@ -89,8 +89,8 @@ TEST_CASE("Pipeline face recognition det+rec", "[pipeline][model]") {
 }
 
 TEST_CASE("Pipeline face rec predict_max_face", "[pipeline][model]") {
-    auto det = onnx_model("face/scrfd_2.5g_bnkps_shape640x640.onnx");
-    auto rec = onnx_model("face/face_recognizer.onnx");
+    auto det = onnx_model("seetaface/scrfd_2.5g_bnkps_shape640x640.onnx");
+    auto rec = onnx_model("seetaface/face_recognizer.onnx");
     if (!has_file(det) || !has_file(rec)) return;
     modeldeploy::RuntimeOption opt;
     opt.use_cpu();
@@ -107,9 +107,9 @@ TEST_CASE("Pipeline face rec predict_max_face", "[pipeline][model]") {
 }
 
 TEST_CASE("Pipeline face anti-spoof det+first+second", "[pipeline][model]") {
-    auto det = onnx_model("face/scrfd_2.5g_bnkps_shape640x640.onnx");
-    auto first = onnx_model("face/fas_first.onnx");
-    auto second = onnx_model("face/fas_second.onnx");
+    auto det = onnx_model("seetaface/scrfd_2.5g_bnkps_shape640x640.onnx");
+    auto first = onnx_model("seetaface/fas_first.onnx");
+    auto second = onnx_model("seetaface/fas_second.onnx");
     if (!has_file(det) || !has_file(first) || !has_file(second)) return;
     modeldeploy::RuntimeOption opt;
     opt.use_cpu();

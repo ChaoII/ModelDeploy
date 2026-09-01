@@ -21,13 +21,11 @@ int main() {
     opt.enable_trt = true;
     opt.enable_fp16 = true;
     opt.ort_option.trt_engine_cache_path = "./trt_engine";
-    opt.set_trt_min_shape("x:1x3x640x640");
-    opt.set_trt_opt_shape("x:1x3x640x640");
-    opt.set_trt_max_shape("x:1x3x640x640");
 
     // ---- 2. 加载模型（旋转目标检测）----
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("../../test_data/test_models/onnx/yolo26n/yolo26n-obb.onnx", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
+    m->get_preprocessor().set_size({1024, 1024});
     // ---- 3. 读图 ----
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }

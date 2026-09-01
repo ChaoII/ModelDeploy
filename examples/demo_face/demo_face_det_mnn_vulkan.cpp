@@ -20,7 +20,7 @@ int main() {
     opt.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_VULKAN;
 
     // ---- 2. 加载模型（人脸检测）----
-    auto m = std::make_unique<modeldeploy::vision::face::Scrfd>("../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx", opt);
+    auto m = std::make_unique<modeldeploy::vision::face::Scrfd>("../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     // ---- 3. 读图 ----
     auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");

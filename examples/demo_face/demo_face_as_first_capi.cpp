@@ -9,7 +9,7 @@ int main() {
 
     MDModelHandle model = nullptr;
     die(md_model_create(&model, MD_MODEL_FACE_AS,
-                        "../../test_data/test_models/onnx/face/fas_first.onnx", opt),
+                        "../../test_data/test_models/onnx/seetaface/fas_first.onnx", opt),
         "create face anti-spoof first");
 
     MDImageHandle img = nullptr;

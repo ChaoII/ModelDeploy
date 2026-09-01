@@ -19,8 +19,8 @@ int main() {
     option.use_ort_backend();
 
     auto model = modeldeploy::vision::face::FaceRecognizerPipeline(
-        "../../test_data/test_models/onnx/face/scrfd_2.5g_bnkps_shape640x640.onnx",
-        "../../test_data/test_models/onnx/face/face_recognizer.onnx", option);
+        "../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx",
+        "../../test_data/test_models/onnx/seetaface/face_recognizer.onnx", option);
     const auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_face_detection4.jpg");
     auto im_bak = im.clone();
     TimerArray timers;

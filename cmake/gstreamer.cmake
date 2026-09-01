@@ -47,8 +47,10 @@ if (EXISTS "${GSTREAMER_ROOT}/include/gstreamer-1.0/gst/cuda/gstcudamemory.h"
     if (CUDAToolkit_INCLUDE_DIRS)
         set(GSTREAMER_CUDA_INCLUDE ${CUDAToolkit_INCLUDE_DIRS})
     else ()
+        # 版本无关探测：命中任意已安装 CUDA 版本（如 v13.x），避免写死 12.8
         find_path(GSTREAMER_CUDA_INCLUDE cuda.h
-                PATHS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/include"
+                PATHS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA"/*
+                PATH_SUFFIXES include
                 NO_DEFAULT_PATH)
     endif ()
     if (GSTREAMER_GSTCUDA_LIB AND GSTREAMER_CUDA_INCLUDE)

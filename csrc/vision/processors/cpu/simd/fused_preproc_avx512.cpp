@@ -60,6 +60,11 @@ MD_TARGET_AVX512 void fused_preproc_avx512(const uint8_t* src, int src_w, int sr
     const __m512 a2 = _mm512_set1_ps(alpha[2]);
     const __m512 b2 = _mm512_set1_ps(beta[2]);
     const __m512 padv = _mm512_set1_ps(pad_value);
+    // pad_value 已是最终（归一化后）要写入 dst 的值；逐像素路径随后做
+    // fmadd(raw, alpha, beta)，故需先按通道反变换 raw=(pad-beta)/alpha
+    const float pad_r_raw = (pad_value - beta[0]) / alpha[0];
+    const float pad_g_raw = (pad_value - beta[1]) / alpha[1];
+    const float pad_b_raw = (pad_value - beta[2]) / alpha[2];
 
     #pragma omp parallel for schedule(static)
     for (int y = 0; y < dst_h; ++y) {
@@ -85,7 +90,7 @@ MD_TARGET_AVX512 void fused_preproc_avx512(const uint8_t* src, int src_w, int sr
                     if (swap_rb) { r[i] = pr; g[i] = pg; b[i] = pb; }
                     else { r[i] = pb; g[i] = pg; b[i] = pr; }
                 } else {
-                    r[i] = g[i] = b[i] = pad_value;
+                    r[i] = pad_r_raw; g[i] = pad_g_raw; b[i] = pad_b_raw;
                 }
             }
             _mm512_storeu_ps(dst + 0 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(r), a0, b0));
@@ -103,7 +108,7 @@ MD_TARGET_AVX512 void fused_preproc_avx512(const uint8_t* src, int src_w, int sr
                 if (swap_rb) { rv = pr; gv = pg; bv = pb; }
                 else { rv = pb; gv = pg; bv = pr; }
             } else {
-                rv = gv = bv = pad_value;
+                rv = pad_r_raw; gv = pad_g_raw; bv = pad_b_raw;
             }
             dst[0 * plane + base + x] = rv * alpha[0] + beta[0];
             dst[1 * plane + base + x] = gv * alpha[1] + beta[1];

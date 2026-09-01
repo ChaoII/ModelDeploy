@@ -81,6 +81,21 @@ audio8.predict_stream("你好，世界。", "demo", 1.0f, 480,
     [](const float* samples, int n, float progress) -> bool { return true; });
 ```
 
+### TTS 使用 CUDA 加速
+
+三个 TTS 模型均可经 `RuntimeOption::set_device(Device::GPU, 0)` 启用 ORT CUDAExecutionProvider（多子模型管线收益最明显，Qwen3 实测约 9×、Audio8 约 2×）：
+
+```cpp
+modeldeploy::RuntimeOption option;
+option.set_device(modeldeploy::Device::GPU, 0);
+modeldeploy::audio::tts::Audio8 audio8;
+audio8.Load("{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview", option);
+
+// Qwen3-TTS 同理：构造 Qwen3Tts 时传入同一个 option 即可启用 CUDA EP
+```
+
+依赖 GPU 版 onnxruntime（providers 动态库 `onnxruntime_providers_cuda.dll` 等需在可执行搜索路径）+ CUDA 运行库（Windows 下 `CUDA\v13.x\bin\x64` 在 PATH）。任一不可用时打印 `CUDAExecutionProvider not available`（或 provider 初始化失败时打印 `failed to enable`）并**自动回退 CPU**（fail-closed，行为与 CPU 构建一致）。
+
 ## 设备与设备帧
 
 `RuntimeOption::set_device(Device::OPENCL/VULKAN)`(需显式 `use_mnn_backend()`,否则 fail-closed）:

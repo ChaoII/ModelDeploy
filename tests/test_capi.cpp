@@ -493,7 +493,7 @@ TEST_CASE("capi face anti-spoof enum + spoof getter guards", "[capi]") {
 TEST_CASE("capi face anti-spoof inference (first)", "[model]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string model = data_dir + "/test_models/onnx/face/fas_first.onnx";
+    const std::string model = data_dir + "/test_models/onnx/seetaface/fas_first.onnx";
     const std::string imgf = data_dir + "/test_images/test_face_id3.jpg";
     if (!std::filesystem::exists(model) || !std::filesystem::exists(imgf)) return;
 
@@ -990,7 +990,7 @@ TEST_CASE("capi single-value batch getters reject null args (no model needed)", 
 TEST_CASE("capi age batch getters + single-getter compat (real model, guarded)", "[capi]") {
     const char* env = std::getenv("TEST_DATA_DIR");
     std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
-    const std::string age_file = data_dir + "/test_models/onnx/face/age_predictor.onnx";
+    const std::string age_file = data_dir + "/test_models/onnx/seetaface/age_predictor.onnx";
     const std::string img1 = data_dir + "/test_images/test_face.jpg";
     const std::string img2 = data_dir + "/test_images/test_face.jpg";
     if (!std::filesystem::exists(age_file) || !std::filesystem::exists(img1)) {

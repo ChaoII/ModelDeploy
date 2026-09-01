@@ -64,12 +64,19 @@ mkdir -p "$OUT_DIR"
 # *_top_f32_all_weight.npz（写到 cwd）与 mlir/校准表/产物同目录，部署时相对名可解析
 cd "$OUT_DIR"
 
-# tpu-mlir 1.27 不兼容 numpy 2.x
-pip3 install --quiet --force-reinstall --no-cache-dir numpy==1.24.3 2>&1 | tail -1 || true
+# tpu-mlir 1.27 不兼容 numpy 2.x；仅当 numpy 为 2.x 时才降级（1.x 直接跳过，避免每次联网重装挂死）
+if python3 -c "import numpy as np; import sys; sys.exit(0 if np.__version__.startswith('1.') else 1)" 2>/dev/null; then
+    echo "numpy 1.x 已满足，跳过重装"
+else
+    pip3 install --quiet --force-reinstall --no-cache-dir numpy==1.24.3 2>&1 | tail -1 || true
+fi
 
 MT=$(python3 -c "import tpu_mlir,os; print(os.path.join(os.path.dirname(tpu_mlir.__file__),'python','tools','model_transform.py'))")
 RC=$(python3 -c "import tpu_mlir,os; print(os.path.join(os.path.dirname(tpu_mlir.__file__),'python','tools','run_calibration.py'))")
 MD=$(python3 -c "import tpu_mlir,os; print(os.path.join(os.path.dirname(tpu_mlir.__file__),'python','tools','model_deploy.py'))")
+# pymlir (*.so) 在 tpu_mlir/python 下,需加入 PYTHONPATH 才能 import
+_TPU_PY=$(python3 -c "import tpu_mlir,os; print(os.path.join(os.path.dirname(tpu_mlir.__file__),'python'))")
+export PYTHONPATH="$_TPU_PY:${PYTHONPATH:-}"
 
 echo "=== 1/3 model_transform ($ONNX -> $NAME.mlir) ==="
 python3 "$MT" --model_name "$NAME" --model_def "$ONNX" \

@@ -192,6 +192,7 @@ TEST_CASE("yolo26n-obb obb detection (ORT)", "[regression]") {
 
     UltralyticsObb model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
+    model.get_preprocessor().set_size({1024, 1024});
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
 
@@ -219,7 +220,7 @@ TEST_CASE("yolo26n-cls classification (ORT)", "[regression]") {
 }
 
 TEST_CASE("scrfd face detection (ORT)", "[regression]") {
-    auto modelfile = model_path("face/scrfd_2.5g_bnkps_shape640x640.onnx");
+    auto modelfile = model_path("seetaface/scrfd_2.5g_bnkps_shape640x640.onnx");
     if (!fs::exists(modelfile)) return;
     auto imgf = image_path("test_face_detection.jpg");
     if (!fs::exists(imgf)) return;
@@ -340,6 +341,7 @@ TEST_CASE("yolo26n-obb obb detection MNN", "[regression][backend:mnn]") {
 
     UltralyticsObb model(modelfile.string(), cpu_option());
     REQUIRE(model.is_initialized());
+    model.get_preprocessor().set_size({1024, 1024});
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
 
@@ -427,6 +429,7 @@ TEST_CASE("yolo26n-obb obb detection TRT", "[regression][backend:trt]") {
     if (!fs::exists(imgf)) return;
 
     UltralyticsObb model(modelfile.string(), trt_option());
+    model.get_preprocessor().set_size({1024, 1024});
     if (!model.is_initialized()) return;   // TRT backend 未构建 -> 跳过
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
@@ -515,6 +518,7 @@ TEST_CASE("yolo26n-obb obb detection Sophgo", "[backend:sophgo]") {
 
     UltralyticsObb model(modelfile.string(), cpu_option());
     if (!model.is_initialized()) return;   // Sophgo backend 未构建 -> 跳过
+    model.get_preprocessor().set_size({1024, 1024});
     auto img = ImageData::imread(imgf.string());
     REQUIRE_FALSE(img.empty());
 

@@ -566,7 +566,7 @@ public class AllModelsTests
     [Test]
     public void OcrDet_Works()
     {
-        var model = Path.Combine(ModelRoot, "ocr", "ppocrv4_mobile", "det_infer.onnx");
+        var model = Path.Combine(ModelRoot, "ppocrv4_mobile", "det_infer.onnx");
         var img = Path.Combine(ImageRoot, "test_ocr.png");
         if (!Has(model) || !Has(img)) Assert.Ignore("data missing");
         using var vi = VisionImage.Read(img);

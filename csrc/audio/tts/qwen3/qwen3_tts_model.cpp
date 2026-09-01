@@ -10,6 +10,7 @@
 #include <utility>
 
 #include <nlohmann/json.hpp>
+#include "audio/tts/common/ort_ep.h"
 #include "core/md_log.h"
 
 namespace modeldeploy::audio::tts {
@@ -111,6 +112,7 @@ public:
         opts->SetLogSeverityLevel(3);
         if (opt.cpu_thread_num > 0) opts->SetIntraOpNumThreads(opt.cpu_thread_num);
         opts->SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+        ApplyOrtCudaEp(*opts, opt.device, opt.device_id);
         sess_opts_ = opts;
         const Ort::SessionOptions& so = *opts;
 
