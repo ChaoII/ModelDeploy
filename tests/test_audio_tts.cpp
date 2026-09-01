@@ -391,3 +391,33 @@ TEST_CASE("Audio8 GpuState slow prefill matches CPU (spike)",
         }
     }
 }
+
+TEST_CASE("Audio8 GpuState fast step matches CPU", "[tts][tts-audio8][gpu][spike]") {
+    MD_TEST_GPU_OR_SKIP();
+    namespace a8 = modeldeploy::audio::tts::audio8;
+    const auto dir = audio8_dir();
+    if (!fs::exists(dir)) { WARN("audio8 model dir missing; skipping"); return; }
+    a8::Audio8Manifest manifest;
+    REQUIRE(a8::Audio8Manifest::FromJson((dir / "runtime_manifest.json").string(),
+                                         dir.string(), &manifest));
+    a8::Audio8Runtime rt;
+    REQUIRE(rt.Load(manifest, 4, modeldeploy::Device::GPU, 0));
+    auto gpu = rt.MakeGpuState(modeldeploy::Device::GPU, 0);
+    if (!gpu) { WARN("GpuState unavailable; skipping"); return; }
+
+    const int64_t fseg =
+        manifest.fast_n_local_heads * manifest.num_codebooks * manifest.fast_head_dim;
+    std::vector<uint16_t> cpu_fast(static_cast<size_t>(2 * manifest.num_fast_layers * fseg), 0);
+    std::vector<uint16_t> hidden(static_cast<size_t>(rt.fast_dim()), 42u);
+    std::vector<float> cpu_l, gpu_l;
+    REQUIRE(rt.FastStep(7, true, 2, hidden, &cpu_fast, &cpu_l));
+    REQUIRE(rt.FastStepGpu(gpu.get(), 7, true, 2, hidden, &gpu_l));
+    REQUIRE(gpu_l.size() == cpu_l.size());
+    for (size_t i = 0; i < cpu_l.size(); ++i)
+        REQUIRE(std::fabs(gpu_l[i] - cpu_l[i]) < 1e-3f);
+    std::vector<uint16_t> fast_cpy(cpu_fast.size(), 0);
+    REQUIRE(rt.CopyGpuCacheToHost(gpu.get(), 1, fast_cpy.data()));
+    for (size_t i = 0; i < cpu_fast.size(); ++i)
+        REQUIRE(std::fabs(static_cast<float>(fast_cpy[i]) -
+                          static_cast<float>(cpu_fast[i])) <= 2.0f);
+}

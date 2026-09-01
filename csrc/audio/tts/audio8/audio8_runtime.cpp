@@ -482,7 +482,39 @@ Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
         g->slow_binding->BindOutput("logits", cpu_mem);
         g->slow_binding->BindOutput("slow_hidden", cpu_mem);
     }
-    // ---- fast IoBinding ----(Task 2 填,本任务留空:fast 仅预分配,不建 binding)
+    // ---- fast IoBinding(绑一次)----
+    {
+        g->fast_binding = std::make_unique<Ort::IoBinding>(*I.fast);
+        const int64_t fseg = g->fast_seg;
+        const std::array<int64_t, 4> fcache_shape{1, I.fast_n_local_heads, I.num_codebooks,
+                                                  I.fast_head_dim};
+        for (int64_t i = 0; i < I.num_fast_layers; ++i) {
+            auto kv = CreateFP16Tensor(g->cuda_mem,
+                                       static_cast<uint16_t*>(g->fast_kv[static_cast<size_t>(2 * i)]),
+                                       static_cast<size_t>(fseg), fcache_shape.data(), 4);
+            auto vv = CreateFP16Tensor(g->cuda_mem,
+                                       static_cast<uint16_t*>(g->fast_kv[static_cast<size_t>(2 * i + 1)]),
+                                       static_cast<size_t>(fseg), fcache_shape.data(), 4);
+            g->fast_binding->BindInput(("cache_key_" + std::to_string(i)).c_str(), kv);
+            g->fast_binding->BindInput(("cache_value_" + std::to_string(i)).c_str(), vv);
+        }
+        const Ort::MemoryInfo cpu_mem =
+            Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+        g->fast_binding->BindOutput("logits", cpu_mem);
+        // fast 单步:delta 输出形状固定 [1, fast_n_local_heads, 1, fast_head_dim](单 token),
+        // 可在建 state 时 Value-绑一次到 scratch(ORT 1.29 无 4 参 BindOutput)。
+        const std::array<int64_t, 4> fdshape{1, I.fast_n_local_heads, 1, I.fast_head_dim};
+        const size_t fdcount = static_cast<size_t>(I.fast_n_local_heads * 1 * I.fast_head_dim);
+        for (int64_t i = 0; i < I.num_fast_layers; ++i) {
+            auto kout = CreateFP16Tensor(g->cuda_mem, g->fast_scratch[static_cast<size_t>(2 * i)],
+                                         fdcount, fdshape.data(), 4);
+            auto vout = CreateFP16Tensor(g->cuda_mem,
+                                         g->fast_scratch[static_cast<size_t>(2 * i + 1)],
+                                         fdcount, fdshape.data(), 4);
+            g->fast_binding->BindOutput(("key_delta_" + std::to_string(i)).c_str(), kout);
+            g->fast_binding->BindOutput(("value_delta_" + std::to_string(i)).c_str(), vout);
+        }
+    }
     return std::move(g);
 }
 
@@ -560,6 +592,71 @@ bool Audio8Runtime::SlowStepGpu(Audio8GpuState* g, const std::vector<int64_t>& c
                                  << cudaGetErrorString(ev) << std::endl;
                     return false;
                 }
+            }
+        }
+    }
+    return true;
+}
+
+bool Audio8Runtime::FastStepGpu(Audio8GpuState* g, int64_t token, bool use_hidden, int64_t position,
+                                const std::vector<uint16_t>& slow_hidden,
+                                std::vector<float>* last_logits) {
+    if (!impl_ || !g || !impl_->fast || !last_logits) return false;
+    if (g->fast_binding == nullptr) return false;
+    Impl& I = *impl_;
+    if (static_cast<int64_t>(slow_hidden.size()) != I.fast_dim) return false;
+    const std::array<int64_t, 3> hidden_shape{1, 1, I.fast_dim};
+    auto hval = CreateFP16Tensor(I.meminfo, const_cast<uint16_t*>(slow_hidden.data()),
+                                 slow_hidden.size(), hidden_shape.data(), 3);
+    const std::array<int64_t, 2> token_shape{1, 1};
+    const std::array<int64_t, 1> scalar_shape{1};
+    std::array<int64_t, 1> token_val{token};
+    auto tval = Ort::Value::CreateTensor<int64_t>(I.meminfo, token_val.data(), token_val.size(),
+                                                  token_shape.data(), 2);
+    std::array<uint8_t, 1> use_val{static_cast<uint8_t>(use_hidden ? 1 : 0)};
+    auto uval = CreateBoolTensor(I.meminfo, use_val.data(), 1, scalar_shape.data(), 1);
+    std::array<int64_t, 1> pos_val{position};
+    auto pval = Ort::Value::CreateTensor<int64_t>(I.meminfo, pos_val.data(), pos_val.size(),
+                                                  scalar_shape.data(), 1);
+    g->fast_binding->BindInput("slow_hidden", hval);
+    g->fast_binding->BindInput("token_id", tval);
+    g->fast_binding->BindInput("use_slow_hidden", uval);
+    g->fast_binding->BindInput("input_pos", pval);
+    try {
+        I.fast->Run(Ort::RunOptions{nullptr}, *g->fast_binding);
+    } catch (const Ort::Exception& e) {
+        MD_LOG_ERROR << "audio8: fast gpu run failed: " << e.what() << std::endl;
+        return false;
+    }
+    const auto outs = g->fast_binding->GetOutputValues();
+    if (outs.size() < 1 + 2 * static_cast<size_t>(I.num_fast_layers)) return false;
+    {
+        const float* logits = outs[0].GetTensorData<float>();
+        last_logits->assign(logits, logits + static_cast<size_t>(4096));
+    }
+    // delta 已写进 fast_scratch(形状 [1, h, 1, d]),按 strided 布局拷入 fast cache 槽位;
+    // 失败 fail-closed(F3 与 slow 路径一致)。
+    for (int64_t i = 0; i < I.num_fast_layers; ++i) {
+        for (int64_t h = 0; h < I.fast_n_local_heads; ++h) {
+            const int64_t dst = (h * I.num_codebooks + position) * I.fast_head_dim * 2;
+            const int64_t src = h * I.fast_head_dim * 2;
+            const cudaError_t ek = cudaMemcpy(
+                static_cast<char*>(g->fast_kv[static_cast<size_t>(2 * i)]) + dst,
+                static_cast<char*>(g->fast_scratch[static_cast<size_t>(2 * i)]) + src,
+                static_cast<size_t>(I.fast_head_dim) * 2, cudaMemcpyDeviceToDevice);
+            if (ek != cudaSuccess) {
+                MD_LOG_ERROR << "audio8: fast gpu cache D2D key copy failed: "
+                             << cudaGetErrorString(ek) << std::endl;
+                return false;
+            }
+            const cudaError_t ev = cudaMemcpy(
+                static_cast<char*>(g->fast_kv[static_cast<size_t>(2 * i + 1)]) + dst,
+                static_cast<char*>(g->fast_scratch[static_cast<size_t>(2 * i + 1)]) + src,
+                static_cast<size_t>(I.fast_head_dim) * 2, cudaMemcpyDeviceToDevice);
+            if (ev != cudaSuccess) {
+                MD_LOG_ERROR << "audio8: fast gpu cache D2D value copy failed: "
+                             << cudaGetErrorString(ev) << std::endl;
+                return false;
             }
         }
     }
