@@ -960,7 +960,7 @@ public:
         }
         const bool use_gpu = true;
         const bool prefill_ok = use_gpu
-            ? runtime.SlowStepGpu(gstate.get(), prompt, positions, &logits, &hidden)
+            ? runtime.SlowStepGpu(gstate.get(), prompt, positions, &logits, nullptr)
             : runtime.SlowStep(prompt, positions, &slow_cache, &logits, &hidden);
         if (!prefill_ok) {
             MD_LOG_ERROR << "audio8: slow prefill failed" << std::endl;
@@ -1021,7 +1021,7 @@ public:
             for (int64_t k = 0; k < num_codebooks; ++k) column[k + 1] = frame[k];
             const std::vector<int64_t> one_pos{prompt_len + step};
             const bool s_ok = use_gpu
-                ? runtime.SlowStepGpu(gstate.get(), column, one_pos, &logits, &hidden)
+                ? runtime.SlowStepGpu(gstate.get(), column, one_pos, &logits, nullptr)
                 : runtime.SlowStep(column, one_pos, &slow_cache, &logits, &hidden);
             if (!s_ok) {
                 MD_LOG_ERROR << "audio8: slow step failed" << std::endl;

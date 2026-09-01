@@ -392,6 +392,8 @@ struct Audio8Runtime::Audio8GpuState {
     std::vector<void*> fast_kv;
     std::vector<void*> fast_scratch;
     int64_t fast_seg = 0;
+    // slow 输出的 hidden(fast_dim fp16)常驻显存:slow 每帧写、fast 直接引用,免 CPU 往返
+    uint16_t* hidden_gpu = nullptr;
     std::unique_ptr<Ort::IoBinding> slow_binding;
     std::unique_ptr<Ort::IoBinding> fast_binding;
 };
@@ -402,6 +404,7 @@ void Audio8Runtime::Audio8GpuStateDeleter::operator()(Audio8GpuState* p) const n
     for (auto* buf : p->slow_scratch) p->slow_alloc.Free(buf);
     for (auto* buf : p->fast_kv) p->fast_alloc.Free(buf);
     for (auto* buf : p->fast_scratch) p->fast_alloc.Free(buf);
+    if (p->hidden_gpu) p->slow_alloc.Free(p->hidden_gpu);
     delete p;
 }
 
@@ -433,6 +436,8 @@ Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
         g->fast_scratch.resize(static_cast<size_t>(2 * I.num_fast_layers));
         for (auto& p : g->fast_kv) p = g->fast_alloc.Alloc(static_cast<size_t>(g->fast_seg) * 2);
         for (auto& p : g->fast_scratch) p = g->fast_alloc.Alloc(static_cast<size_t>(g->fast_seg) * 2);
+        g->hidden_gpu = static_cast<uint16_t*>(
+            g->slow_alloc.Alloc(static_cast<size_t>(I.fast_dim) * 2));
     } catch (const std::exception& e) {
         MD_LOG_WARN << "audio8: GPU KV alloc failed: " << e.what() << std::endl;
         return {};
@@ -480,7 +485,11 @@ Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
         const Ort::MemoryInfo cpu_mem =
             Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         g->slow_binding->BindOutput("logits", cpu_mem);
-        g->slow_binding->BindOutput("slow_hidden", cpu_mem);
+        // slow_hidden 常驻显存:输出直接写到 hidden_gpu(不再 D2H,hidden 免 CPU 往返)
+        const std::array<int64_t, 3> hidden_shape{1, 1, I.fast_dim};
+        auto sh = CreateFP16Tensor(g->cuda_mem, g->hidden_gpu,
+                                   static_cast<size_t>(I.fast_dim), hidden_shape.data(), 3);
+        g->slow_binding->BindOutput("slow_hidden", sh);
     }
     // ---- fast IoBinding(绑一次)----
     {
@@ -501,6 +510,14 @@ Audio8Runtime::MakeGpuState(Device device, int32_t device_id) {
         const Ort::MemoryInfo cpu_mem =
             Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
         g->fast_binding->BindOutput("logits", cpu_mem);
+        // fast 的 slow_hidden 输入直接引用 hidden_gpu(与 slow 输出同缓冲,绑一次,
+        // fast 单步不再 H2D)。位置/token 依仍每帧绑。
+        {
+            const std::array<int64_t, 3> hidden_shape{1, 1, I.fast_dim};
+            auto sh = CreateFP16Tensor(g->cuda_mem, g->hidden_gpu,
+                                       static_cast<size_t>(I.fast_dim), hidden_shape.data(), 3);
+            g->fast_binding->BindInput("slow_hidden", sh);
+        }
         // fast 单步:delta 输出形状固定 [1, fast_n_local_heads, 1, fast_head_dim](单 token),
         // 可在建 state 时 Value-绑一次到 scratch(ORT 1.29 无 4 参 BindOutput)。
         const std::array<int64_t, 4> fdshape{1, I.fast_n_local_heads, 1, I.fast_head_dim};
@@ -522,7 +539,7 @@ bool Audio8Runtime::SlowStepGpu(Audio8GpuState* g, const std::vector<int64_t>& c
                                 const std::vector<int64_t>& positions,
                                 std::vector<float>* last_logits,
                                 std::vector<uint16_t>* last_hidden) {
-    if (!impl_ || !g || !impl_->slow || !last_logits || !last_hidden) return false;
+    if (!impl_ || !g || !impl_->slow || !last_logits) return false;
     Impl& I = *impl_;
     const int64_t T = static_cast<int64_t>(positions.size());
     const int64_t rows = num_codebooks_ + 1;
@@ -563,9 +580,17 @@ bool Audio8Runtime::SlowStepGpu(Audio8GpuState* g, const std::vector<int64_t>& c
         const float* logits = outs[0].GetTensorData<float>();
         last_logits->assign(logits, logits + I.slow_logits_size);
     }
-    {
-        const uint16_t* hidden = outs[1].GetTensorData<uint16_t>();
-        last_hidden->assign(hidden, hidden + static_cast<size_t>(I.fast_dim));
+    // hidden 已留在 hidden_gpu;仅当调用方需要 CPU 副本(D2H)才拷贝(生产路径传 nullptr)
+    if (last_hidden) {
+        last_hidden->resize(static_cast<size_t>(I.fast_dim));
+        const cudaError_t ce = cudaMemcpy(last_hidden->data(), g->hidden_gpu,
+                                          static_cast<size_t>(I.fast_dim) * 2,
+                                          cudaMemcpyDeviceToHost);
+        if (ce != cudaSuccess) {
+            MD_LOG_ERROR << "audio8: slow hidden D2H failed: " << cudaGetErrorString(ce)
+                         << std::endl;
+            return false;
+        }
     }
     // delta(已写进 scratch)按 strided 布局拷入 cache 槽位;失败 fail-closed(F3)
     const int64_t pos0 = positions[0];
@@ -604,10 +629,9 @@ bool Audio8Runtime::FastStepGpu(Audio8GpuState* g, int64_t token, bool use_hidde
     if (!impl_ || !g || !impl_->fast || !last_logits) return false;
     if (g->fast_binding == nullptr) return false;
     Impl& I = *impl_;
-    if (static_cast<int64_t>(slow_hidden.size()) != I.fast_dim) return false;
-    const std::array<int64_t, 3> hidden_shape{1, 1, I.fast_dim};
-    auto hval = CreateFP16Tensor(I.meminfo, const_cast<uint16_t*>(slow_hidden.data()),
-                                 slow_hidden.size(), hidden_shape.data(), 3);
+    // slow_hidden 已绑 hidden_gpu(MakeGpuState 绑一次);仅当非空时校验维度(生产可传空)
+    if (!slow_hidden.empty() && static_cast<int64_t>(slow_hidden.size()) != I.fast_dim)
+        return false;
     const std::array<int64_t, 2> token_shape{1, 1};
     const std::array<int64_t, 1> scalar_shape{1};
     std::array<int64_t, 1> token_val{token};
@@ -618,7 +642,6 @@ bool Audio8Runtime::FastStepGpu(Audio8GpuState* g, int64_t token, bool use_hidde
     std::array<int64_t, 1> pos_val{position};
     auto pval = Ort::Value::CreateTensor<int64_t>(I.meminfo, pos_val.data(), pos_val.size(),
                                                   scalar_shape.data(), 1);
-    g->fast_binding->BindInput("slow_hidden", hval);
     g->fast_binding->BindInput("token_id", tval);
     g->fast_binding->BindInput("use_slow_hidden", uval);
     g->fast_binding->BindInput("input_pos", pval);
