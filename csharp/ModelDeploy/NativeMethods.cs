@@ -242,11 +242,6 @@ IntPtr voice, float speed,
             float speed, int chunkFrames, MDTtsAudioCb cb, IntPtr userdata,
             out int sampleRate, out IntPtr audio, out UIntPtr audioN);
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern MDStatus md_audio_tts_qwen3_clone(IntPtr handle, IntPtr text,
-            IntPtr refAudio, IntPtr refText, IntPtr lang,
-            out int sampleRate, out IntPtr audio, out UIntPtr audioN);
-
         // 声纹（SpeakerVerify）：提取说话人 embedding。返回的 embedding 为借用指针
         // （归模型句柄所有），调用方用 Marshal.Copy 立即复制，勿阻塞/复用。
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
