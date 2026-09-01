@@ -110,8 +110,6 @@ typedef enum MD_MODEL_KIND {
     MD_MODEL_FACE_LANDMARK,
     MD_MODEL_TEXT_CLASSIFIER,
     MD_MODEL_FASTSAM,
-    MD_MODEL_TTS_AUDIO8,     /* =37 */
-    MD_MODEL_TTS_QWEN3,      /* =38 */
     MD_MODEL_COUNT
 } MDModelKind;
 
@@ -323,18 +321,11 @@ MD_CAPI_EXPORT MDStatus md_audio_tts(MDModelHandle, const char* text, const char
  * 返回非 0 继续合成，返回 0 提前中止（中止时整段缓冲仍可读，仅截断）。 */
 typedef int32_t (*MDTtsAudioCb)(const float* samples, int32_t n, float progress, void* userdata);
 
-/* TTS 流式合成（Kokoro/Audio8/Qwen3 通用，走 ITtsModel::predict_stream）。
+/* TTS 流式合成（Kokoro 通用，走 ITtsModel::predict_stream）。
  * chunk_frames<=0 时等价一次性合成（单次回调整段）；>0 时逐块回调。
  * 成功与 md_audio_tts 相同，返回整段合成音频 + 采样率。 */
 MD_CAPI_EXPORT MDStatus md_audio_tts_stream(MDModelHandle h, const char* text, const char* voice,
                        float speed, int32_t chunk_frames, MDTtsAudioCb cb, void* userdata,
-                       int* sample_rate, const float** audio, size_t* audio_n);
-
-/* TTS 声音克隆（仅 Qwen3 支持，其余返回 MD_ERR_INVALID_ARGUMENT）。
- * ref_audio 参考音频 wav 路径、ref_text 参考文本、lang 语言白名单（null/空串视为 "auto"）。
- * 成功返回 24kHz 克隆音频。 */
-MD_CAPI_EXPORT MDStatus md_audio_tts_qwen3_clone(MDModelHandle h, const char* text,
-                       const char* ref_audio, const char* ref_text, const char* lang,
                        int* sample_rate, const float** audio, size_t* audio_n);
 
 /* 声纹（SpeakerVerify）：提取说话人 embedding（借用指针；embedding 归模型句柄内部，
