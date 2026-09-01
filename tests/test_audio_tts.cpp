@@ -485,3 +485,29 @@ TEST_CASE("Audio8 GPU clone concurrent predict", "[tts][tts-audio8][gpu][tts-rtf
     REQUIRE(oa.size() > 0);
     REQUIRE(ob.size() > 0);
 }
+
+TEST_CASE("Qwen3Tts GPU RTF <= 3.0", "[tts][tts-qwen3][gpu][tts-rtf]") {
+    MD_TEST_GPU_OR_SKIP();
+    const auto dir = qwen3_dir();
+    if (!fs::exists(dir)) { WARN("qwen3 model dir missing; skipping"); return; }
+    modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
+    Qwen3Tts m;
+    REQUIRE(m.init(dir.string(), opt));
+    const std::string text =
+        "实时性验收，较长的文本以稳定测出真实的合成速率，同时把首帧等待的小波动摊平。";
+    std::vector<float> audio;
+    const auto t0 = std::chrono::steady_clock::now();
+    REQUIRE(m.predict(text, "Vivian", 1.0f, &audio));
+    const auto t1 = std::chrono::steady_clock::now();
+    const double synth_s = std::chrono::duration<double>(t1 - t0).count();
+    const double audio_s =
+        static_cast<double>(audio.size()) / static_cast<double>(m.get_sample_rate());
+    REQUIRE(audio_s > 1.0);
+    const double rtf = synth_s / audio_s;
+    MD_LOG_INFO << "Qwen3Tts GPU RTF = " << rtf << " (synth=" << synth_s
+                << "s audio=" << audio_s << "s)" << std::endl;
+    // 回归门禁(2026-09-01 用户决策):Qwen3 不设实时线。GPU 基线随机器负载漂移大
+    // (实测 1.2 空闲 ~ 2.7 重载),CPU 同句 ≈7;取 3.0 仍可捕捉"GPU 退化回 CPU 级"回归。
+    REQUIRE(rtf <= 3.0);
+}
