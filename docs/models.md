@@ -327,6 +327,14 @@ audio.save_wav("out.wav");
 
 **示例**：`examples/demo_audio/demo_kokoro_cxx.cpp`
 
+**GPU 加速**：Kokoro 走通用 `RuntimeOption` → ORT 后端，`option.set_device(Device::GPU, 0)` 即可用 CUDA EP，代码无需改动；实测 GPU RTF≈0.32（对实时合成无压力，且不受 CPU 负载影响），比同负载 CPU 快 3–5 倍（CPU 空闲约 0.19）。
+
+**模型变体实测结论**：
+- int8 动态量化（MatMul-only，`onnxruntime.quantization`）对 kokoro-zh **几乎无提速**（~0.162→0.159）且改变输出长度/行为（量化漂移）→ 不建议。
+- 本地 fp16 转换（`onnxconverter-common convert_float_to_float16`）会产生类型不一致（Albert Cast 输出 fp16 与后续 fp32 期望不匹配）→ 不可用。
+- 如需 fp16/int8，请以官方导出版为准（如 `hexgrad/Kokoro-82M-v1.1-zh` 的 onnx 变体），并核对词表/token 与 `tokens.txt`、`voices.bin` 一致再替换 `model.onnx`。
+- kokoro-zh 含 `SplitToSequence` 算子，**TensorRT 不支持**，无法转 TRT engine（有 CUDA 时用 ORT GPU EP 即可）。
+
 ### 11.2 统一流式合成（predict_stream）
 
 Kokoro 实现 `ITtsModel::predict_stream(text, voice, speed, chunk_frames, cb)`：`chunk_frames == 0` 等价一次性合成（单次回调整段）；`> 0` 时按块回调，`cb` 返回 `false` 立即中止。
@@ -536,6 +544,14 @@ std::string out = itn.normalize("2024年3月5日");   // 输出中文数字/量�
 ```
 
 > **当前仅 C++**（无 pybind / 示例 demo）。
+
+**WeTextProcessing 后端（可选，精度更高）**：`ENABLE_WETEXT=ON` 时可用
+`modeldeploy::audio::tool::ItnBackend::WeText`（覆盖数字/日期/金额等口语化更全）。
+依赖 wenet-e2e/WeTextProcessing + OpenFst + glog，构建时需
+`-DWETEXT_INCLUDE_DIR=<WeText根> -DOPENFST_INCLUDE_DIR -DOPENFST_LIB -DGLOG_INCLUDE_DIR`；
+运行时通过环境变量 `MODELDEPLOY_WETEXT_DIR` 给出含 `tagger.fst`/`verbalizer.fst` 的模型目录。
+注意：WeTextProcessing 上游 C++ 运行时为 POSIX-only（头依赖 `dlfcn.h`，且语法模型需
+pynini/OpenFst 工具在 Linux 编译），Windows/MSVC 下无法全链路启用；依赖缺失时自动退化到内置轻量实现。
 
 ## 28. 视频解码（VideoDecoder）
 

@@ -5,10 +5,10 @@
 #ifdef MODELDEPLOY_HAS_WETEXT
 #include <memory>
 #include <string>
-// 由 ENABLE_WETEXT 提供 include 路径；接口对齐 WeTextProcessing/sherpa-onnx：
-//   CnItnProcessor(const std::string& tagger_fst, const std::string& verbalizer_fst);
-//   std::string normalize(const std::string& input);
-#include "we-text-processing/csrc/cn_itn_processor.h" // IWYU pragma: keep
+// 接口对齐 wenet-e2e/WeTextProcessing runtime（依赖 OpenFst）：
+//   wetext::Processor(const std::string& tagger_fst, const std::string& verbalizer_fst);
+//   std::string Normalize(const std::string& input);
+#include "processor/wetext_processor.h" // IWYU pragma: keep
 #endif
 
 namespace modeldeploy::audio::tool {
@@ -18,7 +18,7 @@ struct ItnEngine::Impl {
     ItnBackend backend = ItnBackend::Lightweight;
     InverseTextNormalizer lite;
 #ifdef MODELDEPLOY_HAS_WETEXT
-    std::shared_ptr<CnItnProcessor> cn;
+    std::shared_ptr<wetext::Processor> wn;
     bool ready = false;
 #endif
 };
@@ -28,10 +28,10 @@ ItnEngine::ItnEngine(ItnBackend backend)
 #ifdef MODELDEPLOY_HAS_WETEXT
     if (backend == ItnBackend::WeText) {
         // 模型目录由调用方通过环境变量 MODELDEPLOY_WETEXT_DIR 或固定相对路径给出。
-        // 需要 tagger.fst 与 verbalizer.fst。
+        // 需要 tagger.fst 与 verbalizer.fst（由 WeTextProcessing 语法编译生成）。
         const char* dir = std::getenv("MODELDEPLOY_WETEXT_DIR");
         if (dir && *dir) {
-            impl_->cn = std::make_shared<CnItnProcessor>(
+            impl_->wn = std::make_shared<wetext::Processor>(
                 std::string(dir) + "/tagger.fst",
                 std::string(dir) + "/verbalizer.fst");
             impl_->ready = true;
@@ -49,7 +49,7 @@ ItnEngine& ItnEngine::operator=(ItnEngine&&) noexcept = default;
 std::string ItnEngine::normalize(const std::string& text) const {
 #ifdef MODELDEPLOY_HAS_WETEXT
     if (impl_->backend == ItnBackend::WeText) {
-        if (impl_->ready && impl_->cn) return impl_->cn->normalize(text);
+        if (impl_->ready && impl_->wn) return impl_->wn->Normalize(text);
         // 依赖缺失/未加载时退化到轻量实现
         return impl_->lite.normalize(text);
     }

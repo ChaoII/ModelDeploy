@@ -46,15 +46,9 @@ namespace modeldeploy::audio::tts {
         clone_model->punc_set_ = punc_set_;
         clone_model->sample_rate_ = sample_rate_;
         clone_model->max_len_ = max_len_;
-        // 重建轻量词典对象（jieba / text_normalizer），不占显存
-        auto jieba_dir_path = fs::path(jieba_dir_);
-        clone_model->jieba_ = std::make_unique<cppjieba::Jieba>(
-            (jieba_dir_path / "jieba.dict.utf8").string().c_str(),
-            (jieba_dir_path / "hmm_model.utf8").string().c_str(),
-            (jieba_dir_path / "user.dict.utf8").string().c_str(),
-            (jieba_dir_path / "idf.utf8").string().c_str(),
-            (jieba_dir_path / "stop_words.utf8").string().c_str());
-        clone_model->text_normalizer_ = std::make_unique<TextNormalizer>(text_normalization_dir_);
+        // clone 复用同一份只读词典（jieba / text_normalizer），不重复加载/重建，减少初始化开销
+        clone_model->jieba_ = jieba_;
+        clone_model->text_normalizer_ = text_normalizer_;
         clone_model->initialized_ = initialized_;
         return clone_model;
     }
@@ -80,14 +74,14 @@ namespace modeldeploy::audio::tts {
         const std::string kUserDictPath = (jieba_dir_path / "user.dict.utf8").string();
         const std::string kIdfPath = (jieba_dir_path / "idf.utf8").string();
         const std::string kStopWordPath = (jieba_dir_path / "stop_words.utf8").string();
-        jieba_ = std::make_unique<cppjieba::Jieba>(
+        jieba_ = std::make_shared<cppjieba::Jieba>(
             kDictPath.c_str(), kHmmPath.c_str(), kUserDictPath.c_str(),
             kIdfPath.c_str(), kStopWordPath.c_str());
         const std::string punctuations = R"( ;:,.!?-…()\"“”)";
         for (auto p : punctuations) {
             punc_set_.insert(p);
         }
-        text_normalizer_ = std::make_unique<TextNormalizer>(text_normalization_dir_);
+        text_normalizer_ = std::make_shared<TextNormalizer>(text_normalization_dir_);
         return true;
     }
 
@@ -145,6 +139,14 @@ namespace modeldeploy::audio::tts {
             MD_LOG_ERROR << "The input text is empty." << std::endl;
             return false;
         }
+        // 共享的只读词典（由 clone 复用的 jieba/text_normalizer）加读锁保护
+        std::shared_lock<std::shared_mutex> lock(text_mutex_);
+        const auto voice_it = voices_.find(voice);
+        if (voice_it == voices_.end()) {
+            MD_LOG_ERROR << "unknown voice: " << voice << std::endl;
+            return false;
+        }
+        const auto& voice_style = voice_it->second;
         // 中文解决标点断句的问题text_normalizer_能解决这些问题
         // const std::vector<std::pair<std::string, std::string>> replace_str_pairs = {
         //     {"，", ","}, {":", ","}, {"、", ","}, {"；", ";"}, {"：", ":"},
@@ -216,8 +218,8 @@ namespace modeldeploy::audio::tts {
 
         std::vector<float> style;
         const int64_t emb_dim = style_dims_[2];
-        style.assign(voices_[voice].begin() + emb_dim * token_ids.size(),
-                     voices_[voice].begin() + emb_dim * token_ids.size() + emb_dim);
+        style.assign(voice_style.begin() + emb_dim * token_ids.size(),
+                     voice_style.begin() + emb_dim * token_ids.size() + emb_dim);
 
 
         outputs->resize(3); // tokens,style,speed

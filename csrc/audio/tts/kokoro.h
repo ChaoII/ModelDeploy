@@ -7,6 +7,10 @@
 #include "audio/tts/tts_model.h"
 #include "cppjieba/Jieba.hpp"
 #include "audio/text_normalize/text_normalization.h"
+#include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
+#include <memory>
 
 
 namespace modeldeploy::audio::tts
@@ -51,7 +55,7 @@ namespace modeldeploy::audio::tts
                          std::vector<int64_t>& dims, const std::string& voices_bin);
         [[nodiscard]] std::vector<std::string> split_ch_eng(const std::string& text) const;
 
-        std::unique_ptr<cppjieba::Jieba> jieba_;
+        std::shared_ptr<cppjieba::Jieba> jieba_;
         std::set<char> punc_set_;
         int32_t sample_rate_{};
         int32_t max_len_{};
@@ -60,10 +64,12 @@ namespace modeldeploy::audio::tts
         std::string voices_bin_;
         std::string jieba_dir_;
         std::string text_normalization_dir_;
-        std::map<std::string, int32_t> token2id_;
-        std::map<std::string, std::vector<std::string>> word2token_;
-        std::map<std::string, std::vector<float>> voices_; // voice -> 510 x 1 x 256
+        std::unordered_map<std::string, int32_t> token2id_;
+        std::unordered_map<std::string, std::vector<std::string>> word2token_;
+        std::unordered_map<std::string, std::vector<float>> voices_; // voice -> 510 x 1 x 256
         std::vector<int64_t> style_dims_;
-        std::unique_ptr<TextNormalizer> text_normalizer_;
+        std::shared_ptr<TextNormalizer> text_normalizer_;
+        // 共享的 jieba/TextNormalizer 只读词典并发访问保护（clone 复用同一实例）
+        mutable std::shared_mutex text_mutex_;
     };
 } // namespace detection

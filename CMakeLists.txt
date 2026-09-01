@@ -253,15 +253,35 @@ if (BUILD_AUDIO)
     list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core)
     if (ENABLE_WETEXT)
         # 可选 WeTextProcessing ITN 后端（覆盖最全）；需第三方 OpenFst + we-text-processing。
-        # 通过 WETEXT_INCLUDE_DIR / WETEXT_FST_DIR 传入 include 与模型目录。
-        find_path(WETEXT_INCLUDE_DIR "we-text-processing/csrc/cn_itn_processor.h")
-        if (WETEXT_INCLUDE_DIR)
-            include_directories(${WETEXT_INCLUDE_DIR})
+        # 检测 wenet-e2e/WeTextProcessing 运行时头
+        #   WETEXT_INCLUDE_DIR = <WeTextProcessing 根目录>
+        #   OPENFST_INCLUDE_DIR / OPENFST_LIB = OpenFst("kkm000/openfst" CMake 版) 头与静态库
+        #   GLOG_INCLUDE_DIR = glog 头（WeTextProcessing 源码使用 <glog/logging.h>；缺失时 WETEXT 不启用）
+        set(WETEXT_INCLUDE_DIR "" CACHE PATH "wenet-e2e/WeTextProcessing checkout root")
+        set(OPENFST_INCLUDE_DIR "" CACHE PATH "OpenFst include dir (containing fst/fstlib.h)")
+        set(OPENFST_LIB "" CACHE FILEPATH "OpenFst static lib (fst.lib)")
+        set(GLOG_INCLUDE_DIR "" CACHE PATH "glog include dir (containing glog/logging.h)")
+        find_path(WETEXT_INCLUDE_DIR_FOUND "runtime/processor/wetext_processor.h"
+                  HINTS ${WETEXT_INCLUDE_DIR} NO_DEFAULT_PATH)
+        set(_wetext_ready FALSE)
+        if (WETEXT_INCLUDE_DIR_FOUND AND OPENFST_INCLUDE_DIR AND OPENFST_LIB AND GLOG_INCLUDE_DIR)
+            include_directories(SYSTEM ${WETEXT_INCLUDE_DIR}/runtime ${WETEXT_INCLUDE_DIR}
+                                ${OPENFST_INCLUDE_DIR} ${GLOG_INCLUDE_DIR})
+            add_library(md_wetext STATIC
+                ${WETEXT_INCLUDE_DIR}/runtime/processor/wetext_processor.cc
+                ${WETEXT_INCLUDE_DIR}/runtime/processor/wetext_token_parser.cc
+                ${WETEXT_INCLUDE_DIR}/runtime/utils/wetext_string.cc)
+            target_include_directories(md_wetext SYSTEM PUBLIC
+                ${WETEXT_INCLUDE_DIR}/runtime ${WETEXT_INCLUDE_DIR}
+                ${OPENFST_INCLUDE_DIR} ${GLOG_INCLUDE_DIR})
             add_definitions(-DMODELDEPLOY_HAS_WETEXT)
-            message(STATUS "WeTextProcessing ITN backend: ENABLED")
+            list(APPEND PRIVATE_DEPENDS md_wetext ${OPENFST_LIB})
+            set(_wetext_ready TRUE)
+            message(STATUS "WeTextProcessing ITN backend: ENABLED (wenet-e2e + OpenFst)")
         else ()
-            message(WARNING "ENABLE_WETEXT=ON 但未找到 WeTextProcessing 头文件，ITN 退化到轻量实现。"
-                            "请设置 -DWETEXT_INCLUDE_DIR=<we-text-processing 根目录>")
+            message(WARNING "ENABLE_WETEXT=ON 但依赖不完整（需 wenet WeText 头 + OpenFst 头/库 + glog 头），"
+                            "ITN 退化到轻量实现。设置: -DWETEXT_INCLUDE_DIR=<WeText根> "
+                            "-DOPENFST_INCLUDE_DIR -DOPENFST_LIB -DGLOG_INCLUDE_DIR")
         endif ()
     endif ()
 endif ()
