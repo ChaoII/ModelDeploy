@@ -1,0 +1,38 @@
+# generated time: 2026-08-31 14:11:30.463770
+# sample number: 0
+# chip: bm1684x
+# total layers: 23 (unique list blow)
+# number of shape layers: 0
+# number of pattern layers: 23
+# number of custom layers: 0
+# # part_quant_mode: None
+###
+# ['top.MaxPool', 'top.MaxPool', 'top.MaxPool', 'top.Concat'] (Name: yolo_block) is a subset of the main list. Count: 1
+###
+# op_name   quantize_mode
+# custom layers
+# shape layers
+# pattern layers
+/model.23/Reshape_output_0_Reshape F16
+/model.23/Concat_output_0_Concat F16
+/model.23/Slice_output_0_Slice F16
+/model.23/Slice_1_output_0_Slice F16
+/model.23/Sub_output_0_Sub F16
+/model.23/Add_1_output_0_Add F16
+/model.23/Add_2_output_0_Add F16
+/model.23/Sub_1_output_0_Sub F16
+/model.23/Div_1_output_0_Div F16
+/model.23/Concat_3_output_0_Concat F16
+/model.23/Mul_2_output_0_Mul F16
+graph_output_cast_0_Concat F16
+/model.23/Reshape_6_output_0_Reshape F16
+/model.23/Concat_2_output_0_Concat F16
+/model.23/Reshape_3_output_0_Reshape F16
+/model.23/Concat_1_output_0_Concat F16
+/model.23/Sigmoid_output_0_Sigmoid F16
+/model.23/Reshape_1_output_0_Reshape F16
+/model.23/Reshape_7_output_0_Reshape F16
+/model.23/Reshape_4_output_0_Reshape F16
+/model.23/Reshape_2_output_0_Reshape F16
+/model.23/Reshape_8_output_0_Reshape F16
+/model.23/Reshape_5_output_0_Reshape F16
