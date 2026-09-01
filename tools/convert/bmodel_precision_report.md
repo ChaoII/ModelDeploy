@@ -19,7 +19,7 @@
 | gender | OK | cos=0.9999 max=0.00817 | onnx_max=0.788 bmodel_max=0.796 |
 | facerec | OK | cos=0.9385 max=5.091 | onnx_max=18.4 bmodel_max=18.8 |
 | fas1 | OK | cos=1.0000 max=0.002149 | onnx_max=0.986 bmodel_max=0.988 |
-| fas2 | 待转 | 取修复后 onnx 于 300×300 | Reshape 烘焙已修复, TRT/MNN 重转通过, 待 sophgo 容器补 bmodel |
+| fas2 | OK | scores cos=0.99999 max=0.109 / boxes cos=0.99613 max=1.08 / argmax 类别一致 99.95%(1916/1917) | 300×300 cmodel vs ONNX, int8(无 qtable), 双输出 |
 | det10g | OK | cos=0.9922 max=0.4156 | onnx_max=0.388 bmodel_max=0.373 |
 | 2d106 | OK | cos=0.9427 max=0.2363 | onnx_max=0.792 bmodel_max=0.862 |
 | 1k3d | OK | cos=0.9992 max=0.01649 | onnx_max=0.306 bmodel_max=0.29 |

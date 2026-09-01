@@ -109,8 +109,12 @@ python tools/convert/verify_precision.py
   `tools/convert/repair_tf_ssd_reshape.py` 把 12 个 Reshape 锚数维改动态(-1),
   头部随分辨率自适应: ≤224 仍因背骨 Conv 不可用, **≥300 可用,
   300×300 时锚数恰还原 1917**。SDK `SeetaFaceAsSecond::size_` 默认 {300,300}
-  与原生分辨率吻合, 无需改动。registry fas2 shape 改为 `1x3x300x300` 并去
-  skip_reason。对应 MNN/TRT 已重转通过(见 bmodel_precision_report.md 下说明)。
+   与原生分辨率吻合, 无需改动。registry fas2 shape 改为 `1x3x300x300` 并去
+   skip_reason。对应 MNN/TRT 已重转通过; **int8 bmodel 已由本地容器转换**
+   (`test_data/test_models/sophgo/seetaface/fas_second-int8.bmodel` 7.0MB),
+   300×300 cmodel 验证: scores cos=0.99999 / boxes cos=0.996 / argmax 类别一致
+   99.95%(1916/1917), 详见 bmodel_precision_report.md。真机(Sophon)部署验证
+   待设备(172.168.100.243 交叉编译/部署环境)连通后补跑。
 - **zhgd-det 不可转(skip)**: 内建 NMS/GatherND 不被 tpu-mlir 1.27 支持,
   理由保留在 models.json `skip_reason` / `note`。
 - **seetaface**: 5 个模型曾缺 `kernel_shape` 属性(tpu-mlir KeyError), 由
