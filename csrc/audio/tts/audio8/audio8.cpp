@@ -542,6 +542,10 @@ public:
 
     bool loaded_ = false;
 
+    // ---------- 设备(GPU-only) ----------
+    modeldeploy::Device device_{modeldeploy::Device::CPU};
+    int32_t device_id_ = 0;
+
     // ---------- tokenizer ----------
     std::unordered_map<std::string, int64_t> token2id_;
     std::unordered_map<std::string, int32_t> merges_rank_;
@@ -573,6 +577,8 @@ public:
             return false;
         }
         const int32_t threads = opt.cpu_thread_num > 0 ? opt.cpu_thread_num : 0;
+        device_ = opt.device;
+        device_id_ = opt.device_id;
         if (!runtime.Load(manifest, threads, opt.device, opt.device_id)) {
             MD_LOG_ERROR << "audio8: failed to load onnx runtime" << std::endl;
             return false;
@@ -940,7 +946,23 @@ public:
 
         std::vector<float> logits;
         std::vector<uint16_t> hidden;
-        if (!runtime.SlowStep(prompt, positions, &slow_cache, &logits, &hidden)) {
+        // 硬性指标:audio8 仅 GPU;KV 常驻 GPU,故 prefill 前即建 GPU 状态并接管 KV。
+        if (device_ != modeldeploy::Device::GPU) {
+            MD_LOG_ERROR << "audio8: TTS is GPU-only; device is not GPU" << std::endl;
+            return false;
+        }
+        audio8::Audio8Runtime::Audio8GpuStatePtr gstate =
+            runtime.MakeGpuState(device_, device_id_);
+        if (!gstate) {
+            MD_LOG_ERROR << "audio8: GPU state unavailable; refusing CPU fallback"
+                         << std::endl;
+            return false;
+        }
+        const bool use_gpu = true;
+        const bool prefill_ok = use_gpu
+            ? runtime.SlowStepGpu(gstate.get(), prompt, positions, &logits, &hidden)
+            : runtime.SlowStep(prompt, positions, &slow_cache, &logits, &hidden);
+        if (!prefill_ok) {
             MD_LOG_ERROR << "audio8: slow prefill failed" << std::endl;
             return false;
         }
@@ -968,7 +990,10 @@ public:
             if (static_cast<int64_t>(previous.size()) > 10)
                 previous.erase(previous.begin(), previous.begin() + 1);
             std::fill(fast_cache.begin(), fast_cache.end(), 0);
-            if (!runtime.FastStep(0, true, 0, hidden, &fast_cache, &fast_logits)) {
+            const bool boot_ok = use_gpu
+                ? runtime.FastStepGpu(gstate.get(), 0, true, 0, hidden, &fast_logits)
+                : runtime.FastStep(0, true, 0, hidden, &fast_cache, &fast_logits);
+            if (!boot_ok) {
                 MD_LOG_ERROR << "audio8: fast bootstrap failed" << std::endl;
                 return false;
             }
@@ -976,8 +1001,12 @@ public:
                                      codebook_size - 1);
             frame[0] = token;
             for (int64_t fast_pos = 1; fast_pos < num_codebooks; ++fast_pos) {
-                if (!runtime.FastStep(token, false, fast_pos, hidden, &fast_cache,
-                                      &fast_logits)) {
+                const bool fok = use_gpu
+                    ? runtime.FastStepGpu(gstate.get(), token, false, fast_pos, hidden,
+                                          &fast_logits)
+                    : runtime.FastStep(token, false, fast_pos, hidden, &fast_cache,
+                                       &fast_logits);
+                if (!fok) {
                     MD_LOG_ERROR << "audio8: fast step failed" << std::endl;
                     return false;
                 }
@@ -991,7 +1020,10 @@ public:
             column[0] = semantic;
             for (int64_t k = 0; k < num_codebooks; ++k) column[k + 1] = frame[k];
             const std::vector<int64_t> one_pos{prompt_len + step};
-            if (!runtime.SlowStep(column, one_pos, &slow_cache, &logits, &hidden)) {
+            const bool s_ok = use_gpu
+                ? runtime.SlowStepGpu(gstate.get(), column, one_pos, &logits, &hidden)
+                : runtime.SlowStep(column, one_pos, &slow_cache, &logits, &hidden);
+            if (!s_ok) {
                 MD_LOG_ERROR << "audio8: slow step failed" << std::endl;
                 return false;
             }

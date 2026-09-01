@@ -135,10 +135,12 @@ TEST_CASE("split_for_synthesis respects max_chars", "[tts][tts-common]") {
     REQUIRE(joined == text);  // 不丢字、不增字
 }
 
-TEST_CASE("Audio8 predict produces audio", "[tts][tts-audio8]") {
+TEST_CASE("Audio8 predict produces audio", "[tts][tts-audio8][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = audio8_dir();
     if (!fs::exists(dir / "runtime_manifest.json")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Audio8 m;
     if (!m.Load(dir.string(), opt)) return;
     REQUIRE(m.get_sample_rate() == 44100);
@@ -148,10 +150,12 @@ TEST_CASE("Audio8 predict produces audio", "[tts][tts-audio8]") {
     REQUIRE(rms(audio) > 1e-3);
 }
 
-TEST_CASE("Qwen3Tts predict produces audio", "[tts][tts-qwen3]") {
+TEST_CASE("Qwen3Tts predict produces audio", "[tts][tts-qwen3][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = qwen3_dir();
     if (!fs::exists(dir / "onnx_kv_06b")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Qwen3Tts m;
     if (!m.init(dir.string(), opt)) return;
     REQUIRE(m.get_sample_rate() == 24000);
@@ -161,10 +165,12 @@ TEST_CASE("Qwen3Tts predict produces audio", "[tts][tts-qwen3]") {
     REQUIRE(rms(audio) > 1e-3);
 }
 
-TEST_CASE("Audio8 predict_stream equals predict", "[tts][tts-audio8]") {
+TEST_CASE("Audio8 predict_stream equals predict", "[tts][tts-audio8][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = audio8_dir();
     if (!fs::exists(dir / "runtime_manifest.json")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Audio8 m;
     if (!m.Load(dir.string(), opt)) return;
     const std::string text = "今天天气真不错，适合出门散步。";
@@ -177,12 +183,14 @@ TEST_CASE("Audio8 predict_stream equals predict", "[tts][tts-audio8]") {
     REQUIRE(rel_len_diff(streamed, whole) < 0.05);
 }
 
-TEST_CASE("Audio8 predict_stream real chunking", "[tts][tts-audio8]") {
+TEST_CASE("Audio8 predict_stream real chunking", "[tts][tts-audio8][gpu]") {
     // 长文本 + chunk_frames=24 → 断言真实分块（滑窗 guard 持续多块）：
     // 回调次数 >1、各块有限非空、拼接总长与 predict 相对差 <5%。
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = audio8_dir();
     if (!fs::exists(dir / "runtime_manifest.json")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Audio8 m;
     if (!m.Load(dir.string(), opt)) return;
     const std::string text = long_sentence(150);
@@ -197,10 +205,12 @@ TEST_CASE("Audio8 predict_stream real chunking", "[tts][tts-audio8]") {
     REQUIRE(rel_len_diff(st.audio, whole) < 0.05);
 }
 
-TEST_CASE("Qwen3Tts predict_stream equals predict", "[tts][tts-qwen3]") {
+TEST_CASE("Qwen3Tts predict_stream equals predict", "[tts][tts-qwen3][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = qwen3_dir();
     if (!fs::exists(dir / "onnx_kv_06b")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Qwen3Tts m;
     if (!m.init(dir.string(), opt)) return;
     const std::string text = "你好，世界！这是流式一致性测试。";
@@ -220,12 +230,14 @@ TEST_CASE("Qwen3Tts predict_stream equals predict", "[tts][tts-qwen3]") {
     REQUIRE(best < 0.3);
 }
 
-TEST_CASE("Qwen3Tts predict_stream real chunking", "[tts][tts-qwen3]") {
-    // chunk_frames=12（≈1s/块，12×1920 采样）→ 断言音频回调次数 >1（进度空块不计数）。
-    // 采样 thread_local 随机 → 逐次生成非确定，沿用"3 对最小差 <30%"放宽策略。
+TEST_CASE("Qwen3Tts predict_stream real chunking", "[tts][tts-qwen3][gpu]") {
+    // 长文本 + chunk_frames=24 → 断言真实分块（滑窗 guard 持续多块）：
+    // 回调次数 >1、各块有限非空、拼接总长与 predict 相对差 <5%。
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = qwen3_dir();
     if (!fs::exists(dir / "onnx_kv_06b")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Qwen3Tts m;
     if (!m.init(dir.string(), opt)) return;
     const std::string text = "你好，世界！这是流式分块一致性测试，用于验证 Qwen3 的多块路径。";
@@ -294,10 +306,12 @@ TEST_CASE("Kokoro predict_stream real chunking", "[tts][tts-kokoro]") {
     REQUIRE_FALSE(st.audio.empty());
 }
 
-TEST_CASE("Audio8 overlong text rejected without truncation", "[tts][tts-audio8]") {
+TEST_CASE("Audio8 overlong text rejected without truncation", "[tts][tts-audio8][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = audio8_dir();
     if (!fs::exists(dir / "runtime_manifest.json")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Audio8 m;
     if (!m.Load(dir.string(), opt)) return;
     const std::string long_text(6000, '啊');
@@ -309,10 +323,12 @@ TEST_CASE("Audio8 overlong text rejected without truncation", "[tts][tts-audio8]
     REQUIRE(audio[2] == 0.0f);
 }
 
-TEST_CASE("Qwen3Tts overlong text rejected without truncation", "[tts][tts-qwen3]") {
+TEST_CASE("Qwen3Tts overlong text rejected without truncation", "[tts][tts-qwen3][gpu]") {
+    MD_TEST_GPU_OR_SKIP();
     const auto dir = qwen3_dir();
     if (!fs::exists(dir / "onnx_kv_06b")) return;
     modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
     Qwen3Tts m;
     if (!m.init(dir.string(), opt)) return;
     const std::string long_text(6000, '好');
