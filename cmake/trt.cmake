@@ -15,12 +15,24 @@ set(TRT_VERSION_HPP "${TRT_INC_DIR}/NvInferVersion.h")
 if (EXISTS "${TRT_VERSION_HPP}")
     # 读取版本头文件
     file(READ "${TRT_VERSION_HPP}" TRT_VERSION_CONTENT)
-    # 提取宏定义
-    string(REGEX MATCH "#define NV_TENSORRT_MAJOR ([0-9]+)"
+    # 提取宏定义（标准版直接定义 NV_TENSORRT_MAJOR 为数字；
+    # Enterprise 版改为 #define NV_TENSORRT_MAJOR TRT_MAJOR_ENTERPRISE，
+    # 实际数字定义在 TRT_MAJOR_ENTERPRISE 上，需回退匹配）
+    string(REGEX MATCH "#define NV_TENSORRT_MAJOR[ \t]+([0-9]+)"
             TRT_MAJOR_MATCH ${TRT_VERSION_CONTENT})
     if (TRT_MAJOR_MATCH)
         set(TRT_MAJOR_VERSION ${CMAKE_MATCH_1})
+    else ()
+        string(REGEX MATCH "#define TRT_MAJOR_ENTERPRISE[ \t]+([0-9]+)"
+                TRT_MAJOR_MATCH ${TRT_VERSION_CONTENT})
+        if (TRT_MAJOR_MATCH)
+            set(TRT_MAJOR_VERSION ${CMAKE_MATCH_1})
+        endif ()
+    endif ()
+    if (TRT_MAJOR_VERSION)
         message(STATUS "TensorRT 主版本: ${TRT_MAJOR_VERSION}")
+    else ()
+        message(WARNING "无法从 NvInferVersion.h 解析 TensorRT 主版本")
     endif ()
 endif ()
 
