@@ -10,8 +10,6 @@
 
 #include "csrc/audio/tts/utils.h"
 #include "csrc/audio/tts/kokoro.h"
-#include "csrc/audio/tts/audio8/audio8.h"
-#include "csrc/audio/tts/qwen3/qwen3_tts.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -42,7 +40,7 @@ bool run_stream(const std::string& name, ModelT* model, const std::string& text,
                 std::cout << "  [" << name << "] progress=" << static_cast<int>(progress * 100.0f)
                           << "% chunk=" << n << " samples=" << accumulated.size() << std::endl;
             } else {
-                // progress 空块（Qwen3 mode B AR 阶段）：跳过音频处理，仅记进度
+                // progress 空块：跳过音频处理，仅记进度
                 std::cout << "  [" << name << "] progress=" << static_cast<int>(progress * 100.0f)
                           << "% (no audio)" << std::endl;
             }
@@ -73,8 +71,7 @@ int32_t main() {
     SetConsoleOutputCP(CP_UTF8);
     std::wcout.imbue(std::locale(""));
 #endif
-    // 各模型 chunk_frames 取较小值（单位模型相关：Audio8=AR 码帧 / Qwen3=vq 码帧 / Kokoro=字符），
-    // 以便演示真实流式的多次音频回调。
+    // Kokoro chunk_frames=字符数（>120 字触发多块），以便演示真实流式的多次音频回调。
     const std::string models_root = models_dir();
 
     // ---- Kokoro（chunk_frames=字符数，>120 字触发多块）----
@@ -105,31 +102,6 @@ int32_t main() {
         if (!ok) return 1;
     }
 
-    // ---- Audio8 ----
-    {
-        const std::string model_dir = models_root + "/audio8_preview";
-        modeldeploy::RuntimeOption option;
-        modeldeploy::audio::tts::Audio8 audio8;
-        if (!audio8.Load(model_dir, option)) {
-            std::cerr << "FAILED: Audio8 load " << model_dir << std::endl;
-            return 1;
-        }
-        std::cout << "Audio8 loaded, sample_rate=" << audio8.get_sample_rate() << std::endl;
-        run_stream("audio8", &audio8, "你好，世界。这是流式合成的测试音频。", "demo",
-                   24, "out_stream_audio8.wav");
-    }
-
-    // ---- Qwen3 ----
-    {
-        const std::string model_dir = models_root + "/qwen3_tts_0.6b";
-        modeldeploy::RuntimeOption option;
-        modeldeploy::audio::tts::Qwen3Tts qwen3(model_dir, option);
-        std::cout << "Qwen3Tts loaded, sample_rate=" << qwen3.get_sample_rate() << std::endl;
-        const bool ok = run_stream("qwen3", &qwen3, "你好，世界。这是流式合成的测试音频。",
-                                   "Vivian", 12, "out_stream_qwen3.wav");
-        if (!ok) return 1;
-    }
-
-    std::cout << "All three stream TTS finished." << std::endl;
+    std::cout << "Kokoro stream TTS finished." << std::endl;
     return 0;
 }

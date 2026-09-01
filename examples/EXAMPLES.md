@@ -96,9 +96,7 @@ cmake --build build
 | `demo_diarization` | 说话人分段（VAD 切段骨架） | 无 | 音频 wav 可选 | `demo_diarization [input.wav]`，合成/读取音频 -> 打印 [start_ms, end_ms] 段 |
 | `demo_stream_stt` | 流式语音识别骨架（分块 push + on_text 回调） | 无 | 合成音频 | 分块推送 -> run_once 打印 VAD 分段，缺 SenseVoice 权重不崩 |
 | `demo_tts_batch` | TTS 批处理队列（enqueue/dequeue_all） | 无 | 文本 | 注入 mock 合成器演示队列：打印每条音频长度 |
-| `demo_audio8_cxx` | TTS（Audio8-TTS-Preview 0.6B） | `{MODELDEPLOY_TTS_MODELS_DIR}/audio8_preview`（默认 `test_data/test_models/tts/audio8_preview`） | 文本 | `out_audio8.wav`（用法 `demo_audio8_cxx [voice]`，默认 voice `demo`，见 `{model_dir}/voices`） |
-| `demo_qwen3_tts_cxx` | TTS（Qwen3-TTS 12Hz 0.6B） | `{MODELDEPLOY_TTS_MODELS_DIR}/qwen3_tts_0.6b` | 文本 | `out_qwen3.wav`；`--clone <ref_audio> <ref_text> [lang]` 输出 `out_qwen3_clone.wav` |
-| `demo_tts_stream_cxx` | TTS 流式（Kokoro+Audio8+Qwen3 统一 predict_stream） | kokoro 走 `test_data/test_models/onnx/kokoro_v1_1`，另外两个走 `{MODELDEPLOY_TTS_MODELS_DIR}` | 文本 | `out_stream_kokoro.wav` / `out_stream_audio8.wav` / `out_stream_qwen3.wav`（回调打印 progress 与块长） |
+| `demo_tts_stream_cxx` | TTS 流式（Kokoro 统一 predict_stream） | kokoro 走 `test_data/test_models/onnx/kokoro_v1_1` | 文本 | `out_stream_kokoro.wav`（回调打印 progress 与块长） |
 
 > **跟踪 demo**：无真实视频时用单张测试图（`test_detection1.jpg` 等）模拟多帧序列——把同一批检测框按帧做轻微确定性抖动连续送入追踪器，展示同一物体在帧间保持**稳定 track_id**。逐帧打印 track 数量，并统计"稳定物体数（每个物体跨帧只使用单一 track_id）"。
 

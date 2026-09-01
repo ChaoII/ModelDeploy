@@ -10,11 +10,5 @@ target_link_libraries(demo_kokoro_capi PUBLIC ${LIBRARY_NAME})
 add_executable(demo_sense_voice_capi demo_sense_voice_capi.cpp)
 target_link_libraries(demo_sense_voice_capi PUBLIC ${LIBRARY_NAME})
 
-add_executable(demo_audio8_cxx demo_audio8_cxx.cpp)
-target_link_libraries(demo_audio8_cxx PUBLIC ${LIBRARY_NAME})
-
-add_executable(demo_qwen3_tts_cxx demo_qwen3_tts_cxx.cpp)
-target_link_libraries(demo_qwen3_tts_cxx PUBLIC ${LIBRARY_NAME})
-
 add_executable(demo_tts_stream_cxx demo_tts_stream_cxx.cpp)
 target_link_libraries(demo_tts_stream_cxx PUBLIC ${LIBRARY_NAME})
