@@ -6,10 +6,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "audio/solutions/tts_batcher.h"
@@ -436,4 +438,50 @@ TEST_CASE("Audio8 GpuState fast step matches CPU", "[tts][tts-audio8][gpu][spike
     for (size_t i = 0; i < cpu_fast.size(); ++i)
         REQUIRE(std::fabs(static_cast<float>(fast_cpy[i]) -
                           static_cast<float>(cpu_fast[i])) <= 2.0f);
+}
+
+TEST_CASE("Audio8 GPU RTF <= 1.5", "[tts][tts-audio8][gpu][tts-rtf]") {
+    MD_TEST_GPU_OR_SKIP();
+    const auto dir = audio8_dir();
+    if (!fs::exists(dir)) { WARN("audio8 model dir missing; skipping"); return; }
+    modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
+    Audio8 m;
+    REQUIRE(m.Load(dir.string(), opt));
+    const std::string text =
+        "今天天气真不错，适合出门散步。GPU 推理让 KV 常驻显存，合成延迟压到实时以下。";
+    std::vector<float> audio;
+    const auto t0 = std::chrono::steady_clock::now();
+    REQUIRE(m.predict(text, "demo", 1.0f, &audio));
+    const auto t1 = std::chrono::steady_clock::now();
+    const double synth_s = std::chrono::duration<double>(t1 - t0).count();
+    const double audio_s =
+        static_cast<double>(audio.size()) / static_cast<double>(m.get_sample_rate());
+    REQUIRE(audio_s > 1.0);
+    const double rtf = synth_s / audio_s;
+    MD_LOG_INFO << "Audio8 GPU RTF = " << rtf << " (synth=" << synth_s
+                << "s audio=" << audio_s << "s)" << std::endl;
+    // 验收线(2026-09-01 用户决策):放弃无法达成的 ≤0.3 实时线;改为实测回归门禁。
+    // 本机 GPU 基线 RTF≈1.22(短句/负载中等),CPU 同句 ≈2.7;取 1.5 作余量,
+    // 仍可捕捉"GPU 路径退化回 CPU 级性能"这类回归。
+    REQUIRE(rtf <= 1.5);
+}
+
+TEST_CASE("Audio8 GPU clone concurrent predict", "[tts][tts-audio8][gpu][tts-rtf]") {
+    MD_TEST_GPU_OR_SKIP();
+    const auto dir = audio8_dir();
+    if (!fs::exists(dir)) { WARN("audio8 model dir missing; skipping"); return; }
+    modeldeploy::RuntimeOption opt;
+    opt.set_device(modeldeploy::Device::GPU, 0);
+    Audio8 base;
+    REQUIRE(base.Load(dir.string(), opt));
+    auto a = base.clone();
+    auto b = base.clone();
+    std::vector<float> oa, ob;
+    std::thread ta([&] { a->predict("并发测试句子甲。", "demo", 1.0f, &oa); });
+    std::thread tb([&] { b->predict("并发测试句子乙。", "demo", 1.0f, &ob); });
+    ta.join();
+    tb.join();
+    REQUIRE(oa.size() > 0);
+    REQUIRE(ob.size() > 0);
 }
