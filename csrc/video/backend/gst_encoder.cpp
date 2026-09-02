@@ -63,7 +63,8 @@ bool GstEncoder::runtime_available() const {
     if (nvh264enc_available() ||
         nvv4l2h264enc_available() ||
         bmh264enc_available() ||
-        qsvh264enc_available()) return true;
+        qsvh264enc_available() ||
+        qsvh265enc_available()) return true;
     return false;
 }
 
@@ -135,11 +136,21 @@ bool GstEncoder::qsvh264enc_available() {
     return true;
 }
 
+bool GstEncoder::qsvh265enc_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    GstElementFactory* f = gst_element_factory_find("qsvh265enc");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
 // 决议本次会话的编码元素：
 //   codec=="nvh264enc" → 硬编 nvcodec（不可用则报错 no-nvh264enc）
 //   codec=="nvv4l2h264enc" → Jetson L4T V4L2 硬编（不可用则报错 no-nvv4l2h264enc）
 //   codec=="bmh264enc" → 算能 SOPHGO BM 硬编（不可用则报错 no-bmh264enc）
-//   codec=="qsvh264enc"/"qsvh265enc" → Intel QSV 硬编（不可用则报错 no-qsvh264enc）
+//   codec=="qsvh264enc" → Intel QSV H.264 硬编（不可用则报错 no-qsvh264enc）
+//   codec=="qsvh265enc" → Intel QSV HEVC 硬编（不可用则报错 no-qsvh265enc）
 //   codec=="vaapih264enc" → VAAPI 硬编（不可用则报错 no-vaapih264enc；仅 ENABLE_VAAPI 编译时支持）
 //   codec=="x264enc"/空 → 软编 x264enc
 //   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则 nv 硬编（优先，支持 GPU-direct）；
@@ -159,8 +170,10 @@ int GstEncoder::resolve_encoder(std::string* err) {
         choice = 4;
     } else if (codec == "qsvh264enc") {
         choice = 5;
+        qsv_enc_name_ = "qsvh264enc";
     } else if (codec == "qsvh265enc") {
-        choice = 5;  // 复用同一条 QSV 管道（hevc 由插件自适应），QSV 桶统一
+        choice = 5;
+        qsv_enc_name_ = "qsvh265enc";
     } else if (codec == "x264enc" || codec.empty()) {
         choice = 0;
 #ifdef ENABLE_VAAPI
@@ -200,8 +213,9 @@ int GstEncoder::resolve_encoder(std::string* err) {
         set_err(err, "no-bmh264enc");
         return -1;
     }
-    if (choice == 5 && !qsvh264enc_available()) {
-        set_err(err, "no-qsvh264enc");
+    if (choice == 5 && (qsv_enc_name_ == "qsvh265enc" ? !qsvh265enc_available()
+                                                      : !qsvh264enc_available())) {
+        set_err(err, qsv_enc_name_ == "qsvh265enc" ? "no-qsvh265enc" : "no-qsvh264enc");
         return -1;
     }
 #ifdef ENABLE_VAAPI
@@ -296,8 +310,9 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     encoder_part = " bmh264enc bps=" + std::to_string(cfg_.bitrate_kbps * 1000) +
                    " gop=" + std::to_string(cfg_.gop);
     } else if (enc == 5) {
-        // qsvh264enc：bitrate 单位 kbit/sec；关键帧间隔属性 gop-size；低延迟 low-latency=true
-        encoder_part = " qsvh264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
+        // QSV 硬编（qsvh264enc/qsvh265enc）：bitrate 单位 kbit/sec；关键帧间隔属性 gop-size；
+        // 低延迟 low-latency=true。元素名按本会话请求的 codec 取 qsv_enc_name_。
+        encoder_part = " " + qsv_enc_name_ + " bitrate=" + std::to_string(cfg_.bitrate_kbps) +
                        " gop-size=" + std::to_string(cfg_.gop) +
                        (cfg_.low_latency ? " low-latency=true" : "");
 #ifdef ENABLE_VAAPI
@@ -316,15 +331,18 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     }
     // GPU 直编（gpu_direct_input）：设备 NV12 CUDA memory 直接进 nvh264enc，无需 videoconvert
     const bool gpu_direct = cfg_.gpu_direct_input && (enc == 1);
+    // 按本次实际编码元素选对应 parse：qsvh265enc(HEVC)→h265parse，其余 H.264→h264parse
+    std::string parse_part = " h264parse ";
+    if (enc == 5 && qsv_enc_name_ == "qsvh265enc") parse_part = " h265parse ";
     std::string launch;
     if (gpu_direct) {
         launch = "appsrc name=src format=time "
                  "! video/x-raw(memory:CUDAMemory),format=NV12 !" + encoder_part +
-                 " ! h264parse ! mp4mux ! filesink location=\"" + url + "\"";
+                 " !" + parse_part + "! mp4mux ! filesink location=\"" + url + "\"";
     } else {
         launch = "appsrc name=src format=time "
                  "! videoconvert !" + encoder_part +
-                 " ! h264parse ! mp4mux ! filesink location=\"" + url + "\"";
+                 " !" + parse_part + "! mp4mux ! filesink location=\"" + url + "\"";
     }
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -612,6 +630,7 @@ void GstEncoder::teardown() {
     encoder_is_l4t_ = false;
     encoder_is_qsv_ = false;
     encoder_is_bm_ = false;
+    qsv_enc_name_ = "qsvh264enc";
 #ifdef ENABLE_VAAPI
     encoder_is_vaapi_ = false;
 #endif
