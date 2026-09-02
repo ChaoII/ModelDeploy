@@ -29,6 +29,15 @@ bool cuda_ctx_available() {
     if (ctx) av_buffer_unref(&ctx);
     return true;
 }
+
+// QSV 设备上下文能否建立：av_hwdevice_ctx_create(QSV) 成功才保留 h264_qsv 族。
+// 不 include hwcontext_qsv.h（依赖 libmfx 头）；AV_HWDEVICE_TYPE_QSV 来自通用 hwcontext.h。
+bool qsv_ctx_available() {
+    AVBufferRef* ctx = nullptr;
+    if (av_hwdevice_ctx_create(&ctx, AV_HWDEVICE_TYPE_QSV, nullptr, nullptr, 0) < 0) return false;
+    if (ctx) av_buffer_unref(&ctx);
+    return true;
+}
 #endif
 
 #ifdef ENABLE_GSTREAMER
@@ -54,18 +63,22 @@ HwProbeResult probe_ffmpeg_hw() {
     HwProbeResult r;
 #ifdef ENABLE_FFMPEG
     const bool cuda_ok = cuda_ctx_available();
+    const bool qsv_ok = qsv_ctx_available();
     const char* decoders[] = {"h264_cuvid", "hevc_cuvid", "av1_cuvid",
-                              "mjpeg_cuvid", "h264_vaapi", "hevc_vaapi"};
+                              "mjpeg_cuvid", "h264_vaapi", "hevc_vaapi",
+                              "h264_qsv", "hevc_qsv"};
     for (const char* name : decoders) {
         if (!avcodec_find_decoder_by_name(name)) continue;
-        if (std::strstr(name, "cuvid") && !cuda_ok) continue;  // CUDA 不可用则剔除
+        if (std::strstr(name, "cuvid") && !cuda_ok) continue;
+        if (std::strstr(name, "qsv") && !qsv_ok) continue;
         r.decoders.emplace_back(name);
     }
     const char* encoders[] = {"h264_nvenc", "hevc_nvenc", "av1_nvenc",
                               "h264_vaapi", "hevc_vaapi", "h264_qsv", "hevc_qsv"};
     for (const char* name : encoders) {
         if (!avcodec_find_encoder_by_name(name)) continue;
-        if (std::strstr(name, "nvenc") && !cuda_ok) continue;  // CUDA 不可用则剔除
+        if (std::strstr(name, "nvenc") && !cuda_ok) continue;
+        if (std::strstr(name, "qsv") && !qsv_ok) continue;
         r.encoders.emplace_back(name);
     }
 #endif
@@ -77,7 +90,8 @@ HwProbeResult probe_gstreamer_hw() {
 #ifdef ENABLE_GSTREAMER
     if (!gst_probe_init_once()) return r;
     const char* names[] = {"nvh264enc", "nvh264dec", "nvv4l2decoder",
-                           "vaapih264enc", "vaapih264dec"};
+                           "vaapih264enc", "vaapih264dec",
+                           "qsvh264enc", "qsvh265enc", "qsvh264dec", "qsvh265dec"};
     for (const char* name : names) {
         GstElementFactory* f = gst_element_factory_find(name);
         if (!f) continue;
