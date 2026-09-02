@@ -137,3 +137,34 @@ TEST_CASE("FFmpeg encode 注入外部 pts_ms → 回读时间戳非降", "[video
     }
     REQUIRE(cnt >= 2);
 }
+
+TEST_CASE("FFmpeg h264_qsv 硬编（CPU NV12）→ mp4 回读", "[video][ffmpeg][hw][gpu][integration]") {
+    auto cap = query_video_capabilities();
+    bool qsv = std::find(cap.hw_encoders.begin(), cap.hw_encoders.end(), "h264_qsv") !=
+               cap.hw_encoders.end();
+    if (!qsv) SKIP("no h264_qsv encoder in this environment");
+    const int W = 192, H = 144;
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::FFmpeg;
+    ecfg.hw_accel = HwAccel::Qsv;
+    ecfg.set_codec("auto").set_format("mp4");
+    auto enc = create_encoder_backend(ecfg);
+    REQUIRE(enc != nullptr);
+    auto ff = std::dynamic_pointer_cast<FfmpegEncoder>(enc);
+    std::string err;
+    REQUIRE(enc->open("test_data/video/qsv_ffmpeg_out.mp4", W, H, 25, ecfg, &err));
+    auto img = make_solid(W, H);
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
+    enc->close();
+    if (ff) REQUIRE(ff->used_hw());  // 确实走 QSV 硬编
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::FFmpeg;
+    dcfg.hw_accel = HwAccel::None;
+    auto dec = VideoDecoder::create(dcfg);
+    REQUIRE(dec != nullptr);
+    REQUIRE(dec->open("test_data/video/qsv_ffmpeg_out.mp4", &err));
+    int cnt = 0;
+    VideoFrame f;
+    while (dec->read_one_frame(&f, &err)) ++cnt;
+    REQUIRE(cnt > 0);
+}

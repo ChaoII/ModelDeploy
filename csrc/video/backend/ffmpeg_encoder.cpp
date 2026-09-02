@@ -27,7 +27,8 @@ FfmpegEncoder::~FfmpegEncoder() { cleanup(); }
 bool FfmpegEncoder::runtime_available() const {
     // 任一候选编码器可用即视为后端可用：软编 libx264、NVENC、OPMEDIA(h264_sophon)、BM 硬编等。
     // 不同平台 ffmpeg 内置的编码器集不同（如 sophon-ffmpeg 无 libx264 但有 h264_bm）。
-    const char* names[] = {"libx264", "h264_nvenc", "h264_v4l2m2m", "h264_bm", "h265_bm", "h264_sophon"};
+    const char* names[] = {"libx264", "h264_nvenc", "h264_v4l2m2m", "h264_bm", "h265_bm", "h264_sophon",
+                           "h264_qsv", "hevc_qsv"};
     for (const char* n : names)
         if (avcodec_find_encoder_by_name(n) != nullptr) return true;
     return false;
@@ -66,7 +67,7 @@ bool FfmpegEncoder::open(const std::string& url, int w, int h, int src_fps,
 }
 
 bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
-    // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi), 3=算能 BM(h264_bm/h265_bm)
+    // kind: 0=软编 libx264, 1=NVENC(nvenc), 2=VAAPI(h264_vaapi), 3=算能 BM(h264_bm/h265_bm), 4=QSV(h264_qsv/hevc_qsv)
     struct Opt { std::string name; int kind; };
     std::vector<Opt> candidates;
     if (cfg_.codec == "auto") {
@@ -75,6 +76,9 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
         const bool want_nvenc = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda) &&
                                 avcodec_find_encoder_by_name("h264_nvenc") != nullptr;
         if (want_nvenc) candidates.push_back({"h264_nvenc", 1});
+        const bool want_qsv = (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Qsv) &&
+                              avcodec_find_encoder_by_name("h264_qsv") != nullptr;
+        if (!want_nvenc && want_qsv) candidates.push_back({"h264_qsv", 4});
 #ifdef ENABLE_VAAPI
         if (!want_nvenc &&
             (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Vaapi) &&
@@ -89,6 +93,8 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
     } else if (cfg_.codec == "h264_bm" || cfg_.codec == "h265_bm" || cfg_.codec == "hevc_bm") {
         // 算能 BM 硬件编码器（仅当 SDK 链接 sophon-ffmpeg 时 avcodec 存在；NV12 输入）
         candidates.push_back({cfg_.codec, 3});
+    } else if (cfg_.codec == "h264_qsv" || cfg_.codec == "hevc_qsv") {
+        candidates.push_back({cfg_.codec, 4});
 #ifdef ENABLE_VAAPI
     } else if (cfg_.codec == "vaapih264enc" || cfg_.codec == "h264_vaapi") {
         // VAAPI 编码器（GStreamer 名 vaapih264enc 与 FFmpeg 名 h264_vaapi 都映射到 FFmpeg h264_vaapi）
@@ -112,7 +118,8 @@ bool FfmpegEncoder::init_encoder(int w, int h, int fps, std::string* err) {
         // 候选打开失败：显式 nvenc/vaapi 必须报错（不静默换软编）；auto 时继续尝试下一候选（软编回退）
         if (cfg_.codec == "h264_nvenc" || cfg_.codec == "vaapih264enc" ||
             cfg_.codec == "h264_vaapi" || cfg_.codec == "h264_bm" ||
-            cfg_.codec == "h265_bm" || cfg_.codec == "hevc_bm") {
+            cfg_.codec == "h265_bm" || cfg_.codec == "hevc_bm" ||
+            cfg_.codec == "h264_qsv" || cfg_.codec == "hevc_qsv") {
             set_err(err, "encoder-open-fail");
             return false;
         }
@@ -142,7 +149,8 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
     // 软编 libx264 用 YUV420P，普通 nvenc（CPU NV12 上传）与 VAAPI 均用 NV12。
     const bool gpu_direct = (kind == 1) && cfg_.gpu_direct_input;
     const AVPixelFormat enc_fmt = kind == 1 ? (gpu_direct ? AV_PIX_FMT_CUDA : AV_PIX_FMT_NV12)
-                                            : ((kind == 3 || vaapi) ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P);
+                                            : ((kind == 3 || kind == 4 || vaapi) ? AV_PIX_FMT_NV12
+                                                                                 : AV_PIX_FMT_YUV420P);
     enc_->pix_fmt = enc_fmt;
     enc_->gop_size = cfg_.gop;
     enc_->bit_rate = static_cast<int64_t>(cfg_.bitrate_kbps) * 1000;
@@ -196,6 +204,19 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
                    cfg_.preset.empty() ? "ultrafast" : cfg_.preset.c_str(), 0);
         if (cfg_.low_latency) {
             av_opt_set(enc_->priv_data, "tune", "zerolatency", 0);
+        }
+    }
+    if (kind == 4) {
+        if (av_hwdevice_ctx_create(&hw_device_ctx_, AV_HWDEVICE_TYPE_QSV, nullptr, nullptr, 0) != 0) {
+            avcodec_free_context(&enc_);
+            enc_ = nullptr;
+            return false;
+        }
+        enc_->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
+        if (!enc_->hw_device_ctx) {
+            avcodec_free_context(&enc_);
+            enc_ = nullptr;
+            return false;
         }
     }
     if (avcodec_open2(enc_, codec, nullptr) < 0) {
