@@ -14,7 +14,7 @@ inline std::string backend_to_string(CodecBackend b) {
     return "unknown";
 }
 // 硬件加速策略
-enum class HwAccel { Auto, None, Cuda, Vaapi, Sophgo };
+enum class HwAccel { Auto, None, Cuda, Vaapi, Sophgo, Qsv };
 inline std::string hwaccel_to_string(HwAccel h) {
     switch (h) {
         case HwAccel::Auto: return "auto";
@@ -22,6 +22,7 @@ inline std::string hwaccel_to_string(HwAccel h) {
         case HwAccel::Cuda: return "cuda";
         case HwAccel::Vaapi: return "vaapi";
         case HwAccel::Sophgo: return "sophgo";
+        case HwAccel::Qsv: return "qsv";
     }
     return "none";
 }
