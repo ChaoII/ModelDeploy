@@ -157,13 +157,15 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         }
     }
 #endif
-    // QSV 硬解（显式 Qsv 或 Auto）：qsvh264dec → videoconvert → appsink(NV12)。
+    // QSV 硬解（显式 Qsv 或 Auto）：qsvh264dec/qsvh265dec → videoconvert → appsink(NV12)。
     // 显式 Qsv 失败 → fail-closed；Auto 失败/无插件 → 落在下方软解。
     if (!cfg_.device_only &&
         (cfg_.hw_accel == HwAccel::Qsv || cfg_.hw_accel == HwAccel::Auto)) {
-        if (!qsvh264dec_available()) {
+        // 依据请求 codec 判 HEVC：hevc_qsv/qsvh265dec → QSV HEVC 硬解；其余（auto/h264_qsv/空）→ H.264。
+        qsv_hevc_ = (cfg_.codec == "hevc_qsv" || cfg_.codec == "qsvh265dec");
+        if (qsv_hevc_ ? !qsvh265dec_available() : !qsvh264dec_available()) {
             if (cfg_.hw_accel == HwAccel::Qsv) {
-                set_err(err, "no-qsvh264dec");
+                set_err(err, qsv_hevc_ ? "no-qsvh265dec" : "no-qsvh264dec");
                 state_ = State::Error;
                 return false;
             }
@@ -402,10 +404,21 @@ bool GstDecoder::qsvh264dec_available() {
     return true;
 }
 
+bool GstDecoder::qsvh265dec_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    GstElementFactory* f = gst_element_factory_find("qsvh265dec");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
 bool GstDecoder::build_qsv_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
+    const char* parse = qsv_hevc_ ? "h265parse" : "h264parse";
+    const char* dec = qsv_hevc_ ? "qsvh265dec" : "qsvh264dec";
     std::string launch = "filesrc location=\"" + url +
-                         "\" ! h264parse ! qsvh264dec ! videoconvert "
+                         "\" ! " + parse + " ! " + dec + " ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -468,7 +481,18 @@ bool GstDecoder::read_one_frame(VideoFrame* out, std::string* err) {
         set_err(err, "not-opened");
         return false;
     }
-    GstSample* sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink_), GST_SECOND);
+    GstSample* sample;
+    if (qsv_hw_active_) {
+        // QSV 硬解（尤其 qsvh265dec）冷启动时 MFX 器件初始化/首帧可能超过 1s（进程负载下偶发），
+        // 对瞬态空拉取重试，避免误判 pull-sample-fail；EOS 及时返回。
+        sample = nullptr;
+        for (int i = 0; i < 6 && !sample; ++i) {
+            sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink_), GST_SECOND);
+            if (!sample && gst_app_sink_is_eos(GST_APP_SINK(appsink_))) break;
+        }
+    } else {
+        sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink_), GST_SECOND);
+    }
     if (!sample) {
         // 本地文件解码结束：appsink is-eos 为真；否则为瞬态拉取失败（可重连）
         bool eos = gst_app_sink_is_eos(GST_APP_SINK(appsink_));
@@ -612,6 +636,7 @@ void GstDecoder::cleanup() {
     device_only_active_ = false;
     bm_hw_active_ = false;
     qsv_hw_active_ = false;
+    qsv_hevc_ = false;
 #ifdef HAVE_NVBUF
     l4t_hw_active_ = false;
 #endif

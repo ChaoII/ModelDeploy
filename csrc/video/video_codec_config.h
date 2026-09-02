@@ -26,6 +26,10 @@ struct VideoCodecConfig {
 };
 
 struct VideoDecoderConfig : VideoCodecConfig {
+    // 请求编解码格式（默认自动）：auto/hevc_qsv/qsvh265dec/h264_qsv/qsvh264dec 等。
+    // FFmpeg 解码自动探测码流；GStreamer QSV 依赖它区分 HEVC(qsvh265dec+h265parse) 与 H.264(qsvh264dec+h264parse)。
+    std::string codec = "auto";
+    VideoDecoderConfig& set_codec(const std::string& v) { codec = v; return *this; }
     MODELDEPLOY_CXX_EXPORT bool validate(std::string* err) const;
 };
 
