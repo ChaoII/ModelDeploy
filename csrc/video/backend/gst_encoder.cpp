@@ -307,8 +307,8 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     } else if (enc == 4) {
         // 算能 SOPHGO BM H264 硬编（bmh264enc）：bps 单位是 bit/sec（非 kbit），GOP 属性名 gop。
         // 经 videoconvert 由 CPU 主机帧（BGR→NV12）喂入。底层 BM VPU 硬件编码。
-    encoder_part = " bmh264enc bps=" + std::to_string(cfg_.bitrate_kbps * 1000) +
-                   " gop=" + std::to_string(cfg_.gop);
+        encoder_part = " bmh264enc bps=" + std::to_string(cfg_.bitrate_kbps * 1000) +
+                       " gop=" + std::to_string(cfg_.gop);
     } else if (enc == 5) {
         // QSV 硬编（qsvh264enc/qsvh265enc）：bitrate 单位 kbit/sec；关键帧间隔属性 gop-size；
         // 低延迟 low-latency=true。元素名按本会话请求的 codec 取 qsv_enc_name_。

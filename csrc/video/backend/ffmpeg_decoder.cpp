@@ -143,7 +143,8 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
                 state_ = State::Error;
                 return false;
             } else {
-                err_ = "qsv-unavailable-fallback-soft";  // Auto：降级软解
+                // Auto：降级软解。保留更早的 CUDA 失败原因，仅在无诊断时写入 QSV 回退说明。
+                if (err_.empty()) err_ = "qsv-unavailable-fallback-soft";
             }
         }
 #ifdef ENABLE_VAAPI
@@ -167,7 +168,7 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
                     state_ = State::Error;
                     return false;
                 }
-                err_ = "vaapi-unavailable-fallback-soft";  // Auto：降级软解
+                if (err_.empty()) err_ = "vaapi-unavailable-fallback-soft";  // Auto：保留更早原因
             }
         }
 #endif
@@ -415,20 +416,24 @@ bool FfmpegDecoder::setup_qsv_cpu_decoder(AVCodecParameters* cp, const AVCodec* 
     qsv_hw_ctx_ = hwdev;
 
     ctx_ = avcodec_alloc_context3(hwc);
-    if (!ctx_) return false;
+    if (!ctx_) { av_buffer_unref(&qsv_hw_ctx_); qsv_hw_ctx_ = nullptr; return false; }
     avcodec_parameters_to_context(ctx_, cp);
     ctx_->hw_device_ctx = av_buffer_ref(qsv_hw_ctx_);
-    if (!ctx_->hw_device_ctx) return false;
+    if (!ctx_->hw_device_ctx) { avcodec_free_context(&ctx_); ctx_ = nullptr; av_buffer_unref(&qsv_hw_ctx_); qsv_hw_ctx_ = nullptr; return false; }
 
     if (avcodec_open2(ctx_, hwc, nullptr) != 0) {
         avcodec_free_context(&ctx_);
         ctx_ = nullptr;
+        av_buffer_unref(&qsv_hw_ctx_);
+        qsv_hw_ctx_ = nullptr;
         return false;
     }
     AVBufferRef* hwfr = av_hwframe_ctx_alloc(qsv_hw_ctx_);
     if (!hwfr) {
         avcodec_free_context(&ctx_);
         ctx_ = nullptr;
+        av_buffer_unref(&qsv_hw_ctx_);
+        qsv_hw_ctx_ = nullptr;
         return false;
     }
     AVHWFramesContext* fc = (AVHWFramesContext*)hwfr->data;
@@ -441,6 +446,8 @@ bool FfmpegDecoder::setup_qsv_cpu_decoder(AVCodecParameters* cp, const AVCodec* 
         av_buffer_unref(&hwfr);
         avcodec_free_context(&ctx_);
         ctx_ = nullptr;
+        av_buffer_unref(&qsv_hw_ctx_);
+        qsv_hw_ctx_ = nullptr;
         return false;
     }
     qsv_hw_frames_ = hwfr;
