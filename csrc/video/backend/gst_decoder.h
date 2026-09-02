@@ -62,6 +62,11 @@ private:
     // 复用软解 read 路径（device_only_active_ 保持 false）。未在本机验证（需 Linux VAAPI）。
     bool build_vaapi_pipeline_locked(const std::string& url, std::string* err);
 #endif
+    // 静态探测：qsvh264dec 插件可实例化（Intel QSV，GStreamer oneVPL）
+    static bool qsvh264dec_available();
+    // QSV 硬解：filesrc → h264parse → qsvh264dec → videoconvert → appsink(NV12)，输出 CPU NV12。
+    // 复用软解 read 路径（device_only_active_ 保持 false）。
+    bool build_qsv_pipeline_locked(const std::string& url, std::string* err);
     // 算能 SOPHGO BM 硬解探测：bmdec 插件可实例化（sophon-gstreamer bmcodec）。
     static bool bmdec_available();
     // 算能 SOPHGO BM 硬解：filesrc→h264parse→bmdec→videoconvert→appsink(主机 NV12)，
@@ -83,6 +88,7 @@ private:
     std::atomic<bool> opened_{false};
     bool device_only_active_ = false;  // 设备直通模式：输出保持 CUDA 设备帧
     bool bm_hw_active_ = false;        // 算能 SOPHGO BM 硬件解码（bmdec → 主机 NV12）
+    bool qsv_hw_active_ = false;  // 本次会话是否实际用 QSV 硬解
 #ifdef HAVE_NVBUF
     bool l4t_hw_active_ = false;   // Jetson L4T 硬件解码（nvv4l2decoder → nvvidconv → 主机 NV12）
 #endif

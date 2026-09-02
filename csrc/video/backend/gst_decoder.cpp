@@ -157,6 +157,28 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
         }
     }
 #endif
+    // QSV 硬解（显式 Qsv 或 Auto）：qsvh264dec → videoconvert → appsink(NV12)。
+    // 显式 Qsv 失败 → fail-closed；Auto 失败/无插件 → 落在下方软解。
+    if (!cfg_.device_only &&
+        (cfg_.hw_accel == HwAccel::Qsv || cfg_.hw_accel == HwAccel::Auto)) {
+        if (!qsvh264dec_available()) {
+            if (cfg_.hw_accel == HwAccel::Qsv) {
+                set_err(err, "no-qsvh264dec");
+                state_ = State::Error;
+                return false;
+            }
+        } else if (!build_qsv_pipeline_locked(url, err)) {
+            if (cfg_.hw_accel == HwAccel::Qsv) {
+                state_ = State::Error;
+                return false;
+            }
+            // Auto：建管道失败则回落到软解
+        } else {
+            opened_ = true;
+            state_ = State::Running;
+            return true;
+        }
+    }
     std::string launch = "filesrc location=\"" + url +
                          "\" ! decodebin ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
@@ -371,6 +393,44 @@ bool GstDecoder::build_vaapi_pipeline_locked(const std::string& url, std::string
 }
 #endif // ENABLE_VAAPI
 
+bool GstDecoder::qsvh264dec_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    GstElementFactory* f = gst_element_factory_find("qsvh264dec");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
+bool GstDecoder::build_qsv_pipeline_locked(const std::string& url, std::string* err) {
+    close_pipeline();
+    std::string launch = "filesrc location=\"" + url +
+                         "\" ! h264parse ! qsvh264dec ! videoconvert "
+                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    GError* gerr = nullptr;
+    pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
+    if (!pipeline_ || gerr) {
+        if (gerr) g_error_free(gerr);
+        if (pipeline_) { gst_object_unref(pipeline_); pipeline_ = nullptr; }
+        set_err(err, "parse-launch-fail");
+        return false;
+    }
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "sink");
+    if (!appsink_) {
+        set_err(err, "no-appsink");
+        close_pipeline();
+        return false;
+    }
+    if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+        set_err(err, "qsv-play-fail");
+        close_pipeline();
+        return false;
+    }
+    query_caps_locked(5000);
+    qsv_hw_active_ = true;
+    return true;
+}
+
 bool GstDecoder::query_caps_locked(int timeout_ms) {
     if (!appsink_) return false;
     auto begin = std::chrono::steady_clock::now();
@@ -551,6 +611,7 @@ void GstDecoder::cleanup() {
     opened_ = false;
     device_only_active_ = false;
     bm_hw_active_ = false;
+    qsv_hw_active_ = false;
 #ifdef HAVE_NVBUF
     l4t_hw_active_ = false;
 #endif
