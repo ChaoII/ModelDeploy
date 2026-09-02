@@ -171,6 +171,15 @@ if (WITH_GPU)
     endif ()
     list(APPEND ALL_SOURCE ${CUDA_SOURCE})
     list(APPEND DEPENDS CUDA::cudart)
+    # 设备直编/直通的 D2D 拷贝：用 CUDA 驱动 API（cuda.h→cuda.lib）而非整库 cudart，
+    # 供 FFmpeg 后端 encode_gpu() 设备指针直编 NVENC（与 GStreamer CUDA 路径共用该宏）。
+    add_definitions(-DMODELDEPLOY_CUDA_DRV)
+    if (NOT MD_CUDA_DRIVER_LIB)
+        find_library(MD_CUDA_DRIVER_LIB cuda PATHS "${CUDAToolkit_LIBRARY_DIR}" NO_DEFAULT_PATH)
+    endif ()
+    if (MD_CUDA_DRIVER_LIB)
+        list(APPEND DEPENDS ${MD_CUDA_DRIVER_LIB})
+    endif ()
 endif ()
 
 if (WITH_GPU AND ENABLE_ORT)
@@ -252,39 +261,28 @@ if (BUILD_AUDIO)
     # 音频静态依赖 PRIVATE 链接（打进共享库，导出时无需第三方 target）
     list(APPEND PRIVATE_DEPENDS samplerate kaldi-native-fbank-core)
     if (ENABLE_WETEXT)
-        # 可选 WeTextProcessing ITN 后端（覆盖最全）；需第三方 OpenFst + we-text-processing。
-        # 检测 wenet-e2e/WeTextProcessing 运行时头
-        #   WETEXT_INCLUDE_DIR = <WeTextProcessing 根目录>
-        #   OPENFST_INCLUDE_DIR / OPENFST_LIB = OpenFst 头与静态库。
-        #     标准版（"kkm000/openfst" CMake 版，Windows 可编）即可：需给 fst/string.h 的
-        #     StringCompiler/StringPrinter 构造加默认 "token_type = BYTE"（2 行补丁，对齐 weText 的默认构造用法；
-        #     csukuangfj fork 依赖 dlfcn.h 不适用于 Windows）。
-        #   GLOG_INCLUDE_DIR = glog 头（WeTextProcessing 源码使用 <glog/logging.h>；缺失时 WETEXT 不启用）
-        set(WETEXT_INCLUDE_DIR "" CACHE PATH "wenet-e2e/WeTextProcessing checkout root")
-        set(OPENFST_INCLUDE_DIR "" CACHE PATH "OpenFst include dir (containing fst/fstlib.h)")
-        set(OPENFST_LIB "" CACHE FILEPATH "OpenFst static lib (fst.lib)")
-        set(GLOG_INCLUDE_DIR "" CACHE PATH "glog include dir (containing glog/logging.h)")
-        find_path(WETEXT_INCLUDE_DIR_FOUND "runtime/processor/wetext_processor.h"
-                  HINTS ${WETEXT_INCLUDE_DIR} NO_DEFAULT_PATH)
+        # 可选 WeTextProcessing ITN 后端（覆盖最全）。依赖以源码形式 vendor 在
+        # third_party/ 下（third_party/openfst + third_party/WeTextProcessing），
+        # 由项目 CMake 现场构建 fst 与 md_wetext，跨平台且不依赖任何仓库外路径。
+        #   - third_party/openfst            OpenFst 核心库源码（fst 静态库）
+        #   - third_party/WeTextProcessing   wenet-e2e 运行时精简源码（md_wetext）
+        #     + glog_stub                    仅编译所需的 <glog/logging.h> 占位头
         set(_wetext_ready FALSE)
-        if (WETEXT_INCLUDE_DIR_FOUND AND OPENFST_INCLUDE_DIR AND OPENFST_LIB AND GLOG_INCLUDE_DIR)
-            include_directories(SYSTEM ${WETEXT_INCLUDE_DIR}/runtime ${WETEXT_INCLUDE_DIR}
-                                ${OPENFST_INCLUDE_DIR} ${GLOG_INCLUDE_DIR})
-            add_library(md_wetext STATIC
-                ${WETEXT_INCLUDE_DIR}/runtime/processor/wetext_processor.cc
-                ${WETEXT_INCLUDE_DIR}/runtime/processor/wetext_token_parser.cc
-                ${WETEXT_INCLUDE_DIR}/runtime/utils/wetext_string.cc)
-            target_include_directories(md_wetext SYSTEM PUBLIC
-                ${WETEXT_INCLUDE_DIR}/runtime ${WETEXT_INCLUDE_DIR}
-                ${OPENFST_INCLUDE_DIR} ${GLOG_INCLUDE_DIR})
+        if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/openfst/include/fst/fstlib.h"
+                AND EXISTS "${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing/runtime/processor/wetext_processor.h")
+            add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/openfst)
+            add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing)
+            include_directories(SYSTEM
+                ${CMAKE_SOURCE_DIR}/third_party/openfst/include
+                ${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing/runtime
+                ${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing/glog_stub/include)
             add_definitions(-DMODELDEPLOY_HAS_WETEXT)
-            list(APPEND PRIVATE_DEPENDS md_wetext ${OPENFST_LIB})
+            list(APPEND PRIVATE_DEPENDS md_wetext fst)
             set(_wetext_ready TRUE)
-            message(STATUS "WeTextProcessing ITN backend: ENABLED (wenet-e2e + OpenFst)")
+            message(STATUS "WeTextProcessing ITN backend: ENABLED (vendored wenet-e2e + OpenFst)")
         else ()
-            message(WARNING "ENABLE_WETEXT=ON 但依赖不完整（需 wenet WeText 头 + OpenFst 头/库 + glog 头），"
-                            "ITN 退化到轻量实现。设置: -DWETEXT_INCLUDE_DIR=<WeText根> "
-                            "-DOPENFST_INCLUDE_DIR -DOPENFST_LIB -DGLOG_INCLUDE_DIR")
+            message(WARNING "ENABLE_WETEXT=ON 但 third_party 依赖缺失（openfst 或 WeTextProcessing 未 vendor），"
+                            "ITN 退化到轻量实现。")
         endif ()
     endif ()
 endif ()
@@ -337,12 +335,15 @@ if (BUILD_VIDEO)
             add_definitions(-DHAVE_GSTCUDA)
             # 设备直编/直通的 D2D 拷贝：用 CUDA 驱动 API（cuda.h→nvcuda.dll 的 cuda.lib），
             # 最小化链接，避免把整库卷进 cudart 运行时。
-            add_definitions(-DMODELDEPLOY_CUDA_DRV)
-            get_filename_component(_md_cuda_root "${GSTREAMER_CUDA_INCLUDE}" DIRECTORY)
-            find_library(MD_CUDA_DRIVER_LIB cuda PATHS "${_md_cuda_root}/lib/x64" NO_DEFAULT_PATH)
+            # WITH_GPU 分支已定义 MD_CUDA_DRIVER_LIB 时不再重复链接（find_library 结果复用）。
+            if (NOT MD_CUDA_DRIVER_LIB)
+                add_definitions(-DMODELDEPLOY_CUDA_DRV)
+                get_filename_component(_md_cuda_root "${GSTREAMER_CUDA_INCLUDE}" DIRECTORY)
+                find_library(MD_CUDA_DRIVER_LIB cuda PATHS "${_md_cuda_root}/lib/x64" NO_DEFAULT_PATH)
+            endif ()
             if (MD_CUDA_DRIVER_LIB)
                 list(APPEND DEPENDS ${MD_CUDA_DRIVER_LIB})
-            endif()
+            endif ()
         endif ()
         if (GSTREAMER_HAS_NVBUF)
             add_definitions(-DHAVE_NVBUF)

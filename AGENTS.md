@@ -82,7 +82,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | `BUILD_PYTHON` | ON | pybind11 模块 |
 | `BUILD_TESTS` | OFF | Catch2 测试二进制 |
 | `BUILD_ENCRYPTION` | ON | 需要 OpenSSL；未找到时静默禁用 |
-| `ENABLE_WETEXT` | OFF | 可选 WeTextProcessing ITN 后端（覆盖最全，需 OpenFst + `-DWETEXT_INCLUDE_DIR`）；未找到时 ITN 退化到内置轻量实现 |
+| `ENABLE_WETEXT` | OFF | 可选 WeTextProcessing ITN 后端（覆盖最全）；依赖已 vendor 于 `third_party/`（openfst + WeTextProcessing + glog stub），开启即由 CMake 现场构建，无需外部路径；模型缺失时 ITN 退化到内置轻量实现 |
 
 ## 注意事项
 

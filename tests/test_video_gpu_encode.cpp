@@ -71,6 +71,7 @@ TEST_CASE("FFmpeg encode_from_gpu_nv12 设备指针直编 nvenc → soft 回读"
     auto ff = std::dynamic_pointer_cast<FfmpegEncoder>(enc);
     std::string err;
     bool ok = enc->open("test_data/video/gpu_direct_ffmpeg.mp4", W, H, 25, ecfg, &err);
+    INFO("open err: " << err);
     REQUIRE(ok);
     REQUIRE(ff->used_hw());  // 确实决议出 nvenc 硬编直编
 
