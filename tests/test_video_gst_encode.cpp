@@ -75,3 +75,37 @@ TEST_CASE("GStreamer nvh264enc 硬编 → mp4 回读", "[video][hw][gpu][integra
     while (dec->read_one_frame(&f, &err)) ++cnt;
     REQUIRE(cnt > 0);
 }
+
+TEST_CASE("GStreamer qsvh264enc 硬编（CPU BGR→QSV）→ mp4 回读", "[video][gst][hw][gpu][integration]") {
+    auto cap = query_video_capabilities();
+    bool qsv = std::find(cap.hw_encoders.begin(), cap.hw_encoders.end(), "qsvh264enc") !=
+               cap.hw_encoders.end();
+    if (!qsv) SKIP("no qsvh264enc encoder in this environment");
+    const int W = 192, H = 144;
+    VideoEncoderConfig ecfg;
+    ecfg.backend = CodecBackend::GStreamer;
+    ecfg.hw_accel = HwAccel::Qsv;
+    ecfg.set_codec("auto").set_format("mp4");
+    auto enc = create_encoder_backend(ecfg);
+    if (!enc) SKIP("no GStreamer encoder");
+    auto gst = std::dynamic_pointer_cast<GstEncoder>(enc);
+    std::string err;
+    REQUIRE(enc->open("test_data/video/qsv_gst_out.mp4", W, H, 25, ecfg, &err));
+    REQUIRE(gst != nullptr);
+    REQUIRE(gst->used_hw());  // auto+Qsv 且 qsvh264enc 存在 → 必须真走 QSV 硬编，而非回退 x264
+    uint8_t bgr[W * H * 3];
+    memset(bgr, 128, sizeof(bgr));
+    auto img = modeldeploy::vision::ImageData::from_raw(bgr, W, H, MdImageType::PKG_BGR_U8, true);
+    for (int i = 0; i < 32; ++i) REQUIRE(enc->encode(VideoFrame{img}, &err));
+    enc->close();
+    VideoDecoderConfig dcfg;
+    dcfg.backend = CodecBackend::FFmpeg;
+    dcfg.hw_accel = HwAccel::None;
+    auto dec = VideoDecoder::create(dcfg);
+    REQUIRE(dec != nullptr);
+    REQUIRE(dec->open("test_data/video/qsv_gst_out.mp4", &err));
+    int cnt = 0;
+    VideoFrame f;
+    while (dec->read_one_frame(&f, &err)) ++cnt;
+    REQUIRE(cnt > 0);
+}

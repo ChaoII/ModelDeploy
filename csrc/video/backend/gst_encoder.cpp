@@ -62,7 +62,8 @@ bool GstEncoder::runtime_available() const {
     if (x264_and_mux_available()) return true;
     if (nvh264enc_available() ||
         nvv4l2h264enc_available() ||
-        bmh264enc_available()) return true;
+        bmh264enc_available() ||
+        qsvh264enc_available()) return true;
     return false;
 }
 
@@ -125,14 +126,25 @@ bool GstEncoder::bmh264enc_available() {
     return true;
 }
 
+bool GstEncoder::qsvh264enc_available() {
+    md_gst_init_once();
+    if (!g_gst_initialized.load()) return false;
+    GstElementFactory* f = gst_element_factory_find("qsvh264enc");
+    if (!f) return false;
+    gst_object_unref(f);
+    return true;
+}
+
 // 决议本次会话的编码元素：
 //   codec=="nvh264enc" → 硬编 nvcodec（不可用则报错 no-nvh264enc）
 //   codec=="nvv4l2h264enc" → Jetson L4T V4L2 硬编（不可用则报错 no-nvv4l2h264enc）
 //   codec=="bmh264enc" → 算能 SOPHGO BM 硬编（不可用则报错 no-bmh264enc）
+//   codec=="qsvh264enc"/"qsvh265enc" → Intel QSV 硬编（不可用则报错 no-qsvh264enc）
 //   codec=="vaapih264enc" → VAAPI 硬编（不可用则报错 no-vaapih264enc；仅 ENABLE_VAAPI 编译时支持）
 //   codec=="x264enc"/空 → 软编 x264enc
 //   codec=="auto" → hw_accel∈{Auto,Cuda} 且 nvh264enc 存在则 nv 硬编（优先，支持 GPU-direct）；
-//     否则 hw_accel∈{Auto,Cuda} 且 nvv4l2h264enc 存在则 L4T V4L2 硬编（CPU 帧）；否则 hw_accel∈{Auto,Vaapi}
+//     否则 hw_accel∈{Auto,Cuda} 且 nvv4l2h264enc 存在则 L4T V4L2 硬编（CPU 帧）；否则 hw_accel∈{Auto,Qsv}
+//     且 qsvh264enc 存在则 QSV 硬编；否则 hw_accel∈{Auto,Vaapi}
 //     且 vaapih264enc 存在则 VAAPI 硬编；否则回退软编 x264enc
 //   Sophgo：GStreamer 无对应编码插件（未实现/未验证），显式 Sophgo 走 unsupported-codec fail-closed。
 //   其余名称（libx264 / h264_nvenc 等 GStreamer 不支持的）→ unsupported-codec。
@@ -145,6 +157,10 @@ int GstEncoder::resolve_encoder(std::string* err) {
         choice = 3;
     } else if (codec == "bmh264enc") {
         choice = 4;
+    } else if (codec == "qsvh264enc") {
+        choice = 5;
+    } else if (codec == "qsvh265enc") {
+        choice = 5;  // 复用同一条 QSV 管道（hevc 由插件自适应），QSV 桶统一
     } else if (codec == "x264enc" || codec.empty()) {
         choice = 0;
 #ifdef ENABLE_VAAPI
@@ -157,6 +173,9 @@ int GstEncoder::resolve_encoder(std::string* err) {
             choice = 1;
         } else if (want_nv && nvv4l2h264enc_available()) {
             choice = 3;
+        } else if ((cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Qsv) &&
+                   qsvh264enc_available()) {
+            choice = 5;
 #ifdef ENABLE_VAAPI
         } else if ((cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Vaapi) &&
                    vaapih264enc_available()) {
@@ -181,6 +200,10 @@ int GstEncoder::resolve_encoder(std::string* err) {
         set_err(err, "no-bmh264enc");
         return -1;
     }
+    if (choice == 5 && !qsvh264enc_available()) {
+        set_err(err, "no-qsvh264enc");
+        return -1;
+    }
 #ifdef ENABLE_VAAPI
     if (choice == 2 && !vaapih264enc_available()) {
         set_err(err, "no-vaapih264enc");
@@ -200,6 +223,7 @@ int GstEncoder::resolve_encoder(std::string* err) {
     encoder_is_nv_ = (choice == 1);
     encoder_is_l4t_ = (choice == 3);
     encoder_is_bm_ = (choice == 4);
+    encoder_is_qsv_ = (choice == 5);
 #ifdef ENABLE_VAAPI
     encoder_is_vaapi_ = (choice == 2);
 #endif
@@ -269,8 +293,13 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     } else if (enc == 4) {
         // 算能 SOPHGO BM H264 硬编（bmh264enc）：bps 单位是 bit/sec（非 kbit），GOP 属性名 gop。
         // 经 videoconvert 由 CPU 主机帧（BGR→NV12）喂入。底层 BM VPU 硬件编码。
-        encoder_part = " bmh264enc bps=" + std::to_string(cfg_.bitrate_kbps * 1000) +
-                       " gop=" + std::to_string(cfg_.gop);
+    encoder_part = " bmh264enc bps=" + std::to_string(cfg_.bitrate_kbps * 1000) +
+                   " gop=" + std::to_string(cfg_.gop);
+    } else if (enc == 5) {
+        // qsvh264enc：bitrate 单位 kbit/sec；关键帧间隔属性 gop-size；低延迟 low-latency=true
+        encoder_part = " qsvh264enc bitrate=" + std::to_string(cfg_.bitrate_kbps) +
+                       " gop-size=" + std::to_string(cfg_.gop) +
+                       (cfg_.low_latency ? " low-latency=true" : "");
 #ifdef ENABLE_VAAPI
     } else if (enc == 2) {
         // vaapih264enc：bitrate 单位 kbit/sec；GOP 关键帧间隔属性名因 gst-vaapi 版本而异
@@ -581,6 +610,7 @@ void GstEncoder::teardown() {
     opened_ = false;
     encoder_is_nv_ = false;
     encoder_is_l4t_ = false;
+    encoder_is_qsv_ = false;
     encoder_is_bm_ = false;
 #ifdef ENABLE_VAAPI
     encoder_is_vaapi_ = false;
