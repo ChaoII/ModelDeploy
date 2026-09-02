@@ -34,7 +34,8 @@ namespace ModelDeploy
         None = 1,
         Cuda = 2,
         Vaapi = 3,
-        Sophgo = 4
+        Sophgo = 4,
+        Qsv = 5
     }
 
     /// <summary>异步队列满时的背压策略（对应 capi MDBackpressure）。</summary>

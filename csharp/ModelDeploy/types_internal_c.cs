@@ -47,7 +47,8 @@ namespace ModelDeploy
             MD_HW_NONE = 1,
             MD_HW_CUDA = 2,
             MD_HW_VAAPI = 3,
-            MD_HW_SOPHGO = 4
+            MD_HW_SOPHGO = 4,
+            MD_HW_QSV = 5
         }
 
         public enum MDBackpressure

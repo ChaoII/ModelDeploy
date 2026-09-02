@@ -767,7 +767,8 @@ typedef enum MD_HWACCEL {
     MD_HW_NONE = 1,
     MD_HW_CUDA = 2,
     MD_HW_VAAPI = 3,
-    MD_HW_SOPHGO = 4
+    MD_HW_SOPHGO = 4,
+    MD_HW_QSV = 5
 } MDHwAccel;
 
 typedef enum MD_BACKPRESSURE {

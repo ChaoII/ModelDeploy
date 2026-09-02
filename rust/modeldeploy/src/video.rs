@@ -23,6 +23,7 @@ pub enum HwAccel {
     Cuda = 2,
     Vaapi = 3,
     Sophgo = 4,
+    Qsv = 5,
 }
 
 /// 异步队列满时背压策略（对应 capi MDBackpressure）。
@@ -459,6 +460,7 @@ fn to_hw(h: HwAccel) -> ffi::MDHwAccel {
         HwAccel::Cuda => ffi::MDHwAccel::Cuda,
         HwAccel::Vaapi => ffi::MDHwAccel::Vaapi,
         HwAccel::Sophgo => ffi::MDHwAccel::Sophgo,
+        HwAccel::Qsv => ffi::MDHwAccel::Qsv,
     }
 }
 fn to_bp(bp: Backpressure) -> ffi::MDBackpressure {

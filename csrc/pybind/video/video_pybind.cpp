@@ -50,6 +50,7 @@ void bind_video(pybind11::module& m) {
         .value("Cuda", HwAccel::Cuda)
         .value("Vaapi", HwAccel::Vaapi)
         .value("Sophgo", HwAccel::Sophgo)
+        .value("Qsv", HwAccel::Qsv)
         .export_values();
     py::enum_<Backpressure>(m, "Backpressure")
         .value("Block", Backpressure::Block)
@@ -127,7 +128,9 @@ void bind_video(pybind11::module& m) {
         .def_readwrite("timeout_us", &VideoDecoderConfig::timeout_us,
                        "网络/打开超时（微秒）")
         .def_readwrite("rtsp_transport", &VideoDecoderConfig::rtsp_transport,
-                       "RTSP 传输协议：tcp / udp");
+                       "RTSP 传输协议：tcp / udp")
+        .def_readwrite("codec", &VideoDecoderConfig::codec,
+                       "请求编解码格式：auto / hevc_qsv / qsvh265dec / h264_qsv / qsvh264dec（GStreamer QSV 区分 HEVC/H.264）");
 
     // 编码配置：全字段（含编码专用）。
     py::class_<VideoEncoderConfig>(m, "VideoEncoderConfig")

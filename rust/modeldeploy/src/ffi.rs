@@ -397,6 +397,7 @@ pub enum MDHwAccel {
     Cuda = 2,
     Vaapi = 3,
     Sophgo = 4,
+    Qsv = 5,
 }
 
 #[repr(C)]

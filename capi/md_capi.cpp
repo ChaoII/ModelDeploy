@@ -4938,6 +4938,7 @@ MDStatus md_video_config_set_hw_accel(MDVideoConfigHandle cfg, MDHwAccel h) {
         case MD_HW_CUDA:    ha = modeldeploy::video::HwAccel::Cuda; break;
         case MD_HW_VAAPI:   ha = modeldeploy::video::HwAccel::Vaapi; break;
         case MD_HW_SOPHGO:  ha = modeldeploy::video::HwAccel::Sophgo; break;
+        case MD_HW_QSV:     ha = modeldeploy::video::HwAccel::Qsv; break;
         default:            ha = modeldeploy::video::HwAccel::Auto; break;
     }
     c->dec.hw_accel = ha; c->enc.hw_accel = ha;
@@ -5081,7 +5082,9 @@ MDStatus md_video_config_set_codec(MDVideoConfigHandle cfg, const char* codec) {
     auto* c = video_cfg(cfg, "codec");
     if (!c) return MD_ERR_NULL_POINTER;
     if (!codec) { set_error("codec is null"); return MD_ERR_NULL_POINTER; }
+    // 编解码配置共用：同时应用到解码器（GStreamer QSV 需 codec=hevc_qsv 走 qsvh265dec）与编码器。
     c->enc.codec = codec;
+    c->dec.codec = codec;
     return MD_OK;
 #else
     (void)cfg; (void)codec; set_error("built without BUILD_VIDEO"); return MD_ERR_UNSUPPORTED_BACKEND;
