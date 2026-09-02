@@ -84,7 +84,16 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
             state_ = State::Error;
             return false;
         }
+        // QSV 不支持设备直通（Intel 无零拷贝 D2D）：显式 Qsv + device_only → fail-closed
+        if (cfg_.device_only && cfg_.hw_accel == HwAccel::Qsv) {
+            set_err(err, "qsv-device-only-unsupported");
+            cleanup();
+            state_ = State::Error;
+            return false;
+        }
         // 硬解选择：仅已显式/自动请求 CUDA 且未强制软解时尝试 CUVID；否则（含降级）回软解。
+        // 注意：Qsv 不加入 want_hw —— 否则下方"非设备 CUDA 硬解块"会为显式 Qsv 抢先用 cuvid，
+        // 违背"显式 Qsv 走 QSV"语义。QSV 块有独立条件，Auto 时在 CUDA 之后尝试。
         bool used_hw = false;
         bool want_hw = !force_soft_ &&
                        (cfg_.hw_accel == HwAccel::Auto || cfg_.hw_accel == HwAccel::Cuda);
@@ -116,6 +125,25 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
                 }
             } else {
                 err_ = "hw-decoder-not-found-fallback-soft";  // 无对应 CUVID 名/解码器：降级软解
+            }
+        }
+        // QSV 硬解（非设备直通，输出 QSV → CPU NV12）：Auto 时在 CUDA 之后尝试；显式 Qsv 尝试失败 fail-closed。
+        if (!used_hw && !force_soft_ && !cfg_.device_only &&
+            (cfg_.hw_accel == HwAccel::Qsv || cfg_.hw_accel == HwAccel::Auto)) {
+            const std::string qname = qsv_decoder_name(cp->codec_id);
+            const AVCodec* qc = qname.empty() ? nullptr
+                                              : avcodec_find_decoder_by_name(qname.c_str());
+            if (qc && setup_qsv_cpu_decoder(cp, qc)) {
+                used_hw = true;
+                qsv_active_ = true;
+            } else if (cfg_.hw_accel == HwAccel::Qsv) {
+                // 显式 Qsv：fail-closed，不静默降级软解（与 Vaapi 显式语义一致）
+                set_err(err, "qsv-unavailable");
+                cleanup();
+                state_ = State::Error;
+                return false;
+            } else {
+                err_ = "qsv-unavailable-fallback-soft";  // Auto：降级软解
             }
         }
 #ifdef ENABLE_VAAPI
@@ -232,6 +260,31 @@ bool FfmpegDecoder::read_one_frame_locked(VideoFrame* out, std::string* err) {
                 return true;
             }
 #endif
+            if (qsv_active_) {
+                // QSV 硬件帧（AV_PIX_FMT_QSV）→ 转移到 CPU NV12，经 IPlaneView 交付。
+                if (!qsv_transfer_to_nv12()) {
+                    set_err(err, "qsv-transfer-fail");
+                    return false;
+                }
+                std::shared_ptr<AVFrame> owned(av_frame_alloc(),
+                                               [](AVFrame* f) { av_frame_free(&f); });
+                if (av_frame_ref(owned.get(), sws_frame_) < 0) {
+                    set_err(err, "ref-fail");
+                    return false;
+                }
+                IPlaneView v{owned->data[0], owned->linesize[0],
+                             owned->data[1], owned->linesize[1],
+                             (int)owned->width, (int)owned->height, Device::CPU, owned};
+                out->image = make_image_from_planes_view(v);
+                auto* st = fmt_->streams[vstream_];
+                out->pts_ms = (frame_->pts == AV_NOPTS_VALUE)
+                                  ? 0
+                                  : static_cast<uint64_t>(av_rescale_q(
+                                        frame_->pts, st->time_base, AVRational{1, 1000}));
+                stats_.frames_out++;
+                delivered_frames_++;
+                return true;
+            }
             if (device_only_active_) {
                 // 设备直通：解码帧必须是 AV_PIX_FMT_CUDA（CUDA 设备内存，NV12 双平面）。
                 // data[0]=Y / data[1]=UV 为设备可寻址指针，linesize[] 为各平面步长，不回主机。
@@ -342,6 +395,75 @@ std::string FfmpegDecoder::hw_decoder_name(int codec_id) const {
         case AV_CODEC_ID_AV1: return "av1_cuvid";
         default: return "";  // 其它编解码器无 CUVID 硬解名
     }
+}
+
+std::string FfmpegDecoder::qsv_decoder_name(int codec_id) const {
+    switch (codec_id) {
+        case AV_CODEC_ID_H264: return "h264_qsv";
+        case AV_CODEC_ID_HEVC: return "hevc_qsv";
+        default: return "";
+    }
+}
+
+// QSV 硬解（非设备直通、输出 CPU NV12）：创建 QSV 设备上下文 + format=QSV、sw_format=NV12 的
+// hw 帧上下文，两者都挂到解码器上再打开。收到 AV_PIX_FMT_QSV 硬件帧后由 qsv_transfer_to_nv12()
+// 转移为主机 NV12。仅用通用 AV_HWDEVICE_TYPE_QSV/AV_PIX_FMT_QSV，不引 hwcontext_qsv.h（依赖 libmfx 头）。
+bool FfmpegDecoder::setup_qsv_cpu_decoder(AVCodecParameters* cp, const AVCodec* hwc) {
+    AVBufferRef* hwdev = nullptr;
+    if (av_hwdevice_ctx_create(&hwdev, AV_HWDEVICE_TYPE_QSV, nullptr, nullptr, 0) != 0)
+        return false;
+    qsv_hw_ctx_ = hwdev;
+
+    ctx_ = avcodec_alloc_context3(hwc);
+    if (!ctx_) return false;
+    avcodec_parameters_to_context(ctx_, cp);
+    ctx_->hw_device_ctx = av_buffer_ref(qsv_hw_ctx_);
+    if (!ctx_->hw_device_ctx) return false;
+
+    if (avcodec_open2(ctx_, hwc, nullptr) != 0) {
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    AVBufferRef* hwfr = av_hwframe_ctx_alloc(qsv_hw_ctx_);
+    if (!hwfr) {
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    AVHWFramesContext* fc = (AVHWFramesContext*)hwfr->data;
+    fc->format = AV_PIX_FMT_QSV;
+    fc->sw_format = AV_PIX_FMT_NV12;
+    fc->width = cp->width;
+    fc->height = cp->height;
+    fc->initial_pool_size = 12;
+    if (av_hwframe_ctx_init(hwfr) < 0) {
+        av_buffer_unref(&hwfr);
+        avcodec_free_context(&ctx_);
+        ctx_ = nullptr;
+        return false;
+    }
+    qsv_hw_frames_ = hwfr;
+    return true;
+}
+
+// QSV 硬件帧 → CPU NV12：复用 sws_frame_ 作为目标（NV12 buffer），av_hwframe_transfer_data 完成
+// 下采样拷贝（与 VAAPI vaapi_transfer_to_nv12 同构）。
+bool FfmpegDecoder::qsv_transfer_to_nv12() {
+    if (frame_->format != AV_PIX_FMT_QSV) return false;
+    if (!sws_frame_) sws_frame_ = av_frame_alloc();
+    if (!sws_frame_) return false;
+    if (!sws_frame_->buf[0]) {
+        sws_frame_->format = AV_PIX_FMT_NV12;
+        sws_frame_->width = w_;
+        sws_frame_->height = h_;
+        sws_frame_->hw_frames_ctx = av_buffer_ref(qsv_hw_frames_);
+        if (av_frame_get_buffer(sws_frame_, 0) < 0) return false;
+    }
+    if (av_hwframe_transfer_data(sws_frame_, frame_, 0) < 0) return false;
+    sws_frame_->width = w_;
+    sws_frame_->height = h_;
+    return true;
 }
 
 bool FfmpegDecoder::setup_cuda_device_decoder(AVCodecParameters* cp, const AVCodec* hwc) {
@@ -524,6 +646,11 @@ void FfmpegDecoder::cleanup() {
     opened_ = false;
     used_hw_ = false;
     device_only_active_ = false;
+    if (qsv_hw_frames_) av_buffer_unref(&qsv_hw_frames_);
+    qsv_hw_frames_ = nullptr;
+    if (qsv_hw_ctx_) av_buffer_unref(&qsv_hw_ctx_);
+    qsv_hw_ctx_ = nullptr;
+    qsv_active_ = false;
 #ifdef ENABLE_VAAPI
     if (vaapi_hw_frames_) av_buffer_unref(&vaapi_hw_frames_);
     vaapi_hw_frames_ = nullptr;

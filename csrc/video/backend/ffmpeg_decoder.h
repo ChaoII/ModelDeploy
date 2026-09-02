@@ -55,6 +55,14 @@ private:
     // 设备直通：以 CUDA 硬件设备上下文打开 hwc（h264_cuvid 等），使解码输出 AV_PIX_FMT_CUDA 设备帧。
     // 成功返回 true 且 ctx_ 持有 hw_device_ctx 引用；否则返回 false（不留下 ctx_）。
     bool setup_cuda_device_decoder(AVCodecParameters* cp, const AVCodec* hwc);
+    // 依据 codec_id 映射 QSV 硬解名（h264_qsv/hevc_qsv）；其它返回空串
+    std::string qsv_decoder_name(int codec_id) const;
+    // 以 QSV 硬件设备上下文 + sw_format=NV12 的 hw 帧上下文打开 hwc（h264_qsv/hevc_qsv），
+    // 使解码输出 AV_PIX_FMT_QSV 硬件帧，经 qsv_transfer_to_nv12() 转移为 CPU NV12 交付。
+    // 成功返回 true 且 ctx_ 持有 qsv_hw_ctx_/qsv_hw_frames_；否则返回 false。不 include hwcontext_qsv.h。
+    bool setup_qsv_cpu_decoder(AVCodecParameters* cp, const AVCodec* hwc);
+    // 把 frame_（AV_PIX_FMT_QSV）经 av_hwframe_transfer_data 转移到 CPU NV12（存 sws_frame_）。
+    bool qsv_transfer_to_nv12();
 #ifdef ENABLE_VAAPI
     // 依据 codec_id 映射 VAAPI 硬解名（h264_vaapi/hevc_vaapi）；其它返回空串
     std::string vaapi_hw_decoder_name(int codec_id) const;
@@ -89,6 +97,9 @@ private:
     std::atomic<bool> opened_{false};
     bool used_hw_ = false;  // 本次会话是否实际起到硬件（CUVID）解码
     bool device_only_active_ = false;  // 设备直通模式：解码输出保持 GPU 设备帧（AV_PIX_FMT_CUDA）
+    AVBufferRef* qsv_hw_ctx_ = nullptr;     // QSV 硬件设备上下文（通用 hwcontext.h，不引 qsv 专用头）
+    AVBufferRef* qsv_hw_frames_ = nullptr;  // QSV hw 帧上下文（format=QSV, sw_format=NV12）
+    bool qsv_active_ = false;               // 本次会话是否实际用 QSV 硬解
 #ifdef ENABLE_VAAPI
     AVBufferRef* vaapi_hw_ctx_ = nullptr;     // VAAPI 硬件设备上下文（libavutil hwcontext_vaapi）
     AVBufferRef* vaapi_hw_frames_ = nullptr;  // VAAPI hw 帧上下文（format=VAAPI, sw_format=NV12）

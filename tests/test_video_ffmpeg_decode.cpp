@@ -177,3 +177,33 @@ TEST_CASE("FFmpeg 运行期 0 帧硬解自动回退软解（截断源，无死�
     d->close();  // 关闭本身也须能正常完成（析构/清理不卡死）
     // 至此读取正常终止即证明回退路径安全。n 不要求 >0：截断内容本身可能产不出完整帧。
 }
+
+TEST_CASE("FFmpeg h264_qsv 硬解 → CPU NV12", "[video][ffmpeg][hw][gpu][integration]") {
+    std::ifstream probe("test_data/video/clip.h264");
+    if (!probe.good()) SKIP("no test clip; place at test_data/video/clip.h264");
+    auto cap = query_video_capabilities();
+    bool qsv = std::find(cap.hw_decoders.begin(), cap.hw_decoders.end(), "h264_qsv") !=
+               cap.hw_decoders.end();
+    if (!qsv) SKIP("no h264_qsv decoder in this environment");
+    VideoDecoderConfig hw;
+    hw.backend = CodecBackend::FFmpeg;
+    hw.hw_accel = HwAccel::Qsv;
+    auto d = create_decoder_backend(hw);
+    REQUIRE(d != nullptr);
+    auto ff = std::dynamic_pointer_cast<FfmpegDecoder>(d);
+    std::string err;
+    REQUIRE(d->open("test_data/video/clip.h264", &err));
+    REQUIRE(d->width() > 0);
+    REQUIRE(d->height() > 0);
+    int n = 0;
+    VideoFrame f;
+    while (d->read_one_frame(&f, &err) && n < 200) {
+        REQUIRE_FALSE(f.image.empty());
+        REQUIRE(f.image.width() == d->width());
+        REQUIRE(f.image.height() == d->height());
+        ++n;
+    }
+    REQUIRE(n > 0);
+    if (ff) REQUIRE(ff->used_hw());  // 确实走 QSV 硬解
+    d->close();
+}
