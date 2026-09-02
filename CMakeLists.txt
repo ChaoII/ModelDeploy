@@ -255,7 +255,10 @@ if (BUILD_AUDIO)
         # 可选 WeTextProcessing ITN 后端（覆盖最全）；需第三方 OpenFst + we-text-processing。
         # 检测 wenet-e2e/WeTextProcessing 运行时头
         #   WETEXT_INCLUDE_DIR = <WeTextProcessing 根目录>
-        #   OPENFST_INCLUDE_DIR / OPENFST_LIB = OpenFst("kkm000/openfst" CMake 版) 头与静态库
+        #   OPENFST_INCLUDE_DIR / OPENFST_LIB = OpenFst 头与静态库。
+        #     标准版（"kkm000/openfst" CMake 版，Windows 可编）即可：需给 fst/string.h 的
+        #     StringCompiler/StringPrinter 构造加默认 "token_type = BYTE"（2 行补丁，对齐 weText 的默认构造用法；
+        #     csukuangfj fork 依赖 dlfcn.h 不适用于 Windows）。
         #   GLOG_INCLUDE_DIR = glog 头（WeTextProcessing 源码使用 <glog/logging.h>；缺失时 WETEXT 不启用）
         set(WETEXT_INCLUDE_DIR "" CACHE PATH "wenet-e2e/WeTextProcessing checkout root")
         set(OPENFST_INCLUDE_DIR "" CACHE PATH "OpenFst include dir (containing fst/fstlib.h)")

@@ -550,8 +550,10 @@ std::string out = itn.normalize("2024年3月5日");   // 输出中文数字/量�
 依赖 wenet-e2e/WeTextProcessing + OpenFst + glog，构建时需
 `-DWETEXT_INCLUDE_DIR=<WeText根> -DOPENFST_INCLUDE_DIR -DOPENFST_LIB -DGLOG_INCLUDE_DIR`；
 运行时通过环境变量 `MODELDEPLOY_WETEXT_DIR` 给出含 `tagger.fst`/`verbalizer.fst` 的模型目录。
-注意：WeTextProcessing 上游 C++ 运行时为 POSIX-only（头依赖 `dlfcn.h`，且语法模型需
-pynini/OpenFst 工具在 Linux 编译），Windows/MSVC 下无法全链路启用；依赖缺失时自动退化到内置轻量实现。
+**标准 OpenFst（`kkm000/openfst` CMake 版）可用，勿用 csukuangfj fork（其头依赖 `dlfcn.h`，Windows 编不了）**：
+给 `fst/string.h` 打 2 行最小补丁——`StringCompiler`/`StringPrinter` 构造加默认 `token_type = BYTE`——
+即可在 Windows/MSVC 完整编译并链接进 SDK（本机已验证）。唯一跨平台的剩余依赖是 `tagger.fst`/`verbalizer.fst`
+语法模型：需用 pynini/OpenFst 工具链在 Linux 编译生成后拷入；模型缺失时自动退化到内置轻量实现。
 
 ## 28. 视频解码（VideoDecoder）
 
