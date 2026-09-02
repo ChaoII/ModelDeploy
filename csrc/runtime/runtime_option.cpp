@@ -17,6 +17,7 @@ namespace modeldeploy {
         if (fmt == "mnn")   return Backend::MNN;
         if (fmt == "engine") return Backend::TRT;
         if (fmt == "bmodel") return Backend::SOPHGO;
+        if (fmt == "ncnn")  return Backend::NCNN;
         return Backend::NONE;
     }
 
@@ -26,6 +27,7 @@ namespace modeldeploy {
             case Backend::ORT: return ext == ".onnx";
             case Backend::MNN: return ext == ".mnn";
             case Backend::TRT: return ext == ".onnx" || ext == ".engine";
+            case Backend::NCNN: return ext == ".param";
             case Backend::SOPHGO: return ext == ".bmodel";
             default: return false;
         }
@@ -114,6 +116,11 @@ namespace modeldeploy {
                 backend = Backend::SOPHGO;
 #endif
             }
+            else if (ext == ".param") {
+#ifdef ENABLE_NCNN
+                backend = Backend::NCNN;
+#endif
+            }
         }
     }
 
@@ -143,6 +150,10 @@ namespace modeldeploy {
             case Backend::SOPHGO:
                 device = Device::TPU;
                 sophgo_option.device_id = device_id;
+                break;
+            case Backend::NCNN:
+                ncnn_option.device_id = device_id;
+                ncnn_option.cpu_thread_num = cpu_thread_num;
                 break;
             default:
                 break;
@@ -197,6 +208,14 @@ namespace modeldeploy {
         device = Device::TPU;
 #else
         MD_LOG_FATAL << "The ModelDeploy didn't compile with SOPHGO backend." << std::endl;
+#endif
+    }
+
+    void RuntimeOption::use_ncnn_backend() {
+#ifdef ENABLE_NCNN
+        backend = Backend::NCNN;
+#else
+        MD_LOG_FATAL << "The ModelDeploy didn't compile with ncnn backend." << std::endl;
 #endif
     }
 

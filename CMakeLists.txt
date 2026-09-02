@@ -12,6 +12,7 @@ option(ENABLE_ORT "enable ort backend" ON)
 option(ENABLE_MNN "enable mnn backend" ON)
 option(ENABLE_TRT "enable trt backend" OFF)
 option(ENABLE_SOPHGO "enable sophgo backend (Linux + SOPHON-Sail)" OFF)
+option(ENABLE_NCNN "enable ncnn backend" OFF)
 option(ENABLE_VAAPI "enable VAAPI hardware video path (Linux + libva; compile-gated, only affects video backends)" OFF)
 option(ENABLE_WETEXT "enable WeTextProcessing ITN backend (requires OpenFst + we-text-processing)" OFF)
 option(BUILD_AUDIO "build asr tts vad sr" ON)
@@ -142,6 +143,7 @@ file(GLOB_RECURSE MNN_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/
 file(GLOB_RECURSE TRT_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/trt/*.cpp)
 file(GLOB_RECURSE SOPHGO_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/sophgo/*.cpp
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/sophgo/*.cpp)
+file(GLOB_RECURSE NCNN_BACKEND_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/runtime/backends/ncnn/*.cpp)
 file(GLOB_RECURSE VISION_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/vision/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/audio/*.cpp)
 file(GLOB_RECURSE VIDEO_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/video/*.cpp)
@@ -151,7 +153,7 @@ file(GLOB_RECURSE CUDA_SOURCE CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cpp)
 
-list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${SOPHGO_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE} ${CUDA_SOURCE} ${VIDEO_SOURCE})
+list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${SOPHGO_BACKEND_SOURCE} ${NCNN_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE} ${CUDA_SOURCE} ${VIDEO_SOURCE})
 
 if (WITH_GPU)
     add_definitions(-DWITH_GPU)
@@ -227,6 +229,13 @@ if (ENABLE_SOPHGO)
     else ()
         message(STATUS "Sophon-Sail not found, SOPHGO backend disabled")
     endif ()
+endif ()
+
+if (ENABLE_NCNN)
+    add_definitions(-DENABLE_NCNN)
+    include("${CMAKE_SOURCE_DIR}/cmake/ncnn.cmake")
+    list(APPEND ALL_SOURCE ${NCNN_BACKEND_SOURCE})
+    list(APPEND DEPENDS ${NCNN_LIBS})
 endif ()
 
 

@@ -12,6 +12,7 @@ namespace modeldeploy {
         ORT,
         MNN,
         TRT,
+        NCNN,
         SOPHGO,
         NONE
     };
@@ -70,6 +71,7 @@ namespace modeldeploy {
         case Backend::ORT: return "ORT";
         case Backend::MNN: return "MNN";
         case Backend::TRT: return "TRT";
+        case Backend::NCNN: return "NCNN";
         case Backend::SOPHGO: return "SOPHGO";
         case Backend::NONE: return "NONE";
         default: return "Unknown";

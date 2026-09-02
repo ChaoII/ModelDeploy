@@ -8,6 +8,7 @@
 #include "runtime/backends/mnn/option.h"
 #include "runtime/backends/ort/option.h"
 #include "runtime/backends/sophgo/option.h"
+#include "runtime/backends/ncnn/option.h"
 #include "core/enum_variables.h"
 
 
@@ -33,6 +34,7 @@ namespace modeldeploy {
         void use_mnn_backend();
         void use_trt_backend();
         void use_sophgo_backend();          // 无参，隐含 device=TPU
+        void use_ncnn_backend();
         void validate();                     // 配置期校验 + 快照到激活后端
 
         void set_trt_min_shape(const std::string&);
@@ -43,6 +45,7 @@ namespace modeldeploy {
         MnnBackendOption mnn_option;
         TrtBackendOption trt_option;
         SophgoBackendOption sophgo_option;
+        NcnnBackendOption ncnn_option;
         std::string password;
         bool enable_fp16 = false;
         bool enable_trt = false;

@@ -17,6 +17,9 @@
 #ifdef ENABLE_SOPHGO
 #include "runtime/backends/sophgo/sophgo_backend.h"
 #endif
+#ifdef ENABLE_NCNN
+#include "runtime/backends/ncnn/ncnn_backend.h"
+#endif
 
 
 namespace modeldeploy {
@@ -33,6 +36,9 @@ namespace modeldeploy {
         }
         if (option.backend == Backend::SOPHGO) {
             return create_sophgo_backend();
+        }
+        if (option.backend == Backend::NCNN) {
+            return create_ncnn_backend();
         }
         MD_LOG_ERROR << "The " << option.backend << " backend is not supported now." << std::endl;
         return false;
@@ -185,6 +191,21 @@ namespace modeldeploy {
         }
 #else
         MD_LOG_FATAL << "SophgoBackend is not available, please compiled with ENABLE_SOPHGO=ON." << std::endl;
+        return false;
+#endif
+        MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
+        return true;
+    }
+
+    bool Runtime::create_ncnn_backend() {
+#ifdef ENABLE_NCNN
+        backend_ = std::make_unique<NcnnBackend>();
+        if (!backend_->init(option)) {
+            MD_LOG_ERROR << "Failed to initialize " << option.backend << "." << std::endl;
+            return false;
+        }
+#else
+        MD_LOG_FATAL << "NCNNBackend is not available, please compiled with ENABLE_NCNN=ON." << std::endl;
         return false;
 #endif
         MD_LOG_INFO << "Runtime initialized with " << option.backend << " in " << option.device << "." << std::endl;
