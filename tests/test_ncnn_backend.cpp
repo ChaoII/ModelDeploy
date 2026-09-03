@@ -58,3 +58,27 @@ TEST_CASE("ncnn backend CPU infer", "[ncnn][cpu]") {
     WARN("ENABLE_NCNN off, skipping");
 #endif
 }
+
+TEST_CASE("ncnn backend VULKAN infer", "[ncnn][vulkan]") {
+#ifdef ENABLE_NCNN
+    auto param = write_min_ncnn();
+    RuntimeOption opt;
+    opt.use_ncnn_backend();
+    opt.set_device(Device::VULKAN, 0);
+    opt.set_model_path(param.string());
+    Runtime rt;
+    REQUIRE(rt.init(opt));
+    Tensor input({1, 3, 64, 64}, DataType::FP32, Device::CPU, "data");
+    for (int i = 0; i < static_cast<int>(input.byte_size() / sizeof(float)); ++i) {
+        reinterpret_cast<float*>(input.data())[i] = 2.0f;
+    }
+    std::vector<Tensor> ins{input};
+    std::vector<Tensor> outs;
+    REQUIRE(rt.infer(ins, &outs));
+    REQUIRE(outs.size() == 1);
+    auto* od = reinterpret_cast<float*>(outs[0].data());
+    REQUIRE(od[0] == Catch::Approx(2.0f).margin(1e-2f));
+#else
+    WARN("ENABLE_NCNN off, skipping");
+#endif
+}
