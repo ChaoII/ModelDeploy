@@ -121,7 +121,8 @@ namespace modeldeploy {
                 // 注意：batch=1 图像输入（如 [1,3,64,64]）在此被压掉 batch 维，以 Mat(w=64,h=64,c=3) 喂 3D 卷积，
                 // 对应输出即 CHW dims==3。batch>1 仍需显式扩充（未实现）。
                 if (shp[0] != 1) {
-                    MD_LOG_WARN << "ncnn 4D 输入按 batch=1 语义处理，忽略 batch=" << shp[0] << std::endl;
+                    MD_LOG_ERROR << "ncnn backend only supports batch=1, got batch=" << shp[0] << std::endl;
+                    return false;
                 }
                 ncnn::Mat in_mat(static_cast<int>(shp[3]), static_cast<int>(shp[2]),
                                  static_cast<int>(shp[1]) /* w,h,c */);

@@ -13,12 +13,10 @@ namespace modeldeploy::vision::classification {
     }
 
     bool ClassificationPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) const {
-        // ncnn 在 batch==1 时压掉输出首维 [N]；分类层期望 2D [1,N]，故补 batch 维后重入。
+        std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) const {
+        // ncnn batch==1 压掉输出首维 [N]；用通用 Tensor::expand_dim(0) 补回 batch 维后落体。
         if (tensors[0].shape().size() == 1) {
-            Tensor batched = tensors[0];
-            batched.expand_dim(0);
-            return run({batched}, results);
+            tensors[0].expand_dim(0);
         }
         const int64_t batch = tensors[0].shape()[0];
         const Tensor& infer_result = tensors[0];

@@ -12,7 +12,7 @@ namespace modeldeploy::vision::lpr {
     class MODELDEPLOY_CXX_EXPORT LprRecPostprocessor {
     public:
         LprRecPostprocessor() = default;
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<LprResult>* results) const;
 
     private:

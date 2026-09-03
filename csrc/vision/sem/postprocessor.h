@@ -16,7 +16,7 @@ namespace modeldeploy::vision::detection {
     public:
         UltralyticsSemPostprocessor();
 
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<SemSegResult>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;
 

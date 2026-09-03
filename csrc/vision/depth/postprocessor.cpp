@@ -13,13 +13,11 @@ namespace modeldeploy::vision::detection {
     UltralyticsDepthPostprocessor::UltralyticsDepthPostprocessor() = default;
 
     bool UltralyticsDepthPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<DepthResult>* results,
+        std::vector<Tensor>& tensors, std::vector<DepthResult>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         if (!tensors.empty() && tensors[0].shape().size() == 3) {
-            // ncnn batch==1 压掉首维；depth 为全图 4D 输出 [1,1,H,W] → expand_dim(0) 补 4D 后递归。
-            Tensor batched = tensors[0];
-            batched.expand_dim(0);
-            return run({batched}, results, letter_box_records);
+            // ncnn batch==1 压掉首维；depth 全图 4D [1,1,H,W] → 通用 Tensor::expand_dim(0) 补回后落体。
+            tensors[0].expand_dim(0);
         }
         if (tensors.empty() || tensors[0].shape().size() != 4) {
             MD_LOG_ERROR << "Depth estimation requires 4D output [B,C,H,W]." << std::endl;

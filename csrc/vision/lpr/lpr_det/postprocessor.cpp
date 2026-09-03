@@ -16,13 +16,11 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprDetPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
+        std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
         // ncnn batch==1 压掉输出首维：[N,15](2D)→[1,N,15](3D)，与 ORT/MNN 对齐。
         if (tensors[0].shape().size() == 2) {
-            Tensor batched = tensors[0];
-            batched.expand_dim(0);
-            return run({batched}, results, letter_box_records);
+            tensors[0].expand_dim(0);
         }
         const size_t batch = tensors[0].shape()[0];
         results->resize(batch);

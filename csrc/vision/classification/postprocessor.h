@@ -21,7 +21,7 @@ namespace modeldeploy::vision::classification {
         * \param[in] results The output result of classification
         * \return true if the postprocess successful, otherwise false
         */
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<ClassifyResult>* results) const;
 
         /// Set topk, default 1

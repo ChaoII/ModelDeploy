@@ -138,14 +138,12 @@ namespace modeldeploy::vision::detection {
         return true;
     }
 
-    bool UltralyticsObbPostprocessor::run(const std::vector<Tensor>& tensors,
+    bool UltralyticsObbPostprocessor::run(std::vector<Tensor>& tensors,
                                           std::vector<std::vector<ObbResult>>* results,
                                           const std::vector<LetterBoxRecord>& letter_box_records) const {
         if (tensors[0].shape().size() == 2) {
-            // ncnn batch==1 压掉首维；expand_dim(0) 补 batch 维后再递归处理。
-            Tensor batched = tensors[0];
-            batched.expand_dim(0);
-            return run({batched}, results, letter_box_records);
+            // ncnn batch==1 压掉首维；用通用 Tensor::expand_dim(0) 补回 batch 维后落体。
+            tensors[0].expand_dim(0);
         }
         if (tensors[0].shape().size() != 3) {
             MD_LOG_ERROR << "Only support post process with 3D tensor." << std::endl;

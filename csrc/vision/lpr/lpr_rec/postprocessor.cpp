@@ -8,16 +8,16 @@
 
 namespace modeldeploy::vision::lpr {
     bool LprRecPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<LprResult>* results) const {
+        std::vector<Tensor>& tensors, std::vector<LprResult>* results) const {
         // ncnn batch==1 压掉首维，且双输出槽位与 ORT/ONNX 反序：
         // ncnn 实际 t0=color[5](1D)、t1=rec[21,78](2D)，而 ORT 为 t0=rec[1,21,78]、t1=color[1,5]。
-        // 按 ORT 槽位重排（rec→batched[0]、color→batched[1]）并前置补 batch 维。
+        // 先按 ORT 槽位交换为（rec, color），再各自 expand_dim(0) 补 batch 维后落体。
         if (tensors.size() >= 2 && tensors[0].shape().size() == 1) {
-            // 按 ORT 槽位重排（rec→batched[0]、color→batched[1]）并前置补 batch 维。
-            Tensor rec = tensors[1], color = tensors[0];
-            rec.expand_dim(0);
-            color.expand_dim(0);
-            return run({rec, color}, results);
+            const Tensor color = tensors[0];
+            tensors[0] = tensors[1];
+            tensors[1] = color;
+            tensors[0].expand_dim(0);
+            tensors[1].expand_dim(0);
         }
         const size_t batch = tensors[0].shape()[0];
         results->resize(batch);

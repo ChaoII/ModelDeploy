@@ -12,7 +12,7 @@ namespace modeldeploy::vision::detection {
     class MODELDEPLOY_CXX_EXPORT UltralyticsPosePostprocessor {
     public:
         UltralyticsPosePostprocessor();
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<std::vector<KeyPointsResult>>* results,
                  const std::vector<LetterBoxRecord>& letter_box_records) const;
 
