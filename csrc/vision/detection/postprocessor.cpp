@@ -184,6 +184,8 @@ namespace modeldeploy::vision::detection {
         const auto& t = tensors[0];
         // ncnn 在 batch==1 时压掉首维，输出 2D [C,N]；检测层期望 3D [B,C,N]，
         // 故将 2D 视为 batch=1（共享内存视图），3D 输出行为保持不变。
+        // 该分支针对 ncnn 后端 batch=1 压掉首维的输出（如 [84,8400]，C=4+nc，N=8400）
+        // 按 batch=1 复原为 [1,84,8400]；其余后端（ORT/MNN）通常直接输出 3D，不受影响。
         if (t.shape().size() == 2) {
             const std::vector<Tensor> batched = {t.reshape({1, t.shape()[0], t.shape()[1]})};
             return run(batched, results, letter_box_records);

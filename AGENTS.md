@@ -75,6 +75,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | `ENABLE_ORT` | ON | OnnxRuntime 后端 |
 | `ENABLE_MNN` | ON | MNN 后端 |
 | `ENABLE_TRT` | OFF | 需要 `WITH_GPU=ON`，不支持 Apple |
+| `ENABLE_NCNN` | OFF | ncnn 后端（CPU+Vulkan）；依赖 `cmake/ncnn.cmake`（本地 `-DNCNN_ROOT` 或 Windows x64 modelscope 下载） |
 | `WITH_GPU` | ON | 启用 CUDA（默认 SM 8.6） |
 | `BUILD_AUDIO` | ON | 启用音频模块（samplerate、kaldi-native-fbank、cppjieba） |
 | `BUILD_VISION` | ON | 启用视觉模块（OpenCV） |
@@ -92,6 +93,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 - **OpenSSL**：Windows 下从 slproweb.com 安装，设置 `-DOPENSSL_ROOT_DIR="C:/Program Files/OpenSSL-Win64"`。未找到 OpenSSL 时加密功能静默禁用。
 - **GPU 构建**：默认 CUDA 架构为 86（RTX 40 系列）。测试数据来自 modelscope，不在仓库内。
 - **TRT 后端**：需要预先通过 `trtexec` 生成 `.engine` 文件。从 ONNX 在线构建 engine 速度较慢。
+- **ncnn 后端 `-DNCNN_ROOT`**：仅 Windows x64 有已确认的自动下载工件；其它平台/未确认工件须本地解包 ncnn 预编译包后 `-DNCNN_ROOT=<解包路径>`（解包路径内含 `<arch>/lib/cmake` 与 `<arch>/include`），否则 cmake 配置直接 fail-fast。
 - **Linux rpath**：`$ORIGIN`；macOS：`@loader_path` —— SDK 运行时无需设置 `LD_LIBRARY_PATH`。
 - **NVIDIA Jetson**：通过 `/etc/nv_tegra_release` 自动检测；设置架构标志并强制 `WITH_GPU=ON`、`ENABLE_TRT=ON`，需要 TBB。
 - **C++17 必需**；第三方依赖（pybind11、Catch2）已捆绑在 `third_party/` 中。

@@ -17,6 +17,8 @@ namespace modeldeploy {
             if (m.dims == 1) return {static_cast<int64_t>(m.w)};
             if (m.dims == 2) return {static_cast<int64_t>(m.h), static_cast<int64_t>(m.w)};
             if (m.dims == 3) return {static_cast<int64_t>(m.c), static_cast<int64_t>(m.h), static_cast<int64_t>(m.w)};
+            // ncnn dims==4 的 Mat 布局为 (w,h,d,c)；本后端按 batch=1 语义处理（见 infer 4D 输入），
+            // 使 c/d 因子与全链路一致对称。此处将 (w,h,d,c) 映射为 SDK 的 (c,d,h,w)。
             return {static_cast<int64_t>(m.c), static_cast<int64_t>(m.d), static_cast<int64_t>(m.h), static_cast<int64_t>(m.w)};
         }
 
@@ -113,6 +115,11 @@ namespace modeldeploy {
             if (t.dtype() != DataType::FP32) { MD_LOG_ERROR << "ncnn requires FP32 input." << std::endl; return false; }
             auto shp = t.shape();
             if (shp.size() == 4) {
+                // ncnn dims==4 的 Mat 构造参数为 (w,h,d,c)；SDK 输入 Tensor 顺序为 (n,c,d,h,w)。
+                // 当前按 batch=1 语义处理（假设 shp[0]==1），使 batch 维与深度维 c/d 对称、全链路一致。
+                if (shp[0] != 1) {
+                    MD_LOG_WARN << "ncnn 4D 输入按 batch=1 语义处理，忽略 batch=" << shp[0] << std::endl;
+                }
                 ncnn::Mat in_mat(static_cast<int>(shp[3]), static_cast<int>(shp[2]),
                                  static_cast<int>(shp[1]), static_cast<int>(shp[0]));
                 memcpy(in_mat.data, t.data(), t.byte_size());
