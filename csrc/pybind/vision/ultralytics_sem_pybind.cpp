@@ -37,7 +37,7 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](const detection::UltralyticsSemPostprocessor& self,
-                    const std::vector<Tensor>& inputs,
+                    std::vector<Tensor>& inputs,
                     const std::vector<LetterBoxRecord>& records) {
                      std::vector<SemSegResult> results;
                      if (!self.run(inputs, &results, records)) {

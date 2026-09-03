@@ -33,7 +33,7 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](const lpr::LprRecPostprocessor& self,
-                    const std::vector<Tensor>& inputs) {
+                    std::vector<Tensor>& inputs) {
                      std::vector<LprResult> results;
                      if (!self.run(inputs, &results)) {
                          throw std::runtime_error(

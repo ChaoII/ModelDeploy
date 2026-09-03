@@ -35,7 +35,7 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](const classification::ClassificationPostprocessor& self,
-                    const std::vector<Tensor>& inputs) {
+                    std::vector<Tensor>& inputs) {
                      std::vector<ClassifyResult> results;
                      if (!self.run(inputs, &results)) {
                          throw std::runtime_error(
