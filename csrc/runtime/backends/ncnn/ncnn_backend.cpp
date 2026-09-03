@@ -121,7 +121,7 @@ namespace modeldeploy {
                     MD_LOG_WARN << "ncnn 4D 输入按 batch=1 语义处理，忽略 batch=" << shp[0] << std::endl;
                 }
                 ncnn::Mat in_mat(static_cast<int>(shp[3]), static_cast<int>(shp[2]),
-                                 static_cast<int>(shp[1]), static_cast<int>(shp[0]));
+                                 static_cast<int>(shp[1]) /* w,h,c */);
                 memcpy(in_mat.data, t.data(), t.byte_size());
                 ex.input(input_names_[i].c_str(), in_mat);
             } else if (shp.size() == 3) {

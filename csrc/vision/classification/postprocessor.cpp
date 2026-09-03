@@ -3,6 +3,7 @@
 //
 
 #include "vision/utils.h"
+#include "vision/utils/ncnn_output.h"
 #include "vision/classification/postprocessor.h"
 
 #include <numeric>
@@ -14,6 +15,12 @@ namespace modeldeploy::vision::classification {
 
     bool ClassificationPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<ClassifyResult>* results) const {
+        // ncnn 在 batch==1 时压掉输出首维 [N]；分类层期望 2D [1,N]，故补 batch 维后重入。
+        if (tensors[0].shape().size() == 1) {
+            const std::vector<Tensor> batched = {
+                modeldeploy::vision::ncnn_utils::restore_leading_batch1(tensors[0], 2)};
+            return run(batched, results);
+        }
         const int64_t batch = tensors[0].shape()[0];
         const Tensor& infer_result = tensors[0];
         // 注意cls在模型中已经做过softmax了。

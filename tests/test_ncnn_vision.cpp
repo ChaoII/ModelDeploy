@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <vector>
 #include "csrc/vision.h"
+#include "csrc/vision/utils.h"
 
 // ==================== ncnn 后端 vision 集成验证 ====================
 // 需要真实 test_data（ncnn/yolo11n/yolo11n.param+.bin + test_images），无数据时优雅跳过
