@@ -140,7 +140,13 @@ namespace modeldeploy {
                 plain = out_mat;
             }
             size_t total = mat_total(plain);
-            (*outputs)[i].allocate(mat_shape(plain), DataType::FP32, Device::CPU, output_names_[i]);
+            // ncnn 会在 batch==1 时压掉 batch 维（[B,C,N] → [C,N] 2D）。为与 ORT 输出约定
+            // [1,C,N] 对齐（postprocessor 以 3D [B,C,N] 解析），把 batch-1 的 2D 输出抬升为 3D。
+            auto sh = mat_shape(plain);
+            if (plain.dims == 2) {
+                sh.insert(sh.begin(), 1);
+            }
+            (*outputs)[i].allocate(sh, DataType::FP32, Device::CPU, output_names_[i]);
             if ((*outputs)[i].byte_size() / sizeof(float) != total) {
                 MD_LOG_ERROR << "output size mismatch." << std::endl;
                 return false;
