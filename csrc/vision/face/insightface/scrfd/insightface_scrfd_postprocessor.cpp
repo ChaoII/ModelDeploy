@@ -6,6 +6,8 @@
 #include "core/md_log.h"
 #include "vision/face/insightface/scrfd/insightface_scrfd_postprocessor.h"
 #include <algorithm>
+#include <utility>
+#include <string>
 
 namespace modeldeploy::vision::face {
 
@@ -63,6 +65,39 @@ namespace modeldeploy::vision::face {
             }
             return keep;
         }
+
+        // det_10g 有 9 个输出。ORT/MNN 以 feature-major 输出
+        // （[sc_s8,sc_s16,sc_s32, bb_s8,bb_s16,bb_s32, kps_s8,kps_s16,kps_s32]），
+        // 而 ncnn(pnnx) 可能以 stride-major 输出（每组 stride 内 score/bbox/kps）。
+        // 后处理器按 feature-major 索引输出（idx, idx+3, idx+6），这里按输出唯一形状
+        // （rows=N∈{12800,3200,800}，cols=C∈{1,4,10}）重排为 feature-major，兼容两侧。
+        // 已为 feature-major 时是恒等重排（对 ORT/MNN 无影响）。
+        std::vector<Tensor> reorder_feature_major(const std::vector<Tensor>& ts) {
+            if (ts.size() != 9) return ts;
+            std::vector<std::pair<int, const Tensor*>> slots(9, {-1, nullptr});
+            for (const auto& t : ts) {
+                const auto& shp = t.shape();
+                if (shp.empty()) return ts;
+                const int64_t N = shp[0];
+                const int64_t C = shp.size() >= 2 ? shp[1] : 1;
+                int off;
+                if (C == 1) off = 0;        // score
+                else if (C == 4) off = 3;   // bbox
+                else if (C == 10) off = 6;  // kps
+                else return ts;
+                int sind;
+                if (N == 12800) sind = 0;        // stride 8
+                else if (N == 3200) sind = 1;    // stride 16
+                else if (N == 800) sind = 2;     // stride 32
+                else return ts;
+                slots[off + sind] = {off + sind, &t};
+            }
+            for (auto& s : slots)
+                if (!s.second) return ts;
+            std::vector<Tensor> ordered(ts.size());
+            for (int i = 0; i < 9; ++i) ordered[i] = *slots[i].second;
+            return ordered;
+        }
     } // namespace
 
     bool InsightFaceDetPostprocessor::run(const std::vector<Tensor>& infer_results,
@@ -70,6 +105,7 @@ namespace modeldeploy::vision::face {
                                           std::vector<std::vector<InsightFaceBox>>* results) {
         const int dst_w = 640;
         const int dst_h = 640;
+        const auto ordered = reorder_feature_major(infer_results);
         results->resize(letter_box_records.size());
         for (size_t b = 0; b < letter_box_records.size(); ++b) {
             const float det_scale = letter_box_records[b].scale;
@@ -79,11 +115,11 @@ namespace modeldeploy::vision::face {
             std::vector<float> scores_list, bboxes_list, kpss_list;
             for (int idx = 0; idx < kFmc; ++idx) {
                 const int stride = kStride[idx];
-                const float* score_ptr = static_cast<const float*>(infer_results[idx].data());
-                const float* bbox_ptr = static_cast<const float*>(infer_results[idx + kFmc].data());
-                const float* kps_ptr = static_cast<const float*>(infer_results[idx + kFmc * 2].data());
+                const float* score_ptr = static_cast<const float*>(ordered[idx].data());
+                const float* bbox_ptr = static_cast<const float*>(ordered[idx + kFmc].data());
+                const float* kps_ptr = static_cast<const float*>(ordered[idx + kFmc * 2].data());
                 // 输出 2D shape：[N, ...]；N = num_points（det_10g 无 batch 维）
-                const int total = static_cast<int>(infer_results[idx].shape()[0]);
+                const int total = static_cast<int>(ordered[idx].shape()[0]);
                 const int H = dst_h / stride;
                 const int W = dst_w / stride;
                 if (total != H * W * kNumAnchors) {
