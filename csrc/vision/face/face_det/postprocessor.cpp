@@ -7,6 +7,41 @@
 #include "vision/face/face_det/postprocessor.h"
 
 namespace modeldeploy::vision::face {
+    namespace {
+        // pnnx(ncnn) 运行时输出强制按 stride-major 次序
+        // （每组 stride 内 score/bbox/kps：sc8,bb8,kps8,sc16,bb16,kps16,sc32,bb32,kps32），
+        // 而 ORT/MNN/后处理器按 feature-major 索引（idx, idx+fmc, idx+2*fmc：
+        // sc8,sc16,sc32,bb8,bb16,bb32,kps8,kps16,kps32）。scrfd 后处理器按 feature-major 槽位读取，
+        // 故按输出唯一形状（补秩后 batch=1：N∈{12800,3200,800}，C∈{1,4,10}）重排为 feature-major；
+        // 已是 feature-major 时为恒等重排（对 ORT/MNN 无影响）。
+        std::vector<Tensor> reorder_feature_major(const std::vector<Tensor>& ts) {
+            if (ts.size() != 9) return ts;
+            std::vector<std::pair<int, const Tensor*>> slots(9, {-1, nullptr});
+            for (const auto& t : ts) {
+                const auto& shp = t.shape();
+                if (shp.size() < 3 || shp[0] != 1) return ts;
+                const int64_t N = shp[1];
+                const int64_t C = shp[2];
+                int off;
+                if (C == 1) off = 0;        // score
+                else if (C == 4) off = 3;   // bbox
+                else if (C == 10) off = 6;  // kps
+                else return ts;
+                int sind;
+                if (N == 12800) sind = 0;        // stride 8
+                else if (N == 3200) sind = 1;    // stride 16
+                else if (N == 800) sind = 2;     // stride 32
+                else return ts;
+                slots[off + sind] = {off + sind, &t};
+            }
+            for (auto& s : slots)
+                if (!s.second) return ts;
+            std::vector<Tensor> ordered(ts.size());
+            for (int i = 0; i < 9; ++i) ordered[i] = *slots[i].second;
+            return ordered;
+        }
+    } // namespace
+
     ScrfdPostprocessor::ScrfdPostprocessor() {
         conf_threshold_ = 0.25;
         nms_threshold_ = 0.5;
@@ -39,7 +74,7 @@ namespace modeldeploy::vision::face {
 
 
     bool ScrfdPostprocessor::run(
-        const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
+        std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) {
         const size_t fmc = downsample_strides_.size();
         // scrfd has 6,9,10,15 output tensors
@@ -50,12 +85,21 @@ namespace modeldeploy::vision::face {
             return false;
         }
         if (!(fmc == 3 || fmc == 5)) { MD_LOG_ERROR << "The fmc must be 3 or 5" << std::endl; }
-        if (tensors.at(0).shape()[0] != 1) {
+        // ncnn batch==1 压掉首维：[1,N,C](3D)→[N,C](2D)；用通用 Tensor::expand_dim(0) 补回后再做断言/序排列。
+        for (auto& t : tensors) {
+            if (t.shape().size() == 2) {
+                t.expand_dim(0);
+            }
+        }
+        // ncnn(pnnx) 运行时按 stride-major 输出 9 个 tensor，重排为 feature-major（对 ORT 恒等）。
+        const std::vector<Tensor> ordered = reorder_feature_major(tensors);
+        // ordered 与 tensors 在 ORT 下为同一顺序，断言同 valid。
+        if (ordered.at(0).shape()[0] != 1) {
             MD_LOG_ERROR << "Only support batch =1 now." << std::endl;
             return false;
         }
         for (int i = 0; i < fmc; ++i) {
-            if (tensors.at(i).dtype() != DataType::FP32) {
+            if (ordered.at(i).dtype() != DataType::FP32) {
                 MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
                 return false;
             }
@@ -63,9 +107,9 @@ namespace modeldeploy::vision::face {
         size_t total_num_boxes = 0;
         // compute the reserve space.
         for (int f = 0; f < fmc; ++f) {
-            total_num_boxes += tensors.at(f).shape()[1];
+            total_num_boxes += ordered.at(f).shape()[1];
         }
-        const size_t batch = tensors[0].shape()[0];
+        const size_t batch = ordered[0].shape()[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
             const float ipt_h = letter_box_records[bs].ipt_h;
@@ -81,9 +125,9 @@ namespace modeldeploy::vision::face {
             unsigned int count = 0;
             // loop each stride
             for (int f = 0; f < fmc; ++f) {
-                const auto* score_ptr = static_cast<const float*>(tensors.at(f).data());
-                const auto* bbox_ptr = static_cast<const float*>(tensors.at(f + fmc).data());
-                const unsigned int num_points = tensors.at(f).shape()[1];
+                const auto* score_ptr = static_cast<const float*>(ordered.at(f).data());
+                const auto* bbox_ptr = static_cast<const float*>(ordered.at(f + fmc).data());
+                const unsigned int num_points = ordered.at(f).shape()[1];
                 int current_stride = downsample_strides_[f];
                 auto& stride_points = center_points_[current_stride];
                 // loop each anchor
@@ -108,7 +152,7 @@ namespace modeldeploy::vision::face {
                     landmarks.reserve(landmarks_per_face_);
                     if (use_kps_) {
                         const auto* landmarks_ptr =
-                            static_cast<const float*>(tensors.at(f + 2 * fmc).data());
+                            static_cast<const float*>(ordered.at(f + 2 * fmc).data());
                         // landmarks
                         const float* kps_offsets = landmarks_ptr + i * (landmarks_per_face_ * 2);
                         for (unsigned int j = 0; j < landmarks_per_face_ * 2; j += 2) {
