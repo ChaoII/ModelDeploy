@@ -181,11 +181,18 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsPostprocessor::run(const std::vector<Tensor>& tensors,
                                        std::vector<std::vector<DetectionResult>>* results,
                                        const std::vector<LetterBoxRecord>& letter_box_records) const {
-        if (tensors[0].shape().size() != 3) {
-            MD_LOG_ERROR << "Only support post process with 3D tensor." << std::endl;
+        const auto& t = tensors[0];
+        // ncnn 在 batch==1 时压掉首维，输出 2D [C,N]；检测层期望 3D [B,C,N]，
+        // 故将 2D 视为 batch=1（共享内存视图），3D 输出行为保持不变。
+        if (t.shape().size() == 2) {
+            const std::vector<Tensor> batched = {t.reshape({1, t.shape()[0], t.shape()[1]})};
+            return run(batched, results, letter_box_records);
+        }
+        if (t.shape().size() != 3) {
+            MD_LOG_ERROR << "Only support post process with 3D tensor, got dims=" << t.shape().size() << std::endl;
             return false;
         }
-        if (tensors[0].shape()[2] == 6) {
+        if (t.shape()[2] == 6) {
             return run_with_nms(tensors, results, letter_box_records);
         }
         return run_without_nms(tensors, results, letter_box_records);
