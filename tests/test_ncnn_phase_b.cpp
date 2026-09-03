@@ -103,7 +103,8 @@ TEST_CASE("InsightFace recognition (w600k_r50) ncnn vs ORT", "[ncnn][phase_b][in
     double dot = 0, na = 0, nb = 0;
     for (size_t i = 0; i < emb_ort.size(); ++i) { dot += emb_ort[i]*emb_ncnn[i]; na += emb_ort[i]*emb_ort[i]; nb += emb_ncnn[i]*emb_ncnn[i]; }
     const double sim = dot / (std::sqrt(na) * std::sqrt(nb));
-    REQUIRE(sim > 0.95);
+    INFO("rec embedding cosine sim=" << sim);
+    REQUIRE(sim > 0.99);
 }
 
 TEST_CASE("InsightFace genderage ncnn vs ORT", "[ncnn][phase_b][insightface][ga]") {
@@ -220,7 +221,7 @@ TEST_CASE("InsightFace Analysis pipeline ncnn vs ORT", "[ncnn][phase_b][insightf
     std::vector<face::InsightFaceResult> ro, rn;
     REQUIRE(ort.analyze(img, &ro, true, true, true, true, true));
     REQUIRE(ncnn.analyze(img, &rn, true, true, true, true, true));
-    // 每人脸 embedding 余弦 > 0.95（按 bbox 中心、score 匹配）
+    // 每人脸 embedding 余弦 > 0.99（同权重同输入，两后端应几乎一致；按 bbox 中心、score 匹配）
     size_t matched = 0, total = std::min(ro.size(), rn.size());
     for (size_t i = 0; i < total; ++i) {
         if (ro[i].embedding.empty() || rn[i].embedding.empty()) continue;
@@ -228,7 +229,8 @@ TEST_CASE("InsightFace Analysis pipeline ncnn vs ORT", "[ncnn][phase_b][insightf
         double dot = 0, na = 0, nb = 0;
         for (size_t k = 0; k < ro[i].embedding.size(); ++k) { dot += ro[i].embedding[k]*rn[i].embedding[k]; na += ro[i].embedding[k]*ro[i].embedding[k]; nb += rn[i].embedding[k]*rn[i].embedding[k]; }
         const double sim = dot / (std::sqrt(na) * std::sqrt(nb));
-        if (sim > 0.95) ++matched;
+        INFO("pipe face " << i << " embedding cosine sim=" << sim);
+        if (sim > 0.99) ++matched;
     }
     REQUIRE(matched >= 1);  // 至少一张人脸高相似
 }
