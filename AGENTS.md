@@ -75,7 +75,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | `ENABLE_ORT` | ON | OnnxRuntime 后端 |
 | `ENABLE_MNN` | ON | MNN 后端 |
 | `ENABLE_TRT` | OFF | 需要 `WITH_GPU=ON`，不支持 Apple |
-| `ENABLE_NCNN` | OFF | ncnn 后端（CPU+Vulkan）；依赖 `cmake/ncnn.cmake`（本地 `-DNCNN_ROOT` 或 Windows x64 modelscope 下载） |
+| `ENABLE_NCNN` | OFF | ncnn 后端（CPU+Vulkan）；依赖 `cmake/ncnn.cmake`（本地 `-DNCNN_ROOT` 或 Windows x64 modelscope 下载）。Vision 模型经 ncnn 支持 ultralytics YOLO 全系（det/cls/obb/pose/seg/sem/depth），用 `ultralytics .pt export format=ncnn` 转出的 param/bin 加载 |
 | `WITH_GPU` | ON | 启用 CUDA（默认 SM 8.6） |
 | `BUILD_AUDIO` | ON | 启用音频模块（samplerate、kaldi-native-fbank、cppjieba） |
 | `BUILD_VISION` | ON | 启用视觉模块（OpenCV） |
