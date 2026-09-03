@@ -4,6 +4,7 @@
 
 #include "core/md_log.h"
 #include "vision/depth/postprocessor.h"
+#include "vision/utils/ncnn_output.h"
 
 #include <algorithm>
 #include <cstring>
@@ -15,6 +16,12 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsDepthPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<DepthResult>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
+        if (!tensors.empty() && tensors[0].shape().size() == 3) {
+            // ncnn 在 batch==1 时压掉输出首维，depth 为全图 4D 输出 [1,1,H,W] → 补回 4D 后递归。
+            const std::vector<Tensor> batched = {
+                vision::ncnn_utils::restore_leading_batch1(tensors[0], 4)};
+            return run(batched, results, letter_box_records);
+        }
         if (tensors.empty() || tensors[0].shape().size() != 4) {
             MD_LOG_ERROR << "Depth estimation requires 4D output [B,C,H,W]." << std::endl;
             return false;
