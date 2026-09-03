@@ -136,4 +136,29 @@ TEST_CASE("LprRecognizer ncnn vs ORT", "[ncnn][phase_b][lpr][rec]") {
     REQUIRE(r_ncnn.car_plate_str == r_ort.car_plate_str);       // 车牌字符串强锚点
     REQUIRE(r_ncnn.car_plate_color == r_ort.car_plate_color);   // 颜色强锚点
 }
+
+TEST_CASE("LprPipeline ncnn vs ORT", "[ncnn][phase_b][lpr][pipe]") {
+    namespace p = lpr_test;
+    const auto dmdl = p::lpr_model("yolov5plate");
+    const auto rmdl = p::lpr_model("plate_recognition_color");
+    const auto imgf = p::image("test_lpr_pipeline.jpg");
+    if (!p::avail(dmdl) || !p::avail(rmdl) || !p::avail(imgf)) return;
+
+    auto img = ImageData::imread(imgf.string());
+    if (img.empty()) return;
+    // ORT：显式传 .onnx 防默认按扩展名误切 ncnn；ncnn：传 .param
+    lpr::LprPipeline ort(p::lpr_onnx("yolov5plate").string(), p::lpr_onnx("plate_recognition_color").string(), p::ort_opt());
+    lpr::LprPipeline ncnn(dmdl.string(), rmdl.string(), p::ncnn_opt());
+    REQUIRE(ort.is_initialized());
+    REQUIRE(ncnn.is_initialized());
+
+    std::vector<LprResult> ro, rn;
+    REQUIRE(ort.predict(img, &ro));
+    REQUIRE(ncnn.predict(img, &rn));
+    REQUIRE((!ro.empty() && !rn.empty()));
+    bool match = false;
+    for (const auto& a : ro) for (const auto& b : rn)
+        if (!a.car_plate_str.empty() && a.car_plate_str == b.car_plate_str && a.car_plate_color == b.car_plate_color) match = true;
+    REQUIRE(match);  // 至少一个车牌字符串+颜色双侧一致
+}
 #endif  // ENABLE_NCNN
