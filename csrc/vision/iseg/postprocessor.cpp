@@ -6,7 +6,6 @@
 #include <algorithm>
 #include "core/md_log.h"
 #include "vision/utils.h"
-#include "vision/utils/ncnn_output.h"
 #include "vision/iseg/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
@@ -360,9 +359,9 @@ namespace modeldeploy::vision::detection {
                                           const std::vector<LetterBoxRecord>& letter_box_records) const {
         // ncnn batch=1 压掉首维：tensors[0]=检测头 [N,C]→3D；tensors[1]=proto [C,160,160]→4D
         if (tensors[0].shape().size() == 2) {
-            tensors[0] = vision::ncnn_utils::restore_leading_batch1(tensors[0], 3);
+            tensors[0].expand_dim(0);
             if (tensors.size() >= 2) {
-                tensors[1] = vision::ncnn_utils::restore_leading_batch1(tensors[1], 4);
+                tensors[1].expand_dim(0);
             }
         }
         if (tensors[0].shape().size() != 3) {

@@ -5,7 +5,6 @@
 #include <numeric>
 #include "core/md_log.h"
 #include "vision/utils.h"
-#include "vision/utils/ncnn_output.h"
 #include "vision/obb/postprocessor.h"
 
 #include <utils/utils.h>
@@ -143,10 +142,10 @@ namespace modeldeploy::vision::detection {
                                           std::vector<std::vector<ObbResult>>* results,
                                           const std::vector<LetterBoxRecord>& letter_box_records) const {
         if (tensors[0].shape().size() == 2) {
-            // ncnn 在 batch==1 时压掉输出首维，补回 batch 维后再递归处理
-            const std::vector<Tensor> batched = {
-                vision::ncnn_utils::restore_leading_batch1(tensors[0], 3)};
-            return run(batched, results, letter_box_records);
+            // ncnn batch==1 压掉首维；expand_dim(0) 补 batch 维后再递归处理。
+            Tensor batched = tensors[0];
+            batched.expand_dim(0);
+            return run({batched}, results, letter_box_records);
         }
         if (tensors[0].shape().size() != 3) {
             MD_LOG_ERROR << "Only support post process with 3D tensor." << std::endl;

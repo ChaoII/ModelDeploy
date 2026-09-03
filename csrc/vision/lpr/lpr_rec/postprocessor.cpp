@@ -4,7 +4,6 @@
 
 #include "utils/utils.h"
 #include "core/md_log.h"
-#include "vision/utils/ncnn_output.h"
 #include "vision/lpr/lpr_rec/postprocessor.h"
 
 namespace modeldeploy::vision::lpr {
@@ -14,11 +13,11 @@ namespace modeldeploy::vision::lpr {
         // ncnn 实际 t0=color[5](1D)、t1=rec[21,78](2D)，而 ORT 为 t0=rec[1,21,78]、t1=color[1,5]。
         // 按 ORT 槽位重排（rec→batched[0]、color→batched[1]）并前置补 batch 维。
         if (tensors.size() >= 2 && tensors[0].shape().size() == 1) {
-            std::vector<Tensor> batched;
-            batched.reserve(2);
-            batched.push_back(vision::ncnn_utils::restore_leading_batch1(tensors[1], 3));
-            batched.push_back(vision::ncnn_utils::restore_leading_batch1(tensors[0], 2));
-            return run(batched, results);
+            // 按 ORT 槽位重排（rec→batched[0]、color→batched[1]）并前置补 batch 维。
+            Tensor rec = tensors[1], color = tensors[0];
+            rec.expand_dim(0);
+            color.expand_dim(0);
+            return run({rec, color}, results);
         }
         const size_t batch = tensors[0].shape()[0];
         results->resize(batch);
