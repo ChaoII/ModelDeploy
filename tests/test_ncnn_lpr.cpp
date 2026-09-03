@@ -32,7 +32,7 @@ RuntimeOption ncnn_opt() {
     return o;
 }
 std::filesystem::path lpr_model(const std::string& name) {
-    return data_root() / "test_data" / "test_models" / "ncnn" / "lpr" / name / (name + ".param");
+    return data_root() / "test_data" / "test_models" / "ncnn" / name / (name + ".param");
 }
 std::filesystem::path lpr_onnx(const std::string& name) {
     return data_root() / "test_data" / "test_models" / "onnx" / (name + ".onnx");

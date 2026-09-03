@@ -31,7 +31,7 @@ RuntimeOption ncnn_opt() {
     return o;
 }
 std::filesystem::path ncnn_model(const std::string& name) {
-    return data_root() / "test_data" / "test_models" / "ncnn" / name / (name + ".param");
+    return data_root() / "test_data" / "test_models" / "ncnn" / "yolo26n" / (name + ".param");
 }
 std::filesystem::path onnx_model(const std::string& rel) {
     return data_root() / "test_data" / "test_models" / rel;
