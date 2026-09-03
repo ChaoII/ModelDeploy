@@ -50,4 +50,83 @@ TEST_CASE("OCR DBDetector ncnn vs ORT", "[ncnn][phase_b][ocr][det]") {
     INFO("ORT boxes=" << ro.size() << " ncnn boxes=" << rn.size());
     REQUIRE(rn.size() >= 1);
 }
+
+TEST_CASE("OCR Classifier ncnn vs ORT", "[ncnn][phase_b][ocr][cls]") {
+    namespace p = ocr_test;
+    const auto mdl = p::ncnn_sub("cls");
+    const auto imgf = p::image("test_ocr.png");
+    if (!p::avail(mdl) || !p::avail(imgf)) return;
+
+    ocr::Classifier ort(p::onnx_sub("cls").string(), p::ort_opt());
+    ocr::Classifier ncnn(mdl.string(), p::ncnn_opt());
+    REQUIRE(ort.is_initialized());
+    REQUIRE(ncnn.is_initialized());
+    auto img = ImageData::imread(imgf.string());
+    int32_t lo = -1, ln = -1; float so = 0, sn = 0;
+    REQUIRE(ort.predict(img, &lo, &so));
+    REQUIRE(ncnn.predict(img, &ln, &sn));
+    REQUIRE(lo >= 0);
+    REQUIRE(ln >= 0);
+    INFO("cls ORT label=" << lo << " score=" << so << " | ncnn label=" << ln << " score=" << sn);
+    REQUIRE(ln == lo);                       // 方向标签一致
+    REQUIRE(std::fabs(sn - so) < 0.05f);     // 分容差
+}
+
+TEST_CASE("OCR Recognizer ncnn vs ORT", "[ncnn][phase_b][ocr][rec]") {
+    namespace p = ocr_test;
+    const auto mdl = p::ncnn_sub("rec");
+    const auto dictf = p::dict();
+    const auto imgf = p::image("test_ocr_recognition.jpg");
+    const auto altf = p::image("test_ocr.png");
+    if (!p::avail(mdl) || !p::avail(dictf)) return;
+    if (!p::avail(imgf) && !p::avail(altf)) return;
+    const std::filesystem::path use = p::avail(imgf) ? imgf : altf;
+
+    ocr::Recognizer ort(p::onnx_sub("rec").string(), dictf.string(), p::ort_opt());
+    ocr::Recognizer ncnn(mdl.string(), dictf.string(), p::ncnn_opt());
+    REQUIRE(ort.is_initialized());
+    REQUIRE(ncnn.is_initialized());
+    auto img = ImageData::imread(use.string());
+    std::string to, tn; float so = 0, sn = 0;
+    REQUIRE(ort.predict(img, &to, &so));
+    if (to.empty()) return;  // v6 rec 对多行图可能返回空，跳过
+    REQUIRE(ncnn.predict(img, &tn, &sn));
+    INFO("rec ORT text=[" << to << "] score=" << so << " | ncnn text=[" << tn << "] score=" << sn);
+    REQUIRE(tn == to);               // 文本串强锚点
+    REQUIRE(std::fabs(sn - so) < 0.1f);
+}
+
+TEST_CASE("PaddleOCR pipeline ncnn vs ORT", "[ncnn][phase_b][ocr][pipe]") {
+    namespace p = ocr_test;
+    const auto detm = p::ncnn_sub("det"), clsm = p::ncnn_sub("cls"), recm = p::ncnn_sub("rec");
+    const auto dictf = p::dict();
+    const auto imgf = p::image("test_ocr.png");
+    if (!p::avail(detm) || !p::avail(clsm) || !p::avail(recm) || !p::avail(dictf) || !p::avail(imgf)) return;
+
+    auto img = ImageData::imread(imgf.string());
+    // ORT 显式传 .onnx、ncnn 传 .param
+    ocr::PaddleOCR ort(p::onnx_sub("det").string(), p::onnx_sub("cls").string(), p::onnx_sub("rec").string(), dictf.string(), p::ort_opt());
+    ocr::PaddleOCR ncnn(detm.string(), clsm.string(), recm.string(), dictf.string(), p::ncnn_opt());
+    REQUIRE(ort.is_initialized());
+    REQUIRE(ncnn.is_initialized());
+    // pipeline 内部 cls/rec 按行 batch（默认 6/8），ncnn 强制 batch==1：两侧都设为 1 保持可比。
+    REQUIRE(ort.set_cls_batch_size(1));
+    REQUIRE(ort.set_rec_batch_size(1));
+    REQUIRE(ncnn.set_cls_batch_size(1));
+    REQUIRE(ncnn.set_rec_batch_size(1));
+
+    OCRResult ro, rn;
+    REQUIRE(ort.predict(img, &ro));
+    REQUIRE(ncnn.predict(img, &rn));
+    INFO("ORT boxes=" << ro.boxes.size() << " text=" << ro.text.size()
+         << " | ncnn boxes=" << rn.boxes.size() << " text=" << rn.text.size());
+    REQUIRE(!ro.boxes.empty());
+    REQUIRE(!ro.text.empty());
+    REQUIRE(!rn.boxes.empty());
+    // 至少一个文本串双侧一致
+    bool match = false;
+    for (const auto& a : ro.text) for (const auto& b : rn.text)
+        if (!a.empty() && a == b) match = true;
+    REQUIRE(match);
+}
 #endif
