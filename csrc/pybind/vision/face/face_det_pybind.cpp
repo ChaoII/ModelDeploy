@@ -45,7 +45,7 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](face::ScrfdPostprocessor& self,
-                    const std::vector<Tensor>& inputs,
+                    std::vector<Tensor>& inputs,
                     const std::vector<LetterBoxRecord>& records) {
                      std::vector<std::vector<KeyPointsResult>> results;
                      if (!self.run(inputs, &results, records)) {

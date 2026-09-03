@@ -22,6 +22,6 @@ namespace modeldeploy::vision::face {
          * \param[in] results The output result of FaceRecognitionResult
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<Tensor>& tensors, std::vector<FaceRecognitionResult>* results);
+        bool run(std::vector<Tensor>& tensors, std::vector<FaceRecognitionResult>* results);
     };
 } // namespace modeldeploy::vision::faceid

@@ -9,11 +9,15 @@
 
 
 namespace modeldeploy::vision::face {
-    bool SeetaFaceIDPostprocessor::run(const std::vector<Tensor>& tensors,
+    bool SeetaFaceIDPostprocessor::run(std::vector<Tensor>& tensors,
                                        std::vector<FaceRecognitionResult>* results) {
         if (tensors[0].dtype() != DataType::FP32) {
             MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
             return false;
+        }
+        // ncnn batch==1 压掉首维：[1,1024,1,1](4D)→[1024,1,1](3D)；用通用 Tensor::expand_dim(0) 补回后做 transpose。
+        if (tensors[0].shape().size() == 3) {
+            tensors[0].expand_dim(0);
         }
         // (-1,1024,1,1) -> (-1,1,1,1024)
         Tensor tensor_transpose = tensors[0].transpose({0, 2, 3, 1}).contiguous();

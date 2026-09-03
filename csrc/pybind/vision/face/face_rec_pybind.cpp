@@ -33,7 +33,7 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def("run",
                  [](face::SeetaFaceIDPostprocessor& self,
-                    const std::vector<Tensor>& inputs) {
+                    std::vector<Tensor>& inputs) {
                      std::vector<FaceRecognitionResult> results;
                      if (!self.run(inputs, &results)) {
                          throw std::runtime_error(

@@ -7,6 +7,8 @@
 #include <array>
 #include <algorithm>
 #include "csrc/vision/face/face_det/scrfd.h"
+#include "csrc/vision/face/face_rec/seetaface.h"
+#include "csrc/vision/face/face_rec_pipeline/face_rec_pipeline.h"
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -72,5 +74,60 @@ TEST_CASE("Scrfd face detection ncnn vs ORT", "[ncnn][phase_b][seetaface][det]")
     for (const auto& r : ro) if (r.score > best_o->score) best_o = &r;
     for (const auto& r : rn) if (r.score > best_n->score) best_n = &r;
     REQUIRE(p::box_match(best_o->box, best_n->box));
+}
+
+TEST_CASE("SeetaFaceID recognition ncnn vs ORT", "[ncnn][phase_b][seetaface][rec]") {
+    namespace p = seetaface_test;
+    const auto mdl = p::ncnn_sub("face_recognizer");
+    const auto imgf = p::image("test_face_detection.jpg");
+    if (!p::avail(mdl) || !p::avail(imgf)) return;
+    face::SeetaFaceID ort(p::onnx_sub("face_recognizer").string(), p::ort_opt());
+    face::SeetaFaceID ncnn(mdl.string(), p::ncnn_opt());
+    REQUIRE(ort.is_initialized());
+    REQUIRE(ncnn.is_initialized());
+    auto img = ImageData::imread(imgf.string());
+    FaceRecognitionResult ro, rn;
+    REQUIRE(ort.predict(img, &ro));
+    REQUIRE(ncnn.predict(img, &rn));
+    REQUIRE(!ro.embedding.empty());
+    REQUIRE(!rn.embedding.empty());
+    REQUIRE(ro.embedding.size() == rn.embedding.size());
+    float dot = 0, an = 0, bn = 0;
+    for (size_t i = 0; i < ro.embedding.size(); ++i) {
+        dot += ro.embedding[i] * rn.embedding[i];
+        an += ro.embedding[i] * ro.embedding[i];
+        bn += rn.embedding[i] * rn.embedding[i];
+    }
+    float cos = dot / (std::sqrt(an) * std::sqrt(bn) + 1e-9f);
+    INFO("rec embedding dim=" << rn.embedding.size() << " cos=" << cos);
+    REQUIRE(cos > 0.99f);
+}
+
+TEST_CASE("FaceRecognizerPipeline predict_max_face ncnn vs ORT", "[ncnn][phase_b][seetaface][pipe]") {
+    namespace p = seetaface_test;
+    const auto detm = p::ncnn_sub("scrfd"), recm = p::ncnn_sub("face_recognizer");
+    const auto imgf = p::image("test_face_detection.jpg");
+    if (!p::avail(detm) || !p::avail(recm) || !p::avail(imgf)) return;
+    auto img = ImageData::imread(imgf.string());
+    face::FaceRecognizerPipeline ort(p::onnx_sub("scrfd").string(),
+                                     p::onnx_sub("face_recognizer").string(), p::ort_opt());
+    face::FaceRecognizerPipeline ncnn(detm.string(), recm.string(), p::ncnn_opt());
+    REQUIRE(ort.is_initialized());
+    REQUIRE(ncnn.is_initialized());
+    FaceRecognitionResult ro, rn;
+    REQUIRE(ort.predict_max_face(img, &ro));
+    REQUIRE(ncnn.predict_max_face(img, &rn));
+    REQUIRE(!ro.embedding.empty());
+    REQUIRE(!rn.embedding.empty());
+    REQUIRE(ro.embedding.size() == rn.embedding.size());
+    float dot = 0, an = 0, bn = 0;
+    for (size_t i = 0; i < ro.embedding.size(); ++i) {
+        dot += ro.embedding[i] * rn.embedding[i];
+        an += ro.embedding[i] * ro.embedding[i];
+        bn += rn.embedding[i] * rn.embedding[i];
+    }
+    float cos = dot / (std::sqrt(an) * std::sqrt(bn) + 1e-9f);
+    INFO("pipe embedding dim=" << rn.embedding.size() << " cos=" << cos);
+    REQUIRE(cos > 0.99f);
 }
 #endif
