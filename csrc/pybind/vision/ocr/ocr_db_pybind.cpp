@@ -58,7 +58,7 @@ namespace modeldeploy::vision {
 
             .def("run",
                  [](ocr::DBDetectorPostprocessor& self,
-                    const std::vector<Tensor>& inputs,
+                    std::vector<Tensor>& inputs,
                     const std::vector<std::array<int, 4>>& batch_det_img_info) {
                      std::vector<std::vector<std::array<int, 8>>> results;
                      if (!self.run(inputs, &results, batch_det_img_info)) {

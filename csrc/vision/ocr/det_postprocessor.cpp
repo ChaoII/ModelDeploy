@@ -42,9 +42,13 @@ namespace modeldeploy::vision::ocr {
     }
 
     bool DBDetectorPostprocessor::run(
-        const std::vector<Tensor>& tensors,
+        std::vector<Tensor>& tensors,
         std::vector<std::vector<std::array<int, 8>>>* results,
         const std::vector<std::array<int, 4>>& batch_img_info) const {
+        // ncnn batch==1 压掉首维：[1,1,H,W](4D)→[1,H,W](3D)；用通用 Tensor::expand_dim(0) 补回后落体。
+        if (tensors[0].shape().size() == 3) {
+            tensors[0].expand_dim(0);
+        }
         // DBDetector have only 1 output tensor.
         const Tensor& tensor = tensors[0];
         // For DBDetector, the output tensor shape = [batch, 1, ?, ?]

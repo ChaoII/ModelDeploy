@@ -16,10 +16,10 @@ namespace modeldeploy::vision::ocr {
          * \param[in] cls_scores The output score results of classification model
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<int32_t>* cls_labels, std::vector<float>* cls_scores);
 
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<int32_t>* cls_labels, std::vector<float>* cls_scores,
                  size_t start_index, size_t total_size);
 

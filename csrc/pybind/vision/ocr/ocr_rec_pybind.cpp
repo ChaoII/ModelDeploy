@@ -48,7 +48,7 @@ namespace modeldeploy::vision {
             }), pybind11::arg("label_path"))
             .def("run",
                  [](ocr::RecognizerPostprocessor& self,
-                    const std::vector<Tensor>& inputs) {
+                    std::vector<Tensor>& inputs) {
                      std::vector<std::string> texts;
                      std::vector<float> rec_scores;
                      if (!self.run(inputs, &texts, &rec_scores)) {

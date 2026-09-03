@@ -85,21 +85,29 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool RecognizerPostprocessor::run(const std::vector<Tensor>& tensors,
+    bool RecognizerPostprocessor::run(std::vector<Tensor>& tensors,
                                       std::vector<std::string>* texts,
                                       std::vector<float>* rec_scores) const {
+        // ncnn batch==1 压掉首维：[1,T,C](3D)→[T,C](2D)；expand_dim(0) 补回后落体。
+        if (tensors[0].shape().size() == 2) {
+            tensors[0].expand_dim(0);
+        }
         // Recognizer have only 1 output tensor.
         // For Recognizer, the output tensor shape = [batch, ?, 6625]
         const size_t total_size = tensors[0].shape()[0];
         return run(tensors, texts, rec_scores, 0, total_size, {});
     }
 
-    bool RecognizerPostprocessor::run(const std::vector<Tensor>& tensors,
+    bool RecognizerPostprocessor::run(std::vector<Tensor>& tensors,
                                       std::vector<std::string>* texts,
                                       std::vector<float>* rec_scores,
                                       const size_t start_index,
                                       const size_t total_size,
                                       const std::vector<int>& indices) const {
+        // ncnn batch==1 压掉首维：[1,T,C](3D)→[T,C](2D)；expand_dim(0) 补回后落体。
+        if (tensors[0].shape().size() == 2) {
+            tensors[0].expand_dim(0);
+        }
         if (!initialized_) {
             MD_LOG_ERROR << "Postprocessor is not initialized." << std::endl;
             return false;

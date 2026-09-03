@@ -16,7 +16,7 @@ namespace modeldeploy::vision::ocr {
          * \param[in] batch_img_info The detector_preprocess result
          * \return true if the postprocess successes, otherwise false
          */
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                    std::vector<std::vector<std::array<int, 8>>>* results,
                    const std::vector<std::array<int, 4>>& batch_img_info) const;
 

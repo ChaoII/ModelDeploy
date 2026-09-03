@@ -17,17 +17,25 @@ namespace modeldeploy::vision::ocr {
         return true;
     }
 
-    bool ClassifierPostprocessor::run(const std::vector<Tensor>& tensors,
+    bool ClassifierPostprocessor::run(std::vector<Tensor>& tensors,
                                       std::vector<int32_t>* cls_labels,
                                       std::vector<float>* cls_scores) {
+        // ncnn batch==1 压掉首维：[1,2](2D)→[2](1D)；expand_dim(0) 补回后落体。
+        if (tensors[0].shape().size() == 1) {
+            tensors[0].expand_dim(0);
+        }
         const size_t total_size = tensors[0].shape()[0];
         return run(tensors, cls_labels, cls_scores, 0, total_size);
     }
 
-    bool ClassifierPostprocessor::run(const std::vector<Tensor>& tensors,
+    bool ClassifierPostprocessor::run(std::vector<Tensor>& tensors,
                                       std::vector<int32_t>* cls_labels,
                                       std::vector<float>* cls_scores,
                                       const size_t start_index, const size_t total_size) {
+        // ncnn batch==1 压掉首维：[1,2](2D)→[2](1D)；expand_dim(0) 补回后落体。
+        if (tensors[0].shape().size() == 1) {
+            tensors[0].expand_dim(0);
+        }
         // Classifier have only 1 output tensor.
         const Tensor& tensor = tensors[0];
         // For Classifier, the output tensor shape = [batch,2]

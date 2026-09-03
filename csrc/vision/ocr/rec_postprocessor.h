@@ -27,10 +27,10 @@ namespace modeldeploy::vision::ocr {
          * \param[in] rec_scores The output score results of recognizer
          * \return true if the postprocess successed, otherwise false
          */
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<std::string>* texts, std::vector<float>* rec_scores) const;
 
-        bool run(const std::vector<Tensor>& tensors,
+        bool run(std::vector<Tensor>& tensors,
                  std::vector<std::string>* texts, std::vector<float>* rec_scores,
                  size_t start_index, size_t total_size,
                  const std::vector<int>& indices) const;
