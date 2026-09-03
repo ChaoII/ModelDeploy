@@ -49,8 +49,10 @@ TEST_CASE("ncnn backend CPU infer", "[ncnn][cpu]") {
     REQUIRE(rt.infer(ins, &outs));
     REQUIRE(outs.size() == 1);
     auto shp = outs[0].shape();
-    REQUIRE(shp.size() == 4);
-    REQUIRE((shp[0] == 1 && shp[1] == 3 && shp[2] == 64 && shp[3] == 64));
+    // ncnn batch=1 图像输入压掉 batch 维、输出为 CHW：喂入 Mat(w=64,h=64,c=3)，
+    // ReLU 输出 dims==3 → mat_shape 映射为 {c,h,w}={3,64,64}。
+    REQUIRE(shp.size() == 3);
+    REQUIRE((shp[0] == 3 && shp[1] == 64 && shp[2] == 64));
     // ReLU 恒等：输入全 1 → 输出全 1
     auto* od = reinterpret_cast<float*>(outs[0].data());
     REQUIRE(od[0] == Catch::Approx(1.0f).margin(1e-3f));
@@ -76,6 +78,10 @@ TEST_CASE("ncnn backend VULKAN infer", "[ncnn][vulkan]") {
     std::vector<Tensor> outs;
     REQUIRE(rt.infer(ins, &outs));
     REQUIRE(outs.size() == 1);
+    // ncnn batch=1 图像输入压掉 batch 维、输出为 CHW（与 CPU 用例同语义）
+    auto shp = outs[0].shape();
+    REQUIRE(shp.size() == 3);
+    REQUIRE((shp[0] == 3 && shp[1] == 64 && shp[2] == 64));
     auto* od = reinterpret_cast<float*>(outs[0].data());
     REQUIRE(od[0] == Catch::Approx(2.0f).margin(1e-2f));
 #else
