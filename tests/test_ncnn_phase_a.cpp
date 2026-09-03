@@ -6,6 +6,7 @@
 #include "vision/classification/classification.h"
 #include "vision/obb/ultralytics_obb.h"
 #include "vision/pose/ultralytics_pose.h"
+#include "vision/iseg/ultralytics_seg.h"
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -96,5 +97,23 @@ TEST_CASE("UltralyticsPose ncnn vs ORT", "[ncnn][phase_a][pose]") {
     REQUIRE((!r_ort.empty() && !r_ncnn.empty()));
     REQUIRE(r_ncnn[0].label_id == r_ort[0].label_id);
     REQUIRE(r_ncnn[0].keypoints.size() == 17);
+}
+
+TEST_CASE("UltralyticsSeg ncnn vs ORT", "[ncnn][phase_a][seg]") {
+    namespace p = phase_a_test;
+    const auto mdl = p::ncnn_model("yolo26n-seg");
+    const auto imgf = p::image("test_detection0.jpg");
+    const auto onx = p::onnx_model("yolo26n-seg.onnx");
+    if (!p::avail(mdl) || !p::avail(imgf) || !p::avail(onx)) return;
+    modeldeploy::vision::detection::UltralyticsSeg ort(onx.string(), p::ort_opt());
+    modeldeploy::vision::detection::UltralyticsSeg ncnn(mdl.string(), p::ncnn_opt());
+    REQUIRE((ort.is_initialized() && ncnn.is_initialized()));
+    auto img = ImageData::imread(imgf.string());
+    std::vector<modeldeploy::vision::InstanceSegResult> r_ort, r_ncnn;
+    REQUIRE(ort.predict(img, &r_ort, nullptr));
+    REQUIRE(ncnn.predict(img, &r_ncnn, nullptr));
+    REQUIRE((!r_ort.empty() && !r_ncnn.empty()));
+    REQUIRE(r_ncnn[0].label_id == r_ort[0].label_id);
+    REQUIRE(r_ncnn[0].score > 0.5f);
 }
 #endif

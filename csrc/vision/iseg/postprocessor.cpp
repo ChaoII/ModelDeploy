@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "core/md_log.h"
 #include "vision/utils.h"
+#include "vision/utils/ncnn_output.h"
 #include "vision/iseg/postprocessor.h"
 
 namespace modeldeploy::vision::detection {
@@ -357,6 +358,13 @@ namespace modeldeploy::vision::detection {
     bool UltralyticsSegPostprocessor::run(std::vector<Tensor>& tensors,
                                           std::vector<std::vector<InstanceSegResult>>* results,
                                           const std::vector<LetterBoxRecord>& letter_box_records) const {
+        // ncnn batch=1 压掉首维：tensors[0]=检测头 [N,C]→3D；tensors[1]=proto [C,160,160]→4D
+        if (tensors[0].shape().size() == 2) {
+            tensors[0] = vision::ncnn_utils::restore_leading_batch1(tensors[0], 3);
+            if (tensors.size() >= 2) {
+                tensors[1] = vision::ncnn_utils::restore_leading_batch1(tensors[1], 4);
+            }
+        }
         if (tensors[0].shape().size() != 3) {
             MD_LOG_ERROR << "Only support post process with 3D tensor." << std::endl;
             return false;
