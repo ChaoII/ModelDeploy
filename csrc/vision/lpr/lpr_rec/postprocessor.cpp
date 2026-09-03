@@ -4,11 +4,22 @@
 
 #include "utils/utils.h"
 #include "core/md_log.h"
+#include "vision/utils/ncnn_output.h"
 #include "vision/lpr/lpr_rec/postprocessor.h"
 
 namespace modeldeploy::vision::lpr {
     bool LprRecPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<LprResult>* results) const {
+        // ncnn batch==1 压掉首维，且双输出槽位与 ORT/ONNX 反序：
+        // ncnn 实际 t0=color[5](1D)、t1=rec[21,78](2D)，而 ORT 为 t0=rec[1,21,78]、t1=color[1,5]。
+        // 按 ORT 槽位重排（rec→batched[0]、color→batched[1]）并前置补 batch 维。
+        if (tensors.size() >= 2 && tensors[0].shape().size() == 1) {
+            std::vector<Tensor> batched;
+            batched.reserve(2);
+            batched.push_back(vision::ncnn_utils::restore_leading_batch1(tensors[1], 3));
+            batched.push_back(vision::ncnn_utils::restore_leading_batch1(tensors[0], 2));
+            return run(batched, results);
+        }
         const size_t batch = tensors[0].shape()[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {

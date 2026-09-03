@@ -4,6 +4,7 @@
 
 #include "core/md_log.h"
 #include "vision/utils.h"
+#include "vision/utils/ncnn_output.h"
 #include "utils/utils.h"
 #include "vision/lpr/lpr_det/postprocessor.h"
 
@@ -18,6 +19,11 @@ namespace modeldeploy::vision::lpr {
     bool LprDetPostprocessor::run(
         const std::vector<Tensor>& tensors, std::vector<std::vector<KeyPointsResult>>* results,
         const std::vector<LetterBoxRecord>& letter_box_records) const {
+        // ncnn batch==1 压掉输出首维：[N,15](2D)→[1,N,15](3D)，与 ORT/MNN 对齐。
+        if (tensors[0].shape().size() == 2) {
+            return run({vision::ncnn_utils::restore_leading_batch1(tensors[0], 3)},
+                       results, letter_box_records);
+        }
         const size_t batch = tensors[0].shape()[0];
         results->resize(batch);
         for (size_t bs = 0; bs < batch; ++bs) {
