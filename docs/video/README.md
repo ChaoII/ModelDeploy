@@ -51,9 +51,10 @@ cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
 | 项 | 取值 |
 |----|------|
 | 后端 | FFmpeg（默认）、GStreamer、Auto |
-| 硬件加速 | Auto / None / Cuda / Vaapi / Sophgo |
+| 硬件加速 | Auto / None / Cuda / Vaapi / **Qsv(Intel)** / Sophgo |
 | 解码硬解 | `h264_cuvid` `hevc_cuvid` `av1_cuvid`、VAAPI、GStreamer `nvcodec` |
-| 编码 | `libx264` `x264enc`（软）、`h264_nvenc` `nvh264enc` `vaapih264enc`（硬） |
+| 编码 | `libx264` `x264enc`（软）、`h264_nvenc` `nvh264enc` `vaapih264enc`（硬）、QSV `h264_qsv` |
+| 设备绘制 | CUDA 全部 `vis_*_nv12`；Sophgo 全部 `vis_*_nv12`（bmcv 近似，真机验证） |
 | 容器 | mp4 / flv / rtmp / rtsp |
 | 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
 
@@ -75,27 +76,5 @@ cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
 - **文本仅 ASCII**（`bmcv_image_put_text`）→ 中文 label 退化为 `id: score`，OCR/车牌文本过滤非 ASCII。
 - `vis_sem_nv12` / `vis_depth_nv12` 返回 false（bmcv 无逐像素 colormap 叠加）。
 - BM1688 的 VPSS 要求 NV12 帧 stride 256 字节对齐（`step == width` 时需 width 为 256 的倍数）。
-
-## 构建要点
-
-```bash
-cmake -S . -B build -G Ninja -DBUILD_VIDEO=ON -DBUILD_VISION=ON \
-      -DENABLE_FFMPEG=ON -DENABLE_GSTREAMER=OFF ...
-```
-
-- `BUILD_VIDEO=ON` 必须配 `BUILD_VISION=ON`；FFmpeg 或 GStreamer 至少一个。
-- 需要 FFmpeg/GStreamer 开发库，找不到时 `BUILD_VIDEO` 自动关闭。
-
-## 支持矩阵
-
-| 项 | 取值 |
-|----|------|
-| 后端 | FFmpeg（默认）、GStreamer、Auto |
-| 硬件加速 | Auto / None / Cuda / Vaapi / Sophgo |
-| 解码硬解 | `h264_cuvid` `hevc_cuvid` `av1_cuvid`、VAAPI、GStreamer `nvcodec` |
-| 编码 | `libx264` `x264enc`（软）、`h264_nvenc` `nvh264enc` `vaapih264enc`（硬） |
-| 设备绘制 | CUDA 全部 `vis_*_nv12`；Sophgo 全部 `vis_*_nv12`（bmcv 近似，真机验证） |
-| 容器 | mp4 / flv / rtmp / rtsp |
-| 语言 | C++、C API、C#、Rust、Python（全部解码+编码全功能） |
 
 > 返回 [文档中心](../README.md)

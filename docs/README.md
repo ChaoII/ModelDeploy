@@ -1,6 +1,6 @@
 # ModelDeploy 文档中心
 
-ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标检测 / 实例分割 / 姿态估计 / 旋转框 / 分类 / OCR / 人脸 / 车牌 / 行人属性 / 语音识别 / 语音合成 / VAD** 等模型，一套代码统一调用 **OnnxRuntime / TensorRT / MNN / Sophgo(算能 TPU)** 四种后端，并提供 **C++ / Python / C / C# / Rust** 多语言绑定。
+ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标检测 / 实例分割 / 姿态估计 / 旋转框 / 分类 / OCR / 人脸 / 车牌 / 行人属性 / 语音识别 / 语音合成 / VAD** 等模型，一套代码统一调用 **OnnxRuntime / TensorRT / MNN / ncnn / Sophgo(算能 TPU)** 五种后端，并提供 **C++ / Python / C / C# / Rust** 多语言绑定。
 
 ## 文档导航
 
@@ -24,7 +24,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 
 | 文档 | 内容 |
 |------|------|
-| [后端详解](./backends.md) | OnnxRuntime / TensorRT / MNN / Sophgo 四种后端对比、模型格式、构建要求 |
+| [后端详解](./backends.md) | OnnxRuntime / TensorRT / MNN / ncnn / Sophgo 五种后端对比、模型格式、构建要求 |
 
 ### 模型
 
@@ -48,21 +48,37 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | 文档 | 内容 |
 |------|------|
 | [性能优化指南](./performance.md) | 推理提速、多线程与 clone、零拷贝、后端选型、实测数据 |
+| [海量视频流效率优化](./pipeline-efficiency.md) | CUDA PC / Jetson / Sophgo 跨平台视频管线实测与瓶颈分析 |
 | [多语言 API](./api/README.md) | C++ / Python / C / C# / Rust 绑定概览 |
 | [模型加密](./encryption.md) | AES-256-CBC 模型加密与解密模型使用 |
 | [多线程推理](./multi_thread.md) | `clone()` 多线程并发详解 |
 | [Triton 推理服务](../examples/serving/) | Triton 部署（preprocess → pipeline → postprocess） |
 
+### 应用案例
+
+| 文档 | 内容 |
+|------|------|
+| [AI 智能安防监控平台](./surveillance.md) | `application/surveillance` 跨平台监控应用架构（CUDA/Jetson/Sophgo） |
+
+### 发布与开发
+
+| 文档 | 内容 |
+|------|------|
+| [发布流程](./release.md) | 版本号 bump、打 tag、GitHub Release/资产上传规范 |
+
 ## 支持矩阵
 
 ### 后端 × 设备
 
-| 后端 | 模型格式 | CPU | CUDA GPU | OpenCL | TPU |
-|------|---------|-----|----------|--------|-----|
-| OnnxRuntime | `.onnx` | ✅ | ✅ | ✅ | — |
-| TensorRT | `.engine` / `.onnx` | — | ✅ | — | — |
-| MNN | `.mnn` | ✅ | ✅ | ✅ | — |
-| Sophgo | `.bmodel` | — | — | — | ✅ (BM1688/CV186X) |
+| 后端 | 模型格式 | CPU | CUDA GPU | OpenCL | Vulkan | TPU |
+|------|---------|-----|----------|--------|--------|-----|
+| OnnxRuntime | `.onnx` | ✅ | ✅ | ✅ | — | — |
+| TensorRT | `.engine` / `.onnx` | — | ✅ | — | — | — |
+| MNN | `.mnn` | ✅ | ✅ | ✅ | ✅ | — |
+| ncnn | `.param` / `.bin` | ✅ | — | — | ✅ | — |
+| Sophgo | `.bmodel` | — | — | — | — | ✅ (BM1688/CV186X) |
+
+> **模型覆盖**：上表"后端支持=全部"指 ORT / TRT / MNN / Sophgo 四后端全覆盖；**ncnn 后端当前仅覆盖 ultralytics YOLO 全系**（det/cls/obb/pose/seg/sem/depth），其余模型请用 ORT / MNN / TRT / Sophgo。
 
 ### 模型能力
 

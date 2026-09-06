@@ -21,12 +21,14 @@ option.set_model_path("yolo11n.onnx", "password");  // 模型 + 可选解密密�
 | `use_ort_backend()` | OnnxRuntime | `.onnx`，最通用 |
 | `use_trt_backend()` | TensorRT | `.engine` / `.onnx`，GPU 最高性能 |
 | `use_mnn_backend()` | MNN | `.mnn`，移动端/边缘 |
+| `use_ncnn_backend()` | ncnn | `.param` / `.bin`，CPU / Vulkan，YOLO 全系 |
 | `use_sophgo_backend(device_id)` | Sophgo | `.bmodel`，算能 TPU |
 
 ```cpp
 option.use_ort_backend();      // ORT
 option.use_trt_backend();      // 纯 TRT
 option.use_mnn_backend();      // MNN
+option.use_ncnn_backend();     // ncnn
 option.use_sophgo_backend(0);  // Sophgo TPU
 option.sophgo_option.bmodel_path = "model.bmodel";
 ```
@@ -38,8 +40,9 @@ option.sophgo_option.bmodel_path = "model.bmodel";
 | 方法 | 设备 | 说明 |
 |------|------|------|
 | `use_cpu()` | CPU | 默认 |
-| `use_gpu(gpu_id)` | NVIDIA GPU | 需 CUDA，配合 TRT/ORT |
+| `use_gpu(gpu_id)` | NVIDIA GPU | 需 CUDA，配合 TRT/ORT/MNN |
 | `use_opencl(device_id)` | OpenCL | ORT/MNN 支持 |
+| `set_device(Device::VULKAN, id)` | Vulkan | ORT/MNN/ncnn 支持 |
 
 ```cpp
 option.use_cpu();          // CPU
@@ -150,6 +153,30 @@ option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_CUDA;
 | `bmodel_path` | 空 | `.bmodel` 路径 |
 | `use_device_input` | false | 设备内存直通 |
 
+### 8.5 `ncnn_option`（ncnn）
+
+ncnn 后端选项，`std::optional<bool>` 项为三态（`nullopt` = 用后端默认）：
+
+| 成员 | 默认 | 说明 |
+|------|------|------|
+| `device_id` | 0 | 设备 ID |
+| `cpu_thread_num` | -1 | CPU 线程数（-1 自动） |
+| `use_cooperative_matrix` | false | 是否用协处理矩阵（内核态加速） |
+| `openmp_blocktime` | -1 | OpenMP 阻塞时间 |
+| `lightmode` | nullopt | 轻量模式（可选布尔） |
+| `use_fp16_packed` | nullopt | FP16 packed（可选布尔） |
+| `use_fp16_storage` | nullopt | FP16 storage（可选布尔） |
+| `use_fp16_arithmetic` | nullopt | FP16 运算（可选布尔） |
+| `use_bf16_storage` | nullopt | BF16 storage（可选布尔） |
+
+```cpp
+option.use_ncnn_backend();
+option.use_cpu();
+option.ncnn_option.use_cooperative_matrix = true;
+```
+
+> ncnn 支持 CPU 与 Vulkan；Vulkan 用 `option.set_device(modeldeploy::Device::VULKAN, 0)`。
+
 ## 9. 完整配置模板
 
 ### CPU + ORT
@@ -187,6 +214,15 @@ option.set_trt_max_shape("images:4x3x1280x1280");
 option.use_mnn_backend();
 option.use_gpu(0);
 option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_CUDA;
+```
+
+### ncnn CPU / Vulkan
+
+```cpp
+option.use_ncnn_backend();
+option.use_cpu();
+// 或 Vulkan：option.set_device(modeldeploy::Device::VULKAN, 0);
+option.ncnn_option.use_cooperative_matrix = true;
 ```
 
 ### Sophgo TPU
