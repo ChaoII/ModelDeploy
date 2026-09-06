@@ -94,20 +94,73 @@ int main() {
 
 ## 路线图
 
-- [x] 重构 `Tensor` 支持 CUDA
-- [x] Python / C / C# / Rust 绑定（五语言全覆盖）
-- [x] Pipeline DAG 编排、视频解码、多目标跟踪、动作识别、文档理解、Re-ID、声纹、解决方案层
-- [x] 多后端（ORT/TRT/MNN/ncnn/Sophgo）统一 API + 模型加密
-- [x] **ncnn 后端（CPU + Vulkan，YOLO 全系）**
-- [x] 视频编解码：硬解/硬编、CUDA 直通、设备 NV12 就地可视化、GStreamer 后端
-- [x] **Intel QSV 硬件加速（v2.6.0）**
-- [ ] 更多 CUDA 预处理函数
-- [ ] ncnn 输出加载时原生 shape（当前依赖 dummy probe，导出模型常无输入 shape）
-- [ ] 更多 Vulkan 预处理与算子覆盖
-- [ ] 端上（ARM/aarch64）交叉编译与移动端性能打磨
-- [ ] 服务端多路视频的 ORT+TRT EP 混合部署文档
+> 完整版本历史与发布流程见 [docs/release.md](./docs/release.md)。
 
-> 各版本功能与验收见 [docs/release.md](./docs/release.md)。
+### 已完成里程碑
+
+**核心推理底座**
+- [x] `Tensor` 重构：CUDA 支持、零拷贝外部内存、多线程 `clone()` 并发
+- [x] 预处理流水线：CPU / CUDA(自研核) / BMCV(TPU) / Vulkan 硬件加速、`ImageData` 统一抽象
+- [x] Pipeline DAG 编排 + 前处理 → 推理 → 后处理解耦
+
+**推理后端（统一 API）**
+- [x] 五后端统一：OnnxRuntime / TensorRT / MNN / **ncnn** / Sophgo(算能 TPU)，一套 `RuntimeOption` 切换
+- [x] **ncnn（CPU + Vulkan，YOLO 全系）**、MNN（CPU/CUDA/OpenCL/Vulkan/Metal）
+- [x] TensorRT engine 在线构建/缓存 + 动态 shape；ORT 内嵌 TRT EP
+- [x] Sophgo：`.bmodel` 转换(F16/INT8)、BMCV 设备端零拷贝、混合量化(qtable)
+- [x] **模型加密**：AES-256-CBC 权重防泄露
+
+**AI 视觉**
+- [x] 检测 / 实例分割 / 语义分割 / 深度估计 / 姿态估计 / OBB / 分类 / FastSAM 提示词
+- [x] 人脸全套（检测/识别/分析/年龄性别/防伪/Re-ID）、车牌、OCR、文档理解(→Markdown)
+- [x] 行人属性、手部关键点、手势、条码/二维码
+
+**AI 音频 / 语音**
+- [x] ASR（SenseVoice/AAsr/流式）、TTS（Kokoro）、VAD、声纹验证、说话人分段/检索
+
+**视频编解码**
+- [x] FFmpeg / GStreamer 双后端解码 + 编码（mp4/flv/rtmp/rtsp）
+- [x] 硬解/硬编：CUDA / VAAPI / **QSV(Intel)** / Sophgo，`Auto` 自动回退
+- [x] GPU 直通：`device_only` 解码、`gpu_direct_input` 编码、设备 NV12 就地可视化（免主机往返）
+- [x] 工程化：有界背压、帧缓冲池(零拷贝复用)、断流重连、状态/统计可观测
+- [x] 视频动作识别（TSN/ST-GCN）+ 多目标跟踪（Byte/BotSort/StrongSort）
+
+**NLP**
+- [x] jieba 分词/分句/关键词/统计、BERT 文本分类、**WeText 数字归一化 ITN（v2.6.0）**
+
+**解决方案 / 工具 / 服务化**
+- [x] 解决方案层：计数/热力/测速/车位/距离/打码/裁剪/健身/说话人/流式 STT/TTS 批处理
+- [x] 后处理工具底座：标注/检测容器/指标/切片/平滑/区域判断
+- [x] Triton 推理服务部署（preprocess → pipeline → postprocess）
+
+**多语言绑定**
+- [x] C++ / Python / C / C# / Rust 五语言绑定（视频编解码全功能覆盖）
+
+### 未来路线
+
+按「近期 → 中期 → 远期」分层，越靠前优先落地。
+
+**近期（Next 1–2 majors）**
+- [ ] **ncnn 后端补全**：加载时输出原生 shape（替代 probe 兜底）、覆盖非 YOLO 模型（人脸/OCR/分类）、补齐 Vulkan 算子
+- [ ] **动态 shape 规范统一**：多后端一致的 I/O shape 语义，去除 MNN/ncnn 的 dummy-probe 依赖
+- [ ] **更多 CUDA / Vulkan 预处理函数**（补齐已知缺项）+ 设备端算子统一注册表
+- [ ] **量化工具链完善**：INT8 覆盖检测头友好（攻克 end2end/OBB 无法 INT8）、统一量化回灌流程与精度护栏
+- [ ] **ARM / 边缘交叉编译模板**：Jetson / RK3588 / RK3399 等 + 性能基线，落地 `baseline_compare` 跨平台差异
+- [ ] **生成式/LLM 第一步**：接入 onnxruntime-genai / llama.cpp，跑通 Qwen / DeepSeek 等小模型 chat
+
+**中期（Mid）**
+- [ ] **更多 NPU 后端**：Rockchip RKNN（RK3588）、Qualcomm QNN/Snapdragon、华为昇腾 CANN（国产化）——沿用下载式接入范式
+- [ ] **流式/异步 API**：跨帧 stateful 算子、事件/回调式异步推理（五语言统一 Promise/callback）
+- [ ] **服务化增强**：内置 HTTP / gRPC 推理网关、模型仓库热更新、多 worker 调度
+- [ ] **视频编解码深化**：AV1 硬编、HEVC 遍历、GPU 多路编码、更高吞吐基准
+- [ ] **视觉大模型（VLM）融合**：Qwen2-VL 等视觉语言模型接入统一推理 API
+
+**远期（Long）**
+- [ ] **WASM / Web + iOS / Android** 端到端部署模板（边缘全平台覆盖）
+- [ ] **模型管理平台**：模型仓库 + 版本 + 分片 + 注册，一键下发设备
+- [ ] **边缘–云协同调度**：分布式推理、带宽感知分流
+- [ ] **算子层收敛**：自研统一算子抽象，屏蔽各后端差异，降低新后端接入成本
+- [ ] **低代码可视化编排**：拖拽式流程构建，降低集成门槛
 
 ## 已知问题 / 当前 SDK 痛点
 
