@@ -1,13 +1,41 @@
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include <memory>
+#include <mutex>
 #include <ncnn/net.h>
+#include <ncnn/gpu.h>
 #include "core/md_log.h"
 #include "runtime/backends/ncnn/ncnn_backend.h"
+#include "runtime/backends/io_table.h"
 
 namespace modeldeploy {
 
     namespace {
+        // ncnn 的 Vulkan 设备/实例是进程级单例。若不主动拆除，其全局析构会被推迟到进程退出
+        // (onexit/DLL 卸载)才执行，此时撞上驱动卸载导致访问违例崩溃（本机 nvoglv64 即如此）。
+        // 用 shared_ptr 共享此会话：最后一个持有者释放时，析构自动调用 destroy_gpu_instance()，
+        // 使清理发生在所有 ncnn 资源析构之后、进程退出之前，且对调用方完全透明，无需手动管理。
+        class VkGpuSession {
+        public:
+            VkGpuSession() = default;
+            ~VkGpuSession() { ncnn::destroy_gpu_instance(); }
+            VkGpuSession(const VkGpuSession&) = delete;
+            VkGpuSession& operator=(const VkGpuSession&) = delete;
+        };
+
+        std::shared_ptr<void> acquire_vk_session() {
+            static std::mutex mutex;
+            static std::weak_ptr<VkGpuSession> active;
+            std::lock_guard<std::mutex> guard(mutex);
+            auto session = active.lock();
+            if (!session) {
+                session = std::make_shared<VkGpuSession>();
+                active = session;
+            }
+            return session;
+        }
+
         std::string replace_ext(const std::string& path, const char* ns) {
             auto p = std::filesystem::path(path);
             return p.replace_extension(ns).string();
@@ -26,6 +54,13 @@ namespace modeldeploy {
         size_t mat_total(const ncnn::Mat& m) {
             return static_cast<size_t>(m.w) * m.h * (m.dims >= 3 ? m.c : 1) * (m.dims >= 4 ? m.d : 1);
         }
+
+        std::vector<int> to_int_shape(const std::vector<int64_t>& v) {
+            std::vector<int> r;
+            r.reserve(v.size());
+            for (auto x : v) r.push_back(static_cast<int>(x));
+            return r;
+        }
     }
 
     bool NcnnBackend::init(const RuntimeOption& runtime_option) {
@@ -40,8 +75,16 @@ namespace modeldeploy {
         net_->opt.num_threads = option_.cpu_thread_num > 0 ? option_.cpu_thread_num : 4;
         bool vulkan = (runtime_option.device == Device::VULKAN);
         net_->opt.use_vulkan_compute = vulkan;
+        net_->opt.use_cooperative_matrix = option_.use_cooperative_matrix;
+        if (option_.openmp_blocktime >= 0) net_->opt.openmp_blocktime = option_.openmp_blocktime;
+        if (option_.lightmode.has_value()) net_->opt.lightmode = *option_.lightmode;
+        if (option_.use_fp16_packed.has_value()) net_->opt.use_fp16_packed = *option_.use_fp16_packed;
+        if (option_.use_fp16_storage.has_value()) net_->opt.use_fp16_storage = *option_.use_fp16_storage;
+        if (option_.use_fp16_arithmetic.has_value()) net_->opt.use_fp16_arithmetic = *option_.use_fp16_arithmetic;
+        if (option_.use_bf16_storage.has_value()) net_->opt.use_bf16_storage = *option_.use_bf16_storage;
         if (vulkan) {
             net_->set_vulkan_device(runtime_option.device_id >= 0 ? runtime_option.device_id : option_.device_id);
+            vk_session_ = acquire_vk_session();
         }
 
         if (option_.model_from_memory) {
@@ -64,17 +107,65 @@ namespace modeldeploy {
         for (auto* n : net_->input_names()) input_names_.emplace_back(n);
         for (auto* n : net_->output_names()) output_names_.emplace_back(n);
 
+        // 输入输出信息：输入形状仅在 param 声明 shape hint（blobs 中为正维）时可得，
+        // 否则为 [-1]；输出形状由 init dummy probe 补全（见 infer_output_info）。
+        auto input_idxs = net_->input_indexes();
+        auto& blobs = net_->blobs();
+        for (size_t i = 0; i < input_names_.size(); ++i) {
+            std::vector<int> sh{-1};
+            if (i < input_idxs.size() && input_idxs[i] >= 0 && input_idxs[i] < static_cast<int>(blobs.size())) {
+                const auto& bsh = blobs[input_idxs[i]].shape;
+                if (bsh.dims > 0) sh = to_int_shape(mat_shape(bsh));
+            }
+            input_info_.push_back({input_names_[i], sh, DataType::FP32});
+        }
+        for (auto& on : output_names_)
+            output_info_.push_back({on, {-1}, DataType::FP32});
+        infer_output_info();
+
         MD_LOG_INFO << "ncnn loaded " << input_names_.size() << " input(s), "
                     << output_names_.size() << " output(s), device="
                     << (vulkan ? "VULKAN" : "CPU") << "." << std::endl;
+        MD_LOG_INFO << std::endl << build_io_table(input_info_, output_info_) << std::endl;
         initialized_ = true;
         return true;
+    }
+
+    void NcnnBackend::infer_output_info() {
+        // 仅当所有输入形状已由 param 声明（正维）时才能跑 probe；否则保持 [-1]。
+        for (auto& in : input_info_)
+            for (auto d : in.shape)
+                if (d <= 0) return;
+        try {
+            ncnn::Extractor ex = net_->create_extractor();
+            for (size_t i = 0; i < input_info_.size(); ++i) {
+                const auto& s = input_info_[i].shape;
+                ncnn::Mat m;
+                if (s.size() == 3) m = ncnn::Mat(s[2], s[1], s[0]);        // w,h,c
+                else if (s.size() == 4) m = ncnn::Mat(s[3], s[2], s[1], s[0]); // w,h,d,c
+                else return;
+                memset(m.data, 0, mat_total(m) * m.elemsize);
+                ex.input(input_names_[i].c_str(), m);
+            }
+            for (size_t i = 0; i < output_info_.size(); ++i) {
+                ncnn::Mat out;
+                if (ex.extract(output_names_[i].c_str(), out) != 0) continue;
+                ncnn::Mat plain;
+                if (out.elempack != 1) ncnn::convert_packing(out, plain, 1);
+                else plain = out;
+                output_info_[i].shape = to_int_shape(mat_shape(plain));
+            }
+        }
+        catch (...) {
+            MD_LOG_WARN << "[NcnnBackend] init output-shape probe failed; keep [-1]." << std::endl;
+        }
     }
 
     TensorInfo NcnnBackend::get_input_info(int index) {
         if (index < 0 || index >= static_cast<int>(num_inputs())) {
             MD_LOG_FATAL << "input index " << index << " out of range." << std::endl;
         }
+        if (static_cast<size_t>(index) < input_info_.size()) return input_info_[index];
         TensorInfo info;
         info.name = input_names_[index];
         info.shape = {-1};
@@ -86,6 +177,7 @@ namespace modeldeploy {
         if (index < 0 || index >= static_cast<int>(num_outputs())) {
             MD_LOG_FATAL << "output index " << index << " out of range." << std::endl;
         }
+        if (static_cast<size_t>(index) < output_info_.size()) return output_info_[index];
         TensorInfo info;
         info.name = output_names_[index];
         info.shape = {-1};
@@ -170,6 +262,14 @@ namespace modeldeploy {
             return nullptr;
         }
         return nb;
+    }
+
+    NcnnBackend::~NcnnBackend() {
+        if (net_) {
+            net_->clear();
+            net_.reset();
+        }
+        vk_session_.reset();
     }
 
 } // namespace modeldeploy

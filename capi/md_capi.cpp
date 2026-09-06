@@ -18,6 +18,7 @@
 #include <sstream>
 
 #include "runtime/backends/mnn/option.h"
+#include "runtime/backends/ncnn/option.h"
 
 #include "core/device_validate.h"
 
@@ -387,6 +388,7 @@ MDStatus md_option_set_backend(MDOptionHandle h, MDBackend b) {
         case MD_BK_MNN: o->opt.use_mnn_backend(); break;
         case MD_BK_TRT: o->opt.use_trt_backend(); break;
         case MD_BK_SOPHGO: o->opt.use_sophgo_backend(); break;
+        case MD_BK_NCNN: o->opt.use_ncnn_backend(); break;
         default: set_error("md_option_set_backend: unknown backend"); return MD_ERR_INVALID_ARGUMENT;
     }
     o->backend_explicit = true;
@@ -574,6 +576,23 @@ MDStatus md_option_set_config(MDOptionHandle h, const char* ns, const char* key,
     } else if (!strcmp(ns, "sophgo")) {
         if (k == "bmodel_path") { o->opt.sophgo_option.bmodel_path = value; return MD_OK; }
         if (k == "use_device_input" && parse_bool(value, b)) { o->opt.sophgo_option.use_device_input = b; return MD_OK; }
+    } else if (!strcmp(ns, "ncnn")) {
+        if (k == "device_id" && parse_int(value, i)) { o->opt.ncnn_option.device_id = i; return MD_OK; }
+        if (k == "cpu_thread_num" && parse_int(value, i)) { o->opt.ncnn_option.cpu_thread_num = i; return MD_OK; }
+        if (k == "use_cooperative_matrix" && parse_bool(value, b)) { o->opt.ncnn_option.use_cooperative_matrix = b; return MD_OK; }
+        if (k == "openmp_blocktime" && parse_int(value, i)) { o->opt.ncnn_option.openmp_blocktime = i; return MD_OK; }
+        /* 可选布尔（三态）："true"/"false" 设置；空串或 "unset"/"default" 复位为后端默认 */
+        auto set_opt = [&](std::optional<bool>& dst) -> bool {
+            if (!value[0] || !strcmp(value, "unset") || !strcmp(value, "default")) { dst.reset(); return true; }
+            bool t;
+            if (parse_bool(value, t)) { dst = t; return true; }
+            return false;
+        };
+        if (k == "lightmode" && set_opt(o->opt.ncnn_option.lightmode)) return MD_OK;
+        if (k == "use_fp16_packed" && set_opt(o->opt.ncnn_option.use_fp16_packed)) return MD_OK;
+        if (k == "use_fp16_storage" && set_opt(o->opt.ncnn_option.use_fp16_storage)) return MD_OK;
+        if (k == "use_fp16_arithmetic" && set_opt(o->opt.ncnn_option.use_fp16_arithmetic)) return MD_OK;
+        if (k == "use_bf16_storage" && set_opt(o->opt.ncnn_option.use_bf16_storage)) return MD_OK;
     } else {
         set_error_fmt("md_option_set_config: unknown ns '%s'", ns); return MD_ERR_INVALID_ARGUMENT;
     }

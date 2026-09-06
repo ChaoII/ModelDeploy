@@ -39,12 +39,15 @@ namespace modeldeploy {
         [[nodiscard]] std::map<std::string, std::string> get_custom_meta_data() const override;
 
     private:
+        // init 时用模型声明的输入形状跑一次零数据 dummy forward，补全 outputs_desc_ 的 shape/dtype。
+        void infer_output_info();
         std::shared_ptr<MNN::Express::Executor::RuntimeManager> rtmgr_;
         MnnBackendOption option_;
         std::string model_buffer_;
                 std::shared_ptr<MNN::Express::Module> net_;
         std::vector<TensorInfo> inputs_desc_;
         std::vector<TensorInfo> outputs_desc_;
+        std::vector<MNN::Express::VARP> cached_inputs_;
     };
 
 

@@ -1,4 +1,4 @@
-// ModelDeploy demo: 图像分类（mnn_cuda）。
+// ModelDeploy demo: 图像分类（ncnn_vulkan）。
 // 最小可运行示例，完整逻辑自包含：构造 RuntimeOption -> 加载模型 -> 预处理 -> 推理(计时) -> 可视化。
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
@@ -16,11 +16,11 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_mnn_backend();
-    opt.use_gpu(0);
+    opt.use_ncnn_backend();
+    opt.set_device(modeldeploy::Device::VULKAN);
 
     // ---- 2. 加载模型（图像分类）----
-    auto m = std::make_unique<modeldeploy::vision::classification::Classification>("../../test_data/test_models/mnn/yolo26n/yolo26n-cls.mnn", opt);
+    auto m = std::make_unique<modeldeploy::vision::classification::Classification>("../../test_data/test_models/ncnn/yolo26n/yolo26n-cls.param", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     m->get_preprocessor().set_size({224, 224});
     m->get_preprocessor().disable_center_crop();
@@ -38,7 +38,7 @@ int main() {
     // ---- 5. 结果与可视化 ----
     modeldeploy::vision::dis_cls(res);
     auto vis = modeldeploy::vision::vis_cls(im, res, 5, 0.5, kFont, 12, 0.3, false);
-    (void)vis.imwrite("result_classification_mnn_cuda.jpg");
+    (void)vis.imwrite("result_classification_ncnn_vulkan.jpg");
     std::printf("done, label=%d score=%.4f\n",
                 res.label_ids.empty() ? -1 : res.label_ids[0],
                 res.scores.empty() ? -1.f : res.scores[0]);

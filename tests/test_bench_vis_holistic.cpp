@@ -61,16 +61,17 @@ static void bgr_to_nv12(const cv::Mat& bgr, std::vector<uint8_t>& y, std::vector
 // ── 设备端(CUDA)高层 vis_* 绘制 ──
 static bool run_dev(Frame& fr, CudaProcessorBackend& b, int scene,
                     VisionProcessorBackend::VisOptions& opt) {
+    ImageData dev = fr.dev();
     switch (scene) {
         case 0: {
             DetectionResult r; r.box = {fr.w * 0.10f, fr.h * 0.15f, fr.w * 0.45f, fr.h * 0.50f}; r.label_id = 1; r.score = 0.92f;
             DetectionResult r2; r2.box = {fr.w * 0.58f, fr.h * 0.20f, fr.w * 0.36f, fr.h * 0.45f}; r2.label_id = 3; r2.score = 0.78f;
-            std::vector<DetectionResult> v{r, r2}; return b.vis_det_nv12(fr.dev(), v, opt);
+            std::vector<DetectionResult> v{r, r2}; return b.vis_det_nv12(dev, v, opt);
         }
         case 1: {
             KeyPointsResult r; r.box = {fr.w * 0.05f, fr.h * 0.05f, fr.w * 0.90f, fr.h * 0.90f}; r.score = 0.90f;
             for (int i = 0; i < 17; ++i) r.keypoints.push_back(Point3f(fr.w * (0.12f + 0.045f * i), fr.h * (0.2f + 0.03f * (i % 5)), 0.9f));
-            std::vector<KeyPointsResult> v{r}; return b.vis_pose_nv12(fr.dev(), v, opt);
+            std::vector<KeyPointsResult> v{r}; return b.vis_pose_nv12(dev, v, opt);
         }
         case 2: {
             OCRResult rr;
@@ -79,11 +80,11 @@ static bool run_dev(Frame& fr, CudaProcessorBackend& b, int scene,
                                            (int)((x + w) * fr.w), (int)((y + h) * fr.h), (int)(x * fr.w), (int)((y + h) * fr.h) };
             };
             rr.boxes.push_back(box(0.1f, 0.1f, 0.6f, 0.15f)); rr.text.push_back("Hello World 2024");
-            return b.vis_ocr_nv12(fr.dev(), rr, opt);
+            return b.vis_ocr_nv12(dev, rr, opt);
         }
         default: {
             ClassifyResult r; r.label_ids = {1, 3}; r.scores = {0.85f, 0.60f};
-            return b.vis_cls_nv12(fr.dev(), r, opt, 5);
+            return b.vis_cls_nv12(dev, r, opt, 5);
         }
     }
 }
@@ -91,7 +92,8 @@ static bool run_dev(Frame& fr, CudaProcessorBackend& b, int scene,
 // ── 主机(CPU)图元绘制(与设备端相同场景的近似) ──
 static void run_cpu(Frame& fr, CpuProcessorBackend& b, int scene,
                     const std::vector<uint8_t>& yy, const std::vector<uint8_t>& uu) {
-    auto img = [&] { return fr.host_img(yy, uu); };
+    ImageData _img_cache;
+    auto img = [&]() -> ImageData& { _img_cache = fr.host_img(yy, uu); return _img_cache; };
     switch (scene) {
         case 0:
             b.draw_rect_nv12(img(), fr.w * 0.10f, fr.h * 0.15f, fr.w * 0.45f, fr.h * 0.50f, 0, 158, 115, 2);

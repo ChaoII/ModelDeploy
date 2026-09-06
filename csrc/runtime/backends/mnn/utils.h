@@ -4,6 +4,7 @@
 
 #pragma once
 #include <string>
+#include <algorithm>
 #include <MNN/Interpreter.hpp>
 #include "core/tensor.h"
 

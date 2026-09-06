@@ -8,6 +8,7 @@
 
 #include "core/md_log.h"
 #include "runtime/backends/sophgo/sophgo_backend.h"
+#include "runtime/backends/io_table.h"
 
 #include "bmlib_runtime.h"
 #include "bmdef.h"
@@ -142,6 +143,7 @@ namespace {
         MD_LOG_INFO << "SophgoBackend(bmrt) loaded " << engine_->bmodel_path
             << " graph[" << engine_->graph_name << "] inputs=" << inputs_desc_.size()
             << " outputs=" << outputs_desc_.size() << std::endl;
+        MD_LOG_INFO << std::endl << build_io_table(inputs_desc_, outputs_desc_) << std::endl;
         return true;
     }
 

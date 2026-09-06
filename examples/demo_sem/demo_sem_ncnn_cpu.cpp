@@ -1,4 +1,4 @@
-// ModelDeploy demo: 旋转目标检测（mnn_cuda）。
+// ModelDeploy demo: 语义分割（ncnn_cpu）。
 // 最小可运行示例，完整逻辑自包含：构造 RuntimeOption -> 加载模型 -> 预处理 -> 推理(计时) -> 可视化。
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
@@ -16,28 +16,31 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_mnn_backend();
-    opt.use_gpu(0);
+    opt.use_ncnn_backend();
+    opt.set_device(modeldeploy::Device::CPU);
 
-    // ---- 2. 加载模型（旋转目标检测）----
-    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("../../test_data/test_models/mnn/yolo26n/yolo26n-obb.mnn", opt);
+    // ---- 2. 加载模型（语义分割）----
+    auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsSem>("../../test_data/test_models/ncnn/yolo26n/yolo26n-sem.param", opt);
     if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
+    const auto label_map = m->get_label_map("names");
     // ---- 3. 读图 ----
-    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_obb1.jpg");
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_sem_540.jpg");
     if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
 
-    std::vector<modeldeploy::vision::ObbResult> res; // 推理结果
+    modeldeploy::vision::SemSegResult res; // 推理结果
 
     // ---- 4. 推理：先 warmup，再计时 ----
-    for (int i = 0; i < 10; ++i) m->predict(im, &res, nullptr);
+    for (int i = 0; i < 20; ++i) m->predict(im, &res, nullptr);
     TimerArray timers;
     for (int i = 0; i < 100; ++i) m->predict(im, &res, &timers);
     timers.print_benchmark();
 
     // ---- 5. 结果与可视化 ----
-    auto vis = modeldeploy::vision::vis_obb(im, res, 0.2, kFont, 12, 0.3, 0);
-    (void)vis.imwrite("result_obb_mnn_cuda.jpg");
-    std::printf("done, %zu obbs\n", res.size());
+    auto vis = modeldeploy::vision::vis_sem(im, res, label_map, 0.5, true);
+    (void)vis.imwrite("result_sem_ncnn_cpu.jpg");
+    std::printf("done %zux%zu\n",
+                res.shape.empty() ? 0 : (size_t)res.shape[0],
+                res.shape.size() < 2 ? 0 : (size_t)res.shape[1]);
     return 0;
 
 }

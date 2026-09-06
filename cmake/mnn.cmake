@@ -1,64 +1,44 @@
-
+# MNN 后端依赖（单库静态包，3.6.1），与 onnxruntime 同范式：
+# 配置时按平台差异从魔塔 Modelscope 自动下载，无需本地 *_ROOT / 本地 lib。
 #
+# 已上传工件（modelscope repo: ChaoII0987/ModelDeploy_cmake_deps）：
+#   - Windows x64  : mnn_win_x64_static_3_6_1.zip
+#   - Linux x64    : mnn_linux_x64_static_3_6_1.zip
+#   - Linux aarch64: mnn_aarch64_static_3_6_1.zip
+# 单库静态包（MNN_SEP_BUILD=OFF），即仅 MNN 一个导入目标，
+# Express/OpenCL/Vulkan 后端已内联其中；无独立 CUDA 库（MNN CUDA 不随包分发）。
 message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
 
-set(mnn_win_x64_static_3_2_0_md_FILE_NAME "mnn_win_x64_static_3_2_0_md.zip")
-set(mnn_linux_x64_static_3_2_0_FILE_NAME "mnn_linux_x64_static_3_2_0.zip")
-set(mnn_linux_aarch64_static_3_2_0_FILE_NAME "mnn_linux_aarch64_static_3_2_0.zip")
-set(mnn_win_x64_gpu_3_2_0_FILE_NAME "mnn_win_x64_gpu_3_2_0.zip")
-set(mnn_linux_x64_gpu_3_2_0_FILE_NAME "mnn_linux_x64_gpu_3_2_0.zip")
-
-
 set(MNN_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
-include(FetchContent)
 set(MNN_LIBS MNN)
 
-if (WITH_GPU)
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-        set(MNN_FILE_NAME ${mnn_win_x64_gpu_3_2_0_FILE_NAME})
-        set(MNN_URL ${MNN_BASE_URL}/${MNN_FILE_NAME})
-        set(MNN_HASH "SHA256=ba1404ba39571b7929dd991d8baf67c0eb77ee99ad92629fd9c8f940c8e4c572")
+include(FetchContent)
 
-    elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-            set(MNN_FILE_NAME ${mnn_linux_x64_gpu_3_2_0_FILE_NAME})
-            set(MNN_URL ${MNN_BASE_URL}/${MNN_FILE_NAME})
-            set(MNN_HASH "SHA256=2b01f6d815401e3d6dbb31cc6c9c291e0d374462d7a56d0622b4e0eed143b046")
-            list(APPEND MNN_LIBS MNN_Express MNN_Cuda_Main)
-        else ()
-            message(FATAL_ERROR "Unsupported system : ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for WITH_GPU=ON")
-        endif ()
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(MNN_FILE_NAME "mnn_win_x64_static_3_6_1.zip")
+    set(MNN_HASH "SHA256=8b4661010939dfedba8bcbb0a5edd02744fb5ff5a03f22a75f16a85a33cb14a1")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /WHOLEARCHIVE:MNN")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+        set(MNN_FILE_NAME "mnn_linux_x64_static_3_6_1.zip")
+        set(MNN_HASH "SHA256=49562e7bc67c2e7011d224c50bc7a4e99a2a9c0a4ada57e639ffc1a77d323fc1")
+    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(MNN_FILE_NAME "mnn_aarch64_static_3_6_1.zip")
+        set(MNN_HASH "SHA256=d1637d66c783954e37dfb2717820f5cce5118b2edbde546cac7f8f1f1cdb59b4")
     else ()
-        message(FATAL_ERROR "Unsupported system : ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for WITH_GPU=ON")
+        message(FATAL_ERROR "Unsupported system arch: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for MNN")
     endif ()
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--whole-archive -lMNN -Wl,--no-whole-archive")
 else ()
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /WHOLEARCHIVE:MNN")
-        set(MNN_FILE_NAME ${mnn_win_x64_static_3_2_0_md_FILE_NAME})
-        set(MNN_URL ${MNN_BASE_URL}/${MNN_FILE_NAME})
-        set(MNN_HASH "SHA256=575e14cfa18a2eaa95c732617393eb424ad75803d7d2162ca985d1d705018b19")
-    elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-            set(MNN_FILE_NAME ${mnn_linux_x64_static_3_2_0_FILE_NAME})
-            set(MNN_URL ${MNN_BASE_URL}/${MNN_FILE_NAME})
-            set(MNN_HASH "SHA256=8e8533220940033da9676c3104e2e299d20f7439fbc102d627aa7855b8d499f3")
-        elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-            set(MNN_FILE_NAME ${mnn_linux_aarch64_static_3_2_0_FILE_NAME})
-            set(MNN_URL ${MNN_BASE_URL}/${MNN_FILE_NAME})
-            set(MNN_HASH "SHA256=d93ab07ec5e19509d79acc4d5bcb1c23284c0834d6deefeadd5e2d57481a31a2")
-        endif ()
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--whole-archive -lMNN -Wl,--no-whole-archive")
-    else ()
-        message(FATAL_ERROR "Unsupported system :" ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})
-    endif ()
+    message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for MNN")
 endif ()
 
+set(MNN_URL "${MNN_BASE_URL}/${MNN_FILE_NAME}")
 
 FetchContent_Declare(mnn
-        URL
-        ${MNN_URL}
+        URL ${MNN_URL}
         URL_HASH ${MNN_HASH}
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -72,22 +52,26 @@ else ()
 endif ()
 message(STATUS "MNN is downloaded to ${mnn_SOURCE_DIR}")
 
-
-set(MNN_LIB_DIR "${mnn_SOURCE_DIR}/lib")
 set(MNN_INC_DIR "${mnn_SOURCE_DIR}/include")
+set(MNN_LIB_DIR "${mnn_SOURCE_DIR}/lib")
 include_directories(${MNN_INC_DIR})
 link_directories(${MNN_LIB_DIR})
 
+find_library(MNN_LIB MNN
+        PATHS "${MNN_LIB_DIR}"
+        NO_DEFAULT_PATH
+)
 
-# 拷贝到 ${CMAKE_BINARY_DIR}/bin 或你指定的 bin 目录
+add_library(MNN STATIC IMPORTED GLOBAL)
+set_target_properties(MNN PROPERTIES
+        IMPORTED_LOCATION "${MNN_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${MNN_INC_DIR}"
+)
+
+# 拷贝共享库（动态包需要；静态包无 *.dll/*.so 时为空操作）
 file(GLOB MNN_SHARED_LIBS
         "${MNN_LIB_DIR}/*.dll"
         "${MNN_LIB_DIR}/*.so"
         "${MNN_LIB_DIR}/*.dylib"
 )
 file(COPY ${MNN_SHARED_LIBS} DESTINATION ${CMAKE_BINARY_DIR}/bin)
-
-
-
-
-

@@ -9,6 +9,7 @@
 #include "runtime/runtime.h"
 #include "core/enum_variables.h"
 #include "core/device_validate.h"
+#include "runtime/backends/ncnn/option.h"
 
 namespace modeldeploy {
     std::vector<pybind11::array>
@@ -94,8 +95,21 @@ namespace modeldeploy {
             .value("ORT", ORT)
             .value("TRT", TRT)
             .value("MNN", MNN)
-            .value("SOPHGO", SOPHGO);
+            .value("SOPHGO", SOPHGO)
+            .value("NCNN", NCNN);
 
+
+        pybind11::class_<NcnnBackendOption>(m, "NcnnOption")
+            .def(pybind11::init())
+            .def_readwrite("device_id", &NcnnBackendOption::device_id)
+            .def_readwrite("cpu_thread_num", &NcnnBackendOption::cpu_thread_num)
+            .def_readwrite("use_cooperative_matrix", &NcnnBackendOption::use_cooperative_matrix)
+            .def_readwrite("openmp_blocktime", &NcnnBackendOption::openmp_blocktime)
+            .def_readwrite("lightmode", &NcnnBackendOption::lightmode)
+            .def_readwrite("use_fp16_packed", &NcnnBackendOption::use_fp16_packed)
+            .def_readwrite("use_fp16_storage", &NcnnBackendOption::use_fp16_storage)
+            .def_readwrite("use_fp16_arithmetic", &NcnnBackendOption::use_fp16_arithmetic)
+            .def_readwrite("use_bf16_storage", &NcnnBackendOption::use_bf16_storage);
 
         pybind11::class_<RuntimeOption>(m, "RuntimeOption")
             .def(pybind11::init())
@@ -113,6 +127,7 @@ namespace modeldeploy {
             .def("use_mnn_backend", &RuntimeOption::use_mnn_backend)
             .def("use_trt_backend", &RuntimeOption::use_trt_backend)
             .def("use_sophgo_backend", &RuntimeOption::use_sophgo_backend)
+            .def("use_ncnn_backend", &RuntimeOption::use_ncnn_backend)
             // 不暴露给python
             // .def_readwrite("ort_option", &RuntimeOption::ort_option)
             // .def("set_external_stream", &RuntimeOption::set_external_stream,
@@ -132,7 +147,8 @@ namespace modeldeploy {
             .def_readwrite("model_from_memory", &RuntimeOption::model_from_memory)
             .def_readwrite("enable_trt", &RuntimeOption::enable_trt)
             .def_readwrite("enable_fp16", &RuntimeOption::enable_fp16)
-            .def_readwrite("password", &RuntimeOption::password);
+            .def_readwrite("password", &RuntimeOption::password)
+            .def_readwrite("ncnn_option", &RuntimeOption::ncnn_option);
 
 
         pybind11::class_<TensorInfo>(m, "TensorInfo")

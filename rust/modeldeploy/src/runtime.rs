@@ -41,6 +41,46 @@ impl RuntimeOption {
         self
     }
 
+    pub fn use_ncnn(&mut self) -> &mut Self {
+        let _ = unsafe { ffi::md_option_set_backend(self.handle, ffi::MDBackend::NCNN) };
+        self
+    }
+
+    // ---- ncnn 后端选项（映射到 C API "ncnn" 配置命名空间）----
+    pub fn ncnn_use_cooperative_matrix(&mut self, v: bool) -> Result<&mut Self, MdError> {
+        self.set_config("ncnn", "use_cooperative_matrix", if v { "true" } else { "false" })
+    }
+
+    pub fn ncnn_set_openmp_blocktime(&mut self, v: i32) -> Result<&mut Self, MdError> {
+        self.set_config("ncnn", "openmp_blocktime", &v.to_string())
+    }
+
+    /// `None` 表示复位为后端默认（不设置该项）。
+    fn ncnn_opt_bool(&mut self, key: &str, v: Option<bool>) -> Result<&mut Self, MdError> {
+        let val = match v {
+            Some(true) => "true",
+            Some(false) => "false",
+            None => "",
+        };
+        self.set_config("ncnn", key, val)
+    }
+
+    pub fn ncnn_set_lightmode(&mut self, v: Option<bool>) -> Result<&mut Self, MdError> {
+        self.ncnn_opt_bool("lightmode", v)
+    }
+    pub fn ncnn_use_fp16_packed(&mut self, v: Option<bool>) -> Result<&mut Self, MdError> {
+        self.ncnn_opt_bool("use_fp16_packed", v)
+    }
+    pub fn ncnn_use_fp16_storage(&mut self, v: Option<bool>) -> Result<&mut Self, MdError> {
+        self.ncnn_opt_bool("use_fp16_storage", v)
+    }
+    pub fn ncnn_use_fp16_arithmetic(&mut self, v: Option<bool>) -> Result<&mut Self, MdError> {
+        self.ncnn_opt_bool("use_fp16_arithmetic", v)
+    }
+    pub fn ncnn_use_bf16_storage(&mut self, v: Option<bool>) -> Result<&mut Self, MdError> {
+        self.ncnn_opt_bool("use_bf16_storage", v)
+    }
+
     pub fn set_device(&mut self, device: ffi::MDDevice, device_id: i32) -> Result<&mut Self, MdError> {
         check_status(unsafe { ffi::md_option_set_device(self.handle, device, device_id) })?;
         Ok(self)

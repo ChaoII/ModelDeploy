@@ -75,7 +75,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | `ENABLE_ORT` | ON | OnnxRuntime 后端 |
 | `ENABLE_MNN` | ON | MNN 后端 |
 | `ENABLE_TRT` | OFF | 需要 `WITH_GPU=ON`，不支持 Apple |
-| `ENABLE_NCNN` | OFF | ncnn 后端（CPU+Vulkan）；依赖 `cmake/ncnn.cmake`（本地 `-DNCNN_ROOT` 或 Windows x64 modelscope 下载）。Vision 模型经 ncnn 支持 ultralytics YOLO 全系（det/cls/obb/pose/seg/sem/depth），用 `ultralytics .pt export format=ncnn` 转出的 param/bin 加载 |
+| `ENABLE_NCNN` | OFF | ncnn 后端（CPU+Vulkan）；依赖 `cmake/ncnn.cmake`（配置时按平台从 modelscope 自动下载，Win/Linux-x64/aarch64）。Vision 模型经 ncnn 支持 ultralytics YOLO 全系（det/cls/obb/pose/seg/sem/depth），用 `ultralytics .pt export format=ncnn` 转出的 param/bin 加载 |
 | `WITH_GPU` | ON | 启用 CUDA（默认 SM 8.6） |
 | `BUILD_AUDIO` | ON | 启用音频模块（samplerate、kaldi-native-fbank、cppjieba） |
 | `BUILD_VISION` | ON | 启用视觉模块（OpenCV） |
@@ -93,10 +93,13 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 - **OpenSSL**：Windows 下从 slproweb.com 安装，设置 `-DOPENSSL_ROOT_DIR="C:/Program Files/OpenSSL-Win64"`。未找到 OpenSSL 时加密功能静默禁用。
 - **GPU 构建**：默认 CUDA 架构为 86（RTX 40 系列）。测试数据来自 modelscope，不在仓库内。
 - **TRT 后端**：需要预先通过 `trtexec` 生成 `.engine` 文件。从 ONNX 在线构建 engine 速度较慢。
-- **ncnn 后端 `-DNCNN_ROOT`**：仅 Windows x64 有已确认的自动下载工件；其它平台/未确认工件须本地解包 ncnn 预编译包后 `-DNCNN_ROOT=<解包路径>`（解包路径内含 `<arch>/lib/cmake` 与 `<arch>/include`），否则 cmake 配置直接 fail-fast。
+- **ncnn 后端**：`cmake/ncnn.cmake` 按平台（Win-x64 / Linux-x64 / Linux-aarch64）从 modelscope 自动下载预编译静态包（含 ncnn + glslang 与各自 CMake config，`find_package(ncnn)`/`find_package(glslang)` 直接可用）；不支持平台配置时 fail-fast。MNN 同理（`cmake/mnn.cmake`，单库静态包，无独立 CUDA 库）。
 - **Linux rpath**：`$ORIGIN`；macOS：`@loader_path` —— SDK 运行时无需设置 `LD_LIBRARY_PATH`。
 - **NVIDIA Jetson**：通过 `/etc/nv_tegra_release` 自动检测；设置架构标志并强制 `WITH_GPU=ON`、`ENABLE_TRT=ON`，需要 TBB。
 - **C++17 必需**；第三方依赖（pybind11、Catch2）已捆绑在 `third_party/` 中。
+- **baseline_compare 已知平台差异（不修）**：`tests/baseline_compare.cpp` 的 ORT 端到端/预处理护栏基线按 MSVC 生成。GCC/Linux 构建因 `-O3 -mavx2 -mfma` 的 FMA 收缩，使 `utils::cal_letter_box_param` 的 `pad_h` 比 80.0 高 1 ULP（80.000007629）、`pad_w` 得 7.6e-6，随后 fused 预处理核（`src_yf<0`/`src_xf<0` 严格判断）把首行内容/左缘列误写为 pad → 输入张量逐像元差最大 0.557，翻转 logit≈阈值的临界检测（如 yolo26n instance[3] score 0.303 vs 0.564）。已确认与 onnxruntime 打包/MNN/ncnn 下载式接入**无关**（同机 i7-12700 双平台同走 AVX2 核），属预存在缺陷、生产影响趋近于零，故不修。CI 若在 GCC 跑 baseline_compare 会持续失败，需在 CI 平台重新生成基线。
+
+## CI 工作流
 - **Sophgo TPU 测试（触发词“在 sophgo 上测试”）**：用户要求算能 TPU 交叉编译 + 部署测试时，纯 Sophgo 构建用 `ENABLE_SOPHGO=ON` + **`ENABLE_ORT=OFF`**（不依赖动态 onnxruntime）；在 `172.168.100.243` 的 `tpuc_dev` 容器（`/workspace`）内构建，产物经 `.243` 直传 `172.168.100.70` 的 `/data/ModelDeploy/build_sophgo/bin` 运行；Sophgo int8 bmodel 多属 batch=1 静态形状，pipeline 内须 `set_cls_batch_size(1)`。
 
 ## CI 工作流

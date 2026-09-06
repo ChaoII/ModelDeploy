@@ -10,6 +10,7 @@
 #include "core/md_log.h"
 #include "runtime/backends/mnn/utils.h"
 #include "runtime/backends/mnn/mnn_backend.h"
+#include "runtime/backends/io_table.h"
 
 
 namespace modeldeploy {
@@ -26,22 +27,28 @@ namespace modeldeploy {
         }
         else if (option.device == Device::GPU) {
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_CUDA);
+            config.mode = option_.gpu_mode;
         }
         else if (option.device == Device::OPENCL) {
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_OPENCL);
+            config.mode = option_.gpu_mode;
         }
         else if (option.device == Device::VULKAN) {
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_VULKAN);
+            config.mode = option_.gpu_mode;
         }
         else {
             MD_LOG_WARN << "Unsupported device: " << option.device << " switch to Auto." << std::endl;
             config.type = static_cast<MNNForwardType>(mnn::MNNForwardType::MNN_FORWARD_AUTO);
         }
-        if (option.device_id >= 0) {
+        // 注意：MNN 的 sharedContext 语义按后端而异。OpenCL 把 sharedContext 当 MNNDeviceContext*
+        // （读 deviceId/platformId 等），而 Vulkan 把它当 MNNVulkanContext*（读 pInstance/pDevice 等）。
+        // 我们这里构造的是通用 MNNDeviceContext，若传给 Vulkan 会被强转成 MNNVulkanContext* 读到垃圾
+        // -> Vulkan runtime 创建返回 nullptr -> 后续空指针崩溃。且 MNN Vulkan 本就把 GPU 硬编码为
+        // tmpGpus[0]、device_id 无效。故 Vulkan（及 CPU）不设置 sharedContext。
+        if (option.device_id >= 0 && option.device != Device::VULKAN) {
             device_context.deviceId = option.device_id;
             backend_config.sharedContext = &device_context;
-            // union 类型，如果是Device为CPU那么这里设置就会出错
-            config.mode = option_.gpu_mode;
         }
         backend_config.precision = static_cast<MNN::BackendConfig::PrecisionMode>(option_.precision);
         if (option_.power_mode != mnn::PowerMode::MNN_Power_Normal) {
@@ -63,7 +70,7 @@ namespace modeldeploy {
         if (!option_.cache_file_path.empty()) {
             rtmgr_->setCache(option_.cache_file_path);
         }
-        rtmgr_->setHint(MNN::Interpreter::GEOMETRY_COMPUTE_MASK, 0);
+        rtmgr_->setHint(MNN::Interpreter::GEOMETRY_COMPUTE_MASK, 0xFFFF);
     }
 
 
@@ -101,15 +108,6 @@ namespace modeldeploy {
         const auto mnn_inputs_names = net_->getInfo()->inputNames;
         const auto mnn_outputs_names = net_->getInfo()->outputNames;
 
-        // 模型输入输出信息
-        tabulate::Table input_table;
-        input_table.format().font_color(tabulate::Color::yellow)
-                   .border_color(tabulate::Color::blue)
-                   .corner_color(tabulate::Color::blue);
-
-        // input_table.add_row(Row_t{model_info_table});
-        input_table.add_row({"Type", "Index", "Name", "Data Type", "Shape"});
-        input_table[0].format().font_style({tabulate::FontStyle::bold});
         if (mnn_inputs.size() != mnn_inputs_names.size()) {
             MD_LOG_ERROR << "inputs size not equal to inputs names size." << std::endl;
             return false;
@@ -120,13 +118,6 @@ namespace modeldeploy {
             info.shape = mnn_inputs[i].dim;
             info.dtype = mnn_dtype_to_md_dtype(mnn_inputs[i].type);
             inputs_desc_.emplace_back(info);
-            input_table.add_row({
-                "Input",
-                std::to_string(0),
-                info.name,
-                datatype_to_string(info.dtype),
-                vector_to_string(info.shape)
-            });
         }
         for (auto& output_name : mnn_outputs_names) {
             TensorInfo info;
@@ -134,23 +125,47 @@ namespace modeldeploy {
             info.shape = {-1};
             info.dtype = DataType::UNKNOWN;
             outputs_desc_.emplace_back(info);
-            input_table.add_row({
-                "Output",
-                std::to_string(0),
-                info.name,
-                datatype_to_string(info.dtype),
-                vector_to_string(info.shape)
-            });
         }
+        // init 时 MNN 输出形状未知，跑一次零数据 dummy forward 补全（动态维用 1 占位）。
+        infer_output_info();
         MD_LOG_INFO
             << "[model file:"
             << std::filesystem::absolute(runtime_option.model_file).filename().string()
             << " model size: " << std::fixed << std::setprecision(3)
             << static_cast<float>(model_buffer_.size()) / 1024 / 1024.0f << "MB]"
             << std::endl;
-        MD_LOG_INFO << std::endl << input_table << std::endl;
+        MD_LOG_INFO << std::endl << build_io_table(inputs_desc_, outputs_desc_) << std::endl;
         initialized_ = true;
         return true;
+    }
+
+    void MnnBackend::infer_output_info() {
+        try {
+            const auto& mnn_inputs = net_->getInfo()->inputs;
+            if (mnn_inputs.size() != inputs_desc_.size()) return;
+            const auto& mnn_outputs_names = net_->getInfo()->outputNames;
+            std::vector<MNN::Express::VARP> probe_inputs;
+            probe_inputs.reserve(mnn_inputs.size());
+            for (size_t i = 0; i < mnn_inputs.size(); ++i) {
+                std::vector<int> dims = mnn_inputs[i].dim;
+                for (auto& d : dims) if (d <= 0) d = 1; // 动态维占位
+                auto v = MNN::Express::_Input(dims, MNN::Express::NCHW, mnn_inputs[i].type);
+                v->setName(inputs_desc_[i].name);
+                probe_inputs.push_back(v);
+            }
+            const auto outs = net_->onForward(probe_inputs);
+            if (outs.size() != outputs_desc_.size()) return;
+            for (size_t i = 0; i < outs.size(); ++i) {
+                const auto* info = outs[i]->getInfo();
+                if (!info) continue;
+                outputs_desc_[i].shape = convert_shape<int, int>(info->dim);
+                outputs_desc_[i].dtype = mnn_dtype_to_md_dtype(info->type);
+                outputs_desc_[i].name = mnn_outputs_names[i];
+            }
+        }
+        catch (...) {
+            MD_LOG_WARN << "[MnnBackend] init output-shape probe failed; keep [-1]." << std::endl;
+        }
     }
 
     TensorInfo MnnBackend::get_input_info(int index) {
@@ -183,14 +198,27 @@ namespace modeldeploy {
                 << inputs_desc_.size() << ")." << std::endl;
             return false;
         }
-        std::vector<MNN::Express::VARP> mnn_inputs;
-        for (auto& input : inputs) {
-            auto tensor = MNN::Express::_Input(convert_shape<int64_t, int>(input.shape()),
-                                               MNN::Express::NCHW,
-                                               md_dtype_to_mnn_dtype(input.dtype()));
-            tensor->setName(input.get_name());
-            memcpy(tensor->writeMap<void>(), input.data(), input.byte_size());
-            mnn_inputs.push_back(std::move(tensor));
+        std::vector<MNN::Express::VARP> mnn_inputs(inputs.size());
+        if (cached_inputs_.size() != inputs.size()) {
+            cached_inputs_.resize(inputs.size());
+        }
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            auto& input = inputs[i];
+            auto& tens = cached_inputs_[i];
+            bool shape_changed = (tens == nullptr) ||
+                tens->getInfo()->dim != convert_shape<int64_t, int>(input.shape());
+            bool dtype_changed = (tens == nullptr) ||
+                tens->getInfo()->type != md_dtype_to_mnn_dtype(input.dtype());
+            if (shape_changed || dtype_changed) {
+                tens = MNN::Express::_Input(convert_shape<int64_t, int>(input.shape()),
+                                            MNN::Express::NCHW,
+                                            md_dtype_to_mnn_dtype(input.dtype()));
+                tens->setName(input.get_name());
+            }
+            // 复用同一输入 VARP（MNN 图缓存按输入身份缓存，换新输入会触发 GPU 重排，
+            // 实测 OpenCL 慢约一倍）。仅数据内容更新，shape/dtype 不变则复用缓存。
+            memcpy(tens->writeMap<void>(), input.data(), input.byte_size());
+            mnn_inputs[i] = tens;
         }
         const auto mnn_outputs = net_->onForward(mnn_inputs);
         if (mnn_outputs.size() != outputs_desc_.size()) {

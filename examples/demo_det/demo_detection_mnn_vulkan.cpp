@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_mnn_backend();
-    opt.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_VULKAN;
+    opt.set_device(modeldeploy::Device::VULKAN);
 
     // ---- 2. 加载模型（目标检测）----
     auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("../../test_data/test_models/mnn/yolo26n/yolo26n.mnn", opt);
@@ -44,3 +44,5 @@ int main() {
     return 0;
 
 }
+
+

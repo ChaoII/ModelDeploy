@@ -1,48 +1,52 @@
-# ncnn 后端依赖（CPU + Vulkan）。
+# ncnn 后端依赖（CPU + Vulkan，静态库），与 onnxruntime 同范式：
+# 配置时按平台差异从魔塔 Modelscope 自动下载，无需本地 *_ROOT / 本地 lib。
 #
-# 注意：当前仅 Windows x64 提供已确认可用的自动下载工件（modelscope），
-# 其余平台 / 未确认工件一律 fail-fast——请设置 -DNCNN_ROOT 指向本地已解包目录。
-# 本地解包：下载 ncnn 预编译包后解压，路径内需含 <arch>/lib/cmake（find_package 用）
-# 与 <arch>/include（头文件用）。
+# 已上传工件（modelscope repo: ChaoII0987/ModelDeploy_cmake_deps）：
+#   - Windows x64  : ncnn_win_x64_sttaic_20260526.zip
+#   - Linux x64    : ncnn_linux_x64_static_20260526.zip
+#   - Linux aarch64: ncnn_aarch64_static_20260526.zip
+#
+# 解包后主目录即含 include 与 lib，lib 内含 cmake/ncnn 与 cmake/glslang；
+# ncnn 目标自动携带对 glslang 的链接依赖。其余平台一律 fail-fast。
 message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 
 set(NCNN_BASE_URL "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master")
 set(NCNN_LIBS ncnn)
 
-# 平台 → 包内 arch 子目录
-if (WIN32)
-    set(NCNN_ARCH "x64")
-elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-    set(NCNN_ARCH "arm64")
-else()
-    set(NCNN_ARCH "x64")
-endif()
+include(FetchContent)
 
-if (NCNN_ROOT)  # 本地已解包目录，调试用
-    message(STATUS "Using local NCNN_ROOT=${NCNN_ROOT}")
-elseif (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)  # 仅 Windows x64 有已确认下载工件
-    include(FetchContent)
-    set(NCNN_FILE_NAME "ncnn_win_x64_static_20260526.zip")
-    FetchContent_Declare(ncnn
-        URL ${NCNN_BASE_URL}/${NCNN_FILE_NAME}
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(NCNN_FILE_NAME "ncnn_win_x64_sttaic_20260526.zip")
+    set(NCNN_HASH "SHA256=88d58700b067e1b30fb7e3bfa0792cae198c149dfdcdff71be282c5d2d956d3e")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+        set(NCNN_FILE_NAME "ncnn_linux_x64_static_20260526.zip")
+        set(NCNN_HASH "SHA256=a0095865b47c1be1d6fa70215ecf182179d49aca064d301637835b3e700e35a8")
+    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(NCNN_FILE_NAME "ncnn_aarch64_static_20260526.zip")
+        set(NCNN_HASH "SHA256=afd21e11672a5ffbc88027b62be5fc3cb90bc03adf299e60d49854434623509b")
+    else ()
+        message(FATAL_ERROR "Unsupported system arch: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for ncnn")
+    endif ()
+else ()
+    message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for ncnn")
+endif ()
+
+set(NCNN_URL "${NCNN_BASE_URL}/${NCNN_FILE_NAME}")
+
+FetchContent_Declare(ncnn
+        URL ${NCNN_URL}
+        URL_HASH ${NCNN_HASH}
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
-    FetchContent_GetProperties(ncnn)
-    if (NOT ncnn_POPULATED)
-        message(STATUS "Downloading ncnn from ${NCNN_BASE_URL}/${NCNN_FILE_NAME}")
-        FetchContent_Populate(ncnn)
-    endif()
-    set(NCNN_ROOT "${ncnn_SOURCE_DIR}")
-else()
-    message(FATAL_ERROR
-        "ncnn 依赖在非 Windows-x64 平台（或未确认工件）不自动下载。"
-        "请先本地解包 ncnn 预编译包，然后用 -DNCNN_ROOT=<解包路径> 指定 "
-        "（解包路径内含 <arch>/lib/cmake 与 <arch>/include）。"
-        "当前仅 Windows x64 有已确认的自动下载工件可用。")
-endif()
+)
+FetchContent_GetProperties(ncnn)
+if (NOT ncnn_POPULATED)
+    message(STATUS "Downloading ncnn from ${NCNN_URL}")
+    FetchContent_Populate(ncnn)
+endif ()
 
-set(NCNN_DIR "${NCNN_ROOT}/${NCNN_ARCH}")
-find_package(ncnn CONFIG REQUIRED PATHS "${NCNN_DIR}/lib/cmake" NO_DEFAULT_PATH)
-find_package(glslang CONFIG REQUIRED PATHS "${NCNN_DIR}/lib/cmake" NO_DEFAULT_PATH)
-include_directories(${NCNN_DIR}/include)
+# ncnn 与 glslang 的 CMake config 同居一目录；ncnn 目标自动携带对 glslang 的链接依赖
+find_package(ncnn CONFIG REQUIRED PATHS "${ncnn_SOURCE_DIR}/lib/cmake" NO_DEFAULT_PATH)
+find_package(glslang CONFIG REQUIRED PATHS "${ncnn_SOURCE_DIR}/lib/cmake" NO_DEFAULT_PATH)
+include_directories(${ncnn_SOURCE_DIR}/include)

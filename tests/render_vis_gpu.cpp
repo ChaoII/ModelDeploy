@@ -28,9 +28,11 @@ struct Frame {
         return cudaMemcpy(back_y.data(), d_y, y.size(), cudaMemcpyDeviceToHost) == cudaSuccess &&
                cudaMemcpy(back_uv.data(), d_uv, uv.size(), cudaMemcpyDeviceToHost) == cudaSuccess;
     }
-    ImageData make() {
+    ImageData make_cache;
+    ImageData& make() {
         const ImageData::Plane pl[2] = {{d_y, w}, {d_uv, w}};
-        return ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+        make_cache = ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, modeldeploy::Device::GPU);
+        return make_cache;
     }
 };
 

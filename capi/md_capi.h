@@ -128,7 +128,8 @@ typedef enum MD_BACKEND {
     MD_BK_ORT = 0,
     MD_BK_MNN = 1,
     MD_BK_TRT = 2,
-    MD_BK_SOPHGO = 3
+    MD_BK_SOPHGO = 3,
+    MD_BK_NCNN = 4
 } MDBackend;
 
 /* 创建默认选项（可后续用 setter 覆盖） */

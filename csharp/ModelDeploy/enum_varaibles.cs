@@ -16,7 +16,8 @@ namespace ModelDeploy
         ORT = 0,
         MNN = 1,
         TRT = 2,
-        SOPHGO = 3
+        SOPHGO = 3,
+        NCNN = 4
     }
 
     /// <summary>视频编解码后端（对应 capi MDCodecBackend）。</summary>

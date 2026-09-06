@@ -1,4 +1,4 @@
-// ModelDeploy demo: 目标检测（mnn_cuda）。
+// ModelDeploy demo: 目标检测（ncnn_cpu）。
 // 最小可运行示例，完整逻辑自包含：构造 RuntimeOption -> 加载模型 -> 预处理 -> 推理(计时) -> 可视化。
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
@@ -16,11 +16,11 @@ int main() {
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
-    opt.use_mnn_backend();
-    opt.use_gpu(0);
+    opt.use_ncnn_backend();
+    opt.set_device(modeldeploy::Device::CPU);
 
     // ---- 2. 加载模型（目标检测）----
-    auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("../../test_data/test_models/mnn/yolo26n/yolo26n.mnn", opt);
+    auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("../../test_data/test_models/ncnn/yolo11n/yolo11n.param", opt);
     if (!det->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
     det->get_preprocessor().set_size({640, 640});
     const auto label_map = det->get_label_map("names");
@@ -39,7 +39,7 @@ int main() {
     // ---- 5. 结果与可视化 ----
     modeldeploy::vision::dis_det(res);
     auto vis = modeldeploy::vision::vis_det(im, res, 0.5, label_map, kFont, 12, 0.3, false);
-    (void)vis.imwrite("result_detection_mnn_cuda.jpg");
+    (void)vis.imwrite("result_detection_ncnn_cpu.jpg");
     std::printf("done, %zu objects\n", res.size());
     return 0;
 

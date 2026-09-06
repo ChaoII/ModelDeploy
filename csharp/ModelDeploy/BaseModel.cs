@@ -33,6 +33,19 @@ namespace ModelDeploy
         public RuntimeOption UseMnn() { return SetBackend(Backend.MNN); }
         public RuntimeOption UseTrt() { return SetBackend(Backend.TRT); }
         public RuntimeOption UseSophgo() { return SetBackend(Backend.SOPHGO); }
+        public RuntimeOption UseNcnn() { return SetBackend(Backend.NCNN); }
+
+        // ---- ncnn 后端选项（映射到 C API "ncnn" 配置命名空间）----
+        public RuntimeOption NcnnUseCooperativeMatrix(bool v) { return SetConfig("ncnn", "use_cooperative_matrix", v ? "true" : "false"); }
+        public RuntimeOption NcnnSetOpenmpBlocktime(int v) { return SetConfig("ncnn", "openmp_blocktime", v.ToString()); }
+        public RuntimeOption NcnnSetLightmode(bool? v) { return NcnnOptBool("lightmode", v); }
+        public RuntimeOption NcnnUseFp16Packed(bool? v) { return NcnnOptBool("use_fp16_packed", v); }
+        public RuntimeOption NcnnUseFp16Storage(bool? v) { return NcnnOptBool("use_fp16_storage", v); }
+        public RuntimeOption NcnnUseFp16Arithmetic(bool? v) { return NcnnOptBool("use_fp16_arithmetic", v); }
+        public RuntimeOption NcnnUseBf16Storage(bool? v) { return NcnnOptBool("use_bf16_storage", v); }
+
+        private RuntimeOption NcnnOptBool(string key, bool? v)
+            => SetConfig("ncnn", key, v == null ? "" : (v.Value ? "true" : "false"));
 
         public RuntimeOption SetDevice(Device dev, int deviceId = 0)
         { Check(); ThrowOnError(NativeMethods.md_option_set_device(Handle, (int)dev, deviceId)); return this; }
