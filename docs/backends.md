@@ -1,6 +1,6 @@
 # ModelDeploy 后端详解
 
-ModelDeploy 支持四种推理后端，一套上层 API 统一调用。本文详细对比各后端的使用方式、模型格式、配置项与适用场景。
+ModelDeploy 支持五种推理后端，一套上层 API 统一调用。本文详细对比各后端的使用方式、模型格式、配置项与适用场景。
 
 ## 1. 后端总览
 
@@ -9,7 +9,10 @@ ModelDeploy 支持四种推理后端，一套上层 API 统一调用。本文详
 | OnnxRuntime | `OrtBackend` | `.onnx` | CPU / CUDA / OpenCL | `ENABLE_ORT` | 跨平台通用，模型生态最全 |
 | TensorRT | `TrtBackend` | `.engine` / `.onnx` | NVIDIA GPU | `ENABLE_TRT + WITH_GPU` | 英伟达 GPU 最高性能 |
 | MNN | `MnnBackend` | `.mnn` | CPU / GPU(多种) / Metal | `ENABLE_MNN` | 移动端 / 边缘设备 |
+| ncnn | `NcnnBackend` | `.param` / `.bin` | CPU / Vulkan | `ENABLE_NCNN` | 移动端 / Vulkan 场景，YOLO 全系 |
 | Sophgo | `SophgoBackend` | `.bmodel` | 算能 TPU (BM1688/CV186X) | `ENABLE_SOPHGO` | 国产化 / 低功耗边缘 |
+
+> ncnn 后端配置时按平台（Win-x64 / Linux-x64 / Linux-aarch64）从模型库自动下载预编译静态包；完整用法见 `csrc/runtime/backends/ncnn/` 与 ncnn 相关 demo（`examples/demo_*/*_ncnn_*.cpp`）。
 
 ## 2. OnnxRuntime 后端
 
@@ -287,7 +290,7 @@ Sophgo 后端支持 BMCV 设备端预处理零拷贝：
 | 英伟达 GPU 最高性能 | TRT 或 ORT+TRT EP |
 | 服务端多路视频 | TRT + 多线程 clone |
 | 边缘盒子 / 低功耗 | Sophgo TPU |
-| 移动端 | MNN |
+| 移动端 / Vulkan | MNN 或 ncnn |
 | 国产化替代 | Sophgo |
 
 ## 7. 模型格式转换
