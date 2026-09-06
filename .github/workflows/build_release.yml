@@ -98,6 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.PKG }}
+          generate_release_notes: true
 
   # ==================== GPU 构建（仅编译，无测试） ====================
   gpu:
@@ -202,3 +203,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.PKG }}
+          generate_release_notes: true
