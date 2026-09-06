@@ -152,6 +152,40 @@ option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_VULKAN;
 
 > MNN 模型由 `.onnx/.torchscript` 通过 `MNNConvert` 转换，转换工具见 MNN 官方文档。
 
+## 4.5 ncnn 后端（CPU + Vulkan）
+
+### 4.5.1 基本使用
+
+```cpp
+option.use_ncnn_backend();
+option.use_cpu();
+// 或 Vulkan：option.set_device(modeldeploy::Device::VULKAN, 0);
+
+auto det = modeldeploy::vision::detection::UltralyticsDet("model.param", option);
+```
+
+ncnn 模型为 `.param` + `.bin`，可用 `ultralytics .pt export format=ncnn` 导出；当前覆盖 **ultralytics YOLO 全系**（det / cls / obb / pose / seg / sem / depth）。
+
+### 4.5.2 配置项（`ncnn_option`）
+
+| 配置项 | 默认 | 说明 |
+|--------|------|------|
+| `device_id` | 0 | 设备 ID |
+| `cpu_thread_num` | -1 | CPU 线程数（-1 自动） |
+| `use_cooperative_matrix` | false | 协处理矩阵（加速） |
+| `openmp_blocktime` | -1 | OpenMP 阻塞时间 |
+| `lightmode` / `use_fp16_packed` / `use_fp16_storage` / `use_fp16_arithmetic` / `use_bf16_storage` | nullopt | 可选布尔开关（未设置用后端默认） |
+
+### 4.5.3 构建与接入
+
+- 编译开关：`ENABLE_NCNN=ON`。
+- ncnn 静态包按平台（Win-x64 / Linux-x64 / Linux-aarch64）配置时从模型库自动下载，无需手动提供路径；不支持平台时 fail-fast。
+
+### 4.5.4 注意
+
+- ncnn 后端**不支持 CUDA**（仅 CPU + Vulkan）。
+- 导出模型的 `.param` 常未声明输入 shape，输出形状可能显示为 `[-1]`（依赖 dummy probe，详见 README「已知问题」）。
+
 ## 5. Sophgo 后端（算能 TPU）
 
 ### 5.1 环境要求

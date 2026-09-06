@@ -24,7 +24,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 
 | 文档 | 内容 |
 |------|------|
-| [后端详解](./backends.md) | OnnxRuntime / TensorRT / MNN / ncnn / Sophgo 四种后端对比、模型格式、构建要求 |
+| [后端详解](./backends.md) | OnnxRuntime / TensorRT / MNN / ncnn / Sophgo 五种后端对比、模型格式、构建要求 |
 
 ### 模型
 
@@ -48,10 +48,23 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | 文档 | 内容 |
 |------|------|
 | [性能优化指南](./performance.md) | 推理提速、多线程与 clone、零拷贝、后端选型、实测数据 |
+| [海量视频流效率优化](./pipeline-efficiency.md) | CUDA PC / Jetson / Sophgo 跨平台视频管线实测与瓶颈分析 |
 | [多语言 API](./api/README.md) | C++ / Python / C / C# / Rust 绑定概览 |
 | [模型加密](./encryption.md) | AES-256-CBC 模型加密与解密模型使用 |
 | [多线程推理](./multi_thread.md) | `clone()` 多线程并发详解 |
 | [Triton 推理服务](../examples/serving/) | Triton 部署（preprocess → pipeline → postprocess） |
+
+### 应用案例
+
+| 文档 | 内容 |
+|------|------|
+| [AI 智能安防监控平台](./surveillance.md) | `application/surveillance` 跨平台监控应用架构（CUDA/Jetson/Sophgo） |
+
+### 发布与开发
+
+| 文档 | 内容 |
+|------|------|
+| [发布流程](./release.md) | 版本号 bump、打 tag、GitHub Release/资产上传规范 |
 
 ## 支持矩阵
 

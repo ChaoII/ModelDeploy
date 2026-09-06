@@ -66,7 +66,7 @@ model_encrypted decrypt yolo11n_nms.mdenc yolo11n_decrypted.onnx 123456
 
 ## 6. 与后端结合
 
-加密模型适用于所有后端（ORT/TRT/MNN/Sophgo）：
+加密模型适用于所有后端（ORT/TRT/MNN/Sophgo，均已验证；ncnn 因 param+bin 双文件封装待验证）：
 
 ```cpp
 // TRT
