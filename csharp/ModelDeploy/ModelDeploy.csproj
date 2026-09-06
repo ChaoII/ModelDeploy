@@ -5,7 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <PackageId>ModelDeploySDK</PackageId>
-    <Version>2.6.0</Version>
+    <Version>2.7.0</Version>
     <Authors>ModelDeploy Contributors</Authors>
     <Description>C# bindings for the ModelDeploy cross-platform inference SDK</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
