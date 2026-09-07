@@ -446,7 +446,77 @@ int main() {
 }
 ```
 
-## 11. 更多模型（均使用同一 `RuntimeOption`）
+## 11. OCR（vision::ocr::PaddleOCR + 子模型）
+
+OCR 主流水线（命名空间 `vision::ocr`）：`PaddleOCR(det, cls, rec, dict, opt)` 串联文本检测 `DBDetector` → 方向分类 `Classifier` → 文本识别 `Recognizer`（`cls_model_path` 可传空串跳过方向分类）。单图 `predict(im, &res)` 输出**单个** `vision::OCRResult`：`boxes`（`std::vector<std::array<int, 8>>`，每行 4 点共 8 个 int，原图像素，按上下序排列）、`text`、`rec_scores`、`cls_labels`、`cls_scores` 逐行配对（det 未检出文本框时对整图直接识别，此时 `boxes` 为空）。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    namespace ocr_ns = modeldeploy::vision::ocr;
+    // 1. 运行时选项 + 构造（det/cls/rec/dict 四路径，详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+    auto ocr = std::make_unique<ocr_ns::PaddleOCR>(
+        "det.onnx", "cls.onnx", "rec.onnx", "dict.txt", opt);
+    if (!ocr->is_initialized()) return 1;
+
+    // 2. 参数设置（主流水线 batch + 经 get_* 子模型指针设置；括号内为默认值）
+    ocr->set_cls_batch_size(6);                 // 方向分类子模型 batch（默认 6）
+    ocr->set_rec_batch_size(8);                 // 识别子模型 batch（默认 8）
+    ocr->get_detector()->get_preprocessor().set_max_side_len(960);      // 检测最长边（默认 960）
+    ocr->get_detector()->get_postprocessor().set_det_db_thresh(0.3);        // DB 二值化阈值（默认 0.3）
+    ocr->get_detector()->get_postprocessor().set_det_db_box_thresh(0.6);    // 框置信度阈值（默认 0.6）
+    ocr->get_detector()->get_postprocessor().set_det_db_unclip_ratio(1.5);  // 扩框比例（默认 1.5）
+    ocr->get_detector()->get_postprocessor().set_det_db_score_mode("slow"); // 框得分模式（默认 "slow"）
+    ocr->get_detector()->get_postprocessor().set_use_dilation(0);           // 是否膨胀（默认 0）
+    ocr->get_recognizer()->get_preprocessor().set_rec_image_shape({3, 48, 320});  // 识别输入形状（默认 {3, 48, 320}）
+    ocr->get_classifier()->get_postprocessor().set_cls_thresh(0.9f);        // 方向分类阈值（默认 0.9）
+
+    // 3. 单图推理：输出单个 OCRResult（text/boxes/rec_scores/cls_labels 逐行配对）
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    modeldeploy::vision::OCRResult res;
+    if (!ocr->predict(im, &res)) return 1;
+    for (size_t i = 0; i < res.text.size(); ++i) {
+        const auto& box = res.boxes[i];   // 4 点共 8 个 int
+        std::printf("%s %.3f cls=%d box=(%d,%d,%d,%d,%d,%d,%d,%d)\n",
+                    res.text[i].c_str(), res.rec_scores[i], res.cls_labels[i],
+                    box[0], box[1], box[2], box[3], box[4], box[5], box[6], box[7]);
+    }
+
+    // 4. 可视化：vis_ocr(image, result, font_path, font_size=14, alpha=0.15, save_result=false)
+    auto vis = modeldeploy::vision::vis_ocr(im, res, "msyh.ttc", 14, 0.3, false);
+    vis.imwrite("ocr_vis.jpg");
+
+    // 5. 批量推理：每图一个 OCRResult
+    std::vector<modeldeploy::vision::ImageData> images = {
+        modeldeploy::vision::ImageData::imread("a.jpg"),
+        modeldeploy::vision::ImageData::imread("b.jpg"),
+    };
+    std::vector<modeldeploy::vision::OCRResult> ress;
+    ocr->batch_predict(images, &ress);
+
+    // 6. 子模型独立使用（也可不经 PaddleOCR 单独构造）
+    ocr_ns::DBDetector db("det.onnx", opt);
+    ocr_ns::Recognizer rec("rec.onnx", "dict.txt", opt);
+    ocr_ns::Classifier clr("cls.onnx", opt);
+    modeldeploy::vision::OCRResult det_res;
+    db.predict(im, &det_res);                    // 文本框：det_res.boxes
+    std::string text; float rec_score = 0.f;
+    rec.predict(im, &text, &rec_score);          // 整行识别（text + score）
+    int32_t cls_label = 0; float cls_score = 0.f;
+    clr.predict(im, &cls_label, &cls_score);     // 方向分类（0°/180°）
+
+    // 7. 多线程：clone() 深拷贝独立实例（主流水线三个子模型一起深拷贝）
+    auto ocr2 = ocr->clone();
+    return 0;
+}
+```
+
+## 12. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -458,7 +528,7 @@ int main() {
 | 姿态 / 关键点 | `vision::detection::UltralyticsPose` / `vision::hand::HandKeypoint` / `vision::landmark::VehicleKeypoint` / `vision::landmark::FaceLandmark` | 见上文 §8 |
 | 旋转框 | `vision::detection::UltralyticsObb` | 见 [models-旋转框](../models.md#4-旋转框检测oriented-bounding-box) |
 | 分类 | `vision::Classification` | 见 [models-分类](../models.md#5-图像分类classification) |
-| OCR | `vision::ocr::PaddleOCR` | 见 [models-OCR](../models.md#8-ocr文字识别) |
+| OCR | `vision::ocr::PaddleOCR` | 见上文 §11 |
 | 人脸 | `vision::face::Scrfd` / `InsightFaceAnalysis` | 见 [models-人脸](../models.md#6-人脸face) |
 | 车牌 | `vision::lpr::LprPipeline` | 见 [models-车牌](../models.md#7-车牌识别license-plate) |
 | ASR | `audio::asr::SenseVoice` | 见 [models-语音](../models.md#10-语音识别asr) |
@@ -502,7 +572,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 12. 工程配置
+## 13. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

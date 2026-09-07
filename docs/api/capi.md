@@ -477,6 +477,73 @@ int main(void) {
 }
 ```
 
+## 11. OCR（`MD_MODEL_OCR` / `MD_MODEL_OCR_DET` / `MD_MODEL_OCR_REC` / `MD_MODEL_OCR_CLS`）
+
+主流水线 `MD_MODEL_OCR` 经 `md_model_create` 创建，`model_path` 用 `|` 串联 **det/cls/rec/dict 四段**：`"det.onnx|cls.onnx|rec.onnx|dict.txt"`。结果 kind 为 `MD_RES_OCR`：每行文本 = `quad`（4 点共 8 个 int，原图像素）+ `text` + `score`（`md_result_ocr`），方向分类 label/score 按行用 `md_result_ocr_cls` 配对。**注意**：单图 OCR 结果的 `md_result_count` 恒为 1（单值包装），行数以 `md_result_ocr` 越界（返回非 `MD_OK`）为准。
+
+子模型 kind（可独立部署）：`MD_MODEL_OCR_DET`（单段 det.onnx）、`MD_MODEL_OCR_REC`（`"rec.onnx|dict.txt"` 两段）、`MD_MODEL_OCR_CLS`（单段 cls.onnx）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    /* 主流水线：det|cls|rec|dict 四段路径（'|' 分隔） */
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_OCR,
+                        "det.onnx|cls.onnx|rec.onnx|dict.txt", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    /* 参数自省：OCR 返回 "det_db_thresh|det_db_box_thresh|det_db_unclip_ratio|
+     * det_db_score_mode|use_dilation|cls_thresh|max_side_len"（类型 D/D/D/S/B/D/I） */
+    md_model_set_param_d(m, "det_db_thresh", 0.3);        /* DB 二值化阈值（默认 0.3） */
+    md_model_set_param_d(m, "det_db_box_thresh", 0.6);    /* 框置信度阈值（默认 0.6） */
+    md_model_set_param_d(m, "det_db_unclip_ratio", 1.5);  /* 扩框比例（默认 1.5） */
+    md_model_set_param_s(m, "det_db_score_mode", "slow"); /* 框得分模式（默认 "slow"） */
+    md_model_set_param_b(m, "use_dilation", 0);           /* 是否膨胀（默认 0） */
+    md_model_set_param_d(m, "cls_thresh", 0.9);           /* 方向分类阈值（默认 0.9） */
+    md_model_set_param_i(m, "max_side_len", 960);         /* 检测最长边（默认 960） */
+    md_model_set_cls_batch_size(m, 6);                    /* 方向分类子模型 batch（默认 6） */
+    md_model_set_rec_batch_size(m, 8);                    /* 识别子模型 batch（默认 8） */
+    md_model_set_rec_image_shape(m, 3, 48, 320);          /* 识别输入形状（默认 3x48x320） */
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+    MDResultHandle res = NULL;
+    md_model_predict(m, img, &res);
+
+    /* 逐行读直到 md_result_ocr 返回非 MD_OK（行数以越界为准，见上） */
+    for (size_t i = 0; ; i++) {
+        const int* quad = NULL; const char* text = NULL; float score = 0.f;
+        int cls_label = 0; float cls_score = 0.f;
+        if (md_result_ocr(res, i, &quad, &text, &score) != MD_OK) break;
+        md_result_ocr_cls(res, i, &cls_label, &cls_score);
+        printf("[%zu] '%s' score=%.3f cls=%d box=(%d,%d,%d,%d,%d,%d,%d,%d)\n",
+               i, text ? text : "", score, cls_label,
+               quad[0], quad[1], quad[2], quad[3],
+               quad[4], quad[5], quad[6], quad[7]);
+    }
+
+    /* 批量推理：md_result_ocr_batch_count(bres, &nimgs) 得图数，
+     * md_result_ocr_batch(bres, g, j, &quad, &text, &score) +
+     * md_result_ocr_cls_batch(bres, g, j, &cls_label, &cls_score) 按 (图, 行) 读 */
+
+    /* 可视化：md_draw_result 支持 MD_RES_OCR（底层 vis_ocr），用法同 §3 */
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

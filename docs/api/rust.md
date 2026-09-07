@@ -398,6 +398,67 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 11. OCR（`PaddleOCR` + 子模型）
+
+主流水线 `PaddleOCR::new(model_path, &opt)?`：`model_path` 用 `|` 串联 **det/cls/rec/dict 四段**（`"det.onnx|cls.onnx|rec.onnx|dict.txt"`）。单图返回 `Vec<OcrLine>`（字段 `quad: [i32; 8]`（4 点，原图像素）、`text: String`、`score: f32`、`cls_label: i32`、`cls_score: f32`，逐行配对）。注意：单图 `predict` 经 C API 单值包装**仅返回首行**，完整逐行结果请用 `predict_batch(&[&img])`（逐图逐行完整读取）。
+
+```rust
+use modeldeploy::{DbDetectorModel, DrawOptions, Image, OcrClassifierModel, PaddleOCR,
+                  RecognizerModel, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项 + 构造（det|cls|rec|dict 四段路径，详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+    let model = PaddleOCR::new("det.onnx|cls.onnx|rec.onnx|dict.txt", &opt)?;
+
+    // 2. 参数设置（括号内为默认值）
+    model.set_det_db_thresh(0.3)?;        // DB 二值化阈值（默认 0.3）
+    model.set_det_db_box_thresh(0.6)?;    // 框置信度阈值（默认 0.6）
+    model.set_det_db_unclip_ratio(1.5)?;  // 扩框比例（默认 1.5）
+    model.set_det_db_score_mode("slow")?; // 框得分模式（默认 "slow"）
+    model.set_use_dilation(false)?;       // 是否膨胀（默认 false）
+    model.set_cls_thresh(0.9)?;           // 方向分类阈值（默认 0.9）
+    model.set_max_side_len(960)?;         // 检测最长边（默认 960）
+    model.set_cls_batch_size(6)?;         // 方向分类子模型 batch（默认 6）
+    model.set_rec_batch_size(8)?;         // 识别子模型 batch（默认 8）
+    model.set_rec_image_shape(3, 48, 320)?; // 识别输入形状（默认 3x48x320）
+
+    // 3. 单图推理：Vec<OcrLine>（text/quad/score/cls_label/cls_score 逐行配对；仅首行，见上）
+    let img = Image::read("test.jpg")?;
+    let lines = model.predict(&img)?;
+    for line in &lines {
+        println!("{} {:.3} cls={} box={:?}", line.text, line.score, line.cls_label, line.quad);
+    }
+
+    // 4. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<OcrLine>>（按图分组，逐行完整）
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+    for (i, ls) in batch.iter().enumerate() {
+        println!("image {}: {} lines", i, ls.len());
+    }
+
+    // 5. 可视化：predict_and_draw 句柄直达 C++ vis_ocr
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas,
+        &DrawOptions::new().with_font("msyh.ttc", 14).with_alpha(0.3))?;
+    canvas.save("ocr_vis.jpg")?;
+
+    // 6. 子模型独立使用（也可不经 PaddleOCR 单独构造；predict 均返回 Vec<OcrLine>）
+    let db  = DbDetectorModel::new("det.onnx", &opt)?;           // quad（文本框）
+    let rec = RecognizerModel::new("rec.onnx|dict.txt", &opt)?;  // text/score（路径 '|' 两段）
+    let clr = OcrClassifierModel::new("cls.onnx", &opt)?;        // 方向分类
+    let _det_lines = db.predict(&img)?;
+    let _rec_lines = rec.predict(&img)?;
+    let _cls_lines = clr.predict(&img)?;
+
+    // 7. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let model2 = model.clone()?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

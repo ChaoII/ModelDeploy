@@ -374,14 +374,64 @@ cv2.imwrite("cls_vis.jpg", vis)
 cls2 = cls.clone()
 ```
 
-## 11. 已绑定模块
+## 11. OCR（PaddleOCR + 子模型）
+
+PaddleOCR 三段流水线：文本检测（`DBDetector`）→ 方向分类（`Classifier`）→ 文本识别（`Recognizer`），构造时依次传 det/cls/rec 模型路径与字符字典 `dict_path`（`option` 为必填位置参数）。单图 `predict` 返回**单个** `OCRResult`：`text`（识别文本）、`boxes`（每行 4 点共 8 个整数，原图像素，按上下序排列）、`rec_scores`、`cls_labels`、`cls_scores` 五个列表**逐行配对**（det 未检出文本框时对整图直接识别，此时 `boxes` 为空）。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（det/cls/rec/dict 四个路径 + option；option 配置见上节）
+ocr = md.vision.PaddleOCR("det.onnx", "cls.onnx", "rec.onnx", "dict.txt", option)
+
+# 2. 参数设置（主流水线 batch 属性 + 经 get_* 子模型链式设置；括号内为默认值）
+ocr.cls_batch_size = 6                     # 方向分类子模型 batch（默认 6）
+ocr.rec_batch_size = 8                     # 文本识别子模型 batch（默认 8）
+det = ocr.get_detector()                   # -> DBDetector
+det.preprocessor.max_side_len = 960        # 检测最长边（默认 960）
+det.postprocessor.det_db_thresh = 0.3      # DB 二值化阈值（默认 0.3）
+det.postprocessor.det_db_box_thresh = 0.6  # 框置信度阈值（默认 0.6）
+det.postprocessor.det_db_unclip_ratio = 1.5   # 扩框比例（默认 1.5）
+det.postprocessor.det_db_score_mode = "slow"  # 框得分模式（默认 "slow"）
+det.postprocessor.use_dilation = 0         # 是否膨胀（int，默认 0）
+ocr.get_recognizer().preprocessor.rec_image_shape = [3, 48, 320]  # 识别输入形状（默认 [3, 48, 320]）
+ocr.get_classifier().postprocessor.cls_thresh = 0.9               # 方向分类阈值（默认 0.9）
+
+# 3. 单图推理：返回单个 OCRResult（text/boxes/rec_scores/cls_labels 逐行配对）
+img = cv2.imread("test.jpg")
+r = ocr.predict(img)
+for i in range(len(r.text)):
+    print(r.text[i], r.rec_scores[i], r.cls_labels[i], r.boxes[i])  # boxes：4 点共 8 整数
+
+# 4. 批量推理：返回 list[OCRResult]（每图一个）
+batch = ocr.batch_predict([cv2.imread("a.jpg"), cv2.imread("b.jpg")])
+
+# 5. 可视化：md.vision.vis_ocr 返回 BGR ndarray
+#    签名：vis_ocr(image, result, font_path="", font_size=14, alpha=0.15, save_result=False)
+vis = md.vision.vis_ocr(img, r, font_path="msyh.ttc", font_size=14, alpha=0.3)
+cv2.imwrite("ocr_vis.jpg", vis)
+
+# 6. 多线程：clone() 深拷贝独立实例（主流水线三个子模型一起深拷贝）
+ocr2 = ocr.clone()
+
+# 7. 子模型独立使用（也可不经 PaddleOCR 单独构造；predict 均返回 OCRResult）
+db = md.vision.DBDetector("det.onnx", option)                # predict -> OCRResult.boxes
+rec = md.vision.Recognizer("rec.onnx", "dict.txt", option)   # predict -> OCRResult.text/rec_scores
+clr = md.vision.Classifier("cls.onnx", option)               # predict -> OCRResult.cls_labels/cls_scores
+boxes = db.predict(img).boxes        # 文本框（4 点 8 整数列表）
+text = rec.predict(img).text         # 识别文本（整图为 1 行）
+label = clr.predict(img).cls_labels  # 方向标签（0°/180°，整图为 1 项）
+```
+
+## 12. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 12. 性能测试
+## 13. 性能测试
 
 ```python
 import time

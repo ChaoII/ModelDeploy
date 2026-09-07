@@ -355,6 +355,57 @@ for (int g = 0; g < batch.Count; g++) {
 using var cls2 = cls.Clone();
 ```
 
+## 11. OCR（`OcrModel` + 子模型）
+
+主流水线类 `ModelDeploy.Models.OcrModel`（对应 `MD_MODEL_OCR`）：`modelPath` 用 `|` 串联 **det/cls/rec/dict 四段**（`"det.onnx|cls.onnx|rec.onnx|dict.txt"`）。`Predict` 返回 `Prediction<OcrResult>`，每行文本一项：`Quad`（4 点共 8 个 int，原图像素）、`Text`、`Score`（识别得分）、`ClsLabel`/`ClsScore`（方向分类，逐行配对）。注意：单图 `Predict` 的 `Prediction` 因底层单值包装**仅含首行**，完整逐行结果可经 `pred.Handle` 配合原生 `md_result_ocr` / `md_result_ocr_cls` 读取；OCR 模型类亦未提供 `PredictBatch`。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 1. 构造：det|cls|rec|dict 四段路径（'|' 分隔）
+using var ocr = new OcrModel("det.onnx|cls.onnx|rec.onnx|dict.txt", option);
+
+// 2. 参数设置（括号内为默认值）
+ocr.SetDetDbThresh(0.3);          // DB 二值化阈值（默认 0.3）
+ocr.SetDetDbBoxThresh(0.6);       // 框置信度阈值（默认 0.6）
+ocr.SetDetDbUnclipRatio(1.5);     // 扩框比例（默认 1.5）
+ocr.SetDetDbScoreMode("slow");    // 框得分模式（默认 "slow"）
+ocr.SetUseDilation(false);        // 是否膨胀（默认 false）
+ocr.SetClsThresh(0.9);            // 方向分类阈值（默认 0.9）
+ocr.SetMaxSideLen(960);           // 检测最长边（默认 960）
+ocr.SetClsBatchSize(6);           // 方向分类子模型 batch（默认 6）
+ocr.SetRecBatchSize(8);           // 识别子模型 batch（默认 8）
+ocr.SetRecImageShape(3, 48, 320); // 识别输入形状（默认 3x48x320）
+
+// 3. 单图推理：Prediction<OcrResult>（Text/Quad/Score/ClsLabel/ClsScore 逐行配对）
+using var img = VisionImage.Read("test.jpg");
+using var pred = ocr.Predict(img);
+foreach (var r in pred) {
+    Console.WriteLine($"{r.Text} {r.Score:F3} cls={r.ClsLabel} box=({string.Join(',', r.Quad)})");
+}
+
+// 4. 可视化：pred.Draw 直达 C++ vis_ocr
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { FontPath = "msyh.ttc", FontSize = 14, Alpha = 0.3 });
+canvas.Save("ocr_vis.jpg");
+
+// 5. 子模型独立使用（也可不经 OcrModel 单独构造；Predict 均返回 Prediction<OcrResult>）
+using var db  = new DbDetectorModel("det.onnx", option);            // Quad（文本框）
+using var rec = new RecognizerModel("rec.onnx|dict.txt", option);   // Text/Score（路径 '|' 两段）
+using var clr = new OcrClassifierModel("cls.onnx", option);         // 需 SetClsThresh 时可设
+using var predDet = db.Predict(img);
+using var predRec = rec.Predict(img);
+using var predCls = clr.Predict(img);
+
+// 6. 多线程：Clone() 深拷贝独立实例
+using var ocr2 = ocr.Clone();
+```
+
 ## 运行示例
 
 ```bash
