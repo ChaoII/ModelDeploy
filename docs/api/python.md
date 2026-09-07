@@ -424,14 +424,78 @@ text = rec.predict(img).text         # 识别文本（整图为 1 行）
 label = clr.predict(img).cls_labels  # 方向标签（0°/180°，整图为 1 项）
 ```
 
-## 12. 已绑定模块
+## 12. OCR 进阶（版面 / 表格 / 公式 / 文档转 Markdown）
+
+进阶四件套全部绑定 Python：版面分析 `StructureV2Layout`、表格 `StructureV2Table`/`PPStructureV2Table`、公式 `FormulaRecognizer`，以及把它们**组合**成整页 Markdown 的 `DocToMarkdown`（`set_layout/set_ocr/set_table/set_formula` → `predict` 返回 Markdown 字符串）。
+
+```python
+import cv2
+import modeldeploy as md
+
+option = md.RuntimeOption()
+option.use_ort_backend()
+option.use_cpu()
+
+# 1. 版面分析：StructureV2Layout(model_file, option) -> list[DetectionResult]
+#    CDLA 版面类别检测（picodet），返回每个版面区域框 + 类别
+layout = md.vision.StructureV2Layout("layout.onnx", option)
+layout.preprocessor.layout_image_shape = [3, 800, 608]  # 输入 c,h,w（默认 [3, 800, 608]）
+layout.preprocessor.static_shape_infer = True           # 静态输入形状（默认 True）
+layout.postprocessor.score_threshold = 0.4             # 置信度阈值（默认 0.4）
+layout.postprocessor.nms_threshold = 0.5               # NMS IoU 阈值（默认 0.5）
+layout.postprocessor.num_class = 5                     # 版面类别数（默认 5）
+img = cv2.imread("doc.jpg")
+boxes = layout.predict(img)                            # list[DetectionResult]
+for b in boxes:
+    print(b.label_id, b.score, b.box.x, b.box.y, b.box.width, b.box.height)
+
+# 2. 表格结构识别：StructureV2Table(model, table_dict, option) -> OCRResult
+#    仅表格结构（SLANet），输出 table_html / table_structure
+table = md.vision.StructureV2Table("table.onnx", "table_dict.txt", option)
+tr = table.predict(img)
+print(tr.table_html)        # '<html><body><table>...' 完整表格 HTML
+print(tr.table_structure)   # ['<td>', '</td>', ...] 结构 token 列表
+print(tr.table_boxes)       # 单元框（4 点共 8 整数）
+
+# 3. 端到端表格：PPStructureV2Table(det, rec, table, rec_dict, table_dict, option)
+#    检测 + 识别 + 表结构串联，option 为必填位置参数（可带 keyword）
+ppt = md.vision.PPStructureV2Table(
+    "det.onnx", "rec.onnx", "table.onnx",
+    "rec_dict.txt", "table_dict.txt", option=option)
+ppt.rec_batch_size = 8                # 识别子模型 batch（默认 8）
+pr = ppt.predict(img)
+print(pr.table_html)
+for i in range(len(pr.text)):
+    print(pr.text[i], pr.rec_scores[i], pr.boxes[i])   # 单元格文字逐行
+
+# 4. 公式识别：FormulaRecognizer(model, dict, option) -> str（LaTeX）
+formula = md.vision.FormulaRecognizer("formula.onnx", "dict.txt", option)
+tex = formula.predict(cv2.imread("equation.jpg"))     # -> 'x^2 + y^2 = r^2' 等 LaTeX
+print(tex)
+
+# 5. 文档转 Markdown：DocToMarkdown 组合器
+#    先构造各子模型，再 set_* 注入；layout 为必须，ocr/table/formula 至少其一
+ocr = md.vision.PaddleOCR("det.onnx", "cls.onnx", "rec.onnx", "dict.txt", option)
+doc = md.vision.DocToMarkdown()       # 默认空构造
+doc.set_layout(layout)                # 版面（必须）
+doc.set_ocr(ocr)                      # 文本区 OCR
+doc.set_table(ppt)                    # 表格区
+doc.set_formula(formula)              # 公式区（可省）
+print(doc.ready())                    # 是否已配置 layout + 至少一个内容识别器
+markdown = doc.predict(img)           # -> Markdown 字符串
+print(markdown)
+```
+
+> `DocToMarkdown` 为**单列自上而下**顺序排版（不做多栏重排）；公式以 `$...$`、表格以 HTML 呈现。`set_*` 在 Python 中通过 `keep_alive` 保证子模型寿命被托管，可安全复用已构造的 `layout/ocr/ppt/formula`。
+
+## 13. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 13. 性能测试
+## 14. 性能测试
 
 ```python
 import time

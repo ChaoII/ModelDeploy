@@ -459,6 +459,36 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 12. OCR 进阶（版面 / 表格 / 公式 / 文档转 Markdown）
+
+Rust 仅绑定其中**公式识别**：`modeldeploy::FormulaRecognizer`，`predict` 直接返回 LaTeX `String`。
+**版面 `StructureV2Layout` / 表格 `StructureV2Table` / `PPStructureV2Table` / 文档转 Markdown `DocToMarkdown` 本语言未绑定**（C API 无对应 kind），如需请用 C++ / Python 绑定。
+
+`FormulaRecognizer::new(model_path, &opt)?` 的 `model_path` 用 `|` 串联 **model[|dict]** 两段：`"formula.onnx|dict.txt"`（dict 可省略为 `"formula.onnx"`）。
+
+```rust
+use modeldeploy::{FormulaRecognizer, Image, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+
+    // 公式识别：model|dict 两段路径（'|' 分隔，dict 可省）
+    let model = FormulaRecognizer::new("formula.onnx|dict.txt", &opt)?;
+    println!("ready={}", model.is_ready());
+
+    // 单图推理：返回 LaTeX 字符串
+    let img = Image::read("equation.jpg")?;
+    let latex = model.predict(&img)?;
+    println!("{}", latex);
+
+    // 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let _model2 = model.clone()?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

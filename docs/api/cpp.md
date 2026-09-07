@@ -516,7 +516,75 @@ int main() {
 }
 ```
 
-## 12. 更多模型（均使用同一 `RuntimeOption`）
+## 12. OCR 进阶（版面 / 表格 / 公式 / 文档转 Markdown）
+
+命名空间 `vision::ocr` 下四件套，见 [models.md §8.3/§8.4](../models.md#8-ocr文字识别) 与 [models.md §17 文档理解](../models.md#17-文档理解document-understanding--markdown):版面分析 `StructureV2Layout`、表格结构 `StructureV2Table` / 表格流水线 `PPStructureV2Table`、公式 `FormulaRecognizer`，以及组合器 `DocToMarkdown`（`set_layout/set_ocr/set_table/set_formula` → `predict` 输出 Markdown 字符串）。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    namespace ocr_ns = modeldeploy::vision::ocr;
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+
+    // 1. 版面分析：StructureV2Layout(model, opt)
+    ocr_ns::StructureV2Layout layout("layout.onnx", opt);
+    auto& layout_pre = layout.get_preprocessor();
+    layout_pre.set_layout_image_shape({3, 800, 608}); // 输入 c,h,w（默认 {3, 800, 608}）
+    layout_pre.set_static_shape_infer(true);          // 静态输入形状（默认 true）
+    auto& layout_post = layout.get_postprocessor();
+    layout_post.set_score_threshold(0.4f);            // 置信度阈值（默认 0.4）
+    layout_post.set_nms_threshold(0.5f);              // NMS IoU 阈值（默认 0.5）
+    auto im = modeldeploy::vision::ImageData::imread("doc.jpg");
+
+    std::vector<modeldeploy::vision::DetectionResult> layout_res;
+    layout.predict(im, &layout_res);                  // -> CDLA 版面区域
+    for (const auto& b : layout_res)
+        std::printf("label=%d score=%.3f box=(%.0f %.0f %.0f %.0f)\n",
+                    b.label_id, b.score, b.box.x, b.box.y, b.box.width, b.box.height);
+
+    // 2. 表格结构：StructureV2Table(model, table_dict, opt) -> OCRResult(table_html/structure)
+    ocr_ns::StructureV2Table table("table.onnx", "table_dict.txt", opt);
+    modeldeploy::vision::OCRResult table_res;
+    table.predict(im, &table_res);                    // 输出 table_html / table_structure
+    std::printf("%s\n", table_res.table_html.c_str());
+
+    // 3. 端到端表格：PPStructureV2Table(det, rec, table, rec_dict, table_dict, ...)
+    ocr_ns::PPStructureV2Table ppt(
+        "det.onnx", "rec.onnx", "table.onnx",
+        "rec_dict.txt", "table_dict.txt", 960, 0.3, 0.6, 1.5, "slow", false, 8, opt);
+    ppt.set_rec_batch_size(8);                        // 识别子模型 batch（默认 8）
+    modeldeploy::vision::OCRResult ocr_res;
+    ppt.predict(im, &ocr_res);                        // text + table_html 单元格内容
+    for (size_t i = 0; i < ocr_res.text.size(); ++i)
+        std::printf("%s %.3f\n", ocr_res.text[i].c_str(), ocr_res.rec_scores[i]);
+
+    // 4. 公式识别：FormulaRecognizer(model, dict, opt) -> std::string（LaTeX）
+    ocr_ns::FormulaRecognizer formula("formula.onnx", "dict.txt", opt);
+    auto eq = modeldeploy::vision::ImageData::imread("equation.jpg");
+    std::string latex;
+    if (formula.predict(eq, &latex)) std::printf("%s\n", latex.c_str());
+
+    // 5. 文档转 Markdown：DocToMarkdown 组合器（set_* 为借用指针，调用方须保持子模型存活）
+    ocr_ns::PaddleOCR ocr("det.onnx", "cls.onnx", "rec.onnx", "dict.txt", opt);
+    ocr_ns::DocToMarkdown doc;
+    doc.set_layout(&layout);                          // 版面（必须）
+    doc.set_ocr(&ocr);                                // 文本区 OCR
+    doc.set_table(&ppt);                              // 表格区
+    doc.set_formula(&formula);                        // 公式区（可省）
+    std::string markdown;
+    if (doc.ready() && doc.predict(im, &markdown))
+        std::printf("%s\n", markdown.c_str());        // 公式 $...$、表格 HTML
+    return 0;
+}
+```
+
+> `DocToMarkdown` 为**单列自上而下**顺序排版（不做多栏重排）；`set_*` 同时提供 `std::unique_ptr` 所有权重载与 `T*` 借用重载（本例为借用，须保证子模型生命周期覆盖 `doc` 使用期间）。
+
+## 13. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -572,7 +640,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 13. 工程配置
+## 14. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

@@ -544,6 +544,48 @@ int main(void) {
 }
 ```
 
+## 12. OCR 进阶（版面 / 表格 / 公式 / 文档转 Markdown）
+
+C API 仅绑定其中**公式识别**：经 `MD_MODEL_FORMULA_RECOGNIZER` 创建、`md_model_predict` 推理，结果用 `md_result_formula` 读出 LaTeX 字符串。
+**版面 `StructureV2Layout` / 表格 `StructureV2Table` / `PPStructureV2Table` / 文档转 Markdown `DocToMarkdown` 本语言未绑定**（无对应 `MDModelKind` 与 `md_result_*` 读取接口），如需请用 C++ / Python 绑定。
+
+`MD_MODEL_FORMULA_RECOGNIZER` 的 `model_path` 用 `|` 串联 **model[|dict]** 两段：`"formula.onnx|dict.txt"`（dict 可省略为 `"formula.onnx"`）。单图结果为 `MD_RES_FORMULA`（单值包装），`md_result_count` 恒为 1，用 `md_result_formula(h, 0, &latex)` 读取。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    /* 公式识别：model|dict 两段路径（'|' 分隔，dict 可省） */
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_FORMULA_RECOGNIZER,
+                        "formula.onnx|dict.txt", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "equation.jpg");
+    MDResultHandle res = NULL;
+    if (md_model_predict(m, img, &res) != MD_OK) return 1;
+
+    const char* latex = NULL;
+    if (md_result_formula(res, 0, &latex) != MD_OK) return 1;
+    printf("LaTeX: %s\n", latex ? latex : "");
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

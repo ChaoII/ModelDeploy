@@ -406,6 +406,31 @@ using var predCls = clr.Predict(img);
 using var ocr2 = ocr.Clone();
 ```
 
+## 12. OCR 进阶（版面 / 表格 / 公式 / 文档转 Markdown）
+
+C# 仅绑定其中**公式识别**：`ModelDeploy.Models.FormulaRecognizerModel`，`Predict` 直接返回 LaTeX `string`。
+**版面 `StructureV2Layout` / 表格 `StructureV2Table` / `PPStructureV2Table` / 文档转 Markdown `DocToMarkdown` 本语言未绑定**（C API 无对应 kind），如需请用 C++ / Python 绑定。
+
+`FormulaRecognizerModel` 的 `modelPath` 用 `|` 串联 **model[|dict]** 两段：`"formula.onnx|dict.txt"`（dict 可省略为 `"formula.onnx"`）。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 公式识别：model|dict 两段路径（'|' 分隔，dict 可省）
+using var formula = new FormulaRecognizerModel("formula.onnx|dict.txt", option);
+
+// 单图推理：返回 LaTeX 字符串
+using var img = VisionImage.Read("equation.jpg");
+string latex = formula.Predict(img);
+Console.WriteLine(latex);
+
+// 多线程：Clone() 深拷贝独立实例
+using var formula2 = formula.Clone();
+```
+
 ## 运行示例
 
 ```bash
