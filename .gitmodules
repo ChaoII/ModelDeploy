@@ -13,3 +13,6 @@
 [submodule "third_party/samplerate"]
 	path = third_party/samplerate
 	url = https://github.com/libsndfile/libsamplerate.git
+[submodule "third_party/zxing-cpp"]
+	path = third_party/zxing-cpp
+	url = https://github.com/zxing-cpp/zxing-cpp.git
