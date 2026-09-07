@@ -899,14 +899,60 @@ print(score.precision, score.recall, score.f1, score.map50)
 
 > Python 的 `solutions`/`tools` 与 C++ `vision::solution`/`vision::tool` 一一对应；各解决方案的真实方法名以本绑定存根为准（如 `line_in`/`line_out`/`region_count`/`class_count`、`heat_at`/`peak`、`region_counts`/`total_regions`、`queue_count`、`inside_count`、`speeds_m_s`、`occupancy`、`reps`、`pair_distances_m`）。
 
-## 20. 已绑定模块
+## 20. 音频模型（`Kokoro` TTS / `SenseVoice` ASR / `SpeakerVerify` / `SpeakerGallery`）
+
+`md.audio` 子模块提供语音合成 `Kokoro`（24kHz）、语音识别 `SenseVoice`（16k PCM）与说话人验证 `SpeakerVerify` / 声纹库 `SpeakerGallery`。音频采样均为 `float`（PCM），声纹 embedding 为 `list[float]`。
+
+### TTS：`Kokoro`（24kHz）
+
+```python
+# Kokoro：24kHz，构造 7 参（onnx / tokens / lexicons / voices.bin / jieba / norm_dir / option）
+kokoro = md.audio.Kokoro("kokoro.onnx", "tokens.txt", ["lex_en.txt", "lex_zh.txt"],
+                         "voices.bin", "dict/", "text_normalization/", option)
+print(kokoro.sample_rate)                            # 24000
+
+wav = kokoro.predict("你好，世界。", "zf_001", 1.0)  # list[float]，24k 采样
+# 流式合成：chunk_frames 默认 24（单位 UTF-8 字符数），0 等价一次性合成
+chunks = kokoro.predict_stream("你好，世界。", "zf_001", chunk_frames=120)
+for c in chunks:                                     # 每块为 float32 数组，可 np.concatenate 平铺
+    ...
+```
+
+### ASR：`SenseVoice`（16k）
+
+```python
+sv = md.audio.SenseVoice("sense_voice.onnx", "tokens.txt")   # custom_option 可省
+text = sv.predict(wav16k_list)                               # 纯净文本 -> str
+r = sv.recognize(wav16k_list)                                # -> SenseVoiceResult
+print(r.text, r.language, r.emotion, r.event, r.task, r.itn, r.nospeech)
+```
+
+`SenseVoiceResult` 字段：`text`（纯净文本）、`language`（zh/en/ja/ko…）、`emotion`（NEUTRAL/HAPPY…）、`event`（Speech/Music…）、`task`（ASR/AED/SER…）、`itn`（是否 withitn）、`nospeech`（是否检测到 `<|nospeech|>`）。
+
+### 说话人：`SpeakerVerify` + `SpeakerGallery`
+
+```python
+sp = md.audio.SpeakerVerify("ecapa.onnx")          # 192-d 声纹 embedding
+sp.is_initialized()
+emb = sp.predict(pcm16k_list)                      # list[float]
+
+gal = md.audio.SpeakerGallery()                    # 纯内存声纹库
+gal.enroll("alice", emb)                           # 注册说话人
+for label, score in gal.match(emb, k=1):           # top-k 余弦匹配 -> [(label, score)]
+    print(label, score)
+gal.size(); gal.remove("alice"); gal.clear()
+```
+
+> `md.audio` 与 C++ `audio::asr`/`audio::tts`/`audio::speaker` 一一对应；SenseVoice / SpeakerVerify 输入为 16kHz 单声道 PCM（约 1s 即足够），Kokoro 输出 24kHz 单声道。
+
+## 21. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID`、`BarcodeDetector`、`ByteTracker`/`BotSortTracker`/`StrongSortTracker` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult`、`BarcodeResult`、`TrackResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 21. 性能测试
+## 22. 性能测试
 
 ```python
 import time

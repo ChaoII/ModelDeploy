@@ -1046,18 +1046,18 @@ int main() {
 | 行人 ReID | `vision::reid::ReID` + `reid::ReIdGallery` | 见上文 §16 |
 | 条码 / 二维码 | `vision::barcode::BarcodeDetector` | 见上文 §17 |
 | 多目标跟踪 | `vision::tracking::ByteTracker` / `BotSortTracker` / `StrongSortTracker` | 见上文 §18 |
-| ASR | `audio::asr::SenseVoice` | 见 [models-语音](../models.md#10-语音识别asr) |
-| TTS（Kokoro） | `audio::tts::Kokoro` | 见 [models-TTS](../models.md#11-语音合成tts) |
+| ASR | `audio::asr::SenseVoice` | 见下文 §21 与 [models-语音](../models.md#10-语音识别asr) |
+| TTS（Kokoro） | `audio::tts::Kokoro` | 见下文 §21 与 [models-TTS](../models.md#11-语音合成tts) |
 
 > 各类模型完整 API 见 [models.md](../models.md)；后端/设备切换见 [RuntimeOption](../runtime_option.md) 与 [后端详解](../backends.md)。
 
-### TTS 类签名
+## 21. 音频模型（`audio::tts::Kokoro` / `audio::asr::SenseVoice` / `audio::speaker`）
 
-Kokoro 继承 `audio::tts::ITtsModel`，提供 `predict` / `predict_stream` / `get_sample_rate`（`predict_stream` 的 `cb` 签名 `bool(const float*, int, float progress)`，返回 `false` 中止；`chunk_frames == 0` 等价一次性合成）。
+`modeldeploy::audio` 命名空间提供语音合成（`tts::Kokoro`，24kHz）、语音识别（`asr::SenseVoice`，16k PCM）与说话人验证/声纹库（`speaker_verify::SpeakerVerify` + `SpeakerGallery`）。完整示例见 `examples/demo_audio/` 与 `examples/demo_speaker/`。
 
-> `chunk_frames` 单位为 **UTF-8 字符数**（Kokoro，>120 字触发多块）。上层应传相对小的值以观察多次音频回调（如 120）。
+### TTS：`audio::tts::Kokoro`（24kHz）
 
-- `audio::tts::Kokoro(model_onnx, tokens, lexicons, voices_bin, jieba_dir, norm_dir, opt)` —— 24kHz，`predict(text, voice, speed, &audio)`。
+Kokoro 继承 `audio::tts::ITtsModel`，提供 `predict` / `predict_stream` / `get_sample_rate`。`predict_stream` 的 `cb` 签名 `bool(const float*, int, float progress)`，返回 `false` 中止；`chunk_frames == 0` 等价一次性合成。`chunk_frames` 单位为 **UTF-8 字符数**（>120 字触发多块），上层应传相对小的值以观察多次音频回调（如 120）。
 
 ```cpp
 modeldeploy::RuntimeOption option;
@@ -1074,6 +1074,36 @@ kokoro.predict_stream("你好，世界。", "zf_001", 1.0f, 120,
     [](const float* samples, int n, float progress) -> bool { return true; });
 ```
 
+### ASR：`audio::asr::SenseVoice`（16k）
+
+```cpp
+modeldeploy::audio::asr::SenseVoice sv("sense_voice.onnx", "tokens.txt", option);
+
+std::string text;                    // 纯净文本
+sv.predict(pcm16k, &text);
+
+modeldeploy::audio::asr::SenseVoiceResult r;   // 结构化：language/emotion/event/task/itn/nospeech
+sv.predict(pcm16k, &r);
+std::printf("%s | %s | %s | %s | %s | itn=%d nospeech=%d\n",
+            r.text.c_str(), r.language.c_str(), r.emotion.c_str(),
+            r.event.c_str(), r.task.c_str(), r.itn, r.nospeech);
+```
+
+### 说话人：`audio::speaker_verify::SpeakerVerify` + `audio::SpeakerGallery`
+
+```cpp
+using modeldeploy::audio::speaker_verify::SpeakerVerify;
+SpeakerVerify sp("ecapa.onnx", option);          // 192-d 声纹 embedding
+std::vector<float> emb;
+sp.predict(pcm16k, &emb);
+
+modeldeploy::audio::SpeakerGallery gal;          // 纯内存声纹库（label -> l2 归一化 embedding）
+gal.enroll("alice", emb);
+for (auto& [label, score] : gal.match(emb, 1))   // top-k 余弦匹配
+    std::printf("%s %.4f\n", label.c_str(), score);
+gal.size(); gal.remove("alice"); gal.clear();
+```
+
 ## 设备与设备帧
 
 `RuntimeOption::set_device(Device::OPENCL/VULKAN)`(需显式 `use_mnn_backend()`,否则 fail-closed）:
@@ -1087,7 +1117,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 21. 工程配置
+## 22. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

@@ -1092,6 +1092,70 @@ int main(void) {
 
 > `MDSolutionKind` 的 `SPEED`/`DISTANCE`/`WORKOUT`/`PARKING`/`FALL_DETECT` 枚举存在（用于 `md_solution_create`），但本层**未提供**逐帧 update 与结果读取函数（C API 阈值未暴露这些 `vision::solution` 方法），相应业务请用 C++ / Python。工具 `md_vision_iou4` 对应 C++ `vision::tool::iou`。
 
+## 20. 音频模型（ASR / TTS / SpeakerVerify）
+
+音频模型经 `md_model_create` 按 `MD_MODEL_ASR` / `MD_MODEL_TTS` / `MD_MODEL_SPEAKER_VERIFY` 创建，再用 `md_audio_*` 专属函数推理（多文件模型以 `|` 拼接路径）。`SpeakerGallery` 无高层类，声纹库用音频解决方案 `MD_AUDIO_SPEAKER_SEARCH`（`md_audio_speaker_search_*`）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+/* TTS 流式回调：返回 0 提前中止合成 */
+static int32_t on_audio(const float* samples, int32_t n, float progress, void* userdata) {
+    (void)samples; (void)n; (void)userdata;
+    printf("progress=%.1f%%\n", progress * 100);
+    return 1;
+}
+
+int main(void) {
+    /* 多文件模型经 '|' 拼路径：
+       ASR: model.onnx|tokens.txt
+       TTS: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir */
+    MDModelHandle asr = NULL, tts = NULL, spv = NULL;
+    md_model_create(&asr, MD_MODEL_ASR, "sense_voice.onnx|tokens.txt", opt);
+    md_model_create(&tts, MD_MODEL_TTS,
+        "kokoro.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|dict/|norm/", opt);
+    md_model_create(&spv, MD_MODEL_SPEAKER_VERIFY, "ecapa.onnx", opt);
+
+    /* ASR：文本（库内解码 wav / PCM 浮点） */
+    const char* text = NULL;
+    md_audio_asr_wav(asr, "in.wav", &text);                  /* 文本归结果句柄，无需释放 */
+    md_audio_asr(asr, pcm, n, 16000, &text);
+
+    /* ASR：结构化（SenseVoice 复任务标签） */
+    MDAsrResult r;
+    md_audio_asr_result(asr, pcm, n, 16000, &r);
+    printf("%s | %s | %s | %s | %s | itn=%d nospeech=%d\n",
+           r.text, r.language, r.emotion, r.event, r.task, r.itn, r.nospeech);
+
+    /* TTS：合成音频（24k）并落盘 */
+    int sr = 0; const float* audio = NULL; size_t audio_n = 0;
+    md_audio_tts(tts, "你好，世界。", "zf_001", 1.0f, &sr, &audio, &audio_n);
+    md_wav_save(audio, audio_n, sr, "out.wav");
+
+    /* TTS：流式回调（chunk_frames<=0 等价一次性合成） */
+    md_audio_tts_stream(tts, "你好，世界。", "zf_001", 1.0f, 120, on_audio, NULL,
+                        &sr, &audio, &audio_n);
+
+    /* 声纹：提取说话人 embedding（借用指针，用后无需释放） */
+    const float* emb = NULL; size_t emb_n = 0;
+    md_audio_speaker_embed(spv, pcm, n, &emb, &emb_n);
+
+    /* 声纹库：SpeakerGallery 未提供高层类 -> 用 SpeakerSearch 解决方案 */
+    MDAudioSolutionHandle gal = NULL;
+    md_audio_solution_create(&gal, MD_AUDIO_SPEAKER_SEARCH);
+    md_audio_speaker_search_enroll(gal, "alice", emb, emb_n);
+    const char* label = NULL; float score = 0.f;
+    md_audio_speaker_search_match(gal, emb, emb_n, 1, &label, &score);
+
+    md_audio_solution_destroy(gal);
+    md_model_destroy(asr); md_model_destroy(tts); md_model_destroy(spv);
+    return 0;
+}
+```
+
+> 返回值语义同 `md_audio_asr(asr, samples, n, sample_rate, &text)`：16kHz 单声道 PCM；`md_audio_tts` 返回整段 24kHz 单声道音频（`audio` 归模型句柄内部，随 `md_model_destroy` 或下次调用前有效）。`md_audio_resample` 可在各采样率间转换 PCM（见 §接口分组）。
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

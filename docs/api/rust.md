@@ -816,6 +816,45 @@ fn main() -> Result<(), modeldeploy::MdError> {
 
 > C API `MDSolutionKind` 另有 `SPEED`/`DISTANCE`/`WORKOUT`/`PARKING`/`FALL_DETECT` 五个枚举项，Rust 未桥接对应逐帧查询接口；底层 C++ 实现见 [solutions.md](../solutions.md)。
 
+## 20. 音频模型（SenseVoice / Kokoro / SpeakerVerify / SpeakerGallery）
+
+`modeldeploy` crate 提供 ASR `SenseVoice`、TTS `Kokoro`、声纹 `SpeakerVerify` 与纯内存声纹库 `SpeakerGallery`（C++ 侧为纯内存类、不经 C ABI，故 Rust 以等价数据结构纯 Rust 复刻）。`SenseVoice`/`Kokoro`/`SpeakerVerify` 的模型路径为 `|` 拼接的多文件路径。
+
+```rust
+use modeldeploy::{Kokoro, SenseVoice, SpeakerGallery, SpeakerVerify, RuntimeOption};
+use modeldeploy::types::{AsrResult, TtsAudio};
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let opt = RuntimeOption::new()?.use_ort();
+
+    // ── ASR（SenseVoice，16k）：路径 model.onnx|tokens.txt
+    let sv = SenseVoice::new("sense_voice.onnx|tokens.txt", &opt)?;
+    let text: String = sv.predict(&wav16k, 16000)?;              // 纯净文本
+    let r: AsrResult = sv.predict_structured(&wav16k, 16000)?;   // 结构化
+    println!("{} | {} | {} | {} | {} | itn={} nospeech={}",
+             r.text, r.language, r.emotion, r.event, r.task, r.itn, r.nospeech);
+
+    // ── TTS（Kokoro，24k）：路径 model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
+    let kokoro = Kokoro::new("kokoro.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|dict/|norm/", &opt)?;
+    let audio: TtsAudio = kokoro.predict("你好，世界。", "zf_001", 1.0)?;  // samples / sample_rate
+
+    // ── 声纹（SpeakerVerify）：提取 192-d 说话人 embedding
+    let spv = SpeakerVerify::new("ecapa.onnx", &opt)?;
+    let emb: Vec<f32> = spv.predict(&wav16k)?;
+
+    // ── 声纹库（纯 Rust，余弦 top-k 匹配）
+    let mut gal = SpeakerGallery::new();
+    gal.enroll("alice", &emb);
+    for (label, score) in gal.r#match(&emb, 1) {                 // (label, score)
+        println!("{} {:.4}", label, score);
+    }
+    gal.size(); gal.remove("alice"); gal.clear();
+    Ok(())
+}
+```
+
+> `SenseVoice` 另提供 `predict_wav`/`predict_wav_structured`（从 wav 文件）；`SpeakerVerify` 与 `Kokoro` 的 `new` 后可用 `is_ready()` 探活、`clone()` 深拷贝（独立实例可并行）。PCM 输入均为 16kHz 单声道（约 1s 足够），Kokoro 输出 24kHz。`AsrResult`/`TtsAudio` 字段见 `types.rs`。
+
 ## 主要模块文件
 
 | 文件 | 说明 |

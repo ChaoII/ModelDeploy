@@ -743,6 +743,40 @@ Console.WriteLine(iou);
 
 > C API `MDSolutionKind` 另有 `SPEED`/`DISTANCE`/`WORKOUT`/`PARKING`/`FALL_DETECT` 五个枚举项，但 C# 与 C API 均无对应逐帧查询接口（仅 `md_solution_create`/`destroy`），故不提供类封装；底层 C++ 实现见 [solutions.md](../solutions.md)。
 
+## 20. 音频模型（SenseVoice / Kokoro / SpeakerVerify）
+
+`ModelDeploy.Models` 命名空间提供 ASR `SenseVoiceModel`、TTS `KokoroModel` 与声纹 `SpeakerVerifyModel`；`SpeakerGallery`（注册/比对库）**未绑定**，用 `ModelDeploy.Audio.SpeakerSearch` 替代（封装 C API `md_audio_speaker_search_*`）。模型路径为 **`|` 拼接的多文件路径**。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var opt = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// ── ASR（SenseVoice，16k）─ 路径格式: model.onnx|tokens.txt
+var asr = new SenseVoiceModel("sense_voice.onnx|tokens.txt", opt);
+var r1  = asr.Predict(wav16k, 16000);            // AsrResult.Text：纯净文本
+var r2  = asr.PredictWav("in.wav");
+var rs  = asr.PredictStructured(wav16k, 16000);  // AsrResult{Text,Language,Emotion,Event,Task,Itn,NoSpeech}
+
+// ── TTS（Kokoro，24k）─ 路径格式: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
+var kokoro = new KokoroModel("kokoro.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir", opt);
+var tts  = kokoro.Predict("你好，世界。", "zf_001");   // TtsResult{ Audio(float[]), SampleRate }
+kokoro.SaveWav(tts, "kokoro.wav");
+
+// ── 声纹（SpeakerVerify，提取 192-d embedding）与声纹库 ─
+var spv = new SpeakerVerifyModel("ecapa.onnx", opt);
+float[] emb = spv.Predict(wav16k);
+
+// SpeakerGallery 未绑定 → 用 SpeakerSearch（纯内存声纹库）
+using var gal = new ModelDeploy.Audio.SpeakerSearch();
+gal.Enroll("alice", emb);
+string label = gal.Match(emb);                  // 余弦 top-1，返回最相似 label
+```
+
+> `SenseVoiceModel` 另提供 `PredictWavStructured`/`PredictStructured`（结构化 `AsrResult`，字段 `Text/Language/Emotion/Event/Task/Itn/NoSpeech`）；`KokoroModel.Predict` 与 `SpeakerVerifyModel.Predict` 的 PCM 输入为 16kHz 单声道（约 1s 足够），Kokoro 输出 24kHz。`SpeakerSearch` 仅暴露 `Enroll`/`Match`（top-1），如需 top-k 与多说话人请用 C++ / Python。
+
 ## 运行示例
 
 ```bash
@@ -759,28 +793,6 @@ cd ModelDeployExample/bin/Debug/net9.0
 - `ModelDeploy` — C# 绑定库
 - `ModelDeployExample` — 示例
 - `ModelDeployUnitTest` — 单元测试
-
-## TTS（Kokoro）
-
-命名空间 `ModelDeploy.Models`，`KokoroModel` 返回 `TtsResult { Audio (float[]), SampleRate }`，另有 `SaveWav(result, path)` 落盘。
-
-```csharp
-using ModelDeploy;
-using ModelDeploy.Models;
-
-var opt = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
-
-// Kokoro：24kHz。modelPath 格式: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
-var kokoro = new KokoroModel("kokoro.onnx|tokens.txt|...", opt);
-kokoro.SaveWav(kokoro.Predict("你好，世界。", "zf_001"), "kokoro.wav");
-
-// 统一流式：PredictStream 逐块回调 onChunk(samples, progress)，同时返回整段音频
-// chunkFrames <= 0 等价一次性合成（单次回调整段）
-var r1 = kokoro.PredictStream("你好，世界。", "zf_001", 1.0f, 120,
-    (samples, progress) => Console.WriteLine($"progress={progress:P0} chunk={samples.Length}"));
-```
-
-`KokoroModel` 提供 `Predict(text, voice, speed=1.0f)`、`PredictStream(text, voice, speed, chunkFrames, onChunk)` 与 `Clone()`（深拷贝实例，多线程用）。
 
 ## 图像原始字节（`VisionImage`）
 
