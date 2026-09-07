@@ -1045,15 +1045,59 @@ print(dag.get_node("C").get_output("out"))               # 读下游输出
 
 > `modeldeploy.nlp` 与 C++ `nlp::tool` / `nlp::solution::TextClassifier` 一一对应（模型语义见 [models.md §21](../models.md)）；`modeldeploy.pipeline` 以 Python 变换函数包装节点，对应 C++ `pipeline::{Planner, Dag, Node}`（C++ 用 `register_model` + 工厂，Python 用 `register_transform` + 可调用）。
 
-## 23. 已绑定模块
+## 23. 视频编解码（`modeldeploy.video`）
+
+`modeldeploy.video` 等价于 C++ `modeldeploy::video`（解码+编码全功能，与 C API / C# / Rust 全对齐）：`VideoDecoder` / `VideoEncoder` / `VideoDecoderConfig` / `VideoEncoderConfig` / `VideoCapabilities`，枚举 `CodecBackend` / `HwAccel` / `Backpressure` / `State`。帧类型复用 `modeldeploy.vision.ImageData`（`read_frame` 返回 NV12，`from_nv12` / `from_device_nv12` 构造输入帧）。
+
+```python
+import modeldeploy as md
+
+# 1. 能力探测（等价 C++ query_video_capabilities）
+cap = md.video.query_video_capabilities()
+print(cap.ffmpeg_available, cap.hw_decoders, cap.hw_encoders)
+
+# 2. 解码配置（VideoDecoderConfig 全字段，均有默认）
+cfg = md.video.VideoDecoderConfig()
+cfg.backend   = md.video.CodecBackend.FFmpeg
+cfg.hw_accel  = md.video.HwAccel.Auto     # 硬解失败自动回退软解
+cfg.backpressure = md.video.Backpressure.Block
+cfg.pooling = True
+
+# 3. 同步抽帧：read_frame() -> (bool, NV12 ImageData, 毫秒时间戳)
+dec = md.video.VideoDecoder(cfg)
+dec.open("demo.mp4")                      # 或 rtsp://...；失败抛异常
+ok, image, pts = dec.read_frame()         # EOF/失败时 ok=False
+print(dec.width, dec.height, dec.fps)
+dec.close()                               # 幂等
+
+# 4. 异步解码（回调推送，后台线程投递，帧为自有 ImageData）
+adec = md.video.VideoDecoder(cfg)
+adec.set_callback(lambda image, pts_ms: print(pts_ms, image.width, image.height))
+adec.open("demo.mp4"); adec.start()
+# ... 同时做别的事 ...
+adec.stop()
+
+# 5. 编码：encode(image, pts_ms)，按 ImageData.device() 路由（CPU BGR 软编 / GPU 直编）
+ecfg = md.video.VideoEncoderConfig()
+ecfg.codec = "libx264"; ecfg.fps = 25; ecfg.bitrate_kbps = 2000; ecfg.format = "mp4"
+enc = md.video.VideoEncoder(ecfg)
+enc.open("out.mp4", 1280, 720, 25)
+enc.encode(image, pts)
+enc.close()                               # 必须 close，mp4 尾部索引(moov)在此写盘
+```
+
+> **构建前提（重要）**：`modeldeploy.video` 是**真实绑定**（源码 `csrc/pybind/video/video_pybind.cpp`，随 `modeldeploy.video` 子模块注册），但仅在 SDK/轮子以 `BUILD_VIDEO=ON` 且 `BUILD_VISION=ON`（还需 FFmpeg/GStreamer）编译时才导出。`BUILD_VIDEO` **默认 OFF**，官方标准 wheel 不包含该模块 —— 此时 `import modeldeploy.video` 报 `ModuleNotFoundError`，请用 `cmake -DBUILD_VIDEO=ON ...`（Python 构建经 `pyproject.toml`/CMake 透传）自行重建。各语言用法一致，全程示例与成员清单见 [视频接口总览](../video/api.md)。
+
+## 24. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID`、`BarcodeDetector`、`ByteTracker`/`BotSortTracker`/`StrongSortTracker` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult`、`BarcodeResult`、`TrackResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 - **NLP**：`nlp.tools.{Splitter, Tokenizer, Keywords, Stats}`、`nlp.solutions.TextClassifier`、`pipeline.{Planner, Dag, Node}`
+- **视频**（需 `BUILD_VIDEO=ON`）：`video.VideoDecoder` / `VideoEncoder` / `VideoDecoderConfig` / `VideoEncoderConfig` / `VideoCapabilities`
 
-## 24. 性能测试
+## 25. 性能测试
 
 ```python
 import time

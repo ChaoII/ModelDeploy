@@ -1209,6 +1209,72 @@ if (dag->build()) {                                     // 校验无环 + 拓扑
 
 > C++ 工具类为 `modeldeploy::nlp::tool`（`Splitter`/`Keywords`/`Stats`/`Tokenizer`/`Normalizer`），文本分类为 `modeldeploy::nlp::solution::TextClassifier`。C++ `pipeline` 与 Python `modeldeploy.pipeline` 对应，接口名有差异：C++ `Planner::register_model(name, Factory)` 注册节点工厂（Python 用 `register_transform(name, type, fn)` 直接注册可调用）；`Dag::connect(src, src_port, dst, dst_port)` / `add_node` 也可手工搭更复杂的图（YAGNI，DSL 仅支持顺序 + 单级 fan-in/fan-out）。
 
+## 24. 视频编解码（`video::VideoDecoder` / `video::VideoEncoder`）
+
+`modeldeploy::video` 命名空间提供视频解码/编码门面 `VideoDecoder` / `VideoEncoder`（后端无关，不泄漏 FFmpeg/GStreamer 原生结构），配置统一为 `VideoDecoderConfig` / `VideoEncoderConfig`（编码专用字段以链式 `set_*` 设置），能力用 `query_video_capabilities()` 探测。完整语义见 [视频接口总览](../video/api.md) 与 [使用指引](../video/guide.md)；可运行示例见 `examples/demo_action/demo_action.cpp`（TSN 视频动作识别，`build/examples/demo_action`）、`application/video_source.cpp` / `video_sink.cpp` / `video_codec.cpp`。
+
+```cpp
+#include "modeldeploy/video.h"
+#include <cstdio>
+
+using modeldeploy::video::VideoDecoder;
+using modeldeploy::video::VideoDecoderConfig;
+using modeldeploy::video::VideoEncoder;
+using modeldeploy::video::VideoEncoderConfig;
+using modeldeploy::video::VideoFrame;
+
+int main() {
+    // 1. 能力探测：当前编译/运行环境实际可用后端 + 硬解硬编列表（如 "h264_cuvid" / "h264_nvenc"）
+    auto cap = modeldeploy::video::query_video_capabilities();
+    std::printf("ffmpeg=%d gstreamer=%d hw_dec=%zu hw_enc=%zu\n",
+                cap.ffmpeg_available, cap.gstreamer_available,
+                cap.hw_decoders.size(), cap.hw_encoders.size());
+
+    // 2. 解码配置 + 门面（create 后端不可用返回 nullptr）
+    VideoDecoderConfig vcfg;
+    vcfg.hw_accel  = modeldeploy::video::HwAccel::Auto;   // 默认 Auto，硬解失败自动回退软解
+    vcfg.backpressure = modeldeploy::video::Backpressure::Block;
+    vcfg.async_queue_size = 30;
+    auto dec = VideoDecoder::create(vcfg);
+
+    // 3. 同步抽帧：read_one_frame 输出 CPU NV12 + 毫秒时间戳；失败/EOF 返回 false
+    if (dec && dec->open("demo.mp4", nullptr)) {
+        VideoFrame vf;
+        while (dec->read_one_frame(&vf, nullptr)) {
+            std::printf("frame %llu ms %dx%d\n",
+                        (unsigned long long)vf.pts_ms, vf.image.width(), vf.image.height());
+        }
+        dec->close();
+    }
+
+    // 4. 异步解码：set_callback + start（回调后台线程投递，帧以移动语义交付后回收回缓冲池）
+    auto adec = VideoDecoder::create(vcfg);
+    adec->set_callback([](VideoFrame&& vf) {
+        std::printf("async %llu ms\n", (unsigned long long)vf.pts_ms);
+    });
+    adec->open("rtsp://...", nullptr);
+    adec->start();
+    // ... 做别的事 ...
+    adec->stop();
+
+    // 5. 编码：统一 encode(const VideoFrame&)，按 frame.image.device() 路由
+    //    （CPU BGR 软编 / GPU CUDA 设备显存直编，见下方所有权约定）
+    VideoEncoderConfig ecfg;
+    ecfg.fps = 25; ecfg.bitrate_kbps = 2000;
+    ecfg.codec = "libx264"; ecfg.format = "mp4";       // 链式：ecfg.set_fps(25).set_bitrate_kbps(2000)
+    auto enc = VideoEncoder::create(ecfg);
+    enc->open("out.mp4", 1280, 720, 25);               // (url, w, h, src_fps)
+    VideoFrame out;
+    out.image = /* ImageData（CPU BGR 或设备 NV12） */;
+    out.pts_ms = 0;
+    enc->encode(out);
+    enc->close();   // 必须 close，mp4 尾部索引(moov)在此写盘
+    return 0;
+}
+```
+
+> **所有权约定**：`encode(frame)` 时若 `frame.image.device() == Device::GPU`（设备 NV12），SDK **借用调用方显存平面直通编码、不拷贝、不持有其生命周期** —— 这些平面须在 `close()` 之前始终有效；CPU 输入由 SDK 拷贝、无此约束。编码器 `open` 须传 `w,h,src_fps`；`close()` 幂等、别忘调用（moov 在此写盘）。解码 `create` 返回 `shared_ptr`，`nullptr` = 后端不可用；同步/异步二选一（同步只 `read_one_frame`，异步 `set_callback`+`start` 走背压队列+缓冲池+重连）。编译需 `ENABLE_FFMPEG=ON` 或 `ENABLE_GSTREAMER=ON`。
+
 ## 设备与设备帧
 
 `RuntimeOption::set_device(Device::OPENCL/VULKAN)`(需显式 `use_mnn_backend()`,否则 fail-closed）:
@@ -1222,7 +1288,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 24. 工程配置
+## 25. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
