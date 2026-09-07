@@ -544,6 +544,49 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 14. InsightFace 全流程（`InsightFaceAnalysis` + `InsightFaceDetModel`）
+
+InsightFace Buffalo 全家桶（det + 2d106 + 3d68 + recognition）经一次 `predict` 综合输出检测框/5 关键点/姿态/特征/性别年龄。
+
+```rust
+use modeldeploy::{Image, InsightFaceAnalysis, InsightFaceDetModel, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+
+    // 1. 全流程分析：InsightFaceAnalysis。model_path 用 '|' 串联最多 5 段子模型路径
+    //    （det_10g.onnx|w600k_r50.onnx|2d106det.onnx|1k3d68.onnx|genderage.onnx，第 5 段可省）
+    let ia = InsightFaceAnalysis::new(
+        "det_10g.onnx|w600k_r50.onnx|2d106det.onnx|1k3d68.onnx|genderage.onnx", &opt)?;
+    ia.set_det_thresh(0.5)?;      // 检测阈值（默认 0.5）
+
+    let img = Image::read("test.jpg")?;
+    let faces = ia.predict(&img)?;    // Vec<InsightFace>
+    for f in &faces {
+        // f.rect / f.score：检测框 + 置信度
+        // f.keypoints：5 关键点（Vec<Point>）；f.embedding：512 维特征（Vec<f32>）
+        // f.pose：3 姿态角（Vec<f32>）；f.gender / f.age：0/1 整数、年龄（未启用 genderage 时为 -1）
+        // 注意：Rust 未暴露 106/68 关键点（C++/Python 才有）
+        println!("score={:.3} rect=({:.0},{:.0},{:.0},{:.0}) kps={} emb={} gender={} age={}",
+                 f.score, f.rect.x, f.rect.y, f.rect.width, f.rect.height,
+                 f.keypoints.len(), f.embedding.len(), f.gender, f.age);
+    }
+    // 批量：ia.predict_batch(&[&img, &img2])? -> Vec<Vec<InsightFace>>
+    // 多线程：ia.clone()?；可视化：predict_and_draw(canvas, DrawOptions::new().with_alpha(0.3))?
+
+    // 2. 子模型：InsightFaceDetModel（仅检测，det_10g.onnx -> Vec<FaceDetection>）
+    let det = InsightFaceDetModel::new("det_10g.onnx", &opt)?;
+    let dets = det.predict(&img)?;    // rect/score/keypoints（5 关键点）
+    for d in &dets {
+        println!("score={:.3} rect=({:.0},{:.0},{:.0},{:.0}) kps={}",
+                 d.score, d.rect.x, d.rect.y, d.rect.width, d.rect.height, d.keypoints.len());
+    }
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

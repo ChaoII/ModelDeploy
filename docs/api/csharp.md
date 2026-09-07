@@ -481,6 +481,49 @@ foreach (var r in pipePred) Console.WriteLine($"embedding dim={r.Embedding.Lengt
 using var det2 = det.Clone();
 ```
 
+## 14. InsightFace 全流程（`InsightFaceModel` + `InsightFaceDetModel`）
+
+InsightFace Buffalo 全家桶（det + 2d106 + 3d68 + recognition）经一次 `Predict` 综合输出检测框/5 关键点/姿态/特征/性别年龄。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 1. 全流程分析：InsightFaceModel。modelPath 用 '|' 串联最多 5 段子模型路径
+//    （det_10g.onnx|w600k_r50.onnx|2d106det.onnx|1k3d68.onnx|genderage.onnx，第 5 段可省）
+using var ia = new InsightFaceModel(
+    "det_10g.onnx|w600k_r50.onnx|2d106det.onnx|1k3d68.onnx|genderage.onnx", option);
+ia.SetDetThresh(0.5);            // 检测阈值（默认 0.5）
+
+using var img = VisionImage.Read("test.jpg");
+using var pred = ia.Predict(img);     // Prediction<InsightFaceResult>
+foreach (var r in pred)
+{
+    Console.WriteLine($"{r.Score:F3} ({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height}) " +
+                      $"kps={r.KeyPoints.Length} emb={r.Embedding.Length} pose={r.Pose.Length} " +
+                      $"gender={r.Gender} age={r.Age}");
+    // r.Box / r.Score：检测框 + 置信度
+    // r.KeyPoints：5 关键点（PointF[]）；r.Embedding：512 维特征（float[]）
+    // r.Pose：3 姿态角（float[]）；r.Gender / r.Age：0/1 整数、年龄（未启用 genderage 时为 -1）
+    // 注意：C# 未暴露 106/68 关键点（C++/Python 才有）
+}
+
+// 批量：ia.PredictBatch(new[] { img, img2 }) -> IReadOnlyList<InsightFaceResult[]>
+// 多线程：ia.Clone()；可视化：pred.Draw(canvas, new DrawOptions { Alpha = 0.3 })
+
+// 2. 子模型：InsightFaceDetModel（仅检测，det_10g.onnx -> Prediction<FaceDetResult>）
+using var det = new InsightFaceDetModel("det_10g.onnx", option);
+using var detPred = det.Predict(img);
+foreach (var f in detPred)
+{
+    Console.WriteLine($"{f.Score:F3} ({f.Box.X},{f.Box.Y},{f.Box.Width},{f.Box.Height}) " +
+                      $"kps={f.KeyPoints.Length}");
+}
+```
+
 ## 运行示例
 
 ```bash

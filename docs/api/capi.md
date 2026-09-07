@@ -690,6 +690,84 @@ int main(void) {
 }
 ```
 
+## 14. InsightFace 全流程（`MD_MODEL_INSIGHTFACE` / `MD_MODEL_INSIGHTFACE_DET`）
+
+InsightFace Buffalo 全家桶（det + 2d106 + 3d68 + recognition）组合成一次 `md_model_predict`，输出检测框/5 关键点/姿态/特征/性别年龄。子模型分别创建。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+
+    /* 1. 全流程分析：MD_MODEL_INSIGHTFACE。model_path 用 '|' 串联最多 5 段子模型路径
+     *    det_10g.onnx|w600k_r50.onnx|2d106det.onnx|1k3d68.onnx|genderage.onnx
+     *    （至少 4 段，第 5 段 genderage 可省略）。参数自省为 "det_thresh"（类型 'D'） */
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_INSIGHTFACE,
+            "det_10g.onnx|w600k_r50.onnx|2d106det.onnx|1k3d68.onnx|genderage.onnx",
+            opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    md_model_set_param_d(m, "det_thresh", 0.5);    /* 检测阈值（默认 0.5） */
+
+    MDResultHandle res = NULL;
+    md_model_predict(m, img, &res);
+
+    const MDInsightFaceItem* items = NULL;   /* {x, y, w, h, score, gender, age} */
+    size_t n = 0;
+    md_result_insightface(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        const MDPoint* kps = NULL; size_t kn = 0;
+        md_result_insightface_kps(res, i, &kps, &kn);        /* 5 关键点 (x,y) */
+        const float* emb = NULL; size_t en = 0;
+        md_result_insightface_embedding(res, i, &emb, &en);  /* 512 维特征 */
+        const float* pose = NULL; size_t pn = 0;
+        md_result_insightface_pose(res, i, &pose, &pn);      /* 3 姿态角 [pitch,yaw,roll] */
+        printf("[%zu] score=%.3f box=(%.0f,%.0f,%.0f,%.0f) kps=%zu emb=%zu gender=%d age=%d\n",
+               i, items[i].score, items[i].x, items[i].y, items[i].w, items[i].h,
+               kn, en, items[i].gender, items[i].age);
+    }
+    /* 批量：md_model_predict_batch + md_result_insightface_batch/_kps_batch/_embedding_batch/_pose_batch */
+    /* 可视化：md_draw_result 支持 MD_RES_INSIGHTFACE（底层 vis_keypoints，alpha 经 MDDrawOptions，如 0.3） */
+
+    /* 注意：C API 仅暴露 bbox/score/kps/embedding/pose/gender/age，不含 106/68 关键点（C++/Python 才有） */
+
+    md_result_destroy(res);
+    md_model_destroy(m);
+
+    /* 2. 子模型：MD_MODEL_INSIGHTFACE_DET（仅检测，det_10g.onnx）。
+     *    结果 kind 为 MD_RES_FACE，读取同人脸检测：md_result_face + md_result_face_kps */
+    MDModelHandle det = NULL;
+    md_model_create(&det, MD_MODEL_INSIGHTFACE_DET, "det_10g.onnx", opt);
+    md_model_set_input_size(det, 640, 640);
+    MDResultHandle det_res = NULL;
+    md_model_predict(det, img, &det_res);
+    const MDFaceItem* ditem = NULL; size_t dn = 0;
+    md_result_face(det_res, &ditem, &dn);
+    for (size_t i = 0; i < dn; i++) {
+        const MDPoint* dk = NULL; size_t dkn = 0;
+        md_result_face_kps(det_res, i, &dk, &dkn);   /* 5 关键点 (x,y) */
+        printf("det[%zu] score=%.3f box=(%.0f,%.0f,%.0f,%.0f) kps=%zu\n",
+               i, ditem[i].score, ditem[i].x, ditem[i].y, ditem[i].w, ditem[i].h, dkn);
+    }
+    md_result_destroy(det_res);
+    md_model_destroy(det);
+
+    md_image_destroy(img);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

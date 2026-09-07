@@ -658,7 +658,74 @@ int main() {
 }
 ```
 
-## 14. 更多模型（均使用同一 `RuntimeOption`）
+## 14. InsightFace 全流程（face::InsightFaceAnalysis + 子模型）
+
+InsightFace Buffalo 全家桶（det + 2d106 + 3d68 + recognition）组合成一次 `analyze`，输出检测框/5 关键点/106/68 点/姿态/特征，适合人脸注册与比对。详细语义见 [models.md §6.1](../models.md#61-insightfacebuffalo-系列全流程)。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    // 1. 从 buffalo_l 模型目录加载全流水线
+    //    （create_from_dir 自动拼出 det_10g / w600k_r50 / 2d106det / 1k3d68 / genderage）
+    auto analysis = modeldeploy::vision::face::InsightFaceAnalysis::create_from_dir(
+        "test_data/test_models/onnx/insightface/buffalo_l");
+    if (!analysis || !analysis->is_initialized()) return 1;
+
+    // 或显式构造：InsightFaceAnalysis(det, rec, lmk2d, lmk3d, option, genderage="")
+    // auto analysis = std::make_unique<modeldeploy::vision::face::InsightFaceAnalysis>(
+    //     "det_10g.onnx", "w600k_r50.onnx", "2d106det.onnx", "1k3d68.onnx",
+    //     modeldeploy::RuntimeOption(), "genderage.onnx");
+
+    analysis->set_det_thresh(0.5f);   // 检测阈值（默认 0.5）
+
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    std::vector<modeldeploy::vision::face::InsightFaceResult> res;
+    if (!analysis->analyze(im, &res)) return 1;
+    for (const auto& r : res) {
+        std::printf("det=%.3f bbox=(%.0f,%.0f,%.0f,%.0f)\n",
+                    r.det_score, r.bbox[0], r.bbox[1], r.bbox[2], r.bbox[3]);
+        // r.bbox：[x1,y1,x2,y2]（原图坐标）；r.det_score：检测置信度
+        // r.kps：5 关键点；r.landmark_2d_106：106 个 2D 点；r.landmark_3d_68：68 个 3D 点
+        // r.pose：[pitch,yaw,roll]；r.embedding：512 维特征；r.gender / r.age（-1 表示未启用 genderage）
+        std::printf("kps=%zu l2d=%zu l3d=%zu emb=%zu gender=%d age=%d\n",
+                    r.kps.size(), r.landmark_2d_106.size(),
+                    r.landmark_3d_68.size(), r.embedding.size(), r.gender, r.age);
+    }
+    // analyze(image, &res, with_2d106=true, with_3d68=true, with_recognition=true,
+    //         with_genderage=true, max_face_only=false)
+    // 只取主脸：analysis->analyze_max_face(im, &one, ...)
+
+    // 2. 仅检测：输出 vector<InsightFaceBox>（bbox/kps/score）
+    std::vector<modeldeploy::vision::face::InsightFaceBox> boxes;
+    analysis->detect(im, &boxes);
+
+    // 3. 子模型独立使用（均位于 modeldeploy::vision::face，继承 BaseModel）
+    modeldeploy::vision::face::InsightFaceDet det("det_10g.onnx");
+    std::vector<modeldeploy::vision::face::InsightFaceBox> det_res;
+    det.predict(im, &det_res);
+
+    modeldeploy::vision::face::InsightFaceLandmark lmk("2d106det.onnx");
+    std::vector<std::array<float, 2>> pts_2d;
+    lmk.predict_2d106(im, det_res[0].bbox, &pts_2d);               // 106 个 2D 点
+    std::vector<std::array<float, 3>> pts_3d;
+    std::array<float, 3> pose{};
+    lmk.predict_3d68(im, det_res[0].bbox, &pts_3d, &pose);         // 68 个 3D 点 + 姿态
+
+    modeldeploy::vision::face::InsightFaceRecognition rec("w600k_r50.onnx");
+    std::vector<float> emb;
+    rec.predict(im, det_res[0].kps, &emb);                         // 512 维特征（需 5 关键点）
+
+    modeldeploy::vision::face::InsightFaceGenderAge ga("genderage.onnx");
+    modeldeploy::vision::face::GenderAgeResult ga_res;
+    ga.predict_gender_age(im, det_res[0].bbox, &ga_res);           // ga_res.gender / ga_res.age
+    return 0;
+}
+```
+
+> 注意：C++（与 Python）是仅有的两类能拿到 `landmark_2d_106` / `landmark_3d_68` 的绑定；C API / C# / Rust 仅暴露 bbox/kps/embedding/pose/gender/age。
+
+## 15. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -714,7 +781,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 15. 工程配置
+## 16. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

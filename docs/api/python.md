@@ -551,14 +551,73 @@ det2 = det.clone()
 
 > 注意：`Scrfd` 的 preprocessor 额外暴露 `is_mini_pad` / `is_scale_up` / `padding_value` 与 `stride`（读写属性）；`SeetaFaceAge/Gender/ID` 的 preprocessor 仅暴露 `size`，postprocessor 无参数（argmax / 内联输出）。`SeetaFaceAs*` 与 `FaceRecognizerPipeline` 在 Python 绑定**未暴露** preprocessor/postprocessor 属性，用默认参数。
 
-## 14. 已绑定模块
+## 14. InsightFace 全流程（InsightFaceAnalysis + 子模型）
+
+InsightFace Buffalo 全家桶（det + 2d106 + 3d68 + recognition + genderage）组合成一次 `analyze`，输出检测框/5 关键点/106/68 点/姿态/特征/性别年龄，适合人脸注册与比对。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 从 buffalo_l 模型目录加载全流水线。
+#    create_from_dir 会自动拼出目录内 det_10g.onnx / w600k_r50.onnx / 2d106det.onnx /
+#    1k3d68.onnx / genderage.onnx 五个模型路径
+ia = md.vision.InsightFaceAnalysis.create_from_dir(
+    "test_data/test_models/onnx/insightface/buffalo_l")
+# 或显式传各子模型路径：InsightFaceAnalysis(det, rec, lmk2d, lmk3d, option=None, genderage_model='')
+# ia = md.vision.InsightFaceAnalysis(
+#     "det_10g.onnx", "w600k_r50.onnx", "2d106det.onnx", "1k3d68.onnx",
+#     genderage_model="genderage.onnx")
+
+ia.set_det_thresh(0.5)      # 检测阈值（默认 0.5）
+
+img = cv2.imread("test.jpg")
+# 2. 全流程分析：一次调用输出所有通道
+res = ia.analyze(img)        # list[InsightFaceResult]
+for r in res:
+    print(r.bbox)              # [x1, y1, x2, y2]（原图坐标）
+    print(r.det_score)         # 检测置信度
+    print(r.kps)               # 5 关键点 [[x, y], ...]（原图坐标）
+    print(r.landmark_2d_106)   # 106 个 2D 点 [[x, y], ...]
+    print(r.landmark_3d_68)    # 68 个 3D 点 [[x, y, z], ...]
+    print(r.pose)              # [pitch, yaw, roll] 姿态角
+    print(r.embedding)         # 512 维人脸特征
+    print(r.gender, r.age)     # 性别/年龄（gender 为 0/1 整数，未启用 genderage 时为 -1）
+# analyze 各通道可开关：analyze(image, with_2d106=True, with_3d68=True,
+#                              with_recognition=True, with_genderage=True)
+
+# 3. 仅检测：ia.detect(img) -> list[InsightFaceBox]（bbox/kps/score）
+boxes = ia.detect(img)
+
+# 4. 子模型独立使用（也可不经 InsightFaceAnalysis 单独构造；option 可省略）
+det = md.vision.InsightFaceDet("det_10g.onnx")
+det.preprocessor.size = [640, 640]       # 输入尺寸（默认 [640, 640]）
+det.postprocessor.nms_thresh = 0.5       # NMS 阈值（默认 0.5）
+faces = det.predict(img)                 # -> list[InsightFaceBox]
+for f in faces:
+    print(f.bbox, f.score, f.kps)
+
+lmk = md.vision.InsightFaceLandmark("2d106det.onnx")
+p2d = lmk.predict_2d106(img, boxes[0].bbox)                # 106 个 2D 点
+p3d, pose = lmk.predict_3d68(img, boxes[0].bbox)           # 68 个 3D 点 + 姿态
+
+rec = md.vision.InsightFaceRecognition("w600k_r50.onnx")
+emb = rec.predict(img, boxes[0].kps)                       # 512 维特征（需 5 关键点）
+
+ga = md.vision.InsightFaceGenderAge("genderage.onnx")
+gender, age = ga.predict_gender_age(img, boxes[0].bbox)    # (gender, age)
+```
+
+> InsightFace 的角度/特征/关键点坐标均为原图像素；`gender`/`age` 由 genderage 子模型在后处理中给出（未启用该通道时返回 -1）。
+
+## 15. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 15. 性能测试
+## 16. 性能测试
 
 ```python
 import time
