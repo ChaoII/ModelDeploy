@@ -39,23 +39,11 @@ namespace modeldeploy::vision {
                 {"score", r.score}};
     }
 
-    inline nlohmann::json to_json(const std::vector<DetectionResult>& rs) {
-        nlohmann::json arr = nlohmann::json::array();
-        for (const auto& r : rs) arr.push_back(to_json(r));
-        return arr;
-    }
-
     inline nlohmann::json to_json(const InstanceSegResult& r) {
         return {{"box", nlohmann::json(to_json(r.box))},
                 {"mask", to_json(r.mask)},
                 {"label_id", r.label_id},
                 {"score", r.score}};
-    }
-
-    inline nlohmann::json to_json(const std::vector<InstanceSegResult>& rs) {
-        nlohmann::json arr = nlohmann::json::array();
-        for (const auto& r : rs) arr.push_back(to_json(r));
-        return arr;
     }
 
     inline nlohmann::json to_json(const SemSegResult& r) {
@@ -77,12 +65,6 @@ namespace modeldeploy::vision {
                 {"score", r.score}};
     }
 
-    inline nlohmann::json to_json(const std::vector<ObbResult>& rs) {
-        nlohmann::json arr = nlohmann::json::array();
-        for (const auto& r : rs) arr.push_back(to_json(r));
-        return arr;
-    }
-
     inline nlohmann::json to_json(const KeyPointsResult& r) {
         nlohmann::json kps = nlohmann::json::array();
         for (const auto& p : r.keypoints) kps.push_back(to_json(p));
@@ -90,12 +72,6 @@ namespace modeldeploy::vision {
                 {"keypoints", kps},
                 {"label_id", r.label_id},
                 {"score", r.score}};
-    }
-
-    inline nlohmann::json to_json(const std::vector<KeyPointsResult>& rs) {
-        nlohmann::json arr = nlohmann::json::array();
-        for (const auto& r : rs) arr.push_back(to_json(r));
-        return arr;
     }
 
     inline nlohmann::json to_json(const OCRResult& r) {
@@ -130,6 +106,15 @@ namespace modeldeploy::vision {
                 {"box_label_id", r.box_label_id},
                 {"box_score", r.box_score},
                 {"attr_scores", r.attr_scores}};
+    }
+
+    // 通用：任意单对象可 to_json 的 T，其 std::vector<T> 自动展开为 JSON 数组。
+    // 注意必须与各 to_json(T) 同命名空间（modeldeploy::vision），依赖 ADL 找到逐元素 to_json。
+    template <typename T>
+    inline nlohmann::json to_json(const std::vector<T>& rs) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& r : rs) arr.push_back(to_json(r));
+        return arr;
     }
 
 }  // namespace modeldeploy::vision

@@ -53,6 +53,42 @@ TEST_CASE("result_json: DetectionResult 及 vector", "[result_json]") {
     REQUIRE(jv[1]["score"] == 0.95f);
 }
 
+TEST_CASE("result_json: 通用 vector 模板（覆盖所有类型）", "[result_json]") {
+    // 之前手写 vector 版本之外的其它类型，走通用模板
+    std::vector<OCRResult> vocr;
+    OCRResult r;
+    r.text = {"a"};
+    r.rec_scores = {0.8f};
+    vocr.push_back(r);
+    vocr.push_back(r);
+    auto jv = modeldeploy::vision::to_json(vocr);
+    REQUIRE(jv.is_array());
+    REQUIRE(jv.size() == 2);
+    REQUIRE(jv[1]["text"][0] == "a");
+
+    std::vector<ClassifyResult> vcls;
+    ClassifyResult c;
+    c.label_ids = {3};
+    c.scores = {0.99f};
+    vcls.push_back(c);
+    auto jc = modeldeploy::vision::to_json(vcls);
+    REQUIRE(jc.size() == 1);
+    REQUIRE(jc[0]["label_ids"][0] == 3);
+
+    std::vector<SemSegResult> vsem(2);
+    auto jsem = modeldeploy::vision::to_json(vsem);
+    REQUIRE(jsem.size() == 2);
+
+    std::vector<modeldeploy::vision::FaceRecognitionResult> vf;
+    modeldeploy::vision::FaceRecognitionResult f;
+    f.embedding = {0.1f};
+    vf.push_back(f);
+    REQUIRE(modeldeploy::vision::to_json(vf)[0]["embedding"][0] == 0.1f);
+
+    std::vector<modeldeploy::vision::LprResult> vlpr(1);
+    REQUIRE(modeldeploy::vision::to_json(vlpr).size() == 1);
+}
+
 TEST_CASE("result_json: OCRResult", "[result_json]") {
     OCRResult r;
     r.boxes = {{0, 0, 10, 0, 10, 20, 0, 20}};
