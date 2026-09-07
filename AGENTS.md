@@ -82,7 +82,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | `BUILD_CAPI` | ON | C API |
 | `BUILD_PYTHON` | ON | pybind11 模块 |
 | `BUILD_TESTS` | OFF | Catch2 测试二进制 |
-| `BUILD_ENCRYPTION` | ON | 需要 OpenSSL；未找到时静默禁用 |
+| `BUILD_ENCRYPTION` | ON | 需要 mbedTLS git submodule（`git submodule update --init --recursive`） |
 | `ENABLE_WETEXT` | OFF | 可选 WeTextProcessing ITN 后端（覆盖最全）；依赖已 vendor 于 `third_party/`（openfst + WeTextProcessing + glog stub），开启即由 CMake 现场构建，无需外部路径；模型缺失时 ITN 退化到内置轻量实现 |
 
 ## 注意事项
@@ -90,7 +90,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 - **MSVC**：必须添加 `/utf-8` 编译选项（根 CMakeLists.txt 已为 SDK 自动设置）。设置 `CMAKE_CXX_STANDARD=17`。
 - **scikit-build-core**：使用多配置生成器，必须在 `pyproject.toml` 中显式设置 `CMAKE_BUILD_TYPE="Release"`，环境变量不会被转发。
 - **Python `__init__.py`**：由 `python/__init__.py.in` 生成 —— CMake 在配置时替换 `@WITH_GPU@`、`@ENABLE_ORT@` 等变量。生成文件位于 `python/modeldeploy/__init__.py`。
-- **OpenSSL**：Windows 下从 slproweb.com 安装，设置 `-DOPENSSL_ROOT_DIR="C:/Program Files/OpenSSL-Win64"`。未找到 OpenSSL 时加密功能静默禁用。
+- **BUILD_ENCRYPTION**：基于 mbedTLS（git submodule，`third_party/mbedtls`，构建前 `git submodule update --init --recursive`）。无系统 OpenSSL 依赖。
 - **GPU 构建**：默认 CUDA 架构为 86（RTX 40 系列）。测试数据来自 modelscope，不在仓库内。
 - **TRT 后端**：需要预先通过 `trtexec` 生成 `.engine` 文件。从 ONNX 在线构建 engine 速度较慢。
 - **ncnn 后端**：`cmake/ncnn.cmake` 按平台（Win-x64 / Linux-x64 / Linux-aarch64）从 modelscope 自动下载预编译静态包（含 ncnn + glslang 与各自 CMake config，`find_package(ncnn)`/`find_package(glslang)` 直接可用）；不支持平台配置时 fail-fast。MNN 同理（`cmake/mnn.cmake`，单库静态包，无独立 CUDA 库）。

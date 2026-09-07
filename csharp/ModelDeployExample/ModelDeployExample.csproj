@@ -17,8 +17,9 @@
     <Target Name="CopySDKDll" AfterTargets="Build">
         <!-- capi SDK -->
         <Copy SourceFiles="..\..\$(ModelDeploySdkDir)\bin\ModelDeploySDK.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true"/>
-        <!-- libcrypto（SDK 静态链 OpenSSL 的运行时依赖，来自 vcpkg） -->
-        <Copy SourceFiles="E:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('E:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll')"/>
+<!-- SDK 已改用 mbedTLS（静态链接）做模型加密，不再依赖 OpenSSL；libcrypto DLL 拷贝已废弃。
+     CS_OSSL_DLL_NOTE: 若需回退旧 SDK，可取消下行注释恢复 OpenSSL 运行时 DLL 拷贝。 -->
+<!-- <Copy SourceFiles="E:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('E:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll')"/> -->
     </Target>
 
 </Project>

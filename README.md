@@ -9,7 +9,7 @@
 **推理后端**
 - **多后端统一 API**：`RuntimeOption` 一键切换 OnnxRuntime / TensorRT / MNN / ncnn / Sophgo(算能 TPU)
 - **ncnn 后端（新增）**：CPU + **Vulkan**，支持 ultralytics YOLO 全系（det/cls/obb/pose/seg/sem/depth），配置时按平台从模型库自动下载接入
-- **模型加密**：AES-256-CBC 防模型权重泄露
+- **模型加密**：AES-256-GCM 防模型权重泄露
 
 **AI 视觉**
 - 检测 / 实例分割 / 语义分割 / 深度估计 / 姿态估计 / OBB 旋转框 / 分类 / 人脸(检测/识别/分析/年龄性别/防伪) / 车牌 / OCR / 文档理解(版面+公式+表格→Markdown) / 行人属性 / Re-ID / 手势 / 手部关键点 / 条码二维码
@@ -108,7 +108,7 @@ int main() {
 - [x] **ncnn（CPU + Vulkan，YOLO 全系）**、MNN（CPU/CUDA/OpenCL/Vulkan/Metal）
 - [x] TensorRT engine 在线构建/缓存 + 动态 shape；ORT 内嵌 TRT EP
 - [x] Sophgo：`.bmodel` 转换(F16/INT8)、BMCV 设备端零拷贝、混合量化(qtable)
-- [x] **模型加密**：AES-256-CBC 权重防泄露
+- [x] **模型加密**：AES-256-GCM 权重防泄露
 
 **AI 视觉**
 - [x] 检测 / 实例分割 / 语义分割 / 深度估计 / 姿态估计 / OBB / 分类 / FastSAM 提示词
@@ -180,7 +180,7 @@ int main() {
 
 7. **Sophgo INT8 量化受限**：带内置 NMS 的 end2end 模型（det/pose/seg）与 OBB 无法 INT8 量化（算子被量化破坏/坐标失真），只能 F16；cls/sem/depth 可用 INT8。详见 [docs/backends.md](./docs/backends.md)。
 
-8. **Windows 构建环境**：MSVC 编译需在 "x64 Native Tools Command Prompt"（含 `vcvars64` include/lib 路径）下进行；OpenSSL 需自 slproweb.com 安装并 `-DOPENSSL_ROOT_DIR`，缺失时加密功能静默禁用。
+8. **Windows 构建环境**：MSVC 编译需在 "x64 Native Tools Command Prompt"（含 `vcvars64` include/lib 路径）下进行；模型加密基于 mbedTLS（git submodule），构建前需 `git submodule update --init --recursive`，不再需要安装 OpenSSL。
 
 ## 更多文档
 

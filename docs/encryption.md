@@ -1,22 +1,30 @@
 # ModelDeploy 模型加密
 
-ModelDeploy 使用 **AES-256-CBC** 实现模型加密，保护模型权重不被直接盗用。基于 OpenSSL / BCrypt（Windows 用 BCrypt，Linux 用 OpenSSL）。
+ModelDeploy 使用 **AES-256-GCM**（认证加密）+ **PBKDF2-HMAC-SHA256** 密钥派生实现模型加密，保护模型权重不被直接盗用。基于 **mbedTLS**（以 git submodule 引入，跨平台、可静态链接，无系统级 OpenSSL 依赖）。
 
-> 编译需 `BUILD_ENCRYPTION=ON`（默认 ON）。未找到 OpenSSL 时加密功能静默禁用。
+> 编译需 `BUILD_ENCRYPTION=ON`（默认 ON）。构建前需初始化 mbedTLS submodule：
+> `git submodule update --init --recursive`。
 
-## 1. 加密文件格式
+## 1. 加密文件格式（V3）
 
 加密后的模型文件（`.mdenc`）结构：
 
 ```
 [4 字节]  魔数 "MDEN" (ModelDeploy Encrypted)
-[4 字节]  版本号（当前为 1）
+[4 字节]  版本号（当前为 3）
 [4 字节]  模型格式字符串长度
 [N 字节]  模型格式字符串（如 "onnx", "mnn", "engine"）
-[4 字节]  模型原始字节的 CRC32 校验和
+[16 字节]  Salt（PBKDF2 密钥派生用）
+[12 字节] GCM nonce
 [4 字节]  加密数据长度
-[N 字节]  加密后的模型数据（AES-256-CBC + SHA-256 密钥派生）
+[N 字节]  加密后的模型数据（AES-256-GCM）
+[16 字节] GCM 认证标签（128-bit，防篡改）
 ```
+
+- 密钥：`PBKDF2-HMAC-SHA256(password, salt, 迭代 100000)` → 32 字节 AES-256 密钥。
+- 随机源：mbedTLS 熵源 + CTR-DRBG（salt 与 nonce）。
+- GCM 认证标签替代旧 CRC32：错误密码或任何篡改都会导致解密失败。
+- 旧 V2 文件已作废：V3 读取到非 3 的版本号会明确报错。
 
 ## 2. 加密模型
 

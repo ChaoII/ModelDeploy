@@ -54,7 +54,7 @@ cmake --install build
 | `WITH_GPU` | ON | CUDA 支持 |
 | `ENABLE_SOPHGO` | OFF | Sophgo TPU 后端 |
 | `BUILD_TESTS` | OFF | Catch2 测试 |
-| `BUILD_ENCRYPTION` | ON | 模型加密（需 OpenSSL） |
+| `BUILD_ENCRYPTION` | ON | 模型加密（需 mbedTLS submodule） |
 
 > **MSVC 注意**：根 `CMakeLists.txt` 已自动为 SDK 设置 `/utf-8` 编译选项，无需手动加。
 
