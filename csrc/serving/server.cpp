@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <future>
 #include <memory>
 #include <string>
@@ -19,6 +20,34 @@
 #include "httplib.h"
 
 namespace modeldeploy::serving {
+
+// 全局令牌桶（线程安全）。rate<=0（不限流）时恒放行；否则按恒定速率补充令牌，容量=1，
+// 故严格按 qps 收敛，无突发窗口——便于测试稳定（qps=1 时并发第 2 个必 429）。
+// 定义于此命名空间域，与 server.h 的前置声明（struct TokenBucket;）对应。
+class TokenBucket {
+public:
+    explicit TokenBucket(double qps)
+        : rate_(qps), tokens_(1.0), last_(std::chrono::steady_clock::now()) {}
+    bool try_acquire() {
+        if (rate_ <= 0.0) return true;
+        std::lock_guard<std::mutex> lk(m_);
+        const auto now = std::chrono::steady_clock::now();
+        const double elapsed = std::chrono::duration<double>(now - last_).count();
+        last_ = now;
+        tokens_ = std::min(1.0, tokens_ + elapsed * rate_);
+        if (tokens_ >= 1.0) {
+            tokens_ -= 1.0;
+            return true;
+        }
+        return false;
+    }
+
+private:
+    std::mutex m_;
+    double rate_;
+    double tokens_;
+    std::chrono::steady_clock::time_point last_;
+};
 
 namespace {
 
@@ -62,11 +91,88 @@ bool authorized(const ServingConfig& cfg, const httplib::Request& req, httplib::
     return false;
 }
 
+// CORS：enable_cors 且请求带 Origin 时，在其上追加允许跨域响应头。OPTIONS 预检由
+// register_routes 的 Options("/.*") 处理，且经 post_routing 统一追加（本函数）。
+void apply_cors(const ServingConfig& cfg, const httplib::Request& req, httplib::Response& res) {
+    if (!cfg.enable_cors) return;
+    if (req.headers.find("Origin") == req.headers.end()) return;
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.set_header("Access-Control-Allow-Headers", "Authorization,Content-Type");
+}
+
+// 全局令牌桶实现移动到命名空间域（见上方），匿名命名空间仅保留自由函数与局部结构。
+
+// 记录一次 infer 请求的最终状态码到 /metrics（RAII：handler 返回时记录）。
+// res 为 httplib handler 的形参，存活期覆盖本 recorder（它与 handler 同作用域）。const
+// 引用仅读取 res.status，不修改连接。
+struct InferRecorder {
+    ServingMetrics* metrics;
+    std::string model;
+    const httplib::Response& res;
+    ~InferRecorder() {
+        if (metrics) metrics->record_request(model, res.status);
+    }
+};
+
 }  // namespace
+
+void ServingMetrics::record_request(const std::string& model, int code) {
+    std::lock_guard<std::mutex> lk(m);
+    ++requests[model][code];
+}
+
+void ServingMetrics::record_inference(const std::string& model, double ms) {
+    std::lock_guard<std::mutex> lk(m);
+    inference_ms[model].push_back(ms);
+}
+
+std::string ServingMetrics::render() const {
+    std::lock_guard<std::mutex> lk(m);
+    std::string out;
+    out += "# HELP modeldeploy_serving_requests_total Number of inference requests served per "
+           "model and status code.\n";
+    out += "# TYPE modeldeploy_serving_requests_total counter\n";
+    for (const auto& [model, codes] : requests) {
+        for (const auto& [code, count] : codes) {
+            out += "modeldeploy_serving_requests_total{model=\"" + model +
+                   "\",code=\"" + std::to_string(code) + "\"} " + std::to_string(count) + "\n";
+        }
+    }
+
+    out += "# HELP modeldeploy_serving_inference_ms Inference latency in milliseconds.\n";
+    out += "# TYPE modeldeploy_serving_inference_ms summary\n";
+    for (const auto& [model, samples] : inference_ms) {
+        if (samples.empty()) continue;
+        double sum = 0.0;
+        for (double s : samples) sum += s;
+        auto sorted = samples;
+        std::sort(sorted.begin(), sorted.end());
+        auto pct = [&](double q) {
+            if (sorted.empty()) return 0.0;
+            const size_t idx =
+                static_cast<size_t>(std::ceil(q * static_cast<double>(sorted.size()))) - 1;
+            return sorted[std::min(idx, sorted.size() - 1)];
+        };
+        out += "modeldeploy_serving_inference_ms_sum{model=\"" + model + "\"} " +
+               std::to_string(sum) + "\n";
+        out += "modeldeploy_serving_inference_ms_count{model=\"" + model + "\"} " +
+               std::to_string(samples.size()) + "\n";
+        out += "modeldeploy_serving_inference_ms{model=\"" + model +
+               "\",quantile=\"0.5\"} " + std::to_string(pct(0.5)) + "\n";
+        out += "modeldeploy_serving_inference_ms{model=\"" + model +
+               "\",quantile=\"0.95\"} " + std::to_string(pct(0.95)) + "\n";
+        out += "modeldeploy_serving_inference_ms{model=\"" + model +
+               "\",quantile=\"1\"} " + std::to_string(pct(1.0)) + "\n";
+    }
+    return out;
+}
 
 ServingServer::ServingServer(const ServingConfig& cfg, HandleBuilder builder, std::string* err)
     : cfg_(cfg),
       drain_(std::make_shared<DrainState>()),
+      metrics_(std::make_shared<ServingMetrics>()),
+      limiter_(std::make_unique<TokenBucket>(cfg.rate_limit_qps)),
       repo_(std::make_shared<ModelRepo>(cfg, std::move(builder), err)) {}
 
 ServingServer::~ServingServer() { stop(); }
@@ -76,7 +182,7 @@ bool ServingServer::start(std::string* err) {
         if (err) *err = "ServingServer already started";
         return false;
     }
-    srv_ = std::make_shared<httplib::Server>();
+    srv_ = make_http_server();
     if (cfg_.http_threads > 0) {
         srv_->new_task_queue = [n = cfg_.http_threads]() {
             return new httplib::ThreadPool(n, n, 0, 0);
@@ -101,6 +207,20 @@ bool ServingServer::start(std::string* err) {
     });
     srv_->wait_until_ready();
     return true;
+}
+
+// 依配置装配 HTTP 或 HTTPS（TLS）服务器。TLS 仅当构建带 OpenSSL（BUILD_SERVING_TLS）
+// 且 cfg.enable_tls && tls_cert 非空时启用；否则回退普通 HTTP。TTLS 分支在
+// #if defined(MODELDEPLOY_SERVING_TLS) 下编译，本机（无 OpenSSL）不参与。
+std::shared_ptr<httplib::Server> ServingServer::make_http_server() {
+#if defined(MODELDEPLOY_SERVING_TLS)
+    if (cfg_.enable_tls && !cfg_.tls_cert.empty()) {
+        return std::make_shared<httplib::SSLServer>(cfg_.tls_cert.c_str(),
+                                                    cfg_.tls_key.empty() ? nullptr
+                                                                         : cfg_.tls_key.c_str());
+    }
+#endif
+    return std::make_shared<httplib::Server>();
 }
 
 void ServingServer::stop() {
@@ -133,6 +253,19 @@ void ServingServer::wait_drained() {
 void ServingServer::register_routes() {
     auto srv = srv_;
 
+    // CORS：enable_cors 时对所有响应（含错误与 OPTIONS 预检）追加跨域头；无 Origin 不加。
+    srv->set_post_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
+        apply_cors(cfg_, req, res);
+    });
+    srv->Options(
+        "/.*", [this](const httplib::Request& req, httplib::Response& res) {
+            if (!cfg_.enable_cors) {  // 关闭 CORS 时预检报 404，不泄露跨域许可
+                res.status = 404;
+                return;
+            }
+            res.status = 204;  // 跨域头由 post_routing 统一追加
+        });
+
     srv->Get("/health", [this](const httplib::Request& req, httplib::Response& res) {
         if (!authorized(cfg_, req, res)) return;
         const auto models = repo_->list();
@@ -159,9 +292,9 @@ void ServingServer::register_routes() {
         }
     });
 
-    srv->Get("/metrics", [](const httplib::Request&, httplib::Response& res) {
-        // Task 4 占位；完整 Prometheus 指标在 Task 5 填充。
-        res.set_content("# serving metrics (Task 5)\n", "text/plain; version=0.0.4");
+    srv->Get("/metrics", [this](const httplib::Request&, httplib::Response& res) {
+        // Prometheus 文本（prometheus 客户端标准 text format 0.0.4）。
+        res.set_content(metrics_->render(), "text/plain; version=0.0.4");
     });
 
     srv->Get("/v1/models", [this](const httplib::Request& req, httplib::Response& res) {
@@ -189,8 +322,15 @@ void ServingServer::register_routes() {
 
     srv->Post("/v1/models/:name/infer", [this](const httplib::Request& req,
                                                httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
         const std::string name = req.path_params.at("name");
+        // RAII：handler 返回时把最终状态码记入 /metrics（覆盖 429/401/404/503/400/200/504）。
+        InferRecorder recorder{metrics_.get(), name, res};
+        // 限流（全局令牌桶）：超限 429，不入 in_flight、不占推理。
+        if (!limiter_->try_acquire()) {
+            write_error(res, 429, "RATE_LIMITED", "rate limit exceeded");
+            return;
+        }
+        if (!authorized(cfg_, req, res)) return;
         ModelHandle h;
         if (!repo_->get(name, "latest", &h)) {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
@@ -219,6 +359,9 @@ void ServingServer::register_routes() {
             std::string err;
             bool ok = false;
         };
+
+        // 推理耗时记入 /metrics（含超时样本：观测时长为 request_timeout）。
+        const auto t0 = std::chrono::steady_clock::now();
 
         // 推理放到游离 worker 线程：文件句柄持有自己的 AsyncModel（shared_ptr），
         // 故不阻塞 httplib 工作线程，且可用 wait_for 施加 cfg_.request_timeout。
@@ -249,11 +392,21 @@ void ServingServer::register_routes() {
 
         if (df.wait_for(cfg_.request_timeout) == std::future_status::timeout) {
             // 超时 → 504，后台线程继续跑完（fire-and-forget），不阻塞、不泄漏。
+            const double elapsed_ms =
+                std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - t0)
+                    .count();
+            metrics_->record_inference(name, elapsed_ms);
             write_error(res, 504, "TIMEOUT",
                         "inference timed out after " + std::to_string(cfg_.request_timeout.count()) +
                             "ms");
         } else {
             df.get();
+            const double elapsed_ms =
+                std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - t0)
+                    .count();
+            metrics_->record_inference(name, elapsed_ms);
             if (job->ok) {
                 res.status = 200;
                 res.set_content(job->out.dump(), "application/json");

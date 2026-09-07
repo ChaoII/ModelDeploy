@@ -35,6 +35,11 @@ option(BUILD_SERVING "Build embedded inference serving gateway (ServingServer)" 
 option(BUILD_SERVING_TLS "Enable HTTPS for serving (requires OpenSSL)" OFF)
 if(BUILD_SERVING_TLS)
     find_package(OpenSSL REQUIRED)
+    # 启用 httplib::SSLServer 分支（server.cpp 在 #if defined(MODELDEPLOY_SERVING_TLS) 下编译）。
+    # 本机默认 BUILD_SERVING_TLS=OFF（无 OpenSSL），TLS 代码不参与编译。
+    add_definitions(-DMODELDEPLOY_SERVING_TLS -DCPPHTTPLIB_OPENSSL_SUPPORT)
+    include_directories(${OPENSSL_INCLUDE_DIR} ${OpenSSL_INCLUDE_DIRS})
+    list(APPEND DEPENDS OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 if (BUILD_SURVEILLANCE)

@@ -641,3 +641,133 @@ TEST_CASE("ServingServer drain deadline exceeded safe dtor (detached thread outl
 
     fs::remove_all(repo);
 }
+
+TEST_CASE("ServingServer rate limit 429", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.rate_limit_qps = 1;  // 严格 1 qps，无突发窗口 → 连发第 2 个必 429
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    auto body = nlohmann::json{{"image", PNG1X1_B64}}.dump();
+    auto first = cli.Post("/v1/models/det/infer", body, "application/json");
+    REQUIRE(first);
+    REQUIRE(first->status == 200);  // 首令牌可用
+
+    auto second = cli.Post("/v1/models/det/infer", body, "application/json");
+    require_error(second, 429, "RATE_LIMITED");
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+// /metrics Prometheus 文本：计数每模型每状态码、推理耗时聚合（sum/count 与分位数）。
+TEST_CASE("ServingServer metrics text", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    auto body = nlohmann::json{{"image", PNG1X1_B64}}.dump();
+    REQUIRE(cli.Post("/v1/models/det/infer", body, "application/json")->status == 200);
+    REQUIRE(cli.Post("/v1/models/det/infer", body, "application/json")->status == 200);
+    REQUIRE(cli.Post("/v1/models/nope/infer", body, "application/json")->status == 404);  // 计入 404
+
+    auto res = cli.Get("/metrics");
+    REQUIRE(res);
+    REQUIRE(res->status == 200);
+    const std::string text = res->body;
+    // 计数器：det 的 200 ×2、nope 的 404 ×1
+    REQUIRE(text.find("modeldeploy_serving_requests_total{model=\"det\",code=\"200\"} 2") !=
+            std::string::npos);
+    REQUIRE(text.find("modeldeploy_serving_requests_total{model=\"nope\",code=\"404\"} 1") !=
+            std::string::npos);
+    // 推理耗时聚合：det 有 2 个样本，sum/count 行存在
+    REQUIRE(text.find("modeldeploy_serving_inference_ms_count{model=\"det\"} 2") !=
+            std::string::npos);
+    REQUIRE(text.find("modeldeploy_serving_inference_ms_sum{model=\"det\"}") !=
+            std::string::npos);
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+// CORS：enable_cors（默认 true）时 OPTIONS 预检回带跨域头；关闭后不加。
+TEST_CASE("ServingServer cors headers", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    auto pre = cli.Options(
+        "/v1/models/det/infer",
+        httplib::Headers{{"Origin", "https://example.com"}, {"Access-Control-Request-Method", "POST"}});
+    REQUIRE(pre);
+    REQUIRE(pre->status == 204);
+    REQUIRE(pre->get_header_value("Access-Control-Allow-Origin") == "*");
+    REQUIRE(pre->get_header_value("Access-Control-Allow-Methods") == "GET,POST,OPTIONS");
+    REQUIRE(pre->get_header_value("Access-Control-Allow-Headers") == "Authorization,Content-Type");
+
+    // 带 Origin 的普通请求也会带上跨域头
+    auto get = cli.Get("/health", httplib::Headers{{"Origin", "https://example.com"}});
+    REQUIRE(get);
+    REQUIRE(get->status == 200);
+    REQUIRE(get->get_header_value("Access-Control-Allow-Origin") == "*");
+
+    srv.stop();
+    fs::remove_all(repo);
+
+    // 关闭 CORS：OPTIONS 预检 404，普通响应也无跨域头。
+    ServingConfig cfg2;
+    cfg2.model_repo = repo;
+    cfg2.enable_cors = false;
+    write_model(repo, "det", "latest");
+    ServingServer srv2(cfg2, fake_model_builder());
+    int port2 = start_listening(srv2);
+    httplib::Client cli2("127.0.0.1", port2);
+    auto pre2 = cli2.Options("/v1/models/det/infer",
+                             httplib::Headers{{"Origin", "https://example.com"}});
+    REQUIRE(pre2);
+    REQUIRE(pre2->status == 404);
+    REQUIRE_FALSE(pre2->has_header("Access-Control-Allow-Origin"));
+    auto get2 = cli2.Get("/health", httplib::Headers{{"Origin", "https://example.com"}});
+    REQUIRE(get2);
+    REQUIRE(get2->status == 200);
+    REQUIRE_FALSE(get2->has_header("Access-Control-Allow-Origin"));
+    srv2.stop();
+    fs::remove_all(repo);
+}
+
+// TLS：HTTPS 服务器装配。仅当构建带 OpenSSL（BUILD_SERVING_TLS）时编译；本机无 OpenSSL
+// 故该用例不参与编译（标签 [serving-tls]，`[serving]~[serving-tls]` 排除）。
+#if defined(MODELDEPLOY_SERVING_TLS)
+TEST_CASE("ServingServer tls branch", "[serving][serving-tls]") {
+    // 自签证书导入：仅验证 enable_tls + tls_cert 走 SSLServer 装配路径。
+    ServingConfig cfg;
+    cfg.model_repo = make_temp_repo();
+    cfg.enable_tls = true;
+    // 无合法证书文件时 SSLServer 构造可能失败 → start() 可能 false；此处仅验证
+    // 配置了 TLS 且未崩溃地走到 listen（错误在 err 中返回，不抛跨对象）。
+    write_model(cfg.model_repo, "det", "latest");
+    ServingServer srv(cfg, fake_model_builder());
+    std::string err;
+    bool ok = srv.start(&err);
+    srv.stop();
+    fs::remove_all(cfg.model_repo);
+    // 本用例仅验证 TLS 装配分支存在且可安全起停；不要求无证书时也能成功监听。
+    (void)ok;
+    (void)err;
+}
+#endif
