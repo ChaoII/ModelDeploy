@@ -37,10 +37,11 @@ cfg.enable_batching = true;             // 可关闭，退化为逐条 predict
 auto infer = std::make_unique<AsyncModel<MyModel>>(
     std::make_unique<MyModel>(), cfg);
 
-// 3. 启动（启动后投递才被受理）
+// 3. 启动（启动后投递才开始被处理）
 infer->start();
 
-// 4. 投递若干帧（future 式；队列满时会阻塞等待空位，保序不丢）
+// 4. 投递若干帧（future 式；队列满时会阻塞等待空位，保序不丢）。image 为待推理帧
+ImageData image;   // 示例占位，实际可从视频帧/读图获得
 std::future<MyModel::result_type> f = infer->predict_async(image);
 
 // 5. 等待全部完成（调试/退出前常用）
