@@ -39,8 +39,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-  with:
-    submodules: recursive
 
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v6
@@ -125,8 +123,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-  with:
-    submodules: recursive
 
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v6
