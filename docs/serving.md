@@ -29,7 +29,7 @@
 
 | 选项 | 默认 | 说明 |
 |------|------|------|
-| `BUILD_SERVING` | ON（随 SDK） | 构建内嵌推理网关（C++） |
+| `BUILD_SERVING` | OFF（源码经 `GLOB` 恒随 SDK 编入，开关当前不门控编译） | 构建内嵌推理网关（C++） |
 | `BUILD_SERVING_TLS` | OFF | 开启 HTTPS，**需要 OpenSSL**；`find_package(OpenSSL)` 仅在该分支执行 |
 
 ```bash
