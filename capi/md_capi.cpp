@@ -1051,8 +1051,8 @@ MDStatus md_model_create(MDModelHandle* out, MDModelKind kind,
     if (opt_h) {
         auto* o = static_cast<const md_option_handle*>(opt_h);
         auto& opt_mut = const_cast<RuntimeOption&>(o->opt);
-        if (!opt_mut.password.empty() && is_encrypted_model_file(split_path(model_path)[0])) {
-            opt_mut.set_model_path(model_path, opt_mut.password);
+        if (!opt_mut.get_password().empty() && is_encrypted_model_file(split_path(model_path)[0])) {
+            opt_mut.set_model_path(model_path, opt_mut.get_password());
         }
         opt_mut.validate();
     }

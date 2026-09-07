@@ -26,6 +26,7 @@ namespace modeldeploy {
         [[deprecated("use set_device(Device::GPU, id)")]] void use_gpu(int gpu_id = 0);
         [[deprecated("use set_device(Device::OPENCL, id)")]] void use_opencl(int device_id = 0);
         void set_password(const std::string& pwd) { password = pwd; }
+        const std::string& get_password() const { return password; }
 
         void set_external_stream(void* external_stream);
         void set_cpu_thread_num(int thread_num);
@@ -46,7 +47,6 @@ namespace modeldeploy {
         TrtBackendOption trt_option;
         SophgoBackendOption sophgo_option;
         NcnnBackendOption ncnn_option;
-        std::string password;
         bool enable_fp16 = false;
         bool enable_trt = false;
         bool model_from_memory = false;
@@ -56,5 +56,10 @@ namespace modeldeploy {
         Device device = Device::CPU;
         std::string model_file;
         Backend backend = Backend::ORT;
+
+    private:
+        // 密码：仅通过 set_password() 设置，解密时由 set_model_path() 内部读取。
+        // 显式 set_model_path(path, pwd) 的 pwd 优先；为空则回退到此密码。
+        std::string password;
     };
 }
