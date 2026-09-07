@@ -768,6 +768,100 @@ int main(void) {
 }
 ```
 
+## 15. 车牌 LPR（`MD_MODEL_LPR_PIPELINE` / `LPR_DET` / `LPR_REC`）
+
+车牌三个 kind 均经 `md_model_create` 创建，结果统一为 `MD_RES_LPR`：`md_result_lpr` 返回 `MDLprItem{ x, y, w, h, score }` 数组，车牌字符串/颜色经 `md_result_plate` 按实例序号读，4 角点经 `md_result_lpr_keypoints` 读（`MDPoint{x,y}` 数组）。主流水线 `MD_MODEL_LPR_PIPELINE` 的 `model_path` 用 `|` 串联 **det|rec 两段**：`"det.onnx|rec.onnx"`。子模型：`MD_MODEL_LPR_DET`（单段 det.onnx，参数 `conf_threshold|nms_threshold|landmarks_per_card`，类型均 `'D'`）、`MD_MODEL_LPR_REC`（单段 rec.onnx，无参数表）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    /* 1. 主流水线：LPR pipeline，model_path 用 '|' 串联 det|rec 两段 */
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_LPR_PIPELINE, "det.onnx|rec.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+    MDResultHandle res = NULL;
+    md_model_predict(m, img, &res);
+
+    /* 结果遍历：MDLprItem{x,y,w,h,score} 数组 + 车牌字符串/颜色 + 4 角点 */
+    const MDLprItem* items = NULL;
+    size_t n = 0;
+    md_result_lpr(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        const char* plate = NULL; const char* color = NULL;
+        md_result_plate(res, i, &plate, &color);
+        const MDPoint* kps = NULL; size_t kn = 0;
+        md_result_lpr_keypoints(res, i, &kps, &kn);   /* 车牌 4 角点 (x, y) */
+        printf("[%zu] '%s' color=%s score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+               i, plate ? plate : "", color ? color : "", items[i].score,
+               items[i].x, items[i].y, items[i].w, items[i].h, kn);
+        for (size_t j = 0; j < kn; j++)
+            printf("  kp=(%.1f, %.1f)\n", kps[j].x, kps[j].y);
+    }
+    /* 批量推理：md_result_lpr_batch(bres, g, &items, &n) 取第 g 图项数组，车牌/角点用
+     * md_result_plate_batch / md_result_lpr_keypoints_batch(bres, g, j, ...) 按 (图, 项) 读 */
+
+    /* 可视化：md_draw_result 支持 MD_RES_LPR（底层 vis_lpr），用法同 §3 */
+
+    md_result_destroy(res);
+    md_model_destroy(m);
+
+    /* 2. 子模型：LPR_DET（仅检测，参数 conf_threshold/nms_threshold/landmarks_per_card 均 'D'） */
+    MDModelHandle det = NULL;
+    md_model_create(&det, MD_MODEL_LPR_DET, "det.onnx", opt);
+    md_model_set_input_size(det, 640, 640);
+    md_model_set_param_d(det, "conf_threshold", 0.25);   /* 置信度阈值（默认 0.25） */
+    md_model_set_param_d(det, "nms_threshold", 0.45);    /* NMS IoU 阈值（默认 0.5） */
+    md_model_set_param_d(det, "landmarks_per_card", 4);  /* 每车牌角点数（默认 4） */
+    MDResultHandle det_res = NULL;
+    md_model_predict(det, img, &det_res);
+    const MDLprItem* ditem = NULL; size_t dn = 0;
+    md_result_lpr(det_res, &ditem, &dn);
+    for (size_t i = 0; i < dn; i++) {
+        const MDPoint* dk = NULL; size_t dkn = 0;
+        md_result_lpr_keypoints(det_res, i, &dk, &dkn);  /* 车牌 4 角点 */
+        printf("det[%zu] score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+               i, ditem[i].score, ditem[i].x, ditem[i].y, ditem[i].w, ditem[i].h, dkn);
+    }
+    md_result_destroy(det_res);
+    md_model_destroy(det);
+
+    /* 3. 子模型：LPR_REC（仅识别，无参数表）；输入车牌裁剪图 */
+    MDModelHandle rec = NULL;
+    md_model_create(&rec, MD_MODEL_LPR_REC, "rec.onnx", opt);
+    MDImageHandle crop = NULL;
+    md_image_from_file(&crop, "plate_crop.jpg");
+    MDResultHandle rec_res = NULL;
+    md_model_predict(rec, crop, &rec_res);
+    const MDLprItem* ritem = NULL; size_t rn = 0;
+    md_result_lpr(rec_res, &ritem, &rn);
+    if (rn > 0) {
+        const char* plate = NULL; const char* color = NULL;
+        md_result_plate(rec_res, 0, &plate, &color);
+        printf("rec: '%s' color=%s score=%.3f\n",
+               plate ? plate : "", color ? color : "", ritem[0].score);
+    }
+    md_result_destroy(rec_res);
+    md_image_destroy(crop);
+    md_model_destroy(rec);
+
+    md_image_destroy(img);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

@@ -587,6 +587,66 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 15. 车牌 LPR（`LprPipeline` / `LprDetectionModel` / `LprRecognizerModel`）
+
+车牌模型类：主流水线 `LprPipeline`（`model_path` 用 `|` 串联 **det|rec 两段**：`"det.onnx|rec.onnx"`）、子模型 `LprDetectionModel`（`"det.onnx"`）与 `LprRecognizerModel`（`"rec.onnx"`）。三者 `predict` 均返回 `Vec<LicensePlate>`（字段 `rect: Rect`、`plate: String`、`color: String`、`score: f32`、`keypoints: Vec<Point>`（车牌 4 角点）），`predict_batch` 返回 `Vec<Vec<LicensePlate>>`（按图分组）。主流水线 `predict` 输出全部车牌；`LprRecognizerModel` 输入为车牌裁剪图（plate/color 有效），`LprDetectionModel` 仅框 + 角点（plate/color 为空串）。
+
+```rust
+use modeldeploy::{DrawOptions, Image, LprDetectionModel, LprPipeline, LprRecognizerModel, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项 + 构造（详见上节；'|' 串联 det|rec 两段）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+    let lpr = LprPipeline::new("det.onnx|rec.onnx", &opt)?;
+
+    // 2. 单图推理：predict(&Image) -> Vec<LicensePlate>
+    let img = Image::read("test.jpg")?;
+    let plates = lpr.predict(&img)?;
+    for p in &plates {
+        println!("'{}' color={} score={:.3} rect=({:.0},{:.0},{:.0},{:.0}) kps={}",
+                 p.plate, p.color, p.score,
+                 p.rect.x, p.rect.y, p.rect.width, p.rect.height, p.keypoints.len());
+        for kp in &p.keypoints { println!("  kp=({:.1}, {:.1})", kp.x, kp.y); }
+    }
+
+    // 3. 可视化：predict_and_draw 句柄直达 C++ vis_lpr
+    let canvas = img.clone()?;
+    lpr.predict_and_draw(&img, &canvas,
+        &DrawOptions::new().with_font("msyh.ttc", 14).with_alpha(0.3))?;
+    canvas.save("lpr_vis.jpg")?;
+
+    // 4. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<LicensePlate>>
+    let img2 = Image::read("bus.jpg")?;
+    let batch = lpr.predict_batch(&[&img, &img2])?;
+    for (i, ps) in batch.iter().enumerate() { println!("image {}: {} plates", i, ps.len()); }
+
+    // 5. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let _lpr2 = lpr.clone()?;
+
+    // 6. 子模型独立使用（也可不经 LprPipeline 单独构造）
+    let det = LprDetectionModel::new("det.onnx", &opt)?;
+    det.set_input_size(640, 640)?;
+    det.set_conf_threshold(0.25)?;    // 置信度阈值（默认 0.25）
+    det.set_nms_threshold(0.45)?;     // NMS IoU 阈值（默认 0.5）
+    det.set_landmarks_per_card(4.0)?; // 每车牌角点数（默认 4；C API 参数类型 'D'，为 double）
+    let boxes = det.predict(&img)?;   // 仅框 + 4 角点
+    for b in &boxes {
+        println!("score={:.3} rect=({:.0},{:.0},{:.0},{:.0}) kps={}",
+                 b.score, b.rect.x, b.rect.y, b.rect.width, b.rect.height, b.keypoints.len());
+    }
+
+    let rec = LprRecognizerModel::new("rec.onnx", &opt)?;
+    let crop = Image::read("plate_crop.jpg")?;
+    let r = rec.predict(&crop)?;      // 输入车牌裁剪图
+    if let Some(p) = r.first() {
+        println!("'{}' color={} score={:.3}", p.plate, p.color, p.score);
+    }
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

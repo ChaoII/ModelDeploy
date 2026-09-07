@@ -610,14 +610,70 @@ gender, age = ga.predict_gender_age(img, boxes[0].bbox)    # (gender, age)
 
 > InsightFace 的角度/特征/关键点坐标均为原图像素；`gender`/`age` 由 genderage 子模型在后处理中给出（未启用该通道时返回 -1）。
 
-## 15. 已绑定模块
+## 15. 车牌 LPR（LprPipeline / LprDetection / LprRecognizer）
+
+车牌识别全部绑定 Python：主流水线 `LprPipeline`（检测 det + 识别 rec 一体化，构造为 `(det, rec, option)`），子模型 `LprDetection`（Locate 车牌位置）与 `LprRecognizer`（识别车牌字符/颜色）。主流水线结果类型 `LprResult`（字段 `box: Rect2f`、`landmarks: list[Point3f]`（车牌 4 角点）、`label_id: int`、`score: float`、`car_plate_str: str`、`car_plate_color: str`）。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（option 配置见上节）
+option = md.RuntimeOption()
+option.use_ort_backend()
+option.use_cpu()
+
+# 2. 主流水线：LprPipeline(det_model_path, rec_model_path, option)
+lpr = md.vision.LprPipeline("det.onnx", "rec.onnx", option)
+
+# 3. 单图推理：输入整图 BGR ndarray，返回 list[LprResult]
+img = cv2.imread("test.jpg")
+results = lpr.predict(img)
+for r in results:
+    print(r.car_plate_str, r.car_plate_color, r.score)
+    print(r.box.x, r.box.y, r.box.width, r.box.height)
+    print(r.label_id, r.box)          # box 为车牌框；landmarks 为 4 角点
+    for kp in r.landmarks:
+        print(kp.x, kp.y)
+
+# 4. 可视化：md.vision.vis_lpr 返回 BGR ndarray
+#    签名：vis_lpr(image, result, font_path='', font_size=14, landmark_radius=4, alpha=0.15, save_result=False)
+vis = md.vision.vis_lpr(img, results, font_path="msyh.ttc", font_size=14, alpha=0.3)
+cv2.imwrite("lpr_vis.jpg", vis)
+
+# 5. 多线程：clone() 深拷贝独立实例
+lpr2 = lpr.clone()
+
+# 6. 子模型独立使用（也可不经 LprPipeline 单独构造）
+#    LprDetection -> list[KeyPointsResult]（框 + 4 角点）
+det = md.vision.LprDetection("det.onnx", option)
+det.preprocessor.size = [640, 640]          # letterbox 输入尺寸（默认 [640, 640]）
+det.postprocessor.conf_threshold = 0.25     # 置信度阈值（默认 0.25）
+det.postprocessor.nms_threshold = 0.45      # NMS IoU 阈值（默认 0.5）
+det.postprocessor.landmarks_per_card_ = 4   # 每车牌角点数（默认 4），注意字段名与 Scrfd 不同
+boxes = det.predict(img)
+for r in boxes:
+    print(r.score, r.box.x, r.box.y, r.box.width, r.box.height)
+    for kp in r.keypoints:
+        print(kp.x, kp.y)
+
+#    LprRecognizer -> 单个 LprResult（输入车牌裁剪图）
+rec = md.vision.LprRecognizer("rec.onnx", option)
+crop = cv2.imread("plate_crop.jpg")
+plate = rec.predict(crop)
+print(plate.car_plate_str, plate.car_plate_color, plate.score, plate.landmarks)
+```
+
+> 与 `Scrfd` 类似，`LprDetection` 的 preprocessor 暴露 `size`/`padding_value`/`is_scale_up`/`is_mini_pad`/`stride`；其 postprocessor 参数名是 `landmarks_per_card_`（带尾下划线，每车牌角点数），**不是** `landmarks_per_face`。`LprRecognizer` 仅暴露 preprocessor 的 `size`（默认 `[168, 48]`），postprocessor 无参数（字符表含 78 类、颜色 5 类内联解码）。
+
+## 16. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 16. 性能测试
+## 17. 性能测试
 
 ```python
 import time

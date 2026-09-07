@@ -725,7 +725,71 @@ int main() {
 
 > 注意：C++（与 Python）是仅有的两类能拿到 `landmark_2d_106` / `landmark_3d_68` 的绑定；C API / C# / Rust 仅暴露 bbox/kps/embedding/pose/gender/age。
 
-## 15. 更多模型（均使用同一 `RuntimeOption`）
+## 15. 车牌 LPR（vision::lpr::LprPipeline / LprDetection / LprRecognizer）
+
+车牌识别在命名空间 `modeldeploy::vision::lpr`：主流水线 `LprPipeline`（检测 det + 识别 rec 一体化），子模型 `LprDetection`（Locate 车牌位置，输出框 + 4 角点）与 `LprRecognizer`（识别车牌字符/颜色）。主流水线结果类型 `vision::LprResult`（字段 `box: Rect2f`、`keypoints: vector<Point3f>`（车牌 4 角点，`z` 恒为 0）、`label_id: int32_t`、`score: float`、`car_plate_str: string`、`car_plate_color: string`）。注意：`LprResult` 的关键点字段名为 `keypoints`（Python 绑定为 `landmarks`）。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    namespace lpr_ns = modeldeploy::vision::lpr;
+    // 1. 运行时选项 + 构造（详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+
+    // 2. 主流水线：LprPipeline(det, rec, opt) 检测 + 识别一体化
+    lpr_ns::LprPipeline lpr("det.onnx", "rec.onnx", opt);
+    if (!lpr.is_initialized()) return 1;
+
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    std::vector<modeldeploy::vision::LprResult> results;
+    if (!lpr.predict(im, &results)) return 1;
+    for (const auto& r : results) {
+        std::printf("%s %s score=%.3f label=%d box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+                    r.car_plate_str.c_str(), r.car_plate_color.c_str(), r.score, r.label_id,
+                    r.box.x, r.box.y, r.box.width, r.box.height, r.keypoints.size());
+        for (const auto& kp : r.keypoints)     // 车牌 4 角点（z 恒为 0）
+            std::printf("  kp=(%.1f, %.1f)\n", kp.x, kp.y);
+    }
+
+    // 3. 可视化：vis_lpr(image, result, font_path, font_size, landmark_radius, alpha, save)
+    //    （绘制车牌框 + 字符 + 4 角点连线）
+    auto vis = modeldeploy::vision::vis_lpr(im, results, "msyh.ttc", 14, 4, 0.3, false);
+    vis.imwrite("lpr_vis.jpg");
+
+    // 4. 多线程：clone() 深拷贝独立实例（每线程持有一个，互不干扰）
+    auto lpr2 = lpr.clone();
+
+    // 5. 子模型独立使用（也可不经 LprPipeline 单独构造）
+    lpr_ns::LprDetection det("det.onnx", opt);
+    if (!det.is_initialized()) return 1;
+    det.get_preprocessor().set_size({640, 640});       // letterbox 输入尺寸（默认 {640, 640}）
+    det.get_postprocessor().set_conf_threshold(0.25f); // 置信度阈值（默认 0.25）
+    det.get_postprocessor().set_nms_threshold(0.45f);  // NMS IoU 阈值（默认 0.5）
+    det.get_postprocessor().set_landmarks_per_card(4); // 每车牌角点数（默认 4）
+    std::vector<modeldeploy::vision::KeyPointsResult> boxes;
+    if (!det.predict(im, &boxes)) return 1;            //  输出框 + 4 角点
+    for (const auto& r : boxes)
+        std::printf("score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+                    r.score, r.box.x, r.box.y, r.box.width, r.box.height, r.keypoints.size());
+
+    lpr_ns::LprRecognizer rec("rec.onnx", opt);        // 输入车牌裁剪图，输出单个 LprResult
+    if (!rec.is_initialized()) return 1;
+    auto crop = modeldeploy::vision::ImageData::imread("plate_crop.jpg");
+    modeldeploy::vision::LprResult plate;
+    if (!rec.predict(crop, &plate)) return 1;
+    std::printf("rec: %s %s %.3f\n", plate.car_plate_str.c_str(),
+                plate.car_plate_color.c_str(), plate.score);
+    return 0;
+}
+```
+
+> 与 `Scrfd`/姿态族类似，`LprDetection` 的 `markers` 后处理参数名是 `landmarks_per_card`（每车牌角点数），**不是** `landmarks_per_face`；`LprRecPreprocessor` 仅 `set_size`（默认 `{168, 48}`），`LprRecPostprocessor` **无参数**（字符/颜色内联解码，字符表含 78 类）。
+
+## 16. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -739,7 +803,7 @@ int main() {
 | 分类 | `vision::Classification` | 见 [models-分类](../models.md#5-图像分类classification) |
 | OCR | `vision::ocr::PaddleOCR` | 见上文 §11 |
 | 人脸 | `vision::face::Scrfd` / `InsightFaceAnalysis` | 见 [models-人脸](../models.md#6-人脸face) |
-| 车牌 | `vision::lpr::LprPipeline` | 见 [models-车牌](../models.md#7-车牌识别license-plate) |
+| 车牌 | `vision::lpr::LprPipeline` | 见上文 §15 |
 | ASR | `audio::asr::SenseVoice` | 见 [models-语音](../models.md#10-语音识别asr) |
 | TTS（Kokoro） | `audio::tts::Kokoro` | 见 [models-TTS](../models.md#11-语音合成tts) |
 
@@ -781,7 +845,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 16. 工程配置
+## 17. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

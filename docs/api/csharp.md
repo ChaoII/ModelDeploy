@@ -524,6 +524,64 @@ foreach (var f in detPred)
 }
 ```
 
+## 15. 车牌 LPR（`LprModel` / `LprDetectionModel` / `LprRecognizerModel`）
+
+车牌模型类位于 `ModelDeploy.Models`：主流水线 `LprModel`（对应 `MD_MODEL_LPR_PIPELINE`）、子模型 `LprDetectionModel`（`MD_MODEL_LPR_DET`，仅框 + 置信度 → `LprDetResult`）与 `LprRecognizerModel`（`MD_MODEL_LPR_REC`，字符/颜色 → `LprResult`）。主流水线/识别结果类型 `ModelDeploy.Results.LprResult`（属性 `Box: RectF`、`Plate: string`、`Color: string`、`Score: float`、`KeyPoints: PointF[]`（车牌 4 角点））。
+
+```csharp
+using System;
+using System.Collections.Generic;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 1. 主流水线：两参重载 (det, rec)，或单串 "det.onnx|rec.onnx"
+using var lpr = new LprModel("det.onnx", "rec.onnx", option);
+
+using var img = VisionImage.Read("test.jpg");
+
+// 2. 单图推理：Prediction<LprResult>
+using var pred = lpr.Predict(img);
+foreach (var r in pred)
+{
+    Console.WriteLine($"'{r.Plate}' {r.Color} {r.Score:F3} " +
+                      $"({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height}) kps={r.KeyPoints.Length}");
+    foreach (var kp in r.KeyPoints) Console.WriteLine($"  ({kp.X},{kp.Y})");
+}
+
+// 3. 可视化：pred.Draw 直达 C++ vis_lpr（车牌框 + 字符 + 4 角点连线）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { FontPath = "msyh.ttc", FontSize = 14, Alpha = 0.3 });
+canvas.Save("lpr_vis.jpg");
+
+// 4. 批量推理：PredictBatch 按图返回 IReadOnlyList<LprResult[]>
+using var img2 = VisionImage.Read("bus.jpg");
+var batch = lpr.PredictBatch(new[] { img, img2 });
+for (int g = 0; g < batch.Count; g++)
+    Console.WriteLine($"image {g}: {batch[g].Length} plates");
+
+// 5. 多线程：Clone() 深拷贝独立实例
+using var lpr2 = lpr.Clone();
+
+// 6. 子模型独立使用
+using var det = new LprDetectionModel("det.onnx", option);
+det.SetInputSize(640, 640);
+det.SetConfThreshold(0.25);    // 置信度阈值（默认 0.25）
+det.SetNmsThreshold(0.45);     // NMS IoU 阈值（默认 0.5）
+det.SetLandmarksPerCard(4);    // 每车牌角点数（默认 4）
+using var detPred = det.Predict(img);        // Prediction<LprDetResult>（仅框 + 置信度）
+foreach (var r in detPred)
+    Console.WriteLine($"{r.Score:F3} ({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height})");
+
+using var rec = new LprRecognizerModel("rec.onnx", option);
+using var crop = VisionImage.Read("plate_crop.jpg");
+using var recPred = rec.Predict(crop);       // Prediction<LprResult>（输入车牌裁剪图）
+foreach (var r in recPred)
+    Console.WriteLine($"'{r.Plate}' {r.Color} {r.Score:F3}");
+```
+
 ## 运行示例
 
 ```bash
