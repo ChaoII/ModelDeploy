@@ -179,6 +179,8 @@ int main() {
 
 8. **Windows 构建环境**：MSVC 编译需在 "x64 Native Tools Command Prompt"（含 `vcvars64` include/lib 路径）下进行；模型加密基于 mbedTLS（git submodule），构建前需 `git submodule update --init --recursive`，不再需要安装 OpenSSL。
 
+9. **BaseModel 复用缓冲致同实例并发 `batch_predict` 不安全**：`BaseModel`（`csrc/base_model.h`）持有共享成员 `reused_input_tensors_`/`reused_output_tensors_`，各模型 `batch_predict`（如 `ultralytics_det.cpp`）直接复用它们——同一实例**并发调用会互相踩缓冲**。因此异步层 `AsyncModel` 采用「单推理线程 / 克隆多实例」方案（`num_workers=1` 默认，`>1` 需 `M::clone()`；见 `docs/async_inference.md`）。**后续改进**：为推理路径引入 per-`predict` 局部缓冲或缓冲池化改造，以支持对同一实例真正并发（列入路线图/远期架构项）。
+
 ## 更多文档
 
 | 主题 | 文档 |
