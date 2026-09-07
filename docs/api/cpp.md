@@ -364,7 +364,7 @@ int main() {
 
     // 2. 预处理/后处理参数
     obb->get_preprocessor().set_size({1024, 1024});     // letterbox 输入尺寸（默认 {1024, 1024}）
-    obb->get_preprocessor().set_padding_value({114.f, 114.f, 114.f});
+    obb->get_preprocessor().set_padding_value(114.0f);  // 填充灰值（单值标量）
     obb->get_postprocessor().set_conf_threshold(0.25f); // 置信度阈值（默认 0.25）
     obb->get_postprocessor().set_nms_threshold(0.45f);  // NMS IoU 阈值（默认 0.5）
 

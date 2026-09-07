@@ -317,7 +317,7 @@ obb = md.vision.UltralyticsObb("yolo11n-obb.onnx", option)
 
 # 2. 预处理/后处理参数（属性直接赋值）
 obb.preprocessor.size = [1024, 1024]       # letterbox 输入尺寸（默认 [1024, 1024]）
-obb.preprocessor.padding_value = [114.0, 114.0, 114.0]
+obb.preprocessor.padding_value = 114.0      # 填充灰值（单值标量）
 obb.postprocessor.conf_threshold = 0.25    # 置信度阈值（默认 0.25）
 obb.postprocessor.nms_threshold = 0.45     # NMS IoU 阈值（默认 0.5）
 
