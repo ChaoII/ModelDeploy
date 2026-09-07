@@ -280,7 +280,73 @@ int main() {
 }
 ```
 
-## 8. 更多模型（均使用同一 `RuntimeOption`）
+## 8. 姿态与关键点族（UltralyticsPose / HandKeypoint / VehicleKeypoint / FaceLandmark）
+
+姿态与关键点模型族结果类型统一为 `vision::KeyPointsResult`（字段 `box: Rect2f`、`keypoints: vector<Point3f>`（`x/y/z`，`z` 为关键点置信度）、`label_id: int32_t`、`score: float`）。类分布：`detection::UltralyticsPose`（COCO 17 点人体骨架）、`hand::HandKeypoint`（21 点手部）、`landmark::VehicleKeypoint`（4 车轮关键点）与 `landmark::FaceLandmark`（InsightFace 2d106 面部 106 点）。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    // 1. 运行时选项（详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+
+    // 2. 构造：UltralyticsPose（detection）/ HandKeypoint（hand）/ VehicleKeypoint、FaceLandmark（landmark）
+    auto pose = std::make_unique<modeldeploy::vision::detection::UltralyticsPose>("yolo11n-pose.onnx", opt);
+    auto hand = std::make_unique<modeldeploy::vision::hand::HandKeypoint>("hand.onnx", opt);
+    auto vehicle = std::make_unique<modeldeploy::vision::landmark::VehicleKeypoint>("vehicle.onnx", opt);
+    auto face = std::make_unique<modeldeploy::vision::landmark::FaceLandmark>("face_landmark.onnx", opt);
+    if (!pose->is_initialized()) return 1;
+
+    // 3. 预处理/后处理参数（HandKeypoint 构造默认 21 点、VehicleKeypoint 默认 4 点；
+    //    FaceLandmark 无 get_preprocessor/get_postprocessor，参数不可调）
+    pose->get_preprocessor().set_size({640, 640});       // letterbox 输入尺寸（默认 {640, 640}）
+    pose->get_postprocessor().set_conf_threshold(0.30f); // 置信度阈值（默认 0.30）
+    pose->get_postprocessor().set_nms_threshold(0.45f);  // NMS IoU 阈值（默认 0.5）
+    pose->get_postprocessor().set_keypoints_num(17);     // 关键点数（默认 17，须与模型输出一致）
+    hand->get_postprocessor().set_nms_threshold(0.45f);  // HandKeypoint/VehicleKeypoint 经 get_postprocessor 透传同款参数
+    vehicle->get_postprocessor().set_keypoints_num(4);   // 不同车型模型可覆盖点数
+
+    // 4. 单图推理
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    std::vector<modeldeploy::vision::KeyPointsResult> res;
+    if (!pose->predict(im, &res)) return 1;
+    for (const auto& r : res) {
+        std::printf("label=%d score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+                    r.label_id, r.score, r.box.x, r.box.y, r.box.width, r.box.height, r.keypoints.size());
+        for (const auto& kp : r.keypoints) {
+            std::printf("  kp=(%.1f, %.1f, %.2f)\n", kp.x, kp.y, kp.z);   // z 为关键点置信度
+        }
+    }
+    // FaceLandmark：输入人脸裁剪图 -> 单元素结果（106 点 z=0，box 为整图、score=1.0）
+    auto crop = modeldeploy::vision::ImageData::imread("face_crop.jpg");
+    std::vector<modeldeploy::vision::KeyPointsResult> fres;
+    if (!face->predict(crop, &fres)) return 1;
+
+    // 5. 可视化：vis_pose（COCO 骨架连线）/ vis_hand（手部连线）/ vis_keypoints（仅关键点+框，车辆/面部用）
+    auto vis = modeldeploy::vision::vis_pose(im, res, "msyh.ttc", 14, 4, 0.3, false);
+    vis.imwrite("pose_vis.jpg");
+    // 或就地绘制到图像帧（GPU 帧按设备分发）：
+    // hand->draw_result(im, hand_res, 0.5); vehicle->draw_result(im, vres, 0.5);
+
+    // 6. 批量推理：各图统一 letterbox 后拼 batch，返回按图分组（FaceLandmark 无 batch_predict）
+    std::vector<modeldeploy::vision::ImageData> images = {
+        modeldeploy::vision::ImageData::imread("a.jpg"),
+        modeldeploy::vision::ImageData::imread("b.jpg"),
+    };
+    std::vector<std::vector<modeldeploy::vision::KeyPointsResult>> ress;
+    pose->batch_predict(images, &ress);
+    hand->batch_predict(images, &ress);
+
+    // 7. 多线程：clone() 深拷贝独立实例（每线程持有一个，互不干扰）
+    auto pose2 = pose->clone();
+    return 0;
+}
+```
+
+## 9. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -289,7 +355,7 @@ int main() {
 | 轻量分割一切 | `vision::seg::FastSam` | 见上文 §5 |
 | 语义分割 | `vision::detection::UltralyticsSem` | 见上文 §6 |
 | 深度估计 | `vision::detection::UltralyticsDepth` | 见上文 §7 |
-| 姿态估计 | `vision::detection::UltralyticsPose` | 见 [models-姿态](../models.md#3-姿态估计pose--keypoints) |
+| 姿态 / 关键点 | `vision::detection::UltralyticsPose` / `vision::hand::HandKeypoint` / `vision::landmark::VehicleKeypoint` / `vision::landmark::FaceLandmark` | 见上文 §8 |
 | 旋转框 | `vision::detection::UltralyticsObb` | 见 [models-旋转框](../models.md#4-旋转框检测oriented-bounding-box) |
 | 分类 | `vision::Classification` | 见 [models-分类](../models.md#5-图像分类classification) |
 | OCR | `vision::ocr::PaddleOCR` | 见 [models-OCR](../models.md#8-ocr文字识别) |
@@ -336,7 +402,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 9. 工程配置
+## 10. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

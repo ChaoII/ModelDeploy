@@ -212,6 +212,62 @@ pred.Draw(canvas, new DrawOptions());
 canvas.Save("depth_vis.jpg");
 ```
 
+## 8. 姿态与关键点族（`PoseModel` / `HandModel` / `VehicleKeypointModel` / `FaceLandmarkModel`）
+
+四个模型类（`ModelDeploy.Models`，分别对应 `MD_MODEL_POSE` / `MD_MODEL_HAND` / `MD_MODEL_VEHICLE_KEYPOINT` / `MD_MODEL_FACE_LANDMARK`）结果类型统一为 `ModelDeploy.Results.PoseResult`（属性 `Box: RectF`、`Score: float`、`KeyPoints: Point3F[]`，`Point3F` 含 `X/Y/Z`，`Z` 为关键点置信度；无 `LabelId`）。`PoseModel`（COCO 17 点人体骨架）、`HandModel`（21 点手部）、`VehicleKeypointModel`（4 车轮关键点）支持 `SetConfThreshold` / `SetNmsThreshold` / `SetKeypointsNum`；`FaceLandmarkModel`（InsightFace 2d106 面部 106 点，`Z` 恒为 0）无阈值 setter（输入须为人脸裁剪图）。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var pose = new PoseModel("yolo11n-pose.onnx", option);
+using var hand = new HandModel("hand.onnx", option);
+using var vehicle = new VehicleKeypointModel("vehicle.onnx", option);
+using var face = new FaceLandmarkModel("face_landmark.onnx", option);
+
+// 预处理/后处理参数（FaceLandmarkModel 无参数 setter；HandModel 构造默认 21 点、
+// VehicleKeypointModel 构造默认 4 点，均可 SetKeypointsNum 覆盖）
+pose.SetInputSize(640, 640);      // letterbox 输入尺寸
+pose.SetConfThreshold(0.30);      // 置信度阈值（默认 0.30）
+pose.SetNmsThreshold(0.45);       // NMS IoU 阈值（默认 0.5）
+pose.SetKeypointsNum(17);         // 关键点数（默认 17，须与模型输出一致）
+hand.SetKeypointsNum(21);
+vehicle.SetKeypointsNum(4);
+
+using var img = VisionImage.Read("test.jpg");
+
+// 单图推理：Predict 返回 Prediction<PoseResult>（foreach / 索引 / .Count）
+using var pred = pose.Predict(img);
+foreach (var r in pred) {
+    Console.WriteLine($"{r.Score:F3} ({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height}) kps={r.KeyPoints.Length}");
+    foreach (var kp in r.KeyPoints) {
+        Console.WriteLine($"  ({kp.X},{kp.Y},{kp.Z})");
+    }
+}
+// 面部 Landmark：输入人脸裁剪图 -> 单元素结果（106 点 Z=0，Box 为整图、Score=1.0）
+using var crop = VisionImage.Read("face_crop.jpg");
+using var fpred = face.Predict(crop);
+
+// 批量推理：PredictBatch 按图返回 IReadOnlyList<PoseResult[]>
+using var img2 = VisionImage.Read("bus.jpg");
+var batch = pose.PredictBatch(new[] { img, img2 });
+for (int g = 0; g < batch.Count; g++) {
+    Console.WriteLine($"image {g}: {batch[g].Length} persons");
+}
+
+// 可视化：pred.Draw 直达 C++ vis_pose（COCO 骨架连线）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { Threshold = 0.30, Alpha = 0.3 });
+canvas.Save("pose_vis.jpg");
+
+// 多线程：Clone() 深拷贝独立实例
+using var pose2 = pose.Clone();
+```
+
 ## 运行示例
 
 ```bash

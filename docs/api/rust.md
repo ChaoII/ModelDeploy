@@ -248,6 +248,66 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 8. 姿态与关键点族（`UltralyticsPose` / `HandKeypoint` / `VehicleKeypoint` / `FaceLandmark`）
+
+姿态与关键点模型族结果类型统一为 `Pose`（字段 `rect: Rect`、`score: f32`、`keypoints: Vec<Point3>`，`Point3` 含 `x/y/z`，`z` 为关键点置信度；无 `label_id`）。`predict` 返回 `Vec<Pose>`，`predict_batch` 返回 `Vec<Vec<Pose>>`（按图分组）。类对应：`UltralyticsPose`（COCO 17 点人体骨架）、`HandKeypoint`（21 点手部）、`VehicleKeypoint`（4 车轮关键点）、`FaceLandmark`（InsightFace 2d106 面部 106 点，`z` 恒为 0，输入须为人脸裁剪图）。
+
+```rust
+use modeldeploy::{Image, RuntimeOption, UltralyticsPose};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项（详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+
+    // 2. 构造：HandKeypoint / VehicleKeypoint / FaceLandmark 同为 ::new(path, &opt)?
+    let model = UltralyticsPose::new("yolo11n-pose.onnx", &opt)?;
+    let hand = modeldeploy::HandKeypoint::new("hand.onnx", &opt)?;
+    let vehicle = modeldeploy::VehicleKeypoint::new("vehicle.onnx", &opt)?;
+    let face = modeldeploy::FaceLandmark::new("face_landmark.onnx", &opt)?;
+
+    // 3. 预处理/后处理参数（UltralyticsPose/HandKeypoint/VehicleKeypoint 共用；
+    //    FaceLandmark 无参数表，调阈值 setter 会返回 Err）
+    model.set_input_size(640, 640)?;      // letterbox 输入尺寸
+    model.set_conf_threshold(0.30)?;      // 置信度阈值（默认 0.30）
+    model.set_nms_threshold(0.45)?;       // NMS IoU 阈值（默认 0.5）
+    model.set_keypoints_num(17)?;         // 关键点数（默认 17，须与模型输出一致）
+    hand.set_keypoints_num(21)?;          // 手部 21 点（构造默认 21）
+    vehicle.set_keypoints_num(4)?;        // 车轮 4 点（构造默认 4，不同车型可覆盖）
+
+    // 4. 单图推理：predict(&Image) -> Vec<Pose>
+    let img = Image::read("test.jpg")?;
+    let poses = model.predict(&img)?;
+    for p in &poses {
+        println!("score={:.3} rect=({:.0},{:.0},{:.0},{:.0}) kps={}",
+                 p.score, p.rect.x, p.rect.y, p.rect.width, p.rect.height, p.keypoints.len());
+        for kp in &p.keypoints {
+            println!("  kp=({:.1}, {:.1}, {:.2})", kp.x, kp.y, kp.z);   // z 为关键点置信度
+        }
+    }
+    // 面部 Landmark：输入人脸裁剪图 -> 单元素 Vec（106 点 z=0，rect 为整图、score=1.0）
+    let crop = Image::read("face_crop.jpg")?;
+    let _flms = face.predict(&crop)?;
+
+    // 5. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<Pose>>（按图分组）
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+    for (i, ps) in batch.iter().enumerate() {
+        println!("image {}: {} persons", i, ps.len());
+    }
+
+    // 6. 可视化：predict_and_draw 句柄直达 C++ vis_pose（COCO 骨架连线）
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas, &modeldeploy::DrawOptions::new().with_alpha(0.3))?;
+    canvas.save("pose_vis.jpg")?;
+
+    // 7. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let model2 = model.clone()?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

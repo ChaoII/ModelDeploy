@@ -302,6 +302,83 @@ printf("depth %zux%zu, center=%.2f m\n", h, w, depth[(h / 2) * w + (w / 2)]);
 md_result_destroy(res);
 ```
 
+## 8. 姿态与关键点族（`MD_MODEL_POSE` / `MD_MODEL_HAND` / `MD_MODEL_VEHICLE_KEYPOINT` / `MD_MODEL_FACE_LANDMARK`）
+
+四个 kind 均经 `md_model_create` 创建，结果统一为 `MD_RES_POSE` 种类：`md_result_pose` 返回 `MDPoseItem{ x, y, w, h, score }` 数组，关键点经 `md_result_keypoints(res, i, ...)` 按实例序号读取 `MDPoint3{ x, y, z }` 数组（`z` 为关键点置信度）。参数自省：POSE/HAND/VEHICLE_KEYPOINT 返回 `"conf_threshold|nms_threshold|keypoints_num"`（类型 'D'/'D'/'I'，默认 conf 0.30 / nms 0.5 / 17 点）；FACE_LANDMARK 无参数（固定 106 点，InsightFace 2d106，输入须为人脸裁剪图）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_POSE, "yolo11n-pose.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    md_model_set_input_size(m, 640, 640);
+    /* 参数自省：POSE/HAND/VEHICLE_KEYPOINT 返回 "conf_threshold|nms_threshold|keypoints_num"
+     * （keypoints_num 类型 'I'，须用 md_model_set_param_i）；默认 conf 0.30 / nms 0.5 / 17 点 */
+    md_model_set_param_d(m, "conf_threshold", 0.30);
+    md_model_set_param_d(m, "nms_threshold", 0.45);
+    md_model_set_param_i(m, "keypoints_num", 17);
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+    MDResultHandle res = NULL;
+    if (md_model_predict(m, img, &res) != MD_OK) {
+        fprintf(stderr, "predict failed: %s\n", md_get_last_error());
+        return 1;
+    }
+
+    /* 结果遍历：bbox+score 在 items，关键点按实例序号读取 */
+    const MDPoseItem* items = NULL;
+    size_t n = 0;
+    md_result_pose(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        const MDPoint3* kps = NULL;
+        size_t kn = 0;
+        md_result_keypoints(res, i, &kps, &kn);   /* kps[j].x/y/z，z 为关键点置信度 */
+        printf("[%zu] score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu first=(%.1f, %.1f, %.2f)\n",
+               i, items[i].score, items[i].x, items[i].y, items[i].w, items[i].h, kn,
+               kn > 0 ? kps[0].x : 0.f, kn > 0 ? kps[0].y : 0.f, kn > 0 ? kps[0].z : 0.f);
+    }
+    /* 批量推理：md_result_pose_batch(bres, g, &items, &n) 取第 g 图项数组，
+     * 关键点用 md_result_keypoints_batch(bres, g, j, &kps, &kn) 按 (图, 项) 读 */
+
+    /* 可视化：md_draw_result 支持 MD_RES_POSE（底层 vis_pose 骨架连线），用法同 §3 */
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
+手部 / 车辆 / 面部 Landmark 只是换 kind 创建，参数与结果读取完全同构：
+
+```c
+MDModelHandle hand = NULL, vk = NULL, fl = NULL;
+md_model_create(&hand, MD_MODEL_HAND, "hand.onnx", opt);
+md_model_set_param_i(hand, "keypoints_num", 21);   /* 手部 21 点（构造默认 21，可省略） */
+
+md_model_create(&vk, MD_MODEL_VEHICLE_KEYPOINT, "vehicle.onnx", opt);
+md_model_set_param_i(vk, "keypoints_num", 4);      /* 车辆 4 车轮点（构造默认 4，不同车型可覆盖） */
+
+/* 面部 Landmark（InsightFace 2d106）：无参数（md_model_param_names 返回空表）、固定 106 点（z=0）、
+ * 输入须为人脸裁剪图；多线程用 md_model_clone */
+md_model_create(&fl, MD_MODEL_FACE_LANDMARK, "face_landmark.onnx", opt);
+
+/* 三者结果读取同上：md_result_pose + md_result_keypoints（或 _batch 变体），
+ * md_draw_result 亦按 MD_RES_POSE 绘制 */
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

@@ -250,14 +250,65 @@ batch = dep.batch_predict([cv2.imread("a.jpg"), cv2.imread("b.jpg")])   # list[D
 # Python 绑定未提供 vis_depth；JET 伪彩图请用 C++ vis_depth / C API md_draw_result
 ```
 
-## 8. 已绑定模块
+## 8. 姿态与关键点族（UltralyticsPose / HandKeypoint / VehicleKeypoint / FaceLandmark）
+
+姿态与关键点模型族结果类型统一为 `KeyPointsResult`（字段 `box: Rect2f`、`keypoints: list[Point3f]`（`x/y/z`，`z` 为关键点置信度）、`label_id: int`、`score: float`）。`UltralyticsPose`（COCO 17 点人体骨架）、`HandKeypoint`（21 点手部）在 `md.vision`；`VehicleKeypoint`（4 车轮关键点）与 `FaceLandmark`（InsightFace 2d106 面部 106 点，`z` 恒为 0）在 `md.vision.landmark` 子模块。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（option 配置见上节；VehicleKeypoint/FaceLandmark 的 option 可省略，默认 RuntimeOption()）
+option = md.RuntimeOption()
+option.use_ort_backend()
+option.use_cpu()
+
+pose = md.vision.UltralyticsPose("yolo11n-pose.onnx", option)
+hand = md.vision.HandKeypoint("hand.onnx", option)
+vehicle = md.vision.landmark.VehicleKeypoint("vehicle.onnx", option)
+face = md.vision.landmark.FaceLandmark("face_landmark.onnx", option)
+
+# 2. 参数设置
+pose.preprocessor.size = [640, 640]          # letterbox 输入尺寸（默认 [640, 640]）
+pose.postprocessor.conf_threshold = 0.30     # 置信度阈值（默认 0.30）
+pose.postprocessor.nms_threshold = 0.45      # NMS IoU 阈值（默认 0.5）
+pose.postprocessor.set_keypoints_num(17)     # 关键点数（默认 17，须与模型输出一致）
+hand.set_keypoints_num(21)                   # 手部点数（构造默认 21）
+vehicle.set_keypoints_num(4)                 # 车轮点数（构造默认 4，不同车型可覆盖）
+# FaceLandmark 固定 106 点（InsightFace 2d106 仿射对齐），无可调参数；输入须为人脸裁剪图
+
+# 3. 单图推理：返回 list[KeyPointsResult]
+img = cv2.imread("test.jpg")
+results = pose.predict(img)
+for r in results:
+    print(r.label_id, r.score, r.box.x, r.box.y, r.box.width, r.box.height)
+    for kp in r.keypoints:
+        print(kp.x, kp.y, kp.z)              # z 为关键点置信度
+face_crop = cv2.imread("face_crop.jpg")
+fr = face.predict(face_crop)                 # -> 单元素 list（box 为整图、score=1.0、106 点 z=0）
+
+# 4. 批量推理：返回 list[list[KeyPointsResult]]（HandKeypoint / FaceLandmark 未绑定 batch_predict）
+batch = pose.batch_predict([cv2.imread("a.jpg"), cv2.imread("b.jpg")])
+vbatch = vehicle.batch_predict([cv2.imread("a.jpg"), cv2.imread("b.jpg")])
+
+# 5. 可视化：md.vision.vis_keypoints（vis_pose / vis_hand 未绑定 Python）
+#    签名：vis_keypoints(image, result, font_path="", font_size=14, landmark_radius=4, alpha=0.15, save_result=False, draw_lines=False)
+vis = md.vision.vis_keypoints(img, results, font_path="msyh.ttc", font_size=14, landmark_radius=4, alpha=0.3)
+cv2.imwrite("pose_vis.jpg", vis)
+
+# 6. 多线程：clone() 深拷贝独立实例（HandKeypoint 未绑定 clone）
+pose2 = pose.clone()
+vehicle2 = vehicle.clone()
+```
+
+## 9. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
-- **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
+- **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
-- **可视化**：`vis_det`、`vis_iseg`、`vis_ocr` 等
+- **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 9. 性能测试
+## 10. 性能测试
 
 ```python
 import time
