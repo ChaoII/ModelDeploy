@@ -584,7 +584,81 @@ int main() {
 
 > `DocToMarkdown` 为**单列自上而下**顺序排版（不做多栏重排）；`set_*` 同时提供 `std::unique_ptr` 所有权重载与 `T*` 借用重载（本例为借用，须保证子模型生命周期覆盖 `doc` 使用期间）。
 
-## 13. 更多模型（均使用同一 `RuntimeOption`）
+## 13. 人脸（face::Scrfd / SeetaFace 族 / FaceRecognizerPipeline）
+
+人脸模块在命名空间 `modeldeploy::vision::face`：`Scrfd`（检测，框+5 关键点）、`SeetaFaceID`（特征）、`SeetaFaceAge`（年龄）、`SeetaFaceGender`（性别）、`SeetaFaceAsFirst`/`SeetaFaceAsSecond`（防伪一/二阶段）、`SeetaFaceAsPipeline`（防伪串联）、`FaceRecognizerPipeline`（检测+特征一体化）。完整说明见 [models.md §6](../models.md#6-人脸face)。
+
+**注意**：`Scrfd` 与姿态族同用 `ScrfdPreprocessor`+`ScrfdPostprocessor`（`set_size`/`set_padding_value`/`set_scale_up`/`set_mini_pad`/`set_stride`；`set_conf_threshold`/`set_nms_threshold`/`set_landmarks_per_face`），**不是**检测族的 preprocessor；`SeetaFaceID/Age/Gender` 的 preprocessor 仅 `set_size`、postprocessor **无参数**（不同构于 det）。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+
+    // 1. 人脸检测：face::Scrfd -> std::vector<KeyPointsResult>（框 + 5 关键点）
+    auto det = std::make_unique<modeldeploy::vision::face::Scrfd>("scrfd.onnx", opt);
+    if (!det->is_initialized()) return 1;
+    det->get_preprocessor().set_size({640, 640});      // letterbox 输入尺寸（默认 {640, 640}）
+    det->get_postprocessor().set_conf_threshold(0.30f); // 置信度阈值（默认 0.25）
+    det->get_postprocessor().set_nms_threshold(0.45f);  // NMS IoU 阈值（默认 0.5）
+    det->get_postprocessor().set_landmarks_per_face(5); // 每人脸关键点（默认 5）
+
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    std::vector<modeldeploy::vision::KeyPointsResult> faces;
+    if (!det->predict(im, &faces)) return 1;
+    for (const auto& r : faces) {
+        std::printf("score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+                    r.score, r.box.x, r.box.y, r.box.width, r.box.height, r.keypoints.size());
+        for (const auto& kp : r.keypoints)
+            std::printf("  kp=(%.1f, %.1f)\n", kp.x, kp.y);
+    }
+
+    // 2. 年龄 / 性别（输入对齐后的人脸裁剪图）：predict(image, &v) 输出 int
+    modeldeploy::vision::face::SeetaFaceAge age("age.onnx", opt);
+    modeldeploy::vision::face::SeetaFaceGender gender("gender.onnx", opt);
+    int a = 0, g = 0;
+    if (age.predict(im, &a) && gender.predict(im, &g))
+        std::printf("age=%d gender=%d (%s)\n", a, g, g == 0 ? "女" : "男");
+
+    // 3. 人脸识别（特征）：face::SeetaFaceID -> FaceRecognitionResult{embedding}
+    modeldeploy::vision::face::SeetaFaceID rec("rec.onnx", opt);
+    modeldeploy::vision::FaceRecognitionResult emb;
+    rec.predict(im, &emb);
+    std::printf("embedding dim=%zu\n", emb.embedding.size());
+
+    // 4. 防伪一 / 二阶段
+    modeldeploy::vision::face::SeetaFaceAsFirst af("first.onnx", opt);
+    float score = 0.f;
+    af.predict(im, &score);                 // 活体得分
+    modeldeploy::vision::face::SeetaFaceAsSecond as("second.onnx", opt);
+    std::vector<std::tuple<int, float>> probs;
+    as.predict(im, &probs);                 // label + 概率
+
+    // 5. 防伪流水线：det|first|second 三模型，predict(im, &res, fuse=0.8, clarity=0.3)
+    modeldeploy::vision::face::SeetaFaceAsPipeline as_pipe(
+        "det.onnx", "first.onnx", "second.onnx", opt);
+    std::vector<modeldeploy::vision::FaceAntiSpoofResult> spoofs;
+    as_pipe.predict(im, &spoofs, 0.8f, 0.3f);   // 枚举 REAL / FUZZY / SPOOF
+
+    // 6. 识别流水线：det|rec 两模型，输出 vector<FaceRecognitionResult>
+    modeldeploy::vision::face::FaceRecognizerPipeline pipe("det.onnx", "rec.onnx", opt);
+    pipe.get_detector()->get_postprocessor().set_conf_threshold(0.30f);  // 调检测子模型阈值
+    std::vector<modeldeploy::vision::FaceRecognitionResult> embeddings;
+    pipe.predict(im, &embeddings);
+    // 只取主脸：modeldeploy::vision::FaceRecognitionResult maxface;
+    // pipe.predict_max_face(im, &maxface, &face_count);
+
+    // 7. 多线程：clone() 深拷贝独立实例（各模型均支持）
+    auto det2 = det->clone();
+    return 0;
+}
+```
+
+## 14. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -640,7 +714,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 14. 工程配置
+## 15. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

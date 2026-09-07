@@ -489,6 +489,61 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 13. 人脸（`Scrfd` + SeetaFace 族）
+
+人脸模型结果类型不同：`Scrfd` 输出 `FaceDetection`（`rect: Rect` + `score` + `keypoints: Vec<Point>`，5 关键点）、`SeetaFaceID`/`FaceRecognizerPipelineModel` 输出 `FaceRecognition`（`embedding: Vec<f32>`，512 维）、`SeetaFaceAge`/`SeetaFaceGender` 为标量，`predict` 直接返回 `i32`（gender `0`=女 / `1`=男）。**人脸防伪（`SeetaFaceAsFirst/AsSecond/AsPipeline`）本语言未绑定**（C API 未封装于 Rust 模型类），如需请用 C++ / Python。
+
+```rust
+use modeldeploy::{FaceRecognizerPipelineModel, Image, RuntimeOption, Scrfd, SeetaFaceAge,
+                  SeetaFaceGender, SeetaFaceID};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+
+    // 1. 人脸检测：Scrfd -> Vec<FaceDetection>（框 + 5 关键点）
+    let det = Scrfd::new("scrfd.onnx", &opt)?;
+    det.set_input_size(640, 640)?;
+    det.set_conf_threshold(0.30)?;       // 置信度阈值（默认 0.25）
+    det.set_nms_threshold(0.45)?;        // NMS IoU 阈值（默认 0.5）
+    det.set_landmarks_per_face(5)?;      // 每人脸关键点（默认 5）
+
+    let img = Image::read("test.jpg")?;
+    let faces = det.predict(&img)?;
+    for f in &faces {
+        println!("score={:.3} rect=({:.0},{:.0},{:.0},{:.0}) kps={}",
+                 f.score, f.rect.x, f.rect.y, f.rect.width, f.rect.height, f.keypoints.len());
+        for kp in &f.keypoints {
+            println!("  kp=({:.1}, {:.1})", kp.x, kp.y);
+        }
+    }
+
+    // 2. 年龄 / 性别：SeetaFaceAge / SeetaFaceGender -> i32（标量，无 predict_batch）
+    let age = SeetaFaceAge::new("age.onnx", &opt)?;
+    let gender = SeetaFaceGender::new("gender.onnx", &opt)?;
+    println!("age={} gender={}", age.predict(&img)?, gender.predict(&img)?);
+
+    // 3. 人脸识别（特征）：SeetaFaceID -> Vec<FaceRecognition>（embedding）
+    let rec = SeetaFaceID::new("rec.onnx", &opt)?;
+    let emb = rec.predict(&img)?;
+    println!("embedding dim={}", emb[0].embedding.len());
+
+    // 4. 识别流水线：FaceRecognizerPipelineModel，model_path 用 '|' 两段
+    let pipe = FaceRecognizerPipelineModel::new("det.onnx|rec.onnx", &opt)?;
+    pipe.set_conf_threshold(0.30)?;
+    let results = pipe.predict(&img)?;      // Vec<FaceRecognition>
+    for r in &results {
+        println!("embedding dim={}", r.embedding.len());
+    }
+
+    // 批量：det.predict_batch(&[&img, &img2])? -> Vec<Vec<FaceDetection>>（按图分组）
+    // 多线程：det.clone()? 深拷贝独立实例
+    let _det2 = det.clone()?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

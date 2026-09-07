@@ -586,6 +586,110 @@ int main(void) {
 }
 ```
 
+## 13. 人脸（`MD_MODEL_FACE_DET` / `FACE_REC` / `FACE_AGE` / `FACE_GENDER` / `FACE_AS_PIPELINE` / `FACE_REC_PIPELINE`）
+
+人脸六个 kind 均经 `md_model_create` 创建，结果按模型族不同读取：
+
+| kind | 底层模型 | 结果 kind | 读取接口 |
+|------|---------|-----------|----------|
+| `MD_MODEL_FACE_DET` | `Scrfd`（框+5 关键点） | `MD_RES_FACE` | `md_result_face` + `md_result_face_kps` |
+| `MD_MODEL_FACE_REC` | `SeetaFaceID`（512-d 特征） | `MD_RES_FACE_REC` | `md_result_face_embedding` |
+| `MD_MODEL_FACE_AGE` | `SeetaFaceAge` | `MD_RES_AGE` | `md_result_age` |
+| `MD_MODEL_FACE_GENDER` | `SeetaFaceGender` | `MD_RES_GENDER` | `md_result_gender` |
+| `MD_MODEL_FACE_AS_PIPELINE` | `SeetaFaceAsPipeline`（det\|first\|second） | `MD_RES_ANTISPOOF` | `md_result_spoof` |
+| `MD_MODEL_FACE_REC_PIPELINE` | `FaceRecognizerPipeline`（det\|rec） | `MD_RES_FACE_REC` | `md_result_face_embedding` |
+
+参数自省：`FACE_DET` / `FACE_REC_PIPELINE` 返回 `"conf_threshold|nms_threshold|landmarks_per_face"`（类型 `D/D/I`）；`FACE_REC`/`FACE_AGE`/`FACE_GENDER`/`FACE_AS_PIPELINE` 无参数表（年龄/性别后处理 argmax、防伪流水线用默认 fuse 0.8 / clarity 0.3）。多子模型路径用 `|` 串联：`FACE_AS_PIPELINE` 为 `"det.onnx|first.onnx|second.onnx"`、`FACE_REC_PIPELINE` 为 `"det.onnx|rec.onnx"`。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+
+    /* 1. 人脸检测：FACE_DET。MDFaceItem{x, y, w, h, score}，关键点按实例读 MDPoint */
+    MDModelHandle det = NULL;
+    md_model_create(&det, MD_MODEL_FACE_DET, "scrfd.onnx", opt);
+    /* 参数自省：FACE_DET 返回 "conf_threshold|nms_threshold|landmarks_per_face"（D/D/I） */
+    md_model_set_input_size(det, 640, 640);
+    md_model_set_param_d(det, "conf_threshold", 0.30);
+    md_model_set_param_d(det, "nms_threshold", 0.45);
+    md_model_set_param_i(det, "landmarks_per_face", 5);
+    MDResultHandle res = NULL;
+    md_model_predict(det, img, &res);
+    const MDFaceItem* items = NULL;
+    size_t n = 0;
+    md_result_face(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        const MDPoint* kps = NULL;
+        size_t kn = 0;
+        md_result_face_kps(res, i, &kps, &kn);      /* 5 关键点 (x, y) */
+        printf("[%zu] score=%.3f box=(%.0f, %.0f, %.0f, %.0f) kps=%zu\n",
+               i, items[i].score, items[i].x, items[i].y, items[i].w, items[i].h, kn);
+    }
+    md_result_destroy(res);
+    md_model_destroy(det);
+
+    /* 2. 人脸识别：FACE_REC（单面输出），embedding 归结果句柄所有 */
+    MDModelHandle rec = NULL;
+    md_model_create(&rec, MD_MODEL_FACE_REC, "rec.onnx", opt);
+    md_model_predict(rec, img, &res);
+    const float* emb = NULL;
+    size_t emb_n = 0;
+    md_result_face_embedding(res, 0, &emb, &emb_n);
+    printf("embedding dim=%zu first=%.4f\n", emb_n, emb_n ? emb[0] : 0.f);
+    md_result_destroy(res);
+    md_model_destroy(rec);
+
+    /* 3. 年龄 / 性别：FACE_AGE / FACE_GENDER（单值），gender 0=女 1=男 */
+    MDModelHandle age = NULL, gender = NULL;
+    md_model_create(&age, MD_MODEL_FACE_AGE, "age.onnx", opt);
+    md_model_create(&gender, MD_MODEL_FACE_GENDER, "gender.onnx", opt);
+    int a = 0, g = 0;
+    md_model_predict(age, img, &res);    md_result_age(res, &a);    md_result_destroy(res);
+    md_model_predict(gender, img, &res); md_result_gender(res, &g); md_result_destroy(res);
+    printf("age=%d gender=%d\n", a, g);
+    md_model_destroy(age); md_model_destroy(gender);
+
+    /* 4. 防伪流水线：FACE_AS_PIPELINE，路径 '|' 三段；结果经 md_result_spoof */
+    MDModelHandle asp = NULL;
+    md_model_create(&asp, MD_MODEL_FACE_AS_PIPELINE,
+                    "det.onnx|first.onnx|second.onnx", opt);
+    md_model_predict(asp, img, &res);
+    for (size_t i = 0; ; i++) {
+        int label = 0;
+        if (md_result_spoof(res, i, &label) != MD_OK) break;   /* 0=REAL 1=FUZZY 2=SPOOF */
+        printf("face %zu: %s\n", i, label == 0 ? "REAL" : label == 1 ? "FUZZY" : "SPOOF");
+    }
+    md_result_destroy(res);
+    md_model_destroy(asp);
+
+    /* 5. 识别流水线：FACE_REC_PIPELINE，'|' 两段；embedding 按实例读 */
+    MDModelHandle rp = NULL;
+    md_model_create(&rp, MD_MODEL_FACE_REC_PIPELINE, "det.onnx|rec.onnx", opt);
+    md_model_set_param_d(rp, "conf_threshold", 0.30);
+    md_model_predict(rp, img, &res);
+    for (size_t i = 0; ; i++) {
+        const float* e = NULL; size_t en = 0;
+        if (md_result_face_embedding(res, i, &e, &en) != MD_OK) break;
+        printf("face %zu: dim=%zu\n", i, en);
+    }
+    md_result_destroy(res);
+    md_model_destroy(rp);
+
+    md_image_destroy(img);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

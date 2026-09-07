@@ -488,14 +488,77 @@ print(markdown)
 
 > `DocToMarkdown` 为**单列自上而下**顺序排版（不做多栏重排）；公式以 `$...$`、表格以 HTML 呈现。`set_*` 在 Python 中通过 `keep_alive` 保证子模型寿命被托管，可安全复用已构造的 `layout/ocr/ppt/formula`。
 
-## 13. 已绑定模块
+## 13. 人脸（Scrfd + SeetaFace 族 + FaceRecognizerPipeline）
+
+人脸模块包含检测、识别、年龄、性别、防伪五类，全部绑定 Python。结果类型逐模型不同：`Scrfd` 复用姿态族的 `KeyPointsResult`（`box` + `keypoints`，框带 5 关键点），`SeetaFaceAge/Gender` 返回 `int`，`SeetaFaceID`/`FaceRecognizerPipeline` 返回 `FaceRecognitionResult{embedding}`，防伪族返回 `FaceAntiSpoofResult` 枚举（`REAL=0` / `FUZZY=1` / `SPOOF=2`）。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（option 配置见上节）
+option = md.RuntimeOption()
+option.use_ort_backend()
+option.use_cpu()
+
+# 人脸检测：Scrfd -> list[KeyPointsResult]（框 + 5 关键点）
+det = md.vision.Scrfd("scrfd.onnx", option)
+det.preprocessor.size = [640, 640]            # letterbox 输入尺寸（默认 [640, 640]）
+det.postprocessor.conf_threshold = 0.30       # 置信度阈值（默认 0.25）
+det.postprocessor.nms_threshold = 0.45        # NMS IoU 阈值（默认 0.5）
+
+# 2. 检测：对整图返回 list[KeyPointsResult]
+img = cv2.imread("test.jpg")
+faces = det.predict(img)
+for r in faces:
+    print(r.score, r.box.x, r.box.y, r.box.width, r.box.height)
+    for kp in r.keypoints:                     # 5 个关键点（两眼/鼻/两嘴角）
+        print(kp.x, kp.y)
+
+# 3. 年龄 / 性别：predict -> int（输入对齐后的人脸裁剪图）
+age = md.vision.SeetaFaceAge("age.onnx", option)
+gender = md.vision.SeetaFaceGender("gender.onnx", option)
+crop = cv2.imread("face_crop.jpg")
+print("age=", age.predict(crop), "gender=", gender.predict(crop))  # gender 0=女 / 1=男
+# 批量：ages = age.batch_predict([crop1, crop2]) -> list[int]
+
+# 4. 人脸识别（特征）：predict -> FaceRecognitionResult{embedding}（512 维）
+rec = md.vision.SeetaFaceID("rec.onnx", option)
+emb = rec.predict(crop).embedding
+
+# 5. FaceRecognizerPipeline（检测 + 特征一体化）：输入整图 -> list[FaceRecognitionResult]
+pipe = md.vision.FaceRecognizerPipeline("det.onnx", "rec.onnx", option)
+results = pipe.predict(img)
+for r in results:
+    print(len(r.embedding), r.embedding[:4])
+
+# 6. 防伪（SeetaFace 族，Python 全绑定型齐全）
+#    - 一阶段：SeetaFaceAsFirst -> float（活体得分）
+first = md.vision.SeetaFaceAsFirst("first.onnx", option)
+print("score=", first.predict(crop))
+#    - 二阶段：SeetaFaceAsSecond -> list[tuple[int, float]]（label + 概率）
+second = md.vision.SeetaFaceAsSecond("second.onnx", option)
+print(second.predict(crop))
+#    - 流水线：det|first|second 三模型串联，predict -> list[FaceAntiSpoofResult]
+as_pipe = md.vision.SeetaFaceAsPipeline("det.onnx", "first.onnx", "second.onnx", option)
+spoofs = as_pipe.predict(img, fuse_threshold=0.8, clarity_threshold=0.3)
+for s in spoofs:
+    print(s.name)   # REAL / FUZZY / SPOOF
+
+# 7. 多线程：clone() 深拷贝独立实例（age/gender/rec/first/second/as_pipe 均绑定 clone）
+det2 = det.clone()
+```
+
+> 注意：`Scrfd` 的 preprocessor 额外暴露 `is_mini_pad` / `is_scale_up` / `padding_value` 与 `stride`（读写属性）；`SeetaFaceAge/Gender/ID` 的 preprocessor 仅暴露 `size`，postprocessor 无参数（argmax / 内联输出）。`SeetaFaceAs*` 与 `FaceRecognizerPipeline` 在 Python 绑定**未暴露** preprocessor/postprocessor 属性，用默认参数。
+
+## 14. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 14. 性能测试
+## 15. 性能测试
 
 ```python
 import time

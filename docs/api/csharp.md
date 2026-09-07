@@ -431,6 +431,56 @@ Console.WriteLine(latex);
 using var formula2 = formula.Clone();
 ```
 
+## 13. 人脸（`FaceDetModel` / `FaceRecModel` / `FaceAgeModel` / `FaceGenderModel` / `FaceRecognizerPipelineModel`）
+
+人脸模型类位于 `ModelDeploy.Models`，结果类型不同：`FaceDetModel` 返回 `FaceDetResult`（`Box: RectF` + `Score` + `KeyPoints: PointF[]`，5 关键点）、`FaceRecModel`/`FaceRecognizerPipelineModel` 返回 `FaceRecResult`（`Embedding: float[]`，512 维）、`FaceAgeModel`/`FaceGenderModel` 直接返回 `int`（gender `0`=女 / `1`=男）。**人脸防伪（SeetaFaceAs 一/二阶段与 AsPipeline）本语言未绑定**（C API 未暴露 `FACE_AS_PIPELINE` 于 C# 模型类），如需请用 C++ / Python。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 1. 人脸检测：FaceDetModel -> Prediction<FaceDetResult>（框 + 5 关键点）
+using var det = new FaceDetModel("scrfd.onnx", option);
+det.SetInputSize(640, 640);
+det.SetConfThreshold(0.30);        // 置信度阈值（默认 0.25）
+det.SetNmsThreshold(0.45);         // NMS IoU 阈值（默认 0.5）
+det.SetLandmarksPerFace(5);        // 每人脸关键点（默认 5）
+
+using var img = VisionImage.Read("test.jpg");
+using var detPred = det.Predict(img);
+foreach (var r in detPred) {
+    Console.WriteLine($"{r.Score:F3} ({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height}) kps={r.KeyPoints.Length}");
+    foreach (var kp in r.KeyPoints) Console.WriteLine($"  ({kp.X},{kp.Y})");
+}
+
+// 2. 年龄 / 性别：FaceAgeModel / FaceGenderModel -> int
+using var age = new FaceAgeModel("age.onnx", option);
+using var gender = new FaceGenderModel("gender.onnx", option);
+var a = age.Predict(img);
+var g = gender.Predict(img);
+Console.WriteLine($"age={a} gender={g} ({(g == 0 ? "女" : "男")})");
+
+// 3. 人脸识别（特征）：FaceRecModel -> FaceRecResult.Embedding（512 维）
+using var rec = new FaceRecModel("rec.onnx", option);
+var emb = rec.Predict(img);
+Console.WriteLine($"embedding dim={emb.Embedding.Length}");
+
+// 4. 识别流水线：FaceRecognizerPipelineModel（检测 + 特征一体化）
+//    modelPath 用 '|' 两段，或直接用 (detModelPath, recModelPath, opt) 构造
+using var pipe = new FaceRecognizerPipelineModel("det.onnx", "rec.onnx", option);
+pipe.SetConfThreshold(0.30);
+pipe.SetLandmarksPerFace(5);
+using var pipePred = pipe.Predict(img);      // Prediction<FaceRecResult>
+foreach (var r in pipePred) Console.WriteLine($"embedding dim={r.Embedding.Length}");
+
+// 批量推理：det.PredictBatch(new[] { img, img2 }) 按图返回 IReadOnlyList<FaceDetResult[]>
+// 多线程：Clone() 深拷贝独立实例
+using var det2 = det.Clone();
+```
+
 ## 运行示例
 
 ```bash
