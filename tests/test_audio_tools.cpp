@@ -9,6 +9,8 @@
 #include "audio/tools/itn.h"
 #include "audio/tools/hotword.h"
 #include "audio/tools/itn_engine.h"
+#include "audio/text_normalize/text_normalization.h"
+#include "tests/utils.h"
 using namespace modeldeploy::audio::tool;
 
 TEST_CASE("ITN normalizes Chinese spoken numbers", "[audio_tools]") {
@@ -29,6 +31,34 @@ TEST_CASE("ITN normalizes Chinese spoken numbers", "[audio_tools]") {
     REQUIRE(itn.normalize("第八") == "第8");
     // 模糊词保留（单字/不在数字词里）
     REQUIRE(itn.normalize("十几个人") == "十几个人");
+}
+
+TEST_CASE("ITN fraction, currency, measure, telephone", "[audio_tools]") {
+    InverseTextNormalizer itn;
+    // 分数 X分之Y -> Y/X
+    REQUIRE(itn.normalize("四分之三") == "3/4");
+    REQUIRE(itn.normalize("三分之二") == "2/3");
+    REQUIRE(itn.normalize("十分之一") == "1/10");
+    REQUIRE(itn.normalize("五分之一百") == "100/5");
+    // 货币
+    REQUIRE(itn.normalize("五元六角七分") == "5.67元");
+    REQUIRE(itn.normalize("五元六角") == "5.6元");
+    REQUIRE(itn.normalize("五十元") == "50元");
+    REQUIRE(itn.normalize("五十万元") == "500000元");
+    REQUIRE(itn.normalize("三美元") == "3美元");
+    REQUIRE(itn.normalize("两千英镑") == "2000英镑");
+    // 度量
+    REQUIRE(itn.normalize("三公里") == "3公里");
+    REQUIRE(itn.normalize("五百克") == "500克");
+    REQUIRE(itn.normalize("三十千克") == "30千克");
+    REQUIRE(itn.normalize("两吨") == "2吨");
+    REQUIRE(itn.normalize("三万公里") == "30000公里");
+    // 电话 / 连续号码（含 幺）
+    REQUIRE(itn.normalize("幺三八零零一三") == "1380013");
+    REQUIRE(itn.normalize("一三八零零一二三四五") == "1380012345");
+    // 大写人民币数词归一
+    REQUIRE(itn.normalize("壹佰贰拾叁") == "123");
+    REQUIRE(itn.normalize("人民币伍拾元") == "人民币50元");
 }
 
 TEST_CASE("ItnEngine routes to lightweight backend by default", "[audio_tools]") {
@@ -184,4 +214,54 @@ TEST_CASE("VadSegment splits speech vs silence", "[audio_tools]") {
     REQUIRE(segs.size() >= 2);
     REQUIRE(segs[0].samples.size() > 0);
     REQUIRE(segs[1].start_ms > segs[0].end_ms);
+}
+
+TEST_CASE("TextNormalizer baseline (正向 TN 现状快照)", "[audio_tools]") {
+    const std::filesystem::path data_dir = get_test_data_path();
+    if (!std::filesystem::exists(data_dir / "s2t_map.bin")) {
+        WARN("test_data/s2t_map.bin 缺失，跳过");
+        return;
+    }
+    modeldeploy::audio::TextNormalizer tn(data_dir);
+    // 探测型基线：用 CHECK 收集实际输出（首次运行失败信息即真实输出，随后固化为基线）。
+    CHECK(tn.normalize_sentence(L"3.14") == L"三点一四");
+    CHECK(tn.normalize_sentence(L"123") == L"一百二十三");
+    CHECK(tn.normalize_sentence(L"3/4") == L"四分之三");
+    CHECK(tn.normalize_sentence(L"60%") == L"百分之六十");
+    CHECK(tn.normalize_sentence(L"30度") == L"三十度");
+    CHECK(tn.normalize_sentence(L"10m2") == L"十平方米");
+    CHECK(tn.normalize_sentence(L"13800123456") == L"幺三八零零幺二三四五六");
+    // 现状探测：负数/量词/大数 是否已被通用 re_number 覆盖（决定是否需启用注释规则）
+    CHECK(tn.normalize_sentence(L"-5") == L"负五");
+    CHECK(tn.normalize_sentence(L"300人") == L"三百人");
+    CHECK(tn.normalize_sentence(L"50件") == L"五十件");
+    CHECK(tn.normalize_sentence(L"123456") == L"十二万三千四百五十六");
+}
+
+TEST_CASE("TextNormalizer measure dict expansion (RED)", "[audio_tools]") {
+    const std::filesystem::path data_dir = get_test_data_path();
+    if (!std::filesystem::exists(data_dir / "s2t_map.bin")) {
+        WARN("test_data/s2t_map.bin 缺失，跳过");
+        return;
+    }
+    modeldeploy::audio::TextNormalizer tn(data_dir);
+    // RED：当前 measure_dict 缺这些"符号->中文量词"映射，这些输入会保持原样或错读。
+    REQUIRE(tn.normalize_sentence(L"5kg") == L"五千克");
+    REQUIRE(tn.normalize_sentence(L"10km") == L"十千米");
+    REQUIRE(tn.normalize_sentence(L"2cm") == L"二厘米");
+    REQUIRE(tn.normalize_sentence(L"10mm") == L"十毫米");
+    REQUIRE(tn.normalize_sentence(L"500ml") == L"五百毫升");
+}
+
+TEST_CASE("TextNormalizer 400 uniform number (RED)", "[audio_tools]") {
+    const std::filesystem::path data_dir = get_test_data_path();
+    if (!std::filesystem::exists(data_dir / "s2t_map.bin")) {
+        WARN("test_data/s2t_map.bin 缺失，跳过");
+        return;
+    }
+    modeldeploy::audio::TextNormalizer tn(data_dir);
+    // RED：process_uniform_number 硬编码 "400" 且仅替换到连字符号码段，
+    // 无连字符的 400 号码无法完整读取。期望按位读出整串。
+    REQUIRE(tn.normalize_sentence(L"4001234567") == L"四零零幺二三四五六七");
+    REQUIRE(tn.normalize_sentence(L"400-123-4567") == L"四零零幺二三四五六七");
 }

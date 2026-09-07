@@ -8,9 +8,10 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include "core/md_decl.h"
 
 namespace modeldeploy::audio {
-    class TextNormalizer {
+    class MODELDEPLOY_CXX_EXPORT TextNormalizer {
     public:
         explicit TextNormalizer(const std::filesystem::path& char_map_folder);
         [[nodiscard]] std::vector<std::wstring> split(const std::wstring& text,

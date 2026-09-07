@@ -115,22 +115,13 @@ namespace modeldeploy::audio {
     }
 
     std::wstring process_uniform_number(const std::wstring& phone) {
-        // 匹配400号码
-        const std::wregex re_400(LR"(400)");
-        std::wsmatch match;
-        std::wstring result = phone;
-
-        if (regex_search(phone, match, re_400)) {
-            result = regex_replace(result, re_400, L"四，零，零");
+        // 收集所有数字位（忽略连字符/空格），整串按位读，避免硬编码 "400" 导致
+        // 无连字符号段（如 4001234567）只替换 400、丢其余位的问题。
+        std::wstring digits;
+        for (const wchar_t c : phone) {
+            if (std::iswdigit(c)) digits += c;
         }
-
-        // 匹配剩余的号码部分
-        const std::wregex re_phone_body(LR"(\d{3}-\d{4})");
-        if (regex_search(result, match, re_phone_body)) {
-            const std::wstring phone_body = match.str(0);
-            result = regex_replace(result, re_phone_body, verbalize_digit(phone_body, true));
-        }
-
-        return result;
+        if (digits.empty()) return phone;
+        return verbalize_digit(digits, true);
     }
 }

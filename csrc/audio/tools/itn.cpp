@@ -43,6 +43,20 @@ std::wstring transform(const std::wstring& in, const std::wregex& re,
     out += in.substr(last);
     return out;
 }
+
+// 大写/变体中文数字 → 小写（壹贰叁...玖拾/幺），便于后续正则与 parse 统一处理；
+// 未命中的字符原样保留。序列化原则：仅归并数字写法，不影响语义。
+void zh_big_to_small(std::wstring& s) {
+    static const std::unordered_map<wchar_t, wchar_t> m = {
+        {L'零', L'零'}, {L'〇', L'零'}, {L'幺', L'一'},
+        {L'壹', L'一'}, {L'贰', L'二'}, {L'叁', L'三'}, {L'肆', L'四'},
+        {L'伍', L'五'}, {L'陆', L'六'}, {L'柒', L'七'}, {L'捌', L'八'},
+        {L'玖', L'九'}, {L'拾', L'十'}, {L'佰', L'百'}, {L'仟', L'千'}};
+    for (auto& c : s) {
+        auto it = m.find(c);
+        if (it != m.end()) c = it->second;
+    }
+}
 } // namespace
 
 long long InverseTextNormalizer::parse_low(const std::wstring& s) {
@@ -109,6 +123,7 @@ std::wstring InverseTextNormalizer::normalize(const std::wstring& in) const {
     using std::wregex;
     using std::wsmatch;
     std::wstring text = in;
+    zh_big_to_small(text);
 
     // 1) 百分之X -> X%
     text = transform(text, wregex(L"百分之([零一二两三四五六七八九十百千万亿]+)"),
@@ -181,11 +196,57 @@ std::wstring InverseTextNormalizer::normalize(const std::wstring& in) const {
             return L"第" + std::to_wstring(parse_cn_number(m[1].str()));
         });
 
-    // 8) 一般数字：仅转换长度>=2 的数词串，保留单字模糊词
+    // 8) 分数：X分之Y -> Y/X（X=分母，Y=分子）。先于"一般数字"，因分母/分子是独立数词串
+    text = transform(text, wregex(L"([零一二两三四五六七八九十百千万亿]+)分之([零一二两三四五六七八九十百千万亿]+)"),
+        [](const wsmatch& m) -> std::wstring {
+            return std::to_wstring(parse_cn_number(m[2].str())) + L"/" +
+                   std::to_wstring(parse_cn_number(m[1].str()));
+        });
+
+    // 9) 货币：X元Y角Z分 / X元Y角 / X[币种]，支持万/亿（如 五十万元）。先于"一般数字"
+    const std::wstring kCurrencyUnit = L"元|美元|美金|日元|欧元|英镑|港币";
+    text = transform(text, wregex(L"([零一二两三四五六七八九十百千万亿]+)(" + kCurrencyUnit + L")([零一二三四五六七八九])角([零一二三四五六七八九])分"),
+        [](const wsmatch& m) -> std::wstring {
+            std::wstring frac = std::to_wstring(digit_of(m[3].str()[0])) + std::to_wstring(digit_of(m[4].str()[0]));
+            return std::to_wstring(parse_cn_number(m[1].str())) + L"." + frac + m[2].str();
+        });
+    text = transform(text, wregex(L"([零一二两三四五六七八九十百千万亿]+)(" + kCurrencyUnit + L")([零一二三四五六七八九])角"),
+        [](const wsmatch& m) -> std::wstring {
+            return std::to_wstring(parse_cn_number(m[1].str())) + L"." + std::to_wstring(digit_of(m[3].str()[0])) + m[2].str();
+        });
+    text = transform(text, wregex(L"([零一二两三四五六七八九十百千万亿]+)(" + kCurrencyUnit + L")"),
+        [](const wsmatch& m) -> std::wstring {
+            return std::to_wstring(parse_cn_number(m[1].str())) + m[2].str();
+        });
+
+    // 10) 度量：X[单位]，转 数字+单位（支持万/亿，如 三万公里）。先于"一般数字"。
+    //     数词必须非贪婪 + 单位长优先：否则数词字符类(含 千/百)会吞掉"千克/千米"的"千"，
+    //     把 三十千克 误读为 三十千+克=1030克。
+    const std::wstring kMeasureUnit =
+        L"平方千米|平方米|立方米|摄氏度|平方公里|千克|千米|公里|千瓦|毫升|厘米|毫米|微米|分米|公顷|公斤|亩|吨|斤|两|克|米|度|升|瓦|伏|安";
+    text = transform(text, wregex(L"([零一二两三四五六七八九十百千万亿]+?)(" + kMeasureUnit + L")"),
+        [](const wsmatch& m) -> std::wstring {
+            return std::to_wstring(parse_cn_number(m[1].str())) + m[2].str();
+        });
+
+    // 11) 一般数字：仅转换长度>=2 的数词串，保留单字模糊词。
+    //     纯个位数串（电话/编号/含零连串，如 一三八零零一三）按位逐字拼接：
+    //     parse_low 对"零"是清零语义（一百零三用），会弄错电话号码，故须按位转。
     text = transform(text, wregex(L"[零一二两三四五六七八九十百千万亿]{2,}"),
         [](const wsmatch& m) -> std::wstring {
             if (!InverseTextNormalizer::convertible_run(m.str())) return m.str();
-            return render_cn_number(m.str());
+            const std::wstring& s = m.str();
+            const bool has_unit = s.find(L'十') != std::wstring::npos ||
+                                  s.find(L'百') != std::wstring::npos ||
+                                  s.find(L'千') != std::wstring::npos ||
+                                  s.find(L'万') != std::wstring::npos ||
+                                  s.find(L'亿') != std::wstring::npos;
+            if (!has_unit) {
+                std::wstring d;
+                for (wchar_t c : s) d += wchar_t(L'0' + digit_of(c));
+                return d;
+            }
+            return InverseTextNormalizer::render_cn_number(s);
         });
 
     return text;
