@@ -2,16 +2,43 @@
 
 Rust 通过 FFI 封装 C API。目录 `rust/modeldeploy/`：
 
-```rust
-use modeldeploy::runtime::RuntimeOption;
+## 1. 引入
 
-let mut option = RuntimeOption::new();
-option.ort_backend();   // 或 sophgo_backend(0)/trt_backend()/mnn_backend()
-
-// 设备（OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed）
-option.use_mnn().set_device(modeldeploy::ffi::MDDevice::OPENCL, 0)?;  // == Ok
-option.set_device(modeldeploy::ffi::MDDevice::VULKAN, 0)?;            // == Ok
+```toml
+[dependencies]
+modeldeploy = { path = "path/to/ModelDeploy/rust/modeldeploy" }
 ```
+
+常用类型在 crate 顶层 re-export：`RuntimeOption`、`Image`、各模型类（如 `UltralyticsDet`）与 `MdError`；设备枚举 `MDDevice` 位于 `ffi` 模块（`modeldeploy::ffi::MDDevice`）。
+
+## 2. RuntimeOption（后端/设备/精度）
+
+```rust
+use modeldeploy::{Image, RuntimeOption, UltralyticsDet};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;          // 返回 Result
+    opt.use_ort().set_device(MDDevice::CPU, 0)?;  // 设备
+    opt.set_cpu_threads(4)?;                      // CPU 线程数
+
+    // 其它后端（&mut self -> &mut Self，可链式）：
+    // opt.use_mnn() / opt.use_trt() / opt.use_sophgo() / opt.use_ncnn()
+    // 精度：opt.set_fp16(true)?
+    // GPU：opt.use_ort().set_device(MDDevice::GPU, 0)?
+    // OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed：
+    // opt.use_mnn().set_device(MDDevice::OPENCL, 0)?;
+
+    let model = UltralyticsDet::new("yolo11n.onnx", &opt)?;
+    let img = Image::read("test.jpg")?;
+    let dets = model.predict(&img)?;
+    Ok(())
+}
+```
+
+- `RuntimeOption::new()` 返回 `Result`；setter 返回 `Result<&mut Self, MdError>`，用 `?` 链式调用。
+- 后端方法：`use_ort` / `use_mnn` / `use_trt` / `use_sophgo` / `use_ncnn`。
+- 设备：`set_device(MDDevice::CPU, 0)?`；线程数 `set_cpu_threads(n)?`；精度 `set_fp16(bool)?`。
 
 ## 主要模块文件
 

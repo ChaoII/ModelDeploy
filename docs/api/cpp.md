@@ -2,32 +2,60 @@
 
 首选，完整功能，支持全部模型与后端。核心逻辑全在 C++ SDK。编译链接见 [快速开始](../quickstart.md#3-编写第一个检测程序)。
 
-## 1. 核心类型
+## 1. 安装/引入
 
-| 类型 | 说明 |
-|------|------|
-| `RuntimeOption` | 运行时配置（后端/设备/精度/线程/动态 shape），见 [配置详解](../runtime_option.md) |
-| `Tensor` | 张量（CPU/CUDA/TPU，支持外部内存零拷贝） |
-| `ImageData` | 图像封装（统一平面存储，BGR HWC uint8 / NV12 / I420 等），见 [预处理](../preprocess.md) |
-| `BaseModel` | 所有模型基类，提供 `predict` / `batch_predict` / `clone` |
-| 结果结构 | `DetectionResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`FaceDetectionResult` 等 |
+引入视觉与音频头文件：
 
-## 2. 检测示例
+```cpp
+#include "modeldeploy/vision.h"
+#include "modeldeploy/audio.h"
+```
+
+CMake 链接 SDK（经 `find_package` 安装后）：
+
+```cmake
+find_package(ModelDeploySDK)
+target_link_libraries(your_target PRIVATE ModelDeploySDK)
+```
+
+## 2. RuntimeOption（后端/设备/精度）
+
+`RuntimeOption` 是运行时配置结构，控制后端、设备、精度、线程数等，所有模型类通过它初始化。完整字段见 [配置详解](../runtime_option.md)。
 
 ```cpp
 #include "modeldeploy/vision.h"
 
 modeldeploy::RuntimeOption option;
-option.use_ort_backend(); option.use_cpu();
+
+// 后端：五选一
+option.use_ort_backend();       // OnnxRuntime（.onnx，最通用）
+// option.use_mnn_backend();    // MNN（.mnn，移动端/边缘）
+// option.use_trt_backend();    // TensorRT（.engine，GPU 最高性能）
+// option.use_sophgo_backend(); // Sophgo（.bmodel，算能 TPU）
+// option.use_ncnn_backend();   // ncnn（.param/.bin，CPU/Vulkan，YOLO 全系）
+
+// 设备
+option.use_cpu();                                   // CPU（默认）
+// option.use_gpu(device_id);                       // NVIDIA GPU
+// option.set_device(modeldeploy::Device::OPENCL, 0); // 需显式 use_mnn_backend()
+// option.set_device(modeldeploy::Device::VULKAN, 0); // 需显式 use_mnn_backend()
+// option.set_device(modeldeploy::Device::GPU, 0);
+// option.set_device(modeldeploy::Device::TPU, 0);
+
+// CPU 线程数
+option.set_cpu_thread_num(4);
+
+// 精度（公有字段，直接赋值）——enable_trt 仅对 ORT 后端生效（启用 TRT EP）
+option.enable_fp16 = true;
+option.enable_trt = true;
+
+// 模型路径（可选，加密模型可带密码）
+option.set_model_path("m.onnx");
 
 auto det = modeldeploy::vision::detection::UltralyticsDet("yolo11n.onnx", option);
-det.get_preprocessor().set_size({640, 640});
-det.get_postprocessor().set_conf_threshold(0.25f);
-
-auto img = modeldeploy::ImageData::imread("test.jpg");
-std::vector<modeldeploy::vision::DetectionResult> result;
-det.predict(img, &result);
 ```
+
+> **注意**：OPENCL/VULKAN 需显式 `use_mnn_backend()`，否则 fail-closed。其余后端与设备的组合见 [后端详解](../backends.md)。
 
 ## 3. 更多模型（均使用同一 `RuntimeOption`）
 

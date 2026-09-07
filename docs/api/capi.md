@@ -1,44 +1,114 @@
 # C API（`md_*` 前缀）
 
-面向 C/C++ 嵌入式、其他语言 FFI 桥接。统一返回 `MDStatusCode`。
+面向 C/C++ 嵌入式、其它语言 FFI 桥接。编译需 `BUILD_CAPI=ON`。引入头文件：
 
 ```c
-#include "modeldeploy/md_model_capi.h"
+#include "modeldeploy/md_capi.h"     // 常量/句柄/枚举 + 统一运行时/模型/结果接口
+```
 
-// 创建模型
-MDModel model = md_create_detection_model("yolo11n.onnx", md_create_default_runtime_option());
+## 1. 统一分发点与生命周期
 
-// 设置输入尺寸
-md_set_detection_input_size(model, 640, 640);
+C API 是**统一分发点**设计：没有 per-model 的 create/get_preprocessor，所有模型族经一个 `md_model_create` 按 `MDModelKind` 分发，结果统一用 `md_result_*` 读取。生命周期：
 
-// 推理
-MDDetectionResults results;
-md_detection_predict(model, img, &results);
+```c
+MDOptionHandle opt;
+md_option_create(&opt);                              // 1. 建选项
+// ... md_option_set_* 配置 ...
+MDModelHandle m;
+md_model_create(&m, MD_MODEL_DETECTION, "yolo11n.onnx", opt);  // 2. 建模型
+MDImageHandle img;
+md_image_from_file(&img, "test.jpg");                // 3. 读图
+MDResultHandle res;
+md_model_predict(m, img, &res);                      // 4. 推理
+// ... md_result_* 读结果 ...
+md_result_destroy(res);                              // 5. 释放
+md_model_destroy(m);
+md_image_destroy(img);
+md_option_destroy(opt);
+```
 
-// 读取结果
-int n = md_get_detection_result_size(results);
-// ...
+**错误处理**：所有函数返回 `MDStatus`（`MD_OK == 0` 表示成功），失败时可用 `md_get_last_error()` 取线程安全的错误信息字符串。
 
-// 释放
-md_free_detection_results(results);
-md_free_detection_model(model);
+## 2. RuntimeOption（后端/设备/精度）
+
+选项用 `md_option_create` 创建后，用下面的 setter 配置（均可链式校验返回值）：
+
+```c
+MDOptionHandle opt;
+md_option_create(&opt);
+
+md_option_set_backend(opt, MD_BK_ORT);       // 见下方 MD_BK_* 枚举
+md_option_set_device(opt, MD_DEV_CPU, 0);    // 见下方 MD_DEV_* 枚举
+md_option_set_cpu_threads(opt, 4);
+md_option_set_fp16(opt, 1);                  // 0/1 表示关闭/开启
+md_option_set_model_path(opt, "m.onnx", ""); // path + 可选加密密码 pwd
+```
+
+### 枚举取值
+
+设备 `MDDevice`（`MD_DEV_*`，数值与 C#/Rust 对齐）：
+
+| 枚举 | 值 | 说明 |
+|------|----|------|
+| `MD_DEV_CPU` | 0 | CPU（默认） |
+| `MD_DEV_GPU` | 1 | NVIDIA GPU |
+| `MD_DEV_TPU` | 2 | 算能 TPU |
+| `MD_DEV_OPENCL` | 3 | OpenCL（需先 `MD_BK_MNN`，否则 fail-closed） |
+| `MD_DEV_VULKAN` | 4 | Vulkan（需先 `MD_BK_MNN`，否则 fail-closed） |
+
+后端 `MDBackend`（`MD_BK_*`）：
+
+| 枚举 | 值 | 说明 |
+|------|----|------|
+| `MD_BK_ORT` | 0 | OnnxRuntime（`.onnx`，最通用） |
+| `MD_BK_MNN` | 1 | MNN（`.mnn`） |
+| `MD_BK_TRT` | 2 | TensorRT（`.engine`） |
+| `MD_BK_SOPHGO` | 3 | Sophgo（`.bmodel`） |
+| `MD_BK_NCNN` | 4 | ncnn（`.param`/`.bin`） |
+
+### 检测骨架示例
+
+```c
+MDOptionHandle opt; md_option_create(&opt);
+md_option_set_backend(opt, MD_BK_ORT);
+md_option_set_device(opt, MD_DEV_CPU, 0);
+
+MDModelHandle m;
+if (md_model_create(&m, MD_MODEL_DETECTION, "yolo11n.onnx", opt) != MD_OK) {
+    fprintf(stderr, "%s\n", md_get_last_error());
+    return -1;
+}
+
+MDImageHandle img; md_image_from_file(&img, "test.jpg");
+MDResultHandle res;
+md_model_predict(m, img, &res);
+
+size_t n = 0; const MDDetectionItem* items = NULL;
+md_result_detection(res, &items, &n);
+for (size_t i = 0; i < n; i++) {
+    printf("label=%d score=%f box=%f,%f,%f,%f\n",
+        items[i].label_id, items[i].score,
+        items[i].box.x, items[i].box.y, items[i].box.w, items[i].box.h);
+}
+
+md_result_destroy(res);
+md_image_destroy(img);
+md_model_destroy(m);
+md_option_destroy(opt);
 ```
 
 ## 接口分组
 
+C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。
+
 | 模块 | 接口 |
 |------|------|
-| 检测 | `md_create_detection_model` / `md_detection_predict` |
-| 分类 | `md_create_classification_model` / `md_classification_predict` |
-| 分割 | `md_create_instance_seg_model` / `md_instance_seg_predict` |
-| 姿态 | `md_create_keypoint_model` / `md_keypoint_predict` |
-| 旋转框 | `md_create_obb_model` / `md_obb_predict` |
-| 人脸 | `md_create_face_det/rec/age/gender/as_*_model` |
-| 车牌 | `md_create_lpr_*_model` |
-| OCR | `md_create_ocr_model` / `md_ocr_model_predict` |
-| 行人属性 | `md_create_attr_model` / `md_attr_predict` |
-| 图像 | `md_read_image` / `md_save_image` / `md_from_bgr24` / `md_image_to_host_bytes` / `md_image_plane_bytes` 等 |
-| 绘制 | `md_draw_rect` / `md_draw_polygon` / `md_draw_text` |
+| 选项 | `md_option_create` / `md_option_set_device` / `md_option_set_backend` / `md_option_set_cpu_threads` / `md_option_set_fp16` / `md_option_set_model_path` / `md_option_set_config` 等 + `md_option_destroy` |
+| 模型 | `md_model_create` / `md_model_predict` / `md_model_predict_batch` / `md_model_set_input_size` / `md_model_set_param_*` / `md_model_destroy` |
+| 结果 | `md_result_count` / `md_result_detection` / `md_result_classification` / `md_result_instance_seg` / `md_result_ocr` / `md_result_face` / `md_result_lpr` / `md_result_attribute` 等 + `md_result_destroy` |
+| 图像 | `md_image_from_file` / `md_image_from_bgr24` / `md_image_from_device_nv12` / `md_image_to_host_bytes` / `md_image_plane_bytes` / `md_image_save` / `md_image_destroy` 等 |
+| 音频 | `md_audio_asr` / `md_audio_asr_wav` / `md_audio_tts` / `md_audio_tts_stream` / `md_wav_save` |
+| 绘制 | `md_draw_rect` / `md_draw_polygon` / `md_draw_text` / `md_draw_result` |
 | 视频 | `md_video_*`（解码/编码，见下） |
 
 编译需 `BUILD_CAPI=ON`。

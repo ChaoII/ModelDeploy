@@ -18,24 +18,27 @@ pybind11-stubgen modeldeploy
 ## 2. 使用
 
 ```python
-import modeldeploy
+import cv2
+import modeldeploy as md
 
-option = modeldeploy.RuntimeOption()
+option = md.RuntimeOption()
 option.use_ort_backend()
 option.use_cpu()
+option.set_cpu_thread_num(4)
 
 # 设备（OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed）
 option.use_mnn_backend()
-option.set_device(modeldeploy.Device.OPENCL, 0)
-option.set_device(modeldeploy.Device.VULKAN, 0)
-option.use_sophgo_backend(0)   # 或 Sophgo
+option.set_device(md.Device.OPENCL, 0)   # 或 md.Device.VULKAN / md.Device.GPU / md.Device.TPU
+
+# 其它后端（均无参数）
+# option.use_ncnn_backend()  /  option.use_trt_backend()  /  option.use_sophgo_backend()
+# GPU：option.use_gpu(0) 或 option.set_device(md.Device.GPU, 0)
 
 # 目标检测
-model = modeldeploy.vision.detection.UltralyticsDet("yolo11n.onnx", option)
+model = md.vision.UltralyticsDet("yolo11n.onnx", option)
 model.get_preprocessor().set_size([640, 640])
 model.get_postprocessor().set_conf_threshold(0.25)
 
-import cv2
 img = cv2.imread("test.jpg")
 results = model.predict(img)
 for r in results:

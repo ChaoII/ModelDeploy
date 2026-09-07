@@ -1,23 +1,36 @@
 # C# 绑定（.NET）
 
-C# 绑定封装 C API，命名空间 `ModelDeploy`。解决方案见 `csharp/ModelDeploy.sln`。
+C# 绑定封装 C API，命名空间 `ModelDeploy`（模型类在 `ModelDeploy.Models`）。解决方案见 `csharp/ModelDeploy.sln`。
+
+## 1. 引入
 
 ```csharp
 using ModelDeploy;
+using ModelDeploy.Models;
+```
 
-var option = new MDRuntimeOption();
-option.UseOrtBackend();
-option.UseCpu();
+## 2. RuntimeOption 与检测示例
+
+C# 没有 `UseCpu()`；改 CPU 用 `SetDevice(Device.CPU)`。后端用 `UseOrt()`/`UseMnn()`/`UseTrt()`/`UseSophgo()`/`UseNcnn()`，设备用 `SetDevice(Device dev, int deviceId = 0)`：
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+option.SetCpuThreads(4);
 
 // 设备（OPENCL/VULKAN 需显式 MNN 后端，否则 fail-closed）
-option.UseMnn().SetDevice(Device.OPENCL, 0);
-option.SetDevice(Device.VULKAN, 0);
+// option.UseMnn().SetDevice(Device.OPENCL, 0);
+// option.SetDevice(Device.VULKAN, 0);
+// GPU：option.UseOrt().SetDevice(Device.GPU, 0);
 
-var model = new MDDetectionModel("yolo11n.onnx", option);
+var model = new DetectionModel("yolo11n.onnx", option);
 model.SetInputSize(640, 640);
 
-var results = model.Predict(img);
-foreach (var r in results) {
+using var img = VisionImage.Read("test.jpg");
+using var pred = model.Predict(img);
+foreach (var r in pred) {
     Console.WriteLine($"{r.LabelId} {r.Score} {r.Box}");
 }
 ```
@@ -47,8 +60,7 @@ cd ModelDeployExample/bin/Debug/net9.0
 using ModelDeploy;
 using ModelDeploy.Models;
 
-var opt = new MDRuntimeOption();
-opt.UseOrtBackend(); opt.UseCpu();
+var opt = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
 
 // Kokoro：24kHz。modelPath 格式: model.onnx|tokens.txt|lex_en.txt|lex_zh.txt|voices.bin|jieba_dir|norm_dir
 var kokoro = new KokoroModel("kokoro.onnx|tokens.txt|...", opt);
