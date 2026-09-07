@@ -156,7 +156,7 @@ fn main() -> Result<(), modeldeploy::MdError> {
     opt.use_ort().set_device(MDDevice::CPU, 0)?;
     let model = FastSam::new("fastsam-s.onnx", &opt)?;
 
-    // 1. 参数：默认输入 640x640、conf 0.30 / nms 0.40 / mask 0.5（官方 FastSAM-s 常配 1024x1024）
+    // 1. 参数：默认输入 640x640、conf 0.30 / nms 0.5 / mask 0.5（官方 FastSAM-s 常配 1024x1024）
     model.set_input_size(1024, 1024)?;
     model.set_conf_threshold(0.30)?;
     model.set_nms_threshold(0.40)?;

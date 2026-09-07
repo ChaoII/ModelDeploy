@@ -226,7 +226,7 @@ MDModelHandle m = NULL;
 md_model_create(&m, MD_MODEL_FASTSAM, "fastsam-s.onnx", opt);
 md_model_set_input_size(m, 1024, 1024);   /* 默认 640x640；官方 FastSAM-s 常配 1024x1024 */
 /* 参数自省：FASTSAM 返回 "conf_threshold|nms_threshold|mask_threshold"；
- * 默认 conf 0.30 / nms 0.40 / mask 0.5 */
+ * 默认 conf 0.30 / nms 0.5 / mask 0.5 */
 md_model_set_param_d(m, "conf_threshold", 0.30);
 md_model_set_param_d(m, "nms_threshold", 0.40);
 

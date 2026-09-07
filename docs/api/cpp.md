@@ -189,7 +189,7 @@ int main() {
     auto sam = std::make_unique<modeldeploy::vision::seg::FastSam>("fastsam-s.onnx", opt);
     if (!sam->is_initialized()) return 1;
 
-    // 1. 参数：默认输入 640x640、conf 0.30 / nms 0.40 / mask 0.5（官方 FastSAM-s 常配 1024x1024）
+    // 1. 参数：默认输入 640x640、conf 0.30 / nms 0.5 / mask 0.5（官方 FastSAM-s 常配 1024x1024）
     sam->get_preprocessor().set_size({1024, 1024});
     sam->get_postprocessor().set_conf_threshold(0.30f);
     sam->get_postprocessor().set_nms_threshold(0.40f);

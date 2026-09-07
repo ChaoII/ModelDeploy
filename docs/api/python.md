@@ -175,7 +175,7 @@ seg2 = seg.clone()
 `predict_with_prompts` 在全量结果上按提示过滤实例，**不重跑网络**；提示为空等价全图 `predict`。
 
 > Python 绑定的 `preprocessor`/`postprocessor` 属性存在但未暴露可写参数，使用默认值
-> （输入 640×640，conf 0.30 / nms 0.40 / mask 0.5）；需改输入尺寸（如官方推荐的 1024×1024）
+> （输入 640×640，conf 0.30 / nms 0.5 / mask 0.5）；需改输入尺寸（如官方推荐的 1024×1024）
 > 请用 C++ `set_size` / C API `md_model_set_input_size` / C# `SetInputSize` / Rust `set_input_size`。
 
 ```python

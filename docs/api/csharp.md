@@ -141,7 +141,7 @@ var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
 
 using var sam = new FastSamModel("fastsam-s.onnx", option);
 sam.SetInputSize(1024, 1024);    // 默认 640x640；官方 FastSAM-s 常配 1024x1024
-sam.SetConfThreshold(0.30);      // 默认 conf 0.30 / nms 0.40 / mask 0.5
+sam.SetConfThreshold(0.30);      // 默认 conf 0.30 / nms 0.5 / mask 0.5
 sam.SetNmsThreshold(0.40);
 sam.SetMaskThreshold(0.5);
 
