@@ -1,10 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 #include <nlohmann/json.hpp>
 #include "serving/config.h"
@@ -46,15 +48,18 @@ std::vector<unsigned char> b64_decode(const std::string& s) {
 }
 
 // 最小 FakeModel：R = std::string，predict/batch_predict 返回 w/h（与异步契约匹配）。
+// delay 可配：>0 时 infer 前 sleep，用于 504 超时 / 在途停机用例。
 struct FakeModel {
     using result_type = std::string;
     int predict_calls = 0;
+    std::chrono::milliseconds delay{0};
     static std::string big_result(int w, int h) {
         return "w=" + std::to_string(w) + ",h=" + std::to_string(h);
     }
     bool predict(const modeldeploy::vision::ImageData& img, std::string* out,
                  TimerArray* /*timers*/ = nullptr) {
         ++predict_calls;
+        std::this_thread::sleep_for(delay);
         *out = big_result(img.width(), img.height());
         return true;
     }
@@ -62,7 +67,10 @@ struct FakeModel {
                        std::vector<std::string>* outs,
                        TimerArray* /*timers*/ = nullptr) {
         outs->clear();
-        for (auto& im : imgs) outs->push_back(big_result(im.width(), im.height()));
+        for (auto& im : imgs) {
+            std::this_thread::sleep_for(delay);
+            outs->push_back(big_result(im.width(), im.height()));
+        }
         return true;
     }
 };
@@ -308,6 +316,23 @@ HandleBuilder fake_model_builder() {
     };
 }
 
+// 慢模型 HandleBuilder：每次 infer 前 sleep delay，用于 504 超时 / 在途停机用例。
+HandleBuilder slow_model_builder(std::chrono::milliseconds delay) {
+    return [delay](const std::string& name, const std::string&, const std::string&) -> InferFn {
+        try {
+            auto model = std::make_unique<FakeModel>();
+            model->delay = delay;
+            auto h = make_model_handle<FakeModel>(name, std::move(model));
+            return h.infer;
+        } catch (...) {
+            return InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
+                if (err) *err = "fake model start failed";
+                return false;
+            });
+        }
+    };
+}
+
 // 起服并断言随机端口；返回监听中的随机端口供 httplib::Client 使用。
 int start_listening(ServingServer& srv) {
     REQUIRE(srv.start());
@@ -477,5 +502,58 @@ TEST_CASE("ServingServer graceful stop", "[serving]") {
     srv.stop();   // 幂等
     srv.stop();
     REQUIRE_FALSE(srv.is_listening());
+    fs::remove_all(repo);
+}
+
+// 504 超时：慢模型比 request_timeout 慢得多 → 期望 504 TIMEOUT；随后 stop() 等后台
+// 线程跑完后安全返回，无崩溃/无 hang（UAF 修复的回归护栏）。
+TEST_CASE("ServingServer 504 timeout", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.request_timeout = std::chrono::milliseconds(50);
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, slow_model_builder(std::chrono::milliseconds(500)));
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    auto res = cli.Post("/v1/models/det/infer", nlohmann::json{{"image", PNG1X1_B64}}.dump(),
+                        "application/json");
+    require_error(res, 504, "TIMEOUT");
+
+    // 超时后后台推理线程仍在跑；stop() 守候其完成（受 deadline 约束），须安全返回。
+    srv.stop();
+    REQUIRE_FALSE(srv.is_listening());
+    fs::remove_all(repo);
+}
+
+// 在途时 stop：后台线程发起慢推理，主线程在推理尚未结束时调用 stop()，须安全返回、
+// 进程不崩、临时资源清理干净（依赖 drain_ 堆对象保证游离线程不触已析构 this）。
+TEST_CASE("ServingServer stop while inference in flight", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.request_timeout = std::chrono::milliseconds(60000);  // 长超时：走非超时完整路径
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, slow_model_builder(std::chrono::milliseconds(1000)));
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    bool requester_ok = false;
+    // 独立线程发起请求，构造「推理在途」；主线程随即 stop()。
+    std::thread requester([&] {
+        auto r = cli.Post("/v1/models/det/infer", nlohmann::json{{"image", PNG1X1_B64}}.dump(),
+                          "application/json");
+        requester_ok = r && r->status == 200;
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));  // 确保请求已进入推理
+
+    srv.stop();  // 推理在途时停机：须安全返回、等待后台完成、无 crash/hang
+    REQUIRE_FALSE(srv.is_listening());
+    requester.join();
+    REQUIRE(requester_ok);
+
     fs::remove_all(repo);
 }

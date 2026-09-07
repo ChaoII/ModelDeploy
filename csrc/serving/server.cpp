@@ -65,7 +65,9 @@ bool authorized(const ServingConfig& cfg, const httplib::Request& req, httplib::
 }  // namespace
 
 ServingServer::ServingServer(const ServingConfig& cfg, HandleBuilder builder, std::string* err)
-    : cfg_(cfg), repo_(std::make_shared<ModelRepo>(cfg, std::move(builder), err)) {}
+    : cfg_(cfg),
+      drain_(std::make_shared<DrainState>()),
+      repo_(std::make_shared<ModelRepo>(cfg, std::move(builder), err)) {}
 
 ServingServer::~ServingServer() { stop(); }
 
@@ -116,21 +118,16 @@ int ServingServer::port() const { return bound_port_; }
 ModelRepo* ServingServer::repo() { return repo_.get(); }
 
 void ServingServer::begin_request() {
-    std::lock_guard<std::mutex> lk(drain_mtx_);
-    ++in_flight_;
-}
-void ServingServer::end_request() {
-    {
-        std::lock_guard<std::mutex> lk(drain_mtx_);
-        if (in_flight_ > 0) --in_flight_;
-    }
-    drain_cv_.notify_all();
+    auto d = drain_;
+    std::lock_guard<std::mutex> lk(d->m);
+    ++d->in_flight;
 }
 void ServingServer::wait_drained() {
+    auto d = drain_;
     const auto deadline =
         std::chrono::steady_clock::now() + cfg_.request_timeout + std::chrono::seconds(1);
-    std::unique_lock<std::mutex> lk(drain_mtx_);
-    drain_cv_.wait_until(lk, deadline, [this] { return in_flight_ == 0; });
+    std::unique_lock<std::mutex> lk(d->m);
+    d->cv.wait_until(lk, deadline, [&d] { return d->in_flight == 0; });
 }
 
 void ServingServer::register_routes() {
@@ -225,16 +222,29 @@ void ServingServer::register_routes() {
 
         // 推理放到游离 worker 线程：文件句柄持有自己的 AsyncModel（shared_ptr），
         // 故不阻塞 httplib 工作线程，且可用 wait_for 施加 cfg_.request_timeout。
+        // 线程 lambda 捕获 drain_ 的 shared_ptr（以及持有 AsyncModel 的 job->handle），
+        // 不捕获裸 this —— 即使 ServingServer 析构，线程仍借 DrainState/job 存活，无 UAF。
         begin_request();
         auto job = std::make_shared<InferJob>();
         job->handle = std::move(h);
         job->in = std::move(in);
+        auto drain = drain_;
         std::promise<void> done;
         auto df = done.get_future();
-        std::thread([this, job, done = std::move(done)]() mutable {
-            job->ok = job->handle.infer(job->in, &job->out, &job->err);
-            done.set_value();
-            end_request();  // 在途计数在真正完成时回收（含超时后的后台继续）
+        std::thread([job, done = std::move(done), drain]() mutable {
+            try {
+                job->ok = job->handle.infer(job->in, &job->out, &job->err);
+            } catch (...) {
+                // 无论抛什么异常，都走失败分支继续，避免 in_flight 泄漏与 std::terminate。
+                job->ok = false;
+                if (job->err.empty()) job->err = "inference threw";
+            }
+            done.set_value();  // 先解除 httplib worker 阻塞（非超时路径取结果）
+            {
+                std::lock_guard<std::mutex> lk(drain->m);
+                if (drain->in_flight > 0) --drain->in_flight;
+            }
+            drain->cv.notify_all();  // 在途计数在真正完成时回收（含超时后的后台继续）
         }).detach();
 
         if (df.wait_for(cfg_.request_timeout) == std::future_status::timeout) {
