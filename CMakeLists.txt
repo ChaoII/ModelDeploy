@@ -28,7 +28,7 @@ option(BUILD_SURVEILLANCE "build AI surveillance application" OFF)
 option(BUILD_VIDEO "build video decoder module (requires FFmpeg and BUILD_VISION)" OFF)
 option(ENABLE_FFMPEG "build video FFmpeg backend" ON)
 option(ENABLE_GSTREAMER "build video GStreamer backend" OFF)
-option(BUILD_ENCRYPTION "enable model encryption/decryption (requires OpenSSL)" ON)
+option(BUILD_ENCRYPTION "enable model encryption/decryption (requires mbedTLS git submodule)" ON)
 option(WITH_GPU "Enable GPU" ON)
 option(BUILD_ON_JETSON "Whether to build ModelDeploy on Nvidia Jetson" OFF)
 
@@ -398,25 +398,14 @@ if (BUILD_CAPI)
     list(APPEND ALL_SOURCE ${CAPI_SOURCE})
 endif ()
 
-# 模型加密（可选，需要 OpenSSL）
+# 模型加密（可选，基于 mbedTLS git submodule）
 if (BUILD_ENCRYPTION)
-    find_package(OpenSSL QUIET)
-    if (OpenSSL_FOUND)
-        add_definitions(-DENABLE_ENCRYPTION)
-        include_directories(${OPENSSL_INCLUDE_DIR})
-        list(APPEND DEPENDS OpenSSL::SSL OpenSSL::Crypto)
-        message(STATUS "OpenSSL found: ${OPENSSL_VERSION}")
-    else ()
-        message(WARNING "BUILD_ENCRYPTION=ON but OpenSSL not found. "
-                "Model encryption will be disabled.\n"
-                "  Windows: Download from https://slproweb.com/products/Win32OpenSSL.html\n"
-                "           Install the Win64 OpenSSL Light version (e.g. Win64 OpenSSL v3.x.x)\n"
-                "           Then set: cmake -DOPENSSL_ROOT_DIR=\"C:/Program Files/OpenSSL-Win64\"\n"
-                "  Linux:   sudo apt install libssl-dev  (Debian/Ubuntu)\n"
-                "           sudo dnf install openssl-devel  (Fedora/RHEL)\n"
-                "           sudo pacman -S openssl  (Arch)\n"
-                "  macOS:   brew install openssl")
-    endif ()
+    set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+    set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    add_subdirectory(third_party/mbedtls)
+    add_definitions(-DENABLE_ENCRYPTION)
+    list(APPEND PRIVATE_DEPENDS mbedtls)
+    message(STATUS "mbedTLS model encryption enabled")
 endif ()
 
 add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
