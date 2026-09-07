@@ -36,6 +36,7 @@ set(TEST_SOURCES
     test_reid.cpp
     test_formula_recognition.cpp
     test_doc_to_markdown.cpp
+    test_result_json.cpp
     baseline_compare.cpp
     baseline_utils.cpp
     utils.cpp
