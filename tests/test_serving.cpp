@@ -10,8 +10,10 @@
 #include "serving/config.h"
 #include "serving/model_repo.h"
 #include "serving/model_entry.h"
+#include "serving/server.h"
 #include "pipeline/async_model.h"
 #include "vision/common/image_data.h"
+#include "../third_party/httplib.h"
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::serving;
@@ -287,4 +289,193 @@ TEST_CASE("ModelEntry bad input", "[serving]") {
     REQUIRE_FALSE(handle.infer(
         nlohmann::json{{"image_path", fs::temp_directory_path() / "no_such_file.png"}}, &out, &err));
     REQUIRE_FALSE(err.empty());
+}
+
+namespace {
+
+// 注入真实 AsyncModel（FakeModel）的 HandleBuilder：make_model_handle 启动失败时兜底为失败 InferFn。
+HandleBuilder fake_model_builder() {
+    return [](const std::string& name, const std::string&, const std::string&) -> InferFn {
+        try {
+            auto h = make_model_handle<FakeModel>(name, std::make_unique<FakeModel>());
+            return h.infer;
+        } catch (...) {
+            return InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
+                if (err) *err = "fake model start failed";
+                return false;
+            });
+        }
+    };
+}
+
+// 起服并断言随机端口；返回监听中的随机端口供 httplib::Client 使用。
+int start_listening(ServingServer& srv) {
+    REQUIRE(srv.start());
+    REQUIRE(srv.is_listening());
+    int port = srv.port();
+    REQUIRE(port > 0);
+    return port;
+}
+
+httplib::Client make_client(int port) { return httplib::Client("127.0.0.1", port); }
+
+// 校验统一错误体：{ "error": { "code": ..., "message": ... } }
+void require_error(const httplib::Result& res, int status, const std::string& code) {
+    REQUIRE(res);
+    REQUIRE(res->status == status);
+    auto j = nlohmann::json::parse(res->body);
+    REQUIRE(j.contains("error"));
+    REQUIRE(j["error"]["code"].get<std::string>() == code);
+}
+
+}  // namespace
+
+// 端到端：起服（随机端口）→ httplib::Client 发请求 → stop() + 清理临时 repo。
+TEST_CASE("ServingServer 200 infer", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+    REQUIRE(srv.repo() != nullptr);
+
+    auto cli = make_client(port);
+    auto res = cli.Post("/v1/models/det/infer", nlohmann::json{{"image", PNG1X1_B64}}.dump(),
+                        "application/json");
+    REQUIRE(res);
+    REQUIRE(res->status == 200);
+    auto body = nlohmann::json::parse(res->body);
+    REQUIRE(body["results"] == "w=1,h=1");
+    REQUIRE(body["model"] == "det");
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+TEST_CASE("ServingServer 404 model not found", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    require_error(cli.Post("/v1/models/nope/infer", "{}", "application/json"), 404,
+                  "MODEL_NOT_FOUND");
+    require_error(cli.Get("/v1/models/nope"), 404, "MODEL_NOT_FOUND");
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+TEST_CASE("ServingServer 400 bad request", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    require_error(cli.Post("/v1/models/det/infer", "{}", "application/json"), 400, "BAD_REQUEST");
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+TEST_CASE("ServingServer bearer auth", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.api_keys = {"key1"};
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    std::string body = nlohmann::json{{"image", PNG1X1_B64}}.dump();
+
+    // 无 header → 401
+    require_error(cli.Post("/v1/models/det/infer", body, "application/json"), 401, "UNAUTHORIZED");
+    // 错误 key → 401
+    require_error(cli.Post("/v1/models/det/infer", httplib::Headers{{"Authorization", "Bearer wrong"}},
+                           body, "application/json"), 401, "UNAUTHORIZED");
+    // 正确 key → 200
+    auto res = cli.Post("/v1/models/det/infer", httplib::Headers{{"Authorization", "Bearer key1"}},
+                        body, "application/json");
+    REQUIRE(res);
+    REQUIRE(res->status == 200);
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+TEST_CASE("ServingServer health & readyz", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    auto h = cli.Get("/health");
+    REQUIRE(h);
+    REQUIRE(h->status == 200);
+    auto r = cli.Get("/readyz");
+    REQUIRE(r);
+    REQUIRE(r->status == 200);
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+TEST_CASE("ServingServer model list", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+    write_model(repo, "cls", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+
+    auto cli = make_client(port);
+    auto res = cli.Get("/v1/models");
+    REQUIRE(res);
+    REQUIRE(res->status == 200);
+    auto body = nlohmann::json::parse(res->body);
+    REQUIRE(body.contains("models"));
+    bool has_det = false;
+    for (auto& m : body["models"]) {
+        if (m["name"].get<std::string>() == "det") has_det = true;
+    }
+    REQUIRE(has_det);
+
+    srv.stop();
+    fs::remove_all(repo);
+}
+
+// 优雅停机：起服后立即 stop()（含注入模型句柄在途场景的干净析构），可重复调用。
+TEST_CASE("ServingServer graceful stop", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "latest");
+
+    ServingServer srv(cfg, fake_model_builder());
+    int port = start_listening(srv);
+    REQUIRE(port > 0);
+
+    srv.stop();   // 幂等
+    srv.stop();
+    REQUIRE_FALSE(srv.is_listening());
+    fs::remove_all(repo);
 }
