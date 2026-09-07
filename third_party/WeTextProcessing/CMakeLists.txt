@@ -7,6 +7,12 @@
 cmake_minimum_required(VERSION 3.14)
 project(md_we_text_processing LANGUAGES CXX)
 
+# 与 openfst 同理：wetext 运行时为旧代码且依赖 OpenFst 头，需 C++17
+# （std::allocator::pointer/rebind、shared_ptr::unique 等已被 C++20 移除）。
+# 强制本子工程 C++17，SDK 其余部分保持 C++20 不受影响。
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 add_library(md_wetext STATIC
     runtime/processor/wetext_processor.cc
     runtime/processor/wetext_token_parser.cc

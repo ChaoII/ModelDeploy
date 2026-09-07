@@ -10,6 +10,12 @@
 cmake_minimum_required(VERSION 3.14)
 project(md_openfst LANGUAGES CXX)
 
+# OpenFst 是旧 C++11 代码，直接使用 std::allocator 的 pointer/rebind/other、
+# shared_ptr::unique() 等，这些在 C++20 标准库已移除。强制本子工程 C++17
+# （局部覆盖根工程的 C++20），兼容旧代码；SDK 其余部分不受影响。
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 add_library(fst STATIC
     lib/compat.cc
     lib/flags.cc

@@ -433,6 +433,17 @@ add_library(${LIBRARY_NAME} SHARED ${ALL_SOURCE})
 set_target_properties(${LIBRARY_NAME} PROPERTIES
         VERSION ${MD_VERSION}
         SOVERSION ${MD_VERSION_MAJOR})
+# itn_engine.cpp 直接 include OpenFst 头并模板实例化（SymbolTable 等），而 openfst
+# 是旧 C++11 代码，只兼容 ≤C++17。仅对该源文件强制 C++17，SDK 其余保持 C++20。
+if (TARGET md_wetext)
+    if (MSVC)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/csrc/audio/tools/itn_engine.cpp
+                PROPERTIES COMPILE_OPTIONS "/std:c++17")
+    elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/csrc/audio/tools/itn_engine.cpp
+                PROPERTIES COMPILE_OPTIONS "-std=c++17")
+    endif ()
+endif ()
 md_warn_own(${LIBRARY_NAME})
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${DEPENDS} PRIVATE ${PRIVATE_DEPENDS})
 # Sophgo 平台 jpg 变暗修复：whole-archive 逻辑定义在 cmake/opencv.cmake（MD_OCV_JPEG_TURBO_WHOLE_ARCHIVE）
