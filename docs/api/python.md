@@ -945,14 +945,60 @@ gal.size(); gal.remove("alice"); gal.clear()
 
 > `md.audio` 与 C++ `audio::asr`/`audio::tts`/`audio::speaker` 一一对应；SenseVoice / SpeakerVerify 输入为 16kHz 单声道 PCM（约 1s 即足够），Kokoro 输出 24kHz 单声道。
 
-## 21. 已绑定模块
+## 21. 音频解决方案 + 工具（`audio.solutions` / `audio.tools`）
+
+`md.audio.solutions` 提供说话人检索 `SpeakerSearch` 与 TTS 批处理 `TTSBatcher`；`md.audio.tools` 提供逆文本归一化 `InverseTextNormalizer`/`ItnEngine`、特征 `Fbank`/`Spectrum`、重采样 `Resampler` 与热词 `HotwordContext` 等纯音频工具（纯后处理/计算，不依赖模型）。
+
+```python
+from modeldeploy.audio.solutions import SpeakerSearch, TTSBatcher
+from modeldeploy.audio.tools import (
+    InverseTextNormalizer, ItnEngine, ItnBackend,
+    Fbank, Resampler, Spectrum, HotwordContext,
+)
+
+# 1. 说话人检索：SpeakerSearch —— enroll 注册，match 余弦 top-k
+ss = SpeakerSearch()
+ss.enroll("alice", emb)                        # label + embedding（list[float]）
+for label, score in ss.match(emb, 1):          # -> list[(label, score)] 降序
+    print(label, score)
+
+# 2. TTS 批处理：TTSBatcher —— enqueue 排队，dequeue_all 一次取全部
+tb = TTSBatcher()
+tb.enqueue("你好")                             # 单段文本入队
+for audio in tb.dequeue_all():                 # -> list[list[float]]，每段一个 float PCM 列表
+    ...
+
+# 3. 逆文本归一化：口读 -> 书面（ItnEngine 可切换后端）
+itn = InverseTextNormalizer()
+print(itn.normalize("二零二四年三月五日"))      # -> "2024年3月5日"
+eng = ItnEngine(ItnBackend.Lightweight)        # Lightweight=0 / WeText=1
+print(eng.backend, eng.normalize("百分之五"))   # -> 5%
+
+# 4. Fbank / Spectrum / Resampler
+f = Fbank(16000, 80)                           # sample_rate=16000, num_bins=80
+feats = f.compute(samples)                     # -> list[list[float]]（帧 x bins）
+sp = Spectrum(1024)                            # fft_n=1024
+mag = sp.magnitudes(samples)                   # -> list[float]
+r = Resampler.resample(samples, 48000, 16000)  # 静态方法，重采样
+
+# 5. HotwordContext：热词注册/扫描/高亮
+hctx = HotwordContext()
+hctx.add("小爱同学", 2.0)                      # word + weight（默认 1.0）
+hits = hctx.scan("你好小爱同学")               # -> list[FoundHotword]（word/count/weight）
+print(hits[0].word, hits[0].count, hits[0].weight)
+print(hctx.highlight("你好小爱同学"))           # 高亮包围，默认 "[...]"；hctx.words() 全部热词
+```
+
+> `md.audio.solutions`/`md.audio.tools` 与 C++ `audio::solution`/`audio::tool` 一一对应；各方法真实签名以本绑定存根为准。`ItnBackend.Lightweight` 为内置轻量实现（默认、零依赖），`WeText` 需 `ENABLE_WETEXT=ON` 且语法模型就绪（缺失自动退化到轻量）。
+
+## 22. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID`、`BarcodeDetector`、`ByteTracker`/`BotSortTracker`/`StrongSortTracker` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult`、`BarcodeResult`、`TrackResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 22. 性能测试
+## 23. 性能测试
 
 ```python
 import time

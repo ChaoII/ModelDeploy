@@ -1104,6 +1104,61 @@ for (auto& [label, score] : gal.match(emb, 1))   // top-k 余弦匹配
 gal.size(); gal.remove("alice"); gal.clear();
 ```
 
+## 22. 音频解决方案 + 工具（`audio::solution` / `audio::tool`）
+
+`modeldeploy::audio::solution` 提供说话人检索 `SpeakerSearch`、流式识别 `StreamingStt` 与 TTS 批处理 `TtsBatcher`；`modeldeploy::audio::tool` 提供逆文本归一化 `InverseTextNormalizer`/`ItnEngine`、特征 `Fbank`/`Spectrum`/`Waveform` 与重采样 `Resampler` 等纯音频工具。方案清单与算法说明见 [solutions.md](../solutions.md) 与 [models.md §20/§27](../models.md)；可运行示例见 `examples/demo_audio_solutions/`（`demo_diarization` / `demo_stream_stt` / `demo_tts_batch`）。
+
+```cpp
+#include "audio/solutions/speaker_search.h"
+#include "audio/solutions/streaming_stt.h"
+#include "audio/solutions/tts_batcher.h"
+#include "audio/tools/itn.h"
+#include "audio/tools/itn_engine.h"
+#include "audio/tools/fbank.h"
+#include "audio/tools/resampler.h"
+#include "audio/tools/waveform.h"
+
+using namespace modeldeploy;
+namespace sol = modeldeploy::audio::solution;
+namespace tool = modeldeploy::audio::tool;
+
+// 1. 说话人检索：SpeakerSearch（纯内存声纹库，enroll/match top-k）
+sol::SpeakerSearch ss;
+ss.enroll("alice", emb);
+for (auto& [label, score] : ss.match(emb, 1))   // -> vector<pair<label,score>> 降序
+    std::printf("%s %.3f\n", label.c_str(), score);
+
+// 2. TTS 批处理：TtsBatcher（set_synth 注入合成回调；可包真实 Kokoro）
+modeldeploy::audio::tts::Kokoro kokoro("kokoro.onnx", "tokens.txt", {"lexicon-us-en.txt"},
+                                       "voices.bin", "dict/", "", option);
+sol::TtsBatcher batcher(sol::TtsBatcher::kokoro_synth(kokoro, "zf_001", 1.0f));
+batcher.enqueue("锄禾日当午，汗滴禾下土。");      // 长文本自动按标点分块
+auto batches = batcher.dequeue_all();             // vector<vector<float>>（每段 PCM）
+
+// 3. 流式识别：StreamingStt（分块 push + VAD 分段，回调交付文字）
+sol::StreamingSTT stt([](const std::string& text) { std::printf("[STT] %s\n", text.c_str()); });
+stt.set_transcribe(sol::StreamingSTT::sense_voice(sv));   // 可选：注入 SenseVoice 转写
+stt.push(pcm_chunk, 16000); stt.run_once();               // ... 逐块喂入
+stt.finish();                                             // 流结束，转写末尾语音段
+
+// 4. 逆文本归一化：口读 -> 书面
+tool::InverseTextNormalizer itn;
+std::string out = itn.normalize("二零二四年三月五日");     // "2024年5月9日" 等
+tool::ItnEngine eng(tool::ItnBackend::Lightweight);        // Lightweight / WeText
+std::string out2 = eng.normalize("百分之五");               // "5%"
+bool is_we = eng.backend() == tool::ItnBackend::WeText;
+
+// 5. Fbank / Spectrum / Waveform / Resampler
+tool::Fbank fbank(16000, 80);                              // sample_rate, num_bins
+auto feats = fbank.compute(samples);                       // vector<vector<float>>（帧 x bins）
+tool::Spectrum sp(1024);                                   // fft_n=1024
+auto mags = sp.magnitudes(samples);                        // vector<float>
+auto down = tool::Waveform::downsample(samples, 256);
+auto resampled = tool::Resampler::resample(samples, 48000, 16000);  // 静态重采样
+```
+
+> C++ 音频解决方案/工具命名空间为 `modeldeploy::audio::solution`（单数）与 `modeldeploy::audio::tool`。`TtsBatcher::enqueue` 同时提供单文本与 `vector<string>` 批量重载；`StreamingSTT::set_transcribe` 可注入 `StreamingSTT::sense_voice(AsrModel&)` 转写器，缺省仅做 VAD 分段。
+
 ## 设备与设备帧
 
 `RuntimeOption::set_device(Device::OPENCL/VULKAN)`(需显式 `use_mnn_backend()`,否则 fail-closed）:
@@ -1117,7 +1172,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 22. 工程配置
+## 23. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

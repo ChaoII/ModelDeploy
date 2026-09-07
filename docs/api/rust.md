@@ -855,6 +855,24 @@ fn main() -> Result<(), modeldeploy::MdError> {
 
 > `SenseVoice` 另提供 `predict_wav`/`predict_wav_structured`（从 wav 文件）；`SpeakerVerify` 与 `Kokoro` 的 `new` 后可用 `is_ready()` 探活、`clone()` 深拷贝（独立实例可并行）。PCM 输入均为 16kHz 单声道（约 1s 足够），Kokoro 输出 24kHz。`AsrResult`/`TtsAudio` 字段见 `types.rs`。
 
+## 21. 音频解决方案 + 工具（`audio::SpeakerSearch` / `resample`）
+
+`modeldeploy::audio` 模块提供说话人检索 `SpeakerSearch`（封装 C API `md_audio_speaker_search_*`）与自由函数 `resample`（封装 `md_audio_resample`），二者在 crate 顶层亦 re-export 为 `modeldeploy::SpeakerSearch` / `modeldeploy::resample`。**TTS 批处理（`TTSBatcher`）与逆文本归一化（`ITN`：`InverseTextNormalizer`/`ItnEngine`）本语言未绑定**，如需请用 C++ / Python。
+
+```rust
+use modeldeploy::{SpeakerSearch, resample};
+
+// 1. 说话人检索：SpeakerSearch（纯内存声纹库，return Result）
+let ss = SpeakerSearch::new()?;
+ss.enroll("alice", &emb)?;
+let label: String = ss.match_top(&emb)?;    // 余弦 top-1，返回最相似 label
+
+// 2. 重采样：自由函数 resample(&[f32], in_sr, out_sr) -> Result<Vec<f32>, _>
+let out16k = resample(&pcm48k, 48000, 16000)?;
+```
+
+> Rust 的 `resample` 是**自由函数**而非方法（C++/Python 为类 `Resampler` 内的重采样）；`SpeakerSearch::match_top` 仅返回 top-1（C API 语义），如需 top-k 请用 C++ / Python 的 `SpeakerGallery`/`SpeakerSearch.match(k)`。
+
 ## 主要模块文件
 
 | 文件 | 说明 |

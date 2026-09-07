@@ -777,6 +777,25 @@ string label = gal.Match(emb);                  // 余弦 top-1，返回最相�
 
 > `SenseVoiceModel` 另提供 `PredictWavStructured`/`PredictStructured`（结构化 `AsrResult`，字段 `Text/Language/Emotion/Event/Task/Itn/NoSpeech`）；`KokoroModel.Predict` 与 `SpeakerVerifyModel.Predict` 的 PCM 输入为 16kHz 单声道（约 1s 足够），Kokoro 输出 24kHz。`SpeakerSearch` 仅暴露 `Enroll`/`Match`（top-1），如需 top-k 与多说话人请用 C++ / Python。
 
+## 21. 音频解决方案 + 工具（`Audio.SpeakerSearch` / `Audio.Tools`）
+
+`ModelDeploy.Audio` 命名空间提供说话人检索 `SpeakerSearch`（封装 C API `md_audio_speaker_search_*`）与静态工具类 `Tools`（封装 `md_audio_resample`）。**TTS 批处理（`TTSBatcher`）与逆文本归一化（`ITN`：`InverseTextNormalizer`/`ItnEngine`）本语言未绑定**（C API 未暴露其 enqueue/dequeue 与 normalize 接口），如需请用 C++ / Python。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Audio;
+
+// 1. 说话人检索：SpeakerSearch（纯内存声纹库，对应 C API md_audio_speaker_search_*）
+using var ss = new SpeakerSearch();
+ss.Enroll("alice", emb);             // label + embedding（float[]）
+string label = ss.Match(emb);        // 余弦 top-1，返回最相似 label
+
+// 2. 工具：重采样（Audio.Tools.Resample，封装 C API md_audio_resample）
+float[] out16k = Audio.Tools.Resample(pcm48k, 48000, 16000);
+```
+
+> `SpeakerSearch` 仅暴露 `Enroll`/`Match`（top-1，见 §20）；`Audio.Tools.Resample(float[], inSr, outSr)` 在任意采样率间转换 float PCM。C# 无声纹 `SpeakerGallery`/`TTSBatcher`/`ITN` 封装。
+
 ## 运行示例
 
 ```bash

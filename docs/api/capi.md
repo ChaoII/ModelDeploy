@@ -1154,7 +1154,36 @@ int main(void) {
 }
 ```
 
-> 返回值语义同 `md_audio_asr(asr, samples, n, sample_rate, &text)`：16kHz 单声道 PCM；`md_audio_tts` 返回整段 24kHz 单声道音频（`audio` 归模型句柄内部，随 `md_model_destroy` 或下次调用前有效）。`md_audio_resample` 可在各采样率间转换 PCM（见 §接口分组）。
+> 返回值语义同 `md_audio_asr(asr, samples, n, sample_rate, &text)`：16kHz 单声道 PCM；`md_audio_tts` 返回整段 24kHz 单声道音频（`audio` 归模型句柄内部，随 `md_model_destroy` 或下次调用前有效）。`md_audio_resample` 可在各采样率间转换 PCM（见 §21）。
+
+## 21. 音频解决方案 + 工具（`md_audio_solution_*` / `md_audio_resample`）
+
+音频解决方案统一经 `md_audio_solution_create` 按 `MDAudioSolutionKind` 创建、`md_audio_solution_destroy` 释放。当前提供说话人检索 `MD_AUDIO_SPEAKER_SEARCH`（`md_audio_speaker_search_enroll` / `md_audio_speaker_search_match`）；`MD_AUDIO_TTS_BATCHER` 枚举可创建/销毁**但无 enqueue/dequeue 接口**，TTS 批处理请用 C++ / Python。重采样工具为 `md_audio_resample`。逆文本归一化（ITN）本语言**未绑定**。
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    /* 1. 说话人检索：MD_AUDIO_SPEAKER_SEARCH（纯内存声纹库） */
+    MDAudioSolutionHandle ss = NULL;
+    md_audio_solution_create(&ss, MD_AUDIO_SPEAKER_SEARCH);
+    md_audio_speaker_search_enroll(ss, "alice", emb, emb_n);   /* label + embedding */
+    const char* label = NULL; float score = 0.f;
+    md_audio_speaker_search_match(ss, emb, emb_n, 1, &label, &score);  /* top-1 label + score */
+    printf("match -> %s (%.3f)\n", label ? label : "", score);
+    md_audio_solution_destroy(ss);
+
+    /* 2. 重采样：md_audio_resample（out/out_n 归 C API 内部，借用指针，用后无需释放） */
+    float* out = NULL; size_t out_n = 0;
+    md_audio_resample(pcm48k, n, 48000, 16000, &out, &out_n);
+    printf("resampled %zu samples\n", out_n);
+    return 0;
+}
+```
+
+> `md_audio_speaker_search_match` 虽然接收 `k`，但只回填 `best_label`/`best_score`（top-1）；多说话人 top-k 请用 C++ / Python `SpeakerGallery`/`SpeakerSearch.match(k)`。`md_audio_resample` 输出指针归 C API 内部缓冲区所有（借用、不 `free`，随下次调用失效）。
 
 ## 接口分组
 
@@ -1166,7 +1195,7 @@ C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创�
 | 模型 | `md_model_create` / `md_model_predict` / `md_model_predict_batch` / `md_model_set_input_size` / `md_model_set_param_*` / `md_model_destroy` |
 | 结果 | `md_result_count` / `md_result_detection` / `md_result_classification` / `md_result_instance_seg` / `md_result_ocr` / `md_result_face` / `md_result_lpr` / `md_result_attribute` 等 + `md_result_destroy` |
 | 图像 | `md_image_from_file` / `md_image_from_bgr24` / `md_image_from_device_nv12` / `md_image_to_host_bytes` / `md_image_plane_bytes` / `md_image_save` / `md_image_destroy` 等 |
-| 音频 | `md_audio_asr` / `md_audio_asr_wav` / `md_audio_tts` / `md_audio_tts_stream` / `md_wav_save` |
+| 音频 | `md_audio_asr` / `md_audio_asr_wav` / `md_audio_tts` / `md_audio_tts_stream` / `md_audio_speaker_embed` / `md_audio_resample` / `md_wav_save`；解决方案 `md_audio_solution_create`（`MD_AUDIO_SPEAKER_SEARCH`）+ `md_audio_speaker_search_*` |
 | 绘制 | `md_draw_rect` / `md_draw_polygon` / `md_draw_text` / `md_draw_result` |
 | 视频 | `md_video_*`（解码/编码，见下） |
 
