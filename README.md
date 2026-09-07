@@ -77,7 +77,7 @@ int main() {
 |------|---------|-----|------|--------|--------|-----|
 | OnnxRuntime | `.onnx` | ✅ | ✅ | ✅ | — | — |
 | TensorRT | `.engine`/`.onnx` | — | ✅ | — | — | — |
-| MNN | `.mnn` | ✅ | ✅ | ✅ | ✅ | — |
+| MNN | `.mnn` | ✅ | — | ✅ | ✅ | — |
 | **ncnn** | `.param`/`.bin` | ✅ | — | — | ✅ | — |
 | Sophgo | `.bmodel` | — | — | — | — | ✅ (BM1688/CV186X) |
 
@@ -105,7 +105,8 @@ int main() {
 
 **推理后端（统一 API）**
 - [x] 五后端统一：OnnxRuntime / TensorRT / MNN / **ncnn** / Sophgo(算能 TPU)，一套 `RuntimeOption` 切换
-- [x] **ncnn（CPU + Vulkan，YOLO 全系）**、MNN（CPU/CUDA/OpenCL/Vulkan/Metal）
+- [x] **ncnn（CPU + Vulkan，YOLO 全系）**、MNN（CPU/OpenCL/Vulkan）
+- [x] **ncnn 覆盖非 YOLO 模型**：人脸（InsightFace/Scrfd/SeetaFace）、OCR（DBDetector/Recognizer/Classifier/PaddleOCR）、分类、车牌 LPR（CPU + Vulkan）
 - [x] TensorRT engine 在线构建/缓存 + 动态 shape；ORT 内嵌 TRT EP
 - [x] Sophgo：`.bmodel` 转换(F16/INT8)、BMCV 设备端零拷贝、混合量化(qtable)
 - [x] **模型加密**：AES-256-GCM 权重防泄露
@@ -136,30 +137,26 @@ int main() {
 **多语言绑定**
 - [x] C++ / Python / C / C# / Rust 五语言绑定（视频编解码全功能覆盖）
 
+**构建 / CI**
+- [x] **aarch64（Linux ARM64）CI**：x86_64 runner 交叉编译 SDK + Python wheel（cibuildwheel）
+
 ### 未来路线
 
-按「近期 → 中期 → 远期」分层，越靠前优先落地。
-
-**近期（Next 1–2 majors）**
-- [ ] **ncnn 后端补全**：加载时输出原生 shape（替代 probe 兜底）、覆盖非 YOLO 模型（人脸/OCR/分类）、补齐 Vulkan 算子
-- [ ] **动态 shape 规范统一**：多后端一致的 I/O shape 语义，去除 MNN/ncnn 的 dummy-probe 依赖
-- [ ] **更多 CUDA / Vulkan 预处理函数**（补齐已知缺项）+ 设备端算子统一注册表
-- [ ] **量化工具链完善**：INT8 覆盖检测头友好（攻克 end2end/OBB 无法 INT8）、统一量化回灌流程与精度护栏
-- [ ] **ARM / 边缘交叉编译模板**：Jetson / RK3588 / RK3399 等 + 性能基线，落地 `baseline_compare` 跨平台差异
-- [ ] **生成式/LLM 第一步**：接入 onnxruntime-genai / llama.cpp，跑通 Qwen / DeepSeek 等小模型 chat
+按「中期 → 远期」分层，越靠前优先落地（近期事项已全部落地/移出，暂无近期条目）。
 
 **中期（Mid）**
 - [ ] **更多 NPU 后端**：Rockchip RKNN（RK3588）、Qualcomm QNN/Snapdragon、华为昇腾 CANN（国产化）——沿用下载式接入范式
-- [ ] **流式/异步 API**：跨帧 stateful 算子、事件/回调式异步推理（五语言统一 Promise/callback）
-- [ ] **服务化增强**：内置 HTTP / gRPC 推理网关、模型仓库热更新、多 worker 调度
+- [ ] **流式/异步推理**：一期**仅 C++**——`AsyncModel` 异步投递壳（有界背压队列 + worker 线程 + `std::future`/回调，复用解码头基建的范式），跨帧 stateful 算子；**其它语言绑定后续再议**（文档注明）
+- [ ] **服务化增强（嵌入式推理网关）**：内置 HTTP / gRPC 推理端点、模型仓库热更新、多 worker 调度、健康/指标/TLS——**按 llama.cpp server 级工程化完备落地，覆盖各类部署场景**（非精简版）
 - [ ] **视频编解码深化**：AV1 硬编、HEVC 遍历、GPU 多路编码、更高吞吐基准
-- [ ] **视觉大模型（VLM）融合**：Qwen2-VL 等视觉语言模型接入统一推理 API
 
 **远期（Long）**
 - [ ] **WASM / Web + iOS / Android** 端到端部署模板（边缘全平台覆盖）
 - [ ] **模型管理平台**：模型仓库 + 版本 + 分片 + 注册，一键下发设备
 - [ ] **边缘–云协同调度**：分布式推理、带宽感知分流
-- [ ] **算子层收敛**：自研统一算子抽象，屏蔽各后端差异，降低新后端接入成本
+- [ ] **算子层收敛**：自研统一算子抽象 + **设备端算子统一注册表**，屏蔽各后端差异，降低新后端接入成本
+- [ ] **生成式大模型（LLM/VLM）**：接入 **llama.cpp**（GGUF/int4/CMake 集成），跑通 Qwen / DeepSeek 等小模型 chat + VLM（如 Qwen2.5-VL）；标的**可选、按需拉前**；ASR/TTS 沿用现有 ORT 专用后端，不纳入 llama.cpp 范围
+- [ ] **视觉大模型（VLM）融合**：Qwen2-VL 等视觉语言模型**接入统一推理 API**（走现有 ONNX 视觉模型路线，区别于上面的 llama.cpp 生成式路线）
 - [ ] **低代码可视化编排**：拖拽式流程构建，降低集成门槛
 
 ## 已知问题 / 当前 SDK 痛点
@@ -178,7 +175,7 @@ int main() {
 
 6. **Sophgo 后端无法本地编译验证**：仅能在 `172.168.100.243` 的 `tpuc_dev` 容器交叉编译、`.70`（BM1688）真机验证；改动需走该远程链路。
 
-7. **Sophgo INT8 量化受限**：带内置 NMS 的 end2end 模型（det/pose/seg）与 OBB 无法 INT8 量化（算子被量化破坏/坐标失真），只能 F16；cls/sem/depth 可用 INT8。详见 [docs/backends.md](./docs/backends.md)。
+7. **Sophgo INT8 量化**：det/pose/seg 需**解码头 qtable**（INT8 backbone + 检测头输出链 F16）才可 INT8（cmodel cos≈0.99）；OBB 的 INT8 仍失效（坐标失真、cos≈0.6），**建议用 F16**；cls/sem/depth 可直接 INT8。详见 [docs/backends.md](./docs/backends.md)。
 
 8. **Windows 构建环境**：MSVC 编译需在 "x64 Native Tools Command Prompt"（含 `vcvars64` include/lib 路径）下进行；模型加密基于 mbedTLS（git submodule），构建前需 `git submodule update --init --recursive`，不再需要安装 OpenSSL。
 

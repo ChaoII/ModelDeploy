@@ -40,7 +40,7 @@ option.sophgo_option.bmodel_path = "model.bmodel";
 | 方法 | 设备 | 说明 |
 |------|------|------|
 | `use_cpu()` | CPU | 默认 |
-| `use_gpu(gpu_id)` | NVIDIA GPU | 需 CUDA，配合 TRT/ORT/MNN |
+| `use_gpu(gpu_id)` | NVIDIA GPU | 需 CUDA，配合 TRT/ORT |
 | `use_opencl(device_id)` | OpenCL | ORT/MNN 支持 |
 | `set_device(Device::VULKAN, id)` | Vulkan | ORT/MNN/ncnn 支持 |
 
@@ -127,13 +127,13 @@ option.ort_option.trt_engine_cache_path = "./trt_engine";
 
 | 成员 | 默认 | 说明 |
 |------|------|------|
-| `forward_type` | AUTO | CPU/AUTO/CUDA/OPENCL/VULKAN/METAL/NN |
+| `forward_type` | AUTO | CPU/AUTO/OPENCL/VULKAN/NN |
 | `precision` | 正常 | 推理精度 |
 | `power_mode` | 正常 | 功耗模式 |
 | `cache_file_path` | 空 | 缓存文件 |
 
 ```cpp
-option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_CUDA;
+option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_OPENCL;
 ```
 
 ### 8.3 `trt_option`（TensorRT）
@@ -208,12 +208,12 @@ option.set_trt_opt_shape("images:1x3x640x640");
 option.set_trt_max_shape("images:4x3x1280x1280");
 ```
 
-### MNN GPU
+### MNN OpenCL / Vulkan
 
 ```cpp
 option.use_mnn_backend();
-option.use_gpu(0);
-option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_CUDA;
+option.set_device(modeldeploy::Device::OPENCL, 0);   // 或 Device::VULKAN
+option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_OPENCL;
 ```
 
 ### ncnn CPU / Vulkan

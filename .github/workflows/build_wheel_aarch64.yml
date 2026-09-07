@@ -1,0 +1,55 @@
+name: Wheel aarch64
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheel-aarch64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==================== aarch64 wheel ====================
+  # 在 ubuntu-latest 上用 cibuildwheel 构建 Linux aarch64 的 Python wheel。
+  # cibuildwheel 内部在 manylinux_aarch64 容器中构建（该 ABI 无原生 runner，
+  # 需 QEMU 模拟运行构建环境——此为打 aarch64 wheel 的标准做法）。
+  # 构建经 scikit-build-core 走 CMake，CMAKE_SYSTEM_PROCESSOR=aarch64，
+  # 自动拉取 aarch64 预编译依赖（onnxruntime/MNN/ncnn/OpenCV）。
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up QEMU (for aarch64 build env)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libssl-dev
+
+      - name: Build aarch64 wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        with:
+          output-dir: dist
+        env:
+          CIBW_ARCHS: aarch64
+          CIBW_BUILD: "cp312-* cp313-*"
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.12"
+          CIBW_BEFORE_ALL_LINUX: >-
+            yum install -y openssl-devel || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-aarch64
+          path: dist/*.whl
+          retention-days: 7

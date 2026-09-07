@@ -8,7 +8,7 @@ ModelDeploy 支持五种推理后端，一套上层 API 统一调用。本文详
 |------|------|---------|------|---------|---------|
 | OnnxRuntime | `OrtBackend` | `.onnx` | CPU / CUDA / OpenCL | `ENABLE_ORT` | 跨平台通用，模型生态最全 |
 | TensorRT | `TrtBackend` | `.engine` / `.onnx` | NVIDIA GPU | `ENABLE_TRT + WITH_GPU` | 英伟达 GPU 最高性能 |
-| MNN | `MnnBackend` | `.mnn` | CPU / GPU(多种) / Metal | `ENABLE_MNN` | 移动端 / 边缘设备 |
+| MNN | `MnnBackend` | `.mnn` | CPU / OpenCL / Vulkan | `ENABLE_MNN` | 移动端 / 边缘设备 |
 | ncnn | `NcnnBackend` | `.param` / `.bin` | CPU / Vulkan | `ENABLE_NCNN` | 移动端 / Vulkan 场景，YOLO 全系 |
 | Sophgo | `SophgoBackend` | `.bmodel` | 算能 TPU (BM1688/CV186X) | `ENABLE_SOPHGO` | 国产化 / 低功耗边缘 |
 
@@ -124,7 +124,7 @@ option.set_trt_max_shape("images:4x3x1280x1280"); // 最大
 ```cpp
 option.use_mnn_backend();
 option.use_cpu();
-// 或 option.use_gpu(0);
+// 或 OpenCL / Vulkan（见 4.3）
 
 auto det = modeldeploy::vision::detection::UltralyticsDet("model.mnn", option);
 ```
@@ -133,7 +133,7 @@ auto det = modeldeploy::vision::detection::UltralyticsDet("model.mnn", option);
 
 | 配置项 | 默认 | 说明 |
 |--------|------|------|
-| `forward_type` | AUTO | `MNN_FORWARD_CPU/AUTO/CUDA/OPENCL/VULKAN/METAL/NN` |
+| `forward_type` | AUTO | `MNN_FORWARD_CPU/AUTO/OPENCL/VULKAN/NN` |
 | `precision` | 正常 | 推理精度（正常/低/高） |
 | `power_mode` | 正常 | 功耗模式 |
 | `memory_mode` | — | 内存模式 |
@@ -142,8 +142,6 @@ auto det = modeldeploy::vision::detection::UltralyticsDet("model.mnn", option);
 ### 4.3 forward 类型
 
 ```cpp
-// CUDA
-option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_CUDA;
 // OpenCL
 option.mnn_option.forward_type = modeldeploy::mnn::MNN_FORWARD_OPENCL;
 // Vulkan
@@ -298,13 +296,13 @@ yolo26n 全系 7 个任务（det/cls/obb/pose/seg/sem/depth）均固定 `[1,3,64
 
 | 模型 | 类型 | INT8 可用性 |
 |------|------|------------|
-| det / pose / seg | **end2end（内置 NMS）** | ❌ 不可用：内置 NMS 算子被量化破坏，输出 conf 全 0 |
-| obb | 无 NMS 检测头 | ⚠️ box 坐标量化后失真（ch0-3 变常量），检测框错误；qtable 检测头/前段 F16 均无法恢复，**建议用 F16** |
+| det / pose / seg | 无 NMS 检测头（NMS 由 SDK 完成） | ✅ 可用：解码头 qtable（INT8 backbone + 检测头输出链 F16），cos 0.9996 / 0.9995 / 0.9919；曾因检测头坐标被压缩（≤44、cos≈0.77）而失效，靠 qtable 修复 |
+| obb | 无 NMS 检测头 | ⚠️ box 坐标量化后失真（ch0-3 变常量），检测框错误；qtable 检测头/前段 F16 均无法恢复（cos≈0.6），**建议用 F16** |
 | cls | 全卷积 | ✅ top1 与 F16 一致 |
 | sem | 全卷积 | ✅ 主类别一致（小类别有偏差） |
 | depth | 全卷积 | ✅ 深度量级正确（有偏差） |
 
-> 结论：**end2end 模型（det/pose/seg）和 obb 的 INT8 不可用，用 F16**；**cls/sem/depth 的 INT8 可用**（精度有少量偏差）。转换命令同 5.4.1，onnx 在 `test_data/test_models/onnx/yolo26n/`，bmodel 在 `test_data/test_models/sophgo/yolo26n/`。
+> 结论：**det/pose/seg 的 INT8 已可用**——需解码头 qtable（INT8 backbone + 检测头输出链 F16，见 `tools/convert/yolo26n.qtable` / `yolo26n-seg.qtable`），cmodel cos 0.9996 / 0.9995 / 0.9919；**obb 的 INT8 仍不可用（cos≈0.6，建议 F16）**；**cls/sem/depth 的 INT8 可用**（精度有少量偏差）。转换命令同 5.4.1，onnx 在 `test_data/test_models/onnx/yolo26n/`，bmodel 在 `test_data/test_models/sophgo/yolo26n/`。
 
 ### 5.5 零拷贝推理（BMCV）
 

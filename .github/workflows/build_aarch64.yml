@@ -1,0 +1,75 @@
+name: Build aarch64
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aarch64-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_NAME: "ModelDeploy"
+
+jobs:
+  # ==================== aarch64 交叉编译 ====================
+  # GitHub runner 均为 x86_64。此处用 aarch64 交叉工具链把 SDK 交叉编译为
+  # Linux aarch64 产物（不经 QEMU / arm64 容器，不实际以 arm64 运行）。
+  # 依赖（onnxruntime / MNN / ncnn / OpenCV）均有 aarch64 预编译静态包，
+  # CMake FetchContent 按 toolchain 的 CMAKE_SYSTEM_PROCESSOR=aarch64 自动下载。
+  # 交叉编译无法在 x86 上运行 aarch64 测试，故本任务只做 配置 + 编译 + 打包。
+  cross-build:
+    name: cross-build (x86_64 -> aarch64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-aarch64-linux-gnu cmake ninja-build
+
+      - name: Write aarch64 toolchain file
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/aarch64-toolchain.cmake" <<'EOF'
+          set(CMAKE_SYSTEM_NAME Linux)
+          set(CMAKE_SYSTEM_PROCESSOR aarch64)
+          set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+          set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+          set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
+          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          EOF
+
+      - name: Configure (cross)
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/aarch64-toolchain.cmake
+          -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON
+          -DBUILD_PYTHON=OFF
+          -DWITH_GPU=OFF
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Install
+        run: cmake --install build --prefix install
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-linux-aarch64
+          path: install
+          retention-days: 7
