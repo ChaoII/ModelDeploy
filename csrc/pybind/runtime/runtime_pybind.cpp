@@ -147,7 +147,9 @@ namespace modeldeploy {
             .def_readwrite("model_from_memory", &RuntimeOption::model_from_memory)
             .def_readwrite("enable_trt", &RuntimeOption::enable_trt)
             .def_readwrite("enable_fp16", &RuntimeOption::enable_fp16)
-            .def_readwrite("password", &RuntimeOption::password)
+            .def_property("password",
+                          [](const RuntimeOption& o) { return o.get_password(); },
+                          [](RuntimeOption& o, const std::string& p) { o.set_password(p); })
             .def_readwrite("ncnn_option", &RuntimeOption::ncnn_option);
 
 
