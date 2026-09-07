@@ -91,7 +91,14 @@ if (MSVC)
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4819>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4996>"
             "$<$<COMPILE_LANGUAGE:CXX>:/wd4251>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>")
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4244>"
+            # /W3 常见低价值噪音（截断/窄化/符号比较/nodiscard 丢弃），全构建屏蔽；
+            # 保留 /W3 其余更有价值的类型与逻辑检查（需工程师关注的仍在 /W4 级别）。
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4834>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4305>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4267>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4018>"
+            "$<$<COMPILE_LANGUAGE:CXX>:/wd4805>")
     add_definitions(-DMD_CXX_EXPORT)
     if (NOT "${CMAKE_GENERATOR}" STREQUAL "Ninja")
         set(DIST_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
@@ -127,7 +134,12 @@ function(md_warn_own target)
     if (MSVC)
         target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/W3>")
     elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(${target} PRIVATE -Wall -Wextra)
+        # -Wall -Wextra 下的常见低价值噪音；与 MSVC /wd4834、/wd4018 对应的 GCC 版，
+        # 保留其余更有价值的检查（GCC 的截断/窄化 -Wconversion 默认未开，无需处理）。
+        target_compile_options(${target} PRIVATE
+                -Wall -Wextra
+                -Wno-unused-result
+                -Wno-sign-compare)
     endif ()
 endfunction()
 
@@ -281,6 +293,8 @@ if (BUILD_AUDIO)
                 AND EXISTS "${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing/runtime/processor/wetext_processor.h")
             add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/openfst)
             add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing)
+            md_silence_external(fst)
+            md_silence_external(md_wetext)
             include_directories(SYSTEM
                 ${CMAKE_SOURCE_DIR}/third_party/openfst/include
                 ${CMAKE_SOURCE_DIR}/third_party/WeTextProcessing/runtime
@@ -403,6 +417,13 @@ if (BUILD_ENCRYPTION)
     set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
     set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
     add_subdirectory(third_party/mbedtls)
+    # mbedtls 自带 /W3 /WX，目标名随构建模式有 static/非 static 两种，统一静默（避免平台差异触发 /WX）
+    md_silence_external(mbedcrypto)
+    md_silence_external(mbedcrypto_static)
+    md_silence_external(mbedx509)
+    md_silence_external(mbedx509_static)
+    md_silence_external(mbedtls)
+    md_silence_external(mbedtls_static)
     add_definitions(-DENABLE_ENCRYPTION)
     list(APPEND PRIVATE_DEPENDS mbedtls)
     message(STATUS "mbedTLS model encryption enabled")
