@@ -147,7 +147,7 @@ int main() {
 **中期（Mid）**
 - [ ] **更多 NPU 后端**：Rockchip RKNN（RK3588）、Qualcomm QNN/Snapdragon、华为昇腾 CANN（国产化）——沿用下载式接入范式
 - [ ] **流式/异步推理**：一期**仅 C++**——`AsyncModel` 异步投递壳（有界背压队列 + worker 线程 + `std::future`/回调，复用解码头基建的范式），跨帧 stateful 算子；**其它语言绑定后续再议**（文档注明）
-- [ ] **服务化增强（嵌入式推理网关）**：内置 HTTP / gRPC 推理端点、模型仓库热更新、多 worker 调度、健康/指标/TLS——**按 llama.cpp server 级工程化完备落地，覆盖各类部署场景**（非精简版）
+- [x] **服务化增强（嵌入式推理网关）**：内置 HTTP 推理端点、模型仓库热更新、健康/鉴权/限流/CORS/metrics/TLS(可选)、优雅停机——**本期 C++ 完整实现（REST）**，见 [Serving 使用指南](docs/serving.md)；**gRPC 二期**
 - [ ] **视频编解码深化**：AV1 硬编、HEVC 遍历、GPU 多路编码、更高吞吐基准
 
 **远期（Long）**
