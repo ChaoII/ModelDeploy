@@ -7,6 +7,8 @@
 #include "vision/common/image_data.h"
 #include "utils/benchmark.h"
 #include "pipeline/async_model.h"
+#include "video/async_video_infer.h"
+#include "video/video_frame.h"
 
 namespace {
 // 仿 UltralyticsDet 的同步接口；R = std::string
@@ -165,6 +167,65 @@ TEST_CASE("AsyncModel surfaces model errors via future and callback", "[async]")
     std::lock_guard<std::mutex> lk(cb_mu);
     REQUIRE(cb_errors.size() >= 1);
     for (auto& e : cb_errors) REQUIRE(!e.empty());
+    am.stop();
+}
+
+TEST_CASE("AsyncVideoInfer wires decode frames to async inference", "[async]") {
+    auto m = std::make_unique<FakeModel>();
+    AsyncModelConfig cfg;
+    AsyncModel<FakeModel> am(std::move(m), cfg);
+    REQUIRE(am.start());
+    modeldeploy::video::AsyncVideoInfer<FakeModel> avi(am);
+    std::vector<std::string> got;
+    std::mutex got_mu;
+    avi.set_result_callback([&](uint64_t /*id*/, std::string&& r, const std::string& e) {
+        if (e.empty()) {
+            std::lock_guard<std::mutex> lk(got_mu);
+            got.push_back(std::move(r));
+        }
+    });
+    modeldeploy::video::VideoFrame f1;
+    f1.image = make_bgr(4, 2);
+    avi.on_frame(std::move(f1));
+    modeldeploy::video::VideoFrame f2;
+    f2.image = make_bgr(8, 3);
+    avi.on_frame(std::move(f2));
+    am.wait_idle();
+    REQUIRE(avi.frames_submitted() == 2);
+    {
+        std::lock_guard<std::mutex> lk(got_mu);
+        REQUIRE(got.size() == 2);
+        REQUIRE(got[0] == FakeModel::big_result(4, 2));
+        REQUIRE(got[1] == FakeModel::big_result(8, 3));
+    }
+    am.stop();
+}
+
+TEST_CASE("AsyncVideoInfer accumulates many frames without blocking", "[async]") {
+    auto m = std::make_unique<FakeModel>();
+    AsyncModelConfig cfg;
+    AsyncModel<FakeModel> am(std::move(m), cfg);
+    REQUIRE(am.start());
+    modeldeploy::video::AsyncVideoInfer<FakeModel> avi(am);
+    std::atomic<size_t> got{0};
+    avi.set_result_callback([&](uint64_t /*id*/, std::string&&, const std::string& e) {
+        if (e.empty()) ++got;
+    });
+    const int kN = 100;
+    auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < kN; ++i) {
+        modeldeploy::video::VideoFrame f;
+        f.image = make_bgr(1 + i, 2);
+        avi.on_frame(std::move(f));
+    }
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - t0)
+                       .count();
+    REQUIRE(avi.frames_submitted() == static_cast<uint64_t>(kN));
+    REQUIRE(elapsed < 2000);   // on_frame 不阻塞
+    am.wait_idle();
+    REQUIRE(got.load() == static_cast<size_t>(kN));
+    avi.set_result_callback({});   // 复位回调防后续污染
     am.stop();
 }
 
