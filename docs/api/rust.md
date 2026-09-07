@@ -647,6 +647,54 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 16. 行人属性（`PedestrianAttribute`）+ 行人 ReID（`ReID`）
+
+行人属性模型 `modeldeploy::PedestrianAttribute`（对应 `MD_MODEL_PED_ATTR`），`model_path` 用 `|` 串联 **det|cls 两段**：`"det.onnx|cls.onnx"`，`predict` 返回 `Vec<Attribute>`（字段 `rect: Rect`、`box_label_id: i32`、`box_score: f32`、`attr_scores: Vec<f32>`）。参数：`set_input_size`（检测子模型输入尺寸）、`set_cls_input_size`、`set_cls_batch_size`（>0 固定 / -1 自动）、`set_det_threshold`。
+
+行人 ReID 模型 `modeldeploy::ReID`（对应 `MD_MODEL_REID`），单段 `"osnet.onnx"`，`predict` 返回 `Vec<ReIdResult>`（`embedding: Vec<f32>`，L2 归一化 512 维）。**Rust 未绑定 ReIdGallery**（C API 无对应句柄；Rust 仅音频 `SpeakerGallery` 用于声纹检索），行人库检索请用 C++ / Python。
+
+```rust
+use modeldeploy::{DrawOptions, Image, PedestrianAttribute, ReID, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项 + 构造（详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+
+    // 2. 行人属性：'|' 串联 det|cls 两段；predict -> Vec<Attribute>
+    let attr = PedestrianAttribute::new("det.onnx|cls.onnx", &opt)?;
+    attr.set_input_size(1280, 1280)?;        // 检测子模型输入尺寸
+    attr.set_cls_input_size(192, 256)?;      // 分类子模型输入尺寸
+    attr.set_cls_batch_size(8)?;             // 分类子模型 batch（>0 固定 / -1 自动）
+    attr.set_det_threshold(0.5)?;            // 检测阈值（默认 0.5）
+
+    let img = Image::read("test.jpg")?;
+    let attrs = attr.predict(&img)?;
+    for a in &attrs {
+        println!("rect=({:.0},{:.0},{:.0},{:.0}) label={} score={:.3} attrs={}",
+                 a.rect.x, a.rect.y, a.rect.width, a.rect.height,
+                 a.box_label_id, a.box_score, a.attr_scores.len());
+    }
+    // 可视化：predict_and_draw 句柄直达 C++ vis_attr
+    let canvas = img.clone()?;
+    attr.predict_and_draw(&img, &canvas, &DrawOptions::new().with_alpha(0.3))?;
+    canvas.save("attr_vis.jpg")?;
+    // 批量：attr.predict_batch(&[&img])? -> Vec<Vec<Attribute>>；多线程：attr.clone()?
+
+    // 3. 行人 ReID：单段 osnet.onnx；predict -> Vec<ReIdResult>（L2 归一化 512 维）
+    let reid = ReID::new("osnet.onnx", &opt)?;
+    let crop = Image::read("person_crop.jpg")?;
+    let rs = reid.predict(&crop)?;
+    if let Some(r) = rs.first() {
+        println!("embedding dim={}", r.embedding.len());
+    }
+
+    // 注意：Rust 未绑定 ReIdGallery；行人库检索请用 C++/Python
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

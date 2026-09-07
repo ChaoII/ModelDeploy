@@ -862,6 +862,81 @@ int main(void) {
 }
 ```
 
+## 16. 行人属性（`MD_MODEL_PED_ATTR`）+ 行人 ReID（`MD_MODEL_REID`）
+
+行人属性 kind 经 `md_model_create` 创建，`model_path` 用 `|` 串联 **det|cls 两段**：`"det.onnx|cls.onnx"`，结果 kind 为 `MD_RES_ATTR`。行人 ReID kind 创建后 `predict` 输出 L2 归一化 512-d 行人特征，结果 kind 为 `MD_RES_REID`。**C API 未绑定 ReIdGallery**（C API 仅在音频 `md_audio_speaker_search_enroll`/`match` 提供声纹库），行人库检索匹配请用 C++ / Python。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+
+    /* 1. 行人属性：MD_MODEL_PED_ATTR，det|cls 两段路径 */
+    MDModelHandle attr = NULL;
+    if (md_model_create(&attr, MD_MODEL_PED_ATTR, "det.onnx|cls.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    md_model_set_input_size(attr, 1280, 1280);        /* 检测子模型输入尺寸 */
+    md_model_set_cls_input_size(attr, 192, 256);      /* 分类子模型输入尺寸 */
+    md_model_set_cls_batch_size(attr, 8);             /* 分类子模型 batch（>0 固定 / -1 自动） */
+    md_model_set_param_d(attr, "det_threshold", 0.5); /* 检测阈值（默认 0.5） */
+
+    MDResultHandle res = NULL;
+    md_model_predict(attr, img, &res);
+    const MDAttrItem* items = NULL;   /* {x,y,w,h,box_score,box_label_id} */
+    size_t n = 0;
+    md_result_attribute(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        const float* scores = NULL; size_t sn = 0;
+        md_result_attr_scores(res, i, &scores, &sn);  /* 该行人的各属性得分 */
+        printf("[%zu] box=(%.0f, %.0f, %.0f, %.0f) label=%d score=%.3f attrs=%zu\n",
+               i, items[i].x, items[i].y, items[i].w, items[i].h,
+               items[i].box_label_id, items[i].box_score, sn);
+    }
+    /* 批量：md_result_attribute_batch(bres, g, &items, &n) +
+     *        md_result_attr_scores_batch(bres, g, j, &scores, &sn) 按 (图, 项) 读 */
+    /* 可视化：md_draw_result 支持 MD_RES_ATTR（底层 vis_attr；
+     *         abnormal_ids / show_attr 经 MDDrawOptions 透传） */
+    MDDrawOptions dopt = {0};
+    dopt.threshold = 0.5; dopt.alpha = 0.3; dopt.show_attr = 1;
+    MDImageHandle canvas = NULL;
+    md_image_clone(img, &canvas);
+    md_draw_result(canvas, res, &dopt);
+    md_image_save(canvas, "attr_vis.jpg");
+    md_image_destroy(canvas);
+    md_result_destroy(res);
+    md_model_destroy(attr);
+
+    /* 2. 行人 ReID：MD_MODEL_REID，单段 osnet.onnx，输出 L2 归一化 512 维特征 */
+    MDModelHandle reid = NULL;
+    md_model_create(&reid, MD_MODEL_REID, "osnet.onnx", opt);
+    MDImageHandle crop = NULL;
+    md_image_from_file(&crop, "person_crop.jpg");
+    md_model_predict(reid, crop, &res);
+    const float* emb = NULL; size_t en = 0;
+    md_result_reid_embedding(res, 0, &emb, &en);
+    printf("embedding dim=%zu\n", en);
+    /* 批量：md_result_reid_embedding_batch(bres, g, &emb, &en) 按图读 */
+    /* 注意：C API 无 ReIdGallery，行人库检索匹配请用 C++/Python */
+    md_result_destroy(res);
+    md_model_destroy(reid);
+    md_image_destroy(crop);
+
+    md_image_destroy(img);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

@@ -789,7 +789,69 @@ int main() {
 
 > 与 `Scrfd`/姿态族类似，`LprDetection` 的 `markers` 后处理参数名是 `landmarks_per_card`（每车牌角点数），**不是** `landmarks_per_face`；`LprRecPreprocessor` 仅 `set_size`（默认 `{168, 48}`），`LprRecPostprocessor` **无参数**（字符/颜色内联解码，字符表含 78 类）。
 
-## 16. 更多模型（均使用同一 `RuntimeOption`）
+## 16. 行人属性 + 行人 ReID（vision::PedestrianAttribute / reid::ReID / reid::ReIdGallery）
+
+行人属性 `modeldeploy::vision::PedestrianAttribute`（`vision.h`）把检测 + 多标签属性分类串联成流水线，`predict` 输出每个人的 `AttributeResult`（字段 `box: Rect2f`、`box_label_id: int32_t`、`box_score: float`、`attr_scores: vector<float>`）；行人 ReID 在 `modeldeploy::vision::reid` 命名空间：`reid::ReID`（OSNet）提取 L2 归一化 512-d 特征，配合内存 `reid::ReIdGallery` 做注册与 top-k 余弦匹配。
+
+```cpp
+#include "modeldeploy/vision.h"
+#include "vision/reid/reid.h"
+#include "vision/reid/gallery.h"
+
+int main() {
+    // 1. 运行时选项（详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    auto crop = modeldeploy::vision::ImageData::imread("person_crop.jpg");
+
+    // 2. 行人属性：PedestrianAttribute(det, cls, opt) 检测 + 多标签属性分类串联
+    modeldeploy::vision::PedestrianAttribute attr("det.onnx", "cls.onnx", opt);
+    if (!attr.is_initialized()) return 1;
+    attr.set_det_threshold(0.5f);            // 检测阈值（默认 0.5）
+    attr.set_det_input_size({1280, 1280});   // 检测子模型输入尺寸（默认 {640, 640}）
+    attr.set_cls_input_size({192, 256});     // 分类子模型输入尺寸（默认 {192, 256}）
+    attr.set_cls_batch_size(8);              // 分类子模型 batch（默认 8），>0 固定 / -1 自动
+    // 也可经 get_detector() / get_classifier() 链式细调
+    std::vector<modeldeploy::vision::AttributeResult> attrs;
+    if (!attr.predict(im, &attrs)) return 1;
+    for (const auto& r : attrs) {
+        std::printf("box=(%.0f, %.0f, %.0f, %.0f) label=%d score=%.3f attrs=%zu\n",
+                    r.box.x, r.box.y, r.box.width, r.box.height,
+                    r.box_label_id, r.box_score, r.attr_scores.size());
+        for (float s : r.attr_scores) std::printf("  %.3f\n", s);
+    }
+    // 批量：attr.batch_predict({im, ...}, &batch)；多线程：attr.clone()
+    // 可视化：vis_attr(image, result, threshold, label_map, font_path, font_size, alpha,
+    //                  save, abnormal_ids, show_attr)
+    auto vis = modeldeploy::vision::vis_attr(im, attrs, 0.5, {}, "msyh.ttc", 14, 0.3, false, {}, true);
+    vis.imwrite("attr_vis.jpg");
+
+    // 3. 行人 ReID：reid::ReID(model, opt) 提取 L2 归一化 512-d 特征（输入行人裁剪图）
+    modeldeploy::vision::reid::ReID reid("osnet.onnx", opt);
+    if (!reid.is_initialized()) return 1;
+    std::vector<modeldeploy::vision::ReIdResult> res;
+    if (!reid.predict(crop, &res) || res.empty() || res[0].embedding.empty()) return 1;
+    const auto& emb = res[0].embedding;      // 已 L2 归一化
+
+    // 4. reid::ReIdGallery：内存行人库，注册 + 余弦 top-k 匹配（同 label 覆盖）
+    modeldeploy::vision::reid::ReIdGallery gallery;
+    gallery.enroll("a", emb);                // label + embedding
+    gallery.enroll("b", emb);
+    std::cout << "gallery size=" << gallery.size() << "\n";
+    for (auto& [label, score] : gallery.match(emb, 1))   // -> vector<pair<label, score>> 降序
+        std::printf("match -> label=%s score=%.3f\n", label.c_str(), score);
+    gallery.remove("b");                     // -> vector<bool>；gallery.clear() 清空
+    return 0;
+}
+```
+
+> `ReID::predict` 输出即已 L2 归一化；`ReIdGallery::match` 直接对其做点积求余弦（`enroll`/`match` 的 embedding 均要求已归一化）。
+
+## 17. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -804,6 +866,8 @@ int main() {
 | OCR | `vision::ocr::PaddleOCR` | 见上文 §11 |
 | 人脸 | `vision::face::Scrfd` / `InsightFaceAnalysis` | 见 [models-人脸](../models.md#6-人脸face) |
 | 车牌 | `vision::lpr::LprPipeline` | 见上文 §15 |
+| 行人属性 | `vision::PedestrianAttribute` | 见上文 §16 |
+| 行人 ReID | `vision::reid::ReID` + `reid::ReIdGallery` | 见上文 §16 |
 | ASR | `audio::asr::SenseVoice` | 见 [models-语音](../models.md#10-语音识别asr) |
 | TTS（Kokoro） | `audio::tts::Kokoro` | 见 [models-TTS](../models.md#11-语音合成tts) |
 
@@ -845,7 +909,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 17. 工程配置
+## 18. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

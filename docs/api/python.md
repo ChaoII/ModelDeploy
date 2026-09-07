@@ -666,14 +666,64 @@ print(plate.car_plate_str, plate.car_plate_color, plate.score, plate.landmarks)
 
 > 与 `Scrfd` 类似，`LprDetection` 的 preprocessor 暴露 `size`/`padding_value`/`is_scale_up`/`is_mini_pad`/`stride`；其 postprocessor 参数名是 `landmarks_per_card_`（带尾下划线，每车牌角点数），**不是** `landmarks_per_face`。`LprRecognizer` 仅暴露 preprocessor 的 `size`（默认 `[168, 48]`），postprocessor 无参数（字符表含 78 类、颜色 5 类内联解码）。
 
-## 16. 已绑定模块
+## 16. 行人属性 + 行人 ReID（PedestrianAttribute / ReID / ReIdGallery）
+
+行人属性 `PedestrianAttribute` 把检测（UltralyticsDet）+ 多标签属性分类（Classification）串联成一条流水线，对整图返回每个行人的检测框与属性得分；行人 ReID 用 `ReID`（OSNet）提取 512-d 特征，配合内存 `ReIdGallery` 做注册与 top-k 匹配。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（option 配置见上节）
+option = md.RuntimeOption()
+option.use_ort_backend()
+option.use_cpu()
+
+# 2. 行人属性：PedestrianAttribute(det_model, cls_model, option) -> list[AttributeResult]
+attr = md.vision.PedestrianAttribute("det.onnx", "cls.onnx", option)
+attr.set_det_threshold(0.5)          # 检测阈值（默认 0.5）
+# det/cls 输入尺寸是两个独立属性，须分别设置（不是数组整体赋值成同一份）
+attr.det_input_size = [1280, 1280]   # 检测子模型输入尺寸（默认 [640, 640]）
+attr.cls_input_size = [192, 256]     # 分类子模型输入尺寸（默认 [192, 256]）
+attr.cls_batch_size = 8              # 分类子模型 batch（默认 8）
+# 也可经 get_detector() / get_classifier() 链式细调（返回 UltralyticsDet / Classification）
+
+img = cv2.imread("test.jpg")
+res = attr.predict(img)              # list[AttributeResult]
+for r in res:
+    print(r.box, r.box_label_id, r.box_score, r.attr_scores)
+    # r.box: Rect2f 行人框；r.box_label_id/r.box_score: 检测类别/置信度；r.attr_scores: 各属性得分
+
+# 批量：attr.batch_predict([imgA, imgB]) -> list[list[AttributeResult]]（按图分组）
+# 多线程：attr2 = attr.clone()
+# 可视化：vis_attr(image, result, threshold=0.5, label_map={}, font_path="", font_size=14,
+#                 alpha=0.15, save_result=False, abnormal_ids=[], show_attr=True)
+vis = md.vision.vis_attr(img, res, threshold=0.5, font_path="msyh.ttc", font_size=14, alpha=0.3)
+cv2.imwrite("attr_vis.jpg", vis)
+
+# 3. 行人 ReID：ReID(model_file, option) -> list[ReIdResult]（embedding 为 L2 归一化 512 维）
+reid = md.vision.ReID("osnet.onnx", option)
+emb = reid.predict(img)[0].embedding   # 输入行人裁剪图，取第 0 个特征
+
+# 4. ReIdGallery：内存行人库，注册 + 余弦 top-k 匹配（Python 全绑定）
+gallery = md.vision.ReIdGallery()
+gallery.enroll("a", emb)               # 登记 label -> embedding（同 label 覆盖）
+gallery.enroll("b", emb)
+print(gallery.size())                  # 2
+top = gallery.match(emb, 1)            # -> list[tuple[str, float]]（label, score 降序）
+for label, score in top:
+    print(label, score)
+gallery.remove("b")                    # 移除，返回 list[bool]；gallery.clear() 清空
+```
+
+## 17. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
-- **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
-- **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
-- **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
+- **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID` 等
+- **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult` 等
+- **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 17. 性能测试
+## 18. 性能测试
 
 ```python
 import time

@@ -582,6 +582,49 @@ foreach (var r in recPred)
     Console.WriteLine($"'{r.Plate}' {r.Color} {r.Score:F3}");
 ```
 
+## 16. 行人属性（`PedestrianAttributeModel`）+ 行人 ReID（`ReIdModel`）
+
+行人属性模型类 `ModelDeploy.Models.PedestrianAttributeModel`（对应 `MD_MODEL_PED_ATTR`）。构造可用两参重载 `(detModelPath, clsModelPath)`（内部拼成 C API 的 `"det|cls"`）或单串 `"det.onnx|cls.onnx"`。结果类型 `ModelDeploy.Results.AttributeResult`（属性 `Box: RectF`、`BoxLabelId: int`、`BoxScore: float`、`AttrScores: float[]`）；`Predict` 返回 **`Prediction<AttributeResult>`**。参数 setter：`SetInputSize`（检测子模型输入尺寸）、`SetClsInputSize`（分类子模型输入尺寸）、`SetClsBatchSize`（>0 固定 / -1 自动）、`SetDetThreshold`。
+
+行人 ReID 模型类 `ModelDeploy.Models.ReIdModel`（对应 `MD_MODEL_REID`），`Predict` 返回**裸 `ReIdResult`**（属性 `Embedding: float[]`，L2 归一化 512 维），**不是** `Prediction<ReIdResult>`。**C# 未绑定 ReIdGallery**（C API 无对应句柄），行人库检索请用 C++/Python。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 1. 行人属性：两参重载 (det, cls) 或单串 "det.onnx|cls.onnx"
+using var attr = new PedestrianAttributeModel("det.onnx", "cls.onnx", option);
+attr.SetInputSize(1280, 1280);        // 检测子模型输入尺寸
+attr.SetClsInputSize(192, 256);       // 分类子模型输入尺寸
+attr.SetClsBatchSize(8);              // 分类子模型 batch（>0 固定 / -1 自动；Sophgo batch=1 静态）
+attr.SetDetThreshold(0.5);            // 检测阈值（默认 0.5）
+
+using var img = VisionImage.Read("test.jpg");
+using var pred = attr.Predict(img);   // Prediction<AttributeResult>
+foreach (var r in pred)
+    Console.WriteLine($"{r.Box} label={r.BoxLabelId} score={r.BoxScore:F3} attrs=[{string.Join(",", r.AttrScores)}]");
+
+// 可视化：pred.Draw 直达 C++ vis_attr（框 + 属性文本）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { FontPath = "msyh.ttc", FontSize = 14, Alpha = 0.3 });
+canvas.Save("attr_vis.jpg");
+
+// 批量：attr.PredictBatch(new[] { img, img2 }) -> IReadOnlyList<AttributeResult[]>
+// 多线程：using var attr2 = attr.Clone();
+
+// 2. 行人 ReID：ReIdModel 单模型，Predict 返回裸 ReIdResult（非 Prediction）
+using var reid = new ReIdModel("osnet.onnx", option);
+using var crop = VisionImage.Read("person_crop.jpg");
+ReIdResult r = reid.Predict(crop);    // 裸 ReIdResult，非 Prediction
+Console.WriteLine($"embedding dim={r.Embedding.Length}");
+
+// 注意：C# 未绑定 ReIdGallery；行人库检索请用 C++/Python
+```
+
 ## 运行示例
 
 ```bash
