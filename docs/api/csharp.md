@@ -694,6 +694,55 @@ for (int f = 0; f < 100; f++)   // 假定逐帧读取视频，这里用帧索引
 tracker.Reset();   // 清空内部状态，ID 重新从 0 计
 ```
 
+## 19. CV 解决方案 + 工具（`ModelDeploy.Solutions`）
+
+`ModelDeploy.Solutions` 命名空间封装 C API `md_solution_*`，提供解决方案类与静态工具类 `Tool`。所有解决方案均 `IDisposable`（`using` 自动释放底层句柄），框为扁平 `float[]`（`[x,y,w,h,...]`）、多边形为扁平 `[x0,y0,x1,y1,...]`。
+
+**已绑定清单**：`ObjectCounter` / `Heatmap` / `RegionCounter` / `QueueManager` / `TrackZone` + `Tool.Iou`。
+**未绑定**：`SpeedEstimator`（测速）、`ParkingManager`（停车）、`FallDetector`、`WorkoutMonitor`、`DistanceEstimator` 本语言**无类封装**（C API 枚举可创建但无对应 C# 查询接口），如需请用 C++ / Python。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Solutions;
+
+// 1. 人流统计：跨线进出 + 区域/类别统计
+using var cnt = new ObjectCounter();
+cnt.SetLine(0, 0, 100, 100);                    // 计数线两点
+cnt.Update(boxes, labelIds, trackIds);          // boxes=[x,y,w,h,...]
+var (inCnt, outCnt) = cnt.HLine();
+
+// 2. 热力图：SetSize 低分辨率栅格，Update 累加，Peak 峰值
+using var hm = new Heatmap();
+hm.SetSize(320, 240);
+hm.Update(boxes, frameW: 1920, frameH: 1080);
+var peak = hm.Peak();                           // (X, Y)
+
+// 3. 多区域逐帧计数：AddRegion 命名区域 -> Count(name)
+using var rc = new RegionCounter();
+rc.AddRegion("doorA", new[] { 0f, 0, 80, 0, 80, 240, 0, 240 });   // 扁平多边形
+rc.Update(boxes, ids, labels);
+Console.WriteLine(rc.Count("doorA"));
+
+// 4. 排队：单区域当前帧排队长度
+using var qm = new QueueManager();
+qm.SetRegion(new[] { 100f, 0, 160, 0, 160, 240, 100, 240 });
+qm.Update(boxes, ids, labels);
+Console.WriteLine(qm.Count());
+
+// 5. 追踪区域：只保留区域内目标并计数
+using var tz = new TrackZone();
+tz.SetRegion(new[] { 100f, 0, 160, 0, 160, 240, 100, 240 });
+tz.Update(boxes, ids, labels);
+Console.WriteLine(tz.Count());
+
+// 6. 工具：两个矩形 (x,y,w,h) 的 IoU（对应 C++ vision::tool::iou）
+float iou = Tool.Iou(0, 0, 100, 100, 20, 20, 100, 100);
+Console.WriteLine(iou);
+```
+
+> C API `MDSolutionKind` 另有 `SPEED`/`DISTANCE`/`WORKOUT`/`PARKING`/`FALL_DETECT` 五个枚举项，但 C# 与 C API 均无对应逐帧查询接口（仅 `md_solution_create`/`destroy`），故不提供类封装；底层 C++ 实现见 [solutions.md](../solutions.md)。
+
 ## 运行示例
 
 ```bash

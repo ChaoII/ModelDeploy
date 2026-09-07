@@ -1018,6 +1018,80 @@ int main(void) {
 }
 ```
 
+## 19. CV 解决方案（`md_solution_*`）+ 工具（`md_vision_iou4`）
+
+解决方案统一经 `md_solution_create` 按 `MDSolutionKind` 创建、`md_solution_destroy` 释放，再按 kind 调用专属函数。框为扁平 `float`、模拟 `[x,y,w,h,...]`，多边形为 `[x0,y0,x1,y1,...]`。
+
+**已绑定（含逐帧接口）**：`MD_SOLUTION_OBJECT_COUNTER` / `HEATMAP` / `REGION_COUNTER` / `QUEUE` / `TRACK_ZONE`，另提供工具 `md_vision_iou4`。
+**仅可创建（`md_solution_create`/`destroy`，无 update/查询接口）**：`MD_SOLUTION_SPEED` / `DISTANCE` / `WORKOUT` / `PARKING` / `FALL_DETECT` —— C API 只创建句柄，逐帧喂入与结果查询请用 C++ / Python。
+
+| kind | 专属函数 |
+|------|----------|
+| `MD_SOLUTION_OBJECT_COUNTER` | `md_solution_object_counter_set_line` / `_update` / `_hline`（输出 in/out） |
+| `MD_SOLUTION_HEATMAP` | `md_solution_heatmap_set_size` / `_update` / `_peak` |
+| `MD_SOLUTION_REGION_COUNTER` | `md_solution_region_counter_add` / `_update` / `_count` |
+| `MD_SOLUTION_QUEUE` | `md_solution_queue_set_region` / `_update` / `_count` |
+| `MD_SOLUTION_TRACK_ZONE` | `md_solution_track_zone_set_region` / `_update` / `_count` |
+| `MD_SOLUTION_SPEED` / `DISTANCE` / `WORKOUT` / `PARKING` / `FALL_DETECT` | 仅 `md_solution_create` / `_destroy` |
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    /* 1. 人流统计：跨线进出 */
+    MDSolutionHandle cnt = NULL;
+    md_solution_create(&cnt, MD_SOLUTION_OBJECT_COUNTER);
+    md_solution_object_counter_set_line(cnt, 0.f, 0.f, 100.f, 100.f);  /* 计数线两点 */
+    /* 每帧：boxes/4 个框，label_ids / track_ids 与框数等长 */
+    float boxes[16]  = {0.f};   /* [x,y,w,h,...] 示例容量 */
+    int   labels[4]  = {0, 0, 0, 0};
+    int   track_ids[4] = {0, 1, 2, 3};
+    md_solution_object_counter_update(cnt, boxes, 4, labels, track_ids);
+    int in = 0, out = 0;
+    md_solution_object_counter_hline(cnt, &in, &out);
+    printf("line_in=%d line_out=%d\n", in, out);
+
+    /* 2. 热力图：峰值 */
+    MDSolutionHandle hm = NULL;
+    md_solution_create(&hm, MD_SOLUTION_HEATMAP);
+    md_solution_heatmap_set_size(hm, 320, 240);
+    md_solution_heatmap_update(hm, boxes, 4, 1920, 1080);
+    int px = 0, py = 0;
+    md_solution_heatmap_peak(hm, &px, &py);
+
+    /* 3. 多区域逐帧计数 */
+    MDSolutionHandle rc = NULL;
+    md_solution_create(&rc, MD_SOLUTION_REGION_COUNTER);
+    float door[8] = {0.f,0.f, 80.f,0.f, 80.f,240.f, 0.f,240.f};
+    md_solution_region_counter_add(rc, "doorA", door, 4);            /* 4 个点 */
+    md_solution_region_counter_update(rc, boxes, 4, track_ids, labels);
+    int n = md_solution_region_counter_count(rc, "doorA");
+
+    /* 4. 排队 / 5. 追踪区域：set_region + update + count 同构 */
+    MDSolutionHandle q = NULL, tz = NULL;
+    md_solution_create(&q,  MD_SOLUTION_QUEUE);
+    md_solution_create(&tz, MD_SOLUTION_TRACK_ZONE);
+    float region[8] = {100.f,0.f, 160.f,0.f, 160.f,240.f, 100.f,240.f};
+    md_solution_queue_set_region(q, region, 4);
+    md_solution_queue_update(q, boxes, 4, track_ids, labels);
+    int qlen = md_solution_queue_count(q);
+    md_solution_track_zone_set_region(tz, region, 4);
+    md_solution_track_zone_update(tz, boxes, 4, track_ids, labels);
+    int inside = md_solution_track_zone_count(tz);
+
+    /* 6. 工具：两矩形 (x,y,w,h) 的 IoU */
+    float iou = 0.f;
+    md_vision_iou4(0.f, 0.f, 100.f, 100.f, 20.f, 20.f, 100.f, 100.f, &iou);
+
+    md_solution_destroy(cnt); md_solution_destroy(hm);
+    md_solution_destroy(rc);  md_solution_destroy(q);  md_solution_destroy(tz);
+    return 0;
+}
+```
+
+> `MDSolutionKind` 的 `SPEED`/`DISTANCE`/`WORKOUT`/`PARKING`/`FALL_DETECT` 枚举存在（用于 `md_solution_create`），但本层**未提供**逐帧 update 与结果读取函数（C API 阈值未暴露这些 `vision::solution` 方法），相应业务请用 C++ / Python。工具 `md_vision_iou4` 对应 C++ `vision::tool::iou`。
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

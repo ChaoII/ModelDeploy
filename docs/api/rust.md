@@ -766,6 +766,56 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 19. CV 解决方案 + 工具（`solution` 模块）
+
+`modeldeploy::solution` 模块封装 C API `md_solution_*`，提供解决方案结构体与工具函数 `iou`（框为扁平 `&[f32]` `[x,y,w,h,...]`、多边形为扁平 `[x0,y0,x1,y1,...]`）。五个解决方案在 crate 顶层亦有 re-export：`modeldeploy::{ObjectCounter, Heatmap, RegionCounter, QueueManager, TrackZone}`；工具 `iou` 顶层 re-export 为 `modeldeploy::vision_iou`。
+
+**已绑定**：`solution::{ObjectCounter, Heatmap, RegionCounter, QueueManager, TrackZone}` + `solution::iou`。
+**未绑定**：`SpeedEstimator`（测速）、`ParkingManager`（停车）、`FallDetector`、`WorkoutMonitor`、`DistanceEstimator` 本语言**无封装**（C API 枚举可创建但无对应逐帧查询接口），如需请用 C++ / Python。
+
+```rust
+use modeldeploy::solution::{Heatmap, ObjectCounter, QueueManager, RegionCounter, TrackZone, iou};
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 人流统计：跨线进出
+    let cnt = ObjectCounter::new()?;
+    cnt.set_line((0.0, 0.0), (100.0, 100.0))?;          // 计数线两点
+    cnt.update(&boxes, &labels, &track_ids)?;           // boxes=[x,y,w,h,...]
+    let (in_cnt, out_cnt) = cnt.hline()?;
+
+    // 2. 热力图：set_size 低分辨率栅格，peak 峰值
+    let hm = Heatmap::new()?;
+    hm.set_size(320, 240)?;
+    hm.update(&boxes, 1920, 1080)?;
+    let peak = hm.peak()?;                              // (x, y)
+
+    // 3. 多区域逐帧计数：add_region 命名区域 -> count(name)
+    let rc = RegionCounter::new()?;
+    rc.add_region("doorA", &[0.0, 0.0, 80.0, 0.0, 80.0, 240.0, 0.0, 240.0])?;
+    rc.update(&boxes, &track_ids, &labels)?;
+    println!("doorA={}", rc.count("doorA"));
+
+    // 4. 排队：单区域当前帧排队长度
+    let qm = QueueManager::new()?;
+    qm.set_region(&[100.0, 0.0, 160.0, 0.0, 160.0, 240.0, 100.0, 240.0])?;
+    qm.update(&boxes, &track_ids, &labels)?;
+    println!("queue={}", qm.count());
+
+    // 5. 追踪区域：只保留区域内目标并计数
+    let tz = TrackZone::new()?;
+    tz.set_region(&[100.0, 0.0, 160.0, 0.0, 160.0, 240.0, 100.0, 240.0])?;
+    tz.update(&boxes, &track_ids, &labels)?;
+    println!("inside={}", tz.count());
+
+    // 6. 工具：两矩形 (x,y,w,h) 的 IoU（即顶层 modeldeploy::vision_iou）
+    let v = iou(0.0, 0.0, 100.0, 100.0, 20.0, 20.0, 100.0, 100.0)?;
+    println!("iou={}", v);
+    Ok(())
+}
+```
+
+> C API `MDSolutionKind` 另有 `SPEED`/`DISTANCE`/`WORKOUT`/`PARKING`/`FALL_DETECT` 五个枚举项，Rust 未桥接对应逐帧查询接口；底层 C++ 实现见 [solutions.md](../solutions.md)。
+
 ## 主要模块文件
 
 | 文件 | 说明 |

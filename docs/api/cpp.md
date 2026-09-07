@@ -934,7 +934,100 @@ int main() {
 }
 ```
 
-## 19. 更多模型（均使用同一 `RuntimeOption`）
+## 19. CV 解决方案 + 工具（`vision::solution` / `vision::tool`）
+
+解决方案层（`modeldeploy::vision::solution`）把**检测 + 跟踪**组合成可交付的业务功能，均为纯后处理 / 统计逻辑，逐帧喂入 `std::vector<tracking::TrackResult>` 即得业务结果；工具层（`modeldeploy::vision::tool`）提供检测容器 `Detections`、区域判断 `LineZone`/`PolygonZone`、评估与 IoU/NMS 等公共底座。完整清单见 [solutions.md](../solutions.md) 与 [tools.md](../tools.md)。
+
+```cpp
+#include "modeldeploy/vision.h"
+#include "vision/solutions/object_counter.h"
+#include "vision/solutions/heatmap.h"
+#include "vision/solutions/region_counter.h"
+#include "vision/solutions/queue_manager.h"
+#include "vision/solutions/track_zone.h"
+#include "vision/solutions/speed_estimator.h"
+#include "vision/solutions/parking_manager.h"
+#include "vision/solutions/fall_detector.h"
+#include "vision/solutions/workout_monitor.h"
+#include "vision/solutions/distance_estimator.h"
+
+using namespace modeldeploy;
+namespace sol = modeldeploy::vision::solution;
+
+int main() {
+    // 1. 人流统计：跨线/区域进出 + 类别统计
+    sol::ObjectCounter cnt;
+    cnt.set_line({0.f, 0.f}, {100.f, 100.f});                 // 计数线两点
+    cnt.set_region({Point2f(0,0), Point2f(100,0), Point2f(100,240), Point2f(0,240)});
+    cnt.set_classes({0});                                     // 类别白名单（空=全部）
+    cnt.update(tracks);                                       // 每帧喂入 TrackResult
+    auto s = cnt.stats();    // s.line_in / s.line_out / s.class_count
+    int n = cnt.region_count();
+
+    // 2. 热力图：set_size 低分辨率栅格，peak 峰值，heat_at 取栅格值
+    sol::Heatmap hm;
+    hm.set_size(320, 240);
+    hm.update(tracks, frame_w, frame_h);
+    auto peak = hm.peak();    float v = hm.heat_at(peak.first, peak.second);
+
+    // 3. 多区域逐帧计数：add_region 命名区域 -> region_counts()
+    sol::RegionCounter rc;
+    rc.add_region("doorA", {Point2f(0,0), Point2f(80,0), Point2f(80,240), Point2f(0,240)});
+    rc.update(tracks);
+    for (auto& [name, c] : rc.region_counts()) printf("%s=%d\n", name.c_str(), c);
+    size_t total = rc.total_regions();
+
+    // 4. 排队：单区域当前帧排队长度
+    sol::QueueManager q;
+    q.set_region({Point2f(100,0), Point2f(160,0), Point2f(160,240), Point2f(100,240)});
+    q.update(tracks);    int qlen = q.queue_count();
+
+    // 5. 追踪区域：只保留区域内目标并计数
+    sol::TrackZone tz;
+    tz.set_region({Point2f(100,0), Point2f(160,0), Point2f(160,240), Point2f(100,240)});
+    tz.update(tracks);    auto inside = tz.inside_tracks();   int in = tz.inside_count();
+
+    // 6. 测速：像素->米比例需标定；update 带毫秒时间戳
+    sol::SpeedEstimator sp;
+    sp.set_meter_per_pixel(0.05f);
+    sp.update(tracks, ts_ms);    auto mps = sp.speeds_m_s();   // track_id -> 米/秒
+
+    // 7. 停车：set_slots 车位多边形列表 -> occupancy()
+    sol::ParkingManager pk;
+    pk.set_slots({{Point2f(0,0),Point2f(40,0),Point2f(40,40),Point2f(0,40)},
+                  {Point2f(50,0),Point2f(90,0),Point2f(90,40),Point2f(50,40)}});
+    pk.update(tracks);    auto occ = pk.occupancy();          // [bool, ...]
+
+    // 8. 跌倒：update 喂入关键点结果 -> FallResult{state, confidence}
+    sol::FallDetector fd;
+    auto fr = fd.update(persons);   // state: Standing=0/PreFall=1/Fallen=2
+
+    // 9. 锻炼计数：夹角阈值状态机（min_deg/max_deg）；angle 为三点二维夹角(度)
+    sol::WorkoutMonitor wm(70.0f, 160.0f);
+    float deg = sol::WorkoutMonitor::angle(a, b, c);
+    wm.update(deg);    int reps = wm.reps();
+
+    // 10. 距离估计：两两质心距离（米，需标定 mpp）
+    sol::DistanceEstimator de;
+    de.set_meter_per_pixel(0.05f);
+    auto dm = de.pair_distances_m(tracks);   // { {id_a,id_b}, 距离 }
+
+    // 工具层：modeldeploy::vision::tool
+    namespace tool = modeldeploy::vision::tool;
+    tool::Detections d = tool::from_track(tracks);            // 跟踪 -> 检测容器
+    tool::nms(d, 0.5f);                                       // 就地 NMS
+    float iou = tool::iou(d.boxes[0], d.boxes[1]);
+    tool::LineZone lz(Point2f(160,0), Point2f(160,240));      // 跨线触发
+    if (lz.trigger(Point2f(cx, cy))) ++crossed;
+    tool::PolygonZone zone({Point2f(0,0), Point2f(320,0), Point2f(320,240), Point2f(0,240)});
+    bool in_zone = zone.contains(Point2f(100,100));
+    return 0;
+}
+```
+
+> C++ 解决方案/工具命名空间为 `modeldeploy::vision::solution` 与 `modeldeploy::vision::tool`（注意 `solution` 为单数）。以上方法与 Python `md.vision.solutions`/`md.vision.tools`、C API `md_solution_*` 对应；`FallDetector`/`WorkoutMonitor`/`DistanceEstimator`/`SpeedEstimator`/`ParkingManager` 为 C++ 完整实现，其部分绑定（C API/C#/Rust）仅创建、无逐帧查询接口，见各语言章节标注。
+
+## 20. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -994,7 +1087,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 20. 工程配置
+## 21. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

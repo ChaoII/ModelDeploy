@@ -796,14 +796,117 @@ tracker.reset()                                # 清空内部状态，ID 重新�
 cap.release()
 ```
 
-## 19. 已绑定模块
+## 19. CV 解决方案 + 工具（`vision.solutions` / `vision.tools`）
+
+解决方案层把**检测 + 跟踪**组合成可交付的业务功能，均为纯后处理 / 统计逻辑（不直接依赖模型），逐帧喂入跟踪结果 `TrackResult` 即得业务结果；工具层提供检测容器 / 区域判断 / 评估指标等公共底座。底层 C++ 说明见 [solutions.md](../solutions.md) 与 [tools.md](../tools.md)。
+
+`md.vision.solutions` 子模块提供了十类视觉解决方案；`md.vision.tools` 提供检测容器与工具函数：
+
+```python
+from modeldeploy.vision.solutions import (
+    ObjectCounter, Heatmap, RegionCounter, QueueManager, TrackZone,
+    SpeedEstimator, ParkingManager, FallDetector, WorkoutMonitor, DistanceEstimator,
+)
+
+# 1. 人流统计：跨线 / 区域进出计数 + 类别统计
+cnt = ObjectCounter()
+cnt.set_line((0, 0), (100, 100))                     # 计数线两点
+cnt.set_region([(0, 0), (100, 0), (100, 240), (0, 240)])   # 可选：进入区域计数
+cnt.set_classes([0])                                 # 类别白名单（空=全部）
+cnt.update(tracks)                                   # 每帧喂入 TrackResult
+print(cnt.line_in(), cnt.line_out(), cnt.region_count(), cnt.class_count())
+
+# 2. 热力图：set_size 低分辨率栅格，update 累加，peak 峰值
+hm = Heatmap()
+hm.set_size(320, 240)
+hm.update(boxes, frame_w, frame_h)                   # boxes 为 [x,y,w,h,...]
+print(hm.peak(), hm.heat_at(160, 120))
+
+# 3. 多区域逐帧计数：add_region 命名区域 -> region_counts()
+rc = RegionCounter()
+rc.add_region("doorA", [(0, 0), (80, 0), (80, 240), (0, 240)])
+rc.set_classes([0])
+rc.update(tracks)
+print(rc.region_counts(), rc.total_regions())        # {区域名: 当前帧在区数}
+
+# 4. 排队：单区域当前帧排队长度
+qm = QueueManager()
+qm.set_region([(100, 0), (160, 0), (160, 240), (100, 240)])
+qm.update(tracks)
+print("queue=", qm.queue_count())
+
+# 5. 追踪区域：只保留区域内目标并计数
+tz = TrackZone()
+tz.set_region([(100, 0), (160, 0), (160, 240), (100, 240)])
+tz.update(tracks)
+print("inside=", tz.inside_count())
+
+# 6. 测速：像素->米比例需标定；update 带毫秒时间戳
+sp = SpeedEstimator()
+sp.set_meter_per_pixel(0.05)
+sp.update(tracks, timestamp_ms)
+print(sp.speeds_m_s())                               # dict[track_id -> 米/秒]
+
+# 7. 停车：set_slots 车位多边形列表 -> occupancy() 各车位占用
+pk = ParkingManager()
+pk.set_slots([[(0, 0), (40, 0), (40, 40), (0, 40)],
+              [(50, 0), (90, 0), (90, 40), (50, 40)]])
+pk.update(tracks)
+print(pk.occupancy())                                # [bool, ...]
+
+# 8. 跌倒：update 喂入关键点结果 -> (state, confidence)
+fd = FallDetector()
+state, conf = fd.update(keypoint_results)            # state: Standing=0/PreFall=1/Fallen=2
+print(state, conf)
+
+# 9. 锻炼计数：基于夹角阈值的状态机（min_deg/max_deg）
+wm = WorkoutMonitor(min_deg=70, max_deg=160)
+deg = wm.angle(p1, p2, p3)                           # 三点二维夹角（度）
+wm.update(deg)
+print(wm.reps())
+
+# 10. 距离估计：两两质心距离（米，需标定 mpp）
+de = DistanceEstimator()
+de.set_meter_per_pixel(0.05)
+print(de.pair_distances_m(tracks))                   # [( (id_a, id_b), 距离 ), ...]
+```
+
+`md.vision.tools` 子模块提供检测容器 `Detections`、区域判断 `LineZone`/`PolygonZone`、评估 `MetricsScores`/`evaluate_metrics` 与工具函数 `iou`/`nms`/`from_track`：
+
+```python
+from modeldeploy.vision.tools import (
+    Detections, LineZone, PolygonZone, MetricsScores,
+    evaluate_metrics, iou, nms, from_track,
+)
+
+# 跨线 / 多边形区域判断
+lz = LineZone((160, 0), (160, 240))
+if lz.trigger((cx, cy)):
+    print("crossed", lz.trigger_count())
+pz = PolygonZone([(0, 0), (320, 0), (320, 240), (0, 240)])
+print(pz.contains((100, 100)), pz.current_count())
+
+# 检测容器 + 工具函数
+d: Detections = from_track(tracks)                   # 跟踪结果 -> Detections
+print(len(d), d.boxes, d.class_id, d.confidence, d.tracker_id)
+nms(d, iou_threshold=0.5)                            # 就地 NMS
+print(iou(a, b))                                     # 两框 IoU
+
+# 评估指标（precision / recall / f1 / mAP@50）
+score: MetricsScores = evaluate_metrics(det_boxes, det_scores, gt_boxes, 0.5)
+print(score.precision, score.recall, score.f1, score.map50)
+```
+
+> Python 的 `solutions`/`tools` 与 C++ `vision::solution`/`vision::tool` 一一对应；各解决方案的真实方法名以本绑定存根为准（如 `line_in`/`line_out`/`region_count`/`class_count`、`heat_at`/`peak`、`region_counts`/`total_regions`、`queue_count`、`inside_count`、`speeds_m_s`、`occupancy`、`reps`、`pair_distances_m`）。
+
+## 20. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID`、`BarcodeDetector`、`ByteTracker`/`BotSortTracker`/`StrongSortTracker` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult`、`BarcodeResult`、`TrackResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 20. 性能测试
+## 21. 性能测试
 
 ```python
 import time
