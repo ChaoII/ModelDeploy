@@ -6,10 +6,12 @@
 #include <thread>
 #include "vision/common/image_data.h"
 #include "utils/benchmark.h"
+#include "pipeline/async_model.h"
 
 namespace {
 // 仿 UltralyticsDet 的同步接口；R = std::string
 struct FakeModel {
+    using result_type = std::string;
     bool ok = true;
     std::chrono::milliseconds delay{0};
     std::atomic<size_t> predict_calls{0};
@@ -55,4 +57,129 @@ TEST_CASE("FakeModel batch_predict aggregates results", "[async]") {
     REQUIRE(outs.size() == 2);
     REQUIRE(outs[0] == "w=4,h=2");
     REQUIRE(outs[1] == "w=8,h=3");
+}
+
+using namespace modeldeploy::pipeline;
+
+TEST_CASE("AsyncModel future non-blocking single prediction", "[async]") {
+    auto model = std::make_unique<FakeModel>();
+    AsyncModelConfig cfg;
+    cfg.enable_batching = false;
+    AsyncModel<FakeModel> am(std::move(model), cfg);
+    REQUIRE(am.start());
+    auto fut = am.predict_async(make_bgr(16, 9));
+    REQUIRE(am.submitted() >= 1);
+    REQUIRE(fut.get() == FakeModel::big_result(16, 9));
+    am.wait_idle();
+    REQUIRE(am.pending() == 0);
+    am.stop();
+    REQUIRE(am.completed() == am.submitted());
+}
+
+TEST_CASE("AsyncModel batches multiple predictions", "[async]") {
+    auto model = std::make_unique<FakeModel>();
+    FakeModel* m = model.get();
+    AsyncModelConfig cfg;
+    cfg.enable_batching = true;
+    cfg.max_batch = 8;
+    AsyncModel<FakeModel> am(std::move(model), cfg);
+    REQUIRE(am.start());
+    std::vector<std::future<std::string>> futs;
+    for (int i = 1; i <= 16; ++i) futs.push_back(am.predict_async(make_bgr(i, i + 1)));
+    am.wait_idle();
+    REQUIRE(am.batch_runs() >= 2);
+    REQUIRE(m->batch_calls > 0);
+    for (int i = 1; i <= 16; ++i)
+        REQUIRE(futs[static_cast<size_t>(i - 1)].get() == FakeModel::big_result(i, i + 1));
+    REQUIRE(am.pending() == 0);
+    am.stop();
+}
+
+TEST_CASE("AsyncModel backpressure does not drop tasks", "[async]") {
+    auto model = std::make_unique<FakeModel>();
+    model->delay = std::chrono::milliseconds(30);
+    AsyncModelConfig cfg;
+    cfg.queue_capacity = 2;
+    AsyncModel<FakeModel> am(std::move(model), cfg);
+    REQUIRE(am.start());
+    const int kCount = 50;
+    std::vector<std::future<std::string>> futs;
+    for (int i = 0; i < kCount; ++i) futs.push_back(am.predict_async(make_bgr(3 + i, 5)));
+    for (int i = 0; i < kCount; ++i)
+        REQUIRE(futs[static_cast<size_t>(i)].get() == FakeModel::big_result(3 + i, 5));
+    REQUIRE(am.completed() == am.submitted());
+    REQUIRE(am.pending() == 0);
+    am.stop();
+}
+
+TEST_CASE("AsyncModel callback matches future results", "[async]") {
+    auto model = std::make_unique<FakeModel>();
+    AsyncModelConfig cfg;
+    cfg.enable_batching = true;
+    cfg.max_batch = 4;
+    AsyncModel<FakeModel> am(std::move(model), cfg);
+    std::vector<std::pair<uint64_t, std::string>> cb;
+    std::mutex cb_mu;
+    am.set_callback([&](uint64_t id, std::string&& r, const std::string& err) {
+        std::lock_guard<std::mutex> lk(cb_mu);
+        if (err.empty()) cb.emplace_back(id, std::move(r));
+    });
+    REQUIRE(am.start());
+    std::vector<uint64_t> ids;
+    for (int i = 0; i < 5; ++i) ids.push_back(am.predict_async_cb(make_bgr(2 + i, 3)));
+    am.wait_idle();
+    REQUIRE(am.completed() == am.submitted());
+    for (size_t i = 1; i < ids.size(); ++i) REQUIRE(ids[i] > ids[i - 1]);
+    std::lock_guard<std::mutex> lk(cb_mu);
+    REQUIRE(cb.size() == ids.size());
+    for (size_t i = 0; i < ids.size(); ++i) {
+        REQUIRE(cb[i].first == ids[i]);
+        REQUIRE(cb[i].second == FakeModel::big_result(static_cast<int>(2 + i), 3));
+    }
+    am.stop();
+}
+
+TEST_CASE("AsyncModel surfaces model errors via future and callback", "[async]") {
+    auto model = std::make_unique<FakeModel>();
+    model->ok = false;
+    AsyncModelConfig cfg;
+    cfg.enable_batching = true;
+    AsyncModel<FakeModel> am(std::move(model), cfg);
+    std::vector<std::string> cb_errors;
+    std::mutex cb_mu;
+    am.set_callback([&](uint64_t, std::string&&, const std::string& err) {
+        std::lock_guard<std::mutex> lk(cb_mu);
+        cb_errors.push_back(err);
+    });
+    REQUIRE(am.start());
+    auto fut = am.predict_async(make_bgr(4, 4));
+    bool threw = false;
+    try {
+        fut.get();
+    } catch (const std::exception&) {
+        threw = true;
+    }
+    REQUIRE(threw);
+    am.wait_idle();
+    REQUIRE(am.completed() == am.submitted());
+    std::lock_guard<std::mutex> lk(cb_mu);
+    REQUIRE(cb_errors.size() >= 1);
+    for (auto& e : cb_errors) REQUIRE(!e.empty());
+    am.stop();
+}
+
+TEST_CASE("AsyncModel stop is idempotent and wait_idle drains", "[async]") {
+    auto model = std::make_unique<FakeModel>();
+    model->delay = std::chrono::milliseconds(5);
+    AsyncModelConfig cfg;
+    cfg.queue_capacity = 4;
+    AsyncModel<FakeModel> am(std::move(model), cfg);
+    REQUIRE(am.start());
+    for (int i = 0; i < 10; ++i) am.predict_async(make_bgr(4, 4));
+    am.wait_idle();
+    REQUIRE(am.pending() == 0);
+    REQUIRE(am.completed() == am.submitted());
+    am.stop();
+    am.stop();   // 幂等：第二次不抛异常
+    REQUIRE(am.pending() == 0);
 }
