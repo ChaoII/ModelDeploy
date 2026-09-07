@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -49,28 +50,43 @@ std::vector<unsigned char> b64_decode(const std::string& s) {
 
 // 最小 FakeModel：R = std::string，predict/batch_predict 返回 w/h（与异步契约匹配）。
 // delay 可配：>0 时 infer 前 sleep，用于 504 超时 / 在途停机用例。
+// started/finished 为可选事件标志（均为 shared_ptr，供测试事件同步）：
+//   started  置位于 infer（predict/batch_predict）真正开始前——确认请求已在途；
+//   finished 置位于 infer 真正结束后——确认游离线程已安全跑完（可用于析构后守候）。
 struct FakeModel {
     using result_type = std::string;
     int predict_calls = 0;
     std::chrono::milliseconds delay{0};
+    std::shared_ptr<std::atomic<bool>> started;
+    std::shared_ptr<std::atomic<bool>> finished;
     static std::string big_result(int w, int h) {
         return "w=" + std::to_string(w) + ",h=" + std::to_string(h);
+    }
+    void mark_started() {
+        if (started) started->store(true);
+    }
+    void mark_finished() {
+        if (finished) finished->store(true);
     }
     bool predict(const modeldeploy::vision::ImageData& img, std::string* out,
                  TimerArray* /*timers*/ = nullptr) {
         ++predict_calls;
+        mark_started();
         std::this_thread::sleep_for(delay);
         *out = big_result(img.width(), img.height());
+        mark_finished();
         return true;
     }
     bool batch_predict(const std::vector<modeldeploy::vision::ImageData>& imgs,
                        std::vector<std::string>* outs,
                        TimerArray* /*timers*/ = nullptr) {
+        mark_started();
         outs->clear();
         for (auto& im : imgs) {
             std::this_thread::sleep_for(delay);
             outs->push_back(big_result(im.width(), im.height()));
         }
+        mark_finished();
         return true;
     }
 };
@@ -316,12 +332,18 @@ HandleBuilder fake_model_builder() {
     };
 }
 
-// 慢模型 HandleBuilder：每次 infer 前 sleep delay，用于 504 超时 / 在途停机用例。
-HandleBuilder slow_model_builder(std::chrono::milliseconds delay) {
-    return [delay](const std::string& name, const std::string&, const std::string&) -> InferFn {
+// 带事件标志的慢模型 HandleBuilder：started/finished 与 FakeModel 对应字段共享，
+// 供测试以事件同步代替固定 sleep，确认推理确已在途（started）与确已跑完（finished）。
+HandleBuilder slow_model_builder_flag(std::chrono::milliseconds delay,
+                                      std::shared_ptr<std::atomic<bool>> started,
+                                      std::shared_ptr<std::atomic<bool>> finished) {
+    return [delay, started, finished](const std::string& name, const std::string&,
+                                      const std::string&) -> InferFn {
         try {
             auto model = std::make_unique<FakeModel>();
             model->delay = delay;
+            model->started = started;
+            model->finished = finished;
             auto h = make_model_handle<FakeModel>(name, std::move(model));
             return h.infer;
         } catch (...) {
@@ -331,6 +353,16 @@ HandleBuilder slow_model_builder(std::chrono::milliseconds delay) {
             });
         }
     };
+}
+
+// 慢模型 HandleBuilder：每次 infer 前 sleep delay，用于 504 超时 / 在途停机用例。
+HandleBuilder slow_model_builder(std::chrono::milliseconds delay) {
+    return slow_model_builder_flag(delay, nullptr, nullptr);
+}
+
+// 事件同步：阻塞直到 pred 返回 true（避免在压测下用固定 sleep 猜时序的 flake）。
+void wait_until(const std::function<bool()>& pred) {
+    while (!pred()) std::this_thread::yield();
 }
 
 // 起服并断言随机端口；返回监听中的随机端口供 httplib::Client 使用。
@@ -537,7 +569,9 @@ TEST_CASE("ServingServer stop while inference in flight", "[serving]") {
     cfg.request_timeout = std::chrono::milliseconds(60000);  // 长超时：走非超时完整路径
     write_model(repo, "det", "latest");
 
-    ServingServer srv(cfg, slow_model_builder(std::chrono::milliseconds(1000)));
+    auto started = std::make_shared<std::atomic<bool>>(false);
+    ServingServer srv(cfg, slow_model_builder_flag(std::chrono::milliseconds(300), started,
+                                                   nullptr));
     int port = start_listening(srv);
 
     auto cli = make_client(port);
@@ -548,12 +582,62 @@ TEST_CASE("ServingServer stop while inference in flight", "[serving]") {
                           "application/json");
         requester_ok = r && r->status == 200;
     });
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));  // 确保请求已进入推理
+    // 事件同步：确认请求确已进入推理（started 置位）后再 stop，杜绝固定 sleep 的
+    // 「stop 早于请求入队」flake；此时 handler 已 begin_request()，推理线程必在途。
+    wait_until([&] { return started->load(); });
 
     srv.stop();  // 推理在途时停机：须安全返回、等待后台完成、无 crash/hang
     REQUIRE_FALSE(srv.is_listening());
     requester.join();
     REQUIRE(requester_ok);
+
+    fs::remove_all(repo);
+}
+
+// drain 超期回归：推理耗时远大于 wait_drained deadline（request_timeout=50ms + 约 1s），
+// stop() 的 wait_drained() 必然超期返回；随后 ServingServer 先完成析构，游离推理线程
+// 稍后才跑完——验证不崩溃、不 hang、无泄漏（UAF 修复的关键护栏：脱离 this 靠 shared
+// DrainState/job 存活）。
+TEST_CASE("ServingServer drain deadline exceeded safe dtor (detached thread outlives server)",
+          "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.request_timeout = std::chrono::milliseconds(50);  // wait_drained deadline ≈ 50ms + 1s
+    write_model(repo, "det", "latest");
+
+    // 推理 3s ≫ deadline ≈ 1.05s：wait_drained 必超期返回，且析构先于推理完成。
+    auto started = std::make_shared<std::atomic<bool>>(false);
+    auto finished = std::make_shared<std::atomic<bool>>(false);
+
+    bool finished_at_stop = false;
+    {
+        ServingServer srv(cfg, slow_model_builder_flag(std::chrono::milliseconds(3000), started,
+                                                       finished));
+        int port = start_listening(srv);
+
+        auto cli = make_client(port);
+        // 独立线程发 POST：handler 在 request_timeout=50ms 内返回（504/或超时），
+        // 后台 fire-and-forget 推理线程继续跑（推理在途）。
+        std::thread requester([&] {
+            cli.Post("/v1/models/det/infer", nlohmann::json{{"image", PNG1X1_B64}}.dump(),
+                     "application/json");
+        });
+        // 事件同步：确认请求确已在途（推理线程已 begin_request + started 置位）。
+        wait_until([&] { return started->load(); });
+
+        // stop() → wait_drained 在 deadline（~1.05s）超期返回，而非等到推理（3s）跑完。
+        srv.stop();
+        finished_at_stop = finished->load();
+        // 关键断言：stop() 返回时推理尚未完成 ⇒ wait_drained 确实超期（未真 drain 干净）。
+        REQUIRE_FALSE(finished_at_stop);
+        REQUIRE_FALSE(srv.is_listening());
+        requester.join();
+    }
+    // 作用域退出 → ServingServer 已析构；游离推理线程仍存活且稍后安全跑完（不碰 this）。
+
+    // 事件同步：守候游离线程在 server 析构后仍安全完成（不崩、不 hang）。
+    wait_until([&] { return finished->load(); });
 
     fs::remove_all(repo);
 }
