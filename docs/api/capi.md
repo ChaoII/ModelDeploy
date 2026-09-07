@@ -66,36 +66,9 @@ md_option_set_model_path(opt, "m.onnx", ""); // path + 可选加密密码 pwd
 | `MD_BK_SOPHGO` | 3 | Sophgo（`.bmodel`） |
 | `MD_BK_NCNN` | 4 | ncnn（`.param`/`.bin`） |
 
-### 检测骨架示例
+### 骨架示例
 
-```c
-MDOptionHandle opt; md_option_create(&opt);
-md_option_set_backend(opt, MD_BK_ORT);
-md_option_set_device(opt, MD_DEV_CPU, 0);
-
-MDModelHandle m;
-if (md_model_create(&m, MD_MODEL_DETECTION, "yolo11n.onnx", opt) != MD_OK) {
-    fprintf(stderr, "%s\n", md_get_last_error());
-    return -1;
-}
-
-MDImageHandle img; md_image_from_file(&img, "test.jpg");
-MDResultHandle res;
-md_model_predict(m, img, &res);
-
-size_t n = 0; const MDDetectionItem* items = NULL;
-md_result_detection(res, &items, &n);
-for (size_t i = 0; i < n; i++) {
-    printf("label=%d score=%f box=%f,%f,%f,%f\n",
-        items[i].label_id, items[i].score,
-        items[i].box.x, items[i].box.y, items[i].box.w, items[i].box.h);
-}
-
-md_result_destroy(res);
-md_image_destroy(img);
-md_model_destroy(m);
-md_option_destroy(opt);
-```
+生命周期总览（create→configure→predict→read→destroy）见上文 §1；完整检测示例见下文 §3 目标检测（结果项 `MDDetectionItem` 为扁平结构，直接访问 `items[i].x/y/w/h/score/label_id`）。
 
 ## 3. 目标检测（`MD_MODEL_DETECTION`）
 
