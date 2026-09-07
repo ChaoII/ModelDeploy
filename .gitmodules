@@ -1,3 +1,15 @@
 [submodule "third_party/mbedtls"]
 	path = third_party/mbedtls
 	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "third_party/Catch2"]
+	path = third_party/Catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "third_party/pybind11"]
+	path = third_party/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "third_party/kaldi_native_fbank"]
+	path = third_party/kaldi_native_fbank
+	url = https://github.com/csukuangfj/kaldi-native-fbank.git
+[submodule "third_party/samplerate"]
+	path = third_party/samplerate
+	url = https://github.com/libsndfile/libsamplerate.git
