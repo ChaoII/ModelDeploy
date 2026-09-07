@@ -716,14 +716,94 @@ for label, score in top:
 gallery.remove("b")                    # 移除，返回 list[bool]；gallery.clear() 清空
 ```
 
-## 17. 已绑定模块
+## 17. 条码 / 二维码（`BarcodeDetector`）
+
+条码识别器 `BarcodeDetector` 是**纯 CV**（基于 ZXing），无模型依赖，CPU 上即可解码条码 / 二维码。默认解码全部格式（`FMT_ALL`），可用 `set_formats` 限定子集（`FMT_*` 位或）。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（无模型路径，无需 RuntimeOption）
+det = md.vision.BarcodeDetector()
+det.set_formats(md.vision.FMT_QR_CODE | md.vision.FMT_EAN_13)  # 限定 QR + EAN-13
+print(hex(det.formats))                     # 只读属性，返回当前格式位掩码
+
+# 2. 检测：det.detect(img) -> list[BarcodeResult]
+img = cv2.imread("qrcode.jpg")
+for r in det.detect(img):
+    # r.format: str（如 "QR_CODE"/"EAN_13"/"CODE_128"）；r.text: 解码文本/URL
+    # r.score: 可信度 [0,1]；r.is_qr: 是否二维码；r.quad: list[Point2f] 长度 4（角点，左上起顺时针）
+    print(r.format, r.text, r.score, r.is_qr)
+    for p in r.quad:
+        print(p.x, p.y)
+
+# 恢复全部格式：det.set_formats(md.vision.FMT_ALL)
+```
+
+## 18. 多目标跟踪（`ByteTracker` / `BotSortTracker` / `StrongSortTracker`）
+
+三类 MOT 跟踪器均为**纯 CPU**、无模型依赖，跟踪 ID 跨帧稳定，`reset()` 归零。用法一致：每帧把检测框转成 `Detection`（`box: Rect2f`、`score: float`、`label_id: int`、`feature: list[float]`），再 `update` 推进一帧，返回 `list[TrackResult]`（`track_id` 跨帧关联同一目标；`state` 为 `TrackState` 枚举 `New=0 / Tracked=1 / Lost=2 / Removed=3`）。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（无参）与参数（各 tracker 的 set_params 签名不同，见下）
+tracker = md.vision.ByteTracker()
+tracker.set_params(track_thresh=0.5, high_thresh=0.5, low_thresh=0.1,
+                   max_age=30, min_hits=3, iou_threshold=0.3)
+
+# BoT-SORT 额外参数：match_thresh=0.8, fuse_score_weight=0.5, ema_alpha=0.9, with_cmc=True
+# bs = md.vision.BotSortTracker()
+# bs.set_params(track_thresh=0.5, high_thresh=0.5, low_thresh=0.1, max_age=30, min_hits=3,
+#               iou_threshold=0.3, match_thresh=0.8, fuse_score_weight=0.5,
+#               ema_alpha=0.9, with_cmc=True)
+
+# StrongSORT 额外参数：match_thresh=0.8, ema_alpha=0.9, appearance_priority=0.7, with_cmc=True
+# ss = md.vision.StrongSortTracker()
+# ss.set_params(track_thresh=0.5, high_thresh=0.5, low_thresh=0.1, max_age=30, min_hits=3,
+#               iou_threshold=0.3, match_thresh=0.8, ema_alpha=0.9,
+#               appearance_priority=0.7, with_cmc=True)
+
+detector = md.vision.UltralyticsDet("yolo11n.onnx", md.RuntimeOption())
+
+cap = cv2.VideoCapture("demo.mp4")
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+
+    # 2. 每帧：检测框 -> Detection
+    dets = []
+    for r in detector.predict(frame):          # r.box: Rect2f
+        dets.append(md.vision.Detection())     # Detection 可无参构造后逐字段填
+        dets[-1].box = r.box
+        dets[-1].score = r.score
+        dets[-1].label_id = r.label_id
+        # dets[-1].feature = [...]             # 可选：BoT-SORT / StrongSORT 外观特征（ReID）
+
+    # 3. 推进一帧：tracker.update(detections, frame=ImageData=None, timestamp=-1.0)
+    tracks = tracker.update(dets, frame=None, timestamp=-1.0)
+    for t in tracks:
+        # t.track_id: 跨帧稳定 ID；t.state: TrackState；其余同 Detection
+        print(t.track_id, int(t.state), t.box, t.score)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+tracker.reset()                                # 清空内部状态，ID 重新从 0 计
+cap.release()
+```
+
+## 19. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
-- **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID` 等
-- **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult` 等
+- **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID`、`BarcodeDetector`、`ByteTracker`/`BotSortTracker`/`StrongSortTracker` 等
+- **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult`、`BarcodeResult`、`TrackResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 18. 性能测试
+## 20. 性能测试
 
 ```python
 import time

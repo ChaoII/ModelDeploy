@@ -937,6 +937,87 @@ int main(void) {
 }
 ```
 
+## 17. 条码 / 二维码（`md_barcode_*`）
+
+条码识别器是**纯 CV**（基于 ZXing）、无模型依赖，CPU 上即可解码条码 / 二维码。`md_barcode_create` 默认全部格式（`FMT_ALL`），`md_barcode_set_formats` 限定 `FMT_*` 位或子集（位定义见 C++ `Formats`：QR=0、EAN-13=4 等）。解码遵循查询/提交：`items==NULL` 先取 `*count=need`，再按容量读数。
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDBarcodeHandle bc = NULL;
+    md_barcode_create(&bc);
+    /* 限定 QR(位0) + EAN-13(位4)，其余格式不解码；0 = 全部格式 */
+    md_barcode_set_formats(bc, (uint32_t)((1u << 0) | (1u << 4)));
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "qrcode.jpg");
+
+    uint32_t need = 0;
+    md_barcode_detect(bc, img, NULL, &need);          /* 阶段 1：查询需要数 */
+    MD_BarcodeItem* items = calloc(need ? need : 1, sizeof(MD_BarcodeItem));
+    uint32_t written = need;
+    md_barcode_detect(bc, img, items, &written);       /* 阶段 2：正式读取 */
+    for (uint32_t i = 0; i < written; i++) {
+        /* items[i].format: "QR_CODE"/"EAN_13"/...；.text: 解码文本/URL
+         * .score: 可信度 [0,1]；.is_qr: 是否二维码；.quad[8]: 4 角点(x,y) 顺时针 */
+        printf("format=%s text=%s score=%.3f is_qr=%d\n",
+               items[i].format, items[i].text, items[i].score, items[i].is_qr);
+        for (int k = 0; k < 4; k++)
+            printf("  corner=(%.0f, %.0f)\n", items[i].quad[2 * k], items[i].quad[2 * k + 1]);
+    }
+    free(items);
+    md_barcode_destroy(bc);
+    md_image_destroy(img);
+    return 0;
+}
+```
+
+## 18. 多目标跟踪（`md_tracker_*`）
+
+多目标跟踪器为**纯 CPU**、无模型依赖，跟踪 ID 跨帧稳定，`md_tracker_reset` 归零。`md_tracker_create(kind)` 按 `MDTrackerKind`（`MD_TRACKER_BYTETRACK` / `MD_TRACKER_BOTSORT` / `MD_TRACKER_STRONGSORT`）选择 ByteTracker / BoT-SORT / StrongSORT。参数经 `md_tracker_set_params(name, double)` 命名设置（支持 `track_thresh` / `high_thresh` / `low_thresh` / `max_age` / `min_hits` / `iou_threshold` / `match_thresh` / `ema_alpha` / `fuse_score_weight` / `appearance_priority` / `with_cmc`，按 kind 忽略不适用项）。
+
+更新遵循**查询/提交契约**：每逻辑帧先 `md_tracker_capacity`（非变异、不推进状态）求 `need`，再以该容量 `md_tracker_update` **提交一次**（有状态）——切勿用 `update` 自身做容量探测（会双重推进帧状态）。
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    /* 1. 创建（ByteTracker）并命名设参 */
+    MDTrackerHandle tr = NULL;
+    md_tracker_create(MD_TRACKER_BYTETRACK, &tr);
+    md_tracker_set_params(tr, "track_thresh", 0.5);
+    md_tracker_set_params(tr, "max_age", 30.0);
+    md_tracker_set_params(tr, "iou_threshold", 0.3);
+
+    /* 2. 每帧：检测框 -> MDBox[]/scores/label_ids */
+    MDBox  boxes[8]  = {{0}};
+    float  scores[8] = {0.9f, 0.8f, 0.0f};
+    int    labels[8] = {0, 0, 0};
+    size_t n = 2;
+
+    /* 3. 查询/提交：每逻辑帧 capacity(非变异) -> update(推进一次) */
+    size_t cap = 0;
+    md_tracker_capacity(tr, boxes, scores, labels, n, &cap);
+    MDTrackItem* out = calloc(cap ? cap : 1, sizeof(MDTrackItem));
+    size_t cnt = cap;
+    md_tracker_update(tr, boxes, scores, labels, n, out, &cnt);
+    for (size_t i = 0; i < cnt; i++)
+        /* out[i].track_id 跨帧稳定；out[i].state: MD_TRACK_NEW/TRACKED/LOST/REMOVED */
+        printf("id=%d state=%d x=%.0f y=%.0f w=%.0f h=%.0f score=%.3f\n",
+               out[i].track_id, out[i].state, out[i].x, out[i].y, out[i].w, out[i].h, out[i].score);
+    free(out);
+
+    md_tracker_reset(tr);    /* 清空内部状态，ID 重新从 0 计 */
+    md_tracker_destroy(tr);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

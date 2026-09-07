@@ -625,6 +625,75 @@ Console.WriteLine($"embedding dim={r.Embedding.Length}");
 // 注意：C# 未绑定 ReIdGallery；行人库检索请用 C++/Python
 ```
 
+## 17. 条码 / 二维码（`BarcodeDetector`）
+
+命名空间 `ModelDeploy`，`BarcodeDetector` 封装 C API `md_barcode_*`，是**纯 CV**（基于 ZXing）、无模型依赖，CPU 上即可解码条码 / 二维码。默认解码全部格式，可用 `SetFormats` 限定 `FMT_*` 位或子集。
+
+```csharp
+using System;
+using ModelDeploy;
+
+// 1. 构造（无模型路径，无需 RuntimeOption）
+var det = new BarcodeDetector();
+det.SetFormats((1u << 0) | (1u << 4));   // FMT_QR_CODE | FMT_EAN_13（位 0 和位 4）
+
+// 2. 检测：Detect(VisionImage) -> BarcodeResult[]
+using var img = VisionImage.Read("qrcode.jpg");
+foreach (var r in det.Detect(img))
+{
+    // r.Format: string（如 "QR_CODE"/"EAN_13"）；r.Text: 解码文本/URL
+    // r.Score: 可信度 [0,1]；r.IsQr: 是否二维码；r.Quad: PointF[] 长度 4（角点，左上起顺时针）
+    Console.WriteLine($"{r.Format} [{r.Text}] score={r.Score:F3} is_qr={r.IsQr}");
+    foreach (var p in r.Quad) Console.WriteLine($"  corner=({p.X},{p.Y})");
+}
+```
+
+## 18. 多目标跟踪（`ModelDeploy.Tracking.Tracker`）
+
+命名空间 `ModelDeploy.Tracking`，`Tracker` 封装 C API `md_tracker_*`，构造时选 `TrackerKind`（`ByteTrack` / `BotSort` / `StrongSort`），**纯 CPU**、无模型依赖，跟踪 ID 跨帧稳定，`Reset()` 归零。因 C API 用命名参数，C# 用 `SetParam(name, value)` 设参（支持 `track_thresh` / `high_thresh` / `low_thresh` / `max_age` / `min_hits` / `iou_threshold` / `match_thresh` / `ema_alpha` / `fuse_score_weight` / `appearance_priority` / `with_cmc`，按 kind 忽略不适用项）；`Update(boxes, scores, labelIds)` 返回 `TrackItem[]`（`TrackId` 跨帧关联同一目标；`State` 为 `MDTrackState`：New=0 / Tracked=1 / Lost=2 / Removed=3）。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Tracking;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+// 1. 构造与命名参数
+var tracker = new Tracker(TrackerKind.ByteTrack);
+tracker.SetParam("track_thresh", 0.5);
+tracker.SetParam("max_age", 30.0);
+tracker.SetParam("iou_threshold", 0.3);
+// BoT-SORT / StrongSORT 另可：SetParam("match_thresh", 0.8)、SetParam("ema_alpha", 0.9) 等
+
+using var det = new DetectionModel("yolo11n.onnx", option);
+for (int f = 0; f < 100; f++)   // 假定逐帧读取视频，这里用帧索引示意
+{
+    using var frame = VisionImage.Read("frame_%03d.jpg");
+    var rs = det.Predict(frame);   // IReadOnlyList<DetectionResult>
+
+    // 2. 每帧：检测框 -> RectF[]/scores/labelIds
+    int n = rs.Count;
+    var boxes = new RectF[n];
+    var scores = new float[n];
+    var labels = new int[n];
+    for (int i = 0; i < n; i++)
+    {
+        boxes[i] = rs[i].Box;
+        scores[i] = rs[i].Score;
+        labels[i] = rs[i].LabelId;
+    }
+
+    // 3. 推进一帧：Update(boxes, scores, labelIds) -> TrackItem[]
+    foreach (var t in tracker.Update(boxes, scores, labels))
+        // t.TrackId: 跨帧稳定 ID；t.State: New/Tracked/Lost/Removed；其余：X/Y/Width/Height/Score
+        Console.WriteLine($"id={t.TrackId} state={t.State} score={t.Score:F3}");
+}
+tracker.Reset();   // 清空内部状态，ID 重新从 0 计
+```
+
 ## 运行示例
 
 ```bash

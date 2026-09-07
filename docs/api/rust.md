@@ -695,6 +695,77 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 17. 条码 / 二维码（`BarcodeDetector`）
+
+条码识别器 `modeldeploy::BarcodeDetector`（封装 C API `md_barcode_*`）是**纯 CV**（基于 ZXing）、无模型依赖，CPU 上即可解码条码 / 二维码。默认解码全部格式，可用 `set_formats` 限定 `FMT_*` 位或子集。
+
+```rust
+use modeldeploy::{BarcodeDetector, Image};
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 构造（无模型路径），并用 set_formats 限定 QR + EAN-13（位 0 和位 4）
+    let det = BarcodeDetector::new()?;
+    det.set_formats((1u32 << 0) | (1u32 << 4))?;   // FMT_QR_CODE | FMT_EAN_13
+
+    // 2. 检测：detect(&Image) -> Vec<BarcodeResult>
+    let img = Image::read("qrcode.jpg")?;
+    for r in det.detect(&img)? {
+        // r.text: 解码文本/URL；r.format: BarcodeFormat（e.g. QrCode / Ean13）
+        // r.score: 可信度 [0,1]；r.is_qr: 是否二维码；r.quad: [(f32,f32); 4]（角点）
+        println!("{:?} [{}] score={:.3} is_qr={}", r.format, r.text, r.score, r.is_qr);
+        for (x, y) in r.quad {
+            println!("  corner=({x:.0},{y:.0})");
+        }
+    }
+    Ok(())
+}
+```
+
+## 18. 多目标跟踪（`Tracker`）
+
+跟踪器由 `modeldeploy::Tracker::new(TrackerKind)` 构造（`TrackerKind::{ByteTrack, BotSort, StrongSort}`），**纯 CPU**、无模型依赖，跟踪 ID 跨帧稳定，`reset()` 归零。因 C API 用命名参数，Rust 用 `set_param(name, value)` 设参（支持 `track_thresh` / `high_thresh` / `low_thresh` / `max_age` / `min_hits` / `iou_threshold` / `match_thresh` / `ema_alpha` / `fuse_score_weight` / `appearance_priority` / `with_cmc`，按 kind 忽略不适用项）；`update(&[Rect], &[f32], &[i32])` 返回 `Vec<TrackItem>`（`track_id` 跨帧关联同一目标；`state` 为 `TrackState::{New, Tracked, Lost, Removed}`）。
+
+```rust
+use modeldeploy::{Image, Rect, RuntimeOption, Tracker, TrackerKind, UltralyticsDet};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?;
+
+    // 1. 构造与命名参数（Rust 用 set_param）
+    let tracker = Tracker::new(TrackerKind::ByteTrack)?;
+    tracker.set_param("track_thresh", 0.5)?;
+    tracker.set_param("max_age", 30.0)?;
+    tracker.set_param("iou_threshold", 0.3)?;
+    // BoT-SORT / StrongSORT 另可：set_param("match_thresh", 0.8)?、("ema_alpha", 0.9)? 等
+
+    let det = UltralyticsDet::new("yolo11n.onnx", &opt)?;
+    for f in 0..100 {   // 假定逐帧读取视频，这里用帧索引示意
+        let frame = Image::read("frame_%03d.jpg")?;
+        let rs = det.predict(&frame)?;
+
+        // 2. 每帧：检测框 -> Rect[]/scores/label_ids
+        let mut boxes = Vec::new();
+        let mut scores = Vec::new();
+        let mut labels = Vec::new();
+        for r in &rs {
+            boxes.push(Rect { x: r.rect.x, y: r.rect.y, width: r.rect.width, height: r.rect.height });
+            scores.push(r.score);
+            labels.push(r.label_id);
+        }
+
+        // 3. 推进一帧：update(boxes, scores, labels) -> Vec<TrackItem>
+        for t in tracker.update(&boxes, &scores, &labels)? {
+            // t.track_id: 跨帧稳定 ID；t.state: TrackState::{New,Tracked,Lost,Removed}
+            println!("id={} state={:?} score={:.3}", t.track_id, t.state, t.score);
+        }
+    }
+    tracker.reset()?;   // 清空内部状态，ID 重新从 0 计
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

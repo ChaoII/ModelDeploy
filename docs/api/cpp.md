@@ -851,7 +851,90 @@ int main() {
 
 > `ReID::predict` 输出即已 L2 归一化；`ReIdGallery::match` 直接对其做点积求余弦（`enroll`/`match` 的 embedding 均要求已归一化）。
 
-## 17. 更多模型（均使用同一 `RuntimeOption`）
+## 17. 条码 / 二维码（vision::barcode::BarcodeDetector）
+
+条码识别器 `modeldeploy::vision::barcode::BarcodeDetector`（`vision/barcode/barcode.h`）是**纯 CV**（基于 ZXing）、无模型依赖，CPU 上即可解码条码 / 二维码。默认解码全部格式（`FMT_ALL`），可用 `set_formats` 限定 `FMT_*` 位或子集。
+
+```cpp
+#include "modeldeploy/vision.h"
+#include "vision/barcode/barcode.h"
+
+int main() {
+    modeldeploy::vision::barcode::BarcodeDetector det;
+    det.set_formats(modeldeploy::vision::barcode::FMT_QR_CODE |
+                    modeldeploy::vision::barcode::FMT_EAN_13);   // 限定 QR + EAN-13
+
+    auto im = modeldeploy::vision::ImageData::imread("qrcode.jpg");
+    auto codes = det.detect(im);   // std::vector<barcode::BarcodeResult>
+    for (const auto& r : codes) {
+        // r.text: 解码文本/URL；r.format: "QR_CODE"/"EAN_13"/"CODE_128"/...
+        // r.score: 可信度 [0,1]；r.is_qr: 是否二维码；r.quad: std::array<Point2f,4>
+        std::printf("%s [%s] score=%.3f is_qr=%d\n", r.text.c_str(), r.format.c_str(), r.score, r.is_qr);
+        std::printf("quad: ");
+        for (const auto& p : r.quad) std::printf("(%.0f,%.0f) ", p.x, p.y);
+        std::printf("\n");
+    }
+    det.set_formats(modeldeploy::vision::barcode::FMT_ALL);   // 恢复全部格式
+    return 0;
+}
+```
+
+## 18. 多目标跟踪（tracking::ByteTracker / BotSortTracker / StrongSortTracker）
+
+三类 MOT 跟踪器均在 `modeldeploy::vision::tracking` 命名空间，**纯 CPU**、无模型依赖，跟踪 ID 跨帧稳定，`reset()` 归零。用法一致：每帧把检测框转成 `tracking::Detection`（`box: Rect2f`、`score: float`、`label_id: int`、`feature: vector<float>`），再 `update` 推进一帧，返回 `vector<tracking::TrackResult>`（`track_id` 跨帧关联同一目标；`state` 为 `TrackState` 枚举 `New=0 / Tracked=1 / Lost=2 / Removed=3`）。
+
+```cpp
+#include "modeldeploy/vision.h"
+#include "vision/detection/ultralytics_det.h"
+#include "vision/tracking/bytetrack.h"      // ByteTracker
+#include "vision/tracking/botsort.h"        // BotSortTracker
+#include "vision/tracking/strongsort.h"     // StrongSortTracker
+
+int main() {
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend(); opt.use_cpu();
+
+    // 1. 构造（无参）与参数（各 tracker 的 set_params 签名不同，见下）
+    modeldeploy::vision::tracking::ByteTracker tracker;
+    tracker.set_params(0.5f, 0.5f, 0.1f, 30, 3, 0.3f);
+
+    // BoT-SORT 额外参数：match_thresh=0.8, fuse_score_weight=0.5, ema_alpha=0.9, with_cmc=true
+    // modeldeploy::vision::tracking::BotSortTracker bs;
+    // bs.set_params(0.5f, 0.5f, 0.1f, 30, 3, 0.3f, 0.8f, 0.5f, 0.9f, true);
+
+    // StrongSORT 额外参数：match_thresh=0.8, ema_alpha=0.9, appearance_priority=0.7, with_cmc=true
+    // modeldeploy::vision::tracking::StrongSortTracker ss;
+    // ss.set_params(0.5f, 0.5f, 0.1f, 30, 3, 0.3f, 0.8f, 0.9f, 0.7f, true);
+
+    modeldeploy::vision::detection::UltralyticsDet det("yolo11n.onnx", opt);
+
+    for (int f = 0; f < 100; ++f) {   // 假定逐帧读取视频，这里用帧索引示意
+        auto frame = modeldeploy::vision::ImageData::imread("frame_%03d.jpg");
+        std::vector<modeldeploy::vision::DetectionResult> boxes;
+        if (!det.predict(frame, &boxes)) break;
+
+        // 2. 每帧：检测框 -> tracking::Detection
+        std::vector<modeldeploy::vision::tracking::Detection> dets;
+        for (const auto& r : boxes) {
+            modeldeploy::vision::tracking::Detection d;
+            d.box = r.box; d.score = r.score; d.label_id = r.label_id;
+            // d.feature = {...};   // 可选：BoT-SORT / StrongSORT 外观特征（ReID）
+            dets.push_back(d);
+        }
+
+        // 3. 推进一帧：update(detections, frame=nullptr, timestamp=-1)
+        auto tracks = tracker.update(dets, nullptr, -1.0);
+        for (const auto& t : tracks)
+            // t.track_id: 跨帧稳定 ID；t.state: TrackState；其余同 Detection
+            std::printf("id=%d state=%d box=(%.0f,%.0f,%.0f,%.0f) score=%.3f\n",
+                        t.track_id, t.state, t.box.x, t.box.y, t.box.width, t.box.height, t.score);
+    }
+    tracker.reset();   // 清空内部状态，ID 重新从 0 计
+    return 0;
+}
+```
+
+## 19. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -868,6 +951,8 @@ int main() {
 | 车牌 | `vision::lpr::LprPipeline` | 见上文 §15 |
 | 行人属性 | `vision::PedestrianAttribute` | 见上文 §16 |
 | 行人 ReID | `vision::reid::ReID` + `reid::ReIdGallery` | 见上文 §16 |
+| 条码 / 二维码 | `vision::barcode::BarcodeDetector` | 见上文 §17 |
+| 多目标跟踪 | `vision::tracking::ByteTracker` / `BotSortTracker` / `StrongSortTracker` | 见上文 §18 |
 | ASR | `audio::asr::SenseVoice` | 见 [models-语音](../models.md#10-语音识别asr) |
 | TTS（Kokoro） | `audio::tts::Kokoro` | 见 [models-TTS](../models.md#11-语音合成tts) |
 
@@ -909,7 +994,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 18. 工程配置
+## 20. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
