@@ -47,6 +47,7 @@ set(TEST_SOURCES
     test_ncnn_lpr.cpp
     test_ncnn_ocr.cpp
     test_ncnn_seetaface.cpp
+    test_async_model.cpp
 )
 
 # CAPI 测试：仅当 BUILD_CAPI 打开时参与编译（否则 capi/md_capi.h 缺失 + 库中无 CAPI 符号）。
