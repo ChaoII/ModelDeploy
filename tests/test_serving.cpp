@@ -9,9 +9,63 @@
 #include <nlohmann/json.hpp>
 #include "serving/config.h"
 #include "serving/model_repo.h"
+#include "serving/model_entry.h"
+#include "pipeline/async_model.h"
+#include "vision/common/image_data.h"
 
 namespace fs = std::filesystem;
 using namespace modeldeploy::serving;
+
+namespace {
+
+// 内嵌 1×1 有效 PNG 的 base64（宽高已知：1×1）。来源：标准 1×1 透明 PNG。
+const std::string PNG1X1_B64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+// 测试自包含 base64 解码（SDK 的 utils::base64_decode 未导出，测试侧不复用）。
+std::vector<unsigned char> b64_decode(const std::string& s) {
+    static const std::string tbl =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::vector<unsigned char> out;
+    int val = 0;
+    int bits = -8;
+    for (unsigned char c : s) {
+        if (c == '=') break;
+        auto pos = tbl.find(static_cast<char>(c));
+        if (pos == std::string::npos) break;
+        val = (val << 6) + static_cast<int>(pos);
+        bits += 6;
+        if (bits >= 0) {
+            out.push_back(static_cast<unsigned char>((val >> bits) & 0xFF));
+            bits -= 8;
+        }
+    }
+    return out;
+}
+
+// 最小 FakeModel：R = std::string，predict/batch_predict 返回 w/h（与异步契约匹配）。
+struct FakeModel {
+    using result_type = std::string;
+    int predict_calls = 0;
+    static std::string big_result(int w, int h) {
+        return "w=" + std::to_string(w) + ",h=" + std::to_string(h);
+    }
+    bool predict(const modeldeploy::vision::ImageData& img, std::string* out,
+                 TimerArray* /*timers*/ = nullptr) {
+        ++predict_calls;
+        *out = big_result(img.width(), img.height());
+        return true;
+    }
+    bool batch_predict(const std::vector<modeldeploy::vision::ImageData>& imgs,
+                       std::vector<std::string>* outs,
+                       TimerArray* /*timers*/ = nullptr) {
+        outs->clear();
+        for (auto& im : imgs) outs->push_back(big_result(im.width(), im.height()));
+        return true;
+    }
+};
+
+}  // namespace
 
 namespace {
 
@@ -168,4 +222,69 @@ TEST_CASE("ModelRepo unknown names/versions", "[serving]") {
     REQUIRE_FALSE(m.get("det", "v999", &h));
 
     fs::remove_all(repo);
+}
+
+TEST_CASE("ModelEntry image_path & image infer + reuse", "[serving]") {
+    // base64 → 字节 → 写临时 PNG（1×1）
+    auto bytes = b64_decode(PNG1X1_B64);
+    REQUIRE(bytes.size() > 0);
+
+    auto tmp = fs::temp_directory_path() /
+               ("md_entry_" + std::to_string(static_cast<unsigned>(std::random_device{}())));
+    fs::create_directories(tmp);
+    fs::path png = tmp / "one.png";
+    {
+        std::ofstream ofs(png, std::ios::binary);
+        ofs.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+    }
+
+    auto handle =
+        make_model_handle<FakeModel>("fake", std::make_unique<FakeModel>());
+    REQUIRE(handle.name == "fake");
+    REQUIRE(handle.ready);
+
+    nlohmann::json out;
+    std::string err;
+
+    // 1) image_path 路径
+    REQUIRE(handle.infer(nlohmann::json{{"image_path", png.string()}}, &out, &err));
+    REQUIRE(out["results"] == "w=1,h=1");
+    REQUIRE(out["model"] == "fake");
+    REQUIRE(out["duration_ms"].is_number());
+
+    // 2) image(base64) 路径
+    REQUIRE(handle.infer(nlohmann::json{{"image", PNG1X1_B64}}, &out, &err));
+    REQUIRE(out["results"] == "w=1,h=1");
+    REQUIRE(out["model"] == "fake");
+
+    // 3) 复用：同一 handle 多次 infer（AsyncModel 单实例可用）
+    REQUIRE(handle.infer(nlohmann::json{{"image", PNG1X1_B64}}, &out, &err));
+    REQUIRE(out["results"] == "w=1,h=1");
+    REQUIRE(handle.infer(nlohmann::json{{"image_path", png.string()}}, &out, &err));
+    REQUIRE(out["results"] == "w=1,h=1");
+
+    fs::remove_all(tmp);
+}
+
+TEST_CASE("ModelEntry bad input", "[serving]") {
+    auto handle =
+        make_model_handle<FakeModel>("fake", std::make_unique<FakeModel>());
+    nlohmann::json out;
+    std::string err;
+
+    // 无 image/image_path → false + err
+    REQUIRE_FALSE(handle.infer(nlohmann::json::object(), &out, &err));
+    REQUIRE_FALSE(err.empty());
+
+    // 非法 base64（非 base64 字符）→ false + err
+    err.clear();
+    REQUIRE_FALSE(handle.infer(nlohmann::json{{"image", "%%%非法%%%"}}, &out, &err));
+    REQUIRE_FALSE(err.empty());
+
+    // 不存在的 image_path → false + err
+    err.clear();
+    REQUIRE_FALSE(handle.infer(
+        nlohmann::json{{"image_path", fs::temp_directory_path() / "no_such_file.png"}}, &out, &err));
+    REQUIRE_FALSE(err.empty());
 }
