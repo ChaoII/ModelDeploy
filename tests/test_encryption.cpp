@@ -124,7 +124,7 @@ TEST_CASE("Encryption long password", "[encryption]") {
     fs::remove(decrypted);
 }
 
-TEST_CASE("Encryption CRC mismatch detection", "[encryption]") {
+TEST_CASE("Encryption tamper detection (GCM auth tag)", "[encryption]") {
     auto tmp_dir = fs::temp_directory_path();
     auto input = tmp_dir / "test_crc.onnx";
     auto encrypted = tmp_dir / "test_crc.mdenc";
@@ -136,7 +136,7 @@ TEST_CASE("Encryption CRC mismatch detection", "[encryption]") {
 
     REQUIRE(modeldeploy::encrypt_model_file(input.string(), encrypted.string(), "crc_test", "onnx"));
 
-    // 篡改加密文件内容，CRC 应不匹配导致解密失败
+    // 篡改加密文件尾部（GCM tag 区），认证标签校验应失败
     auto decrypted = tmp_dir / "test_crc_decoded.onnx";
     {
         std::fstream f(encrypted, std::ios::in | std::ios::out | std::ios::binary);

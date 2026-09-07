@@ -5,63 +5,91 @@
 #include "encryption/encryption.h"
 
 #ifdef ENABLE_ENCRYPTION
-#include <openssl/evp.h>
-#include <openssl/rand.h>
+#include <mbedtls/gcm.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/md.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
 
 namespace modeldeploy {
 
-    // ==================== SHA-256 密钥派生 ====================
-    static void derive_key(const std::string& password,
+    // ==================== 常量（文件格式 V3） ====================
+    // [4]   魔数 "MDEN"
+    // [4]   版本号 (3)
+    // [4]   格式字符串长度
+    // [N]   格式字符串
+    // [16]  Salt（PBKDF2 key 派生用）
+    // [12]  GCM nonce
+    // [4]   密文长度
+    // [N]   密文（AES-256-GCM）
+    // [16]  GCM 认证标签（128-bit，替代旧 CRC，防篡改）
+    constexpr static uint32_t SALT_LEN = 16;
+    constexpr static uint32_t NONCE_LEN = 12;
+    constexpr static uint32_t TAG_LEN = 16;
+    constexpr static uint32_t AES_KEY_LEN = 32;
+    constexpr static uint32_t PBKDF2_ITERATIONS = 100000;
+    constexpr static uint32_t VERSION = 3;
+    const static std::string MAGIC = "MDEN";
+
+    static bool is_password_invalid(const std::string& pwd) { return pwd.empty(); }
+
+    // ==================== PBKDF2-HMAC-SHA256 密钥派生 ====================
+    static bool derive_key(const std::string& password,
                            const uint8_t* salt, uint32_t salt_len,
                            uint8_t* out_key) {
-        EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-        EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
-        EVP_DigestUpdate(ctx, password.data(), password.size());
-        EVP_DigestUpdate(ctx, salt, salt_len);
-        EVP_DigestFinal_ex(ctx, out_key, nullptr);
-        EVP_MD_CTX_free(ctx);
+        return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
+                    reinterpret_cast<const unsigned char*>(password.data()), password.size(),
+                    salt, salt_len, PBKDF2_ITERATIONS, AES_KEY_LEN, out_key) == 0;
     }
 
-    // ==================== AES-256-CBC 加密 ====================
-    static bool aes_encrypt(const uint8_t* key, const uint8_t* iv,
+    // ==================== AES-256-GCM 加密 ====================
+    static bool gcm_encrypt(const uint8_t* key, const uint8_t* nonce,
                             const uint8_t* plain, uint32_t plain_len,
-                            std::vector<uint8_t>* cipher) {
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-        if (!ctx) return false;
+                            std::vector<uint8_t>* cipher, uint8_t* tag) {
+        mbedtls_gcm_context ctx;
+        mbedtls_gcm_init(&ctx);
         bool ok = false;
-        if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key, iv) == 1) {
-            cipher->resize(plain_len + 32);
-            int out_len = 0;
-            if (EVP_EncryptUpdate(ctx, cipher->data(), &out_len, plain, (int)plain_len) == 1) {
-                int tail = 0;
-                ok = (EVP_EncryptFinal_ex(ctx, cipher->data() + out_len, &tail) == 1);
-                cipher->resize((size_t)out_len + tail);
-            }
+        if (mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 256) == 0) {
+            cipher->resize(plain_len);
+            ok = mbedtls_gcm_crypt_and_tag(&ctx, MBEDTLS_GCM_ENCRYPT, plain_len,
+                    nonce, NONCE_LEN, nullptr, 0,
+                    plain, cipher->data(), TAG_LEN, tag) == 0;
         }
-        EVP_CIPHER_CTX_free(ctx);
+        mbedtls_gcm_free(&ctx);
         return ok;
     }
 
-    static bool aes_decrypt(const uint8_t* key, const uint8_t* iv,
+    // ==================== AES-256-GCM 解密（认证） ====================
+    static bool gcm_decrypt(const uint8_t* key, const uint8_t* nonce,
                             const uint8_t* cipher_data, uint32_t cipher_len,
-                            std::vector<uint8_t>* plain) {
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-        if (!ctx) return false;
+                            const uint8_t* tag, std::vector<uint8_t>* plain) {
+        mbedtls_gcm_context ctx;
+        mbedtls_gcm_init(&ctx);
         bool ok = false;
-        if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key, iv) == 1) {
-            plain->resize(cipher_len + 32);
-            int out_len = 0;
-            if (EVP_DecryptUpdate(ctx, plain->data(), &out_len, cipher_data, (int)cipher_len) == 1) {
-                int tail = 0;
-                ok = (EVP_DecryptFinal_ex(ctx, plain->data() + out_len, &tail) == 1);
-                plain->resize((size_t)out_len + tail);
-            }
+        if (mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 256) == 0) {
+            plain->resize(cipher_len);
+            ok = mbedtls_gcm_auth_decrypt(&ctx, cipher_len,
+                    nonce, NONCE_LEN, nullptr, 0,
+                    tag, TAG_LEN, cipher_data, plain->data()) == 0;
         }
-        EVP_CIPHER_CTX_free(ctx);
+        mbedtls_gcm_free(&ctx);
         return ok;
     }
 
-    // ==================== CRC32 ====================
+    // ==================== 随机数（熵源 + CTR-DRBG） ====================
+    static bool fill_random(uint8_t* out, uint32_t len) {
+        mbedtls_entropy_context entropy;
+        mbedtls_ctr_drbg_context drbg;
+        mbedtls_entropy_init(&entropy);
+        mbedtls_ctr_drbg_init(&drbg);
+        bool ok = (mbedtls_ctr_drbg_seed(&drbg, mbedtls_entropy_func, &entropy, nullptr, 0) == 0) &&
+                  (mbedtls_ctr_drbg_random(&drbg, out, len) == 0);
+        mbedtls_ctr_drbg_free(&drbg);
+        mbedtls_entropy_free(&entropy);
+        return ok;
+    }
+
+    // ==================== CRC32（保留兼容既有外部调用） ====================
     uint32_t calculate_crc32(const std::string& data) {
         static const uint32_t table[256] = {
             0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL, 0x076dc419L, 0x706af48fL,
@@ -75,25 +103,7 @@ namespace modeldeploy {
         return crc ^ 0xFFFFFFFF;
     }
 
-    // ==================== 文件格式（V2） ====================
-    // [4] 魔数 "MDEN"
-    // [4] 版本号 (2)
-    // [4] 格式字符串长度
-    // [N] 格式字符串
-    // [16] Salt（密钥派生用）
-    // [16] IV（AES-CBC）
-    // [4] 密文长度
-    // [N] 密文
-    // [4] CRC32（对密文校验）
-
-    constexpr static uint32_t SALT_LEN = 16;
-    constexpr static uint32_t IV_LEN = 16;
-    constexpr static uint32_t AES_KEY_LEN = 32;
-    constexpr static uint32_t VERSION = 2;
-    const static std::string MAGIC = "MDEN";
-
-    static bool is_password_invalid(const std::string& pwd) { return pwd.empty(); }
-
+    // ==================== 文件格式（V3） ====================
     bool encrypt_model_file(const std::string& input_path, const std::string& output_path,
                             const std::string& password, const std::string& model_format) {
         if (is_password_invalid(password)) { MD_LOG_ERROR << "Password cannot be empty." << std::endl; return false; }
@@ -102,18 +112,18 @@ namespace modeldeploy {
         if (!read_binary_from_file(input_path, &model_data))
         { MD_LOG_ERROR << "Failed to read model file: " << input_path << std::endl; return false; }
 
-        uint8_t salt[SALT_LEN], iv[IV_LEN];
-        if (RAND_bytes(salt, SALT_LEN) != 1 || RAND_bytes(iv, IV_LEN) != 1)
+        uint8_t salt[SALT_LEN], nonce[NONCE_LEN], tag[TAG_LEN];
+        if (!fill_random(salt, SALT_LEN) || !fill_random(nonce, NONCE_LEN))
         { MD_LOG_ERROR << "Failed to generate random bytes." << std::endl; return false; }
 
         uint8_t aes_key[AES_KEY_LEN];
-        derive_key(password, salt, SALT_LEN, aes_key);
+        if (!derive_key(password, salt, SALT_LEN, aes_key))
+        { MD_LOG_ERROR << "Key derivation failed." << std::endl; return false; }
 
         std::vector<uint8_t> cipher;
-        if (!aes_encrypt(aes_key, iv, (const uint8_t*)model_data.data(), (uint32_t)model_data.size(), &cipher))
-        { MD_LOG_ERROR << "AES encryption failed." << std::endl; return false; }
-
-        uint32_t crc = calculate_crc32(std::string((const char*)cipher.data(), cipher.size()));
+        if (!gcm_encrypt(aes_key, nonce, (const uint8_t*)model_data.data(),
+                         (uint32_t)model_data.size(), &cipher, tag))
+        { MD_LOG_ERROR << "AES-GCM encryption failed." << std::endl; return false; }
 
         std::ofstream out(output_path, std::ios::binary);
         if (!out.is_open())
@@ -122,17 +132,17 @@ namespace modeldeploy {
         auto w32 = [&](uint32_t v) { out.write((const char*)&v, 4); };
         out.write(MAGIC.data(), 4); w32(VERSION);
         w32((uint32_t)model_format.size()); out.write(model_format.data(), (std::streamsize)model_format.size());
-        out.write((const char*)salt, SALT_LEN); out.write((const char*)iv, IV_LEN);
+        out.write((const char*)salt, SALT_LEN); out.write((const char*)nonce, NONCE_LEN);
         w32((uint32_t)cipher.size()); out.write((const char*)cipher.data(), (std::streamsize)cipher.size());
-        w32(crc);
+        out.write((const char*)tag, TAG_LEN);
         out.close();
         MD_LOG_INFO << "Model encrypted: " << output_path << std::endl;
         return true;
     }
 
     static bool read_header(const std::string& path, std::string* fmt,
-                            std::vector<uint8_t>* salt, std::vector<uint8_t>* iv,
-                            std::vector<uint8_t>* cipher, uint32_t* crc_out) {
+                            std::vector<uint8_t>* salt, std::vector<uint8_t>* nonce,
+                            std::vector<uint8_t>* cipher, std::vector<uint8_t>* tag) {
         std::ifstream in(path, std::ios::binary);
         if (!in.is_open()) { MD_LOG_ERROR << "Cannot open: " << path << std::endl; return false; }
 
@@ -140,35 +150,36 @@ namespace modeldeploy {
         char magic[4]; uint32_t ver, fmt_len, data_len;
         if (!in.read(magic, 4) || std::string(magic, 4) != MAGIC)
         { MD_LOG_ERROR << "Bad magic." << std::endl; return false; }
-        if (!r32(&ver) || ver != VERSION)
-        { MD_LOG_ERROR << "Unsupported version: " << ver << std::endl; return false; }
+        if (!r32(&ver)) return false;
+        if (ver != VERSION) {
+            MD_LOG_ERROR << "Unsupported version: " << ver
+                         << " (only V" << VERSION << " supported; older files are deprecated)." << std::endl;
+            return false;
+        }
         if (!r32(&fmt_len)) return false;
         fmt->resize(fmt_len); if (!in.read(&(*fmt)[0], fmt_len)) return false;
 
-        salt->resize(SALT_LEN); iv->resize(IV_LEN);
-        if (!in.read((char*)salt->data(), SALT_LEN) || !in.read((char*)iv->data(), IV_LEN)) return false;
+        salt->resize(SALT_LEN); nonce->resize(NONCE_LEN); tag->resize(TAG_LEN);
+        if (!in.read((char*)salt->data(), SALT_LEN) || !in.read((char*)nonce->data(), NONCE_LEN)) return false;
 
         if (!r32(&data_len)) return false;
         cipher->resize(data_len); if (!in.read((char*)cipher->data(), data_len)) return false;
-        if (!r32(crc_out)) return false;
+        if (!in.read((char*)tag->data(), TAG_LEN)) return false;
         return true;
     }
 
     bool decrypt_model_file(const std::string& in_path, const std::string& out_path,
                             const std::string& password) {
         if (is_password_invalid(password)) { MD_LOG_ERROR << "Password cannot be empty." << std::endl; return false; }
-        std::string fmt; std::vector<uint8_t> salt, iv, cipher; uint32_t crc_ref;
-        if (!read_header(in_path, &fmt, &salt, &iv, &cipher, &crc_ref)) return false;
-
-        std::string cs((const char*)cipher.data(), cipher.size());
-        if (calculate_crc32(cs) != crc_ref)
-        { MD_LOG_ERROR << "CRC mismatch (file corrupted)." << std::endl; return false; }
+        std::string fmt; std::vector<uint8_t> salt, nonce, cipher, tag;
+        if (!read_header(in_path, &fmt, &salt, &nonce, &cipher, &tag)) return false;
 
         uint8_t key[AES_KEY_LEN];
-        derive_key(password, salt.data(), (uint32_t)salt.size(), key);
+        if (!derive_key(password, salt.data(), (uint32_t)salt.size(), key))
+        { MD_LOG_ERROR << "Key derivation failed." << std::endl; return false; }
 
         std::vector<uint8_t> plain;
-        if (!aes_decrypt(key, iv.data(), cipher.data(), (uint32_t)cipher.size(), &plain))
+        if (!gcm_decrypt(key, nonce.data(), cipher.data(), (uint32_t)cipher.size(), tag.data(), &plain))
         { MD_LOG_ERROR << "Decryption failed: wrong password or corrupted file." << std::endl; return false; }
 
         std::ofstream out(out_path, std::ios::binary);
@@ -186,22 +197,20 @@ namespace modeldeploy {
     }
 
     std::string get_model_format_from_encrypted_file(const std::string& path) {
-        std::string fmt; std::vector<uint8_t> s, iv, c; uint32_t crc = 0;
-        read_header(path, &fmt, &s, &iv, &c, &crc); return fmt;
+        std::string fmt; std::vector<uint8_t> s, n, c, t;
+        read_header(path, &fmt, &s, &n, &c, &t); return fmt;
     }
 
     bool read_encrypted_model_to_buffer(const std::string& path, const std::string& password,
                                         std::string* buf, std::string* fmt) {
         if (!buf || !fmt) return false;
         if (is_password_invalid(password)) return false;
-        std::vector<uint8_t> salt, iv, cipher; uint32_t crc_ref;
-        if (!read_header(path, fmt, &salt, &iv, &cipher, &crc_ref)) return false;
-        std::string cs((const char*)cipher.data(), cipher.size());
-        if (calculate_crc32(cs) != crc_ref) return false;
+        std::vector<uint8_t> salt, nonce, cipher, tag;
+        if (!read_header(path, fmt, &salt, &nonce, &cipher, &tag)) return false;
         uint8_t key[AES_KEY_LEN];
-        derive_key(password, salt.data(), (uint32_t)salt.size(), key);
+        if (!derive_key(password, salt.data(), (uint32_t)salt.size(), key)) { buf->clear(); fmt->clear(); return false; }
         std::vector<uint8_t> plain;
-        if (!aes_decrypt(key, iv.data(), cipher.data(), (uint32_t)cipher.size(), &plain)) { buf->clear(); fmt->clear(); return false; }
+        if (!gcm_decrypt(key, nonce.data(), cipher.data(), (uint32_t)cipher.size(), tag.data(), &plain)) { buf->clear(); fmt->clear(); return false; }
         buf->assign((const char*)plain.data(), plain.size());
         return true;
     }
