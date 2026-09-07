@@ -1106,7 +1106,7 @@ gal.size(); gal.remove("alice"); gal.clear();
 
 ## 22. 音频解决方案 + 工具（`audio::solution` / `audio::tool`）
 
-`modeldeploy::audio::solution` 提供说话人检索 `SpeakerSearch`、流式识别 `StreamingStt` 与 TTS 批处理 `TtsBatcher`；`modeldeploy::audio::tool` 提供逆文本归一化 `InverseTextNormalizer`/`ItnEngine`、特征 `Fbank`/`Spectrum`/`Waveform` 与重采样 `Resampler` 等纯音频工具。方案清单与算法说明见 [solutions.md](../solutions.md) 与 [models.md §20/§27](../models.md)；可运行示例见 `examples/demo_audio_solutions/`（`demo_diarization` / `demo_stream_stt` / `demo_tts_batch`）。
+`modeldeploy::audio::solution` 提供说话人检索 `SpeakerSearch`、流式识别 `StreamingSTT` 与 TTS 批处理 `TTSBatcher`；`modeldeploy::audio::tool` 提供逆文本归一化 `InverseTextNormalizer`/`ItnEngine`、特征 `Fbank`/`Spectrum`/`Waveform` 与重采样 `Resampler` 等纯音频工具。方案清单与算法说明见 [solutions.md](../solutions.md) 与 [models.md §20/§27](../models.md)；可运行示例见 `examples/demo_audio_solutions/`（`demo_diarization` / `demo_stream_stt` / `demo_tts_batch`）。
 
 ```cpp
 #include "audio/solutions/speaker_search.h"
@@ -1128,14 +1128,14 @@ ss.enroll("alice", emb);
 for (auto& [label, score] : ss.match(emb, 1))   // -> vector<pair<label,score>> 降序
     std::printf("%s %.3f\n", label.c_str(), score);
 
-// 2. TTS 批处理：TtsBatcher（set_synth 注入合成回调；可包真实 Kokoro）
+// 2. TTS 批处理：TTSBatcher（set_synth 注入合成回调；可包真实 Kokoro）
 modeldeploy::audio::tts::Kokoro kokoro("kokoro.onnx", "tokens.txt", {"lexicon-us-en.txt"},
                                        "voices.bin", "dict/", "", option);
-sol::TtsBatcher batcher(sol::TtsBatcher::kokoro_synth(kokoro, "zf_001", 1.0f));
+sol::TTSBatcher batcher(sol::TTSBatcher::kokoro_synth(kokoro, "zf_001", 1.0f));
 batcher.enqueue("锄禾日当午，汗滴禾下土。");      // 长文本自动按标点分块
 auto batches = batcher.dequeue_all();             // vector<vector<float>>（每段 PCM）
 
-// 3. 流式识别：StreamingStt（分块 push + VAD 分段，回调交付文字）
+// 3. 流式识别：StreamingSTT（分块 push + VAD 分段，回调交付文字）
 sol::StreamingSTT stt([](const std::string& text) { std::printf("[STT] %s\n", text.c_str()); });
 stt.set_transcribe(sol::StreamingSTT::sense_voice(sv));   // 可选：注入 SenseVoice 转写
 stt.push(pcm_chunk, 16000); stt.run_once();               // ... 逐块喂入
@@ -1157,7 +1157,7 @@ auto down = tool::Waveform::downsample(samples, 256);
 auto resampled = tool::Resampler::resample(samples, 48000, 16000);  // 静态重采样
 ```
 
-> C++ 音频解决方案/工具命名空间为 `modeldeploy::audio::solution`（单数）与 `modeldeploy::audio::tool`。`TtsBatcher::enqueue` 同时提供单文本与 `vector<string>` 批量重载；`StreamingSTT::set_transcribe` 可注入 `StreamingSTT::sense_voice(AsrModel&)` 转写器，缺省仅做 VAD 分段。
+> C++ 音频解决方案/工具命名空间为 `modeldeploy::audio::solution`（单数）与 `modeldeploy::audio::tool`。`TTSBatcher::enqueue` 同时提供单文本与 `vector<string>` 批量重载；`StreamingSTT::set_transcribe` 可注入 `StreamingSTT::sense_voice(AsrModel&)` 转写器，缺省仅做 VAD 分段。
 
 ## 设备与设备帧
 
