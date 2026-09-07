@@ -796,6 +796,26 @@ float[] out16k = Audio.Tools.Resample(pcm48k, 48000, 16000);
 
 > `SpeakerSearch` 仅暴露 `Enroll`/`Match`（top-1，见 §20）；`Audio.Tools.Resample(float[], inSr, outSr)` 在任意采样率间转换 float PCM。C# 无声纹 `SpeakerGallery`/`TTSBatcher`/`ITN` 封装。
 
+## 22. NLP 工具 + 文本分类（`NlpTools` / `NlpClassifier`）
+
+`NlpTools` 静态类（封装 C API `md_nlp_*`）提供句切分 `SplitSentences` 与文本统计 `Stats`；`NlpClassifier`（封装 `MD_MODEL_TEXT_CLASSIFIER` + `md_nlp_classify`）提供基于 BERT 的文本分类。**C# 未绑定 Keywords / Tokenizer（分词、关键词）与 Pipeline DAG（`Planner`/`Dag`/`Node`）**，如需请用 C++ / Python。
+
+```csharp
+using ModelDeploy;
+
+// 1. 工具：SplitSentences / Stats（对应 C API md_nlp_split_sent / md_nlp_stats）
+string[] sents = NlpTools.SplitSentences("你好。世界。");      // string[]
+(ulong chars, ulong words, ulong nsents) = NlpTools.Stats("我爱北京");
+Console.WriteLine($"{chars} {words} {nsents}");
+
+// 2. 文本分类：NlpClassifier（构造函数模型路径 + RuntimeOption；Predict 返回 (Label, Score)）
+using var tc = new NlpClassifier("bert.onnx", option);
+var (label, score) = tc.Predict("今天天气不错");
+Console.WriteLine($"label={label} score={score:F4}");
+```
+
+> `NlpTools.SplitSentences(string)` / `Stats(string)` 均为静态；`NlpClassifier(string modelPath, RuntimeOption opt = null)`，`Predict(string)` 返回 `(int Label, float Score)`（label_id + score）。C# 无 Keywords / Tokenizer / Pipeline DAG 封装（对应 [models.md §21](../models.md) 的 NLP 族），如需用 C++ / Python。
+
 ## 运行示例
 
 ```bash

@@ -1159,6 +1159,56 @@ auto resampled = tool::Resampler::resample(samples, 48000, 16000);  // 静态重
 
 > C++ 音频解决方案/工具命名空间为 `modeldeploy::audio::solution`（单数）与 `modeldeploy::audio::tool`。`TTSBatcher::enqueue` 同时提供单文本与 `vector<string>` 批量重载；`StreamingSTT::set_transcribe` 可注入 `StreamingSTT::sense_voice(AsrModel&)` 转写器，缺省仅做 VAD 分段。
 
+## 23. NLP 工具 + 文本分类 + Pipeline DAG（`nlp::tool` / `nlp::solution::TextClassifier` / `pipeline`）
+
+`modeldeploy::nlp::tool` 提供纯中文处理工具（`Splitter` / `Keywords` / `Stats` / `Tokenizer` / `Normalizer`，基于 jieba，零模型依赖），`modeldeploy::nlp::solution::TextClassifier` 提供 BERT 文本分类（ONNX，见 [models.md §21](../models.md)）；`modeldeploy::pipeline` 提供通用 DAG 编排（`Planner` / `Dag` / `Node`）。完整示例见 `examples/demo_nlp/demo_nlp.cpp`。
+
+```cpp
+#include "nlp/tools/splitter.h"
+#include "nlp/tools/keywords.h"
+#include "nlp/tools/stats.h"
+#include "nlp/tools/tokenizer.h"
+#include "nlp/solutions/text_classifier.h"
+#include "pipeline/planner.h"
+#include "pipeline/dag.h"
+
+using namespace modeldeploy;
+namespace nlp = modeldeploy::nlp;
+
+// 1. 纯工具：Splitter / Keywords / Stats / Tokenizer（静态方法 + 简单构造）
+auto sents = nlp::tool::Splitter::split_sentences("你好。世界。");       // vector<string>
+size_t words = nlp::tool::Stats::word_count("我爱北京");
+size_t chars = nlp::tool::Stats::char_count("我爱北京");
+size_t nsent = nlp::tool::Stats::sentence_count("你好。世界。");
+for (auto& [word, count] : nlp::tool::Keywords::top("我是中国人。", 5))  // 默认 k=5
+    std::printf("%s %d\n", word.c_str(), count);
+
+nlp::tool::Tokenizer tk("dict_dir");                    // 构造传词典目录
+if (tk.is_loaded()) {
+    auto toks = tk.tokenize("我爱北京");                // mode: "mix"(默认)/"mp"/"hmm"/"full"
+}
+
+// 2. 文本分类：nlp::solution::TextClassifier（继承 BaseModel，同 RuntimeOption）
+nlp::solution::TextClassifier tc("bert.onnx", option);
+int label = 0; float score = 0.f;
+if (tc.is_initialized() && tc.predict("今天天气不错", &label, &score))
+    std::printf("label=%d score=%.4f\n", label, score);
+
+// 3. Pipeline DAG：注册模型工厂（Factory: unique_ptr<Node>(instance)），按 DSL 布图
+pipeline::Planner planner;
+planner.register_model("double", [](const std::string& inst) {
+    return std::make_unique<DoubleNode>(inst);          // Node 子类，声明 in/out 端口 schema
+});
+std::unique_ptr<pipeline::Dag> dag = planner.build("A -> B -> C");
+dag->get_node("A")->set_input("in", std::any(3));       // 种子输入
+if (dag->build()) {                                     // 校验无环 + 拓扑排序
+    if (dag->execute())                                 // 拓扑序单线程执行
+        auto order = dag->execution_order();            // vector<string> 拓扑序
+}
+```
+
+> C++ 工具类为 `modeldeploy::nlp::tool`（`Splitter`/`Keywords`/`Stats`/`Tokenizer`/`Normalizer`），文本分类为 `modeldeploy::nlp::solution::TextClassifier`。C++ `pipeline` 与 Python `modeldeploy.pipeline` 对应，接口名有差异：C++ `Planner::register_model(name, Factory)` 注册节点工厂（Python 用 `register_transform(name, type, fn)` 直接注册可调用）；`Dag::connect(src, src_port, dst, dst_port)` / `add_node` 也可手工搭更复杂的图（YAGNI，DSL 仅支持顺序 + 单级 fan-in/fan-out）。
+
 ## 设备与设备帧
 
 `RuntimeOption::set_device(Device::OPENCL/VULKAN)`(需显式 `use_mnn_backend()`,否则 fail-closed）:
@@ -1172,7 +1222,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 23. 工程配置
+## 24. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

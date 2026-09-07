@@ -991,14 +991,69 @@ print(hctx.highlight("你好小爱同学"))           # 高亮包围，默认 "[
 
 > `md.audio.solutions`/`md.audio.tools` 与 C++ `audio::solution`/`audio::tool` 一一对应；各方法真实签名以本绑定存根为准。`ItnBackend.Lightweight` 为内置轻量实现（默认、零依赖），`WeText` 需 `ENABLE_WETEXT=ON` 且语法模型就绪（缺失自动退化到轻量）。
 
-## 22. 已绑定模块
+## 22. NLP 工具 + 文本分类 + Pipeline DAG（`md.nlp` / `modeldeploy.pipeline`）
+
+`modeldeploy.nlp` 提供纯中文处理工具（句切分 / 分词 / 关键词 / 统计，基于 jieba，零模型依赖）与基于 BERT 的文本分类 `TextClassifier`（`nlp.solutions`，ONNX）；`modeldeploy.pipeline` 提供通用 DAG 编排（`Planner` / `Dag` / `Node`，DSL `"A -> B -> C"`）。
+
+### NLP 工具（`modeldeploy.nlp.tools`）
+
+```python
+from modeldeploy.nlp.tools import Splitter, Tokenizer, Keywords, Stats
+
+# Splitter / Stats / Keywords 均为静态方法，直接以类名调用
+print(Splitter.split_sentences("你好。世界。"))     # list[str]：["你好。", "世界。"]
+print(Stats.word_count("我爱北京"))                 # int
+print(Stats.char_count("我爱北京"))                 # int
+print(Stats.sentence_count("你好。世界。"))          # int
+for word, count in Keywords.top("我是中国人。", 5): # list[tuple[str, int]]，k 默认 5
+    print(word, count)
+
+# Tokenizer：jieba 分词，构造传入词典目录；mode 支持 'mix'/'mp'/'hmm'/'full'
+tk = Tokenizer("dict_dir")
+tk.is_loaded()                                     # bool
+print(tk.tokenize("我爱北京"))                      # list[str]，默认 mode='mix'
+```
+
+### 文本分类（`modeldeploy.nlp.solutions.TextClassifier`）
+
+```python
+from modeldeploy.nlp.solutions import TextClassifier
+
+t = TextClassifier("bert.onnx", option)            # option 可省
+t.is_initialized()                                 # bool
+label, score = t.predict("今天天气不错")            # tuple[int, float]：label_id, score
+```
+
+### Pipeline DAG（`modeldeploy.pipeline`）
+
+`Planner.register_transform(name, type, fn)` 注册一个 Python 变换节点（`in`/`out` 端口按 `type` 声明、`fn` 为 Python 可调用），`build(spec)` 按 DSL 自动布节点/边并返回 `Dag`。DSL：`"A -> B -> C"`（顺序）、`"{A,B} -> C"`（fan-in）、`"A -> {B,C}"`（fan-out）；端口固定命名为 `in`/`out`。
+
+```python
+from modeldeploy.pipeline import Planner
+
+pl = Planner()
+pl.register_transform("double", "int", lambda x: x * 2)  # name, type(端口类型), fn
+dag = pl.build("A -> B -> C")                            # 实例名来自 DSL
+
+node = dag.get_node("A")
+node.set_input("in", 3)                                  # 种子输入
+ok = dag.build()                                         # 校验无环 + 拓扑排序
+ok = dag.execute()                                       # 拓扑序单线程执行
+print(dag.execution_order())                             # list[str]，拓扑序
+print(dag.get_node("C").get_output("out"))               # 读下游输出
+```
+
+> `modeldeploy.nlp` 与 C++ `nlp::tool` / `nlp::solution::TextClassifier` 一一对应（模型语义见 [models.md §21](../models.md)）；`modeldeploy.pipeline` 以 Python 变换函数包装节点，对应 C++ `pipeline::{Planner, Dag, Node}`（C++ 用 `register_model` + 工厂，Python 用 `register_transform` + 可调用）。
+
+## 23. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute`、`ReID`、`BarcodeDetector`、`ByteTracker`/`BotSortTracker`/`StrongSortTracker` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult`、`AttributeResult`、`ReIdResult`、`BarcodeResult`、`TrackResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr`、`vis_attr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
+- **NLP**：`nlp.tools.{Splitter, Tokenizer, Keywords, Stats}`、`nlp.solutions.TextClassifier`、`pipeline.{Planner, Dag, Node}`
 
-## 23. 性能测试
+## 24. 性能测试
 
 ```python
 import time

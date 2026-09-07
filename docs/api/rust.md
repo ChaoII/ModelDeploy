@@ -873,6 +873,26 @@ let out16k = resample(&pcm48k, 48000, 16000)?;
 
 > Rust 的 `resample` 是**自由函数**而非方法（C++/Python 为类 `Resampler` 内的重采样）；`SpeakerSearch::match_top` 仅返回 top-1（C API 语义），如需 top-k 请用 C++ / Python 的 `SpeakerGallery`/`SpeakerSearch.match(k)`。
 
+## 22. NLP 工具 + 文本分类（`nlp::split_sentences` / `nlp::stats` / `NlpClassifier`）
+
+`nlp` 模块（`src/nlp.rs`，封装 C API `md_nlp_*`）提供句切分 `split_sentences` 与文本统计 `stats` 两个自由函数，以及基于 BERT 的文本分类 `NlpClassifier`。**Rust 未绑定 Keywords / Tokenizer（分词、关键词）与 Pipeline DAG（`Planner`/`Dag`/`Node`）**，如需请用 C++ / Python。函数均返回 `Result<_, MdError>`。
+
+```rust
+use modeldeploy::{RuntimeOption, nlp};
+use modeldeploy::nlp::NlpClassifier;
+
+let sents: Vec<String> = nlp::split_sentences("你好。世界。")?;  // 句切分
+let (chars, words, nsents): (usize, usize, usize) = nlp::stats("我爱北京")?;
+
+// 文本分类：NlpClassifier::new(model_path, &RuntimeOption)；predict -> (label, score)
+let opt = RuntimeOption::new()?.use_ort();
+let tc = NlpClassifier::new("bert.onnx", &opt)?;
+let (label, score): (i32, f32) = tc.predict("今天天气不错")?;
+println!("label={} score={:.4}", label, score);
+```
+
+> Rust 以自由函数 `nlp::split_sentences` / `nlp::stats`（对应 C API `md_nlp_split_sent` / `md_nlp_stats`）与结构 `NlpClassifier`（对应 `MD_MODEL_TEXT_CLASSIFIER` + `md_nlp_classify`）承载 NLP；统计返回 `(chars, words, sents)` 三元组，分类 `predict` 返回 `(i32, f32)`（label_id + score）。无分词/关键词/文本分类之外的 pipeline DAG 绑定（对应 C++ `pipeline::{Planner, Dag, Node}`，见 [models.md §21](../models.md)）。
+
 ## 主要模块文件
 
 | 文件 | 说明 |

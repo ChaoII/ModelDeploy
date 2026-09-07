@@ -1185,6 +1185,38 @@ int main(void) {
 
 > `md_audio_speaker_search_match` 虽然接收 `k`，但只回填 `best_label`/`best_score`（top-1）；多说话人 top-k 请用 C++ / Python `SpeakerGallery`/`SpeakerSearch.match(k)`。`md_audio_resample` 输出指针归 C API 内部缓冲区所有（借用、不 `free`，随下次调用失效）。
 
+## 22. NLP 工具 + 文本分类（`md_nlp_*`）
+
+`md_nlp_*` 封装 C++ `nlp::tool`/`nlp::solution::TextClassifier` 提供句切分、统计、关键词、分词与文本分类（如 [models.md §21](../models.md)）。文本分类经 `md_model_create(MD_MODEL_TEXT_CLASSIFIER, path, opt)` 创建句柄，再用 `md_nlp_classify` 推理。字符串/数组输出指针归 C API 内部缓冲区所有（借用、不 `free`，随下次调用失效）。DSL 编排的 `pipeline::{Planner, Dag, Node}` **未在 C API 绑定**，如需请用 C++ / Python。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+/* 1. 纯工具：md_nlp_split_sent / md_nlp_stats / md_nlp_keywords / md_nlp_tokenize */
+const char** sents = NULL; size_t n = 0;
+md_nlp_split_sent("你好。世界。", &sents, &n);        /* n 个句段 */
+
+size_t chars = 0, words = 0, nsents = 0;
+md_nlp_stats("我爱北京", &chars, &words, &nsents);
+
+const char** wds = NULL; int* counts = NULL; size_t nw = 0;
+md_nlp_keywords("我是中国人。", 5, &wds, &counts, &nw); /* top-k (词, 计数) */
+
+const char** toks = NULL; size_t nt = 0;
+md_nlp_tokenize("我爱北京", "dict_dir", &toks, &nt);    /* jieba 分词 */
+
+/* 2. 文本分类：MD_MODEL_TEXT_CLASSIFIER + md_nlp_classify */
+MDModelHandle h = NULL;
+md_option_create(&opt);                                 /* RuntimeOption */
+md_model_create(&h, MD_MODEL_TEXT_CLASSIFIER, "bert.onnx", opt);
+int label = 0; float score = 0.f;
+md_nlp_classify(h, "今天天气不错", &label, &score);      /* label + score */
+md_model_destroy(h); md_option_destroy(opt);
+```
+
+> `md_nlp_stats` 一次回填 chars/words/sents 三值；`md_nlp_keywords` 的 `counts` 与 `wds` 逐一对应。所有输出缓冲归 C API 内部、借用只读，不释放、随下次调用失效。
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。
@@ -1196,6 +1228,7 @@ C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创�
 | 结果 | `md_result_count` / `md_result_detection` / `md_result_classification` / `md_result_instance_seg` / `md_result_ocr` / `md_result_face` / `md_result_lpr` / `md_result_attribute` 等 + `md_result_destroy` |
 | 图像 | `md_image_from_file` / `md_image_from_bgr24` / `md_image_from_device_nv12` / `md_image_to_host_bytes` / `md_image_plane_bytes` / `md_image_save` / `md_image_destroy` 等 |
 | 音频 | `md_audio_asr` / `md_audio_asr_wav` / `md_audio_tts` / `md_audio_tts_stream` / `md_audio_speaker_embed` / `md_audio_resample` / `md_wav_save`；解决方案 `md_audio_solution_create`（`MD_AUDIO_SPEAKER_SEARCH`）+ `md_audio_speaker_search_*` |
+| NLP | `md_nlp_split_sent` / `md_nlp_stats` / `md_nlp_keywords` / `md_nlp_tokenize` / `md_nlp_classify`（`MD_MODEL_TEXT_CLASSIFIER`） |
 | 绘制 | `md_draw_rect` / `md_draw_polygon` / `md_draw_text` / `md_draw_result` |
 | 视频 | `md_video_*`（解码/编码，见下） |
 
