@@ -268,6 +268,93 @@ canvas.Save("pose_vis.jpg");
 using var pose2 = pose.Clone();
 ```
 
+## 9. OBB（旋转框检测）（`ObbModel`）
+
+旋转框检测模型类 `ModelDeploy.Models.ObbModel`（对应 `MD_MODEL_OBB`）。结果类型 `ModelDeploy.Results.ObbResult`（属性 `Box: RotatedRectF{Cx, Cy, Width, Height, Angle}`、`LabelId: int`、`Score: float`）；`Cx/Cy` 为旋转框中心、`Angle` 为弧度角，坐标均为原图像素。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var obb = new ObbModel("yolo11n-obb.onnx", option);
+
+// 预处理/后处理参数
+obb.SetInputSize(1024, 1024);     // letterbox 输入尺寸（默认 1024x1024）
+obb.SetConfThreshold(0.25);       // 置信度阈值（默认 0.25）
+obb.SetNmsThreshold(0.45);        // NMS IoU 阈值（默认 0.5）
+
+using var img = VisionImage.Read("test.jpg");
+
+// 单图推理：Prediction<ObbResult>（foreach / 索引 / .Count）
+using var pred = obb.Predict(img);
+foreach (var r in pred) {
+    Console.WriteLine($"{r.LabelId} {r.Score:F3} " +
+                      $"(xc={r.Box.Cx}, yc={r.Box.Cy}, w={r.Box.Width}, h={r.Box.Height}, angle={r.Box.Angle})");
+}
+
+// 可视化：pred.Draw 直达 C++ vis_obb
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { Threshold = 0.5, FontSize = 14, Alpha = 0.3 });
+canvas.Save("obb_vis.jpg");
+
+// 批量推理：PredictBatch 按图返回 IReadOnlyList<ObbResult[]>
+using var img2 = VisionImage.Read("bus.jpg");
+var batch = obb.PredictBatch(new[] { img, img2 });
+for (int g = 0; g < batch.Count; g++) {
+    Console.WriteLine($"image {g}: {batch[g].Length} rotated boxes");
+}
+
+// 多线程：Clone() 深拷贝独立实例
+using var obb2 = obb.Clone();
+```
+
+## 10. 图像分类（`ClassificationModel`）
+
+分类模型类 `ModelDeploy.Models.ClassificationModel`（对应 `MD_MODEL_CLASSIFICATION`）。结果类型 `ModelDeploy.Results.ClassificationResult`（属性 `LabelId: int`、`Score: float`，`Prediction` 中 Top-K 逐项）。参数 setter：`SetTopK`（默认 1）、`SetMultiLabel`（默认 false）。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var cls = new ClassificationModel("yolo11n-cls.onnx", option);
+
+// 预处理/后处理参数
+cls.SetInputSize(224, 224);       // 输入尺寸（默认 224x224）
+cls.SetTopK(5);                   // Top-K 输出个数（默认 1）
+cls.SetMultiLabel(false);         // 多标签模式（默认 false）
+
+using var img = VisionImage.Read("test.jpg");
+
+// 单图推理：Prediction<ClassificationResult>（LabelId 与 Score 逐位配对）
+using var pred = cls.Predict(img);
+foreach (var r in pred) {
+    Console.WriteLine($"{r.LabelId} {r.Score:F3}");
+}
+
+// 可视化：pred.Draw 直达 C++ vis_cls（Threshold 即分数阈值）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { Threshold = 0.35, FontSize = 14, Alpha = 0.3 });
+canvas.Save("cls_vis.jpg");
+
+// 批量推理：PredictBatch 按图返回 IReadOnlyList<ClassificationResult[]>
+using var img2 = VisionImage.Read("bus.jpg");
+var batch = cls.PredictBatch(new[] { img, img2 });
+for (int g = 0; g < batch.Count; g++) {
+    Console.WriteLine($"image {g}: {batch[g].Length} labels");
+}
+
+// 多线程：Clone() 深拷贝独立实例
+using var cls2 = cls.Clone();
+```
+
 ## 运行示例
 
 ```bash

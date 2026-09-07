@@ -308,6 +308,96 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 9. OBB（旋转框检测）（`UltralyticsObb`）
+
+旋转框检测模型 `UltralyticsObb::new(path, &opt)?` 加载（输入默认 1024x1024）。结果类型 `Obb`（字段 `rotated_box: RotatedBox{cx, cy, width, height, angle}`、`label_id: i32`、`score: f32`）；`cx/cy` 为旋转框中心、`angle` 为弧度角，坐标均为原图像素。
+
+```rust
+use modeldeploy::{DrawOptions, Image, RuntimeOption, UltralyticsObb};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项 + 构造（详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+    let model = UltralyticsObb::new("yolo11n-obb.onnx", &opt)?;
+
+    // 2. 预处理/后处理参数（均为 Result<(), MdError>）
+    model.set_input_size(1024, 1024)?;    // letterbox 输入尺寸（默认 1024x1024）
+    model.set_conf_threshold(0.25)?;      // 置信度阈值（默认 0.25）
+    model.set_nms_threshold(0.45)?;       // NMS IoU 阈值（默认 0.5）
+
+    // 3. 单图推理：predict(&Image) -> Vec<Obb>
+    let img = Image::read("test.jpg")?;
+    let obbs = model.predict(&img)?;
+    for r in &obbs {
+        let rb = &r.rotated_box;
+        println!("label={} score={:.3} obb=(xc={:.1}, yc={:.1}, w={:.1}, h={:.1}, angle={:.3})",
+                 r.label_id, r.score, rb.cx, rb.cy, rb.width, rb.height, rb.angle);
+    }
+
+    // 4. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<Obb>>（按图分组）
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+    for (i, rs) in batch.iter().enumerate() {
+        println!("image {}: {} rotated boxes", i, rs.len());
+    }
+
+    // 5. 可视化：predict_and_draw 句柄直达 C++ vis_obb，把结果绘制到 canvas
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas, &DrawOptions::new().with_threshold(0.5).with_alpha(0.3))?;
+    canvas.save("obb_vis.jpg")?;
+
+    // 6. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let model2 = model.clone()?;
+    Ok(())
+}
+```
+
+## 10. 图像分类（`Classification`）
+
+分类模型 `Classification::new(path, &opt)?` 加载（输入默认 224x224）。单图返回 `Vec<ClassificationResult>`（字段 `label_id: i32`、`score: f32`，Top-K 逐项）。参数：`set_top_k`（默认 1）、`set_multi_label`（默认 false）。
+
+```rust
+use modeldeploy::{Classification, DrawOptions, Image, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项 + 构造（详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+    let model = Classification::new("yolo11n-cls.onnx", &opt)?;
+
+    // 2. 预处理/后处理参数
+    model.set_input_size(224, 224)?;      // 输入尺寸（默认 224x224）
+    model.set_top_k(5)?;                  // Top-K 输出个数（默认 1）
+    model.set_multi_label(false)?;        // 多标签模式（默认 false）
+
+    // 3. 单图推理：predict(&Image) -> Vec<ClassificationResult>
+    let img = Image::read("test.jpg")?;
+    let cls = model.predict(&img)?;
+    for c in &cls {
+        println!("label={} score={:.3}", c.label_id, c.score);
+    }
+
+    // 4. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<ClassificationResult>>（按图分组）
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+    for (i, cs) in batch.iter().enumerate() {
+        println!("image {}: {} labels", i, cs.len());
+    }
+
+    // 5. 可视化：predict_and_draw 句柄直达 C++ vis_cls
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas, &DrawOptions::new().with_threshold(0.35).with_alpha(0.3))?;
+    canvas.save("cls_vis.jpg")?;
+
+    // 6. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let model2 = model.clone()?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

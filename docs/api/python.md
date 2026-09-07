@@ -301,14 +301,87 @@ pose2 = pose.clone()
 vehicle2 = vehicle.clone()
 ```
 
-## 9. 已绑定模块
+## 9. OBB（旋转框检测）（UltralyticsObb）
+
+Ultralytics YOLO-OBB 模型（`yolo11n-obb.onnx` 等），输入默认 [1024, 1024]。单图返回 `list[ObbResult]`（字段 `rotated_box: RotatedRect`、`label_id: int`、`score: float`）；`rotated_box` 为旋转框（`xc/yc` 中心点 + `width/height` 边长 + `angle` 弧度角，原图像素坐标）。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（option 配置见上节）
+option = md.RuntimeOption()
+option.use_ort_backend()
+option.use_cpu()
+obb = md.vision.UltralyticsObb("yolo11n-obb.onnx", option)
+
+# 2. 预处理/后处理参数（属性直接赋值）
+obb.preprocessor.size = [1024, 1024]       # letterbox 输入尺寸（默认 [1024, 1024]）
+obb.preprocessor.padding_value = [114.0, 114.0, 114.0]
+obb.postprocessor.conf_threshold = 0.25    # 置信度阈值（默认 0.25）
+obb.postprocessor.nms_threshold = 0.45     # NMS IoU 阈值（默认 0.5）
+
+# 3. 单图推理：返回 list[ObbResult]
+img = cv2.imread("test.jpg")
+results = obb.predict(img)
+for r in results:
+    rb = r.rotated_box
+    print(r.label_id, r.score, rb.xc, rb.yc, rb.width, rb.height, rb.angle)
+
+# 4. 批量推理：返回 list[list[ObbResult]]（按图分组）
+batch = obb.batch_predict([cv2.imread("a.jpg"), cv2.imread("b.jpg")])
+
+# 5. 可视化：md.vision.vis_obb 返回 BGR ndarray
+#    签名：vis_obb(image, result, threshold=0.5, font_path="", font_size=14, alpha=0.15, save_result=False)
+vis = md.vision.vis_obb(img, results, threshold=0.5, font_path="msyh.ttc", font_size=14, alpha=0.3)
+cv2.imwrite("obb_vis.jpg", vis)
+
+# 6. 多线程：clone() 深拷贝独立实例（每线程持有一个，互不干扰）
+obb2 = obb.clone()
+```
+
+## 10. 图像分类（Classification）
+
+分类模型（`yolo11n-cls.onnx` 等，输入默认 [224, 224] + center crop）。单图返回**单个** `ClassifyResult`（字段 `label_ids: list[int]`、`scores: list[float]`，二者按序配对；Top-K 由模型后处理决定）。注意：Python 绑定的 `ClassificationPostprocessor` **只暴露 `set_multi_label`，无 `set_topk`**。
+
+```python
+import cv2
+import modeldeploy as md
+
+# 1. 构造（option 配置见上节）
+cls = md.vision.Classification("yolo11n-cls.onnx", option)
+
+# 2. 预处理/后处理参数（属性直接赋值）
+cls.preprocessor.size = [224, 224]         # 输入尺寸（默认 [224, 224]）
+cls.preprocessor.disable_center_crop()     # 关闭 center crop（默认开启）
+cls.postprocessor.set_multi_label(True)    # 多标签模式（默认 False）
+
+# 3. 单图推理：返回单个 ClassifyResult（label_ids 与 scores 逐位配对）
+img = cv2.imread("test.jpg")
+cr = cls.predict(img)
+for lid, s in zip(cr.label_ids, cr.scores):
+    print(lid, s)
+
+# 4. 批量推理：返回 list[ClassifyResult]（每图一个）
+batch = cls.batch_predict([cv2.imread("a.jpg"), cv2.imread("b.jpg")])
+
+# 5. 可视化：md.vision.vis_cls；top_k / threshold 为必填位置参数
+#    签名：vis_cls(image, result, top_k, threshold, font_path="", font_size=14, alpha=0.15, save_result=False)
+vis = md.vision.vis_cls(img, cr, 5, 0.35, font_path="msyh.ttc", font_size=14, alpha=0.3)
+cv2.imwrite("cls_vis.jpg", vis)
+
+# 6. 多线程：clone() 深拷贝独立实例
+cls2 = cls.clone()
+```
+
+## 11. 已绑定模块
 - **核心**：`RuntimeOption`、`Runtime`、`Tensor`、`BaseModel`、`Device`、`Backend`
 - **视觉模型**：`UltralyticsDet/Seg/Obb/Pose`、`UltralyticsSem/Depth`、`FastSam`、`HandKeypoint`、`landmark.VehicleKeypoint/FaceLandmark`、`Classification`、`Scrfd`、`SeetaFace*`、`LprPipeline`、`PaddleOCR`、`PedestrianAttribute` 等
 - **结果结构**：`DetectionResult`、`InstanceSegResult`、`SemSegResult`、`DepthResult`、`OCRResult`、`KeyPointsResult` 等
 - **可视化**：`vis_det`、`vis_iseg`、`vis_keypoints`、`vis_ocr` 等
 - **音频**：`Kokoro`（TTS，`predict_stream` 返回 chunks 列表）、`SenseVoice` 等
 
-## 10. 性能测试
+## 12. 性能测试
 
 ```python
 import time

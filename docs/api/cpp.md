@@ -346,7 +346,107 @@ int main() {
 }
 ```
 
-## 9. 更多模型（均使用同一 `RuntimeOption`）
+## 9. OBB（旋转框检测）（UltralyticsObb）
+
+Ultralytics YOLO-OBB 模型（命名空间 `vision::detection`，`yolo11n-obb.onnx` 等）。结果类型 `vision::ObbResult`（字段 `rotated_box: RotatedRect{xc, yc, width, height, angle}`、`label_id: int32_t`、`score: float`）；`xc/yc` 为旋转框中心、`angle` 为弧度角，坐标均为原图像素。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    // 1. 运行时选项 + 构造（详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+    auto obb = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("yolo11n-obb.onnx", opt);
+    if (!obb->is_initialized()) return 1;
+
+    // 2. 预处理/后处理参数
+    obb->get_preprocessor().set_size({1024, 1024});     // letterbox 输入尺寸（默认 {1024, 1024}）
+    obb->get_preprocessor().set_padding_value({114.f, 114.f, 114.f});
+    obb->get_postprocessor().set_conf_threshold(0.25f); // 置信度阈值（默认 0.25）
+    obb->get_postprocessor().set_nms_threshold(0.45f);  // NMS IoU 阈值（默认 0.5）
+
+    // 3. 单图推理
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    std::vector<modeldeploy::vision::ObbResult> res;
+    if (!obb->predict(im, &res)) return 1;
+    for (const auto& r : res) {
+        const auto& rb = r.rotated_box;
+        std::printf("label=%d score=%.3f obb=(xc=%.1f, yc=%.1f, w=%.1f, h=%.1f, angle=%.3f)\n",
+                    r.label_id, r.score, rb.xc, rb.yc, rb.width, rb.height, rb.angle);
+    }
+
+    // 4. 可视化：vis_obb；或 obb->draw_result(im, res, 0.5) 就地绘制（GPU 帧按设备分发）
+    auto vis = modeldeploy::vision::vis_obb(im, res, 0.5, "msyh.ttc", 14, 0.3, false);
+    vis.imwrite("obb_vis.jpg");
+    const auto label_map = obb->get_label_map("names");
+
+    // 5. 批量推理：各图统一 letterbox 后拼 batch，返回按图分组
+    std::vector<modeldeploy::vision::ImageData> images = {
+        modeldeploy::vision::ImageData::imread("a.jpg"),
+        modeldeploy::vision::ImageData::imread("b.jpg"),
+    };
+    std::vector<std::vector<modeldeploy::vision::ObbResult>> ress;
+    obb->batch_predict(images, &ress);
+
+    // 6. 多线程：clone() 深拷贝独立实例
+    auto obb2 = obb->clone();
+    return 0;
+}
+```
+
+## 10. 图像分类（classification::Classification）
+
+分类模型（命名空间 `vision::classification`，`yolo11n-cls.onnx` 等，输入默认 {224, 224} + center crop）。单图返回**单个** `vision::ClassifyResult`（字段 `label_ids: std::vector<int32_t>`、`scores: std::vector<float>`，二者按序配对）。后处理经 `set_top_k`（默认 1）控制输出个数、`set_multi_label`（默认 false）切换逐维独立概率的多标签模式；另有 `set_multi_label_auto(true)` 按全类概率和自动判别单/多标签（显式 `set_multi_label` 优先）。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    // 1. 运行时选项 + 构造（详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+    auto cls = std::make_unique<modeldeploy::vision::classification::Classification>(
+        "yolo11n-cls.onnx", opt);
+    if (!cls->is_initialized()) return 1;
+
+    // 2. 预处理/后处理参数
+    cls->get_preprocessor().set_size({224, 224});            // 输入尺寸（默认 {224, 224}）
+    cls->get_preprocessor().disable_center_crop();           // 关闭 center crop（默认开启）
+    cls->get_postprocessor().set_top_k(5);                   // Top-K 输出个数（默认 1）
+    cls->get_postprocessor().set_multi_label(false);         // 多标签模式（默认 false）
+
+    // 3. 单图推理：输出单个 ClassifyResult（label_ids 与 scores 逐位配对）
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    modeldeploy::vision::ClassifyResult res;
+    if (!cls->predict(im, &res)) return 1;
+    for (size_t i = 0; i < res.label_ids.size() && i < res.scores.size(); ++i) {
+        std::printf("label=%d score=%.3f\n", res.label_ids[i], res.scores[i]);
+    }
+
+    // 4. 可视化：vis_cls(image, result, top_k, threshold, font_path, font_size, alpha, save_result)
+    auto vis = modeldeploy::vision::vis_cls(im, res, 5, 0.35, "msyh.ttc", 14, 0.3, false);
+    vis.imwrite("cls_vis.jpg");
+
+    // 5. 批量推理：每图一个 ClassifyResult
+    std::vector<modeldeploy::vision::ImageData> images = {
+        modeldeploy::vision::ImageData::imread("a.jpg"),
+        modeldeploy::vision::ImageData::imread("b.jpg"),
+    };
+    std::vector<modeldeploy::vision::ClassifyResult> ress;
+    cls->batch_predict(images, &ress);
+
+    // 6. 多线程：clone() 深拷贝独立实例
+    auto cls2 = cls->clone();
+    return 0;
+}
+```
+
+## 11. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -402,7 +502,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 10. 工程配置
+## 12. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

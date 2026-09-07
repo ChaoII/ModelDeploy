@@ -24,4 +24,7 @@ ModelDeploy 核心逻辑全部在 C++ SDK，提供 **C++ / Python / C / C# / Rus
 | 深度估计 | `vision::detection::UltralyticsDepth` | `modeldeploy.vision.UltralyticsDepth` | `MD_MODEL_DEPTH`（经 `md_model_create`） | `Models.DepthModel` | `UltralyticsDepth` |
 | 姿态 / 关键点 | `vision::detection::UltralyticsPose` / `vision::hand::HandKeypoint` / `vision::landmark::VehicleKeypoint` / `vision::landmark::FaceLandmark` | `modeldeploy.vision.UltralyticsPose` / `.HandKeypoint` / `.landmark.VehicleKeypoint` / `.landmark.FaceLandmark` | `MD_MODEL_POSE` / `MD_MODEL_HAND` / `MD_MODEL_VEHICLE_KEYPOINT` / `MD_MODEL_FACE_LANDMARK`（经 `md_model_create`） | `Models.PoseModel` / `Models.HandModel` / `Models.VehicleKeypointModel` / `Models.FaceLandmarkModel` | `UltralyticsPose` / `HandKeypoint` / `VehicleKeypoint` / `FaceLandmark` |
 
+| OBB（旋转框检测） | `vision::detection::UltralyticsObb` | `modeldeploy.vision.UltralyticsObb` | `MD_MODEL_OBB`（经 `md_model_create`） | `Models.ObbModel` | `UltralyticsObb` |
+| 图像分类 | `vision::classification::Classification` | `modeldeploy.vision.Classification` | `MD_MODEL_CLASSIFICATION`（经 `md_model_create`） | `Models.ClassificationModel` | `Classification` |
+
 其余模型族在后续小节逐个补全。

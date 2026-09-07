@@ -379,6 +379,104 @@ md_model_create(&fl, MD_MODEL_FACE_LANDMARK, "face_landmark.onnx", opt);
  * md_draw_result 亦按 MD_RES_POSE 绘制 */
 ```
 
+## 9. OBB（旋转框检测）（`MD_MODEL_OBB`）
+
+OBB 模型经 `md_model_create(kind=MD_MODEL_OBB, ...)` 创建。结果经 `md_result_obb` 以 `MDObbItem{ cx, cy, w, h, angle, score, label_id }` 数组返回（`cx/cy` 为旋转框中心、`angle` 为弧度角，坐标均为原图像素）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_OBB, "yolo11n-obb.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    md_model_set_input_size(m, 1024, 1024);   /* letterbox 输入尺寸（默认 1024x1024） */
+    /* 参数自省：OBB 返回 "conf_threshold|nms_threshold"（类型均 'D'） */
+    md_model_set_param_d(m, "conf_threshold", 0.25);
+    md_model_set_param_d(m, "nms_threshold", 0.45);
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+    MDResultHandle res = NULL;
+    md_model_predict(m, img, &res);
+
+    const MDObbItem* items = NULL;
+    size_t n = 0;
+    md_result_obb(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        printf("[%zu] label=%d score=%.3f obb=(xc=%.1f, yc=%.1f, w=%.1f, h=%.1f, angle=%.3f)\n",
+               i, items[i].label_id, items[i].score,
+               items[i].cx, items[i].cy, items[i].w, items[i].h, items[i].angle);
+    }
+
+    /* 批量推理：md_result_obb_batch(bres, g, &items, &n) 取第 g 图项数组 */
+
+    /* 可视化：md_draw_result 支持 MD_RES_OBB（底层 vis_obb），用法同 §3 */
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
+## 10. 图像分类（`MD_MODEL_CLASSIFICATION`）
+
+分类模型经 `md_model_create(kind=MD_MODEL_CLASSIFICATION, ...)` 创建。结果经 `md_result_classification` 以 `MDClassifyItem{ label_id, score }` 数组返回（Top-K 逐项，`label_id`/`score` 逐位配对）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_CLASSIFICATION, "yolo11n-cls.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    md_model_set_input_size(m, 224, 224);     /* 输入尺寸（默认 224x224） */
+    /* 参数自省：CLASSIFICATION 返回 "top_k|multi_label"（类型 'I' / 'B'） */
+    md_model_set_param_i(m, "top_k", 5);      /* Top-K 输出个数（默认 1） */
+    md_model_set_param_b(m, "multi_label", 0);/* 多标签模式（默认 0） */
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+    MDResultHandle res = NULL;
+    md_model_predict(m, img, &res);
+
+    const MDClassifyItem* items = NULL;
+    size_t n = 0;
+    md_result_classification(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        printf("[%zu] label=%d score=%.3f\n", i, items[i].label_id, items[i].score);
+    }
+
+    /* 批量推理：md_result_classification_batch(bres, g, &items, &n) 取第 g 图项数组 */
+
+    /* 可视化：md_draw_result 支持 MD_RES_CLASSIFICATION（底层 vis_cls），用法同 §3 */
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。
