@@ -949,7 +949,7 @@ int main(void) {
 int main(void) {
     MDBarcodeHandle bc = NULL;
     md_barcode_create(&bc);
-    /* 限定 QR(位0) + EAN-13(位4)，其余格式不解码；0 = 全部格式 */
+    /* 限定 QR(位0) + EAN-13(位4)，其余格式不解码；不调用即在默认 FMT_ALL 下解码全部 */
     md_barcode_set_formats(bc, (uint32_t)((1u << 0) | (1u << 4)));
 
     MDImageHandle img = NULL;

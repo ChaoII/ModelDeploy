@@ -592,7 +592,7 @@ boxes = ia.detect(img)
 # 4. 子模型独立使用（也可不经 InsightFaceAnalysis 单独构造；option 可省略）
 det = md.vision.InsightFaceDet("det_10g.onnx")
 det.preprocessor.size = [640, 640]       # 输入尺寸（默认 [640, 640]）
-det.postprocessor.nms_thresh = 0.5       # NMS 阈值（默认 0.5）
+det.postprocessor.nms_thresh = 0.4       # NMS 阈值（默认 0.4）
 faces = det.predict(img)                 # -> list[InsightFaceBox]
 for f in faces:
     print(f.bbox, f.score, f.kps)

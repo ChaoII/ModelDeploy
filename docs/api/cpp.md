@@ -34,13 +34,12 @@ option.use_ort_backend();       // OnnxRuntime（.onnx，最通用）
 // option.use_sophgo_backend(); // Sophgo（.bmodel，算能 TPU）
 // option.use_ncnn_backend();   // ncnn（.param/.bin，CPU/Vulkan，YOLO 全系）
 
-// 设备
-option.use_cpu();                                   // CPU（默认）
-// option.use_gpu(device_id);                       // NVIDIA GPU
-// option.set_device(modeldeploy::Device::OPENCL, 0); // 需显式 use_mnn_backend()
-// option.set_device(modeldeploy::Device::VULKAN, 0); // 需显式 use_mnn_backend()
-// option.set_device(modeldeploy::Device::GPU, 0);
-// option.set_device(modeldeploy::Device::TPU, 0);
+// 设备（推荐 set_device；use_cpu/use_gpu/use_opencl 等为废弃转发，兼容旧代码）
+option.set_device(modeldeploy::Device::CPU);                    // CPU
+// option.set_device(modeldeploy::Device::GPU, 0);              // NVIDIA CUDA GPU
+// option.set_device(modeldeploy::Device::OPENCL, 0);           // 需显式 use_mnn_backend()
+// option.set_device(modeldeploy::Device::VULKAN, 0);           // 需显式 use_mnn_backend()
+// option.set_device(modeldeploy::Device::TPU, 0);              // 算能 TPU
 
 // CPU 线程数
 option.set_cpu_thread_num(4);
