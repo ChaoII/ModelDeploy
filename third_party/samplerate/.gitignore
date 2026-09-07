@@ -29,6 +29,7 @@ autom4te.cache
 libsamplerate-*.tar.xz
 compile
 config.*
+!config.h.cmake
 !/config.h.in
 configure
 depcomp

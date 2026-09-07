@@ -108,6 +108,24 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 - `build_wheel.yml` — 在 ubuntu/windows 上运行 `python -m build`，Python 3.12–3.13，无测试
 - `build_release.yml` — 完整 cmake 构建 + `ctest`（CPU）；GPU 任务仅编译，无测试。标签 `v*` 触发 GitHub Release 上传
 
+## GitHub 凭据
+
+- GitHub 访问令牌（供 `gh` / REST API / Chrono II 调试 Actions 用）以纯文本存放在 git 凭据文件：
+  `C:\Users\aichao\.git-credentials`
+  每行格式 `https://<github用户名>:<token>@github.com`（本机用户 `ChaoII`，仓库 `ChaoII/ModelDeploy`）。
+- 读取方式（不打印明文本体，token 存入变量复用）：
+  ```powershell
+  $line = Get-Content "$env:USERPROFILE\.git-credentials" |
+          Where-Object { $_ -like '*@github.com*' } | Select-Object -First 1
+  $token = (($line.Split('@'))[0] -split ':')[2]   # 提取 https://user:<token>@... 中的 token
+  ```
+- 用法示例（拉 CI 失败日志需仓库 admin 权限，本目录 token 具备）：
+  ```powershell
+  curl -s -H "Authorization: Bearer $token" `
+       "https://api.github.com/repos/ChaoII/ModelDeploy/actions/jobs/<job_id>/logs"
+  ```
+- **安全红线**：该 token 属机密。**禁止**把 token 明文写进 AGENTS.md / 仓库文件 / 提交 / 日志回显；调用 GitHub 一律经环境变量或动态读取上述文件取得，切勿硬编码或打印其明文。
+
 ## 开发过程文档（superpowers）
 
 - **覆盖技能默认路径**：superpowers 的 design spec / 实施计划默认写 `docs/superpowers/`，但本仓库约定改到仓库根 **`.superpowers/`**：spec 存 `.superpowers/specs/`，plan 存 `.superpowers/plans/`（`docs/` 只放面向使用者的公开文档）。
