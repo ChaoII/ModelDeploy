@@ -35,6 +35,57 @@ foreach (var r in pred) {
 }
 ```
 
+## 3. 目标检测（`DetectionModel`）
+
+检测模型类 `ModelDeploy.Models.DetectionModel`（对应 `MD_MODEL_DETECTION`）。结果类型 `ModelDeploy.Results.DetectionResult`（属性 `Box: RectF{X,Y,Width,Height}`、`LabelId: int`、`Score: float`）；`Predict` 返回 `Prediction<DetectionResult>`（实现 `IReadOnlyList<T>`，`using`/`Dispose` 释放底层结果句柄）。
+
+```csharp
+using System;
+using System.Collections.Generic;
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var det = new DetectionModel("yolo11n.onnx", option);
+
+// 预处理/后处理参数（类型化 setter，编译期检查；通用 setter 为 SetParam(name, value)，见下）
+det.SetInputSize(640, 640);      // letterbox 输入尺寸
+det.SetConfThreshold(0.25);      // 置信度阈值（默认 0.25）
+det.SetNmsThreshold(0.45);       // NMS IoU 阈值（默认 0.5）
+// 自省：本 kind 支持的参数名与类型（'I'/'D'/'B'/'S'）
+Console.WriteLine(string.Join(", ", det.ParamNames()));
+
+using var img = VisionImage.Read("test.jpg");
+
+// 单图推理：Predict 返回 Prediction<DetectionResult>（可 foreach / 索引 / .Count）
+using var pred = det.Predict(img);
+foreach (var r in pred) {
+    Console.WriteLine($"{r.LabelId} {r.Score:F3} ({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height})");
+}
+
+// 可视化：pred.Draw 直达 C++ vis_det（句柄直达原始结果；绘制到任意 VisionImage 画布）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions {
+    Threshold = 0.25,
+    LabelMap = new Dictionary<int, string> { { 0, "person" }, { 1, "bicycle" }, { 2, "car" } },
+    FontSize = 14,
+    Alpha = 0.3,
+});
+canvas.Save("det_vis.jpg");
+
+// 批量推理：PredictBatch 按图返回 IReadOnlyList<DetectionResult[]>
+using var img2 = VisionImage.Read("bus.jpg");
+var batch = det.PredictBatch(new[] { img, img2 });
+for (int g = 0; g < batch.Count; g++) {
+    Console.WriteLine($"image {g}: {batch[g].Length} objects");
+}
+
+// 多线程：Clone() 深拷贝独立实例（每线程持有一个，互不干扰）
+using var det2 = det.Clone();
+```
+
 ## 运行示例
 
 ```bash

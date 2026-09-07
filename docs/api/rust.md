@@ -40,6 +40,60 @@ fn main() -> Result<(), modeldeploy::MdError> {
 - 后端方法：`use_ort` / `use_mnn` / `use_trt` / `use_sophgo` / `use_ncnn`。
 - 设备：`set_device(MDDevice::CPU, 0)?`；线程数 `set_cpu_threads(n)?`；精度 `set_fp16(bool)?`。
 
+## 3. 目标检测（`UltralyticsDet`）
+
+检测模型 `UltralyticsDet::new(path, &opt)?` 加载。结果类型 `Detection`（字段 `rect: Rect{x, y, width, height}`、`label_id: i32`、`score: f32`）；`predict` 返回 `Vec<Detection>`，`predict_batch` 返回 `Vec<Vec<Detection>>`（按图分组）。
+
+```rust
+use modeldeploy::{DrawOptions, Image, RuntimeOption, UltralyticsDet};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项（详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+
+    // 2. 构造模型
+    let model = UltralyticsDet::new("yolo11n.onnx", &opt)?;
+
+    // 3. 预处理/后处理参数（均为 Result<(), MdError>）
+    model.set_input_size(640, 640)?;      // letterbox 输入尺寸
+    model.set_conf_threshold(0.25)?;      // 置信度阈值（默认 0.25）
+    model.set_nms_threshold(0.45)?;       // NMS IoU 阈值（默认 0.5）
+
+    // 4. 单图推理：predict(&Image) -> Vec<Detection>
+    let img = Image::read("test.jpg")?;
+    let dets = model.predict(&img)?;
+    for d in &dets {
+        println!("label={} score={:.3} rect=({:.0},{:.0},{:.0},{:.0})",
+                 d.label_id, d.score, d.rect.x, d.rect.y, d.rect.width, d.rect.height);
+    }
+
+    // 5. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<Detection>>
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+    for (i, dets) in batch.iter().enumerate() {
+        println!("image {}: {} objects", i, dets.len());
+    }
+
+    // 6. 可视化：predict_and_draw 句柄直达 C++ vis_det，把结果绘制到 canvas（并返回检测结果）
+    let canvas = img.clone()?;
+    model.predict_and_draw(
+        &img,
+        &canvas,
+        &DrawOptions::new()
+            .with_threshold(0.25)
+            .with_label_map(vec![(0, "person".into()), (1, "bicycle".into()), (2, "car".into())])
+            .with_alpha(0.3),
+    )?;
+    canvas.save("det_vis.png")?;
+
+    // 7. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>，每线程持有一个）
+    let model2 = model.clone()?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |

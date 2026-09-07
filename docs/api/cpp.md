@@ -57,7 +57,68 @@ auto det = modeldeploy::vision::detection::UltralyticsDet("yolo11n.onnx", option
 
 > **注意**：OPENCL/VULKAN 需显式 `use_mnn_backend()`，否则 fail-closed。其余后端与设备的组合见 [后端详解](../backends.md)。
 
-## 3. 更多模型（均使用同一 `RuntimeOption`）
+## 3. 目标检测（UltralyticsDet）
+
+Ultralytics YOLO 检测模型。结果类型 `vision::DetectionResult`（字段 `box: Rect2f{x,y,width,height}`、`label_id: int32_t`、`score: float`），`predict`/`batch_predict` 可选传入 `TimerArray*` 做分段计时。
+
+```cpp
+#include "modeldeploy/vision.h"
+
+int main() {
+    // 1. 运行时选项（详见上节）
+    modeldeploy::RuntimeOption opt;
+    opt.use_ort_backend();
+    opt.use_cpu();
+    opt.set_cpu_thread_num(4);
+
+    // 2. 构造模型
+    auto det = std::make_unique<modeldeploy::vision::detection::UltralyticsDet>("yolo11n.onnx", opt);
+    if (!det->is_initialized()) return 1;
+
+    // 3. 预处理/后处理参数
+    det->get_preprocessor().set_size({640, 640});       // letterbox 输入尺寸（默认 {640, 640}）
+    det->get_preprocessor().set_padding_value({114.f, 114.f, 114.f});
+    det->get_postprocessor().set_conf_threshold(0.25f); // 置信度阈值（默认 0.25）
+    det->get_postprocessor().set_nms_threshold(0.5f);   // NMS IoU 阈值（默认 0.5）
+
+    // 4. 单图推理：predict(image, &res, timers = nullptr)
+    auto im = modeldeploy::vision::ImageData::imread("test.jpg");
+    std::vector<modeldeploy::vision::DetectionResult> res;
+    if (!det->predict(im, &res)) return 1;
+    for (const auto& r : res) {
+        std::printf("label=%d score=%.3f box=(%.0f, %.0f, %.0f, %.0f)\n",
+                    r.label_id, r.score, r.box.x, r.box.y, r.box.width, r.box.height);
+    }
+
+    // 5. 可视化：vis_det 返回绘制后的 ImageData；label_map 从模型元数据读取（ultralytics 导出的 onnx 键一般为 "names"）
+    const auto label_map = det->get_label_map("names");
+    auto vis = modeldeploy::vision::vis_det(im, res, 0.5, label_map, "msyh.ttc", 14, 0.3, false);
+    vis.imwrite("det_vis.jpg");
+    // 或就地绘制到图像帧（GPU 帧按设备分发）：
+    // det->draw_result(im, res, 0.5);
+
+    // 6. 批量推理：一次喂多图（各图统一 letterbox 到 set_size 尺寸后拼 batch），返回按图分组
+    std::vector<modeldeploy::vision::ImageData> images = {
+        modeldeploy::vision::ImageData::imread("a.jpg"),
+        modeldeploy::vision::ImageData::imread("b.jpg"),
+    };
+    std::vector<std::vector<modeldeploy::vision::DetectionResult>> ress;
+    det->batch_predict(images, &ress);
+    for (size_t i = 0; i < ress.size(); ++i) {
+        std::printf("image %zu: %zu objects\n", i, ress[i].size());
+    }
+
+    // 7. 多线程：clone() 深拷贝独立实例（每线程持有一个，互不干扰）
+    std::vector<decltype(det->clone())> models;
+    for (int i = 0; i < 4; ++i) {
+        models.emplace_back(std::move(det->clone()));
+    }
+    // 各线程用 models[i].get() 调 predict
+    return 0;
+}
+```
+
+## 4. 更多模型（均使用同一 `RuntimeOption`）
 
 | 能力 | 类 | 用法 |
 |------|----|------|
@@ -111,7 +172,7 @@ opt.set_device(modeldeploy::Device::VULKAN, 0);   // == OK
 
 设备帧 NV12：`ImageData::from_planes(pl, 2, MdImageType::NV12, w, h, device)`(device 取 `Device::CPU/GPU/OPENCL/VULKAN/TPU`）——Python `ImageData.from_device_nv12(y, uv, w, h, dev=...)` 与 C/C#/Rust 均对齐此语义。
 
-## 4. 工程配置
+## 5. 工程配置
 
 ```cmake
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)

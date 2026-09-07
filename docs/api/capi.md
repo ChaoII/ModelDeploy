@@ -97,6 +97,98 @@ md_model_destroy(m);
 md_option_destroy(opt);
 ```
 
+## 3. 目标检测（`MD_MODEL_DETECTION`）
+
+C API 无 per-model 类，检测模型由 `md_model_create(kind=MD_MODEL_DETECTION, ...)` 创建。检测结果经 `md_result_detection` 以 `MDDetectionItem{ x, y, w, h, score, label_id }` 数组返回（内存归结果句柄所有，无需逐项释放）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+    md_option_set_cpu_threads(opt, 4);
+
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_DETECTION, "yolo11n.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+
+    /* 预处理/后处理参数：输入尺寸 + 阈值。
+     * 参数名以运行时内省为准（md_model_param_names 返回 "conf_threshold|nms_threshold"） */
+    md_model_set_input_size(m, 640, 640);
+    const char* param_names = NULL;
+    md_model_param_names(MD_MODEL_DETECTION, &param_names);  /* 自省本 kind 支持的参数名 */
+    md_model_set_param_d(m, "conf_threshold", 0.25);
+    md_model_set_param_d(m, "nms_threshold", 0.45);
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+
+    MDResultHandle res = NULL;
+    if (md_model_predict(m, img, &res) != MD_OK) {
+        fprintf(stderr, "predict failed: %s\n", md_get_last_error());
+        return 1;
+    }
+
+    /* 结果遍历 */
+    const MDDetectionItem* items = NULL;
+    size_t n = 0;
+    md_result_detection(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        printf("[%zu] label=%d score=%.3f box=(%.0f, %.0f, %.0f, %.0f)\n",
+               i, items[i].label_id, items[i].score,
+               items[i].x, items[i].y, items[i].w, items[i].h);
+    }
+    /* 批量推理：结果按图存储，用 md_result_detection_batch 逐图读取 */
+    MDImageHandle img_b = NULL;
+    md_image_from_file(&img_b, "bus.jpg");
+    MDImageHandle imgs[2] = {img, img_b};
+    MDResultHandle bres = NULL;
+    if (md_model_predict_batch(m, imgs, 2, &bres) == MD_OK) {
+        for (size_t g = 0; g < 2; ++g) {
+            const MDDetectionItem* bitems = NULL;
+            size_t bn = 0;
+            if (md_result_detection_batch(bres, g, &bitems, &bn) == MD_OK) {
+                printf("image %zu: %zu objects\n", g, bn);
+            }
+        }
+        md_result_destroy(bres);
+    }
+    md_image_destroy(img_b);
+
+    /* 多线程：md_model_clone 深拷贝独立句柄（每线程持有一个，互不干扰） */
+    MDModelHandle m2 = NULL;
+    md_model_clone(m, &m2);
+
+    /* 可视化：md_draw_result 就地绘制到画布（threshold/label_map/字体/alpha 可控，传 NULL 用默认值）；
+     * 需在结果句柄存活期间调用 */
+    MDLabelItem label_map[] = {{0, "person"}, {1, "bicycle"}, {2, "car"}};
+    MDDrawOptions dopt = {0};
+    dopt.threshold = 0.25;
+    dopt.label_map = label_map;
+    dopt.label_map_size = 3;
+    dopt.font_size = 14;
+    dopt.alpha = 0.3;
+    MDImageHandle canvas = NULL;
+    md_image_clone(img, &canvas);
+    md_draw_result(canvas, res, &dopt);
+    md_image_save(canvas, "det_vis.jpg");
+    md_image_destroy(canvas);
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m2);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。
