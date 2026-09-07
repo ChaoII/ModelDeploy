@@ -16,6 +16,16 @@ int main(const int argc, char** argv) {
     const std::string out_path = argv[3];
     const std::string password = argv[4];
     if (mode == "encrypt") {
+        // 多文件（ncnn param+bin）: encrypt ncnn <param> <bin> <out> <pwd> ncnn
+        if (argc >= 7 && std::string(argv[argc - 1]) == "ncnn") {
+            if (!modeldeploy::encrypt_model_files({argv[2], argv[3]}, argv[4], argv[5], "ncnn")) {
+                std::cout << "encrypt error" << std::endl;
+            } else {
+                std::cout << "encrypt success" << std::endl;
+            }
+            return 0;
+        }
+        // 单文件: encrypt <input> <output> <password> <format>
         if (argc < 6) {
             std::cout << "encrypt must a model format(onnx/mnn/engine)\n";
             return 1;

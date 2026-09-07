@@ -73,6 +73,27 @@ namespace modeldeploy {
                 backend = Backend::ORT;
             }
 
+            // ======================== ncnn 多文件（param + bin）容器 ========================
+            if (required == Backend::NCNN) {
+                if (backend != Backend::NCNN) {
+                    MD_LOG_INFO << "Encrypted model format is " << encrypted_format
+                        << ", switching backend from " << static_cast<int>(backend) << " to NCNN." << std::endl;
+                    backend = Backend::NCNN;
+                }
+                std::map<std::string, std::string> entries;
+                if (!read_encrypted_model_entries(model_path, decrypt_password, &entries, &encrypted_format)) {
+                    throw std::runtime_error("Model decryption failed. Check password (set via option.password) "
+                        "or that the file is not corrupted.");
+                }
+                model_from_memory = true;
+                ncnn_option.model_from_memory = true;
+                for (const auto& [name, data] : entries) {
+                    if (name == "param") ncnn_option.param_buffer = data;
+                    else if (name == "bin")  ncnn_option.bin_buffer = data;
+                }
+                return;
+            }
+
             model_from_memory = true;
             model_buffer = buffer;
             ort_option.model_from_memory = true;

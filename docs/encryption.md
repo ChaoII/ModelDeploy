@@ -5,39 +5,46 @@ ModelDeploy 使用 **AES-256-GCM**（认证加密）+ **PBKDF2-HMAC-SHA256** 密
 > 编译需 `BUILD_ENCRYPTION=ON`（默认 ON）。构建前需初始化 mbedTLS submodule：
 > `git submodule update --init --recursive`。
 
-## 1. 加密文件格式（V3）
+## 1. 加密文件格式（V4，条目容器）
 
-加密后的模型文件（`.mdenc`）结构：
+加密后的模型文件（`.mdenc`）结构（支持单文件与多文件，如 ncnn 的 param+bin）：
 
 ```
 [4 字节]  魔数 "MDEN" (ModelDeploy Encrypted)
-[4 字节]  版本号（当前为 3）
+[4 字节]  版本号（当前为 4）
 [4 字节]  模型格式字符串长度
-[N 字节]  模型格式字符串（如 "onnx", "mnn", "engine"）
+[N 字节]  模型格式字符串（如 "onnx", "mnn", "engine", "ncnn"）
 [16 字节]  Salt（PBKDF2 密钥派生用）
 [12 字节] GCM nonce
-[4 字节]  加密数据长度
-[N 字节]  加密后的模型数据（AES-256-GCM）
+[4 字节]  明文区长度
+[N 字节]  明文区（AES-256-GCM 加密），明文区为条目表：
+            [4 字节] 条目数 M
+            M × ( [4] 文件名长度 + [N] 文件名
+                  [4] 内容长度 + [N] 内容 )
 [16 字节] GCM 认证标签（128-bit，防篡改）
 ```
 
 - 密钥：`PBKDF2-HMAC-SHA256(password, salt, 迭代 100000)` → 32 字节 AES-256 密钥。
 - 随机源：mbedTLS 熵源 + CTR-DRBG（salt 与 nonce）。
 - GCM 认证标签替代旧 CRC32：错误密码或任何篡改都会导致解密失败。
-- 旧 V2 文件已作废：V3 读取到非 3 的版本号会明确报错。
+- 单文件模型为 M=1（一个条目），多文件（ncnn）为 M=2（param + bin）。
+- 旧 V2/V3 文件已作废：V4 读取到非 4 的版本号会明确报错。
 
 ## 2. 加密模型
 
 使用命令行工具 `model_encrypted`：
 
 ```bash
-# 加密
+# 单文件加密
 model_encrypted encrypt input_model_path output_model_path password [format]
 
 # 示例：把 yolo11n.onnx 加密为 yolo11n_nms.mdenc
 model_encrypted encrypt yolo11n.onnx yolo11n_nms.mdenc 123456 onnx
 
-# 支持的格式：onnx / mnn / engine
+# 多文件加密（ncnn param + bin）
+model_encrypted encrypt ncnn model.param model.bin model.mdenc 123456 ncnn
+
+# 支持的格式：onnx / mnn / engine / ncnn
 ```
 
 工具源码：`examples/tools/model_encrypted.cpp`

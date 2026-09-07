@@ -153,3 +153,38 @@ TEST_CASE("Encryption tamper detection (GCM auth tag)", "[encryption]") {
     fs::remove(input);
     fs::remove(encrypted);
 }
+
+TEST_CASE("Encryption ncnn container roundtrip", "[encryption]") {
+    auto tmp = fs::temp_directory_path();
+    auto param = tmp / "test_ncnn.param";
+    auto bin = tmp / "test_ncnn.bin";
+    auto enc = tmp / "test_ncnn.mdenc";
+    {
+        std::ofstream ofs(param, std::ios::binary);
+        ofs << "param_binary_content_123";
+    }
+    {
+        std::ofstream ofs(bin, std::ios::binary);
+        ofs << "bin_weight_content_456";
+    }
+
+    REQUIRE(modeldeploy::encrypt_model_files({param.string(), bin.string()}, enc.string(), "pwd", "ncnn"));
+    REQUIRE(modeldeploy::is_encrypted_model_file(enc.string()));
+    REQUIRE(modeldeploy::get_model_format_from_encrypted_file(enc.string()) == "ncnn");
+
+    std::map<std::string, std::string> entries;
+    std::string fmt;
+    REQUIRE(modeldeploy::read_encrypted_model_entries(enc.string(), "pwd", &entries, &fmt));
+    REQUIRE(fmt == "ncnn");
+    REQUIRE(entries.size() == 2);
+    REQUIRE(entries["test_ncnn.param"] == "param_binary_content_123");
+    REQUIRE(entries["test_ncnn.bin"] == "bin_weight_content_456");
+
+    // 错误密码应失败
+    std::map<std::string, std::string> bad;
+    REQUIRE_FALSE(modeldeploy::read_encrypted_model_entries(enc.string(), "wrong", &bad, &fmt));
+
+    fs::remove(param);
+    fs::remove(bin);
+    fs::remove(enc);
+}

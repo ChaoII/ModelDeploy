@@ -1,6 +1,7 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+#include <filesystem>
 #include "utils/utils.h"
 #include "encryption/encryption.h"
 
@@ -13,22 +14,23 @@
 
 namespace modeldeploy {
 
-    // ==================== 常量（文件格式 V3） ====================
+    // ==================== 常量（文件格式 V4，条目容器） ====================
     // [4]   魔数 "MDEN"
-    // [4]   版本号 (3)
+    // [4]   版本号 (4)
     // [4]   格式字符串长度
     // [N]   格式字符串
     // [16]  Salt（PBKDF2 key 派生用）
     // [12]  GCM nonce
-    // [4]   密文长度
-    // [N]   密文（AES-256-GCM）
-    // [16]  GCM 认证标签（128-bit，替代旧 CRC，防篡改）
+    // [4]   明文区长度
+    // [N]   明文区（AES-256-GCM 加密；明文区为条目表）
+    //        明文区: [4] 条目数 M; M x ([4] 文件名长+[N] 文件名, [4] 内容长+[N] 内容)
+    // [16]  GCM 认证标签（128-bit，防篡改）
     constexpr static uint32_t SALT_LEN = 16;
     constexpr static uint32_t NONCE_LEN = 12;
     constexpr static uint32_t TAG_LEN = 16;
     constexpr static uint32_t AES_KEY_LEN = 32;
     constexpr static uint32_t PBKDF2_ITERATIONS = 100000;
-    constexpr static uint32_t VERSION = 3;
+    constexpr static uint32_t VERSION = 4;
     const static std::string MAGIC = "MDEN";
 
     static bool is_password_invalid(const std::string& pwd) { return pwd.empty(); }
@@ -103,14 +105,53 @@ namespace modeldeploy {
         return crc ^ 0xFFFFFFFF;
     }
 
-    // ==================== 文件格式（V3） ====================
-    bool encrypt_model_file(const std::string& input_path, const std::string& output_path,
-                            const std::string& password, const std::string& model_format) {
+    // ==================== 条目表序列化 ====================
+    // 明文区 = [4]条目数 + 每项([4]名长+名, [4]内容长+内容)
+    static std::string serialize_entries(const std::vector<std::pair<std::string, std::string>>& entries) {
+        std::string zone;
+        auto w32 = [&](uint32_t v) { zone.append(reinterpret_cast<const char*>(&v), 4); };
+        w32((uint32_t)entries.size());
+        for (const auto& e : entries) {
+            w32((uint32_t)e.first.size());
+            zone.append(e.first);
+            w32((uint32_t)e.second.size());
+            zone.append(e.second);
+        }
+        return zone;
+    }
+
+    static bool parse_entries(const std::string& zone,
+                              std::vector<std::pair<std::string, std::string>>* entries) {
+        size_t pos = 0;
+        auto r32 = [&](uint32_t* v) {
+            if (pos + 4 > zone.size()) return false;
+            memcpy(v, zone.data() + pos, 4); pos += 4; return true;
+        };
+        auto read_blob = [&](std::string* out) {
+            uint32_t len = 0;
+            if (!r32(&len)) return false;
+            if (pos + len > zone.size()) return false;
+            out->assign(zone.data() + pos, len); pos += len; return true;
+        };
+        uint32_t count = 0;
+        if (!r32(&count)) return false;
+        entries->clear();
+        for (uint32_t i = 0; i < count; ++i) {
+            std::string name, content;
+            if (!read_blob(&name) || !read_blob(&content)) return false;
+            entries->emplace_back(std::move(name), std::move(content));
+        }
+        return pos == zone.size();
+    }
+
+    // ==================== 通用加密（条目容器） ====================
+    static bool encrypt_entries(const std::vector<std::pair<std::string, std::string>>& entries,
+                                const std::string& output_path,
+                                const std::string& password,
+                                const std::string& model_format) {
         if (is_password_invalid(password)) { MD_LOG_ERROR << "Password cannot be empty." << std::endl; return false; }
 
-        std::string model_data;
-        if (!read_binary_from_file(input_path, &model_data))
-        { MD_LOG_ERROR << "Failed to read model file: " << input_path << std::endl; return false; }
+        std::string plain_zone = serialize_entries(entries);
 
         uint8_t salt[SALT_LEN], nonce[NONCE_LEN], tag[TAG_LEN];
         if (!fill_random(salt, SALT_LEN) || !fill_random(nonce, NONCE_LEN))
@@ -121,8 +162,8 @@ namespace modeldeploy {
         { MD_LOG_ERROR << "Key derivation failed." << std::endl; return false; }
 
         std::vector<uint8_t> cipher;
-        if (!gcm_encrypt(aes_key, nonce, (const uint8_t*)model_data.data(),
-                         (uint32_t)model_data.size(), &cipher, tag))
+        if (!gcm_encrypt(aes_key, nonce, (const uint8_t*)plain_zone.data(),
+                         (uint32_t)plain_zone.size(), &cipher, tag))
         { MD_LOG_ERROR << "AES-GCM encryption failed." << std::endl; return false; }
 
         std::ofstream out(output_path, std::ios::binary);
@@ -140,6 +181,34 @@ namespace modeldeploy {
         return true;
     }
 
+    static bool read_binary(const std::string& path, std::string* data) {
+        return read_binary_from_file(path, data);
+    }
+
+    bool encrypt_model_file(const std::string& input_path, const std::string& output_path,
+                            const std::string& password, const std::string& model_format) {
+        std::string model_data;
+        if (!read_binary(input_path, &model_data))
+        { MD_LOG_ERROR << "Failed to read model file: " << input_path << std::endl; return false; }
+        std::string name = std::filesystem::path(input_path).filename().string();
+        return encrypt_entries({{name, model_data}}, output_path, password, model_format);
+    }
+
+    bool encrypt_model_files(const std::vector<std::string>& input_paths,
+                             const std::string& output_path,
+                             const std::string& password,
+                             const std::string& model_format) {
+        std::vector<std::pair<std::string, std::string>> entries;
+        for (const auto& p : input_paths) {
+            std::string data;
+            if (!read_binary(p, &data))
+            { MD_LOG_ERROR << "Failed to read model file: " << p << std::endl; return false; }
+            entries.emplace_back(std::filesystem::path(p).filename().string(), std::move(data));
+        }
+        return encrypt_entries(entries, output_path, password, model_format);
+    }
+
+    // ==================== 读取 + 解密 ====================
     static bool read_header(const std::string& path, std::string* fmt,
                             std::vector<uint8_t>* salt, std::vector<uint8_t>* nonce,
                             std::vector<uint8_t>* cipher, std::vector<uint8_t>* tag) {
@@ -168,11 +237,10 @@ namespace modeldeploy {
         return true;
     }
 
-    bool decrypt_model_file(const std::string& in_path, const std::string& out_path,
-                            const std::string& password) {
-        if (is_password_invalid(password)) { MD_LOG_ERROR << "Password cannot be empty." << std::endl; return false; }
-        std::string fmt; std::vector<uint8_t> salt, nonce, cipher, tag;
-        if (!read_header(in_path, &fmt, &salt, &nonce, &cipher, &tag)) return false;
+    static bool decrypt_plain(const std::string& path, const std::string& password,
+                              std::string* fmt, std::string* plain_zone) {
+        std::vector<uint8_t> salt, nonce, cipher, tag;
+        if (!read_header(path, fmt, &salt, &nonce, &cipher, &tag)) return false;
 
         uint8_t key[AES_KEY_LEN];
         if (!derive_key(password, salt.data(), (uint32_t)salt.size(), key))
@@ -182,9 +250,23 @@ namespace modeldeploy {
         if (!gcm_decrypt(key, nonce.data(), cipher.data(), (uint32_t)cipher.size(), tag.data(), &plain))
         { MD_LOG_ERROR << "Decryption failed: wrong password or corrupted file." << std::endl; return false; }
 
+        plain_zone->assign((const char*)plain.data(), plain.size());
+        return true;
+    }
+
+    bool decrypt_model_file(const std::string& in_path, const std::string& out_path,
+                            const std::string& password) {
+        if (is_password_invalid(password)) { MD_LOG_ERROR << "Password cannot be empty." << std::endl; return false; }
+        std::string fmt, plain_zone;
+        if (!decrypt_plain(in_path, password, &fmt, &plain_zone)) return false;
+
+        std::vector<std::pair<std::string, std::string>> entries;
+        if (!parse_entries(plain_zone, &entries) || entries.empty())
+        { MD_LOG_ERROR << "Failed to parse encrypted entries." << std::endl; return false; }
+
         std::ofstream out(out_path, std::ios::binary);
         if (!out.is_open()) { MD_LOG_ERROR << "Cannot create: " << out_path << std::endl; return false; }
-        out.write((const char*)plain.data(), (std::streamsize)plain.size());
+        out.write(entries[0].second.data(), (std::streamsize)entries[0].second.size());
         MD_LOG_INFO << "Model decrypted: " << out_path << std::endl;
         return true;
     }
@@ -205,13 +287,24 @@ namespace modeldeploy {
                                         std::string* buf, std::string* fmt) {
         if (!buf || !fmt) return false;
         if (is_password_invalid(password)) return false;
-        std::vector<uint8_t> salt, nonce, cipher, tag;
-        if (!read_header(path, fmt, &salt, &nonce, &cipher, &tag)) return false;
-        uint8_t key[AES_KEY_LEN];
-        if (!derive_key(password, salt.data(), (uint32_t)salt.size(), key)) { buf->clear(); fmt->clear(); return false; }
-        std::vector<uint8_t> plain;
-        if (!gcm_decrypt(key, nonce.data(), cipher.data(), (uint32_t)cipher.size(), tag.data(), &plain)) { buf->clear(); fmt->clear(); return false; }
-        buf->assign((const char*)plain.data(), plain.size());
+        std::string plain_zone;
+        if (!decrypt_plain(path, password, fmt, &plain_zone)) { buf->clear(); fmt->clear(); return false; }
+        std::vector<std::pair<std::string, std::string>> entries;
+        if (!parse_entries(plain_zone, &entries) || entries.empty()) { buf->clear(); fmt->clear(); return false; }
+        buf->assign(entries[0].second);
+        return true;
+    }
+
+    bool read_encrypted_model_entries(const std::string& path, const std::string& password,
+                                      std::map<std::string, std::string>* entries, std::string* fmt) {
+        if (!entries || !fmt) return false;
+        if (is_password_invalid(password)) return false;
+        std::string plain_zone;
+        if (!decrypt_plain(path, password, fmt, &plain_zone)) { entries->clear(); fmt->clear(); return false; }
+        std::vector<std::pair<std::string, std::string>> vec;
+        if (!parse_entries(plain_zone, &vec)) { entries->clear(); fmt->clear(); return false; }
+        entries->clear();
+        for (auto& e : vec) (*entries)[e.first] = e.second;
         return true;
     }
 } // namespace modeldeploy

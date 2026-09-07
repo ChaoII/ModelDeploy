@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <cstdint>
+#include <vector>
+#include <map>
 #include "core/md_decl.h"
 
 namespace modeldeploy {
@@ -8,6 +10,10 @@ namespace modeldeploy {
     uint32_t calculate_crc32(const std::string& data);
     MODELDEPLOY_CXX_EXPORT bool encrypt_model_file(const std::string& input_path, const std::string& output_path,
                                                    const std::string& password, const std::string& model_format);
+    MODELDEPLOY_CXX_EXPORT bool encrypt_model_files(const std::vector<std::string>& input_paths,
+                                                    const std::string& output_path,
+                                                    const std::string& password,
+                                                    const std::string& model_format);
     MODELDEPLOY_CXX_EXPORT bool decrypt_model_file(const std::string& input_path, const std::string& output_path,
                                                    const std::string& password);
     MODELDEPLOY_CXX_EXPORT bool is_encrypted_model_file(const std::string& file_path);
@@ -15,13 +21,19 @@ namespace modeldeploy {
     MODELDEPLOY_CXX_EXPORT bool read_encrypted_model_to_buffer(const std::string& file_path,
                                                                const std::string& password,
                                                                std::string* model_buffer, std::string* model_format);
+    MODELDEPLOY_CXX_EXPORT bool read_encrypted_model_entries(const std::string& file_path,
+                                                             const std::string& password,
+                                                             std::map<std::string, std::string>* entries,
+                                                             std::string* model_format);
 #else
     // 加密未启用时，所有函数返回默认值
     inline uint32_t calculate_crc32(const std::string&) { return 0; }
     inline bool encrypt_model_file(const std::string&, const std::string&, const std::string&, const std::string&) { return false; }
+    inline bool encrypt_model_files(const std::vector<std::string>&, const std::string&, const std::string&, const std::string&) { return false; }
     inline bool decrypt_model_file(const std::string&, const std::string&, const std::string&) { return false; }
     inline bool is_encrypted_model_file(const std::string&) { return false; }
     inline std::string get_model_format_from_encrypted_file(const std::string&) { return ""; }
     inline bool read_encrypted_model_to_buffer(const std::string&, const std::string&, std::string*, std::string*) { return false; }
+    inline bool read_encrypted_model_entries(const std::string&, const std::string&, std::map<std::string, std::string>*, std::string*) { return false; }
 #endif
 }
