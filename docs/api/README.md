@@ -19,5 +19,8 @@ ModelDeploy 核心逻辑全部在 C++ SDK，提供 **C++ / Python / C / C# / Rus
 | 模型族 | C++ | Python | C API | C# | Rust |
 |--------|-----|--------|-------|----|------|
 | 目标检测 | `vision::detection::UltralyticsDet` | `modeldeploy.vision.UltralyticsDet` | `MD_MODEL_DETECTION`（经 `md_model_create`） | `Models.DetectionModel` | `UltralyticsDet` |
+| 实例分割 / FastSAM | `vision::detection::UltralyticsSeg` / `vision::seg::FastSam` | `modeldeploy.vision.UltralyticsSeg` / `.FastSam` | `MD_MODEL_INSTANCE_SEG` / `MD_MODEL_FASTSAM`（经 `md_model_create`） | `Models.InstanceSegModel` / `Models.FastSamModel` | `UltralyticsSeg` / `FastSam` |
+| 语义分割 | `vision::detection::UltralyticsSem` | `modeldeploy.vision.UltralyticsSem` | `MD_MODEL_SEM_SEG`（经 `md_model_create`） | `Models.SemSegModel` | `UltralyticsSem` |
+| 深度估计 | `vision::detection::UltralyticsDepth` | `modeldeploy.vision.UltralyticsDepth` | `MD_MODEL_DEPTH`（经 `md_model_create`） | `Models.DepthModel` | `UltralyticsDepth` |
 
 其余模型族在后续小节逐个补全。

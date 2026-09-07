@@ -86,6 +86,132 @@ for (int g = 0; g < batch.Count; g++) {
 using var det2 = det.Clone();
 ```
 
+## 4. 实例分割（`InstanceSegModel`）
+
+实例分割模型类 `ModelDeploy.Models.InstanceSegModel`（对应 `MD_MODEL_INSTANCE_SEG`）。结果类型 `ModelDeploy.Results.InstanceSegResult`（属性 `Box: RectF`、`LabelId: int`、`Score: float`、`Mask: byte[]` + `MaskWidth`/`MaskHeight`；`Mask` 为 uint8 0/1，行主序 `MaskHeight * MaskWidth`）。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+using ModelDeploy.Results;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var seg = new InstanceSegModel("yolo11n-seg.onnx", option);
+seg.SetInputSize(640, 640);      // letterbox 输入尺寸
+seg.SetConfThreshold(0.25);      // 置信度阈值（默认 0.25）
+seg.SetNmsThreshold(0.45);       // NMS IoU 阈值（默认 0.5）
+seg.SetMaskThreshold(0.5);       // 掩码二值化阈值（默认 0.5）
+
+using var img = VisionImage.Read("test.jpg");
+
+// 单图推理：Prediction<InstanceSegResult>（foreach / 索引 / .Count）
+using var pred = seg.Predict(img);
+foreach (var r in pred) {
+    Console.WriteLine($"{r.LabelId} {r.Score:F3} ({r.Box.X},{r.Box.Y},{r.Box.Width},{r.Box.Height})");
+    // 掩码逐像元读取：r.Mask[y * r.MaskWidth + x]
+    Console.WriteLine($"mask {r.MaskWidth}x{r.MaskHeight}, bytes={r.Mask.Length}");
+}
+
+// 批量推理：按图返回 IReadOnlyList<InstanceSegResult[]>
+using var img2 = VisionImage.Read("bus.jpg");
+var batch = seg.PredictBatch(new[] { img, img2 });
+for (int g = 0; g < batch.Count; g++) {
+    Console.WriteLine($"image {g}: {batch[g].Length} instances");
+}
+
+// 可视化：pred.Draw 直达 C++ vis_iseg
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { Threshold = 0.5 });
+canvas.Save("iseg_vis.jpg");
+
+// 多线程：Clone() 深拷贝独立实例
+using var seg2 = seg.Clone();
+```
+
+## 5. FastSAM（`FastSamModel`）
+
+FastSAM 结果与实例分割同构（`InstanceSegResult`）。`PredictWithPrompts` 在全量结果上按提示过滤实例，**不重跑网络**；提示为空等价全图 `Predict`。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var sam = new FastSamModel("fastsam-s.onnx", option);
+sam.SetInputSize(1024, 1024);    // 默认 640x640；官方 FastSAM-s 常配 1024x1024
+sam.SetConfThreshold(0.30);      // 默认 conf 0.30 / nms 0.40 / mask 0.5
+sam.SetNmsThreshold(0.40);
+sam.SetMaskThreshold(0.5);
+
+using var img = VisionImage.Read("test.jpg");
+
+// 全图（Everything）分割：Prediction<InstanceSegResult>，用法同 InstanceSegModel
+using var pred = sam.Predict(img);
+
+// 提示过滤：bboxes 为 [x,y,w,h,...]（原图像素）、points 为 [x,y,...]、
+// labels 逐点（1=前景保留, 0=背景剔除）。返回 IReadOnlyList<InstanceSegResult>
+var prompted = sam.PredictWithPrompts(img,
+    new float[] { 100, 80, 220, 180 },
+    new float[] { 150, 130 },
+    new int[] { 1 });
+Console.WriteLine($"prompted: {prompted.Count}");
+```
+
+## 6. 语义分割（`SemSegModel`）
+
+语义分割模型（`yolo26n-sem` 等，cityscapes 19 类）。结果类型 `ModelDeploy.Results.SemSegResult`（属性 `Labels: byte[]`、`Width`/`Height`、`NumClasses: int`；`Labels` 为每像素类别索引 `[0, NumClasses)`，行主序）。该模型无阈值 setter，也无 `PredictBatch`（C API 对 `MD_MODEL_SEM_SEG` 无参数、结果为整图单值）。
+
+```csharp
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var sem = new SemSegModel("yolo26n-sem.onnx", option);
+sem.SetInputSize(640, 640);      // 输入尺寸可调；无其它参数（后处理 argmax）
+
+using var img = VisionImage.Read("test.jpg");
+using var pred = sem.Predict(img);
+var r = pred[0];
+// 掩码/标签逐像元读取：r.Labels[y * r.Width + x]
+Console.WriteLine($"sem {r.Width}x{r.Height} classes={r.NumClasses} labels={r.Labels.Length}");
+
+// 可视化：pred.Draw 直达 C++ vis_sem（cityscapes 调色板叠加）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions { Alpha = 0.5 });
+canvas.Save("sem_vis.jpg");
+```
+
+## 7. 深度估计（`DepthModel`）
+
+深度估计模型（`yolo26n-depth` 等）。结果类型 `ModelDeploy.Results.DepthResult`（属性 `Depth: float[]`、`Width`/`Height`；每像素深度单位**米**，log 输出已 `exp` 还原，行主序）。该模型无阈值 setter，也无 `PredictBatch`（同上，整图单值结果）。
+
+```csharp
+using System;
+using ModelDeploy;
+using ModelDeploy.Models;
+
+var option = new RuntimeOption().UseOrt().SetDevice(Device.CPU);
+
+using var dep = new DepthModel("yolo26n-depth.onnx", option);
+dep.SetInputSize(640, 640);
+
+using var img = VisionImage.Read("test.jpg");
+using var pred = dep.Predict(img);
+var r = pred[0];
+// 深度逐像元读取：r.Depth[y * r.Width + x]（米）
+float near = float.MaxValue, far = float.MinValue;
+foreach (var d in r.Depth) { near = Math.Min(near, d); far = Math.Max(far, d); }
+Console.WriteLine($"depth {r.Width}x{r.Height} range=[{near:F2}, {far:F2}] m");
+
+// 可视化：pred.Draw 直达 C++ vis_depth（JET 伪彩）
+using var canvas = img.Clone();
+pred.Draw(canvas, new DrawOptions());
+canvas.Save("depth_vis.jpg");
+```
+
 ## 运行示例
 
 ```bash

@@ -162,6 +162,146 @@ int main(void) {
 }
 ```
 
+## 4. 实例分割（`MD_MODEL_INSTANCE_SEG`）
+
+实例分割模型经 `md_model_create(kind=MD_MODEL_INSTANCE_SEG, ...)` 创建。实例框经 `md_result_instance_seg` 以 `MDIsegItem{ x, y, w, h, score, label_id }` 数组返回；掩码单独经 `md_result_mask(res, i, ...)` 按实例序号读取（uint8 0/1，行主序 H*W，内存归结果句柄所有）。
+
+```c
+#include <stdio.h>
+#include "modeldeploy/md_capi.h"
+
+int main(void) {
+    MDOptionHandle opt = NULL;
+    md_option_create(&opt);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDModelHandle m = NULL;
+    if (md_model_create(&m, MD_MODEL_INSTANCE_SEG, "yolo11n-seg.onnx", opt) != MD_OK) {
+        fprintf(stderr, "create failed: %s\n", md_get_last_error());
+        return 1;
+    }
+    md_model_set_input_size(m, 640, 640);
+    /* 参数自省：INSTANCE_SEG 返回 "conf_threshold|nms_threshold|mask_threshold"（类型均 'D'） */
+    md_model_set_param_d(m, "conf_threshold", 0.25);
+    md_model_set_param_d(m, "nms_threshold", 0.45);
+    md_model_set_param_d(m, "mask_threshold", 0.5);   /* 掩码二值化阈值（默认 0.5） */
+
+    MDImageHandle img = NULL;
+    md_image_from_file(&img, "test.jpg");
+    MDResultHandle res = NULL;
+    md_model_predict(m, img, &res);
+
+    const MDIsegItem* items = NULL;
+    size_t n = 0;
+    md_result_instance_seg(res, &items, &n);
+    for (size_t i = 0; i < n; i++) {
+        const unsigned char* mask = NULL;
+        size_t mh = 0, mw = 0;
+        md_result_mask(res, i, &mask, &mh, &mw);   /* mask[y * mw + x]，uint8 0/1 */
+        printf("[%zu] label=%d score=%.3f box=(%.0f, %.0f, %.0f, %.0f) mask=%zux%zu\n",
+               i, items[i].label_id, items[i].score,
+               items[i].x, items[i].y, items[i].w, items[i].h, mh, mw);
+    }
+
+    /* 批量推理：md_result_instance_seg_batch(bres, g, &items, &n) 取第 g 图项数组，
+     * 掩码用 md_result_mask_batch(bres, g, j, &mask, &mh, &mw) 按 (图,项) 读 */
+
+    /* 可视化：md_draw_result 支持 MD_RES_INSTANCE_SEG（底层 vis_iseg），用法同 §3 */
+
+    md_result_destroy(res);
+    md_image_destroy(img);
+    md_model_destroy(m);
+    md_option_destroy(opt);
+    return 0;
+}
+```
+
+## 5. FastSAM（`MD_MODEL_FASTSAM`）
+
+FastSAM 结果与实例分割完全同构（`md_result_instance_seg` + `md_result_mask`）。`md_fastsam_predict_with_prompts` 在全量结果上按提示过滤实例，**不重跑网络**；空提示（`nb==0 && np==0`）等价全图 `md_model_predict`。
+
+```c
+MDModelHandle m = NULL;
+md_model_create(&m, MD_MODEL_FASTSAM, "fastsam-s.onnx", opt);
+md_model_set_input_size(m, 1024, 1024);   /* 默认 640x640；官方 FastSAM-s 常配 1024x1024 */
+/* 参数自省：FASTSAM 返回 "conf_threshold|nms_threshold|mask_threshold"；
+ * 默认 conf 0.30 / nms 0.40 / mask 0.5 */
+md_model_set_param_d(m, "conf_threshold", 0.30);
+md_model_set_param_d(m, "nms_threshold", 0.40);
+
+MDImageHandle img = NULL;
+md_image_from_file(&img, "test.jpg");
+
+/* 全图（Everything）分割：普通 predict，读取同实例分割 */
+MDResultHandle res = NULL;
+md_model_predict(m, img, &res);
+md_result_destroy(res);
+
+/* 提示过滤：
+ * - bboxes: float[nb*4] = (x,y,w,h) 原图像素，每个框取 IoU 最大实例
+ * - points: float[np*2]；labels: int[np]（1=前景保留, 0=背景剔除；NULL = 全前景）
+ */
+float bboxes[4] = {100.f, 80.f, 220.f, 180.f};
+float points[2] = {150.f, 130.f};
+int labels[1] = {1};
+MDResultHandle pres = NULL;
+md_fastsam_predict_with_prompts(m, img, bboxes, 1, points, labels, 1, &pres);
+/* 读取同 INSTANCE_SEG：md_result_instance_seg(pres, &items, &n) + md_result_mask(pres, i, ...) */
+md_result_destroy(pres);
+```
+
+## 6. 语义分割（`MD_MODEL_SEM_SEG`）
+
+语义分割模型（`yolo26n-sem` 等，cityscapes 19 类）。结果经 `md_result_sem_seg` 返回每像素类别索引（uint8，`[0, num_classes)`，行主序 H*W）；该 kind 无 `md_model_set_param_*` 参数（后处理 argmax + 去除 letterbox 边，返回空参数表）。
+
+```c
+MDModelHandle m = NULL;
+md_model_create(&m, MD_MODEL_SEM_SEG, "yolo26n-sem.onnx", opt);
+md_model_set_input_size(m, 640, 640);
+
+MDImageHandle img = NULL;
+md_image_from_file(&img, "test_sem_540.jpg");
+MDResultHandle res = NULL;
+md_model_predict(m, img, &res);
+
+const unsigned char* labels = NULL;
+size_t h = 0, w = 0;
+int num_classes = 0;
+md_result_sem_seg(res, &labels, &h, &w, &num_classes);   /* labels[y * w + x] */
+printf("sem %zux%zu classes=%d\n", h, w, num_classes);
+
+/* 批量推理：md_result_sem_seg_batch(bres, g, &labels, &h, &w, &num_classes) 按图读 */
+
+/* 可视化：md_draw_result 支持 MD_RES_SEM_SEG（底层 vis_sem，label_map 经 MDDrawOptions） */
+md_result_destroy(res);
+```
+
+## 7. 深度估计（`MD_MODEL_DEPTH`）
+
+深度估计模型（`yolo26n-depth` 等）。结果经 `md_result_depth` 返回每像素深度（float，单位**米**，log 输出已 `exp` 还原，行主序 H*W）；该 kind 无 `md_model_set_param_*` 参数（返回空参数表）。
+
+```c
+MDModelHandle m = NULL;
+md_model_create(&m, MD_MODEL_DEPTH, "yolo26n-depth.onnx", opt);
+md_model_set_input_size(m, 640, 640);
+
+MDImageHandle img = NULL;
+md_image_from_file(&img, "test_depth_540.jpg");
+MDResultHandle res = NULL;
+md_model_predict(m, img, &res);
+
+const float* depth = NULL;
+size_t h = 0, w = 0;
+md_result_depth(res, &depth, &h, &w);   /* depth[y * w + x]，单位米 */
+printf("depth %zux%zu, center=%.2f m\n", h, w, depth[(h / 2) * w + (w / 2)]);
+
+/* 批量推理：md_result_depth_batch(bres, g, &depth, &h, &w) 按图读 */
+
+/* 可视化：md_draw_result 支持 MD_RES_DEPTH（底层 vis_depth JET 伪彩） */
+md_result_destroy(res);
+```
+
 ## 接口分组
 
 C API 为**统一分发点**：模型经 `md_model_create(kind, path, opt)` 创建、`md_model_predict` 推理，各类模型差异只体现在 `MDModelKind` 枚举与 `md_result_*` 读结果接口上，**没有** per-model 的 create/predict 函数。

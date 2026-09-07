@@ -94,6 +94,160 @@ fn main() -> Result<(), modeldeploy::MdError> {
 }
 ```
 
+## 4. 实例分割（`UltralyticsSeg`）
+
+实例分割模型 `UltralyticsSeg::new(path, &opt)?` 加载。结果类型 `InstanceSeg`（字段 `rect: Rect`、`label_id: i32`、`score: f32`）。
+
+> **mask 说明**：本绑定的 `InstanceSeg` 结构**未封装掩码读取**（C API 的 `md_result_mask` 未桥接）；需要掩码数据请用 C++ / C API / Python / C# 绑定，或按 `mask` 尺寸自行经 C API 扩展。可视化（`predict_and_draw`）不受影响，底层 `vis_iseg` 会完整绘制掩码。
+
+```rust
+use modeldeploy::{DrawOptions, Image, RuntimeOption, UltralyticsSeg};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    // 1. 运行时选项 + 构造（详见上节）
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?.set_cpu_threads(4)?;
+    let model = UltralyticsSeg::new("yolo11n-seg.onnx", &opt)?;
+
+    // 2. 预处理/后处理参数（均为 Result<(), MdError>）
+    model.set_input_size(640, 640)?;      // letterbox 输入尺寸
+    model.set_conf_threshold(0.25)?;      // 置信度阈值（默认 0.25）
+    model.set_nms_threshold(0.45)?;       // NMS IoU 阈值（默认 0.5）
+    model.set_mask_threshold(0.5)?;       // 掩码二值化阈值（默认 0.5）
+
+    // 3. 单图推理：predict(&Image) -> Vec<InstanceSeg>
+    let img = Image::read("test.jpg")?;
+    let instances = model.predict(&img)?;
+    for r in &instances {
+        println!("label={} score={:.3} rect=({:.0},{:.0},{:.0},{:.0})",
+                 r.label_id, r.score, r.rect.x, r.rect.y, r.rect.width, r.rect.height);
+    }
+
+    // 4. 批量推理：predict_batch(&[&Image]) -> Vec<Vec<InstanceSeg>>（按图分组）
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+    for (i, rs) in batch.iter().enumerate() {
+        println!("image {}: {} instances", i, rs.len());
+    }
+
+    // 5. 可视化：predict_and_draw 句柄直达 C++ vis_iseg，把结果绘制到 canvas
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas, &DrawOptions::new().with_threshold(0.5))?;
+    canvas.save("iseg_vis.jpg")?;
+
+    // 6. 多线程：clone() 深拷贝独立实例（返回 Result<Self, MdError>）
+    let model2 = model.clone()?;
+    Ok(())
+}
+```
+
+## 5. FastSAM（`FastSam`）
+
+FastSAM 结果与实例分割同构（`Vec<InstanceSeg>`，同样不含 mask，见上节说明）。
+`predict_with_prompts` 在全量结果上按提示过滤实例，**不重跑网络**；空切片提示等价全图 `predict`。
+
+```rust
+use modeldeploy::{FastSam, Image, RuntimeOption};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?;
+    let model = FastSam::new("fastsam-s.onnx", &opt)?;
+
+    // 1. 参数：默认输入 640x640、conf 0.30 / nms 0.40 / mask 0.5（官方 FastSAM-s 常配 1024x1024）
+    model.set_input_size(1024, 1024)?;
+    model.set_conf_threshold(0.30)?;
+    model.set_nms_threshold(0.40)?;
+    model.set_mask_threshold(0.5)?;
+
+    let img = Image::read("test.jpg")?;
+
+    // 2. 全图（Everything）分割：predict -> Vec<InstanceSeg>
+    let all = model.predict(&img)?;
+
+    // 3. 提示过滤：bboxes 为 [x,y,w,h,...]（原图像素，每个框取 IoU 最大实例）、
+    //    points 为 [x,y,...]、labels 逐点（1=前景保留, 0=背景剔除）
+    let prompted = model.predict_with_prompts(
+        &img,
+        &[100.0, 80.0, 220.0, 180.0],
+        &[150.0, 130.0],
+        &[1],
+    )?;
+    println!("all={} prompted={}", all.len(), prompted.len());
+
+    // 4. 可视化同实例分割：predict_and_draw（底层 vis_iseg）
+    Ok(())
+}
+```
+
+## 6. 语义分割（`UltralyticsSem`）
+
+语义分割模型（`yolo26n-sem` 等，cityscapes 19 类）。`predict` 返回 `Vec<SemSeg>`（单图单结果，取 `[0]`），`SemSeg`（字段 `labels: Vec<u8>`、`height`/`width: usize`、`num_classes: i32`）；`labels` 为每像素类别索引 `[0, num_classes)`（行主序）。该模型无阈值 setter（后处理 argmax，运行时无参数）。
+
+```rust
+use modeldeploy::{Image, RuntimeOption, UltralyticsSem};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?;
+    let model = UltralyticsSem::new("yolo26n-sem.onnx", &opt)?;
+    model.set_input_size(640, 640)?;      // 输入尺寸可调；无其它参数
+
+    let img = Image::read("test.jpg")?;
+    let sems = model.predict(&img)?;
+    let sem = &sems[0];
+    // 逐像元读取：sem.labels[y * sem.width + x]
+    println!("sem {}x{} classes={} labels={}",
+             sem.width, sem.height, sem.num_classes, sem.labels.len());
+
+    // 批量推理：predict_batch(&[&Image]) -> Vec<Vec<SemSeg>>（按图分组）
+    let img2 = Image::read("bus.jpg")?;
+    let batch = model.predict_batch(&[&img, &img2])?;
+
+    // 可视化：predict_and_draw（底层 vis_sem，cityscapes 调色板叠加）
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas, &modeldeploy::DrawOptions::new())?;
+    canvas.save("sem_vis.jpg")?;
+    Ok(())
+}
+```
+
+## 7. 深度估计（`UltralyticsDepth`）
+
+深度估计模型（`yolo26n-depth` 等）。`predict` 返回 `Vec<Depth>`（单图单结果，取 `[0]`），`Depth`（字段 `depth: Vec<f32>`、`height`/`width: usize`）；每像素深度单位**米**（log 输出已 `exp` 还原，行主序）。该模型无阈值 setter（后处理无参数）。
+
+```rust
+use modeldeploy::{Image, RuntimeOption, UltralyticsDepth};
+use modeldeploy::ffi::MDDevice;
+
+fn main() -> Result<(), modeldeploy::MdError> {
+    let mut opt = RuntimeOption::new()?;
+    opt.use_ort().set_device(MDDevice::CPU, 0)?;
+    let model = UltralyticsDepth::new("yolo26n-depth.onnx", &opt)?;
+    model.set_input_size(640, 640)?;
+
+    let img = Image::read("test.jpg")?;
+    let depths = model.predict(&img)?;
+    let dep = &depths[0];
+    // 逐像元读取：dep.depth[y * dep.width + x]（米）
+    let mut near = f32::MAX;
+    let mut far = f32::MIN;
+    for &d in &dep.depth { near = near.min(d); far = far.max(d); }
+    println!("depth {}x{} range=[{:.2}, {:.2}] m", dep.width, dep.height, near, far);
+
+    // 批量推理：predict_batch(&[&Image]) -> Vec<Vec<Depth>>（按图分组）
+
+    // 可视化：predict_and_draw（底层 vis_depth JET 伪彩）
+    let canvas = img.clone()?;
+    model.predict_and_draw(&img, &canvas, &modeldeploy::DrawOptions::new())?;
+    canvas.save("depth_vis.jpg")?;
+    Ok(())
+}
+```
+
 ## 主要模块文件
 
 | 文件 | 说明 |
