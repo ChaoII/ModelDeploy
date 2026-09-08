@@ -167,6 +167,7 @@ int main(int argc, char** argv) {
                                        std::vector<vision::KeyPointsResult>>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
