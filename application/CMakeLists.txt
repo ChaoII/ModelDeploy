@@ -3,8 +3,8 @@
 
 # ── 模型演示后端（demo_server） ──────────────────────────────
 # 独立于 BUILD_SURVEILLANCE：注册 ServingServer 之后端（det/cls 等真实模型族），
-# 由 BUILD_WEB_DEMO（默认 ON）门控。web 资产（application/web_demo）POST_BUILD
-# 拷到构建目录的 bin/web_demo（Task 4 将 index.html 换成真实演示页）。
+# 由 BUILD_WEB_DEMO（默认 OFF，需显式 -DBUILD_WEB_DEMO=ON 开启）门控。
+# web 资产（application/web_demo）POST_BUILD 拷到构建目录的 bin/web_demo。
 if (BUILD_WEB_DEMO)
     add_executable(demo_server demo_server.cpp)
     target_link_libraries(demo_server PRIVATE ${LIBRARY_NAME})
