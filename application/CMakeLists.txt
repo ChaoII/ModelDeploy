@@ -11,7 +11,15 @@ if (BUILD_WEB_DEMO)
     target_include_directories(demo_server PRIVATE ${CMAKE_SOURCE_DIR}/csrc)
     add_custom_command(TARGET demo_server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_SOURCE_DIR}/application/web_demo ${CMAKE_BINARY_DIR}/bin/web_demo)
+                ${CMAKE_SOURCE_DIR}/application/web_demo ${CMAKE_BINARY_DIR}/bin/web_demo
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                ${CMAKE_BINARY_DIR}/bin/application/demo_labels
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/application/demo_manifest.json
+                ${CMAKE_BINARY_DIR}/bin/application/demo_manifest.json
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_SOURCE_DIR}/application/demo_labels
+                ${CMAKE_BINARY_DIR}/bin/application/demo_labels)
 endif ()
 
 if (NOT BUILD_SURVEILLANCE)
