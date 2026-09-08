@@ -296,7 +296,7 @@ TEST_CASE("ModelRepo hot update (manifest rescan)", "[serving]") {
     REQUIRE(oldh.status == ModelStatus::Ready);
     auto old_infer = oldh.infer;  // 值拷贝：旧持有者可独立于 repo 完成
 
-    // 重写 manifest 增加 cls；rescan 新增它，同时 det 回落目录态。
+    // 重写 manifest 增加 cls；rescan 新增它，同时 det（活跃）保持 Ready。
     write_manifest(repo, {{"det", "det"}, {"cls", "cls"}});
     auto changed = m.scan();
     REQUIRE(std::find(changed.begin(), changed.end(), "cls") != changed.end());
@@ -306,13 +306,74 @@ TEST_CASE("ModelRepo hot update (manifest rescan)", "[serving]") {
     REQUIRE(m.get("cls", &h));
     REQUIRE(h.status == ModelStatus::Unloaded);
     REQUIRE(m.get("det", &h));
-    REQUIRE(h.status == ModelStatus::Unloaded);  // 重扫回落 Unloaded
+    REQUIRE(h.status == ModelStatus::Ready);  // 活跃模型不被重扫降级
 
     nlohmann::json out;
     REQUIRE(old_infer(nlohmann::json::object(), &out, nullptr));
     REQUIRE(out["handle"] == "det");
 
     fs::remove_all(repo);
+}
+
+TEST_CASE("serving lazy: scan preserves active loaded model", "[serving]") {
+    auto dir = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = write_manifest(dir, {{"det", "det"}});
+
+    ModelRepo m(cfg, echo_builder());
+    m.scan();
+    std::string err;
+    REQUIRE(m.load("det", &err));
+
+    write_manifest(dir, {{"det", "det"}});  // 重扫同一清单
+    m.scan();
+    ModelHandle h;
+    REQUIRE(m.get("det", &h));
+    REQUIRE(h.status == ModelStatus::Ready);
+    REQUIRE(h.infer);
+    REQUIRE(m.unload("det"));
+    REQUIRE(m.get("det", &h));
+    REQUIRE(h.status == ModelStatus::Unloaded);
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("serving lazy: single-slot load evicts previous", "[serving]") {
+    auto dir = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = write_manifest(dir, {{"a", "det"}, {"b", "cls"}});
+
+    std::string last_id;
+    HandleBuilder b = [&](const ManifestModel& m, const std::string&) {
+        last_id = m.id;
+        ModelHandle h;
+        h.infer = [](const nlohmann::json&, nlohmann::json*, std::string*) { return true; };
+        h.error.clear();
+        return h;
+    };
+    ModelRepo m(cfg, std::move(b));
+    m.scan();
+
+    std::string err;
+    REQUIRE(m.load("a", &err));
+    ModelHandle ha;
+    REQUIRE(m.get("a", &ha));
+    REQUIRE(ha.status == ModelStatus::Ready);
+
+    REQUIRE(m.load("b", &err));
+    REQUIRE(last_id == "b");  // builder 最后一次实例化 b
+    REQUIRE(m.get("a", &ha));
+    REQUIRE(ha.status == ModelStatus::Unloaded);  // b 卸下 a
+    ModelHandle hb;
+    REQUIRE(m.get("b", &hb));
+    REQUIRE(hb.status == ModelStatus::Ready);
+
+    REQUIRE(m.unload("b"));
+    REQUIRE(m.get("b", &hb));
+    REQUIRE(hb.status == ModelStatus::Unloaded);
+    REQUIRE_FALSE(m.unload("b"));  // 已卸，非活跃
+
+    fs::remove_all(dir);
 }
 
 TEST_CASE("ModelRepo unknown names", "[serving]") {

@@ -96,7 +96,14 @@ std::vector<std::string> ModelRepo::scan() {
     std::vector<std::string> changed;
     for (const auto& mm : impl_->manifest) {
         const bool is_new = by_name_.find(mm.id) == by_name_.end();
-        by_name_[mm.id] = metadata_handle(mm);
+        ModelHandle h = metadata_handle(mm);
+        if (!is_new && active_ == mm.id) {
+            auto& old = by_name_[mm.id];
+            h.infer = old.infer;
+            h.status = old.status;
+            h.error = old.error;
+        }
+        by_name_[mm.id] = std::move(h);
         if (is_new) changed.push_back(mm.id);
     }
     // 移除 manifest 中已不存在的 id。
