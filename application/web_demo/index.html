@@ -202,19 +202,24 @@ function renderResult(type,res){
 
   // 单对象族：ocr / lpr / sem / depth
   if(type==='ocr'&&res.boxes){ocrBoxes(res.boxes,res.text,res.rec_scores);renderOcrTable(res);return;}
-  if(type==='lpr'){lprRender(res);return;}
   if(type==='sem'&&res.shape&&res.labels){semOverlay(res);return;}
   if(type==='depth'&&res.shape&&res.depth){depthOverlay(res);return;}
   if(type==='face'&&res.embedding){tableEmbedding(res);return;}
 
   if(!arr){renderTable([],true);return;}
 
-  // 数组族：det/face/seg/pose/obb
+  // 数组族：det/face/seg/pose/obb/lpr
   arr.forEach((r,i)=>{
     const box=r.box||r.rotated_box;
     const labelName=(labels.length?labels[+r.label_id]:null)||('id'+r.label_id);
     const score=r.score!=null?(' '+Number(r.score).toFixed(2)):'';
     const caption=[labelName,score].join('').trim();
+    if(type==='lpr'){
+      const colorMap={BLUE:'#2563eb',GREEN:'#22c55e',YELLOW:'#ffcc00',WHITE:'#e5e7eb',BLACK:'#000000'};
+      const c=colorMap[((r.car_plate_color||'')+'').toLowerCase()]||'#25c6fc';
+      if(r.box) rect(r.box,c,r.car_plate_str||'车牌');
+      return;
+    }
     if(type==='obb'){
       if(r.rotated_box) rotated(r.rotated_box,colorOf(i),caption);
     }else if(type==='pose'){
@@ -283,19 +288,7 @@ function ocrBoxes(boxes,text,rec_scores){
     }
   });
 }
-// LPR: {box,...,car_plate_str,car_plate_color}
-function lprRender(r){
-  const colorMap={BLUE:'#2563eb',GREEN:'#22c55e',YELLOW:'#ffcc00',WHITE:'#e5e7eb',BLACK:'#000000'};
-  const plate=(r.car_plate_color||'')+'';
-  const c=colorMap[plate.toLowerCase()]||'#25c6fc';
-  if(r.box) rect(r.box,c,r.car_plate_str||'车牌');
-  if(Array.isArray(r.keypoints)&&r.keypoints.length>=4){ // 描出四角
-    ctx.strokeStyle='#a855f7';ctx.lineWidth=2;ctx.beginPath();
-    r.keypoints.forEach((p,i)=>{const X=p.x,Y=p.y;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
-    ctx.closePath();ctx.stroke();
-  }
-  renderLprTable(r);
-}
+// LPR: 数组元素 {box,...,car_plate_str,car_plate_color}，在数组族 forEach 中按元素渲染
 // Sem: {shape:[H,W], num_classes, labels:每像素类别}
 function semOverlay(res){
   const s=res.shape,[h,w]=[s[0],s[1]];if(!h||!w)return;
@@ -353,15 +346,6 @@ function renderOcrTable(res){
   let html='<table><tr><th>#</th><th>文本</th><th>识别分</th></tr>';
   for(let i=0;i<n;i++){html+=`<tr><td>${i+1}</td><td>${esc(res.text&&res.text[i])}</td><td>${res.rec_scores&&res.rec_scores[i]!=null?fmt(res.rec_scores[i]):'—'}</td></tr>`;}
   t.innerHTML=html+'</table>';
-}
-function renderLprTable(r){
-  const t=$('table');
-  t.innerHTML=`<table>
-    <tr><th>字段</th><th>值</th></tr>
-    <tr><td>车牌</td><td>${esc(r.car_plate_str||'—')}</td></tr>
-    <tr><td>颜色</td><td>${esc(r.car_plate_color||'—')}</td></tr>
-    <tr><td>label_id</td><td>${esc(fmt(r.label_id))}</td></tr>
-    <tr><td>score</td><td>${esc(fmt(r.score))}</td></tr></table>`;
 }
 function renderSemTable(r){
   const t=$('table');
