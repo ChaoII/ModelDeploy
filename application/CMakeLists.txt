@@ -12,9 +12,6 @@ if (BUILD_WEB_DEMO)
     add_custom_command(TARGET demo_server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${CMAKE_SOURCE_DIR}/application/web_demo ${CMAKE_BINARY_DIR}/bin/web_demo)
-    if (WITH_GPU)
-        target_include_directories(demo_server PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
-    endif ()
 endif ()
 
 if (NOT BUILD_SURVEILLANCE)

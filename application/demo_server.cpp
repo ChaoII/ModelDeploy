@@ -33,6 +33,7 @@
 //
 // 加载语义：缺权重 / 无设备 / 初始化失败 → 该模型注册为 ready=false（empty infer），
 // 绝不因单个模型崩溃进程。未知族名给一个不可用占位。
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
@@ -302,6 +303,11 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::cout << "Demo serving on http://127.0.0.1:" << srv.port() << "/\n";
-    std::signal(SIGINT, [](int) { /* 主线程忙等；Ctrl+C 结束 */ });
-    while (true) std::this_thread::sleep_for(std::chrono::hours(1));
+    // SIGINT/SIGTERM → 置位停止标志（仅做 async-signal-safe 的 sig_atomic_t 赋值）。
+    // stop 声明为 static：非捕获 lambda 可调用其地址用作信号处理器，仍属本作用域。
+    static volatile std::sig_atomic_t stop = 0;
+    std::signal(SIGINT, [](int) { stop = 1; });
+    std::signal(SIGTERM, [](int) { stop = 1; });
+    while (!stop) std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    return 0;
 }

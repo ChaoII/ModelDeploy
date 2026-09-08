@@ -33,7 +33,7 @@ option(WITH_GPU "Enable GPU" ON)
 option(BUILD_ON_JETSON "Whether to build ModelDeploy on Nvidia Jetson" OFF)
 option(BUILD_SERVING "Build embedded inference serving gateway (ServingServer)" OFF)
 option(BUILD_SERVING_TLS "Enable HTTPS for serving (requires OpenSSL)" OFF)
-option(BUILD_WEB_DEMO "Build model-demo serving server (demo_server) + web assets" ON)
+option(BUILD_WEB_DEMO "Build model-demo serving server (demo_server) + web assets" OFF)
 if(BUILD_SERVING_TLS)
     find_package(OpenSSL REQUIRED)
     # 启用 httplib::SSLServer 分支（server.cpp 在 #if defined(MODELDEPLOY_SERVING_TLS) 下编译）。

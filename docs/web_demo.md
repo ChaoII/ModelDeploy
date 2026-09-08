@@ -27,7 +27,7 @@ ServingServer (csrc/serving/server.cpp)
 
 ## 构建
 
-在根 `CMakeLists.txt` 中 `BUILD_WEB_DEMO`（默认 `ON`）门控 demo_server 与 web 资产。CPU 构建示例：
+在根 `CMakeLists.txt` 中 `BUILD_WEB_DEMO`（默认 `OFF`，需显式 `=ON`）门控 demo_server 与 web 资产。CPU 构建示例：
 
 ```bash
 cmake -S . -B build -G Ninja -DBUILD_AUDIO=ON -DBUILD_VISION=ON \
@@ -53,8 +53,9 @@ build/bin/demo_server --web build/bin/web_demo --repo <模型仓库目录> --por
 | `--repo` | `demo_repo` | 模型仓库根目录 `repo/{name}/{ver}/` |
 | `--port` | `8000` | 期望绑定端口 |
 
-> **注意**：`ServingServer` 实际绑定的是测试后打印的端口。若指定端口被占用，会退避到临时空闲端口，
-> 请以启动日志 `Demo serving on http://127.0.0.1:<实际端口>/` 中**打印的端口**为准在浏览器访问。
+> **注意**：`ServingServer` 的 `start()` 始终绑定一个临时空闲端口（内部调用 `bind_to_any_port`），
+> 不会实际使用 `--port` 指定的值 —— `--port` 仅为提示性参数。启动后请以日志中打印的真实地址
+> `Demo serving on http://127.0.0.1:<实际端口>/` 为准，用打印的端口在浏览器访问演示页。
 
 ## 模型仓库布局（每族）
 

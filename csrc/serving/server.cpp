@@ -192,7 +192,8 @@ bool ServingServer::start(std::string* err) {
     srv_->set_payload_max_length(cfg_.max_body_bytes);
     if (!cfg_.web_root.empty()) {
         // 同源静态托管：web_root 非空即在 "/" 挂载静态目录（index.html/MIME/路径穿越
-        // 由 httplib 处理），缺失文件回落 API 路由。目录无效仅告警，不致命。
+        // 由 httplib 处理）。挂载点下不存在的文件返回 404，不遮蔽已注册的 API 路由。
+        // 目录无效仅告警，不致命。
         if (!srv_->set_mount_point("/", cfg_.web_root)) {
             MD_LOG_WARN << "ServingServer: web_root invalid or not a directory: "
                         << cfg_.web_root << std::endl;

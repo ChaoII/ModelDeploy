@@ -215,7 +215,7 @@ function renderResult(type,res){
     const score=r.score!=null?(' '+Number(r.score).toFixed(2)):'';
     const caption=[labelName,score].join('').trim();
     if(type==='lpr'){
-      const colorMap={BLUE:'#2563eb',GREEN:'#22c55e',YELLOW:'#ffcc00',WHITE:'#e5e7eb',BLACK:'#000000'};
+      const colorMap={blue:'#2563eb',green:'#22c55e',yellow:'#ffcc00',white:'#e5e7eb',black:'#000000'};
       const c=colorMap[((r.car_plate_color||'')+'').toLowerCase()]||'#25c6fc';
       if(r.box) rect(r.box,c,r.car_plate_str||'车牌');
       return;
