@@ -311,7 +311,9 @@ void ServingServer::register_routes() {
         const auto models = repo_->list();
         nlohmann::json arr = nlohmann::json::array();
         for (const auto& h : models)
-            arr.push_back({{"name", h.name}, {"version", h.version}, {"ready", h.ready}});
+            arr.push_back({{"name", h.name}, {"version", h.version}, {"ready", h.ready},
+                           {"type", h.type}, {"labels", h.labels},
+                           {"input_size", h.input_size}});
         res.set_content(nlohmann::json{{"models", arr}}.dump(), "application/json");
     });
 
@@ -324,7 +326,9 @@ void ServingServer::register_routes() {
             return;
         }
         res.set_content(nlohmann::json{{"model", {{"name", h.name}, {"version", h.version},
-                                                 {"ready", h.ready}}}}
+                                                 {"ready", h.ready}, {"type", h.type},
+                                                 {"labels", h.labels},
+                                                 {"input_size", h.input_size}}}}
                             .dump(),
                         "application/json");
     });

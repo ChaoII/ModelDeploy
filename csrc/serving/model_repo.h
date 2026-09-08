@@ -19,11 +19,14 @@ struct MODELDEPLOY_CXX_EXPORT ModelHandle {
     std::string version;
     bool ready = false;
     InferFn infer;
+    std::string type;                              // 前端渲染器选择：det/cls/seg/pose/ocr/face/lpr/obb/sem/depth
+    std::vector<std::string> labels;               // 类别名（det/cls/seg/pose/obb 等有意义）
+    std::vector<int> input_size;                   // {w,h}
 };
 
-// 注入式句柄构造器：给定 name/version/模型目录，产出 InferFn（Task 3 提供真实实现）。
-using HandleBuilder = std::function<InferFn(const std::string& name, const std::string& version,
-                                            const std::string& model_dir)>;
+// 注入式句柄构造器：给定 name/version/模型目录，产出 ModelHandle（Task 3 提供真实实现）。
+using HandleBuilder = std::function<ModelHandle(const std::string& name, const std::string& version,
+                                                const std::string& model_dir)>;
 
 // 模型仓库：扫描 repo/{name}/{version}/，登记地址、解析 latest、支持 scan 热更新。
 class MODELDEPLOY_CXX_EXPORT ModelRepo {

@@ -57,18 +57,19 @@ ModelRepo::ModelRepo(const ServingConfig& cfg, HandleBuilder builder, std::strin
         builder_ = std::move(builder);
     } else {
         builder_ = [](const std::string&, const std::string&, const std::string&) {
-            return placeholder_infer();
+            ModelHandle h;
+            h.infer = placeholder_infer();
+            return h;
         };
     }
 }
 
 ModelHandle ModelRepo::make_handle(const std::string& name, const std::string& version,
                                    const std::string& dir) const {
-    ModelHandle h;
-    h.name = name;
-    h.version = version;
-    h.ready = true;
-    h.infer = builder_(name, version, dir);
+    ModelHandle h = builder_(name, version, dir);
+    if (h.name.empty()) h.name = name;
+    if (h.version.empty()) h.version = version;
+    h.ready = h.infer ? true : false;
     return h;
 }
 
