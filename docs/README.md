@@ -61,6 +61,7 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | 文档 | 内容 |
 |------|------|
 | [AI 智能安防监控平台](./surveillance.md) | `application/surveillance` 跨平台监控应用架构（CUDA/Jetson/Sophgo） |
+| [Web 模型演示](./web_demo.md) | `demo_server` 各模型族浏览器演示（ServingServer + 静态页 + 每族 E2E 验证） |
 
 ### 发布与开发
 

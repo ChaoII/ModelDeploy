@@ -15,6 +15,7 @@
 
 #include "vision/detection/ultralytics_det.h"
 #include "vision/classification/classification.h"
+#include "vision/lpr/lpr_pipeline/lpr_pipeline.h"
 
 namespace modeldeploy::serving {
 
@@ -43,6 +44,26 @@ public:
     bool batch_predict(const std::vector<modeldeploy::vision::ImageData>& imgs,
                        std::vector<R>* results, TimerArray* = nullptr) {
         return Base::batch_predict(imgs, results);
+    }
+};
+
+// lpr 族专用：LprPipeline 只有 predict 且其 predict 输出 std::vector<LprResult>（整图可能
+// 多块车牌），无 batch_predict，与 AsyncModel 的 batch 调用不匹配。此处补 batch_predict：
+// 逐图转发 predict；R = std::vector<LprResult>（result_type 同 predict 单图输出形态）。
+template <class R>
+class LprAdapter : public modeldeploy::vision::lpr::LprPipeline {
+public:
+    using result_type = R;
+    using LprPipeline::LprPipeline;  // 继承 (det_model_path, rec_model_path, RuntimeOption)
+
+    bool batch_predict(const std::vector<modeldeploy::vision::ImageData>& imgs,
+                       std::vector<R>* results, TimerArray* = nullptr) {
+        if (!results) return false;
+        results->resize(imgs.size());
+        for (size_t i = 0; i < imgs.size(); ++i) {
+            if (!LprPipeline::predict(imgs[i], &(*results)[i])) return false;
+        }
+        return true;
     }
 };
 
