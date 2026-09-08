@@ -117,4 +117,29 @@ namespace modeldeploy::vision {
         return arr;
     }
 
+    // ── nlohmann 两参 to_json 桥 ────────────────────────────────
+    // 上方各 to_json(T) 是「返回 json」的单参形式，仅供显式调用（测试/上层）使用；
+    // 但 nlohmann 的 adl_serializer 只认「void to_json(json&, const T&)」两参形式，
+    // 否则 `json = T`（如 make_model_handle 的 out["results"] = res）无法编译。
+    // 故这里为每种结果类型补两参转发（j 由调用侧 ADL 定位到本命名空间）。
+    inline void to_json(nlohmann::json& j, const Rect2f& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const Point3f& p) { j = to_json(p); }
+    inline void to_json(nlohmann::json& j, const RotatedRect& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const Mask& m) { j = to_json(m); }
+    inline void to_json(nlohmann::json& j, const ClassifyResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const DetectionResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const InstanceSegResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const SemSegResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const DepthResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const ObbResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const KeyPointsResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const OCRResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const FaceRecognitionResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const ReIdResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const LprResult& r) { j = to_json(r); }
+    inline void to_json(nlohmann::json& j, const AttributeResult& r) { j = to_json(r); }
+    // vector<T> 泛型两参桥：对任意可 to_json 的 T 展开为数组（结果向量直接落 JSON）。
+    template <typename T>
+    inline void to_json(nlohmann::json& j, const std::vector<T>& rs) { j = to_json(rs); }
+
 }  // namespace modeldeploy::vision

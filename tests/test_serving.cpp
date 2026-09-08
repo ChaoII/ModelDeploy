@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -14,8 +15,10 @@
 #include "serving/model_repo.h"
 #include "serving/model_entry.h"
 #include "serving/server.h"
+#include "serving/adapters.h"
 #include "pipeline/async_model.h"
 #include "vision/common/image_data.h"
+#include "vision/common/result_json.h"
 #include "../third_party/httplib.h"
 
 namespace fs = std::filesystem;
@@ -91,7 +94,48 @@ struct FakeModel {
     }
 };
 
+// StubDet —— 模拟真实 det 模型的结果形态（result_type=std::vector<DetectionResult>）。
+// 不依赖真实权重；predict/batch_predict 各产出一个框，用于 typed 结果 JSON round-trip。
+struct StubDet {
+    using result_type = std::vector<modeldeploy::vision::DetectionResult>;
+    static result_type make_one(float x, float y, float w, float h, int label, float score) {
+        result_type v(1);
+        v[0].box = {x, y, w, h};
+        v[0].label_id = label;
+        v[0].score = score;
+        return v;
+    }
+    bool predict(const modeldeploy::vision::ImageData&, result_type* r, TimerArray* = nullptr) {
+        *r = make_one(10.f, 20.f, 100.f, 50.f, 0, 0.9f);
+        return true;
+    }
+    bool batch_predict(const std::vector<modeldeploy::vision::ImageData>& imgs,
+                       std::vector<result_type>* rs, TimerArray* = nullptr) {
+        rs->clear();
+        for (size_t i = 0; i < imgs.size(); ++i)
+            rs->push_back(make_one(10.f, 20.f, 100.f, 50.f, 0, 0.9f));
+        return true;
+    }
+};
+
 }  // namespace
+
+TEST_CASE("typed result JSON via make_model_handle (CPU)", "[serving]") {
+    auto h = make_model_handle<StubDet>("det", std::make_unique<StubDet>());
+    REQUIRE(h.ready);
+    nlohmann::json out;
+    std::string err;
+    REQUIRE(h.infer(nlohmann::json{{"image", PNG1X1_B64}}, &out, &err));
+    REQUIRE(out["model"] == "det");
+    REQUIRE(out.contains("results"));
+    REQUIRE(out["results"].is_array());
+    REQUIRE(out["results"].size() == 1);
+    REQUIRE(out["results"][0]["score"] == Catch::Approx(0.9f));
+    REQUIRE(out["results"][0]["label_id"] == 0);
+    REQUIRE(out["results"][0]["box"]["x"] == Catch::Approx(10.0f));
+    REQUIRE(out["results"][0]["box"]["width"] == Catch::Approx(100.0f));
+    REQUIRE(out.contains("duration_ms"));
+}
 
 namespace {
 

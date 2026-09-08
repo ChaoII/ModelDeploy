@@ -1,6 +1,22 @@
 # 应用：AI 智能安防监控平台
 # 通过顶层 CMake 的 BUILD_SURVEILLANCE=ON 激活
 
+# ── 模型演示后端（demo_server） ──────────────────────────────
+# 独立于 BUILD_SURVEILLANCE：注册 ServingServer 之后端（det/cls 等真实模型族），
+# 由 BUILD_WEB_DEMO（默认 ON）门控。web 资产（application/web_demo）POST_BUILD
+# 拷到构建目录的 bin/web_demo（Task 4 将 index.html 换成真实演示页）。
+if (BUILD_WEB_DEMO)
+    add_executable(demo_server demo_server.cpp)
+    target_link_libraries(demo_server PRIVATE ${LIBRARY_NAME})
+    target_include_directories(demo_server PRIVATE ${CMAKE_SOURCE_DIR}/csrc)
+    add_custom_command(TARGET demo_server POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_SOURCE_DIR}/application/web_demo ${CMAKE_BINARY_DIR}/bin/web_demo)
+    if (WITH_GPU)
+        target_include_directories(demo_server PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+    endif ()
+endif ()
+
 if (NOT BUILD_SURVEILLANCE)
     return()
 endif ()
