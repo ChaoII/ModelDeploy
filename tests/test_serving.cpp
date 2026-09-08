@@ -966,21 +966,30 @@ TEST_CASE("serving lazy: manifest parses entries", "[serving]") {
     j["models"].push_back({{"id", "cls"}, {"type", "cls"},
                            {"files", {{"model", "yolo11n-cls/model.onnx"}}},
                            {"labels", "assets/coco.txt"}});
+    j["models"].push_back({{"id", "ocr"}, {"type", "ocr"},
+                           {"files", {{"rec", "ppocrv4/rec.onnx"},
+                                      {"cls", "ppocrv4/cls.onnx"},
+                                      {"dict", "ppocrv4/ppocr_keys.txt"}}}});
     auto path = (fs::path(dir) / "manifest.json").string();
     { std::ofstream f(path); f << j.dump(); }
 
     std::vector<ManifestModel> out;
     std::string err;
     REQUIRE(load_manifest(path, dir, &out, &err));
-    REQUIRE(out.size() == 2);
+    REQUIRE(out.size() == 3);
     REQUIRE(out[0].id == "det");
     REQUIRE(out[0].type == "det");
     REQUIRE(out[0].display == "Det");
     REQUIRE(out[0].labels.size() == 2);
     REQUIRE(out[0].input_size == std::vector<int>{640, 640});
+    REQUIRE(out[0].model_f == (fs::path(dir) / "yolo11n/model.onnx").string());
     REQUIRE(out[1].labels.size() == 2);                        // 从 assets/coco.txt 读入
     REQUIRE(out[1].labels[0] == "person");
     REQUIRE(out[1].input_size == std::vector<int>{640, 640});  // 缺省 640x640
+    REQUIRE(out[1].model_f == (fs::path(dir) / "yolo11n-cls/model.onnx").string());
+    REQUIRE(out[2].rec_f == (fs::path(dir) / "ppocrv4/rec.onnx").string());
+    REQUIRE(out[2].cls_f == (fs::path(dir) / "ppocrv4/cls.onnx").string());
+    REQUIRE(out[2].dict_f == (fs::path(dir) / "ppocrv4/ppocr_keys.txt").string());
 
     fs::remove_all(dir);
 }

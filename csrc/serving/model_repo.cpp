@@ -23,7 +23,7 @@ namespace {
 // 内置占位 InferFn：真实推理由 HandleBuilder（Task 4）注入。
 InferFn placeholder_infer() {
     return [](const nlohmann::json&, nlohmann::json*, std::string* err) {
-        if (err) *err = "not implemented (Task3)";
+        if (err) *err = "not implemented (lazy-load stub)";
         return false;
     };
 }
