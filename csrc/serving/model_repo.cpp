@@ -142,8 +142,6 @@ std::vector<ModelHandle> ModelRepo::list() const {
     return res;
 }
 
-const std::vector<ManifestModel>& ModelRepo::manifest() const { return impl_->manifest; }
-
 bool ModelRepo::load(const std::string& name, std::string* err) {
     if (err) err->clear();
     ManifestModel mm;

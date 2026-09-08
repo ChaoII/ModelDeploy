@@ -45,7 +45,6 @@ public:
     std::vector<std::string> scan();                 // 读 manifest，填充目录元数据；返回新增模型 id
     bool get(const std::string& name, ModelHandle* out) const;
     std::vector<ModelHandle> list() const;
-    const std::vector<ManifestModel>& manifest() const;
     bool load(const std::string& name, std::string* err);   // 同步实例化，单槽，成功置 Ready
     bool unload(const std::string& name);                    // 卸下活跃模型，置 Unloaded
 

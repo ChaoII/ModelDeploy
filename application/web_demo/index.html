@@ -298,11 +298,12 @@ async function select(id){
     try{await apiPost('/v1/models/'+encodeURIComponent(id)+'/load');}catch(e){if(gen===selectGen){hideModal();toast('加载请求失败：'+(e.message||e),'err');}return;}
   }
   const deadline=Date.now()+120000;
+  let gone=false;
   while(Date.now()<deadline){
     await sleep(500);
     await refresh();
     const cur=curModel();
-    if(!cur)break;
+    if(!cur){gone=true;break;}
     if(cur.status==='ready'){
       if(gen===selectGen){hideModal();toast('模型已就绪，可以推理了','ok');}
       return;
@@ -313,7 +314,7 @@ async function select(id){
     }
     if(cur.status==='loading'&&gen===selectGen)showModal('加载「'+cur.display+'」…');
   }
-  if(gen===selectGen){hideModal();toast('加载超时，请重试','err');}
+  if(gen===selectGen){hideModal();toast(gone?'模型不存在':'加载超时，请重试','err');}
 }
 
 /* ── 图片处理（长边≤1600 降采样）── */
@@ -346,7 +347,8 @@ async function loadFromImage(img,type){
 }
 async function uploadFile(f){
   if(!f)return;
-  if(!/^image\//.test((f.type||''))){toast('请选择图片文件（JPG/PNG 等）','err');return;}
+  const okType=/^image\//.test(f.type||'')||/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name||'');
+  if(!okType){toast('请选择图片文件（JPG/PNG 等）','err');return;}
   try{loadFromImage(await fileToImage(f),f.type||'image/jpeg');}
   catch(e){toast('图片解码失败','err');}
 }

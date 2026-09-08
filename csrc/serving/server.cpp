@@ -397,15 +397,15 @@ void ServingServer::register_routes() {
         const std::string name = req.path_params.at("name");
         // RAII：handler 返回时把最终状态码记入 /metrics（覆盖 429/401/404/503/400/200/504）。
         InferRecorder recorder{metrics_.get(), name, res};
-        // 限流（全局令牌桶）：超限 429，不入 in_flight、不占推理。
-        if (!limiter_->try_acquire()) {
-            write_error(res, 429, "RATE_LIMITED", "rate limit exceeded");
-            return;
-        }
         if (!authorized(cfg_, req, res)) return;
         ModelHandle h;
         if (!repo_->get(name, &h)) {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
+            return;
+        }
+        // Failed 模型不重建：直接报错，避免每次 /infer 都重建重型模型。
+        if (h.status == ModelStatus::Failed) {
+            write_error(res, 503, "MODEL_NOT_READY", "model failed to load: " + h.error);
             return;
         }
         // 懒加载：非 Ready 且非 Loading 时同步 load 一次；此后仍非 Ready → 不重试，直接报错。
@@ -415,7 +415,14 @@ void ServingServer::register_routes() {
             repo_->get(name, &h);
         }
         if (h.status != ModelStatus::Ready) {
-            write_error(res, 503, "MODEL_NOT_READY", "model loading or failed: " + name);
+            write_error(res, 503, "MODEL_NOT_READY",
+                        h.status == ModelStatus::Failed ? "model failed to load: " + h.error
+                                                        : "model not ready: " + name);
+            return;
+        }
+        // 限流（全局令牌桶）：超限 429，不入 in_flight、不占推理。
+        if (!limiter_->try_acquire()) {
+            write_error(res, 429, "RATE_LIMITED", "rate limit exceeded");
             return;
         }
         nlohmann::json in;
