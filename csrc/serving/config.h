@@ -11,6 +11,7 @@ struct ServingConfig {
     std::string host = "0.0.0.0";
     int port = 8000;
     std::string model_repo;                 // 仓库根
+    std::string web_root;                   // 非空时 ServingServer 同源托管该静态目录
     size_t http_threads = 0;                // 0=硬件并发
     std::vector<std::string> api_keys;      // 非空启用鉴权
     size_t max_body_bytes = 64 << 20;

@@ -37,7 +37,11 @@ jobs:
           sudo apt-get install -y ninja-build libssl-dev
 
       - name: Build aarch64 wheels
-        uses: pypa/cibuildwheel@v2.21.3
+        # 须 cibuildwheel >= v2.22.0：v2.21.x 在 before_all 硬编码容器基础 python
+        # 为 /opt/python/cp38-cp38，而新版 manylinux_2_28_aarch64 镜像已移除 cp38
+        # （实测 2026.09.05-1 默认 python3=3.12，/opt/python 仅 cp39+），导致
+        # before_all 首行 `No such file or directory` (code 127)。v2.22.0 起改用 cp39。
+        uses: pypa/cibuildwheel@v2.23.4
         with:
           output-dir: dist
         env:

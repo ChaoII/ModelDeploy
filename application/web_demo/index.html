@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ModelDeploy · 模型功能演示</title>
+<style>
+:root{
+  --bg:#060913;--bg-2:#0a1024;--panel:#0f1730;--panel-2:#0b1123;
+  --line:#1d2b4d;--line-glow:rgba(37,198,252,.35);
+  --tx:#e6f0ff;--mut:#7d8db0;--acc:#25c6fc;--sec:#a855f7;
+  --ok:#2be6a3;--warn:#ffcc00;--bad:#ff5470;
+  --mono:Consolas,'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,'Segoe UI','Microsoft YaHei',sans-serif;color:var(--tx);
+  background:var(--bg);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 900px 560px at 12% 6%,rgba(37,198,252,.10),transparent 60%),
+    radial-gradient(ellipse 700px 480px at 90% 92%,rgba(168,85,247,.10),transparent 60%),
+    linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%)}
+.bg::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(37,198,252,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(37,198,252,.03) 1px,transparent 1px);
+  background-size:44px 44px;mask-image:radial-gradient(ellipse at center,black 0%,transparent 78%)}
+header{position:relative;z-index:2;display:flex;align-items:center;gap:12px;height:52px;padding:0 18px;
+  border-bottom:1px solid var(--line);background:rgba(10,18,38,.85);backdrop-filter:blur(8px)}
+header h1{font-size:15px;margin:0;letter-spacing:.5px;font-weight:600}
+header .sub{color:var(--mut);font-size:11px;margin-left:2px}
+.sp{flex:1}
+.pill{font-size:11px;padding:3px 11px;border-radius:20px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.pill.ok{color:var(--ok);border-color:var(--ok)}
+.pill.bad{color:var(--bad);border-color:var(--bad)}
+.pill.on{color:var(--acc);border-color:var(--acc)}
+.layout{position:relative;z-index:1;display:flex;height:calc(100vh - 52px)}
+nav{width:238px;border-right:1px solid var(--line);overflow:auto;padding:12px 10px;background:rgba(8,13,28,.6)}
+nav .nav-t{font-size:10px;letter-spacing:1.5px;color:var(--mut);padding:2px 8px 8px;text-transform:uppercase}
+nav .m{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;
+  border:1px solid transparent;border-radius:9px;cursor:pointer;transition:.12s}
+nav .m:hover{background:#101b38;border-color:var(--line)}
+nav .m.sel{border-color:var(--acc);background:linear-gradient(90deg,rgba(37,198,252,.12),transparent)}
+nav .m .name{display:flex;align-items:center;gap:7px;font-weight:600}
+nav .m .tag{font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(37,198,252,.12);color:var(--acc);letter-spacing:.5px}
+nav .m.off .name{opacity:.45}
+nav .m .inf{font-size:10px;color:var(--mut);margin-top:2px}
+nav .m .r{font-size:10px;padding:2px 8px;border-radius:10px;flex-shrink:0}
+.r.y{background:rgba(43,230,163,.12);color:var(--ok)}
+.r.n{background:rgba(255,84,112,.14);color:var(--bad)}
+main{flex:1;display:flex;flex-direction:column;padding:16px 18px;gap:14px;overflow:auto}
+#drop{border:1px dashed var(--line);padding:30px;text-align:center;color:var(--mut);cursor:pointer;
+  border-radius:12px;transition:.15s;background:rgba(10,16,36,.4)}
+#drop.drag{border-color:var(--acc);color:var(--acc);background:rgba(37,198,252,.06)}
+#drop .h{font-size:14px}
+#drop .s{font-size:11px;margin-top:4px;opacity:.8}
+#samples{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#samples .cap{font-size:11px;color:var(--mut)}
+#samples img{height:60px;cursor:pointer;border:1px solid var(--line);border-radius:8px;transition:.12s;background:#fff}
+#samples img:hover{border-color:var(--acc);transform:translateY(-2px)}
+#samples img.cur{border-color:var(--acc);box-shadow:0 0 0 2px var(--line-glow)}
+#wrap{position:relative;display:inline-block;max-width:100%;align-self:center;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#img{max-width:100%;display:block}
+canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+#meta{font-size:12px;color:var(--mut);min-height:18px}
+#meta .err{color:var(--bad);font-weight:600}
+details{border:1px solid var(--line);border-radius:10px;background:rgba(12,18,38,.55);overflow:hidden}
+details summary{cursor:pointer;padding:9px 14px;font-weight:600;font-size:12px;color:var(--acc);user-select:none}
+details[open] summary{border-bottom:1px solid var(--line)}
+details .cnt{padding:12px 14px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+td,th{border:1px solid var(--line);padding:5px 9px;text-align:left}
+th{color:var(--acc);background:rgba(37,198,252,.06)}
+pre{background:#070d1c;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;
+  font-family:var(--mono);font-size:11px;max-height:260px;margin:0}
+#json{white-space:pre-wrap;word-break:break-all}
+.mut{color:var(--mut)}
+.empty{color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<header>
+  <h1>ModelDeploy<span class="sub">模型功能演示</span></h1>
+  <div class="sp"></div>
+  <span id="conn" class="pill bad">连接中…</span>
+  <span id="cnt" class="pill">0 模型</span>
+</header>
+<div class="layout">
+  <nav>
+    <div class="nav-t">模型列表</div>
+    <div id="nav"></div>
+  </nav>
+  <main>
+    <div id="drop">
+      <div class="h">拖拽图片到此处，或点击选择</div>
+      <div class="s">推理将由当前选中的模型执行</div>
+    </div>
+    <div id="samples"><span class="cap">快速样例：</span></div>
+    <div id="wrap" style="display:none">
+      <img id="img" alt="input">
+      <canvas id="cv"></canvas>
+    </div>
+    <div id="meta"></div>
+    <details>
+      <summary>结果表</summary>
+      <div class="cnt" id="table"></div>
+    </details>
+    <details>
+      <summary>原始 JSON</summary>
+      <div class="cnt"><pre id="json"></pre></div>
+    </details>
+  </main>
+</div>
+
+<script>
+'use strict';
+let models=[], sel=null, srcImg=null, cv=null, ctx=null, curB64=null;
+const $=id=>document.getElementById(id);
+
+const PALETTE=['#25c6fc','#a855f7','#2be6a3','#ffcc00','#ff5470','#ff8c42','#7cff5c','#5cb8ff','#f26dff','#4deaea'];
+const colorOf=i=>PALETTE[((i%PALETTE.length)+PALETTE.length)%PALETTE.length];
+
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function hexRgba(h,a){const n=parseInt(h.slice(1),16);return [n>>16&255,n>>8&255,n&255,Math.round(a*255)];}
+function fmt(v){if(typeof v==='number')return (Math.round(v*1000)/1000).toString();return v==null?'':String(v);}
+
+const TYPE_ICONS={det:'DT',face:'FC',seg:'SEG',pose:'PS',obb:'OB',ocr:'OCR',lpr:'LPR',cls:'CLS',sem:'SEM',depth:'DP',reid:'RE',attr:'AT'};
+const typeIcon=t=>TYPE_ICONS[t]||String(t||'?').toUpperCase().slice(0,4);
+
+async function apiGet(u){const r=await fetch(u);const j=await r.json().catch(()=>({}));if(!r.ok)throw(j.error||new Error('HTTP '+r.status));return j;}
+async function apiPost(u,b){
+  const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw (j.error?Object.assign(new Error(j.error.message||j.error.code),{json:j}):new Error('HTTP '+r.status));
+  return j;
+}
+
+async function refresh(){
+  // /health: 无就绪模型时返回 503 但服务在线 —— 单独解析 status 而非抛错。
+  let conn=false, connTxt='未连接', anyReady=false;
+  try{const r=await fetch('/health');const j=await r.json().catch(()=>({}));
+    conn=true;anyReady=!!(j.status==='ok');connTxt=j.status==='ok'?'已连接':'已连接（无就绪模型）';}catch(e){}
+  const c=$('conn');c.className='pill '+(conn?(anyReady?'ok':'on'):'bad');c.textContent=connTxt;
+  try{models=(await apiGet('/v1/models')).models||[];}catch(e){models=[];}
+  $('cnt').textContent=models.length+' 模型';
+  renderNav();
+}
+function renderNav(){
+  const n=$('nav');n.innerHTML='';
+  if(!models.length){const e=document.createElement('div');e.className='empty';e.textContent='无可用模型';n.appendChild(e);return;}
+  models.forEach(m=>{
+    const d=document.createElement('div');
+    d.className='m'+(sel&&m.name===sel.name?' sel':'')+(m.ready?'':' off');
+    d.onclick=()=>{sel=m;renderNav();setMeta('已选择模型 '+esc(m.name));};
+    const input=(m.input_size||[]).map(v=>String(v)).join(' × ')||'—';
+    const lab=(m.labels&&m.labels.length)?m.labels.length+' 类':'';
+    d.innerHTML=`<div>
+        <div class="name"><span class="tag">${esc(typeIcon(m.type))}</span>${esc(m.name)}</div>
+        <div class="inf">${esc(m.type||'?')} · ${esc(input)}${lab?(' · '+esc(lab)):''}</div>
+      </div>
+      <span class="r ${m.ready?'y':'n'}">${m.ready?'就绪':'未就绪'}</span>`;
+    n.appendChild(d);
+  });
+}
+function setMeta(html){$('meta').innerHTML=html;}
+
+function fileToB64(f){return new Promise((ok,er)=>{const r=new FileReader();r.onload=()=>{const s=String(r.result);ok({b64:s.slice(s.indexOf(',')+1),type:f.type||'image/jpeg',name:f.name||''});};r.onerror=er;r.readAsDataURL(f);});}
+function loadImage(b64,type){return new Promise((ok,er)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=er;im.src='data:'+(type||'image/jpeg')+';base64,'+b64;});}
+function makeB64(img){const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);return c.toDataURL('image/jpeg',0.9).split(',')[1];}
+
+async function showImage(b64,type){
+  try{srcImg=await loadImage(b64,type);}catch(e){setMeta('<span class="err">图片解码失败</span>');return;}
+  const img=$('img');img.src=srcImg.src;img.style.display='block';
+  const w=$('wrap');w.style.display='inline-block';
+  cv=$('cv');cv.width=srcImg.naturalWidth;cv.height=srcImg.naturalHeight;
+  ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
+  curB64=makeB64(srcImg);
+}
+
+async function run(){
+  if(!sel){setMeta('<span class="err">请先选择模型</span>');return;}
+  if(!sel.ready){setMeta('<span class="err">模型「'+esc(sel.name)+'」未就绪，无法推理</span>');return;}
+  if(!curB64){setMeta('<span class="err">请先上传或选择样例图片</span>');return;}
+  const t0=performance.now();let r;
+  try{r=await apiPost('/v1/models/'+encodeURIComponent(sel.name)+'/infer',{image:curB64});}
+  catch(e){$('json').textContent=JSON.stringify(e.json||{error:{message:String(e.message||e)}},null,2);
+    setMeta('<span class="err">推理失败：'+esc(e.message||e)+'</span>');return;}
+  const dt=performance.now()-t0;
+  setMeta(`${esc(sel.name)} · <b class="mut">服务端</b> ${fmt(r.duration_ms)} ms · <b class="mut">浏览器总耗时</b> ${dt.toFixed(0)} ms`);
+  $('json').textContent=JSON.stringify(r,null,2);
+  renderResult(sel.type,r.results);
+}
+
+/* ================= 渲染 ================= */
+function renderResult(type,res){
+  cv.width=srcImg.naturalWidth;cv.height=srcImg.naturalHeight;ctx.clearRect(0,0,cv.width,cv.height);
+  if(res==null){renderTable([],true);return;}
+  const labels=(sel&&sel.labels)||[];
+  const arr=Array.isArray(res)?res:(res&&res.results?res.results:null);
+
+  // cls: 单对象 {label_ids,scores,feature}
+  if(type==='cls'||type==='reid'){clsTopN(res);return;}
+
+  // 单对象族：ocr / lpr / sem / depth
+  if(type==='ocr'&&res.boxes){ocrBoxes(res.boxes,res.text,res.rec_scores);renderOcrTable(res);return;}
+  if(type==='sem'&&res.shape&&res.labels){semOverlay(res);return;}
+  if(type==='depth'&&res.shape&&res.depth){depthOverlay(res);return;}
+  if(type==='face'&&res.embedding){tableEmbedding(res);return;}
+
+  if(!arr){renderTable([],true);return;}
+
+  // 数组族：det/face/seg/pose/obb/lpr
+  arr.forEach((r,i)=>{
+    const box=r.box||r.rotated_box;
+    const labelName=(labels.length?labels[+r.label_id]:null)||('id'+r.label_id);
+    const score=r.score!=null?(' '+Number(r.score).toFixed(2)):'';
+    const caption=[labelName,score].join('').trim();
+    if(type==='lpr'){
+      const colorMap={blue:'#2563eb',green:'#22c55e',yellow:'#ffcc00',white:'#e5e7eb',black:'#000000'};
+      const c=colorMap[((r.car_plate_color||'')+'').toLowerCase()]||'#25c6fc';
+      if(r.box) rect(r.box,c,r.car_plate_str||'车牌');
+      return;
+    }
+    if(type==='obb'){
+      if(r.rotated_box) rotated(r.rotated_box,colorOf(i),caption);
+    }else if(type==='pose'){
+      if(r.box) rect(r.box,'#25c6fc',caption);
+      if(Array.isArray(r.keypoints)) poseSkeleton(r.keypoints,colorOf(i));
+    }else{
+      if(r.box) rect(r.box,colorOf(i),caption);
+      if(type==='seg'&&r.mask) maskOverlay(r.mask,colorOf(i));
+    }
+  });
+  renderTable(arr,type);
+}
+
+// -- 绘图原语（源码分辨率 canvas，浏览器按 CSS 缩放对齐 img）--
+function rect(b,c,txt){
+  ctx.strokeStyle=c;ctx.lineWidth=2;ctx.strokeRect(b.x,b.y,b.width,b.height);
+  if(txt){ctx.font='12px system-ui';ctx.fillStyle=c;const tw=ctx.measureText(txt).width+8;
+    const yy=b.y>16?b.y-17:Math.max(0,b.y+b.height+2);
+    ctx.fillRect(b.x,yy,tw,15);ctx.fillStyle='#000';ctx.fillText(txt,b.x+4,yy+11);}
+}
+function dot(p,r){ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fillStyle='#25c6fc';ctx.fill();}
+function poseSkeleton(kps,c){
+  const LIMBS=[[0,1],[0,2],[1,3],[2,4],[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]];
+  ctx.strokeStyle=c;ctx.lineWidth=2;
+  LIMBS.forEach(([a,b])=>{
+    const A=kps[a],B=kps[b];
+    if(A&&B&&A.x!=null&&B.x!=null){ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();}
+  });
+  kps.forEach((p,i)=>{if(p&&p.x!=null)dot(p,i<5?5:3);});
+}
+function rotated(o,c,txt){
+  const rad=o.angle*Math.PI/180,cx=o.xc,cy=o.yc,cw=o.width/2,ch=o.height/2;
+  const pts=[[-cw,-ch],[cw,-ch],[cw,ch],[-cw,ch]].map(p=>[cx+p[0]*Math.cos(rad)-p[1]*Math.sin(rad),cy+p[0]*Math.sin(rad)+p[1]*Math.cos(rad)]);
+  ctx.strokeStyle=c;ctx.lineWidth=2;ctx.beginPath();
+  pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
+  if(txt){ctx.font='12px system-ui';ctx.fillStyle=c;ctx.fillText(txt,pts[0][0],Math.max(0,pts[0][1]-4));}
+}
+// Mask: {shape:[H,W], data:[0/1...,行优先]}
+function maskOverlay(m,c){
+  const s=m.shape;if(!Array.isArray(s)||!Array.isArray(m.data))return;
+  const h=s[0],w=s[1];if(!h||!w)return;
+  const [cr,cg,cb]=hexRgba(c,255);
+  const id=ctx.createImageData(w,h),d=m.data;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const v=d[y*w+x],k=(y*w+x)*4;
+    if(v){id.data[k]=cr;id.data[k+1]=cg;id.data[k+2]=cb;id.data[k+3]=110;}
+  }
+  ctx.globalAlpha=0.5;ctx.putImageData(id,0,0);ctx.globalAlpha=1;
+}
+// OCR: 单对象 {boxes:[[x1,y1,x2,y2,x3,y3,x4,y4],...], text[], rec_scores[]}
+function ocrBoxes(boxes,text,rec_scores){
+  boxes.forEach((b,i)=>{
+    if(!Array.isArray(b))return;
+    if(b.length===8){ // 四点四边形 [x1,y1,x2,y2,x3,y3,x4,y4]
+      const pts=[[b[0],b[1]],[b[2],b[3]],[b[4],b[5]],[b[6],b[7]]];
+      const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+      ctx.strokeStyle='#25c6fc';ctx.lineWidth=2;ctx.beginPath();
+      pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
+      const x=Math.min(...xs),y=Math.min(...ys);
+      const caption=(text&&text[i]?text[i]:'')+(rec_scores&&rec_scores[i]!=null?(' '+Number(rec_scores[i]).toFixed(2)):'');
+      if(caption){ctx.font='12px system-ui';ctx.fillStyle='#25c6fc';
+        const tw=ctx.measureText(caption).width+8,yy=y>16?y-17:y;
+        ctx.fillRect(x,yy,tw,15);ctx.fillStyle='#000';ctx.fillText(caption,x+4,yy+11);}
+    }else if(b.length===4){ // 兼容 [x,y,w,h]
+      rect({x:b[0],y:b[1],width:b[2],height:b[3]},'#25c6fc',(text&&text[i])||'');
+    }
+  });
+}
+// LPR: 数组元素 {box,...,car_plate_str,car_plate_color}，在数组族 forEach 中按元素渲染
+// Sem: {shape:[H,W], num_classes, labels:每像素类别}
+function semOverlay(res){
+  const s=res.shape,[h,w]=[s[0],s[1]];if(!h||!w)return;
+  const id=ctx.createImageData(w,h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const c=res.labels[y*w+x];const k=(y*w+x)*4;
+    if(c){const[cr,cg,cb]=hexRgba(colorOf(c),255);id.data[k]=cr;id.data[k+1]=cg;id.data[k+2]=cb;id.data[k+3]=150;}
+  }
+  ctx.globalAlpha=0.55;ctx.putImageData(id,0,0);ctx.globalAlpha=1;
+  renderSemTable(res);
+}
+// Depth: {shape:[H,W], depth:行优先 float}
+function depthOverlay(res){
+  const s=res.shape,[h,w]=[s[0],s[1]];const d=res.depth;
+  if(!h||!w||!Array.isArray(d))return;
+  let mn=Infinity,mx=-Infinity;for(const v of d){if(v<mn)mn=v;if(v>mx)mx=v;}
+  const rng=(mx-mn)||1;
+  const id=ctx.createImageData(w,h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const v=(d[y*w+x]-mn)/rng,k=(y*w+x)*4;
+    id.data[k]=Math.round(v*255);id.data[k+1]=Math.round(v*120);id.data[k+2]=Math.round((1-v)*255);id.data[k+3]=160;
+  }
+  ctx.globalAlpha=0.6;ctx.putImageData(id,0,0);ctx.globalAlpha=1;
+  renderDepthTable(res);
+}
+function clsTopN(res){
+  const scores=res.scores||[],ids=res.label_ids||[],labels=(sel&&sel.labels)||[];
+  const rows=scores.map((s,i)=>({s,i,name:(labels.length?labels[ids[i]]:null)||('id'+(ids[i]!=null?ids[i]:i))}))
+    .sort((a,b)=>b.s-a.s).slice(0,10);
+  const t=$('table');
+  if(!rows.length){t.innerHTML='<span class="empty">无结果</span>';return;}
+  let html='<table><tr><th>#</th><th>label</th><th>score</th></tr>';
+  rows.forEach((x,i)=>{html+=`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${x.s.toFixed(4)}</td></tr>`;});
+  t.innerHTML=html+'</table>';
+}
+function tableEmbedding(res){
+  const dim=Array.isArray(res.embedding)?res.embedding.length:(Array.isArray(res.feature)?res.feature.length:0);
+  const t=$('table');t.innerHTML=`<table><tr><th>字段</th><th>值</th></tr>
+    <tr><td>embedding 维度</td><td>${esc(fmt(dim))}</td></tr></table>`;
+}
+function renderTable(arr,type){
+  const t=$('table');
+  if(!arr.length){t.innerHTML='<span class="empty">无对象</span>';return;}
+  const skip=new Set(['mask','keypoints','data','feature','embedding','table_html','table_structure']);
+  const cols=[...new Set(arr.flatMap(o=>Object.keys(o)))].filter(k=>!skip.has(k));
+  if(!cols.length){t.innerHTML='<span class="empty">无可展示字段</span>';return;}
+  let html='<table><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr>';
+  arr.forEach(o=>{html+='<tr>'+cols.map(c=>'<td>'+(o[c]==null?'':esc(typeof o[c]==='object'?JSON.stringify(o[c]):fmt(o[c])))+'</td>').join('')+'</tr>';});
+  t.innerHTML=html+'</table>';
+}
+function renderOcrTable(res){
+  const t=$('table');
+  const n=(res.boxes||[]).length;
+  if(!n){t.innerHTML='<span class="empty">无文本</span>';return;}
+  let html='<table><tr><th>#</th><th>文本</th><th>识别分</th></tr>';
+  for(let i=0;i<n;i++){html+=`<tr><td>${i+1}</td><td>${esc(res.text&&res.text[i])}</td><td>${res.rec_scores&&res.rec_scores[i]!=null?fmt(res.rec_scores[i]):'—'}</td></tr>`;}
+  t.innerHTML=html+'</table>';
+}
+function renderSemTable(r){
+  const t=$('table');
+  t.innerHTML=`<table><tr><th>字段</th><th>值</th></tr>
+    <tr><td>shape (H×W)</td><td>${esc((r.shape||[]).join(' × '))}</td></tr>
+    <tr><td>num_classes</td><td>${esc(fmt(r.num_classes))}</td></tr></table>`;
+}
+function renderDepthTable(r){
+  const t=$('table');
+  t.innerHTML=`<table><tr><th>字段</th><th>值</th></tr>
+    <tr><td>shape (H×W)</td><td>${esc((r.shape||[]).join(' × '))}</td></tr>
+    <tr><td>像素数</td><td>${esc(fmt((r.depth||[]).length))}</td></tr></table>`;
+}
+
+/* ================= 交互 ================= */
+const drop=$('drop');
+drop.onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='image/*';
+  i.onchange=()=>i.files[0]&&upload(i.files[0]);i.click();};
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag');};
+drop.ondragleave=()=>drop.classList.remove('drag');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0]);};
+
+async function upload(f){
+  const {b64,type}=await fileToB64(f);
+  await showImage(b64,type||'image/jpeg');
+  markCur(null);
+  run();
+}
+function markCur(name){
+  document.querySelectorAll('#samples img').forEach(im=>im.classList.toggle('cur',im.dataset.name===name));
+}
+async function loadSample(name,type){
+  await showImage(base64Of(name),type);
+  markCur(name);
+  run();
+}
+const SAMPLES=[['scene.png','image/png'],['gradient.png','image/png'],['plate.png','image/png']];
+const SAMPLE_B64={};
+function base64Of(n){return SAMPLE_B64[n];}
+const sampleBox=$('samples');
+SAMPLES.forEach(([name,type])=>{
+  const im=document.createElement('img');
+  im.dataset.name=name;im.title=name;im.alt=name;
+  im.src='samples/'+name;
+  im.onload=()=>{ // 预取 base64 以便直接推理（同源可 fetch，离线也可作回退）
+    try{const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;
+      c.getContext('2d').drawImage(im,0,0);SAMPLE_B64[name]=c.toDataURL('image/jpeg',0.9).split(',')[1];}catch(e){}
+  };
+  im.onclick=()=>loadSample(name,type);
+  sampleBox.appendChild(im);
+});
+
+setInterval(refresh,4000);
+refresh();
+</script>
+</body>
+</html>

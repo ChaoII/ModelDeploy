@@ -133,6 +133,7 @@ int main() {
 - [x] 解决方案层：计数/热力/测速/车位/距离/打码/裁剪/健身/说话人/流式 STT/TTS 批处理
 - [x] 后处理工具底座：标注/检测容器/指标/切片/平滑/区域判断
 - [x] Triton 推理服务部署（preprocess → pipeline → postprocess）
+- [x] **浏览器模型演示**：`demo_server` 各模型族（det/cls/seg/pose/obb/sem/depth/ocr/face/lpr）网页可视化试跑（见 [docs/web_demo.md](./docs/web_demo.md)）
 
 **多语言绑定**
 - [x] C++ / Python / C / C# / Rust 五语言绑定（视频编解码全功能覆盖）

@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -14,8 +15,10 @@
 #include "serving/model_repo.h"
 #include "serving/model_entry.h"
 #include "serving/server.h"
+#include "serving/adapters.h"
 #include "pipeline/async_model.h"
 #include "vision/common/image_data.h"
+#include "vision/common/result_json.h"
 #include "../third_party/httplib.h"
 
 namespace fs = std::filesystem;
@@ -91,7 +94,48 @@ struct FakeModel {
     }
 };
 
+// StubDet —— 模拟真实 det 模型的结果形态（result_type=std::vector<DetectionResult>）。
+// 不依赖真实权重；predict/batch_predict 各产出一个框，用于 typed 结果 JSON round-trip。
+struct StubDet {
+    using result_type = std::vector<modeldeploy::vision::DetectionResult>;
+    static result_type make_one(float x, float y, float w, float h, int label, float score) {
+        result_type v(1);
+        v[0].box = {x, y, w, h};
+        v[0].label_id = label;
+        v[0].score = score;
+        return v;
+    }
+    bool predict(const modeldeploy::vision::ImageData&, result_type* r, TimerArray* = nullptr) {
+        *r = make_one(10.f, 20.f, 100.f, 50.f, 0, 0.9f);
+        return true;
+    }
+    bool batch_predict(const std::vector<modeldeploy::vision::ImageData>& imgs,
+                       std::vector<result_type>* rs, TimerArray* = nullptr) {
+        rs->clear();
+        for (size_t i = 0; i < imgs.size(); ++i)
+            rs->push_back(make_one(10.f, 20.f, 100.f, 50.f, 0, 0.9f));
+        return true;
+    }
+};
+
 }  // namespace
+
+TEST_CASE("typed result JSON via make_model_handle (CPU)", "[serving]") {
+    auto h = make_model_handle<StubDet>("det", std::make_unique<StubDet>());
+    REQUIRE(h.ready);
+    nlohmann::json out;
+    std::string err;
+    REQUIRE(h.infer(nlohmann::json{{"image", PNG1X1_B64}}, &out, &err));
+    REQUIRE(out["model"] == "det");
+    REQUIRE(out.contains("results"));
+    REQUIRE(out["results"].is_array());
+    REQUIRE(out["results"].size() == 1);
+    REQUIRE(out["results"][0]["score"] == Catch::Approx(0.9f));
+    REQUIRE(out["results"][0]["label_id"] == 0);
+    REQUIRE(out["results"][0]["box"]["x"] == Catch::Approx(10.0f));
+    REQUIRE(out["results"][0]["box"]["width"] == Catch::Approx(100.0f));
+    REQUIRE(out.contains("duration_ms"));
+}
 
 namespace {
 
@@ -114,14 +158,16 @@ void write_model(const std::string& repo, const std::string& name, const std::st
 
 // 注入假 InferFn：调用时把 name/version 写进 out["handle"]，用于核对句柄身份。
 HandleBuilder echo_builder() {
-    return [](const std::string& name, const std::string& ver, const std::string&) {
+    return [](const std::string& name, const std::string& ver, const std::string&) -> ModelHandle {
         std::string key = name + "/" + ver;
-        return InferFn([key](const nlohmann::json& in, nlohmann::json* out, std::string* err) {
+        ModelHandle h;
+        h.infer = InferFn([key](const nlohmann::json& in, nlohmann::json* out, std::string* err) {
             (void)in;
             (void)err;
             if (out) (*out)["handle"] = key;
             return true;
         });
+        return h;
     };
 }
 
@@ -131,6 +177,18 @@ std::string handle_of(const ModelHandle& h) {
     REQUIRE(h.infer(nlohmann::json::object(), &out, &err));
     REQUIRE(out.contains("handle"));
     return out["handle"].get<std::string>();
+}
+
+// 写一个临时 web_root：index.html + app.js + 一个嵌套目录。
+std::string make_web_root() {
+    static std::mt19937 rng{std::random_device{}()};
+    auto r = fs::temp_directory_path() /
+             ("md_web_" + std::to_string(static_cast<unsigned>(rng())));
+    fs::create_directories(r / "assets");
+    { std::ofstream f(r / "index.html"); f << "<h1>ok</h1>"; }
+    { std::ofstream f(r / "app.js"); f << "console.log('x')"; }
+    { std::ofstream f(r / "assets" / "logo.svg"); f << "<svg/>"; }
+    return r.string();
 }
 
 }  // namespace
@@ -319,16 +377,18 @@ namespace {
 
 // 注入真实 AsyncModel（FakeModel）的 HandleBuilder：make_model_handle 启动失败时兜底为失败 InferFn。
 HandleBuilder fake_model_builder() {
-    return [](const std::string& name, const std::string&, const std::string&) -> InferFn {
+    return [](const std::string& name, const std::string&, const std::string&) -> ModelHandle {
+        ModelHandle h;
         try {
-            auto h = make_model_handle<FakeModel>(name, std::make_unique<FakeModel>());
-            return h.infer;
+            auto mh = make_model_handle<FakeModel>(name, std::make_unique<FakeModel>());
+            h = mh;
         } catch (...) {
-            return InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
+            h.infer = InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
                 if (err) *err = "fake model start failed";
                 return false;
             });
         }
+        return h;
     };
 }
 
@@ -338,20 +398,21 @@ HandleBuilder slow_model_builder_flag(std::chrono::milliseconds delay,
                                       std::shared_ptr<std::atomic<bool>> started,
                                       std::shared_ptr<std::atomic<bool>> finished) {
     return [delay, started, finished](const std::string& name, const std::string&,
-                                      const std::string&) -> InferFn {
+                                      const std::string&) -> ModelHandle {
+        ModelHandle h;
         try {
             auto model = std::make_unique<FakeModel>();
             model->delay = delay;
             model->started = started;
             model->finished = finished;
-            auto h = make_model_handle<FakeModel>(name, std::move(model));
-            return h.infer;
+            h = make_model_handle<FakeModel>(name, std::move(model));
         } catch (...) {
-            return InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
+            h.infer = InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
                 if (err) *err = "fake model start failed";
                 return false;
             });
         }
+        return h;
     };
 }
 
@@ -385,7 +446,63 @@ void require_error(const httplib::Result& res, int status, const std::string& co
     REQUIRE(j["error"]["code"].get<std::string>() == code);
 }
 
+// 返回带 type/labels 的 builder：det→labels=[person,car]，cls→无 labels。
+HandleBuilder meta_builder() {
+    return [](const std::string& name, const std::string&, const std::string&) -> ModelHandle {
+        ModelHandle h;
+        h.infer = [](const nlohmann::json&, nlohmann::json* out, std::string*) {
+            if (out) (*out)["meta_ok"] = true;
+            return true;
+        };
+        if (name == "det") {
+            h.type = "det";
+            h.labels = {"person", "car"};
+            h.input_size = {640, 640};
+        } else {
+            h.type = "cls";
+        }
+        return h;
+    };
+}
+
 }  // namespace
+
+TEST_CASE("model metadata in /v1/models", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    write_model(repo, "det", "1");
+    write_model(repo, "cls", "1");
+    ServingServer srv(cfg, meta_builder());
+    std::string err;
+    REQUIRE(srv.start(&err));
+    httplib::Client cli("127.0.0.1", srv.port());
+
+    auto all = cli.Get("/v1/models");
+    REQUIRE(all);
+    REQUIRE(all->status == 200);
+    auto j = nlohmann::json::parse(all->body);
+    REQUIRE(j["models"].is_array());
+
+    nlohmann::json det;
+    bool found = false;
+    for (auto& m : j["models"]) if (m["name"] == "det") { det = m; found = true; }
+    REQUIRE(found);
+    REQUIRE(det["type"] == "det");
+    REQUIRE(det["labels"].size() == 2);
+    REQUIRE(det["labels"][0] == "person");
+    REQUIRE(det["input_size"][0] == 640);
+    REQUIRE(det["ready"] == true);
+
+    auto one = cli.Get("/v1/models/cls");
+    REQUIRE(one);
+    REQUIRE(one->status == 200);
+    auto j1 = nlohmann::json::parse(one->body);
+    REQUIRE(j1["model"]["type"] == "cls");
+
+    srv.stop();
+    fs::remove_all(repo);
+}
 
 // 端到端：起服（随机端口）→ httplib::Client 发请求 → stop() + 清理临时 repo。
 TEST_CASE("ServingServer 200 infer", "[serving]") {
@@ -771,3 +888,43 @@ TEST_CASE("ServingServer tls branch", "[serving][serving-tls]") {
     (void)err;
 }
 #endif
+
+TEST_CASE("serving static hosting same-origin", "[serving]") {
+    auto repo = make_temp_repo();
+    auto web = make_web_root();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.web_root = web;
+    write_model(repo, "det", "1");
+    ServingServer srv(cfg, fake_model_builder());
+    std::string err;
+    REQUIRE(srv.start(&err));
+    httplib::Client cli("127.0.0.1", srv.port());
+
+    auto idx = cli.Get("/");
+    REQUIRE((idx && idx->status == 200));
+    REQUIRE(idx->body.find("<h1>ok</h1>") != std::string::npos);
+
+    auto js = cli.Get("/app.js");
+    REQUIRE((js && js->status == 200));
+    auto svg = cli.Get("/assets/logo.svg");
+    REQUIRE((svg && svg->status == 200));
+
+    // 缺失文件 → 404（不落到 API）
+    auto miss = cli.Get("/nope.txt");
+    REQUIRE((miss && miss->status == 404));
+
+    // 路径穿越 → 404
+    auto trav = cli.Get("/../CMakeLists.txt");
+    REQUIRE((trav && trav->status == 404));
+
+    // API 路由不被静态托管遮蔽
+    auto api = cli.Get("/v1/models");
+    REQUIRE((api && api->status == 200));
+
+    auto health = cli.Get("/health");
+    REQUIRE((health && health->status == 200));
+
+    fs::remove_all(web);
+    fs::remove_all(repo);
+}
