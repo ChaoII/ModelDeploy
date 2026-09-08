@@ -133,6 +133,18 @@ std::string handle_of(const ModelHandle& h) {
     return out["handle"].get<std::string>();
 }
 
+// 写一个临时 web_root：index.html + app.js + 一个嵌套目录。
+std::string make_web_root() {
+    static std::mt19937 rng{std::random_device{}()};
+    auto r = fs::temp_directory_path() /
+             ("md_web_" + std::to_string(static_cast<unsigned>(rng())));
+    fs::create_directories(r / "assets");
+    { std::ofstream f(r / "index.html"); f << "<h1>ok</h1>"; }
+    { std::ofstream f(r / "app.js"); f << "console.log('x')"; }
+    { std::ofstream f(r / "assets" / "logo.svg"); f << "<svg/>"; }
+    return r.string();
+}
+
 }  // namespace
 
 TEST_CASE("ModelRepo scan get list", "[serving]") {
@@ -771,3 +783,43 @@ TEST_CASE("ServingServer tls branch", "[serving][serving-tls]") {
     (void)err;
 }
 #endif
+
+TEST_CASE("serving static hosting same-origin", "[serving]") {
+    auto repo = make_temp_repo();
+    auto web = make_web_root();
+    ServingConfig cfg;
+    cfg.model_repo = repo;
+    cfg.web_root = web;
+    write_model(repo, "det", "1");
+    ServingServer srv(cfg, fake_model_builder());
+    std::string err;
+    REQUIRE(srv.start(&err));
+    httplib::Client cli("127.0.0.1", srv.port());
+
+    auto idx = cli.Get("/");
+    REQUIRE((idx && idx->status == 200));
+    REQUIRE(idx->body.find("<h1>ok</h1>") != std::string::npos);
+
+    auto js = cli.Get("/app.js");
+    REQUIRE((js && js->status == 200));
+    auto svg = cli.Get("/assets/logo.svg");
+    REQUIRE((svg && svg->status == 200));
+
+    // 缺失文件 → 404（不落到 API）
+    auto miss = cli.Get("/nope.txt");
+    REQUIRE((miss && miss->status == 404));
+
+    // 路径穿越 → 404
+    auto trav = cli.Get("/../CMakeLists.txt");
+    REQUIRE((trav && trav->status == 404));
+
+    // API 路由不被静态托管遮蔽
+    auto api = cli.Get("/v1/models");
+    REQUIRE((api && api->status == 200));
+
+    auto health = cli.Get("/health");
+    REQUIRE((health && health->status == 200));
+
+    fs::remove_all(web);
+    fs::remove_all(repo);
+}
