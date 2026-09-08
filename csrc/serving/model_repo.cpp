@@ -146,54 +146,80 @@ const std::vector<ManifestModel>& ModelRepo::manifest() const { return impl_->ma
 
 bool ModelRepo::load(const std::string& name, std::string* err) {
     if (err) err->clear();
-    std::lock_guard<std::mutex> lock(mtx_);
-
-    auto it = by_name_.find(name);
-    if (it == by_name_.end()) {
-        if (err) *err = "model not found: " + name;
-        return false;
-    }
-    // 单槽：卸下旧活跃模型。
-    if (!active_.empty() && active_ != name) {
-        auto prev = by_name_.find(active_);
-        if (prev != by_name_.end()) {
-            prev->second.infer = {};
-            prev->second.status = ModelStatus::Unloaded;
-            prev->second.error.clear();
+    ManifestModel mm;
+    std::string base;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = by_name_.find(name);
+        if (it == by_name_.end()) {
+            if (err) *err = "model not found: " + name;
+            return false;
         }
-        active_.clear();
+        // 在途保护：同一 id 正在后台构建 → no-op，返回当前（loading）状态，避免重复构建。
+        if (it->second.status == ModelStatus::Loading) return true;
+        // 单槽：卸下旧活跃模型。
+        if (!active_.empty() && active_ != name) {
+            auto prev = by_name_.find(active_);
+            if (prev != by_name_.end()) {
+                prev->second.infer = {};
+                prev->second.status = ModelStatus::Unloaded;
+                prev->second.error.clear();
+            }
+            active_.clear();
+        }
+        const ManifestModel* found = nullptr;
+        for (const auto& mi : impl_->manifest)
+            if (mi.id == name) { found = &mi; break; }
+        if (!found) {
+            if (err) *err = "model not in manifest: " + name;
+            return false;
+        }
+        mm = *found;
+        base = base_;
+        it->second.status = ModelStatus::Loading;
+        it->second.error.clear();
     }
 
-    const ManifestModel* mm = nullptr;
-    for (const auto& mi : impl_->manifest)
-        if (mi.id == name) { mm = &mi; break; }
-    if (!mm) {
-        if (err) *err = "model not in manifest: " + name;
-        return false;
-    }
-
-    it->second.status = ModelStatus::Loading;
-    it->second.error.clear();
-
+    // 构建放在锁外：让 list()/get() 在构建期间可观察 loading 状态，不阻塞 HTTP 线程。
     ModelHandle built;
     try {
-        built = builder_(*mm, base_);
+        built = builder_(mm, base);
     } catch (...) {
         built.status = ModelStatus::Failed;
         if (built.error.empty()) built.error = "construct threw";
     }
 
-    if (built.infer) {
-        it->second.infer = std::move(built.infer);
-        it->second.status = ModelStatus::Ready;
-        it->second.error.clear();
-        active_ = name;
-        return true;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = by_name_.find(name);
+        if (it == by_name_.end()) {
+            if (err) *err = "model not found: " + name;
+            return false;
+        }
+        // 构建期间被 unload/降级 → 丢弃本次结果。
+        if (it->second.status != ModelStatus::Loading) return false;
+        // 单槽：构建完成时仍保证至多一个活跃（可能被其它在途构建抢占）。
+        if (!active_.empty() && active_ != name) {
+            auto prev = by_name_.find(active_);
+            if (prev != by_name_.end()) {
+                prev->second.infer = {};
+                prev->second.status = ModelStatus::Unloaded;
+                prev->second.error.clear();
+            }
+            active_.clear();
+        }
+        if (built.infer) {
+            it->second.infer = std::move(built.infer);
+            it->second.status = ModelStatus::Ready;
+            it->second.error.clear();
+            active_ = name;
+            return true;
+        }
+        it->second.status = ModelStatus::Failed;
+        it->second.error = built.error.empty() ? "model failed to initialize" : built.error;
+        if (err) *err = it->second.error;
+        return false;
     }
-    it->second.status = ModelStatus::Failed;
-    it->second.error = built.error.empty() ? "model failed to initialize" : built.error;
-    if (err) *err = it->second.error;
-    return false;
 }
 
 bool ModelRepo::unload(const std::string& name) {

@@ -1055,6 +1055,108 @@ TEST_CASE("serving lazy: manifest parses entries", "[serving]") {
     fs::remove_all(dir);
 }
 
+// Task 3：ServingServer 懒加载 REST 路由 —— list 状态 / load / unload / infer 懒加载。
+TEST_CASE("serving lazy: HTTP list/load/unload/lazy-infer", "[serving]") {
+    auto dir = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = write_manifest(dir, {{"a", "det"}, {"b", "cls"}});
+
+    std::string built_id;
+    HandleBuilder b = [&](const ManifestModel& m, const std::string&) {
+        built_id = m.id;
+        ModelHandle h;
+        h.name = m.id;
+        h.infer = [](const nlohmann::json&, nlohmann::json* out, std::string*) {
+            if (out) (*out)["ok"] = true;
+            return true;
+        };
+        return h;
+    };
+    ServingServer srv(cfg, std::move(b));
+    int port = start_listening(srv);
+    auto cli = make_client(port);
+
+    auto get_status = [&](const std::string& id) -> std::string {
+        auto r = cli.Get("/v1/models/" + id);
+        REQUIRE((r && r->status == 200));
+        auto j = nlohmann::json::parse(r->body);
+        return j["model"]["status"].get<std::string>();
+    };
+    auto wait_status = [&](const std::string& id, const std::string& want) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (std::chrono::steady_clock::now() < deadline) {
+            auto r = cli.Get("/v1/models");
+            REQUIRE(r);
+            REQUIRE(r->status == 200);
+            auto j = nlohmann::json::parse(r->body);
+            bool done = false;
+            for (auto& m : j["models"]) {
+                if (m["id"].get<std::string>() == id &&
+                    m["status"].get<std::string>() == want)
+                    done = true;
+            }
+            if (done) return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        FAIL("status of " + id + " never became " + want);
+    };
+
+    // 1) 目录初始全 unloaded
+    auto list0 = cli.Get("/v1/models");
+    REQUIRE((list0 && list0->status == 200));
+    auto j0 = nlohmann::json::parse(list0->body);
+    int n = 0;
+    for (auto& m : j0["models"]) {
+        REQUIRE(m["status"].get<std::string>() == "unloaded");
+        ++n;
+    }
+    REQUIRE(n == 2);
+
+    // 2) load a → 轮询至 ready
+    auto la = cli.Post("/v1/models/a/load", "", "application/json");
+    REQUIRE((la && la->status == 200));
+    wait_status("a", "ready");
+    REQUIRE(built_id == "a");
+
+    // 3) 已加载 a 上两次 infer 均 200
+    auto body = nlohmann::json{{"image", "x"}}.dump();
+    auto r1 = cli.Post("/v1/models/a/infer", body, "application/json");
+    REQUIRE((r1 && r1->status == 200));
+    auto r2 = cli.Post("/v1/models/a/infer", body, "application/json");
+    REQUIRE((r2 && r2->status == 200));
+
+    // 4) load b → a 降到 unloaded、b 就绪（单槽）
+    auto lb = cli.Post("/v1/models/b/load", "", "application/json");
+    REQUIRE((lb && lb->status == 200));
+    wait_status("b", "ready");
+    REQUIRE(built_id == "b");
+    REQUIRE(get_status("a") == "unloaded");
+    REQUIRE(get_status("b") == "ready");
+
+    // 5) unload a（同步）→ unloaded
+    auto ua = cli.Post("/v1/models/a/unload", "", "application/json");
+    REQUIRE((ua && ua->status == 200));
+    REQUIRE(get_status("a") == "unloaded");
+
+    // infer 懒加载：a 当前 unloaded → infer 触发 load → 200 且 a 变 ready
+    built_id = "";
+    auto li = cli.Post("/v1/models/a/infer", body, "application/json");
+    REQUIRE((li && li->status == 200));
+    REQUIRE(built_id == "a");
+    REQUIRE(get_status("a") == "ready");
+
+    // 6) 未知 id：load/unload/infer 均 404
+    require_error(cli.Post("/v1/models/nope/load", "", "application/json"), 404,
+                  "MODEL_NOT_FOUND");
+    require_error(cli.Post("/v1/models/nope/unload", "", "application/json"), 404,
+                  "MODEL_NOT_FOUND");
+    require_error(cli.Post("/v1/models/nope/infer", body, "application/json"), 404,
+                  "MODEL_NOT_FOUND");
+
+    srv.stop();
+    fs::remove_all(dir);
+}
+
 TEST_CASE("serving lazy: startup catalog not instantiated", "[serving]") {
     auto dir = make_temp_repo();
     nlohmann::json j;

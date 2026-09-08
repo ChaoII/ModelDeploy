@@ -69,6 +69,17 @@ void write_error(httplib::Response& res, int status, const std::string& code,
                     "application/json");
 }
 
+// 模型状态 → 前端字符串。
+std::string status_str(ModelStatus s) {
+    switch (s) {
+        case ModelStatus::Unloaded: return "unloaded";
+        case ModelStatus::Loading: return "loading";
+        case ModelStatus::Ready: return "ready";
+        case ModelStatus::Failed: return "failed";
+    }
+    return "unloaded";
+}
+
 // Bearer 鉴权中间件：cfg.api_keys 非空才启用；失败填 401 并返回 false。
 bool authorized(const ServingConfig& cfg, const httplib::Request& req, httplib::Response& res) {
     if (cfg.api_keys.empty()) return true;
@@ -293,10 +304,19 @@ void ServingServer::register_routes() {
     srv->Get("/readyz", [this](const httplib::Request& req, httplib::Response& res) {
         if (!authorized(cfg_, req, res)) return;
         const auto models = repo_->list();
-        const bool all_ready =
-            std::all_of(models.begin(), models.end(),
-                        [](const ModelHandle& h) { return h.status == ModelStatus::Ready; });
-        if (all_ready) {
+        // 单槽语义：有模型在后台构建 → 瞬态 loading；否则仅当恰有一个活跃 Ready 才 ready。
+        const bool any_loading =
+            std::any_of(models.begin(), models.end(),
+                        [](const ModelHandle& h) { return h.status == ModelStatus::Loading; });
+        if (any_loading) {
+            res.status = 503;
+            res.set_content("{\"status\":\"loading\"}", "application/json");
+            return;
+        }
+        int ready_count = 0;
+        for (const auto& h : models)
+            if (h.status == ModelStatus::Ready) ++ready_count;
+        if (ready_count == 1) {
             res.set_content("{\"status\":\"ready\"}", "application/json");
         } else {
             res.status = 503;
@@ -314,9 +334,10 @@ void ServingServer::register_routes() {
         const auto models = repo_->list();
         nlohmann::json arr = nlohmann::json::array();
         for (const auto& h : models)
-            arr.push_back({{"name", h.name}, {"version", h.version}, {"ready", h.status == ModelStatus::Ready},
-                           {"type", h.type}, {"labels", h.labels},
-                           {"input_size", h.input_size}});
+            arr.push_back({{"id", h.name}, {"name", h.name}, {"display", h.display},
+                           {"version", h.version}, {"type", h.type}, {"labels", h.labels},
+                           {"input_size", h.input_size}, {"status", status_str(h.status)},
+                           {"ready", h.status == ModelStatus::Ready}, {"error", h.error}});
         res.set_content(nlohmann::json{{"models", arr}}.dump(), "application/json");
     });
 
@@ -328,11 +349,46 @@ void ServingServer::register_routes() {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
             return;
         }
-        res.set_content(nlohmann::json{{"model", {{"name", h.name}, {"version", h.version},
-                                                 {"ready", h.status == ModelStatus::Ready}, {"type", h.type},
-                                                 {"labels", h.labels},
-                                                 {"input_size", h.input_size}}}}
+        res.set_content(nlohmann::json{{"model", {{"id", h.name}, {"name", h.name},
+                                                 {"display", h.display}, {"version", h.version},
+                                                 {"type", h.type}, {"labels", h.labels},
+                                                 {"input_size", h.input_size},
+                                                 {"status", status_str(h.status)},
+                                                 {"ready", h.status == ModelStatus::Ready},
+                                                 {"error", h.error}}}}
                             .dump(),
+                        "application/json");
+    });
+
+    srv->Post("/v1/models/:id/load", [this](const httplib::Request& req, httplib::Response& res) {
+        if (!authorized(cfg_, req, res)) return;
+        const std::string id = req.path_params.at("id");
+        ModelHandle probe;
+        if (!repo_->get(id, &probe)) {
+            write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + id);
+            return;
+        }
+        // 后台线程调 load，避免阻塞 HTTP worker；立即返回当前目录状态。并发保护由
+        // ModelRepo 的 Loading 在途状态承担（同一 id 重复 load 为 no-op）。
+        auto repo = repo_;
+        std::thread([repo, id]() { std::string err; repo->load(id, &err); }).detach();
+        ModelHandle h;
+        repo_->get(id, &h);
+        res.set_content(nlohmann::json{{"id", h.name}, {"status", status_str(h.status)}}.dump(),
+                        "application/json");
+    });
+
+    srv->Post("/v1/models/:id/unload", [this](const httplib::Request& req, httplib::Response& res) {
+        if (!authorized(cfg_, req, res)) return;
+        const std::string id = req.path_params.at("id");
+        ModelHandle h;
+        if (!repo_->get(id, &h)) {
+            write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + id);
+            return;
+        }
+        repo_->unload(id);
+        repo_->get(id, &h);
+        res.set_content(nlohmann::json{{"id", h.name}, {"status", status_str(h.status)}}.dump(),
                         "application/json");
     });
 
@@ -352,8 +408,14 @@ void ServingServer::register_routes() {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
             return;
         }
+        // 懒加载：非 Ready 且非 Loading 时同步 load 一次；此后仍非 Ready → 不重试，直接报错。
+        if (h.status != ModelStatus::Ready && h.status != ModelStatus::Loading) {
+            std::string load_err;
+            repo_->load(name, &load_err);
+            repo_->get(name, &h);
+        }
         if (h.status != ModelStatus::Ready) {
-            write_error(res, 503, "MODEL_NOT_READY", "model not ready: " + name);
+            write_error(res, 503, "MODEL_NOT_READY", "model loading or failed: " + name);
             return;
         }
         nlohmann::json in;
