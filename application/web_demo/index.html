@@ -284,30 +284,36 @@ async function refresh(){
 }
 
 /* ── 选中 / 加载 ── */
+let selectGen=0;
 async function select(id){
+  const gen=++selectGen;
   selId=id;
   renderNav();
   updateToolbar(curModel());
-  let m=curModel();
-  if(m&&m.status==='ready'){toast('模型已就绪','ok');return;}
+  const m=curModel();
+  if(m&&m.status==='ready'){if(gen===selectGen)toast('模型已就绪','ok');return;}
   if(!m)return;
-  showModal('加载「'+m.display+'」…');
-  try{await apiPost('/v1/models/'+encodeURIComponent(id)+'/load');}catch(e){hideModal();toast('加载请求失败：'+(e.message||e),'err');return;}
+  if(gen===selectGen)showModal('加载「'+m.display+'」…');
+  if(m.status!=='loading'&&m.status!=='ready'){
+    try{await apiPost('/v1/models/'+encodeURIComponent(id)+'/load');}catch(e){if(gen===selectGen){hideModal();toast('加载请求失败：'+(e.message||e),'err');}return;}
+  }
   const deadline=Date.now()+120000;
   while(Date.now()<deadline){
     await sleep(500);
     await refresh();
-    m=curModel();
-    if(!m)break;
-    if(m.status==='ready'){hideModal();toast('模型已就绪，可以推理了','ok');return;}
-    if(m.status==='failed'){
-      if(selId===id){hideModal();toast('模型加载失败：'+(m.error||'未知错误'),'err');}
-      else hideModal();
+    const cur=curModel();
+    if(!cur)break;
+    if(cur.status==='ready'){
+      if(gen===selectGen){hideModal();toast('模型已就绪，可以推理了','ok');}
       return;
     }
-    if(m.status==='loading'&&selId===id)showModal('加载「'+m.display+'」…');
+    if(cur.status==='failed'){
+      if(gen===selectGen){hideModal();toast('模型加载失败：'+(cur.error||'未知错误'),'err');}
+      return;
+    }
+    if(cur.status==='loading'&&gen===selectGen)showModal('加载「'+cur.display+'」…');
   }
-  hideModal();toast('加载超时，请重试','err');
+  if(gen===selectGen){hideModal();toast('加载超时，请重试','err');}
 }
 
 /* ── 图片处理（长边≤1600 降采样）── */
