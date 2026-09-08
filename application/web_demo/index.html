@@ -155,7 +155,7 @@ function renderNav(){
     const lab=(m.labels&&m.labels.length)?m.labels.length+' 类':'';
     d.innerHTML=`<div>
         <div class="name"><span class="tag">${esc(typeIcon(m.type))}</span>${esc(m.name)}</div>
-        <div class="inf">${esc(m.type||'?')} · ${input}${lab?(' · '+esc(lab)):''}</div>
+        <div class="inf">${esc(m.type||'?')} · ${esc(input)}${lab?(' · '+esc(lab)):''}</div>
       </div>
       <span class="r ${m.ready?'y':'n'}">${m.ready?'就绪':'未就绪'}</span>`;
     n.appendChild(d);
