@@ -91,7 +91,7 @@
         "model": "ocr/ppocrv5_mobile/det_infer.onnx",
         "rec": "ocr/ppocrv5_mobile/rec_infer.onnx",
         "cls": "ocr/ppocrv5_mobile/cls_infer.onnx",
-        "dict": "ppocr_dict.txt"
+        "dict": "application/demo_labels/ppocr_dict.txt"
       },
       "input_size": [640, 640]
     },

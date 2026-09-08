@@ -64,26 +64,23 @@ static ModelHandle built_handle(const ManifestModel& m, std::unique_ptr<M> model
 // m.model_f/m.rec_f/m.cls_f/m.dict_f），故此处不再需要 base 参数（保留签名以对齐 API）。
 int main(int argc, char** argv) {
     int port = 8000;
-    std::string web_root, repo, base_arg;
+    std::string web_root, repo;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto val = [&]() -> std::string { return (i + 1 < argc) ? argv[++i] : ""; };
         if (a == "--port") port = std::stoi(val());
         else if (a == "--web") web_root = val();
         else if (a == "--repo") repo = val();
-        else if (a == "--base") base_arg = val();  // 兼容 CLI；实际根由 manifest 的 base 字段决定
         else if (a == "--help") {
-            std::cout << "usage: demo_server [--port <port>] [--web <dir>] [--repo <manifest.json>] "
-                         "[--base <onnx-root>]\n";
-            std::cout << "  --repo  manifest.json 路径（缺省 repository/application 下的 demo_manifest.json）\n";
+            std::cout << "usage: demo_server [--port <port>] [--web <dir>] [--repo <manifest.json>]\n";
+            std::cout << "  从仓库根目录运行：资源根由 manifest 的 base 字段决定。\n";
+            std::cout << "  --repo  manifest.json 路径（缺省 application/demo_manifest.json）\n";
             std::cout << "  --web   静态 web 资产目录（缺省 web_demo）\n";
-            std::cout << "  --base  onnx 根（缺省由 manifest 的 base 字段决定；资源根以 manifest 为准）\n";
             return 0;
         }
     }
     if (web_root.empty()) web_root = "web_demo";  // 构建目录下的 web 资产
     if (repo.empty()) repo = "application/demo_manifest.json";
-    (void)base_arg;
 
     ServingConfig cfg;
     cfg.host = "0.0.0.0";

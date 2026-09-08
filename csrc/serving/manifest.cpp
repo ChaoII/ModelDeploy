@@ -29,6 +29,15 @@ std::string join_root(const std::string& root, const std::string& rel) {
     return (fs::path(root) / p).string();
 }
 
+// dict/labels 资产：仓库内已提交的文件（CWD 相对）优先，否则回退 base 拼接。
+std::string resolve_asset(const std::string& root, const std::string& rel) {
+    if (rel.empty()) return rel;
+    const fs::path p(rel);
+    if (p.is_absolute()) return rel;
+    if (fs::exists(p)) return rel;
+    return join_root(root, rel);
+}
+
 }  // namespace
 
 bool load_manifest(const std::string& path, const std::string& base,
@@ -92,7 +101,8 @@ bool load_manifest(const std::string& path, const std::string& base,
             g("model", &m.model_f);
             g("rec", &m.rec_f);
             g("cls", &m.cls_f);
-            g("dict", &m.dict_f);
+            if (files.contains("dict") && files["dict"].is_string())
+                m.dict_f = resolve_asset(root, files["dict"].get<std::string>());
         }
 
         if (e.contains("labels")) {
@@ -101,7 +111,7 @@ bool load_manifest(const std::string& path, const std::string& base,
                 m.labels.clear();
                 for (const auto& x : lab) if (x.is_string()) m.labels.push_back(x.get<std::string>());
             } else if (lab.is_string()) {
-                std::ifstream lf(join_root(root, lab.get<std::string>()));
+                std::ifstream lf(resolve_asset(root, lab.get<std::string>()));
                 std::string line;
                 while (std::getline(lf, line)) if (!line.empty()) m.labels.push_back(line);
             }
