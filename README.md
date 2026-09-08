@@ -147,7 +147,7 @@ int main() {
 **中期（Mid）**
 - [ ] **更多 NPU 后端**：Rockchip RKNN（RK3588）、Qualcomm QNN/Snapdragon、华为昇腾 CANN（国产化）——沿用下载式接入范式
 - [ ] **流式/异步推理**：一期**仅 C++**——`AsyncModel` 异步投递壳（有界背压队列 + worker 线程 + `std::future`/回调，复用解码头基建的范式），跨帧 stateful 算子；**其它语言绑定后续再议**（文档注明）
-- [ ] **服务化增强（嵌入式推理网关）**：内置 HTTP / gRPC 推理端点、模型仓库热更新、多 worker 调度、健康/指标/TLS——**按 llama.cpp server 级工程化完备落地，覆盖各类部署场景**（非精简版）
+- [x] **服务化增强（嵌入式推理网关）**：内置 HTTP 推理端点、模型仓库热更新、健康/鉴权/限流/CORS/metrics/TLS(可选)、优雅停机——**本期 C++ 完整实现（REST）**，见 [Serving 使用指南](docs/serving.md)；**gRPC 二期**
 - [ ] **视频编解码深化**：AV1 硬编、HEVC 遍历、GPU 多路编码、更高吞吐基准
 
 **远期（Long）**
@@ -178,6 +178,8 @@ int main() {
 7. **Sophgo INT8 量化**：det/pose/seg 需**解码头 qtable**（INT8 backbone + 检测头输出链 F16）才可 INT8（cmodel cos≈0.99）；OBB 的 INT8 仍失效（坐标失真、cos≈0.6），**建议用 F16**；cls/sem/depth 可直接 INT8。详见 [docs/backends.md](./docs/backends.md)。
 
 8. **Windows 构建环境**：MSVC 编译需在 "x64 Native Tools Command Prompt"（含 `vcvars64` include/lib 路径）下进行；模型加密基于 mbedTLS（git submodule），构建前需 `git submodule update --init --recursive`，不再需要安装 OpenSSL。
+
+9. **BaseModel 复用缓冲致同实例并发 `batch_predict` 不安全**：`BaseModel`（`csrc/base_model.h`）持有共享成员 `reused_input_tensors_`/`reused_output_tensors_`，各模型 `batch_predict`（如 `ultralytics_det.cpp`）直接复用它们——同一实例**并发调用会互相踩缓冲**。因此异步层 `AsyncModel` 采用「单推理线程 / 克隆多实例」方案（`num_workers=1` 默认，`>1` 需 `M::clone()`；见 `docs/async_inference.md`）。**后续改进**：为推理路径引入 per-`predict` 局部缓冲或缓冲池化改造，以支持对同一实例真正并发（列入路线图/远期架构项）。
 
 ## 更多文档
 
