@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <future>
+#include <mutex>
 #include <random>
 #include <string>
 #include <thread>
@@ -1183,5 +1186,93 @@ TEST_CASE("serving lazy: startup catalog not instantiated", "[serving]") {
     auto list = m.list();
     REQUIRE(list.size() >= 1);
     REQUIRE(list[0].status == ModelStatus::Unloaded);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("serving lazy: same-id concurrent load deduped", "[serving]") {
+    auto dir = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = write_manifest(dir, {{"a", "det"}});
+
+    std::promise<void> entered;
+    auto entered_fut = entered.get_future();
+    std::promise<void> release;
+    auto release_fut = release.get_future();
+    std::atomic<int> builds{0};
+    HandleBuilder b = [&](const ManifestModel&, const std::string&) {
+        ++builds;
+        entered.set_value();
+        release_fut.wait();
+        ModelHandle h;
+        h.infer = [](const nlohmann::json&, nlohmann::json*, std::string*) { return true; };
+        return h;
+    };
+    ModelRepo m(cfg, std::move(b));
+    m.scan();
+
+    std::string errA, errB;
+    std::thread ta([&] { m.load("a", &errA); });
+    entered_fut.wait();
+
+    REQUIRE(m.load("a", &errB));
+    REQUIRE(errB.empty());
+    REQUIRE(builds.load() == 1);
+
+    release.set_value();
+    ta.join();
+    REQUIRE(errA.empty());
+    ModelHandle h;
+    REQUIRE(m.get("a", &h));
+    REQUIRE(h.status == ModelStatus::Ready);
+    REQUIRE(h.infer);
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("serving lazy: cross-id concurrent load leaves exactly one active", "[serving]") {
+    auto dir = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = write_manifest(dir, {{"a", "det"}, {"b", "cls"}});
+
+    std::mutex g_mtx;
+    std::condition_variable g_cv;
+    int entered = 0;
+    bool release_all = false;
+    HandleBuilder b = [&](const ManifestModel&, const std::string&) {
+        ModelHandle h;
+        {
+            std::unique_lock<std::mutex> lock(g_mtx);
+            ++entered;
+            g_cv.notify_all();
+            g_cv.wait(lock, [&] { return release_all; });
+        }
+        h.infer = [](const nlohmann::json&, nlohmann::json*, std::string*) { return true; };
+        return h;
+    };
+    ModelRepo m(cfg, std::move(b));
+    m.scan();
+
+    std::string errA, errB;
+    std::thread ta([&] { m.load("a", &errA); });
+    std::thread tb([&] { m.load("b", &errB); });
+
+    std::unique_lock<std::mutex> lock(g_mtx);
+    g_cv.wait(lock, [&] { return entered >= 2; });
+    release_all = true;
+    g_cv.notify_all();
+    lock.unlock();
+
+    ta.join();
+    tb.join();
+
+    ModelHandle ha, hb;
+    REQUIRE(m.get("a", &ha));
+    REQUIRE(m.get("b", &hb));
+    const int ready = (ha.status == ModelStatus::Ready) + (hb.status == ModelStatus::Ready);
+    const int unloaded =
+        (ha.status == ModelStatus::Unloaded) + (hb.status == ModelStatus::Unloaded);
+    REQUIRE(ready == 1);
+    REQUIRE(unloaded == 1);
+
     fs::remove_all(dir);
 }
