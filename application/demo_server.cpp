@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
                                        std::vector<vision::DetectionResult>>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
@@ -108,6 +109,7 @@ int main(int argc, char** argv) {
                 using MM = ClassifyAdapter<vision::ClassifyResult>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
@@ -117,6 +119,7 @@ int main(int argc, char** argv) {
                                        std::vector<vision::InstanceSegResult>>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
@@ -126,6 +129,7 @@ int main(int argc, char** argv) {
                                        std::vector<vision::KeyPointsResult>>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
@@ -135,6 +139,7 @@ int main(int argc, char** argv) {
                                        std::vector<vision::ObbResult>>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
@@ -143,6 +148,7 @@ int main(int argc, char** argv) {
                 using MM = ResultModel<vision::detection::UltralyticsSem, vision::SemSegResult>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }
@@ -151,6 +157,7 @@ int main(int argc, char** argv) {
                 using MM = ResultModel<vision::detection::UltralyticsDepth, vision::DepthResult>;
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
+                model->get_preprocessor().set_size(m.input_size);
                 return built_handle(m, std::move(model));
             } catch (...) { return meta; }
         }

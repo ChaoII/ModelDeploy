@@ -64,7 +64,7 @@
       "type": "obb",
       "desc": "YOLO26n 旋转目标检测（OBB，DOTA）。",
       "files": { "model": "yolo26n/yolo26n-obb.onnx" },
-      "input_size": [640, 640]
+      "input_size": [1024, 1024]
     },
     {
       "id": "yolo26n-sem",

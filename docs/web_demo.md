@@ -162,7 +162,7 @@ obb/face/lpr）的 `box` 坐标为**绝对像素**（`x/y/width/height`，对应
 | cls `yolo26n-cls` | ready | 200 | top-1 标签 722 / 0.50 |
 | seg `yolo11n-seg` | ready | 200 | 实例掩码 |
 | pose `yolo26n-pose` | ready | 200 | 17 关键点骨架 |
-| obb `yolo26n-obb` | ready | 400 | **推理失败，见"已知限制"** |
+| obb `yolo26n-obb` | ready | 200 | 旋转框非空（1024 输入） |
 | sem `yolo26n-sem` | ready | 200 | 逐像素标签 |
 | depth `yolo26n-depth` | ready | 200 | 深度图 |
 | ocr `ppocr5-mobile` | ready | 200 | 识别出文本（小图 ~4s） |
@@ -177,11 +177,9 @@ obb/face/lpr）的 `box` 坐标为**绝对像素**（`x/y/width/height`，对应
 - **请求级参数**：`/v1/models/{id}/infer` 仅接受 `image`/`image_path` 与透传 `params`，无
   每请求阈值/尺寸控制。
 - **后端固定**：demo 统一使用 ORT（`use_ort_backend()`），演示多后端请走 SDK 其它示例。
-- **obb 族推理失败（已知缺陷，未修）**：`yolo26n-obb.onnx` 的输入是 **1024×1024**，而 demo
-  统一按 640×640 预处理（OBb 预处理器默认尺寸，未按模型原生输入设置），导致 ORT 维度不匹配，
-  infer 恒返回 400 `batch_predict failed`。该问题与 manifest 的 `input_size=[640,640]`
-  元数据一致，属预处理器默认尺寸与模型输入不一致所致（`demo_obb_ort_cpu.exe` 同样复现），需
-  在 demo 构造 OBB 时显式 `set_size({1024,1024})`（或换 640 输入的 OBB 权重）修复。
+- **输入尺寸由 manifest 驱动**：demofor 支持 `set_size` 的家族（det/cls/seg/pose/obb/sem/depth/face）
+  按 manifest 条目 `input_size` 显式设置预处理器目标尺寸，故非 640 输入模型（如
+  `yolo26n-obb` 的 1024×1024）也能正确推理；ocr/lpr 为管线模型，不受此控制。
 - **OCR 大图 CPU 超时**：PP-OCRv5 Mobile 在大分辨率图（如 1996×1108）CPU 推理可能超过默认
   60s 请求超时 → 返回 504；后台线程仍会跑完（fire-and-forget），但客户端已先返回。换较小图
   （长边数百像素）可在数秒内完成。
