@@ -52,6 +52,8 @@ ModelDeploy 是一个面向工业落地的多后端推理 SDK，支持 **目标�
 | [多语言 API](./api/README.md) | C++ / Python / C / C# / Rust 绑定概览 |
 | [模型加密](./encryption.md) | AES-256-GCM 模型加密与解密模型使用 |
 | [多线程推理](./multi_thread.md) | `clone()` 多线程并发详解 |
+| [异步推理](./async_inference.md) | `AsyncModel` 异步投递（有界背压队列 / 攒批 / future+回调）+ 解码联动 `AsyncVideoInfer` |
+| [嵌入式推理网关](./serving.md) | `ServingServer` REST 推理服务（健康/鉴权/限流/CORS/metrics/TLS(可选)/优雅停机）、模型仓库热更新；gRPC 二期 |
 | [Triton 推理服务](../examples/serving/) | Triton 部署（preprocess → pipeline → postprocess） |
 
 ### 应用案例
