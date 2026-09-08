@@ -70,6 +70,7 @@ link_directories(${onnxruntime_SOURCE_DIR}/lib)
 find_library(ONNXRUNTIME_LIB onnxruntime
         PATHS "${onnxruntime_SOURCE_DIR}/lib"
         NO_DEFAULT_PATH
+        NO_CMAKE_FIND_ROOT_PATH
 )
 
 add_library(onnxruntime::onnxruntime STATIC IMPORTED GLOBAL)

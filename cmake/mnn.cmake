@@ -60,6 +60,7 @@ link_directories(${MNN_LIB_DIR})
 find_library(MNN_LIB MNN
         PATHS "${MNN_LIB_DIR}"
         NO_DEFAULT_PATH
+        NO_CMAKE_FIND_ROOT_PATH
 )
 
 add_library(MNN STATIC IMPORTED GLOBAL)
