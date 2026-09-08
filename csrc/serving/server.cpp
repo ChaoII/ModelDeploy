@@ -280,7 +280,8 @@ void ServingServer::register_routes() {
         if (!authorized(cfg_, req, res)) return;
         const auto models = repo_->list();
         const bool any_ready =
-            std::any_of(models.begin(), models.end(), [](const ModelHandle& h) { return h.ready; });
+            std::any_of(models.begin(), models.end(),
+                        [](const ModelHandle& h) { return h.status == ModelStatus::Ready; });
         if (any_ready) {
             res.set_content("{\"status\":\"ok\"}", "application/json");
         } else {
@@ -293,7 +294,8 @@ void ServingServer::register_routes() {
         if (!authorized(cfg_, req, res)) return;
         const auto models = repo_->list();
         const bool all_ready =
-            std::all_of(models.begin(), models.end(), [](const ModelHandle& h) { return h.ready; });
+            std::all_of(models.begin(), models.end(),
+                        [](const ModelHandle& h) { return h.status == ModelStatus::Ready; });
         if (all_ready) {
             res.set_content("{\"status\":\"ready\"}", "application/json");
         } else {
@@ -312,7 +314,7 @@ void ServingServer::register_routes() {
         const auto models = repo_->list();
         nlohmann::json arr = nlohmann::json::array();
         for (const auto& h : models)
-            arr.push_back({{"name", h.name}, {"version", h.version}, {"ready", h.ready},
+            arr.push_back({{"name", h.name}, {"version", h.version}, {"ready", h.status == ModelStatus::Ready},
                            {"type", h.type}, {"labels", h.labels},
                            {"input_size", h.input_size}});
         res.set_content(nlohmann::json{{"models", arr}}.dump(), "application/json");
@@ -322,12 +324,12 @@ void ServingServer::register_routes() {
         if (!authorized(cfg_, req, res)) return;
         const std::string name = req.path_params.at("name");
         ModelHandle h;
-        if (!repo_->get(name, "latest", &h)) {
+        if (!repo_->get(name, &h)) {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
             return;
         }
         res.set_content(nlohmann::json{{"model", {{"name", h.name}, {"version", h.version},
-                                                 {"ready", h.ready}, {"type", h.type},
+                                                 {"ready", h.status == ModelStatus::Ready}, {"type", h.type},
                                                  {"labels", h.labels},
                                                  {"input_size", h.input_size}}}}
                             .dump(),
@@ -346,11 +348,11 @@ void ServingServer::register_routes() {
         }
         if (!authorized(cfg_, req, res)) return;
         ModelHandle h;
-        if (!repo_->get(name, "latest", &h)) {
+        if (!repo_->get(name, &h)) {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
             return;
         }
-        if (!h.ready) {
+        if (h.status != ModelStatus::Ready) {
             write_error(res, 503, "MODEL_NOT_READY", "model not ready: " + name);
             return;
         }

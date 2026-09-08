@@ -44,7 +44,7 @@ ModelHandle make_model_handle(std::string name, std::unique_ptr<M> model,
 
     ModelHandle h;
     h.name = name;
-    h.ready = true;
+    h.status = ModelStatus::Ready;
     const std::string model_name = name;
 
     h.infer = [async, model_name](const nlohmann::json& in, nlohmann::json* out,

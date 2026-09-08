@@ -1,8 +1,10 @@
 #include "serving/model_repo.h"
 
+#include "serving/manifest.h"
+
 #include <algorithm>
-#include <cctype>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -10,13 +12,15 @@
 #include <utility>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 namespace modeldeploy::serving {
 
 namespace fs = std::filesystem;
 
 namespace {
 
-// 内置占位 InferFn：真实推理由 Task 3 注入 HandleBuilder 提供。
+// 内置占位 InferFn：真实推理由 HandleBuilder（Task 4）注入。
 InferFn placeholder_infer() {
     return [](const nlohmann::json&, nlohmann::json*, std::string* err) {
         if (err) *err = "not implemented (Task3)";
@@ -24,39 +28,50 @@ InferFn placeholder_infer() {
     };
 }
 
-// 提取版本字符串中第一段连续数字。无数字返回 -1。
-long long first_number(const std::string& s) {
-    size_t i = 0;
-    while (i < s.size() && !std::isdigit(static_cast<unsigned char>(s[i]))) ++i;
-    if (i == s.size()) return -1;
-    size_t j = i;
-    while (j < s.size() && std::isdigit(static_cast<unsigned char>(s[j]))) ++j;
+// 读 manifest 顶层的资源根（base 字段），无则用 manifest 所在目录兜底。
+std::string manifest_root_of(const std::string& manifest_path, const std::string& fallback) {
     try {
-        return std::stoll(s.substr(i, j - i));
+        std::ifstream f(manifest_path);
+        nlohmann::json j;
+        f >> j;
+        if (j.contains("base") && j["base"].is_string()) {
+            std::string b = j["base"].get<std::string>();
+            if (!b.empty()) return b;
+        }
     } catch (...) {
-        return 0;
     }
+    return fallback;
 }
 
-// 数字优先比较：有数字则按数值（高者胜），同值或同为无数字 → 字典序；数字版本高于无数字版本。
-bool version_higher(const std::string& a, const std::string& b) {
-    const long long na = first_number(a);
-    const long long nb = first_number(b);
-    if (na >= 0 && nb >= 0) return na != nb ? na > nb : a > b;
-    if (na >= 0) return true;
-    if (nb >= 0) return false;
-    return a > b;
+ModelHandle metadata_handle(const ManifestModel& m) {
+    ModelHandle h;
+    h.name = m.id;
+    h.display = m.display;
+    h.version = "1";
+    h.type = m.type;
+    h.input_size = m.input_size;
+    h.labels = m.labels;
+    h.error.clear();
+    h.status = ModelStatus::Unloaded;
+    return h;
 }
 
 }  // namespace
 
+struct ModelRepo::Impl {
+    std::vector<ManifestModel> manifest;
+};
+
+ModelRepo::~ModelRepo() = default;
+
 ModelRepo::ModelRepo(const ServingConfig& cfg, HandleBuilder builder, std::string* err)
-    : cfg_(cfg) {
+    : cfg_(cfg), impl_(std::make_unique<Impl>()) {
     (void)err;
+    base_ = fs::path(cfg_.model_repo).parent_path().string();
     if (builder) {
         builder_ = std::move(builder);
     } else {
-        builder_ = [](const std::string&, const std::string&, const std::string&) {
+        builder_ = [](const ManifestModel&, const std::string&) {
             ModelHandle h;
             h.infer = placeholder_infer();
             return h;
@@ -64,102 +79,126 @@ ModelRepo::ModelRepo(const ServingConfig& cfg, HandleBuilder builder, std::strin
     }
 }
 
-ModelHandle ModelRepo::make_handle(const std::string& name, const std::string& version,
-                                   const std::string& dir) const {
-    ModelHandle h = builder_(name, version, dir);
-    if (h.name.empty()) h.name = name;
-    if (h.version.empty()) h.version = version;
-    h.ready = h.infer ? true : false;
-    return h;
-}
-
 std::vector<std::string> ModelRepo::scan() {
     std::lock_guard<std::mutex> lock(mtx_);
 
-    std::vector<std::string> changed;
-    const fs::path root(cfg_.model_repo);
-    std::error_code ec;
-    if (!fs::exists(root, ec)) return changed;
+    base_ = manifest_root_of(cfg_.model_repo, fs::path(cfg_.model_repo).parent_path().string());
 
-    // 本次扫描：name → 已登记版本全集；name → 最高版本。
-    std::unordered_map<std::string, std::vector<std::string>> scanned_versions;
-    std::unordered_map<std::string, std::string> scanned_active;
-
-    for (auto it = fs::directory_iterator(root, ec); it != fs::directory_iterator(); it.increment(ec)) {
-        if (ec || !it->is_directory(ec)) continue;
-        const std::string name = it->path().filename().string();
-
-        std::vector<std::string> vers;
-        for (auto vit = fs::directory_iterator(it->path(), ec); vit != fs::directory_iterator();
-             vit.increment(ec)) {
-            if (ec) continue;
-            if (!vit->is_directory(ec)) continue;
-            const std::string ver = vit->path().filename().string();
-            std::error_code fec;
-            if (fs::exists(vit->path() / "model.onnx", fec)) vers.push_back(ver);
-        }
-        if (vers.empty()) continue;  // 该 name 无任何合法版本
-
-        std::sort(vers.begin(), vers.end(),
-                  [](const std::string& a, const std::string& b) { return version_higher(a, b); });
-        scanned_versions[name] = vers;
-        scanned_active[name] = vers.front();
+    std::vector<ManifestModel> fresh;
+    std::string err;
+    if (!load_manifest(cfg_.model_repo, base_, &fresh, &err)) {
+        by_name_.clear();
+        impl_->manifest.clear();
+        return {};
     }
+    impl_->manifest = std::move(fresh);
 
-    // 应用本次扫描：原子替换 by_name_ / versions_；移除已消失的 name。
+    std::vector<std::string> changed;
+    for (const auto& mm : impl_->manifest) {
+        const bool is_new = by_name_.find(mm.id) == by_name_.end();
+        by_name_[mm.id] = metadata_handle(mm);
+        if (is_new) changed.push_back(mm.id);
+    }
+    // 移除 manifest 中已不存在的 id。
     for (auto it = by_name_.begin(); it != by_name_.end();) {
-        if (scanned_active.find(it->first) == scanned_active.end()) {
-            versions_.erase(it->first);
+        const bool gone =
+            std::find_if(impl_->manifest.begin(), impl_->manifest.end(),
+                         [&](const ManifestModel& mm) { return mm.id == it->first; }) ==
+            impl_->manifest.end();
+        if (gone) {
+            if (active_ == it->first) active_.clear();
             it = by_name_.erase(it);
         } else {
             ++it;
         }
     }
-
-    for (const auto& kv : scanned_active) {
-        const std::string& name = kv.first;
-        const std::string& new_active = kv.second;
-
-        auto prev = by_name_.find(name);
-        const bool is_new = (prev == by_name_.end());
-        const bool upgraded =
-            !is_new && (prev->second.version.empty() || version_higher(new_active, prev->second.version));
-        if (is_new || upgraded) changed.push_back(name);
-
-        const fs::path dir = root / name / new_active;
-        by_name_[name] = make_handle(name, new_active, dir.string());
-        versions_[name] = scanned_versions.at(name);
-    }
-
     return changed;
 }
 
-bool ModelRepo::get(const std::string& name, const std::string& version, ModelHandle* out) const {
+bool ModelRepo::get(const std::string& name, ModelHandle* out) const {
     if (!out) return false;
     std::lock_guard<std::mutex> lock(mtx_);
-
-    if (version.empty() || version == "latest") {
-        auto it = by_name_.find(name);
-        if (it == by_name_.end() || !it->second.ready) return false;
-        *out = it->second;  // 值拷贝：旧持有者持有的 InferFn 不受热换影响
-        return true;
-    }
-
-    auto vit = versions_.find(name);
-    if (vit == versions_.end()) return false;
-    if (std::find(vit->second.begin(), vit->second.end(), version) == vit->second.end()) return false;
-
-    const fs::path dir = fs::path(cfg_.model_repo) / name / version;
-    *out = make_handle(name, version, dir.string());
+    auto it = by_name_.find(name);
+    if (it == by_name_.end()) return false;
+    *out = it->second;
     return true;
 }
 
 std::vector<ModelHandle> ModelRepo::list() const {
     std::lock_guard<std::mutex> lock(mtx_);
     std::vector<ModelHandle> res;
-    res.reserve(by_name_.size());
-    for (const auto& kv : by_name_) res.push_back(kv.second);
+    res.reserve(impl_->manifest.size());
+    for (const auto& mm : impl_->manifest) {
+        auto it = by_name_.find(mm.id);
+        if (it != by_name_.end()) res.push_back(it->second);
+    }
     return res;
+}
+
+const std::vector<ManifestModel>& ModelRepo::manifest() const { return impl_->manifest; }
+
+bool ModelRepo::load(const std::string& name, std::string* err) {
+    if (err) err->clear();
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    auto it = by_name_.find(name);
+    if (it == by_name_.end()) {
+        if (err) *err = "model not found: " + name;
+        return false;
+    }
+    // 单槽：卸下旧活跃模型。
+    if (!active_.empty() && active_ != name) {
+        auto prev = by_name_.find(active_);
+        if (prev != by_name_.end()) {
+            prev->second.infer = {};
+            prev->second.status = ModelStatus::Unloaded;
+            prev->second.error.clear();
+        }
+        active_.clear();
+    }
+
+    const ManifestModel* mm = nullptr;
+    for (const auto& mi : impl_->manifest)
+        if (mi.id == name) { mm = &mi; break; }
+    if (!mm) {
+        if (err) *err = "model not in manifest: " + name;
+        return false;
+    }
+
+    it->second.status = ModelStatus::Loading;
+    it->second.error.clear();
+
+    ModelHandle built;
+    try {
+        built = builder_(*mm, base_);
+    } catch (...) {
+        built.status = ModelStatus::Failed;
+        if (built.error.empty()) built.error = "construct threw";
+    }
+
+    if (built.infer) {
+        it->second.infer = std::move(built.infer);
+        it->second.status = ModelStatus::Ready;
+        it->second.error.clear();
+        active_ = name;
+        return true;
+    }
+    it->second.status = ModelStatus::Failed;
+    it->second.error = built.error.empty() ? "model failed to initialize" : built.error;
+    if (err) *err = it->second.error;
+    return false;
+}
+
+bool ModelRepo::unload(const std::string& name) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (active_ != name) return false;
+    auto it = by_name_.find(name);
+    if (it == by_name_.end()) return false;
+    it->second.infer = {};
+    it->second.status = ModelStatus::Unloaded;
+    it->second.error.clear();
+    active_.clear();
+    return true;
 }
 
 }  // namespace modeldeploy::serving

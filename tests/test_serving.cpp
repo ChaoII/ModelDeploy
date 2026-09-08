@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 #include "serving/config.h"
 #include "serving/model_repo.h"
+#include "serving/manifest.h"
 #include "serving/model_entry.h"
 #include "serving/server.h"
 #include "serving/adapters.h"
@@ -122,7 +123,7 @@ struct StubDet {
 
 TEST_CASE("typed result JSON via make_model_handle (CPU)", "[serving]") {
     auto h = make_model_handle<StubDet>("det", std::make_unique<StubDet>());
-    REQUIRE(h.ready);
+    REQUIRE(h.status == ModelStatus::Ready);
     nlohmann::json out;
     std::string err;
     REQUIRE(h.infer(nlohmann::json{{"image", PNG1X1_B64}}, &out, &err));
@@ -139,7 +140,7 @@ TEST_CASE("typed result JSON via make_model_handle (CPU)", "[serving]") {
 
 namespace {
 
-// 返回唯一临时仓库根（不放在仓库/源目录）；调用方可 remove_all 清理。
+// 返回唯一临时目录（不放在仓库/源目录）；调用方可 remove_all 清理。
 std::string make_temp_repo() {
     static std::mt19937 rng{std::random_device{}()};
     auto base = fs::temp_directory_path() /
@@ -148,19 +149,41 @@ std::string make_temp_repo() {
     return base.string();
 }
 
-// 建 repo/{name}/{ver}/model.onnx（写一个占位字节，让合法目录被登记）。
-void write_model(const std::string& repo, const std::string& name, const std::string& ver) {
-    auto dir = fs::path(repo) / name / ver;
+// 测试用的 manifest 条目描述。
+struct TestModel {
+    std::string id;
+    std::string type = "det";
+    std::string display;
+    std::vector<int> input_size;
+    std::vector<std::string> labels;
+};
+
+// 在 dir 下写 manifest.json（base=dir），返回其路径。BASE 指向 dir，目录不存在则创建。
+std::string write_manifest(const std::string& dir, const std::vector<TestModel>& mods) {
     fs::create_directories(dir);
-    std::ofstream ofs(dir / "model.onnx", std::ios::binary);
-    ofs.put(static_cast<char>(0));
+    nlohmann::json j;
+    j["base"] = dir;
+    j["models"] = nlohmann::json::array();
+    for (const auto& m : mods) {
+        nlohmann::json e;
+        e["id"] = m.id;
+        e["type"] = m.type;
+        if (!m.display.empty()) e["display"] = m.display;
+        if (!m.input_size.empty()) e["input_size"] = m.input_size;
+        if (!m.labels.empty()) e["labels"] = m.labels;
+        j["models"].push_back(e);
+    }
+    auto path = (fs::path(dir) / "manifest.json").string();
+    { std::ofstream f(path); f << j.dump(); }
+    return path;
 }
 
-// 注入假 InferFn：调用时把 name/version 写进 out["handle"]，用于核对句柄身份。
+// 注入假 InferFn：调用时把 manifest id 写进 out["handle"]，用于核对句柄身份。
 HandleBuilder echo_builder() {
-    return [](const std::string& name, const std::string& ver, const std::string&) -> ModelHandle {
-        std::string key = name + "/" + ver;
+    return [](const ManifestModel& m, const std::string&) -> ModelHandle {
+        std::string key = m.id;
         ModelHandle h;
+        h.name = m.id;
         h.infer = InferFn([key](const nlohmann::json& in, nlohmann::json* out, std::string* err) {
             (void)in;
             (void)err;
@@ -196,10 +219,7 @@ std::string make_web_root() {
 TEST_CASE("ModelRepo scan get list", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "1");
-    write_model(repo, "det", "2");
-    write_model(repo, "cls", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det", "Det"}, {"cls", "cls", "Cls"}});
 
     ModelRepo m(cfg, echo_builder());
     auto changed = m.scan();
@@ -207,25 +227,23 @@ TEST_CASE("ModelRepo scan get list", "[serving]") {
     REQUIRE(std::find(changed.begin(), changed.end(), "cls") != changed.end());
 
     ModelHandle h;
-    REQUIRE(m.get("det", "latest", &h));
+    REQUIRE(m.get("det", &h));
     REQUIRE(h.name == "det");
-    REQUIRE(h.version == "2");
-    REQUIRE(h.ready);
-    REQUIRE(handle_of(h) == "det/2");
-
-    REQUIRE(m.get("det", "2", &h));
-    REQUIRE(h.version == "2");
-    REQUIRE(handle_of(h) == "det/2");
-
-    REQUIRE(m.get("det", "1", &h));
+    REQUIRE(h.display == "Det");
     REQUIRE(h.version == "1");
-    REQUIRE(handle_of(h) == "det/1");
+    REQUIRE(h.type == "det");
+    REQUIRE(h.status == ModelStatus::Unloaded);
+    REQUIRE_FALSE(h.infer);  // 目录只含元数据，不实例化
 
-    REQUIRE(m.get("cls", "latest", &h));
-    REQUIRE(h.version == "latest");
+    std::string err;
+    REQUIRE(m.load("det", &err));
+    REQUIRE(err.empty());
+    REQUIRE(m.get("det", &h));
+    REQUIRE(h.status == ModelStatus::Ready);
+    REQUIRE(handle_of(h) == "det");  // echo builder 按 manifest id 回显
 
-    REQUIRE(m.get("cls", "", &h));  // 空串也解析 latest
-    REQUIRE(h.version == "latest");
+    REQUIRE(m.get("cls", &h));
+    REQUIRE(h.status == ModelStatus::Unloaded);
 
     auto all = m.list();
     REQUIRE(all.size() == 2);
@@ -234,76 +252,81 @@ TEST_CASE("ModelRepo scan get list", "[serving]") {
     REQUIRE(std::find(names.begin(), names.end(), "det") != names.end());
     REQUIRE(std::find(names.begin(), names.end(), "cls") != names.end());
 
-    fs::remove_all(repo);
-}
-
-TEST_CASE("ModelRepo latest numeric order", "[serving]") {
-    auto repo = make_temp_repo();
-    ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "m", "1");
-    write_model(repo, "m", "2");
-    write_model(repo, "m", "10");
-
-    ModelRepo m(cfg);
-    m.scan();
-
-    ModelHandle h;
-    REQUIRE(m.get("m", "latest", &h));
-    REQUIRE(h.version == "10");  // 数字比较，否则 10<2
+    // 单槽：load cls 卸下 det。
+    REQUIRE(m.load("cls", &err));
+    REQUIRE(m.get("det", &h));
+    REQUIRE(h.status == ModelStatus::Unloaded);
+    REQUIRE(m.get("cls", &h));
+    REQUIRE(h.status == ModelStatus::Ready);
 
     fs::remove_all(repo);
 }
 
-TEST_CASE("ModelRepo hot update", "[serving]") {
+TEST_CASE("ModelRepo manifest order & defaults", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "1");
+    cfg.model_repo = write_manifest(repo, {{"a", "det"}, {"b", "cls"}});
 
     ModelRepo m(cfg, echo_builder());
     m.scan();
 
-    ModelHandle oldh;
-    REQUIRE(m.get("det", "latest", &oldh));
-    REQUIRE(oldh.version == "1");
-
-    // 旧持有者：值拷贝的 InferFn，可在热换后继续完成。
-    auto old_infer = oldh.infer;
-
-    write_model(repo, "det", "2");
-    auto changed = m.scan();
-    REQUIRE(std::find(changed.begin(), changed.end(), "det") != changed.end());
-
-    ModelHandle newh;
-    REQUIRE(m.get("det", "latest", &newh));
-    REQUIRE(newh.version == "2");
-
-    // 旧版本句柄仍可读取。
-    REQUIRE(m.get("det", "1", &newh));
-    REQUIRE(newh.version == "1");
-
-    // 旧持有的 InferFn 不受热换影响。
-    nlohmann::json out;
-    std::string err;
-    REQUIRE(old_infer(nlohmann::json::object(), &out, &err));
-    REQUIRE(out["handle"] == "det/1");
+    auto all = m.list();
+    REQUIRE(all.size() == 2);
+    REQUIRE(all[0].name == "a");   // 目录序 = manifest 序
+    REQUIRE(all[1].name == "b");
+    REQUIRE(all[0].input_size == std::vector<int>{640, 640});  // 缺省 640x640
+    ModelHandle h;
+    REQUIRE(m.get("a", &h));
+    REQUIRE(h.version == "1");  // 恒 "1"
 
     fs::remove_all(repo);
 }
 
-TEST_CASE("ModelRepo unknown names/versions", "[serving]") {
+TEST_CASE("ModelRepo hot update (manifest rescan)", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "1");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
+
+    ModelRepo m(cfg, echo_builder());
+    m.scan();
+    std::string err;
+    REQUIRE(m.load("det", &err));
+    ModelHandle oldh;
+    REQUIRE(m.get("det", &oldh));
+    REQUIRE(oldh.status == ModelStatus::Ready);
+    auto old_infer = oldh.infer;  // 值拷贝：旧持有者可独立于 repo 完成
+
+    // 重写 manifest 增加 cls；rescan 新增它，同时 det 回落目录态。
+    write_manifest(repo, {{"det", "det"}, {"cls", "cls"}});
+    auto changed = m.scan();
+    REQUIRE(std::find(changed.begin(), changed.end(), "cls") != changed.end());
+    REQUIRE(std::find(changed.begin(), changed.end(), "det") == changed.end());  // 非新增
+
+    ModelHandle h;
+    REQUIRE(m.get("cls", &h));
+    REQUIRE(h.status == ModelStatus::Unloaded);
+    REQUIRE(m.get("det", &h));
+    REQUIRE(h.status == ModelStatus::Unloaded);  // 重扫回落 Unloaded
+
+    nlohmann::json out;
+    REQUIRE(old_infer(nlohmann::json::object(), &out, nullptr));
+    REQUIRE(out["handle"] == "det");
+
+    fs::remove_all(repo);
+}
+
+TEST_CASE("ModelRepo unknown names", "[serving]") {
+    auto repo = make_temp_repo();
+    ServingConfig cfg;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ModelRepo m(cfg);
     m.scan();
 
     ModelHandle h;
-    REQUIRE_FALSE(m.get("nope", "latest", &h));
-    REQUIRE_FALSE(m.get("det", "v999", &h));
+    REQUIRE_FALSE(m.get("nope", &h));
+    std::string err;
+    REQUIRE_FALSE(m.load("nope", &err));
 
     fs::remove_all(repo);
 }
@@ -326,7 +349,7 @@ TEST_CASE("ModelEntry image_path & image infer + reuse", "[serving]") {
     auto handle =
         make_model_handle<FakeModel>("fake", std::make_unique<FakeModel>());
     REQUIRE(handle.name == "fake");
-    REQUIRE(handle.ready);
+    REQUIRE(handle.status == ModelStatus::Ready);
 
     nlohmann::json out;
     std::string err;
@@ -377,10 +400,10 @@ namespace {
 
 // 注入真实 AsyncModel（FakeModel）的 HandleBuilder：make_model_handle 启动失败时兜底为失败 InferFn。
 HandleBuilder fake_model_builder() {
-    return [](const std::string& name, const std::string&, const std::string&) -> ModelHandle {
+    return [](const ManifestModel& m, const std::string&) -> ModelHandle {
         ModelHandle h;
         try {
-            auto mh = make_model_handle<FakeModel>(name, std::make_unique<FakeModel>());
+            auto mh = make_model_handle<FakeModel>(m.id, std::make_unique<FakeModel>());
             h = mh;
         } catch (...) {
             h.infer = InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
@@ -397,15 +420,14 @@ HandleBuilder fake_model_builder() {
 HandleBuilder slow_model_builder_flag(std::chrono::milliseconds delay,
                                       std::shared_ptr<std::atomic<bool>> started,
                                       std::shared_ptr<std::atomic<bool>> finished) {
-    return [delay, started, finished](const std::string& name, const std::string&,
-                                      const std::string&) -> ModelHandle {
+    return [delay, started, finished](const ManifestModel& m, const std::string&) -> ModelHandle {
         ModelHandle h;
         try {
             auto model = std::make_unique<FakeModel>();
             model->delay = delay;
             model->started = started;
             model->finished = finished;
-            h = make_model_handle<FakeModel>(name, std::move(model));
+            h = make_model_handle<FakeModel>(m.id, std::move(model));
         } catch (...) {
             h.infer = InferFn([](const nlohmann::json&, nlohmann::json*, std::string* err) {
                 if (err) *err = "fake model start failed";
@@ -437,7 +459,7 @@ int start_listening(ServingServer& srv) {
 
 httplib::Client make_client(int port) { return httplib::Client("127.0.0.1", port); }
 
-// 校验统一错误体：{ "error": { "code": ..., "message": ... } }
+// 统一校验错误体：{ "error": { "code": ..., "message": ... } }
 void require_error(const httplib::Result& res, int status, const std::string& code) {
     REQUIRE(res);
     REQUIRE(res->status == status);
@@ -446,21 +468,20 @@ void require_error(const httplib::Result& res, int status, const std::string& co
     REQUIRE(j["error"]["code"].get<std::string>() == code);
 }
 
-// 返回带 type/labels 的 builder：det→labels=[person,car]，cls→无 labels。
+// 起服后显式懒加载指定模型（懒加载语义：启动不实例化，需用前 load）。
+void preload(ServingServer& srv, const std::string& id) {
+    std::string err;
+    REQUIRE(srv.repo()->load(id, &err));
+}
+
+// 返回就绪态 infer 的 builder（元数据由 manifest 提供）。
 HandleBuilder meta_builder() {
-    return [](const std::string& name, const std::string&, const std::string&) -> ModelHandle {
+    return [](const ManifestModel&, const std::string&) -> ModelHandle {
         ModelHandle h;
         h.infer = [](const nlohmann::json&, nlohmann::json* out, std::string*) {
             if (out) (*out)["meta_ok"] = true;
             return true;
         };
-        if (name == "det") {
-            h.type = "det";
-            h.labels = {"person", "car"};
-            h.input_size = {640, 640};
-        } else {
-            h.type = "cls";
-        }
         return h;
     };
 }
@@ -470,28 +491,34 @@ HandleBuilder meta_builder() {
 TEST_CASE("model metadata in /v1/models", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "1");
-    write_model(repo, "cls", "1");
+    cfg.model_repo = write_manifest(
+        repo, {{"det", "det", "Det", {640, 640}, {"person", "car"}}, {"cls", "cls"}});
     ServingServer srv(cfg, meta_builder());
     std::string err;
     REQUIRE(srv.start(&err));
     httplib::Client cli("127.0.0.1", srv.port());
 
-    auto all = cli.Get("/v1/models");
-    REQUIRE(all);
-    REQUIRE(all->status == 200);
-    auto j = nlohmann::json::parse(all->body);
-    REQUIRE(j["models"].is_array());
-
+    auto all0 = cli.Get("/v1/models");
+    REQUIRE(all0);
+    REQUIRE(all0->status == 200);
+    auto j0 = nlohmann::json::parse(all0->body);
+    REQUIRE(j0["models"].is_array());
     nlohmann::json det;
-    bool found = false;
-    for (auto& m : j["models"]) if (m["name"] == "det") { det = m; found = true; }
-    REQUIRE(found);
+    for (auto& m : j0["models"]) if (m["name"] == "det") det = m;
+    REQUIRE(!det.is_null());
     REQUIRE(det["type"] == "det");
     REQUIRE(det["labels"].size() == 2);
     REQUIRE(det["labels"][0] == "person");
     REQUIRE(det["input_size"][0] == 640);
+    REQUIRE(det["ready"] == false);  // 目录态未实例化
+
+    // 显式 load → ready
+    REQUIRE(srv.repo()->load("det", &err));
+    auto all = cli.Get("/v1/models");
+    REQUIRE(all);
+    REQUIRE(all->status == 200);
+    auto j = nlohmann::json::parse(all->body);
+    for (auto& m : j["models"]) if (m["name"] == "det") det = m;
     REQUIRE(det["ready"] == true);
 
     auto one = cli.Get("/v1/models/cls");
@@ -508,12 +535,12 @@ TEST_CASE("model metadata in /v1/models", "[serving]") {
 TEST_CASE("ServingServer 200 infer", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
     REQUIRE(srv.repo() != nullptr);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     auto res = cli.Post("/v1/models/det/infer", nlohmann::json{{"image", PNG1X1_B64}}.dump(),
@@ -531,8 +558,7 @@ TEST_CASE("ServingServer 200 infer", "[serving]") {
 TEST_CASE("ServingServer 404 model not found", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
@@ -549,11 +575,11 @@ TEST_CASE("ServingServer 404 model not found", "[serving]") {
 TEST_CASE("ServingServer 400 bad request", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     require_error(cli.Post("/v1/models/det/infer", "{}", "application/json"), 400, "BAD_REQUEST");
@@ -565,12 +591,12 @@ TEST_CASE("ServingServer 400 bad request", "[serving]") {
 TEST_CASE("ServingServer bearer auth", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg.api_keys = {"key1"};
-    write_model(repo, "det", "latest");
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     std::string body = nlohmann::json{{"image", PNG1X1_B64}}.dump();
@@ -593,11 +619,11 @@ TEST_CASE("ServingServer bearer auth", "[serving]") {
 TEST_CASE("ServingServer health & readyz", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     auto h = cli.Get("/health");
@@ -614,9 +640,7 @@ TEST_CASE("ServingServer health & readyz", "[serving]") {
 TEST_CASE("ServingServer model list", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
-    write_model(repo, "cls", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}, {"cls", "cls"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
@@ -641,8 +665,7 @@ TEST_CASE("ServingServer model list", "[serving]") {
 TEST_CASE("ServingServer graceful stop", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
@@ -659,12 +682,12 @@ TEST_CASE("ServingServer graceful stop", "[serving]") {
 TEST_CASE("ServingServer 504 timeout", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg.request_timeout = std::chrono::milliseconds(50);
-    write_model(repo, "det", "latest");
 
     ServingServer srv(cfg, slow_model_builder(std::chrono::milliseconds(500)));
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     auto res = cli.Post("/v1/models/det/infer", nlohmann::json{{"image", PNG1X1_B64}}.dump(),
@@ -682,14 +705,14 @@ TEST_CASE("ServingServer 504 timeout", "[serving]") {
 TEST_CASE("ServingServer stop while inference in flight", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg.request_timeout = std::chrono::milliseconds(60000);  // 长超时：走非超时完整路径
-    write_model(repo, "det", "latest");
 
     auto started = std::make_shared<std::atomic<bool>>(false);
     ServingServer srv(cfg, slow_model_builder_flag(std::chrono::milliseconds(300), started,
                                                    nullptr));
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     bool requester_ok = false;
@@ -719,9 +742,8 @@ TEST_CASE("ServingServer drain deadline exceeded safe dtor (detached thread outl
           "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg.request_timeout = std::chrono::milliseconds(50);  // wait_drained deadline ≈ 50ms + 1s
-    write_model(repo, "det", "latest");
 
     // 推理 3s ≫ deadline ≈ 1.05s：wait_drained 必超期返回，且析构先于推理完成。
     auto started = std::make_shared<std::atomic<bool>>(false);
@@ -732,6 +754,7 @@ TEST_CASE("ServingServer drain deadline exceeded safe dtor (detached thread outl
         ServingServer srv(cfg, slow_model_builder_flag(std::chrono::milliseconds(3000), started,
                                                        finished));
         int port = start_listening(srv);
+        preload(srv, "det");
 
         auto cli = make_client(port);
         // 独立线程发 POST：handler 在 request_timeout=50ms 内返回（504/或超时），
@@ -762,12 +785,12 @@ TEST_CASE("ServingServer drain deadline exceeded safe dtor (detached thread outl
 TEST_CASE("ServingServer rate limit 429", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg.rate_limit_qps = 1;  // 严格 1 qps，无突发窗口 → 连发第 2 个必 429
-    write_model(repo, "det", "latest");
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     auto body = nlohmann::json{{"image", PNG1X1_B64}}.dump();
@@ -786,11 +809,11 @@ TEST_CASE("ServingServer rate limit 429", "[serving]") {
 TEST_CASE("ServingServer metrics text", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     auto body = nlohmann::json{{"image", PNG1X1_B64}}.dump();
@@ -821,11 +844,11 @@ TEST_CASE("ServingServer metrics text", "[serving]") {
 TEST_CASE("ServingServer cors headers", "[serving]") {
     auto repo = make_temp_repo();
     ServingConfig cfg;
-    cfg.model_repo = repo;
-    write_model(repo, "det", "latest");
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
 
     ServingServer srv(cfg, fake_model_builder());
     int port = start_listening(srv);
+    preload(srv, "det");
 
     auto cli = make_client(port);
     auto pre = cli.Options(
@@ -848,11 +871,11 @@ TEST_CASE("ServingServer cors headers", "[serving]") {
 
     // 关闭 CORS：OPTIONS 预检 404，普通响应也无跨域头。
     ServingConfig cfg2;
-    cfg2.model_repo = repo;
+    cfg2.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg2.enable_cors = false;
-    write_model(repo, "det", "latest");
     ServingServer srv2(cfg2, fake_model_builder());
     int port2 = start_listening(srv2);
+    preload(srv2, "det");
     httplib::Client cli2("127.0.0.1", port2);
     auto pre2 = cli2.Options("/v1/models/det/infer",
                              httplib::Headers{{"Origin", "https://example.com"}});
@@ -873,16 +896,16 @@ TEST_CASE("ServingServer cors headers", "[serving]") {
 TEST_CASE("ServingServer tls branch", "[serving][serving-tls]") {
     // 自签证书导入：仅验证 enable_tls + tls_cert 走 SSLServer 装配路径。
     ServingConfig cfg;
-    cfg.model_repo = make_temp_repo();
+    auto dir = make_temp_repo();
+    cfg.model_repo = write_manifest(dir, {{"det", "det"}});
     cfg.enable_tls = true;
     // 无合法证书文件时 SSLServer 构造可能失败 → start() 可能 false；此处仅验证
     // 配置了 TLS 且未崩溃地走到 listen（错误在 err 中返回，不抛跨对象）。
-    write_model(cfg.model_repo, "det", "latest");
     ServingServer srv(cfg, fake_model_builder());
     std::string err;
     bool ok = srv.start(&err);
     srv.stop();
-    fs::remove_all(cfg.model_repo);
+    fs::remove_all(dir);
     // 本用例仅验证 TLS 装配分支存在且可安全起停；不要求无证书时也能成功监听。
     (void)ok;
     (void)err;
@@ -893,12 +916,12 @@ TEST_CASE("serving static hosting same-origin", "[serving]") {
     auto repo = make_temp_repo();
     auto web = make_web_root();
     ServingConfig cfg;
-    cfg.model_repo = repo;
+    cfg.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg.web_root = web;
-    write_model(repo, "det", "1");
     ServingServer srv(cfg, fake_model_builder());
     std::string err;
     REQUIRE(srv.start(&err));
+    preload(srv, "det");
     httplib::Client cli("127.0.0.1", srv.port());
 
     auto idx = cli.Get("/");
@@ -927,4 +950,66 @@ TEST_CASE("serving static hosting same-origin", "[serving]") {
 
     fs::remove_all(web);
     fs::remove_all(repo);
+}
+
+TEST_CASE("serving lazy: manifest parses entries", "[serving]") {
+    auto dir = make_temp_repo();
+    fs::create_directories(fs::path(dir) / "assets");
+    { std::ofstream f(fs::path(dir) / "assets" / "coco.txt"); f << "person\ncar\n"; }
+    nlohmann::json j;
+    j["base"] = dir;
+    j["models"] = nlohmann::json::array();
+    j["models"].push_back({{"id", "det"}, {"display", "Det"}, {"type", "det"},
+                           {"files", {{"model", "yolo11n/model.onnx"}}},
+                           {"labels", {"person", "car"}}, {"input_size", {640, 640}},
+                           {"desc", "detect"}});
+    j["models"].push_back({{"id", "cls"}, {"type", "cls"},
+                           {"files", {{"model", "yolo11n-cls/model.onnx"}}},
+                           {"labels", "assets/coco.txt"}});
+    auto path = (fs::path(dir) / "manifest.json").string();
+    { std::ofstream f(path); f << j.dump(); }
+
+    std::vector<ManifestModel> out;
+    std::string err;
+    REQUIRE(load_manifest(path, dir, &out, &err));
+    REQUIRE(out.size() == 2);
+    REQUIRE(out[0].id == "det");
+    REQUIRE(out[0].type == "det");
+    REQUIRE(out[0].display == "Det");
+    REQUIRE(out[0].labels.size() == 2);
+    REQUIRE(out[0].input_size == std::vector<int>{640, 640});
+    REQUIRE(out[1].labels.size() == 2);                        // 从 assets/coco.txt 读入
+    REQUIRE(out[1].labels[0] == "person");
+    REQUIRE(out[1].input_size == std::vector<int>{640, 640});  // 缺省 640x640
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("serving lazy: startup catalog not instantiated", "[serving]") {
+    auto dir = make_temp_repo();
+    nlohmann::json j;
+    j["base"] = dir;
+    j["models"] = nlohmann::json::array();
+    j["models"].push_back({{"id", "det"}, {"type", "det"}});
+    j["models"].push_back({{"id", "cls"}, {"type", "cls"}});
+    auto path = (fs::path(dir) / "manifest.json").string();
+    { std::ofstream f(path); f << j.dump(); }
+
+    int builds = 0;
+    HandleBuilder b = [&](const ManifestModel&, const std::string&) {
+        ++builds;
+        ModelHandle h;
+        h.infer = [](const nlohmann::json&, nlohmann::json*, std::string*) { return true; };
+        return h;
+    };
+    ServingConfig cfg;
+    cfg.model_repo = path;
+    cfg.web_root = "";
+    ModelRepo m(cfg, std::move(b));
+    m.scan();
+    REQUIRE(builds == 0);  // 启动不实例化
+    auto list = m.list();
+    REQUIRE(list.size() >= 1);
+    REQUIRE(list[0].status == ModelStatus::Unloaded);
+    fs::remove_all(dir);
 }
