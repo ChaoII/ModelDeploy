@@ -471,6 +471,13 @@ if (MSVC AND ENABLE_ORT)
 endif ()
 if (MSVC)
     target_compile_options(${LIBRARY_NAME} PRIVATE "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:/wd4251>")
+    if (ENABLE_TRT)
+        # TRT 可选后端延迟加载：CPU/ORT 推理不触碰 TRT 路径，避免 import 时依赖 nvinfer_*.dll
+        target_link_options(${LIBRARY_NAME} PRIVATE
+                "/DELAYLOAD:${NVINFER_LIB_NAME}.dll"
+                "/DELAYLOAD:${NVONNXPARSER_LIB_NAME}.dll")
+        target_link_libraries(${LIBRARY_NAME} PRIVATE delayimp)
+    endif ()
 endif ()
 
 if (UNIX AND NOT APPLE)

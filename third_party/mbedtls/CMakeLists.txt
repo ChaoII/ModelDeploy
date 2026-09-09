@@ -258,8 +258,9 @@ if(CMAKE_COMPILER_IS_IAR)
 endif(CMAKE_COMPILER_IS_IAR)
 
 if(CMAKE_COMPILER_IS_MSVC)
-    # Strictest warnings, UTF-8 source and execution charset
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3 /utf-8")
+    # UTF-8 source and execution charset. 本仓库统一经 md_silence_external 以 /w 关闭
+    # 第三方告警（含本目录），因此不再设置 /W3，避免与 /w 冲突触发 MSVC D9025 覆盖警告。
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
 endif(CMAKE_COMPILER_IS_MSVC)
 
 if(MBEDTLS_FATAL_WARNINGS)
