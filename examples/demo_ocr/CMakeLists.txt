@@ -1,6 +1,8 @@
 md_add_demo_matrix(ocr_pipeline ${CMAKE_CURRENT_LIST_DIR})
 
 if(ENABLE_ORT)
+  add_executable(demo_ocr demo_ocr.cpp)
+  target_link_libraries(demo_ocr PUBLIC ${LIBRARY_NAME})
   add_executable(demo_ocr_det_cxx demo_ocr_det_cxx.cpp)
   target_link_libraries(demo_ocr_det_cxx PUBLIC ${LIBRARY_NAME})
   add_executable(demo_ocr_rec_cxx demo_ocr_rec_cxx.cpp)

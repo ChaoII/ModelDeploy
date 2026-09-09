@@ -9,10 +9,12 @@
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include "serving/config.h"
 #include "serving/model_repo.h"
@@ -23,6 +25,7 @@
 
 #include "runtime/runtime_option.h"
 #include "vision/common/result_json.h"
+#include "vision/common/visualize/visualize.h"
 #include "vision/detection/ultralytics_det.h"
 #include "vision/classification/classification.h"
 #include "vision/iseg/ultralytics_seg.h"
@@ -50,15 +53,32 @@ static ModelHandle meta_handle(const ManifestModel& m) {
 }
 
 // 构造成功 → make_model_handle 的核心句柄已带 infer，仅回填元数据后返回。
+// vis：按族把【原图 + 结果】喂给 SDK 的 vision::vis_* 渲染标注图。
 template <typename M>
-static ModelHandle built_handle(const ManifestModel& m, std::unique_ptr<M> model) {
-    ModelHandle h = make_model_handle<M>(m.id, std::move(model));
+static ModelHandle built_handle(
+    const ManifestModel& m, std::unique_ptr<M> model,
+    std::function<vision::ImageData(vision::ImageData&,
+                                    const typename M::result_type&)> vis = {}) {
+    ModelHandle h = make_model_handle<M>(m.id, std::move(model), {}, std::move(vis));
     h.display = m.display;
     h.type = m.type;
     h.input_size = m.input_size;
     h.labels = m.labels;
     return h;
 }
+
+// 从模型尽量取名称标签；取不到就返回空（vis 用默认配色，不影响推理）。
+static std::unordered_map<int, std::string> model_labels(
+    const std::function<std::unordered_map<int, std::string>()>& fn) {
+    try {
+        return fn();
+    } catch (...) {
+        return {};
+    }
+}
+
+// 中文字体：demo_server 约定从仓库根运行（manifest base 亦为 CWD 相对）。
+static const char* kFont = "test_data/msyh.ttc";
 
 // 按 manifest 条目构造真实模型句柄。files.* 已在 load_manifest 时拼上 base（如
 // m.model_f/m.rec_f/m.cls_f/m.dict_f），故此处不再需要 base 参数（保留签名以对齐 API）。
@@ -101,7 +121,12 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto lm = model_labels([&] { return model->get_label_map("names"); });
+                auto vis = [lm](vision::ImageData& im,
+                                const std::vector<vision::DetectionResult>& r) {
+                    return vision::vis_det(im, r, 0.5, lm, kFont, 12, 0.3, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "cls") {
@@ -110,7 +135,10 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im, const vision::ClassifyResult& r) {
+                    return vision::vis_cls(im, r, 1, 0.5, kFont, 12, 0.15, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "seg") {
@@ -120,7 +148,11 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im,
+                              const std::vector<vision::InstanceSegResult>& r) {
+                    return vision::vis_iseg(im, r, 0.5, kFont, 12, 0.3, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "pose") {
@@ -130,7 +162,11 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im,
+                              const std::vector<vision::KeyPointsResult>& r) {
+                    return vision::vis_pose(im, r, kFont, 12, 4, 0.3, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "obb") {
@@ -140,7 +176,10 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im, const std::vector<vision::ObbResult>& r) {
+                    return vision::vis_obb(im, r, 0.5, kFont, 12, 0.3, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "sem") {
@@ -149,7 +188,11 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto lm = model_labels([&] { return model->get_label_map("names"); });
+                auto vis = [lm](vision::ImageData& im, const vision::SemSegResult& r) {
+                    return vision::vis_sem(im, r, lm, 0.5, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "depth") {
@@ -158,7 +201,10 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im, const vision::DepthResult& r) {
+                    return vision::vis_depth(im, r, true, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "face") {
@@ -168,7 +214,11 @@ int main(int argc, char** argv) {
                 auto model = std::make_unique<MM>(m.model_f, opt);
                 if (!model->is_initialized()) return meta;
                 model->get_preprocessor().set_size(m.input_size);
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im,
+                              const std::vector<vision::KeyPointsResult>& r) {
+                    return vision::vis_keypoints(im, r, kFont, 12, 4, 0.3, false, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "ocr") {
@@ -178,7 +228,10 @@ int main(int argc, char** argv) {
                 if (m.rec_f.empty() || m.dict_f.empty()) return meta;
                 auto model = std::make_unique<MM>(m.model_f, m.cls_f, m.rec_f, m.dict_f, opt);
                 if (!model->is_initialized()) return meta;
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im, const vision::OCRResult& r) {
+                    return vision::vis_ocr(im, r, kFont, 12, 0.3, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         if (m.type == "lpr") {
@@ -188,7 +241,11 @@ int main(int argc, char** argv) {
                 if (m.rec_f.empty()) return meta;
                 auto model = std::make_unique<MM>(m.model_f, m.rec_f, opt);
                 if (!model->is_initialized()) return meta;
-                return built_handle(m, std::move(model));
+                auto vis = [](vision::ImageData& im,
+                              const std::vector<vision::LprResult>& r) {
+                    return vision::vis_lpr(im, r, kFont, 12, 4, 0.3, false);
+                };
+                return built_handle(m, std::move(model), std::move(vis));
             } catch (...) { return meta; }
         }
         return meta;  // 未知 type：目录内可列，load 置 Failed

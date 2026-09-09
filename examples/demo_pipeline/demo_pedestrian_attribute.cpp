@@ -10,7 +10,11 @@
 #include <string>
 #include <vector>
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::fprintf(stderr, "usage: %s <image>\n", argv[0]);
+        return 2;
+    }
     const char* kFont = "../../test_data/msyh.ttc";
 
     // ---- 1. 运行时选项 ----
@@ -22,7 +26,7 @@ int main() {
 
     // ---- 2. 加载模型（行人属性：检测 + 多标签分类）----
     auto m = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
-        "../../best.onnx", "../../zhgd_ml_c.onnx", opt);
+        "zhgd_det.onnx", "zhgd_ml.onnx", opt);
     if (!m->is_initialized()) {
         std::fprintf(stderr, "init failed\n");
         return 1;
@@ -32,19 +36,14 @@ int main() {
     m->set_det_threshold(0.5);
     m->set_cls_input_size({192, 256});
     // ---- 3. 读图 ----
-    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/test_pedestrian_attribute2.jpg");
+    auto im = modeldeploy::vision::ImageData::imread(argv[1]);
     if (im.empty()) {
         std::fprintf(stderr, "cannot read image\n");
         return 1;
     }
     std::vector<modeldeploy::vision::AttributeResult> res; // 推理结果
-
     // ---- 4. 推理：先 warmup，再计时 ----
-    for (int i = 0; i < 10; ++i) m->predict(im, &res, nullptr);
-    TimerArray timers;
-    for (int i = 0; i < 50; ++i) m->predict(im, &res, &timers);
-    timers.print_benchmark();
-
+    m->predict(im, &res);
     // ---- 5. 结果与可视化 ----
     modeldeploy::vision::dis_attr(res);
     std::unordered_map<int, std::string> label_map;
@@ -60,8 +59,8 @@ int main() {
         }
     }
     auto vis = modeldeploy::vision::vis_attr(im, res, 0.5, label_map, kFont, 15, 0.15, false, abnormal);
-    vis.imshow("ss");
-    (void)vis.imwrite("result_pedestrian_attribute_ort_cpu2.jpg");
+    vis.imshow("pedestrian_attribute");
+    (void)vis.imwrite("pedestrian_attribute.jpg");
     std::printf("done, %zu persons\n", res.size());
     return 0;
 }

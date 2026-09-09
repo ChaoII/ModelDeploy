@@ -80,20 +80,21 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 #emptyHint b{color:var(--acc)}
 #wrap{position:relative;max-width:100%;display:none;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 #img{max-width:100%;max-height:70vh;display:block;object-fit:contain}
-#cv{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+#resImg{max-width:100%;max-height:52vh;object-fit:contain;display:none;margin:0 0 10px;
+  border:1px solid var(--line);border-radius:8px;background:#000}
 
 /* ── 结果面板 ── */
-.results{flex-shrink:0;max-height:44%;display:flex;flex-direction:column;overflow:hidden;
+.results{flex-shrink:0;max-height:min(46%,560px);display:flex;flex-direction:column;
   border-top:1px solid var(--line);background:rgba(9,14,30,.7)}
-.results .tabs{display:flex;align-items:center;gap:6px;padding:8px 12px;flex-shrink:0;border-bottom:1px solid transparent}
+.results .tabs{display:flex;align-items:center;gap:6px;padding:8px 12px;flex-shrink:0;border-bottom:1px solid var(--line)}
 .tabbtn{background:none;border:none;color:var(--mut);font-size:12px;font-weight:600;padding:5px 12px;border-radius:7px}
 .tabbtn:hover{color:var(--tx)}
 .tabbtn.on{color:var(--acc);background:rgba(37,198,252,.1)}
 .results .fold{margin-left:8px;background:none;border:1px solid var(--line);color:var(--mut);font-size:11px;padding:3px 9px;border-radius:6px}
 .results .fold:hover{color:var(--acc);border-color:var(--acc)}
-.res-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
-.tabpane{display:none;padding:12px 14px}
-.tabpane.on{display:block}
+.res-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.tabpane{display:none;padding:12px 14px;flex:1;min-height:0;overflow-y:auto;overflow-x:auto}
+.tabpane.on{display:flex;flex-direction:column}
 .results.collapsed .res-body{display:none}
 .results.collapsed{max-height:42px}
 #viznote{font-size:12px;color:var(--mut);margin-bottom:10px}
@@ -159,7 +160,6 @@ pre{background:#070d1c;border:1px solid var(--line);border-radius:8px;padding:12
       <div id="emptyHint">选择左侧模型并<b>解锁</b>后，<br>上传图片或选取样例即可推理。</div>
       <div id="wrap">
         <img id="img" alt="input preview">
-        <canvas id="cv"></canvas>
       </div>
     </div>
 
@@ -167,13 +167,14 @@ pre{background:#070d1c;border:1px solid var(--line);border-radius:8px;padding:12
       <div class="tabs">
         <button class="tabbtn on" data-tab="viz">可视化</button>
         <button class="tabbtn" data-tab="json">JSON</button>
-        <button id="dlPng">下载 PNG</button>
+        <button id="dlPng">下载可视化</button>
         <div class="sp"></div>
         <button class="fold" id="foldBtn">收起 ▲</button>
       </div>
       <div class="res-body">
         <div class="tabpane on" id="tab-viz">
           <div id="viznote"></div>
+          <img id="resImg" alt="可视化结果（SDK 渲染）">
           <div id="table"></div>
         </div>
         <div class="tabpane" id="tab-json">
@@ -196,12 +197,9 @@ pre{background:#070d1c;border:1px solid var(--line);border-radius:8px;padding:12
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
-let models=[], selId=null, curB64=null, cv=null, ctx=null;
+let models=[], selId=null, curB64=null;
 
-const PALETTE=['#25c6fc','#a855f7','#2be6a3','#ffcc00','#ff5470','#ff8c42','#7cff5c','#5cb8ff','#f26dff','#4deaea'];
-const colorOf=i=>PALETTE[((i%PALETTE.length)+PALETTE.length)%PALETTE.length];
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-function hexRgba(h,a){const n=parseInt(h.slice(1),16);return [n>>16&255,n>>8&255,n&255,Math.round(a*255)];}
 function fmt(v){if(typeof v==='number')return (Math.round(v*1000)/1000).toString();return v==null?'':String(v);}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const TYPE_ICONS={det:'DT',face:'FC',seg:'SEG',pose:'PS',obb:'OB',ocr:'OCR',lpr:'LPR',cls:'CLS',sem:'SEM',depth:'DP'};
@@ -331,13 +329,12 @@ function setPreview(info){
   const img=$('img');img.src=info.dataUrl;
   $('wrap').style.display='block';
   $('emptyHint').style.display='none';
-  cv=$('cv');cv.width=info.w;cv.height=info.h;
-  ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
   curB64=info.dataUrl.split(',')[1];
   clearResult();
 }
 function clearResult(){
   $('viznote').innerHTML='';
+  $('resImg').style.display='none';$('resImg').removeAttribute('src');
   $('table').innerHTML='<span class="empty">等待推理结果…</span>';
   $('json').textContent='';
 }
@@ -368,10 +365,13 @@ async function run(){
   const t0=performance.now();
   $('runBtn').disabled=true;
   try{
-    const r=await apiPost('/v1/models/'+encodeURIComponent(m.id)+'/infer',{image:curB64});
+    const j=await apiPost('/v1/models/'+encodeURIComponent(m.id)+'/infer',{image:curB64});
+    const r=Object.assign({},j);delete r.image_b64;
+    if(j.image_b64){$('resImg').src='data:image/jpeg;base64,'+j.image_b64;$('resImg').style.display='block';}
     const dt=performance.now()-t0;
-    renderResult(m,r.results);
-    $('viznote').innerHTML=esc(m.display)+' · 服务端 <b>'+fmt(r.duration_ms)+' ms</b> · 浏览器总耗时 '+dt.toFixed(0)+' ms';
+    const n=(Array.isArray(j.results)?j.results.length:(j.results&&j.results.boxes?j.results.boxes.length:null));
+    renderResult(m,j.results);
+    $('viznote').innerHTML=esc(m.display)+' · 服务端 <b>'+fmt(j.duration_ms)+' ms</b> · 浏览器总耗时 '+dt.toFixed(0)+' ms'+(n!=null?' · 检出 <b>'+n+'</b> 项':'');
     $('json').textContent=JSON.stringify(r,null,2);
     showTab('viz');
     toast('推理完成','ok');
@@ -380,120 +380,20 @@ async function run(){
   }finally{$('runBtn').disabled=!(m.status==='ready');}
 }
 
-/* ════════════ 各类型渲染（沿用既有实现，坐标=输入图绝对像素） ════════════ */
+/* ════════════ 结果表格（视觉结果由服务端 SDK vis_* 渲染经 image_b64 返回，前端直显） ════════════ */
 function renderResult(m,res){
-  ctx.clearRect(0,0,cv.width,cv.height);
-  if(res==null){renderTable([],true);return;}
-  const labels=(m&&m.labels)||[];
+  const table=$('table');
+  if(res==null){table.innerHTML='<span class="empty">无结果</span>';return;}
   const arr=Array.isArray(res)?res:(res&&res.results?res.results:null);
 
   if(m.type==='cls'){clsTopN(res);return;}
-
-  if(m.type==='ocr'&&res.boxes){ocrBoxes(res.boxes,res.text,res.rec_scores);renderOcrTable(res);return;}
-  if(m.type==='sem'&&res.shape&&res.labels){semOverlay(res);return;}
-  if(m.type==='depth'&&res.shape&&res.depth){depthOverlay(res);return;}
+  if(m.type==='ocr'&&res.boxes){renderOcrTable(res);return;}
+  if(m.type==='sem'&&res.shape){renderSemTable(res);return;}
+  if(m.type==='depth'&&res.shape){renderDepthTable(res);return;}
   if(m.type==='face'&&res.embedding){tableEmbedding(res);return;}
 
-  if(!arr){renderTable([],true);return;}
-
-  arr.forEach((r,i)=>{
-    const box=r.box||r.rotated_box;
-    const labelName=(labels.length?labels[+r.label_id]:null)||('id'+r.label_id);
-    const score=r.score!=null?(' '+Number(r.score).toFixed(2)):'';
-    const caption=[labelName,score].join('').trim();
-    if(m.type==='lpr'){
-      const colorMap={blue:'#2563eb',green:'#22c55e',yellow:'#ffcc00',white:'#e5e7eb',black:'#000000'};
-      const c=colorMap[((r.car_plate_color||'')+'').toLowerCase()]||'#25c6fc';
-      if(r.box) rect(r.box,c,r.car_plate_str||'车牌');
-      return;
-    }
-    if(m.type==='obb'){
-      if(r.rotated_box) rotated(r.rotated_box,colorOf(i),caption);
-    }else if(m.type==='pose'){
-      if(r.box) rect(r.box,'#25c6fc',caption);
-      if(Array.isArray(r.keypoints)) poseSkeleton(r.keypoints,colorOf(i));
-    }else{
-      if(r.box) rect(r.box,colorOf(i),caption);
-      if(m.type==='seg'&&r.mask) maskOverlay(r.mask,colorOf(i));
-    }
-  });
+  if(!arr){table.innerHTML='<span class="empty">无结果</span>';return;}
   renderTable(arr);
-}
-function rect(b,c,txt){
-  if(!b)return;
-  ctx.strokeStyle=c;ctx.lineWidth=2;ctx.strokeRect(b.x,b.y,b.width,b.height);
-  if(txt){ctx.font='12px system-ui';ctx.fillStyle=c;const tw=ctx.measureText(txt).width+8;
-    const yy=b.y>16?b.y-17:Math.max(0,b.y+b.height+2);
-    ctx.fillRect(b.x,yy,tw,15);ctx.fillStyle='#000';ctx.fillText(txt,b.x+4,yy+11);}
-}
-function dot(p,r){ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fillStyle='#25c6fc';ctx.fill();}
-function poseSkeleton(kps,c){
-  const LIMBS=[[0,1],[0,2],[1,3],[2,4],[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]];
-  ctx.strokeStyle=c;ctx.lineWidth=2;
-  LIMBS.forEach(([a,b])=>{
-    const A=kps[a],B=kps[b];
-    if(A&&B&&A.x!=null&&B.x!=null){ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();}
-  });
-  kps.forEach((p,i)=>{if(p&&p.x!=null)dot(p,i<5?5:3);});
-}
-function rotated(o,c,txt){
-  const rad=o.angle*Math.PI/180,cx=o.xc,cy=o.yc,cw=o.width/2,ch=o.height/2;
-  const pts=[[-cw,-ch],[cw,-ch],[cw,ch],[-cw,ch]].map(p=>[cx+p[0]*Math.cos(rad)-p[1]*Math.sin(rad),cy+p[0]*Math.sin(rad)+p[1]*Math.cos(rad)]);
-  ctx.strokeStyle=c;ctx.lineWidth=2;ctx.beginPath();
-  pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
-  if(txt){ctx.font='12px system-ui';ctx.fillStyle=c;ctx.fillText(txt,pts[0][0],Math.max(0,pts[0][1]-4));}
-}
-function maskOverlay(m,c){
-  const s=m.shape;if(!Array.isArray(s)||!Array.isArray(m.data))return;
-  const h=s[0],w=s[1];if(!h||!w)return;
-  const [cr,cg,cb]=hexRgba(c,255);
-  const id=ctx.createImageData(w,h),d=m.data;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const v=d[y*w+x],k=(y*w+x)*4;
-    if(v){id.data[k]=cr;id.data[k+1]=cg;id.data[k+2]=cb;id.data[k+3]=110;}
-  }
-  ctx.globalAlpha=0.5;ctx.putImageData(id,0,0);ctx.globalAlpha=1;
-}
-function ocrBoxes(boxes,text,rec_scores){
-  boxes.forEach((b,i)=>{
-    if(!Array.isArray(b))return;
-    if(b.length===8){
-      const pts=[[b[0],b[1]],[b[2],b[3]],[b[4],b[5]],[b[6],b[7]]];
-      const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
-      ctx.strokeStyle='#25c6fc';ctx.lineWidth=2;ctx.beginPath();
-      pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.stroke();
-      const x=Math.min(...xs),y=Math.min(...ys);
-      const caption=(text&&text[i]?text[i]:'')+(rec_scores&&rec_scores[i]!=null?(' '+Number(rec_scores[i]).toFixed(2)):'');
-      if(caption){ctx.font='12px system-ui';ctx.fillStyle='#25c6fc';
-        const tw=ctx.measureText(caption).width+8,yy=y>16?y-17:y;
-        ctx.fillRect(x,yy,tw,15);ctx.fillStyle='#000';ctx.fillText(caption,x+4,yy+11);}
-    }else if(b.length===4){
-      rect({x:b[0],y:b[1],width:b[2],height:b[3]},'#25c6fc',(text&&text[i])||'');
-    }
-  });
-}
-function semOverlay(res){
-  const s=res.shape,[h,w]=[s[0],s[1]];if(!h||!w)return;
-  const id=ctx.createImageData(w,h);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const c=res.labels[y*w+x];const k=(y*w+x)*4;
-    if(c){const[cr,cg,cb]=hexRgba(colorOf(c),255);id.data[k]=cr;id.data[k+1]=cg;id.data[k+2]=cb;id.data[k+3]=150;}
-  }
-  ctx.globalAlpha=0.55;ctx.putImageData(id,0,0);ctx.globalAlpha=1;
-  renderSemTable(res);
-}
-function depthOverlay(res){
-  const s=res.shape,[h,w]=[s[0],s[1]];const d=res.depth;
-  if(!h||!w||!Array.isArray(d))return;
-  let mn=Infinity,mx=-Infinity;for(const v of d){if(v<mn)mn=v;if(v>mx)mx=v;}
-  const rng=(mx-mn)||1;
-  const id=ctx.createImageData(w,h);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const v=(d[y*w+x]-mn)/rng,k=(y*w+x)*4;
-    id.data[k]=Math.round(v*255);id.data[k+1]=Math.round(v*120);id.data[k+2]=Math.round((1-v)*255);id.data[k+3]=160;
-  }
-  ctx.globalAlpha=0.6;ctx.putImageData(id,0,0);ctx.globalAlpha=1;
-  renderDepthTable(res);
 }
 function clsTopN(res){
   const scores=res.scores||[],ids=res.label_ids||[],labels=(curModel()&&curModel().labels)||[];
@@ -572,12 +472,11 @@ $('foldBtn').onclick=()=>{
   else{w.style.maxHeight='44%';$('foldBtn').textContent='收起 ▲';}
 };
 $('dlPng').onclick=()=>{
-  if(!curB64||$('wrap').style.display==='none'){toast('暂无可下载的可视化结果','err');return;}
-  const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;
-  const g=c.getContext('2d');
-  g.drawImage($('img'),0,0,c.width,c.height);
-  g.drawImage(cv,0,0);
-  const a=document.createElement('a');a.download='visual.png';a.href=c.toDataURL('image/png');a.click();
+  const ri=$('resImg');
+  const src=(ri&&ri.style.display!=='none'&&ri.getAttribute('src'))?ri.getAttribute('src')
+            :($('wrap').style.display!=='none'?$('img').getAttribute('src'):null);
+  if(!src){toast('暂无可下载的可视化结果','err');return;}
+  const a=document.createElement('a');a.download='visual.png';a.href=src;a.click();
 };
 
 buildSamples();

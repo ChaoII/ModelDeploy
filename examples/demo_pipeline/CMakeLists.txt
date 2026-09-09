@@ -1,5 +1,10 @@
 md_add_demo_matrix(pedestrian_attribute ${CMAKE_CURRENT_LIST_DIR})
 
+if(ENABLE_ORT)
+  add_executable(demo_pedestrian_attribute demo_pedestrian_attribute.cpp)
+  target_link_libraries(demo_pedestrian_attribute PUBLIC ${LIBRARY_NAME})
+endif()
+
 if(BUILD_CAPI)
   add_executable(demo_pedestrian_attribute_capi demo_pedestrian_attribute_capi.cpp)
   target_link_libraries(demo_pedestrian_attribute_capi PUBLIC ${LIBRARY_NAME})
