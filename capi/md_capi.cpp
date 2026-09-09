@@ -1901,6 +1901,18 @@ MDStatus md_result_kind(MDResultHandle h, MDResultKind* out) {
 MDStatus md_result_count(MDResultHandle h, size_t* out) {
     auto* rh = static_cast<md_result_handle*>(h);
     if (!rh || !out) return MD_ERR_NULL_POINTER;
+    // OCR 的 md_result_ocr 以“行(框)序号”取结果，故 count 须返回行数而非图数：
+    // 单图 (SingleResult) 返回 value.boxes 数；批量 (ResultData) 与 md_result_ocr 一致读第 0 图的行数。
+    if (rh->kind == MD_RES_OCR) {
+        if (auto* s = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
+            *out = s->value.boxes.size();
+        } else if (auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
+            *out = d->v.empty() ? 0 : d->v[0].boxes.size();
+        } else {
+            *out = 0;
+        }
+        return MD_OK;
+    }
     *out = origin_count(rh);
     return MD_OK;
 }
