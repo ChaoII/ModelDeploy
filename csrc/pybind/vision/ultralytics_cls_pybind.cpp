@@ -59,7 +59,7 @@ namespace modeldeploy::vision {
             .def("set_multi_label", &classification::ClassificationPostprocessor::set_multi_label);
 
 
-        pybind11::class_<classification::Classification, BaseModel>(m, "Classification")
+        pybind11::class_<classification::Classification, std::shared_ptr<classification::Classification>, BaseModel>(m, "Classification")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<classification::Classification>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

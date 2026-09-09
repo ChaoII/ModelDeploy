@@ -48,7 +48,7 @@ namespace modeldeploy::vision {
                      return results;
                  }, pybind11::arg("inputs"), pybind11::arg("records"));
 
-        pybind11::class_<detection::UltralyticsSem, BaseModel>(m, "UltralyticsSem")
+        pybind11::class_<detection::UltralyticsSem, std::shared_ptr<detection::UltralyticsSem>, BaseModel>(m, "UltralyticsSem")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<detection::UltralyticsSem>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

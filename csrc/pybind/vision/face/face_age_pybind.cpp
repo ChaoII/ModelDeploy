@@ -57,7 +57,7 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("inputs"));
 
 
-        pybind11::class_<face::SeetaFaceAge, BaseModel>(m, "SeetaFaceAge")
+        pybind11::class_<face::SeetaFaceAge, std::shared_ptr<face::SeetaFaceAge>, BaseModel>(m, "SeetaFaceAge")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<face::SeetaFaceAge>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

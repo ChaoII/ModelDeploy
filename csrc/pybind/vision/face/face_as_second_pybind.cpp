@@ -8,7 +8,7 @@
 
 namespace modeldeploy::vision {
     void bind_face_as_second(const pybind11::module& m) {
-        pybind11::class_<face::SeetaFaceAsSecond, BaseModel>(m, "SeetaFaceAsSecond")
+        pybind11::class_<face::SeetaFaceAsSecond, std::shared_ptr<face::SeetaFaceAsSecond>, BaseModel>(m, "SeetaFaceAsSecond")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<face::SeetaFaceAsSecond>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

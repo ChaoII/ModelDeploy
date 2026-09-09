@@ -59,7 +59,7 @@ namespace modeldeploy::vision::ocr {
             }
 
             if (best_idx > 0 && best_idx != last_index) {
-                if (best_idx > label_list_.size()) {
+                if (best_idx >= label_list_.size()) {
                     MD_LOG_ERROR << "The output index: " << best_idx <<
                         " is larger than the size of label_list: " <<
                         label_list_.size() << ". Please check the label file!" << std::endl;

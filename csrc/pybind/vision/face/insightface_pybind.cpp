@@ -38,7 +38,7 @@ namespace modeldeploy::vision {
             .def(pybind11::init<>())
             .def_readwrite("nms_thresh", &face::InsightFaceDetPostprocessor::nms_thresh_);
 
-        pybind11::class_<face::InsightFaceDet, BaseModel>(m, "InsightFaceDet")
+        pybind11::class_<face::InsightFaceDet, std::shared_ptr<face::InsightFaceDet>, BaseModel>(m, "InsightFaceDet")
             .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
                 RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceDet>(model_file.string(), option);
@@ -54,7 +54,7 @@ namespace modeldeploy::vision {
             .def_property_readonly("postprocessor", &face::InsightFaceDet::get_postprocessor);
 
         // 关键点模型
-        pybind11::class_<face::InsightFaceLandmark, BaseModel>(m, "InsightFaceLandmark")
+        pybind11::class_<face::InsightFaceLandmark, std::shared_ptr<face::InsightFaceLandmark>, BaseModel>(m, "InsightFaceLandmark")
             .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
                 RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceLandmark>(model_file.string(), option);
@@ -78,7 +78,7 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("image"), pybind11::arg("bbox"));
 
         // 识别模型
-        pybind11::class_<face::InsightFaceRecognition, BaseModel>(m, "InsightFaceRecognition")
+        pybind11::class_<face::InsightFaceRecognition, std::shared_ptr<face::InsightFaceRecognition>, BaseModel>(m, "InsightFaceRecognition")
             .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
                 RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceRecognition>(model_file.string(), option);
@@ -93,7 +93,7 @@ namespace modeldeploy::vision {
                  }, pybind11::arg("image"), pybind11::arg("kps"));
 
         // 性别年龄模型
-        pybind11::class_<face::InsightFaceGenderAge, BaseModel>(m, "InsightFaceGenderAge")
+        pybind11::class_<face::InsightFaceGenderAge, std::shared_ptr<face::InsightFaceGenderAge>, BaseModel>(m, "InsightFaceGenderAge")
             .def(pybind11::init([](const std::filesystem::path& model_file, pybind11::object option_obj) {
                 RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();
                 return std::make_unique<face::InsightFaceGenderAge>(model_file.string(), option);

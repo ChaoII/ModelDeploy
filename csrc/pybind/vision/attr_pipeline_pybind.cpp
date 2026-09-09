@@ -7,7 +7,7 @@
 
 namespace modeldeploy::vision {
     void bind_attr_pipeline(const pybind11::module& m) {
-        pybind11::class_<pipeline::PedestrianAttribute, BaseModel>(m, "PedestrianAttribute")
+        pybind11::class_<pipeline::PedestrianAttribute, std::shared_ptr<pipeline::PedestrianAttribute>, BaseModel>(m, "PedestrianAttribute")
             .def(pybind11::init([](const std::filesystem::path& det_model_path,
                                    const std::filesystem::path& cls_model_path,
                                    const RuntimeOption& option) {

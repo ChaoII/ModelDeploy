@@ -73,7 +73,7 @@ namespace modeldeploy::vision {
             .def("get_keypoints_num",
                  &detection::UltralyticsPosePostprocessor::get_keypoints_num);
 
-        pybind11::class_<detection::UltralyticsPose, BaseModel>(m, "UltralyticsPose")
+        pybind11::class_<detection::UltralyticsPose, std::shared_ptr<detection::UltralyticsPose>, BaseModel>(m, "UltralyticsPose")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<detection::UltralyticsPose>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

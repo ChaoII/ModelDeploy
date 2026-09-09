@@ -9,7 +9,7 @@
 
 namespace modeldeploy::audio {
     void bind_kokoro(pybind11::module& m) {
-        pybind11::class_<tts::Kokoro, BaseModel>(m, "Kokoro")
+        pybind11::class_<tts::Kokoro, std::shared_ptr<tts::Kokoro>, BaseModel>(m, "Kokoro")
             .def(pybind11::init([](const std::filesystem::path& model_file_path,
                                    const std::filesystem::path& token_path_str,
                                    const std::vector<std::string>& lexicons,

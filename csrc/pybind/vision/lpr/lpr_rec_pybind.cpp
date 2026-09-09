@@ -56,7 +56,7 @@ namespace modeldeploy::vision {
                      return results;
                  }, pybind11::arg("inputs"));
 
-        pybind11::class_<lpr::LprRecognizer, BaseModel>(m, "LprRecognizer")
+        pybind11::class_<lpr::LprRecognizer, std::shared_ptr<lpr::LprRecognizer>, BaseModel>(m, "LprRecognizer")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<lpr::LprRecognizer>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

@@ -4,7 +4,7 @@
 
 namespace modeldeploy::audio {
     void bind_speaker_verify(pybind11::module& m) {
-        pybind11::class_<speaker_verify::SpeakerVerify, BaseModel>(m, "SpeakerVerify")
+        pybind11::class_<speaker_verify::SpeakerVerify, std::shared_ptr<speaker_verify::SpeakerVerify>, BaseModel>(m, "SpeakerVerify")
             .def(pybind11::init([](const std::filesystem::path& model_file,
                                    pybind11::object option_obj) {
                      RuntimeOption option = pybind11::none().equal(option_obj) ? RuntimeOption() : option_obj.cast<RuntimeOption>();

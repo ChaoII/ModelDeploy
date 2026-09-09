@@ -81,7 +81,7 @@ namespace modeldeploy::vision {
                      return results;
                  }, pybind11::arg("inputs"), pybind11::arg("batch_layout_img_info"));
 
-        pybind11::class_<ocr::StructureV2Layout, BaseModel>(
+        pybind11::class_<ocr::StructureV2Layout, std::shared_ptr<ocr::StructureV2Layout>, BaseModel>(
                 m, "StructureV2Layout")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<ocr::StructureV2Layout>(model_file.string(), option);
@@ -109,7 +109,7 @@ namespace modeldeploy::vision {
                 self.batch_predict(_images, &results);
                 return results;
             }, pybind11::arg("images"));
-        pybind11::class_<ocr::StructureV2SERViLayoutXLMModel, BaseModel>(m, "StructureV2SERViLayoutXLMModel")
+        pybind11::class_<ocr::StructureV2SERViLayoutXLMModel, std::shared_ptr<ocr::StructureV2SERViLayoutXLMModel>, BaseModel>(m, "StructureV2SERViLayoutXLMModel")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<ocr::StructureV2SERViLayoutXLMModel>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

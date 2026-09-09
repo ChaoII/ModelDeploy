@@ -66,7 +66,7 @@ namespace modeldeploy::vision {
                           &detection::UltralyticsPostprocessor::get_nms_threshold,
                           &detection::UltralyticsPostprocessor::set_nms_threshold);
 
-        pybind11::class_<detection::UltralyticsDet, BaseModel>(m, "UltralyticsDet")
+        pybind11::class_<detection::UltralyticsDet, std::shared_ptr<detection::UltralyticsDet>, BaseModel>(m, "UltralyticsDet")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<detection::UltralyticsDet>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

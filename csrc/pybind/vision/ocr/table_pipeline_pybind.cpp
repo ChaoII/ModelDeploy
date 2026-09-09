@@ -21,7 +21,7 @@ namespace modeldeploy::vision {
         //            int rec_batch_size = 8, const RuntimeOption& option = RuntimeOption());
 
 
-        pybind11::class_<ocr::PPStructureV2Table, BaseModel>(m, "PPStructureV2Table")
+        pybind11::class_<ocr::PPStructureV2Table, std::shared_ptr<ocr::PPStructureV2Table>, BaseModel>(m, "PPStructureV2Table")
             .def(pybind11::init([](const std::filesystem::path& det_model_file, const std::filesystem::path& rec_model_file, const std::filesystem::path& table_model_file, const std::filesystem::path& rec_label_file, const std::filesystem::path& table_char_dict_path, int max_side_len, double det_db_thresh, double det_db_box_thresh, double det_db_unclip_ratio, const std::string& det_db_score_mode, bool use_dilation, int rec_batch_size, const RuntimeOption& option) {
                 return std::make_unique<ocr::PPStructureV2Table>(det_model_file.string(), rec_model_file.string(), table_model_file.string(), rec_label_file.string(), table_char_dict_path.string(), max_side_len, det_db_thresh, det_db_box_thresh, det_db_unclip_ratio, det_db_score_mode, use_dilation, rec_batch_size, option);
             }),

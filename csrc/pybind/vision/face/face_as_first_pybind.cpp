@@ -8,7 +8,7 @@
 
 namespace modeldeploy::vision {
     void bind_face_as_first(const pybind11::module& m) {
-        pybind11::class_<face::SeetaFaceAsFirst, BaseModel>(m, "SeetaFaceAsFirst")
+        pybind11::class_<face::SeetaFaceAsFirst, std::shared_ptr<face::SeetaFaceAsFirst>, BaseModel>(m, "SeetaFaceAsFirst")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<face::SeetaFaceAsFirst>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

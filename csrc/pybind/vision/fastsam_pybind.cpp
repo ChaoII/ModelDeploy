@@ -19,7 +19,7 @@ namespace modeldeploy::vision {
             .def_readwrite("points", &seg::FastSamPrompts::points)
             .def_readwrite("point_labels", &seg::FastSamPrompts::point_labels);
 
-        pybind11::class_<seg::FastSam, BaseModel>(m, "FastSam")
+        pybind11::class_<seg::FastSam, std::shared_ptr<seg::FastSam>, BaseModel>(m, "FastSam")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<seg::FastSam>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

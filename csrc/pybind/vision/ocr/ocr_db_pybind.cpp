@@ -82,7 +82,7 @@ namespace modeldeploy::vision {
                      return results;
                  }, pybind11::arg("inputs"), pybind11::arg("batch_det_img_info"));
 
-        pybind11::class_<ocr::DBDetector, BaseModel>(m, "DBDetector")
+        pybind11::class_<ocr::DBDetector, std::shared_ptr<ocr::DBDetector>, BaseModel>(m, "DBDetector")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<ocr::DBDetector>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))

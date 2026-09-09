@@ -8,7 +8,7 @@
 
 namespace modeldeploy {
     void bind_base_model(pybind11::module& m) {
-        pybind11::class_<BaseModel>(m, "BaseModel")
+        pybind11::class_<BaseModel, std::shared_ptr<BaseModel>>(m, "BaseModel")
             .def(pybind11::init<>(), "Default Constructor")
             .def("model_name", &BaseModel::name)
             .def("num_inputs", &BaseModel::num_inputs)

@@ -78,7 +78,7 @@ namespace modeldeploy::vision {
                           &face::ScrfdPostprocessor::get_landmarks_per_face,
                           &face::ScrfdPostprocessor::set_landmarks_per_face);
 
-        pybind11::class_<face::Scrfd, BaseModel>(m, "Scrfd")
+        pybind11::class_<face::Scrfd, std::shared_ptr<face::Scrfd>, BaseModel>(m, "Scrfd")
             .def(pybind11::init([](const std::filesystem::path& model_file, const RuntimeOption& option) {
                 return std::make_unique<face::Scrfd>(model_file.string(), option);
             }), pybind11::arg("model_file"), pybind11::arg("option"))
