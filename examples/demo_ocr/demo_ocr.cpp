@@ -1,6 +1,6 @@
-// demo_ocr: 用 ORT CPU 后端跑 PaddleOCR（det+cls+rec+dict），打印识别文本。
+// demo_ocr: 用 ORT 后端跑 PaddleOCR（det+cls+rec+dict），打印识别文本。
 // 用法:
-//   demo_ocr <det.onnx> <cls.onnx> <rec.onnx> <dict.txt> <image>
+//   demo_ocr <image> [use_gpu 0/1]
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
 
@@ -10,7 +10,7 @@
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: %s <image>\n", argv[0]);
+        std::fprintf(stderr, "usage: %s <image> [use_gpu 0/1]\n", argv[0]);
         return 2;
     }
     const char* kFont = "msyh.ttc";
@@ -20,11 +20,20 @@ int main(int argc, char** argv) {
     const std::string rec = "rec.onnx";
     const std::string dict = "dict.txt";
     const std::string img = argv[1];
+    bool use_gpu = false;
+    if (argc >= 3) {
+        const std::string a = argv[2];
+        use_gpu = (a == "1" || a == "true" || a == "on" || a == "gpu");
+    }
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
-    opt.set_cpu_thread_num(4);
+    if (use_gpu) {
+        opt.set_device(modeldeploy::Device::GPU, 0);
+    } else {
+        opt.set_device(modeldeploy::Device::CPU);
+        opt.set_cpu_thread_num(4);
+    }
 
     auto m = std::make_unique<modeldeploy::vision::ocr::PaddleOCR>(det, cls, rec, dict, opt);
     if (!m->is_initialized()) {
@@ -47,7 +56,7 @@ int main(int argc, char** argv) {
     }
     auto vis = modeldeploy::vision::vis_ocr(im, res, kFont, 24);
     (void)vis.imwrite("train_ocr.jpg");
-    vis.imshow("train_ocr");
+    // vis.imshow("train_ocr");
     modeldeploy::vision::dis_ocr(res);
     return 0;
 }

@@ -1,4 +1,4 @@
-// ModelDeploy demo: 行人属性（ort_cpu）。
+// ModelDeploy demo: 行人属性（ort）。
 // 最小可运行示例，完整逻辑自包含：构造 RuntimeOption -> 加载模型 -> 预处理 -> 推理(计时) -> 可视化。
 #include "csrc/vision.h"
 #include "csrc/vision/common/display/display.h"
@@ -12,17 +12,26 @@
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: %s <image>\n", argv[0]);
+        std::fprintf(stderr, "usage: %s <image> [use_gpu 0/1]\n", argv[0]);
         return 2;
     }
-    const char* kFont = "../../test_data/msyh.ttc";
+    const char* kFont = "msyh.ttc";
+    bool use_gpu = false;
+    if (argc >= 3) {
+        const std::string a = argv[2];
+        use_gpu = (a == "1" || a == "true" || a == "on" || a == "gpu");
+    }
 
     // ---- 1. 运行时选项 ----
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
-    opt.set_cpu_thread_num(4);
+    if (use_gpu) {
+        opt.set_device(modeldeploy::Device::GPU, 0);
+    } else {
+        opt.set_device(modeldeploy::Device::CPU);
+        opt.set_cpu_thread_num(4);
+    }
 
     // ---- 2. 加载模型（行人属性：检测 + 多标签分类）----
     auto m = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
@@ -59,7 +68,7 @@ int main(int argc, char** argv) {
         }
     }
     auto vis = modeldeploy::vision::vis_attr(im, res, 0.5, label_map, kFont, 15, 0.15, false, abnormal);
-    vis.imshow("pedestrian_attribute");
+    // vis.imshow("pedestrian_attribute");
     (void)vis.imwrite("pedestrian_attribute.jpg");
     std::printf("done, %zu persons\n", res.size());
     return 0;
