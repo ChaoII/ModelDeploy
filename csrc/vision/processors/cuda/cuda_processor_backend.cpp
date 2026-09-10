@@ -8,6 +8,7 @@
 #include "vision/processors/cuda/fused_preproc.cuh"
 #include "vision/processors/cuda/scrfd_preproc.cuh"
 #include "vision/processors/cuda/draw_gpu.cuh"
+#include "vision/common/visualize/utils.h"
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/geometry/2d.hpp>
@@ -57,10 +58,7 @@ static cv::Mat render_text_sprite(const std::string& text, const uint8_t* bgr_ta
                                   const std::string& font_path) {
     cv::Mat empty;
     if (text.empty() || font_path.empty()) return empty;
-    static std::unordered_map<std::string, cv::FontFace> font_cache;
-    auto it = font_cache.find(font_path);
-    if (it == font_cache.end())
-        it = font_cache.emplace(font_path, cv::FontFace(font_path)).first;
+    cv::FontFace& font = modeldeploy::vision::get_font_face(font_path);
     const int cw = static_cast<int>(text.size()) * (font_px + 6) + 64;
     const int ch = 2 * font_px + 32;
     // 压暗底色保证白字在亮色(黄等)上也可读；bgr_tag 按设备约定为 (R,G,B)，cv::Scalar 为 (B,G,R)
@@ -70,7 +68,7 @@ static cv::Mat render_text_sprite(const std::string& text, const uint8_t* bgr_ta
     const uint8_t bg_r = static_cast<uint8_t>(std::lround(bgr_tag[0] * kTagDark));
     cv::Mat canvas(ch, cw, CV_8UC3, cv::Scalar(bg_b, bg_g, bg_r));
     cv::putText(canvas, text, cv::Point(8, font_px + 14), cv::Scalar(255, 255, 255),
-                it->second, font_px, 600);
+                font, font_px, 600);
     // 墨迹掩码：任一通道 != 底色即视为文本(含 AA 边缘；canvas 底色为压暗后 BGR: bg_b,bg_g,bg_r)
     cv::Mat mask = cv::Mat::zeros(ch, cw, CV_8UC1);
     for (int i = 0; i < cw * ch; ++i) {

@@ -108,7 +108,7 @@ namespace modeldeploy::vision {
         cv::Mat cv_image, overlay;
         image.asMat(&cv_image);
         cv_image.copyTo(overlay);
-        const cv::FontFace font(font_path);
+        cv::FontFace& font = get_font_face(font_path);
         static std::map<int, cv::Scalar_<int>> color_map; // ← 每类颜色只初始化一次
         // 绘制半透明部分（填充矩形）
         for (const auto& _result : result) {

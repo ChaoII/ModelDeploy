@@ -17,7 +17,7 @@ namespace modeldeploy::vision {
         cv::Mat cv_image, overlay;
         image.asMat(&cv_image);
         cv_image.copyTo(overlay);
-        cv::FontFace font(font_path);
+        cv::FontFace& font = get_font_face(font_path);
         constexpr int margin = 5;
         // 根据label_id获取颜色
         static std::map<int, cv::Scalar_<int>> color_map;

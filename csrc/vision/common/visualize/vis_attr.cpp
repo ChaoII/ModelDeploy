@@ -16,12 +16,7 @@ namespace modeldeploy::vision {
         cv::Mat cv_image, overlay;
         image.asMat(&cv_image);
         cv_image.copyTo(overlay);
-#if defined(CV_VERSION_MAJOR) && CV_VERSION_MAJOR >= 5
-        cv::FontFace font(font_path);
-#else
-        MD_FONT_OBJ font = MD_FONT_SIMPLEX;
-        (void)font_path;
-#endif
+        cv::FontFace& font = get_font_face(font_path);
         if (abnormal_ids.size() > result.size()) {
             MD_LOG_WARN << "abnormal_ids size is larger than result size" << std::endl;
         }

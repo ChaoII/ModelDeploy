@@ -12,7 +12,7 @@ namespace modeldeploy::vision {
         cv::Mat cv_image, overlay;
         image.asMat(&cv_image);
         cv_image.copyTo(overlay);
-        cv::FontFace font(font_path);
+        cv::FontFace& font = get_font_face(font_path);
         cv::Scalar cv_color = get_random_color();
         // 绘制半透明部分（填充多边形）和文字背景色
         for (int i = 0; i < result.boxes.size(); ++i) {

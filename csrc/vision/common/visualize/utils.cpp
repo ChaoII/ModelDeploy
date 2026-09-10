@@ -1,10 +1,23 @@
 //
 // Created by aichao on 2025/7/21.
 //
+#include <mutex>
 #include <random>
+#include <unordered_map>
 #include "vision/common/visualize/utils.h"
 
 namespace modeldeploy::vision {
+    cv::FontFace& get_font_face(const std::string& font_path) {
+        static std::mutex mtx;
+        static std::unordered_map<std::string, cv::FontFace> font_cache;
+        std::lock_guard<std::mutex> lk(mtx);
+        const auto it = font_cache.find(font_path);
+        if (it == font_cache.end()) {
+            return font_cache.emplace(font_path, cv::FontFace(font_path)).first->second;
+        }
+        return it->second;
+    }
+
     cv::Scalar get_random_color() {
         std::random_device rd; // 获取随机数种子
         std::mt19937 gen(rd()); // 使用Mersenne Twister算法生成随机数
@@ -17,7 +30,7 @@ namespace modeldeploy::vision {
     }
 
     void draw_rectangle_and_text(cv::Mat& image, const cv::Rect2f box, const std::string& text,
-                                 const cv::Scalar& color, MD_FONT_OBJ font, const int font_size,
+                                 const cv::Scalar& color, cv::FontFace& font, const int font_size,
                                  const int thickness, const bool draw_text) {
         // 绘制对象矩形框
         cv::rectangle(image, box, color, thickness);
@@ -51,11 +64,7 @@ namespace modeldeploy::vision {
 
     void draw_text(cv::Mat& image, const std::string& text, const std::string& font_path,
                    const int font_size, const cv::Scalar& color, const cv::Point& origin) {
-        MD_FONT_OBJ font = MD_FONT_SIMPLEX;
-        if (!font_path.empty()) {
-            font = cv::FontFace(font_path);   // OpenCV 4.11+ / 5.x 支持从字体文件构造
-        }
-        cv::putText(image, text, origin, color, font, font_size);
+        cv::putText(image, text, origin, color, get_font_face(font_path), font_size);
     }
 
     void draw_landmarks(cv::Mat& cv_image,

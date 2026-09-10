@@ -5,20 +5,15 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 
-// OpenCV 5 用 cv::FontFace（可从字体文件构造）；OpenCV 4 用 int 字体枚举
-#if defined(CV_VERSION_MAJOR) && CV_VERSION_MAJOR >= 5
-#define MD_FONT_OBJ cv::FontFace
-#define MD_FONT_SIMPLEX cv::FontFace()
-#else
-#define MD_FONT_OBJ int
-#define MD_FONT_SIMPLEX cv::FONT_HERSHEY_SIMPLEX
-#endif
-
 namespace modeldeploy::vision {
+    // 按字体文件路径懒加载并缓存 cv::FontFace，避免每次可视化都重新读取字体文件。
+    // 仅支持 OpenCV 5.0：cv::FontFace 可直接从字体文件构造。
+    cv::FontFace& get_font_face(const std::string& font_path);
+
     cv::Scalar get_random_color();
 
     void draw_rectangle_and_text(cv::Mat& image, cv::Rect2f box, const std::string& text,
-                                 const cv::Scalar& color, MD_FONT_OBJ font, int font_size,
+                                 const cv::Scalar& color, cv::FontFace& font, int font_size,
                                  int thickness, bool draw_text = false);
 
     // 填充矩形 + 边框（alpha 混合，与 vis_* 系一致的半透明绘制）
@@ -28,7 +23,7 @@ namespace modeldeploy::vision {
     void draw_filled_polygon(cv::Mat& image, const std::vector<cv::Point>& points,
                              const cv::Scalar& color, double alpha);
 
-    // 用字体文件渲染文本（OpenCV 4 需 FontFace；5 用 cv::FontFace）
+    // 用字体文件渲染文本（走 get_font_face 缓存）
     void draw_text(cv::Mat& image, const std::string& text, const std::string& font_path,
                    int font_size, const cv::Scalar& color, const cv::Point& origin);
 
