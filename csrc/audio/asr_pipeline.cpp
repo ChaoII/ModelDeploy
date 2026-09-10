@@ -46,7 +46,7 @@ namespace modeldeploy::audio {
                const std::string& vad_onnx) {
         running_ = true;
         modeldeploy::RuntimeOption option;
-        option.use_gpu(0);
+        option.set_device(modeldeploy::Device::GPU, 0);
         sense_voice_ = std::make_unique<asr::SenseVoice>(asr_onnx, tokens, option);
         vad_ = std::make_unique<vad::SileroVAD>(vad_onnx, option);
         th_ = std::thread(&AAsr::run, this);
@@ -62,7 +62,7 @@ namespace modeldeploy::audio {
         running_ = true;
         conf_threshold_ = offline_conf_threshold;
         modeldeploy::RuntimeOption option;
-        option.use_gpu(0);
+        option.set_device(modeldeploy::Device::GPU, 0);
         sense_voice_ = std::make_unique<asr::SenseVoice>(asr_onnx, tokens, option);
         vad_ = std::make_unique<vad::SileroVAD>(vad_onnx, option);
         if (!stream_encoder.empty() && !stream_decoder.empty() && !stream_tokens.empty()) {
@@ -115,7 +115,6 @@ namespace modeldeploy::audio {
     }
 
     void AAsr::run() {
-        int idx = 0;
         bool in_segment = false;
         while (running_.load()) {
             std::vector<float> data;

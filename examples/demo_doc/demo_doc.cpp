@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
 
     // ---- 1. 版面分析（必须）----
     auto layout = std::make_unique<ocr::StructureV2Layout>(layout_file, opt);

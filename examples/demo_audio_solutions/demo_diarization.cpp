@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     std::unique_ptr<modeldeploy::audio::speaker_verify::SpeakerVerify> sv;
     if (argc > 2) {
         modeldeploy::RuntimeOption opt;
-        opt.use_cpu();
+        opt.set_device(modeldeploy::Device::CPU);
         sv = std::make_unique<modeldeploy::audio::speaker_verify::SpeakerVerify>(argv[2], opt);
         if (sv->is_initialized()) {
             embed = modeldeploy::audio::solution::SpeakerDiarization::ecapa_embedder(*sv);

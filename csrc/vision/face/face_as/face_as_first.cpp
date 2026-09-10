@@ -30,7 +30,6 @@ namespace modeldeploy::vision::face {
         // 输入为对齐后的 BGR 图（固定 256x256，可能其它尺寸）。
         // CenterCrop(224) + BGR2YCrCb + cast(float) + HWC2CHW 全融合为单步 SIMD kernel。
         const int src_w = image->width();
-        const int src_h = image->height();
         // 非 256 时先 resize 到 256 再 center_crop 224（与原始语义一致，合并为单步映射）。
         // fused 映射：src = (dst - origin)/scale。
         //   resize 到 256：scale_resize = src_w/256（dst 256 像素覆盖 src 全部）

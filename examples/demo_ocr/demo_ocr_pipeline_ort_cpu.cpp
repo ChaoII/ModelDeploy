@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
     opt.set_cpu_thread_num(4);
 
     // ---- 2. 加载模型（OCR：检测 + 方向分类 + 识别；词典统一 ppocrv6_tiny）----

@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
 
     // ---- 2. 加载模型（旋转目标检测）----
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsObb>("../../test_data/test_models/onnx/yolo26n/yolo26n-obb.onnx", opt);

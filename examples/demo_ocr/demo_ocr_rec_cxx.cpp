@@ -44,5 +44,5 @@ int main() {
     timers.print_benchmark();
     modeldeploy::vision::dis_ocr(result);
     const auto vis_image = modeldeploy::vision::vis_ocr(img, result, "../../test_data/msyh.ttc");
-    vis_image.imwrite("ocr_rec_out.jpg");
+    (void)vis_image.imwrite("ocr_rec_out.jpg");
 }

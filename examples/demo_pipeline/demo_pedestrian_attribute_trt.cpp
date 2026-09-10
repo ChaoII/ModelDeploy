@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_trt_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
     opt.enable_fp16 = true;
 
     // ---- 2. 加载模型（行人属性：检测 + 多标签分类）----

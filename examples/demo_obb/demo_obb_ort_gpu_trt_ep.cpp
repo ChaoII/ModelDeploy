@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
     opt.enable_trt = true;
     opt.enable_fp16 = true;
     opt.ort_option.trt_engine_cache_path = "./trt_engine";

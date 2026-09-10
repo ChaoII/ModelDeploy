@@ -24,7 +24,6 @@ namespace modeldeploy::audio::vad {
         const auto& min_silence_duration_ms = std::chrono::milliseconds(200);
         const auto& speech_pad_ms = std::chrono::milliseconds(30);
         const auto& min_speech_duration_ms = std::chrono::milliseconds(64);
-        const auto& max_speech_duration_s = std::chrono::seconds(std::numeric_limits<int64_t>::max());
 
         threshold_ = 0.65f;
         sample_rate_ = static_cast<uint32_t>(Sample_rate);

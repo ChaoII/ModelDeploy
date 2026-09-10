@@ -5,7 +5,7 @@
 int main() {
     modeldeploy::RuntimeOption opt;
     opt.use_mnn_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
     return run_tracking_demo(opt,
                              "../../test_data/test_models/mnn/yolo26n/yolo26n.mnn",
                              "result_tracking_mnn_cpu.jpg",

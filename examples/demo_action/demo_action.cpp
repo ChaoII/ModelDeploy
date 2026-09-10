@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     }
     md::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
 
     md::vision::action::TSN model(argv[1], opt);
     if (!model.is_initialized()) {

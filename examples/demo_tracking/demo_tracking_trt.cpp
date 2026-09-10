@@ -5,7 +5,7 @@
 int main() {
     modeldeploy::RuntimeOption opt;
     opt.use_trt_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
     opt.enable_fp16 = true;
     return run_tracking_demo(opt,
                              "../../test_data/test_models/trt/yolo26n/yolo26n.engine",

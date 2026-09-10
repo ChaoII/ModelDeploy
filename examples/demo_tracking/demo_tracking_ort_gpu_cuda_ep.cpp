@@ -5,7 +5,7 @@
 int main() {
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
     return run_tracking_demo(opt,
                              "../../test_data/test_models/onnx/yolo26n/yolo26n.onnx",
                              "result_tracking_ort_gpu_cuda_ep.jpg",

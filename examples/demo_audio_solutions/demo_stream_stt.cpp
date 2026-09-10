@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
 
     if (argc >= 4) {
         modeldeploy::RuntimeOption opt;
-        opt.use_cpu();
+        opt.set_device(modeldeploy::Device::CPU);
         sv = std::make_unique<modeldeploy::audio::asr::SenseVoice>(argv[1], argv[2], opt);
         if (!sv->is_initialized()) {
             printf("SenseVoice init failed; fallback to VAD-only\n");

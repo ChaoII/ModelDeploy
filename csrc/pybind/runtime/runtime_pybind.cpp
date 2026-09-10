@@ -120,8 +120,11 @@ namespace modeldeploy {
                  },
                  pybind11::arg("model_path"), pybind11::arg("password") = "")
             .def("set_device", &RuntimeOption::set_device, pybind11::arg("device"), pybind11::arg("device_id") = 0)
-            .def("use_gpu", &RuntimeOption::use_gpu, pybind11::arg("device_id") = 0)
-            .def("use_cpu", &RuntimeOption::use_cpu)
+            .def("use_gpu",
+                 [](RuntimeOption& self, int device_id) { self.set_device(modeldeploy::Device::GPU, device_id); },
+                 pybind11::arg("device_id") = 0)
+            .def("use_cpu",
+                 [](RuntimeOption& self) { self.set_device(modeldeploy::Device::CPU); })
             .def("set_cpu_thread_num", &RuntimeOption::set_cpu_thread_num, pybind11::arg("thread_num") = -1)
             .def("use_ort_backend", &RuntimeOption::use_ort_backend)
             .def("use_mnn_backend", &RuntimeOption::use_mnn_backend)

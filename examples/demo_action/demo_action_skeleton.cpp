@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     }
     md::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
 
     md::vision::detection::UltralyticsPose pose(argv[2], opt);
     if (!pose.is_initialized()) {

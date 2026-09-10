@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
 
     modeldeploy::RuntimeOption option;
     option.use_ort_backend();
-    option.use_cpu();
+    option.set_device(modeldeploy::Device::CPU);
 
     modeldeploy::audio::speaker_verify::SpeakerVerify model(model_file, option);
     if (!model.is_initialized()) {

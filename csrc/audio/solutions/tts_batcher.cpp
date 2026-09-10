@@ -52,8 +52,7 @@ std::vector<std::string> TTSBatcher::split_for_synthesis(const std::string& text
 
     auto is_break = [](unsigned char c) {
         return c == ' ' || c == '\t' || c == '.' || c == ',' || c == ';' ||
-               c == '!' || c == '?' || c == '。' || c == '，' || c == '；' ||
-               c == '！' || c == '？' || c == '、' || c == '\n' || c == '\r';
+               c == '!' || c == '?' || c == '\n' || c == '\r';
     };
 
     size_t start = 0;

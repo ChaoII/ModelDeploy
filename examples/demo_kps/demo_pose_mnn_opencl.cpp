@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_mnn_backend();
-    opt.use_opencl(0);
+    opt.set_device(modeldeploy::Device::OPENCL, 0);
 
     // ---- 2. 加载模型（姿态估计）----
     auto m = std::make_unique<modeldeploy::vision::detection::UltralyticsPose>("../../test_data/test_models/mnn/yolo26n/yolo26n-pose.mnn", opt);

@@ -14,7 +14,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
     opt.set_cpu_thread_num(4);
 
     auto m = std::make_unique<modeldeploy::vision::seg::FastSam>(model, opt);

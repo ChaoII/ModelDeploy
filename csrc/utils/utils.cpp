@@ -157,7 +157,7 @@ namespace modeldeploy {
         int i = 0;
         int j = 0;
         unsigned char char_array_3[3];
-        unsigned char char_array_4[4];
+        unsigned char char_array_4[4] = {};
         while (in_len--) {
             char_array_3[i++] = data[j++];
             if (i == 3) {

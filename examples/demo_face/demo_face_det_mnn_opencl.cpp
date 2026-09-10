@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_mnn_backend();
-    opt.use_opencl(0);
+    opt.set_device(modeldeploy::Device::OPENCL, 0);
 
     // ---- 2. 加载模型（人脸检测）----
     auto m = std::make_unique<modeldeploy::vision::face::Scrfd>("../../test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx", opt);

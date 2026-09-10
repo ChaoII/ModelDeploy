@@ -9,7 +9,7 @@
 int main() {
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
     opt.set_cpu_thread_num(4);
     return run_tracking_demo(opt,
                              "../../test_data/test_models/onnx/yolo26n/yolo26n.onnx",

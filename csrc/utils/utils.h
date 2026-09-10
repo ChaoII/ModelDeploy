@@ -50,14 +50,14 @@ namespace modeldeploy {
 
     std::vector<int64_t> get_stride(const std::vector<int64_t>& dims);
 
-    static int canonical_axis(const int axis, const int rank) {
+    [[maybe_unused]] static int canonical_axis(const int axis, const int rank) {
         if (axis < 0) {
             return axis + rank;
         }
         return axis;
     }
 
-    static int size_to_axis(const int axis, const std::vector<int64_t>& dims) {
+    [[maybe_unused]] static int size_to_axis(const int axis, const std::vector<int64_t>& dims) {
         int size = 1;
         for (int i = 0; i < axis; i++) {
             size *= static_cast<int>(dims[i]);
@@ -65,7 +65,7 @@ namespace modeldeploy {
         return size;
     }
 
-    static int size_from_axis(const int axis,
+    [[maybe_unused]] static int size_from_axis(const int axis,
                               const std::vector<int64_t>& dims) {
         int size = 1;
         for (int i = axis; i < dims.size(); i++) {
@@ -74,7 +74,7 @@ namespace modeldeploy {
         return size;
     }
 
-    static int size_out_axis(const int axis,
+    [[maybe_unused]] static int size_out_axis(const int axis,
                              const std::vector<int64_t>& dims) {
         int size = 1;
         for (int i = axis + 1; i < dims.size(); i++) {

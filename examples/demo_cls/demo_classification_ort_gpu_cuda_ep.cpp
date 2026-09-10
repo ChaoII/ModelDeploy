@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
 
     // ---- 2. 加载模型（图像分类）----
     auto m = std::make_unique<modeldeploy::vision::classification::Classification>("../../test_data/test_models/onnx/yolo26n/yolo26n-cls.onnx", opt);

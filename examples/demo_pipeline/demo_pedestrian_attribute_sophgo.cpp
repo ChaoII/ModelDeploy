@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
         printf("[backend] Sophgo TPU: det=%s\n", det_model.c_str());
     } else {
         option.use_ort_backend();
-        option.use_cpu();
+        option.set_device(modeldeploy::Device::CPU);
         option.set_cpu_thread_num(4);
         printf("[backend] ORT CPU: det=%s\n", det_model.c_str());
     }

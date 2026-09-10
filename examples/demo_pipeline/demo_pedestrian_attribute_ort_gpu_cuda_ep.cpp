@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_gpu(0);
+    opt.set_device(modeldeploy::Device::GPU, 0);
 
     // ---- 2. 加载模型（行人属性：检测 + 多标签分类）----
     auto m = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>("../../test_data/test_models/onnx/zhgd_det.onnx", "../../test_data/test_models/onnx/zhgd_ml.onnx", opt);

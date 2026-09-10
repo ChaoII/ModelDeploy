@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 
     modeldeploy::RuntimeOption option;
     option.use_ort_backend();
-    option.use_cpu();
+    option.set_device(modeldeploy::Device::CPU);
 
     modeldeploy::vision::reid::ReID reid(model_file, option);
     if (!reid.is_initialized()) {

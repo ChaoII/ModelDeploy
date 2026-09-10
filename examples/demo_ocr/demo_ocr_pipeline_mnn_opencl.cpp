@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_mnn_backend();
-    opt.use_opencl(0);
+    opt.set_device(modeldeploy::Device::OPENCL, 0);
 
     // ---- 2. 加载模型（OCR：检测 + 方向分类 + 识别；词典统一 ppocrv6_tiny）----
     const char* dict = "../../test_data/ppocrv6_tiny_dict.txt";

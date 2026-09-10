@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_mnn_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
 
     // ---- 2. 加载模型（车牌识别：检测 + 识别）----
     auto m = std::make_unique<modeldeploy::vision::lpr::LprPipeline>("../../test_data/test_models/onnx/yolov5plate.onnx", "../../test_data/test_models/onnx/plate_recognition_color.onnx", opt);

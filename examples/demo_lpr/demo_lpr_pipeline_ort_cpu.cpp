@@ -17,7 +17,7 @@ int main() {
 
     modeldeploy::RuntimeOption opt;
     opt.use_ort_backend();
-    opt.use_cpu();
+    opt.set_device(modeldeploy::Device::CPU);
     opt.set_cpu_thread_num(4);
 
     // ---- 2. 加载模型（车牌识别：检测 + 识别）----

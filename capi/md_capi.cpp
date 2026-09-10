@@ -496,11 +496,14 @@ bool set_mnn_enum(const char* value, int& out) {
 
 bool parse_int(const char* s, int& out) {
     char* e = nullptr; long v = strtol(s, &e, 10);
-    if (!e || *e) return false; out = (int)v; return true;
+    if (!e || *e) { return false; }
+    out = (int)v;
+    return true;
 }
 
 bool parse_bool(const char* s, bool& out) {
-    if (!s) return false; std::string v = s;
+    if (!s) { return false; }
+    std::string v = s;
     if (v == "1" || v == "true" || v == "True") { out = true; return true; }
     if (v == "0" || v == "false" || v == "False") { out = false; return true; }
     return false;
@@ -2694,7 +2697,7 @@ MDStatus md_model_predict_skeleton(MDModelHandle h, const float* joints,
 
 namespace {
 
-bool load_wav(const char* path, int* sample_rate, std::vector<float>& data) {
+[[maybe_unused]] bool load_wav(const char* path, int* sample_rate, std::vector<float>& data) {
     int32_t sr = 0;
     if (!load_wav_file(path, &sr, data)) return false;
     *sample_rate = sr;
@@ -4935,7 +4938,7 @@ void md_video_config_destroy(MDVideoConfigHandle cfg) {
 #endif
 }
 
-static md_video_config_handle* video_cfg(MDVideoConfigHandle cfg, const char* fn) {
+[[maybe_unused]] static md_video_config_handle* video_cfg(MDVideoConfigHandle cfg, const char* fn) {
     auto* c = static_cast<md_video_config_handle*>(cfg);
     if (!c) set_error("(null config)");
     (void)fn;

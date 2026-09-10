@@ -30,7 +30,7 @@ int32_t main() {
     const std::string jieba_dir = "../../test_data/test_models/onnx/kokoro_v1_1/dict/";
     const std::string text_normalization_dir = "../../test_data/";
     modeldeploy::RuntimeOption option;
-    option.use_gpu(0);
+    option.set_device(modeldeploy::Device::GPU, 0);
     auto kokoro = modeldeploy::audio::tts::Kokoro(kokoro_onnx,
                                                   tokens,
                                                   lexicons, voice_bin,

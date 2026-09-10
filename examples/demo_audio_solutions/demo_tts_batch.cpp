@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
         namespace fs = std::filesystem;
         const fs::path d = argv[1];
         modeldeploy::RuntimeOption opt;
-        opt.use_cpu();
+        opt.set_device(modeldeploy::Device::CPU);
         const std::vector<std::string> lexicons = {
             (d / "lexicon-us-en.txt").string(),
             (d / "lexicon-zh.txt").string(),
