@@ -24,6 +24,7 @@
 #include <future>
 #include "core/md_decl.h"
 #include "serving/model_repo.h"
+#include "serving/result_params.h"
 #include "pipeline/async_model.h"
 #include "vision/common/image_data.h"
 
@@ -112,6 +113,8 @@ ModelHandle make_model_handle(
             (*out)["duration_ms"] = ms;
             (*out)["model"] = model_name;
             if (in.contains("params")) (*out)["params"] = in["params"];
+            // 每请求结果参数（threshold/top_k/max_det）作用于结果 JSON/前端叠加。
+            if (in.contains("params")) detail::apply_result_params((*out)["results"], in["params"]);
             // 可视化可选：仅当请求显式 visualize=true 时渲染标注图（base64 JPEG）。
             if (vis && in.value("visualize", false)) {
                 try {

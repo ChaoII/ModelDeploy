@@ -113,7 +113,10 @@ BASE 由绑定地址与端口决定（`host` / `port`）。
 
 - `image`（base64）或 `image_path`（本地路径）二选一。
 - `visualize`（可选，默认 `false`）：为 `true` 时额外返回标注图 `image_b64`（base64 JPEG）与 `image_w/image_h`（需 manifest 模型带可视化，且 `font_path` 非空才能画中文）。
-- `params`（可选）：原样回传。
+- `params`（可选）：每请求结果参数，服务端对结果 JSON 生效：
+  - `threshold`（float，`<0`/缺省=不过滤）：置信度下限，过滤结果项（分类/OCR 按各自分数）。
+  - `top_k`（int，`>0`）：分类结果取前 K。
+  - `max_det`（int，`>0`）：目标数上限。
 
 成功响应（示例）：
 
