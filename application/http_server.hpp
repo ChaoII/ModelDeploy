@@ -34,7 +34,8 @@ private:
     // 媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 用它；默认 8080）
     int media_server_port_ = 8080;
 
-    static std::string err_json(const std::string& msg);
+    // 统一错误体：与 SDK ServingServer 一致的 { "error": { "code", "message" } }
+    static std::string err_json(const std::string& msg, const std::string& code = "BAD_REQUEST");
     static std::string ok_json(const nlohmann::json& data = {});
     static nlohmann::json task_status_to_json(const TaskStatus& ts);
     static nlohmann::json model_config_to_json(const ModelConfig& m);

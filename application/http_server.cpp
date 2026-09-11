@@ -50,8 +50,9 @@ void HttpServer::stop() {
 
 // ── JSON helpers ──────────────────────────────
 
-std::string HttpServer::err_json(const std::string& msg) {
-    return json{{"ok", false}, {"msg", msg}}.dump();
+std::string HttpServer::err_json(const std::string& msg, const std::string& code) {
+    // 与 SDK ServingServer 统一：{ "error": { "code", "message" } }
+    return json{{"error", {{"code", code}, {"message", msg}}}}.dump();
 }
 
 std::string HttpServer::ok_json(const json& data) {
@@ -272,7 +273,7 @@ void HttpServer::register_routes() {
         std::string id = get_id(req);
         TaskConfig cfg;
         if (!mgr_.get_task_config(id, &cfg)) {
-            res.set_content(err_json("task not found: " + id), "application/json");
+            res.set_content(err_json("task not found: " + id, "NOT_FOUND"), "application/json");
             return;
         }
         res.set_content(ok_json({{"task", task_config_to_json(cfg)}}), "application/json");
@@ -283,7 +284,7 @@ void HttpServer::register_routes() {
         std::string id = get_id(req);
         std::string stats_json;
         if (!mgr_.get_task_stats(id, &stats_json)) {
-            res.set_content(err_json("task not found: " + id), "application/json");
+            res.set_content(err_json("task not found: " + id, "NOT_FOUND"), "application/json");
             return;
         }
         try {
@@ -318,7 +319,7 @@ void HttpServer::register_routes() {
         std::cout << "[API] DELETE /api/v1/tasks/" << id << std::endl;
         if (!mgr_.remove_task(id)) {
             std::cerr << "[API] Delete failed: task not found: " << id << std::endl;
-            res.set_content(err_json("task not found"), "application/json");
+            res.set_content(err_json("task not found", "NOT_FOUND"), "application/json");
             return;
         }
         std::cout << "[API] Task deleted: " << id << std::endl;
@@ -331,7 +332,7 @@ void HttpServer::register_routes() {
         std::cout << "[API] POST /api/v1/tasks/" << id << "/start" << std::endl;
         if (!mgr_.start_task(id)) {
             std::cerr << "[API] Start failed for " << id << std::endl;
-            res.set_content(err_json("task not found"), "application/json");
+            res.set_content(err_json("task not found", "NOT_FOUND"), "application/json");
             return;
         }
         std::cout << "[API] Task " << id << " starting (async initialization)" << std::endl;
@@ -344,7 +345,7 @@ void HttpServer::register_routes() {
         std::cout << "[API] POST /api/v1/tasks/" << id << "/stop" << std::endl;
         if (!mgr_.stop_task(id)) {
             std::cerr << "[API] Stop failed: task not found: " << id << std::endl;
-            res.set_content(err_json("task not found"), "application/json");
+            res.set_content(err_json("task not found", "NOT_FOUND"), "application/json");
             return;
         }
         std::cout << "[API] Task " << id << " stopped" << std::endl;
@@ -481,7 +482,7 @@ void HttpServer::register_routes() {
             auto mcfg = parse_model_config(req.body);
             std::cout << "[API] PATCH /api/v1/models/" << name << std::endl;
             if (!mgr_.update_model_in_library(name, mcfg)) {
-                res.set_content(err_json("model not found"), "application/json");
+                res.set_content(err_json("model not found", "NOT_FOUND"), "application/json");
                 return;
             }
             std::cout << "[API] Model updated in library: " << name << std::endl;
@@ -497,7 +498,7 @@ void HttpServer::register_routes() {
         std::string name = (it != req.path_params.end()) ? it->second : "";
         std::cout << "[API] DELETE /api/v1/models/" << name << std::endl;
         if (!mgr_.remove_model_from_library(name)) {
-            res.set_content(err_json("model not found"), "application/json");
+            res.set_content(err_json("model not found", "NOT_FOUND"), "application/json");
             return;
         }
         std::cout << "[API] Model removed from library: " << name << std::endl;

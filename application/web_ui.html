@@ -747,6 +747,8 @@ function api(method,url,body,cb){
   x.onload=function(){
     var r,raw=x.responseText;
     try{r=JSON.parse(raw)}catch(e){console.error('[API] Invalid JSON response',method,url,raw.substring(0,200));r={ok:false,msg:'invalid json',_raw:raw.substring(0,200)}}
+    // 统一错误体 {error:{code,message}} → 兼容既有 r.ok/r.msg 处理器
+    if(r&&r.error){r.ok=false;r.msg=r.error.message||r.error.code||'error';r.code=r.error.code}
     setConnection(true);cb(r)
   };
   x.onerror=function(){console.error('[API] Network error',method,url);setConnection(false);cb({ok:false,msg:'network error'})};
