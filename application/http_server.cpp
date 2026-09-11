@@ -197,6 +197,7 @@ void HttpServer::register_routes() {
     // ── 可选 Bearer 鉴权（api_keys_ 非空时保护 /api/v1/*；静态页与 /health 放行） ──
     server_.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
         if (api_keys_.empty()) return httplib::Server::HandlerResponse::Unhandled;
+        if (req.method == "OPTIONS") return httplib::Server::HandlerResponse::Unhandled;  // 预检放行
         if (req.path.rfind("/api/v1/", 0) != 0) return httplib::Server::HandlerResponse::Unhandled;
         auto ct_equal = [](const std::string& a, const std::string& b) {
             if (a.size() != b.size()) return false;
@@ -219,6 +220,18 @@ void HttpServer::register_routes() {
         res.set_content(err_json("invalid or missing API key", "UNAUTHORIZED"), "application/json");
         return httplib::Server::HandlerResponse::Handled;
     });
+
+    // ── CORS + 连接超时（对齐 SDK serving；enable_cors 语义默认开） ──
+    server_.set_post_routing_handler([](const httplib::Request& req, httplib::Response& res) {
+        if (req.headers.find("Origin") != req.headers.end()) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Authorization,Content-Type");
+        }
+    });
+    server_.Options("/.*", [](const httplib::Request&, httplib::Response& res) { res.status = 204; });
+    server_.set_read_timeout(30, 0);
+    server_.set_write_timeout(30, 0);
 
     // ── Web UI ──────────────────────────────────────
     // 注入媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 读取），三个入口统一注入
