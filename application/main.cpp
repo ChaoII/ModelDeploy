@@ -85,6 +85,7 @@ int main(int argc, char* argv[]) {
     HttpServer server(mgr, "0.0.0.0", port);
     server.set_api_keys(std::move(api_keys));
     server.set_rate_limit(rate_limit);
+    server.set_data_dir(g_data_dir);
     if (!server.start()) {
         std::cerr << "[Main] Failed to start HTTP server" << std::endl;
         return 1;

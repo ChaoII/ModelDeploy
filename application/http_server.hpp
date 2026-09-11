@@ -27,6 +27,8 @@ public:
     void set_api_keys(std::vector<std::string> keys) { api_keys_ = std::move(keys); }
     // 可选全局限流：qps>0 时按恒定速率放行，超限返回 429
     void set_rate_limit(double qps) { rate_limit_qps_ = qps; }
+    // 数据目录（/api/v1/save 落盘用；空则不落盘）
+    void set_data_dir(std::string d) { data_dir_ = std::move(d); }
 
 private:
     PipelineManager& mgr_;
@@ -50,6 +52,8 @@ private:
     double rate_tokens_ = 1.0;
     std::chrono::steady_clock::time_point rate_last_ = std::chrono::steady_clock::now();
     bool rate_acquire();
+    // 数据目录（/api/v1/save 落盘用）
+    std::string data_dir_;
 
     // 统一错误体：与 SDK ServingServer 一致的 { "error": { "code", "message" } }
     static std::string err_json(const std::string& msg, const std::string& code = "BAD_REQUEST");

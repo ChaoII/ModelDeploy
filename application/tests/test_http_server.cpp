@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <filesystem>
 #include "http_server.hpp"
 #include "httplib.h"
 #include "nlohmann/json.hpp"
@@ -115,4 +116,26 @@ TEST_CASE("HttpServer static asset route", "[http]") {
     REQUIRE(bad->status == 404);
 
     srv.stop();
+}
+
+TEST_CASE("HttpServer save persists to data dir", "[http]") {
+    namespace fs = std::filesystem;
+    PipelineManager mgr;
+    auto dir = fs::temp_directory_path() / "md_save_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+
+    HttpServer srv(mgr, "127.0.0.1", 18088);
+    srv.set_data_dir(dir.string());
+    REQUIRE(srv.start());
+    httplib::Client cli("127.0.0.1", 18088);
+
+    auto r = cli.Post("/api/v1/save");
+    REQUIRE(r);
+    REQUIRE(r->status == 200);
+    auto j = nlohmann::json::parse(r->body);
+    REQUIRE(j["saved"] == true);
+
+    srv.stop();
+    fs::remove_all(dir);
 }

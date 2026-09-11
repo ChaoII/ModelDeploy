@@ -340,6 +340,11 @@ void HttpServer::register_routes() {
     });
 
     server_.Post("/api/v1/save", [this](const httplib::Request&, httplib::Response& res) {
+        if (data_dir_.empty() || !mgr_.save_to_directory(data_dir_)) {
+            res.status = 500;
+            res.set_content(err_json("save failed", "INTERNAL"), "application/json");
+            return;
+        }
         res.set_content(ok_json({{"saved", true}}), "application/json");
     });
 
