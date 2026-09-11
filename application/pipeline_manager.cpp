@@ -5,6 +5,7 @@
 #include <fstream>
 #include <filesystem>
 #include <set>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -92,6 +93,13 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
 }
 
 std::shared_ptr<BatchedDetector> PipelineManager::get_or_create_detector(const ModelConfig& cfg) {
+    // MD_DET_INDEPENDENT=1：每路独立检测器/session（不跨路共享，避免 ORT-TRT 动态 batch 重建；
+    // 适合 GPU 上多路并发）。TRT EP 也默认独立：其按 batch size 惰性重建 engine，跨路批处理会
+    // 触发多次重建并阻塞；其余情况共享池化（省显存 + 跨路批处理）。
+    static const bool independent_env = std::getenv("MD_DET_INDEPENDENT") != nullptr;
+    if (independent_env || cfg.use_trt_ep) {
+        return std::make_shared<BatchedDetector>(cfg, /*max_batch=*/1);
+    }
     const int w = cfg.input_size.size() >= 2 ? cfg.input_size[0] : 640;
     const int h = cfg.input_size.size() >= 2 ? cfg.input_size[1] : 640;
     const std::string key = cfg.path + "|" + cfg.backend + "|" + cfg.device + "|" +
