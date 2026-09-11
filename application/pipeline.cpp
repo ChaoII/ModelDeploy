@@ -260,15 +260,17 @@ void Pipeline::detect_loop() {
 
         auto t0 = std::chrono::steady_clock::now();
 
-        // 推理 + 绘制，均在 frame.image（设备 NV12）上零拷贝
+        // 推理（pre/infer/post 合并为 run_models）
         std::vector<std::pair<std::string, std::vector<DetectionResult>>> sdk_dets;
         std::vector<std::pair<std::string, InferResult>> non_det;
         infer_group_.run_models(f.image, &sdk_dets, &non_det);
+        auto tA = std::chrono::steady_clock::now();
+
+        // 绘制（设备 NV12 就地 / CPU）
         for (auto& [name, dets] : sdk_dets) {
             auto* det = infer_group_.det_model(name);
             if (det) det->draw_result(f.image, dets, model_threshold(name));
         }
-        // 非 detection（face/classification）标注到输出帧（DrawEngine）
         if (!non_det.empty()) {
             std::vector<InferResult> res;
             res.reserve(non_det.size());
@@ -276,10 +278,9 @@ void Pipeline::detect_loop() {
             draw_non_det(f.image, res);
         }
         last_frame_pts_ = static_cast<int64_t>(f.pts_ms);
+        auto tB = std::chrono::steady_clock::now();
 
-        auto t1 = std::chrono::steady_clock::now();
-
-        // 预览编码（encode_async；GPU 直编 D2D）
+        // 预览编码提交（encode_async；GPU 直编 D2D）
         if (cfg_.enable_preview && !cfg_.output_url.empty()) {
             if (!sink_.encode(f.image) || sink_.has_failed()) {
                 if (!encode_failed_reported) {
@@ -288,17 +289,17 @@ void Pipeline::detect_loop() {
                 }
             }
         }
-
-        auto t2 = std::chrono::steady_clock::now();
+        auto tC = std::chrono::steady_clock::now();
 
         // 低频快照（不占每帧关键路径）
         update_snapshot(f.image, snapshot_counter);
+        auto tD = std::chrono::steady_clock::now();
 
-        auto t3 = std::chrono::steady_clock::now();
-        int64_t infer_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-        int64_t draw_us  = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-        int64_t enc_us   = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
-        stats_.record_frame(0, infer_us, draw_us, enc_us);
+        const auto us = [](auto a, auto b) {
+            return std::chrono::duration_cast<std::chrono::microseconds>(b - a).count();
+        };
+        // 槽位语义修正：infer=run_models、draw=绘制、encode=编码提交（snapshot 不计入窗口）
+        stats_.record_frame(0, us(t0, tA), us(tA, tB), us(tB, tC));
 
         // 摄入 SDK 编解码统计（轻量：src_/sink_ 已聚合的标量拷贝；解码侧帧率快照）
         {
@@ -308,7 +309,7 @@ void Pipeline::detect_loop() {
                               sst.avg_decode_ms, sst.reconnect_count,
                               kst.avg_encode_ms);
         }
-        t_last = t3;
+        t_last = tD;
     }
 }
 

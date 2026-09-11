@@ -93,9 +93,9 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
 }
 
 std::shared_ptr<BatchedDetector> PipelineManager::get_or_create_detector(const ModelConfig& cfg) {
-    // MD_DET_INDEPENDENT=1：每路独立检测器/session（不跨路共享，避免 ORT-TRT 动态 batch 重建；
-    // 适合 GPU 上多路并发）。TRT EP 也默认独立：其按 batch size 惰性重建 engine，跨路批处理会
-    // 触发多次重建并阻塞；其余情况共享池化（省显存 + 跨路批处理）。
+    // MD_DET_INDEPENDENT=1 或 TRT EP：每路独立检测器/session（不跨路共享）。TRT EP 动态 batch
+    // 会按 batch size 惰性重建 engine，且多路并发共享单 session 争用更重；实测独立更优。
+    // 其余情况共享池化（省显存 + 跨路批处理，适合 CUDA EP 等）。
     static const bool independent_env = std::getenv("MD_DET_INDEPENDENT") != nullptr;
     if (independent_env || cfg.use_trt_ep) {
         return std::make_shared<BatchedDetector>(cfg, /*max_batch=*/1);
