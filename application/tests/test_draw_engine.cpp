@@ -1,10 +1,14 @@
 #include <catch2/catch_test_macros.hpp>
+#ifdef WITH_GPU
 #include <cuda_runtime.h>
+#endif
 #include <cstring>
 #include <cstdio>
 #include "draw_engine.hpp"
 #include "csrc/vision/common/image_data.h"
+#ifdef WITH_GPU
 #include "csrc/vision/processors/cuda/draw_gpu.cuh"
+#endif
 
 using namespace modeldeploy::vision;
 
