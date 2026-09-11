@@ -305,3 +305,54 @@ pwsh application/tools/smoke_8ch.ps1
 - 默认脚本解码侧 `hw_accel="cuda"`（GPU 冒烟默认）；**CPU 冒烟**可将
   `decoder.hw_accel` 改为 `"none"`、`encoder.codec` 保持 `"libx264"`，即全软编软解验证。
 - 断言：`frames_out ≥ 25 × SampleSec × 0.6`；脚本退出即清理进程与临时目录。
+
+---
+
+## 8. GPU-direct 多路实时实测（NVDEC + TRT EP + NVENC 零拷贝）
+
+`application/tools/bench_gpu_direct.ps1` 用 **ZLMediaKit** 以「URL 路径」区分多路
+（`rtsp://<host>:8554/live/camNN`，**不是每路一个端口**），自动用 `ffmpeg -re` 把素材实时
+推流到 ZLM，再让 `surveillance.exe` 以 **GPU-direct** 配置拉流推理+编码，逐路统计。
+
+```powershell
+# 本机需有 NVIDIA GPU + CUDA + TensorRT，且已 WITH_GPU=ON 构建 surveillance
+# 需先起 ZLMediaKit（RTSP :8554）
+pwsh application/tools/bench_gpu_direct.ps1 -N 10
+```
+
+关键配置（GPU-direct 门控：`decoder.hw_accel="cuda"` + `decoder.device_only=true` + 硬编 codec）：
+
+```jsonc
+{
+  "decoder": { "backend": "ffmpeg", "hw_accel": "cuda", "device_only": true, "rtsp_transport": "tcp" },
+  "encoder": { "backend": "ffmpeg", "codec": "h264_nvenc", "hw_accel": "cuda", "gpu_direct_input": true, "format": "flv" },
+  "models":  [ { "name":"yolo11n", "type":"detection", "backend":"ort", "device":"gpu", "use_trt_ep": true, ... } ]
+}
+```
+
+**实测（RTX 4060 Ti，yolo11n@640，ORT TensorRT EP）**：
+
+| 项 | 值 |
+|---|---|
+| 10 路 RTSP | **每路 25.1 fps（10×25），dropped=0** |
+| 每帧 `infer` | ~10–15 ms（设备态） |
+| `encode` 提交 | ~0.4–0.6 ms（NVENC 直编） |
+| `draw` | ~0.05–0.1 ms（设备就地绘制） |
+| `decode(sdk)` | ~28–38 ms（≈ 帧间隔，主要网络 pacing，独立线程） |
+
+对照（同为 1 路）：关键路径 `detect_loop` ≈ 4.7 ms（infer 主导，pre/post <0.3 ms）；
+GPU TRT 单帧纯推理 ≈ 2.0 ms（`tests/test_perf_stages.cpp` `[perf]`）。
+
+**达成条件（缺一不可）**：
+1. **硬解**（NVDEC）：否则 10 路软件解码占满 CPU、饿死解码线程。
+2. **GPU-direct 零拷贝**：`device_only` + `gpu_direct_input`，避免 CPU 逐帧 NV12 处理与拷回。
+3. **每路独立 ORT-TRT session**：`use_trt_ep=true` 时 SDK 走独立 session（见下）；共享单 session +
+   动态 batch 会因 ORT-TRT **按 batch size 重建 engine**（batch8 实测 ~25s）而阻塞。
+4. GPU 算力足够（本例 4060 Ti 对 yolo11n@640 裕量有限，恰好实时）。
+
+### 8.1 相关修复（本期）
+- **RTSP 传输未透传**（`csrc/video/backend/ffmpeg_decoder.cpp`）：此前未把 `rtsp_transport` 传给
+  FFmpeg → RTSP 默认 UDP，被防火墙/NAT 丢包 → 只拿到 SDP（能读 fps）却**零帧**。已修（默认 tcp）。
+- **NVDEC pitch 不匹配**（`csrc/video/backend/ffmpeg_encoder.cpp`）：NVDEC 设备 NV12 的 pitch 按对齐
+  > 宽度，硬编原先要求 `step==width` → `device-step-mismatch`。现按真实源 pitch 做 D2D 拷贝。
+
