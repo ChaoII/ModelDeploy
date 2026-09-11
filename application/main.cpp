@@ -4,6 +4,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <thread>
+#include <vector>
 #ifdef WITH_GPU
 #include <cuda_runtime.h>
 #endif
@@ -51,6 +52,7 @@ int main(int argc, char* argv[]) {
 
     int port = 18080;
     g_data_dir = get_default_data_dir();
+    std::vector<std::string> api_keys;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -58,8 +60,11 @@ int main(int argc, char* argv[]) {
             port = std::atoi(argv[++i]);
         } else if (arg == "--data-dir" && i + 1 < argc) {
             g_data_dir = argv[++i];
+        } else if (arg == "--api-key" && i + 1 < argc) {
+            api_keys.push_back(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cerr << "Usage: " << argv[0] << " [--port PORT] [--data-dir DIR]" << std::endl;
+            std::cerr << "Usage: " << argv[0]
+                      << " [--port PORT] [--data-dir DIR] [--api-key KEY]..." << std::endl;
             return 0;
         }
     }
@@ -74,6 +79,7 @@ int main(int argc, char* argv[]) {
     mgr.load_from_directory(g_data_dir);
 
     HttpServer server(mgr, "0.0.0.0", port);
+    server.set_api_keys(std::move(api_keys));
     if (!server.start()) {
         std::cerr << "[Main] Failed to start HTTP server" << std::endl;
         return 1;

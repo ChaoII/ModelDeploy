@@ -194,6 +194,32 @@ static ModelConfig parse_model_config(const std::string& body) {
 
 void HttpServer::register_routes() {
 
+    // ── 可选 Bearer 鉴权（api_keys_ 非空时保护 /api/v1/*；静态页与 /health 放行） ──
+    server_.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
+        if (api_keys_.empty()) return httplib::Server::HandlerResponse::Unhandled;
+        if (req.path.rfind("/api/v1/", 0) != 0) return httplib::Server::HandlerResponse::Unhandled;
+        auto ct_equal = [](const std::string& a, const std::string& b) {
+            if (a.size() != b.size()) return false;
+            unsigned char d = 0;
+            for (size_t i = 0; i < a.size(); ++i)
+                d |= static_cast<unsigned char>(a[i] ^ b[i]);
+            return d == 0;
+        };
+        const std::string prefix = "Bearer ";
+        auto it = req.headers.find("Authorization");
+        bool ok = false;
+        if (it != req.headers.end() && it->second.size() > prefix.size() &&
+            it->second.compare(0, prefix.size(), prefix) == 0) {
+            const std::string tok = it->second.substr(prefix.size());
+            for (const auto& k : api_keys_)
+                if (ct_equal(tok, k)) { ok = true; break; }
+        }
+        if (ok) return httplib::Server::HandlerResponse::Unhandled;
+        res.status = 401;
+        res.set_content(err_json("invalid or missing API key", "UNAUTHORIZED"), "application/json");
+        return httplib::Server::HandlerResponse::Handled;
+    });
+
     // ── Web UI ──────────────────────────────────────
     // 注入媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 读取），三个入口统一注入
     auto serve_ui = [this](httplib::Response& res) {
