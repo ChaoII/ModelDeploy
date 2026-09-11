@@ -38,6 +38,11 @@ bool FfmpegDecoder::open_locked(const std::string& url, std::string* err, bool r
     AVDictionary* opts = nullptr;
     std::string timeout_str = std::to_string(cfg_.timeout_us);
     av_dict_set(&opts, "stimeout", timeout_str.c_str(), 0);
+    // RTSP 传输方式必须透传给 FFmpeg：否则默认 UDP，RTP 在防火墙/NAT 下被丢 → 只拿到 SDP
+    // （能读出 fps/尺寸）却收不到帧。默认 tcp（见 DecoderConfig::rtsp_transport）。
+    if (!cfg_.rtsp_transport.empty()) {
+        av_dict_set(&opts, "rtsp_transport", cfg_.rtsp_transport.c_str(), 0);
+    }
     fmt_ = avformat_alloc_context();
     state_ = State::Opening;
     if (avformat_open_input(&fmt_, url.c_str(), nullptr, &opts) < 0) {
