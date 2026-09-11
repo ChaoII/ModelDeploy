@@ -486,7 +486,8 @@ bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint
     }
     auto py = image.plane(0);
     auto puv = image.plane(1);
-    if (!py.data || !puv.data || py.step != w_ || puv.step != w_) {
+    // NVDEC 设备 NV12 的 pitch 通常按对齐 > 宽度；这里允许 pitch>=宽，交由 D2D 拷贝按 pitch 处理。
+    if (!py.data || !puv.data || py.step < w_ || puv.step < w_) {
         set_err(err, py.data && puv.data ? "device-step-mismatch" : "no-device-plane");
         return false;
     }
@@ -512,7 +513,7 @@ bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint
         set_err(err, "hwframe-alloc-fail");
         return false;
     }
-    if (!d2d_copy_nv12(d_y, d_uv, w_, h_, hw)) {
+    if (!d2d_copy_nv12(d_y, d_uv, w_, h_, py.step, puv.step, hw)) {
         av_frame_free(&hw);
         set_err(err, "d2d-copy-fail");
         return false;
@@ -552,11 +553,11 @@ bool FfmpegEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint
 #endif
 }
 
-// 设备→设备的 NV12 2D 拷贝（Y/UV 各一次 cuMemcpy2D）。源紧凑连续（pitch=w），
-// 目标为 FFmpeg CUDA hw 帧（pitch=linesize，可能含对齐）。在当前 CUDA 上下文≠编码器上下文时
-// 也成立：设备指针在整张卡上共享地址空间。返回是否全部拷贝成功。
+// 设备→设备的 NV12 2D 拷贝（Y/UV 各一次 cuMemcpy2D）。源 pitch 由调用方给出（NVDEC 常按对齐 >
+// 宽度），目标为 FFmpeg CUDA hw 帧（pitch=linesize）；仅拷贝 width_bytes=w 的有效像素/行。
+// 设备指针在整张卡上共享地址空间，跨上下文亦成立。返回是否全部拷贝成功。
 bool FfmpegEncoder::d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
-                                  AVFrame* hw) {
+                                  int y_pitch, int uv_pitch, AVFrame* hw) {
 #ifdef MODELDEPLOY_CUDA_DRV
     AVHWDeviceContext* dev = (AVHWDeviceContext*)hw_device_ctx_->data;
     if (!dev || !dev->hwctx) return false;
@@ -582,12 +583,12 @@ bool FfmpegEncoder::d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w
         cp.Height = rows;
         return cuMemcpy2D(&cp) == CUDA_SUCCESS;
     };
-    r = copy_plane((CUdeviceptr)hw->data[0], (size_t)hw->linesize[0], d_y, (size_t)w, (size_t)w,
+    r = copy_plane((CUdeviceptr)hw->data[0], (size_t)hw->linesize[0], d_y, (size_t)y_pitch, (size_t)w,
                    (size_t)h)
             ? CUDA_SUCCESS
             : CUDA_ERROR_UNKNOWN;
     if (r == CUDA_SUCCESS) {
-        if (!copy_plane((CUdeviceptr)hw->data[1], (size_t)hw->linesize[1], d_uv, (size_t)w,
+        if (!copy_plane((CUdeviceptr)hw->data[1], (size_t)hw->linesize[1], d_uv, (size_t)uv_pitch,
                         (size_t)w, (size_t)(h / 2)))
             r = CUDA_ERROR_UNKNOWN;
     }
@@ -596,6 +597,10 @@ bool FfmpegEncoder::d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w
 #else
     (void)d_y;
     (void)d_uv;
+    (void)w;
+    (void)h;
+    (void)y_pitch;
+    (void)uv_pitch;
     (void)hw;
     return false;
 #endif

@@ -41,7 +41,8 @@ private:
     bool encode_cpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms, std::string* err);  // 软编（CPU BGR）
     bool encode_gpu(const modeldeploy::vision::ImageData& image, uint64_t pts_ms, std::string* err);  // NVENC CUDA 直通
     bool setup_cuda_hw_frames(int w, int h);
-    bool d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h, AVFrame* hw);
+    bool d2d_copy_nv12(const uint8_t* d_y, const uint8_t* d_uv, int w, int h,
+                       int y_pitch, int uv_pitch, AVFrame* hw);
 #ifdef ENABLE_VAAPI
     // 创建 VAAPI 设备上下文 + NV12 hw 帧上下文；成功置 vaapi_hw_ctx_/vaapi_hw_frames_
     bool setup_vaapi_hw_frames(int w, int h);
