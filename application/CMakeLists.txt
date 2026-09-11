@@ -55,6 +55,7 @@ set(APP_SOURCES
         main.cpp
         config.cpp
         runtime_factory.cpp
+        batched_detector.cpp
         pipeline_manager.cpp
         pipeline.cpp
         video_codec.cpp
@@ -99,6 +100,7 @@ if (BUILD_SURVEILLANCE_TESTS)
             tests/test_perf_stats.cpp
             tests/test_inference_engine.cpp
             tests/test_infer_group.cpp
+            tests/test_batched_detector.cpp
             tests/test_draw_engine.cpp
             tests/test_pipeline.cpp
             tests/test_pipeline_manager.cpp
