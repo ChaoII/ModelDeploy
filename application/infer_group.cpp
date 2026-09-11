@@ -3,16 +3,6 @@
 
 using namespace modeldeploy::vision;
 
-namespace {
-modeldeploy::vision::detection::UltralyticsDet* find_det_model(
-    std::vector<std::unique_ptr<InferenceEngine>>& engines, const std::string& name) {
-    for (auto& e : engines) {
-        if (e->config().name == name) return e->det_model();
-    }
-    return nullptr;
-}
-}
-
 bool InferGroup::load_models(const std::vector<ModelConfig>& mcfgs, ModelFactory factory) {
     clear();
     bool all_ok = true;
@@ -35,14 +25,16 @@ bool InferGroup::add_model(const ModelConfig& mcfg, ModelFactory factory) {
         engine = std::make_unique<InferenceEngine>();
         if (!engine->load(mcfg)) return false;
     }
-    engines_.push_back(std::move(engine));
+    Entry en;
+    en.engine = std::move(engine);
+    entries_.push_back(std::move(en));
     return true;
 }
 
 bool InferGroup::remove_model(const std::string& name) {
-    for (auto it = engines_.begin(); it != engines_.end(); ++it) {
-        if ((*it)->config().name == name) {
-            engines_.erase(it);
+    for (auto it = entries_.begin(); it != entries_.end(); ++it) {
+        if (it->engine->config().name == name) {
+            entries_.erase(it);
             return true;
         }
     }
@@ -50,11 +42,11 @@ bool InferGroup::remove_model(const std::string& name) {
 }
 
 void InferGroup::clear() {
-    engines_.clear();
+    entries_.clear();
 }
 
 bool InferGroup::empty() const {
-    return engines_.empty();
+    return entries_.empty();
 }
 
 bool InferGroup::run_models(
@@ -64,30 +56,51 @@ bool InferGroup::run_models(
     if (sdk_dets) sdk_dets->clear();
     if (non_det) non_det->clear();
     bool any = false;
-    for (auto& e : engines_) {
+    for (auto& en : entries_) {
+        auto* e = en.engine.get();
         const auto& mc = e->config();
-        if (mc.type == "detection" && e->det_model()) {
-            std::vector<DetectionResult> dets;
-            if (!e->det_model()->predict(frame, &dets)) continue;
-            if (sdk_dets) sdk_dets->push_back({mc.name, std::move(dets)});
-            any = true;
-        } else {
-            InferResult r;
-            if (!e->infer(frame, &r)) continue;
-            if (non_det) non_det->push_back({mc.name, std::move(r)});
-            any = true;
+        const int interval = mc.interval > 0 ? mc.interval : 1;
+        // interval 抽帧：每 interval 帧推理一次，其余帧复用上次结果（无结果时强制先跑一次）
+        const bool do_infer = !en.has_last || (en.frame_idx % interval == 0);
+        const bool is_det = (mc.type == "detection" && e->det_model() != nullptr);
+
+        if (do_infer) {
+            if (is_det) {
+                std::vector<DetectionResult> dets;
+                if (e->det_model()->predict(frame, &dets)) {
+                    en.last_dets = std::move(dets);
+                    en.has_last = true;
+                }
+            } else {
+                InferResult r;
+                if (e->infer(frame, &r)) {
+                    en.last_non_det = std::move(r);
+                    en.has_last = true;
+                }
+            }
         }
+        ++en.frame_idx;
+
+        if (is_det) {
+            if (sdk_dets) sdk_dets->push_back({mc.name, en.last_dets});
+        } else {
+            if (non_det) non_det->push_back({mc.name, en.last_non_det});
+        }
+        if (en.has_last) any = true;
     }
     return any;
 }
 
 modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
-    return find_det_model(engines_, name);
+    for (auto& en : entries_) {
+        if (en.engine->config().name == name) return en.engine->det_model();
+    }
+    return nullptr;
 }
 
 const ModelConfig* InferGroup::config_of(const std::string& name) const {
-    for (const auto& e : engines_) {
-        if (e->config().name == name) return &e->config();
+    for (const auto& en : entries_) {
+        if (en.engine->config().name == name) return &en.engine->config();
     }
     return nullptr;
 }
