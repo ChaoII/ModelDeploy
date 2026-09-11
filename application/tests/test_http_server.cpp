@@ -76,3 +76,22 @@ TEST_CASE("HttpServer cors + options preflight", "[http]") {
 
     srv.stop();
 }
+
+TEST_CASE("HttpServer rate limit", "[http]") {
+    PipelineManager mgr;
+    HttpServer srv(mgr, "127.0.0.1", 18086);
+    srv.set_rate_limit(1.0);  // 1 QPS，容量 1
+    REQUIRE(srv.start());
+    httplib::Client cli("127.0.0.1", 18086);
+
+    auto r1 = cli.Get("/api/v1/models");
+    REQUIRE(r1);
+    REQUIRE(r1->status == 200);
+    auto r2 = cli.Get("/api/v1/models");  // 立即第二个 → 429
+    REQUIRE(r2);
+    REQUIRE(r2->status == 429);
+    auto j = nlohmann::json::parse(r2->body);
+    REQUIRE(j["error"]["code"] == "RATE_LIMITED");
+
+    srv.stop();
+}

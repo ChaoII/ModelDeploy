@@ -53,6 +53,7 @@ int main(int argc, char* argv[]) {
     int port = 18080;
     g_data_dir = get_default_data_dir();
     std::vector<std::string> api_keys;
+    double rate_limit = 0.0;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -62,9 +63,12 @@ int main(int argc, char* argv[]) {
             g_data_dir = argv[++i];
         } else if (arg == "--api-key" && i + 1 < argc) {
             api_keys.push_back(argv[++i]);
+        } else if (arg == "--rate-limit" && i + 1 < argc) {
+            rate_limit = std::atof(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
             std::cerr << "Usage: " << argv[0]
-                      << " [--port PORT] [--data-dir DIR] [--api-key KEY]..." << std::endl;
+                      << " [--port PORT] [--data-dir DIR] [--api-key KEY]... [--rate-limit QPS]"
+                      << std::endl;
             return 0;
         }
     }
@@ -80,6 +84,7 @@ int main(int argc, char* argv[]) {
 
     HttpServer server(mgr, "0.0.0.0", port);
     server.set_api_keys(std::move(api_keys));
+    server.set_rate_limit(rate_limit);
     if (!server.start()) {
         std::cerr << "[Main] Failed to start HTTP server" << std::endl;
         return 1;

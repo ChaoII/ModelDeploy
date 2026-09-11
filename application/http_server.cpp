@@ -63,6 +63,18 @@ std::string HttpServer::ok_json(const json& data) {
     return r.dump();
 }
 
+bool HttpServer::rate_acquire() {
+    if (rate_limit_qps_ <= 0.0) return true;
+    std::lock_guard<std::mutex> lk(rate_mtx_);
+    const auto now = std::chrono::steady_clock::now();
+    const double elapsed = std::chrono::duration<double>(now - rate_last_).count();
+    rate_last_ = now;
+    rate_tokens_ += elapsed * rate_limit_qps_;
+    if (rate_tokens_ > 1.0) rate_tokens_ = 1.0;
+    if (rate_tokens_ >= 1.0) { rate_tokens_ -= 1.0; return true; }
+    return false;
+}
+
 json HttpServer::task_status_to_json(const TaskStatus& ts) {
     json j;
     j["id"] = ts.id;
@@ -196,29 +208,37 @@ void HttpServer::register_routes() {
 
     // ── 可选 Bearer 鉴权（api_keys_ 非空时保护 /api/v1/*；静态页与 /health 放行） ──
     server_.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
-        if (api_keys_.empty()) return httplib::Server::HandlerResponse::Unhandled;
         if (req.method == "OPTIONS") return httplib::Server::HandlerResponse::Unhandled;  // 预检放行
         if (req.path.rfind("/api/v1/", 0) != 0) return httplib::Server::HandlerResponse::Unhandled;
-        auto ct_equal = [](const std::string& a, const std::string& b) {
-            if (a.size() != b.size()) return false;
-            unsigned char d = 0;
-            for (size_t i = 0; i < a.size(); ++i)
-                d |= static_cast<unsigned char>(a[i] ^ b[i]);
-            return d == 0;
-        };
-        const std::string prefix = "Bearer ";
-        auto it = req.headers.find("Authorization");
-        bool ok = false;
-        if (it != req.headers.end() && it->second.size() > prefix.size() &&
-            it->second.compare(0, prefix.size(), prefix) == 0) {
-            const std::string tok = it->second.substr(prefix.size());
-            for (const auto& k : api_keys_)
-                if (ct_equal(tok, k)) { ok = true; break; }
+        if (!api_keys_.empty()) {
+            auto ct_equal = [](const std::string& a, const std::string& b) {
+                if (a.size() != b.size()) return false;
+                unsigned char d = 0;
+                for (size_t i = 0; i < a.size(); ++i)
+                    d |= static_cast<unsigned char>(a[i] ^ b[i]);
+                return d == 0;
+            };
+            const std::string prefix = "Bearer ";
+            auto it = req.headers.find("Authorization");
+            bool ok = false;
+            if (it != req.headers.end() && it->second.size() > prefix.size() &&
+                it->second.compare(0, prefix.size(), prefix) == 0) {
+                const std::string tok = it->second.substr(prefix.size());
+                for (const auto& k : api_keys_)
+                    if (ct_equal(tok, k)) { ok = true; break; }
+            }
+            if (!ok) {
+                res.status = 401;
+                res.set_content(err_json("invalid or missing API key", "UNAUTHORIZED"), "application/json");
+                return httplib::Server::HandlerResponse::Handled;
+            }
         }
-        if (ok) return httplib::Server::HandlerResponse::Unhandled;
-        res.status = 401;
-        res.set_content(err_json("invalid or missing API key", "UNAUTHORIZED"), "application/json");
-        return httplib::Server::HandlerResponse::Handled;
+        if (!rate_acquire()) {
+            res.status = 429;
+            res.set_content(err_json("rate limit exceeded", "RATE_LIMITED"), "application/json");
+            return httplib::Server::HandlerResponse::Handled;
+        }
+        return httplib::Server::HandlerResponse::Unhandled;
     });
 
     // ── CORS + 连接超时（对齐 SDK serving；enable_cors 语义默认开） ──

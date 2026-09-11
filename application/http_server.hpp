@@ -5,6 +5,7 @@
 #include <thread>
 #include <future>
 #include <mutex>
+#include <chrono>
 
 #include "httplib.h"
 #include "pipeline_manager.hpp"
@@ -23,6 +24,8 @@ public:
     void set_media_server_port(int port) { media_server_port_ = port; }
     // 可选 Bearer 鉴权：非空时保护 /api/v1/*（静态页与 /health 放行）
     void set_api_keys(std::vector<std::string> keys) { api_keys_ = std::move(keys); }
+    // 可选全局限流：qps>0 时按恒定速率放行，超限返回 429
+    void set_rate_limit(double qps) { rate_limit_qps_ = qps; }
 
 private:
     PipelineManager& mgr_;
@@ -38,6 +41,12 @@ private:
     int media_server_port_ = 8080;
     // 可选 Bearer 鉴权 key（非空启用）
     std::vector<std::string> api_keys_;
+    // 可选全局限流（令牌桶，容量=1）
+    double rate_limit_qps_ = 0.0;
+    std::mutex rate_mtx_;
+    double rate_tokens_ = 1.0;
+    std::chrono::steady_clock::time_point rate_last_ = std::chrono::steady_clock::now();
+    bool rate_acquire();
 
     // 统一错误体：与 SDK ServingServer 一致的 { "error": { "code", "message" } }
     static std::string err_json(const std::string& msg, const std::string& code = "BAD_REQUEST");
