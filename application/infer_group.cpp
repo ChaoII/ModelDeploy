@@ -66,8 +66,20 @@ bool InferGroup::run_models(
 
         if (do_infer) {
             if (is_det) {
+                // ROI 区域裁剪推理：仅 CPU 帧（设备 NV12 不做裁剪）；结果按偏移回映射到全图
+                const bool roi_valid = mc.roi.size() >= 4 && mc.roi[2] > 0 && mc.roi[3] > 0;
+                ImageData infer_frame = frame;
+                float ox = 0.f, oy = 0.f;
+                if (roi_valid && frame.device() == modeldeploy::Device::CPU) {
+                    infer_frame = frame.crop({static_cast<float>(mc.roi[0]), static_cast<float>(mc.roi[1]),
+                                              static_cast<float>(mc.roi[2]), static_cast<float>(mc.roi[3])});
+                    ox = static_cast<float>(mc.roi[0]);
+                    oy = static_cast<float>(mc.roi[1]);
+                }
                 std::vector<DetectionResult> dets;
-                if (e->det_model()->predict(frame, &dets)) {
+                if (e->det_model()->predict(infer_frame, &dets)) {
+                    if (ox != 0.f || oy != 0.f)
+                        for (auto& d : dets) { d.box.x += ox; d.box.y += oy; }
                     en.last_dets = std::move(dets);
                     en.has_last = true;
                 }
