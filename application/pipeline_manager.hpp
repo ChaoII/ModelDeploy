@@ -7,6 +7,7 @@
 
 #include "config.hpp"
 #include "pipeline.hpp"
+#include "batched_detector.hpp"
 
 /// 任务状态摘要
 struct TaskStatus {
@@ -109,4 +110,10 @@ private:
     };
     std::map<std::string, ModelPrototype> model_prototypes_;
     std::mutex proto_mtx_;
+
+    // 共享批处理检测器池：同配置（路径/后端/设备/精度/尺寸/阈值）多路共享一个模型实例 +
+    // AsyncModel 批推理 → GPU/CPU 高利用率、权重只驻留一份。
+    std::map<std::string, std::shared_ptr<BatchedDetector>> det_pool_;
+    std::mutex det_pool_mtx_;
+    std::shared_ptr<BatchedDetector> get_or_create_detector(const ModelConfig& cfg);
 };

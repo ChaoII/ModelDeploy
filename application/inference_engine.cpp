@@ -102,10 +102,30 @@ void InferenceEngine::adopt_face_model(
               << " (shared ORT session)" << std::endl;
 }
 
+void InferenceEngine::set_shared_detector(std::shared_ptr<BatchedDetector> det,
+                                          const ModelConfig& cfg) {
+    if (loaded_) this->unload();
+    cfg_ = cfg;
+    shared_det_ = std::move(det);
+    loaded_ = shared_det_ && shared_det_->ok();
+    if (!loaded_) {
+        std::cerr << "[InferenceEngine] shared detector unavailable: "
+                  << (shared_det_ ? shared_det_->error() : "null") << std::endl;
+    }
+}
+
+bool InferenceEngine::predict_detection(const ImageData& image,
+                                        std::vector<DetectionResult>* out) {
+    if (shared_det_) return shared_det_->predict(image, out);
+    if (!det_model_) return false;
+    return det_model_->predict(image, out);
+}
+
 void InferenceEngine::unload() {
     det_model_.reset();
     cls_model_.reset();
     face_model_.reset();
+    shared_det_.reset();
     loaded_ = false;
 }
 
@@ -124,9 +144,9 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
 }
 
 bool InferenceEngine::infer_detection(const ImageData& image, InferResult* result) {
-    if (!det_model_) return false;
+    if (!shared_det_ && !det_model_) return false;
     std::vector<DetectionResult> det_results;
-    if (!det_model_->predict(image, &det_results)) return false;
+    if (!predict_detection(image, &det_results)) return false;
     for (auto& d : det_results) {
         DetectionBox box;
         box.x = d.box.x; box.y = d.box.y;

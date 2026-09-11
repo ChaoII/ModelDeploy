@@ -77,7 +77,7 @@ bool InferGroup::run_models(
                     oy = static_cast<float>(mc.roi[1]);
                 }
                 std::vector<DetectionResult> dets;
-                if (e->det_model()->predict(infer_frame, &dets)) {
+                if (e->predict_detection(infer_frame, &dets)) {
                     if (ox != 0.f || oy != 0.f)
                         for (auto& d : dets) { d.box.x += ox; d.box.y += oy; }
                     en.last_dets = std::move(dets);

@@ -1,5 +1,8 @@
 #include "batched_detector.hpp"
 
+#include <algorithm>
+#include <thread>
+
 #include "runtime_factory.hpp"
 
 using namespace modeldeploy;
@@ -7,7 +10,13 @@ using namespace modeldeploy::vision;
 
 BatchedDetector::BatchedDetector(const ModelConfig& cfg, const size_t max_batch,
                                  const std::chrono::milliseconds batch_timeout) {
-    const RuntimeOption opt = build_runtime_option(cfg);
+    RuntimeOption opt = build_runtime_option(cfg);
+    // CPU 上让一个 batch 内多帧并行（intra-op 线程数 ≥ batch 并行度）；GPU 忽略此设置。
+    if (cfg.device != "gpu" && cfg.device != "tpu") {
+        const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+        const int threads = static_cast<int>(std::max<size_t>(1, std::min<size_t>(hw, max_batch)));
+        opt.set_cpu_thread_num(threads);
+    }
     auto model = std::make_unique<RM>(cfg.path, opt);
     if (!model->is_initialized()) {
         err_ = "failed to initialize detection model: " + cfg.path;

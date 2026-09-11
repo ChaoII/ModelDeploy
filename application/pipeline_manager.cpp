@@ -55,24 +55,15 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
     }
 
     // 首次加载
-    auto opt = build_runtime_option(cfg);
     ModelPrototype proto;
     proto.key = key;
 
     if (cfg.type == "detection") {
-        proto.det = std::make_unique<detection::UltralyticsDet>(cfg.path, opt);
-        if (!proto.det->is_initialized()) {
-            std::cerr << "[Manager] Failed to load detection: " << cfg.path << std::endl;
-            auto eng = std::make_unique<InferenceEngine>(); eng->load(cfg);
-            return eng;
-        }
-        if (cfg.input_size.size() == 2) proto.det->get_preprocessor().set_size(cfg.input_size);
-
-        model_prototypes_[key] = std::move(proto);
-        auto& lp = model_prototypes_[key].det;
+        // 共享批处理检测器：同配置多路共享一个模型实例 + AsyncModel 批推理（GPU 高利用率）
+        auto det = get_or_create_detector(cfg);
         auto eng = std::make_unique<InferenceEngine>();
-        eng->clone_detection_from(*lp, cfg);
-        std::cout << "[Manager] Created detection prototype: " << cfg.name << std::endl;
+        eng->set_shared_detector(std::move(det), cfg);
+        std::cout << "[Manager] Shared batched detector: " << cfg.name << std::endl;
         return eng;
     }
 
@@ -98,6 +89,20 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
 
     auto eng = std::make_unique<InferenceEngine>(); eng->load(cfg);
     return eng;
+}
+
+std::shared_ptr<BatchedDetector> PipelineManager::get_or_create_detector(const ModelConfig& cfg) {
+    const int w = cfg.input_size.size() >= 2 ? cfg.input_size[0] : 640;
+    const int h = cfg.input_size.size() >= 2 ? cfg.input_size[1] : 640;
+    const std::string key = cfg.path + "|" + cfg.backend + "|" + cfg.device + "|" +
+                            std::to_string(cfg.confidence_threshold) + "|" +
+                            std::to_string(w) + "x" + std::to_string(h);
+    std::lock_guard<std::mutex> lk(det_pool_mtx_);
+    auto it = det_pool_.find(key);
+    if (it != det_pool_.end()) return it->second;
+    auto det = std::make_shared<BatchedDetector>(cfg, /*max_batch=*/8);
+    if (det->ok()) det_pool_[key] = det;
+    return det;
 }
 
 bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {

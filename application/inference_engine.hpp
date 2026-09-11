@@ -11,6 +11,7 @@
 #include "csrc/utils/benchmark.h"
 
 #include "config.hpp"
+#include "batched_detector.hpp"
 
 struct DetectionBox {
     float x, y, w, h;
@@ -51,13 +52,23 @@ public:
     void adopt_face_model(std::unique_ptr<modeldeploy::vision::face::Scrfd> model,
                           const ModelConfig& cfg);
 
+    /// 接管共享批处理检测器（多路共享一个模型实例 + 批推理；GPU 高利用率路径）
+    void set_shared_detector(std::shared_ptr<BatchedDetector> det, const ModelConfig& cfg);
+    BatchedDetector* shared_detector() const { return shared_det_.get(); }
+
     void unload();
     bool is_loaded() const { return loaded_; }
 
     bool infer(const modeldeploy::vision::ImageData& image, InferResult* result);
 
     /// 获取底层 detection 模型指针（BatchScheduler 需要直接调用 batch_predict）
-    modeldeploy::vision::detection::UltralyticsDet* det_model() { return det_model_.get(); }
+    modeldeploy::vision::detection::UltralyticsDet* det_model() {
+        return shared_det_ ? shared_det_->model() : det_model_.get();
+    }
+
+    /// detection 统一推理入口：共享批处理检测器优先（批推理），否则本实例模型
+    bool predict_detection(const modeldeploy::vision::ImageData& image,
+                           std::vector<modeldeploy::vision::DetectionResult>* out);
 
     const ModelConfig& config() const { return cfg_; }
     std::pair<int, int> input_size() const {
@@ -73,6 +84,7 @@ private:
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> det_model_;
     std::unique_ptr<modeldeploy::vision::classification::Classification> cls_model_;
     std::unique_ptr<modeldeploy::vision::face::Scrfd> face_model_;
+    std::shared_ptr<BatchedDetector> shared_det_;   // 共享批处理检测器（多路共享，优先）
 
     bool infer_detection(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_classification(const modeldeploy::vision::ImageData& image, InferResult* result);
