@@ -29,26 +29,33 @@ struct DecoderConfig {
     int max_reconnects = 10;
     int timeout_us = 10000000;
     std::string rtsp_transport = "tcp";   // tcp / udp
-    std::string hw_accel = "cuda";        // cuda / none
-    std::string backend = "ffmpeg";       // ffmpeg / gstreamer / auto
+    std::string hw_accel = "auto";        // auto / none / cuda / vaapi / qsv / sophgo
+    std::string backend = "auto";         // auto / ffmpeg / gstreamer
     bool device_only = false;             // true 时跳过 D2H，仅暴露设备指针（GPU 直通）
+    std::string codec = "auto";           // auto / hevc_qsv / h264_qsv ...（QSV 编解码区分）
+    int async_queue_size = 30;            // SDK 有界异步队列容量
+    bool pooling = true;                  // 帧缓冲池开关
+    std::string backpressure = "block";   // block / drop / overwrite
 };
 
 // ==================== 编码器配置 ====================
 struct EncoderConfig {
     int fps = 0;                          // 0 = 自动匹配源帧率；非零 = 强制帧率
-    int out_width = 0;                    // 0 = 源宽
-    int out_height = 0;                   // 0 = 源高
-    int out_fps = 0;                      // 0 = 跟随源帧率（fps 仍为源帧率覆盖别名）
     int bitrate_kbps = 2500;              // 平均码率 (kbps)，预览路 2.5Mbps 足够
     int gop = 12;                         // 关键帧间隔（约 0.5 秒/I 帧，flv.js 快速首帧）
-    std::string codec = "auto";           // auto / libx264 / h264_nvenc / nvh264enc
-    std::string backend = "ffmpeg";       // ffmpeg / gstreamer / auto
+    std::string codec = "auto";           // auto / libx264 / h264_nvenc / h264_qsv / nvh264enc / vaapih264enc ...
+    std::string backend = "auto";         // auto / ffmpeg / gstreamer
+    std::string hw_accel = "auto";        // auto / none / cuda / vaapi / qsv / sophgo
     std::string preset = "ultrafast";     // x264: ultrafast..veryslow ; nvenc: p1..p7
     std::string tune = "zerolatency";     // x264 only
     std::string format = "auto";          // auto / rtsp / rtmp / flv / mp4
     int max_b_frames = 0;
     bool low_latency = true;
+    bool device_only = false;             // 设备帧直编（跳过主机往返）
+    bool gpu_direct_input = false;        // GPU 直编（需 hw_accel=cuda + nvenc）
+    int async_queue_size = 30;
+    bool pooling = true;
+    std::string backpressure = "block";   // block / drop / overwrite
 };
 
 // ==================== 绘制配置 ====================

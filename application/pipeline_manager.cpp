@@ -16,7 +16,7 @@ using modeldeploy::vision::face::Scrfd;
 // ── helper: 根据 ModelConfig 创建 RuntimeOption ──
 static modeldeploy::RuntimeOption build_runtime_option(const ModelConfig& cfg) {
     modeldeploy::RuntimeOption opt;
-    if (cfg.device == "gpu") opt.use_gpu(0);
+    if (cfg.device == "gpu") opt.set_device(modeldeploy::Device::GPU, 0);
     opt.set_cpu_thread_num(1);
     bool is_engine_file = (cfg.path.size() > 7 &&
         (cfg.path.substr(cfg.path.size() - 7) == ".engine" ||

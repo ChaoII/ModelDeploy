@@ -104,9 +104,6 @@ try {
             };
             encoder        = [ordered]@{
                 fps          = 25;
-                out_width    = 1280;
-                out_height   = 720;
-                out_fps      = 25;
                 bitrate_kbps = 2500;
                 gop          = 12;
                 codec        = "libx264";

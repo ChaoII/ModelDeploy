@@ -14,7 +14,7 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
 
     RuntimeOption opt;
     if (cfg.device == "gpu") {
-        opt.use_gpu(0);
+        opt.set_device(Device::GPU, 0);
     }
     opt.set_cpu_thread_num(1);
 
@@ -167,70 +167,6 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
     if (cfg_.type == "classification")
         return infer_classification(image, result);
     return false;
-}
-
-bool InferenceEngine::infer_nv12(const uint8_t* y_plane, const uint8_t* uv_plane,
-                                 int width, int height, int y_step, int uv_step,
-                                 InferResult* result, TimerArray* timers) {
-    if (!loaded_ || !result) return false;
-    result->model_name = cfg_.name;
-    result->type = cfg_.type;
-    if (cfg_.type != "detection" || !det_model_) return false;
-
-    // 收敛后的单入口：设备/主机 NV12 帧 → from_planes → predict(ImageData)
-    ImageData::Plane pl[2] = {
-        {y_plane, y_step > 0 ? y_step : width},
-        {uv_plane, uv_step > 0 ? uv_step : width},
-    };
-    auto frame = ImageData::from_planes(pl, 2, MdImageType::NV12, width, height, Device::CPU);
-    std::vector<modeldeploy::vision::DetectionResult> det_results;
-    if (!det_model_->predict(frame, &det_results, timers)) {
-        return false;
-    }
-    for (auto& d : det_results) {
-        DetectionBox box;
-        box.x = d.box.x; box.y = d.box.y;
-        box.w = d.box.width; box.h = d.box.height;
-        box.score = d.score;
-        box.label_id = d.label_id;
-        result->boxes.push_back(box);
-    }
-    return true;
-}
-
-bool InferenceEngine::batch_infer(const std::vector<ImageData>& images,
-                                   std::vector<InferResult>* results) {
-    if (!loaded_ || !results) return false;
-    results->clear();
-
-    if (cfg_.type == "detection" && det_model_) {
-        std::vector<std::vector<DetectionResult>> det_results;
-        if (!det_model_->batch_predict(images, &det_results))
-            return false;
-        results->resize(det_results.size());
-        for (size_t i = 0; i < det_results.size(); ++i) {
-            (*results)[i].model_name = cfg_.name;
-            (*results)[i].type = "detection";
-            for (auto& d : det_results[i]) {
-                DetectionBox box;
-                box.x = d.box.x; box.y = d.box.y;
-                box.w = d.box.width; box.h = d.box.height;
-                box.score = d.score;
-                box.label_id = d.label_id;
-                (*results)[i].boxes.push_back(box);
-            }
-        }
-        return true;
-    }
-
-    // 非 detection 模型（face / classification）：逐帧 fallback
-    results->resize(images.size());
-    for (size_t i = 0; i < images.size(); ++i) {
-        if (!infer(images[i], &(*results)[i])) {
-            (*results)[i] = InferResult{}; // 空结果
-        }
-    }
-    return true;
 }
 
 bool InferenceEngine::infer_detection(const ImageData& image, InferResult* result) {

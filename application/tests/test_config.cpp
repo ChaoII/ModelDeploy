@@ -66,19 +66,33 @@ TEST_CASE("Config all fields", "[config]") {
     REQUIRE(cfg.models[0].labels[0] == "person");
 }
 
-TEST_CASE("encoder out dims + topology roundtrip", "[config]") {
+TEST_CASE("codec config roundtrip (backend/hw_accel/device_only/backpressure)", "[config]") {
     TaskConfig cfg;
     cfg.id = "t1";
     cfg.topology = "mosaic";
-    cfg.encoder.out_width = 1280;
-    cfg.encoder.out_height = 720;
-    cfg.encoder.out_fps = 25;
+    cfg.decoder.backend = "gstreamer";
+    cfg.decoder.hw_accel = "vaapi";
+    cfg.decoder.device_only = true;
+    cfg.decoder.codec = "h264_qsv";
+    cfg.decoder.backpressure = "drop";
+    cfg.encoder.backend = "auto";
+    cfg.encoder.hw_accel = "qsv";
+    cfg.encoder.device_only = true;
+    cfg.encoder.gpu_direct_input = true;
+    cfg.encoder.backpressure = "overwrite";
     auto j = task_config_to_json(cfg);
     auto back = task_config_from_json(j);
     REQUIRE(back.topology == "mosaic");
-    REQUIRE(back.encoder.out_width == 1280);
-    REQUIRE(back.encoder.out_height == 720);
-    REQUIRE(back.encoder.out_fps == 25);
+    REQUIRE(back.decoder.backend == "gstreamer");
+    REQUIRE(back.decoder.hw_accel == "vaapi");
+    REQUIRE(back.decoder.device_only == true);
+    REQUIRE(back.decoder.codec == "h264_qsv");
+    REQUIRE(back.decoder.backpressure == "drop");
+    REQUIRE(back.encoder.backend == "auto");
+    REQUIRE(back.encoder.hw_accel == "qsv");
+    REQUIRE(back.encoder.device_only == true);
+    REQUIRE(back.encoder.gpu_direct_input == true);
+    REQUIRE(back.encoder.backpressure == "overwrite");
 }
 
 TEST_CASE("topology backward compat default", "[config]") {

@@ -68,20 +68,27 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["decoder"]["hw_accel"] = cfg.decoder.hw_accel;
     j["decoder"]["backend"] = cfg.decoder.backend;
     j["decoder"]["device_only"] = cfg.decoder.device_only;
+    j["decoder"]["codec"] = cfg.decoder.codec;
+    j["decoder"]["async_queue_size"] = cfg.decoder.async_queue_size;
+    j["decoder"]["pooling"] = cfg.decoder.pooling;
+    j["decoder"]["backpressure"] = cfg.decoder.backpressure;
 
     j["encoder"]["fps"] = cfg.encoder.fps;
-    j["encoder"]["out_width"] = cfg.encoder.out_width;
-    j["encoder"]["out_height"] = cfg.encoder.out_height;
-    j["encoder"]["out_fps"] = cfg.encoder.out_fps;
     j["encoder"]["bitrate_kbps"] = cfg.encoder.bitrate_kbps;
     j["encoder"]["gop"] = cfg.encoder.gop;
     j["encoder"]["codec"] = cfg.encoder.codec;
     j["encoder"]["backend"] = cfg.encoder.backend;
+    j["encoder"]["hw_accel"] = cfg.encoder.hw_accel;
     j["encoder"]["preset"] = cfg.encoder.preset;
     j["encoder"]["tune"] = cfg.encoder.tune;
     j["encoder"]["format"] = cfg.encoder.format;
     j["encoder"]["max_b_frames"] = cfg.encoder.max_b_frames;
     j["encoder"]["low_latency"] = cfg.encoder.low_latency;
+    j["encoder"]["device_only"] = cfg.encoder.device_only;
+    j["encoder"]["gpu_direct_input"] = cfg.encoder.gpu_direct_input;
+    j["encoder"]["async_queue_size"] = cfg.encoder.async_queue_size;
+    j["encoder"]["pooling"] = cfg.encoder.pooling;
+    j["encoder"]["backpressure"] = cfg.encoder.backpressure;
 
     j["draw"]["show_label"] = cfg.draw.show_label;
     j["draw"]["show_score"] = cfg.draw.show_score;
@@ -125,23 +132,30 @@ TaskConfig task_config_from_json(const json& j) {
         if (d.contains("hw_accel") && d["hw_accel"].is_string()) cfg.decoder.hw_accel = d["hw_accel"];
         if (d.contains("backend") && d["backend"].is_string()) cfg.decoder.backend = d["backend"];
         if (d.contains("device_only") && d["device_only"].is_boolean()) cfg.decoder.device_only = d["device_only"];
+        if (d.contains("codec") && d["codec"].is_string()) cfg.decoder.codec = d["codec"];
+        if (d.contains("async_queue_size")) cfg.decoder.async_queue_size = d["async_queue_size"];
+        if (d.contains("pooling")) cfg.decoder.pooling = d["pooling"];
+        if (d.contains("backpressure") && d["backpressure"].is_string()) cfg.decoder.backpressure = d["backpressure"];
     }
 
     if (j.contains("encoder") && j["encoder"].is_object()) {
         auto& e = j["encoder"];
         if (e.contains("fps")) cfg.encoder.fps = e["fps"];
-        if (e.contains("out_width")) cfg.encoder.out_width = e["out_width"];
-        if (e.contains("out_height")) cfg.encoder.out_height = e["out_height"];
-        if (e.contains("out_fps")) cfg.encoder.out_fps = e["out_fps"];
         if (e.contains("bitrate_kbps")) cfg.encoder.bitrate_kbps = e["bitrate_kbps"];
         if (e.contains("gop")) cfg.encoder.gop = e["gop"];
         if (e.contains("codec") && e["codec"].is_string()) cfg.encoder.codec = e["codec"];
         if (e.contains("backend") && e["backend"].is_string()) cfg.encoder.backend = e["backend"];
+        if (e.contains("hw_accel") && e["hw_accel"].is_string()) cfg.encoder.hw_accel = e["hw_accel"];
         if (e.contains("preset") && e["preset"].is_string()) cfg.encoder.preset = e["preset"];
         if (e.contains("tune") && e["tune"].is_string()) cfg.encoder.tune = e["tune"];
         if (e.contains("format") && e["format"].is_string()) cfg.encoder.format = e["format"];
         if (e.contains("max_b_frames")) cfg.encoder.max_b_frames = e["max_b_frames"];
         if (e.contains("low_latency")) cfg.encoder.low_latency = e["low_latency"];
+        if (e.contains("device_only")) cfg.encoder.device_only = e["device_only"];
+        if (e.contains("gpu_direct_input")) cfg.encoder.gpu_direct_input = e["gpu_direct_input"];
+        if (e.contains("async_queue_size")) cfg.encoder.async_queue_size = e["async_queue_size"];
+        if (e.contains("pooling")) cfg.encoder.pooling = e["pooling"];
+        if (e.contains("backpressure") && e["backpressure"].is_string()) cfg.encoder.backpressure = e["backpressure"];
     }
 
     if (j.contains("draw") && j["draw"].is_object()) {
