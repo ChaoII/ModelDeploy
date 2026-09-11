@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <map>
 #include <atomic>
 #include <thread>
 #include <future>
@@ -37,6 +38,8 @@ private:
 
     void register_routes();
     std::string load_web_ui() const;
+    // 从 application/third_party 解析静态资源（如 flv.min.js），带缓存
+    std::string load_asset(const std::string& name) const;
     // 媒体服务器 HTTP-FLV 端口（前端 deriveHttpFlv 用它；默认 8080）
     int media_server_port_ = 8080;
     // 可选 Bearer 鉴权 key（非空启用）
@@ -58,4 +61,7 @@ private:
     mutable std::mutex web_ui_mtx_;
     mutable std::string web_ui_cache_;
     mutable bool web_ui_loaded_ = false;
+    // 静态资源缓存
+    mutable std::mutex asset_mtx_;
+    mutable std::map<std::string, std::string> asset_cache_;
 };

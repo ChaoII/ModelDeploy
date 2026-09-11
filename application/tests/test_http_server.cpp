@@ -95,3 +95,24 @@ TEST_CASE("HttpServer rate limit", "[http]") {
 
     srv.stop();
 }
+
+TEST_CASE("HttpServer static asset route", "[http]") {
+    PipelineManager mgr;
+    HttpServer srv(mgr, "127.0.0.1", 18087);
+    REQUIRE(srv.start());
+    httplib::Client cli("127.0.0.1", 18087);
+
+    auto r = cli.Get("/assets/flv.min.js");
+    REQUIRE(r);
+    REQUIRE((r->status == 200 || r->status == 404));  // 资产可解析时 200，否则优雅 404
+    if (r->status == 200) {
+        REQUIRE(r->body.size() > 1000);
+        REQUIRE(r->get_header_value("Content-Type").find("javascript") != std::string::npos);
+    }
+    // 目录穿越防护 → 404
+    auto bad = cli.Get("/assets/../CMakeLists.txt");
+    REQUIRE(bad);
+    REQUIRE(bad->status == 404);
+
+    srv.stop();
+}

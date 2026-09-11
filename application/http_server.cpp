@@ -167,6 +167,42 @@ std::string HttpServer::load_web_ui() const {
     return result;
 }
 
+std::string HttpServer::load_asset(const std::string& name) const {
+    // 防目录穿越：仅接受纯文件名
+    if (name.empty() || name.find("..") != std::string::npos ||
+        name.find('/') != std::string::npos || name.find('\\') != std::string::npos) {
+        return "";
+    }
+    {
+        std::lock_guard<std::mutex> lock(asset_mtx_);
+        auto it = asset_cache_.find(name);
+        if (it != asset_cache_.end()) return it->second;
+    }
+    std::vector<std::string> paths;
+    auto exe_dir = get_exe_dir();
+    if (!exe_dir.empty()) {
+        paths.push_back(exe_dir + "\\..\\third_party\\" + name);
+        paths.push_back(exe_dir + "\\..\\..\\application\\third_party\\" + name);
+    }
+    paths.push_back("application/third_party/" + name);
+    paths.push_back("../application/third_party/" + name);
+    std::string result;
+    for (const auto& p : paths) {
+        std::ifstream f(p, std::ios::binary);
+        if (f.is_open()) {
+            std::stringstream buf;
+            buf << f.rdbuf();
+            auto s = buf.str();
+            if (!s.empty()) { result = s; break; }
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(asset_mtx_);
+        asset_cache_[name] = result;
+    }
+    return result;
+}
+
 // ── Route helpers ─────────────────────────────
 
 static std::string get_id(const httplib::Request& req) {
@@ -268,6 +304,17 @@ void HttpServer::register_routes() {
     server_.Get("/", [this, serve_ui](const httplib::Request&, httplib::Response& res) { serve_ui(res); });
     server_.Get("/index.html", [this, serve_ui](const httplib::Request&, httplib::Response& res) { serve_ui(res); });
     server_.Get("/ui", [this, serve_ui](const httplib::Request&, httplib::Response& res) { serve_ui(res); });
+
+    // ── 静态资源（application/third_party 下的本地依赖，如 flv.min.js） ──
+    server_.Get("/assets/:name", [this](const httplib::Request& req, httplib::Response& res) {
+        const auto it = req.path_params.find("name");
+        const std::string name = (it != req.path_params.end()) ? it->second : "";
+        const std::string body = load_asset(name);
+        if (body.empty()) { res.status = 404; res.set_content("not found", "text/plain"); return; }
+        const bool js = name.size() > 3 && name.compare(name.size() - 3, 3, ".js") == 0;
+        res.set_header("Cache-Control", "max-age=86400");
+        res.set_content(body, js ? "text/javascript" : "application/octet-stream");
+    });
 
     // ── Health / Metrics ─────────────────────────────
     server_.Get("/health", [](const httplib::Request&, httplib::Response& res) {
