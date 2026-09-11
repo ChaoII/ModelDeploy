@@ -84,8 +84,25 @@ bool InferGroup::run_models(
                     en.has_last = true;
                 }
             } else {
+                // ROI：非 detection 族（如人脸）按区域裁剪，几何结果按偏移回映射；classification 无几何不做
+                const bool roi_valid = mc.roi.size() >= 4 && mc.roi[2] > 0 && mc.roi[3] > 0;
+                const bool can_roi = roi_valid && frame.device() == modeldeploy::Device::CPU &&
+                                     mc.type != "classification";
+                ImageData infer_frame = frame;
+                float ox = 0.f, oy = 0.f;
+                if (can_roi) {
+                    infer_frame = frame.crop({static_cast<float>(mc.roi[0]), static_cast<float>(mc.roi[1]),
+                                              static_cast<float>(mc.roi[2]), static_cast<float>(mc.roi[3])});
+                    ox = static_cast<float>(mc.roi[0]);
+                    oy = static_cast<float>(mc.roi[1]);
+                }
                 InferResult r;
-                if (e->infer(frame, &r)) {
+                if (e->infer(infer_frame, &r)) {
+                    if (ox != 0.f || oy != 0.f) {
+                        for (auto& b : r.boxes) { b.x += ox; b.y += oy; }
+                        for (auto& kps : r.keypoints)
+                            for (auto& k : kps) { k.x += ox; k.y += oy; }
+                    }
                     en.last_non_det = std::move(r);
                     en.has_last = true;
                 }
