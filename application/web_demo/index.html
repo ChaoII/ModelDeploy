@@ -3,211 +3,309 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ModelDeploy · 模型功能演示</title>
+<title>ModelDeploy · 观测台</title>
 <style>
 :root{
-  --bg:#060913;--bg-2:#0a1024;--panel:#0f1730;--panel-2:#0b1123;
-  --line:#1d2b4d;--line-glow:rgba(37,198,252,.35);
-  --tx:#e6f0ff;--mut:#7d8db0;--acc:#25c6fc;--sec:#a855f7;
-  --ok:#2be6a3;--warn:#ffcc00;--bad:#ff5470;
-  --mono:Consolas,'JetBrains Mono',monospace;
+  /* 石墨底 + 信号琥珀（测量台风格） */
+  --ink:#0d0e11; --panel:#14161b; --panel-2:#191c22; --panel-3:#1f232b;
+  --rule:#2a2e37; --rule-2:#333844;
+  --text:#e8eaee; --muted:#8b93a3; --faint:#5c6472;
+  --amber:#f5a623; --amber-dim:rgba(245,166,35,.14); --amber-line:rgba(245,166,35,.5);
+  --ok:#4ad6a0; --warn:#f5c451; --bad:#ff6b6b;
+  --mono:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  --ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",Roboto,sans-serif;
+  --r:5px;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,'Segoe UI','Microsoft YaHei',sans-serif;color:var(--tx);
-  background:var(--bg);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden}
-button{font-family:inherit;cursor:pointer}
-.bg{position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 900px 560px at 12% 6%,rgba(37,198,252,.10),transparent 60%),
-    radial-gradient(ellipse 700px 480px at 90% 92%,rgba(168,85,247,.10),transparent 60%),
-    linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%)}
-header{position:relative;z-index:3;display:flex;align-items:center;gap:12px;height:52px;padding:0 18px;
-  border-bottom:1px solid var(--line);background:rgba(10,18,38,.85);backdrop-filter:blur(8px)}
-header h1{font-size:15px;margin:0;letter-spacing:.5px;font-weight:600}
-header .sub{color:var(--mut);font-size:11px;margin-left:2px}
+html,body{height:100%}
+body{margin:0;font-family:var(--ui);color:var(--text);background:var(--ink);
+  font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input{font-family:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-radius:3px}
+.mono{font-family:var(--mono)}
+
+/* ── 顶栏 ── */
+header{height:50px;display:flex;align-items:center;gap:14px;padding:0 16px;
+  border-bottom:1px solid var(--rule);background:var(--panel);position:relative;z-index:5}
+.brand{display:flex;align-items:baseline;gap:9px}
+.brand b{font-size:15px;letter-spacing:.2px;font-weight:650}
+.brand .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-family:var(--mono)}
 .sp{flex:1}
-.pill{font-size:11px;padding:3px 11px;border-radius:20px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
-.pill.ok{color:var(--ok);border-color:var(--ok)}
-.pill.bad{color:var(--bad);border-color:var(--bad)}
-.pill.on{color:var(--acc);border-color:var(--acc)}
-.pill .d{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono);
+  padding:4px 11px;border:1px solid var(--rule);border-radius:999px;color:var(--muted);white-space:nowrap}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.chip.ok{color:var(--ok);border-color:rgba(74,214,160,.45)} .chip.ok .dot{background:var(--ok)}
+.chip.bad{color:var(--bad);border-color:rgba(255,107,107,.45)} .chip.bad .dot{background:var(--bad)}
+.chip.hot{color:var(--amber);border-color:var(--amber-line)} .chip.hot .dot{background:var(--amber)}
 
-.layout{position:relative;z-index:1;display:flex;height:100%}
+/* ── 三栏 ── */
+.layout{height:calc(100% - 50px);display:grid;grid-template-columns:242px minmax(0,1fr) 344px}
+@media (max-width:1100px){ .layout{grid-template-columns:212px minmax(0,1fr)} .inspector{display:none} }
+@media (max-width:820px){
+  .layout{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .rail{display:none}
+}
 
-/* ── 左栏 ── */
-nav{width:262px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;padding:12px 10px;background:rgba(8,13,28,.6)}
-nav .nav-t{font-size:10px;letter-spacing:1.5px;color:var(--mut);padding:2px 8px 8px;text-transform:uppercase}
-.grp{color:var(--mut);font-size:11px;font-weight:600;margin:10px 6px 5px;letter-spacing:1px}
-nav .m{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;
-  border:1px solid transparent;border-radius:9px;cursor:pointer;transition:.12s}
-nav .m:hover{background:#101b38;border-color:var(--line)}
-nav .m.sel{border-color:var(--acc);background:linear-gradient(90deg,rgba(37,198,252,.12),transparent)}
-nav .m .name{display:flex;align-items:center;gap:7px;font-weight:600}
-nav .m .tag{font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(37,198,252,.12);color:var(--acc);letter-spacing:.5px}
-nav .m .inf{font-size:10px;color:var(--mut);margin-top:2px}
-.Status{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:10px;padding:2px 8px;border-radius:10px}
-.Status .d{width:7px;height:7px;border-radius:50%;background:var(--mut)}
-.Status.un .d{background:#54627f}
-.Status.lo .d{border:2px solid var(--acc);border-top-color:transparent;border-radius:50%;width:9px;height:9px;animation:spin .7s linear infinite;background:transparent}
-.Status.rd{color:var(--ok)}
-.Status.rd .d{background:var(--ok)}
-.Status.fl{color:var(--bad)}
-.Status.fl .d{background:var(--bad)}
+/* 左：模型轨 */
+.rail{border-right:1px solid var(--rule);background:var(--panel);overflow-y:auto;padding:10px 8px}
+.rail .hd{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+  font-family:var(--mono);padding:2px 8px 9px;display:flex;justify-content:space-between}
+.grp{margin:12px 6px 5px;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.04em;
+  display:flex;align-items:center;gap:6px}
+.grp .cnt{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.m{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--r);cursor:pointer;
+  border:1px solid transparent;position:relative;transition:background .12s,border-color .12s}
+.m:hover{background:var(--panel-2);border-color:var(--rule)}
+.m.sel{background:var(--amber-dim);border-color:var(--amber-line)}
+.m.sel::before{content:"";position:absolute;left:-8px;top:8px;bottom:8px;width:2px;background:var(--amber)}
+.m .abbr{width:30px;height:22px;flex-shrink:0;display:grid;place-items:center;border-radius:4px;
+  font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.02em;
+  background:var(--panel-3);color:var(--muted);border:1px solid var(--rule)}
+.m.sel .abbr{color:var(--amber);border-color:var(--amber-line);background:var(--amber-dim)}
+.m .body{min-width:0;flex:1}
+.m .nm{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m .meta{font-family:var(--mono);font-size:10px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{width:8px;height:8px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.st.rd{background:var(--ok);box-shadow:0 0 0 3px rgba(74,214,160,.14)}
+.st.lo{background:transparent;border:2px solid var(--amber);border-top-color:transparent;animation:spin .7s linear infinite}
+.st.fl{background:var(--bad)}
 @keyframes spin{to{transform:rotate(360deg)}}
+.empty-rail{color:var(--faint);font-size:12px;padding:14px 10px;text-align:center}
 
-/* ── 右主区 ── */
-main{flex:1;min-width:0;display:flex;flex-direction:column}
-.toolbar{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--line);
-  background:rgba(10,16,36,.55);flex-shrink:0}
-.toolbar .cur{display:flex;align-items:center;gap:8px;min-width:0}
-.toolbar #curName{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
-.tbtn{border:1px solid var(--line);background:rgba(15,23,48,.7);color:var(--tx);font-size:12px;
-  padding:6px 13px;border-radius:8px;transition:.12s}
-.tbtn:hover{border-color:var(--acc);color:var(--acc)}
-.tbtn:disabled{opacity:.45;cursor:not-allowed}
-.tbtn.primary{background:linear-gradient(90deg,rgba(37,198,252,.2),rgba(168,85,247,.18));border-color:var(--acc);color:#dff5ff;font-weight:600}
-.tbtn.primary:disabled{border-color:var(--line);color:var(--mut);background:rgba(15,23,48,.7)}
+/* 中：观测台 */
+.bench{display:flex;flex-direction:column;min-width:0;background:
+  linear-gradient(180deg,#101216,#0d0e11)}
+.bar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--rule);
+  flex-shrink:0;flex-wrap:wrap}
+.cur{display:flex;align-items:center;gap:9px;min-width:0}
+.cur .nm{font-weight:650;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--muted);font-size:11px;padding:5px 11px}
+.seg button.on{background:var(--amber);color:#1a1206;font-weight:650}
+.btn{background:var(--panel-2);border:1px solid var(--rule);color:var(--text);font-size:12px;
+  padding:6px 12px;border-radius:var(--r);transition:.12s;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--rule-2);background:var(--panel-3)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:#1a1206;font-weight:650}
+.btn.amber:hover{filter:brightness(1.08)}
+.btn.amber:disabled{background:var(--panel-2);border-color:var(--rule);color:var(--muted);filter:none}
+.lay{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--rule);border-radius:var(--r)}
+.lay button{background:transparent;border:0;color:var(--faint);font-family:var(--mono);font-size:10px;
+  padding:5px 8px;border-radius:3px;letter-spacing:.02em}
+.lay button.on{background:var(--panel-3);color:var(--amber)}
+.prow{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px}
+.prow label{color:var(--muted);flex:1;white-space:nowrap}
+.prow input[type=range]{width:96px}
+.prow input[type=number]{background:var(--panel-3);border:1px solid var(--rule);color:var(--text);border-radius:4px;padding:3px 6px;width:70px}
+.hintx{color:var(--faint);font-size:10px;font-family:var(--mono)}
 
-.samp-wrap{position:relative}
-.samp-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:180px;
-  background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);overflow:hidden}
-.samp-menu.open{display:block}
-.samp-menu .it{padding:9px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:9px}
-.samp-menu .it:hover{background:rgba(37,198,252,.08);color:var(--acc)}
-.samp-menu .it img{width:34px;height:34px;object-fit:cover;border-radius:5px;background:#000;border:1px solid var(--line)}
+.stage{position:relative;flex:1;min-height:0;overflow:auto;display:grid;place-items:center;padding:16px}
+#frame{position:relative;display:none;line-height:0;border:1px solid var(--rule);border-radius:var(--r);
+  overflow:hidden;background:#000;max-width:100%}
+#img,#ovl,#srvimg{display:block;max-width:100%;max-height:calc(100vh - 250px);object-fit:contain}
+#img{position:relative}
+#srvimg{display:none}
+#ovl{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+.hint{text-align:center;color:var(--muted);max-width:380px;line-height:1.9}
+.hint .k{font-family:var(--mono);color:var(--amber)}
+.hint h2{font-size:15px;color:var(--text);font-weight:600;margin:0 0 8px}
 
-.stagewrap{flex:1;min-height:0;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;align-items:center;gap:8px}
-#emptyHint{color:var(--mut);font-size:13px;margin:auto;text-align:center;line-height:1.8}
-#emptyHint b{color:var(--acc)}
-#wrap{position:relative;max-width:100%;display:none;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-#img{max-width:100%;max-height:70vh;display:block;object-fit:contain}
-#resImg{max-width:100%;max-height:52vh;object-fit:contain;display:none;margin:0 0 10px;
-  border:1px solid var(--line);border-radius:8px;background:#000}
+/* 读数条（签名元素） */
+.readout{flex-shrink:0;display:flex;align-items:center;gap:18px;padding:8px 14px;border-top:1px solid var(--rule);
+  background:var(--panel);font-family:var(--mono);font-size:11px;color:var(--muted);overflow-x:auto;white-space:nowrap}
+.readout .cell{display:flex;gap:7px;align-items:baseline}
+.readout .lb{color:var(--faint);font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.readout .vl{color:var(--text)}
+.readout .vl.hot{color:var(--amber)}
+.readout .sep{width:1px;height:16px;background:var(--rule);flex-shrink:0}
 
-/* ── 结果面板 ── */
-.results{flex-shrink:0;max-height:min(46%,560px);display:flex;flex-direction:column;
-  border-top:1px solid var(--line);background:rgba(9,14,30,.7)}
-.results .tabs{display:flex;align-items:center;gap:6px;padding:8px 12px;flex-shrink:0;border-bottom:1px solid var(--line)}
-.tabbtn{background:none;border:none;color:var(--mut);font-size:12px;font-weight:600;padding:5px 12px;border-radius:7px}
-.tabbtn:hover{color:var(--tx)}
-.tabbtn.on{color:var(--acc);background:rgba(37,198,252,.1)}
-.results .fold{margin-left:8px;background:none;border:1px solid var(--line);color:var(--mut);font-size:11px;padding:3px 9px;border-radius:6px}
-.results .fold:hover{color:var(--acc);border-color:var(--acc)}
-.res-body{flex:1;min-height:0;display:flex;flex-direction:column}
-.tabpane{display:none;padding:12px 14px;flex:1;min-height:0;overflow-y:auto;overflow-x:auto}
-.tabpane.on{display:flex;flex-direction:column}
-.results.collapsed .res-body{display:none}
-.results.collapsed{max-height:42px}
-#viznote{font-size:12px;color:var(--mut);margin-bottom:10px}
-#viznote b{color:var(--tx)}
-#dlPng{margin-left:auto;border:1px solid var(--acc);background:rgba(37,198,252,.12);color:var(--acc);font-size:12px;padding:5px 12px;border-radius:7px}
-#dlPng:hover{background:rgba(37,198,252,.2)}
-table{border-collapse:collapse;width:100%;font-size:12px}
-td,th{border:1px solid var(--line);padding:5px 9px;text-align:left}
-th{color:var(--acc);background:rgba(37,198,252,.06)}
-pre{background:#070d1c;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;
-  font-family:var(--mono);font-size:11px;max-height:300px;margin:0}
-#json{white-space:pre-wrap;word-break:break-all}
-.mut{color:var(--mut)}
-.empty{color:var(--mut);font-size:12px}
+/* 右：检视器 */
+.inspector{border-left:1px solid var(--rule);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+@media (max-width:1100px){ .inspector{display:none} }
+.ihead{padding:12px 14px;border-bottom:1px solid var(--rule);flex-shrink:0}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--panel-2);border:1px solid var(--rule);border-radius:var(--r);padding:8px 10px}
+.stat .k{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-family:var(--mono)}
+.stat .v{font-family:var(--mono);font-size:15px;color:var(--text);margin-top:2px}
+.stat .v small{font-size:10px;color:var(--muted)}
+.tabs{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--rule);flex-shrink:0;align-items:center}
+.tab{background:none;border:0;color:var(--muted);font-size:12px;font-weight:600;padding:5px 10px;border-radius:4px}
+.tab.on{color:var(--amber);background:var(--amber-dim)}
+.tab .n{font-family:var(--mono);font-size:10px;color:var(--faint);margin-left:5px}
+.ipane{flex:1;min-height:0;overflow:auto;display:none;padding:10px 12px}
+.ipane.on{display:block}
+.pane-note{color:var(--faint);font-size:11px;margin:6px 2px 10px}
+.obj{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+  padding:8px 9px;border:1px solid var(--rule);border-radius:var(--r);margin-bottom:6px;
+  background:var(--panel-2);cursor:pointer;transition:.1s}
+.obj:hover{border-color:var(--rule-2);background:var(--panel-3)}
+.obj.sel{border-color:var(--amber-line);background:var(--amber-dim)}
+.obj .idx{font-family:var(--mono);font-size:10px;color:var(--faint);width:20px}
+.obj .t{min-width:0}
+.obj .t .l1{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obj .t .l2{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.obj .sw{width:9px;height:9px;border-radius:2px}
+.bar-wrap{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.bar-wrap .lb{font-family:var(--mono);font-size:11px;width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.bar-track{flex:1;height:6px;background:var(--panel-3);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;background:var(--amber)}
+.bar-wrap .sc{font-family:var(--mono);font-size:11px;width:52px;text-align:right;color:var(--text)}
+details.fold{border:1px solid var(--rule);border-radius:var(--r);margin-bottom:6px;background:var(--panel-2)}
+details.fold summary{padding:8px 10px;font-size:12px;cursor:pointer;font-weight:600;list-style:none}
+details.fold summary::-webkit-details-marker{display:none}
+details.fold[open] summary{border-bottom:1px solid var(--rule)}
+details.fold .grid{padding:10px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-family:var(--mono);font-size:11px}
+details.fold .grid .k{color:var(--faint)}
+pre{background:#0a0b0e;border:1px solid var(--rule);border-radius:var(--r);padding:11px;
+  font-family:var(--mono);font-size:11px;overflow:auto;margin:0;color:#cdd3de}
+.empty{color:var(--faint);font-size:12px;padding:14px 4px}
 
-/* ── 遮罩与 toast ── */
-.modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
-  background:rgba(4,7,15,.62);backdrop-filter:blur(2px)}
-.modal.on{display:flex}
-.modal .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 34px;
-  text-align:center;min-width:250px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
-.modal .spinner{width:34px;height:34px;margin:0 auto 14px;border:3px solid var(--line);border-top-color:var(--acc);
-  border-radius:50%;animation:spin .8s linear infinite}
-.modal .txt{font-size:14px;font-weight:600}
-.modal .err{color:var(--bad);font-size:13px;margin-top:8px;white-space:pre-wrap;max-width:420px}
-#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center}
-.toast{background:var(--panel);border:1px solid var(--line);color:var(--tx);font-size:13px;
-  padding:9px 16px;border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:80vw;animation:pop .15s ease}
-.toast.err{border-color:var(--bad);color:#ffd7dd}
-.toast.ok{border-color:var(--ok);color:#d3fff9}
+/* tooltip */
+#tip{position:fixed;z-index:40;pointer-events:none;background:#0a0b0e;border:1px solid var(--amber-line);
+  border-radius:4px;padding:6px 9px;font-family:var(--mono);font-size:11px;color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);display:none;white-space:nowrap}
+#tip .s{color:var(--amber)}
+
+/* modal / toast */
+.modal{position:fixed;inset:0;z-index:60;display:none;place-items:center;background:rgba(6,7,9,.7);backdrop-filter:blur(2px)}
+.modal.on{display:grid}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:24px 30px;min-width:260px;text-align:center}
+.spin{width:30px;height:30px;margin:0 auto 13px;border:3px solid var(--rule);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
+.card .t{font-size:13px;font-weight:600}
+.card .e{color:var(--bad);font-size:12px;margin-top:8px;white-space:pre-wrap;max-width:400px;font-family:var(--mono)}
+#toasts{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:70;display:flex;flex-direction:column;gap:7px;align-items:center}
+.toast{background:var(--panel-2);border:1px solid var(--rule);font-size:12px;padding:9px 15px;border-radius:6px;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);max-width:80vw;animation:pop .14s ease}
+.toast.ok{border-color:rgba(74,214,160,.5)} .toast.err{border-color:rgba(255,107,107,.5)}
 @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition:none!important}}
 </style>
 </head>
 <body>
-<div class="bg"></div>
 <header>
-  <h1>ModelDeploy<span class="sub">模型功能演示 · 懒加载</span></h1>
+  <div class="brand"><b>ModelDeploy</b><span class="tag">observation bench</span></div>
   <div class="sp"></div>
-  <span id="ctxPill" class="pill">未选择模型</span>
-  <span id="cnt" class="pill">0 模型</span>
+  <span id="chipConn" class="chip"><span class="dot"></span>连接中…</span>
+  <span id="chipCount" class="chip mono">0 模型</span>
 </header>
+
 <div class="layout">
-  <nav>
-    <div class="nav-t">模型列表</div>
-    <div id="nav"></div>
-  </nav>
-  <main>
-    <div class="toolbar">
+  <!-- 左：模型轨 -->
+  <aside class="rail">
+    <div class="hd"><span>模型目录</span><span id="railCount" class="mono">—</span></div>
+    <div id="rail"></div>
+  </aside>
+
+  <!-- 中：观测台 -->
+  <section class="bench">
+    <div class="bar">
       <div class="cur">
-        <span id="curName" class="mut">未选择模型</span>
-        <span id="curSt" class="Status un"><span class="d"></span><span class="t">未选择</span></span>
+        <span id="curName" class="nm" style="color:var(--muted)">未选择模型</span>
+        <span id="curSt" class="chip"><span class="dot"></span><span id="curStTxt">未选择</span></span>
       </div>
       <div class="sp"></div>
-      <button id="uploadBtn" class="tbtn">上传图片</button>
-      <div class="samp-wrap">
-        <button id="sampleBtn" class="tbtn">样例图 ▾</button>
-        <div class="samp-menu" id="sampMenu"></div>
+      <button id="btnUpload" class="btn">上传图片</button>
+      <div style="position:relative">
+        <button id="btnSample" class="btn">样例 ▾</button>
+        <div id="sampleMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:30;
+             background:var(--panel-2);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;min-width:190px"></div>
       </div>
-      <button id="runBtn" class="tbtn primary">推理</button>
-    </div>
-
-    <div class="stagewrap">
-      <div id="emptyHint">选择左侧模型并<b>解锁</b>后，<br>上传图片或选取样例即可推理。</div>
-      <div id="wrap">
-        <img id="img" alt="input preview">
-      </div>
-    </div>
-
-    <div class="results" id="results">
-      <div class="tabs">
-        <button class="tabbtn on" data-tab="viz">可视化</button>
-        <button class="tabbtn" data-tab="json">JSON</button>
-        <button id="dlPng">下载可视化</button>
-        <div class="sp"></div>
-        <button class="fold" id="foldBtn">收起 ▲</button>
-      </div>
-      <div class="res-body">
-        <div class="tabpane on" id="tab-viz">
-          <div id="viznote"></div>
-          <img id="resImg" alt="可视化结果（SDK 渲染）">
-          <div id="table"></div>
-        </div>
-        <div class="tabpane" id="tab-json">
-          <pre id="json"></pre>
+      <div style="position:relative">
+        <button id="btnParams" class="btn">参数 ▾</button>
+        <div id="paramMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:30;
+             background:var(--panel-2);border:1px solid var(--rule);border-radius:var(--r);padding:12px;width:258px">
+          <div class="prow"><label>置信度阈值</label><input id="pThr" type="range" min="0" max="1" step="0.05" value="0"><span id="pThrV" class="hintx">0.00 (关)</span></div>
+          <div class="prow"><label>Top-K（分类）</label><input id="pTopk" type="number" min="0" value="0"><span class="hintx">0=全部</span></div>
+          <div class="prow"><label>最大目标数</label><input id="pMax" type="number" min="0" value="0"><span class="hintx">0=不限</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <span class="hintx">改后点「推理」生效</span>
+            <button id="pReset" class="btn" style="padding:4px 10px;font-size:11px">重置</button>
+          </div>
         </div>
       </div>
+      <div class="seg" id="viewSeg">
+        <button data-v="overlay" class="on">叠加</button>
+        <button data-v="server">服务端渲染</button>
+      </div>
+      <div class="lay" id="layers">
+        <button data-l="box" class="on">框</button>
+        <button data-l="kp" class="on">关键点</button>
+        <button data-l="mask" class="on">掩码</button>
+        <button data-l="label" class="on">标签</button>
+      </div>
+      <button id="btnRun" class="btn amber">推理</button>
     </div>
-  </main>
+
+    <div class="stage" id="stage">
+      <div class="hint" id="hint">
+        <h2>选择一个模型开始</h2>
+        <p>在左侧选中模型（自动懒加载）→ 上传图片或选<b class="k"> 样例 </b>→ 点<b class="k"> 推理 </b>。<br>
+           结果会叠加在画布上，可悬停/点击查看每个目标。</p>
+      </div>
+      <div id="frame">
+        <img id="img" alt="input">
+        <canvas id="ovl"></canvas>
+        <img id="srvimg" alt="server result">
+      </div>
+    </div>
+
+    <div class="readout" id="readout">
+      <div class="cell"><span class="lb">指针</span><span class="vl mono" id="roXY">— , —</span></div>
+      <div class="sep"></div>
+      <div class="cell"><span class="lb">命中</span><span class="vl mono" id="roHit">—</span></div>
+      <div class="sep"></div>
+      <div class="cell"><span class="lb">框</span><span class="vl mono" id="roBox">—</span></div>
+      <div class="sep"></div>
+      <div class="cell"><span class="lb">分辨率</span><span class="vl mono" id="roRes">—</span></div>
+      <div class="sep"></div>
+      <div class="cell"><span class="lb">视图</span><span class="vl mono" id="roView">叠加</span></div>
+    </div>
+  </section>
+
+  <!-- 右：检视器 -->
+  <aside class="inspector">
+    <div class="ihead">
+      <div class="summary">
+        <div class="stat"><div class="k">推理耗时</div><div class="v" id="stMs">—<small> ms</small></div></div>
+        <div class="stat"><div class="k">目标数</div><div class="v" id="stN">—</div></div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-t="objects">对象 <span class="n" id="tabN">0</span></button>
+      <button class="tab" data-t="json">JSON</button>
+      <div class="sp"></div>
+      <button id="btnDl" class="btn" style="padding:5px 10px;font-size:11px">导出</button>
+    </div>
+    <div class="ipane on" id="pane-objects"><div id="objs"></div></div>
+    <div class="ipane" id="pane-json"><pre id="json"></pre></div>
+  </aside>
 </div>
 
-<div class="modal" id="modal">
-  <div class="card">
-    <div class="spinner"></div>
-    <div class="txt" id="mText">加载中…</div>
-    <div class="err" id="mErr" style="display:none"></div>
-  </div>
-</div>
+<div class="modal" id="modal"><div class="card">
+  <div class="spin"></div><div class="t" id="mT">加载中…</div><div class="e" id="mE" style="display:none"></div>
+</div></div>
 <div id="toasts"></div>
+<div id="tip"></div>
 
 <script>
 'use strict';
-const $=id=>document.getElementById(id);
-let models=[], selId=null, curB64=null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (typeof n==='number') ? (Math.round(n*1000)/1000).toString() : (n==null?'':String(n));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const ABBR = {det:'DET',cls:'CLS',seg:'SEG',pose:'POSE',obb:'OBB',sem:'SEM',depth:'DEP',ocr:'OCR',face:'FACE',lpr:'LPR'};
+const GROUP = {det:'检测',cls:'分类',seg:'实例分割',pose:'姿态',obb:'旋转框',sem:'语义分割',depth:'深度',ocr:'文字识别',face:'人脸',lpr:'车牌'};
+const PALETTE = ['#f5a623','#4ecdc4','#7aa2f7','#f7768e','#9ece6a','#bb9af7','#e0af68','#2ac3de','#ff9e64','#73daca'];
+const COCO_EDGES = [[15,13],[13,11],[16,14],[14,12],[11,12],[5,11],[6,12],[5,6],[5,7],[6,8],[7,9],[8,10],[1,2],[0,1],[0,2],[1,3],[2,4],[3,5],[4,6]];
+const KEEP_LABELS = {det:1,cls:1,seg:1,pose:1,obb:1,ocr:1,face:1,lpr:1};
 
-const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-function fmt(v){if(typeof v==='number')return (Math.round(v*1000)/1000).toString();return v==null?'':String(v);}
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const TYPE_ICONS={det:'DT',face:'FC',seg:'SEG',pose:'PS',obb:'OB',ocr:'OCR',lpr:'LPR',cls:'CLS',sem:'SEM',depth:'DP'};
-const typeIcon=t=>TYPE_ICONS[t]||String(t||'?').toUpperCase().slice(0,3);
-const GROUP_LABELS={det:'检测',cls:'分类',seg:'实例分割',pose:'姿态',obb:'OBB',sem:'语义分割',depth:'深度',ocr:'OCR',face:'人脸',lpr:'车牌'};
+const S = { models:[], selId:null, img:null, objects:[], picks:[], res:null,
+  view:'overlay', layers:{box:true,kp:true,mask:true,label:true}, hover:-1, sel:-1,
+  params:{threshold:0, top_k:0, max_det:0} };
 
 /* ── API ── */
-async function apiGet(u){const r=await fetch(u);const j=await r.json().catch(()=>({}));if(!r.ok)throw(j.error||new Error('HTTP '+r.status));return j;}
+async function apiGet(u){ const r=await fetch(u); const j=await r.json().catch(()=>({})); if(!r.ok) throw (j.error||new Error('HTTP '+r.status)); return j; }
 async function apiPost(u,b){
   const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
   const j=await r.json().catch(()=>({}));
@@ -216,270 +314,400 @@ async function apiPost(u,b){
 }
 
 /* ── toast / modal ── */
-function toast(msg,kind){
-  const t=document.createElement('div');t.className='toast '+(kind||'');t.textContent=msg;
-  $('toasts').appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),320);},2600);
-}
-function showModal(text){$('mText').textContent=text;$('mErr').style.display='none';$('modal').classList.add('on');}
-function hideModal(){$('modal').classList.remove('on');}
-function modalFail(text){$('mText').style.display='none';const e=$('mErr');e.style.display='block';e.textContent=text;}
+function toast(m,k){ const t=document.createElement('div'); t.className='toast '+(k||''); t.textContent=m; $('toasts').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),320);},2600); }
+function showModal(t){ $('mT').style.display='block'; $('mT').textContent=t; $('mE').style.display='none'; $('modal').classList.add('on'); }
+function hideModal(){ $('modal').classList.remove('on'); }
+function failModal(t){ $('mT').style.display='none'; const e=$('mE'); e.style.display='block'; e.textContent=t; }
 
-/* ── 列表渲染 ── */
-function statusOf(m){return m.status==='loading'?'lo':(m.status==='ready'?'rd':(m.status==='failed'?'fl':'un'));}
-function statusTxt(m){
-  if(m.status==='loading')return '加载中';
-  if(m.status==='ready')return '就绪';
-  if(m.status==='failed')return '失败';
-  return '未加载';
-}
-function renderNav(){
-  const n=$('nav');n.innerHTML='';
-  if(!models.length){const e=document.createElement('div');e.className='empty';e.textContent='无可用模型';n.appendChild(e);return;}
-  const groups={};
-  models.forEach(m=>{(groups[m.type]=groups[m.type]||[]).push(m);});
-  let first=true;
+/* ── 模型轨 ── */
+const statusCls = m => m.status==='loading'?'lo':(m.status==='ready'?'rd':(m.status==='failed'?'fl':''));
+const statusTxt = m => ({loading:'加载中',ready:'就绪',failed:'失败'}[m.status] || '未加载');
+function curModel(){ return S.models.find(m=>m.id===S.selId) || null; }
+function renderRail(){
+  const rail=$('rail'); rail.innerHTML='';
+  $('railCount').textContent=S.models.length||'0';
+  if(!S.models.length){ rail.innerHTML='<div class="empty-rail">无可用模型</div>'; return; }
+  const groups={}; S.models.forEach(m=>{(groups[m.type]=groups[m.type]||[]).push(m);});
   Object.keys(groups).forEach(type=>{
-    const g=document.createElement('div');
-    g.className='grp';g.style.marginTop=first?'0':'10px';first=false;
-    g.textContent=GROUP_LABELS[type]||type.toUpperCase();
-    n.appendChild(g);
+    const g=document.createElement('div'); g.className='grp';
+    g.innerHTML=esc(GROUP[type]||type.toUpperCase())+' <span class="cnt">'+groups[type].length+'</span>';
+    rail.appendChild(g);
     groups[type].forEach(m=>{
-      const d=document.createElement('div');
-      d.className='m'+(m.id===selId?' sel':'');
-      d.onclick=()=>select(m.id);
-      const input=(m.input_size||[]).map(v=>String(v)).join(' × ')||'—';
-      d.innerHTML=`<div>
-          <div class="name"><span class="tag">${esc(typeIcon(m.type))}</span>${esc(m.display)}</div>
-          <div class="inf">${esc(input)}</div>
-        </div>
-        <span class="Status ${statusOf(m)}"><span class="d"></span><span class="t">${statusTxt(m)}</span></span>`;
-      n.appendChild(d);
+      const d=document.createElement('div'); d.className='m'+(m.id===S.selId?' sel':''); d.tabIndex=0;
+      const sz=(m.input_size||[]).join('×')||'—';
+      d.innerHTML='<div class="abbr">'+esc(ABBR[m.type]||(m.type||'').slice(0,3).toUpperCase())+'</div>'+
+        '<div class="body"><div class="nm">'+esc(m.display||m.id)+'</div>'+
+        '<div class="meta">'+esc(m.id)+' · '+esc(sz)+'</div></div>'+
+        '<span class="st '+statusCls(m)+'" title="'+esc(m.error||statusTxt(m))+'"></span>';
+      d.onclick=()=>select(m.id); d.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(m.id);}};
+      rail.appendChild(d);
     });
   });
 }
-function curModel(){return models.find(m=>m.id===selId)||null;}
-function updateHeader(m){
-  const p=$('ctxPill');
-  if(!m){p.className='pill';p.textContent='未选择模型';return;}
-  const st=m.status==='ready'?'ok':(m.status==='failed'?'bad':'on');
-  p.className='pill '+st;
-  p.innerHTML='<span class="d"></span>'+esc(m.display)+' · '+statusTxt(m);
-}
-function updateToolbar(m){
-  const st=$('curSt');
-  if(!m){$('curName').className='mut';$('curName').textContent='未选择模型';st.className='Status un';st.innerHTML='<span class="d"></span><span class="t">未选择</span>';}
-  else{$('curName').className='';$('curName').textContent=m.display;st.className='Status '+statusOf(m);st.innerHTML='<span class="d"></span><span class="t">'+statusTxt(m)+'</span>';}
-  $('runBtn').disabled=!(m&&m.status==='ready');
+function updateCur(){
+  const m=curModel();
+  $('curName').textContent = m ? (m.display||m.id) : '未选择模型';
+  $('curName').style.color = m ? 'var(--text)' : 'var(--muted)';
+  const st=$('curSt'), tx=$('curStTxt');
+  if(!m){ st.className='chip'; tx.textContent='未选择'; }
+  else { st.className='chip '+(m.status==='ready'?'ok':(m.status==='failed'?'bad':(m.status==='loading'?'hot':''))); tx.textContent=statusTxt(m); }
+  $('btnRun').disabled = !(m && m.status==='ready');
 }
 async function refresh(){
-  try{models=(await apiGet('/v1/models')).models||[];}catch(e){models=[];}
-  $('cnt').textContent=models.length+' 模型';
-  const m=curModel();
-  renderNav();
-  updateHeader(m);
-  updateToolbar(curModel());
+  try{ S.models=(await apiGet('/v1/models')).models||[]; $('chipConn').className='chip ok'; $('chipConn').innerHTML='<span class="dot"></span>已连接'; }
+  catch(e){ S.models=[]; $('chipConn').className='chip bad'; $('chipConn').innerHTML='<span class="dot"></span>连接失败'; }
+  $('chipCount').textContent=S.models.length+' 模型';
+  renderRail(); updateCur();
 }
 
-/* ── 选中 / 加载 ── */
-let selectGen=0;
+/* ── 选择 / 懒加载 ── */
+let gen=0;
 async function select(id){
-  const gen=++selectGen;
-  selId=id;
-  renderNav();
-  updateToolbar(curModel());
-  const m=curModel();
-  if(m&&m.status==='ready'){if(gen===selectGen)toast('模型已就绪','ok');return;}
-  if(!m)return;
-  if(gen===selectGen)showModal('加载「'+m.display+'」…');
-  if(m.status!=='loading'&&m.status!=='ready'){
-    try{await apiPost('/v1/models/'+encodeURIComponent(id)+'/load');}catch(e){if(gen===selectGen){hideModal();toast('加载请求失败：'+(e.message||e),'err');}return;}
+  const g=++gen; S.selId=id; renderRail(); updateCur();
+  const m=curModel(); if(!m) return;
+  if(m.status==='ready'){ toast('模型已就绪','ok'); return; }
+  showModal('加载「'+(m.display||m.id)+'」…');
+  if(m.status!=='loading'){
+    try{ await apiPost('/v1/models/'+encodeURIComponent(id)+'/load'); }
+    catch(e){ if(g===gen){ hideModal(); toast('加载请求失败：'+(e.message||e),'err'); } return; }
   }
-  const deadline=Date.now()+120000;
-  let gone=false;
+  const deadline=Date.now()+180000;
   while(Date.now()<deadline){
-    await sleep(500);
-    await refresh();
+    await sleep(450); await refresh();
+    if(g!==gen) return;
     const cur=curModel();
-    if(!cur){gone=true;break;}
-    if(cur.status==='ready'){
-      if(gen===selectGen){hideModal();toast('模型已就绪，可以推理了','ok');}
-      return;
-    }
-    if(cur.status==='failed'){
-      if(gen===selectGen){hideModal();toast('模型加载失败：'+(cur.error||'未知错误'),'err');}
-      return;
-    }
-    if(cur.status==='loading'&&gen===selectGen)showModal('加载「'+cur.display+'」…');
+    if(!cur){ hideModal(); toast('模型不存在','err'); return; }
+    if(cur.status==='ready'){ hideModal(); toast('已就绪，可以推理','ok'); return; }
+    if(cur.status==='failed'){ hideModal(); toast('加载失败：'+(cur.error||'未知'),'err'); return; }
   }
-  if(gen===selectGen){hideModal();toast(gone?'模型不存在':'加载超时，请重试','err');}
+  if(g===gen){ hideModal(); toast('加载超时，请重试','err'); }
 }
 
-/* ── 图片处理（长边≤1600 降采样）── */
-function fileToImage(f){return new Promise((ok,er)=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>ok(im);im.onerror=er;im.src=r.result;};r.onerror=er;r.readAsDataURL(f);});}
-function downscaled(img,max){
-  let w=img.naturalWidth,h=img.naturalHeight;
-  const mm=Math.max(w,h);
-  if(mm>max){const k=max/mm;w=Math.round(w*k);h=Math.round(h*k);}
-  const off=document.createElement('canvas');off.width=w;off.height=h;
-  off.getContext('2d').drawImage(img,0,0,w,h);
-  return {w,h,dataUrl:off.toDataURL('image/jpeg',0.9)};
+/* ── 图片 ── */
+function fileToImage(f){ return new Promise((ok,er)=>{ const r=new FileReader();
+  r.onload=()=>{const im=new Image(); im.onload=()=>ok(im); im.onerror=er; im.src=r.result;}; r.onerror=er; r.readAsDataURL(f); }); }
+function downscale(img,max){ let w=img.naturalWidth,h=img.naturalHeight; const mm=Math.max(w,h);
+  if(mm>max){ const k=max/mm; w=Math.round(w*k); h=Math.round(h*k); }
+  const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+  return {w,h,dataUrl:c.toDataURL('image/jpeg',0.92)}; }
+function setImage(info){
+  S.img={el:new Image(), naturalW:info.w, naturalH:info.h, dataUrl:info.dataUrl, b64:info.dataUrl.split(',')[1]};
+  S.img.el.onload=()=>layoutCanvas();
+  S.img.el.src=info.dataUrl;
+  $('img').src=info.dataUrl; $('srvimg').style.display='none'; $('img').style.display='block';
+  $('hint').style.display='none'; $('frame').style.display='block';
+  resetResult(); $('roRes').textContent=info.w+' × '+info.h;
+  layoutCanvas();
 }
-function setPreview(info){
-  const img=$('img');img.src=info.dataUrl;
-  $('wrap').style.display='block';
-  $('emptyHint').style.display='none';
-  curB64=info.dataUrl.split(',')[1];
-  clearResult();
+function clearAll(){ S.objects=[]; S.picks=[]; S.res=null; S.hover=-1; S.sel=-1; hideTip(); }
+function resetResult(){ clearAll(); drawOverlay(); renderObjects(); renderJson(); $('stMs').innerHTML='—<small> ms</small>'; $('stN').textContent='—'; $('tabN').textContent='0'; }
+
+/* ── 画布布局与坐标 ── */
+function displayedSize(){ const el=$('img'); return {w:el.clientWidth, h:el.clientHeight}; }
+function layoutCanvas(){
+  const el=$('img'); const ov=$('ovl');
+  if(!el.clientWidth) return;
+  const dpr=window.devicePixelRatio||1;
+  ov.width=Math.round(el.clientWidth*dpr); ov.height=Math.round(el.clientHeight*dpr);
+  ov.style.width=el.clientWidth+'px'; ov.style.height=el.clientHeight+'px';
+  drawOverlay();
 }
-function clearResult(){
-  $('viznote').innerHTML='';
-  $('resImg').style.display='none';$('resImg').removeAttribute('src');
-  $('table').innerHTML='<span class="empty">等待推理结果…</span>';
-  $('json').textContent='';
+function toImg(ev){
+  const el=$('img'); const r=el.getBoundingClientRect();
+  const sx=(S.img?S.img.naturalW:el.naturalWidth)/(el.clientWidth||1);
+  const sy=(S.img?S.img.naturalH:el.naturalHeight)/(el.clientHeight||1);
+  return { x:(ev.clientX-r.left)*sx, y:(ev.clientY-r.top)*sy,
+           dx:ev.clientX-r.left, dy:ev.clientY-r.top };
 }
-async function loadFromImage(img,type){
-  try{setPreview(downscaled(img,1600));toast('图片已加载','ok');}
-  catch(e){toast('图片解码失败','err');}
+function colorFor(id){ return PALETTE[Math.abs(id|0)%PALETTE.length]; }
+
+/* ── 结果 → 对象（几何统一） ── */
+function buildObjects(type,res){
+  const o=[];
+  if(res==null) return o;
+  if(type==='det'){ (res||[]).forEach((r,i)=>o.push({kind:'rect',id:i,c:r.label_id,score:r.score,box:r.box,label:r.label_id})); }
+  else if(type==='face'){ (res||[]).forEach((r,i)=>o.push({kind:'kp',id:i,c:r.label_id,score:r.score,box:r.box,kps:r.keypoints,label:r.label_id})); }
+  else if(type==='pose'){ (res||[]).forEach((r,i)=>o.push({kind:'kp',id:i,c:r.label_id,score:r.score,box:r.box,kps:r.keypoints,label:r.label_id})); }
+  else if(type==='lpr'){ (res||[]).forEach((r,i)=>o.push({kind:'rect',id:i,c:r.label_id,score:r.score,box:r.box,kps:r.keypoints,label:r.label_id,text:r.car_plate_str,sub:r.car_plate_color})); }
+  else if(type==='seg'){ (res||[]).forEach((r,i)=>o.push({kind:'seg',id:i,c:r.label_id,score:r.score,box:r.box,mask:r.mask,label:r.label_id})); }
+  else if(type==='obb'){ (res||[]).forEach((r,i)=>{ const b=r.rotated_box; o.push({kind:'obb',id:i,c:r.label_id,score:r.score,obb:b,box:obbBounds(b),label:r.label_id}); }); }
+  else if(type==='ocr'){ const bx=res.boxes||[], tx=res.text||[], sc=res.rec_scores||[];
+    bx.forEach((q,i)=>o.push({kind:'quad',id:i,c:0,score:sc[i],pts:quadPts(q),text:tx[i],label:'text',
+      box:bboxOf(quadPts(q))})); }
+  return o;
 }
-async function uploadFile(f){
-  if(!f)return;
-  const okType=/^image\//.test(f.type||'')||/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name||'');
-  if(!okType){toast('请选择图片文件（JPG/PNG 等）','err');return;}
-  try{loadFromImage(await fileToImage(f),f.type||'image/jpeg');}
-  catch(e){toast('图片解码失败','err');}
+function obbBounds(b){ // rotated rect → axis-aligned bounds
+  const cs=obbCorners(b);
+  const X=cs.map(c=>c[0]), Y=cs.map(c=>c[1]);
+  return {x:Math.min(...X),y:Math.min(...Y),width:Math.max(...X)-Math.min(...X),height:Math.max(...Y)-Math.min(...Y)};
 }
-function chooseSample(name){
-  const im=new Image();
-  im.onload=()=>loadFromImage(im,'image/png');
-  im.onerror=()=>toast('样例图加载失败','err');
-  im.src='./samples/'+name;
+function obbCorners(b){
+  const a=(b.angle||0), cx=b.xc, cy=b.yc, w=b.width/2, h=b.height/2;
+  const cos=Math.cos(a), sin=Math.sin(a);
+  return [[-w,-h],[w,-h],[w,h],[-w,h]].map(([x,y])=>[cx+x*cos-y*sin, cy+x*sin+y*cos]);
 }
+function quadPts(q){ const p=[]; for(let i=0;i+1<q.length;i+=2)p.push([q[i],q[i+1]]); return p; }
+function bboxOf(pts){ const X=pts.map(p=>p[0]),Y=pts.map(p=>p[1]);
+  return {x:Math.min(...X),y:Math.min(...Y),width:Math.max(...X)-Math.min(...X),height:Math.max(...Y)-Math.min(...Y)}; }
+
+/* ── 叠加绘制 ── */
+function drawOverlay(){
+  const ov=$('ovl'); const ctx=ov.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,ov.width,ov.height);
+  if(S.view!=='overlay'||!S.img||!S.objects.length) return;
+  const dpr=window.devicePixelRatio||1;
+  const sx=(ov.width/dpr)/S.img.naturalW, sy=(ov.height/dpr)/S.img.naturalH;
+  ctx.setTransform(dpr*sx,0,0,dpr*sy,0,0);
+  S.objects.forEach((o,i)=>{
+    const active=(i===S.hover||i===S.sel);
+    if(o.kind==='seg' && S.layers.mask) drawMask(ctx,o,active);
+    if((o.kind==='rect'||o.kind==='seg'||o.kind==='kp') && S.layers.box) drawRect(ctx,o.box,colorFor(o.c),active);
+    if(o.kind==='obb') drawObb(ctx,o,active);
+    if(o.kind==='quad') drawQuad(ctx,o,active);
+    if((o.kind==='kp'||(o.kind==='rect'&&o.kps)) && S.layers.kp && o.kps) drawKps(ctx,o.kps,colorFor(o.c),active,o.kind==='kp'?2:1.5);
+    if(S.layers.label) drawLabel(ctx,o,active);
+  });
+  drawCrosshair(ctx);
+}
+function drawRect(ctx,b,color,active){
+  ctx.lineWidth=active?2:1.2; ctx.strokeStyle=active?'#fff':color;
+  if(active){ ctx.save(); ctx.shadowColor=color; ctx.shadowBlur=8; }
+  ctx.strokeRect(b.x,b.y,b.width,b.height);
+  if(active) ctx.restore();
+}
+function drawObb(ctx,o,active){
+  const c=obbCorners(o.obb), color=colorFor(o.c);
+  ctx.beginPath(); ctx.moveTo(c[0][0],c[0][1]); c.slice(1).forEach(p=>ctx.lineTo(p[0],p[1])); ctx.closePath();
+  ctx.lineWidth=active?2:1.2; ctx.strokeStyle=active?'#fff':color; ctx.stroke();
+}
+function drawQuad(ctx,o,active){
+  const p=o.pts; if(p.length<2) return; const color=active?'#fff':'#f5a623';
+  ctx.beginPath(); ctx.moveTo(p[0][0],p[0][1]); p.slice(1).forEach(q=>ctx.lineTo(q[0],q[1])); ctx.closePath();
+  ctx.lineWidth=active?2:1.2; ctx.strokeStyle=color; ctx.stroke();
+}
+function drawMask(ctx,o,active){
+  const m=o.mask; if(!m||!m.shape||!m.data) return;
+  const mh=m.shape[0], mw=m.shape[1];
+  if(!o._mc||o._mc.width!==mw||o._mc.height!==mh){ o._mc=document.createElement('canvas'); o._mc.width=mw; o._mc.height=mh; }
+  const img=o._ctx||(o._ctx=o._mc.getContext('2d'));
+  const im=img.createImageData(mw,mh); const rgb=hex2rgb(colorFor(o.c));
+  const d=m.data;
+  for(let i=0;i<mw*mh;i++){ if(d[i]){ const k=i*4; im.data[k]=rgb[0]; im.data[k+1]=rgb[1]; im.data[k+2]=rgb[2]; im.data[k+3]=active?190:120; } }
+  img.putImageData(im,0,0);
+  ctx.drawImage(o._mc, o.box.x, o.box.y, o.box.width, o.box.height);
+}
+function drawKps(ctx,kps,color,active,r){
+  if(!kps||!kps.length) return;
+  ctx.strokeStyle=active?'#fff':color; ctx.lineWidth=(active?2:1.2);
+  if(kps.length>=17) COCO_EDGES.forEach(([a,b])=>{ const p=kps[a],q=kps[b]; if(!p||!q)return;
+    if((p.z||1)<=0||(q.z||1)<=0)return; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); });
+  ctx.fillStyle=active?'#fff':color;
+  kps.forEach(p=>{ if((p.z||1)<=0) return; ctx.beginPath(); ctx.arc(p.x,p.y,active?3:2.2,0,7); ctx.fill(); });
+}
+function drawLabel(ctx,o,active){
+  const b=o.box; if(!b) return; const color=colorFor(o.c);
+  const lbl = o.c!=null ? (labelName(o)) : '?' ;
+  const score = o.score!=null ? ' '+o.score.toFixed(2) : '';
+  const txt = (o.text? o.text : lbl)+score;
+  ctx.font='600 12px '+getComputedStyle(document.body).getPropertyValue('--mono');
+  const w=ctx.measureText(txt).width+10, h=17;
+  ctx.fillStyle=active?'#fff':color;
+  ctx.fillRect(b.x, Math.max(0,b.y-h), w, h);
+  ctx.fillStyle=active?color:'#101216';
+  ctx.fillText(txt, b.x+5, Math.max(12, b.y-4));
+}
+function labelName(o){
+  const m=curModel(); const labels=(m&&m.labels)||[];
+  if(o.kind==='quad') return 'text';
+  if(labels.length && o.c!=null && labels[o.c]!=null) return labels[o.c];
+  return (o.c!=null?('#'+o.c):'?');
+}
+function drawCrosshair(ctx){
+  if(cross.x<0) return;
+  ctx.strokeStyle='rgba(245,166,35,.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cross.x,0); ctx.lineTo(cross.x,S.img.naturalH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,cross.y); ctx.lineTo(S.img.naturalW,cross.y); ctx.stroke();
+}
+function hex2rgb(h){ const n=parseInt(h.slice(1),16); return [n>>16&255,n>>8&255,n&255]; }
+
+/* ── 命中 / 交互 ── */
+const cross={x:-1,y:-1};
+let hideTip=()=>{ $('tip').style.display='none'; };
+function hitTest(ix,iy){
+  let best=-1, bestArea=Infinity;
+  S.objects.forEach((o,i)=>{ const b=o.box; if(!b) return;
+    if(ix>=b.x&&ix<=b.x+b.width&&iy>=b.y&&iy<=b.y+b.height){ const a=b.width*b.height; if(a<bestArea){bestArea=a;best=i;} } });
+  return best;
+}
+function onMove(ev){
+  if(!S.img) return; const p=toImg(ev); cross.x=p.x; cross.y=p.y;
+  $('roXY').textContent=Math.round(p.x)+' , '+Math.round(p.y);
+  if(S.view==='overlay'&&S.objects.length) setHover(hitTest(p.x,p.y),ev);
+  if(S.view==='overlay') drawOverlay();
+}
+function setHover(i,ev){
+  if(i!==S.hover){ S.hover=i; renderObjects(); }
+  const o=S.objects[i]; const tip=$('tip');
+  if(o){
+    $('roHit').textContent=labelName(o)+(o.score!=null?' · '+o.score.toFixed(3):'');
+    $('roBox').textContent=boxStr(o.box);
+    tip.style.display='block';
+    tip.innerHTML=esc(labelName(o))+(o.score!=null?' <span class="s">'+o.score.toFixed(3)+'</span>':'')+
+      '<br>'+esc(boxStr(o.box))+(o.text?('<br>'+esc(o.text)):'');
+    const x=(ev?ev.clientX:0), y=(ev?ev.clientY:0);
+    tip.style.left=Math.min(x+14,window.innerWidth-190)+'px';
+    tip.style.top=Math.min(y+16,window.innerHeight-64)+'px';
+  } else { $('roHit').textContent='—'; $('roBox').textContent='—'; hideTip(); }
+}
+function onLeave(){ cross.x=-1; S.hover=-1; $('roXY').textContent='— , —'; $('roHit').textContent='—'; $('roBox').textContent='—'; hideTip(); drawOverlay(); }
+function onPick(ev){ if(!S.img) return; const p=toImg(ev); const i=hitTest(p.x,p.y); S.sel=i; renderObjects(); drawOverlay(); }
+function boxStr(b){ return b?('x '+Math.round(b.x)+'  y '+Math.round(b.y)+'  w '+Math.round(b.width)+'  h '+Math.round(b.height)):'—'; }
+
+/* ── 检视器 ── */
+function renderObjects(){
+  const box=$('objs'); box.innerHTML=''; $('tabN').textContent=S.objects.length;
+  const m=curModel();
+  if(!S.res){ box.innerHTML='<div class="empty">等待推理结果…</div>'; return; }
+  if(m&&m.type==='cls'){ renderCls(box,S.res.results); return; }
+  if(m&&(m.type==='sem'||m.type==='depth')){ renderWhole(box,m.type,S.res.results); return; }
+  if(m&&(m.type==='face_rec'||S.res.results&&S.res.results.embedding)){ renderEmbed(box,S.res.results); return; }
+  if(!S.objects.length){ box.innerHTML='<div class="empty">没有目标</div>'; return; }
+  S.objects.forEach((o,i)=>{
+    const d=document.createElement('div'); d.className='obj'+(i===S.sel?' sel':'');
+    const col=colorFor(o.c);
+    d.innerHTML='<span class="idx">'+String(i+1).padStart(2,'0')+'</span>'+
+      '<div class="t"><div class="l1">'+esc(o.text||labelName(o))+'</div>'+
+      '<div class="l2">'+esc(boxStr(o.box))+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">'+
+      '<span class="sw" style="background:'+col+'"></span>'+
+      '<span class="mono" style="font-size:10px;color:var(--muted)">'+(o.score!=null?o.score.toFixed(2):'')+'</span></div>';
+    d.onmouseenter=()=>{S.hover=i;drawOverlay();d.classList.add('sel');};
+    d.onmouseleave=()=>{if(i!==S.sel){d.classList.remove('sel');}if(S.hover===i){S.hover=-1;drawOverlay();}};
+    d.onclick=()=>{S.sel=i;renderObjects();drawOverlay();};
+    box.appendChild(d);
+  });
+}
+function renderCls(box,res){
+  const sc=res.scores||[], ids=res.label_ids||[], labels=(curModel()&&curModel().labels)||[];
+  const rows=sc.map((s,i)=>({s,id:ids[i],name:labels[ids[i]]||('#'+ids[i])})).sort((a,b)=>b.s-a.s).slice(0,12);
+  if(!rows.length){box.innerHTML='<div class="empty">无结果</div>';return;}
+  rows.forEach(r=>{ const w=Math.max(2,Math.round(r.s*100));
+    const d=document.createElement('div'); d.className='bar-wrap';
+    d.innerHTML='<span class="lb">'+esc(r.name)+'</span><span class="bar-track"><span class="bar-fill" style="width:'+w+'%"></span></span><span class="sc">'+r.s.toFixed(3)+'</span>';
+    box.appendChild(d); });
+}
+function renderWhole(box,type,res){
+  const shape=(res&&res.shape)||[];
+  box.innerHTML='<div class="pane-note">整图结果，请看右侧「服务端渲染」视图。</div>'+
+    '<details class="fold" open><summary>'+esc(type==='depth'?'深度':'语义分割')+'</summary><div class="grid">'+
+    '<span class="k">shape</span><span>'+esc(shape.join(' × ')||'—')+'</span>'+
+    (type==='sem'?('<span class="k">num_classes</span><span>'+esc(res.num_classes)+'</span>'):'')+
+    (type==='depth'?('<span class="k">像素数</span><span>'+esc(res.depth?res.depth.length:0)+'</span>'):'')+
+    '</div></details>';
+}
+function renderEmbed(box,res){
+  const dim=(res.embedding||res.feature||[]).length;
+  box.innerHTML='<div class="pane-note">该族无框，输出向量。</div><details class="fold" open><summary>embedding</summary><div class="grid"><span class="k">维度</span><span>'+dim+'</span></div></details>';
+}
+function renderJson(){ $('json').textContent = S.res ? JSON.stringify(S.res.raw,null,2) : ''; }
+function setStats(){ const j=S.res; $('stMs').innerHTML=(j?fmt(j.duration_ms):'—')+'<small> ms</small>';
+  let n=null; if(j){ const r=j.results; n=Array.isArray(r)?r.length:(r&&r.boxes?r.boxes.length:(r&&r.scores?r.scores.length:null)); }
+  $('stN').textContent = n==null?'—':n; }
 
 /* ── 推理 ── */
 async function run(){
   const m=curModel();
-  if(!m){toast('请先选择模型','err');return;}
-  if(m.status!=='ready'){toast('请等待模型加载完成','err');return;}
-  if(!curB64){toast('请先上传或选择样例图片','err');return;}
-  const t0=performance.now();
-  $('runBtn').disabled=true;
+  if(!m) return toast('请先选择模型','err');
+  if(m.status!=='ready') return toast('请等待模型加载完成','err');
+  if(!S.img) return toast('请先上传或选择样例图片','err');
+  $('btnRun').disabled=true; const t0=performance.now();
   try{
-    const j=await apiPost('/v1/models/'+encodeURIComponent(m.id)+'/infer',{image:curB64});
-    const r=Object.assign({},j);delete r.image_b64;
-    if(j.image_b64){$('resImg').src='data:image/jpeg;base64,'+j.image_b64;$('resImg').style.display='block';}
-    const dt=performance.now()-t0;
-    const n=(Array.isArray(j.results)?j.results.length:(j.results&&j.results.boxes?j.results.boxes.length:null));
-    renderResult(m,j.results);
-    $('viznote').innerHTML=esc(m.display)+' · 服务端 <b>'+fmt(j.duration_ms)+' ms</b> · 浏览器总耗时 '+dt.toFixed(0)+' ms'+(n!=null?' · 检出 <b>'+n+'</b> 项':'');
-    $('json').textContent=JSON.stringify(r,null,2);
-    showTab('viz');
-    toast('推理完成','ok');
-  }catch(e){
-    toast('推理失败：'+(e.message||e),'err');
-  }finally{$('runBtn').disabled=!(m.status==='ready');}
+    // visualize:true → 服务端同时返回渲染图（供「服务端渲染」视图与整图族使用）
+    // params：每请求结果参数（服务端对结果 JSON 生效）
+    const j=await apiPost('/v1/models/'+encodeURIComponent(m.id)+'/infer',
+      {image:S.img.b64, visualize:true,
+       params:{threshold:S.params.threshold, top_k:S.params.top_k, max_det:S.params.max_det}});
+    S.res={raw:Object.assign({},j), results:j.results, duration_ms:j.duration_ms, image_b64:j.image_b64};
+    S.view = (m.type==='sem'||m.type==='depth') ? 'server' : S.view;
+    applyView();
+    S.objects=buildObjects(m.type,j.results); S.hover=-1; S.sel=-1;
+    if(j.image_b64){ $('srvimg').src='data:image/jpeg;base64,'+j.image_b64; }
+    renderObjects(); renderJson(); setStats();
+    drawOverlay();
+    const dt=(performance.now()-t0).toFixed(0);
+    toast('推理完成 · '+dt+' ms','ok');
+  }catch(e){ toast('推理失败：'+(e.message||e),'err'); }
+  finally{ $('btnRun').disabled=!(curModel()&&curModel().status==='ready'); }
 }
 
-/* ════════════ 结果表格（视觉结果由服务端 SDK vis_* 渲染经 image_b64 返回，前端直显） ════════════ */
-function renderResult(m,res){
-  const table=$('table');
-  if(res==null){table.innerHTML='<span class="empty">无结果</span>';return;}
-  const arr=Array.isArray(res)?res:(res&&res.results?res.results:null);
+/* ── 视图 / 图层 ── */
+function applyView(){
+  const server = S.view==='server';
+  $('srvimg').style.display = server? 'block':'none';
+  $('img').style.display = server? 'none':'block';
+  $('ovl').style.display = server? 'none':'block';
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
+  $('roView').textContent = server?'服务端渲染':'叠加';
+  if(!server) layoutCanvas();
+}
+document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{ S.view=b.dataset.v; applyView(); });
+document.querySelectorAll('#layers button').forEach(b=>b.onclick=()=>{ S.layers[b.dataset.l]=!S.layers[b.dataset.l]; b.classList.toggle('on',S.layers[b.dataset.l]); drawOverlay(); });
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.ipane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+b.dataset.t)); });
 
-  if(m.type==='cls'){clsTopN(res);return;}
-  if(m.type==='ocr'&&res.boxes){renderOcrTable(res);return;}
-  if(m.type==='sem'&&res.shape){renderSemTable(res);return;}
-  if(m.type==='depth'&&res.shape){renderDepthTable(res);return;}
-  if(m.type==='face'&&res.embedding){tableEmbedding(res);return;}
-
-  if(!arr){table.innerHTML='<span class="empty">无结果</span>';return;}
-  renderTable(arr);
-}
-function clsTopN(res){
-  const scores=res.scores||[],ids=res.label_ids||[],labels=(curModel()&&curModel().labels)||[];
-  const rows=scores.map((s,i)=>({s,i,name:(labels.length?labels[ids[i]]:null)||('id'+(ids[i]!=null?ids[i]:i))}))
-    .sort((a,b)=>b.s-a.s).slice(0,10);
-  const t=$('table');
-  if(!rows.length){t.innerHTML='<span class="empty">无结果</span>';return;}
-  let html='<table><tr><th>#</th><th>label</th><th>score</th></tr>';
-  rows.forEach((x,i)=>{html+=`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${x.s.toFixed(4)}</td></tr>`;});
-  t.innerHTML=html+'</table>';
-}
-function tableEmbedding(res){
-  const dim=Array.isArray(res.embedding)?res.embedding.length:(Array.isArray(res.feature)?res.feature.length:0);
-  const t=$('table');t.innerHTML=`<table><tr><th>字段</th><th>值</th></tr>
-    <tr><td>embedding 维度</td><td>${esc(fmt(dim))}</td></tr></table>`;
-}
-function renderTable(arr){
-  const t=$('table');
-  if(!arr||!arr.length){t.innerHTML='<span class="empty">无对象</span>';return;}
-  const skip=new Set(['mask','keypoints','data','feature','embedding','table_html','table_structure']);
-  const cols=[...new Set(arr.flatMap(o=>Object.keys(o)))].filter(k=>!skip.has(k));
-  if(!cols.length){t.innerHTML='<span class="empty">无可展示字段</span>';return;}
-  let html='<table><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr>';
-  arr.forEach(o=>{html+='<tr>'+cols.map(c=>'<td>'+(o[c]==null?'':esc(typeof o[c]==='object'?JSON.stringify(o[c]):fmt(o[c])))+'</td>').join('')+'</tr>';});
-  t.innerHTML=html+'</table>';
-}
-function renderOcrTable(res){
-  const t=$('table');
-  const n=(res.boxes||[]).length;
-  if(!n){t.innerHTML='<span class="empty">无文本</span>';return;}
-  let html='<table><tr><th>#</th><th>文本</th><th>识别分</th></tr>';
-  for(let i=0;i<n;i++){html+=`<tr><td>${i+1}</td><td>${esc(res.text&&res.text[i])}</td><td>${res.rec_scores&&res.rec_scores[i]!=null?fmt(res.rec_scores[i]):'—'}</td></tr>`;}
-  t.innerHTML=html+'</table>';
-}
-function renderSemTable(r){
-  const t=$('table');
-  t.innerHTML=`<table><tr><th>字段</th><th>值</th></tr>
-    <tr><td>shape (H×W)</td><td>${esc((r.shape||[]).join(' × '))}</td></tr>
-    <tr><td>num_classes</td><td>${esc(fmt(r.num_classes))}</td></tr></table>`;
-}
-function renderDepthTable(r){
-  const t=$('table');
-  t.innerHTML=`<table><tr><th>字段</th><th>值</th></tr>
-    <tr><td>shape (H×W)</td><td>${esc((r.shape||[]).join(' × '))}</td></tr>
-    <tr><td>像素数</td><td>${esc(fmt((r.depth||[]).length))}</td></tr></table>`;
-}
-
-/* ════════════ 交互装配 ════════════ */
+/* ── 样例 / 上传 / 导出 ── */
 const SAMPLES=[['scene.png','场景图'],['gradient.png','渐变图'],['plate.png','车牌']];
-function buildSamples(){
-  const menu=$('sampMenu');
-  SAMPLES.forEach(([name,label])=>{
-    const it=document.createElement('div');it.className='it';
-    it.innerHTML='<img src="./samples/'+name+'" alt="">'+esc(label);
-    it.onclick=()=>{closeSampleMenu();chooseSample(name);};
-    menu.appendChild(it);
+(function buildSamples(){
+  const menu=$('sampleMenu');
+  SAMPLES.forEach(([f,label])=>{ const d=document.createElement('div');
+    d.style.cssText='padding:9px 13px;font-size:12px;cursor:pointer;display:flex;gap:9px;align-items:center';
+    d.innerHTML='<img src="./samples/'+f+'" style="width:34px;height:26px;object-fit:cover;border-radius:3px;border:1px solid var(--rule)" alt="">'+esc(label);
+    d.onmouseenter=()=>d.style.background='var(--panel-3)'; d.onmouseleave=()=>d.style.background='';
+    d.onclick=()=>{ menu.style.display='none'; const im=new Image(); im.onload=()=>setImage(downscale(im,1600)); im.onerror=()=>toast('样例加载失败','err'); im.src='./samples/'+f; };
+    menu.appendChild(d); });
+  $('btnSample').onclick=e=>{e.stopPropagation(); menu.style.display=menu.style.display==='none'?'block':'none';};
+  document.addEventListener('click',()=>menu.style.display='none');
+})();
+/* ── 参数面板 ── */
+function syncParams(){ $('pThrV').textContent = S.params.threshold>0 ? S.params.threshold.toFixed(2) : '0.00 (关)'; }
+$('pThr').oninput=()=>{ S.params.threshold=parseFloat($('pThr').value)||0; syncParams(); };
+$('pTopk').oninput=()=>{ S.params.top_k=Math.max(0,parseInt($('pTopk').value||'0',10)||0); };
+$('pMax').oninput=()=>{ S.params.max_det=Math.max(0,parseInt($('pMax').value||'0',10)||0); };
+$('btnParams').onclick=e=>{ e.stopPropagation(); $('sampleMenu').style.display='none';
+  const mn=$('paramMenu'); mn.style.display = mn.style.display==='none' ? 'block' : 'none'; };
+$('pReset').onclick=()=>{ S.params={threshold:0,top_k:0,max_det:0}; $('pThr').value=0; $('pTopk').value=0; $('pMax').value=0; syncParams(); toast('参数已重置','ok'); };
+document.addEventListener('click',()=>{ $('paramMenu').style.display='none'; });
+
+$('btnUpload').onclick=()=>{ const i=document.createElement('input'); i.type='file'; i.accept='image/*';
+  i.onchange=async()=>{ const f=i.files[0]; if(!f) return;
+    if(!( /^image\//.test(f.type||'')||/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name||'') )) return toast('请选择图片文件','err');
+    try{ setImage(downscale(await fileToImage(f),1600)); toast('图片已加载','ok'); }catch(e){ toast('图片解码失败','err'); } };
+  i.click(); };
+$('btnRun').onclick=run;
+$('btnDl').onclick=()=>{
+  if(!S.img){ toast('无可导出的内容','err'); return; }
+  const w=S.img.naturalW, h=S.img.naturalH;
+  const c=document.createElement('canvas'); c.width=w; c.height=h; const ctx=c.getContext('2d');
+  ctx.drawImage(S.img.el,0,0,w,h);
+  if(S.view==='server' && S.res&&S.res.image_b64){ const im=new Image(); im.onload=()=>{ c.getContext('2d').drawImage(im,0,0,w,h); dl(c); }; im.src='data:image/jpeg;base64,'+S.res.image_b64; return; }
+  // overlay 叠加：按当前图层重绘到全分辨率
+  ctx.setTransform(1,0,0,1,0,0);
+  S.objects.forEach(o=>{
+    if((o.kind==='rect'||o.kind==='seg'||o.kind==='kp')&&S.layers.box){ ctx.lineWidth=2; ctx.strokeStyle=colorFor(o.c); ctx.strokeRect(o.box.x,o.box.y,o.box.width,o.box.height); }
+    if(o.kind==='obb'){ const cs=obbCorners(o.obb); ctx.beginPath(); ctx.moveTo(cs[0][0],cs[0][1]); cs.slice(1).forEach(p=>ctx.lineTo(p[0],p[1])); ctx.closePath(); ctx.strokeStyle=colorFor(o.c); ctx.lineWidth=2; ctx.stroke(); }
+    if(o.kind==='quad'){ ctx.beginPath(); ctx.moveTo(o.pts[0][0],o.pts[0][1]); o.pts.slice(1).forEach(p=>ctx.lineTo(p[0],p[1])); ctx.closePath(); ctx.strokeStyle='#f5a623'; ctx.lineWidth=2; ctx.stroke(); }
+    if(o.kps && S.layers.kp && o.kind==='kp'){ ctx.fillStyle=colorFor(o.c); o.kps.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,3,0,7);ctx.fill();}); }
   });
-  $('sampleBtn').onclick=e=>{e.stopPropagation();menu.classList.toggle('open');};
-  document.addEventListener('click',closeSampleMenu);
-}
-function closeSampleMenu(){$('sampMenu').classList.remove('open');}
-
-$('uploadBtn').onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>i.files[0]&&uploadFile(i.files[0]);i.click();};
-$('runBtn').onclick=run;
-
-function showTab(name){
-  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
-  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('on',p.id==='tab-'+name));
-}
-document.querySelectorAll('.tabbtn').forEach(b=>{
-  b.onclick=()=>{showTab(b.dataset.tab);const w=$('results');w.classList.remove('collapsed');w.style.maxHeight='44%';$('foldBtn').textContent='收起 ▲';};
-});
-$('foldBtn').onclick=()=>{
-  const w=$('results');const c=w.classList.toggle('collapsed');
-  if(c){w.style.maxHeight='';$('foldBtn').textContent='展开 ▼';}
-  else{w.style.maxHeight='44%';$('foldBtn').textContent='收起 ▲';}
+  dl(c);
 };
-$('dlPng').onclick=()=>{
-  const ri=$('resImg');
-  const src=(ri&&ri.style.display!=='none'&&ri.getAttribute('src'))?ri.getAttribute('src')
-            :($('wrap').style.display!=='none'?$('img').getAttribute('src'):null);
-  if(!src){toast('暂无可下载的可视化结果','err');return;}
-  const a=document.createElement('a');a.download='visual.png';a.href=src;a.click();
-};
+function dl(c){ const a=document.createElement('a'); a.download='modeldeploy_result.png'; a.href=c.toDataURL('image/png'); a.click(); }
 
-buildSamples();
+/* ── 装配 ── */
+const ov=$('ovl');
+ov.addEventListener('mousemove',onMove); ov.addEventListener('mouseleave',onLeave); ov.addEventListener('click',onPick);
+window.addEventListener('resize',()=>{ if(S.img) layoutCanvas(); });
 setInterval(refresh,5000);
 refresh();
 </script>

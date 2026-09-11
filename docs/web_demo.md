@@ -62,12 +62,11 @@ build/bin/demo_server --repo application/demo_manifest.json --web build/bin/web_
 |------|--------|------|
 | `--repo` | `application/demo_manifest.json` | 手写 manifest 文件路径（目录清单） |
 | `--web` | `web_demo` | 静态页面目录 |
-| `--port` | `8000` | 仅为提示性参数，实际无效 |
+| `--port` | `8000` | 监听端口（`0` 为随机空闲端口） |
 
 > **注意**：
-> - `ServingServer::start()` 始终绑定临时空闲端口（内部 `bind_to_any_port`），不以 `--port`
->   为准。启动后以日志打印的 **`Demo serving on http://127.0.0.1:<实际端口>/`** 为准，用该
->   实际端口在浏览器打开演示页。
+> - 端口以 `--port` 为准（`0` 为随机）；启动日志打印
+>   **`Demo serving on http://127.0.0.1:<端口>/`**，用该端口在浏览器打开演示页。
 > - **`--base` 已不存在**。资源根只看 manifest 顶层 `base` 字段（本仓库为
 >   `test_data/test_models/onnx`），OCR 字典来自已提交的
 >   `application/demo_labels/ppocr_dict.txt`（仓库根相对，构建时随 web 资产拷贝）。
@@ -120,14 +119,21 @@ obb/face/lpr）的 `box` 坐标为**绝对像素**（`x/y/width/height`，对应
 
 ## 前端（application/web_demo/index.html）
 
-单文件、无 CDN。左侧边栏按 type 分组列出目录中的模型（名称、type 图标、输入尺寸、状态徽标）；
-右侧主区为工具栏 + 固定画布 + 结果面板。
+单文件、无 CDN、无构建。界面为「观测台 / instrument」风格：左栏按族列出模型（状态徽标），中间为画布，
+右栏为结果检视器，底部为**测量读数条**（实时显示指针图像坐标与悬停目标的 `x/y/w/h/score`）。
 
-- 选中模型触发懒加载：弹出 loading 遮罩轮询直到 `ready`/`failed`；加载失败给出原因。
-- 上传本地图片（自动将长边降采样 ≤1600px）+ 3 个内置样例（scene.png 场景 / gradient.png
-  渐变 / plate.png 车牌）。
-- 画布 `max-height: 70vh` 等比 contain 显示原图，推理结果叠加其上（框、掩码、关键点、车牌号等）。
-- 结果面板分"可视化"与"JSON"两个标签页，可查看完整返回 JSON，并可下载渲染后的 PNG。
+- **两种视图**：`叠加`（默认，前端用返回 JSON 在原图上自绘框/关键点/掩码/车牌）与 `服务端渲染`
+  （显示 SDK `vis_*` 渲染图 `image_b64`）。整图族（sem/depth）自动使用服务端渲染。
+- **客户端叠加**：det/face/lpr 矩形；pose 骨架 + 关键点；obb 旋转框；seg 半透明实例掩码 + 框；
+  ocr 四边形文本框 + 文字。
+- **参数**：工具栏「参数」面板配置每请求结果参数——置信度阈值、Top-K（分类）、最大目标数；
+  改后点「推理」生效（服务端对结果 JSON 过滤，前端叠加/列表随之更新）。
+- **交互**：画布十字准星跟随指针；悬停命中目标高亮 + 浮层（标签/分数/文字）；点击选中，
+  与右侧对象列表双向联动；图层开关（框/关键点/掩码/标签）。
+- **图片**：上传本地图片（长边降采样 ≤1600px）或选内置样例（scene / gradient / plate）；可导出
+  当前叠加结果为 PNG。
+- 选中模型触发懒加载（loading 遮罩轮询至 ready/failed）；推理请求携带 `visualize:true`，
+  故服务端渲染图始终可用。
 
 ## 模型目录（application/demo_manifest.json）
 
