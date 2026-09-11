@@ -1143,11 +1143,11 @@ function renderTasks(){
       entry.actSig=actSig;
       entry.actions.innerHTML=
         (effectiveRunning
-          ? '<button class="btn btn-danger" onclick="stopTask(\''+jsStr(t.id)+'\')">'+ICONS.stop+' 停止</button>'
-          : '<button class="btn btn-primary" onclick="startTask(\''+jsStr(t.id)+'\')">'+ICONS.play+' 启动</button>')+
+          ? '<button class="btn btn-danger" onclick="stopTask(\''+jsStr(t.id)+'\',this)">'+ICONS.stop+' 停止</button>'
+          : '<button class="btn btn-primary" onclick="startTask(\''+jsStr(t.id)+'\',this)">'+ICONS.play+' 启动</button>')+
         (!effectiveRunning?'<button class="btn btn-ghost" onclick="openEditTaskModal(\''+jsStr(t.id)+'\')">'+ICONS.detail+' 编辑</button>':'')+
         '<button class="btn btn-ghost" onclick="showDetail(\''+jsStr(t.id)+'\')">'+ICONS.detail+' 详情</button>'+
-        '<button class="btn btn-ghost" onclick="deleteTask(\''+jsStr(t.id)+'\')">'+ICONS.trash+' 删除</button>';
+        '<button class="btn btn-ghost" onclick="deleteTask(\''+jsStr(t.id)+'\',this)">'+ICONS.trash+' 删除</button>';
     }
 
     // error 显示
@@ -1511,24 +1511,33 @@ function updateTask(){
     }
   });
 }
-function startTask(id){
+function busy(btn,on){ if(!btn)return; if(on){ btn.disabled=true; btn.dataset.busy='1'; } else { btn.disabled=false; delete btn.dataset.busy; } }
+function startTask(id,btn){
+  if(btn&&btn.dataset.busy)return; busy(btn,true);
   log('启动任务：'+id,'info');
   api('POST','/api/v1/tasks/'+encodeURIComponent(id)+'/start',null,function(r){
     if(r.ok){toast('任务已启动','success');log('任务启动：'+id,'ok')}
-    else{toast('启动失败：'+(r.msg||''),'danger');log('启动失败：'+id,'err')}refreshAll();
+    else{busy(btn,false);toast('启动失败：'+(r.msg||''),'danger');log('启动失败：'+id,'err')}
+    refreshAll();
   });
 }
-function stopTask(id){
+function stopTask(id,btn){
+  if(btn&&btn.dataset.busy)return; busy(btn,true);
   log('停止任务：'+id,'info');
   api('POST','/api/v1/tasks/'+encodeURIComponent(id)+'/stop',null,function(r){
-    if(r.ok){toast('任务已停止','success');log('任务停止：'+id,'ok')}else{toast('停止失败','danger')}refreshAll();
+    if(r.ok){toast('任务已停止','success');log('任务停止：'+id,'ok')}
+    else{busy(btn,false);toast('停止失败：'+(r.msg||''),'danger')}
+    refreshAll();
   });
 }
-function deleteTask(id){
+function deleteTask(id,btn){
+  if(btn&&btn.dataset.busy)return;
   if(!confirm('确认删除任务「'+id+'」？'))return;
+  busy(btn,true);
   log('删除任务：'+id,'info');
   api('DELETE','/api/v1/tasks/'+encodeURIComponent(id),null,function(r){
-    if(r.ok){toast('任务已删除','success');log('任务删除：'+id,'ok');refreshAll()}else{toast('删除失败','danger')}
+    if(r.ok){toast('任务已删除','success');log('任务删除：'+id,'ok');refreshAll()}
+    else{busy(btn,false);toast('删除失败：'+(r.msg||''),'danger')}
   });
 }
 function stopAllTasks(){
