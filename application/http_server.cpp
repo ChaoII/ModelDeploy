@@ -110,6 +110,7 @@ json HttpServer::model_config_to_json(const ModelConfig& m) {
     j["path"] = m.path;
     j["backend"] = m.backend;
     j["device"] = m.device;
+    if (m.use_trt_ep) j["use_trt_ep"] = true;
     j["confidence_threshold"] = m.confidence_threshold;
     j["input_size"] = {m.input_size[0], m.input_size[1]};
     j["roi"] = {m.roi[0], m.roi[1], m.roi[2], m.roi[3]};
@@ -223,6 +224,10 @@ static ModelConfig parse_model_config(const std::string& body) {
         mcfg.type = get_s("type", "detection");
         mcfg.backend = get_s("backend", "ort");
         mcfg.device = get_s("device", "gpu");
+        if (j.contains("use_trt_ep")) {
+            mcfg.use_trt_ep = j["use_trt_ep"].is_boolean() ? j["use_trt_ep"].get<bool>()
+                                                           : (j["use_trt_ep"].get<int>() != 0);
+        }
         if (j.contains("confidence_threshold") && j["confidence_threshold"].is_number())
             mcfg.confidence_threshold = j["confidence_threshold"];
         if (j.contains("input_size") && j["input_size"].is_array() && j["input_size"].size() >= 2)

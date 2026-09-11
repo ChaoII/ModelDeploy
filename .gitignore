@@ -100,3 +100,4 @@ TensorrtExecutionProvider_TRTKernel_*.engine
 TensorrtExecutionProvider_TRTKernel_*.profile
 .worktrees/
 build_surv
+build_surv_gpu

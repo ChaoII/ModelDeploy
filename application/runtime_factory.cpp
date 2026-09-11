@@ -38,6 +38,8 @@ RuntimeOption build_runtime_option(const ModelConfig& cfg) {
         if (cfg.device == "gpu") {
             opt.enable_fp16 = true;
             opt.ort_option.enable_fp16 = true;
+            // 可选：启用 ORT TensorRT EP（首次会构建 TRT engine，较慢；需本机 TensorRT）
+            if (cfg.use_trt_ep) opt.enable_trt = true;
             std::string cache_dir = "data/ort_trt_cache";
             try { std::filesystem::create_directories(cache_dir); } catch (...) {}
             opt.ort_option.trt_engine_cache_path = cache_dir;

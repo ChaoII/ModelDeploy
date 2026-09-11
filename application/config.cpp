@@ -101,6 +101,7 @@ json task_config_to_json(const TaskConfig& cfg) {
         mo["path"] = m.path;
         mo["backend"] = m.backend;
         mo["device"] = m.device;
+        if (m.use_trt_ep) mo["use_trt_ep"] = m.use_trt_ep;
         mo["confidence_threshold"] = m.confidence_threshold;
         mo["input_size"] = {m.input_size[0], m.input_size[1]};
         mo["roi"] = {m.roi[0], m.roi[1], m.roi[2], m.roi[3]};
@@ -174,6 +175,7 @@ TaskConfig task_config_from_json(const json& j) {
             if (mo.contains("rec_path")) m.rec_path = mo["rec_path"];
             if (mo.contains("backend")) m.backend = mo["backend"];
             if (mo.contains("device")) m.device = mo["device"];
+            if (mo.contains("use_trt_ep")) m.use_trt_ep = mo["use_trt_ep"];
             if (mo.contains("confidence_threshold")) m.confidence_threshold = mo["confidence_threshold"];
             if (mo.contains("input_size") && mo["input_size"].is_array() && mo["input_size"].size() >= 2)
                 m.input_size = {mo["input_size"][0], mo["input_size"][1]};

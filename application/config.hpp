@@ -15,6 +15,7 @@ struct ModelConfig {
     std::string rec_path;
     std::string backend = "ort";
     std::string device = "gpu";
+    bool use_trt_ep = false;      // device=gpu 且 backend=ort 时，启用 ORT TensorRT EP
     float confidence_threshold = 0.5f;
     std::vector<int> input_size = {640, 640};
     std::vector<int> roi = {0, 0, 0, 0};
