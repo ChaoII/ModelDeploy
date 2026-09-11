@@ -54,6 +54,7 @@ set(HTTPLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 set(APP_SOURCES
         main.cpp
         config.cpp
+        runtime_factory.cpp
         pipeline_manager.cpp
         pipeline.cpp
         video_codec.cpp

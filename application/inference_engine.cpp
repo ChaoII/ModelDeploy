@@ -1,4 +1,5 @@
 #include "inference_engine.hpp"
+#include "runtime_factory.hpp"
 #include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/common/struct.h"
@@ -12,54 +13,7 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
     if (loaded_) unload();
     cfg_ = cfg;
 
-    RuntimeOption opt;
-    if (cfg.device == "gpu") {
-        opt.set_device(Device::GPU, 0);
-    }
-    opt.set_cpu_thread_num(1);
-
-    // 自动识别 .engine 文件 → 走 TRT 后端
-    bool is_engine_file = (cfg.path.size() > 7 &&
-        (cfg.path.substr(cfg.path.size() - 7) == ".engine" ||
-         cfg.path.substr(cfg.path.size() - 7) == ".Engine"));
-
-    // ── TRT 后端（纯 TRT，非 ORT-TRT） ──
-    if (is_engine_file || cfg.backend == "trt" || cfg.backend == "tensorrt") {
-        opt.use_trt_backend();
-        opt.enable_fp16 = true;                    // RuntimeOption 级 FP16
-        std::string cache_dir = "data/trt_cache";
-        try { std::filesystem::create_directories(cache_dir); } catch (...) {}
-        std::string model_name = cfg.path.substr(cfg.path.find_last_of("/\\") + 1);
-        opt.trt_option.cache_file_path = cache_dir + "/" + model_name + ".engine";
-        opt.trt_option.enable_fp16 = true;
-        opt.trt_option.max_workspace_size = 1ULL << 30; // 1GB
-        if (cfg_.input_size.size() == 2) {
-            std::string min_s = "1x3x" + std::to_string(cfg_.input_size[0]) + "x" + std::to_string(cfg_.input_size[1]);
-            opt.set_trt_min_shape(min_s);
-            opt.set_trt_opt_shape(min_s);
-            opt.set_trt_max_shape(min_s);
-        }
-    }
-    // ── MNN 后端 ──
-    else if (cfg.backend == "mnn") {
-        opt.use_mnn_backend();
-    }
-    // ── Sophgo（算能 TPU）后端 ──
-    else if (cfg.backend == "sophgo" || cfg.device == "tpu") {
-        opt.use_sophgo_backend();
-        opt.device_id = 0;   // use_sophgo_backend() 默认 device_id=-1，须显式 0（否则 bm_dev_request(-1) 失败）
-    }
-    // ── ORT 后端（默认）—— GPU 走 CUDA EP（首次即快速可用）；TRT EP 在线构建需数分钟，
-    // 需要时显式用 backend="trt" + .engine 文件走纯 TRT 后端（见上） ──
-    else {
-        opt.use_ort_backend();
-        if (cfg.device == "gpu") {
-            opt.enable_fp16 = true;                    // FP16 推理（关键性能优化）
-            std::string cache_dir = "data/ort_trt_cache";
-            try { std::filesystem::create_directories(cache_dir); } catch (...) {}
-            opt.ort_option.trt_engine_cache_path = cache_dir;
-        }
-    }
+    RuntimeOption opt = build_runtime_option(cfg);
 
     try {
         if (cfg.type == "detection") {
