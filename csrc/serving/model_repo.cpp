@@ -1,5 +1,6 @@
 #include "serving/model_repo.h"
 
+#include "serving/builtin_builder.h"
 #include "serving/manifest.h"
 
 #include <algorithm>
@@ -19,14 +20,6 @@ namespace modeldeploy::serving {
 namespace fs = std::filesystem;
 
 namespace {
-
-// 内置占位 InferFn：真实推理由 HandleBuilder（Task 4）注入。
-InferFn placeholder_infer() {
-    return [](const nlohmann::json&, nlohmann::json*, std::string* err) {
-        if (err) *err = "not implemented (lazy-load stub)";
-        return false;
-    };
-}
 
 // 读 manifest 顶层的资源根（base 字段），无则用 manifest 所在目录兜底。
 std::string manifest_root_of(const std::string& manifest_path, const std::string& fallback) {
@@ -68,15 +61,8 @@ ModelRepo::ModelRepo(const ServingConfig& cfg, HandleBuilder builder, std::strin
     : cfg_(cfg), impl_(std::make_unique<Impl>()) {
     (void)err;
     base_ = fs::path(cfg_.model_repo).parent_path().string();
-    if (builder) {
-        builder_ = std::move(builder);
-    } else {
-        builder_ = [](const ManifestModel&, const std::string&) {
-            ModelHandle h;
-            h.infer = placeholder_infer();
-            return h;
-        };
-    }
+    // 默认用 SDK 内置通用 builder（按 manifest type 构造常见模型族）；用户注入则覆盖。
+    builder_ = builder ? std::move(builder) : make_builtin_builder(cfg_);
 }
 
 std::vector<std::string> ModelRepo::scan() {

@@ -48,8 +48,12 @@ set(TEST_SOURCES
     test_ncnn_ocr.cpp
     test_ncnn_seetaface.cpp
     test_async_model.cpp
-    test_serving.cpp
 )
+
+# Serving 测试仅在 BUILD_SERVING 时编译（否则 serving 源不编入 SDK，链接失败）。
+if(BUILD_SERVING)
+    list(APPEND TEST_SOURCES test_serving.cpp)
+endif()
 
 # CAPI 测试：仅当 BUILD_CAPI 打开时参与编译（否则 capi/md_capi.h 缺失 + 库中无 CAPI 符号）。
 if(BUILD_CAPI)

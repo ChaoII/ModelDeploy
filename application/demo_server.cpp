@@ -2,100 +2,38 @@
 // demo_server —— 演示 Web 的后端可执行：按手写 manifest 提供目录元数据，并开 ServingServer。
 //
 // 懒加载语义：启动只读 manifest 目录（status=Unloaded、infer 空），不实例化任何模型；
-// 单槽实例化经 ModelRepo::load 触达（前端切模型时懒加载）。HandleBuilder 按 manifest 的
-// type 构造各族真实 SDK 模型（ORT CPU）。构造成功 → make_model_handle 产出非空 infer
-// （status 由 ModelRepo::load 置 Ready）；构造失败/未初始化 → 返回空 infer 的元数据句柄，
-// 由 load 统一置 Failed，绝不因单个模型崩溃进程。
+// 单槽实例化经 ModelRepo::load 触达（前端切模型时懒加载）。模型构造复用 SDK 内置
+// HandleBuilder（csrc/serving/builtin_builder.*），故此处不再内联各族构造逻辑。
+//
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
-#include <functional>
 #include <iostream>
-#include <memory>
 #include <string>
 #include <thread>
-#include <unordered_map>
 
 #include "serving/config.h"
-#include "serving/model_repo.h"
-#include "serving/model_entry.h"
-#include "serving/manifest.h"
 #include "serving/server.h"
-#include "serving/adapters.h"
 
-#include "runtime/runtime_option.h"
-#include "vision/common/result_json.h"
-#include "vision/common/visualize/visualize.h"
-#include "vision/detection/ultralytics_det.h"
-#include "vision/classification/classification.h"
-#include "vision/iseg/ultralytics_seg.h"
-#include "vision/pose/ultralytics_pose.h"
-#include "vision/obb/ultralytics_obb.h"
-#include "vision/sem/ultralytics_sem.h"
-#include "vision/depth/ultralytics_depth.h"
-#include "vision/ocr/ppocr.h"
-#include "vision/face/face_det/scrfd.h"
-#include "vision/lpr/lpr_pipeline/lpr_pipeline.h"
-
-using namespace modeldeploy;
 using namespace modeldeploy::serving;
 
-// 从 manifest 条目回填目录元数据（type/input_size/labels 已在扫描阶段解析）。
-static ModelHandle meta_handle(const ManifestModel& m) {
-    ModelHandle h;
-    h.name = m.id;
-    h.display = m.display;
-    h.version = "1";
-    h.type = m.type;
-    h.input_size = m.input_size;
-    h.labels = m.labels;
-    return h;
-}
-
-// 构造成功 → make_model_handle 的核心句柄已带 infer，仅回填元数据后返回。
-// vis：按族把【原图 + 结果】喂给 SDK 的 vision::vis_* 渲染标注图。
-template <typename M>
-static ModelHandle built_handle(
-    const ManifestModel& m, std::unique_ptr<M> model,
-    std::function<vision::ImageData(vision::ImageData&,
-                                    const typename M::result_type&)> vis = {}) {
-    ModelHandle h = make_model_handle<M>(m.id, std::move(model), {}, std::move(vis));
-    h.display = m.display;
-    h.type = m.type;
-    h.input_size = m.input_size;
-    h.labels = m.labels;
-    return h;
-}
-
-// 从模型尽量取名称标签；取不到就返回空（vis 用默认配色，不影响推理）。
-static std::unordered_map<int, std::string> model_labels(
-    const std::function<std::unordered_map<int, std::string>()>& fn) {
-    try {
-        return fn();
-    } catch (...) {
-        return {};
-    }
-}
-
-// 中文字体：demo_server 约定从仓库根运行（manifest base 亦为 CWD 相对）。
-static const char* kFont = "test_data/msyh.ttc";
-
-// 按 manifest 条目构造真实模型句柄。files.* 已在 load_manifest 时拼上 base（如
-// m.model_f/m.rec_f/m.cls_f/m.dict_f），故此处不再需要 base 参数（保留签名以对齐 API）。
 int main(int argc, char** argv) {
     int port = 8000;
-    std::string web_root, repo;
+    std::string web_root, repo, font = "test_data/msyh.ttc";
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto val = [&]() -> std::string { return (i + 1 < argc) ? argv[++i] : ""; };
         if (a == "--port") port = std::stoi(val());
         else if (a == "--web") web_root = val();
         else if (a == "--repo") repo = val();
+        else if (a == "--font") font = val();
         else if (a == "--help") {
-            std::cout << "usage: demo_server [--port <port>] [--web <dir>] [--repo <manifest.json>]\n";
+            std::cout << "usage: demo_server [--port <port>] [--web <dir>] [--repo <manifest.json>]"
+                         " [--font <ttf>]\n";
             std::cout << "  从仓库根目录运行：资源根由 manifest 的 base 字段决定。\n";
             std::cout << "  --repo  manifest.json 路径（缺省 application/demo_manifest.json）\n";
             std::cout << "  --web   静态 web 资产目录（缺省 web_demo）\n";
+            std::cout << "  --font  可视化字体路径（缺省 test_data/msyh.ttc）\n";
             return 0;
         }
     }
@@ -107,152 +45,10 @@ int main(int argc, char** argv) {
     cfg.port = port;
     cfg.web_root = web_root;
     cfg.model_repo = repo;
-
-    HandleBuilder builder = [](const ManifestModel& m, const std::string&) {
-        ModelHandle meta = meta_handle(m);
-        RuntimeOption opt;
-        opt.use_ort_backend();
-        opt.set_device(Device::CPU, 0);  // CPU 起步；有 GPU/权重时改 Device::GPU
-
-        if (m.type == "det") {
-            try {
-                using MM = ResultModel<vision::detection::UltralyticsDet,
-                                       std::vector<vision::DetectionResult>>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto lm = model_labels([&] { return model->get_label_map("names"); });
-                auto vis = [lm](vision::ImageData& im,
-                                const std::vector<vision::DetectionResult>& r) {
-                    return vision::vis_det(im, r, 0.5, lm, kFont, 12, 0.3, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "cls") {
-            try {
-                using MM = ClassifyAdapter<vision::ClassifyResult>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto vis = [](vision::ImageData& im, const vision::ClassifyResult& r) {
-                    return vision::vis_cls(im, r, 1, 0.5, kFont, 12, 0.15, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "seg") {
-            try {
-                using MM = ResultModel<vision::detection::UltralyticsSeg,
-                                       std::vector<vision::InstanceSegResult>>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto vis = [](vision::ImageData& im,
-                              const std::vector<vision::InstanceSegResult>& r) {
-                    return vision::vis_iseg(im, r, 0.5, kFont, 12, 0.3, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "pose") {
-            try {
-                using MM = ResultModel<vision::detection::UltralyticsPose,
-                                       std::vector<vision::KeyPointsResult>>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto vis = [](vision::ImageData& im,
-                              const std::vector<vision::KeyPointsResult>& r) {
-                    return vision::vis_pose(im, r, kFont, 12, 4, 0.3, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "obb") {
-            try {
-                using MM = ResultModel<vision::detection::UltralyticsObb,
-                                       std::vector<vision::ObbResult>>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto vis = [](vision::ImageData& im, const std::vector<vision::ObbResult>& r) {
-                    return vision::vis_obb(im, r, 0.5, kFont, 12, 0.3, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "sem") {
-            try {
-                using MM = ResultModel<vision::detection::UltralyticsSem, vision::SemSegResult>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto lm = model_labels([&] { return model->get_label_map("names"); });
-                auto vis = [lm](vision::ImageData& im, const vision::SemSegResult& r) {
-                    return vision::vis_sem(im, r, lm, 0.5, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "depth") {
-            try {
-                using MM = ResultModel<vision::detection::UltralyticsDepth, vision::DepthResult>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto vis = [](vision::ImageData& im, const vision::DepthResult& r) {
-                    return vision::vis_depth(im, r, true, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "face") {
-            try {
-                using MM = ResultModel<vision::face::Scrfd,
-                                       std::vector<vision::KeyPointsResult>>;
-                auto model = std::make_unique<MM>(m.model_f, opt);
-                if (!model->is_initialized()) return meta;
-                model->get_preprocessor().set_size(m.input_size);
-                auto vis = [](vision::ImageData& im,
-                              const std::vector<vision::KeyPointsResult>& r) {
-                    return vision::vis_keypoints(im, r, kFont, 12, 4, 0.3, false, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "ocr") {
-            try {
-                // PaddleOCR 构造收 (det, cls, rec, dict, option)。
-                using MM = ResultModel<vision::ocr::PaddleOCR, vision::OCRResult>;
-                if (m.rec_f.empty() || m.dict_f.empty()) return meta;
-                auto model = std::make_unique<MM>(m.model_f, m.cls_f, m.rec_f, m.dict_f, opt);
-                if (!model->is_initialized()) return meta;
-                auto vis = [](vision::ImageData& im, const vision::OCRResult& r) {
-                    return vision::vis_ocr(im, r, kFont, 12, 0.3, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        if (m.type == "lpr") {
-            try {
-                // LprPipeline 构造收 (det, rec, option)。
-                using MM = LprAdapter<std::vector<vision::LprResult>>;
-                if (m.rec_f.empty()) return meta;
-                auto model = std::make_unique<MM>(m.model_f, m.rec_f, opt);
-                if (!model->is_initialized()) return meta;
-                auto vis = [](vision::ImageData& im,
-                              const std::vector<vision::LprResult>& r) {
-                    return vision::vis_lpr(im, r, kFont, 12, 4, 0.3, false);
-                };
-                return built_handle(m, std::move(model), std::move(vis));
-            } catch (...) { return meta; }
-        }
-        return meta;  // 未知 type：目录内可列，load 置 Failed
-    };
+    cfg.font_path = font;
 
     std::string err;
-    ServingServer srv(cfg, std::move(builder), &err);
+    ServingServer srv(cfg, nullptr, &err);  // nullptr → 用 SDK 内置通用 builder
     if (!srv.start(&err)) {
         std::cerr << "start failed: " << err << "\n";
         return 1;

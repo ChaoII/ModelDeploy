@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <future>
 #include "core/md_decl.h"
 #include "serving/model_repo.h"
 #include "pipeline/async_model.h"
@@ -78,18 +79,30 @@ ModelHandle make_model_handle(
     const std::string model_name = name;
 
     h.infer = [async, model_name, vis](const nlohmann::json& in, nlohmann::json* out,
-                                       std::string* err) {
+                                       std::string* err,
+                                       std::chrono::milliseconds timeout) -> InferStatus {
         modeldeploy::vision::ImageData img = image_from_json(in, err);
-        if (img.empty()) return false;
+        if (img.empty()) return InferStatus::Failed;
 
         auto t0 = std::chrono::steady_clock::now();
         typename M::result_type res;
+        std::future<typename M::result_type> fut;
         try {
-            auto fut = async->predict_async(img);
+            fut = async->predict_async(img);
+        } catch (const std::exception& e) {
+            if (err) *err = std::string("inference failed: ") + e.what();
+            return InferStatus::Failed;
+        }
+        // 超时：放弃等待返回 Timeout；AsyncModel 用 promise 基 future，析构不阻塞，
+        // worker 继续跑完（结果无人取，无泄漏）。timeout<=0 表示不限时。
+        if (timeout.count() > 0 && fut.wait_for(timeout) == std::future_status::timeout) {
+            return InferStatus::Timeout;
+        }
+        try {
             res = fut.get();
         } catch (const std::exception& e) {
             if (err) *err = std::string("inference failed: ") + e.what();
-            return false;
+            return InferStatus::Failed;
         }
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                       std::chrono::steady_clock::now() - t0)
@@ -99,7 +112,8 @@ ModelHandle make_model_handle(
             (*out)["duration_ms"] = ms;
             (*out)["model"] = model_name;
             if (in.contains("params")) (*out)["params"] = in["params"];
-            if (vis) {
+            // 可视化可选：仅当请求显式 visualize=true 时渲染标注图（base64 JPEG）。
+            if (vis && in.value("visualize", false)) {
                 try {
                     modeldeploy::vision::ImageData viz = vis(img, res);
                     if (!viz.empty()) {
@@ -113,7 +127,7 @@ ModelHandle make_model_handle(
                 }
             }
         }
-        return true;
+        return InferStatus::Ok;
     };
     return h;
 }

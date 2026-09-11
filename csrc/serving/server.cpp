@@ -81,16 +81,23 @@ std::string status_str(ModelStatus s) {
 }
 
 // Bearer 鉴权中间件：cfg.api_keys 非空才启用；失败填 401 并返回 false。
-bool authorized(const ServingConfig& cfg, const httplib::Request& req, httplib::Response& res) {
+// metrics 非空时统计鉴权失败次数。
+bool authorized(const ServingConfig& cfg, const httplib::Request& req, httplib::Response& res,
+                ServingMetrics* metrics = nullptr) {
     if (cfg.api_keys.empty()) return true;
+    auto deny = [metrics] {
+        if (metrics) metrics->auth_failures.fetch_add(1, std::memory_order_relaxed);
+    };
     auto it = req.headers.find("Authorization");
     if (it == req.headers.end()) {
+        deny();
         write_error(res, 401, "UNAUTHORIZED", "missing Authorization header");
         return false;
     }
     const std::string& hdr = it->second;
     constexpr char kPrefix[] = "Bearer ";
     if (hdr.compare(0, sizeof(kPrefix) - 1, kPrefix) != 0 || hdr.size() <= sizeof(kPrefix) - 1) {
+        deny();
         write_error(res, 401, "UNAUTHORIZED",
                     "invalid Authorization header (expect 'Bearer <key>')");
         return false;
@@ -99,9 +106,13 @@ bool authorized(const ServingConfig& cfg, const httplib::Request& req, httplib::
     for (const auto& k : cfg.api_keys) {
         if (ct_equal(token, k)) return true;
     }
+    deny();
     write_error(res, 401, "UNAUTHORIZED", "invalid API key");
     return false;
 }
+
+// 请求进入时的 thread_local 起始时间（pre_routing 写、post_routing 读，同一工作线程）。
+thread_local std::chrono::steady_clock::time_point t_req_start;
 
 // CORS：enable_cors 且请求带 Origin 时，在其上追加允许跨域响应头。OPTIONS 预检由
 // register_routes 的 Options("/.*") 处理，且经 post_routing 统一追加（本函数）。
@@ -136,7 +147,10 @@ void ServingMetrics::record_request(const std::string& model, int code) {
 
 void ServingMetrics::record_inference(const std::string& model, double ms) {
     std::lock_guard<std::mutex> lk(m);
-    inference_ms[model].push_back(ms);
+    auto& v = inference_ms[model];
+    // 有界环形窗口：超出上限则丢弃最旧样本，避免长跑内存无界增长。
+    if (v.size() >= kMaxInferenceSamples) v.erase(v.begin());
+    v.push_back(ms);
 }
 
 std::string ServingMetrics::render() const {
@@ -177,15 +191,33 @@ std::string ServingMetrics::render() const {
         out += "modeldeploy_serving_inference_ms{model=\"" + model +
                "\",quantile=\"1\"} " + std::to_string(pct(1.0)) + "\n";
     }
+
+    out += "# HELP modeldeploy_serving_in_flight In-flight inference requests.\n";
+    out += "# TYPE modeldeploy_serving_in_flight gauge\n";
+    out += "modeldeploy_serving_in_flight " + std::to_string(in_flight.load()) + "\n";
+
+    out += "# HELP modeldeploy_serving_model_load_total Model load attempts by result.\n";
+    out += "# TYPE modeldeploy_serving_model_load_total counter\n";
+    out += "modeldeploy_serving_model_load_total{result=\"ok\"} " +
+           std::to_string(model_load_ok.load()) + "\n";
+    out += "modeldeploy_serving_model_load_total{result=\"fail\"} " +
+           std::to_string(model_load_fail.load()) + "\n";
+
+    out += "# HELP modeldeploy_serving_auth_failures_total Authentication failures.\n";
+    out += "# TYPE modeldeploy_serving_auth_failures_total counter\n";
+    out += "modeldeploy_serving_auth_failures_total " + std::to_string(auth_failures.load()) + "\n";
+
+    out += "# HELP modeldeploy_serving_rate_limited_total Rate-limited requests.\n";
+    out += "# TYPE modeldeploy_serving_rate_limited_total counter\n";
+    out += "modeldeploy_serving_rate_limited_total " + std::to_string(rate_limited.load()) + "\n";
     return out;
 }
 
 ServingServer::ServingServer(const ServingConfig& cfg, HandleBuilder builder, std::string* err)
     : cfg_(cfg),
-      drain_(std::make_shared<DrainState>()),
+      repo_(std::make_shared<ModelRepo>(cfg, std::move(builder), err)),
       metrics_(std::make_shared<ServingMetrics>()),
-      limiter_(std::make_unique<TokenBucket>(cfg.rate_limit_qps)),
-      repo_(std::make_shared<ModelRepo>(cfg, std::move(builder), err)) {}
+      limiter_(std::make_unique<TokenBucket>(cfg.rate_limit_qps)) {}
 
 ServingServer::~ServingServer() { stop(); }
 
@@ -214,13 +246,19 @@ bool ServingServer::start(std::string* err) {
 
     repo_->scan();  // 首次扫描
 
-    const int p = srv_->bind_to_any_port(cfg_.host);
-    if (p < 0) {
-        if (err) *err = "ServingServer: bind_to_any_port failed on " + cfg_.host;
+    int bound = -1;
+    if (cfg_.port == 0) {
+        bound = srv_->bind_to_any_port(cfg_.host);   // 0=随机端口
+    } else if (srv_->bind_to_port(cfg_.host, cfg_.port)) {
+        bound = cfg_.port;
+    }
+    if (bound <= 0) {
+        if (err)
+            *err = "ServingServer: bind failed on " + cfg_.host + ":" + std::to_string(cfg_.port);
         started_.store(false);
         return false;
     }
-    bound_port_ = p;
+    bound_port_ = bound;
     listening_.store(true);
     listen_thread_ = std::thread([this]() {
         srv_->listen_after_bind();
@@ -250,7 +288,6 @@ void ServingServer::stop() {
     auto srv = srv_;
     if (srv) srv->stop();  // 关闭监听 socket → listen_after_bind() 返回
     if (listen_thread_.joinable()) listen_thread_.join();  // join 线程池：同步 handler 于此处完成
-    wait_drained();        // 守候游离 fire-and-forget 推理线程跑完（受 bound 超时）
     srv_.reset();
 }
 
@@ -258,26 +295,39 @@ bool ServingServer::is_listening() const { return listening_.load(); }
 int ServingServer::port() const { return bound_port_; }
 ModelRepo* ServingServer::repo() { return repo_.get(); }
 
-void ServingServer::begin_request() {
-    auto d = drain_;
-    std::lock_guard<std::mutex> lk(d->m);
-    ++d->in_flight;
-}
-void ServingServer::wait_drained() {
-    auto d = drain_;
-    const auto deadline =
-        std::chrono::steady_clock::now() + cfg_.request_timeout + std::chrono::seconds(1);
-    std::unique_lock<std::mutex> lk(d->m);
-    d->cv.wait_until(lk, deadline, [&d] { return d->in_flight == 0; });
-}
-
 void ServingServer::register_routes() {
     auto srv = srv_;
 
     // CORS：enable_cors 时对所有响应（含错误与 OPTIONS 预检）追加跨域头；无 Origin 不加。
+    // 记录请求起始时间（供 post_routing 计算访问日志耗时；同一工作线程）。
+    srv->set_pre_routing_handler([this](const httplib::Request&, httplib::Response&) {
+        t_req_start = std::chrono::steady_clock::now();
+        return httplib::Server::HandlerResponse::Unhandled;
+    });
+    // CORS + 访问日志：post_routing 对所有响应统一追加。
     srv->set_post_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
         apply_cors(cfg_, req, res);
+        if (cfg_.enable_access_log) {
+            const double ms =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                          t_req_start)
+                    .count();
+            MD_LOG_INFO << "serving " << req.method << " " << req.path << " -> " << res.status
+                        << " (" << ms << " ms)" << std::endl;
+        }
     });
+    // 统一错误体：仅对 httplib 内部产生且无 body 的错误（如 413 payload too large）补齐；
+    // 各 handler 已写统一体的错误（body 非空）保持不动。
+    srv->set_error_handler(
+        [this](const httplib::Request&, httplib::Response& res) -> httplib::Server::HandlerResponse {
+            if (!res.body.empty()) return httplib::Server::HandlerResponse::Unhandled;
+            std::string code = "BAD_REQUEST";
+            if (res.status == 413) code = "PAYLOAD_TOO_LARGE";
+            else if (res.status == 404) code = "NOT_FOUND";
+            else if (res.status == 405) code = "METHOD_NOT_ALLOWED";
+            write_error(res, res.status, code, "request rejected by serving gateway");
+            return httplib::Server::HandlerResponse::Handled;
+        });
     srv->Options(
         "/.*", [this](const httplib::Request& req, httplib::Response& res) {
             if (!cfg_.enable_cors) {  // 关闭 CORS 时预检报 404，不泄露跨域许可
@@ -288,49 +338,40 @@ void ServingServer::register_routes() {
         });
 
     srv->Get("/health", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
-        const auto models = repo_->list();
-        const bool any_ready =
-            std::any_of(models.begin(), models.end(),
-                        [](const ModelHandle& h) { return h.status == ModelStatus::Ready; });
-        if (any_ready) {
-            res.set_content("{\"status\":\"ok\"}", "application/json");
-        } else {
-            res.status = 503;
-            res.set_content("{\"status\":\"unavailable\"}", "application/json");
-        }
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
+        // 存活探针：进程在线且仓库已扫描（start 时完成）即 200；单槽懒加载下模型按需
+        // 加载，故不要求有模型 Ready。
+        res.set_content("{\"status\":\"ok\"}", "application/json");
     });
 
     srv->Get("/readyz", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
         const auto models = repo_->list();
-        // 单槽语义：有模型在后台构建 → 瞬态 loading；否则仅当恰有一个活跃 Ready 才 ready。
-        const bool any_loading =
-            std::any_of(models.begin(), models.end(),
-                        [](const ModelHandle& h) { return h.status == ModelStatus::Loading; });
-        if (any_loading) {
-            res.status = 503;
-            res.set_content("{\"status\":\"loading\"}", "application/json");
-            return;
+        // 就绪探针：无模型卡在 Loading/Failed 即 200（懒加载服务"可接受请求"的语义）。
+        bool busy = false;
+        for (const auto& h : models) {
+            if (h.status == ModelStatus::Loading || h.status == ModelStatus::Failed) {
+                busy = true;
+                break;
+            }
         }
-        int ready_count = 0;
-        for (const auto& h : models)
-            if (h.status == ModelStatus::Ready) ++ready_count;
-        if (ready_count == 1) {
-            res.set_content("{\"status\":\"ready\"}", "application/json");
-        } else {
+        if (busy) {
             res.status = 503;
             res.set_content("{\"status\":\"not_ready\"}", "application/json");
+        } else {
+            res.set_content("{\"status\":\"ready\"}", "application/json");
         }
     });
 
-    srv->Get("/metrics", [this](const httplib::Request&, httplib::Response& res) {
+    srv->Get("/metrics", [this](const httplib::Request& req, httplib::Response& res) {
+        // 默认与全局鉴权一致（metrics_require_auth）；可关闭以便内部抓取。
+        if (cfg_.metrics_require_auth && !authorized(cfg_, req, res, metrics_.get())) return;
         // Prometheus 文本（prometheus 客户端标准 text format 0.0.4）。
         res.set_content(metrics_->render(), "text/plain; version=0.0.4");
     });
 
     srv->Get("/v1/models", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
         const auto models = repo_->list();
         nlohmann::json arr = nlohmann::json::array();
         for (const auto& h : models)
@@ -342,7 +383,7 @@ void ServingServer::register_routes() {
     });
 
     srv->Get("/v1/models/:name", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
         const std::string name = req.path_params.at("name");
         ModelHandle h;
         if (!repo_->get(name, &h)) {
@@ -361,17 +402,19 @@ void ServingServer::register_routes() {
     });
 
     srv->Post("/v1/models/:id/load", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
         const std::string id = req.path_params.at("id");
         ModelHandle probe;
         if (!repo_->get(id, &probe)) {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + id);
             return;
         }
-        // 后台线程调 load，避免阻塞 HTTP worker；立即返回当前目录状态。并发保护由
-        // ModelRepo 的 Loading 在途状态承担（同一 id 重复 load 为 no-op）。
-        auto repo = repo_;
-        std::thread([repo, id]() { std::string err; repo->load(id, &err); }).detach();
+        // 同步加载（handler 线程内），不留游离线程；同一 id 重复 load 由 ModelRepo 的
+        // Loading 在途状态保证 no-op。
+        std::string load_err;
+        const bool load_ok = repo_->load(id, &load_err);
+        if (load_ok) metrics_->model_load_ok.fetch_add(1, std::memory_order_relaxed);
+        else metrics_->model_load_fail.fetch_add(1, std::memory_order_relaxed);
         ModelHandle h;
         repo_->get(id, &h);
         res.set_content(nlohmann::json{{"id", h.name}, {"status", status_str(h.status)}}.dump(),
@@ -379,7 +422,7 @@ void ServingServer::register_routes() {
     });
 
     srv->Post("/v1/models/:id/unload", [this](const httplib::Request& req, httplib::Response& res) {
-        if (!authorized(cfg_, req, res)) return;
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
         const std::string id = req.path_params.at("id");
         ModelHandle h;
         if (!repo_->get(id, &h)) {
@@ -397,7 +440,7 @@ void ServingServer::register_routes() {
         const std::string name = req.path_params.at("name");
         // RAII：handler 返回时把最终状态码记入 /metrics（覆盖 429/401/404/503/400/200/504）。
         InferRecorder recorder{metrics_.get(), name, res};
-        if (!authorized(cfg_, req, res)) return;
+        if (!authorized(cfg_, req, res, metrics_.get())) return;
         ModelHandle h;
         if (!repo_->get(name, &h)) {
             write_error(res, 404, "MODEL_NOT_FOUND", "model not found: " + name);
@@ -411,7 +454,9 @@ void ServingServer::register_routes() {
         // 懒加载：非 Ready 且非 Loading 时同步 load 一次；此后仍非 Ready → 不重试，直接报错。
         if (h.status != ModelStatus::Ready && h.status != ModelStatus::Loading) {
             std::string load_err;
-            repo_->load(name, &load_err);
+            const bool load_ok = repo_->load(name, &load_err);
+            if (load_ok) metrics_->model_load_ok.fetch_add(1, std::memory_order_relaxed);
+            else metrics_->model_load_fail.fetch_add(1, std::memory_order_relaxed);
             repo_->get(name, &h);
         }
         if (h.status != ModelStatus::Ready) {
@@ -422,6 +467,7 @@ void ServingServer::register_routes() {
         }
         // 限流（全局令牌桶）：超限 429，不入 in_flight、不占推理。
         if (!limiter_->try_acquire()) {
+            metrics_->rate_limited.fetch_add(1, std::memory_order_relaxed);
             write_error(res, 429, "RATE_LIMITED", "rate limit exceeded");
             return;
         }
@@ -437,68 +483,34 @@ void ServingServer::register_routes() {
             return;
         }
 
-        struct InferJob {
-            ModelHandle handle;
-            nlohmann::json in;
-            nlohmann::json out;
-            std::string err;
-            bool ok = false;
-        };
-
-        // 推理耗时记入 /metrics（含超时样本：观测时长为 request_timeout）。
+        // 在 handler 线程内同步等待推理（timeout 由 InferFn 内部 wait_for 施加）；
+        // 真实并发由 AsyncModel（单 worker + 有界队列 + 背压）约束，不再每请求建线程。
+        nlohmann::json out;
+        std::string infer_err;
         const auto t0 = std::chrono::steady_clock::now();
-
-        // 推理放到游离 worker 线程：文件句柄持有自己的 AsyncModel（shared_ptr），
-        // 故不阻塞 httplib 工作线程，且可用 wait_for 施加 cfg_.request_timeout。
-        // 线程 lambda 捕获 drain_ 的 shared_ptr（以及持有 AsyncModel 的 job->handle），
-        // 不捕获裸 this —— 即使 ServingServer 析构，线程仍借 DrainState/job 存活，无 UAF。
-        begin_request();
-        auto job = std::make_shared<InferJob>();
-        job->handle = std::move(h);
-        job->in = std::move(in);
-        auto drain = drain_;
-        std::promise<void> done;
-        auto df = done.get_future();
-        std::thread([job, done = std::move(done), drain]() mutable {
-            try {
-                job->ok = job->handle.infer(job->in, &job->out, &job->err);
-            } catch (...) {
-                // 无论抛什么异常，都走失败分支继续，避免 in_flight 泄漏与 std::terminate。
-                job->ok = false;
-                if (job->err.empty()) job->err = "inference threw";
-            }
-            done.set_value();  // 先解除 httplib worker 阻塞（非超时路径取结果）
-            {
-                std::lock_guard<std::mutex> lk(drain->m);
-                if (drain->in_flight > 0) --drain->in_flight;
-            }
-            drain->cv.notify_all();  // 在途计数在真正完成时回收（含超时后的后台继续）
-        }).detach();
-
-        if (df.wait_for(cfg_.request_timeout) == std::future_status::timeout) {
-            // 超时 → 504，后台线程继续跑完（fire-and-forget），不阻塞、不泄漏。
-            const double elapsed_ms =
-                std::chrono::duration<double, std::milli>(
-                    std::chrono::steady_clock::now() - t0)
-                    .count();
-            metrics_->record_inference(name, elapsed_ms);
+        InferStatus st = InferStatus::Failed;
+        metrics_->in_flight.fetch_add(1, std::memory_order_relaxed);
+        try {
+            st = h.infer(in, &out, &infer_err, cfg_.request_timeout);
+        } catch (...) {
+            st = InferStatus::Failed;
+            if (infer_err.empty()) infer_err = "inference threw";
+        }
+        metrics_->in_flight.fetch_sub(1, std::memory_order_relaxed);
+        const double elapsed_ms = std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0)
+                                      .count();
+        metrics_->record_inference(name, elapsed_ms);
+        if (st == InferStatus::Timeout) {
             write_error(res, 504, "TIMEOUT",
                         "inference timed out after " + std::to_string(cfg_.request_timeout.count()) +
                             "ms");
+        } else if (st == InferStatus::Ok) {
+            res.status = 200;
+            res.set_content(out.dump(), "application/json");
         } else {
-            df.get();
-            const double elapsed_ms =
-                std::chrono::duration<double, std::milli>(
-                    std::chrono::steady_clock::now() - t0)
-                    .count();
-            metrics_->record_inference(name, elapsed_ms);
-            if (job->ok) {
-                res.status = 200;
-                res.set_content(job->out.dump(), "application/json");
-            } else {
-                write_error(res, 400, "BAD_REQUEST",
-                            job->err.empty() ? "inference failed" : job->err);
-            }
+            write_error(res, 400, "BAD_REQUEST",
+                        infer_err.empty() ? "inference failed" : infer_err);
         }
     });
 }

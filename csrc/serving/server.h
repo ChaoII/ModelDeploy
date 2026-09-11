@@ -28,22 +28,18 @@ class Server;
 
 namespace modeldeploy::serving {
 
-// 共享在途计数 + drain 同步状态（UAF 修复核心）。独立堆对象：ServingServer 持一份
-// shared_ptr，同时每个 fire-and-forget 推理线程也捕获一份 shared_ptr。这样即便
-// ServingServer 已析构（wait_drained 超期返回后 srv_.reset()/析构 drain 原成员），
-// 游离线程仍能借 DrainState 安全递减 + notify，不会触及已析构的 this。
-struct DrainState {
-    std::mutex m;
-    std::condition_variable cv;
-    size_t in_flight = 0;
-};
-
 // 进程内指标（线程安全，mutex 保护）。requests 计各模型各状态码的请求数；
 // inference_ms 存原始样本（ms），/metrics 聚合 avg/max/p95。
 struct ServingMetrics {
+    static constexpr size_t kMaxInferenceSamples = 1024;  // 每模型延迟样本上限（环形窗口）
     mutable std::mutex m;                           // 被 const render() 锁定，须 mutable
     std::map<std::string, std::map<int, uint64_t>> requests;    // model -> (code -> count)
-    std::map<std::string, std::vector<double>> inference_ms;    // model -> raw samples (ms)
+    std::map<std::string, std::vector<double>> inference_ms;    // model -> raw samples (ms, 有界)
+    std::atomic<uint64_t> in_flight{0};             // 当前在途推理数（Gauge）
+    std::atomic<uint64_t> model_load_ok{0};         // 加载成功次数（Counter）
+    std::atomic<uint64_t> model_load_fail{0};       // 加载失败次数（Counter）
+    std::atomic<uint64_t> auth_failures{0};         // 鉴权失败次数（Counter）
+    std::atomic<uint64_t> rate_limited{0};          // 限流命中次数（Counter）
 
     void record_request(const std::string& model, int code);
     void record_inference(const std::string& model, double ms);
@@ -72,14 +68,6 @@ private:
     void register_routes();
     std::shared_ptr<httplib::Server> make_http_server();
 
-    // 在途请求计数：仅统计脱离 httplib 工作线程池的推理 worker（fire-and-forget 超时场景）。
-    // httplib 的 ThreadPool::shutdown() 已在 listen 收尾时 join 同步 handler，故此处只需
-    // 守候这些游离异步线程，保证优雅停机时不析构仍在用 AsyncModel 的句柄。
-    // 计数/同步写在 drain_（shared_ptr<DrainState>）上，而非本对象成员，以避免
-    // 游离线程在 ServingServer 析构后触碰已失效状态（UAF）。
-    void begin_request();
-    void wait_drained();
-
     ServingConfig cfg_;
     std::shared_ptr<ModelRepo> repo_;
     std::shared_ptr<httplib::Server> srv_;
@@ -87,7 +75,6 @@ private:
     int bound_port_ = 0;
     std::atomic<bool> started_{false};
     std::atomic<bool> listening_{false};
-    std::shared_ptr<DrainState> drain_;
     std::shared_ptr<ServingMetrics> metrics_;
     std::unique_ptr<TokenBucket> limiter_;
 };

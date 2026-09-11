@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -12,8 +13,15 @@
 
 namespace modeldeploy::serving {
 
-// 一次推理调用：输入 json → 输出 json，成功返回 true；失败返回 false 并填 err。
-using InferFn = std::function<bool(const nlohmann::json& in, nlohmann::json* out, std::string* err)>;
+// 一次推理调用结果：Ok=成功（out 有效）；Failed=失败（err 填原因）；
+// Timeout=超过 timeout 未完成（底层推理仍在 AsyncModel worker 上继续，不阻塞、不泄漏）。
+enum class InferStatus { Ok = 0, Failed, Timeout };
+
+// 输入 json → 输出 json。timeout<=0 表示不限时。实现方（make_model_handle）内部
+// wait_for；HTTP handler 直接调用，不再为每次请求创建线程。
+using InferFn = std::function<InferStatus(
+    const nlohmann::json& in, nlohmann::json* out, std::string* err,
+    std::chrono::milliseconds timeout)>;
 
 struct ManifestModel;  // 完整定义见 serving/manifest.h
 

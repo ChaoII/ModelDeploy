@@ -31,7 +31,7 @@ option(ENABLE_GSTREAMER "build video GStreamer backend" OFF)
 option(BUILD_ENCRYPTION "enable model encryption/decryption (requires mbedTLS git submodule)" ON)
 option(WITH_GPU "Enable GPU" ON)
 option(BUILD_ON_JETSON "Whether to build ModelDeploy on Nvidia Jetson" OFF)
-option(BUILD_SERVING "Build embedded inference serving gateway (ServingServer)" OFF)
+option(BUILD_SERVING "Build embedded inference serving gateway (ServingServer)" ON)
 option(BUILD_SERVING_TLS "Enable HTTPS for serving (requires OpenSSL)" OFF)
 option(BUILD_WEB_DEMO "Build model-demo serving server (demo_server) + web assets" OFF)
 if(BUILD_SERVING_TLS)
@@ -175,8 +175,14 @@ file(GLOB_RECURSE CUDA_SOURCE CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/face/face_det/*.cu
         ${CMAKE_SOURCE_DIR}/csrc/vision/processors/cuda/*.cpp)
+file(GLOB_RECURSE SERVING_SOURCE CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/csrc/serving/*.cpp)
 
-list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${SOPHGO_BACKEND_SOURCE} ${NCNN_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE} ${CUDA_SOURCE} ${VIDEO_SOURCE})
+list(REMOVE_ITEM ALL_SOURCE ${ORT_BACKEND_SOURCE} ${MNN_BACKEND_SOURCE} ${TRT_BACKEND_SOURCE} ${SOPHGO_BACKEND_SOURCE} ${NCNN_BACKEND_SOURCE} ${VISION_SOURCE} ${AUDIO_SOURCE} ${PYBIND_SOURCE} ${CUDA_SOURCE} ${VIDEO_SOURCE} ${SERVING_SOURCE})
+
+# ServingServer 源码按 BUILD_SERVING 门控（关闭时不编入 SDK；demo_server/test_serving 同步门控）。
+if (BUILD_SERVING)
+    list(APPEND ALL_SOURCE ${SERVING_SOURCE})
+endif ()
 
 if (WITH_GPU)
     add_definitions(-DWITH_GPU)
