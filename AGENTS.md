@@ -52,6 +52,12 @@ GPU CUDA 直通 / TPU 占位 fail-closed），`pts_ms` 可注入外部时间戳�
 
 测试数据需单独下载：`curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip`
 
+**模型/权重（重要）**：`test_data/test_models/` 下已按后端预置大量模型——`onnx/`、`mnn/`、
+`ncnn/`、`trt/`（含现成 `.engine`，如 `trt/yolo11n/yolo11n.engine`、`yolo11n_without_nms.engine`、
+`yolo11n_nms_b8.engine`（batch=8）、OCR/人脸/车牌等）、`sophgo/`。**在转换/生成/下载任何模型之前，
+先查看 `test_data/test_models` 是否已有对应后端的现成模型**，避免重复转换或在线构建（如 TRT 首次
+从 ONNX 构建 engine 需数十秒）。
+
 ## 架构
 
 ```
