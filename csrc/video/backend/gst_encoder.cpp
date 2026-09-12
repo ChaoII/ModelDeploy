@@ -482,9 +482,22 @@ bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint64_
     }
     auto py = image.plane(0);
     auto puv = image.plane(1);
-    if (!py.data || !puv.data || py.step != w_ || puv.step != w_) {
-        set_err(err, py.data && puv.data ? "device-step-mismatch" : "no-device-plane");
+    if (!py.data || !puv.data) {
+        set_err(err, "no-device-plane");
         return false;
+    }
+    const int step_y = py.step > 0 ? py.step : w_;
+    const int step_uv = puv.step > 0 ? puv.step : w_;
+    if (step_y != w_ || step_uv != w_) {
+        // 设备 NV12 pitch 非紧凑（如 NVDEC 对齐到宏块）：gstcuda alloc_wrapped 只接受紧凑
+        // 单块设备指针，直接包装会按错误 stride 读取。此处退化为 D2H → host 编码以保证正确；
+        // GStreamer GPU-direct 零拷贝仅适用于紧凑 pitch 的设备帧。
+        modeldeploy::vision::ImageData cpu_img;
+        if (!image.toCpu(&cpu_img)) {
+            set_err(err, "to-cpu-fail");
+            return false;
+        }
+        return encode_cpu(cpu_img, pts_ms, err);
     }
     const uint8_t* d_y = py.data;
     const uint8_t* d_uv = puv.data;
