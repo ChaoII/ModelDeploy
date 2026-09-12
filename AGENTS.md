@@ -79,14 +79,14 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
 | `ENABLE_ORT` | ON | OnnxRuntime 后端 |
-| `ENABLE_MNN` | ON | MNN 后端 |
+| `ENABLE_MNN` | OFF | MNN 后端 |
 | `ENABLE_TRT` | OFF | 需要 `WITH_GPU=ON`，不支持 Apple |
 | `ENABLE_NCNN` | OFF | ncnn 后端（CPU+Vulkan）；依赖 `cmake/ncnn.cmake`（配置时按平台从 modelscope 自动下载，Win/Linux-x64/aarch64）。Vision 模型经 ncnn 支持 ultralytics YOLO 全系（det/cls/obb/pose/seg/sem/depth），用 `ultralytics .pt export format=ncnn` 转出的 param/bin 加载 |
 | `WITH_GPU` | ON | 启用 CUDA（默认 SM 8.6） |
-| `BUILD_AUDIO` | ON | 启用音频模块（samplerate、kaldi-native-fbank、cppjieba） |
+| `BUILD_AUDIO` | OFF | 启用音频模块（samplerate、kaldi-native-fbank、cppjieba） |
 | `BUILD_VISION` | ON | 启用视觉模块（OpenCV） |
 | `BUILD_CAPI` | ON | C API |
-| `BUILD_PYTHON` | ON | pybind11 模块 |
+| `BUILD_PYTHON` | OFF | pybind11 模块 |
 | `BUILD_TESTS` | OFF | Catch2 测试二进制 |
 | `BUILD_ENCRYPTION` | ON | 需要 mbedTLS git submodule（`git submodule update --init --recursive`） |
 | `ENABLE_WETEXT` | OFF | 可选 WeTextProcessing ITN 后端（覆盖最全）；依赖已 vendor 于 `third_party/`（openfst + WeTextProcessing + glog stub），开启即由 CMake 现场构建，无需外部路径；模型缺失时 ITN 退化到内置轻量实现 |
@@ -107,8 +107,6 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 
 ## CI 工作流
 - **Sophgo TPU 测试（触发词“在 sophgo 上测试”）**：用户要求算能 TPU 交叉编译 + 部署测试时，纯 Sophgo 构建用 `ENABLE_SOPHGO=ON` + **`ENABLE_ORT=OFF`**（不依赖动态 onnxruntime）；在 `172.168.100.243` 的 `tpuc_dev` 容器（`/workspace`）内构建，产物经 `.243` 直传 `172.168.100.70` 的 `/data/ModelDeploy/build_sophgo/bin` 运行；Sophgo int8 bmodel 多属 batch=1 静态形状，pipeline 内须 `set_cls_batch_size(1)`。
-
-## CI 工作流
 
 两个 GitHub Actions 工作流：
 - `build_wheel.yml` — 在 ubuntu/windows 上运行 `python -m build`，Python 3.12–3.13，无测试
