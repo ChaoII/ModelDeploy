@@ -24,13 +24,24 @@ typedef struct _GstCudaStream GstCudaStream;
 typedef struct _GstCudaAllocator GstCudaAllocator;
 GType gst_cuda_context_get_type(void);
 GstCudaContext* gst_cuda_context_new(guint device_id);
+gboolean gst_cuda_context_push(GstCudaContext* ctx);
+gboolean gst_cuda_context_pop(CUcontext* cuda_ctx);
 GType gst_cuda_allocator_get_type(void);
+GstMemory* gst_cuda_allocator_alloc(GstCudaAllocator* allocator, GstCudaContext* context,
+                                    GstCudaStream* stream, const GstVideoInfo* info);
 GstMemory* gst_cuda_allocator_alloc_wrapped(GstCudaAllocator* allocator, GstCudaContext* context,
                                             GstCudaStream* stream, const GstVideoInfo* info,
                                             CUdeviceptr dev_ptr, gpointer user_data,
                                             GDestroyNotify notify);
 #define GST_CUDA_ALLOCATOR(obj) ((GstCudaAllocator*)(obj))
 }
+// GST_MAP_CUDA = GST_MAP_FLAG_LAST(1<<16) << 1（GStreamer 1.30 前未定义）
+#ifndef GST_MAP_CUDA
+#define GST_MAP_CUDA ((GstMapFlags)(GST_MAP_FLAG_LAST << 1))
+#endif
+#ifndef GST_MAP_WRITE_CUDA
+#define GST_MAP_WRITE_CUDA ((GstMapFlags)(GST_MAP_WRITE | GST_MAP_CUDA))
+#endif
 #endif // HAVE_GSTCUDA
 
 using modeldeploy::vision::ImageData;
@@ -72,7 +83,7 @@ bool GstEncoder::x264_and_mux_available() {
     md_gst_init_once();
     if (!g_gst_initialized.load()) return false;
     bool ok = true;
-    const char* names[] = {"appsrc", "videoconvert", "x264enc", "h264parse", "mp4mux",
+    const char* names[] = {"appsrc", "videoconvert", "x264enc", "h264parse", "mp4mux", "flvmux",
                            "filesink"};
     for (const char* n : names) {
         GstElementFactory* f = gst_element_factory_find(n);
@@ -259,8 +270,11 @@ bool GstEncoder::open(const std::string& url, int w, int h, int src_fps,
         set_err(err, "invalid-dimension");
         return false;
     }
-    // Phase1 软编基线仅支持 mp4 容器（mp4mux）；rtsp/rtmp 容器策划留扩展
-    if (cfg_.format != "auto" && cfg_.format != "mp4") {
+    // 容器：auto/mp4→mp4mux；flv→flvmux（直播可流式，供 HTTP-FLV/RTMP 预览）；
+    // ts/mpegts→mpegtsmux；mkv/matroska→matroskamux。未知取值 fail-closed。
+    const std::string& fmt = cfg_.format;
+    if (!(fmt.empty() || fmt == "auto" || fmt == "mp4" || fmt == "flv" || fmt == "ts" ||
+          fmt == "mpegts" || fmt == "mkv" || fmt == "matroska")) {
         set_err(err, "format-not-supported");
         return false;
     }
@@ -286,6 +300,16 @@ bool GstEncoder::open(const std::string& url, int w, int h, int src_fps,
     }
     opened_ = true;
     return true;
+}
+
+// gst_parse_launch 会把 location/uri 内的反斜杠当转义符吞掉（Windows 路径 → 打开失败）。
+// 本地文件路径统一转正斜杠（Windows 文件 API 同样接受）。
+static std::string md_gst_local_path(const std::string& p) {
+    std::string s = p;
+    for (char& c : s) {
+        if (c == '\\') c = '/';
+    }
+    return s;
 }
 
 void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, int enc) {
@@ -334,15 +358,23 @@ void GstEncoder::build_pipeline(const std::string& url, int w, int h, int fps, i
     // 按本次实际编码元素选对应 parse：qsvh265enc(HEVC)→h265parse，其余 H.264→h264parse
     std::string parse_part = " h264parse ";
     if (enc == 5 && qsv_enc_name_ == "qsvh265enc") parse_part = " h265parse ";
+    // 容器多路选择：mp4（默认）/ flv（streamable 直播预览）/ mpegts / matroska
+    const std::string& fmt = cfg_.format;
+    std::string mux_part;
+    if (fmt == "flv") mux_part = "flvmux streamable=true";
+    else if (fmt == "ts" || fmt == "mpegts") mux_part = "mpegtsmux";
+    else if (fmt == "mkv" || fmt == "matroska") mux_part = "matroskamux";
+    else mux_part = "mp4mux";  // auto/mp4/空
+    const std::string sink_loc = md_gst_local_path(url);
     std::string launch;
     if (gpu_direct) {
         launch = "appsrc name=src format=time "
                  "! video/x-raw(memory:CUDAMemory),format=NV12 !" + encoder_part +
-                 " !" + parse_part + "! mp4mux ! filesink location=\"" + url + "\"";
+                 " !" + parse_part + "!" + mux_part + " ! filesink location=\"" + sink_loc + "\"";
     } else {
         launch = "appsrc name=src format=time "
                  "! videoconvert !" + encoder_part +
-                 " !" + parse_part + "! mp4mux ! filesink location=\"" + url + "\"";
+                 " !" + parse_part + "!" + mux_part + " ! filesink location=\"" + sink_loc + "\"";
     }
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -488,17 +520,6 @@ bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint64_
     }
     const int step_y = py.step > 0 ? py.step : w_;
     const int step_uv = puv.step > 0 ? puv.step : w_;
-    if (step_y != w_ || step_uv != w_) {
-        // 设备 NV12 pitch 非紧凑（如 NVDEC 对齐到宏块）：gstcuda alloc_wrapped 只接受紧凑
-        // 单块设备指针，直接包装会按错误 stride 读取。此处退化为 D2H → host 编码以保证正确；
-        // GStreamer GPU-direct 零拷贝仅适用于紧凑 pitch 的设备帧。
-        modeldeploy::vision::ImageData cpu_img;
-        if (!image.toCpu(&cpu_img)) {
-            set_err(err, "to-cpu-fail");
-            return false;
-        }
-        return encode_cpu(cpu_img, pts_ms, err);
-    }
     const uint8_t* d_y = py.data;
     const uint8_t* d_uv = puv.data;
     // 会话内 gstcuda 上下文与 allocator（同一 GPU）——成员持有、teardown 释放，避免进程级状态污染
@@ -517,21 +538,105 @@ bool GstEncoder::encode_gpu(const modeldeploy::vision::ImageData& image, uint64_
         }
     }
 
-    auto t0 = std::chrono::steady_clock::now();
-    // 紧凑连续设备 NV12（单块，base=d_y）→ GStreamer CUDA memory（memory:CUDAMemory）
     GstVideoInfo vi;
     gst_video_info_init(&vi);
     gst_video_info_set_format(&vi, GST_VIDEO_FORMAT_NV12, w_, h_);
     vi.fps_n = fps_;
     vi.fps_d = 1;
-    GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc_, cuda_ctx_, nullptr, &vi,
-                                                      (CUdeviceptr)d_y, nullptr, nullptr);
-    if (!mem) {
-        set_err(err, "cuda-wrap-fail");
-        return false;
+    // NV12 半平面布局：Y 步长 vi.stride[0]，UV 紧随其后。取 GStreamer 期望的平面步长/偏移。
+    const gsize y_pitch = GST_VIDEO_INFO_PLANE_STRIDE(&vi, 0);
+    const gsize uv_pitch = (GST_VIDEO_INFO_N_PLANES(&vi) > 1)
+                               ? GST_VIDEO_INFO_PLANE_STRIDE(&vi, 1)
+                               : y_pitch;
+    const gsize uv_off = (GST_VIDEO_INFO_N_PLANES(&vi) > 1)
+                             ? GST_VIDEO_INFO_PLANE_OFFSET(&vi, 1)
+                             : static_cast<gsize>(y_pitch) * static_cast<gsize>(h_);
+
+    auto t0 = std::chrono::steady_clock::now();
+    GstBuffer* buf = nullptr;
+    // 真零拷贝条件：源步长等于 GStreamer 期望步长，且 UV 平面紧跟 Y（单块连续）。
+    const bool wrap_ok =
+        (static_cast<gsize>(step_y) == y_pitch) && (static_cast<gsize>(step_uv) == uv_pitch) &&
+        (reinterpret_cast<uintptr_t>(d_uv) ==
+         reinterpret_cast<uintptr_t>(d_y) + static_cast<uintptr_t>(step_y) * static_cast<uintptr_t>(h_));
+    if (wrap_ok) {
+        // 紧凑连续设备 NV12（单块，base=d_y）→ 直接包装为 memory:CUDAMemory（真零拷贝）
+        GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc_, cuda_ctx_, nullptr, &vi,
+                                                          reinterpret_cast<CUdeviceptr>(d_y),
+                                                          nullptr, nullptr);
+        if (!mem) {
+            set_err(err, "cuda-wrap-fail");
+            return false;
+        }
+        buf = gst_buffer_new();
+        gst_buffer_append_memory(buf, mem);
+    } else {
+        // 源 pitch 非紧凑（NVDEC 宏块对齐）或 Y/UV 非连续：分配持久设备暂存（按 vi 紧凑排布），
+        // 用 cuMemcpy2D 逐平面 D2D 拷入——全程 GPU、无主机往返，兼容任意厂商源布局。
+        // 尺寸会话内固定，缓存复用（不随每帧重新分配）。
+        const size_t need = static_cast<size_t>(uv_off) +
+                            static_cast<size_t>(uv_pitch) * static_cast<size_t>(h_ / 2);
+        CUcontext prev = nullptr;
+        const bool pushed = gst_cuda_context_push(cuda_ctx_);
+        if (cuda_stage_ == nullptr || cuda_stage_size_ < need) {
+            if (cuda_stage_) {
+                cuMemFree(reinterpret_cast<CUdeviceptr>(cuda_stage_));
+                cuda_stage_ = nullptr;
+                cuda_stage_size_ = 0;
+            }
+            CUdeviceptr p = 0;
+            if (cuMemAlloc(&p, need) != CUDA_SUCCESS) {
+                if (pushed) gst_cuda_context_pop(&prev);
+                set_err(err, "cuda-stage-alloc-fail");
+                return false;
+            }
+            cuda_stage_ = reinterpret_cast<void*>(p);
+            cuda_stage_size_ = need;
+        }
+        const auto copy_plane = [](CUdeviceptr dst, size_t dst_pitch, const uint8_t* src,
+                                   size_t src_pitch, size_t width_bytes,
+                                   size_t rows) -> CUresult {
+            CUDA_MEMCPY2D cp = {};
+            cp.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+            cp.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+            cp.srcDevice = reinterpret_cast<CUdeviceptr>(src);
+            cp.srcPitch = src_pitch;
+            cp.dstDevice = dst;
+            cp.dstPitch = dst_pitch;
+            cp.WidthInBytes = width_bytes;
+            cp.Height = rows;
+            return cuMemcpy2D(&cp);
+        };
+        const CUdeviceptr base = reinterpret_cast<CUdeviceptr>(cuda_stage_);
+        // 设备帧偶发不可拷贝（解码缓冲重协商/上下文切换，尤见首帧）：重试数次；
+        // 仍失败则跳过该帧，保持整路存活（丢 1 帧优于整路失败）。
+        CUresult r1 = CUDA_SUCCESS;
+        CUresult r2 = CUDA_SUCCESS;
+        for (int attempt = 0; attempt < 3; ++attempt) {
+            r1 = copy_plane(base, static_cast<size_t>(y_pitch), d_y, static_cast<size_t>(step_y),
+                            static_cast<size_t>(w_), static_cast<size_t>(h_));
+            r2 = (r1 == CUDA_SUCCESS)
+                     ? copy_plane(base + uv_off, static_cast<size_t>(uv_pitch), d_uv,
+                                  static_cast<size_t>(step_uv), static_cast<size_t>(w_),
+                                  static_cast<size_t>(h_ / 2))
+                     : r1;
+            if (r1 == CUDA_SUCCESS && r2 == CUDA_SUCCESS) break;
+        }
+        if (pushed) gst_cuda_context_pop(&prev);
+        if (r1 != CUDA_SUCCESS || r2 != CUDA_SUCCESS) {
+            ++gpu_copy_drops_;
+            return true;  // 丢弃该帧（不推流），避免退出编码管线
+        }
+        GstMemory* mem = gst_cuda_allocator_alloc_wrapped(cuda_alloc_, cuda_ctx_, nullptr, &vi,
+                                                          base, nullptr, nullptr);
+        if (!mem) {
+            set_err(err, "cuda-wrap-fail");
+            return false;
+        }
+        buf = gst_buffer_new();
+        gst_buffer_append_memory(buf, mem);
     }
-    GstBuffer* buf = gst_buffer_new();
-    gst_buffer_append_memory(buf, mem);
+
     if (pts_ms != 0) GST_BUFFER_PTS(buf) = pts_ms * (GST_SECOND / 1000);
     else GST_BUFFER_PTS(buf) = (pts_ * GST_SECOND) / fps_;
     GST_BUFFER_DURATION(buf) = GST_SECOND / fps_;
@@ -631,6 +736,14 @@ void GstEncoder::teardown() {
     }
 #ifdef HAVE_GSTCUDA
     // 释放会话 GPU 直编状态：不跨会话保留 CUDA 上下文，避免污染同进程后续管道
+    if (cuda_stage_) {
+        CUcontext prev = nullptr;
+        const bool pushed = gst_cuda_context_push(cuda_ctx_);
+        cuMemFree(reinterpret_cast<CUdeviceptr>(cuda_stage_));
+        if (pushed) gst_cuda_context_pop(&prev);
+        cuda_stage_ = nullptr;
+        cuda_stage_size_ = 0;
+    }
     if (cuda_alloc_) { gst_object_unref(cuda_alloc_); cuda_alloc_ = nullptr; }
     if (cuda_ctx_) { gst_object_unref(cuda_ctx_); cuda_ctx_ = nullptr; }
 #endif

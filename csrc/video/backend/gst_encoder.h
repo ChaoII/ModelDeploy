@@ -2,6 +2,7 @@
 #include "csrc/video/video_codec_config.h"
 #include "csrc/video/backend/encoder_backend.h"
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -111,6 +112,12 @@ private:
     // 避免在 DLL/测试进程生命期里全局持有，防止污染同进程后建的 nvh264enc 管道。
     _GstCudaContext* cuda_ctx_ = nullptr;
     _GstCudaAllocator* cuda_alloc_ = nullptr;
+    // 非紧凑源 pitch（如 NVDEC 宏块对齐、Y/UV 分离指针）时的持久设备暂存 NV12：按 GStreamer
+    // 期望的 GstVideoInfo 步长紧凑排布，逐平面 D2D 拷入后再经 alloc_wrapped 交 nvh264enc。
+    // 固定尺寸会话内复用；teardown 释放（存为 void* 以避免本头引入 cuda.h）。
+    void* cuda_stage_ = nullptr;
+    size_t cuda_stage_size_ = 0;
+    uint64_t gpu_copy_drops_ = 0;  // 设备帧 D2D 拷贝失败被跳过的帧数（诊断/观测）
 #endif
 };
 

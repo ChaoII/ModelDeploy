@@ -44,6 +44,22 @@ void md_gst_init_once() {
     if (gst_init_check(nullptr, nullptr, &err)) g_gst_initialized = true;
     if (err) g_error_free(err);
 }
+
+// URL 方案判定：网络源（rtsp/rtmp/http）与本地文件走不同 source 元素。
+bool md_is_network_uri(const std::string& url) {
+    return url.rfind("rtsp://", 0) == 0 || url.rfind("rtmp://", 0) == 0 ||
+           url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0;
+}
+
+// gst_parse_launch 会把 location 内的反斜杠当转义符吞掉（Windows 路径 → 打开失败）。
+// 本地文件路径统一转正斜杠（Windows 文件 API 同样接受）。
+std::string md_gst_local_path(const std::string& p) {
+    std::string s = p;
+    for (char& c : s) {
+        if (c == '\\') c = '/';
+    }
+    return s;
+}
 } // namespace
 
 GstDecoder::GstDecoder(const VideoDecoderConfig& cfg)
@@ -92,7 +108,7 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
             state_ = State::Error;
             return false;
         }
-        set_err(err, "no-bmdec");
+        set_err(err, "sophgo-decode-requires-sophonmw");
         state_ = State::Error;
         return false;
     }
@@ -181,9 +197,16 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
             return true;
         }
     }
-    std::string launch = "filesrc location=\"" + url +
-                         "\" ! decodebin ! videoconvert "
-                         "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    std::string launch;
+    if (md_is_network_uri(url)) {
+        // 网络源（rtsp/rtmp/http）：uridecodebin 自动 depay/parse/decode，输出主机帧
+        launch = "uridecodebin uri=\"" + url +
+                 "\" ! videoconvert ! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    } else {
+        launch = "filesrc location=\"" + md_gst_local_path(url) +
+                 "\" ! decodebin ! videoconvert "
+                 "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
+    }
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
     if (!pipeline_ || gerr) {
@@ -213,6 +236,24 @@ bool GstDecoder::open(const std::string& url, std::string* err) {
     return true;
 }
 
+// URL 方案判定在文件顶部匿名命名空间（md_is_network_uri）。
+std::string GstDecoder::source_prefix_locked(const std::string& url, bool hevc) const {
+    const std::string proto = cfg_.rtsp_transport.empty() ? "tcp" : cfg_.rtsp_transport;
+    const char* rtp = hevc ? "rtph265depay" : "rtph264depay";
+    const char* parse = hevc ? "h265parse" : "h264parse";
+    if (url.rfind("rtsp://", 0) == 0) {
+        return "rtspsrc location=\"" + url + "\" latency=0 protocols=" + proto + " ! " + rtp +
+               " ! " + parse;
+    }
+    if (url.rfind("rtmp://", 0) == 0) {
+        return "rtmpsrc location=\"" + url + "\" ! flvdemux ! " + parse;
+    }
+    if (url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0) {
+        return "souphttpsrc location=\"" + url + "\" ! " + parse;
+    }
+    return "filesrc location=\"" + md_gst_local_path(url) + "\" ! " + parse;
+}
+
 #ifdef HAVE_GSTCUDA
 bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
@@ -224,8 +265,9 @@ bool GstDecoder::build_device_pipeline_locked(const std::string& url, std::strin
     }
     gst_object_unref(f);
     // 显式 nvh264dec 解码 → 设备 CUDA memory，appsink 保持 memory:CUDAMemory（不做 D2H）。
-    std::string launch = "filesrc location=\"" + url +
-                         "\" ! h264parse ! nvh264dec "
+    // 源按 URL 方案分发（rtsp→rtspsrc+rtph264depay；本地文件→filesrc），均经 h264parse。
+    std::string launch = source_prefix_locked(url, false) +
+                         " ! nvh264dec "
                          "! appsink name=sink caps=\"video/x-raw(memory:CUDAMemory),format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -282,9 +324,13 @@ bool GstDecoder::build_bm_pipeline_locked(const std::string& url, std::string* e
                 mp4_container = true;
         }
     }
-    std::string launch = "filesrc location=\"" + url + "\" ! " +
-                         (mp4_container ? "qtdemux ! " : "") +
-                         "h264parse ! bmdec ! videoconvert "
+    const std::string src =
+        md_is_network_uri(url)
+            ? source_prefix_locked(url, false)
+            : ("filesrc location=\"" + md_gst_local_path(url) + "\" ! " +
+               (mp4_container ? "qtdemux ! " : "") + "h264parse");
+    std::string launch = src +
+                         " ! bmdec ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -325,8 +371,8 @@ bool GstDecoder::nvv4l2decoder_available() {
 // L4T 无 CUDA 零拷贝，故以 nvvidconv 转为标准主机 NV12，复用下方软解 read 路径（device_only_active_ 保持 false）。
 bool GstDecoder::build_hwdecode_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
-    std::string launch = "filesrc location=\"" + url +
-                         "\" ! h264parse ! nvv4l2decoder ! nvvidconv "
+    std::string launch = source_prefix_locked(url, false) +
+                         " ! nvv4l2decoder ! nvvidconv "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -367,8 +413,8 @@ bool GstDecoder::vaapih264dec_available() {
 // 复用软解 read 路径（device_only_active_ 保持 false）。未在本机验证（需 Linux VAAPI + gst-vaapi）。
 bool GstDecoder::build_vaapi_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
-    std::string launch = "filesrc location=\"" + url +
-                         "\" ! h264parse ! vaapih264dec ! videoconvert "
+    std::string launch = source_prefix_locked(url, false) +
+                         " ! vaapih264dec ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);
@@ -415,10 +461,9 @@ bool GstDecoder::qsvh265dec_available() {
 
 bool GstDecoder::build_qsv_pipeline_locked(const std::string& url, std::string* err) {
     close_pipeline();
-    const char* parse = qsv_hevc_ ? "h265parse" : "h264parse";
     const char* dec = qsv_hevc_ ? "qsvh265dec" : "qsvh264dec";
-    std::string launch = "filesrc location=\"" + url +
-                         "\" ! " + parse + " ! " + dec + " ! videoconvert "
+    std::string launch = source_prefix_locked(url, qsv_hevc_) + " ! " + dec +
+                         " ! videoconvert "
                          "! appsink name=sink caps=\"video/x-raw,format=NV12\"";
     GError* gerr = nullptr;
     pipeline_ = gst_parse_launch(launch.c_str(), &gerr);

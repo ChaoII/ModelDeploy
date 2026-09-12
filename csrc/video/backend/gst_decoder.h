@@ -45,6 +45,11 @@ private:
     void cleanup();                 // 重置尺寸/状态（不释放管道）
     void close_pipeline();          // 停管道并释放 pipeline/appsink
     bool query_caps_locked(int timeout_ms);  // 从 appsink sink pad 的 current caps 取宽高/帧率
+    // 依据 URL 方案生成「源 + 解复用 + parse」前缀：
+    //   rtsp:// → rtspsrc(protocols=tcp|udp) ! rtph26Xdepay ! h26Xparse
+    //   rtmp:// → rtmpsrc ! flvdemux ! h26Xparse；http(s):// → souphttpsrc ! h26Xparse
+    //   其它（本地文件）→ filesrc ! h26Xparse。hevc=true 时用 H265 系元素。
+    std::string source_prefix_locked(const std::string& url, bool hevc) const;
 #ifdef HAVE_GSTCUDA
     // 设备直通：构建 nvh264dec → CUDA memory → appsink(memory:CUDAMemory) 管道；成功置 device_only_active_
     bool build_device_pipeline_locked(const std::string& url, std::string* err);
