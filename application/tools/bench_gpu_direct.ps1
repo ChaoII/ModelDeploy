@@ -16,6 +16,8 @@ param(
   [bool]$UseTrtEp   = $true,
   [string]$DecHw    = "cuda",
   [bool]$DeviceOnly = $true,
+  [string]$DecBackend = "ffmpeg",
+  [string]$EncBackend = "ffmpeg",
   [string]$EncCodec = "h264_nvenc",
   [bool]$GpuDirect  = $true,
   [bool]$Preview    = $true,
@@ -60,8 +62,8 @@ try {
     $id = "cam{0:d2}" -f $i
     $task = @{ id=$id; name=$id; input_url="$RtspBase/$id"; output_url=(Join-Path $tmp "flv\$id.flv"); enable_preview=$Preview;
       models=@(@{ name="yolo11n"; type="detection"; path=$Model; backend="ort"; device="gpu"; use_trt_ep=$UseTrtEp; confidence_threshold=0.3; input_size=@(640,640); roi=@(0,0,0,0); interval=1 });
-      decoder=@{ backend="ffmpeg"; hw_accel=$DecHw; device_only=$DeviceOnly; rtsp_transport="tcp" };
-      encoder=@{ backend="ffmpeg"; codec=$EncCodec; hw_accel="cuda"; gpu_direct_input=$GpuDirect; format="flv"; bitrate_kbps=2000; gop=25 } }
+      decoder=@{ backend=$DecBackend; hw_accel=$DecHw; device_only=$DeviceOnly; rtsp_transport="tcp" };
+      encoder=@{ backend=$EncBackend; codec=$EncCodec; hw_accel="cuda"; gpu_direct_input=$GpuDirect; format="flv"; bitrate_kbps=2000; gop=25 } }
     PostJson "$base/api/v1/tasks" $task | Out-Null
     PostJson "$base/api/v1/tasks/$id/start" @{} | Out-Null
   }
@@ -69,7 +71,7 @@ try {
   $a=GetJson "$base/api/v1/tasks"; $t0=Get-Date; $f0=@{}; foreach($t in $a.tasks){ $f0[$t.id]=[int64]$t.stats.frames }
   Start-Sleep -Seconds $SampleSec
   $t1=Get-Date; $b=GetJson "$base/api/v1/tasks"; $dt=($t1-$t0).TotalSeconds
-  "channels=$($b.tasks.Count) decHW=$DecHw deviceOnly=$DeviceOnly enc=$EncCodec gpuDirect=$GpuDirect sample=$([math]::Round($dt,1))s"
+  "channels=$($b.tasks.Count) decBackend=$DecBackend decHW=$DecHw deviceOnly=$DeviceOnly encBackend=$EncBackend enc=$EncCodec gpuDirect=$GpuDirect sample=$([math]::Round($dt,1))s"
   "id     fps   frames sdk_in sdk_out drop infer draw encSub total  dec(sdk) enc(sdk) err"
   $ok=0
   foreach($t in $b.tasks){
