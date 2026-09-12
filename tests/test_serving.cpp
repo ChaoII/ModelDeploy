@@ -533,7 +533,10 @@ void wait_until(const std::function<bool()>& pred) {
 
 // 起服并断言随机端口；返回监听中的随机端口供 httplib::Client 使用。
 int start_listening(ServingServer& srv) {
-    REQUIRE(srv.start());
+    std::string e;
+    const bool ok = srv.start(&e);
+    INFO("ServingServer::start err = " << e);
+    REQUIRE(ok);
     REQUIRE(srv.is_listening());
     int port = srv.port();
     REQUIRE(port > 0);
@@ -1085,6 +1088,7 @@ TEST_CASE("ServingServer cors headers", "[serving]") {
 
     // 关闭 CORS：OPTIONS 预检 404，普通响应也无跨域头。
     ServingConfig cfg2;
+    cfg2.port = 0;  // 测试用随机端口（勿用默认 8000，可能被占用/保留）
     cfg2.model_repo = write_manifest(repo, {{"det", "det"}});
     cfg2.enable_cors = false;
     ServingServer srv2(cfg2, fake_model_builder());
