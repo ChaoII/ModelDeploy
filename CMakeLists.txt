@@ -43,20 +43,55 @@ if(BUILD_SERVING_TLS)
     list(APPEND DEPENDS OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
+# ── 选项规范化：能推导的依赖自动满足；无法满足才 FATAL；无意义组合 WARNING ──────
+# R1 surveillance ⇒ vision + video + 至少一个视频后端
 if (BUILD_SURVEILLANCE)
     set(BUILD_VIDEO ON CACHE BOOL "build video decoder module (required by BUILD_SURVEILLANCE)" FORCE)
-endif ()
-
-if (NOT BUILD_ON_JETSON)
-    if (EXISTS "/etc/nv_tegra_release")
-        message(STATUS "detect Jetson")
-        set(BUILD_ON_JETSON ON)
+    set(BUILD_VISION ON CACHE BOOL "build vision module (required by BUILD_SURVEILLANCE)" FORCE)
+    if (NOT ENABLE_FFMPEG AND NOT ENABLE_GSTREAMER)
+        message(STATUS "BUILD_SURVEILLANCE=ON: no video backend selected, enabling ENABLE_FFMPEG")
+        set(ENABLE_FFMPEG ON)
     endif ()
 endif ()
 
+# R2 video ⇒ vision
+if (BUILD_VIDEO AND NOT BUILD_VISION)
+    message(STATUS "BUILD_VIDEO=ON requires vision, enabling BUILD_VISION")
+    set(BUILD_VISION ON CACHE BOOL "build vision module (required by BUILD_VIDEO)" FORCE)
+endif ()
+
+# R3 trt ⇒ gpu
+if (ENABLE_TRT AND NOT WITH_GPU)
+    message(STATUS "ENABLE_TRT=ON requires CUDA, enabling WITH_GPU")
+    set(WITH_GPU ON CACHE BOOL "Enable GPU (required by ENABLE_TRT)" FORCE)
+endif ()
+
+# R4 web demo ⇒ serving
+if (BUILD_WEB_DEMO AND NOT BUILD_SERVING)
+    message(STATUS "BUILD_WEB_DEMO=ON requires serving, enabling BUILD_SERVING")
+    set(BUILD_SERVING ON CACHE BOOL "Build embedded inference serving gateway (required by BUILD_WEB_DEMO)" FORCE)
+endif ()
+
+# R5 sophgo / ncnn ⇒ vision（其后端/处理器依赖 vision::ImageData）
+if ((ENABLE_SOPHGO OR ENABLE_NCNN) AND NOT BUILD_VISION)
+    message(STATUS "ENABLE_SOPHGO/ENABLE_NCNN requires vision, enabling BUILD_VISION")
+    set(BUILD_VISION ON CACHE BOOL "build vision module (required by ENABLE_SOPHGO/ENABLE_NCNN)" FORCE)
+endif ()
+
+# R6 weText 仅在 audio 内生效
+if (ENABLE_WETEXT AND NOT BUILD_AUDIO)
+    message(WARNING "ENABLE_WETEXT=ON has no effect without BUILD_AUDIO; disabling ENABLE_WETEXT")
+    set(ENABLE_WETEXT OFF)
+endif ()
+
+# Jetson 自动探测：缓存 FORCE 赋值，避免普通变量覆盖 option 缓存导致不可复现
+if (NOT BUILD_ON_JETSON AND EXISTS "/etc/nv_tegra_release")
+    message(STATUS "detect Jetson")
+    set(BUILD_ON_JETSON ON CACHE BOOL "Whether to build ModelDeploy on Nvidia Jetson" FORCE)
+endif ()
 if (BUILD_ON_JETSON)
-    set(WITH_GPU ON)
-    set(ENABLE_TRT ON)
+    set(WITH_GPU ON CACHE BOOL "Enable GPU (forced on Jetson)" FORCE)
+    set(ENABLE_TRT ON CACHE BOOL "enable trt backend (forced on Jetson)" FORCE)
     add_compile_options(-O2 -march=armv8-a -mtune=cortex-a78 -ffast-math -fopenmp)
 endif ()
 
@@ -347,23 +382,22 @@ endif ()
 
 # ── VIDEO ──────────────────────────────────
 if (BUILD_VIDEO)
-    if (NOT BUILD_VISION)
-        message(FATAL_ERROR "BUILD_VIDEO requires BUILD_VISION=ON (VideoDecoder returns vision::ImageData)")
-    endif ()
     if (ENABLE_GSTREAMER)
         include("${CMAKE_SOURCE_DIR}/cmake/gstreamer.cmake")
         if (NOT GSTREAMER_INCLUDE_DIR OR NOT GSTREAMER_LIBS)
+            message(WARNING "GStreamer not found; GStreamer video backend disabled")
             set(ENABLE_GSTREAMER OFF)
         endif ()
     endif ()
-    if (NOT ENABLE_FFMPEG AND NOT ENABLE_GSTREAMER)
-        message(FATAL_ERROR "BUILD_VIDEO requires ENABLE_FFMPEG=ON or ENABLE_GSTREAMER=ON")
-    endif ()
     if (ENABLE_FFMPEG)
         include("${CMAKE_SOURCE_DIR}/cmake/ffmpeg.cmake")
-        if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)   # 沿用现有优雅禁用
+        if (NOT FFMPEG_INCLUDE_DIR OR NOT FFMPEG_LIBS)
+            message(WARNING "FFmpeg not found; FFmpeg video backend disabled")
             set(ENABLE_FFMPEG OFF)
         endif ()
+    endif ()
+    if (NOT ENABLE_FFMPEG AND NOT ENABLE_GSTREAMER)
+        message(FATAL_ERROR "BUILD_VIDEO=ON but no usable video backend: neither FFmpeg nor GStreamer was found.")
     endif ()
 endif ()
 if (BUILD_VIDEO)
@@ -519,8 +553,12 @@ if (BUILD_PYTHON)
         file(GLOB _MD_PYBIND_NLP_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/nlp/*.cpp)
         list(REMOVE_ITEM PYBIND_SOURCE ${_MD_PYBIND_NLP_SOURCE})
     endif ()
-    # pybind barcode 绑定依赖 SDK 侧的 barcode 实现（随 BUILD_BARCODE 编译）；关闭时一并排除
-    if (NOT BUILD_BARCODE)
+    # pybind vision 绑定依赖 BUILD_VISION（vision::ImageData 等）；关闭时整目录排除
+    if (NOT BUILD_VISION)
+        file(GLOB _MD_PYBIND_VISION_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/vision/*.cpp)
+        list(REMOVE_ITEM PYBIND_SOURCE ${_MD_PYBIND_VISION_SOURCE})
+    elseif (NOT BUILD_BARCODE)
+        # vision 打开但 barcode 关闭：仅排除 barcode 绑定
         list(REMOVE_ITEM PYBIND_SOURCE ${CMAKE_SOURCE_DIR}/csrc/pybind/vision/barcode_pybind.cpp)
     endif ()
     add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/pybind11")

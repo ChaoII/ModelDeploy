@@ -63,6 +63,10 @@ find_library(MNN_LIB MNN
         NO_CMAKE_FIND_ROOT_PATH
 )
 
+if (NOT MNN_LIB OR MNN_LIB MATCHES "NOTFOUND")
+    message(FATAL_ERROR "MNN static library not found under ${MNN_LIB_DIR} (download/extract failed?)")
+endif ()
+
 add_library(MNN STATIC IMPORTED GLOBAL)
 set_target_properties(MNN PROPERTIES
         IMPORTED_LOCATION "${MNN_LIB}"

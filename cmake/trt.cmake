@@ -47,6 +47,14 @@ endif ()
 find_library(NVINFER_LIB ${NVINFER_LIB_NAME} PATHS "${TRT_LIB_DIR}" NO_DEFAULT_PATH)
 find_library(NVONNXPARSER_LIB ${NVONNXPARSER_LIB_NAME} PATHS "${TRT_LIB_DIR}" NO_DEFAULT_PATH)
 
+if (NOT TRT_MAJOR_VERSION OR NOT NVINFER_LIB OR NVINFER_LIB MATCHES "NOTFOUND"
+        OR NOT NVONNXPARSER_LIB OR NVONNXPARSER_LIB MATCHES "NOTFOUND")
+    message(FATAL_ERROR
+            "TensorRT not found (major='${TRT_MAJOR_VERSION}', nvinfer='${NVINFER_LIB}', "
+            "nvonnxparser='${NVONNXPARSER_LIB}'). Set -DTRT_DIR=<TensorRT root> "
+            "(Jetson uses /usr/include + /usr/lib/aarch64-linux-gnu).")
+endif ()
+
 add_library(trt::nvinfer STATIC IMPORTED GLOBAL)
 add_library(trt::nvonnxparser STATIC IMPORTED GLOBAL)
 

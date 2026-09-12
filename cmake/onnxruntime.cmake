@@ -73,6 +73,10 @@ find_library(ONNXRUNTIME_LIB onnxruntime
         NO_CMAKE_FIND_ROOT_PATH
 )
 
+if (NOT ONNXRUNTIME_LIB OR ONNXRUNTIME_LIB MATCHES "NOTFOUND")
+    message(FATAL_ERROR "onnxruntime library not found under ${onnxruntime_SOURCE_DIR}/lib (download/extract failed?)")
+endif ()
+
 add_library(onnxruntime::onnxruntime STATIC IMPORTED GLOBAL)
 
 
