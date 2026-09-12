@@ -8,47 +8,72 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/t
 #   test_modeldeploy [core]   # 仅核心
 #   test_modeldeploy ~[gpu]   # 排除 GPU
 
+# 核心/运行时测试：不依赖可选模块，始终编译
 set(TEST_SOURCES
     test_core.cpp
-    test_mnn_device.cpp
     test_ptr_validate.cpp
     test_bugfix.cpp
-    test_image_data.cpp
-    test_vision_models.cpp
-    test_obb_nms.cpp
-    test_processor_accuracy.cpp
-    test_insightface.cpp
-    test_pipelines.cpp
-    test_pipeline.cpp
-    test_benchmark_insightface.cpp
-    test_encryption.cpp
-    test_encryption_e2e.cpp
-    test_tracking.cpp
-    test_barcode.cpp
-    test_hand.cpp
-    test_cv_tools.cpp
-    test_cv_solutions.cpp
-    test_fall_detector.cpp
-    test_fall_detector.cpp
-    test_fastsam.cpp
-    test_landmark.cpp
-    test_action.cpp
-    test_reid.cpp
-    test_formula_recognition.cpp
-    test_doc_to_markdown.cpp
-    test_result_json.cpp
-    baseline_compare.cpp
-    baseline_utils.cpp
-    utils.cpp
-    test_ncnn_backend.cpp
-    test_ncnn_vision.cpp
-    test_ncnn_phase_a.cpp
-    test_ncnn_phase_b.cpp
-    test_ncnn_lpr.cpp
-    test_ncnn_ocr.cpp
-    test_ncnn_seetaface.cpp
     test_async_model.cpp
+    utils.cpp
 )
+
+# MNN 测试：仅 ENABLE_MNN 时编译（use_mnn_backend() 未启用时 MD_LOG_FATAL）
+if (ENABLE_MNN)
+    list(APPEND TEST_SOURCES test_mnn_device.cpp)
+endif ()
+
+# 视觉/图像相关测试：依赖 BUILD_VISION（ImageData / result_json / 各 vision 模型）
+if (BUILD_VISION)
+    list(APPEND TEST_SOURCES
+        test_image_data.cpp
+        test_vision_models.cpp
+        test_obb_nms.cpp
+        test_processor_accuracy.cpp
+        test_insightface.cpp
+        test_pipelines.cpp
+        test_pipeline.cpp
+        test_benchmark_insightface.cpp
+        test_tracking.cpp
+        test_hand.cpp
+        test_cv_tools.cpp
+        test_cv_solutions.cpp
+        test_fall_detector.cpp
+        test_fastsam.cpp
+        test_landmark.cpp
+        test_action.cpp
+        test_reid.cpp
+        test_formula_recognition.cpp
+        test_doc_to_markdown.cpp
+        test_result_json.cpp
+        baseline_compare.cpp
+        baseline_utils.cpp
+    )
+    # 条码：vision 的子能力，需 BUILD_BARCODE
+    if (BUILD_BARCODE)
+        list(APPEND TEST_SOURCES test_barcode.cpp)
+    endif ()
+endif ()
+
+# ncnn 测试：仅 ENABLE_NCNN 时编译（否则 ncnn 符号缺失）
+if (ENABLE_NCNN)
+    list(APPEND TEST_SOURCES
+        test_ncnn_backend.cpp
+        test_ncnn_vision.cpp
+        test_ncnn_phase_a.cpp
+        test_ncnn_phase_b.cpp
+        test_ncnn_lpr.cpp
+        test_ncnn_ocr.cpp
+        test_ncnn_seetaface.cpp
+    )
+endif ()
+
+# 加密测试：仅 BUILD_ENCRYPTION 时编译（否则 encryption/* 符号缺失）
+if (BUILD_ENCRYPTION)
+    list(APPEND TEST_SOURCES
+        test_encryption.cpp
+        test_encryption_e2e.cpp
+    )
+endif ()
 
 # Serving 测试仅在 BUILD_SERVING 时编译（否则 serving 源不编入 SDK，链接失败）。
 if(BUILD_SERVING)
@@ -176,7 +201,14 @@ if(BUILD_VIDEO AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_video_gpu_encode.cpp
     # 否则该测试文件整体 SKIP（不引 cuda_runtime.h 到 CPU 构建）。
     if(GSTREAMER_HAS_CUDA OR WITH_GPU)
         target_compile_definitions(test_modeldeploy PRIVATE MODELDEPLOY_TEST_CUDA)
+        # cudart 目录：WITH_GPU 时用 CUDAToolkit；仅 gstcuda 时从 CUDA include 根推导（Windows: lib/x64）
         set(_cuda_lib_dir "${CUDAToolkit_LIBRARY_DIR}")
+        if(NOT _cuda_lib_dir AND GSTREAMER_CUDA_INCLUDE)
+            get_filename_component(_cuda_root "${GSTREAMER_CUDA_INCLUDE}" DIRECTORY)
+            if(EXISTS "${_cuda_root}/lib/x64")
+                set(_cuda_lib_dir "${_cuda_root}/lib/x64")
+            endif()
+        endif()
         if(EXISTS "${_cuda_lib_dir}/cudart.lib")
             target_link_libraries(test_modeldeploy PRIVATE "${_cuda_lib_dir}/cudart.lib")
         endif()

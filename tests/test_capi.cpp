@@ -1831,12 +1831,17 @@ TEST_CASE("capi md_draw_result device NV12 dispatch detection", "[gpu][model][ca
 #endif
 
 TEST_CASE("md_option_set_device accepts OPENCL and VULKAN", "[capi]") {
+#ifdef ENABLE_MNN
     MDOptionHandle opt = nullptr;
     REQUIRE(md_option_create(&opt) == MD_OK);
     md_option_set_backend(opt, MD_BK_MNN);
     REQUIRE(md_option_set_device(opt, MD_DEV_OPENCL, 0) == MD_OK);
     REQUIRE(md_option_set_device(opt, MD_DEV_VULKAN, 0) == MD_OK);
     md_option_destroy(opt);
+#else
+    // OPENCL/VULKAN 映射到 MNN 后端；未编译 MNN 时 use_mnn_backend() 会 MD_LOG_FATAL，跳过。
+    SUCCEED("ENABLE_MNN not enabled; skipped");
+#endif
 }
 
 TEST_CASE("capi region/queue/trackzone count", "[capi][solution]") {
