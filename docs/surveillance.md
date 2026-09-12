@@ -356,3 +356,25 @@ GPU TRT 单帧纯推理 ≈ 2.0 ms（`tests/test_perf_stages.cpp` `[perf]`）。
 - **NVDEC pitch 不匹配**（`csrc/video/backend/ffmpeg_encoder.cpp`）：NVDEC 设备 NV12 的 pitch 按对齐
   > 宽度，硬编原先要求 `step==width` → `device-step-mismatch`。现按真实源 pitch 做 D2D 拷贝。
 
+### 8.2 GStreamer 后端（与 FFmpeg 对等的全链路）
+
+GStreamer 后端同样支持 **RTSP/RTMP/HTTP 网络源**（此前仅 `filesrc` 本地文件）与 **GPU 零拷贝全链路**，
+供不同设备商（NVIDIA NVDEC/NVENC、Jetson L4T、Intel QSV、VAAPI、算能 SOPHGO）走各自硬件路径：
+
+- **解码**（`gst_decoder`）：按 URL 方案分派源元素——`rtsp://` → `rtspsrc protocols=tcp|udp ! rtph26Xdepay
+  ! h26Xparse`；`rtmp://` → `rtmpsrc ! flvdemux`；`http(s)://` → `souphttpsrc`；本地文件 → `filesrc`。
+  `device_only` 下接 `nvh264dec` 输出 `memory:CUDAMemory`（`HAVE_GSTCUDA`）。
+- **编码**（`gst_encoder`）：`gpu_direct_input` 下设备 NV12 → `nvh264enc`（CUDAMemory）零拷贝；源 pitch
+  非紧凑（NVDEC 宏块对齐）或 Y/UV 分离时，分配持久设备暂存并按 GStreamer 步长 **D2D（cuMemcpy2D）**
+  拷入——**全程 GPU、无主机往返**。容器支持 `mp4` / `flv`(streamable) / `mpegts` / `matroska`。
+- 本地路径反斜杠统一转正斜杠（`gst_parse_launch` 会把 `\` 当转义符吞掉）。
+
+```powershell
+# 编解码都走 GStreamer（设备 NV12 → ORT TRT EP → nvh264enc 直编）
+pwsh application/tools/bench_gpu_direct.ps1 -N 10 -DecBackend gstreamer -EncBackend gstreamer -EncCodec nvh264enc
+```
+
+**实测（RTX 4060 Ti）**：GStreamer RTSP 设备解码 → TRT EP 推理 → nvh264enc 直编，**10 路 × 25 fps，dropped=0**，
+输出 FLV 有效（`ffprobe`：h264 640×480）。视频单测（gst-enabled 构建）：`[video]~[gpu]` 34 例全绿，
+`[video][gpu]` 与隔离组 `[video][gst-cuda]` 全绿。
+
