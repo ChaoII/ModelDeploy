@@ -178,6 +178,20 @@ bool FfmpegEncoder::configure_encoder(const std::string& name, int kind, int w, 
                     return false;
                 }
             }
+            // NVENC preset/tune：FFmpeg nvenc 用 p1..p7（p1 最快）与 ull/ll/hq/lossless。
+            // 把通用 preset 名映射过去；否则保持 nvenc 默认。low_latency 映射 tune=ull。
+            {
+                std::string p = cfg_.preset;
+                if (p == "ultrafast" || p == "superfast" || p == "veryfast") p = "p1";
+                else if (p == "faster") p = "p2";
+                else if (p == "fast") p = "p3";
+                else if (p == "medium") p = "p4";
+                else if (p == "slow" || p == "slower") p = "p6";
+                else if (p == "veryslow") p = "p7";
+                else if (p == "auto") p.clear();
+                if (!p.empty()) av_opt_set(enc_->priv_data, "preset", p.c_str(), 0);
+                if (cfg_.low_latency) av_opt_set(enc_->priv_data, "tune", "ull", 0);
+            }
         } else {  // VAAPI：挂 VAAPI hw 帧上下文（format=VAAPI, sw_format=NV12）
 #ifdef ENABLE_VAAPI
             if (!setup_vaapi_hw_frames(w, h)) {
