@@ -14,9 +14,15 @@ AgentRuntime::~AgentRuntime() { stop(); }
 
 bool AgentRuntime::start() {
     bus_.set_sink([this](const DetectionEvent& e) {
-        std::lock_guard<std::mutex> lk(mtx_);
-        auto it = queue_by_task_.find(e.task_id);
-        if (it != queue_by_task_.end() && it->second) it->second->enqueue(e);
+        // 仅在锁内查找并拷贝队列指针；enqueue 含磁盘 I/O，必须在锁外执行，
+        // 否则检测线程会长时间阻塞在 mtx_ 上（与 PipelineManager 形成锁序风险）。
+        DurableQueue* q = nullptr;
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            auto it = queue_by_task_.find(e.task_id);
+            if (it != queue_by_task_.end()) q = it->second;
+        }
+        if (q) q->enqueue(e);
     });
 
     AgentHooks hooks;
@@ -53,14 +59,20 @@ void AgentRuntime::stop() {
 }
 
 nlohmann::json AgentRuntime::metrics() {
-    std::lock_guard<std::mutex> lk(mtx_);
+    // 锁序：先在 mtx_ 之外访问 PipelineManager（其 mtx_ 与检测线程 join 相关），
+    // 再单独持 mtx_ 汇总本类队列；避免 mtx_ -> PipelineManager::mtx_ 与检测
+    // 线程反向获取 mtx_ 构成 ABBA 死锁。
     size_t running = 0;
     for (const auto& t : mgr_.list_tasks())
         if (t.running) ++running;
+
     uint64_t qlen = 0, dropped = 0;
-    for (const auto& [id, q] : queues_) {
-        qlen += q->pending();
-        dropped += q->dropped();
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        for (const auto& [id, q] : queues_) {
+            qlen += q->pending();
+            dropped += q->dropped();
+        }
     }
     return nlohmann::json{
         {"running_channels", running},

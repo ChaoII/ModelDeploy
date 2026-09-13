@@ -79,6 +79,13 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     REQUIRE(e["camera_id"] == 7);
     REQUIRE(e["task_id"] == 777);
     REQUIRE(e["detections"].is_array());
+    REQUIRE(!e["detections"].empty());
+    REQUIRE(e["event_id"].is_string());
+    REQUIRE(e["event_id"].get<std::string>().size() == 36);
+    REQUIRE(e["ts"].is_string());
+    REQUIRE(!e["ts"].get<std::string>().empty());
+    REQUIRE(e["ts"].get<std::string>().back() == 'Z');
+    REQUIRE(e["schema_version"] == 1);
 
     // 快照
     bool got_snapshot = false;
@@ -88,6 +95,32 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     REQUIRE(got_snapshot);
+
+    // 并发冒烟：持续拉取 /api/v1/metrics 的同时反复 stop/start 任务，覆盖
+    // metrics()（旧实现持 mtx_ 再取 PipelineManager::mtx_）与 stop_task（持
+    // PipelineManager::mtx_ 并 join 检测线程，检测线程再经 sink 取 mtx_）
+    // 的相反锁序路径。修复后应稳定完成，不出现 ABBA 死锁；客户端设读超时，
+    // 避免在缺陷回归时无限阻塞。
+    std::atomic<bool> hammer{true};
+    std::thread metrics_thread([&]() {
+        httplib::Client mc("127.0.0.1", agent_port);
+        mc.set_connection_timeout(2, 0);
+        mc.set_read_timeout(5, 0);
+        while (hammer.load()) {
+            auto r = mc.Get("/api/v1/metrics");
+            (void)r;
+        }
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    for (int round = 0; round < 3; ++round) {
+        auto st = cli.Post("/api/v1/tasks/777/stop");
+        REQUIRE(st);
+        auto s2 = cli.Post("/api/v1/tasks/777/start");
+        REQUIRE(s2);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    hammer = false;
+    metrics_thread.join();
 
     auto stopped = cli.Post("/api/v1/tasks/777/stop");
     REQUIRE(stopped);
@@ -176,12 +209,22 @@ struct MockBroker {
         addr.sin_port = htons(static_cast<unsigned short>(port));
         bind(listener, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
         listen(listener, 1);
-        set_recv_timeout(listener, 300);
         sock_t c = INVALID_SOCKET;
         while (running.load()) {
+            // Windows 下 SO_RCVTIMEO 不约束 accept，改用 select 带超时轮询，
+            // 即使无客户端连接也能让 stop() 及时返回。
+            fd_set rfds;
+            FD_ZERO(&rfds);
+            FD_SET(listener, &rfds);
+            timeval tv{};
+            tv.tv_sec = 0;
+            tv.tv_usec = 200000;
+            const int sel = select(static_cast<int>(listener) + 1, &rfds, nullptr, nullptr, &tv);
+            if (sel == 0) continue;
+            if (sel < 0) { CLOSE_SOCK(listener); return; }
             c = accept(listener, nullptr, nullptr);
             if (c != INVALID_SOCKET) break;
-            if (!was_timeout()) { CLOSE_SOCK(listener); return; }
+            if (!running.load()) break;
         }
         if (c == INVALID_SOCKET) { CLOSE_SOCK(listener); return; }
         set_recv_timeout(c, 300);
@@ -229,7 +272,19 @@ struct MockBroker {
         CLOSE_SOCK(listener);
     }
     void start() { th = std::thread([this]() { serve(); }); }
-    void stop() { running = false; if (th.joinable()) th.join(); }
+    void stop() {
+        running = false;
+        // 自连接唤醒可能阻塞在 select/accept 的服务线程，保证快速返回。
+        sock_t w = socket(AF_INET, SOCK_STREAM, 0);
+        if (w != INVALID_SOCKET) {
+            sockaddr_in a{}; a.sin_family = AF_INET;
+            a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            a.sin_port = htons(static_cast<unsigned short>(port));
+            connect(w, reinterpret_cast<sockaddr*>(&a), sizeof(a));
+            CLOSE_SOCK(w);
+        }
+        if (th.joinable()) th.join();
+    }
 };
 }  // namespace
 #endif  // ENABLE_MQTT
@@ -286,8 +341,19 @@ TEST_CASE("Agent E2E: local det emits MQTT event", "[agent][e2e][mqtt]") {
     for (int i = 0; i < 300 && broker.publishes.load() == 0; ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     REQUIRE(broker.publishes.load() >= 1);
-    REQUIRE(broker.payload.find("\"camera_id\":8") != std::string::npos);
     REQUIRE(broker.topic == "aistation/default/edge/edge-e2e/camera/8/detect");
+    auto me = json::parse(broker.payload);
+    REQUIRE(me["edge_code"] == "edge-e2e");
+    REQUIRE(me["camera_id"] == 8);
+    REQUIRE(me["task_id"] == 888);
+    REQUIRE(me["detections"].is_array());
+    REQUIRE(!me["detections"].empty());
+    REQUIRE(me["event_id"].is_string());
+    REQUIRE(me["event_id"].get<std::string>().size() == 36);
+    REQUIRE(me["ts"].is_string());
+    REQUIRE(!me["ts"].get<std::string>().empty());
+    REQUIRE(me["ts"].get<std::string>().back() == 'Z');
+    REQUIRE(me["schema_version"] == 1);
 
     auto stopped = cli.Post("/api/v1/tasks/888/stop");
     REQUIRE(stopped);
