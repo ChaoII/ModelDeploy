@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -63,6 +64,10 @@ public:
     void start();
     void stop();
 
+    /// 发布前采集内联快照：返回 false 或空串则不附加
+    using SnapshotProvider = std::function<bool(int64_t task_id, std::string* b64, int* w, int* h)>;
+    void set_snapshot_provider(SnapshotProvider p);
+
 private:
     void load_existing();
     void worker_loop();
@@ -81,4 +86,5 @@ private:
     std::thread worker_;
     std::atomic<bool> running_{false};
     std::atomic<uint64_t> dropped_{0};
+    SnapshotProvider snapshot_provider_;
 };

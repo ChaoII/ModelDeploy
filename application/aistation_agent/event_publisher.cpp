@@ -245,6 +245,11 @@ size_t DurableQueue::pending() const {
     return files_.size();
 }
 
+void DurableQueue::set_snapshot_provider(SnapshotProvider p) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    snapshot_provider_ = std::move(p);
+}
+
 void DurableQueue::start() {
     if (running_.exchange(true)) return;
     worker_ = std::thread([this]() { worker_loop(); });
@@ -294,6 +299,25 @@ void DurableQueue::worker_loop() {
         bool ok = false;
         try {
             DetectionEvent e = DetectionEvent::from_json(nlohmann::json::parse(payload));
+            if (e.snapshot_data.empty()) {
+                SnapshotProvider provider;
+                {
+                    std::lock_guard<std::mutex> lk(mtx_);
+                    provider = snapshot_provider_;
+                }
+                if (provider) {
+                    std::string b64; int w = 0, h = 0;
+                    try {
+                        if (provider(e.task_id, &b64, &w, &h) && !b64.empty()) {
+                            e.snapshot_data = std::move(b64);
+                            e.snapshot_width = w;
+                            e.snapshot_height = h;
+                        }
+                    } catch (...) {
+                        // 快照采集失败不影响事件发布
+                    }
+                }
+            }
             ok = transport_ && transport_->publish(e);
         } catch (...) { ok = false; }
 

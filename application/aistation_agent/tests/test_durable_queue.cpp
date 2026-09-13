@@ -117,3 +117,36 @@ TEST_CASE("DurableQueue dedups identical event_id", "[agent][queue]") {
     q.stop();
     fs::remove_all(dir);
 }
+
+TEST_CASE("DurableQueue attaches inline snapshot via provider", "[agent][queue]") {
+    auto dir = fs::temp_directory_path() / "md_dq_snap";
+    fs::remove_all(dir);
+
+    struct CapturingTransport : EventPublisher {
+        std::atomic<bool> online{true};
+        std::vector<DetectionEvent> events;
+        std::mutex m;
+        bool publish(const DetectionEvent& e) override {
+            if (!online.load()) return false;
+            std::lock_guard<std::mutex> lk(m);
+            events.push_back(e);
+            return true;
+        }
+        std::string name() const override { return "cap"; }
+    };
+
+    CapturingTransport tx;
+    DurableQueue q(dir.string(), 8, &tx, 20);
+    q.set_snapshot_provider([](int64_t, std::string* b64, int* w, int* h) {
+        *b64 = "QUJD"; *w = 320; *h = 180; return true;
+    });
+    q.start();
+    q.enqueue(ev("s1"));
+    for (int i = 0; i < 100 && tx.events.empty(); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    REQUIRE(tx.events.size() == 1);
+    REQUIRE(tx.events[0].snapshot_data == "QUJD");
+    REQUIRE(tx.events[0].snapshot_width == 320);
+    q.stop();
+    fs::remove_all(dir);
+}
