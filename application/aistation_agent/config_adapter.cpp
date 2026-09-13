@@ -67,12 +67,18 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         if (e.contains("bitrate_kbps") && e["bitrate_kbps"].is_number_integer()) out->sdk.encoder.bitrate_kbps = e["bitrate_kbps"];
     }
 
-    // preview
+    // preview：仅真实流式为 muxer 时启用编码预览；"snapshot"/未知格式保持关闭
     out->sdk.enable_preview = false;
     if (j.contains("preview") && j["preview"].is_object()) {
         const auto& p = j["preview"];
-        if (p.contains("enabled") && p["enabled"].is_boolean()) out->sdk.enable_preview = p["enabled"].get<bool>();
-        if (p.contains("format") && p["format"].is_string()) out->sdk.encoder.format = p["format"].get<std::string>();
+        bool enabled = false;
+        if (p.contains("enabled") && p["enabled"].is_boolean()) enabled = p["enabled"].get<bool>();
+        std::string fmt;
+        if (p.contains("format") && p["format"].is_string()) fmt = p["format"].get<std::string>();
+        if (enabled && (fmt == "flv" || fmt == "rtmp")) {
+            out->sdk.enable_preview = true;
+            out->sdk.encoder.format = fmt;
+        }
     }
     if (out->sdk.enable_preview) {
         // AIStation 未下发 output_url；Agent 生成 FLV 输出（主流程任务 9 接线）

@@ -64,13 +64,23 @@ void AgentRuntime::stop() {
     schedule_running_ = false;
     if (schedule_thread_.joinable()) schedule_thread_.join();
     mgr_.stop_all();
+    // 队列 worker 的 join 必须在 mtx_ 之外：worker 可能经 snapshot provider 走
+    // PipelineManager::get_task_jpeg（持其 mtx_），而其它路径持 PipelineManager::mtx_
+    // 时经 sink 取 AgentRuntime::mtx_，持锁 join 会形成 ABBA 死锁。
+    std::vector<std::unique_ptr<DurableQueue>> queues;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         for (auto& [id, q] : queues_)
-            if (q) q->stop();
+            if (q) queues.push_back(std::move(q));
         queues_.clear();
-        publishers_.clear();
         queue_by_task_.clear();
+    }
+    for (auto& q : queues) q->stop();  // join 在锁外
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        // 队列已停，worker 不再持有 EventPublisher*，此时清理发布器才安全。
+        publishers_.clear();
+        schedules_.clear();
     }
 }
 
@@ -167,16 +177,27 @@ void AgentRuntime::on_updated(const std::string& task_id, const AdaptedTask& t) 
 
 void AgentRuntime::on_removed(const std::string& task_id) {
     bus_.unregister_task(task_id);
-    std::lock_guard<std::mutex> lk(mtx_);
-    auto qit = queues_.find(task_id);
-    if (qit != queues_.end()) {
-        if (qit->second) qit->second->stop();
-        for (auto it = queue_by_task_.begin(); it != queue_by_task_.end();)
-            it = (it->second == qit->second.get()) ? queue_by_task_.erase(it) : std::next(it);
-        queues_.erase(qit);
+    // 先摘下队列（持锁），再在锁外 join：worker 可能经 snapshot provider 调
+    // PipelineManager::get_task_jpeg（持其 mtx_），与持 PipelineManager::mtx_ 经 sink
+    // 取 mtx_ 的路径构成 ABBA，故绝不能持 mtx_ 做 stop()/join。
+    std::unique_ptr<DurableQueue> queue;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        auto qit = queues_.find(task_id);
+        if (qit != queues_.end()) {
+            queue = std::move(qit->second);
+            for (auto it = queue_by_task_.begin(); it != queue_by_task_.end();)
+                it = (it->second == queue.get()) ? queue_by_task_.erase(it) : std::next(it);
+            queues_.erase(qit);
+        }
+        schedules_.erase(task_id);
     }
-    publishers_.erase(task_id);
-    schedules_.erase(task_id);
+    if (queue) queue->stop();  // join 必须在 mtx_ 之外，避免与 PipelineManager 形成 ABBA
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        // 队列已停，worker 不再持有 EventPublisher*，此时才能安全清理发布器。
+        publishers_.erase(task_id);
+    }
 }
 
 void AgentRuntime::schedule_loop() {
