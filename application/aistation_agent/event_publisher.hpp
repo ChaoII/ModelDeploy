@@ -1,6 +1,13 @@
 #pragma once
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <unordered_set>
 #include "event_bus.hpp"
 #include "httplib.h"
 
@@ -41,4 +48,37 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
+};
+
+/// 边缘持久化缓存队列：离线落盘、重启补发、超限丢最旧、按 event_id 去重
+class DurableQueue {
+public:
+    DurableQueue(std::string dir, int max_mb, EventPublisher* transport, int retry_ms = 1000);
+    DurableQueue(std::string dir, size_t max_bytes, EventPublisher* transport, int retry_ms);
+    ~DurableQueue();
+
+    void enqueue(const DetectionEvent& e);    // 非阻塞；失败/离线时落盘
+    size_t pending() const;
+    uint64_t dropped() const { return dropped_.load(); }
+    void start();
+    void stop();
+
+private:
+    void load_existing();
+    void worker_loop();
+    bool enforce_limit();
+
+    std::string dir_;
+    size_t max_bytes_;
+    EventPublisher* transport_;
+    int retry_ms_;
+    mutable std::mutex mtx_;
+    std::condition_variable cv_;
+    std::deque<std::string> files_;
+    std::unordered_set<std::string> event_ids_;
+    size_t bytes_ = 0;
+    uint64_t seq_ = 0;
+    std::thread worker_;
+    std::atomic<bool> running_{false};
+    std::atomic<uint64_t> dropped_{0};
 };

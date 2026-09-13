@@ -52,6 +52,34 @@ nlohmann::json DetectionEvent::to_json() const {
     return j;
 }
 
+DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
+    DetectionEvent e;
+    e.event_id = j.value("event_id", "");
+    e.edge_code = j.value("edge_code", "");
+    e.camera_id = j.value("camera_id", 0);
+    e.task_id = j.value("task_id", int64_t{0});
+    e.algorithm_type = j.value("algorithm_type", "");
+    e.ts = j.value("ts", "");
+    e.latency_ms = j.value("latency_ms", 0.0);
+    e.schema_version = j.value("schema_version", 1);
+    if (j.contains("snapshot") && j["snapshot"].is_object())
+        e.snapshot_ref = j["snapshot"].value("ref", "");
+    if (j.contains("detections") && j["detections"].is_array()) {
+        for (const auto& d : j["detections"]) {
+            EventDetection ed;
+            ed.label = d.value("label", "");
+            ed.label_id = d.value("label_id", 0);
+            ed.confidence = d.value("confidence", 0.f);
+            if (d.contains("bbox")) {
+                ed.x = d["bbox"].value("x", 0.f); ed.y = d["bbox"].value("y", 0.f);
+                ed.w = d["bbox"].value("width", 0.f); ed.h = d["bbox"].value("height", 0.f);
+            }
+            e.detections.push_back(std::move(ed));
+        }
+    }
+    return e;
+}
+
 std::string EventBus::make_uuid_v4() {
     static thread_local std::mt19937_64 rng(std::random_device{}());
     std::uniform_int_distribution<uint64_t> dist;

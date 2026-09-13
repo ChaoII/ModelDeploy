@@ -33,6 +33,7 @@ struct DetectionEvent {
     int schema_version = 1;
 
     nlohmann::json to_json() const;
+    static DetectionEvent from_json(const nlohmann::json& j);
 };
 
 /// 每任务事件元数据

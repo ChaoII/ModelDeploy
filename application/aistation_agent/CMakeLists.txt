@@ -29,6 +29,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_pipeline_sink.cpp
             tests/test_http_publisher.cpp
             tests/test_mqtt_publisher.cpp
+            tests/test_durable_queue.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
