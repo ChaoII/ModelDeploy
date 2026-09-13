@@ -4,6 +4,7 @@ set(AGENT_SOURCES
         config_adapter.cpp
         agent_server.cpp
         event_bus.cpp
+        event_publisher.cpp
         main.cpp
 )
 list(FILTER AGENT_SOURCES EXCLUDE REGEX "main\\.cpp$")   # 供测试目标复用
@@ -26,6 +27,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_agent_server.cpp
             tests/test_event_bus.cpp
             tests/test_pipeline_sink.cpp
+            tests/test_http_publisher.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
