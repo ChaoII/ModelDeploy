@@ -1,10 +1,12 @@
 #include "model_fetcher.hpp"
 #include "httplib.h"
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <random>
 #include <sstream>
+#include <thread>
 
 namespace fs = std::filesystem;
 
@@ -66,8 +68,16 @@ bool ModelFetcher::download(const std::string& base, const std::string& path,
 
     std::error_code ec;
     fs::rename(tmp, dest, ec);
+    // 并发发布同一 dest（同名模型被多任务同时拉取）时，rename 可能因短暂的
+    // 共享冲突而失败。这里必须**退避重试且不先删除 dest**：删除会与其它线程的
+    // rename 交错，造成丢更新（调用方收到 false，且窗口内容缺失）。
+    for (int attempt = 0; ec && attempt < 100; ++attempt) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        ec.clear();
+        fs::rename(tmp, dest, ec);
+    }
     if (ec) {
-        // Windows rename cannot overwrite; drop a stale empty dest and retry.
+        // 兼容不支持覆盖式 rename 的文件系统：删除过期 dest 后最后再试一次。
         std::error_code rmec; fs::remove(dest, rmec);
         ec.clear();
         fs::rename(tmp, dest, ec);
@@ -102,7 +112,14 @@ bool ModelFetcher::fetch(const std::string& url, std::string* local_path, std::s
     std::string name;
     if (!basename_of(url, &name)) return fail("invalid model url (no filename): " + url);
     const std::string dest = (fs::path(cache_dir_) / name).string();
-    if (fs::exists(dest) && fs::file_size(dest) > 0) { if (local_path) *local_path = dest; return true; }
+    // 用 error_code 重载：并发发布时 dest 可能在 exists() 与 file_size() 之间被
+    // 替换/短暂移除，抛出 filesystem_error（工作线程将 terminate）。命中失败时
+    // 直接走下载路径即可。
+    std::error_code cache_ec;
+    if (fs::exists(dest, cache_ec)) {
+        const auto sz = fs::file_size(dest, cache_ec);
+        if (!cache_ec && sz > 0) { if (local_path) *local_path = dest; return true; }
+    }
 
     if (url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0) {
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT

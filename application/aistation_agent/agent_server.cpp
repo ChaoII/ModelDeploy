@@ -51,14 +51,18 @@ bool AgentServer::start() {
         std::cerr << "[AgentServer] failed to bind " << host_ << ":" << port_ << std::endl;
         return false;
     }
-    running_ = true;
     thread_ = std::thread([this]() {
         if (!server_.listen_after_bind()) {
             std::cerr << "[AgentServer] listen stopped on " << host_ << ":" << port_ << std::endl;
             running_ = false;
         }
     });
-    return true;
+    // 等待监听线程真正进入 listen_internal()（is_running_ 置位）再返回。
+    // 否则调用方可能在监听就绪前就 stop()：此时 httplib 0.47 的 stop() 因
+    // is_running_ 仍为 false 而不关闭 socket，导致 stop 无效、join() 阻塞、端口泄漏。
+    server_.wait_until_ready();
+    running_ = server_.is_running();
+    return running_.load();
 }
 
 void AgentServer::stop() {

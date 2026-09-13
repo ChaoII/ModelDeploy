@@ -136,17 +136,23 @@ TEST_CASE("AgentServer start is idempotent and restartable", "[agent][server]") 
     REQUIRE(srv.start());
     REQUIRE(srv.is_running());
     REQUIRE(srv.start());                 // 已在运行时再次 start：不重绑、不重复注册路由
+    REQUIRE(srv.start());
     httplib::Client cli("127.0.0.1", port);
-    auto h = cli.Get("/health");
-    REQUIRE(h);
-    REQUIRE(h->status == 200);
+    for (int i = 0; i < 3; ++i) {
+        auto h = cli.Get("/health");
+        REQUIRE(h);
+        REQUIRE(h->status == 200);
+    }
     srv.stop();
     REQUIRE_FALSE(srv.is_running());
     REQUIRE(srv.start());                 // stop() 后重启（路由仍幂等）
+    REQUIRE(srv.start());
     httplib::Client cli2("127.0.0.1", port);
-    auto h2 = cli2.Get("/health");
-    REQUIRE(h2);
-    REQUIRE(h2->status == 200);
+    for (int i = 0; i < 3; ++i) {
+        auto h2 = cli2.Get("/health");
+        REQUIRE(h2);
+        REQUIRE(h2->status == 200);
+    }
     srv.stop();
 }
 

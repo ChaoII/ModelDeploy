@@ -2,6 +2,7 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <random>
 #include <thread>
 #include <vector>
@@ -51,38 +52,57 @@ TEST_CASE("ModelFetcher http download", "[agent][fetch]") {
     fs::remove_all(dir);
 }
 
-TEST_CASE("ModelFetcher concurrent downloads use unique temp names", "[agent][fetch]") {
+TEST_CASE("ModelFetcher concurrent downloads share one dest safely", "[agent][fetch]") {
     int port = free_port();
     httplib::Server srv;
-    // 每个线程拉取不同文件名，命中同一 temp_path_for 并发路径。
-    srv.Get(R"(/m(\d+)\.onnx)", [](const httplib::Request& req, httplib::Response& res) {
-        res.set_content("bytes-" + req.matches[1].str(), "application/octet-stream");
+    // 全部线程请求同一 URL（同一 dest）：强制并发命中同一 temp_path_for(dest)，
+    // 检验同名临时文件不会互相覆盖/污染。
+    const std::string payload = "shared-model-bytes";
+    srv.Get("/model.onnx", [&](const httplib::Request&, httplib::Response& res) {
+        // 略作延迟，确保所有线程在任一请求完成前都已进入下载路径，放大并发窗口。
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        res.set_content(payload, "application/octet-stream");
     });
     std::thread t([&]() { srv.listen("127.0.0.1", port); });
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     auto dir = fs::temp_directory_path() / "md_fetch_concurrent";
     fs::remove_all(dir);
-    const std::string base = "http://127.0.0.1:" + std::to_string(port) + "/m";
+    const std::string url = "http://127.0.0.1:" + std::to_string(port) + "/model.onnx";
     constexpr int kThreads = 8;
     std::atomic<int> ok{0};
+    std::atomic<int> empty{0};
     std::vector<std::thread> workers;
     for (int i = 0; i < kThreads; ++i) {
-        workers.emplace_back([&, i]() {
+        workers.emplace_back([&]() {
             ModelFetcher fetcher(dir.string());
             std::string out, err;
-            if (fetcher.fetch(base + std::to_string(i) + ".onnx", &out, &err)) ok.fetch_add(1);
+            if (!fetcher.fetch(url, &out, &err)) return;
+            // 并发同名 dest：所有线程共享同一临时写入路径。fetch 返回即成功。
+            // 注意不要在 worker 内读取 dest（会与其它线程的原子替换争用共享句柄，
+            // 属测试自身的竞态）；内容正确性在全部 join 后确定性校验。
+            if (out.empty()) empty.fetch_add(1);
+            ok.fetch_add(1);
         });
     }
     for (auto& w : workers) w.join();
     REQUIRE(ok.load() == kThreads);
+    REQUIRE(empty.load() == 0);
 
+    // 同一 URL 只产出一个最终文件，且不残留任何 .tmp- 临时文件。
     int files = 0;
     for (const auto& e : fs::directory_iterator(dir)) {
         ++files;
         REQUIRE(e.path().filename().string().find(".tmp-") == std::string::npos);
     }
-    REQUIRE(files == kThreads);
+    REQUIRE(files == 1);
+    REQUIRE(fs::file_size(dir / "model.onnx") == payload.size());
+    // 并发写同名临时文件 + 原子 rename 到同一 dest 后，最终内容必须完整无损。
+    {
+        std::ifstream f(dir / "model.onnx", std::ios::binary);
+        std::string body((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        REQUIRE(body == payload);
+    }
 
     srv.stop(); t.join();
     fs::remove_all(dir);
