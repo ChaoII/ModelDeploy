@@ -1,8 +1,10 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include "agent_server.hpp"
 #include "config_adapter.hpp"
@@ -41,6 +43,20 @@ private:
     void on_updated(const std::string& task_id, const AdaptedTask& t);
     void on_removed(const std::string& task_id);
     nlohmann::json metrics();
+
+    bool capture_snapshot_b64(const std::string& task_id, const SnapshotConfig& cfg,
+                              std::string* b64, int* w, int* h);
+    void schedule_loop();
+
+    struct SchedEntry {
+        aistation::Schedule schedule;
+        bool last_active = true;
+        bool initialized = false;
+    };
+    std::unordered_map<std::string, SchedEntry> schedules_;
+    std::unordered_map<int64_t, SnapshotConfig> snapshot_cfg_;
+    std::thread schedule_thread_;
+    std::atomic<bool> schedule_running_{false};
 
     AgentOptions opts_;
     PipelineManager mgr_;

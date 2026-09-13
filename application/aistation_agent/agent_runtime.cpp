@@ -4,6 +4,11 @@
 #include <iterator>
 #include <utility>
 
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+
+#include "agent_util.hpp"
+
 AgentRuntime::AgentRuntime(AgentOptions opts)
     : opts_(std::move(opts)),
       fetcher_(opts_.model_cache_dir.empty() ? "data/model_cache" : opts_.model_cache_dir,
@@ -41,6 +46,9 @@ bool AgentRuntime::start() {
         opts_.secret.empty() ? opts_.api_key : opts_.secret,
         [this]() { return metrics(); }, opts_.heartbeat_interval_sec, opts_.max_channels);
     heartbeat_->start();
+
+    schedule_running_ = true;
+    schedule_thread_ = std::thread([this]() { schedule_loop(); });
     return true;
 }
 
@@ -53,6 +61,8 @@ void AgentRuntime::stop() {
     // 4) 最后销毁 queues_/publishers_：此时已无读者，不会 UAF。
     if (heartbeat_) heartbeat_->stop();
     if (server_) server_->stop();
+    schedule_running_ = false;
+    if (schedule_thread_.joinable()) schedule_thread_.join();
     mgr_.stop_all();
     {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -124,12 +134,33 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
     meta.task_id_num = task_id_num;
     meta.algorithm_type = t.algorithm_type;
     meta.alarm_interval_sec = t.alarm_interval_sec;
+    meta.schedule = t.schedule;
+    meta.roi_polygon = t.roi_polygon;
+
+    // 必须在 queue move 进 queues_ 之前设置 provider（move 后局部 unique_ptr 为空）。
+    // provider 捕获 task_id_num 值拷贝；锁内仅查配置，实际采集在锁外执行。
+    // 注意：on_removed/stop 持 mtx_ 时会 join 队列工作线程，若此处阻塞等锁将死锁，
+    // 故用 try_lock：抢不到锁时跳过本次（尽力而为的）快照即可。
+    queue->set_snapshot_provider([this, task_id_num](int64_t tid, std::string* b64, int* w, int* h) {
+        SnapshotConfig cfg;
+        {
+            std::unique_lock<std::mutex> lk(mtx_, std::try_to_lock);
+            if (!lk.owns_lock()) return false;
+            auto it = snapshot_cfg_.find(tid);
+            if (it == snapshot_cfg_.end()) return false;
+            cfg = it->second;
+        }
+        if (!cfg.enabled || !cfg.inline_snapshot) return false;
+        return capture_snapshot_b64(std::to_string(tid), cfg, b64, w, h);
+    });
 
     {
         std::lock_guard<std::mutex> lk(mtx_);
         queue_by_task_[meta.task_id_num] = queue.get();
         queues_[task_id] = std::move(queue);
         publishers_[task_id] = std::move(pub);
+        schedules_[task_id] = SchedEntry{t.schedule, aistation::schedule_active_now(t.schedule), true};
+        snapshot_cfg_[task_id_num] = t.snapshot;
     }
     bus_.register_task(task_id, meta);
     mgr_.set_detection_sink(task_id, [this, task_id](const std::vector<DetectionBox>& boxes,
@@ -154,4 +185,57 @@ void AgentRuntime::on_removed(const std::string& task_id) {
         queues_.erase(qit);
     }
     publishers_.erase(task_id);
+    schedules_.erase(task_id);
+    try {
+        snapshot_cfg_.erase(std::stoll(task_id));
+    } catch (const std::exception&) {
+        // 非数字 task_id 无快照配置可清理
+    }
+}
+
+void AgentRuntime::schedule_loop() {
+    while (schedule_running_.load()) {
+        std::vector<std::pair<std::string, bool>> actions;  // (task_id, should_start)
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            for (auto& [id, e] : schedules_) {
+                const bool active = aistation::schedule_active_now(e.schedule);
+                if (!e.initialized) {
+                    e.initialized = true;
+                    e.last_active = active;
+                    if (!active) actions.emplace_back(id, false);
+                } else if (active != e.last_active) {
+                    e.last_active = active;
+                    actions.emplace_back(id, active);
+                }
+            }
+        }
+        for (const auto& [id, should_start] : actions) {
+            if (should_start) mgr_.start_task(id);
+            else mgr_.stop_task(id);
+        }
+        for (int i = 0; i < 300 && schedule_running_.load(); ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));  // ~30s
+    }
+}
+
+bool AgentRuntime::capture_snapshot_b64(const std::string& task_id, const SnapshotConfig& cfg,
+                                        std::string* b64, int* w, int* h) {
+    std::vector<uint8_t> jpg;
+    if (!mgr_.get_task_jpeg(task_id, &jpg, cfg.quality) || jpg.empty()) return false;
+    cv::Mat img = cv::imdecode(jpg, cv::IMREAD_COLOR);
+    if (img.empty()) return false;
+    if (cfg.max_width > 0 && img.cols > cfg.max_width) {
+        const double scale = static_cast<double>(cfg.max_width) / static_cast<double>(img.cols);
+        cv::Mat resized;
+        cv::resize(img, resized, cv::Size(), scale, scale, cv::INTER_AREA);
+        img = resized;
+    }
+    std::vector<uint8_t> out;
+    std::vector<int> params{cv::IMWRITE_JPEG_QUALITY, cfg.quality};
+    if (!cv::imencode(".jpg", img, out, params) || out.empty()) return false;
+    *b64 = aistation::base64_encode_bytes(out);
+    *w = img.cols;
+    *h = img.rows;
+    return true;
 }
