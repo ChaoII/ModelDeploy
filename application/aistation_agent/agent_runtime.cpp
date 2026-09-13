@@ -117,7 +117,6 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
     }
     auto queue = std::make_unique<DurableQueue>(
         t.events.buffer_dir + "/" + task_id, t.events.buffer_max_mb, pub.get());
-    queue->start();
 
     EventMeta meta;
     meta.edge_code = opts_.edge_code;
@@ -137,22 +136,15 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
     meta.schedule = t.schedule;
     meta.roi_polygon = t.roi_polygon;
 
-    // 必须在 queue move 进 queues_ 之前设置 provider（move 后局部 unique_ptr 为空）。
-    // provider 捕获 task_id_num 值拷贝；锁内仅查配置，实际采集在锁外执行。
-    // 注意：on_removed/stop 持 mtx_ 时会 join 队列工作线程，若此处阻塞等锁将死锁，
-    // 故用 try_lock：抢不到锁时跳过本次（尽力而为的）快照即可。
-    queue->set_snapshot_provider([this, task_id_num](int64_t tid, std::string* b64, int* w, int* h) {
-        SnapshotConfig cfg;
-        {
-            std::unique_lock<std::mutex> lk(mtx_, std::try_to_lock);
-            if (!lk.owns_lock()) return false;
-            auto it = snapshot_cfg_.find(tid);
-            if (it == snapshot_cfg_.end()) return false;
-            cfg = it->second;
-        }
-        if (!cfg.enabled || !cfg.inline_snapshot) return false;
-        return capture_snapshot_b64(std::to_string(tid), cfg, b64, w, h);
+    // 必须在 queue move 进 queues_ 之前设置 provider（move 后局部 unique_ptr 为空），
+    // 且必须在 start() 之前安装，避免队列中的持久化残留先于 provider 发布。
+    // 配置在 task 生命周期内不可变，故按值捕获 SnapshotConfig，无需加锁查表。
+    const SnapshotConfig snap_cfg = t.snapshot;
+    queue->set_snapshot_provider([this, task_id, snap_cfg](int64_t, std::string* b64, int* w, int* h) {
+        if (!snap_cfg.enabled || !snap_cfg.inline_snapshot) return false;
+        return capture_snapshot_b64(task_id, snap_cfg, b64, w, h);
     });
+    queue->start();
 
     {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -160,7 +152,6 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
         queues_[task_id] = std::move(queue);
         publishers_[task_id] = std::move(pub);
         schedules_[task_id] = SchedEntry{t.schedule, aistation::schedule_active_now(t.schedule), true};
-        snapshot_cfg_[task_id_num] = t.snapshot;
     }
     bus_.register_task(task_id, meta);
     mgr_.set_detection_sink(task_id, [this, task_id](const std::vector<DetectionBox>& boxes,
@@ -186,11 +177,6 @@ void AgentRuntime::on_removed(const std::string& task_id) {
     }
     publishers_.erase(task_id);
     schedules_.erase(task_id);
-    try {
-        snapshot_cfg_.erase(std::stoll(task_id));
-    } catch (const std::exception&) {
-        // 非数字 task_id 无快照配置可清理
-    }
 }
 
 void AgentRuntime::schedule_loop() {

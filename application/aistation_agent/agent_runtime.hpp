@@ -54,7 +54,6 @@ private:
         bool initialized = false;
     };
     std::unordered_map<std::string, SchedEntry> schedules_;
-    std::unordered_map<int64_t, SnapshotConfig> snapshot_cfg_;
     std::thread schedule_thread_;
     std::atomic<bool> schedule_running_{false};
 
