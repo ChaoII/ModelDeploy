@@ -2,15 +2,29 @@
 #include "httplib.h"
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <sstream>
 
 namespace fs = std::filesystem;
 
-static std::string basename_of(const std::string& url) {
+static bool basename_of(const std::string& url, std::string* out) {
     const auto q = url.find('?');
     const std::string clean = q == std::string::npos ? url : url.substr(0, q);
     const auto slash = clean.find_last_of('/');
-    return slash == std::string::npos ? clean : clean.substr(slash + 1);
+    const std::string name = slash == std::string::npos ? clean : clean.substr(slash + 1);
+    if (name.empty() || name == "." || name == "..") return false;
+    if (name.find('/') != std::string::npos || name.find('\\') != std::string::npos) return false;
+    for (unsigned char c : name) {
+        if (c < 0x20) return false;
+    }
+    if (name.find_first_of("<>:\"|?*") != std::string::npos) return false;
+    out->assign(name);
+    return true;
+}
+
+static std::string temp_path_for(const std::string& dest) {
+    static std::mt19937_64 rng(std::random_device{}());
+    return dest + ".tmp-" + std::to_string(rng());
 }
 
 bool ModelFetcher::download(const std::string& base, const std::string& path,
@@ -24,9 +38,40 @@ bool ModelFetcher::download(const std::string& base, const std::string& path,
         return false;
     }
     if (res->body.empty()) { if (err) *err = "downloaded file empty"; return false; }
-    std::ofstream f(dest, std::ios::binary | std::ios::trunc);
-    if (!f.is_open()) { if (err) *err = "cannot write " + dest; return false; }
-    f.write(res->body.data(), static_cast<std::streamsize>(res->body.size()));
+
+    const std::string tmp = temp_path_for(dest);
+    {
+        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+        if (!f.is_open()) { if (err) *err = "cannot write " + dest; return false; }
+        f.write(res->body.data(), static_cast<std::streamsize>(res->body.size()));
+        f.flush();
+        if (!f.good()) {
+            f.close();
+            std::error_code rmec; fs::remove(tmp, rmec);
+            if (err) *err = "failed to write " + dest;
+            return false;
+        }
+        f.close();
+        if (!f.good()) {
+            std::error_code rmec; fs::remove(tmp, rmec);
+            if (err) *err = "failed to write " + dest;
+            return false;
+        }
+    }
+
+    std::error_code ec;
+    fs::rename(tmp, dest, ec);
+    if (ec) {
+        // Windows rename cannot overwrite; drop a stale empty dest and retry.
+        std::error_code rmec; fs::remove(dest, rmec);
+        ec.clear();
+        fs::rename(tmp, dest, ec);
+    }
+    if (ec) {
+        std::error_code rmec; fs::remove(tmp, rmec);
+        if (err) *err = "cannot write " + dest + ": " + ec.message();
+        return false;
+    }
     return true;
 }
 
@@ -49,7 +94,9 @@ bool ModelFetcher::fetch(const std::string& url, std::string* local_path, std::s
 
     std::error_code ec;
     fs::create_directories(cache_dir_, ec);
-    const std::string dest = (fs::path(cache_dir_) / basename_of(url)).string();
+    std::string name;
+    if (!basename_of(url, &name)) return fail("invalid model url (no filename): " + url);
+    const std::string dest = (fs::path(cache_dir_) / name).string();
     if (fs::exists(dest) && fs::file_size(dest) > 0) { if (local_path) *local_path = dest; return true; }
 
     if (url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0) {

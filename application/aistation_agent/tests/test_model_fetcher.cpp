@@ -58,3 +58,47 @@ TEST_CASE("ModelFetcher s3 requires endpoint", "[agent][fetch]") {
     REQUIRE(err.find("s3") != std::string::npos);
     fs::remove_all(dir);
 }
+
+TEST_CASE("ModelFetcher rejects url without filename", "[agent][fetch]") {
+    auto dir = fs::temp_directory_path() / "md_fetch_noname";
+    fs::remove_all(dir);
+    ModelFetcher fetcher(dir.string());
+    std::string out = "sentinel", err;
+    REQUIRE_FALSE(fetcher.fetch("http://127.0.0.1:1/", &out, &err));
+    REQUIRE(out == "sentinel");
+    REQUIRE(err.find("filename") != std::string::npos);
+    REQUIRE_FALSE(fetcher.fetch("http://127.0.0.1:1/..", &out, &err));
+    REQUIRE(out == "sentinel");
+    fs::remove_all(dir);
+}
+
+TEST_CASE("ModelFetcher failed download leaves no file", "[agent][fetch]") {
+    int port = free_port();
+    httplib::Server srv;
+    srv.Get("/ok.onnx", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content("bytes", "application/octet-stream");
+    });
+    std::thread t([&]() { srv.listen("127.0.0.1", port); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    auto dir = fs::temp_directory_path() / "md_fetch_atomic";
+    fs::remove_all(dir);
+    ModelFetcher fetcher(dir.string());
+    std::string out = "sentinel", err;
+
+    REQUIRE_FALSE(fetcher.fetch("http://127.0.0.1:" + std::to_string(port) + "/missing.onnx", &out, &err));
+    REQUIRE(out == "sentinel");
+    REQUIRE_FALSE(err.empty());
+    REQUIRE(fs::is_empty(dir));
+
+    REQUIRE(fetcher.fetch("http://127.0.0.1:" + std::to_string(port) + "/ok.onnx", &out, &err));
+    int files = 0;
+    for (const auto& e : fs::directory_iterator(dir)) {
+        ++files;
+        REQUIRE(e.path().filename().string().find(".tmp-") == std::string::npos);
+    }
+    REQUIRE(files == 1);
+
+    srv.stop(); t.join();
+    fs::remove_all(dir);
+}
