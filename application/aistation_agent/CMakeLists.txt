@@ -2,6 +2,7 @@
 # 注意：BUILD_AISTATION_AGENT_TESTS 已在根 CMakeLists.txt 声明；随任务推进逐步加入源文件（当前仅 config_adapter.cpp）。
 set(AGENT_SOURCES
         config_adapter.cpp
+        model_fetcher.cpp
         agent_server.cpp
         event_bus.cpp
         event_publisher.cpp
@@ -33,6 +34,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_mqtt_publisher.cpp
             tests/test_durable_queue.cpp
             tests/test_capability_heartbeat.cpp
+            tests/test_model_fetcher.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)

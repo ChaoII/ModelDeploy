@@ -101,14 +101,21 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         if (mo.contains("labels") && mo["labels"].is_array())
             m.labels = mo["labels"].get<std::vector<std::string>>();
         m.roi_norm = rect;
-        // path 优先；无 path 时仅接受本地 url（远端拉取见 Task 9）
+        // path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
         if (mo.contains("path") && mo["path"].is_string()) {
             m.path = mo["path"];
         } else if (mo.contains("url") && mo["url"].is_string()) {
             const std::string url = mo["url"];
-            if (url.rfind("file://", 0) == 0) m.path = url.substr(7);
-            else if (url.find("://") == std::string::npos) m.path = url;
-            else return fail("remote model url requires model_fetcher: " + url);
+            if (url.rfind("file://", 0) == 0 || url.find("://") == std::string::npos) {
+                m.path = url.rfind("file://", 0) == 0 ? url.substr(7) : url;
+            } else if (fetcher_) {
+                std::string local, ferr;
+                if (!fetcher_->fetch(url, &local, &ferr))
+                    return fail("model fetch failed for " + m.name + ": " + ferr);
+                m.path = local;
+            } else {
+                return fail("remote model url requires model_fetcher: " + url);
+            }
         }
         if (m.name.empty()) return fail("model.name required");
         if (m.path.empty()) return fail("model.path/url required for " + m.name);

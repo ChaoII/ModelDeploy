@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "config.hpp"
+#include "model_fetcher.hpp"
 #include "nlohmann/json.hpp"
 
 struct CameraMeta {
@@ -40,14 +41,14 @@ struct AdaptedTask {
 /// AIStation TaskConfig(JSON) → SDK TaskConfig + Agent 元数据
 class ConfigAdapter {
 public:
-    explicit ConfigAdapter(std::string model_cache_dir = "") : model_cache_dir_(std::move(model_cache_dir)) {}
+    explicit ConfigAdapter(ModelFetcher* fetcher = nullptr) : fetcher_(fetcher) {}
     bool from_json(const nlohmann::json& j, AdaptedTask* out, std::string* err) const;
 
     /// 归一化多边形 → 外接矩形 [x,y,w,h]（归一化）；非法返回空
     static std::vector<float> polygon_to_norm_rect(const nlohmann::json& roi);
 
 private:
-    std::string model_cache_dir_;
+    ModelFetcher* fetcher_ = nullptr;
 };
 
 /// 模型 type 归一化：det→detection, cls→classification, face→face_detection（未知原样）

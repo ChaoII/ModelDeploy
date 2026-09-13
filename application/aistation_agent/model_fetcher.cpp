@@ -1,0 +1,85 @@
+#include "model_fetcher.hpp"
+#include "httplib.h"
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+
+namespace fs = std::filesystem;
+
+static std::string basename_of(const std::string& url) {
+    const auto q = url.find('?');
+    const std::string clean = q == std::string::npos ? url : url.substr(0, q);
+    const auto slash = clean.find_last_of('/');
+    return slash == std::string::npos ? clean : clean.substr(slash + 1);
+}
+
+bool ModelFetcher::download(const std::string& base, const std::string& path,
+                            const std::string& dest, std::string* err) const {
+    httplib::Client cli(base);
+    cli.set_connection_timeout(5, 0);
+    cli.set_read_timeout(120, 0);
+    auto res = cli.Get(path.c_str());
+    if (!res || res->status != 200) {
+        if (err) *err = "download failed (" + std::to_string(res ? res->status : -1) + "): " + base + path;
+        return false;
+    }
+    if (res->body.empty()) { if (err) *err = "downloaded file empty"; return false; }
+    std::ofstream f(dest, std::ios::binary | std::ios::trunc);
+    if (!f.is_open()) { if (err) *err = "cannot write " + dest; return false; }
+    f.write(res->body.data(), static_cast<std::streamsize>(res->body.size()));
+    return true;
+}
+
+bool ModelFetcher::fetch(const std::string& url, std::string* local_path, std::string* err) const {
+    if (url.empty()) { if (err) *err = "empty model url"; return false; }
+    auto fail = [&](const std::string& m) { if (err) *err = m; return false; };
+
+    // 本地路径 / file://
+    if (url.rfind("file://", 0) == 0) {
+        const std::string p = url.substr(7);
+        if (!fs::exists(p)) return fail("local model not found: " + p);
+        if (local_path) *local_path = p;
+        return true;
+    }
+    if (url.find("://") == std::string::npos) {
+        if (!fs::exists(url)) return fail("local model not found: " + url);
+        if (local_path) *local_path = url;
+        return true;
+    }
+
+    std::error_code ec;
+    fs::create_directories(cache_dir_, ec);
+    const std::string dest = (fs::path(cache_dir_) / basename_of(url)).string();
+    if (fs::exists(dest) && fs::file_size(dest) > 0) { if (local_path) *local_path = dest; return true; }
+
+    if (url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0) {
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+        if (url.rfind("https://", 0) == 0) return fail("https not supported in this build");
+#endif
+        const auto scheme = url.find("://");
+        const std::string rest = url.substr(scheme + 3);
+        const auto slash = rest.find('/');
+        const std::string base = url.substr(0, scheme + 3 + (slash == std::string::npos ? rest.size() : slash));
+        const std::string path = slash == std::string::npos ? "/" : rest.substr(slash);
+        if (!download(base, path, dest, err)) return false;
+        if (local_path) *local_path = dest;
+        return true;
+    }
+
+    if (url.rfind("s3://", 0) == 0) {
+        if (s3_endpoint_.empty()) return fail("s3 url requires --s3-endpoint: " + url);
+        // path-style: <endpoint>/<bucket>/<key>
+        std::string rest = url.substr(5);
+        const auto slash = rest.find('/');
+        if (slash == std::string::npos) return fail("invalid s3 url: " + url);
+        const std::string bucket = rest.substr(0, slash);
+        const std::string key = rest.substr(slash + 1);
+        const std::string base = s3_endpoint_;
+        const std::string path = "/" + bucket + "/" + key;
+        if (!download(base, path, dest, err)) return false;
+        if (local_path) *local_path = dest;
+        return true;
+    }
+
+    return fail("unsupported model url scheme: " + url);
+}
