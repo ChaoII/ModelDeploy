@@ -70,8 +70,8 @@ void AgentRuntime::stop() {
     std::vector<std::unique_ptr<DurableQueue>> queues;
     {
         std::lock_guard<std::mutex> lk(mtx_);
-        for (auto& [id, q] : queues_)
-            if (q) queues.push_back(std::move(q));
+        for (auto& entry : queues_)
+            if (entry.second) queues.push_back(std::move(entry.second));
         queues_.clear();
         queue_by_task_.clear();
     }
@@ -177,10 +177,14 @@ void AgentRuntime::on_updated(const std::string& task_id, const AdaptedTask& t) 
 
 void AgentRuntime::on_removed(const std::string& task_id) {
     bus_.unregister_task(task_id);
-    // 先摘下队列（持锁），再在锁外 join：worker 可能经 snapshot provider 调
+    // 队列与发布器必须在同一次持锁中一起移出：worker 可能经 snapshot provider 调
     // PipelineManager::get_task_jpeg（持其 mtx_），与持 PipelineManager::mtx_ 经 sink
     // 取 mtx_ 的路径构成 ABBA，故绝不能持 mtx_ 做 stop()/join。
+    // 若分两次持锁（先摘队列、停后再 erase 发布器），在锁外 stop() 的窗口内并发的
+    // on_created（同一 task_id）会安装新的 queue+publisher，第二次持锁的
+    // publishers_.erase 将误删新发布器，使新队列 worker 持有的 EventPublisher* 悬空（UAF）。
     std::unique_ptr<DurableQueue> queue;
+    std::unique_ptr<EventPublisher> publisher;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         auto qit = queues_.find(task_id);
@@ -190,14 +194,17 @@ void AgentRuntime::on_removed(const std::string& task_id) {
                 it = (it->second == queue.get()) ? queue_by_task_.erase(it) : std::next(it);
             queues_.erase(qit);
         }
+        // 与队列同锁移出发布器，保证本次删除只作用于当前这一代对象。
+        auto pit = publishers_.find(task_id);
+        if (pit != publishers_.end()) {
+            publisher = std::move(pit->second);
+            publishers_.erase(pit);
+        }
         schedules_.erase(task_id);
     }
     if (queue) queue->stop();  // join 必须在 mtx_ 之外，避免与 PipelineManager 形成 ABBA
-    {
-        std::lock_guard<std::mutex> lk(mtx_);
-        // 队列已停，worker 不再持有 EventPublisher*，此时才能安全清理发布器。
-        publishers_.erase(task_id);
-    }
+    // queue 已停（worker 已 join、不再持有 EventPublisher*），publisher 局部变量
+    // 才在函数返回时析构，避免 UAF/TOCTOU。
 }
 
 void AgentRuntime::schedule_loop() {
