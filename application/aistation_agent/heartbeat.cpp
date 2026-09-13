@@ -52,11 +52,18 @@ bool Heartbeat::send_once() {
 void Heartbeat::start() {
     if (cloud_url_.empty() || running_.exchange(true)) return;
     thread_ = std::thread([this]() {
+        const int interval_ms = std::max(interval_sec_, 1) * 1000;
         int backoff_ms = 1000;
         while (running_.load()) {
-            if (send_once()) backoff_ms = 1000;
-            else backoff_ms = std::min(backoff_ms * 2, 60000);
-            for (int waited = 0; waited < (backoff_ms / 100) && running_.load(); ++waited)
+            int wait_ms;
+            if (send_once()) {
+                backoff_ms = 1000;
+                wait_ms = interval_ms;
+            } else {
+                wait_ms = backoff_ms;
+                backoff_ms = std::min(backoff_ms * 2, 60000);
+            }
+            for (int waited = 0; waited < wait_ms && running_.load(); waited += 100)
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     });

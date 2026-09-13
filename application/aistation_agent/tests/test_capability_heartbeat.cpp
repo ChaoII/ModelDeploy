@@ -61,3 +61,28 @@ TEST_CASE("Heartbeat disabled when cloud_url empty", "[agent][heartbeat]") {
     Heartbeat hb("", "edge-01", "tok", []() { return json::object(); });
     REQUIRE_FALSE(hb.send_once());
 }
+
+TEST_CASE("Heartbeat start respects interval_sec", "[agent][heartbeat]") {
+    int port = free_port();
+    httplib::Server srv;
+    std::atomic<int> hits{0};
+    srv.Post("/api/v1/video/edge/heartbeat", [&](const httplib::Request&, httplib::Response& res) {
+        ++hits; res.status = 200;
+    });
+    std::thread t([&]() { srv.listen("127.0.0.1", port); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    Heartbeat hb("http://127.0.0.1:" + std::to_string(port), "edge-01", "tok",
+                 []() { return json::object(); }, 2, 8);
+    hb.start();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    REQUIRE(hits.load() == 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    const int after = hits.load();
+    REQUIRE(after >= 2);
+    REQUIRE(after <= 3);
+    hb.stop();
+
+    srv.stop();
+    t.join();
+}
