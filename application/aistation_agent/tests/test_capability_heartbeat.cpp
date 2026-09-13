@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <atomic>
 #include <random>
+#include <stdexcept>
 #include <thread>
 #include "capability.hpp"
 #include "heartbeat.hpp"
@@ -60,6 +61,15 @@ TEST_CASE("Heartbeat payload and POST", "[agent][heartbeat]") {
 TEST_CASE("Heartbeat disabled when cloud_url empty", "[agent][heartbeat]") {
     Heartbeat hb("", "edge-01", "tok", []() { return json::object(); });
     REQUIRE_FALSE(hb.send_once());
+}
+
+TEST_CASE("Heartbeat tolerates throwing metrics provider", "[agent][heartbeat]") {
+    Heartbeat hb("", "edge-01", "tok", []() -> json { throw std::runtime_error("boom"); });
+    json payload;
+    REQUIRE_NOTHROW(payload = hb.make_payload());
+    REQUIRE(payload["metrics"].is_object());
+    REQUIRE(payload["metrics"].empty());
+    REQUIRE(payload["edge_code"] == "edge-01");
 }
 
 TEST_CASE("Heartbeat start respects interval_sec", "[agent][heartbeat]") {

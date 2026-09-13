@@ -20,7 +20,13 @@ Heartbeat::~Heartbeat() { stop(); }
 
 nlohmann::json Heartbeat::make_payload() const {
     nlohmann::json metrics = nlohmann::json::object();
-    if (metrics_provider_) metrics = metrics_provider_();
+    if (metrics_provider_) {
+        try {
+            metrics = metrics_provider_();
+        } catch (...) {
+            metrics = nlohmann::json::object();
+        }
+    }
     return nlohmann::json{
         {"edge_code", edge_code_},
         {"token", token_},
@@ -56,7 +62,13 @@ void Heartbeat::start() {
         int backoff_ms = 1000;
         while (running_.load()) {
             int wait_ms;
-            if (send_once()) {
+            bool sent = false;
+            try {
+                sent = send_once();
+            } catch (...) {
+                sent = false;
+            }
+            if (sent) {
                 backoff_ms = 1000;
                 wait_ms = interval_ms;
             } else {
