@@ -9,6 +9,7 @@ set(AGENT_SOURCES
         capability.cpp
         heartbeat.cpp
         agent_runtime.cpp
+        agent_util.cpp
         main.cpp
 )
 list(FILTER AGENT_SOURCES EXCLUDE REGEX "main\\.cpp$")   # 供测试目标复用
@@ -37,6 +38,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_capability_heartbeat.cpp
             tests/test_model_fetcher.cpp
             tests/test_e2e_agent.cpp
+            tests/test_agent_util.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
