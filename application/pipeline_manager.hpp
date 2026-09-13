@@ -34,6 +34,9 @@ public:
     /// 创建并注册一个任务（不自动启动）
     bool create_task(const TaskConfig& cfg, std::string* err = nullptr);
 
+    /// 设置某任务的检测回调（透传 Pipeline；Agent 用）
+    bool set_detection_sink(const std::string& task_id, Pipeline::DetectionSink sink);
+
     /// 移除任务（如果正在运行则停止）
     bool remove_task(const std::string& task_id);
 

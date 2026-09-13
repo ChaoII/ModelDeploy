@@ -21,6 +21,11 @@ void Pipeline::set_init_error(const std::string& msg) {
     init_error_ = msg;
 }
 
+void Pipeline::set_detection_sink(DetectionSink sink) {
+    std::lock_guard<std::mutex> lock(sink_mtx_);
+    detection_sink_ = std::move(sink);
+}
+
 Pipeline::~Pipeline() {
     stop();
 }
@@ -265,6 +270,36 @@ void Pipeline::detect_loop() {
         std::vector<std::pair<std::string, InferResult>> non_det;
         infer_group_.run_models(f.image, &sdk_dets, &non_det);
         auto tA = std::chrono::steady_clock::now();
+
+        // ── 检测事件回调（默认空；Agent 注入，surveillance 零差异） ──
+        {
+            DetectionSink sink;
+            {
+                std::lock_guard<std::mutex> lock(sink_mtx_);
+                sink = detection_sink_;
+            }
+            if (sink && !sdk_dets.empty()) {
+                std::vector<DetectionBox> boxes;
+                for (const auto& [name, dets] : sdk_dets) {
+                    const ModelConfig* mc = infer_group_.config_of(name);
+                    for (const auto& d : dets) {
+                        DetectionBox b;
+                        b.x = d.box.x; b.y = d.box.y; b.w = d.box.width; b.h = d.box.height;
+                        b.score = d.score; b.label_id = d.label_id;
+                        if (mc && d.label_id >= 0 && static_cast<size_t>(d.label_id) < mc->labels.size())
+                            b.label_name = mc->labels[d.label_id];
+                        else
+                            b.label_name = std::to_string(d.label_id);
+                        boxes.push_back(std::move(b));
+                    }
+                }
+                if (!boxes.empty()) {
+                    const double latency_ms =
+                        std::chrono::duration_cast<std::chrono::microseconds>(tA - t0).count() / 1000.0;
+                    sink(boxes, f.image.width(), f.image.height(), latency_ms);
+                }
+            }
+        }
 
         // 绘制（设备 NV12 就地 / CPU）
         for (auto& [name, dets] : sdk_dets) {

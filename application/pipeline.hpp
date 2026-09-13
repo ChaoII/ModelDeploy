@@ -25,6 +25,12 @@ class Pipeline {
 public:
     using ModelFactory = std::function<std::unique_ptr<InferenceEngine>(const ModelConfig&)>;
 
+    using DetectionSink =
+        std::function<void(const std::vector<DetectionBox>& boxes,
+                           int frame_w, int frame_h, double latency_ms)>;
+    /// 注入检测回调（默认空 = 零行为差异）；Agent 使用，surveillance 不调用
+    void set_detection_sink(DetectionSink sink);
+
     explicit Pipeline(TaskConfig cfg, ModelFactory factory = nullptr);
     ~Pipeline();
 
@@ -69,6 +75,9 @@ private:
     VideoSource src_;
     VideoSink sink_;
     PerfStats stats_;
+
+    mutable std::mutex sink_mtx_;
+    DetectionSink detection_sink_;
 
     std::atomic<bool> initialized_{false};
     mutable std::mutex init_error_mtx_;

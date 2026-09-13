@@ -143,6 +143,14 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
     return true;
 }
 
+bool PipelineManager::set_detection_sink(const std::string& task_id, Pipeline::DetectionSink sink) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = pipelines_.find(task_id);
+    if (it == pipelines_.end()) return false;
+    it->second->set_detection_sink(std::move(sink));
+    return true;
+}
+
 bool PipelineManager::remove_task(const std::string& task_id) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = pipelines_.find(task_id);
