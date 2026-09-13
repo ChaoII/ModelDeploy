@@ -1,6 +1,8 @@
 #pragma once
+#include <array>
 #include <string>
 #include <vector>
+#include "agent_util.hpp"
 #include "config.hpp"
 #include "model_fetcher.hpp"
 #include "nlohmann/json.hpp"
@@ -10,6 +12,14 @@ struct CameraMeta {
     std::string name;
     std::string url;
     std::string transport = "tcp";
+};
+
+/// 事件内联快照配置（Agent 采集最新帧 JPEG → base64 随事件上报）
+struct SnapshotConfig {
+    bool enabled = false;
+    bool inline_snapshot = false;
+    int quality = 75;
+    int max_width = 640;
 };
 
 struct EventPublishConfig {
@@ -36,6 +46,9 @@ struct AdaptedTask {
     int alarm_interval_sec = 0;
     EventPublishConfig events;
     std::string tenant = "default";
+    aistation::Schedule schedule;                              // 布控时段（空=全天）
+    std::vector<std::array<float, 2>> roi_polygon;             // 归一化多边形（<3 顶点=不过滤）
+    SnapshotConfig snapshot;                                   // 事件内联快照
 };
 
 /// AIStation TaskConfig(JSON) → SDK TaskConfig + Agent 元数据

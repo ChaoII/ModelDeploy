@@ -82,6 +82,8 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
 
     // roi
     const std::vector<float> rect = j.contains("roi") ? polygon_to_norm_rect(j["roi"]) : std::vector<float>{};
+    out->roi_polygon = aistation::parse_roi_polygon(j.contains("roi") ? j["roi"] : nlohmann::json::array());
+    out->schedule = aistation::parse_schedule(j.contains("schedule") ? j["schedule"] : nlohmann::json::object());
 
     // models
     out->sdk.models.clear();
@@ -133,7 +135,8 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         if (ev.contains("transport") && ev["transport"].is_string()) out->events.transport = ev["transport"];
         if (ev.contains("mqtt") && ev["mqtt"].is_object()) {
             const auto& m = ev["mqtt"];
-            if (m.contains("broker") && m["broker"].is_string()) out->events.mqtt_broker = m["broker"];
+            if (m.contains("broker") && m["broker"].is_string())
+                out->events.mqtt_broker = aistation::normalize_broker_scheme(m["broker"].get<std::string>());
             if (m.contains("topic") && m["topic"].is_string()) out->events.mqtt_topic = m["topic"];
             if (m.contains("qos") && m["qos"].is_number_integer()) out->events.mqtt_qos = m["qos"];
             if (m.contains("client_id") && m["client_id"].is_string()) out->events.mqtt_client_id = m["client_id"];
@@ -149,6 +152,13 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
             const auto& b = ev["buffer"];
             if (b.contains("dir") && b["dir"].is_string()) out->events.buffer_dir = b["dir"];
             if (b.contains("max_mb") && b["max_mb"].is_number_integer()) out->events.buffer_max_mb = b["max_mb"];
+        }
+        if (ev.contains("snapshot") && ev["snapshot"].is_object()) {
+            const auto& s = ev["snapshot"];
+            if (s.contains("enabled") && s["enabled"].is_boolean()) out->snapshot.enabled = s["enabled"].get<bool>();
+            if (s.contains("inline") && s["inline"].is_boolean()) out->snapshot.inline_snapshot = s["inline"].get<bool>();
+            if (s.contains("quality") && s["quality"].is_number_integer()) out->snapshot.quality = s["quality"].get<int>();
+            if (s.contains("max_width") && s["max_width"].is_number_integer()) out->snapshot.max_width = s["max_width"].get<int>();
         }
     }
     return true;

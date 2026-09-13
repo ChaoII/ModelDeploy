@@ -16,12 +16,16 @@ static json make_task_json() {
          "labels": ["person","car"], "input_size": [640,640], "confidence_threshold": 0.45}
       ],
       "roi": [[0.1,0.1],[0.9,0.1],[0.9,0.9],[0.1,0.9]],
+      "schedule": {"slots": [{"day": 0, "start": 8, "end": 18}]},
       "sensitivity": 60,
       "alarm_interval_sec": 30,
       "preview": {"enabled": false, "format": "flv"},
       "events": {
         "transport": "http",
+        "mqtt": {"broker": "mqtt://broker:1883", "topic": "aistation/default/edge/edge-01/camera/7/detect",
+                 "qos": 1, "client_id": "aistation-agent-edge-01", "username": "u", "password": "p"},
         "http": {"url": "http://cloud/cb", "token": "tk"},
+        "snapshot": {"enabled": true, "inline": true, "quality": 60, "max_width": 480},
         "buffer": {"dir": "./events_buffer", "max_mb": 512}
       },
       "decoder": {"hw_accel": "none", "device_only": false, "rtsp_transport": "tcp"},
@@ -96,4 +100,22 @@ TEST_CASE("ConfigAdapter clamps out-of-range roi", "[agent][config]") {
     REQUIRE(rn[1] == Approx(0.f));
     REQUIRE(rn[2] == Approx(1.f));
     REQUIRE(rn[3] == Approx(1.f));
+}
+
+TEST_CASE("ConfigAdapter parses schedule, roi polygon, snapshot and normalizes broker", "[agent][config]") {
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    REQUIRE(adapter.from_json(make_task_json(), &t, &err));
+    REQUIRE(t.schedule.slots.size() == 1);
+    REQUIRE(t.schedule.slots[0].day == 0);
+    REQUIRE(t.roi_polygon.size() == 4);
+    REQUIRE(t.roi_polygon[0][0] == Approx(0.1f));
+    REQUIRE(t.snapshot.enabled);
+    REQUIRE(t.snapshot.inline_snapshot);
+    REQUIRE(t.snapshot.quality == 60);
+    REQUIRE(t.snapshot.max_width == 480);
+    REQUIRE(t.events.mqtt_broker == "tcp://broker:1883");
+    REQUIRE(t.events.mqtt_username == "u");
+    REQUIRE(t.events.mqtt_password == "p");
 }
