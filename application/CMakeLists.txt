@@ -72,10 +72,6 @@ set(APP_SOURCES
 set(APP_COMMON_SOURCES ${APP_SOURCES})
 list(FILTER APP_COMMON_SOURCES EXCLUDE REGEX "main\\.cpp$")
 
-if (BUILD_SURVEILLANCE_TESTS OR BUILD_AISTATION_AGENT_TESTS)
-    enable_testing()
-endif ()
-
 add_library(app_common OBJECT ${APP_COMMON_SOURCES})
 target_include_directories(app_common PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -100,7 +96,6 @@ if (BUILD_SURVEILLANCE)
     add_executable(surveillance main.cpp)
     target_link_libraries(surveillance PRIVATE app_common)
 
-    option(BUILD_SURVEILLANCE_TESTS "build surveillance tests" OFF)
     if (BUILD_SURVEILLANCE_TESTS)
         if (NOT TARGET Catch2::Catch2WithMain)
             add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/Catch2" "${CMAKE_BINARY_DIR}/third_party/Catch2")
