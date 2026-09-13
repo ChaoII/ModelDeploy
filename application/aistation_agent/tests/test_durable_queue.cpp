@@ -87,6 +87,24 @@ TEST_CASE("DurableQueue drops oldest over limit", "[agent][queue]") {
     fs::remove_all(dir);
 }
 
+TEST_CASE("DurableQueue discards vanished file without retry", "[agent][queue]") {
+    auto dir = fs::temp_directory_path() / "md_dq_vanished";
+    fs::remove_all(dir);
+    FakeTransport tx; tx.online = true;
+    DurableQueue q(dir.string(), 8, &tx, 20);
+    q.enqueue(ev("gone"));
+    REQUIRE(q.pending() == 1);
+    // 模拟 enforce_limit 在 worker 取走前删除了文件
+    for (const auto& entry : fs::directory_iterator(dir)) fs::remove(entry.path());
+    q.start();
+    for (int i = 0; i < 100 && q.pending() != 0; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    REQUIRE(q.pending() == 0);   // 条目被安全移除
+    REQUIRE(tx.got.empty());     // 未发布、未当成传输失败无限重试
+    q.stop();
+    fs::remove_all(dir);
+}
+
 TEST_CASE("DurableQueue dedups identical event_id", "[agent][queue]") {
     auto dir = fs::temp_directory_path() / "md_dq_dedup";
     fs::remove_all(dir);

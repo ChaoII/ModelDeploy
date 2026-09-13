@@ -187,12 +187,28 @@ bool DurableQueue::enforce_limit() {
     bool changed = false;
     while (bytes_ > max_bytes_ && !files_.empty()) {
         const std::string victim = files_.front();
+        const fs::path path = fs::path(dir_) / victim;
+
+        std::error_code ec;
+        if (!fs::exists(path, ec)) {
+            if (ec) break;   // 无法确认磁盘状态：保留条目，避免误丢/不一致
+            // 文件已不在磁盘（已被成功发送清理或此前丢弃）：仅清理内存引用，不重复计数
+            files_.pop_front();
+            event_ids_.erase(event_id_of(victim));
+            changed = true;
+            continue;
+        }
+
+        const auto sz = fs::file_size(path, ec);
+        if (ec) break;   // 无法读取大小：保留条目，避免内存与磁盘不一致
+
+        std::error_code rec;
+        const bool removed = fs::remove(path, rec);
+        if (rec || !removed) break;   // 删除失败：保留队列条目（不改内存、不计数）
+
         files_.pop_front();
         event_ids_.erase(event_id_of(victim));
-        std::error_code ec;
-        const auto sz = fs::file_size(fs::path(dir_) / victim, ec);
-        if (!ec) bytes_ = (sz < bytes_) ? bytes_ - static_cast<size_t>(sz) : 0;
-        fs::remove(fs::path(dir_) / victim, ec);
+        bytes_ = (sz < bytes_) ? bytes_ - static_cast<size_t>(sz) : 0;
         ++dropped_;
         changed = true;
     }
@@ -249,11 +265,35 @@ void DurableQueue::worker_loop() {
             if (!running_.load()) break;
             name = files_.front();
         }
+        // 读取 + 解析放进独立作用域：确保 ifstream 在 publish 前析构、文件句柄关闭，
+        // 以免 publish 期间并发 enforce_limit 因句柄占用而删除失败，留下磁盘孤儿。
+        std::string payload;
+        bool vanished = false;
+        {
+            const fs::path path = fs::path(dir_) / name;
+            std::ifstream f(path, std::ios::binary);
+            if (f.is_open()) {
+                std::stringstream ss; ss << f.rdbuf();
+                payload = ss.str();
+            } else {
+                std::error_code ec;
+                if (!fs::exists(path, ec) && !ec) vanished = true;
+            }
+        }
+
+        if (vanished) {
+            // 文件已被超限丢弃：视为「已丢弃」，移除内存条目后继续，不计传输失败、不重试、不重复计数
+            std::lock_guard<std::mutex> lk(mtx_);
+            if (!files_.empty() && files_.front() == name) {
+                files_.pop_front();
+                event_ids_.erase(event_id_of(name));
+            }
+            continue;
+        }
+
         bool ok = false;
         try {
-            std::ifstream f(fs::path(dir_) / name, std::ios::binary);
-            std::stringstream ss; ss << f.rdbuf();
-            DetectionEvent e = DetectionEvent::from_json(nlohmann::json::parse(ss.str()));
+            DetectionEvent e = DetectionEvent::from_json(nlohmann::json::parse(payload));
             ok = transport_ && transport_->publish(e);
         } catch (...) { ok = false; }
 
