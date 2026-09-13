@@ -47,7 +47,11 @@ nlohmann::json DetectionEvent::to_json() const {
     }
     j["detections"] = std::move(arr);
     j["latency_ms"] = latency_ms;
-    if (!snapshot_ref.empty()) j["snapshot"] = {{"ref", snapshot_ref}};
+    if (!snapshot_data.empty()) {
+        j["snapshot"] = {{"data", snapshot_data}, {"width", snapshot_width}, {"height", snapshot_height}};
+    } else if (!snapshot_ref.empty()) {
+        j["snapshot"] = {{"ref", snapshot_ref}};
+    }
     j["schema_version"] = schema_version;
     return j;
 }
@@ -62,8 +66,12 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
     e.ts = j.value("ts", "");
     e.latency_ms = j.value("latency_ms", 0.0);
     e.schema_version = j.value("schema_version", 1);
-    if (j.contains("snapshot") && j["snapshot"].is_object())
+    if (j.contains("snapshot") && j["snapshot"].is_object()) {
         e.snapshot_ref = j["snapshot"].value("ref", "");
+        e.snapshot_data = j["snapshot"].value("data", "");
+        e.snapshot_width = j["snapshot"].value("width", 0);
+        e.snapshot_height = j["snapshot"].value("height", 0);
+    }
     if (j.contains("detections") && j["detections"].is_array()) {
         for (const auto& d : j["detections"]) {
             EventDetection ed;
@@ -128,6 +136,7 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
         auto it = tasks_.find(task_id);
         if (it == tasks_.end()) return;
         TaskState& st = it->second;
+        if (!aistation::schedule_active_now(st.meta.schedule)) return;
         const auto now = std::chrono::steady_clock::now();
 
         std::vector<EventDetection> kept;
@@ -151,6 +160,10 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
             ed.y = b.y / static_cast<float>(frame_h);
             ed.w = b.w / static_cast<float>(frame_w);
             ed.h = b.h / static_cast<float>(frame_h);
+            if (st.meta.roi_polygon.size() >= 3 &&
+                !aistation::point_in_polygon(ed.x + ed.w * 0.5f, ed.y + ed.h * 0.5f, st.meta.roi_polygon)) {
+                continue;
+            }
             kept.push_back(std::move(ed));
             labels.push_back(b.label_name);
         }

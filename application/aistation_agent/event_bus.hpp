@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -9,6 +10,7 @@
 
 #include "nlohmann/json.hpp"
 
+#include "agent_util.hpp"
 #include "inference_engine.hpp"
 
 /// 单个检测框（归一化坐标）
@@ -29,7 +31,10 @@ struct DetectionEvent {
     std::string ts;                              // UTC ISO8601 毫秒 Z
     std::vector<EventDetection> detections;
     double latency_ms = 0.0;
-    std::string snapshot_ref;                    // 可空
+    std::string snapshot_ref;                    // 对象存储引用（可空）
+    std::string snapshot_data;                   // 内联 base64 JPEG（可空）
+    int snapshot_width = 0;
+    int snapshot_height = 0;
     int schema_version = 1;
 
     nlohmann::json to_json() const;
@@ -42,7 +47,9 @@ struct EventMeta {
     int camera_id = 0;
     int64_t task_id_num = 0;
     std::string algorithm_type;                  // AIStation 提供，原样带回
-    int alarm_interval_sec = 0;                  // 0 = 不节流
+    int alarm_interval_sec = 0;                              // 0 = 不节流
+    aistation::Schedule schedule;                            // 空 = 全天
+    std::vector<std::array<float, 2>> roi_polygon;           // <3 顶点 = 不过滤
 };
 
 using EventSink = std::function<void(const DetectionEvent&)>;

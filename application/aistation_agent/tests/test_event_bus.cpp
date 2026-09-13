@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <ctime>
 #include <set>
+#include "agent_util.hpp"
 #include "event_bus.hpp"
 
 using modeldeploy::vision::DetectionResult;
@@ -66,4 +68,54 @@ TEST_CASE("EventBus uuid uniqueness", "[agent][events]") {
     std::set<std::string> ids;
     for (int i = 0; i < 100; ++i) ids.insert(EventBus::make_uuid_v4());
     REQUIRE(ids.size() == 100);
+}
+
+TEST_CASE("EventBus drops detections outside schedule window", "[agent][events]") {
+    EventBus bus;
+    int count = 0;
+    bus.set_sink([&](const DetectionEvent&) { ++count; });
+    EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    const int today = (tm.tm_wday + 6) % 7;
+    meta.schedule.slots.push_back({(today + 1) % 7, 0, 24});  // 只允许"明天" -> 当前必被拒
+    bus.register_task("1", meta);
+    bus.on_detections("1", {box("person", 0, 0.9f)}, 640, 640, 1.0);
+    REQUIRE(count == 0);
+
+    EventMeta open_meta; open_meta.edge_code = "e"; open_meta.camera_id = 1; open_meta.task_id_num = 2;
+    open_meta.schedule.slots.push_back({today, 0, 24});
+    bus.register_task("2", open_meta);
+    bus.on_detections("2", {box("person", 0, 0.9f)}, 640, 640, 1.0);
+    REQUIRE(count == 1);
+}
+
+TEST_CASE("EventBus filters detections by roi polygon", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    meta.roi_polygon = {{{0.0f,0.0f}},{{0.5f,0.0f}},{{0.5f,0.5f}},{{0.0f,0.5f}}};  // 左上象限
+    bus.register_task("1", meta);
+    DetectionBox inside = box("person", 0, 0.9f);   // 中心 (0.2,0.4) 落在多边形内
+    inside.x = 32; inside.y = 160; inside.w = 192; inside.h = 192;
+    DetectionBox outside = box("person", 0, 0.9f);  // 中心 (0.8,0.8) 在多边形外
+    outside.x = 448; outside.y = 448; outside.w = 128; outside.h = 128;
+    bus.on_detections("1", {inside, outside}, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].detections.size() == 1);
+}
+
+TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {
+    DetectionEvent e;
+    e.event_id = "x"; e.snapshot_data = "QUJD"; e.snapshot_width = 320; e.snapshot_height = 180;
+    auto j = e.to_json();
+    REQUIRE(j["snapshot"]["data"] == "QUJD");
+    REQUIRE(j["snapshot"]["width"] == 320);
+    REQUIRE(j["snapshot"]["height"] == 180);
 }
