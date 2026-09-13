@@ -19,6 +19,7 @@ struct ModelConfig {
     float confidence_threshold = 0.5f;
     std::vector<int> input_size = {640, 640};
     std::vector<int> roi = {0, 0, 0, 0};
+    std::vector<float> roi_norm;          // 归一化 [x,y,w,h]，非空时按帧宽高换算 ROI（Agent 用）
     int interval = 1;
     std::vector<std::string> labels;
 };

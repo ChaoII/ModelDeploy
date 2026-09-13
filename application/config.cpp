@@ -45,6 +45,9 @@ void TaskConfig::print() const {
         if (m.roi[2] > 0 && m.roi[3] > 0)
             std::cout << " roi=[" << m.roi[0] << "," << m.roi[1]
                       << "," << m.roi[2] << "," << m.roi[3] << "]";
+        if (!m.roi_norm.empty())
+            std::cout << " roi_norm=[" << m.roi_norm[0] << "," << m.roi_norm[1]
+                      << "," << m.roi_norm[2] << "," << m.roi_norm[3] << "]";
         std::cout << "\n";
     }
 }
@@ -105,6 +108,7 @@ json task_config_to_json(const TaskConfig& cfg) {
         mo["confidence_threshold"] = m.confidence_threshold;
         mo["input_size"] = {m.input_size[0], m.input_size[1]};
         mo["roi"] = {m.roi[0], m.roi[1], m.roi[2], m.roi[3]};
+        if (!m.roi_norm.empty()) mo["roi_norm"] = m.roi_norm;
         mo["interval"] = m.interval;
         if (!m.rec_path.empty()) mo["rec_path"] = m.rec_path;
         if (!m.labels.empty()) mo["labels"] = m.labels;
@@ -181,6 +185,8 @@ TaskConfig task_config_from_json(const json& j) {
                 m.input_size = {mo["input_size"][0], mo["input_size"][1]};
             if (mo.contains("roi") && mo["roi"].is_array() && mo["roi"].size() >= 4)
                 m.roi = {mo["roi"][0], mo["roi"][1], mo["roi"][2], mo["roi"][3]};
+            if (mo.contains("roi_norm") && mo["roi_norm"].is_array() && mo["roi_norm"].size() >= 4)
+                m.roi_norm = {mo["roi_norm"][0], mo["roi_norm"][1], mo["roi_norm"][2], mo["roi_norm"][3]};
             if (mo.contains("interval")) m.interval = mo["interval"];
             if (mo.contains("labels") && mo["labels"].is_array())
                 m.labels = mo["labels"].get<std::vector<std::string>>();

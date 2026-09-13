@@ -3,6 +3,22 @@
 
 using namespace modeldeploy::vision;
 
+namespace {
+// 计算有效像素 ROI：优先 roi_norm（归一化，按帧宽高换算），否则用像素 roi
+struct RoiRect { float x, y, w, h; bool valid; };
+RoiRect effective_roi(const ModelConfig& mc, const ImageData& frame) {
+    if (mc.roi_norm.size() >= 4 && mc.roi_norm[2] > 0.f && mc.roi_norm[3] > 0.f &&
+        frame.width() > 0 && frame.height() > 0) {
+        return {mc.roi_norm[0] * frame.width(), mc.roi_norm[1] * frame.height(),
+                mc.roi_norm[2] * frame.width(), mc.roi_norm[3] * frame.height(), true};
+    }
+    if (mc.roi.size() >= 4 && mc.roi[2] > 0 && mc.roi[3] > 0)
+        return {static_cast<float>(mc.roi[0]), static_cast<float>(mc.roi[1]),
+                static_cast<float>(mc.roi[2]), static_cast<float>(mc.roi[3]), true};
+    return {0, 0, 0, 0, false};
+}
+}
+
 bool InferGroup::load_models(const std::vector<ModelConfig>& mcfgs, ModelFactory factory) {
     clear();
     bool all_ok = true;
@@ -67,14 +83,12 @@ bool InferGroup::run_models(
         if (do_infer) {
             if (is_det) {
                 // ROI 区域裁剪推理：仅 CPU 帧（设备 NV12 不做裁剪）；结果按偏移回映射到全图
-                const bool roi_valid = mc.roi.size() >= 4 && mc.roi[2] > 0 && mc.roi[3] > 0;
+                const RoiRect rr = effective_roi(mc, frame);
                 ImageData infer_frame = frame;
                 float ox = 0.f, oy = 0.f;
-                if (roi_valid && frame.device() == modeldeploy::Device::CPU) {
-                    infer_frame = frame.crop({static_cast<float>(mc.roi[0]), static_cast<float>(mc.roi[1]),
-                                              static_cast<float>(mc.roi[2]), static_cast<float>(mc.roi[3])});
-                    ox = static_cast<float>(mc.roi[0]);
-                    oy = static_cast<float>(mc.roi[1]);
+                if (rr.valid && frame.device() == modeldeploy::Device::CPU) {
+                    infer_frame = frame.crop({rr.x, rr.y, rr.w, rr.h});
+                    ox = rr.x; oy = rr.y;
                 }
                 std::vector<DetectionResult> dets;
                 if (e->predict_detection(infer_frame, &dets)) {
@@ -85,16 +99,14 @@ bool InferGroup::run_models(
                 }
             } else {
                 // ROI：非 detection 族（如人脸）按区域裁剪，几何结果按偏移回映射；classification 无几何不做
-                const bool roi_valid = mc.roi.size() >= 4 && mc.roi[2] > 0 && mc.roi[3] > 0;
-                const bool can_roi = roi_valid && frame.device() == modeldeploy::Device::CPU &&
+                const RoiRect rr = effective_roi(mc, frame);
+                const bool can_roi = rr.valid && frame.device() == modeldeploy::Device::CPU &&
                                      mc.type != "classification";
                 ImageData infer_frame = frame;
                 float ox = 0.f, oy = 0.f;
                 if (can_roi) {
-                    infer_frame = frame.crop({static_cast<float>(mc.roi[0]), static_cast<float>(mc.roi[1]),
-                                              static_cast<float>(mc.roi[2]), static_cast<float>(mc.roi[3])});
-                    ox = static_cast<float>(mc.roi[0]);
-                    oy = static_cast<float>(mc.roi[1]);
+                    infer_frame = frame.crop({rr.x, rr.y, rr.w, rr.h});
+                    ox = rr.x; oy = rr.y;
                 }
                 InferResult r;
                 if (e->infer(infer_frame, &r)) {
