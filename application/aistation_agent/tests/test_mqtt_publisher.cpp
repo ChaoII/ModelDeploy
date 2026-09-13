@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <random>
@@ -17,6 +18,7 @@ using sock_t = SOCKET;
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 using sock_t = int;
 #define CLOSE_SOCK close
@@ -26,6 +28,28 @@ using sock_t = int;
 #endif
 
 namespace {
+bool was_timeout() {
+#if defined(_WIN32)
+    return WSAGetLastError() == WSAETIMEDOUT;
+#else
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+#endif
+}
+
+void set_recv_timeout(sock_t s, int ms) {
+#if defined(_WIN32)
+    DWORD tv = static_cast<DWORD>(ms);
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
+#else
+    timeval tv{};
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+#endif
+}
+}  // namespace
+
+namespace {
 struct MockBroker {
     int port;
     std::atomic<bool> running{true};
@@ -33,6 +57,9 @@ struct MockBroker {
     std::string topic;
     std::string payload;
     std::atomic<int> publishes{0};
+    std::atomic<int> last_qos{-1};
+
+    ~MockBroker() { stop(); }
 
     static uint32_t read_varint(sock_t s, int first) {
         uint32_t mult = 1, value = 0;
@@ -59,11 +86,22 @@ struct MockBroker {
         addr.sin_port = htons(static_cast<unsigned short>(port));
         bind(listener, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
         listen(listener, 1);
-        sock_t c = accept(listener, nullptr, nullptr);
+        set_recv_timeout(listener, 300);
+        sock_t c = INVALID_SOCKET;
+        while (running.load()) {
+            c = accept(listener, nullptr, nullptr);
+            if (c != INVALID_SOCKET) break;
+            if (!was_timeout()) { CLOSE_SOCK(listener); return; }
+        }
         if (c == INVALID_SOCKET) { CLOSE_SOCK(listener); return; }
+        set_recv_timeout(c, 300);
         while (running.load()) {
             unsigned char hdr;
-            if (recv(c, reinterpret_cast<char*>(&hdr), 1, 0) != 1) break;
+            const int rh = recv(c, reinterpret_cast<char*>(&hdr), 1, 0);
+            if (rh != 1) {
+                if (rh < 0 && was_timeout()) continue;
+                break;
+            }
             const int type = (hdr >> 4) & 0x0F;
             unsigned char lb;
             if (recv(c, reinterpret_cast<char*>(&lb), 1, 0) != 1) break;
@@ -85,6 +123,7 @@ struct MockBroker {
                     off += 2;
                 }
                 payload.assign(body.data() + off, rem - off);
+                last_qos = qos;
                 ++publishes;
                 if (qos == 1) {
                     const char puback[4] = {0x40, 0x02, static_cast<char>(pid >> 8), static_cast<char>(pid & 0xFF)};
@@ -132,6 +171,7 @@ TEST_CASE("MqttPublisher publishes QoS1 event to broker", "[agent][publisher][mq
     for (int i = 0; i < 50 && broker.publishes.load() == 0; ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     REQUIRE(broker.publishes.load() == 1);
+    REQUIRE(broker.last_qos.load() == 1);
     REQUIRE(broker.topic == cfg.topic);
     REQUIRE(broker.payload.find("\"event_id\":\"22222222-2222-4222-8222-222222222222\"") != std::string::npos);
     broker.stop();
