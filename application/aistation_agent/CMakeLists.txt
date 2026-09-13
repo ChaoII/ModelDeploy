@@ -8,11 +8,12 @@ set(AGENT_SOURCES
         event_publisher.cpp
         capability.cpp
         heartbeat.cpp
+        agent_runtime.cpp
         main.cpp
 )
 list(FILTER AGENT_SOURCES EXCLUDE REGEX "main\\.cpp$")   # 供测试目标复用
 
-add_executable(aistation_agent main.cpp)
+add_executable(aistation_agent ${AGENT_SOURCES} main.cpp)
 target_link_libraries(aistation_agent PRIVATE app_common)
 target_include_directories(aistation_agent PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 if (ENABLE_MQTT)
@@ -35,6 +36,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_durable_queue.cpp
             tests/test_capability_heartbeat.cpp
             tests/test_model_fetcher.cpp
+            tests/test_e2e_agent.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
