@@ -82,3 +82,18 @@ TEST_CASE("ConfigAdapter rejects remote model url without fetcher", "[agent][con
     std::string err;
     REQUIRE_FALSE(adapter.from_json(j, &t, &err));
 }
+
+TEST_CASE("ConfigAdapter clamps out-of-range roi", "[agent][config]") {
+    auto j = make_task_json();
+    j["roi"] = json::array({json::array({-0.5, -0.2}), json::array({1.5, 1.4})});
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    REQUIRE(adapter.from_json(j, &t, &err));
+    const auto& rn = t.sdk.models[0].roi_norm;
+    REQUIRE(rn.size() == 4);
+    REQUIRE(rn[0] == Approx(0.f));
+    REQUIRE(rn[1] == Approx(0.f));
+    REQUIRE(rn[2] == Approx(1.f));
+    REQUIRE(rn[3] == Approx(1.f));
+}

@@ -12,11 +12,13 @@ std::string normalize_model_type(const std::string& type) {
 }
 
 std::vector<float> ConfigAdapter::polygon_to_norm_rect(const json& roi) {
-    if (!roi.is_array() || roi.size() < 3) return {};
+    if (!roi.is_array() || roi.size() < 2) return {};  // 允许矩形两角点 [x0,y0],[x1,y1]
     float xmin = 1.f, ymin = 1.f, xmax = 0.f, ymax = 0.f;
     for (const auto& p : roi) {
         if (!p.is_array() || p.size() < 2 || !p[0].is_number() || !p[1].is_number()) return {};
-        const float x = p[0].get<float>(), y = p[1].get<float>();
+        // 不可信输入：归一化坐标钳制到 [0,1]
+        const float x = std::clamp(p[0].get<float>(), 0.f, 1.f);
+        const float y = std::clamp(p[1].get<float>(), 0.f, 1.f);
         xmin = std::min(xmin, x); ymin = std::min(ymin, y);
         xmax = std::max(xmax, x); ymax = std::max(ymax, y);
     }

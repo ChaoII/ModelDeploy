@@ -1,4 +1,5 @@
 #include "infer_group.hpp"
+#include <algorithm>
 #include <iostream>
 
 using namespace modeldeploy::vision;
@@ -9,8 +10,18 @@ struct RoiRect { float x, y, w, h; bool valid; };
 RoiRect effective_roi(const ModelConfig& mc, const ImageData& frame) {
     if (mc.roi_norm.size() >= 4 && mc.roi_norm[2] > 0.f && mc.roi_norm[3] > 0.f &&
         frame.width() > 0 && frame.height() > 0) {
-        return {mc.roi_norm[0] * frame.width(), mc.roi_norm[1] * frame.height(),
-                mc.roi_norm[2] * frame.width(), mc.roi_norm[3] * frame.height(), true};
+        const float W = static_cast<float>(frame.width());
+        const float H = static_cast<float>(frame.height());
+        float x = std::clamp(mc.roi_norm[0], 0.f, 1.f) * W;
+        float y = std::clamp(mc.roi_norm[1], 0.f, 1.f) * H;
+        float w = std::clamp(mc.roi_norm[2], 0.f, 1.f) * W;
+        float h = std::clamp(mc.roi_norm[3], 0.f, 1.f) * H;
+        // 防御性裁剪到帧内，避免越界 rect 造成 crop 后偏移错位
+        if (x > W) x = W; if (y > H) y = H;
+        if (x + w > W) w = W - x;
+        if (y + h > H) h = H - y;
+        if (w <= 0.f || h <= 0.f) return {0, 0, 0, 0, false};
+        return {x, y, w, h, true};
     }
     if (mc.roi.size() >= 4 && mc.roi[2] > 0 && mc.roi[3] > 0)
         return {static_cast<float>(mc.roi[0]), static_cast<float>(mc.roi[1]),
