@@ -97,6 +97,11 @@ if (ENABLE_WETEXT AND NOT BUILD_AUDIO)
     set(ENABLE_WETEXT OFF)
 endif ()
 
+# MQTT 事件发布：ENABLE_MQTT 时 FetchContent 拉取 paho.mqtt.c 静态客户端
+if (ENABLE_MQTT)
+    include("${CMAKE_SOURCE_DIR}/cmake/paho_mqtt.cmake")
+endif ()
+
 # Jetson 自动探测：缓存 FORCE 赋值，避免普通变量覆盖 option 缓存导致不可复现
 if (NOT BUILD_ON_JETSON AND EXISTS "/etc/nv_tegra_release")
     message(STATUS "detect Jetson")

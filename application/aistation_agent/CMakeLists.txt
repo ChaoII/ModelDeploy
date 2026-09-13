@@ -28,6 +28,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_event_bus.cpp
             tests/test_pipeline_sink.cpp
             tests/test_http_publisher.cpp
+            tests/test_mqtt_publisher.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
@@ -36,6 +37,9 @@ if (BUILD_AISTATION_AGENT_TESTS)
         target_link_libraries(aistation_agent_test PRIVATE ${PAHO_MQTT_LIBS})
         target_include_directories(aistation_agent_test PRIVATE ${PAHO_MQTT_INCLUDE_DIR})
         target_compile_definitions(aistation_agent_test PRIVATE ENABLE_MQTT)
+        if (WIN32)
+            target_link_libraries(aistation_agent_test PRIVATE ws2_32)
+        endif ()
     endif ()
     add_test(NAME aistation_agent_test COMMAND aistation_agent_test)
     set_tests_properties(aistation_agent_test PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
