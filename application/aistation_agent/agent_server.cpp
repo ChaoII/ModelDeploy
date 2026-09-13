@@ -68,11 +68,22 @@ void AgentServer::register_routes() {
         if (req.path == "/health" || req.path == "/readyz") return httplib::Server::HandlerResponse::Unhandled;
         if (req.path.rfind("/api/v1/", 0) != 0) return httplib::Server::HandlerResponse::Unhandled;
         if (api_key_.empty()) return httplib::Server::HandlerResponse::Unhandled;
+        // 常量时间比较（与 HttpServer 同等安全强度）
+        auto ct_equal = [](const std::string& a, const std::string& b) {
+            if (a.size() != b.size()) return false;
+            unsigned char d = 0;
+            for (size_t i = 0; i < a.size(); ++i)
+                d |= static_cast<unsigned char>(a[i] ^ b[i]);
+            return d == 0;
+        };
         const std::string prefix = "Bearer ";
         auto it = req.headers.find("Authorization");
-        if (it != req.headers.end() && it->second.compare(0, prefix.size(), prefix) == 0 &&
-            it->second.substr(prefix.size()) == api_key_)
-            return httplib::Server::HandlerResponse::Unhandled;
+        bool ok = false;
+        if (it != req.headers.end() && it->second.size() > prefix.size() &&
+            it->second.compare(0, prefix.size(), prefix) == 0) {
+            ok = ct_equal(it->second.substr(prefix.size()), api_key_);
+        }
+        if (ok) return httplib::Server::HandlerResponse::Unhandled;
         res.status = 401;
         res.set_content(err_json("invalid or missing API key", "UNAUTHORIZED"), "application/json");
         return httplib::Server::HandlerResponse::Handled;
@@ -148,9 +159,15 @@ void AgentServer::register_routes() {
 
     server_.Post("/api/v1/tasks/:id/start", [this](const httplib::Request& req, httplib::Response& res) {
         const std::string id = get_id(req);
-        if (!mgr_.start_task(id)) {
+        TaskConfig cfg;
+        if (!mgr_.get_task_config(id, &cfg)) {
             res.status = 404;
             res.set_content(err_json("task not found", "NOT_FOUND"), "application/json");
+            return;
+        }
+        if (!mgr_.start_task(id)) {
+            res.status = 503;
+            res.set_content(err_json("model not ready", "MODEL_NOT_READY"), "application/json");
             return;
         }
         res.set_content(ok_json({{"running", true}}), "application/json");
@@ -224,7 +241,7 @@ void AgentServer::register_routes() {
         std::vector<uint8_t> jpg;
         if (!mgr_.get_task_jpeg(get_id(req), &jpg, 80) || jpg.empty()) {
             res.status = 404;
-            res.set_content("snapshot unavailable", "text/plain");
+            res.set_content(err_json("snapshot unavailable", "NOT_FOUND"), "application/json");
             return;
         }
         res.set_header("Cache-Control", "no-store");

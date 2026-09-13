@@ -121,5 +121,9 @@ TEST_CASE("AgentServer bad config returns 400", "[agent][server]") {
     auto missing = cli.Get("/api/v1/tasks/does-not-exist");
     REQUIRE(missing);
     REQUIRE(missing->status == 404);
+    auto snap = cli.Get("/api/v1/tasks/does-not-exist/snapshot.jpg");
+    REQUIRE(snap);
+    REQUIRE(snap->status == 404);
+    REQUIRE(json::parse(snap->body)["error"]["code"] == "NOT_FOUND");
     srv.stop();
 }
