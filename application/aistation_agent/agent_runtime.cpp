@@ -45,8 +45,15 @@ bool AgentRuntime::start() {
 }
 
 void AgentRuntime::stop() {
+    // 停机顺序（关键：确保释放队列/发布器前已无任何读者）：
+    // 1) 先停 heartbeat_：其 metrics 回调会读 queues_；
+    // 2) 再停 server_：可能触发 hooks（on_removed/on_updated），且其 handler 也会读 queues_；
+    // 3) 然后 mgr_.stop_all()：停止所有 pipeline 并 join 检测线程 —— 检测线程经
+    //    EventBus sink 在 mtx_ 外调用 q->enqueue(e)，join 后保证不再有 sink 回调在途；
+    // 4) 最后销毁 queues_/publishers_：此时已无读者，不会 UAF。
     if (heartbeat_) heartbeat_->stop();
     if (server_) server_->stop();
+    mgr_.stop_all();
     {
         std::lock_guard<std::mutex> lk(mtx_);
         for (auto& [id, q] : queues_)
@@ -55,7 +62,6 @@ void AgentRuntime::stop() {
         publishers_.clear();
         queue_by_task_.clear();
     }
-    mgr_.stop_all();
 }
 
 nlohmann::json AgentRuntime::metrics() {

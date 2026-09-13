@@ -133,6 +133,53 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     fs::remove_all(buf);
 }
 
+TEST_CASE("Agent E2E: shutdown with a running task joins detection before teardown",
+          "[agent][e2e][shutdown]") {
+    if (!std::ifstream("test_data/test_video60.mp4").good() ||
+        !std::ifstream("test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx").good())
+        SKIP("test data absent");
+
+    const int agent_port = free_port();
+    auto buf = fs::temp_directory_path() / "md_e2e_buffer_shutdown";
+    fs::remove_all(buf);
+
+    AgentOptions o;
+    o.host = "127.0.0.1"; o.port = agent_port;
+    o.edge_code = "edge-shutdown";
+    AgentRuntime rt(o);
+    REQUIRE(rt.start());
+
+    // http 回调指向不可达端口：队列会积压并在停机时被安全停止/销毁，正好覆盖
+    // “检测线程仍在经 sink 向 DurableQueue enqueue 时直接停机” 的 UAF 路径。
+    json body = {
+        {"task_id", 999},
+        {"camera", {{"id", 9}, {"name", "cam9"}, {"url", "test_data/test_video60.mp4"}, {"transport", "tcp"}}},
+        {"models", json::array({{{"name", "det"}, {"type", "det"}, {"backend", "ort"}, {"device", "cpu"},
+            {"path", "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx"},
+            {"labels", json::array({"person"})}, {"input_size", json::array({640, 640})},
+            {"confidence_threshold", 0.35}}})},
+        {"alarm_interval_sec", 0},
+        {"algorithm_type", "INTRUSION"},
+        {"preview", {{"enabled", false}}},
+        {"events", {{"transport", "http"},
+                    {"http", {{"url", "http://127.0.0.1:1/cb"}, {"token", "tk"}}},
+                    {"buffer", {{"dir", buf.string()}, {"max_mb", 8}}}}}
+    };
+
+    httplib::Client cli("127.0.0.1", agent_port);
+    auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
+    REQUIRE(created);
+    auto started = cli.Post("/api/v1/tasks/999/start");
+    REQUIRE(started);
+    REQUIRE(started->status == 200);
+    REQUIRE(rt.manager().task_count() == 1);
+
+    // 让检测线程进入 sink → enqueue 路径后再直接停机（不先 stop/delete 任务）。
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    rt.stop();
+    fs::remove_all(buf);
+}
+
 #ifdef ENABLE_MQTT
 #if defined(_WIN32)
 #include <winsock2.h>
