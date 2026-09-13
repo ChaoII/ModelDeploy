@@ -22,7 +22,7 @@ if (BUILD_WEB_DEMO AND BUILD_SERVING)
                 ${CMAKE_BINARY_DIR}/bin/application/demo_labels)
 endif ()
 
-if (NOT BUILD_SURVEILLANCE)
+if (NOT (BUILD_SURVEILLANCE OR BUILD_AISTATION_AGENT))
     return()
 endif ()
 
@@ -69,12 +69,12 @@ set(APP_SOURCES
 )
 
 # ── 共享对象库（surveillance 与 AIStation Agent 共用；除 main.cpp） ──
-if (NOT (BUILD_SURVEILLANCE OR BUILD_AISTATION_AGENT))
-    return()
-endif ()
-
 set(APP_COMMON_SOURCES ${APP_SOURCES})
 list(FILTER APP_COMMON_SOURCES EXCLUDE REGEX "main\\.cpp$")
+
+if (BUILD_SURVEILLANCE_TESTS OR BUILD_AISTATION_AGENT_TESTS)
+    enable_testing()
+endif ()
 
 add_library(app_common OBJECT ${APP_COMMON_SOURCES})
 target_include_directories(app_common PUBLIC
