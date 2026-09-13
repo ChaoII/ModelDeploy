@@ -37,6 +37,7 @@ private:
     httplib::Server server_;
     std::thread thread_;
     std::atomic<bool> running_{false};
+    bool routes_registered_{false};
     std::string api_key_;
     AgentHooks hooks_;
     std::function<nlohmann::json()> metrics_provider_;

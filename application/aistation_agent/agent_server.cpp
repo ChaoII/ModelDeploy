@@ -1,5 +1,4 @@
 #include "agent_server.hpp"
-#include <chrono>
 #include <iostream>
 #include <thread>
 
@@ -46,15 +45,20 @@ json AgentServer::status_to_json(const TaskStatus& ts) {
 bool AgentServer::start() {
     if (running_) return true;
     register_routes();
+    // 同步绑定：bind_to_port 内部已完成 bind + listen(backlog)，失败立即返回，
+    // 不再靠 sleep 后判活（避免绑定失败被误判为启动成功）。
+    if (!server_.bind_to_port(host_, port_)) {
+        std::cerr << "[AgentServer] failed to bind " << host_ << ":" << port_ << std::endl;
+        return false;
+    }
     running_ = true;
     thread_ = std::thread([this]() {
-        if (!server_.listen(host_.c_str(), port_)) {
-            std::cerr << "[AgentServer] failed to bind " << host_ << ":" << port_ << std::endl;
+        if (!server_.listen_after_bind()) {
+            std::cerr << "[AgentServer] listen stopped on " << host_ << ":" << port_ << std::endl;
             running_ = false;
         }
     });
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    return running_.load();
+    return true;
 }
 
 void AgentServer::stop() {
@@ -64,6 +68,8 @@ void AgentServer::stop() {
 }
 
 void AgentServer::register_routes() {
+    if (routes_registered_) return;   // 幂等：stop() 后再 start() 不重复追加路由
+    routes_registered_ = true;
     server_.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
         if (req.path == "/health" || req.path == "/readyz") return httplib::Server::HandlerResponse::Unhandled;
         if (req.path.rfind("/api/v1/", 0) != 0) return httplib::Server::HandlerResponse::Unhandled;

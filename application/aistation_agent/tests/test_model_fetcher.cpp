@@ -1,8 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <random>
 #include <thread>
+#include <vector>
 #include "model_fetcher.hpp"
 #include "httplib.h"
 
@@ -45,6 +47,43 @@ TEST_CASE("ModelFetcher http download", "[agent][fetch]") {
     REQUIRE(fs::file_size(out) > 0);
     // 二次拉取命中缓存
     REQUIRE(fetcher.fetch("http://127.0.0.1:" + std::to_string(port) + "/yolo.onnx", &out, &err));
+    srv.stop(); t.join();
+    fs::remove_all(dir);
+}
+
+TEST_CASE("ModelFetcher concurrent downloads use unique temp names", "[agent][fetch]") {
+    int port = free_port();
+    httplib::Server srv;
+    // 每个线程拉取不同文件名，命中同一 temp_path_for 并发路径。
+    srv.Get(R"(/m(\d+)\.onnx)", [](const httplib::Request& req, httplib::Response& res) {
+        res.set_content("bytes-" + req.matches[1].str(), "application/octet-stream");
+    });
+    std::thread t([&]() { srv.listen("127.0.0.1", port); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    auto dir = fs::temp_directory_path() / "md_fetch_concurrent";
+    fs::remove_all(dir);
+    const std::string base = "http://127.0.0.1:" + std::to_string(port) + "/m";
+    constexpr int kThreads = 8;
+    std::atomic<int> ok{0};
+    std::vector<std::thread> workers;
+    for (int i = 0; i < kThreads; ++i) {
+        workers.emplace_back([&, i]() {
+            ModelFetcher fetcher(dir.string());
+            std::string out, err;
+            if (fetcher.fetch(base + std::to_string(i) + ".onnx", &out, &err)) ok.fetch_add(1);
+        });
+    }
+    for (auto& w : workers) w.join();
+    REQUIRE(ok.load() == kThreads);
+
+    int files = 0;
+    for (const auto& e : fs::directory_iterator(dir)) {
+        ++files;
+        REQUIRE(e.path().filename().string().find(".tmp-") == std::string::npos);
+    }
+    REQUIRE(files == kThreads);
+
     srv.stop(); t.join();
     fs::remove_all(dir);
 }

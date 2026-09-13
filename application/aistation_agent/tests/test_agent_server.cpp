@@ -127,3 +127,34 @@ TEST_CASE("AgentServer bad config returns 400", "[agent][server]") {
     REQUIRE(json::parse(snap->body)["error"]["code"] == "NOT_FOUND");
     srv.stop();
 }
+
+TEST_CASE("AgentServer start is idempotent and restartable", "[agent][server]") {
+    PipelineManager mgr;
+    ConfigAdapter adapter;
+    int port = free_port();
+    AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    REQUIRE(srv.start());
+    REQUIRE(srv.is_running());
+    REQUIRE(srv.start());                 // 已在运行时再次 start：不重绑、不重复注册路由
+    httplib::Client cli("127.0.0.1", port);
+    auto h = cli.Get("/health");
+    REQUIRE(h);
+    REQUIRE(h->status == 200);
+    srv.stop();
+    REQUIRE_FALSE(srv.is_running());
+    REQUIRE(srv.start());                 // stop() 后重启（路由仍幂等）
+    httplib::Client cli2("127.0.0.1", port);
+    auto h2 = cli2.Get("/health");
+    REQUIRE(h2);
+    REQUIRE(h2->status == 200);
+    srv.stop();
+}
+
+TEST_CASE("AgentServer start fails fast on unbindable host", "[agent][server]") {
+    PipelineManager mgr;
+    ConfigAdapter adapter;
+    // TEST-NET-1 地址，非本机接口，bind 立即失败（不依赖 sleep 判活）。
+    AgentServer srv(mgr, adapter, "192.0.2.1", 39117);
+    REQUIRE_FALSE(srv.start());
+    REQUIRE_FALSE(srv.is_running());
+}

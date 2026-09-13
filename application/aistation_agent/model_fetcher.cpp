@@ -1,5 +1,6 @@
 #include "model_fetcher.hpp"
 #include "httplib.h"
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -23,8 +24,12 @@ static bool basename_of(const std::string& url, std::string* out) {
 }
 
 static std::string temp_path_for(const std::string& dest) {
-    static std::mt19937_64 rng(std::random_device{}());
-    return dest + ".tmp-" + std::to_string(rng());
+    // 每线程独立 RNG（thread_local 避免并发调用的数据竞争），叠加进程级原子
+    // 计数器，保证并发下载即使种子相同也各自得到唯一临时文件名。
+    static std::atomic<uint64_t> seq{0};
+    thread_local std::mt19937_64 rng(std::random_device{}());
+    const uint64_t n = seq.fetch_add(1, std::memory_order_relaxed);
+    return dest + ".tmp-" + std::to_string(rng()) + "-" + std::to_string(n);
 }
 
 bool ModelFetcher::download(const std::string& base, const std::string& path,
