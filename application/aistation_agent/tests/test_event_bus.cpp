@@ -3,6 +3,7 @@
 #include <ctime>
 #include <set>
 #include "agent_util.hpp"
+#include "capability.hpp"
 #include "event_bus.hpp"
 
 using modeldeploy::vision::DetectionResult;
@@ -195,6 +196,54 @@ TEST_CASE("EventBus carries LPR plate text", "[agent][events]") {
     // 事件 v2：objects 序列化携带车牌文字
     auto j = got[0].to_json();
     REQUIRE(j["objects"][0]["text"] == "沪A12345");
+}
+
+TEST_CASE("EventBus carries track_id", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    bus.register_task("1", meta);
+    DetectionBox b = box("person", 0, 0.9f);
+    b.track_id = 42;
+    bus.on_detections("1", {b}, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].detections.size() == 1);
+    REQUIRE(got[0].detections[0].track_id == 42);
+    // 事件 v2：objects 序列化携带 track_id
+    auto j = got[0].to_json();
+    REQUIRE(j["objects"][0]["track_id"] == 42);
+    // 未跟踪（-1）不写 track_id 字段
+    DetectionEvent e;
+    EventDetection untracked; untracked.label = "person";
+    e.detections.push_back(untracked);
+    REQUIRE_FALSE(e.to_json()["objects"][0].contains("track_id"));
+}
+
+TEST_CASE("EventBus round-trip preserves track_id", "[agent][events]") {
+    DetectionEvent e;
+    e.event_id = "rt3"; e.ts = "2026-01-01T00:00:00.000Z";
+    EventDetection d; d.label = "person"; d.track_id = 7;
+    e.detections.push_back(d);
+    DetectionEvent back = DetectionEvent::from_json(e.to_json());
+    REQUIRE(back.detections.size() == 1);
+    REQUIRE(back.detections[0].track_id == 7);
+    // 未跟踪事件往返后保持 -1
+    DetectionEvent e2;
+    EventDetection d2; d2.label = "person";
+    e2.detections.push_back(d2);
+    DetectionEvent back2 = DetectionEvent::from_json(e2.to_json());
+    REQUIRE(back2.detections.size() == 1);
+    REQUIRE(back2.detections[0].track_id == -1);
+}
+
+TEST_CASE("detect_capabilities advertises tracking family", "[agent][capability]") {
+    auto c = detect_capabilities(8);
+    bool has_tracking = false;
+    for (const auto& f : c["model_families"]) {
+        if (f == "tracking") has_tracking = true;
+    }
+    REQUIRE(has_tracking);
 }
 
 TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {

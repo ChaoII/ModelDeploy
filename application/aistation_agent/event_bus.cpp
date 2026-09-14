@@ -54,6 +54,8 @@ nlohmann::json DetectionEvent::to_json() const {
         dj["label_id"] = d.label_id;
         dj["confidence"] = d.confidence;
         dj["bbox"] = {{"x", d.x}, {"y", d.y}, {"width", d.w}, {"height", d.h}};
+        // 跟踪 ID：仅已分配（>=0）才写入
+        if (d.track_id >= 0) dj["track_id"] = d.track_id;
         if (!d.attributes.empty()) {
             nlohmann::json attrs = nlohmann::json::object();
             for (const auto& [k, v] : d.attributes) attrs[k] = v;
@@ -118,6 +120,8 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
             // OCR 文字与置信度
             e.detections[i].text = objs[i].value("text", "");
             e.detections[i].text_score = objs[i].value("text_score", 0.f);
+            // 跟踪 ID（缺失视为未跟踪）
+            e.detections[i].track_id = objs[i].value("track_id", -1);
         }
     }
     return e;
@@ -191,6 +195,7 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
             ed.label = b.label_name;
             ed.label_id = b.label_id;
             ed.confidence = b.score;
+            ed.track_id = b.track_id;                 // 跟踪 ID 透传（-1 表示未跟踪）
             ed.x = b.x / static_cast<float>(frame_w);
             ed.y = b.y / static_cast<float>(frame_h);
             ed.w = b.w / static_cast<float>(frame_w);
