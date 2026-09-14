@@ -131,6 +131,16 @@ TEST_CASE("EventBus carries object attributes", "[agent][events]") {
     REQUIRE(j.contains("detections"));
 }
 
+TEST_CASE("EventBus round-trip preserves attributes", "[agent][events]") {
+    DetectionEvent e;
+    e.event_id = "rt"; e.ts = "2026-01-01T00:00:00.000Z";
+    EventDetection d; d.label = "person"; d.attributes["work_uniform"] = 0.2f;
+    e.detections.push_back(d);
+    DetectionEvent back = DetectionEvent::from_json(e.to_json());
+    REQUIRE(back.detections.size() == 1);
+    REQUIRE(back.detections[0].attributes.at("work_uniform") == Catch::Approx(0.2f));
+}
+
 TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {
     DetectionEvent e;
     e.event_id = "x"; e.snapshot_data = "QUJD"; e.snapshot_width = 320; e.snapshot_height = 180;

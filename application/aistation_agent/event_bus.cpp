@@ -101,6 +101,17 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
             e.detections.push_back(std::move(ed));
         }
     }
+    // 事件 v2：detections[] 不携带 attributes，从对齐的 objects[] 按索引恢复
+    if (j.contains("objects") && j["objects"].is_array()) {
+        const auto& objs = j["objects"];
+        for (size_t i = 0; i < e.detections.size() && i < objs.size(); ++i) {
+            if (objs[i].contains("attributes") && objs[i]["attributes"].is_object()) {
+                for (auto it = objs[i]["attributes"].begin(); it != objs[i]["attributes"].end(); ++it) {
+                    if (it.value().is_number()) e.detections[i].attributes[it.key()] = it.value().get<float>();
+                }
+            }
+        }
+    }
     return e;
 }
 
