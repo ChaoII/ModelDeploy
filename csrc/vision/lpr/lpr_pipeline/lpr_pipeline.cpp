@@ -115,7 +115,12 @@ namespace modeldeploy::vision::lpr {
             if (det_result[i].label_id) {
                 transform_image = get_split_merge(transform_image);
             }
-            recognizer_->predict(ImageData(std::move(transform_image)), &r);
+            // 识别只在临时结果里写车牌文字/颜色：LprRecognizer::predict 会用新建的
+            // LprResult 覆盖入参，若直接传 &r 会把上面填好的检测框/分数/关键点清零。
+            LprResult rec;
+            recognizer_->predict(ImageData(std::move(transform_image)), &rec);
+            r.car_plate_str = std::move(rec.car_plate_str);
+            r.car_plate_color = std::move(rec.car_plate_color);
             results->push_back(std::move(r));
         }
         return true;

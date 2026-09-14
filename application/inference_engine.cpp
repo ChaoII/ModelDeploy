@@ -319,8 +319,9 @@ bool InferenceEngine::infer_lpr(const ImageData& image, InferResult* result) {
         DetectionBox box;
         box.x = p.box.x; box.y = p.box.y;
         box.w = p.box.width; box.h = p.box.height;
-        // 车牌无类别：label_id 固定 -1；检测得分与识别得分分别写入 score / text_score
+        // 车牌无类别：label_id 固定 -1；label_name 固定 "plate"，保证事件标签/节流键非空
         box.label_id = -1;
+        box.label_name = "plate";
         box.score = p.score;
         box.text = p.car_plate_str;
         box.text_score = p.score;

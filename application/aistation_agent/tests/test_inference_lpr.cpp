@@ -6,7 +6,8 @@
 TEST_CASE("InferenceEngine loads LPR pipeline", "[agent][pipeline]") {
     const std::string det = "test_data/test_models/onnx/yolov5plate.onnx";
     const std::string rec = "test_data/test_models/onnx/plate_recognition_color.onnx";
-    if (!std::ifstream(det).good() || !std::ifstream(rec).good())
+    const std::string img_path = "test_data/test_images/test_lpr_detection.jpg";
+    if (!std::ifstream(det).good() || !std::ifstream(rec).good() || !std::ifstream(img_path).good())
         SKIP("LPR test data absent");
 
     ModelConfig cfg;
@@ -20,7 +21,7 @@ TEST_CASE("InferenceEngine loads LPR pipeline", "[agent][pipeline]") {
     InferenceEngine eng;
     REQUIRE(eng.load(cfg));
 
-    auto img = modeldeploy::vision::ImageData::imread("test_data/test_images/test_lpr_detection.jpg");
+    auto img = modeldeploy::vision::ImageData::imread(img_path);
     REQUIRE(!img.empty());
 
     InferResult r;
@@ -29,10 +30,12 @@ TEST_CASE("InferenceEngine loads LPR pipeline", "[agent][pipeline]") {
     REQUIRE(!r.boxes.empty());
     REQUIRE(!r.boxes[0].text.empty());
 
-    // 字段映射断言：车牌无类别（label_id=-1），识别得分写入 text_score
-    // 注意：LprPipeline 的识别后处理会重置 box/score（仅保留车牌号与颜色），故不断言 bbox
+    // 字段映射断言：车牌无类别（label_id=-1），检测得分写入 score/text_score；
+    // 识别阶段必须保留检测框几何信息（回归：rec 后处理曾把 box/score 清零）
     const auto& box = r.boxes[0];
     REQUIRE(box.label_id == -1);
-    REQUIRE(box.text_score >= 0.f);
-    REQUIRE(box.score >= 0.f);
+    REQUIRE(box.text_score > 0.f);
+    REQUIRE(box.score > 0.f);
+    REQUIRE(box.w > 0.f);
+    REQUIRE(box.h > 0.f);
 }
