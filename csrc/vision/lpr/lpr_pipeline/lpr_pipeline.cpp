@@ -82,8 +82,35 @@ namespace modeldeploy::vision::lpr {
     }
 
     bool LprPipeline::predict(const ImageData& image, std::vector<LprResult>* results, TimerArray* times) {
+        // LPR 推理要求 packed BGR：det 预处理的 CPU 融合内核把 plane(0) 当作 packed BGR
+        // 读取（NV12 的 Y 平面宽度为 W*H 字节，按 BGR 读会越界），且 rec 前的透视裁剪
+        // （asMat）对多平面帧只能取到 Y 平面单通道，同样会被 rec 预处理误读为 BGR。
+        // 故 NV12 一律先转 packed BGR；packed BGR 输入零拷贝直通。
+        // LPR 的 det CUDA 预处理（fused_preproc.cu）只消费主机 packed BGR，不存在设备侧
+        // NV12 融合路径，故设备 NV12 先 toCpu() 回读到主机再转 BGR，直接按设备内存解读会被误读。
+        ImageData bgr_owned;
+        const ImageData* src_image = &image;
+        if (image.format() == MdImageType::NV12) {
+            ImageData host_owned;
+            const ImageData* host = &image;
+            if (image.device() != Device::CPU) {
+                if (!image.toCpu(&host_owned)) {
+                    MD_LOG_ERROR << "LprPipeline: device NV12 toCpu failed." << std::endl;
+                    return false;
+                }
+                host = &host_owned;
+            }
+            bgr_owned = ImageData::cvt_color(*host, ColorConvertType::CVT_NV122PKG_BGR);
+            if (bgr_owned.empty()) {
+                MD_LOG_ERROR << "LprPipeline: NV12->BGR convert failed." << std::endl;
+                return false;
+            }
+            src_image = &bgr_owned;
+        }
+        const ImageData& img = *src_image;
+
         std::vector<KeyPointsResult> det_result;
-        if (!detector_->predict(image, &det_result)) {
+        if (!detector_->predict(img, &det_result)) {
             MD_LOG_ERROR << "detector predict failed" << std::endl;
             return false;
         }
@@ -92,7 +119,7 @@ namespace modeldeploy::vision::lpr {
         results->reserve(lp_num);
         // 整图只拷贝一次（原来在循环内每辆车重复拷贝）
         cv::Mat _image;
-        image.asMat(&_image);
+        img.asMat(&_image);
 
         for (int i = 0; i < static_cast<int>(lp_num); ++i) {
             LprResult r;

@@ -1,12 +1,24 @@
 #include <catch2/catch_test_macros.hpp>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <thread>
 #include "pipeline.hpp"
 
 static const char* kVideo = "test_data/test_video60.mp4";
 static const char* kModel = "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx";
+
+// 生成 LPR 集成用例所需的回环视频：把 LPR 测试图循环编码成短 mp4（视频解码为 CPU NV12，
+// 正是崩溃路径）。视频已存在则直接复用；ffmpeg 不在 PATH 时返回 false，用例 SKIP。
+static bool ensure_lpr_video(const char* img, const char* out) {
+    if (std::ifstream(out).good()) return true;
+    if (!std::ifstream(img).good()) return false;
+    const std::string cmd = std::string("ffmpeg -y -loglevel error -loop 1 -i \"") + img +
+                            "\" -t 20 -r 8 -pix_fmt yuv420p \"" + out + "\"";
+    if (std::system(cmd.c_str()) != 0) return false;
+    return std::ifstream(out).good();
+}
 
 TEST_CASE("Pipeline detection sink fires on real detections", "[agent][pipeline][integration]") {
     if (!std::ifstream(kVideo).good() || !std::ifstream(kModel).good())
@@ -118,6 +130,49 @@ TEST_CASE("Pipeline ocr delivers text to sink",
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     pipe.stop();
     REQUIRE(text_boxes.load() > 0);
+}
+
+// LPR pipeline 送达 sink 的集成用例：驱动真实 Pipeline（视频/多帧路径），断言检测
+// sink 收到带非空 text（车牌号）的 DetectionBox。单图 infer 已由 test_inference_lpr 覆盖，
+// 本用例专门覆盖视频帧（解码为 CPU NV12）路径：回归 det 预处理把 NV12 的 Y 平面当
+// packed BGR 越界读取导致进程静默崩溃（0xC0000005）。
+TEST_CASE("Pipeline lpr delivers plate text to sink",
+          "[agent][pipeline][integration]") {
+    const char* kLprVideo = "test_data/lpr_plate_loop.mp4";
+    const char* kLprImg = "test_data/test_images/test_lpr_detection.jpg";
+    const char* kDet = "test_data/test_models/onnx/yolov5plate.onnx";
+    const char* kRec = "test_data/test_models/onnx/plate_recognition_color.onnx";
+    if (!std::ifstream(kDet).good() || !std::ifstream(kRec).good() ||
+        !ensure_lpr_video(kLprImg, kLprVideo))
+        SKIP("LPR test data/ffmpeg absent");
+
+    TaskConfig cfg;
+    cfg.id = "lpr_sink_test";
+    cfg.input_url = kLprVideo;
+    cfg.enable_preview = false;
+    ModelConfig m;
+    m.name = "lpr";
+    m.type = "lpr";
+    m.backend = "ort";
+    m.device = "cpu";
+    m.path = kDet;       // 车牌检测模型
+    m.rec_path = kRec;   // 车牌识别模型
+    cfg.models.push_back(m);
+
+    Pipeline pipe(cfg);
+    std::atomic<int> plate_boxes{0};
+    pipe.set_detection_sink([&](const std::vector<DetectionBox>& boxes, int w, int h, double) {
+        REQUIRE(w > 0);
+        REQUIRE(h > 0);
+        for (const auto& b : boxes)
+            if (!b.text.empty()) ++plate_boxes;
+    });
+    REQUIRE(pipe.start());
+    // 有界等待（模型加载 + 多帧推理，上限 30s）
+    for (int i = 0; i < 600 && plate_boxes.load() == 0; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    pipe.stop();
+    REQUIRE(plate_boxes.load() > 0);
 }
 
 TEST_CASE("Pipeline without sink unaffected", "[agent][pipeline]") {
