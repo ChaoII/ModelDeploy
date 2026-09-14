@@ -154,6 +154,27 @@ TEST_CASE("ConfigAdapter parses ocr pipeline", "[agent][config]") {
     REQUIRE(m.dict_path == "test_data/test_models/ocr/dict.txt");
 }
 
+TEST_CASE("ConfigAdapter parses lpr pipeline", "[agent][config]") {
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    json j = json::parse(R"({
+      "task_id": 12,
+      "camera": {"id": 1, "name": "c", "url": "test_data/test_video60.mp4"},
+      "models": [{
+        "name": "lpr", "type": "lpr", "backend": "ort", "device": "cpu",
+        "det_url": "test_data/test_models/onnx/lpr_det.onnx",
+        "rec_url": "test_data/test_models/onnx/lpr_rec.onnx"
+      }],
+      "events": {"transport": "http", "http": {"url": "http://x/cb", "token": "t"}}
+    })");
+    REQUIRE(adapter.from_json(j, &t, &err));
+    const auto& m = t.sdk.models[0];
+    REQUIRE(m.type == "lpr");
+    REQUIRE(m.path == "test_data/test_models/onnx/lpr_det.onnx");
+    REQUIRE(m.rec_path == "test_data/test_models/onnx/lpr_rec.onnx");
+}
+
 TEST_CASE("ModelConfig ocr cls_path/dict_path roundtrip", "[agent][config]") {
     TaskConfig cfg;
     cfg.id = "ocr-round";

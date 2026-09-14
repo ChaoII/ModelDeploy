@@ -134,6 +134,10 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
             if (!resolve_path("cls_url", &m.cls_path)) return false;
             if (!resolve_path("rec_url", &m.rec_path)) return false;
             if (!resolve_path("dict_url", &m.dict_path)) return false;
+        } else if (m.type == "lpr") {
+            // LPR 车牌 pipeline：det_url→path、rec_url→rec_path
+            if (!resolve_path("det_url", &m.path)) return false;
+            if (!resolve_path("rec_url", &m.rec_path)) return false;
         } else {
             // pedestrian_attribute pipeline：det_url→path、cls_url→rec_path
             if (!resolve_path("det_url", &m.path)) return false;
