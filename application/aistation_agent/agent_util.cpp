@@ -45,6 +45,13 @@ bool schedule_active_now(const Schedule& s) {
     return schedule_active(s, iso_day, tm.tm_hour);
 }
 
+bool heartbeat_due(std::chrono::steady_clock::time_point last, int interval_sec,
+                   std::chrono::steady_clock::time_point now) {
+    if (interval_sec <= 0) return false;
+    if (last.time_since_epoch().count() == 0) return true;
+    return std::chrono::duration_cast<std::chrono::seconds>(now - last).count() >= interval_sec;
+}
+
 bool point_in_polygon(float px, float py, const std::vector<std::array<float, 2>>& poly) {
     const size_t n = poly.size();
     if (n < 3) return true;  // 退化多边形 = 不过滤

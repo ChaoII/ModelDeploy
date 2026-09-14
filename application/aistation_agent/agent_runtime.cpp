@@ -51,6 +51,9 @@ bool AgentRuntime::start() {
 
     schedule_running_ = true;
     schedule_thread_ = std::thread([this]() { schedule_loop(); });
+
+    heartbeat_running_ = true;
+    heartbeat_thread_ = std::thread([this]() { heartbeat_loop(); });
     return true;
 }
 
@@ -65,6 +68,9 @@ void AgentRuntime::stop() {
     if (server_) server_->stop();
     schedule_running_ = false;
     if (schedule_thread_.joinable()) schedule_thread_.join();
+
+    heartbeat_running_ = false;
+    if (heartbeat_thread_.joinable()) heartbeat_thread_.join();
     mgr_.stop_all();
     // 队列 worker 的 join 必须在 mtx_ 之外：worker 可能经 snapshot provider 走
     // PipelineManager::get_task_jpeg（持其 mtx_），而其它路径持 PipelineManager::mtx_
@@ -83,6 +89,7 @@ void AgentRuntime::stop() {
         // 队列已停，worker 不再持有 EventPublisher*，此时清理发布器才安全。
         publishers_.clear();
         schedules_.clear();
+        heartbeats_.clear();
     }
 }
 
@@ -164,6 +171,7 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
         queues_[task_id] = std::move(queue);
         publishers_[task_id] = std::move(pub);
         schedules_[task_id] = SchedEntry{t.schedule, false};
+        heartbeats_[task_id] = HeartbeatEntry{t.heartbeat_sec, {}};
     }
     bus_.register_task(task_id, meta);
     mgr_.set_detection_sink(task_id, [this, task_id](const std::vector<DetectionBox>& boxes,
@@ -203,6 +211,7 @@ void AgentRuntime::on_removed(const std::string& task_id) {
             publishers_.erase(pit);
         }
         schedules_.erase(task_id);
+        heartbeats_.erase(task_id);
     }
     if (queue) queue->stop();  // join 必须在 mtx_ 之外，避免与 PipelineManager 形成 ABBA
     // queue 已停（worker 已 join、不再持有 EventPublisher*），publisher 局部变量
@@ -249,6 +258,39 @@ void AgentRuntime::schedule_loop() {
         }
         for (int i = 0; i < 300 && schedule_running_.load(); ++i)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));  // ~30s
+    }
+}
+
+void AgentRuntime::heartbeat_loop() {
+    // 定时线程必须自吞异常：未捕获异常会经 std::thread 触发 std::terminate 杀死进程
+    // （与 schedule_loop / 心跳上报 / 持久化队列线程一致）。1s 粒度保证 heartbeat_sec
+    // 为秒级时到期足够准时。
+    while (heartbeat_running_.load()) {
+        try {
+            std::unordered_map<std::string, bool> running;
+            for (const auto& st : mgr_.list_tasks()) running[st.id] = st.running;
+
+            const auto now = std::chrono::steady_clock::now();
+            std::vector<std::string> due;
+            {
+                std::lock_guard<std::mutex> lk(mtx_);
+                for (auto& [id, e] : heartbeats_) {
+                    const bool is_running = running.count(id) ? running[id] : false;
+                    if (!is_running) continue;
+                    if (!aistation::heartbeat_due(e.last, e.interval_sec, now)) continue;
+                    e.last = now;
+                    due.push_back(id);
+                }
+            }
+            // 在锁外发布，避免订阅者回调路径取 mtx_ 造成 ABBA
+            for (const auto& id : due) bus_.on_heartbeat(id);
+        } catch (const std::exception& e) {
+            std::cerr << "[HeartbeatLoop] tick failed: " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[HeartbeatLoop] tick failed: unknown" << std::endl;
+        }
+        for (int i = 0; i < 10 && heartbeat_running_.load(); ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));  // ~1s
     }
 }
 

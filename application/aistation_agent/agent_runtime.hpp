@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -47,6 +48,7 @@ private:
     bool capture_snapshot_b64(const std::string& task_id, const SnapshotConfig& cfg,
                               std::string* b64, int* w, int* h);
     void schedule_loop();
+    void heartbeat_loop();
 
     struct SchedEntry {
         aistation::Schedule schedule;
@@ -57,6 +59,14 @@ private:
     std::unordered_map<std::string, SchedEntry> schedules_;
     std::thread schedule_thread_;
     std::atomic<bool> schedule_running_{false};
+
+    struct HeartbeatEntry {
+        int interval_sec = 5;
+        std::chrono::steady_clock::time_point last{};   // 默认=未发过，立即到期
+    };
+    std::unordered_map<std::string, HeartbeatEntry> heartbeats_;
+    std::thread heartbeat_thread_;
+    std::atomic<bool> heartbeat_running_{false};
 
     AgentOptions opts_;
     PipelineManager mgr_;

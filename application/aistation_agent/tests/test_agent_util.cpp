@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <array>
+#include <chrono>
 #include <vector>
 #include "agent_util.hpp"
 #include "nlohmann/json.hpp"
@@ -52,4 +53,18 @@ TEST_CASE("normalize_broker_scheme", "[agent][util]") {
 TEST_CASE("base64_encode_bytes", "[agent][util]") {
     std::vector<uint8_t> data = {'M', 'a', 'n'};
     REQUIRE(base64_encode_bytes(data) == "TWFu");
+}
+
+TEST_CASE("heartbeat_due honors interval and disable", "[agent][heartbeat]") {
+    using clock = std::chrono::steady_clock;
+    const auto t0 = clock::now();
+    // 首次（last 为默认构造）立即到期
+    REQUIRE(aistation::heartbeat_due(clock::time_point{}, 5, t0) == true);
+    // 未到间隔
+    REQUIRE(aistation::heartbeat_due(t0, 5, t0 + std::chrono::seconds(4)) == false);
+    // 刚好到间隔
+    REQUIRE(aistation::heartbeat_due(t0, 5, t0 + std::chrono::seconds(5)) == true);
+    // <=0 禁用
+    REQUIRE(aistation::heartbeat_due(t0, 0, t0 + std::chrono::seconds(60)) == false);
+    REQUIRE(aistation::heartbeat_due(t0, -1, t0 + std::chrono::seconds(60)) == false);
 }
