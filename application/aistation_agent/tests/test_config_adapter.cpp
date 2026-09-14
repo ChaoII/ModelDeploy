@@ -102,6 +102,33 @@ TEST_CASE("ConfigAdapter clamps out-of-range roi", "[agent][config]") {
     REQUIRE(rn[3] == Approx(1.f));
 }
 
+TEST_CASE("ConfigAdapter parses pedestrian_attribute pipeline", "[agent][config]") {
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    json j = json::parse(R"({
+      "task_id": 9,
+      "camera": {"id": 1, "name": "c", "url": "test_data/test_video60.mp4"},
+      "models": [{
+        "name": "工作服", "type": "pedestrian_attribute", "backend": "ort", "device": "cpu",
+        "det_url": "test_data/test_models/onnx/zhgd_det.onnx",
+        "cls_url": "test_data/test_models/onnx/zhgd_ml.onnx",
+        "attributes": ["safety_helmet","reflective_vest","safety_rope","work_uniform"],
+        "labels": ["person"], "input_size": [1280,1280], "confidence_threshold": 0.5,
+        "password": "secret"
+      }],
+      "events": {"transport": "http", "http": {"url": "http://x/cb", "token": "t"}}
+    })");
+    REQUIRE(adapter.from_json(j, &t, &err));
+    const auto& m = t.sdk.models[0];
+    REQUIRE(m.type == "pedestrian_attribute");
+    REQUIRE(m.path == "test_data/test_models/onnx/zhgd_det.onnx");
+    REQUIRE(m.rec_path == "test_data/test_models/onnx/zhgd_ml.onnx");
+    REQUIRE(m.attributes.size() == 4);
+    REQUIRE(m.attributes[3] == "work_uniform");
+    REQUIRE(m.password == "secret");
+}
+
 TEST_CASE("ConfigAdapter parses schedule, roi polygon, snapshot and normalizes broker", "[agent][config]") {
     ConfigAdapter adapter;
     AdaptedTask t;

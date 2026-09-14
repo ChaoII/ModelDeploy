@@ -112,6 +112,8 @@ json task_config_to_json(const TaskConfig& cfg) {
         mo["interval"] = m.interval;
         if (!m.rec_path.empty()) mo["rec_path"] = m.rec_path;
         if (!m.labels.empty()) mo["labels"] = m.labels;
+        if (!m.attributes.empty()) mo["attributes"] = m.attributes;
+        if (!m.password.empty()) mo["password"] = m.password;
         j["models"].push_back(mo);
     }
     return j;
@@ -190,6 +192,10 @@ TaskConfig task_config_from_json(const json& j) {
             if (mo.contains("interval")) m.interval = mo["interval"];
             if (mo.contains("labels") && mo["labels"].is_array())
                 m.labels = mo["labels"].get<std::vector<std::string>>();
+            if (mo.contains("attributes") && mo["attributes"].is_array())
+                m.attributes = mo["attributes"].get<std::vector<std::string>>();
+            if (mo.contains("password") && mo["password"].is_string())
+                m.password = mo["password"];
             cfg.models.push_back(m);
         }
     }

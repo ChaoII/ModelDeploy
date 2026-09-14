@@ -22,6 +22,8 @@ struct ModelConfig {
     std::vector<float> roi_norm;          // 归一化 [x,y,w,h]，非空时按帧宽高换算 ROI（Agent 用）
     int interval = 1;
     std::vector<std::string> labels;
+    std::vector<std::string> attributes;  // 多标签属性名（按 attr_scores 下标；pedestrian_attribute 用）
+    std::string password;                 // 加密模型解密口令
 };
 
 // ==================== 解码器配置 ====================
