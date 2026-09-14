@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cstring>
+#include <map>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -12,6 +13,20 @@
 
 using namespace modeldeploy::vision;
 namespace mdtracking = modeldeploy::vision::tracking;
+
+// 跟踪器工厂（纯函数，便于单测）：算法名 → 具体 tracker。
+// "sort" 视为 bytetrack 的历史别名（配置注释/测试曾用 "sort"）；空串按默认 bytetrack。
+// 真正未知的算法返回 nullptr，由调用方 fail-closed（打印告警并禁用跟踪）。
+std::unique_ptr<mdtracking::BaseTracker> make_tracker(const std::string& algorithm) {
+    if (algorithm.empty() || algorithm == "bytetrack" || algorithm == "sort") {
+        auto t = std::make_unique<mdtracking::ByteTracker>();
+        t->set_params();   // 默认参数（track_thresh=0.5 等）
+        return t;
+    }
+    if (algorithm == "botsort") return std::make_unique<mdtracking::BotSortTracker>();
+    if (algorithm == "strongsort") return std::make_unique<mdtracking::StrongSortTracker>();
+    return nullptr;
+}
 
 Pipeline::Pipeline(TaskConfig cfg, ModelFactory factory)
     : cfg_(std::move(cfg)),
@@ -61,23 +76,19 @@ bool Pipeline::start() {
     }
     draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
 
-    // 跟踪器：仅 cfg_.tracking.enabled 时创建；算法按 algorithm 选择（默认 bytetrack）。
-    // "sort" 视为 bytetrack 的历史别名（配置注释/测试曾用 "sort"）；真正未知的算法
-    // 保持 fail-closed：打印明确告警并禁用跟踪，避免静默降级到非预期算法。
-    tracker_.reset();
+    // 跟踪：仅 cfg_.tracking.enabled 时启用；先用工厂校验算法，未知算法 fail-closed
+    // （打印明确告警并禁用跟踪，避免静默降级到非预期算法）。具体 tracker 不在此创建，
+    // 而是在 detect_loop 中按 label_id 惰性创建（每个类别独立跟踪，见该处注释）。
+    trackers_.clear();
+    tracking_active_ = false;
+    tracking_algorithm_.clear();
     if (cfg_.tracking.enabled) {
-        const std::string& alg = cfg_.tracking.algorithm;
-        if (alg.empty() || alg == "bytetrack" || alg == "sort") {
-            auto t = std::make_unique<mdtracking::ByteTracker>();
-            t->set_params();   // 默认参数（track_thresh=0.5 等）
-            tracker_ = std::move(t);
-        } else if (alg == "botsort") {
-            tracker_ = std::make_unique<mdtracking::BotSortTracker>();
-        } else if (alg == "strongsort") {
-            tracker_ = std::make_unique<mdtracking::StrongSortTracker>();
+        if (make_tracker(cfg_.tracking.algorithm)) {
+            tracking_active_ = true;
+            tracking_algorithm_ = cfg_.tracking.algorithm;
         } else {
-            std::cerr << "[Pipeline] " << cfg_.id << " unknown tracking algorithm: " << alg
-                      << " (tracking disabled)" << std::endl;
+            std::cerr << "[Pipeline] " << cfg_.id << " unknown tracking algorithm: "
+                      << cfg_.tracking.algorithm << " (tracking disabled)" << std::endl;
         }
     }
 
@@ -170,7 +181,8 @@ void Pipeline::release_resources() {
     sink_.close();
     infer_group_.clear();
     draw_engine_.reset();
-    tracker_.reset();
+    trackers_.clear();          // 释放所有按类别分组的 tracker
+    tracking_active_ = false;
     initialized_ = false;
     cached_results_.clear();
 
@@ -312,27 +324,46 @@ void Pipeline::detect_loop() {
         infer_group_.run_models(f.image, &sdk_dets, &non_det);
         auto tA = std::chrono::steady_clock::now();
 
-        // ── 逐帧跟踪：更新 tracker 并把 track_id 回填到对应检测框 ──
+        // ── 逐帧跟踪：按 label_id 分组，每组独立 tracker，再回填 track_id ──
         // track_ids 与 sdk_dets 同形（[模型][检测]）；-1 = 未匹配到轨迹。
+        // 关键：不同类别不能共用一个 tracker —— tracker 只按 IoU 关联，会把重叠的
+        // 不同类目标判为同一轨迹并串号。故按 label_id 分组，各 feed 自己的 tracker，
+        // tracker 惰性创建（首次出现该类别时），全程复用其状态。
         std::vector<std::vector<int>> track_ids;
-        if (tracker_) {
-            std::vector<mdtracking::Detection> dets;
-            std::vector<std::pair<size_t, size_t>> det_index;   // dets[i] ← (模型下标, 检测下标)
+        if (tracking_active_) {
+            for (size_t mi = 0; mi < sdk_dets.size(); ++mi)
+                track_ids.emplace_back(sdk_dets[mi].second.size(), -1);
+
+            // label_id → 该类别下所有检测的 (模型下标, 检测下标)
+            std::map<int, std::vector<std::pair<size_t, size_t>>> groups;
             for (size_t mi = 0; mi < sdk_dets.size(); ++mi) {
                 const auto& dets_m = sdk_dets[mi].second;
-                track_ids.emplace_back(dets_m.size(), -1);
-                for (size_t di = 0; di < dets_m.size(); ++di) {
-                    mdtracking::Detection d;
-                    d.box = dets_m[di].box;
-                    d.score = dets_m[di].score;
-                    d.label_id = dets_m[di].label_id;
-                    dets.push_back(std::move(d));
-                    det_index.emplace_back(mi, di);
-                }
+                for (size_t di = 0; di < dets_m.size(); ++di)
+                    groups[dets_m[di].label_id].emplace_back(mi, di);
             }
-            if (!dets.empty()) {
+
+            for (auto& [label, idxs] : groups) {
+                // 惰性创建该类别的 tracker（算法已在 start() 校验过，非未知）
+                auto it = trackers_.find(label);
+                if (it == trackers_.end()) {
+                    it = trackers_.emplace(label, make_tracker(tracking_algorithm_)).first;
+                }
+                if (!it->second) continue;   // 保险：工厂异常（不应发生）
+
+                std::vector<mdtracking::Detection> dets;
+                dets.reserve(idxs.size());
+                for (const auto& [mi, di] : idxs) {
+                    const auto& src = sdk_dets[mi].second[di];
+                    mdtracking::Detection d;
+                    d.box = src.box;
+                    d.score = src.score;
+                    d.label_id = src.label_id;
+                    dets.push_back(std::move(d));
+                }
+                if (dets.empty()) continue;
+
                 const auto tracks =
-                    tracker_->update(dets, &f.image, static_cast<double>(f.pts_ms));
+                    it->second->update(dets, &f.image, static_cast<double>(f.pts_ms));
                 // detection ↔ track 的 IoU 贪心匹配：每轮取全局最大 IoU 且 ≥ 阈值的配对，
                 // 配对确定即移除双方，避免多条检测抢占同一条轨迹。
                 constexpr float kMatchIou = 0.3f;
@@ -353,8 +384,8 @@ void Pipeline::detect_loop() {
                     if (best_d < 0) break;
                     det_used[static_cast<size_t>(best_d)] = 1;
                     track_used[static_cast<size_t>(best_t)] = 1;
-                    const auto& idx = det_index[static_cast<size_t>(best_d)];
-                    track_ids[idx.first][idx.second] = tracks[static_cast<size_t>(best_t)].track_id;
+                    const auto& pos = idxs[static_cast<size_t>(best_d)];
+                    track_ids[pos.first][pos.second] = tracks[static_cast<size_t>(best_t)].track_id;
                 }
             }
         }

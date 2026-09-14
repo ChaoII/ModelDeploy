@@ -9,6 +9,8 @@
 #include <set>
 #include <thread>
 #include "pipeline.hpp"
+// 提供 BaseTracker 完整类型（make_tracker 返回 unique_ptr<BaseTracker>，单测需析构）
+#include "csrc/vision/tracking/base_tracker.h"
 
 static const char* kVideo = "test_data/test_video60.mp4";
 static const char* kModel = "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx";
@@ -22,6 +24,15 @@ static bool ensure_lpr_video(const char* img, const char* out) {
                             "\" -t 20 -r 8 -pix_fmt yuv420p \"" + out + "\"";
     if (std::system(cmd.c_str()) != 0) return false;
     return std::ifstream(out).good();
+}
+
+// 跟踪器工厂单测（纯函数，无需 test_data）：算法名映射 + 未知算法 fail-closed。
+TEST_CASE("make_tracker maps algorithm names", "[agent][tracking]") {
+    REQUIRE(make_tracker("bytetrack") != nullptr);
+    REQUIRE(make_tracker("sort") != nullptr);       // 历史别名 → ByteTracker
+    REQUIRE(make_tracker("botsort") != nullptr);
+    REQUIRE(make_tracker("strongsort") != nullptr);
+    REQUIRE(make_tracker("nonsense") == nullptr);   // 未知 → nullptr（调用方 fail-closed）
 }
 
 TEST_CASE("Pipeline detection sink fires on real detections", "[agent][pipeline][integration]") {
@@ -98,6 +109,41 @@ TEST_CASE("Pipeline tracking backfills stable track_id", "[agent][pipeline][inte
         for (const auto& [id, n] : id_frame_count) max_frames = std::max(max_frames, n);
     }
     REQUIRE(max_frames >= 2);
+}
+
+// 禁用跟踪路径的集成用例：tracking.enabled=false 时 tracker 不创建，sink 收到的
+// 所有框 track_id 必须恒为 -1（disabled 路径零差异）。test_data 缺失则 SKIP。
+TEST_CASE("Pipeline disabled tracking leaves track_id -1",
+          "[agent][pipeline][integration]") {
+    if (!std::ifstream(kVideo).good() || !std::ifstream(kModel).good())
+        SKIP("test video/model absent");
+
+    TaskConfig cfg;
+    cfg.id = "notrack_test";
+    cfg.input_url = kVideo;
+    cfg.enable_preview = false;
+    cfg.tracking.enabled = false;
+    ModelConfig m;
+    m.name = "det"; m.type = "detection"; m.backend = "ort"; m.device = "cpu";
+    m.path = kModel; m.labels = {"person"}; m.input_size = {640, 640};
+    cfg.models.push_back(m);
+
+    Pipeline pipe(cfg);
+    std::atomic<int> calls{0};
+    std::atomic<int> non_minus_one{0};
+    pipe.set_detection_sink([&](const std::vector<DetectionBox>& boxes, int w, int h, double) {
+        REQUIRE(w > 0);
+        REQUIRE(h > 0);
+        ++calls;
+        for (const auto& b : boxes)
+            if (b.track_id != -1) ++non_minus_one;
+    });
+    REQUIRE(pipe.start());
+    for (int i = 0; i < 100 && calls.load() == 0; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    pipe.stop();
+    REQUIRE(calls.load() > 0);
+    REQUIRE(non_minus_one.load() == 0);
 }
 
 // 属性 pipeline 送达 sink 的集成用例：驱动真实 Pipeline，断言检测 sink 收到

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <thread>
 #include <deque>
+#include <map>
 #include <mutex>
 #include <condition_variable>
 #include <vector>
@@ -18,6 +19,12 @@
 
 namespace modeldeploy { namespace vision { class ImageData; } }
 namespace modeldeploy { namespace vision { namespace tracking { class BaseTracker; } } }
+
+/// 跟踪器工厂（纯函数，便于单测）：
+/// bytetrack/sort → ByteTracker；botsort → BotSORT；strongsort → StrongSORT；
+/// 空串按默认 ByteTracker（保持既有行为）；其余未知算法 → nullptr（调用方 fail-closed）。
+std::unique_ptr<modeldeploy::vision::tracking::BaseTracker> make_tracker(
+    const std::string& algorithm);
 
 /// 单路视频流水线：SDK 解码(async)→有界队列→单检测线程(推理+绘制+编码)→SDK 编码(async)
 /// 解码为 SDK 异步 + 缓冲池；检测循环为每帧串行关键路径（detect+draw+encode < 40ms 以达 25fps）。
@@ -73,8 +80,12 @@ private:
     ModelFactory model_factory_;
     InferGroup infer_group_;
     std::unique_ptr<DrawEngine> draw_engine_;   // 非 detection（face/classification）CPU 标注
-    // 逐帧多目标跟踪器：仅 cfg_.tracking.enabled 时创建（默认关闭 = 零行为差异）
-    std::unique_ptr<modeldeploy::vision::tracking::BaseTracker> tracker_;
+    // 逐帧多目标跟踪：按 label_id 分组，每个类别一个 tracker（仅 tracking.enabled 时启用）。
+    // 分组可避免重叠的不同类别目标仅凭 IoU 互相抢占 track_id（跨类别串号）；
+    // 默认关闭 = track_id 恒为 -1，零行为差异。tracker 惰性创建（见 detect_loop）。
+    std::map<int, std::unique_ptr<modeldeploy::vision::tracking::BaseTracker>> trackers_;
+    std::string tracking_algorithm_;   // 已校验受支持的跟踪算法名（供惰性创建使用）
+    bool tracking_active_ = false;     // 跟踪是否实际生效（未知算法时 fail-closed 置 false）
     VideoSource src_;
     VideoSink sink_;
     PerfStats stats_;
