@@ -177,6 +177,26 @@ TEST_CASE("EventBus round-trip preserves text", "[agent][events]") {
     REQUIRE(back.detections[0].text_score == Approx(0.5f));
 }
 
+TEST_CASE("EventBus carries LPR plate text", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    bus.register_task("1", meta);
+    // LPR：label_name="plate"、label_id=-1、text=车牌号（InferenceEngine::infer_lpr 产出形态）
+    DetectionBox b = box("plate", -1, 0.95f);
+    b.text = "沪A12345"; b.text_score = 0.95f;
+    bus.on_detections("1", {b}, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].detections.size() == 1);
+    REQUIRE(got[0].detections[0].label == "plate");
+    REQUIRE(got[0].detections[0].text == "沪A12345");
+    REQUIRE(got[0].detections[0].text_score == Approx(0.95f));
+    // 事件 v2：objects 序列化携带车牌文字
+    auto j = got[0].to_json();
+    REQUIRE(j["objects"][0]["text"] == "沪A12345");
+}
+
 TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {
     DetectionEvent e;
     e.event_id = "x"; e.snapshot_data = "QUJD"; e.snapshot_width = 320; e.snapshot_height = 180;
