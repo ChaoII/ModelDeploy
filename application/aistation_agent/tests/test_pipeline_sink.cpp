@@ -273,6 +273,44 @@ TEST_CASE("Pipeline lpr delivers plate text to sink",
     REQUIRE(plate_boxes.load() > 0);
 }
 
+// 人脸检测 pipeline 送达 sink 的集成用例：face_detection 走 non_det 通道，断言 sink
+// 能收到非空人脸框（覆盖 detect_loop 中 non_det 里 face_detection boxes 的合并分支）。
+TEST_CASE("Pipeline face_detection delivers boxes to sink",
+          "[agent][pipeline][integration]") {
+    const char* kFaceModel =
+        "test_data/test_models/onnx/seetaface/scrfd_2.5g_bnkps_shape640x640.onnx";
+    if (!std::ifstream(kVideo).good() || !std::ifstream(kFaceModel).good())
+        SKIP("face test data absent");
+
+    TaskConfig cfg;
+    cfg.id = "face_sink_test";
+    cfg.input_url = kVideo;
+    cfg.enable_preview = false;
+    ModelConfig m;
+    m.name = "face";
+    m.type = "face_detection";
+    m.backend = "ort";
+    m.device = "cpu";
+    m.path = kFaceModel;
+    m.input_size = {640, 640};
+    m.confidence_threshold = 0.3f;
+    cfg.models.push_back(m);
+
+    Pipeline pipe(cfg);
+    std::atomic<int> face_boxes{0};
+    pipe.set_detection_sink([&](const std::vector<DetectionBox>& boxes, int w, int h, double) {
+        REQUIRE(w > 0);
+        REQUIRE(h > 0);
+        face_boxes += static_cast<int>(boxes.size());
+    });
+    REQUIRE(pipe.start());
+    // 有界等待（模型加载 + 多帧推理，上限 30s）
+    for (int i = 0; i < 600 && face_boxes.load() == 0; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    pipe.stop();
+    REQUIRE(face_boxes.load() > 0);
+}
+
 TEST_CASE("Pipeline without sink unaffected", "[agent][pipeline]") {
     TaskConfig cfg;
     cfg.id = "no_sink";

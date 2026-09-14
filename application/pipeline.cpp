@@ -416,13 +416,16 @@ void Pipeline::detect_loop() {
                     }
                 }
                 // 非检测 pipeline：boxes 已含 attributes（pedestrian_attribute）或
-                // text（ocr）；纯 classification 两者皆空，不入 sink，行为不变
+                // text（ocr）；纯 classification 两者皆空，不入 sink，行为不变。
+                // 人脸检测（face_detection）无属性/文本，但其 boxes 即人脸框，需并入事件；
+                // 空框的人脸结果不并入（不产生空事件）。
                 for (const auto& [name, r] : non_det) {
                     bool any_text = false;
                     for (const auto& b : r.boxes) {
                         if (!b.text.empty()) { any_text = true; break; }
                     }
-                    if (r.attributes.empty() && !any_text) continue;
+                    const bool face_boxes = (r.type == "face_detection" && !r.boxes.empty());
+                    if (r.attributes.empty() && !any_text && !face_boxes) continue;
                     for (const auto& b : r.boxes) boxes.push_back(b);
                 }
                 if (!boxes.empty()) {
