@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "config_adapter.hpp"
+#include "inference_engine.hpp"
 #include "nlohmann/json.hpp"
 
 using nlohmann::json;
@@ -191,6 +192,42 @@ TEST_CASE("ModelConfig ocr cls_path/dict_path roundtrip", "[agent][config]") {
     REQUIRE(back.models.size() == 1);
     REQUIRE(back.models[0].cls_path == "/m/cls.onnx");
     REQUIRE(back.models[0].dict_path == "/m/dict.txt");
+}
+
+TEST_CASE("ConfigAdapter parses top-level tracking config", "[agent][config]") {
+    auto j = make_task_json();
+    j["tracking"] = {{"enabled", true}, {"algorithm", "sort"}};
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    REQUIRE(adapter.from_json(j, &t, &err));
+    REQUIRE(t.tracking.enabled);
+    REQUIRE(t.tracking.algorithm == "sort");
+}
+
+TEST_CASE("ConfigAdapter tracking defaults off with bytetrack", "[agent][config]") {
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    REQUIRE(adapter.from_json(make_task_json(), &t, &err));
+    REQUIRE_FALSE(t.tracking.enabled);
+    REQUIRE(t.tracking.algorithm == "bytetrack");
+}
+
+TEST_CASE("TaskConfig tracking json roundtrip", "[agent][config]") {
+    TaskConfig cfg;
+    cfg.id = "trk-round";
+    cfg.tracking.enabled = true;
+    cfg.tracking.algorithm = "sort";
+    auto j = task_config_to_json(cfg);
+    auto back = task_config_from_json(j);
+    REQUIRE(back.tracking.enabled);
+    REQUIRE(back.tracking.algorithm == "sort");
+}
+
+TEST_CASE("DetectionBox track_id defaults to -1", "[agent][config]") {
+    DetectionBox box{0.f, 0.f, 1.f, 1.f};
+    REQUIRE(box.track_id == -1);
 }
 
 TEST_CASE("ConfigAdapter parses schedule, roi polygon, snapshot and normalizes broker", "[agent][config]") {

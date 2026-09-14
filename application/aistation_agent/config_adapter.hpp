@@ -49,6 +49,7 @@ struct AdaptedTask {
     aistation::Schedule schedule;                              // 布控时段（空=全天）
     std::vector<std::array<float, 2>> roi_polygon;             // 归一化多边形（<3 顶点=不过滤）
     SnapshotConfig snapshot;                                   // 事件内联快照
+    TaskConfig::TrackingConfig tracking;                       // 跟踪配置（顶层 tracking）
 };
 
 /// AIStation TaskConfig(JSON) → SDK TaskConfig + Agent 元数据

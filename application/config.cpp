@@ -97,6 +97,9 @@ json task_config_to_json(const TaskConfig& cfg) {
     j["draw"]["show_score"] = cfg.draw.show_score;
     j["draw"]["font_path"] = cfg.draw.font_path;
 
+    j["tracking"]["enabled"] = cfg.tracking.enabled;
+    j["tracking"]["algorithm"] = cfg.tracking.algorithm;
+
     for (const auto& m : cfg.models) {
         json mo;
         mo["name"] = m.name;
@@ -172,6 +175,12 @@ TaskConfig task_config_from_json(const json& j) {
         if (d.contains("show_label")) cfg.draw.show_label = d["show_label"];
         if (d.contains("show_score")) cfg.draw.show_score = d["show_score"];
         if (d.contains("font_path")) cfg.draw.font_path = d["font_path"];
+    }
+
+    if (j.contains("tracking") && j["tracking"].is_object()) {
+        auto& t = j["tracking"];
+        if (t.contains("enabled") && t["enabled"].is_boolean()) cfg.tracking.enabled = t["enabled"];
+        if (t.contains("algorithm") && t["algorithm"].is_string()) cfg.tracking.algorithm = t["algorithm"];
     }
 
     if (j.contains("models") && j["models"].is_array()) {

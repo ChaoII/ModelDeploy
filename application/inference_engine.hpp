@@ -21,6 +21,7 @@ struct DetectionBox {
     // 默认初始化，避免某些路径漏填导致读到未定义值
     float score = 0.f;
     int label_id = -1;
+    int track_id = -1;                    // 跟踪 ID；-1 = 未分配（默认，不启用跟踪时保持）
     std::string label_name;
     // 属性推理：属性名 -> 得分（pedestrian_attribute 用）
     std::vector<std::pair<std::string, float>> attributes;

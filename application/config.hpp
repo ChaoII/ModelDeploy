@@ -72,6 +72,12 @@ struct DrawConfig {
 
 // ==================== 单路任务配置 ====================
 struct TaskConfig {
+    // 跟踪配置：默认关闭，保持既有行为不变
+    struct TrackingConfig {
+        bool enabled = false;
+        std::string algorithm = "bytetrack";  // bytetrack / sort ...
+    };
+
     std::string id;
     std::string name;
     std::string input_url;
@@ -83,6 +89,7 @@ struct TaskConfig {
     DecoderConfig decoder;
     EncoderConfig encoder;
     DrawConfig draw;
+    TrackingConfig tracking;
 
     [[nodiscard]] bool validate(std::string* err = nullptr) const;
     void print() const;

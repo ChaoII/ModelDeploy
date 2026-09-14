@@ -166,6 +166,13 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         out->sdk.models.push_back(std::move(m));
     }
 
+    // tracking：顶层跟踪配置（默认关闭）
+    if (j.contains("tracking") && j["tracking"].is_object()) {
+        const auto& tk = j["tracking"];
+        if (tk.contains("enabled") && tk["enabled"].is_boolean()) out->tracking.enabled = tk["enabled"].get<bool>();
+        if (tk.contains("algorithm") && tk["algorithm"].is_string()) out->tracking.algorithm = tk["algorithm"].get<std::string>();
+    }
+
     // events
     out->alarm_interval_sec = j.value("alarm_interval_sec", 0);
     if (j.contains("algorithm_type") && j["algorithm_type"].is_string())
