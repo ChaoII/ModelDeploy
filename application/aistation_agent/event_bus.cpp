@@ -46,6 +46,22 @@ nlohmann::json DetectionEvent::to_json() const {
         arr.push_back(std::move(dj));
     }
     j["detections"] = std::move(arr);
+    // 事件 v2：objects（含属性）；detections 保留兼容
+    nlohmann::json objects = nlohmann::json::array();
+    for (const auto& d : detections) {
+        nlohmann::json dj;
+        dj["label"] = d.label;
+        dj["label_id"] = d.label_id;
+        dj["confidence"] = d.confidence;
+        dj["bbox"] = {{"x", d.x}, {"y", d.y}, {"width", d.w}, {"height", d.h}};
+        if (!d.attributes.empty()) {
+            nlohmann::json attrs = nlohmann::json::object();
+            for (const auto& [k, v] : d.attributes) attrs[k] = v;
+            dj["attributes"] = std::move(attrs);
+        }
+        objects.push_back(std::move(dj));
+    }
+    j["objects"] = std::move(objects);
     j["latency_ms"] = latency_ms;
     if (!snapshot_data.empty()) {
         j["snapshot"] = {{"data", snapshot_data}, {"width", snapshot_width}, {"height", snapshot_height}};
@@ -179,7 +195,7 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
         event.ts = utc_iso8601_ms();
         event.detections = std::move(kept);
         event.latency_ms = latency_ms;
-        event.schema_version = 1;
+        event.schema_version = 2;
         for (const auto& l : labels) st.last_emit[l] = now;
         sink = sink_;
     }

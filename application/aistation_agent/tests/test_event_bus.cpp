@@ -28,7 +28,7 @@ TEST_CASE("EventBus assembles normalized event", "[agent][events]") {
     REQUIRE(got[0].camera_id == 7);
     REQUIRE(got[0].task_id == 123);
     REQUIRE(got[0].algorithm_type == "INTRUSION");
-    REQUIRE(got[0].schema_version == 1);
+    REQUIRE(got[0].schema_version == 2);
     REQUIRE(got[0].event_id.size() == 36);
     REQUIRE(got[0].ts.find('T') != std::string::npos);
     REQUIRE(got[0].ts.back() == 'Z');
@@ -123,6 +123,12 @@ TEST_CASE("EventBus carries object attributes", "[agent][events]") {
     REQUIRE(got.size() == 1);
     REQUIRE(got[0].detections.size() == 1);
     REQUIRE(got[0].detections[0].attributes.at("work_uniform") == Approx(0.2f));
+    // 事件 v2：objects 序列化（含属性），detections 兼容保留
+    auto j = got[0].to_json();
+    REQUIRE(j["schema_version"] == 2);
+    REQUIRE(j.contains("objects"));
+    REQUIRE(j["objects"][0]["attributes"]["work_uniform"] == Approx(0.2f));
+    REQUIRE(j.contains("detections"));
 }
 
 TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {

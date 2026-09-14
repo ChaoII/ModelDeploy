@@ -81,12 +81,13 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     REQUIRE(e["task_id"] == 777);
     REQUIRE(e["detections"].is_array());
     REQUIRE(!e["detections"].empty());
+    REQUIRE(e.contains("objects"));
     REQUIRE(e["event_id"].is_string());
     REQUIRE(e["event_id"].get<std::string>().size() == 36);
     REQUIRE(e["ts"].is_string());
     REQUIRE(!e["ts"].get<std::string>().empty());
     REQUIRE(e["ts"].get<std::string>().back() == 'Z');
-    REQUIRE(e["schema_version"] == 1);
+    REQUIRE(e["schema_version"] == 2);
     // 内联快照为尽力而为：首个检测事件可能早于 Pipeline 首个 BGR 快照就绪
     // （快照每 2 帧更新一次），故等待后续携带 snapshot 的事件再断言。
     for (int i = 0; i < 100 && last_body.find("\"snapshot\"") == std::string::npos; ++i)
@@ -402,12 +403,13 @@ TEST_CASE("Agent E2E: local det emits MQTT event", "[agent][e2e][mqtt]") {
     REQUIRE(me["task_id"] == 888);
     REQUIRE(me["detections"].is_array());
     REQUIRE(!me["detections"].empty());
+    REQUIRE(me.contains("objects"));
     REQUIRE(me["event_id"].is_string());
     REQUIRE(me["event_id"].get<std::string>().size() == 36);
     REQUIRE(me["ts"].is_string());
     REQUIRE(!me["ts"].get<std::string>().empty());
     REQUIRE(me["ts"].get<std::string>().back() == 'Z');
-    REQUIRE(me["schema_version"] == 1);
+    REQUIRE(me["schema_version"] == 2);
 
     auto stopped = cli.Post("/api/v1/tasks/888/stop");
     REQUIRE(stopped);

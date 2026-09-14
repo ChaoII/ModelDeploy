@@ -31,7 +31,7 @@ nlohmann::json detect_capabilities(int max_channels) {
     platform = "nvidia";
 #endif
 
-    json families = json::array({"det", "cls", "face"});
+    json families = json::array({"det", "cls", "face", "pedestrian_attribute"});
 
     json decode = json::array({"h264", "h265"});
     json encode = json::array({"h264"});
