@@ -282,6 +282,9 @@ bool InferenceEngine::infer_ocr(const ImageData& image, InferResult* result) {
             if (py > ymax) ymax = py;
         }
         DetectionBox box;
+        // OCR 无类别，显式初始化标签与得分，避免未定义值
+        box.label_id = -1;
+        box.score = 0.f;
         box.x = static_cast<float>(xmin);
         box.y = static_cast<float>(ymin);
         box.w = static_cast<float>(xmax - xmin);
