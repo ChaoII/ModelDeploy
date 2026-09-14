@@ -92,15 +92,16 @@ namespace modeldeploy::vision::ocr {
             timers->post_timer.add_sample(0);
             timers->infer_timer.start();
         }
-        // CPU NV12 输入：det 预处理的 CPU 融合内核把 plane(0) 当作 packed BGR 读取
-        // （NV12 的 Y 平面宽度为 W*H 字节，按 BGR 读会越界），且 rotate_crop 对多平面帧
-        // 只能取 Y 平面得到错误单通道裁剪。故统一先转 packed BGR；packed BGR 输入零拷贝直通。
-        // 设备帧不在此转换（保留设备侧 NV12 融合路径）。
+        // OCR 推理要求 packed BGR：det 预处理的 CPU 融合内核把 plane(0) 当作 packed BGR
+        // 读取（NV12 的 Y 平面宽度为 W*H 字节，按 BGR 读会越界），且 rotate_crop 对多平面帧
+        // 只能取 Y 平面得到错误单通道裁剪。故 NV12 一律先转 packed BGR；packed BGR 输入零拷贝直通。
+        // OCR 的 det CUDA 预处理（fused_preproc.cu）只消费主机 packed BGR，不存在设备侧 NV12
+        // 融合路径，故设备 NV12 先 toCpu() 回读到主机再转 BGR，直接按设备内存解读会被误读。
         std::vector<ImageData> bgr_images;
         const std::vector<ImageData>* src_images = &images;
         bool need_convert = false;
         for (const auto& img : images) {
-            if (img.format() == MdImageType::NV12 && img.device() == Device::CPU) {
+            if (img.format() == MdImageType::NV12) {
                 need_convert = true;
                 break;
             }
@@ -108,14 +109,24 @@ namespace modeldeploy::vision::ocr {
         if (need_convert) {
             bgr_images.resize(images.size());
             for (size_t i = 0; i < images.size(); ++i) {
-                if (images[i].format() == MdImageType::NV12 && images[i].device() == Device::CPU) {
-                    bgr_images[i] = ImageData::cvt_color(images[i], ColorConvertType::CVT_NV122PKG_BGR);
-                    if (bgr_images[i].empty()) {
-                        MD_LOG_ERROR << "PaddleOCR: NV12->BGR convert failed." << std::endl;
+                if (images[i].format() != MdImageType::NV12) {
+                    bgr_images[i] = images[i];
+                    continue;
+                }
+                // 设备 NV12：先回读到主机，再走主机 NV12->BGR
+                const ImageData* host = &images[i];
+                ImageData host_owned;
+                if (images[i].device() != Device::CPU) {
+                    if (!images[i].toCpu(&host_owned)) {
+                        MD_LOG_ERROR << "PaddleOCR: device NV12 toCpu failed." << std::endl;
                         return false;
                     }
-                } else {
-                    bgr_images[i] = images[i];
+                    host = &host_owned;
+                }
+                bgr_images[i] = ImageData::cvt_color(*host, ColorConvertType::CVT_NV122PKG_BGR);
+                if (bgr_images[i].empty()) {
+                    MD_LOG_ERROR << "PaddleOCR: NV12->BGR convert failed." << std::endl;
+                    return false;
                 }
             }
             src_images = &bgr_images;

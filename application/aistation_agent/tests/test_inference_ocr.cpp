@@ -33,4 +33,16 @@ TEST_CASE("InferenceEngine loads OCR pipeline", "[agent][pipeline]") {
     REQUIRE(r.type == "ocr");
     REQUIRE(!r.boxes.empty());
     REQUIRE(!r.boxes[0].text.empty());
+
+    // 字段映射断言：OCR 无类别（label_id=-1），识别得分已写入，且包围盒为图像内合理矩形
+    const auto& box = r.boxes[0];
+    REQUIRE(box.label_id == -1);
+    REQUIRE(box.score >= 0.f);
+    REQUIRE(box.text_score > 0.f);   // 非空文字对应正的识别置信度
+    REQUIRE(box.w > 0.f);
+    REQUIRE(box.h > 0.f);
+    REQUIRE(box.x >= 0.f);
+    REQUIRE(box.y >= 0.f);
+    REQUIRE(box.x + box.w <= static_cast<float>(img.width()));
+    REQUIRE(box.y + box.h <= static_cast<float>(img.height()));
 }
