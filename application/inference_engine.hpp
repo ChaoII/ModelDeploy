@@ -7,6 +7,7 @@
 #include "csrc/vision/detection/ultralytics_det.h"
 #include "csrc/vision/classification/classification.h"
 #include "csrc/vision/face/face_det/scrfd.h"
+#include "csrc/vision/pipeline/pedestrian_attribute.h"
 #include "csrc/vision/common/image_data.h"
 #include "csrc/utils/benchmark.h"
 
@@ -18,6 +19,8 @@ struct DetectionBox {
     float score;
     int label_id;
     std::string label_name;
+    // 属性推理：属性名 -> 得分（pedestrian_attribute 用）
+    std::vector<std::pair<std::string, float>> attributes;
 };
 
 /// 人脸关键点（最多 5 个：左右眼/鼻尖/左右嘴角）
@@ -27,10 +30,12 @@ struct FaceKeypoint {
 
 struct InferResult {
     std::string model_name;
-    std::string type;                 // detection / classification / face_detection
+    std::string type;                 // detection / classification / face_detection / pedestrian_attribute
     std::vector<DetectionBox> boxes;
     // 仅人脸：每个 box 对应一组关键点
     std::vector<std::vector<FaceKeypoint>> keypoints;
+    // 仅属性推理：原始属性结果（pedestrian_attribute 用）
+    std::vector<modeldeploy::vision::AttributeResult> attributes;
 };
 
 /// 推理引擎包装器：每路 Pipeline 独占一个实例
@@ -84,9 +89,11 @@ private:
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> det_model_;
     std::unique_ptr<modeldeploy::vision::classification::Classification> cls_model_;
     std::unique_ptr<modeldeploy::vision::face::Scrfd> face_model_;
+    std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::shared_ptr<BatchedDetector> shared_det_;   // 共享批处理检测器（多路共享，优先）
 
     bool infer_detection(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_classification(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_face(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
 };

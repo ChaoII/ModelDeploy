@@ -41,6 +41,18 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
                 cls_model_.reset();
                 return false;
             }
+        } else if (cfg.type == "pedestrian_attribute") {
+            pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
+                cfg.path, cfg.rec_path, opt);
+            if (!pa_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] pedestrian_attribute init failed" << std::endl;
+                pa_model_.reset();
+                return false;
+            }
+            pa_model_->set_det_threshold(cfg_.confidence_threshold);
+            if (cfg_.input_size.size() == 2) pa_model_->set_det_input_size(cfg_.input_size);
+            pa_model_->set_cls_input_size({192, 256});
+            pa_model_->set_cls_batch_size(8);
         } else {
             std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
             return false;
@@ -125,6 +137,7 @@ void InferenceEngine::unload() {
     det_model_.reset();
     cls_model_.reset();
     face_model_.reset();
+    pa_model_.reset();
     shared_det_.reset();
     loaded_ = false;
 }
@@ -140,6 +153,8 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_face(image, result);
     if (cfg_.type == "classification")
         return infer_classification(image, result);
+    if (cfg_.type == "pedestrian_attribute")
+        return infer_pedestrian_attribute(image, result);
     return false;
 }
 
@@ -193,6 +208,26 @@ bool InferenceEngine::infer_face(const ImageData& image, InferResult* result) {
             kps.push_back(kp);
         }
         result->keypoints.push_back(std::move(kps));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_pedestrian_attribute(const ImageData& image, InferResult* result) {
+    if (!pa_model_ || !result) return false;
+    std::vector<AttributeResult> attrs;
+    if (!pa_model_->predict(image, &attrs)) return false;
+    result->attributes = attrs;
+    result->boxes.clear();
+    for (const auto& a : attrs) {
+        DetectionBox b;
+        b.x = a.box.x; b.y = a.box.y; b.w = a.box.width; b.h = a.box.height;
+        b.score = a.box_score; b.label_id = a.box_label_id;
+        const auto& labels = cfg_.labels;
+        b.label_name = (a.box_label_id >= 0 && static_cast<size_t>(a.box_label_id) < labels.size())
+                           ? labels[a.box_label_id] : "person";
+        for (size_t i = 0; i < a.attr_scores.size() && i < cfg_.attributes.size(); ++i)
+            b.attributes.emplace_back(cfg_.attributes[i], a.attr_scores[i]);
+        result->boxes.push_back(std::move(b));
     }
     return true;
 }

@@ -39,6 +39,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_model_fetcher.cpp
             tests/test_e2e_agent.cpp
             tests/test_agent_util.cpp
+            tests/test_inference_attribute.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
