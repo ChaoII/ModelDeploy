@@ -70,6 +70,18 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
                 pa_model_->set_cls_input_size({192, 256});
             }
             pa_model_->set_cls_batch_size(8);
+        } else if (cfg.type == "ocr") {
+            // OCR pipeline：det 主模型 + cls 方向分类 + rec 识别 + 字典
+            ocr_model_ = std::make_unique<ocr::PaddleOCR>(
+                cfg.path, cfg.cls_path, cfg.rec_path, cfg.dict_path, opt);
+            if (!ocr_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] OCR pipeline init failed" << std::endl;
+                ocr_model_.reset();
+                return false;
+            }
+            ocr_model_->set_rec_batch_size(8);
+            // det 输入长边上限 1440，兼顾大图精度与速度
+            ocr_model_->get_detector()->get_preprocessor().set_max_side_len(1440);
         } else {
             std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
             return false;
@@ -155,6 +167,7 @@ void InferenceEngine::unload() {
     cls_model_.reset();
     face_model_.reset();
     pa_model_.reset();
+    ocr_model_.reset();
     shared_det_.reset();
     loaded_ = false;
 }
@@ -172,6 +185,8 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_classification(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
+    if (cfg_.type == "ocr")
+        return infer_ocr(image, result);
     return false;
 }
 
@@ -245,6 +260,38 @@ bool InferenceEngine::infer_pedestrian_attribute(const ImageData& image, InferRe
         for (size_t i = 0; i < a.attr_scores.size() && i < cfg_.attributes.size(); ++i)
             b.attributes.emplace_back(cfg_.attributes[i], a.attr_scores[i]);
         result->boxes.push_back(std::move(b));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_ocr(const ImageData& image, InferResult* result) {
+    if (!ocr_model_ || !result) return false;
+    OCRResult ocr;
+    if (!ocr_model_->predict(image, &ocr)) return false;
+    for (size_t i = 0; i < ocr.boxes.size(); ++i) {
+        const auto& quad = ocr.boxes[i];  // 4 点：x0,y0,x1,y1,x2,y2,x3,y3
+        // 四点最小外接矩形（DetectionBox 为轴对齐坐标，取包围盒）
+        int xmin = quad[0], xmax = quad[0];
+        int ymin = quad[1], ymax = quad[1];
+        for (int k = 1; k < 4; ++k) {
+            const int px = quad[k * 2];
+            const int py = quad[k * 2 + 1];
+            if (px < xmin) xmin = px;
+            if (px > xmax) xmax = px;
+            if (py < ymin) ymin = py;
+            if (py > ymax) ymax = py;
+        }
+        DetectionBox box;
+        box.x = static_cast<float>(xmin);
+        box.y = static_cast<float>(ymin);
+        box.w = static_cast<float>(xmax - xmin);
+        box.h = static_cast<float>(ymax - ymin);
+        if (i < ocr.rec_scores.size()) {
+            box.score = ocr.rec_scores[i];
+            box.text_score = ocr.rec_scores[i];
+        }
+        if (i < ocr.text.size()) box.text = ocr.text[i];
+        result->boxes.push_back(std::move(box));
     }
     return true;
 }
