@@ -45,5 +45,7 @@ RuntimeOption build_runtime_option(const ModelConfig& cfg) {
             opt.ort_option.trt_engine_cache_path = cache_dir;
         }
     }
+    // 加密模型解密口令：子模型复制该 option，set_model_path 解密时回退使用
+    if (!cfg.password.empty()) opt.set_password(cfg.password);
     return opt;
 }
