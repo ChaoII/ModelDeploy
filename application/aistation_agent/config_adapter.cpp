@@ -172,6 +172,9 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         if (tk.contains("enabled") && tk["enabled"].is_boolean()) out->tracking.enabled = tk["enabled"].get<bool>();
         if (tk.contains("algorithm") && tk["algorithm"].is_string()) out->tracking.algorithm = tk["algorithm"].get<std::string>();
     }
+    // 单一事实源：Agent 用 t.sdk（TaskConfig）建 Pipeline（PipelineManager::create_task(t.sdk)），
+    // 故必须把顶层 tracking 同步写入 sdk.tracking，否则跟踪配置在 Pipeline 侧丢失
+    out->sdk.tracking = out->tracking;
 
     // events
     out->alarm_interval_sec = j.value("alarm_interval_sec", 0);

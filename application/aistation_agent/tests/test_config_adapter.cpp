@@ -203,6 +203,10 @@ TEST_CASE("ConfigAdapter parses top-level tracking config", "[agent][config]") {
     REQUIRE(adapter.from_json(j, &t, &err));
     REQUIRE(t.tracking.enabled);
     REQUIRE(t.tracking.algorithm == "sort");
+    // 单一事实源：sdk（TaskConfig）tracking 与 AdaptedTask.tracking 一致，
+    // 保证 Agent 用 t.sdk 建 Pipeline 时跟踪配置不丢失
+    REQUIRE(t.sdk.tracking.enabled);
+    REQUIRE(t.sdk.tracking.algorithm == "sort");
 }
 
 TEST_CASE("ConfigAdapter tracking defaults off with bytetrack", "[agent][config]") {
@@ -212,6 +216,8 @@ TEST_CASE("ConfigAdapter tracking defaults off with bytetrack", "[agent][config]
     REQUIRE(adapter.from_json(make_task_json(), &t, &err));
     REQUIRE_FALSE(t.tracking.enabled);
     REQUIRE(t.tracking.algorithm == "bytetrack");
+    REQUIRE_FALSE(t.sdk.tracking.enabled);
+    REQUIRE(t.sdk.tracking.algorithm == "bytetrack");
 }
 
 TEST_CASE("TaskConfig tracking json roundtrip", "[agent][config]") {

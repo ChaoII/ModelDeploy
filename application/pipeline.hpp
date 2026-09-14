@@ -17,6 +17,7 @@
 #include "video_sink.hpp"
 
 namespace modeldeploy { namespace vision { class ImageData; } }
+namespace modeldeploy { namespace vision { namespace tracking { class BaseTracker; } } }
 
 /// 单路视频流水线：SDK 解码(async)→有界队列→单检测线程(推理+绘制+编码)→SDK 编码(async)
 /// 解码为 SDK 异步 + 缓冲池；检测循环为每帧串行关键路径（detect+draw+encode < 40ms 以达 25fps）。
@@ -72,6 +73,8 @@ private:
     ModelFactory model_factory_;
     InferGroup infer_group_;
     std::unique_ptr<DrawEngine> draw_engine_;   // 非 detection（face/classification）CPU 标注
+    // 逐帧多目标跟踪器：仅 cfg_.tracking.enabled 时创建（默认关闭 = 零行为差异）
+    std::unique_ptr<modeldeploy::vision::tracking::BaseTracker> tracker_;
     VideoSource src_;
     VideoSink sink_;
     PerfStats stats_;

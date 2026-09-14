@@ -1,10 +1,17 @@
 #include "pipeline.hpp"
+#include <algorithm>
 #include <iostream>
 #include <cstring>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "csrc/vision/tracking/base_tracker.h"
+#include "csrc/vision/tracking/bytetrack.h"
+#include "csrc/vision/tracking/botsort.h"
+#include "csrc/vision/tracking/strongsort.h"
+
 using namespace modeldeploy::vision;
+namespace mdtracking = modeldeploy::vision::tracking;
 
 Pipeline::Pipeline(TaskConfig cfg, ModelFactory factory)
     : cfg_(std::move(cfg)),
@@ -53,6 +60,24 @@ bool Pipeline::start() {
         std::cerr << "[Pipeline] " << cfg_.id << " no models loaded (preview only)" << std::endl;
     }
     draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
+
+    // 跟踪器：仅 cfg_.tracking.enabled 时创建；算法按 algorithm 选择（默认 bytetrack）
+    tracker_.reset();
+    if (cfg_.tracking.enabled) {
+        const std::string& alg = cfg_.tracking.algorithm;
+        if (alg.empty() || alg == "bytetrack") {
+            auto t = std::make_unique<mdtracking::ByteTracker>();
+            t->set_params();   // 默认参数（track_thresh=0.5 等）
+            tracker_ = std::move(t);
+        } else if (alg == "botsort") {
+            tracker_ = std::make_unique<mdtracking::BotSortTracker>();
+        } else if (alg == "strongsort") {
+            tracker_ = std::make_unique<mdtracking::StrongSortTracker>();
+        } else {
+            std::cerr << "[Pipeline] " << cfg_.id << " unknown tracking algorithm: " << alg
+                      << " (tracking disabled)" << std::endl;
+        }
+    }
 
     // 1) SDK 解码源（open 同步完成，之后回调异步）
     std::string err;
@@ -143,6 +168,7 @@ void Pipeline::release_resources() {
     sink_.close();
     infer_group_.clear();
     draw_engine_.reset();
+    tracker_.reset();
     initialized_ = false;
     cached_results_.clear();
 
@@ -205,6 +231,19 @@ modeldeploy::vision::ImageData bgr_to_nv12_host(const modeldeploy::vision::Image
     std::shared_ptr<void> owner(holder, holder->data());
     return modeldeploy::vision::ImageData::from_planes(
         pl, 2, MdImageType::NV12, W, H, modeldeploy::Device::CPU, owner);
+}
+
+// 检测框与轨迹框的 IoU（用于把 track_id 回填到对应检测框）
+float box_iou(const Rect2f& a, const Rect2f& b) {
+    const float x1 = std::max(a.x, b.x);
+    const float y1 = std::max(a.y, b.y);
+    const float x2 = std::min(a.x + a.width, b.x + b.width);
+    const float y2 = std::min(a.y + a.height, b.y + b.height);
+    const float iw = x2 - x1, ih = y2 - y1;
+    if (iw <= 0.f || ih <= 0.f) return 0.f;
+    const float inter = iw * ih;
+    const float uni = a.width * a.height + b.width * b.height - inter;
+    return uni > 0.f ? inter / uni : 0.f;
 }
 }
 
@@ -271,6 +310,53 @@ void Pipeline::detect_loop() {
         infer_group_.run_models(f.image, &sdk_dets, &non_det);
         auto tA = std::chrono::steady_clock::now();
 
+        // ── 逐帧跟踪：更新 tracker 并把 track_id 回填到对应检测框 ──
+        // track_ids 与 sdk_dets 同形（[模型][检测]）；-1 = 未匹配到轨迹。
+        std::vector<std::vector<int>> track_ids;
+        if (tracker_) {
+            std::vector<mdtracking::Detection> dets;
+            std::vector<std::pair<size_t, size_t>> det_index;   // dets[i] ← (模型下标, 检测下标)
+            for (size_t mi = 0; mi < sdk_dets.size(); ++mi) {
+                const auto& dets_m = sdk_dets[mi].second;
+                track_ids.emplace_back(dets_m.size(), -1);
+                for (size_t di = 0; di < dets_m.size(); ++di) {
+                    mdtracking::Detection d;
+                    d.box = dets_m[di].box;
+                    d.score = dets_m[di].score;
+                    d.label_id = dets_m[di].label_id;
+                    dets.push_back(std::move(d));
+                    det_index.emplace_back(mi, di);
+                }
+            }
+            if (!dets.empty()) {
+                const auto tracks =
+                    tracker_->update(dets, &f.image, static_cast<double>(f.pts_ms));
+                // detection ↔ track 的 IoU 贪心匹配：每轮取全局最大 IoU 且 ≥ 阈值的配对，
+                // 配对确定即移除双方，避免多条检测抢占同一条轨迹。
+                constexpr float kMatchIou = 0.3f;
+                std::vector<char> track_used(tracks.size(), 0);
+                std::vector<char> det_used(dets.size(), 0);
+                const size_t pairs = std::min(dets.size(), tracks.size());
+                for (size_t n = 0; n < pairs; ++n) {
+                    int best_d = -1, best_t = -1;
+                    float best_iou = kMatchIou;
+                    for (size_t di = 0; di < dets.size(); ++di) {
+                        if (det_used[di]) continue;
+                        for (size_t ti = 0; ti < tracks.size(); ++ti) {
+                            if (track_used[ti]) continue;
+                            const float v = box_iou(dets[di].box, tracks[ti].box);
+                            if (v > best_iou) { best_iou = v; best_d = static_cast<int>(di); best_t = static_cast<int>(ti); }
+                        }
+                    }
+                    if (best_d < 0) break;
+                    det_used[static_cast<size_t>(best_d)] = 1;
+                    track_used[static_cast<size_t>(best_t)] = 1;
+                    const auto& idx = det_index[static_cast<size_t>(best_d)];
+                    track_ids[idx.first][idx.second] = tracks[static_cast<size_t>(best_t)].track_id;
+                }
+            }
+        }
+
         // ── 检测事件回调（默认空；Agent 注入，surveillance 零差异） ──
         {
             DetectionSink sink;
@@ -280,12 +366,15 @@ void Pipeline::detect_loop() {
             }
             if (sink) {
                 std::vector<DetectionBox> boxes;
-                for (const auto& [name, dets] : sdk_dets) {
+                for (size_t mi = 0; mi < sdk_dets.size(); ++mi) {
+                    const auto& [name, dets] = sdk_dets[mi];
                     const ModelConfig* mc = infer_group_.config_of(name);
-                    for (const auto& d : dets) {
+                    for (size_t di = 0; di < dets.size(); ++di) {
+                        const auto& d = dets[di];
                         DetectionBox b;
                         b.x = d.box.x; b.y = d.box.y; b.w = d.box.width; b.h = d.box.height;
                         b.score = d.score; b.label_id = d.label_id;
+                        if (!track_ids.empty()) b.track_id = track_ids[mi][di];
                         if (mc && d.label_id >= 0 && static_cast<size_t>(d.label_id) < mc->labels.size())
                             b.label_name = mc->labels[d.label_id];
                         else
