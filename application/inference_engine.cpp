@@ -82,6 +82,15 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             ocr_model_->set_rec_batch_size(8);
             // det 输入长边上限 1440，兼顾大图精度与速度
             ocr_model_->get_detector()->get_preprocessor().set_max_side_len(1440);
+        } else if (cfg.type == "lpr") {
+            // LPR 车牌 pipeline：det 定位 + rec 识别（车牌号 + 颜色）
+            lpr_model_ = std::make_unique<lpr::LprPipeline>(cfg.path, cfg.rec_path, opt);
+            if (!lpr_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] LPR pipeline init failed: "
+                          << cfg.path << " | " << cfg.rec_path << std::endl;
+                lpr_model_.reset();
+                return false;
+            }
         } else {
             std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
             return false;
@@ -168,6 +177,7 @@ void InferenceEngine::unload() {
     face_model_.reset();
     pa_model_.reset();
     ocr_model_.reset();
+    lpr_model_.reset();
     shared_det_.reset();
     loaded_ = false;
 }
@@ -187,6 +197,8 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
         return infer_ocr(image, result);
+    if (cfg_.type == "lpr")
+        return infer_lpr(image, result);
     return false;
 }
 
@@ -294,6 +306,24 @@ bool InferenceEngine::infer_ocr(const ImageData& image, InferResult* result) {
             box.text_score = ocr.rec_scores[i];
         }
         if (i < ocr.text.size()) box.text = ocr.text[i];
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_lpr(const ImageData& image, InferResult* result) {
+    if (!lpr_model_ || !result) return false;
+    std::vector<LprResult> lpr_results;
+    if (!lpr_model_->predict(image, &lpr_results)) return false;
+    for (const auto& p : lpr_results) {
+        DetectionBox box;
+        box.x = p.box.x; box.y = p.box.y;
+        box.w = p.box.width; box.h = p.box.height;
+        // 车牌无类别：label_id 固定 -1；检测得分与识别得分分别写入 score / text_score
+        box.label_id = -1;
+        box.score = p.score;
+        box.text = p.car_plate_str;
+        box.text_score = p.score;
         result->boxes.push_back(std::move(box));
     }
     return true;

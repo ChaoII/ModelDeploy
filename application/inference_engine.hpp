@@ -9,6 +9,7 @@
 #include "csrc/vision/face/face_det/scrfd.h"
 #include "csrc/vision/pipeline/pedestrian_attribute.h"
 #include "csrc/vision/ocr/ppocr.h"
+#include "csrc/vision/lpr/lpr_models.h"
 #include "csrc/vision/common/image_data.h"
 #include "csrc/utils/benchmark.h"
 
@@ -96,6 +97,7 @@ private:
     std::unique_ptr<modeldeploy::vision::face::Scrfd> face_model_;
     std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::unique_ptr<modeldeploy::vision::ocr::PaddleOCR> ocr_model_;
+    std::unique_ptr<modeldeploy::vision::lpr::LprPipeline> lpr_model_;
     std::shared_ptr<BatchedDetector> shared_det_;   // 共享批处理检测器（多路共享，优先）
 
     bool infer_detection(const modeldeploy::vision::ImageData& image, InferResult* result);
@@ -103,4 +105,5 @@ private:
     bool infer_face(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_ocr(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_lpr(const modeldeploy::vision::ImageData& image, InferResult* result);
 };
