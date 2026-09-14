@@ -50,8 +50,25 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
                 return false;
             }
             pa_model_->set_det_threshold(cfg_.confidence_threshold);
-            if (cfg_.input_size.size() == 2) pa_model_->set_det_input_size(cfg_.input_size);
-            pa_model_->set_cls_input_size({192, 256});
+            // 从模型元数据读取输入尺寸（NCHW -> {W,H}），优先于配置默认值，避免尺寸不匹配
+            try {
+                const auto det_shape = pa_model_->get_detector()->get_input_info(0).shape;
+                if (det_shape.size() >= 4 && det_shape[2] > 0 && det_shape[3] > 0)
+                    pa_model_->set_det_input_size({static_cast<int>(det_shape[3]), static_cast<int>(det_shape[2])});
+                else if (cfg_.input_size.size() == 2)
+                    pa_model_->set_det_input_size(cfg_.input_size);
+            } catch (...) {
+                if (cfg_.input_size.size() == 2) pa_model_->set_det_input_size(cfg_.input_size);
+            }
+            try {
+                const auto cls_shape = pa_model_->get_classifier()->get_input_info(0).shape;
+                if (cls_shape.size() >= 4 && cls_shape[2] > 0 && cls_shape[3] > 0)
+                    pa_model_->set_cls_input_size({static_cast<int>(cls_shape[3]), static_cast<int>(cls_shape[2])});
+                else
+                    pa_model_->set_cls_input_size({192, 256});
+            } catch (...) {
+                pa_model_->set_cls_input_size({192, 256});
+            }
             pa_model_->set_cls_batch_size(8);
         } else {
             std::cerr << "[InferenceEngine] Unsupported model type: " << cfg.type << std::endl;
