@@ -61,11 +61,13 @@ bool Pipeline::start() {
     }
     draw_engine_ = std::make_unique<DrawEngine>(cfg_.draw);
 
-    // 跟踪器：仅 cfg_.tracking.enabled 时创建；算法按 algorithm 选择（默认 bytetrack）
+    // 跟踪器：仅 cfg_.tracking.enabled 时创建；算法按 algorithm 选择（默认 bytetrack）。
+    // "sort" 视为 bytetrack 的历史别名（配置注释/测试曾用 "sort"）；真正未知的算法
+    // 保持 fail-closed：打印明确告警并禁用跟踪，避免静默降级到非预期算法。
     tracker_.reset();
     if (cfg_.tracking.enabled) {
         const std::string& alg = cfg_.tracking.algorithm;
-        if (alg.empty() || alg == "bytetrack") {
+        if (alg.empty() || alg == "bytetrack" || alg == "sort") {
             auto t = std::make_unique<mdtracking::ByteTracker>();
             t->set_params();   // 默认参数（track_thresh=0.5 等）
             tracker_ = std::move(t);

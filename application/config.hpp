@@ -75,7 +75,7 @@ struct TaskConfig {
     // 跟踪配置：默认关闭，保持既有行为不变
     struct TrackingConfig {
         bool enabled = false;
-        std::string algorithm = "bytetrack";  // bytetrack / sort ...
+        std::string algorithm = "bytetrack";  // bytetrack(默认) / sort(=bytetrack 别名) / botsort / strongsort
     };
 
     std::string id;
