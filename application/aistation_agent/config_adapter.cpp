@@ -114,7 +114,7 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         if (mo.contains("password") && mo["password"].is_string())
             m.password = mo["password"].get<std::string>();
         m.roi_norm = rect;
-        // pedestrian_attribute pipeline：det_url→path、cls_url→rec_path（本地/远端均支持）
+        // 多模型 pipeline：*_url → 本地路径（本地直用；远端经 ModelFetcher）
         auto resolve_path = [&](const std::string& key, std::string* out) -> bool {
             if (!mo.contains(key) || !mo[key].is_string()) return true;
             const std::string url = mo[key].get<std::string>();
@@ -128,8 +128,17 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
             *out = local;
             return true;
         };
-        if (!resolve_path("det_url", &m.path)) return false;
-        if (!resolve_path("cls_url", &m.rec_path)) return false;
+        if (m.type == "ocr") {
+            // OCR pipeline：det_url→path、cls_url→cls_path、rec_url→rec_path、dict_url→dict_path
+            if (!resolve_path("det_url", &m.path)) return false;
+            if (!resolve_path("cls_url", &m.cls_path)) return false;
+            if (!resolve_path("rec_url", &m.rec_path)) return false;
+            if (!resolve_path("dict_url", &m.dict_path)) return false;
+        } else {
+            // pedestrian_attribute pipeline：det_url→path、cls_url→rec_path
+            if (!resolve_path("det_url", &m.path)) return false;
+            if (!resolve_path("cls_url", &m.rec_path)) return false;
+        }
         // 单模型：path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
         if (m.path.empty()) {
             if (mo.contains("path") && mo["path"].is_string()) {

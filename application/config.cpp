@@ -111,6 +111,8 @@ json task_config_to_json(const TaskConfig& cfg) {
         if (!m.roi_norm.empty()) mo["roi_norm"] = m.roi_norm;
         mo["interval"] = m.interval;
         if (!m.rec_path.empty()) mo["rec_path"] = m.rec_path;
+        if (!m.cls_path.empty()) mo["cls_path"] = m.cls_path;
+        if (!m.dict_path.empty()) mo["dict_path"] = m.dict_path;
         if (!m.labels.empty()) mo["labels"] = m.labels;
         if (!m.attributes.empty()) mo["attributes"] = m.attributes;
         if (!m.password.empty()) mo["password"] = m.password;
@@ -179,6 +181,8 @@ TaskConfig task_config_from_json(const json& j) {
             if (mo.contains("type")) m.type = mo["type"];
             if (mo.contains("path")) m.path = mo["path"];
             if (mo.contains("rec_path")) m.rec_path = mo["rec_path"];
+            if (mo.contains("cls_path")) m.cls_path = mo["cls_path"];
+            if (mo.contains("dict_path")) m.dict_path = mo["dict_path"];
             if (mo.contains("backend")) m.backend = mo["backend"];
             if (mo.contains("device")) m.device = mo["device"];
             if (mo.contains("use_trt_ep")) m.use_trt_ep = mo["use_trt_ep"];

@@ -129,6 +129,49 @@ TEST_CASE("ConfigAdapter parses pedestrian_attribute pipeline", "[agent][config]
     REQUIRE(m.password == "secret");
 }
 
+TEST_CASE("ConfigAdapter parses ocr pipeline", "[agent][config]") {
+    ConfigAdapter adapter;
+    AdaptedTask t;
+    std::string err;
+    json j = json::parse(R"({
+      "task_id": 11,
+      "camera": {"id": 1, "name": "c", "url": "test_data/test_video60.mp4"},
+      "models": [{
+        "name": "ocr", "type": "ocr", "backend": "ort", "device": "cpu",
+        "det_url": "test_data/test_models/onnx/ocr_det.onnx",
+        "cls_url": "test_data/test_models/onnx/ocr_cls.onnx",
+        "rec_url": "test_data/test_models/onnx/ocr_rec.onnx",
+        "dict_url": "test_data/test_models/ocr/dict.txt"
+      }],
+      "events": {"transport": "http", "http": {"url": "http://x/cb", "token": "t"}}
+    })");
+    REQUIRE(adapter.from_json(j, &t, &err));
+    const auto& m = t.sdk.models[0];
+    REQUIRE(m.type == "ocr");
+    REQUIRE(m.path == "test_data/test_models/onnx/ocr_det.onnx");
+    REQUIRE(m.cls_path == "test_data/test_models/onnx/ocr_cls.onnx");
+    REQUIRE(m.rec_path == "test_data/test_models/onnx/ocr_rec.onnx");
+    REQUIRE(m.dict_path == "test_data/test_models/ocr/dict.txt");
+}
+
+TEST_CASE("ModelConfig ocr cls_path/dict_path roundtrip", "[agent][config]") {
+    TaskConfig cfg;
+    cfg.id = "ocr-round";
+    ModelConfig m;
+    m.name = "ocr";
+    m.type = "ocr";
+    m.path = "/m/det.onnx";
+    m.cls_path = "/m/cls.onnx";
+    m.rec_path = "/m/rec.onnx";
+    m.dict_path = "/m/dict.txt";
+    cfg.models.push_back(m);
+    auto j = task_config_to_json(cfg);
+    auto back = task_config_from_json(j);
+    REQUIRE(back.models.size() == 1);
+    REQUIRE(back.models[0].cls_path == "/m/cls.onnx");
+    REQUIRE(back.models[0].dict_path == "/m/dict.txt");
+}
+
 TEST_CASE("ConfigAdapter parses schedule, roi polygon, snapshot and normalizes broker", "[agent][config]") {
     ConfigAdapter adapter;
     AdaptedTask t;

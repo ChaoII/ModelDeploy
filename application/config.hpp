@@ -13,6 +13,8 @@ struct ModelConfig {
     std::string type = "detection";
     std::string path;
     std::string rec_path;
+    std::string cls_path;                 // OCR pipeline 方向分类模型路径
+    std::string dict_path;                // OCR pipeline 字典文件路径
     std::string backend = "ort";
     std::string device = "gpu";
     bool use_trt_ep = false;      // device=gpu 且 backend=ort 时，启用 ORT TensorRT EP
