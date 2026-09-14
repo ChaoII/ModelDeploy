@@ -92,7 +92,35 @@ namespace modeldeploy::vision::ocr {
             timers->post_timer.add_sample(0);
             timers->infer_timer.start();
         }
-        if (!detector_->batch_predict(images, &batch_boxes)) {
+        // CPU NV12 输入：det 预处理的 CPU 融合内核把 plane(0) 当作 packed BGR 读取
+        // （NV12 的 Y 平面宽度为 W*H 字节，按 BGR 读会越界），且 rotate_crop 对多平面帧
+        // 只能取 Y 平面得到错误单通道裁剪。故统一先转 packed BGR；packed BGR 输入零拷贝直通。
+        // 设备帧不在此转换（保留设备侧 NV12 融合路径）。
+        std::vector<ImageData> bgr_images;
+        const std::vector<ImageData>* src_images = &images;
+        bool need_convert = false;
+        for (const auto& img : images) {
+            if (img.format() == MdImageType::NV12 && img.device() == Device::CPU) {
+                need_convert = true;
+                break;
+            }
+        }
+        if (need_convert) {
+            bgr_images.resize(images.size());
+            for (size_t i = 0; i < images.size(); ++i) {
+                if (images[i].format() == MdImageType::NV12 && images[i].device() == Device::CPU) {
+                    bgr_images[i] = ImageData::cvt_color(images[i], ColorConvertType::CVT_NV122PKG_BGR);
+                    if (bgr_images[i].empty()) {
+                        MD_LOG_ERROR << "PaddleOCR: NV12->BGR convert failed." << std::endl;
+                        return false;
+                    }
+                } else {
+                    bgr_images[i] = images[i];
+                }
+            }
+            src_images = &bgr_images;
+        }
+        if (!detector_->batch_predict(*src_images, &batch_boxes)) {
             MD_LOG_ERROR << "There's error while detecting image in PaddleOCR." << std::endl;
             return false;
         }
@@ -105,7 +133,7 @@ namespace modeldeploy::vision::ocr {
             OCRResult& ocr_result = (*batch_result)[i_batch];
             // Get cropped images by detection result
             const std::vector<std::array<int, 8>>& boxes = ocr_result.boxes;
-            const ImageData& img = images[i_batch];
+            const ImageData& img = (*src_images)[i_batch];
             std::vector<ImageData> image_list;
             if (boxes.empty()) {
                 image_list.emplace_back(img);
