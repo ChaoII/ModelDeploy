@@ -141,6 +141,42 @@ TEST_CASE("EventBus round-trip preserves attributes", "[agent][events]") {
     REQUIRE(back.detections[0].attributes.at("work_uniform") == Catch::Approx(0.2f));
 }
 
+TEST_CASE("EventBus carries OCR text", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    bus.register_task("1", meta);
+    DetectionBox b = box("text", 0, 0.9f);
+    b.text = "沪A12345"; b.text_score = 0.88f;
+    bus.on_detections("1", {b}, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].detections.size() == 1);
+    REQUIRE(got[0].detections[0].text == "沪A12345");
+    REQUIRE(got[0].detections[0].text_score == Approx(0.88f));
+    // 事件 v2：objects 序列化携带 text/text_score
+    auto j = got[0].to_json();
+    REQUIRE(j["objects"][0]["text"] == "沪A12345");
+    REQUIRE(j["objects"][0]["text_score"] == Approx(0.88f));
+    // 无文字的 box 不写 text 字段
+    DetectionEvent e;
+    EventDetection empty;
+    empty.label = "person";
+    e.detections.push_back(empty);
+    REQUIRE_FALSE(e.to_json()["objects"][0].contains("text"));
+}
+
+TEST_CASE("EventBus round-trip preserves text", "[agent][events]") {
+    DetectionEvent e;
+    e.event_id = "rt2"; e.ts = "2026-01-01T00:00:00.000Z";
+    EventDetection d; d.label = "text"; d.text = "hello"; d.text_score = 0.5f;
+    e.detections.push_back(d);
+    DetectionEvent back = DetectionEvent::from_json(e.to_json());
+    REQUIRE(back.detections.size() == 1);
+    REQUIRE(back.detections[0].text == "hello");
+    REQUIRE(back.detections[0].text_score == Approx(0.5f));
+}
+
 TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {
     DetectionEvent e;
     e.event_id = "x"; e.snapshot_data = "QUJD"; e.snapshot_width = 320; e.snapshot_height = 180;

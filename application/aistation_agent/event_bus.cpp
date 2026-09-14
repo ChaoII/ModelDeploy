@@ -59,6 +59,11 @@ nlohmann::json DetectionEvent::to_json() const {
             for (const auto& [k, v] : d.attributes) attrs[k] = v;
             dj["attributes"] = std::move(attrs);
         }
+        // OCR：文字非空才写入，避免污染纯检测事件
+        if (!d.text.empty()) {
+            dj["text"] = d.text;
+            dj["text_score"] = d.text_score;
+        }
         objects.push_back(std::move(dj));
     }
     j["objects"] = std::move(objects);
@@ -101,7 +106,7 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
             e.detections.push_back(std::move(ed));
         }
     }
-    // 事件 v2：detections[] 不携带 attributes，从对齐的 objects[] 按索引恢复
+    // 事件 v2：detections[] 不携带 attributes/text，从对齐的 objects[] 按索引恢复
     if (j.contains("objects") && j["objects"].is_array()) {
         const auto& objs = j["objects"];
         for (size_t i = 0; i < e.detections.size() && i < objs.size(); ++i) {
@@ -110,6 +115,9 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
                     if (it.value().is_number()) e.detections[i].attributes[it.key()] = it.value().get<float>();
                 }
             }
+            // OCR 文字与置信度
+            e.detections[i].text = objs[i].value("text", "");
+            e.detections[i].text_score = objs[i].value("text_score", 0.f);
         }
     }
     return e;
@@ -189,6 +197,9 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
             ed.h = b.h / static_cast<float>(frame_h);
             // 属性透传：DetectionBox 用 vector<pair>，事件用 map
             for (const auto& [k, v] : b.attributes) ed.attributes[k] = v;
+            // OCR 文字透传
+            ed.text = b.text;
+            ed.text_score = b.text_score;
             if (st.meta.roi_polygon.size() >= 3 &&
                 !aistation::point_in_polygon(ed.x + ed.w * 0.5f, ed.y + ed.h * 0.5f, st.meta.roi_polygon)) {
                 continue;

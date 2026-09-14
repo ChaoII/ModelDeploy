@@ -21,6 +21,9 @@ struct EventDetection {
     float x = 0.f, y = 0.f, w = 0.f, h = 0.f;   // 归一化
     // 属性名 -> 分数（pedestrian_attribute；空表示无属性）
     std::map<std::string, float> attributes;
+    // OCR：识别文字与文字置信度（空表示非 OCR 框）
+    std::string text;
+    float text_score = 0.f;
 };
 
 /// 检测事件（Agent → 云端，见设计 §7.2）
