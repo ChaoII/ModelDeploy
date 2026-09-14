@@ -43,6 +43,8 @@ struct DetectionEvent {
     int snapshot_width = 0;
     int snapshot_height = 0;
     int schema_version = 1;
+    // 静默期心跳事件标记（true 表示空检测保活事件，供云端 absence 评估）
+    bool heartbeat = false;
 
     nlohmann::json to_json() const;
     static DetectionEvent from_json(const nlohmann::json& j);
@@ -55,6 +57,7 @@ struct EventMeta {
     int64_t task_id_num = 0;
     std::string algorithm_type;                  // AIStation 提供，原样带回
     int alarm_interval_sec = 0;                              // 0 = 不节流
+    int heartbeat_sec = 5;                                   // <=0 表示禁用
     aistation::Schedule schedule;                            // 空 = 全天
     std::vector<std::array<float, 2>> roi_polygon;           // <3 顶点 = 不过滤
 };
@@ -71,6 +74,9 @@ public:
     void set_sink(EventSink sink);               // 指向发布器
     void on_detections(const std::string& task_id, const std::vector<DetectionBox>& boxes,
                        int frame_w, int frame_h, double latency_ms);
+
+    /// 发布一条空检测心跳事件（静默期保活；遵守调度窗口，未注册任务不发布）
+    void on_heartbeat(const std::string& task_id);
 
     /// RFC4122 v4 UUID（36 字符，含连字符）
     static std::string make_uuid_v4();

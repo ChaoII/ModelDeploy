@@ -178,6 +178,7 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
 
     // events
     out->alarm_interval_sec = j.value("alarm_interval_sec", 0);
+    out->heartbeat_sec = j.value("heartbeat_sec", 5);
     if (j.contains("algorithm_type") && j["algorithm_type"].is_string())
         out->algorithm_type = j["algorithm_type"].get<std::string>();
     if (j.contains("tenant") && j["tenant"].is_string()) out->tenant = j["tenant"].get<std::string>();

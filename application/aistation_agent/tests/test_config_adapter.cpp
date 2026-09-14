@@ -236,6 +236,26 @@ TEST_CASE("DetectionBox track_id defaults to -1", "[agent][config]") {
     REQUIRE(box.track_id == -1);
 }
 
+TEST_CASE("ConfigAdapter parses heartbeat_sec", "[agent][config]") {
+    json j = json::parse(R"({
+      "task_id": 123,
+      "camera": {"id": 7, "name": "北门", "url": "rtsp://cam/1"},
+      "models": [{"name": "det", "type": "det", "path": "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx"}],
+      "heartbeat_sec": 11
+    })");
+    AdaptedTask out;
+    std::string err;
+    ConfigAdapter adapter(nullptr);
+    REQUIRE(adapter.from_json(j, &out, &err));
+    REQUIRE(out.heartbeat_sec == 11);
+
+    json j2 = j;
+    j2.erase("heartbeat_sec");
+    AdaptedTask out2;
+    REQUIRE(adapter.from_json(j2, &out2, &err));
+    REQUIRE(out2.heartbeat_sec == 5);   // 默认 5s
+}
+
 TEST_CASE("ConfigAdapter parses schedule, roi polygon, snapshot and normalizes broker", "[agent][config]") {
     ConfigAdapter adapter;
     AdaptedTask t;

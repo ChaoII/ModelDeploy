@@ -254,3 +254,46 @@ TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {
     REQUIRE(j["snapshot"]["width"] == 320);
     REQUIRE(j["snapshot"]["height"] == 180);
 }
+
+TEST_CASE("EventBus emits heartbeat with empty detections", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "edge-01"; meta.camera_id = 7; meta.task_id_num = 123;
+    meta.algorithm_type = "ABSENT"; meta.alarm_interval_sec = 0;
+    bus.register_task("123", meta);
+
+    bus.on_heartbeat("123");
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].heartbeat == true);
+    REQUIRE(got[0].detections.empty());
+    REQUIRE(got[0].edge_code == "edge-01");
+    REQUIRE(got[0].camera_id == 7);
+    REQUIRE(got[0].task_id == 123);
+    REQUIRE(got[0].algorithm_type == "ABSENT");
+    REQUIRE(!got[0].event_id.empty());
+    REQUIRE(got[0].schema_version == 2);
+
+    // 序列化后 heartbeat 标记必须出现，空数组必须存在
+    const auto j = got[0].to_json();
+    REQUIRE(j.value("heartbeat", false) == true);
+    REQUIRE(j["detections"].is_array());
+    REQUIRE(j["detections"].empty());
+
+    // 未注册任务不发布
+    bus.on_heartbeat("nope");
+    REQUIRE(got.size() == 1);
+}
+
+TEST_CASE("DetectionEvent without heartbeat omits the flag", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "edge-01"; meta.camera_id = 7; meta.task_id_num = 123;
+    meta.algorithm_type = "INTRUSION"; meta.alarm_interval_sec = 0;
+    bus.register_task("123", meta);
+    bus.on_detections("123", {box("person", 0, 0.91f)}, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].heartbeat == false);
+    REQUIRE(got[0].to_json().contains("heartbeat") == false);
+}

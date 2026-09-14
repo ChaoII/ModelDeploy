@@ -76,6 +76,8 @@ nlohmann::json DetectionEvent::to_json() const {
         j["snapshot"] = {{"ref", snapshot_ref}};
     }
     j["schema_version"] = schema_version;
+    // 心跳标记仅在为真时写入，普通检测事件契约保持不变
+    if (heartbeat) j["heartbeat"] = true;
     return j;
 }
 
@@ -89,6 +91,7 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
     e.ts = j.value("ts", "");
     e.latency_ms = j.value("latency_ms", 0.0);
     e.schema_version = j.value("schema_version", 1);
+    e.heartbeat = j.value("heartbeat", false);
     if (j.contains("snapshot") && j["snapshot"].is_object()) {
         e.snapshot_ref = j["snapshot"].value("ref", "");
         e.snapshot_data = j["snapshot"].value("data", "");
@@ -224,6 +227,29 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
         event.latency_ms = latency_ms;
         event.schema_version = 2;
         for (const auto& l : labels) st.last_emit[l] = now;
+        sink = sink_;
+    }
+    if (sink) sink(event);
+}
+
+void EventBus::on_heartbeat(const std::string& task_id) {
+    DetectionEvent event;
+    EventSink sink;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = tasks_.find(task_id);
+        if (it == tasks_.end()) return;
+        TaskState& st = it->second;
+        if (!aistation::schedule_active_now(st.meta.schedule)) return;
+
+        event.event_id = make_uuid_v4();
+        event.edge_code = st.meta.edge_code;
+        event.camera_id = st.meta.camera_id;
+        event.task_id = st.meta.task_id_num;
+        event.algorithm_type = st.meta.algorithm_type;
+        event.ts = utc_iso8601_ms();
+        event.schema_version = 2;
+        event.heartbeat = true;
         sink = sink_;
     }
     if (sink) sink(event);
