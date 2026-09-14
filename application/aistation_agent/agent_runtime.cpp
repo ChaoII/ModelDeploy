@@ -1,7 +1,9 @@
 #include "agent_runtime.hpp"
 
+#include <chrono>
 #include <iostream>
 #include <iterator>
+#include <thread>
 #include <utility>
 
 #include <opencv2/imgcodecs.hpp>
@@ -209,31 +211,41 @@ void AgentRuntime::on_removed(const std::string& task_id) {
 
 void AgentRuntime::schedule_loop() {
     while (schedule_running_.load()) {
-        // 取一次运行态，避免每任务重复查询
-        std::unordered_map<std::string, bool> running;
-        for (const auto& st : mgr_.list_tasks()) running[st.id] = st.running;
+        // 调度线程必须自吞异常：从 mgr_（list_tasks/start_task/stop_task）逃逸的任何异常，
+        // 若未捕获，会经 std::thread 的未捕获异常路径触发 std::terminate，直接杀死整个 Agent
+        // 进程（Windows 上表现为 0xC0000409 静默退出：无 C++ 崩溃输出、无 WER 转储、控制面端口
+        // 随即拒绝连接）。这与检测线程、心跳线程、持久化队列线程的异常处理方式保持一致。
+        try {
+            // 取一次运行态，避免每任务重复查询
+            std::unordered_map<std::string, bool> running;
+            for (const auto& st : mgr_.list_tasks()) running[st.id] = st.running;
 
-        std::vector<std::pair<std::string, bool>> actions;  // (task_id, should_start)
-        {
-            std::lock_guard<std::mutex> lk(mtx_);
-            for (auto& [id, e] : schedules_) {
-                const bool active = aistation::schedule_active_now(e.schedule);
-                const bool is_running = running.count(id) ? running[id] : false;
-                if (!active) {
-                    // 窗口外：确保停止；只有由本控制器停止的任务才会在窗口开启后自动恢复
-                    if (is_running) {
-                        actions.emplace_back(id, false);
-                        e.stopped_by_us = true;
+            std::vector<std::pair<std::string, bool>> actions;  // (task_id, should_start)
+            {
+                std::lock_guard<std::mutex> lk(mtx_);
+                for (auto& [id, e] : schedules_) {
+                    const bool active = aistation::schedule_active_now(e.schedule);
+                    const bool is_running = running.count(id) ? running[id] : false;
+                    if (!active) {
+                        // 窗口外：确保停止；只有由本控制器停止的任务才会在窗口开启后自动恢复
+                        if (is_running) {
+                            actions.emplace_back(id, false);
+                            e.stopped_by_us = true;
+                        }
+                    } else if (!is_running && e.stopped_by_us) {
+                        actions.emplace_back(id, true);
+                        e.stopped_by_us = false;
                     }
-                } else if (!is_running && e.stopped_by_us) {
-                    actions.emplace_back(id, true);
-                    e.stopped_by_us = false;
                 }
             }
-        }
-        for (const auto& [id, should_start] : actions) {
-            if (should_start) mgr_.start_task(id);
-            else mgr_.stop_task(id);
+            for (const auto& [id, should_start] : actions) {
+                if (should_start) mgr_.start_task(id);
+                else mgr_.stop_task(id);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[Schedule] tick failed: " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[Schedule] tick failed: unknown" << std::endl;
         }
         for (int i = 0; i < 300 && schedule_running_.load(); ++i)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));  // ~30s
@@ -242,8 +254,20 @@ void AgentRuntime::schedule_loop() {
 
 bool AgentRuntime::capture_snapshot_b64(const std::string& task_id, const SnapshotConfig& cfg,
                                         std::string* b64, int* w, int* h) {
+    // 检测线程在首帧的 sink 回调之后才写入 latest_bgr_ 快照，而队列 worker 可能已经先处理
+    // 首条事件：此刻快照尚未就绪，会导致首条事件（进而首个告警）缺失内联快照。
+    // 这里轮询等待首帧快照就绪（宽松上限 ~4s，覆盖慢解码/慢推理的启动阶段）。仅首条事件会
+    // 等待：一旦快照就绪，后续事件立即命中；任务停止/删除时 get_task_jpeg 立即失败并快速放弃。
     std::vector<uint8_t> jpg;
-    if (!mgr_.get_task_jpeg(task_id, &jpg, cfg.quality) || jpg.empty()) return false;
+    bool ready = false;
+    for (int attempt = 0; attempt < 160; ++attempt) {
+        if (mgr_.get_task_jpeg(task_id, &jpg, cfg.quality) && !jpg.empty()) {
+            ready = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+    if (!ready) return false;
     cv::Mat img = cv::imdecode(jpg, cv::IMREAD_COLOR);
     if (img.empty()) return false;
     if (cfg.max_width > 0 && img.cols > cfg.max_width) {
