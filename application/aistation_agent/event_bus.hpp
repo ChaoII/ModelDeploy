@@ -19,6 +19,8 @@ struct EventDetection {
     int label_id = 0;
     float confidence = 0.f;
     float x = 0.f, y = 0.f, w = 0.f, h = 0.f;   // 归一化
+    // 属性名 -> 分数（pedestrian_attribute；空表示无属性）
+    std::map<std::string, float> attributes;
 };
 
 /// 检测事件（Agent → 云端，见设计 §7.2）

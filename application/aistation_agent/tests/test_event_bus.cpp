@@ -111,6 +111,20 @@ TEST_CASE("EventBus filters detections by roi polygon", "[agent][events]") {
     REQUIRE(got[0].detections.size() == 1);
 }
 
+TEST_CASE("EventBus carries object attributes", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    bus.register_task("1", meta);
+    DetectionBox b = box("person", 0, 0.9f);
+    b.attributes = {{"work_uniform", 0.2f}};
+    bus.on_detections("1", {b}, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].detections.size() == 1);
+    REQUIRE(got[0].detections[0].attributes.at("work_uniform") == Approx(0.2f));
+}
+
 TEST_CASE("DetectionEvent serializes inline snapshot", "[agent][events]") {
     DetectionEvent e;
     e.event_id = "x"; e.snapshot_data = "QUJD"; e.snapshot_width = 320; e.snapshot_height = 180;

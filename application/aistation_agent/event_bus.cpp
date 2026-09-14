@@ -160,6 +160,8 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
             ed.y = b.y / static_cast<float>(frame_h);
             ed.w = b.w / static_cast<float>(frame_w);
             ed.h = b.h / static_cast<float>(frame_h);
+            // 属性透传：DetectionBox 用 vector<pair>，事件用 map
+            for (const auto& [k, v] : b.attributes) ed.attributes[k] = v;
             if (st.meta.roi_polygon.size() >= 3 &&
                 !aistation::point_in_polygon(ed.x + ed.w * 0.5f, ed.y + ed.h * 0.5f, st.meta.roi_polygon)) {
                 continue;

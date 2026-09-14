@@ -278,7 +278,7 @@ void Pipeline::detect_loop() {
                 std::lock_guard<std::mutex> lock(sink_mtx_);
                 sink = detection_sink_;
             }
-            if (sink && !sdk_dets.empty()) {
+            if (sink) {
                 std::vector<DetectionBox> boxes;
                 for (const auto& [name, dets] : sdk_dets) {
                     const ModelConfig* mc = infer_group_.config_of(name);
@@ -292,6 +292,12 @@ void Pipeline::detect_loop() {
                             b.label_name = std::to_string(d.label_id);
                         boxes.push_back(std::move(b));
                     }
+                }
+                // 属性 pipeline：non_det 中 boxes 已含 attributes（纯 classification 的
+                // attributes 为空，不入 sink，行为不变）
+                for (const auto& [name, r] : non_det) {
+                    if (r.attributes.empty()) continue;
+                    for (const auto& b : r.boxes) boxes.push_back(b);
                 }
                 if (!boxes.empty()) {
                     const double latency_ms =
