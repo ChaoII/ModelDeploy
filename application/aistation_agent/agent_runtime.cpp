@@ -161,7 +161,7 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
         queue_by_task_[meta.task_id_num] = queue.get();
         queues_[task_id] = std::move(queue);
         publishers_[task_id] = std::move(pub);
-        schedules_[task_id] = SchedEntry{t.schedule, aistation::schedule_active_now(t.schedule), true};
+        schedules_[task_id] = SchedEntry{t.schedule, false};
     }
     bus_.register_task(task_id, meta);
     mgr_.set_detection_sink(task_id, [this, task_id](const std::vector<DetectionBox>& boxes,
@@ -209,18 +209,25 @@ void AgentRuntime::on_removed(const std::string& task_id) {
 
 void AgentRuntime::schedule_loop() {
     while (schedule_running_.load()) {
+        // 取一次运行态，避免每任务重复查询
+        std::unordered_map<std::string, bool> running;
+        for (const auto& st : mgr_.list_tasks()) running[st.id] = st.running;
+
         std::vector<std::pair<std::string, bool>> actions;  // (task_id, should_start)
         {
             std::lock_guard<std::mutex> lk(mtx_);
             for (auto& [id, e] : schedules_) {
                 const bool active = aistation::schedule_active_now(e.schedule);
-                if (!e.initialized) {
-                    e.initialized = true;
-                    e.last_active = active;
-                    if (!active) actions.emplace_back(id, false);
-                } else if (active != e.last_active) {
-                    e.last_active = active;
-                    actions.emplace_back(id, active);
+                const bool is_running = running.count(id) ? running[id] : false;
+                if (!active) {
+                    // 窗口外：确保停止；只有由本控制器停止的任务才会在窗口开启后自动恢复
+                    if (is_running) {
+                        actions.emplace_back(id, false);
+                        e.stopped_by_us = true;
+                    }
+                } else if (!is_running && e.stopped_by_us) {
+                    actions.emplace_back(id, true);
+                    e.stopped_by_us = false;
                 }
             }
         }

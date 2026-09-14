@@ -50,8 +50,9 @@ private:
 
     struct SchedEntry {
         aistation::Schedule schedule;
-        bool last_active = true;
-        bool initialized = false;
+        // 该任务是否由本调度控制器停止（仅此类任务会在窗口重新开启后自动恢复）；
+        // 用于区分手动停止，避免与用户操作相互打架。
+        bool stopped_by_us = false;
     };
     std::unordered_map<std::string, SchedEntry> schedules_;
     std::thread schedule_thread_;
