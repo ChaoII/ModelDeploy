@@ -34,6 +34,46 @@ TEST_CASE("schedule_active window boundaries", "[agent][util]") {
     REQUIRE(schedule_active(all, 3, 0));
 }
 
+TEST_CASE("schedule_active_at derives day/hour from UTC", "[agent][util]") {
+    // 1700000000 = 2023-11-14T22:13:20Z（周二 22 点）。本机为 UTC+8 时，
+    // localtime 会得到周三 06:13，故该用例可稳定区分 UTC 与本地时区判定。
+    const std::time_t t = 1700000000;
+    Schedule utc_hit;                        // 周二 22:00-23:00（UTC）
+    utc_hit.slots.push_back({1, 22, 23});
+    REQUIRE(schedule_active_at(utc_hit, t));
+
+    Schedule local_hit;                      // 周三 06:00-07:00（本地时区，非 UTC）
+    local_hit.slots.push_back({2, 6, 7});
+    REQUIRE_FALSE(schedule_active_at(local_hit, t));
+
+    Schedule all;                            // 空 slots = 全天
+    REQUIRE(schedule_active_at(all, t));
+}
+
+TEST_CASE("schedule_active_now aligns with UTC", "[agent][util]") {
+    // 用 gmtime 独立推导期望的 UTC 星期/小时，确保实现不依赖 localtime。
+    const std::time_t now = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &now);
+#else
+    gmtime_r(&now, &tm);
+#endif
+    const int iso_day = (tm.tm_wday + 6) % 7;
+    const int hour = tm.tm_hour;
+
+    Schedule hit;
+    hit.slots.push_back({iso_day, hour, hour + 1});
+    REQUIRE(schedule_active_now(hit));
+
+    Schedule miss;  // 三天后的同一小时必定不在窗口内
+    miss.slots.push_back({(iso_day + 3) % 7, hour, hour + 1});
+    REQUIRE_FALSE(schedule_active_now(miss));
+
+    Schedule all;  // 空 slots = 全天
+    REQUIRE(schedule_active_now(all));
+}
+
 TEST_CASE("point_in_polygon inside/outside/degenerate", "[agent][util]") {
     std::vector<std::array<float, 2>> poly = {{{0.1f,0.1f}},{{0.9f,0.1f}},{{0.9f,0.9f}},{{0.1f,0.9f}}};
     REQUIRE(point_in_polygon(0.5f, 0.5f, poly));

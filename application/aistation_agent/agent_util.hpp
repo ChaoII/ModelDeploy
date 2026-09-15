@@ -20,6 +20,8 @@ struct Schedule {
 
 Schedule parse_schedule(const nlohmann::json& j);
 bool schedule_active(const Schedule& s, int iso_day, int hour);
+/// 按 UTC 时刻判定时段是否生效（与云端 gating 一致）；utc_t 为 Unix 秒。
+bool schedule_active_at(const Schedule& s, std::time_t utc_t);
 bool schedule_active_now(const Schedule& s);
 
 /// 心跳是否到期：interval_sec<=0 禁用；last 为默认值(epoch 0) 视为立即到期。

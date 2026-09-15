@@ -76,12 +76,13 @@ TEST_CASE("EventBus drops detections outside schedule window", "[agent][events]"
     int count = 0;
     bus.set_sink([&](const DetectionEvent&) { ++count; });
     EventMeta meta; meta.edge_code = "e"; meta.camera_id = 1; meta.task_id_num = 1;
+    // 与云端 gating 一致：schedule_active_now 按 UTC 判定，故期望值也用 gmtime 推导
     std::time_t t = std::time(nullptr);
     std::tm tm{};
 #if defined(_WIN32)
-    localtime_s(&tm, &t);
+    gmtime_s(&tm, &t);
 #else
-    localtime_r(&t, &tm);
+    gmtime_r(&t, &tm);
 #endif
     const int today = (tm.tm_wday + 6) % 7;
     meta.schedule.slots.push_back({(today + 1) % 7, 0, 24});  // 只允许"明天" -> 当前必被拒

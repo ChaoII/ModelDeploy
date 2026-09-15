@@ -5,6 +5,22 @@
 
 #include "httplib.h"
 
+namespace {
+
+/// 时间点（UTC）拆分为 ISO 星期与小时：周一=0 .. 周日=6，hour ∈ [0,23]。
+void utc_day_hour(std::time_t t, int& iso_day, int& hour) {
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &t);
+#else
+    gmtime_r(&t, &tm);
+#endif
+    iso_day = (tm.tm_wday + 6) % 7;  // tm_wday: 0=周日 -> 周一=0
+    hour = tm.tm_hour;
+}
+
+}  // namespace
+
 namespace aistation {
 
 Schedule parse_schedule(const nlohmann::json& j) {
@@ -32,17 +48,19 @@ bool schedule_active(const Schedule& s, int iso_day, int hour) {
     return false;
 }
 
-bool schedule_active_now(const Schedule& s) {
+bool schedule_active_at(const Schedule& s, std::time_t utc_t) {
     if (s.slots.empty()) return true;
-    const std::time_t t = std::time(nullptr);
-    std::tm tm{};
-#if defined(_WIN32)
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
-    const int iso_day = (tm.tm_wday + 6) % 7;  // tm_wday: 0=周日 -> 周一=0
-    return schedule_active(s, iso_day, tm.tm_hour);
+    int iso_day = 0;
+    int hour = 0;
+    utc_day_hour(utc_t, iso_day, hour);
+    return schedule_active(s, iso_day, hour);
+}
+
+bool schedule_active_now(const Schedule& s) {
+    // 与云端 gating 一致，统一按 UTC 判定（云端 inference/gating.py 用
+    // datetime.fromtimestamp(now, tz=timezone.utc) 推导 day/hour）。若改用 localtime，
+    // 非 UTC 主机的同一时段窗口会对应不同的墙钟时间，与云端判定不一致。
+    return schedule_active_at(s, std::time(nullptr));
 }
 
 bool heartbeat_due(std::chrono::steady_clock::time_point last, int interval_sec,
