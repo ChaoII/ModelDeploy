@@ -97,72 +97,8 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
     if (!j.contains("models") || !j["models"].is_array() || j["models"].empty())
         return fail("at least one model required");
     for (const auto& mo : j["models"]) {
-        if (!mo.is_object()) return fail("model entry must be object");
         ModelConfig m;
-        if (mo.contains("name") && mo["name"].is_string()) m.name = mo["name"];
-        if (mo.contains("type") && mo["type"].is_string()) m.type = normalize_model_type(mo["type"]);
-        if (mo.contains("backend") && mo["backend"].is_string()) m.backend = mo["backend"];
-        if (mo.contains("device") && mo["device"].is_string()) m.device = mo["device"];
-        if (mo.contains("confidence_threshold") && mo["confidence_threshold"].is_number())
-            m.confidence_threshold = mo["confidence_threshold"].get<float>();
-        if (mo.contains("input_size") && mo["input_size"].is_array() && mo["input_size"].size() >= 2)
-            m.input_size = {mo["input_size"][0], mo["input_size"][1]};
-        if (mo.contains("labels") && mo["labels"].is_array())
-            m.labels = mo["labels"].get<std::vector<std::string>>();
-        if (mo.contains("attributes") && mo["attributes"].is_array())
-            m.attributes = mo["attributes"].get<std::vector<std::string>>();
-        if (mo.contains("password") && mo["password"].is_string())
-            m.password = mo["password"].get<std::string>();
-        m.roi_norm = rect;
-        // 多模型 pipeline：*_url → 本地路径（本地直用；远端经 ModelFetcher）
-        auto resolve_path = [&](const std::string& key, std::string* out) -> bool {
-            if (!mo.contains(key) || !mo[key].is_string()) return true;
-            const std::string url = mo[key].get<std::string>();
-            if (url.rfind("file://", 0) == 0 || url.find("://") == std::string::npos) {
-                *out = url.rfind("file://", 0) == 0 ? url.substr(7) : url;
-                return true;
-            }
-            if (!fetcher_) return fail("remote model url requires model_fetcher: " + url);
-            std::string local, ferr;
-            if (!fetcher_->fetch(url, &local, &ferr)) return fail("model fetch failed: " + ferr);
-            *out = local;
-            return true;
-        };
-        if (m.type == "ocr") {
-            // OCR pipeline：det_url→path、cls_url→cls_path、rec_url→rec_path、dict_url→dict_path
-            if (!resolve_path("det_url", &m.path)) return false;
-            if (!resolve_path("cls_url", &m.cls_path)) return false;
-            if (!resolve_path("rec_url", &m.rec_path)) return false;
-            if (!resolve_path("dict_url", &m.dict_path)) return false;
-        } else if (m.type == "lpr") {
-            // LPR 车牌 pipeline：det_url→path、rec_url→rec_path
-            if (!resolve_path("det_url", &m.path)) return false;
-            if (!resolve_path("rec_url", &m.rec_path)) return false;
-        } else {
-            // pedestrian_attribute pipeline：det_url→path、cls_url→rec_path
-            if (!resolve_path("det_url", &m.path)) return false;
-            if (!resolve_path("cls_url", &m.rec_path)) return false;
-        }
-        // 单模型：path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
-        if (m.path.empty()) {
-            if (mo.contains("path") && mo["path"].is_string()) {
-                m.path = mo["path"];
-            } else if (mo.contains("url") && mo["url"].is_string()) {
-                const std::string url = mo["url"];
-                if (url.rfind("file://", 0) == 0 || url.find("://") == std::string::npos) {
-                    m.path = url.rfind("file://", 0) == 0 ? url.substr(7) : url;
-                } else if (fetcher_) {
-                    std::string local, ferr;
-                    if (!fetcher_->fetch(url, &local, &ferr))
-                        return fail("model fetch failed for " + m.name + ": " + ferr);
-                    m.path = local;
-                } else {
-                    return fail("remote model url requires model_fetcher: " + url);
-                }
-            }
-        }
-        if (m.name.empty()) return fail("model.name required");
-        if (m.path.empty()) return fail("model.path/url required for " + m.name);
+        if (!parse_one_model(mo, rect, &m, err)) return false;
         out->sdk.models.push_back(std::move(m));
     }
 
@@ -215,4 +151,85 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
         }
     }
     return true;
+}
+
+// models[] 单个条目的字段映射：from_json 与 parse_model 共用同一实现，避免字段漂移。
+bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& roi_norm,
+                                    ModelConfig* out, std::string* err) const {
+    auto fail = [&](const std::string& m) { if (err) *err = m; return false; };
+    if (!out) return fail("null output");
+    if (!mo.is_object()) return fail("model entry must be object");
+
+    ModelConfig m;
+    if (mo.contains("name") && mo["name"].is_string()) m.name = mo["name"];
+    if (mo.contains("type") && mo["type"].is_string()) m.type = normalize_model_type(mo["type"]);
+    if (mo.contains("backend") && mo["backend"].is_string()) m.backend = mo["backend"];
+    if (mo.contains("device") && mo["device"].is_string()) m.device = mo["device"];
+    if (mo.contains("confidence_threshold") && mo["confidence_threshold"].is_number())
+        m.confidence_threshold = mo["confidence_threshold"].get<float>();
+    if (mo.contains("input_size") && mo["input_size"].is_array() && mo["input_size"].size() >= 2)
+        m.input_size = {mo["input_size"][0], mo["input_size"][1]};
+    if (mo.contains("labels") && mo["labels"].is_array())
+        m.labels = mo["labels"].get<std::vector<std::string>>();
+    if (mo.contains("attributes") && mo["attributes"].is_array())
+        m.attributes = mo["attributes"].get<std::vector<std::string>>();
+    if (mo.contains("password") && mo["password"].is_string())
+        m.password = mo["password"].get<std::string>();
+    m.roi_norm = roi_norm;
+    // 多模型 pipeline：*_url → 本地路径（本地直用；远端经 ModelFetcher）
+    auto resolve_path = [&](const std::string& key, std::string* dst) -> bool {
+        if (!mo.contains(key) || !mo[key].is_string()) return true;
+        const std::string url = mo[key].get<std::string>();
+        if (url.rfind("file://", 0) == 0 || url.find("://") == std::string::npos) {
+            *dst = url.rfind("file://", 0) == 0 ? url.substr(7) : url;
+            return true;
+        }
+        if (!fetcher_) return fail("remote model url requires model_fetcher: " + url);
+        std::string local, ferr;
+        if (!fetcher_->fetch(url, &local, &ferr)) return fail("model fetch failed: " + ferr);
+        *dst = local;
+        return true;
+    };
+    if (m.type == "ocr") {
+        // OCR pipeline：det_url→path、cls_url→cls_path、rec_url→rec_path、dict_url→dict_path
+        if (!resolve_path("det_url", &m.path)) return false;
+        if (!resolve_path("cls_url", &m.cls_path)) return false;
+        if (!resolve_path("rec_url", &m.rec_path)) return false;
+        if (!resolve_path("dict_url", &m.dict_path)) return false;
+    } else if (m.type == "lpr") {
+        // LPR 车牌 pipeline：det_url→path、rec_url→rec_path
+        if (!resolve_path("det_url", &m.path)) return false;
+        if (!resolve_path("rec_url", &m.rec_path)) return false;
+    } else {
+        // pedestrian_attribute pipeline：det_url→path、cls_url→rec_path
+        if (!resolve_path("det_url", &m.path)) return false;
+        if (!resolve_path("cls_url", &m.rec_path)) return false;
+    }
+    // 单模型：path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
+    if (m.path.empty()) {
+        if (mo.contains("path") && mo["path"].is_string()) {
+            m.path = mo["path"];
+        } else if (mo.contains("url") && mo["url"].is_string()) {
+            const std::string url = mo["url"];
+            if (url.rfind("file://", 0) == 0 || url.find("://") == std::string::npos) {
+                m.path = url.rfind("file://", 0) == 0 ? url.substr(7) : url;
+            } else if (fetcher_) {
+                std::string local, ferr;
+                if (!fetcher_->fetch(url, &local, &ferr))
+                    return fail("model fetch failed for " + m.name + ": " + ferr);
+                m.path = local;
+            } else {
+                return fail("remote model url requires model_fetcher: " + url);
+            }
+        }
+    }
+    if (m.name.empty()) return fail("model.name required");
+    if (m.path.empty()) return fail("model.path/url required for " + m.name);
+    *out = std::move(m);
+    return true;
+}
+
+bool ConfigAdapter::parse_model(const json& j, ModelConfig* out, std::string* err,
+                                const std::vector<float>& roi_norm) const {
+    return parse_one_model(j, roi_norm, out, err);
 }

@@ -20,6 +20,10 @@ std::string AgentServer::ok_json(const json& data) {
     return r.dump();
 }
 
+std::string AgentServer::fail_json(const std::string& msg, uint64_t generation) {
+    return json{{"ok", false}, {"error", msg}, {"generation", generation}}.dump();
+}
+
 std::string AgentServer::get_id(const httplib::Request& req, const char* key) {
     auto it = req.path_params.find(key);
     return it != req.path_params.end() ? it->second : "";
@@ -234,6 +238,69 @@ void AgentServer::register_routes() {
         }
         if (hooks_.on_removed) hooks_.on_removed(id);
         res.set_content(ok_json(), "application/json");
+    });
+
+    // ── POST /api/v1/tasks/:id/models/:name/update — 模型热更新（COW 热交换） ──
+    // 语义：任务不存在 → 404；模型名不存在 → 404（本接口只更新既有模型，不做隐式追加）；
+    // body 非法 → 400；引擎加载失败/未就绪 → ok:false 且保留旧模型（fail-safe）。
+    server_.Post("/api/v1/tasks/:id/models/:name/update",
+        [this](const httplib::Request& req, httplib::Response& res) {
+        const std::string id = get_id(req, "id");
+        const std::string name = get_id(req, "name");
+        const uint64_t gen = generation_.load();
+        TaskConfig existing;
+        if (!mgr_.get_task_config(id, &existing)) {
+            res.status = 404;
+            res.set_content(fail_json("任务不存在: " + id, gen), "application/json");
+            return;
+        }
+        bool model_exists = false;
+        for (const auto& m : existing.models)
+            if (m.name == name) { model_exists = true; break; }
+        if (!model_exists) {
+            res.status = 404;
+            res.set_content(fail_json("任务中不存在模型: " + name, gen), "application/json");
+            return;
+        }
+        // 复用 /tasks 的 models[] 字段映射解析单模型 ModelConfig（parse_model 与 from_json 同源）
+        ModelConfig mcfg;
+        std::string err;
+        try {
+            json body = json::parse(req.body);
+            // 路径参数为权威：body 缺 name 时补入，避免强制 body 自带 name
+            if (body.is_object() && !body.contains("name")) body["name"] = name;
+            if (!adapter_.parse_model(body, &mcfg, &err)) {
+                res.status = 400;
+                res.set_content(fail_json(err.empty() ? "模型配置非法" : err, gen), "application/json");
+                return;
+            }
+        } catch (const std::exception& e) {
+            res.status = 400;
+            res.set_content(fail_json(std::string("模型配置解析失败: ") + e.what(), gen), "application/json");
+            return;
+        }
+        mcfg.name = name;   // 路径参数为准（与既有 PATCH /models/:name 语义一致）
+        // 引擎就绪校验（关键 fail-safe）：create_engine 对 cls/ocr/lpr 等在加载失败时仍返回
+        // 非空引擎，仅判空会把未加载引擎换入 InferGroup。换入前必须显式校验 is_loaded()。
+        // 说明：此处返回的引擎仅作就绪探针即时使用；其 det_model()/config() 返回的裸指针
+        // 指向快照内部，只在本次调用内有效，绝不长期持有或跨热更新使用。
+        try {
+            auto probe = mgr_.create_engine(mcfg);
+            if (!probe || !probe->is_loaded()) {
+                res.set_content(fail_json("模型加载失败，已保留旧模型: " + name, gen), "application/json");
+                return;
+            }
+        } catch (const std::exception& e) {
+            res.set_content(fail_json(std::string("模型加载异常，已保留旧模型: ") + e.what(), gen),
+                            "application/json");
+            return;
+        }
+        if (!mgr_.update_model(id, name, mcfg)) {
+            res.set_content(fail_json("模型热更新失败，已保留旧模型: " + name, gen), "application/json");
+            return;
+        }
+        const uint64_t next = generation_.fetch_add(1) + 1;   // 仅成功换入才递增
+        res.set_content(ok_json({{"generation", next}}), "application/json");
     });
 
     server_.Get("/api/v1/tasks/:id/stats", [this](const httplib::Request& req, httplib::Response& res) {

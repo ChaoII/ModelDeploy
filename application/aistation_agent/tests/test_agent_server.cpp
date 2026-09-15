@@ -28,6 +28,15 @@ static json task_body() {
     })");
 }
 
+// 模型热更新请求体（单模型 ModelConfig JSON）；默认指向真实可加载模型。
+static json model_update_body(const std::string& name, float conf,
+                              const std::string& path =
+                                  "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx") {
+    return json{{"name", name}, {"type", "det"}, {"backend", "ort"}, {"device", "cpu"},
+                {"path", path}, {"labels", json::array({"person"})},
+                {"input_size", json::array({640, 640})}, {"confidence_threshold", conf}};
+}
+
 TEST_CASE("AgentServer health and readyz", "[agent][server]") {
     PipelineManager mgr;
     ConfigAdapter adapter;
@@ -125,6 +134,78 @@ TEST_CASE("AgentServer bad config returns 400", "[agent][server]") {
     REQUIRE(snap);
     REQUIRE(snap->status == 404);
     REQUIRE(json::parse(snap->body)["error"]["code"] == "NOT_FOUND");
+    srv.stop();
+}
+
+// SP6-c Task 2：模型热更新控制面（COW 热交换）
+// 约定：模型名必须已存在（本接口只更新既有模型，不隐式追加）；
+//       引擎未就绪/加载失败一律 fail-safe（ok:false 且 generation 不递增，旧模型继续服务）。
+TEST_CASE("AgentServer model hot update", "[agent][server]") {
+    PipelineManager mgr;
+    ConfigAdapter adapter;
+    int port = free_port();
+    AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    REQUIRE(srv.start());
+    httplib::Client cli("127.0.0.1", port);
+
+    auto created = cli.Post("/api/v1/tasks", task_body().dump(), "application/json");
+    REQUIRE(created);
+    REQUIRE(created->status == 200);
+
+    // 1) 任务不存在 → 404
+    auto no_task = cli.Post("/api/v1/tasks/does-not-exist/models/det/update",
+                            model_update_body("det", 0.3f).dump(), "application/json");
+    REQUIRE(no_task);
+    REQUIRE(no_task->status == 404);
+    REQUIRE(json::parse(no_task->body)["ok"] == false);
+    REQUIRE(srv.generation() == 0);
+
+    // 2) 模型名不存在 → 404（约定：不隐式追加）
+    auto no_model = cli.Post("/api/v1/tasks/321/models/ghost/update",
+                             model_update_body("ghost", 0.3f).dump(), "application/json");
+    REQUIRE(no_model);
+    REQUIRE(no_model->status == 404);
+    REQUIRE(json::parse(no_model->body)["ok"] == false);
+    REQUIRE(srv.generation() == 0);
+
+    // 3) 非法 ModelConfig → 400，generation 不递增（旧模型保留）
+    auto bad = cli.Post("/api/v1/tasks/321/models/det/update", "{}", "application/json");
+    REQUIRE(bad);
+    REQUIRE(bad->status == 400);
+    REQUIRE(json::parse(bad->body)["ok"] == false);
+    REQUIRE(srv.generation() == 0);
+    // 控制面仍可见旧模型（det 未被移除）
+    auto one = cli.Get("/api/v1/tasks/321");
+    REQUIRE(one);
+    REQUIRE(json::parse(one->body)["task"]["models"][0]["name"] == "det");
+
+    // 4) 引擎未就绪（路径不存在 → create_engine 返回非空但 is_loaded()==false）→
+    //    ok:false，generation 不递增，旧模型保留（fail-safe）
+    auto unready = cli.Post("/api/v1/tasks/321/models/det/update",
+                            model_update_body("det", 0.9f, "/nonexistent/det.onnx").dump(),
+                            "application/json");
+    REQUIRE(unready);
+    REQUIRE(unready->status == 200);
+    REQUIRE(json::parse(unready->body)["ok"] == false);
+    REQUIRE(srv.generation() == 0);
+
+    // 5) 成功热更新 → ok:true 且 generation 递增到 1
+    auto ok1 = cli.Post("/api/v1/tasks/321/models/det/update",
+                        model_update_body("det", 0.3f).dump(), "application/json");
+    REQUIRE(ok1);
+    REQUIRE(ok1->status == 200);
+    auto j1 = json::parse(ok1->body);
+    REQUIRE(j1["ok"] == true);
+    REQUIRE(j1["generation"] == 1);
+    REQUIRE(srv.generation() == 1);
+
+    // 6) 再次成功 → generation 递增到 2
+    auto ok2 = cli.Post("/api/v1/tasks/321/models/det/update",
+                        model_update_body("det", 0.35f).dump(), "application/json");
+    REQUIRE(ok2);
+    REQUIRE(ok2->status == 200);
+    REQUIRE(json::parse(ok2->body)["generation"] == 2);
+    REQUIRE(srv.generation() == 2);
     srv.stop();
 }
 

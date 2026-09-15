@@ -59,10 +59,20 @@ public:
     explicit ConfigAdapter(ModelFetcher* fetcher = nullptr) : fetcher_(fetcher) {}
     bool from_json(const nlohmann::json& j, AdaptedTask* out, std::string* err) const;
 
+    /// 解析单个模型配置（控制面热更新用）：字段映射与 from_json 的 models[] 条目完全一致
+    /// （同一份 parse_one_model 实现，不重复逻辑）。roi_norm 为所属任务的归一化 ROI，
+    /// 单模型热更新无任务上下文时传空。成功返回 true；失败写入 err 并返回 false。
+    bool parse_model(const nlohmann::json& j, ModelConfig* out, std::string* err,
+                     const std::vector<float>& roi_norm = {}) const;
+
     /// 归一化多边形 → 外接矩形 [x,y,w,h]（归一化）；非法返回空
     static std::vector<float> polygon_to_norm_rect(const nlohmann::json& roi);
 
 private:
+    /// models[] 单个条目的字段映射（from_json 与 parse_model 共用，避免两处漂移）
+    bool parse_one_model(const nlohmann::json& mo, const std::vector<float>& roi_norm,
+                         ModelConfig* out, std::string* err) const;
+
     ModelFetcher* fetcher_ = nullptr;
 };
 
