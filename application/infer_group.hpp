@@ -21,8 +21,12 @@ public:
     bool add_model(const ModelConfig& mcfg, ModelFactory factory);
     bool remove_model(const std::string& name);
     /// 热更新：按 mcfg.name 替换对应模型（同名不存在则追加）。
-    /// 新引擎在锁外构建（可能耗时）；factory 失败（为空或返回 nullptr）时返回 false
-    /// 且不改动快照（fail-safe，旧模型继续服务）；成功则复制快照 → 只替换目标条目 → 原子换指针。
+    /// 新引擎在锁外构建（可能耗时），只构建一次：factory 契约是"返回已加载引擎或 nullptr"，
+    /// 为空/返回 nullptr 时返回 false（不回退 InferenceEngine::load，避免重复加载）。
+    /// **换入前强制就绪校验**（InferenceEngine::is_loaded()）：未就绪（含 factory 返回的
+    /// 非空未加载引擎，如 create_engine 对 cls/ocr/lpr 加载失败）一律返回 false 且不改动
+    /// 快照（fail-safe，旧模型继续服务）。校验下沉到本层，保证所有调用方
+    /// （新控制面路由 / 旧 PATCH / 未来调用方）都被覆盖；换入的即校验过的同一实例。
     bool update_model(const ModelConfig& mcfg, ModelFactory factory);
     void clear();
     bool empty() const;
@@ -32,11 +36,14 @@ public:
     bool run_models(const modeldeploy::vision::ImageData& frame,
                     std::vector<std::pair<std::string, std::vector<modeldeploy::vision::DetectionResult>>>* sdk_dets,
                     std::vector<std::pair<std::string, InferResult>>* non_det = nullptr);
-    /// 生命周期约束：返回的裸指针指向快照内引擎持有的模型，仅在该模型被
-    /// update_model/remove_model/clear 换出快照前有效；调用方不得长期持有或跨热更新使用。
+    /// 生命周期约束（悬垂风险，调用方必读）：返回的裸指针指向**当前 COW 快照**内的对象，
+    /// 仅在该同名条目未被换出、且其快照仍被持有期间有效。并发的 update_model / remove_model /
+    /// clear 会原子换出新快照；当旧快照失去最后一个持有者时旧引擎被释放，先前取得的裸指针
+    /// 立即失效（再解引用即访问已释放内存 = UB）。调用方必须：即取即用、只在同步逻辑内使用、
+    /// 绝不跨热更新或跨线程长期持有。若需跨热更新保活，应改为持有 shared_ptr<InferenceEngine>。
     modeldeploy::vision::detection::UltralyticsDet* det_model(const std::string& name);
     /// 按模型名取 ModelConfig（含动态 add_model 加入的模型），未找到返回 nullptr。
-    /// 生命周期约束同 det_model：不得跨热更新长期持有。
+    /// 生命周期约束同 det_model：裸指针指向快照内引擎，并发热更新后可能悬垂，须即取即用。
     const ModelConfig* config_of(const std::string& name) const;
 private:
     /// per-entry 可变状态：仅 detect 线程访问；热交换时代码复用（不重置跳帧计数）

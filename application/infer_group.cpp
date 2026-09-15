@@ -91,10 +91,21 @@ bool InferGroup::remove_model(const std::string& name) {
 }
 
 bool InferGroup::update_model(const ModelConfig& mcfg, ModelFactory factory) {
-    // 先构建新引擎（锁外，可能耗时/下载）。契约：factory 返回可用引擎或 nullptr。
-    // 失败（无 factory / 返回 nullptr）则 fail-safe：不改快照，旧模型继续服务。
+    // 锁外构建新引擎（可能耗时/下载），且只构建一次：换入的必须就是这里校验过的同一实例
+    // （无二次加载、无丢弃）。factory 契约是"返回可用引擎或 nullptr"，但生产 factory
+    // PipelineManager::create_engine 对 classification/pedestrian_attribute/ocr/lpr 在加载
+    // 失败时仍返回非空引擎（只调用 eng->load 不检查返回值），仅判空会把未就绪引擎换入。
+    // 因此这里强制 is_loaded() 就绪校验并下沉到本层 —— 所有调用方（新控制面路由 /
+    // 旧 http_server PATCH / 未来调用方）都被覆盖。未就绪即 fail-safe：不改快照，
+    // 旧模型继续服务。
+    // 注意：与 add_model/load_models（经 build_engine，factory 未就绪时会回退直连加载）不同，
+    // update_model 在 factory 已提供时不再回退 InferenceEngine::load —— 避免对同一配置重复
+    // 加载，并让失败原因保持在调用方 factory 上。factory 为空/返回 nullptr 一律 fail-safe。
     std::shared_ptr<InferenceEngine> engine;
-    if (factory) engine = factory(mcfg);
+    if (factory) {
+        engine = factory(mcfg);
+        if (engine && !engine->is_loaded()) engine.reset();   // 未就绪 → 拒绝换入
+    }
     if (!engine) return false;
 
     std::lock_guard<std::mutex> lk(entries_mtx_);
@@ -198,7 +209,8 @@ bool InferGroup::run_models(
 }
 
 modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
-    // 本地快照查询后即返回裸指针；调用方须在热更新前用完（见头文件生命周期约束）
+    // 取快照后即返回裸指针：指针归快照内引擎所有，并发热更新换出该条目的旧快照时可能悬垂
+    // （详见头文件生命周期约束）。调用方须即取即用，绝不跨热更新/跨线程长期持有。
     std::shared_ptr<const std::vector<Entry>> snap;
     {
         std::lock_guard<std::mutex> lk(entries_mtx_);
@@ -211,7 +223,7 @@ modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std:
 }
 
 const ModelConfig* InferGroup::config_of(const std::string& name) const {
-    // 同上：返回快照内引擎的配置指针，不跨热更新长期持有
+    // 同上：返回快照内引擎的配置裸指针，并发热更新后可能悬垂（见头文件生命周期约束）。
     std::shared_ptr<const std::vector<Entry>> snap;
     {
         std::lock_guard<std::mutex> lk(entries_mtx_);

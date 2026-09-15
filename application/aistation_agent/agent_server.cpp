@@ -29,6 +29,19 @@ std::string AgentServer::get_id(const httplib::Request& req, const char* key) {
     return it != req.path_params.end() ? it->second : "";
 }
 
+// 模型名作为单段 URL 路径的可表示性校验。httplib 在解析请求行时已对 req.path 做一次
+// 百分号解码（req.path_params 中是明文），所以这里只做校验、不再解码：
+// 二次解码会把名字里字面的 %XX（客户端本应写成 %25XX）破坏掉。
+bool is_valid_model_name_segment(const std::string& name, std::string* err) {
+    auto fail = [&](const char* m) { if (err) *err = m; return false; };
+    if (name.empty()) return fail("模型名为空");
+    for (const unsigned char c : name) {
+        if (c == '/') return fail("模型名不能包含 '/'：无法作为单段 URL 路径传输（请改用其他名字）");
+        if (c < 0x20 || c == 0x7F) return fail("模型名不能包含控制字符");
+    }
+    return true;
+}
+
 json AgentServer::status_to_json(const TaskStatus& ts) {
     json j;
     j["task_id"] = ts.id;
@@ -248,6 +261,13 @@ void AgentServer::register_routes() {
         const std::string id = get_id(req, "id");
         const std::string name = get_id(req, "name");
         const uint64_t gen = generation_.load();
+        // 路径段可表示性校验（httplib 已解码，故不再解码）；非法名不发往后续流程
+        std::string name_err;
+        if (!is_valid_model_name_segment(name, &name_err)) {
+            res.status = 400;
+            res.set_content(fail_json(name_err, gen), "application/json");
+            return;
+        }
         TaskConfig existing;
         if (!mgr_.get_task_config(id, &existing)) {
             res.status = 404;
@@ -280,23 +300,13 @@ void AgentServer::register_routes() {
             return;
         }
         mcfg.name = name;   // 路径参数为准（与既有 PATCH /models/:name 语义一致）
-        // 引擎就绪校验（关键 fail-safe）：create_engine 对 cls/ocr/lpr 等在加载失败时仍返回
-        // 非空引擎，仅判空会把未加载引擎换入 InferGroup。换入前必须显式校验 is_loaded()。
-        // 说明：此处返回的引擎仅作就绪探针即时使用；其 det_model()/config() 返回的裸指针
-        // 指向快照内部，只在本次调用内有效，绝不长期持有或跨热更新使用。
-        try {
-            auto probe = mgr_.create_engine(mcfg);
-            if (!probe || !probe->is_loaded()) {
-                res.set_content(fail_json("模型加载失败，已保留旧模型: " + name, gen), "application/json");
-                return;
-            }
-        } catch (const std::exception& e) {
-            res.set_content(fail_json(std::string("模型加载异常，已保留旧模型: ") + e.what(), gen),
-                            "application/json");
-            return;
-        }
+        // 引擎就绪校验已下沉到 InferGroup::update_model（所有调用方共用，含旧 PATCH 控制面）：
+        // create_engine 对 cls/ocr/lpr 等在加载失败时仍返回非空引擎，仅判空会把未就绪引擎换入，
+        // 故由 InferGroup 在换入前显式校验 is_loaded()，未就绪即 fail-safe（保留旧模型）。
+        // 这里不再单独 create_engine 探针 —— 避免对同一配置重复加载。
         if (!mgr_.update_model(id, name, mcfg)) {
-            res.set_content(fail_json("模型热更新失败，已保留旧模型: " + name, gen), "application/json");
+            res.set_content(fail_json("模型加载失败或热更新失败，已保留旧模型: " + name, gen),
+                            "application/json");
             return;
         }
         const uint64_t next = generation_.fetch_add(1) + 1;   // 仅成功换入才递增

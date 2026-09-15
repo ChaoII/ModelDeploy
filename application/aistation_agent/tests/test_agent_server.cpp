@@ -209,6 +209,51 @@ TEST_CASE("AgentServer model hot update", "[agent][server]") {
     srv.stop();
 }
 
+// 模型名进 URL path 段：客户端须按 RFC 3986 对特殊字符做百分号编码。服务端 httplib 在
+// 解析请求行时已对 req.path 解码一次（path_params 中得到的就是明文），因此空格名用 %20
+// 编码即可正常热更新；无需（也不应）在处理器里二次解码。
+// '/' 是路径分隔符，无法在单段 path param 中表示：%2F 解码后会把 name 段拆成两段，
+// 路由整体不匹配 → 404（控制面必须拒绝/不接受这类名字）。
+TEST_CASE("AgentServer model update with URL-encoded model name", "[agent][server]") {
+    // 单段可表示性校验：空格与 ?/# 允许（编码后可作单段传输）；空名、'/'、控制字符拒绝
+    REQUIRE(is_valid_model_name_segment("my model"));
+    REQUIRE(is_valid_model_name_segment("a?b#c"));
+    REQUIRE_FALSE(is_valid_model_name_segment(""));
+    REQUIRE_FALSE(is_valid_model_name_segment("a/b"));
+    REQUIRE_FALSE(is_valid_model_name_segment(std::string("a\nb")));
+    REQUIRE_FALSE(is_valid_model_name_segment(std::string("a\0b", 3)));
+
+    PipelineManager mgr;
+    ConfigAdapter adapter;
+    int port = free_port();
+    AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    REQUIRE(srv.start());
+    httplib::Client cli("127.0.0.1", port);
+
+    // 任务模型名含空格（JSON 层合法）
+    json body = task_body();
+    body["models"][0]["name"] = "my model";
+    auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
+    REQUIRE(created);
+    REQUIRE(created->status == 200);
+
+    // 空格经 %20 编码 → 服务端解码为 "my model" → 命中既有模型 → 热更新成功
+    auto ok = cli.Post("/api/v1/tasks/321/models/my%20model/update",
+                       model_update_body("my model", 0.3f).dump(), "application/json");
+    REQUIRE(ok);
+    REQUIRE(ok->status == 200);
+    REQUIRE(json::parse(ok->body)["ok"] == true);
+    REQUIRE(srv.generation() == 1);
+
+    // 含 '/' 的名字（a%2Fb 解码后为 a/b）无法作单段 path param → 路由不匹配 → 404，不递增
+    auto slash = cli.Post("/api/v1/tasks/321/models/a%2Fb/update",
+                          model_update_body("a/b", 0.3f).dump(), "application/json");
+    REQUIRE(slash);
+    REQUIRE(slash->status == 404);
+    REQUIRE(srv.generation() == 1);
+    srv.stop();
+}
+
 TEST_CASE("AgentServer start is idempotent and restartable", "[agent][server]") {
     PipelineManager mgr;
     ConfigAdapter adapter;
