@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <random>
 #include <string>
 #include <thread>
@@ -14,6 +15,31 @@
 
 namespace fs = std::filesystem;
 using nlohmann::json;
+
+namespace {
+
+/// 退出保护：无论测试因断言失败抛异常还是正常返回，析构时都先执行 cleanup（如
+/// stop() 服务、置位停止标志）再 join 线程。避免可 join 线程在栈展开时析构触发
+/// std::terminate —— Windows 上表现为 0xC0000409 进程崩溃，掩盖真实断言失败。
+template <typename Cleanup>
+struct JoinGuard {
+    std::thread& th;
+    Cleanup cleanup;
+    ~JoinGuard() {
+        cleanup();
+        if (th.joinable()) th.join();
+    }
+};
+
+/// 判定事件体是否为空检测心跳（heartbeat=true 或 detections 为空数组）。
+bool is_heartbeat_event(const json& e) {
+    if (!e.is_object()) return true;
+    if (e.value("heartbeat", false)) return true;
+    if (!e.contains("detections") || !e["detections"].is_array()) return true;
+    return e["detections"].empty();
+}
+
+}  // namespace
 
 static int free_port() {
     static std::mt19937 rng(std::random_device{}());
@@ -28,12 +54,25 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     // HTTP 事件接收器
     const int recv_port = free_port();
     httplib::Server recv;
-    std::atomic<int> events{0};
-    std::string last_body;
+    std::string detection_body;  // 首个真实检测事件体（跳过心跳），接收线程写、主线程读
+    std::string snapshot_body;   // 首个携带内联快照的事件体
+    std::mutex body_mu;          // 保护上述两个字段
     recv.Post("/cb", [&](const httplib::Request& req, httplib::Response& res) {
-        ++events; last_body = req.body; res.status = 200;
+        {
+            std::lock_guard<std::mutex> lk(body_mu);
+            // 就地记录首个匹配事件：心跳会持续覆盖"最新事件"，若只轮询最新值，
+            // 已收到的检测事件可能在两次轮询之间被心跳覆盖而丢失。
+            if (detection_body.empty()) {
+                const json parsed = json::parse(req.body, nullptr, false);
+                if (parsed.is_object() && !is_heartbeat_event(parsed)) detection_body = req.body;
+            }
+            if (snapshot_body.empty() && req.body.find("\"snapshot\"") != std::string::npos)
+                snapshot_body = req.body;
+        }
+        res.status = 200;
     });
     std::thread recv_thread([&]() { recv.listen("127.0.0.1", recv_port); });
+    JoinGuard recv_guard{recv_thread, [&]() { recv.stop(); }};
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     const int agent_port = free_port();
@@ -71,11 +110,21 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     REQUIRE(started);
     REQUIRE(started->status == 200);
 
-    // 等待首个事件（含模型加载 + 推理）
-    for (int i = 0; i < 300 && events.load() == 0; ++i)
+    // 等待首个"真实检测"事件（含模型加载 + 推理）。SP4-b 起任务运行期会周期性上报
+    // 心跳（heartbeat=true、detections 为空），心跳同样经事件 sink 送达本接收器，
+    // 因此必须跳过心跳事件，否则会在空 detections 上误判失败。
+    std::string got_body;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (std::chrono::steady_clock::now() < deadline) {
+        {
+            std::lock_guard<std::mutex> lk(body_mu);
+            got_body = detection_body;
+        }
+        if (!got_body.empty()) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    REQUIRE(events.load() >= 1);
-    auto e = json::parse(last_body);
+    }
+    REQUIRE_FALSE(got_body.empty());  // 30s 内未等到真实检测事件（可能只收到心跳）
+    json e = json::parse(got_body);
     REQUIRE(e["edge_code"] == "edge-e2e");
     REQUIRE(e["camera_id"] == 7);
     REQUIRE(e["task_id"] == 777);
@@ -90,10 +139,17 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     REQUIRE(e["schema_version"] == 2);
     // 内联快照为尽力而为：首个检测事件可能早于 Pipeline 首个 BGR 快照就绪
     // （快照每 2 帧更新一次），故等待后续携带 snapshot 的事件再断言。
-    for (int i = 0; i < 100 && last_body.find("\"snapshot\"") == std::string::npos; ++i)
+    std::string with_snapshot;
+    for (int i = 0; i < 100; ++i) {
+        {
+            std::lock_guard<std::mutex> lk(body_mu);
+            with_snapshot = snapshot_body;
+        }
+        if (!with_snapshot.empty()) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    REQUIRE(last_body.find("\"snapshot\"") != std::string::npos);
-    REQUIRE(last_body.find("\"data\"") != std::string::npos);
+    }
+    REQUIRE(with_snapshot.find("\"snapshot\"") != std::string::npos);
+    REQUIRE(with_snapshot.find("\"data\"") != std::string::npos);
 
     // 快照
     bool got_snapshot = false;
@@ -119,6 +175,8 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
             (void)r;
         }
     });
+    // 断言失败时也必须先停止压测再 join，避免线程在栈展开时析构触发 std::terminate。
+    JoinGuard metrics_guard{metrics_thread, [&]() { hammer = false; }};
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     for (int round = 0; round < 3; ++round) {
         auto st = cli.Post("/api/v1/tasks/777/stop");
@@ -233,9 +291,11 @@ struct MockBroker {
     int port = 0;
     std::atomic<bool> running{true};
     std::thread th;
+    std::mutex mu;                    // 保护下列字段（broker 线程写、主线程读）
     std::string topic;
     std::string payload;
-    std::atomic<int> publishes{0};
+    std::string detection_topic;      // 首个非心跳（真实检测）事件
+    std::string detection_payload;
 
     ~MockBroker() { stop(); }
 
@@ -302,7 +362,6 @@ struct MockBroker {
             } else if (type == 3) {     // PUBLISH
                 if (rem < 2) continue;
                 const int tlen = (static_cast<unsigned char>(body[0]) << 8) | static_cast<unsigned char>(body[1]);
-                topic.assign(body.data() + 2, tlen);
                 int off = 2 + tlen;
                 const int qos = (hdr >> 1) & 0x03;
                 int pid = 0;
@@ -310,8 +369,20 @@ struct MockBroker {
                     pid = (static_cast<unsigned char>(body[off]) << 8) | static_cast<unsigned char>(body[off + 1]);
                     off += 2;
                 }
-                payload.assign(body.data() + off, rem - off);
-                ++publishes;
+                {
+                    std::lock_guard<std::mutex> lk(mu);
+                    topic.assign(body.data() + 2, tlen);
+                    payload.assign(body.data() + off, rem - off);
+                    // 就地记录首个真实检测事件：心跳会持续覆盖"最新事件"，
+                    // 只轮询最新值可能丢失两次轮询之间的检测事件。
+                    if (detection_payload.empty()) {
+                        const json parsed = json::parse(payload, nullptr, false);
+                        if (parsed.is_object() && !is_heartbeat_event(parsed)) {
+                            detection_topic = topic;
+                            detection_payload = payload;
+                        }
+                    }
+                }
                 if (qos == 1) {
                     const char puback[4] = {0x40, 0x02, static_cast<char>(pid >> 8), static_cast<char>(pid & 0xFF)};
                     respond(c, puback, 4);
@@ -393,11 +464,23 @@ TEST_CASE("Agent E2E: local det emits MQTT event", "[agent][e2e][mqtt]") {
     REQUIRE(started);
     REQUIRE(started->status == 200);
 
-    for (int i = 0; i < 300 && broker.publishes.load() == 0; ++i)
+    // 等待首个"真实检测"MQTT 事件：任务心跳（heartbeat=true、detections 为空）同样会
+    // 发布到同一 topic，必须跳过心跳，否则会在空 detections 上误判失败。
+    std::string topic_seen;
+    std::string got_payload;
+    const auto mqtt_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (std::chrono::steady_clock::now() < mqtt_deadline) {
+        {
+            std::lock_guard<std::mutex> lk(broker.mu);
+            topic_seen = broker.detection_topic;
+            got_payload = broker.detection_payload;
+        }
+        if (!got_payload.empty()) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    REQUIRE(broker.publishes.load() >= 1);
-    REQUIRE(broker.topic == "aistation/default/edge/edge-e2e/camera/8/detect");
-    auto me = json::parse(broker.payload);
+    }
+    REQUIRE_FALSE(got_payload.empty());  // 30s 内未等到真实检测 MQTT 事件（可能只收到心跳）
+    REQUIRE(topic_seen == "aistation/default/edge/edge-e2e/camera/8/detect");
+    json me = json::parse(got_payload);
     REQUIRE(me["edge_code"] == "edge-e2e");
     REQUIRE(me["camera_id"] == 8);
     REQUIRE(me["task_id"] == 888);
