@@ -401,6 +401,8 @@ void Pipeline::detect_loop() {
                 std::vector<DetectionBox> boxes;
                 for (size_t mi = 0; mi < sdk_dets.size(); ++mi) {
                     const auto& [name, dets] = sdk_dets[mi];
+                    // 注意：config_of 返回快照内引擎的裸指针，仅限本循环内即时使用；
+                    // 不得跨热更新（InferGroup::update_model/remove_model）长期持有。
                     const ModelConfig* mc = infer_group_.config_of(name);
                     for (size_t di = 0; di < dets.size(); ++di) {
                         const auto& d = dets[di];
@@ -438,6 +440,7 @@ void Pipeline::detect_loop() {
 
         // 绘制（设备 NV12 就地 / CPU）
         for (auto& [name, dets] : sdk_dets) {
+            // 同上：det_model 指针仅在本次绘制内即时使用，不跨热更新持有
             auto* det = infer_group_.det_model(name);
             if (det) det->draw_result(f.image, dets, model_threshold(name));
         }
@@ -514,9 +517,11 @@ bool Pipeline::remove_model(const std::string& name) {
 }
 
 bool Pipeline::update_model(const std::string& name, const ModelConfig& mcfg) {
-    // 新 InferGroup 无原位 update：先删旧、再加新（等价语义）
-    infer_group_.remove_model(name);
-    return infer_group_.add_model(mcfg, model_factory_);
+    // 委托 InferGroup 的写时复制热交换：按 mcfg.name 原位替换引擎（不存在则追加），
+    // 新引擎在锁外构建；加载失败返回 false 且保留旧模型（fail-safe，任务不中断）。
+    // name 与 mcfg.name 由控制面保证一致（见 http_server 的 PATCH 路由会把路径参数写入 mcfg.name）。
+    (void)name;
+    return infer_group_.update_model(mcfg, model_factory_);
 }
 
 bool Pipeline::latest_bgr_snapshot(std::shared_ptr<ImageData>* out) const {

@@ -30,65 +30,119 @@ RoiRect effective_roi(const ModelConfig& mc, const ImageData& frame) {
 }
 }
 
-bool InferGroup::load_models(const std::vector<ModelConfig>& mcfgs, ModelFactory factory) {
-    clear();
-    bool all_ok = true;
-    for (const auto& mcfg : mcfgs) {
-        if (!add_model(mcfg, factory)) {
-            std::cerr << "[InferGroup] Failed to load model: " << mcfg.name << std::endl;
-            all_ok = false;
-        }
-    }
-    return all_ok;
-}
-
-bool InferGroup::add_model(const ModelConfig& mcfg, ModelFactory factory) {
-    std::unique_ptr<InferenceEngine> engine;
+// 按配置构建引擎：优先用 factory（须返回已加载引擎），否则回退到 InferenceEngine::load。
+// 在锁外调用（可能耗时）；失败返回 nullptr（调用方按 fail-safe 处理）。
+std::shared_ptr<InferenceEngine> InferGroup::build_engine(const ModelConfig& mcfg,
+                                                          ModelFactory& factory) {
+    std::shared_ptr<InferenceEngine> engine;
     if (factory) {
         engine = factory(mcfg);
         if (engine && !engine->is_loaded()) engine.reset();
     }
     if (!engine) {
-        engine = std::make_unique<InferenceEngine>();
-        if (!engine->load(mcfg)) return false;
+        auto e = std::make_shared<InferenceEngine>();
+        if (!e->load(mcfg)) return nullptr;   // 加载失败：不改动快照
+        engine = std::move(e);
     }
-    Entry en;
-    en.engine = std::move(engine);
-    entries_.push_back(std::move(en));
+    return engine;
+}
+
+bool InferGroup::load_models(const std::vector<ModelConfig>& mcfgs, ModelFactory factory) {
+    // 一次性构建全部引擎，最后整体换快照（避免逐次 add 触发多次复制）
+    std::vector<Entry> built;
+    built.reserve(mcfgs.size());
+    bool all_ok = true;
+    for (const auto& mcfg : mcfgs) {
+        auto engine = build_engine(mcfg, factory);
+        if (!engine) {
+            std::cerr << "[InferGroup] Failed to load model: " << mcfg.name << std::endl;
+            all_ok = false;
+            continue;
+        }
+        built.push_back(Entry{std::move(engine), std::make_shared<EntryState>()});
+    }
+    {
+        std::lock_guard<std::mutex> lk(entries_mtx_);
+        entries_ = std::make_shared<const std::vector<Entry>>(std::move(built));
+    }
+    return all_ok;
+}
+
+bool InferGroup::add_model(const ModelConfig& mcfg, ModelFactory factory) {
+    auto engine = build_engine(mcfg, factory);   // 锁外构建
+    if (!engine) return false;
+    std::lock_guard<std::mutex> lk(entries_mtx_);
+    auto next = std::make_shared<std::vector<Entry>>(*entries_);   // 写时复制
+    next->push_back(Entry{std::move(engine), std::make_shared<EntryState>()});
+    entries_ = std::move(next);                  // 原子换指针
     return true;
 }
 
 bool InferGroup::remove_model(const std::string& name) {
-    for (auto it = entries_.begin(); it != entries_.end(); ++it) {
-        if (it->engine->config().name == name) {
-            entries_.erase(it);
-            return true;
+    std::lock_guard<std::mutex> lk(entries_mtx_);
+    auto next = std::make_shared<std::vector<Entry>>(*entries_);
+    auto it = std::find_if(next->begin(), next->end(), [&](const Entry& e) {
+        return e.engine && e.engine->config().name == name;
+    });
+    if (it == next->end()) return false;
+    next->erase(it);
+    entries_ = std::move(next);
+    return true;
+}
+
+bool InferGroup::update_model(const ModelConfig& mcfg, ModelFactory factory) {
+    // 先构建新引擎（锁外，可能耗时/下载）。契约：factory 返回可用引擎或 nullptr。
+    // 失败（无 factory / 返回 nullptr）则 fail-safe：不改快照，旧模型继续服务。
+    std::shared_ptr<InferenceEngine> engine;
+    if (factory) engine = factory(mcfg);
+    if (!engine) return false;
+
+    std::lock_guard<std::mutex> lk(entries_mtx_);
+    auto next = std::make_shared<std::vector<Entry>>(*entries_);   // 复制快照
+    bool found = false;
+    for (auto& e : *next) {
+        if (e.engine && e.engine->config().name == mcfg.name) {
+            e.engine = std::move(engine);   // 仅替换目标引擎；state 指针复用（不重置跳帧计数）
+            found = true;
+            break;
         }
     }
-    return false;
+    if (!found) next->push_back(Entry{std::move(engine), std::make_shared<EntryState>()});
+    entries_ = std::move(next);             // 原子换指针（写时复制）
+    return true;
 }
 
 void InferGroup::clear() {
-    entries_.clear();
+    std::lock_guard<std::mutex> lk(entries_mtx_);
+    entries_ = std::make_shared<const std::vector<Entry>>();
 }
 
 bool InferGroup::empty() const {
-    return entries_.empty();
+    std::lock_guard<std::mutex> lk(entries_mtx_);
+    return entries_->empty();
 }
 
 bool InferGroup::run_models(
     const ImageData& frame,
     std::vector<std::pair<std::string, std::vector<DetectionResult>>>* sdk_dets,
     std::vector<std::pair<std::string, InferResult>>* non_det) {
+    // 入口取一次不可变快照：shared_ptr 拷贝保证整段推理期间引擎与状态存活；
+    // 期间并发的增删改只会换出新快照，不影响本次只读遍历（修迭代器失效/数据竞争）。
+    std::shared_ptr<const std::vector<Entry>> snap;
+    {
+        std::lock_guard<std::mutex> lk(entries_mtx_);
+        snap = entries_;
+    }
     if (sdk_dets) sdk_dets->clear();
     if (non_det) non_det->clear();
     bool any = false;
-    for (auto& en : entries_) {
+    for (const auto& en : *snap) {
         auto* e = en.engine.get();
+        auto& st = *en.state;                  // per-entry 状态：仅 detect 线程写
         const auto& mc = e->config();
         const int interval = mc.interval > 0 ? mc.interval : 1;
         // interval 抽帧：每 interval 帧推理一次，其余帧复用上次结果（无结果时强制先跑一次）
-        const bool do_infer = !en.has_last || (en.frame_idx % interval == 0);
+        const bool do_infer = !st.has_last || (st.frame_idx % interval == 0);
         const bool is_det = (mc.type == "detection" && e->det_model() != nullptr);
 
         if (do_infer) {
@@ -105,8 +159,8 @@ bool InferGroup::run_models(
                 if (e->predict_detection(infer_frame, &dets)) {
                     if (ox != 0.f || oy != 0.f)
                         for (auto& d : dets) { d.box.x += ox; d.box.y += oy; }
-                    en.last_dets = std::move(dets);
-                    en.has_last = true;
+                    st.last_dets = std::move(dets);
+                    st.has_last = true;
                 }
             } else {
                 // ROI：非 detection 族（如人脸）按区域裁剪，几何结果按偏移回映射；classification 无几何不做
@@ -126,33 +180,45 @@ bool InferGroup::run_models(
                         for (auto& kps : r.keypoints)
                             for (auto& k : kps) { k.x += ox; k.y += oy; }
                     }
-                    en.last_non_det = std::move(r);
-                    en.has_last = true;
+                    st.last_non_det = std::move(r);
+                    st.has_last = true;
                 }
             }
         }
-        ++en.frame_idx;
+        ++st.frame_idx;
 
         if (is_det) {
-            if (sdk_dets) sdk_dets->push_back({mc.name, en.last_dets});
+            if (sdk_dets) sdk_dets->push_back({mc.name, st.last_dets});
         } else {
-            if (non_det) non_det->push_back({mc.name, en.last_non_det});
+            if (non_det) non_det->push_back({mc.name, st.last_non_det});
         }
-        if (en.has_last) any = true;
+        if (st.has_last) any = true;
     }
     return any;
 }
 
 modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
-    for (auto& en : entries_) {
-        if (en.engine->config().name == name) return en.engine->det_model();
+    // 本地快照查询后即返回裸指针；调用方须在热更新前用完（见头文件生命周期约束）
+    std::shared_ptr<const std::vector<Entry>> snap;
+    {
+        std::lock_guard<std::mutex> lk(entries_mtx_);
+        snap = entries_;
+    }
+    for (const auto& en : *snap) {
+        if (en.engine && en.engine->config().name == name) return en.engine->det_model();
     }
     return nullptr;
 }
 
 const ModelConfig* InferGroup::config_of(const std::string& name) const {
-    for (const auto& en : entries_) {
-        if (en.engine->config().name == name) return &en.engine->config();
+    // 同上：返回快照内引擎的配置指针，不跨热更新长期持有
+    std::shared_ptr<const std::vector<Entry>> snap;
+    {
+        std::lock_guard<std::mutex> lk(entries_mtx_);
+        snap = entries_;
+    }
+    for (const auto& en : *snap) {
+        if (en.engine && en.engine->config().name == name) return &en.engine->config();
     }
     return nullptr;
 }
