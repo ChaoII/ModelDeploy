@@ -77,6 +77,9 @@ private:
     std::unique_ptr<Heartbeat> heartbeat_;
     std::mutex mtx_;
     std::unordered_map<std::string, std::unique_ptr<EventPublisher>> publishers_;
-    std::unordered_map<std::string, std::unique_ptr<DurableQueue>> queues_;
-    std::unordered_map<int64_t, DurableQueue*> queue_by_task_;
+    // 队列用 shared_ptr 持有：EventBus sink 可能在 mtx_ 之外调用 enqueue，若此时
+    // on_removed 把队列摘走并 stop()/析构，裸指针会写已释放对象（UAF）。shared_ptr
+    // 让在途 sink 持有一份强引用，保证 enqueue 期间队列存活。
+    std::unordered_map<std::string, std::shared_ptr<DurableQueue>> queues_;
+    std::unordered_map<int64_t, std::shared_ptr<DurableQueue>> queue_by_task_;
 };

@@ -21,9 +21,11 @@ AgentRuntime::~AgentRuntime() { stop(); }
 
 bool AgentRuntime::start() {
     bus_.set_sink([this](const DetectionEvent& e) {
-        // 仅在锁内查找并拷贝队列指针；enqueue 含磁盘 I/O，必须在锁外执行，
+        // 仅在锁内查找并拷贝队列 shared_ptr；enqueue 含磁盘 I/O，必须在锁外执行，
         // 否则检测线程会长时间阻塞在 mtx_ 上（与 PipelineManager 形成锁序风险）。
-        DurableQueue* q = nullptr;
+        // 持 shared_ptr 而非裸指针：heartbeat 线程可能在 on_removed 摘除并停止/析构
+        // 队列的同时仍在调用本 sink，shared_ptr 保证 enqueue 期间对象存活（防 UAF）。
+        std::shared_ptr<DurableQueue> q;
         {
             std::lock_guard<std::mutex> lk(mtx_);
             auto it = queue_by_task_.find(e.task_id);
@@ -75,11 +77,11 @@ void AgentRuntime::stop() {
     // 队列 worker 的 join 必须在 mtx_ 之外：worker 可能经 snapshot provider 走
     // PipelineManager::get_task_jpeg（持其 mtx_），而其它路径持 PipelineManager::mtx_
     // 时经 sink 取 AgentRuntime::mtx_，持锁 join 会形成 ABBA 死锁。
-    std::vector<std::unique_ptr<DurableQueue>> queues;
+    std::vector<std::shared_ptr<DurableQueue>> queues;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         for (auto& entry : queues_)
-            if (entry.second) queues.push_back(std::move(entry.second));
+            if (entry.second) queues.push_back(entry.second);
         queues_.clear();
         queue_by_task_.clear();
     }
@@ -134,7 +136,7 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
     } else {
         pub = std::make_unique<HttpPublisher>(t.events.http_url, t.events.http_token);
     }
-    auto queue = std::make_unique<DurableQueue>(
+    auto queue = std::make_shared<DurableQueue>(
         t.events.buffer_dir + "/" + task_id, t.events.buffer_max_mb, pub.get());
 
     EventMeta meta;
@@ -155,8 +157,7 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
     meta.schedule = t.schedule;
     meta.roi_polygon = t.roi_polygon;
 
-    // 必须在 queue move 进 queues_ 之前设置 provider（move 后局部 unique_ptr 为空），
-    // 且必须在 start() 之前安装，避免队列中的持久化残留先于 provider 发布。
+    // 必须在 start() 之前安装 provider，避免队列中的持久化残留先于 provider 发布。
     // 配置在 task 生命周期内不可变，故按值捕获 SnapshotConfig，无需加锁查表。
     const SnapshotConfig snap_cfg = t.snapshot;
     queue->set_snapshot_provider([this, task_id, snap_cfg](int64_t, std::string* b64, int* w, int* h) {
@@ -167,8 +168,8 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
 
     {
         std::lock_guard<std::mutex> lk(mtx_);
-        queue_by_task_[meta.task_id_num] = queue.get();
-        queues_[task_id] = std::move(queue);
+        queue_by_task_[meta.task_id_num] = queue;
+        queues_[task_id] = queue;
         publishers_[task_id] = std::move(pub);
         schedules_[task_id] = SchedEntry{t.schedule, false};
         heartbeats_[task_id] = HeartbeatEntry{t.heartbeat_sec, {}};
@@ -193,15 +194,18 @@ void AgentRuntime::on_removed(const std::string& task_id) {
     // 若分两次持锁（先摘队列、停后再 erase 发布器），在锁外 stop() 的窗口内并发的
     // on_created（同一 task_id）会安装新的 queue+publisher，第二次持锁的
     // publishers_.erase 将误删新发布器，使新队列 worker 持有的 EventPublisher* 悬空（UAF）。
-    std::unique_ptr<DurableQueue> queue;
+    // 用 shared_ptr 拷贝（而非 move）：EventBus sink / heartbeat_loop 可能在 mtx_ 外
+    // 持有同一队列的强引用并调用 enqueue；shared_ptr 让本函数 stop() 与析构不再发生在
+    // 在途 enqueue 期间（避免写已释放队列导致堆破坏）。
+    std::shared_ptr<DurableQueue> queue;
     std::unique_ptr<EventPublisher> publisher;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         auto qit = queues_.find(task_id);
         if (qit != queues_.end()) {
-            queue = std::move(qit->second);
+            queue = qit->second;
             for (auto it = queue_by_task_.begin(); it != queue_by_task_.end();)
-                it = (it->second == queue.get()) ? queue_by_task_.erase(it) : std::next(it);
+                it = (it->second == queue) ? queue_by_task_.erase(it) : std::next(it);
             queues_.erase(qit);
         }
         // 与队列同锁移出发布器，保证本次删除只作用于当前这一代对象。

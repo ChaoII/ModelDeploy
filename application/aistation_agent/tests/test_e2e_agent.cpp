@@ -246,6 +246,87 @@ TEST_CASE("Agent E2E: shutdown with a running task joins detection before teardo
     fs::remove_all(buf);
 }
 
+// 单进程多任务回归：在持续发送心跳（heartbeat_sec=1）的同时反复删除/重建其中一个运行中
+// 任务，覆盖 on_removed 摘除并停止 DurableQueue 与 heartbeat_loop 经 EventBus sink 调用
+// 队列 enqueue 的竞态（原实现在锁外持裸 DurableQueue* → 写已释放队列，堆破坏/0xC0000005）。
+// 修复后队列由 shared_ptr 持有，在途 enqueue 期间对象不被析构。断言运行期始终存活、任务数一致。
+TEST_CASE("Agent E2E: two tasks with heartbeats survive churn", "[agent][e2e][churn]") {
+    if (!std::ifstream("test_data/test_video60.mp4").good() ||
+        !std::ifstream("test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx").good())
+        SKIP("test data absent");
+
+    const int agent_port = free_port();
+    auto buf = fs::temp_directory_path() / "md_e2e_buffer_churn";
+    fs::remove_all(buf);
+
+    AgentOptions o;
+    o.host = "127.0.0.1"; o.port = agent_port;
+    o.edge_code = "edge-churn";
+    o.heartbeat_interval_sec = 3600;   // 关闭外部心跳上报，只保留任务级心跳事件
+    AgentRuntime rt(o);
+    REQUIRE(rt.start());
+
+    auto make_body = [&](int tid, int cam) {
+        return json{
+            {"task_id", tid},
+            {"camera", {{"id", cam}, {"name", "cam" + std::to_string(cam)},
+                        {"url", "test_data/test_video60.mp4"}, {"transport", "tcp"}}},
+            {"models", json::array({{{"name", "det"}, {"type", "det"}, {"backend", "ort"}, {"device", "cpu"},
+                {"path", "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx"},
+                {"labels", json::array({"person"})}, {"input_size", json::array({640, 640})},
+                {"confidence_threshold", 0.35}}})},
+            {"heartbeat_sec", 1},          // 心跳每秒到期（首次 last=epoch 立即到期），制造并发
+            {"alarm_interval_sec", 0},
+            {"algorithm_type", "INTRUSION"},
+            {"preview", {{"enabled", false}}},
+            {"events", {{"transport", "http"},
+                        {"http", {{"url", "http://127.0.0.1:1/cb"}, {"token", "tk"}}},
+                        {"buffer", {{"dir", buf.string()}, {"max_mb", 8}}}}}
+        };
+    };
+
+    httplib::Client cli("127.0.0.1", agent_port);
+    for (int tid : {801, 802}) {
+        auto created = cli.Post("/api/v1/tasks", make_body(tid, tid - 800).dump(), "application/json");
+        REQUIRE(created);
+        REQUIRE(cli.Post(("/api/v1/tasks/" + std::to_string(tid) + "/start").c_str()));
+    }
+    REQUIRE(rt.manager().task_count() == 2);
+
+    // 并发读：metrics / tasks 列表
+    std::atomic<bool> hammer{true};
+    std::thread reader([&] {
+        httplib::Client mc("127.0.0.1", agent_port);
+        mc.set_connection_timeout(2, 0);
+        mc.set_read_timeout(5, 0);
+        while (hammer.load()) {
+            (void)mc.Get("/api/v1/metrics");
+            (void)mc.Get("/api/v1/tasks");
+        }
+    });
+    JoinGuard reader_guard{reader, [&]() { hammer = false; }};
+
+    // 反复删除 / 重建 801（运行中），与心跳事件并发
+    for (int round = 0; round < 6; ++round) {
+        auto del = cli.Delete("/api/v1/tasks/801");
+        REQUIRE(del);
+        auto created = cli.Post("/api/v1/tasks", make_body(801, 1).dump(), "application/json");
+        REQUIRE(created);
+        auto started = cli.Post("/api/v1/tasks/801/start");
+        REQUIRE(started);
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    }
+    hammer = false;
+    reader.join();
+
+    REQUIRE(rt.manager().task_count() == 2);
+    (void)cli.Delete("/api/v1/tasks/801");
+    (void)cli.Delete("/api/v1/tasks/802");
+    REQUIRE(rt.manager().task_count() == 0);
+    rt.stop();
+    fs::remove_all(buf);
+}
+
 #ifdef ENABLE_MQTT
 #if defined(_WIN32)
 #include <winsock2.h>
