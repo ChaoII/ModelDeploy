@@ -36,15 +36,38 @@ public:
     bool run_models(const modeldeploy::vision::ImageData& frame,
                     std::vector<std::pair<std::string, std::vector<modeldeploy::vision::DetectionResult>>>* sdk_dets,
                     std::vector<std::pair<std::string, InferResult>>* non_det = nullptr);
-    /// 生命周期约束（悬垂风险，调用方必读）：返回的裸指针指向**当前 COW 快照**内的对象，
-    /// 仅在该同名条目未被换出、且其快照仍被持有期间有效。并发的 update_model / remove_model /
-    /// clear 会原子换出新快照；当旧快照失去最后一个持有者时旧引擎被释放，先前取得的裸指针
-    /// 立即失效（再解引用即访问已释放内存 = UB）。调用方必须：即取即用、只在同步逻辑内使用、
-    /// 绝不跨热更新或跨线程长期持有。若需跨热更新保活，应改为持有 shared_ptr<InferenceEngine>。
+
+    /// 模型句柄：**强引用**持有快照内引擎，句柄存活期间 config()/det_model() 始终有效。
+    /// 用于消除下面裸指针访问器的悬垂风险（并发审计 HIGH：并发热更新换出旧快照后，
+    /// 原裸指针立即失效 → UAF）。调用方直接按值持有本句柄即可安全跨热更新使用，
+    /// 无需关心快照生命周期；句柄析构时若该引擎已不在当前快照中则随之释放。
+    class ModelRef {
+    public:
+        ModelRef() = default;
+        explicit ModelRef(std::shared_ptr<InferenceEngine> engine) : engine_(std::move(engine)) {}
+
+        explicit operator bool() const { return static_cast<bool>(engine_); }
+        const ModelConfig* config() const { return engine_ ? &engine_->config() : nullptr; }
+        modeldeploy::vision::detection::UltralyticsDet* det_model() const {
+            return engine_ ? engine_->det_model() : nullptr;
+        }
+        const std::shared_ptr<InferenceEngine>& engine() const { return engine_; }
+
+    private:
+        std::shared_ptr<InferenceEngine> engine_;
+    };
+
+    /// 按模型名取强引用句柄（并发安全，供生产路径使用）；未找到返回空句柄。
+    ModelRef find_model(const std::string& name) const;
+
+    /// ⚠️ 以下两个裸指针访问器仅为诊断/测试保留（非生产路径）：返回的快照内对象在
+    /// 并发热更新换出同名条目后立即悬垂，**不得**在 pipeline 等生产路径使用。
+    /// 生产代码请改用 find_model() 取得 ModelRef。
     modeldeploy::vision::detection::UltralyticsDet* det_model(const std::string& name);
     /// 按模型名取 ModelConfig（含动态 add_model 加入的模型），未找到返回 nullptr。
-    /// 生命周期约束同 det_model：裸指针指向快照内引擎，并发热更新后可能悬垂，须即取即用。
+    /// 生命周期约束同 det_model（悬垂风险），生产路径请改用 find_model()。
     const ModelConfig* config_of(const std::string& name) const;
+
 private:
     /// per-entry 可变状态：仅 detect 线程访问；热交换时代码复用（不重置跳帧计数）
     struct EntryState {

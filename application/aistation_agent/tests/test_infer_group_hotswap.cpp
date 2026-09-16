@@ -178,3 +178,41 @@ TEST_CASE("InferGroup 更新失败保持旧模型（fail-safe）", "[agent][hots
     REQUIRE(dets.size() == 2);
     REQUIRE(non_det.empty());
 }
+
+// 并发审计 HIGH：旧 API config_of()/det_model() 返回快照内裸指针，函数返回即可能悬垂
+// （并发热更新/移除换出新快照后旧引擎被释放 → UAF）。find_model() 返回的 ModelRef 以
+// 强引用保活引擎：即使当前快照已换出该条目，旧句柄的解引用依然有效（值不变）。
+TEST_CASE("InferGroup ModelRef 跨热更新保活（防悬垂 UAF）", "[agent][hotswap]") {
+    if (!det_data_available()) SKIP("test data absent");
+    DetPrototype proto;
+    REQUIRE(proto.ok);
+    InferGroup g;
+    seed(g, &proto.engine);
+
+    // 取旧引擎句柄，随后热更新同一条目换入新引擎
+    InferGroup::ModelRef old_ref = g.find_model("m2");
+    REQUIRE(static_cast<bool>(old_ref));
+    REQUIRE(old_ref.config() != nullptr);
+    REQUIRE(old_ref.config()->confidence_threshold == 0.5f);
+    REQUIRE(old_ref.det_model() != nullptr);
+
+    REQUIRE(g.update_model(real_cfg("m2", 0.9f), clone_factory(&proto.engine)));
+
+    // 当前快照已换新引擎
+    InferGroup::ModelRef new_ref = g.find_model("m2");
+    REQUIRE(static_cast<bool>(new_ref));
+    REQUIRE(new_ref.config()->confidence_threshold == 0.9f);
+    REQUIRE(new_ref.engine().get() != old_ref.engine().get());   // 确实换出
+
+    // 旧句柄仍保活旧引擎：解引用安全且读到旧值（旧实现此处读已释放内存 = UB）
+    REQUIRE(old_ref.config() != nullptr);
+    REQUIRE(old_ref.config()->confidence_threshold == 0.5f);
+    REQUIRE(old_ref.det_model() != nullptr);
+
+    // 显式移除后旧快照失去最后一个快照持有者，但句柄仍保活
+    REQUIRE(g.remove_model("m2"));
+    REQUIRE_FALSE(static_cast<bool>(g.find_model("m2")));
+    REQUIRE(old_ref.config() != nullptr);
+    REQUIRE(old_ref.config()->confidence_threshold == 0.5f);
+    REQUIRE(old_ref.det_model() != nullptr);
+}

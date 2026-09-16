@@ -208,29 +208,27 @@ bool InferGroup::run_models(
     return any;
 }
 
-modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
-    // 取快照后即返回裸指针：指针归快照内引擎所有，并发热更新换出该条目的旧快照时可能悬垂
-    // （详见头文件生命周期约束）。调用方须即取即用，绝不跨热更新/跨线程长期持有。
+InferGroup::ModelRef InferGroup::find_model(const std::string& name) const {
+    // 取出当前不可变快照的强引用后在锁外查找：返回的 ModelRef 持有其中引擎的 shared_ptr，
+    // 即使随后并发热更新原子换出新快照、旧快照失去其它持有者，本句柄仍保活该引擎，
+    // 调用方在句柄存活期间解引用 config()/det_model() 不会悬垂（消除 UAF）。
     std::shared_ptr<const std::vector<Entry>> snap;
     {
         std::lock_guard<std::mutex> lk(entries_mtx_);
         snap = entries_;
     }
     for (const auto& en : *snap) {
-        if (en.engine && en.engine->config().name == name) return en.engine->det_model();
+        if (en.engine && en.engine->config().name == name) return ModelRef(en.engine);
     }
-    return nullptr;
+    return ModelRef();
+}
+
+modeldeploy::vision::detection::UltralyticsDet* InferGroup::det_model(const std::string& name) {
+    // 诊断/测试用（非生产路径）：裸指针不保活，见头文件生命周期约束。
+    return find_model(name).det_model();
 }
 
 const ModelConfig* InferGroup::config_of(const std::string& name) const {
-    // 同上：返回快照内引擎的配置裸指针，并发热更新后可能悬垂（见头文件生命周期约束）。
-    std::shared_ptr<const std::vector<Entry>> snap;
-    {
-        std::lock_guard<std::mutex> lk(entries_mtx_);
-        snap = entries_;
-    }
-    for (const auto& en : *snap) {
-        if (en.engine && en.engine->config().name == name) return &en.engine->config();
-    }
-    return nullptr;
+    // 诊断/测试用（非生产路径）：裸指针不保活，见头文件生命周期约束。
+    return find_model(name).config();
 }

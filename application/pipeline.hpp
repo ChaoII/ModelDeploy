@@ -136,8 +136,8 @@ private:
     /// 低频快照生成（对设备帧回读 CPU；不占 25fps 关键路径）
     void update_snapshot(const modeldeploy::vision::ImageData& frame, int64_t& counter);
 
-    /// 按模型名取置信度阈值（缺省 0.5）
-    double model_threshold(const std::string& name) const;
+    /// 按模型名取置信度阈值（缺省 0.5）；mc 为调用方持有的模型配置句柄（可为 null）
+    double model_threshold(const std::string& name, const ModelConfig* mc) const;
 
     /// 非 detection（face/classification）结果标注到帧（DrawEngine；NV12 就地/回环绘制）
     void draw_non_det(modeldeploy::vision::ImageData& frame,

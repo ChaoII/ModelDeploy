@@ -204,12 +204,11 @@ void Pipeline::push_detect_frame(modeldeploy::video::VideoFrame&& f) {
     det_cv_.notify_one();
 }
 
-double Pipeline::model_threshold(const std::string& name) const {
+double Pipeline::model_threshold(const std::string& name, const ModelConfig* mc) const {
     for (const auto& m : cfg_.models) {
         if (m.name == name) return m.confidence_threshold;
     }
-    // 动态 add_model 加入的模型不在 cfg_.models：回退查 InferGroup 引擎配置
-    const auto* mc = infer_group_.config_of(name);
+    // 动态 add_model 加入的模型不在 cfg_.models：回退用调用方持有的句柄配置
     if (mc) return mc->confidence_threshold;
     return 0.5;
 }
@@ -401,9 +400,9 @@ void Pipeline::detect_loop() {
                 std::vector<DetectionBox> boxes;
                 for (size_t mi = 0; mi < sdk_dets.size(); ++mi) {
                     const auto& [name, dets] = sdk_dets[mi];
-                    // 注意：config_of 返回快照内引擎的裸指针，仅限本循环内即时使用；
-                    // 不得跨热更新（InferGroup::update_model/remove_model）长期持有。
-                    const ModelConfig* mc = infer_group_.config_of(name);
+                    // 句柄强引用保活引擎：并发热更新换出新快照也不会让 mc 悬垂（消除 UAF）。
+                    const InferGroup::ModelRef ref = infer_group_.find_model(name);
+                    const ModelConfig* mc = ref.config();
                     for (size_t di = 0; di < dets.size(); ++di) {
                         const auto& d = dets[di];
                         DetectionBox b;
@@ -440,9 +439,10 @@ void Pipeline::detect_loop() {
 
         // 绘制（设备 NV12 就地 / CPU）
         for (auto& [name, dets] : sdk_dets) {
-            // 同上：det_model 指针仅在本次绘制内即时使用，不跨热更新持有
-            auto* det = infer_group_.det_model(name);
-            if (det) det->draw_result(f.image, dets, model_threshold(name));
+            // 句柄在本次绘制期间保活引擎与底层检测器（并发热更新也不会悬垂）
+            const InferGroup::ModelRef ref = infer_group_.find_model(name);
+            auto* det = ref.det_model();
+            if (det) det->draw_result(f.image, dets, model_threshold(name, ref.config()));
         }
         if (!non_det.empty()) {
             std::vector<InferResult> res;
