@@ -184,18 +184,18 @@ MD_TARGET_AVX2 void fusion_rpnp_avx2(const uint8_t* src, int src_w, int src_h,
                 g[i] = p[1];
                 r[i] = p[2];
             }
-            _mm256_storeu_ps(dst + 0 * plane + base + x, _mm256_fmadd_ps(_mm256_loadu_ps(r), a0, b0));
+            _mm256_storeu_ps(dst + 0 * plane + base + x, _mm256_fmadd_ps(_mm256_loadu_ps(b), a0, b0));
             _mm256_storeu_ps(dst + 1 * plane + base + x, _mm256_fmadd_ps(_mm256_loadu_ps(g), a1, b1));
-            _mm256_storeu_ps(dst + 2 * plane + base + x, _mm256_fmadd_ps(_mm256_loadu_ps(b), a2, b2));
+            _mm256_storeu_ps(dst + 2 * plane + base + x, _mm256_fmadd_ps(_mm256_loadu_ps(r), a2, b2));
         }
         // 内容区尾部标量
         for (; x < resize_w; ++x) {
             const int sx = std::min(static_cast<int>(x * kx), last_sx);
             const uint8_t* p = src_row + sx * 3;
             const float pb = p[0], pg = p[1], pr = p[2];
-            dst[0 * plane + base + x] = pr * alpha[0] + beta[0];
+            dst[0 * plane + base + x] = pb * alpha[0] + beta[0];
             dst[1 * plane + base + x] = pg * alpha[1] + beta[1];
-            dst[2 * plane + base + x] = pb * alpha[2] + beta[2];
+            dst[2 * plane + base + x] = pr * alpha[2] + beta[2];
         }
         // 行尾 pad 区
         for (; x < dst_w; ++x) {

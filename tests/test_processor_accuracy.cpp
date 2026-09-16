@@ -11,6 +11,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "csrc/vision.h"
+#include "csrc/vision/ocr/rec_preprocessor.h"
 #include "csrc/vision/processors/processor_factory.h"
 #include "csrc/vision/processors/cpu/ocr_det_preprocess.h"
 #include "csrc/vision/processors/cpu/cpu_processor_backend.h"
@@ -349,6 +350,48 @@ TEST_CASE("Processor accuracy: ocr det ocr_det_preprocess CPU vs CUDA", "[proces
     REQUIRE(tensor_maxdiff(cpu_t, cuda_host, &nd) < 1e-4);
     REQUIRE(nd <= 16);
 #endif
+}
+
+// ============ OCR det / rec 通道序：BGR 保持 ============
+// 回归防护：曾把 BGR 图按 RGB 送进 PaddleOCR 系 det/rec 模型（彩色字符识别错+置信度低）。
+// 合成纯色图（B=10,G=20,R=30，三通道可区分），断言输出 C0 对应 B、C2 对应 R。
+TEST_CASE("Processor accuracy: ocr det/rec preprocess keeps BGR channel order", "[processor_accuracy]") {
+    std::vector<uint8_t> buf(8 * 8 * 3);
+    for (size_t i = 0; i < buf.size(); i += 3) {
+        buf[i] = 10;      // B
+        buf[i + 1] = 20;  // G
+        buf[i + 2] = 30;  // R
+    }
+    ImageData img = ImageData::from_raw(buf.data(), 8, 8, MdImageType::PKG_BGR_U8, true);
+
+    // det：ocr_det_preprocess_cpu（rpnp 核）；mean=0, std=1 → out = src / 255
+    {
+        const std::vector<ImageData> imgs{img};
+        const std::vector<std::array<int, 2>> resize_sizes{{8, 8}};
+        Tensor out;
+        REQUIRE(ocr_det_preprocess_cpu(imgs, &out, resize_sizes, {8, 8},
+                                       {0.f, 0.f, 0.f}, {1.f, 1.f, 1.f}, 0.f));
+        const float* d = static_cast<const float*>(out.data());
+        const int plane = 8 * 8;
+        REQUIRE(d[0 * plane] == Catch::Approx(10.f / 255.f).margin(1e-5f));
+        REQUIRE(d[1 * plane] == Catch::Approx(20.f / 255.f).margin(1e-5f));
+        REQUIRE(d[2 * plane] == Catch::Approx(30.f / 255.f).margin(1e-5f));
+    }
+
+    // rec：RecognizerPreprocessor 默认 mean/std=0.5，必须为 BGR（swap_rb=false）
+    {
+        modeldeploy::vision::ocr::RecognizerPreprocessor proc;
+        std::vector<ImageData> imgs{img};
+        std::vector<Tensor> outs;
+        REQUIRE(proc.apply(imgs, &outs));
+        REQUIRE(outs.size() == 1);
+        const float* d = static_cast<const float*>(outs[0].data());
+        const int plane = 48 * 320;
+        const auto norm = [](float v) { return (v / 255.f - 0.5f) / 0.5f; };
+        REQUIRE(d[0 * plane] == Catch::Approx(norm(10.f)).margin(1e-4f));
+        REQUIRE(d[1 * plane] == Catch::Approx(norm(20.f)).margin(1e-4f));
+        REQUIRE(d[2 * plane] == Catch::Approx(norm(30.f)).margin(1e-4f));
+    }
 }
 
 // ==================== fused_color_matrix：BGR2YCrCb 对齐 ====================

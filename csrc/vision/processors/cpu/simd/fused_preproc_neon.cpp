@@ -217,9 +217,9 @@ void fusion_rpnp_neon(const uint8_t* src, int src_w, int src_h,
             const int sx = std::min(static_cast<int>(x * kx), last_sx);
             const int sy = std::min(static_cast<int>(y * ky), last_sy);
             const uint8_t* p = src + (sy * src_w + sx) * 3;
-            dst[0 * plane + idx] = p[2] * alpha[0] + beta[0];
+            dst[0 * plane + idx] = p[0] * alpha[0] + beta[0];
             dst[1 * plane + idx] = p[1] * alpha[1] + beta[1];
-            dst[2 * plane + idx] = p[0] * alpha[2] + beta[2];
+            dst[2 * plane + idx] = p[2] * alpha[2] + beta[2];
         }
     }
 }

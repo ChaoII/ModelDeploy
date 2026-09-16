@@ -68,9 +68,10 @@ namespace modeldeploy::vision::ocr {
             }
             const float scale_x = static_cast<float>(resize_w) / image.width();
             const float scale_y = static_cast<float>(img_h) / image.height();
+            // swap_rb=false：PaddleOCR 系 rec 模型按 BGR 训练，与 cls/table/layout 保持一致
             if (!backend_->fused_preprocess_common(image, &(*outputs)[0], {batch_max_w, img_h},
                                             0.0f, 0.0f, scale_x, scale_y,
-                                            alpha, beta, true, pad_norm)) return false;
+                                            alpha, beta, false, pad_norm)) return false;
             return true;
         }
         // 整批一次 fused kernel（每图独立 resize_w -> scale_x，右侧 pad）
@@ -92,7 +93,7 @@ namespace modeldeploy::vision::ocr {
         outputs->resize(1);
         if (!backend_->fused_preprocess_common_batch(image_batch, &(*outputs)[0], {batch_max_w, img_h},
                                               oxs, oys, sxs, sys,
-                                              alpha, beta, true, pad_norm)) return false;
+                                              alpha, beta, false, pad_norm)) return false;
         return true;
     }
 }

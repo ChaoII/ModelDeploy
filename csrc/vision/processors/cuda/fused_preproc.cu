@@ -689,10 +689,10 @@ __global__ void kernel_fusion_rpnp_batch(
     const float bb = p[0];
     const float g = p[1];
     const float r = p[2];
-    // swap BGR->RGB：C0=R, C1=G, C2=B
-    dst_b[0 * plane + idx] = r * alpha0 + beta0;
+    // BGR 保持：C0=B, C1=G, C2=R
+    dst_b[0 * plane + idx] = bb * alpha0 + beta0;
     dst_b[1 * plane + idx] = g * alpha1 + beta1;
-    dst_b[2 * plane + idx] = bb * alpha2 + beta2;
+    dst_b[2 * plane + idx] = r * alpha2 + beta2;
 }
 
 bool ocr_det_preprocess_cuda(const std::vector<ImageData>& images,

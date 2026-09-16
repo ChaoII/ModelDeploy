@@ -176,16 +176,16 @@ MD_TARGET_AVX512 void fusion_rpnp_avx512(const uint8_t* src, int src_w, int src_
                 g[i] = p[1];
                 r[i] = p[2];
             }
-            _mm512_storeu_ps(dst + 0 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(r), a0, b0));
+            _mm512_storeu_ps(dst + 0 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(b), a0, b0));
             _mm512_storeu_ps(dst + 1 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(g), a1, b1));
-            _mm512_storeu_ps(dst + 2 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(b), a2, b2));
+            _mm512_storeu_ps(dst + 2 * plane + base + x, _mm512_fmadd_ps(_mm512_loadu_ps(r), a2, b2));
         }
         for (; x < resize_w; ++x) {
             const int sx = std::min(static_cast<int>(x * kx), last_sx);
             const uint8_t* p = src_row + sx * 3;
-            dst[0 * plane + base + x] = p[2] * alpha[0] + beta[0];
+            dst[0 * plane + base + x] = p[0] * alpha[0] + beta[0];
             dst[1 * plane + base + x] = p[1] * alpha[1] + beta[1];
-            dst[2 * plane + base + x] = p[0] * alpha[2] + beta[2];
+            dst[2 * plane + base + x] = p[2] * alpha[2] + beta[2];
         }
         for (; x < dst_w; ++x) {
             dst[0 * plane + base + x] = pad[0];

@@ -133,7 +133,7 @@ void fused_bilinear_preproc_scalar(const uint8_t* src, int src_w, int src_h,
     }
 }
 
-// OCR det per-channel-pad scalar kernel（resize + pad right/bottom + swap + affine）
+// OCR det per-channel-pad scalar kernel（resize + pad right/bottom + BGR 保持 + affine）
 void fusion_rpnp_scalar(const uint8_t* src, int src_w, int src_h,
                         float* dst, int dst_w, int dst_h,
                         int resize_w, int resize_h,
@@ -159,9 +159,9 @@ void fusion_rpnp_scalar(const uint8_t* src, int src_w, int src_h,
     const int sy = std::min(static_cast<int>(y * ky), last_sy);
     const uint8_t* p = src + (sy * src_w + sx) * 3;
     const float pb = p[0], pg = p[1], pr = p[2];
-    dst[0 * plane + idx] = pr * alpha[0] + beta[0];
+    dst[0 * plane + idx] = pb * alpha[0] + beta[0];
     dst[1 * plane + idx] = pg * alpha[1] + beta[1];
-    dst[2 * plane + idx] = pb * alpha[2] + beta[2];
+    dst[2 * plane + idx] = pr * alpha[2] + beta[2];
         }
     }
 }
