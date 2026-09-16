@@ -84,11 +84,17 @@ struct MqttPublisher::Impl {
     }
 
     void keepalive_loop() {
+        // 本线程必须自吞异常：未捕获异常经 std::thread 触发 std::terminate 直接杀死进程
+        // （与 Agent 其它 worker 线程一致）。连接/分配异常不应中断保活循环。
         while (running.load()) {
-            {
+            try {
                 std::lock_guard<std::mutex> lk(mtx);
                 ensure_connected();
                 if (client) MQTTClient_yield();
+            } catch (const std::exception& e) {
+                std::cerr << "[MqttPublisher] keepalive tick failed: " << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "[MqttPublisher] keepalive tick failed: unknown" << std::endl;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(250));
         }

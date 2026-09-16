@@ -219,6 +219,18 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
                                                      int w, int h, double lat) {
         bus_.on_detections(task_id, boxes, w, h, lat);
     });
+
+    // 防御控制面 TOCTOU（并发 POST /tasks 与 DELETE /tasks/:id 的交错，并发审计 #7 Medium）：
+    // create_task 成功后、本 hook 完成注册前若任务被并发删除，删除侧的 on_removed 可能已执行
+    // 完毕（此时本代队列/发布器尚未注册，其清理为空操作）→ 这里注册的对象将永不清理（孤儿
+    // worker 线程 + MQTT 连接 + 磁盘队列目录）。注册完成后复核 manager 状态，任务已不存在则
+    // 立即走 on_removed 清理（幂等，且若删除侧稍后才执行 on_removed，重复清理同样安全）。
+    TaskConfig probe;
+    if (!mgr_.get_task_config(task_id, &probe)) {
+        std::cerr << "[AgentRuntime] task " << task_id
+                  << " removed during on_created; cleaning up (TOCTOU)" << std::endl;
+        on_removed(task_id);
+    }
 }
 
 void AgentRuntime::on_updated(const std::string& task_id, const AdaptedTask& t) {
