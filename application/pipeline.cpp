@@ -489,6 +489,7 @@ void Pipeline::detect_loop() {
 // ── 模型动态管理 ──
 
 bool Pipeline::update_config(const TaskConfig& cfg) {
+    std::lock_guard<std::mutex> lock(cfg_mtx_);
     cfg_.enable_preview = cfg.enable_preview;
     cfg_.input_url = cfg.input_url;
     cfg_.output_url = cfg.output_url;
@@ -505,7 +506,13 @@ bool Pipeline::update_config(const TaskConfig& cfg) {
 }
 
 void Pipeline::update_preview_mode(bool enable) {
+    std::lock_guard<std::mutex> lock(cfg_mtx_);
     cfg_.enable_preview = enable;
+}
+
+TaskConfig Pipeline::config() const {
+    std::lock_guard<std::mutex> lock(cfg_mtx_);
+    return cfg_;
 }
 
 bool Pipeline::add_model(const ModelConfig& mcfg) {

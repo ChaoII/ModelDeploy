@@ -153,6 +153,21 @@ void PipelineManager::evict_prototypes_locked(const std::string& keep_key) {
     }
 }
 
+std::shared_ptr<PipelineManager::TaskEntry> PipelineManager::find_entry(const std::string& task_id) const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = pipelines_.find(task_id);
+    return it == pipelines_.end() ? nullptr : it->second;
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<PipelineManager::TaskEntry>>>
+PipelineManager::snapshot_entries() const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    std::vector<std::pair<std::string, std::shared_ptr<TaskEntry>>> entries;
+    entries.reserve(pipelines_.size());
+    for (const auto& [id, e] : pipelines_) entries.emplace_back(id, e);
+    return entries;
+}
+
 bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
     std::string local_err;
     if (!cfg.validate(&local_err)) {
@@ -177,95 +192,104 @@ bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
         return this->create_engine(mcfg);
     };
 
-    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, std::move(factory));
+    auto entry = std::make_shared<TaskEntry>();
+    entry->pipe = std::make_shared<Pipeline>(cfg, std::move(factory));
+    pipelines_[cfg.id] = std::move(entry);
     dirty_ = true;
     std::cout << "[Manager] Task created: " << cfg.id << std::endl;
     return true;
 }
 
 bool PipelineManager::set_detection_sink(const std::string& task_id, Pipeline::DetectionSink sink) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    it->second->set_detection_sink(std::move(sink));
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) return false;   // 加锁窗口内可能已被 remove
+    entry->pipe->set_detection_sink(std::move(sink));
     return true;
 }
 
 bool PipelineManager::remove_task(const std::string& task_id) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    // unique_ptr destructor calls Pipeline::stop()
-    pipelines_.erase(it);
-    dirty_ = true;
+    std::shared_ptr<TaskEntry> entry;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = pipelines_.find(task_id);
+        if (it == pipelines_.end()) return false;
+        entry = it->second;
+        pipelines_.erase(it);   // 先从映射摘除：新操作立即找不到本任务
+        dirty_ = true;
+    }
+    // 等本任务在途慢操作结束，再停止（join 检测/编解码线程，可能秒级）——
+    // 全程不持 mtx_：其它任务的启停/查询/调度不受影响。
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    entry->pipe->stop();
     std::cout << "[Manager] Task removed: " << task_id << std::endl;
     return true;
 }
 
 bool PipelineManager::start_task(const std::string& task_id) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    return it->second->start();
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    // 模型加载在 mtx_ 之外（旧实现持全局锁加载 → 控制面全线阻塞）
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) return false;   // 加锁窗口内可能已被 remove
+    return entry->pipe->start();
 }
 
 bool PipelineManager::stop_task(const std::string& task_id) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    it->second->stop();
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    // 线程 join 在 mtx_ 之外
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) return false;
+    entry->pipe->stop();
     return true;
 }
 
 bool PipelineManager::get_task_config(const std::string& task_id, TaskConfig* cfg) const {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end() || !cfg) return false;
-    *cfg = it->second->config();
+    auto entry = find_entry(task_id);
+    if (!entry || !cfg) return false;
+    *cfg = entry->pipe->config();   // Pipeline::config() 内部按值快照（cfg_mtx_）
     return true;
 }
 
 bool PipelineManager::get_task_stats(const std::string& task_id, std::string* stats_json) const {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end() || !stats_json) return false;
-    *stats_json = it->second->stats().to_json();
+    auto entry = find_entry(task_id);
+    if (!entry || !stats_json) return false;
+    *stats_json = entry->pipe->stats().to_json();
     return true;
 }
 
 bool PipelineManager::get_task_jpeg(const std::string& task_id, std::vector<uint8_t>* jpeg, int quality) {
+    if (!jpeg) return false;
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    // 仅做 shared_ptr 快照拷贝（微秒级），JPEG 编码在所有锁之外（5-15ms）
     std::shared_ptr<modeldeploy::vision::ImageData> snap;
-    {
-        // 全局锁内只做 shared_ptr 快照拷贝（微秒级），JPEG 编码在锁外（5-15ms）
-        std::lock_guard<std::mutex> lock(mtx_);
-        auto it = pipelines_.find(task_id);
-        if (it == pipelines_.end() || !jpeg) return false;
-        if (!it->second->latest_bgr_snapshot(&snap)) return false;
-    }
+    if (!entry->pipe->latest_bgr_snapshot(&snap)) return false;
     return Pipeline::encode_jpeg(snap, jpeg, quality);
 }
 
 std::vector<TaskStatus> PipelineManager::list_tasks() const {
-    std::lock_guard<std::mutex> lock(mtx_);
     std::vector<TaskStatus> result;
-    result.reserve(pipelines_.size());
-    for (const auto& [id, pipe] : pipelines_) {
+    for (const auto& [id, entry] : snapshot_entries()) {
+        const TaskConfig c = entry->pipe->config();   // 一次一致性快照
         TaskStatus ts;
         ts.id = id;
-        ts.name = pipe->config().name;
-        ts.running = pipe->is_running();
-        ts.initialized = pipe->is_initialized();
-        ts.init_error = pipe->init_error();
-        ts.input_url = pipe->config().input_url;
-        ts.output_url = pipe->config().output_url;
-        ts.preview_url = pipe->config().preview_url;
-        ts.enable_preview = pipe->config().enable_preview;
-        for (const auto& m : pipe->config().models) {
+        ts.name = c.name;
+        ts.running = entry->pipe->is_running();
+        ts.initialized = entry->pipe->is_initialized();
+        ts.init_error = entry->pipe->init_error();
+        ts.input_url = c.input_url;
+        ts.output_url = c.output_url;
+        ts.preview_url = c.preview_url;
+        ts.enable_preview = c.enable_preview;
+        for (const auto& m : c.models) {
             ts.model_names.push_back(m.name);
             ts.model_types.push_back(m.type);
         }
-        ts.stats_json = pipe->stats().to_json();
-        result.push_back(ts);
+        ts.stats_json = entry->pipe->stats().to_json();
+        result.push_back(std::move(ts));
     }
     return result;
 }
@@ -276,75 +300,92 @@ size_t PipelineManager::task_count() const {
 }
 
 bool PipelineManager::add_model(const std::string& task_id, const ModelConfig& mcfg) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    bool ok = it->second->add_model(mcfg);
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) return false;
+    bool ok = entry->pipe->add_model(mcfg);   // 模型加载在锁外
     if (ok) dirty_ = true;
     return ok;
 }
 
 bool PipelineManager::remove_model(const std::string& task_id, const std::string& model_name) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    bool ok = it->second->remove_model(model_name);
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) return false;
+    bool ok = entry->pipe->remove_model(model_name);
     if (ok) dirty_ = true;
     return ok;
 }
 
 bool PipelineManager::update_model(const std::string& task_id, const std::string& model_name,
                                     const ModelConfig& mcfg) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) return false;
-    bool ok = it->second->update_model(model_name, mcfg);
+    auto entry = find_entry(task_id);
+    if (!entry) return false;
+    // 引擎加载（秒级）在 mtx_ 之外：热更新不再阻塞其它任务的控制面/查询
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) return false;
+    bool ok = entry->pipe->update_model(model_name, mcfg);
     if (ok) dirty_ = true;
     return ok;
 }
 
 bool PipelineManager::update_task(const std::string& task_id, const TaskConfig& cfg, std::string* err) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = pipelines_.find(task_id);
-    if (it == pipelines_.end()) {
+    auto entry = find_entry(task_id);
+    if (!entry) {
         if (err) *err = "task not found";
         return false;
     }
-    // 需要先停止才能修改配置
-    if (it->second->is_running()) {
+    std::lock_guard<std::mutex> lk(entry->op_mtx);
+    if (!find_entry(task_id)) {
+        if (err) *err = "task not found";
+        return false;
+    }
+    auto& pipe = *entry->pipe;
+    // 需要先停止才能修改配置（op_mtx 保证与并发 start_task 互斥，不再有 TOCTOU）
+    if (pipe.is_running()) {
         if (err) *err = "task must be stopped before updating config";
         return false;
     }
 
-    // Diff 模型列表：移除旧有的、添加新增的
-    TaskConfig old_cfg = it->second->config();
+    // Diff 模型列表：移除旧有的、添加新增的（引擎加载在 mtx_ 之外）
+    TaskConfig old_cfg = pipe.config();
     std::set<std::string> old_names, new_names;
     for (const auto& m : old_cfg.models) old_names.insert(m.name);
     for (const auto& m : cfg.models) new_names.insert(m.name);
 
     for (const auto& m : old_cfg.models) {
         if (!new_names.count(m.name)) {
-            it->second->remove_model(m.name);
+            pipe.remove_model(m.name);
         }
     }
     for (const auto& m : cfg.models) {
         if (!old_names.count(m.name)) {
-            it->second->add_model(m);
+            pipe.add_model(m);
         }
     }
 
-    bool ok = it->second->update_config(cfg);
+    bool ok = pipe.update_config(cfg);
     if (ok) dirty_ = true;
     return ok;
 }
 
 void PipelineManager::stop_all() {
-    std::lock_guard<std::mutex> lock(mtx_);
-    for (auto& [id, pipe] : pipelines_) {
-        pipe->stop();
+    // 先摘除全部（映射清空，新操作找不到任何任务），再在 mtx_ 之外逐个停止/join。
+    std::vector<std::pair<std::string, std::shared_ptr<TaskEntry>>> entries;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        entries.reserve(pipelines_.size());
+        for (const auto& [id, e] : pipelines_) entries.emplace_back(id, e);
+        pipelines_.clear();
+        dirty_ = true;
     }
-    pipelines_.clear();
-    dirty_ = true;
+    for (auto& [id, entry] : entries) {
+        if (!entry) continue;
+        std::lock_guard<std::mutex> lk(entry->op_mtx);
+        entry->pipe->stop();   // join 在 mtx_ 之外
+    }
 }
 
 // ── 模型库管理 ──
@@ -458,7 +499,9 @@ bool PipelineManager::load_from_directory(const std::string& dir) {
                             Pipeline::ModelFactory factory = [this](const ModelConfig& mcfg) {
                                 return this->create_engine(mcfg);
                             };
-    pipelines_[cfg.id] = std::make_unique<Pipeline>(cfg, std::move(factory));
+                            auto entry = std::make_shared<TaskEntry>();
+                            entry->pipe = std::make_shared<Pipeline>(cfg, std::move(factory));
+                            pipelines_[cfg.id] = std::move(entry);
                             ++count;
                         }
                     }
@@ -506,8 +549,8 @@ bool PipelineManager::save_to_directory(const std::string& dir) {
         {
             json j;
             j["tasks"] = json::array();
-            for (const auto& [id, pipe] : pipelines_) {
-                j["tasks"].push_back(task_config_to_json(pipe->config()));
+            for (const auto& [id, entry] : pipelines_) {
+                j["tasks"].push_back(task_config_to_json(entry->pipe->config()));
             }
         std::ofstream f(p / "tasks.json");
         if (f.is_open()) f << j.dump(2);

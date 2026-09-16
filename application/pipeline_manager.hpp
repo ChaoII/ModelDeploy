@@ -105,8 +105,26 @@ public:
     size_t prototype_count() const;
 
 private:
-    mutable std::mutex mtx_;
-    std::map<std::string, std::unique_ptr<Pipeline>> pipelines_;
+    // 任务条目：Pipeline 用 shared_ptr 持有，慢操作（模型加载/线程 join）在**不持 mtx_**
+    // 的情况下进行（旧实现持全局 mtx_ 跨秒级加载/join → 所有控制面/调度/心跳一起阻塞，
+    // 实测控制面请求超时；并发审计 HIGH）。取出条目后在锁外执行，shared_ptr 保证期间
+    // remove_task 摘除映射也不会 UAF。
+    struct TaskEntry {
+        std::shared_ptr<Pipeline> pipe;
+        // 串行化**同一任务**的慢操作与配置变更（启停/移除/热更新/改配置）：
+        // 不同任务互不阻塞；读取路径（list_tasks/get_task_config 等）不持本锁，
+        // 通过 Pipeline::config() 的 cfg_mtx_ 快照取得一致配置。
+        mutable std::mutex op_mtx;
+    };
+
+    /// 按 id 取条目（持 mtx_ 拷贝 shared_ptr）；不存在返回 nullptr。
+    /// 条目在调用方持有期间始终存活，可安全在锁外做慢操作。
+    std::shared_ptr<TaskEntry> find_entry(const std::string& task_id) const;
+    /// 取全部条目快照（持 mtx_ 拷贝后立即放锁）
+    std::vector<std::pair<std::string, std::shared_ptr<TaskEntry>>> snapshot_entries() const;
+
+    mutable std::mutex mtx_;   // 仅保护 pipelines_ / model_library_ 映射本身（短临界区）
+    std::map<std::string, std::shared_ptr<TaskEntry>> pipelines_;
     std::vector<ModelConfig> model_library_;
     std::atomic<bool> dirty_{false};
 

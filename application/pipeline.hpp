@@ -52,7 +52,9 @@ public:
 
     const std::string& task_id() const { return cfg_.id; }
     const PerfStats& stats() const { return stats_; }
-    const TaskConfig& config() const { return cfg_; }
+    /// 任务配置**快照**（按值返回）：内部持 cfg_mtx_ 拷贝，避免与 update_config 并发读写
+    /// cfg_ 造成数据竞争（PipelineManager 的读取路径在慢操作锁之外调用它）。
+    TaskConfig config() const;
 
     bool add_model(const ModelConfig& mcfg);
     bool remove_model(const std::string& name);
@@ -77,6 +79,9 @@ public:
 
 private:
     TaskConfig cfg_;
+    // 保护 cfg_ 的读写快照：config() 在读取侧拷贝，update_config/update_preview_mode 在
+    // 写入侧持有，保证 PipelineManager 的读取路径（不持 op_mtx）不会读到写入中的配置。
+    mutable std::mutex cfg_mtx_;
     ModelFactory model_factory_;
     InferGroup infer_group_;
     std::unique_ptr<DrawEngine> draw_engine_;   // 非 detection（face/classification）CPU 标注
