@@ -34,4 +34,12 @@ std::vector<std::array<float, 2>> parse_roi_polygon(const nlohmann::json& roi);
 std::string normalize_broker_scheme(const std::string& url);
 std::string base64_encode_bytes(const std::vector<uint8_t>& data);
 
+/// 计算某任务实际使用的 MQTT client_id（防御云端下发"每边缘唯一"而非"每任务唯一"的 id）。
+/// Agent 为**每个任务**创建独立的 MQTT 连接，故 client_id 必须在同一 edge 内唯一：MQTT 规范
+/// 要求 broker 在收到重复 client_id 的连接时断开旧连接，若所有任务共用同一 id，会造成任务间
+/// 相互顶下线、事件丢失。这里在云端下发值（或默认 aistation-agent-<edge_code>）后统一追加
+/// 任务 id，保证每任务唯一且跨重连稳定。configured 为空时使用 edge_code 派生默认前缀。
+std::string mqtt_client_id_for(const std::string& configured, const std::string& edge_code,
+                               const std::string& task_id);
+
 }  // namespace aistation

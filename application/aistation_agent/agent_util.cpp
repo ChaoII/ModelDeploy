@@ -108,4 +108,14 @@ std::string base64_encode_bytes(const std::vector<uint8_t>& data) {
         std::string(reinterpret_cast<const char*>(data.data()), data.size()));
 }
 
+std::string mqtt_client_id_for(const std::string& configured, const std::string& edge_code,
+                               const std::string& task_id) {
+    // 云端（orchestrator）当前对所有任务下发同一个 `aistation-agent-<edge_code>`（每边缘唯一），
+    // 但本 Agent 每任务一条 MQTT 连接，故必须在此追加任务 id 才不会相互顶下线（见头文件说明）。
+    const std::string base =
+        configured.empty() ? "aistation-agent-" + edge_code : configured;
+    if (task_id.empty()) return base;
+    return base + "-" + task_id;
+}
+
 }  // namespace aistation

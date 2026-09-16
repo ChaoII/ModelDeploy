@@ -108,3 +108,24 @@ TEST_CASE("heartbeat_due honors interval and disable", "[agent][heartbeat]") {
     REQUIRE(aistation::heartbeat_due(t0, 0, t0 + std::chrono::seconds(60)) == false);
     REQUIRE(aistation::heartbeat_due(t0, -1, t0 + std::chrono::seconds(60)) == false);
 }
+
+// MQTT client_id 唯一化：Agent 每任务一条 MQTT 连接，而云端对所有任务下发同一个
+// "aistation-agent-<edge_code>"（每边缘唯一）。若原样使用，broker 会按 MQTT 规范在收到重复
+// client_id 时断开旧连接 → 同一边缘的多任务相互顶下线、事件丢失。这里断言追加任务 id 后
+// 每任务唯一、同任务稳定（跨重连/热更新不变）、云端未下发时默认前缀同样唯一。
+TEST_CASE("mqtt_client_id_for makes per-task ids unique and stable", "[agent][util][mqtt]") {
+    const std::string cloud = "aistation-agent-edge-01";
+    const std::string a = aistation::mqtt_client_id_for(cloud, "edge-01", "101");
+    const std::string b = aistation::mqtt_client_id_for(cloud, "edge-01", "102");
+    REQUIRE(a == cloud + "-101");
+    REQUIRE(a != b);                                                // 同边缘不同任务互不冲突
+    REQUIRE(aistation::mqtt_client_id_for(cloud, "edge-01", "101") == a);  // 同任务稳定
+
+    const std::string d1 = aistation::mqtt_client_id_for("", "edge-01", "101");
+    const std::string d2 = aistation::mqtt_client_id_for("", "edge-01", "102");
+    REQUIRE(d1 == "aistation-agent-edge-01-101");
+    REQUIRE(d1 != d2);
+
+    // 空任务 id 时退化为前缀本身（不应出现，但不产生非法空 id）
+    REQUIRE(aistation::mqtt_client_id_for(cloud, "edge-01", "") == cloud);
+}

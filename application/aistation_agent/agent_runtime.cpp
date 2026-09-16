@@ -165,8 +165,10 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
             ? "aistation/" + t.tenant + "/edge/" + opts_.edge_code + "/camera/" +
               std::to_string(t.camera.id) + "/detect"
             : t.events.mqtt_topic;
-        mc.client_id = t.events.mqtt_client_id.empty()
-            ? "aistation-agent-" + opts_.edge_code : t.events.mqtt_client_id;
+        // 每任务唯一 client_id（防御云端对同一边缘所有任务下发同一 id）：本任务独占一条
+        // MQTT 连接，若与其它任务共用 id，broker 会按规范断开旧连接 → 任务间相互顶下线。
+        mc.client_id = aistation::mqtt_client_id_for(t.events.mqtt_client_id, opts_.edge_code,
+                                                     task_id);
         mc.username = t.events.mqtt_username;
         mc.password = t.events.mqtt_password;
         mc.qos = t.events.mqtt_qos;
