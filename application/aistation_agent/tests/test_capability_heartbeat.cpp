@@ -61,6 +61,64 @@ TEST_CASE("Heartbeat payload and POST", "[agent][heartbeat]") {
 TEST_CASE("Heartbeat disabled when cloud_url empty", "[agent][heartbeat]") {
     Heartbeat hb("", "edge-01", "tok", []() { return json::object(); });
     REQUIRE_FALSE(hb.send_once());
+    REQUIRE(hb.total_failures() == 0);   // 未配置云端不算失败（心跳禁用）
+    REQUIRE(hb.consecutive_failures() == 0);
+}
+
+// 合同审计 HIGH 3.4：心跳失败必须可计数（旧实现只打一行 stderr，运维不可见）。
+// 关键场景：--secret 与云端 EDGE_CONTROL_TOKEN 不一致 → 云端 403 → 旧实现静默重试。
+TEST_CASE("Heartbeat counts failures (403 + connection refused)", "[agent][heartbeat]") {
+    int port = free_port();
+    httplib::Server srv;
+    srv.Post("/api/v1/video/edge/heartbeat", [](const httplib::Request&, httplib::Response& res) {
+        res.status = 403;   // 模拟密钥不一致被云端拒绝
+    });
+    std::thread t([&]() { srv.listen("127.0.0.1", port); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    Heartbeat hb("http://127.0.0.1:" + std::to_string(port), "edge-01", "wrong",
+                 []() { return json::object(); }, 30, 8);
+    REQUIRE_FALSE(hb.send_once());
+    REQUIRE(hb.total_failures() == 1);
+    REQUIRE(hb.consecutive_failures() == 1);
+    REQUIRE(hb.last_failure_status() == 403);
+    REQUIRE_FALSE(hb.send_once());
+    REQUIRE(hb.consecutive_failures() == 2);
+    REQUIRE(hb.total_failures() == 2);
+
+    srv.stop();
+    t.join();
+
+    // 连接失败（无监听端口）→ status=-1，仍计数
+    Heartbeat dead("http://127.0.0.1:1", "edge-01", "tok",
+                   []() { return json::object(); }, 30, 8);
+    REQUIRE_FALSE(dead.send_once());
+    REQUIRE(dead.total_failures() == 1);
+    REQUIRE(dead.last_failure_status() == -1);
+}
+
+// 成功一次即清零连续失败（恢复连通）
+TEST_CASE("Heartbeat resets consecutive failures on success", "[agent][heartbeat]") {
+    int port = free_port();
+    httplib::Server srv;
+    std::atomic<int> mode{403};
+    srv.Post("/api/v1/video/edge/heartbeat", [&](const httplib::Request&, httplib::Response& res) {
+        res.status = mode.load();
+    });
+    std::thread t([&]() { srv.listen("127.0.0.1", port); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    Heartbeat hb("http://127.0.0.1:" + std::to_string(port), "edge-01", "tok",
+                 []() { return json::object(); }, 30, 8);
+    REQUIRE_FALSE(hb.send_once());
+    REQUIRE(hb.consecutive_failures() == 1);
+    mode = 200;
+    REQUIRE(hb.send_once());
+    REQUIRE(hb.consecutive_failures() == 0);
+    REQUIRE(hb.total_failures() == 1);   // 累计保留
+
+    srv.stop();
+    t.join();
 }
 
 TEST_CASE("Heartbeat tolerates throwing metrics provider", "[agent][heartbeat]") {

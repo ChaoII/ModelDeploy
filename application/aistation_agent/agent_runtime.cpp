@@ -141,6 +141,10 @@ nlohmann::json AgentRuntime::metrics() {
         // 合同审计 HIGH：磁盘写失败（事件必丢）与传输失败需可观测，不再静默
         {"event_write_fail_total", write_fail},
         {"event_send_fail_total", send_fail},
+        // 合同审计 HIGH 3.4：心跳失败需可观测（判断边缘是否已与云端失联）
+        {"heartbeat_fail_total", heartbeat_ ? heartbeat_->total_failures() : 0},
+        {"heartbeat_consecutive_failures", heartbeat_ ? heartbeat_->consecutive_failures() : 0},
+        {"heartbeat_last_status", heartbeat_ ? heartbeat_->last_failure_status() : 0},
     };
 }
 
