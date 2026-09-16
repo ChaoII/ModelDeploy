@@ -43,10 +43,15 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_inference_ocr.cpp
             tests/test_inference_lpr.cpp
             tests/test_infer_group_hotswap.cpp
+            tests/test_model_leak.cpp
     )
     add_executable(aistation_agent_test ${AGENT_TEST_SOURCES} ${AGENT_SOURCES})
     target_link_libraries(aistation_agent_test PRIVATE app_common Catch2::Catch2WithMain)
     target_include_directories(aistation_agent_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    if (WIN32)
+        # test_model_leak.cpp 用 GetProcessMemoryInfo/Thread32First 度量进程内存与线程数
+        target_link_libraries(aistation_agent_test PRIVATE psapi)
+    endif ()
     if (ENABLE_MQTT)
         target_link_libraries(aistation_agent_test PRIVATE ${PAHO_MQTT_LIBS})
         target_include_directories(aistation_agent_test PRIVATE ${PAHO_MQTT_INCLUDE_DIR})

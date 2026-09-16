@@ -39,6 +39,7 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
     // 检查是否已有 prototype
     auto it = model_prototypes_.find(key);
     if (it != model_prototypes_.end()) {
+        it->second.last_use = ++proto_tick_;   // 刷新 LRU
         auto& proto = it->second;
         auto eng = std::make_unique<InferenceEngine>();
         if (cfg.type == "detection" && proto.det && proto.det->is_initialized()) {
@@ -80,7 +81,9 @@ std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfi
         }
         if (cfg.input_size.size() == 2) proto.face->get_preprocessor().set_size(cfg.input_size);
 
+        proto.last_use = ++proto_tick_;
         model_prototypes_[key] = std::move(proto);
+        evict_prototypes_locked(key);   // 上限淘汰：防止不同配置反复热更新时无界驻留
         auto& lp = model_prototypes_[key].face;
         auto cloned = lp->clone();
         auto eng = std::make_unique<InferenceEngine>();
@@ -107,11 +110,47 @@ std::shared_ptr<BatchedDetector> PipelineManager::get_or_create_detector(const M
                             std::to_string(cfg.confidence_threshold) + "|" +
                             std::to_string(w) + "x" + std::to_string(h);
     std::lock_guard<std::mutex> lk(det_pool_mtx_);
+    // 先清理已失效条目：池用 weak_ptr 持有，使用者释放后条目即失效；
+    // 这里顺带回收，避免 map 本身随热更新次数无界增长。
+    for (auto it = det_pool_.begin(); it != det_pool_.end();) {
+        it = it->second.expired() ? det_pool_.erase(it) : std::next(it);
+    }
     auto it = det_pool_.find(key);
-    if (it != det_pool_.end()) return it->second;
+    if (it != det_pool_.end()) {
+        if (auto live = it->second.lock()) return live;   // 仍有使用者 → 复用
+        det_pool_.erase(it);                              // 竞态下刚失效 → 重新创建
+    }
     auto det = std::make_shared<BatchedDetector>(cfg, /*max_batch=*/8);
     if (det->ok()) det_pool_[key] = det;
     return det;
+}
+
+size_t PipelineManager::detector_pool_size() const {
+    std::lock_guard<std::mutex> lk(det_pool_mtx_);
+    size_t n = 0;
+    for (const auto& [k, w] : det_pool_)
+        if (!w.expired()) ++n;
+    return n;
+}
+
+size_t PipelineManager::prototype_count() const {
+    std::lock_guard<std::mutex> lk(proto_mtx_);
+    return model_prototypes_.size();
+}
+
+void PipelineManager::evict_prototypes_locked(const std::string& keep_key) {
+    while (model_prototypes_.size() > kMaxPrototypes) {
+        auto victim = model_prototypes_.end();
+        for (auto it = model_prototypes_.begin(); it != model_prototypes_.end(); ++it) {
+            if (it->first == keep_key) continue;
+            if (victim == model_prototypes_.end() || it->second.last_use < victim->second.last_use)
+                victim = it;
+        }
+        if (victim == model_prototypes_.end()) break;
+        std::cout << "[Manager] Evicting model prototype (LRU, cap=" << kMaxPrototypes
+                  << "): " << victim->first << std::endl;
+        model_prototypes_.erase(victim);
+    }
 }
 
 bool PipelineManager::create_task(const TaskConfig& cfg, std::string* err) {
