@@ -45,6 +45,7 @@ int main(int argc, char** argv) {
         else if (a == "--port") { if (!int_arg(&o.port)) return 1; }
         else if (a == "--data-dir") next(&o.data_dir);
         else if (a == "--api-key") next(&o.api_key);
+        else if (a == "--allow-anonymous") o.allow_anonymous = true;
         else if (a == "--cloud-url") next(&o.cloud_url);
         else if (a == "--edge-code") next(&o.edge_code);
         else if (a == "--secret") next(&o.secret);

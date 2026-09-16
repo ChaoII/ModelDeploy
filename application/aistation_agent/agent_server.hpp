@@ -31,6 +31,9 @@ public:
     ~AgentServer();
 
     void set_api_key(std::string secret) { api_key_ = std::move(secret); }
+    /// 显式开发模式：未配置 api_key 时仍放行控制面（默认关闭 = fail-closed）。
+    /// 只允许本地开发使用；生产必须配置 --api-key，否则 /api/v1/* 一律 503。
+    void set_allow_anonymous(bool v) { allow_anonymous_ = v; }
     void set_hooks(AgentHooks hooks) { hooks_ = std::move(hooks); }
     void set_metrics_provider(std::function<nlohmann::json()> fn) { metrics_provider_ = std::move(fn); }
 
@@ -51,6 +54,10 @@ private:
     std::atomic<bool> running_{false};
     bool routes_registered_{false};
     std::string api_key_;
+    // 未配置密钥时是否放行（默认 false = fail-closed；仅 --allow-anonymous 显式开启）
+    bool allow_anonymous_ = false;
+    // pre_routing 由 httplib 多个工作线程并发调用：告警只打一次，用原子避免竞态
+    std::atomic<bool> anon_warned_{false};
     AgentHooks hooks_;
     std::function<nlohmann::json()> metrics_provider_;
     // 热更新世代号：每次成功换入引擎自增（std::atomic，控制面并发调用安全）。

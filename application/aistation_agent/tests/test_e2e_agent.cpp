@@ -82,6 +82,7 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     AgentOptions o;
     o.host = "127.0.0.1"; o.port = agent_port;
     o.edge_code = "edge-e2e";
+    o.api_key = "e2e-key";          // 控制面 fail-closed：必须配置密钥（见安全审计 BLOCKER）
     AgentRuntime rt(o);
     REQUIRE(rt.start());
 
@@ -102,6 +103,7 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     };
 
     httplib::Client cli("127.0.0.1", agent_port);
+    cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
     REQUIRE(created);
     REQUIRE(json::parse(created->body)["task_id"] == "777");
@@ -170,6 +172,7 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
         httplib::Client mc("127.0.0.1", agent_port);
         mc.set_connection_timeout(2, 0);
         mc.set_read_timeout(5, 0);
+        mc.set_default_headers({{"Authorization", "Bearer e2e-key"}});
         while (hammer.load()) {
             auto r = mc.Get("/api/v1/metrics");
             (void)r;
@@ -212,6 +215,7 @@ TEST_CASE("Agent E2E: shutdown with a running task joins detection before teardo
     AgentOptions o;
     o.host = "127.0.0.1"; o.port = agent_port;
     o.edge_code = "edge-shutdown";
+    o.api_key = "e2e-key";          // 控制面 fail-closed：必须配置密钥
     AgentRuntime rt(o);
     REQUIRE(rt.start());
 
@@ -233,6 +237,7 @@ TEST_CASE("Agent E2E: shutdown with a running task joins detection before teardo
     };
 
     httplib::Client cli("127.0.0.1", agent_port);
+    cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
     REQUIRE(created);
     auto started = cli.Post("/api/v1/tasks/999/start");
@@ -262,6 +267,7 @@ TEST_CASE("Agent E2E: two tasks with heartbeats survive churn", "[agent][e2e][ch
     AgentOptions o;
     o.host = "127.0.0.1"; o.port = agent_port;
     o.edge_code = "edge-churn";
+    o.api_key = "e2e-key";          // 控制面 fail-closed：必须配置密钥
     o.heartbeat_interval_sec = 3600;   // 关闭外部心跳上报，只保留任务级心跳事件
     AgentRuntime rt(o);
     REQUIRE(rt.start());
@@ -286,6 +292,7 @@ TEST_CASE("Agent E2E: two tasks with heartbeats survive churn", "[agent][e2e][ch
     };
 
     httplib::Client cli("127.0.0.1", agent_port);
+    cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     for (int tid : {801, 802}) {
         auto created = cli.Post("/api/v1/tasks", make_body(tid, tid - 800).dump(), "application/json");
         REQUIRE(created);
@@ -299,6 +306,7 @@ TEST_CASE("Agent E2E: two tasks with heartbeats survive churn", "[agent][e2e][ch
         httplib::Client mc("127.0.0.1", agent_port);
         mc.set_connection_timeout(2, 0);
         mc.set_read_timeout(5, 0);
+        mc.set_default_headers({{"Authorization", "Bearer e2e-key"}});
         while (hammer.load()) {
             (void)mc.Get("/api/v1/metrics");
             (void)mc.Get("/api/v1/tasks");
@@ -516,6 +524,7 @@ TEST_CASE("Agent E2E: local det emits MQTT event", "[agent][e2e][mqtt]") {
     AgentOptions o;
     o.host = "127.0.0.1"; o.port = agent_port;
     o.edge_code = "edge-e2e";
+    o.api_key = "e2e-key";          // 控制面 fail-closed：必须配置密钥
     o.heartbeat_interval_sec = 3600;
     AgentRuntime rt(o);
     REQUIRE(rt.start());
@@ -537,6 +546,7 @@ TEST_CASE("Agent E2E: local det emits MQTT event", "[agent][e2e][mqtt]") {
     };
 
     httplib::Client cli("127.0.0.1", agent_port);
+    cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
     REQUIRE(created);
     REQUIRE(json::parse(created->body)["task_id"] == "888");

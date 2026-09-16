@@ -20,6 +20,23 @@ AgentRuntime::AgentRuntime(AgentOptions opts)
 AgentRuntime::~AgentRuntime() { stop(); }
 
 bool AgentRuntime::start() {
+    // 控制面鉴权 fail-closed（安全审计 BLOCKER）：未配置 --api-key 时**拒绝启动**，
+    // 除非显式 --allow-anonymous（仅限本地开发）。否则默认部署即"控制面裸奔"：
+    // 任意可达主机可下发/启停/删除任务、热更新模型（file:// 任意本地文件、http(s) SSRF）。
+    // 注意心跳 token 的缺省回退（--secret 为空时用 --api-key）不能替代控制面密钥。
+    if (opts_.api_key.empty() && !opts_.allow_anonymous) {
+        std::cerr << "[AgentRuntime] refusing to start: control plane requires an API key but "
+                     "--api-key is empty (fail-closed). Pass --api-key <secret>; for local "
+                     "development only you may pass --allow-anonymous to run without authentication."
+                  << std::endl;
+        return false;
+    }
+    if (opts_.allow_anonymous) {
+        std::cerr << "[AgentRuntime] WARNING: --allow-anonymous is set: the control plane will accept "
+                     "unauthenticated requests. Use only on a trusted/isolated network; never in production."
+                  << std::endl;
+    }
+
     bus_.set_sink([this](const DetectionEvent& e) {
         // 仅在锁内查找并拷贝队列 shared_ptr；enqueue 含磁盘 I/O，必须在锁外执行，
         // 否则检测线程会长时间阻塞在 mtx_ 上（与 PipelineManager 形成锁序风险）。
@@ -41,6 +58,7 @@ bool AgentRuntime::start() {
 
     server_ = std::make_unique<AgentServer>(mgr_, adapter_, opts_.host, opts_.port);
     server_->set_api_key(opts_.api_key);
+    server_->set_allow_anonymous(opts_.allow_anonymous);
     server_->set_hooks(std::move(hooks));
     server_->set_metrics_provider([this]() { return metrics(); });
     if (!server_->start()) return false;

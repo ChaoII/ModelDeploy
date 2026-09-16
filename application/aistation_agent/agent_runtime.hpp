@@ -20,6 +20,8 @@ struct AgentOptions {
     int port = 19090;
     std::string data_dir;
     std::string api_key;
+    // 显式开发模式：允许控制面在未配置 --api-key 时启动（默认 false = fail-closed）。
+    bool allow_anonymous = false;
     std::string cloud_url;
     std::string edge_code = "edge-01";
     std::string secret;

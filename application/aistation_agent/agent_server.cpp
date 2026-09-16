@@ -94,7 +94,26 @@ void AgentServer::register_routes() {
     server_.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
         if (req.path == "/health" || req.path == "/readyz") return httplib::Server::HandlerResponse::Unhandled;
         if (req.path.rfind("/api/v1/", 0) != 0) return httplib::Server::HandlerResponse::Unhandled;
-        if (api_key_.empty()) return httplib::Server::HandlerResponse::Unhandled;
+        if (api_key_.empty()) {
+            // fail-closed（安全审计 BLOCKER）：未配置密钥时**绝不放行**控制面。否则任何能访问
+            // 本端口的主机都能创建/启停/删除任务、热更新模型（含 file:// 任意本地文件加载与
+            // http(s) SSRF）。仅当显式开启开发模式（--allow-anonymous）才放行，并大声告警。
+            if (allow_anonymous_) {
+                if (!anon_warned_.exchange(true)) {
+                    std::cerr << "[AgentServer] WARNING: control plane is running WITHOUT authentication "
+                                 "(no --api-key configured + --allow-anonymous). Any host that can reach "
+                              << host_ << ":" << port_
+                              << " can create/start/stop/delete tasks and hot-swap models. "
+                                 "Never use this in production." << std::endl;
+                }
+                return httplib::Server::HandlerResponse::Unhandled;
+            }
+            res.status = 503;
+            res.set_content(err_json("control plane disabled: no API key configured "
+                                     "(pass --api-key; --allow-anonymous is for local development only)",
+                                     "CONTROL_PLANE_DISABLED"), "application/json");
+            return httplib::Server::HandlerResponse::Handled;
+        }
         // 常量时间比较（与 HttpServer 同等安全强度）
         auto ct_equal = [](const std::string& a, const std::string& b) {
             if (a.size() != b.size()) return false;

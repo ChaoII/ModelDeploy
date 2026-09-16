@@ -14,6 +14,13 @@ static int free_port() {
     return 20000 + static_cast<int>(rng() % 10000);
 }
 
+// 控制面鉴权 fail-closed（安全审计 BLOCKER）：除专测 fail-closed 的用例外，控制面测试统一
+// 配置 api_key 并带默认 Authorization 头（未配置密钥时 /api/v1/* 一律 503）。
+static const char* kTestKey = "sk-test";
+static httplib::Headers auth_headers() {
+    return {{"Authorization", std::string("Bearer ") + kTestKey}};
+}
+
 static json task_body() {
     return json::parse(R"({
       "task_id": 321,
@@ -58,8 +65,10 @@ TEST_CASE("AgentServer task lifecycle", "[agent][server]") {
     ConfigAdapter adapter;
     int port = free_port();
     AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    srv.set_api_key(kTestKey);
     REQUIRE(srv.start());
     httplib::Client cli("127.0.0.1", port);
+    cli.set_default_headers(auth_headers());
 
     auto created = cli.Post("/api/v1/tasks", task_body().dump(), "application/json");
     REQUIRE(created);
@@ -116,13 +125,63 @@ TEST_CASE("AgentServer bearer auth", "[agent][server]") {
     srv.stop();
 }
 
+// 安全审计 BLOCKER：未配置 api_key 时控制面必须 fail-closed（503 且明确错误码），
+// 绝不放行（旧实现 api_key 为空即 Unhandled → 任意主机可下发/启停/删除/热更新）。
+// 同时 /health 与 /readyz 必须保持可用（k8s 探针不携带凭据）。
+TEST_CASE("AgentServer fails closed without api key", "[agent][server]") {
+    PipelineManager mgr;
+    ConfigAdapter adapter;
+    int port = free_port();
+    AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    REQUIRE(srv.start());   // 本层不拒绝启动（由 AgentRuntime 拒绝启动）；控制面必须 503
+    httplib::Client cli("127.0.0.1", port);
+
+    auto h = cli.Get("/health");
+    REQUIRE(h);
+    REQUIRE(h->status == 200);
+    auto r = cli.Get("/readyz");
+    REQUIRE(r);
+    REQUIRE(r->status == 200);
+
+    // 无凭据 → 503 CONTROL_PLANE_DISABLED
+    auto list = cli.Get("/api/v1/tasks");
+    REQUIRE(list);
+    REQUIRE(list->status == 503);
+    REQUIRE(json::parse(list->body)["error"]["code"] == "CONTROL_PLANE_DISABLED");
+
+    // 伪造任意 Authorization 头也不放行（没有任何密钥可比对）
+    auto post = cli.Post("/api/v1/tasks", {{"Authorization", "Bearer whatever"}},
+                         task_body().dump(), "application/json");
+    REQUIRE(post);
+    REQUIRE(post->status == 503);
+    REQUIRE(mgr.task_count() == 0);
+    srv.stop();
+}
+
+// 显式开发模式：只有 --allow-anonymous 等价开关才允许无鉴权放行。
+TEST_CASE("AgentServer allow-anonymous dev mode", "[agent][server]") {
+    PipelineManager mgr;
+    ConfigAdapter adapter;
+    int port = free_port();
+    AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    srv.set_allow_anonymous(true);
+    REQUIRE(srv.start());
+    httplib::Client cli("127.0.0.1", port);
+    auto list = cli.Get("/api/v1/tasks");
+    REQUIRE(list);
+    REQUIRE(list->status == 200);
+    srv.stop();
+}
+
 TEST_CASE("AgentServer bad config returns 400", "[agent][server]") {
     PipelineManager mgr;
     ConfigAdapter adapter;
     int port = free_port();
     AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    srv.set_api_key(kTestKey);
     REQUIRE(srv.start());
     httplib::Client cli("127.0.0.1", port);
+    cli.set_default_headers(auth_headers());
     auto bad = cli.Post("/api/v1/tasks", "{}", "application/json");
     REQUIRE(bad);
     REQUIRE(bad->status == 400);
@@ -145,8 +204,10 @@ TEST_CASE("AgentServer model hot update", "[agent][server]") {
     ConfigAdapter adapter;
     int port = free_port();
     AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    srv.set_api_key(kTestKey);
     REQUIRE(srv.start());
     httplib::Client cli("127.0.0.1", port);
+    cli.set_default_headers(auth_headers());
 
     auto created = cli.Post("/api/v1/tasks", task_body().dump(), "application/json");
     REQUIRE(created);
@@ -227,8 +288,10 @@ TEST_CASE("AgentServer model update with URL-encoded model name", "[agent][serve
     ConfigAdapter adapter;
     int port = free_port();
     AgentServer srv(mgr, adapter, "127.0.0.1", port);
+    srv.set_api_key(kTestKey);
     REQUIRE(srv.start());
     httplib::Client cli("127.0.0.1", port);
+    cli.set_default_headers(auth_headers());
 
     // 任务模型名含空格（JSON 层合法）
     json body = task_body();
