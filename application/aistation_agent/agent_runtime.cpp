@@ -15,7 +15,10 @@ AgentRuntime::AgentRuntime(AgentOptions opts)
     : opts_(std::move(opts)),
       fetcher_(opts_.model_cache_dir.empty() ? "data/model_cache" : opts_.model_cache_dir,
                opts_.s3_endpoint),
-      adapter_(&fetcher_) {}
+      adapter_(&fetcher_) {
+    // 本地模型加载白名单（安全审计 HIGH #6）：设置后限制 file:// / 裸路径的加载范围
+    fetcher_.set_local_root(opts_.model_root);
+}
 
 AgentRuntime::~AgentRuntime() { stop(); }
 
@@ -35,6 +38,11 @@ bool AgentRuntime::start() {
         std::cerr << "[AgentRuntime] WARNING: --allow-anonymous is set: the control plane will accept "
                      "unauthenticated requests. Use only on a trusted/isolated network; never in production."
                   << std::endl;
+    }
+    if (opts_.model_root.empty()) {
+        std::cerr << "[AgentRuntime] WARNING: --model-root is not set: local model paths from the cloud "
+                     "(file:// or plain paths) are accepted without directory confinement. "
+                     "Set --model-root <dir> to restrict them." << std::endl;
     }
 
     bus_.set_sink([this](const DetectionEvent& e) {

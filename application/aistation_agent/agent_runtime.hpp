@@ -26,6 +26,9 @@ struct AgentOptions {
     std::string edge_code = "edge-01";
     std::string secret;
     std::string model_cache_dir;
+    // 本地模型加载白名单根目录（可选）：设置后 file:// 与裸本地路径必须落在其内，
+    // 防止云端/攻击者通过 model_path 加载任意本地文件（安全审计 HIGH #6）。
+    std::string model_root;
     std::string s3_endpoint;
     int max_channels = 8;
     int heartbeat_interval_sec = 30;

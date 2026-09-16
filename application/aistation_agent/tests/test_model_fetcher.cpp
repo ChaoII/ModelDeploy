@@ -131,8 +131,7 @@ TEST_CASE("ModelFetcher rejects url without filename", "[agent][fetch]") {
     fs::remove_all(dir);
 }
 
-TEST_CASE("ModelFetcher failed download leaves no file", "[agent][fetch]") {
-    int port = free_port();
+TEST_CASE("ModelFetcher failed download leaves no file", "[agent][fetch]") {    int port = free_port();
     httplib::Server srv;
     srv.Get("/ok.onnx", [](const httplib::Request&, httplib::Response& res) {
         res.set_content("bytes", "application/octet-stream");
@@ -160,4 +159,47 @@ TEST_CASE("ModelFetcher failed download leaves no file", "[agent][fetch]") {
 
     srv.stop(); t.join();
     fs::remove_all(dir);
+}
+
+// 安全审计 HIGH #6：--model-root 设置后，本地模型路径必须落在白名单根（或缓存目录）内，
+// 防止云端/攻击者通过 model_path 让 Agent 加载任意本地文件（含 ".." 穿越与 file:// 形式）。
+TEST_CASE("ModelFetcher confines local paths to --model-root", "[agent][fetch]") {
+    auto base = fs::temp_directory_path() / "md_fetch_root";
+    fs::remove_all(base);
+    auto allowed = base / "allowed";
+    auto outside = base / "outside";
+    auto cache = base / "cache";
+    fs::create_directories(allowed);
+    fs::create_directories(outside);
+    fs::create_directories(cache);
+    { std::ofstream f(allowed / "ok.onnx"); f << "dummy"; }
+    { std::ofstream f(outside / "evil.onnx"); f << "dummy"; }
+
+    ModelFetcher fetcher(cache.string());
+    fetcher.set_local_root(allowed.string());
+    std::string out = "sentinel", err;
+
+    // 根内：允许（裸路径与 file:// 两种形式）
+    REQUIRE(fetcher.fetch((allowed / "ok.onnx").string(), &out, &err));
+    REQUIRE(fetcher.fetch("file://" + (allowed / "ok.onnx").string(), &out, &err));
+
+    // 根外：拒绝（文件存在也不加载）
+    out = "sentinel"; err.clear();
+    REQUIRE_FALSE(fetcher.fetch((outside / "evil.onnx").string(), &out, &err));
+    REQUIRE(out == "sentinel");
+    REQUIRE(err.find("model-root") != std::string::npos);
+    REQUIRE_FALSE(fetcher.fetch("file://" + (outside / "evil.onnx").string(), &out, &err));
+
+    // ".." 穿越：归一化后落在根外 → 拒绝
+    REQUIRE_FALSE(fetcher.fetch((allowed / ".." / "outside" / "evil.onnx").string(), &out, &err));
+
+    // 模型缓存目录始终允许（下载落地点）
+    { std::ofstream f(cache / "cached.onnx"); f << "dummy"; }
+    REQUIRE(fetcher.fetch((cache / "cached.onnx").string(), &out, &err));
+
+    // 未配置 --model-root：保持既有行为（允许任意本地路径），由启动告警提示风险
+    ModelFetcher open_fetcher(cache.string());
+    REQUIRE(open_fetcher.fetch((outside / "evil.onnx").string(), &out, &err));
+
+    fs::remove_all(base);
 }

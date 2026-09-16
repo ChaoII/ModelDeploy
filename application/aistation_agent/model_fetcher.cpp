@@ -1,6 +1,8 @@
 #include "model_fetcher.hpp"
 #include "httplib.h"
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -9,6 +11,24 @@
 #include <thread>
 
 namespace fs = std::filesystem;
+
+namespace {
+/// 规范化 + 小写（Windows 路径大小写不敏感），并统一为 '/' 分隔符
+std::string norm_lower(const fs::path& p) {
+    std::string s = p.lexically_normal().generic_string();
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    while (s.size() > 1 && s.back() == '/') s.pop_back();
+    return s;
+}
+
+/// target 是否位于 root 之内（含等于 root）；root 为空 → false
+bool under_root(const std::string& target, const std::string& root) {
+    if (root.empty()) return false;
+    if (target == root) return true;
+    return target.size() > root.size() && target.compare(0, root.size(), root) == 0 &&
+           target[root.size()] == '/';
+}
+}  // namespace
 
 static bool basename_of(const std::string& url, std::string* out) {
     const auto q = url.find('?');
@@ -90,18 +110,38 @@ bool ModelFetcher::download(const std::string& base, const std::string& path,
     return true;
 }
 
+bool ModelFetcher::local_path_allowed(const std::string& p, std::string* err) const {
+    std::error_code ec;
+    // weakly_canonical：解析 '..' 与符号链接（不存在时按词法归一）后再做前缀比较，
+    // 避免 "root/../../etc/passwd" 之类的绕过。
+    const std::string target = norm_lower(fs::weakly_canonical(fs::absolute(p, ec), ec));
+    if (ec) return true;   // 归一失败交由后续 fs::exists 报错，不在这里误拒
+    // 模型缓存目录始终允许（下载落地点）
+    std::error_code ec2;
+    if (under_root(target, norm_lower(fs::weakly_canonical(fs::absolute(cache_dir_, ec2), ec2))))
+        return true;
+    if (local_root_.empty()) return true;   // 未配置根：保持既有行为（启动时告警）
+    if (under_root(target, norm_lower(fs::weakly_canonical(fs::absolute(local_root_, ec2), ec2))))
+        return true;
+    if (err)
+        *err = "local model path outside allowed root (--model-root): " + p;
+    return false;
+}
+
 bool ModelFetcher::fetch(const std::string& url, std::string* local_path, std::string* err) const {
     if (url.empty()) { if (err) *err = "empty model url"; return false; }
     auto fail = [&](const std::string& m) { if (err) *err = m; return false; };
 
-    // 本地路径 / file://
+    // 本地路径 / file://（受 --model-root 白名单约束）
     if (url.rfind("file://", 0) == 0) {
         const std::string p = url.substr(7);
+        if (!local_path_allowed(p, err)) return false;
         if (!fs::exists(p)) return fail("local model not found: " + p);
         if (local_path) *local_path = p;
         return true;
     }
     if (url.find("://") == std::string::npos) {
+        if (!local_path_allowed(url, err)) return false;
         if (!fs::exists(url)) return fail("local model not found: " + url);
         if (local_path) *local_path = url;
         return true;

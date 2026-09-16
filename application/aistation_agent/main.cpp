@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
         else if (a == "--edge-code") next(&o.edge_code);
         else if (a == "--secret") next(&o.secret);
         else if (a == "--model-cache-dir") next(&o.model_cache_dir);
+        else if (a == "--model-root") next(&o.model_root);
         else if (a == "--s3-endpoint") next(&o.s3_endpoint);
         else if (a == "--max-channels") { if (!int_arg(&o.max_channels)) return 1; }
         else if (a == "--heartbeat-interval") { if (!int_arg(&o.heartbeat_interval_sec)) return 1; }
