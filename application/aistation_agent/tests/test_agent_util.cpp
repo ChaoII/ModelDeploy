@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <array>
 #include <chrono>
+#include <set>
+#include <string>
 #include <vector>
 #include "agent_util.hpp"
 #include "nlohmann/json.hpp"
@@ -114,18 +116,45 @@ TEST_CASE("heartbeat_due honors interval and disable", "[agent][heartbeat]") {
 // client_id 时断开旧连接 → 同一边缘的多任务相互顶下线、事件丢失。这里断言追加任务 id 后
 // 每任务唯一、同任务稳定（跨重连/热更新不变）、云端未下发时默认前缀同样唯一。
 TEST_CASE("mqtt_client_id_for makes per-task ids unique and stable", "[agent][util][mqtt]") {
-    const std::string cloud = "aistation-agent-edge-01";
+    // 23 字节边界：恰好 23 的 id 原样保留（MQTT 3.1.1 强制 broker 支持的上限）
+    const std::string base23 = "aistation-agent-e12";  // 19 字节
+    REQUIRE(aistation::mqtt_client_id_for(base23, "e12", "101") == base23 + "-101");
+    REQUIRE(aistation::mqtt_client_id_for(base23, "e12", "101").size() == 23);
+    REQUIRE(aistation::mqtt_client_id_for(base23, "e12", "101") !=
+            aistation::mqtt_client_id_for(base23, "e12", "102"));
+
+    // 超出 23 字节：确定性压缩（同输入稳定、异输入唯一、仍有可读前缀）
+    const std::string cloud = "aistation-agent-edge-01";  // 云端下发值本身已 23 字节
     const std::string a = aistation::mqtt_client_id_for(cloud, "edge-01", "101");
     const std::string b = aistation::mqtt_client_id_for(cloud, "edge-01", "102");
-    REQUIRE(a == cloud + "-101");
-    REQUIRE(a != b);                                                // 同边缘不同任务互不冲突
+    REQUIRE(a.size() == 23);                                       // cloud+"-101" 为 27 -> 压缩
+    REQUIRE(a.rfind("aistation-agent-", 0) == 0);
+    REQUIRE(a != b);                                               // 同边缘不同任务互不冲突
     REQUIRE(aistation::mqtt_client_id_for(cloud, "edge-01", "101") == a);  // 同任务稳定
 
+    // 云端未下发时用 edge_code 派生默认前缀：与云端同值时结果一致、每任务唯一
     const std::string d1 = aistation::mqtt_client_id_for("", "edge-01", "101");
     const std::string d2 = aistation::mqtt_client_id_for("", "edge-01", "102");
-    REQUIRE(d1 == "aistation-agent-edge-01-101");
+    REQUIRE(d1 == a);
     REQUIRE(d1 != d2);
+
+    // 超长 edge_code（云端列宽 String(64)）同样必须被压到 23 字节
+    const std::string long_edge(64, 'x');
+    const std::string e1 = aistation::mqtt_client_id_for("", long_edge, "101");
+    const std::string e2 = aistation::mqtt_client_id_for("", long_edge, "102");
+    REQUIRE(e1.size() == 23);
+    REQUIRE(e1 != e2);
 
     // 空任务 id 时退化为前缀本身（不应出现，但不产生非法空 id）
     REQUIRE(aistation::mqtt_client_id_for(cloud, "edge-01", "") == cloud);
+
+    // 20 个任务齐发：全部 <=23 字节且两两唯一
+    std::set<std::string> ids;
+    for (int i = 0; i < 20; ++i) {
+        const std::string id =
+            aistation::mqtt_client_id_for(cloud, "edge-01", std::to_string(1000 + i));
+        REQUIRE(id.size() <= 23);
+        ids.insert(id);
+    }
+    REQUIRE(ids.size() == 20);
 }

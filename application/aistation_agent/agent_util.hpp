@@ -39,6 +39,8 @@ std::string base64_encode_bytes(const std::vector<uint8_t>& data);
 /// 要求 broker 在收到重复 client_id 的连接时断开旧连接，若所有任务共用同一 id，会造成任务间
 /// 相互顶下线、事件丢失。这里在云端下发值（或默认 aistation-agent-<edge_code>）后统一追加
 /// 任务 id，保证每任务唯一且跨重连稳定。configured 为空时使用 edge_code 派生默认前缀。
+/// 若拼接结果超过 23 字节（MQTT 3.1.1 [MQTT-3.1.3-5] 强制 broker 支持的上限），则确定性压缩为
+/// `aistation-agent-<7 位十六进制 FNV-1a>`（恒 23 字节），同输入稳定、异输入几乎不撞。
 std::string mqtt_client_id_for(const std::string& configured, const std::string& edge_code,
                                const std::string& task_id);
 

@@ -1,6 +1,7 @@
 #include "agent_util.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <ctime>
 
 #include "httplib.h"
@@ -17,6 +18,34 @@ void utc_day_hour(std::time_t t, int& iso_day, int& hour) {
 #endif
     iso_day = (tm.tm_wday + 6) % 7;  // tm_wday: 0=周日 -> 周一=0
     hour = tm.tm_hour;
+}
+
+/// MQTT 3.1.1 [MQTT-3.1.3-5]：broker 必须支持 1..23 字节的 client_id。
+/// 云端 edge_code 为 String(64)，与任务 id 拼接后可能远超 23 字节（如 `aistation-agent-edge-01-101`
+/// 已 27 字节），故超长时压缩为固定长度，避免依赖 broker 的非强制扩展行为。
+constexpr std::size_t kMqttClientIdMax = 23;
+/// 压缩形式长度：`aistation-agent-`（16）+ 7 位十六进制哈希 = 23。
+constexpr std::size_t kMqttClientIdHashChars = 7;
+
+/// FNV-1a 64 位：跨平台/跨进程确定性的稳定哈希（不用 std::hash，后者实现相关、不保证稳定）。
+std::uint64_t fnv1a64(const std::string& s) {
+    std::uint64_t h = 1469598103934665603ULL;
+    for (unsigned char c : s) {
+        h ^= c;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+/// 超长 client_id 的确定性压缩：固定前缀 + 7 位十六进制哈希（总长恒为 kMqttClientIdMax）。
+std::string shorten_mqtt_client_id(const std::string& full) {
+    static const char kHex[] = "0123456789abcdef";
+    const std::uint64_t v = fnv1a64(full);
+    std::string out = "aistation-agent-";
+    for (int i = static_cast<int>(kMqttClientIdHashChars) - 1; i >= 0; --i) {
+        out.push_back(kHex[(v >> (4 * i)) & 0xFULL]);
+    }
+    return out;
 }
 
 }  // namespace
@@ -114,8 +143,10 @@ std::string mqtt_client_id_for(const std::string& configured, const std::string&
     // 但本 Agent 每任务一条 MQTT 连接，故必须在此追加任务 id 才不会相互顶下线（见头文件说明）。
     const std::string base =
         configured.empty() ? "aistation-agent-" + edge_code : configured;
-    if (task_id.empty()) return base;
-    return base + "-" + task_id;
+    const std::string full = task_id.empty() ? base : base + "-" + task_id;
+    // 超过 23 字节（MQTT 3.1.1 强制 broker 支持的上限）时确定性压缩：同输入稳定、异输入几乎不撞。
+    if (full.size() <= kMqttClientIdMax) return full;
+    return shorten_mqtt_client_id(full);
 }
 
 }  // namespace aistation
