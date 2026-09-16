@@ -60,7 +60,14 @@ public:
 
     void enqueue(const DetectionEvent& e);    // 非阻塞；失败/离线时落盘
     size_t pending() const;
+    /// 队首传输失败（publish=false）的累计次数（可观测，避免静默累积）
+    uint64_t send_failed() const { return send_failed_.load(); }
+    /// 磁盘写失败（落盘失败 → 事件必然丢失）的累计次数
+    uint64_t write_failed() const { return write_failed_.load(); }
+    /// 超限丢弃（丢最旧）的累计条数
     uint64_t dropped() const { return dropped_.load(); }
+    /// 当前落盘占用字节数（观测队列水位）
+    size_t pending_bytes() const;
     void start();
     void stop();
 
@@ -86,5 +93,9 @@ private:
     std::thread worker_;
     std::atomic<bool> running_{false};
     std::atomic<uint64_t> dropped_{0};
+    // 可观测性计数（合同审计 HIGH：旧实现磁盘写失败直接丢事件且不计数、传输永久失败
+    // 静默累积，业务侧无法区分"未发送过期丢弃"与"已发送重试"）。三者都对外暴露。
+    std::atomic<uint64_t> send_failed_{0};    // 传输失败次数（publish 返回 false）
+    std::atomic<uint64_t> write_failed_{0};   // 磁盘写失败次数（事件因此必然丢失）
     SnapshotProvider snapshot_provider_;
 };

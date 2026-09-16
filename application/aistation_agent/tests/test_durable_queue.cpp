@@ -2,6 +2,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -118,8 +119,7 @@ TEST_CASE("DurableQueue dedups identical event_id", "[agent][queue]") {
     fs::remove_all(dir);
 }
 
-TEST_CASE("DurableQueue attaches inline snapshot via provider", "[agent][queue]") {
-    auto dir = fs::temp_directory_path() / "md_dq_snap";
+TEST_CASE("DurableQueue attaches inline snapshot via provider", "[agent][queue]") {    auto dir = fs::temp_directory_path() / "md_dq_snap";
     fs::remove_all(dir);
 
     struct CapturingTransport : EventPublisher {
@@ -147,6 +147,49 @@ TEST_CASE("DurableQueue attaches inline snapshot via provider", "[agent][queue]"
     REQUIRE(tx.events.size() == 1);
     REQUIRE(tx.events[0].snapshot_data == "QUJD");
     REQUIRE(tx.events[0].snapshot_width == 320);
+    q.stop();
+    fs::remove_all(dir);
+}
+
+// 合同审计 HIGH：磁盘写失败（落盘失败 → 事件必然丢失）必须计数并可观测，不得静默丢弃。
+// 用一个"父路径是普通文件"的非法队列目录构造必然失败的 write 路径。
+TEST_CASE("DurableQueue counts disk write failures", "[agent][queue]") {
+    auto dir = fs::temp_directory_path() / "md_dq_writefail";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    // dir/blocker 是普通文件：dir/blocker/q 作为队列目录无法创建，写 tmp 文件必然失败
+    auto blocker = dir / "blocker";
+    {
+        std::ofstream f(blocker);
+        f << "x";
+    }
+    FakeTransport tx;
+    DurableQueue q((blocker / "q").string(), 8, &tx, 20);
+    q.start();
+    q.enqueue(ev("w1"));
+    q.enqueue(ev("w2"));
+    q.enqueue(ev("w3"));
+    REQUIRE(q.write_failed() == 3);   // 旧实现静默 return，计数恒为 0
+    REQUIRE(q.pending() == 0);
+    REQUIRE(q.pending_bytes() == 0);
+    q.stop();
+    fs::remove_all(dir);
+}
+
+// 合同审计 HIGH：传输永久失败必须计数（send_failed）并可观测，不得静默累积。
+TEST_CASE("DurableQueue counts transport failures", "[agent][queue]") {
+    auto dir = fs::temp_directory_path() / "md_dq_sendfail";
+    fs::remove_all(dir);
+    FakeTransport tx;
+    tx.online = false;
+    DurableQueue q(dir.string(), 8, &tx, 20);
+    q.start();
+    q.enqueue(ev("s1"));
+    for (int i = 0; i < 200 && q.send_failed() < 2; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    REQUIRE(q.send_failed() >= 2);   // 记录失败次数（旧实现无任何计数）
+    REQUIRE(q.pending() == 1);       // 队首保留，按序重试
+    REQUIRE(q.dropped() == 0);       // 传输失败 ≠ 超限丢弃，两者语义分明
     q.stop();
     fs::remove_all(dir);
 }

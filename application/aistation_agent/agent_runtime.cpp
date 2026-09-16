@@ -121,18 +121,26 @@ nlohmann::json AgentRuntime::metrics() {
     for (const auto& t : mgr_.list_tasks())
         if (t.running) ++running;
 
-    uint64_t qlen = 0, dropped = 0;
+    uint64_t qlen = 0, dropped = 0, write_fail = 0, send_fail = 0;
+    size_t qbytes = 0;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         for (const auto& [id, q] : queues_) {
             qlen += q->pending();
             dropped += q->dropped();
+            write_fail += q->write_failed();
+            send_fail += q->send_failed();
+            qbytes += q->pending_bytes();
         }
     }
     return nlohmann::json{
         {"running_channels", running},
         {"event_queue_len", qlen},
+        {"event_queue_bytes", qbytes},
         {"event_dropped_total", dropped},
+        // 合同审计 HIGH：磁盘写失败（事件必丢）与传输失败需可观测，不再静默
+        {"event_write_fail_total", write_fail},
+        {"event_send_fail_total", send_fail},
     };
 }
 

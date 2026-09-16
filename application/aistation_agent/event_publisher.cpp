@@ -136,6 +136,10 @@ namespace fs = std::filesystem;
 namespace {
 constexpr size_t kExtLen = 5;   // ".json"
 
+// 限频日志：首次 + 每 100 次打印一次。既不静默（可被运维发现），也不刷屏。
+constexpr uint64_t kLogEvery = 100;
+bool should_log(uint64_t n) { return n == 1 || (n % kLogEvery) == 0; }
+
 std::string pad_seq(uint64_t s) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%020llu", static_cast<unsigned long long>(s));
@@ -158,7 +162,14 @@ DurableQueue::DurableQueue(std::string dir, int max_mb, EventPublisher* transpor
 
 DurableQueue::DurableQueue(std::string dir, size_t max_bytes, EventPublisher* transport, int retry_ms)
     : dir_(std::move(dir)), max_bytes_(max_bytes), transport_(transport), retry_ms_(retry_ms) {
-    fs::create_directories(dir_);
+    // 用 error_code 重载：目录无法创建（父路径是文件/权限不足等）不应从构造函数抛出
+    // filesystem_error 逃逸到调用方（AgentRuntime::on_created 经控制面 handler）。落盘
+    // 失败会由 enqueue 的 write_failed 计数与限频告警显式暴露，不静默。
+    std::error_code ec;
+    fs::create_directories(dir_, ec);
+    if (ec)
+        std::cerr << "[DurableQueue] cannot create buffer dir " << dir_ << ": " << ec.message()
+                  << " (events will be dropped and counted)" << std::endl;
     load_existing();
 }
 
@@ -216,28 +227,53 @@ bool DurableQueue::enforce_limit() {
 }
 
 void DurableQueue::enqueue(const DetectionEvent& e) {
+    bool enqueued = false;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         if (!e.event_id.empty() && event_ids_.count(e.event_id)) return;   // 去重
         const std::string tmp = (fs::path(dir_) / ("tmp-" + pad_seq(seq_))).string();
         const std::string final_name = pad_seq(seq_) + "-" + e.event_id + ".json";
+        bool wrote = false;
         {
             std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
-            if (!f.is_open()) return;
-            f << e.to_json().dump();
-            f.flush();
+            if (f.is_open()) {
+                f << e.to_json().dump();
+                f.flush();
+                wrote = f.good();   // flush 后校验（旧实现不检查：磁盘满时静默丢事件）
+            }
         }
-        std::error_code ec;
-        fs::rename(tmp, fs::path(dir_) / final_name, ec);
-        if (ec) { fs::remove(tmp, ec); return; }
-        files_.push_back(final_name);
-        event_ids_.insert(event_id_of(final_name));
-        const auto sz = fs::file_size(fs::path(dir_) / final_name, ec);
-        if (!ec) bytes_ += static_cast<size_t>(sz);
-        ++seq_;
-        enforce_limit();
+        if (wrote) {
+            std::error_code ec;
+            fs::rename(tmp, fs::path(dir_) / final_name, ec);
+            if (ec) { std::error_code rm; fs::remove(tmp, rm); wrote = false; }
+        } else {
+            std::error_code rm; fs::remove(tmp, rm);
+        }
+        if (!wrote) {
+            // 落盘失败（目录不可写/磁盘满/rename 失败）→ 事件必然丢失。
+            // 旧实现静默 return：无日志、无计数，metrics 的 dropped 也不包含它
+            // （合同审计 HIGH）。此处显式计数 + 限频告警，让丢弃可观测。
+            const uint64_t n = ++write_failed_;
+            if (should_log(n))
+                std::cerr << "[DurableQueue] disk write failed, event dropped (count=" << n
+                          << ", dir=" << dir_ << ", event_id=" << e.event_id << ")" << std::endl;
+        } else {
+            files_.push_back(final_name);
+            event_ids_.insert(event_id_of(final_name));
+            std::error_code ec;
+            const auto sz = fs::file_size(fs::path(dir_) / final_name, ec);
+            if (!ec) bytes_ += static_cast<size_t>(sz);
+            ++seq_;
+            enforce_limit();
+            enqueued = true;
+        }
     }
-    cv_.notify_one();
+    if (enqueued) cv_.notify_one();
+}
+
+size_t DurableQueue::pending_bytes() const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return bytes_;
 }
 
 size_t DurableQueue::pending() const {
@@ -262,6 +298,11 @@ void DurableQueue::stop() {
 }
 
 void DurableQueue::worker_loop() {
+    // 传输失败退避：从 retry_ms_ 起指数增长到上限。旧实现固定 retry_ms_ 死循环重试队首，
+    // 云端永久失败（401/错 URL）时持续高频打点且无任何日志/计数（合同审计 HIGH）。
+    // 上限回退避免刷日志/空转；分片睡眠保证 stop() 能及时 join。
+    constexpr int kMaxRetryBackoffMs = 30000;
+    int backoff_ms = retry_ms_ > 0 ? retry_ms_ : 1000;
     while (running_.load()) {
         std::string name;
         {
@@ -322,6 +363,7 @@ void DurableQueue::worker_loop() {
         } catch (...) { ok = false; }
 
         if (ok) {
+            backoff_ms = retry_ms_ > 0 ? retry_ms_ : 1000;   // 成功即恢复基准退避
             std::lock_guard<std::mutex> lk(mtx_);
             if (!files_.empty() && files_.front() == name) {
                 files_.pop_front();
@@ -333,7 +375,18 @@ void DurableQueue::worker_loop() {
                 enforce_limit();
             }
         } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(retry_ms_));   // 保持队首按序重试
+            // 传输失败：保持队首按序重试，但显式计数 + 限频告警（可观测），
+            // 并以有上限的指数退避避免对不可达/被拒的云端高频空转。
+            const uint64_t n = ++send_failed_;
+            if (should_log(n))
+                std::cerr << "[DurableQueue] transport publish failed, will retry head (count=" << n
+                          << ", transport=" << (transport_ ? transport_->name() : "null")
+                          << ", queue_len=" << pending() << ", backoff_ms=" << backoff_ms << ")"
+                          << std::endl;
+            const int wait_ms = backoff_ms;
+            backoff_ms = std::min(backoff_ms * 2, kMaxRetryBackoffMs);
+            for (int waited = 0; waited < wait_ms && running_.load(); waited += 50)
+                std::this_thread::sleep_for(std::chrono::milliseconds(std::min(50, wait_ms - waited)));
         }
     }
 }
