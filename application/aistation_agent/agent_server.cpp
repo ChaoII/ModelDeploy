@@ -155,6 +155,9 @@ void AgentServer::register_routes() {
         json m;
         m["tasks_total"] = mgr_.task_count();
         m["running_channels"] = running;
+        // 模型热更新世代号（成功换入次数）：不持久化（spec 允许，进程重启归 0），但经 /metrics
+        // 暴露，避免观测值只存在于热更新响应里而在长跑中被忽略。
+        m["model_generation"] = generation_.load();
         if (metrics_provider_) {
             json extra = metrics_provider_();
             for (auto& [k, v] : extra.items()) m[k] = v;

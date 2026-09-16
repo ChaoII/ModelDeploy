@@ -266,6 +266,12 @@ TEST_CASE("AgentServer model hot update", "[agent][server]") {
     REQUIRE(ok2->status == 200);
     REQUIRE(json::parse(ok2->body)["generation"] == 2);
     REQUIRE(srv.generation() == 2);
+
+    // 观测：/metrics 暴露 model_generation，避免世代号只存在于热更新响应中
+    auto met = cli.Get("/api/v1/metrics");
+    REQUIRE(met);
+    REQUIRE(met->status == 200);
+    REQUIRE(json::parse(met->body)["metrics"]["model_generation"] == 2);
     srv.stop();
 }
 
