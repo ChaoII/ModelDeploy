@@ -9,6 +9,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "test_port_util.hpp"
 #include "agent_runtime.hpp"
 #include "httplib.h"
 #include "nlohmann/json.hpp"
@@ -41,10 +42,10 @@ bool is_heartbeat_event(const json& e) {
 
 }  // namespace
 
-static int free_port() {
-    static std::mt19937 rng(std::random_device{}());
-    return 25000 + static_cast<int>(rng() % 4000);
-}
+// 端口由进程内唯一的 test_free_port() 分配：避免同一测试内多个监听器被分到同一端口时
+// 相互遮蔽（httplib SO_REUSEADDR + 先绑定者优先），导致 POST /tasks 落到事件接收器等
+// 非控制面监听器上返回非 JSON 响应。详见 test_port_util.hpp 的根因说明。
+static int free_port() { return aistation_test::test_free_port(); }
 
 TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][e2e]") {
     if (!std::ifstream("test_data/test_video60.mp4").good() ||
@@ -105,7 +106,11 @@ TEST_CASE("Agent E2E: local det emits HTTP event and serves snapshot", "[agent][
     httplib::Client cli("127.0.0.1", agent_port);
     cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
+    // 诊断（偶发 400/非 JSON 响应时给出状态码与响应体，便于定位）：Catch2 只在断言失败时打印
+    INFO("POST /api/v1/tasks -> status=" + std::to_string(created ? created->status : -1) +
+         " body=" + (created ? created->body : std::string("<no response>")));
     REQUIRE(created);
+    REQUIRE(created->status == 200);
     REQUIRE(json::parse(created->body)["task_id"] == "777");
 
     auto started = cli.Post("/api/v1/tasks/777/start");
@@ -295,7 +300,11 @@ TEST_CASE("Agent E2E: two tasks with heartbeats survive churn", "[agent][e2e][ch
     cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     for (int tid : {801, 802}) {
         auto created = cli.Post("/api/v1/tasks", make_body(tid, tid - 800).dump(), "application/json");
+        INFO("POST /api/v1/tasks (churn " + std::to_string(tid) + ") -> status=" +
+             std::to_string(created ? created->status : -1) +
+             " body=" + (created ? created->body : std::string("<no response>")));
         REQUIRE(created);
+        REQUIRE(created->status == 200);
         REQUIRE(cli.Post(("/api/v1/tasks/" + std::to_string(tid) + "/start").c_str()));
     }
     REQUIRE(rt.manager().task_count() == 2);
@@ -319,7 +328,11 @@ TEST_CASE("Agent E2E: two tasks with heartbeats survive churn", "[agent][e2e][ch
         auto del = cli.Delete("/api/v1/tasks/801");
         REQUIRE(del);
         auto created = cli.Post("/api/v1/tasks", make_body(801, 1).dump(), "application/json");
+        INFO("POST /api/v1/tasks (churn recreate 801, round " + std::to_string(round) +
+             ") -> status=" + std::to_string(created ? created->status : -1) +
+             " body=" + (created ? created->body : std::string("<no response>")));
         REQUIRE(created);
+        REQUIRE(created->status == 200);
         auto started = cli.Post("/api/v1/tasks/801/start");
         REQUIRE(started);
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -548,7 +561,10 @@ TEST_CASE("Agent E2E: local det emits MQTT event", "[agent][e2e][mqtt]") {
     httplib::Client cli("127.0.0.1", agent_port);
     cli.set_default_headers({{"Authorization", "Bearer e2e-key"}});
     auto created = cli.Post("/api/v1/tasks", body.dump(), "application/json");
+    INFO("POST /api/v1/tasks -> status=" + std::to_string(created ? created->status : -1) +
+         " body=" + (created ? created->body : std::string("<no response>")));
     REQUIRE(created);
+    REQUIRE(created->status == 200);
     REQUIRE(json::parse(created->body)["task_id"] == "888");
 
     auto started = cli.Post("/api/v1/tasks/888/start");

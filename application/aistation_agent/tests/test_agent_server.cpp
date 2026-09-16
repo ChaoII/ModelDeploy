@@ -2,6 +2,7 @@
 #include <random>
 #include <thread>
 #include <chrono>
+#include "test_port_util.hpp"
 #include "agent_server.hpp"
 #include "pipeline_manager.hpp"
 #include "httplib.h"
@@ -9,10 +10,8 @@
 
 using nlohmann::json;
 
-static int free_port() {
-    static std::mt19937 rng(std::random_device{}());
-    return 20000 + static_cast<int>(rng() % 10000);
-}
+// 进程内唯一端口（详见 test_port_util.hpp）
+static int free_port() { return aistation_test::test_free_port(); }
 
 // 控制面鉴权 fail-closed（安全审计 BLOCKER）：除专测 fail-closed 的用例外，控制面测试统一
 // 配置 api_key 并带默认 Authorization 头（未配置密钥时 /api/v1/* 一律 503）。

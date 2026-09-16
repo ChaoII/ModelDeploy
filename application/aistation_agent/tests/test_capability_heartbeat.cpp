@@ -3,6 +3,7 @@
 #include <random>
 #include <stdexcept>
 #include <thread>
+#include "test_port_util.hpp"
 #include "capability.hpp"
 #include "heartbeat.hpp"
 #include "httplib.h"
@@ -10,10 +11,8 @@
 
 using nlohmann::json;
 
-static int free_port() {
-    static std::mt19937 rng(std::random_device{}());
-    return 23000 + static_cast<int>(rng() % 5000);
-}
+// 进程内唯一端口（详见 test_port_util.hpp）
+static int free_port() { return aistation_test::test_free_port(); }
 
 TEST_CASE("detect_capabilities has required fields", "[agent][capability]") {
     auto c = detect_capabilities(8);

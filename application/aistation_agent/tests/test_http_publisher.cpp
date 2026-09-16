@@ -6,16 +6,15 @@
 #include <random>
 #include <string>
 #include <thread>
+#include "test_port_util.hpp"
 #include "event_publisher.hpp"
 #include "httplib.h"
 #include "nlohmann/json.hpp"
 
 using nlohmann::json;
 
-static int free_port() {
-    static std::mt19937 rng(std::random_device{}());
-    return 21000 + static_cast<int>(rng() % 10000);
-}
+// 进程内唯一端口（详见 test_port_util.hpp）
+static int free_port() { return aistation_test::test_free_port(); }
 
 static DetectionEvent sample_event() {
     DetectionEvent e;

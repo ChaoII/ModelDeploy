@@ -6,15 +6,14 @@
 #include <random>
 #include <thread>
 #include <vector>
+#include "test_port_util.hpp"
 #include "model_fetcher.hpp"
 #include "httplib.h"
 
 namespace fs = std::filesystem;
 
-static int free_port() {
-    static std::mt19937 rng(std::random_device{}());
-    return 24000 + static_cast<int>(rng() % 3000);
-}
+// 进程内唯一端口（详见 test_port_util.hpp）
+static int free_port() { return aistation_test::test_free_port(); }
 
 TEST_CASE("ModelFetcher local path", "[agent][fetch]") {
     auto dir = fs::temp_directory_path() / "md_fetch_local";
