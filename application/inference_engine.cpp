@@ -330,6 +330,34 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             if (cfg_.input_size.size() == 2)
                 fr_det_model_->get_preprocessor().set_size(cfg_.input_size);
             fr_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        } else if (cfg.type == "hand") {
+            // MediaPipe 手部 21 点关键点：单模型（模型本身只做 landmark，不含 palm detector；
+            // 无检测器时对整帧/任务 ROI 直接推理，限制见批次报告）
+            hand_model_ = std::make_unique<hand::HandLandmark>(cfg.path, opt);
+            if (!hand_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] HandLandmark model init failed: " << cfg.path
+                          << std::endl;
+                hand_model_.reset();
+                return false;
+            }
+        } else if (cfg.type == "reid") {
+            // 行人重识别复合模型：检测器（复用同任务 detection 条目）+ OSNet 嵌入
+            if (cfg.rec_path.empty()) {
+                std::cerr << "[InferenceEngine] reid requires rec_path(embedding)" << std::endl;
+                return false;
+            }
+            reid_det_model_ = std::make_unique<detection::UltralyticsDet>(cfg.path, opt);
+            reid_model_ = std::make_unique<reid::ReID>(cfg.rec_path, opt);
+            if (!reid_det_model_->is_initialized() || !reid_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] reid init failed: " << cfg.path << " | "
+                          << cfg.rec_path << std::endl;
+                reid_det_model_.reset();
+                reid_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                reid_det_model_->get_preprocessor().set_size(cfg_.input_size);
+            reid_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -490,6 +518,9 @@ void InferenceEngine::unload() {
     sam_model_.reset();
     fr_det_model_.reset();
     fr_rec_model_.reset();
+    hand_model_.reset();
+    reid_det_model_.reset();
+    reid_model_.reset();
     pa_model_.reset();
     ocr_model_.reset();
     lpr_model_.reset();
@@ -532,6 +563,10 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_sam(image, result);
     if (cfg_.type == "face_rec")
         return infer_face_rec(image, result);
+    if (cfg_.type == "hand")
+        return infer_hand(image, result);
+    if (cfg_.type == "reid")
+        return infer_reid(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -1016,6 +1051,90 @@ bool InferenceEngine::infer_face_rec(const ImageData& image, InferResult* result
         box.label_name = "face";
         box.embedding = std::move(emb);   // 已 L2 归一化（512-d，w600k_r50）
         result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_hand(const ImageData& image, InferResult* result) {
+    if (!hand_model_ || !result) return false;
+    // MediaPipe landmark 预处理走 cv::Mat（packed BGR）：NV12（硬解/摄像头帧）先转 BGR
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<KeyPointsResult> hands;
+    if (!hand_model_->predict(frame, &hands)) return false;
+    const float thresh = cfg_.confidence_threshold;
+    for (const auto& h : hands) {
+        // 手部置信度（handflag）低于阈值：不产生对象。MediaPipe 对任意输入都会输出 21 点，
+        // 必须靠 handflag 做 fail-closed，避免对无手帧伪造关键点。
+        if (h.score < thresh) continue;
+        if (h.keypoints.empty()) continue;
+        DetectionBox box;
+        box.x = h.box.x; box.y = h.box.y; box.w = h.box.width; box.h = h.box.height;
+        box.score = h.score;
+        box.label_id = h.label_id;
+        box.label_name = "hand";
+        box.keypoints.reserve(h.keypoints.size());
+        // 事件契约 objects[].keypoints = [[x, y, score], ...]：第三位是关键点分数，而 MediaPipe
+        // 第三位是相对深度 z（≈0，会被云端 <0.3 的有效点判定过滤）。手部 21 点没有逐点分数，
+        // 故用整手置信度作为每个点的 score（手势几何只需 x/y 与有效点计数）。
+        for (const auto& k : h.keypoints)
+            box.keypoints.push_back({k.x, k.y, h.score});
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_reid(const ImageData& image, InferResult* result) {
+    if (!reid_det_model_ || !reid_model_ || !result) return false;
+    // OSNet / 检测器预处理只支持 packed BGR：NV12 帧先转换
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<DetectionResult> dets;
+    if (!reid_det_model_->predict(frame, &dets)) return false;
+    const float thresh = cfg_.confidence_threshold;
+    const float W = static_cast<float>(frame.width());
+    const float H = static_cast<float>(frame.height());
+    // 逐检测框裁剪（防御性钳制到帧内）后送入 OSNet；几何与裁剪图按下标对齐
+    std::vector<DetectionBox> pending;
+    std::vector<ImageData> crops;
+    for (const auto& d : dets) {
+        if (d.score < thresh) continue;
+        const float x1 = std::max(0.f, d.box.x);
+        const float y1 = std::max(0.f, d.box.y);
+        const float x2 = std::min(W, d.box.x + d.box.width);
+        const float y2 = std::min(H, d.box.y + d.box.height);
+        if (x2 - x1 < 2.f || y2 - y1 < 2.f) continue;
+        ImageData crop = frame.crop({x1, y1, x2 - x1, y2 - y1});
+        if (crop.empty()) continue;
+        DetectionBox b;
+        b.x = d.box.x; b.y = d.box.y; b.w = d.box.width; b.h = d.box.height;
+        b.score = d.score; b.label_id = d.label_id;
+        b.label_name = class_name_of(cfg_, d.label_id);
+        pending.push_back(std::move(b));
+        crops.push_back(std::move(crop));
+    }
+    if (crops.empty()) return true;
+    // OSNet 权重可能固定 batch（提供的 osnet_x0_25 为 16）：按模型声明的 batch 分块，
+    // 短批用首图重复补齐（多出结果丢弃）；动态 batch（B<=0）按实际数量一次推理。
+    const TensorInfo info = reid_model_->get_input_info(0);
+    int B = (!info.shape.empty() && info.shape[0] > 0) ? info.shape[0] : 0;
+    if (B <= 0) B = static_cast<int>(crops.size());
+    for (size_t start = 0; start < crops.size(); start += static_cast<size_t>(B)) {
+        const size_t n = std::min(static_cast<size_t>(B), crops.size() - start);
+        std::vector<ImageData> batch;
+        batch.reserve(static_cast<size_t>(B));
+        for (size_t i = 0; i < n; ++i) batch.push_back(crops[start + i]);
+        while (batch.size() < static_cast<size_t>(B)) batch.push_back(batch[0]);  // 补齐到固定 batch
+        std::vector<std::vector<ReIdResult>> outs;
+        if (!reid_model_->batch_predict(batch, &outs)) return false;
+        for (size_t i = 0; i < n; ++i) {
+            if (i >= outs.size() || outs[i].empty()) continue;
+            std::vector<float> emb = outs[i][0].embedding;
+            if (!l2_normalize(&emb)) continue;   // 无效嵌入（全零/非有限）丢弃
+            DetectionBox b = std::move(pending[start + i]);
+            b.embedding = std::move(emb);
+            result->boxes.push_back(std::move(b));
+        }
     }
     return true;
 }

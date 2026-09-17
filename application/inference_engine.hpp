@@ -10,6 +10,8 @@
 #include "csrc/vision/obb/ultralytics_obb.h"
 #include "csrc/vision/iseg/ultralytics_seg.h"
 #include "csrc/vision/pose/ultralytics_pose.h"
+#include "csrc/vision/hand/hand_landmark.h"
+#include "csrc/vision/reid/reid.h"
 #include "csrc/vision/sem/ultralytics_sem.h"
 #include "csrc/vision/landmark/face_landmark.h"
 #include "csrc/vision/barcode/barcode.h"
@@ -144,6 +146,11 @@ private:
     // face_rec：SCRFD 人脸检测 + ArcFace 嵌入（w600k_r50，512-d，事件 objects[].embedding）
     std::unique_ptr<modeldeploy::vision::face::Scrfd> fr_det_model_;
     std::unique_ptr<modeldeploy::vision::face::InsightFaceRecognition> fr_rec_model_;
+    // hand：MediaPipe 手部 21 点关键点（输入为手掌裁剪/整帧，输出 objects[].keypoints）
+    std::unique_ptr<modeldeploy::vision::hand::HandLandmark> hand_model_;
+    // reid：行人检测（复用同任务 detection 条目）+ OSNet 嵌入（事件 objects[].embedding）
+    std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> reid_det_model_;
+    std::unique_ptr<modeldeploy::vision::reid::ReID> reid_model_;
     std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::unique_ptr<modeldeploy::vision::ocr::PaddleOCR> ocr_model_;
     std::unique_ptr<modeldeploy::vision::lpr::LprPipeline> lpr_model_;
@@ -164,6 +171,8 @@ private:
     bool infer_barcode(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_sam(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_face_rec(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_hand(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_reid(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_ocr(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_lpr(const modeldeploy::vision::ImageData& image, InferResult* result);

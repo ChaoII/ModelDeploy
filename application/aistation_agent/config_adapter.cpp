@@ -64,6 +64,16 @@ std::string normalize_model_type(const std::string& type) {
         type == "face_embed" || type == "face_feature" || type == "face_id" ||
         type == "arcface" || type == "face_rec_pipeline")
         return "face_rec";
+    // 手部关键点（场景目录 HAND_GESTURE 声明 type="hand"，21 点，MediaPipe Hands 坐标系）
+    if (type == "hand" || type == "hand_landmark" || type == "hand_landmarks" ||
+        type == "handpose" || type == "hand_pose" || type == "hand_keypoint" ||
+        type == "hand_keypoints" || type == "mediapipe_hand" || type == "hand_gesture" ||
+        type == "hand_pipeline")
+        return "hand";
+    // 行人重识别（场景目录 REID_TRACK 声明 type="reid"，OSNet 嵌入，objects[].embedding）
+    if (type == "reid" || type == "re_id" || type == "osnet" || type == "person_reid" ||
+        type == "pedestrian_reid" || type == "reid_embedding" || type == "reid_pipeline")
+        return "reid";
     return type;
 }
 
@@ -165,15 +175,20 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
     // face_rec/face_landmark 是「检测 + 次级模型」复合模型。若这些条目未显式给出 det_url/
     // det_path，则复用同一任务中 face_detection 条目的模型路径作为检测器（SCRFD）。
     std::string shared_face_det;
+    std::string shared_det;
     if (j.contains("models") && j["models"].is_array()) {
         for (const auto& mo : j["models"]) {
             if (!mo.is_object() || !mo.contains("type") || !mo["type"].is_string()) continue;
-            if (normalize_model_type(mo["type"].get<std::string>()) != "face_detection") continue;
+            const std::string nt = normalize_model_type(mo["type"].get<std::string>());
+            if (nt != "face_detection" && nt != "detection") continue;
+            std::string path;
             if (mo.contains("url") && mo["url"].is_string())
-                shared_face_det = mo["url"].get<std::string>();
+                path = mo["url"].get<std::string>();
             else if (mo.contains("path") && mo["path"].is_string())
-                shared_face_det = mo["path"].get<std::string>();
-            if (!shared_face_det.empty()) break;
+                path = mo["path"].get<std::string>();
+            if (path.empty()) continue;
+            if (nt == "face_detection" && shared_face_det.empty()) shared_face_det = path;
+            if (nt == "detection" && shared_det.empty()) shared_det = path;
         }
     }
 
@@ -193,6 +208,11 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
             !mo.contains("det_url") && !mo.contains("det_path")) {
             mo_eff["det_url"] = shared_face_det;
         }
+        // reid 缺检测器路径：注入同任务 detection 模型路径（目录 REID_TRACK 的 [det, reid] 两条独立模型）
+        const bool is_reid = mo.is_object() && mo.contains("type") && mo["type"].is_string() &&
+            normalize_model_type(mo["type"].get<std::string>()) == "reid";
+        if (is_reid && !shared_det.empty() && !mo.contains("det_url") && !mo.contains("det_path"))
+            mo_eff["det_url"] = shared_det;
         ModelConfig m;
         if (!parse_one_model(mo_eff, rect, &m, err)) return false;
         // sam/iseg：提示点模型条目优先，缺省用任务级 prompt_point（归一化 [x,y]）
@@ -331,6 +351,21 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         if (m.rec_path.empty()) {
             if (!resolve_first({"url", "path"}, &m.rec_path)) return false;
         }
+    } else if (m.type == "hand") {
+        // 手部关键点（MediaPipe Hands，21 点）：单模型；不含 palm detector（无检测器可复用）
+        if (!resolve_first({"url", "path", "model_url", "model_path"}, &m.path)) return false;
+    } else if (m.type == "reid") {
+        // 行人重识别复合模型：det（检测器，复用同任务 detection）+ rec（OSNet 嵌入）
+        // det 缺省由 from_json 从同任务 detection 条目补齐（目录 REID_TRACK 为 [det, reid] 两条独立模型）
+        if (!resolve_first({"det_url", "det_path", "detector_url", "detector_path"}, &m.path))
+            return false;
+        if (!resolve_first({"reid_url", "reid_path", "embedding_url", "embedding_path",
+                            "osnet_url", "osnet_path"}, &m.rec_path))
+            return false;
+        // 未给显式嵌入键时，url|path 即嵌入模型（云侧 reid 角色的主模型）
+        if (m.rec_path.empty()) {
+            if (!resolve_first({"url", "path"}, &m.rec_path)) return false;
+        }
     } else if (m.type == "face_landmark") {
         // 人脸关键点复合模型：det（SCRFD，逐脸检测）+ landmark（2d106det，逐脸 106 点）。
         // 口径与 face_rec 对齐：det_url→path（检测器），landmark_url|url|path→rec_path（关键点模型）。
@@ -394,7 +429,7 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
     // 单模型：path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
     // barcode 无权重：跳过路径解析（避免无谓下载），也不要求 path
     // face_rec 的 url|path 已解析为嵌入模型（rec_path），此处不得再当作检测器 path
-    if (m.path.empty() && m.type != "barcode" && m.type != "face_rec") {
+    if (m.path.empty() && m.type != "barcode" && m.type != "face_rec" && m.type != "reid") {
         if (mo.contains("path") && mo["path"].is_string()) {
             m.path = mo["path"];
         } else if (mo.contains("url") && mo["url"].is_string()) {
@@ -417,6 +452,8 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
     // face_rec 还需嵌入模型（det 由 det_url 或同任务 face_detection 条目提供）
     if (m.type == "face_rec" && m.rec_path.empty())
         return fail("model.rec_url/url (face embedding) required for " + m.name);
+    if (m.type == "reid" && m.rec_path.empty())
+        return fail("model.reid_url/url (reid embedding) required for " + m.name);
     *out = std::move(m);
     return true;
 }
