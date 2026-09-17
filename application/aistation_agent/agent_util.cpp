@@ -137,6 +137,42 @@ std::string base64_encode_bytes(const std::vector<uint8_t>& data) {
         std::string(reinterpret_cast<const char*>(data.data()), data.size()));
 }
 
+namespace {
+
+/// 单个 base64 字符 → 6bit 值；非法字符返回 -1。
+int base64_value(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+}  // namespace
+
+std::vector<uint8_t> base64_decode_bytes(const std::string& text) {
+    std::vector<uint8_t> out;
+    if (text.empty()) return out;
+    out.reserve(text.size() / 4 * 3);
+    uint32_t buffer = 0;
+    int bits = 0;
+    for (char c : text) {
+        if (c == '=') break;  // 填充开始，忽略其后
+        // 容忍换行/空白（不同实现可能插入）
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+        const int v = base64_value(c);
+        if (v < 0) return {};  // 非法字符 → 整体失败
+        buffer = (buffer << 6) | static_cast<uint32_t>(v);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<uint8_t>((buffer >> bits) & 0xFFu));
+        }
+    }
+    return out;
+}
+
 std::string mqtt_client_id_for(const std::string& configured, const std::string& edge_code,
                                const std::string& task_id) {
     // 云端（orchestrator）当前对所有任务下发同一个 `aistation-agent-<edge_code>`（每边缘唯一），

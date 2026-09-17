@@ -13,6 +13,16 @@
 #include "agent_util.hpp"
 #include "inference_engine.hpp"
 
+/// 单事件最多携带人脸嵌入的对象数（按置信度 Top-N，约束上行体积）；<=0 表示禁用嵌入。
+constexpr int kMaxEmbeddingsPerEvent = 8;
+
+/// 人脸嵌入紧凑编码：base64(小端 IEEE-754 float16)，空向量返回空串。
+/// 事件契约：`objects[].embedding = <base64>` + `objects[].embedding_encoding = "f16b64"`。
+/// 512-d 编码后约 1.37 KB（原始 float32 JSON 约 10.7 KB/脸），配合 Top-N 上限约束最坏体积。
+std::string encode_embedding_f16_b64(const std::vector<float>& vec);
+/// 解码 `f16b64` 为 float 向量；空串/非法字符/奇数长度 → 空向量（fail-closed）。
+std::vector<float> decode_embedding_f16_b64(const std::string& text);
+
 /// 单个检测框（归一化坐标）
 struct EventDetection {
     std::string label;
@@ -65,6 +75,7 @@ struct EventMeta {
     std::string algorithm_type;                  // AIStation 提供，原样带回
     int alarm_interval_sec = 0;                              // 0 = 不节流
     int heartbeat_sec = 5;                                   // <=0 表示禁用
+    int max_embeddings = kMaxEmbeddingsPerEvent;             // 单事件携带嵌入的对象数上限（Top-N）；<=0 禁用
     aistation::Schedule schedule;                            // 空 = 全天
     std::vector<std::array<float, 2>> roi_polygon;           // <3 顶点 = 不过滤
 };

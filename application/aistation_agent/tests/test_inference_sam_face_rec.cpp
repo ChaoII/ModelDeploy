@@ -386,14 +386,16 @@ TEST_CASE("face embedding enters event objects with JSON round-trip", "[agent][e
     auto j = got[0].to_json();
     REQUIRE(j["objects"].size() == 1);
     REQUIRE(j["objects"][0].contains("embedding"));
-    REQUIRE(j["objects"][0]["embedding"].size() == 2);
-    REQUIRE(j["objects"][0]["embedding"][0].get<float>() == Approx(0.6f));
+    // 紧凑编码：base64(float16) + 显式编码标识，避免原始 float 数组膨胀上行体积
+    REQUIRE(j["objects"][0]["embedding_encoding"] == "f16b64");
+    REQUIRE(j["objects"][0]["embedding"].is_string());
     REQUIRE(j["schema_version"] == 2);
 
     auto e2 = DetectionEvent::from_json(j);
     REQUIRE(e2.detections.size() == 1);
     REQUIRE(e2.detections[0].embedding.size() == 2);
-    REQUIRE(e2.detections[0].embedding[1] == Approx(0.8f));
+    REQUIRE(e2.detections[0].embedding[0] == Approx(0.6f).margin(1e-3));
+    REQUIRE(e2.detections[0].embedding[1] == Approx(0.8f).margin(1e-3));
 }
 
 // 无嵌入的普通事件不新增 embedding 字段（契约向后兼容）

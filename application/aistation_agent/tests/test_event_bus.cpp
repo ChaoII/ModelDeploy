@@ -1,10 +1,15 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <cmath>
+#include <cstdio>
 #include <ctime>
 #include <set>
+#include <string>
+#include <vector>
 #include "agent_util.hpp"
 #include "capability.hpp"
 #include "event_bus.hpp"
+#include "nlohmann/json.hpp"
 
 using modeldeploy::vision::DetectionResult;
 using Catch::Approx;
@@ -297,4 +302,182 @@ TEST_CASE("DetectionEvent without heartbeat omits the flag", "[agent][events]") 
     REQUIRE(got.size() == 1);
     REQUIRE(got[0].heartbeat == false);
     REQUIRE(got[0].to_json().contains("heartbeat") == false);
+}
+
+// ── face_rec 嵌入紧凑编码（f16b64）与 Top-N 上限 ──
+
+// 黄金向量跨语言对拍：Python struct.pack('<5e') + base64 的结果
+TEST_CASE("embedding f16b64 matches cross-language golden", "[agent][events]") {
+    const std::vector<float> v{0.5f, -0.25f, 1.0f, 0.0f, 0.25f};
+    REQUIRE(encode_embedding_f16_b64(v) == "ADgAtAA8AAAANA==");
+    const auto back = decode_embedding_f16_b64("ADgAtAA8AAAANA==");
+    REQUIRE(back.size() == 5);
+    REQUIRE(back[0] == Approx(0.5f));
+    REQUIRE(back[1] == Approx(-0.25f));
+    REQUIRE(back[2] == Approx(1.0f));
+    REQUIRE(back[3] == Approx(0.0f));
+    REQUIRE(back[4] == Approx(0.25f));
+}
+
+// 512-d 往返：float16 精度损失后余弦仍接近 1
+TEST_CASE("embedding f16b64 round-trips within float16 tolerance", "[agent][events]") {
+    std::vector<float> v;
+    v.reserve(512);
+    for (int i = 0; i < 512; ++i) v.push_back(std::sin(static_cast<float>(i) * 0.37f));
+    double n = 0.0;
+    for (float x : v) n += static_cast<double>(x) * x;
+    n = std::sqrt(n);
+    for (auto& x : v) x = static_cast<float>(x / n);
+
+    const auto back = decode_embedding_f16_b64(encode_embedding_f16_b64(v));
+    REQUIRE(back.size() == 512);
+    double dot = 0.0, na = 0.0, nb = 0.0;
+    for (size_t i = 0; i < v.size(); ++i) {
+        dot += static_cast<double>(v[i]) * back[i];
+        na += static_cast<double>(v[i]) * v[i];
+        nb += static_cast<double>(back[i]) * back[i];
+    }
+    REQUIRE(dot / std::sqrt(na * nb) > 0.9999);
+}
+
+TEST_CASE("embedding f16b64 rejects malformed input", "[agent][events]") {
+    REQUIRE(decode_embedding_f16_b64("").empty());
+    REQUIRE(decode_embedding_f16_b64("not-base64!!").empty());
+    REQUIRE(decode_embedding_f16_b64("ADgA").empty());   // base64 合法但字节数为奇数
+    REQUIRE(encode_embedding_f16_b64({}).empty());
+}
+
+TEST_CASE("DetectionEvent serializes embedding as f16b64 string", "[agent][events]") {
+    DetectionEvent e;
+    e.event_id = "enc"; e.ts = "2026-01-01T00:00:00.000Z";
+    EventDetection d; d.label = "face"; d.embedding = {0.6f, 0.8f};
+    e.detections.push_back(d);
+
+    auto j = e.to_json();
+    REQUIRE(j["objects"][0].contains("embedding"));
+    REQUIRE(j["objects"][0]["embedding_encoding"] == "f16b64");
+    REQUIRE(j["objects"][0]["embedding"].is_string());
+
+    auto back = DetectionEvent::from_json(j);
+    REQUIRE(back.detections.size() == 1);
+    REQUIRE(back.detections[0].embedding.size() == 2);
+    REQUIRE(back.detections[0].embedding[0] == Approx(0.6f).margin(1e-3));
+    REQUIRE(back.detections[0].embedding[1] == Approx(0.8f).margin(1e-3));
+}
+
+// 向后兼容：旧格式原始 float 数组仍可解析
+TEST_CASE("DetectionEvent from_json accepts legacy raw float embedding", "[agent][events]") {
+    nlohmann::json j;
+    j["detections"] = nlohmann::json::array();
+    j["detections"].push_back({{"label", "face"}, {"bbox", nlohmann::json::object()}});
+    j["objects"] = nlohmann::json::array();
+    j["objects"].push_back({{"label", "face"}, {"embedding", {0.5, 0.25}}});
+    auto e = DetectionEvent::from_json(j);
+    REQUIRE(e.detections.size() == 1);
+    REQUIRE(e.detections[0].embedding.size() == 2);
+    REQUIRE(e.detections[0].embedding[1] == Approx(0.25f));
+}
+
+// 上限：12 张带嵌入的人脸 → 仅置信度最高的 8 个携带嵌入
+TEST_CASE("EventBus caps embeddings to top-N by confidence", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.task_id_num = 1; meta.alarm_interval_sec = 0; meta.max_embeddings = 8;
+    bus.register_task("t", meta);
+
+    std::vector<DetectionBox> boxes;
+    for (int i = 0; i < 12; ++i) {
+        DetectionBox b = box("face", 0, 0.1f * static_cast<float>(i + 1));
+        b.embedding = {static_cast<float>(i), 1.0f};
+        boxes.push_back(b);
+    }
+    bus.on_detections("t", boxes, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+
+    const auto j = got[0].to_json();
+    REQUIRE(j["objects"].size() == 12);
+    int with_embedding = 0;
+    for (const auto& o : j["objects"]) {
+        if (o.contains("embedding")) ++with_embedding;
+    }
+    REQUIRE(with_embedding == 8);
+    // 保留置信度最高的 8 个（i=4..11），低分的 4 个不带嵌入
+    REQUIRE_FALSE(j["objects"][0].contains("embedding"));
+    REQUIRE_FALSE(j["objects"][3].contains("embedding"));
+    REQUIRE(j["objects"][4].contains("embedding"));
+    REQUIRE(j["objects"][11].contains("embedding"));
+    // 解码保留向量：objects[4] 的首元素应为 4.0
+    const auto vec = decode_embedding_f16_b64(j["objects"][4]["embedding"].get<std::string>());
+    REQUIRE(vec.size() == 2);
+    REQUIRE(vec[0] == Approx(4.0f));
+}
+
+// 默认上限为 8（未显式配置时同样生效）
+TEST_CASE("EventBus applies default embedding cap of 8", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.task_id_num = 1; meta.alarm_interval_sec = 0;
+    bus.register_task("t", meta);
+
+    std::vector<DetectionBox> boxes;
+    for (int i = 0; i < 10; ++i) {
+        DetectionBox b = box("face", 0, 0.5f);
+        b.embedding = {1.0f};
+        boxes.push_back(b);
+    }
+    bus.on_detections("t", boxes, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    const auto j = got[0].to_json();
+    int with_embedding = 0;
+    for (const auto& o : j["objects"]) {
+        if (o.contains("embedding")) ++with_embedding;
+    }
+    REQUIRE(with_embedding == 8);
+}
+
+// 最坏体积：24 张 512-d 人脸 + Top-8 上限，事件体积必须远低于原始 float32
+TEST_CASE("embedding payload worst-case is bounded", "[agent][events]") {
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta; meta.task_id_num = 1; meta.alarm_interval_sec = 0; meta.max_embeddings = 8;
+    bus.register_task("t", meta);
+
+    std::vector<DetectionBox> boxes;
+    for (int i = 0; i < 24; ++i) {
+        DetectionBox b = box("face", 0, 0.5f + 0.01f * static_cast<float>(i));
+        b.embedding.reserve(512);
+        for (int k = 0; k < 512; ++k) {
+            b.embedding.push_back(std::sin(static_cast<float>(i * 512 + k) * 0.017f));
+        }
+        boxes.push_back(b);
+    }
+    bus.on_detections("t", boxes, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    const auto j = got[0].to_json();
+
+    int with_embedding = 0;
+    for (const auto& o : j["objects"]) {
+        if (o.contains("embedding")) ++with_embedding;
+    }
+    REQUIRE(with_embedding == 8);
+
+    const size_t encoded_bytes = j.dump().size();
+    // 对照：单张 512-d 脸 f16b64 编码长度 = base64(1024 bytes) = 1368
+    REQUIRE(encode_embedding_f16_b64(boxes[0].embedding).size() == 1368);
+
+    // 对照：原始 float32 数组体积（每脸约 10.7KB / 24 脸 ~250KB）
+    size_t raw_bytes = 0;
+    for (const auto& b : boxes) {
+        raw_bytes += nlohmann::json(b.embedding).dump().size();
+    }
+    // 最坏事件体积：f16b64 + Top-8 后远小于原始（24 脸被压到约 20KB）
+    std::printf("[measure] per_face_raw=%zu per_face_f16b64=%zu encoded_event=%zu raw_embeddings=%zu\n",
+                nlohmann::json(boxes[0].embedding).dump().size(),
+                encode_embedding_f16_b64(boxes[0].embedding).size(), encoded_bytes, raw_bytes);
+    REQUIRE(encoded_bytes < 24 * 1024);
+    REQUIRE(raw_bytes > 100 * 1024);
+    REQUIRE(raw_bytes > 4 * encoded_bytes);
 }

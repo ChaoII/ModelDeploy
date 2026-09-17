@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <random>
 
@@ -28,7 +30,110 @@ std::string utc_iso8601_ms() {
     return std::string(buf);
 }
 
+/// float32 → IEEE-754 half（就近偶数舍入，含次正规/Inf/NaN）。
+uint16_t f32_to_f16(float value) {
+    uint32_t x = 0;
+    std::memcpy(&x, &value, sizeof(x));
+    const uint32_t sign = (x >> 16) & 0x8000u;
+    const uint32_t abs = x & 0x7FFFFFFFu;
+    if (abs >= 0x7F800000u) {  // Inf / NaN
+        return static_cast<uint16_t>(sign | (abs > 0x7F800000u ? 0x7E00u : 0x7C00u));
+    }
+    if (abs >= 0x477FF000u) return static_cast<uint16_t>(sign | 0x7C00u);  // 溢出 → Inf
+    if (abs < 0x38800000u) {  // 次正规（< 2^-14）或零
+        if (abs < 0x33000000u) return static_cast<uint16_t>(sign);  // < 2^-25 → ±0
+        const uint32_t e = abs >> 23;                 // [102, 112]
+        const uint32_t m = (abs & 0x7FFFFFu) | 0x800000u;
+        const uint32_t shift = 126u - e;              // [14, 24]
+        uint32_t half = m >> shift;
+        const uint32_t round = (m >> (shift - 1)) & 1u;
+        const uint32_t sticky = m & ((1u << (shift - 1)) - 1u);
+        if (round && (sticky || (half & 1u))) ++half;
+        return static_cast<uint16_t>(sign | half);
+    }
+    const uint32_t e = (abs >> 23) - 112u;            // half 指数 [1, 30]
+    const uint32_t m = abs & 0x7FFFFFu;
+    uint16_t half = static_cast<uint16_t>(sign | (e << 10) | (m >> 13));
+    const uint32_t round = (m >> 12) & 1u;
+    const uint32_t sticky = m & 0xFFFu;
+    if (round && (sticky || (half & 1u))) ++half;
+    return half;
+}
+
+/// IEEE-754 half → float32。
+float f16_to_f32(uint16_t h) {
+    const uint32_t sign = static_cast<uint32_t>(h & 0x8000u) << 16;
+    uint32_t exp = (h >> 10) & 0x1Fu;
+    uint32_t mant = h & 0x3FFu;
+    uint32_t bits = 0;
+    if (exp == 0) {
+        if (mant == 0) {
+            bits = sign;
+        } else {  // 次正规 → 规格化
+            int e = -14;
+            while ((mant & 0x400u) == 0) {
+                mant <<= 1;
+                --e;
+            }
+            mant &= 0x3FFu;
+            bits = sign | (static_cast<uint32_t>(e + 127) << 23) | (mant << 13);
+        }
+    } else if (exp == 0x1Fu) {
+        bits = sign | 0x7F800000u | (mant << 13);
+    } else {
+        bits = sign | ((exp + (127u - 15u)) << 23) | (mant << 13);
+    }
+    float f = 0.f;
+    std::memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
+/// 嵌入上限：仅保留置信度最高的 max_n 个对象的嵌入（分高者优先；<=0 全部移除）。
+void apply_embedding_cap(std::vector<EventDetection>& dets, int max_n) {
+    std::vector<size_t> idx;
+    for (size_t i = 0; i < dets.size(); ++i) {
+        if (!dets[i].embedding.empty()) idx.push_back(i);
+    }
+    if (max_n <= 0) {
+        for (size_t i : idx) dets[i].embedding.clear();
+        return;
+    }
+    if (idx.size() <= static_cast<size_t>(max_n)) return;
+    std::stable_sort(idx.begin(), idx.end(), [&](size_t a, size_t b) {
+        return dets[a].confidence > dets[b].confidence;
+    });
+    for (size_t k = static_cast<size_t>(max_n); k < idx.size(); ++k) {
+        dets[idx[k]].embedding.clear();
+    }
+}
+
 }  // namespace
+
+std::string encode_embedding_f16_b64(const std::vector<float>& vec) {
+    if (vec.empty()) return "";
+    std::vector<uint8_t> bytes;
+    bytes.reserve(vec.size() * 2);
+    for (float v : vec) {
+        const uint16_t h = f32_to_f16(v);
+        bytes.push_back(static_cast<uint8_t>(h & 0xFFu));
+        bytes.push_back(static_cast<uint8_t>((h >> 8) & 0xFFu));
+    }
+    return aistation::base64_encode_bytes(bytes);
+}
+
+std::vector<float> decode_embedding_f16_b64(const std::string& text) {
+    std::vector<float> out;
+    const std::vector<uint8_t> bytes = aistation::base64_decode_bytes(text);
+    if (bytes.empty() || bytes.size() % 2 != 0) return out;
+    out.reserve(bytes.size() / 2);
+    for (size_t i = 0; i + 1 < bytes.size(); i += 2) {
+        const uint16_t h = static_cast<uint16_t>(bytes[i]) |
+                           static_cast<uint16_t>(static_cast<uint16_t>(bytes[i + 1]) << 8);
+        out.push_back(f16_to_f32(h));
+    }
+    return out;
+}
+
 
 nlohmann::json DetectionEvent::to_json() const {
     nlohmann::json j;
@@ -76,8 +181,13 @@ nlohmann::json DetectionEvent::to_json() const {
         }
         // 深度（depth 模型）：仅在模型激活并产出有效距离时写入（增量字段，旧事件无此键）
         if (d.has_depth && std::isfinite(d.depth)) dj["depth"] = d.depth;
-        // 人脸嵌入（face_rec）：非空才写入（增量字段；已 L2 归一化，512-d ≈ 2KB/脸）
-        if (!d.embedding.empty()) dj["embedding"] = d.embedding;
+        // 人脸嵌入（face_rec）：紧凑编码 base64(float16) + 编码标识（增量字段，旧事件无此键）。
+        // 原始 float 数组每脸约 10 KB（512-d，实测 9,940 B），24 张脸可达 ~235 KB，边缘上行不可接受；
+        // f16b64 每脸 1,368 B，配合 Top-N（默认 8）把 24 脸事件的实测体积压到 19,925 B（~19.5 KB）。
+        if (!d.embedding.empty()) {
+            dj["embedding"] = encode_embedding_f16_b64(d.embedding);
+            dj["embedding_encoding"] = "f16b64";
+        }
         objects.push_back(std::move(dj));
     }
     j["objects"] = std::move(objects);
@@ -151,11 +261,21 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
                 e.detections[i].depth = objs[i]["depth"].get<float>();
                 e.detections[i].has_depth = true;
             }
-            // 人脸嵌入（face_rec，float 数组；仅数值项才恢复，形状异常跳过）
-            if (objs[i].contains("embedding") && objs[i]["embedding"].is_array()) {
-                auto& out = e.detections[i].embedding;
-                for (const auto& v : objs[i]["embedding"]) {
-                    if (v.is_number()) out.push_back(v.get<float>());
+            // 人脸嵌入（face_rec）：
+            // - f16b64：base64 字符串 + embedding_encoding 标识 → 解码回 float 向量；
+            // - 原始 float 数组（无编码标识）→ 向后兼容，仅数值项才恢复，形状异常跳过。
+            if (objs[i].contains("embedding")) {
+                const auto& emb = objs[i]["embedding"];
+                if (emb.is_string()) {
+                    if (objs[i].value("embedding_encoding", "") == "f16b64") {
+                        e.detections[i].embedding =
+                            decode_embedding_f16_b64(emb.get<std::string>());
+                    }
+                } else if (emb.is_array()) {
+                    auto& out = e.detections[i].embedding;
+                    for (const auto& v : emb) {
+                        if (v.is_number()) out.push_back(v.get<float>());
+                    }
                 }
             }
         }
@@ -266,6 +386,8 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
             kept.push_back(std::move(ed));
             labels.push_back(b.label_name);
         }
+        // 嵌入上限：仅置信度 Top-N 携带，约束最坏上行体积（<=0 表示禁用嵌入）
+        apply_embedding_cap(kept, st.meta.max_embeddings);
         if (kept.empty()) return;
 
         event.event_id = make_uuid_v4();

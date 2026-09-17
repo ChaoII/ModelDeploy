@@ -33,6 +33,8 @@ std::vector<std::array<float, 2>> parse_roi_polygon(const nlohmann::json& roi);
 
 std::string normalize_broker_scheme(const std::string& url);
 std::string base64_encode_bytes(const std::vector<uint8_t>& data);
+/// base64 解码为字节；存在非法字符/空输入时返回空（fail-closed）。
+std::vector<uint8_t> base64_decode_bytes(const std::string& text);
 
 /// 计算某任务实际使用的 MQTT client_id（防御云端下发"每边缘唯一"而非"每任务唯一"的 id）。
 /// Agent 为**每个任务**创建独立的 MQTT 连接，故 client_id 必须在同一 edge 内唯一：MQTT 规范
