@@ -24,12 +24,14 @@ PipelineManager::~PipelineManager() {
 // ── 模型工厂（prototype 缓存 + clone 共享 Runtime） ──
 
 std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfig& cfg) {
-    // classification / pose / obb / iseg / face_attr / face_as / depth / pedestrian_attribute /
-    // ocr / lpr 目前直接独立加载（SDK 的模型支持 clone()，可后续接入 prototype 共享 Runtime；
-    // 此处保守保持独立加载）
+    // classification / pose / obb / iseg / face_attr / face_as / depth / sem / face_landmark /
+    // doc / barcode / pedestrian_attribute / ocr / lpr 目前直接独立加载（SDK 的模型支持
+    // clone()，可后续接入 prototype 共享 Runtime；此处保守保持独立加载）
     if (cfg.type == "classification" || cfg.type == "pose" || cfg.type == "obb" ||
         cfg.type == "iseg" || cfg.type == "face_attr" || cfg.type == "face_as" ||
-        cfg.type == "depth" || cfg.type == "pedestrian_attribute" || cfg.type == "ocr" ||
+        cfg.type == "depth" || cfg.type == "sem" || cfg.type == "face_landmark" ||
+        cfg.type == "doc" || cfg.type == "barcode" ||
+        cfg.type == "pedestrian_attribute" || cfg.type == "ocr" ||
         cfg.type == "lpr") {
         auto eng = std::make_unique<InferenceEngine>();
         eng->load(cfg);

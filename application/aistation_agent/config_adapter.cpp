@@ -34,6 +34,26 @@ std::string normalize_model_type(const std::string& type) {
     if (type == "depth" || type == "depth_estimation" || type == "mono_depth" ||
         type == "yolo_depth" || type == "distance")
         return "depth";
+    // 语义分割（场景目录 SEM_AREA 声明 type="sem"）：整帧占比 → attributes{类别名: 占比}
+    if (type == "sem" || type == "semantic_segmentation" || type == "semantic_seg" ||
+        type == "sem_seg" || type == "yolo_sem" || type == "sem_pipeline")
+        return "sem";
+    // 人脸关键点（场景目录 FACE_LANDMARK 声明 type="face_landmark"，106 点）
+    // 与 pose 共用事件字段 objects[].keypoints（归一化 [x,y,score]）
+    if (type == "face_landmark" || type == "face_landmarks" || type == "face_lmk" ||
+        type == "landmark" || type == "landmarks" || type == "face_keypoint" ||
+        type == "face_keypoints" || type == "2d106" || type == "face_landmark_pipeline")
+        return "face_landmark";
+    // 文档/表格（场景目录 DOC_TABLE 的 pipeline 为 [ocr, cls]；本族直连 OCR 导出文本）
+    if (type == "doc" || type == "doc_table" || type == "document" || type == "document_table" ||
+        type == "table" || type == "table_structure" || type == "doc_structure" ||
+        type == "ppstructure" || type == "layout")
+        return "doc";
+    // 条码/二维码（场景目录 BARCODE 的 pipeline 为 [ocr]；本族用原生 ZXing 解码，无需权重）
+    if (type == "barcode" || type == "barcodes" || type == "qr" || type == "qrcode" ||
+        type == "qr_code" || type == "bar_code" || type == "code_reader" ||
+        type == "barcode_pipeline")
+        return "barcode";
     return type;
 }
 
@@ -224,7 +244,10 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         }
         return true;
     };
-    if (m.type == "face_attr") {
+    if (m.type == "barcode") {
+        // 条码/二维码：走原生 ZXing 解码，无需 DNN 权重。刻意不解析/下载 url：
+        // 目录 BARCODE 的 pipeline 为 [ocr]（云端可能下发 OCR 权重），本族忽略该权重。
+    } else if (m.type == "face_attr") {
         // 人脸性别/年龄复合模型：det（SCRFD）+ cls（性别）+ rec（年龄）
         if (!resolve_first({"det_url", "det_path", "url", "path"}, &m.path)) return false;
         if (!resolve_first({"cls_url", "cls_path", "gender_url", "gender_path"}, &m.cls_path))
@@ -250,13 +273,21 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         // LPR 车牌 pipeline：det_url→path、rec_url→rec_path
         if (!resolve_path("det_url", &m.path)) return false;
         if (!resolve_path("rec_url", &m.rec_path)) return false;
+    } else if (m.type == "doc") {
+        // 文档/表格：与 OCR 同口径（det 主模型 + cls 方向分类 + rec 识别 + 字典），
+        // 识别文本写入 objects[].text（云侧 text_match/ocr_label 叶子可读）
+        if (!resolve_first({"det_url", "det_path", "url", "path"}, &m.path)) return false;
+        if (!resolve_first({"cls_url", "cls_path"}, &m.cls_path)) return false;
+        if (!resolve_first({"rec_url", "rec_path"}, &m.rec_path)) return false;
+        if (!resolve_first({"dict_url", "dict_path"}, &m.dict_path)) return false;
     } else {
         // pedestrian_attribute pipeline：det_url→path、cls_url→rec_path
         if (!resolve_path("det_url", &m.path)) return false;
         if (!resolve_path("cls_url", &m.rec_path)) return false;
     }
     // 单模型：path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
-    if (m.path.empty()) {
+    // barcode 无权重：跳过路径解析（避免无谓下载），也不要求 path
+    if (m.path.empty() && m.type != "barcode") {
         if (mo.contains("path") && mo["path"].is_string()) {
             m.path = mo["path"];
         } else if (mo.contains("url") && mo["url"].is_string()) {
@@ -274,7 +305,8 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         }
     }
     if (m.name.empty()) return fail("model.name required");
-    if (m.path.empty()) return fail("model.path/url required for " + m.name);
+    if (m.path.empty() && m.type != "barcode")
+        return fail("model.path/url required for " + m.name);
     *out = std::move(m);
     return true;
 }

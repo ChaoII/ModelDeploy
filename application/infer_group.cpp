@@ -174,10 +174,11 @@ bool InferGroup::run_models(
                     st.has_last = true;
                 }
             } else {
-                // ROI：非 detection 族（如人脸）按区域裁剪，几何结果按偏移回映射；classification 无几何不做
+                // ROI：非 detection 族（如人脸）按区域裁剪，几何结果按偏移回映射；classification/sem 无几何不做
+                // （sem 契约要求整帧对象 0,0,1,1，裁剪会破坏该契约）
                 const RoiRect rr = effective_roi(mc, frame);
                 const bool can_roi = rr.valid && frame.device() == modeldeploy::Device::CPU &&
-                                     mc.type != "classification";
+                                     mc.type != "classification" && mc.type != "sem";
                 ImageData infer_frame = frame;
                 float ox = 0.f, oy = 0.f;
                 if (can_roi) {

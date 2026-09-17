@@ -31,14 +31,16 @@ nlohmann::json detect_capabilities(int max_channels) {
     platform = "nvidia";
 #endif
 
-    // 模型族上报须与实际接线一致：obb/iseg/pose/face_attr/face_as/depth 已接入推理与事件
-    // （见 pipeline/inference_engine），名称与云端场景目录 catalog.py 的声明对齐：
-    // type="obb"/"iseg"/"pose"/"face_attr"/"face_as"/"depth"。
+    // 模型族上报须与实际接线一致：obb/iseg/pose/face_attr/face_as/depth/sem/face_landmark/
+    // doc/barcode 已接入推理与事件（见 pipeline/inference_engine），名称与云端场景目录
+    // catalog.py 的声明对齐：type="obb"/"iseg"/"pose"/"face_attr"/"face_as"/"depth"/
+    // "sem"/"face_landmark"/"doc"/"barcode"。
     // face_attr → 人脸框 attributes{gender_male, age_young}；face_as → attributes{liveness}；
-    // depth → objects[].depth（米）。
+    // depth → objects[].depth（米）；sem → 整帧框 attributes{类别名: 占比}；
+    // face_landmark → objects[].keypoints（106 点，归一化）；doc/barcode → objects[].text。
     json families = json::array({"det", "cls", "face", "pedestrian_attribute", "ocr", "lpr",
                                  "tracking", "obb", "iseg", "pose", "face_attr", "face_as",
-                                 "depth"});
+                                 "depth", "sem", "face_landmark", "doc", "barcode"});
 
     json decode = json::array({"h264", "h265"});
     json encode = json::array({"h264"});

@@ -14,7 +14,9 @@ bool TaskConfig::validate(std::string* err) const {
     for (size_t i = 0; i < models.size(); ++i) {
         const auto& m = models[i];
         if (m.name.empty()) return fail("model[" + std::to_string(i) + "].name is empty");
-        if (m.path.empty()) return fail("model[" + std::to_string(i) + "].path is empty");
+        // barcode 走原生 ZXing 解码，无 DNN 权重，允许 path 为空（其它类型仍强制）
+        if (m.path.empty() && m.type != "barcode")
+            return fail("model[" + std::to_string(i) + "].path is empty");
         if (m.input_size.size() != 2) return fail("model[" + std::to_string(i) + "].input_size must be [w,h]");
         if (m.roi.size() != 4) return fail("model[" + std::to_string(i) + "].roi must be [x,y,w,h]");
         if (m.interval < 1) return fail("model[" + std::to_string(i) + "].interval must be >= 1");

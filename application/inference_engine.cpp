@@ -65,6 +65,13 @@ bool nearest_depth(const std::vector<float>& depth, float* out) {
     *out = best;
     return true;
 }
+
+// 类别名：优先配置 labels，缺失/越界回退 "class<id>"（保证事件 label 非空）。
+std::string class_name_of(const ModelConfig& cfg, int id) {
+    if (id >= 0 && static_cast<size_t>(id) < cfg.labels.size() && !cfg.labels[id].empty())
+        return cfg.labels[id];
+    return "class" + std::to_string(id);
+}
 }  // namespace
 
 bool InferenceEngine::load(const ModelConfig& cfg) {
@@ -183,6 +190,40 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             }
             if (cfg_.input_size.size() == 2)
                 depth_model_->get_preprocessor().set_size(cfg_.input_size);
+        } else if (cfg.type == "sem") {
+            // 语义分割（yolo26n-sem，cityscapes 19 类）：整帧占比写入 attributes（见 infer_sem）
+            sem_model_ = std::make_unique<detection::UltralyticsSem>(cfg.path, opt);
+            if (!sem_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] Sem model init failed: " << cfg.path << std::endl;
+                sem_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                sem_model_->get_preprocessor().set_size(cfg_.input_size);
+        } else if (cfg.type == "face_landmark") {
+            // 人脸关键点（InsightFace 2d106det，106 点）：输入为人脸裁剪图，输出 keypoints 事件字段
+            face_landmark_model_ = std::make_unique<landmark::FaceLandmark>(cfg.path, opt);
+            if (!face_landmark_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] FaceLandmark model init failed: " << cfg.path
+                          << std::endl;
+                face_landmark_model_.reset();
+                return false;
+            }
+        } else if (cfg.type == "doc") {
+            // 文档/表格：与 OCR 同口径（det 主模型 + cls 方向分类 + rec 识别 + 字典），
+            // 文本写入 objects[].text（版面/表格结构叶子云端未实现，本族不伪造结构）
+            ocr_model_ = std::make_unique<ocr::PaddleOCR>(
+                cfg.path, cfg.cls_path, cfg.rec_path, cfg.dict_path, opt);
+            if (!ocr_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] DOC(OCR) pipeline init failed" << std::endl;
+                ocr_model_.reset();
+                return false;
+            }
+            ocr_model_->set_rec_batch_size(8);
+            ocr_model_->get_detector()->get_preprocessor().set_max_side_len(1440);
+        } else if (cfg.type == "barcode") {
+            // 条码/二维码：原生 ZXing 解码（无 DNN 权重，path 可空）
+            barcode_detector_ = std::make_unique<barcode::BarcodeDetector>();
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -336,6 +377,9 @@ void InferenceEngine::unload() {
     fas_first_model_.reset();
     fas_second_model_.reset();
     depth_model_.reset();
+    sem_model_.reset();
+    face_landmark_model_.reset();
+    barcode_detector_.reset();
     pa_model_.reset();
     ocr_model_.reset();
     lpr_model_.reset();
@@ -366,6 +410,14 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_face_as(image, result);
     if (cfg_.type == "depth")
         return infer_depth(image, result);
+    if (cfg_.type == "sem")
+        return infer_sem(image, result);
+    if (cfg_.type == "face_landmark")
+        return infer_face_landmark(image, result);
+    if (cfg_.type == "doc")
+        return infer_doc(image, result);
+    if (cfg_.type == "barcode")
+        return infer_barcode(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -626,6 +678,104 @@ bool InferenceEngine::infer_depth(const ImageData& image, InferResult* result) {
     box.has_depth = true;
     box.depth = near;
     result->boxes.push_back(std::move(box));
+    return true;
+}
+
+bool InferenceEngine::infer_sem(const ImageData& image, InferResult* result) {
+    if (!sem_model_ || !result) return false;
+    SemSegResult sem;
+    // UltralyticsSem::predict 内部支持 NV12/设备帧（零拷贝 NV12 预处路径）
+    if (!sem_model_->predict(image, &sem)) return false;
+    const int64_t total = static_cast<int64_t>(sem.labels.size());
+    if (total <= 0) return false;   // 无像素分类结果：不产生对象（fail-closed）
+    // 逐像素统计类别占比。num_classes 来自输出通道；labels 若含更大索引则防御性扩展桶。
+    int max_idx = 0;
+    for (uint8_t v : sem.labels) max_idx = std::max(max_idx, static_cast<int>(v));
+    const int ncls = std::max<int>(std::max<int32_t>(sem.num_classes, max_idx + 1), 1);
+    std::vector<int64_t> counts(static_cast<size_t>(ncls), 0);
+    for (uint8_t v : sem.labels) ++counts[v];
+    int dominant = 0;
+    for (int c = 1; c < ncls; ++c)
+        if (counts[c] > counts[dominant]) dominant = c;
+    const float dominant_ratio = static_cast<float>(counts[dominant]) / static_cast<float>(total);
+    const float W = static_cast<float>(image.width());
+    const float H = static_cast<float>(image.height());
+    // 语义分割无实例框：产出整帧对象（归一化 0,0,1,1），attributes={类别名: 面积占比}，
+    // 复用分类契约形状（无需云端新增字段）；占比按降序写入，主导类必然在内。
+    DetectionBox box;
+    box.x = 0.f; box.y = 0.f; box.w = W; box.h = H;
+    box.label_id = dominant;
+    box.score = dominant_ratio;
+    box.label_name = class_name_of(cfg_, dominant);
+    std::vector<int> present;
+    present.reserve(static_cast<size_t>(ncls));
+    for (int c = 0; c < ncls; ++c)
+        if (counts[c] > 0) present.push_back(c);
+    std::sort(present.begin(), present.end(), [&](int a, int b) { return counts[a] > counts[b]; });
+    for (int c : present) {
+        const float ratio = static_cast<float>(counts[c]) / static_cast<float>(total);
+        box.attributes.emplace_back(class_name_of(cfg_, c), std::clamp(ratio, 0.f, 1.f));
+    }
+    result->boxes.push_back(std::move(box));
+    return true;
+}
+
+bool InferenceEngine::infer_face_landmark(const ImageData& image, InferResult* result) {
+    if (!face_landmark_model_ || !result) return false;
+    // landmark 预处走 image.asMat（packed CPU):NV12（硬解/摄像头帧）先转 BGR，避免越界
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<KeyPointsResult> lms;
+    if (!face_landmark_model_->predict(frame, &lms)) return false;
+    for (const auto& f : lms) {
+        if (f.keypoints.empty()) continue;
+        // SDK 契约：输入即人脸裁剪图，输出 106 点与该输入同坐标系（事件侧归一化）。
+        // 承载框沿用 SDK 返回的 box（=整帧），label 固定 "face"（非空，供节流/过滤）。
+        DetectionBox box;
+        box.x = f.box.x; box.y = f.box.y;
+        box.w = f.box.width; box.h = f.box.height;
+        box.score = f.score; box.label_id = f.label_id;
+        box.label_name = "face";
+        box.keypoints.reserve(f.keypoints.size());
+        for (const auto& k : f.keypoints) box.keypoints.push_back({k.x, k.y, k.z});
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_doc(const ImageData& image, InferResult* result) {
+    if (!ocr_model_ || !result) return false;
+    // 文档/表格：复用 OCR pipeline 抽取文本，逐行写入 objects[].text
+    // （云侧 text_match/ocr_label 叶子读取 text；structure 叶子未实现，不伪造结构摘要）
+    return infer_ocr(image, result);
+}
+
+bool InferenceEngine::infer_barcode(const ImageData& image, InferResult* result) {
+    if (!barcode_detector_ || !result) return false;
+    // ZXing 仅支持 CPU packed/GRAY；NV12（硬解/摄像头帧）先转 BGR
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    const std::vector<barcode::BarcodeResult> codes = barcode_detector_->detect(frame);
+    for (const auto& c : codes) {
+        if (c.text.empty()) continue;   // 解码文本为空：不产生对象（不伪造码值）
+        // 码区域四角 → 轴对齐外接框（事件契约只有 x/y/w/h，与 OCR/OBB 同口径降维）
+        float xmin = c.quad[0].x, ymin = c.quad[0].y;
+        float xmax = c.quad[0].x, ymax = c.quad[0].y;
+        for (const auto& p : c.quad) {
+            xmin = std::min(xmin, p.x); ymin = std::min(ymin, p.y);
+            xmax = std::max(xmax, p.x); ymax = std::max(ymax, p.y);
+        }
+        DetectionBox box;
+        box.x = xmin; box.y = ymin;
+        box.w = xmax - xmin; box.h = ymax - ymin;
+        box.label_id = -1;
+        box.score = c.score;
+        box.text = c.text;
+        box.text_score = c.score;
+        // label 用码制名（QR_CODE/EAN_13...）保证非空；供事件节流键与人工排查
+        box.label_name = c.format.empty() ? "barcode" : c.format;
+        result->boxes.push_back(std::move(box));
+    }
     return true;
 }
 
