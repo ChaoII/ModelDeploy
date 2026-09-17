@@ -417,14 +417,18 @@ void Pipeline::detect_loop() {
                     }
                 }
                 // 非检测 pipeline：boxes 已含 attributes（pedestrian_attribute）、text（ocr）
-                // 或几何框（face_detection / obb / iseg）；空框结果不并入（不产生空事件）。
+                // 或几何框（face_detection / obb / iseg）；classification 产出整帧框 + top-1
+                // label + 类别分数 attributes（见 InferenceEngine::infer_classification），
+                // 同样并入事件，使云端 object_present（label 匹配）/attribute 叶子可命中
+                // （修复「假可配置」）。空框结果不并入（不产生空事件）。
                 for (const auto& [name, r] : non_det) {
                     bool any_text = false;
                     for (const auto& b : r.boxes) {
                         if (!b.text.empty()) { any_text = true; break; }
                     }
                     const bool has_boxes = !r.boxes.empty() &&
-                        (r.type == "face_detection" || r.type == "obb" || r.type == "iseg");
+                        (r.type == "face_detection" || r.type == "obb" ||
+                         r.type == "iseg" || r.type == "classification");
                     if (r.attributes.empty() && !any_text && !has_boxes) continue;
                     for (const auto& b : r.boxes) boxes.push_back(b);
                 }

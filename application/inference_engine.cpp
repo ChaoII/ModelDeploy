@@ -273,14 +273,41 @@ bool InferenceEngine::infer_detection(const ImageData& image, InferResult* resul
 }
 
 bool InferenceEngine::infer_classification(const ImageData& image, InferResult* result) {
-    if (!cls_model_) return false;
+    if (!cls_model_ || !result) return false;
+    // 分类预处理只接受 packed BGR；NV12（硬解/摄像头帧）必须显式转 BGR。
+    // 否则 CPU fused 预处理会把单通道 Y 平面当 3 通道读，造成越界（回归修复）。
+    ImageData input = image;
+    if (image.type() == MdImageType::NV12 && image.plane_count() >= 2) {
+        if (image.device() != modeldeploy::Device::CPU) {
+            ImageData cpu;
+            if (!image.toCpu(&cpu)) return false;
+            input = ImageData::cvt_color(cpu, ColorConvertType::CVT_NV122PKG_BGR);
+        } else {
+            input = ImageData::cvt_color(image, ColorConvertType::CVT_NV122PKG_BGR);
+        }
+        if (input.empty()) return false;
+    }
     ClassifyResult cls_result;
-    if (!cls_model_->predict(image, &cls_result)) return false;
+    if (!cls_model_->predict(input, &cls_result)) return false;
+    // 分类无几何：为让云端 object_present/attribute 叶子可匹配（无需云改动），产出整帧框
+    // （像素 0,0,W,H → 事件归一化后 0,0,1,1），label = top-1 类别名；attributes 存该类别分数，
+    // 使 attribute 叶子（attributes[field]）也具备可比较的数据。top_k 默认 1，通常仅一个框。
+    const float W = static_cast<float>(image.width());
+    const float H = static_cast<float>(image.height());
     for (size_t i = 0; i < cls_result.label_ids.size(); ++i) {
+        const int id = cls_result.label_ids[i];
+        const float score = i < cls_result.scores.size() ? cls_result.scores[i] : 0.f;
+        const std::string label =
+            (id >= 0 && static_cast<size_t>(id) < cfg_.labels.size())
+                ? cfg_.labels[static_cast<size_t>(id)]
+                : std::to_string(id);
         DetectionBox box;
-        box.label_id = cls_result.label_ids[i];
-        box.score = cls_result.scores[i];
-        result->boxes.push_back(box);
+        box.x = 0.f; box.y = 0.f; box.w = W; box.h = H;
+        box.label_id = id;
+        box.score = score;
+        box.label_name = label;
+        box.attributes.emplace_back(label, score);
+        result->boxes.push_back(std::move(box));
     }
     return true;
 }
