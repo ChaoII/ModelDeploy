@@ -3,11 +3,34 @@
 #include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/common/struct.h"
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <filesystem>
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
+
+namespace {
+// 旋转框 → 轴对齐外接矩形（事件契约只有 x/y/w/h，旋转框降维为外接 bbox）。
+// angle 为 OpenCV RotatedRect 约定（角度制），按中心/宽高/角度取 4 角点后求包围盒。
+void rotated_rect_bounds(const RotatedRect& rr, float* xmin, float* ymin,
+                         float* xmax, float* ymax) {
+    const float rad = rr.angle * 3.14159265358979323846f / 180.0f;
+    const float c = std::cos(rad), s = std::sin(rad);
+    const float hw = rr.width * 0.5f, hh = rr.height * 0.5f;
+    const float dx[4] = {hw, hw, -hw, -hw};
+    const float dy[4] = {hh, -hh, -hh, hh};
+    float x0 = rr.xc, y0 = rr.yc, x1 = rr.xc, y1 = rr.yc;
+    for (int i = 0; i < 4; ++i) {
+        const float px = rr.xc + dx[i] * c - dy[i] * s;
+        const float py = rr.yc + dx[i] * s + dy[i] * c;
+        x0 = std::min(x0, px); x1 = std::max(x1, px);
+        y0 = std::min(y0, py); y1 = std::max(y1, py);
+    }
+    *xmin = x0; *ymin = y0; *xmax = x1; *ymax = y1;
+}
+}  // namespace
 
 bool InferenceEngine::load(const ModelConfig& cfg) {
     if (loaded_) unload();
@@ -41,6 +64,26 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
                 cls_model_.reset();
                 return false;
             }
+        } else if (cfg.type == "obb") {
+            // 旋转目标检测（YOLO-OBB）：SDK 输出旋转框，事件侧降维为轴对齐外接 bbox
+            obb_model_ = std::make_unique<detection::UltralyticsObb>(cfg.path, opt);
+            if (!obb_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] OBB model init failed: " << cfg.path << std::endl;
+                obb_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                obb_model_->get_preprocessor().set_size(cfg_.input_size);
+        } else if (cfg.type == "iseg") {
+            // 实例分割（YOLO-Seg）：仅把实例框送入事件（掩码不入事件，见批次文档）
+            iseg_model_ = std::make_unique<detection::UltralyticsSeg>(cfg.path, opt);
+            if (!iseg_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] ISeg model init failed: " << cfg.path << std::endl;
+                iseg_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                iseg_model_->get_preprocessor().set_size(cfg_.input_size);
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -99,6 +142,12 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
         // 将配置中的置信度阈值传递到模型后处理
         if (det_model_) {
             det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        }
+        if (obb_model_) {
+            obb_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        }
+        if (iseg_model_) {
+            iseg_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
         }
         if (face_model_) {
             face_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
@@ -174,6 +223,8 @@ bool InferenceEngine::predict_detection(const ImageData& image,
 void InferenceEngine::unload() {
     det_model_.reset();
     cls_model_.reset();
+    obb_model_.reset();
+    iseg_model_.reset();
     face_model_.reset();
     pa_model_.reset();
     ocr_model_.reset();
@@ -193,6 +244,10 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_face(image, result);
     if (cfg_.type == "classification")
         return infer_classification(image, result);
+    if (cfg_.type == "obb")
+        return infer_obb(image, result);
+    if (cfg_.type == "iseg")
+        return infer_iseg(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -226,6 +281,44 @@ bool InferenceEngine::infer_classification(const ImageData& image, InferResult* 
         box.label_id = cls_result.label_ids[i];
         box.score = cls_result.scores[i];
         result->boxes.push_back(box);
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_obb(const ImageData& image, InferResult* result) {
+    if (!obb_model_ || !result) return false;
+    std::vector<ObbResult> obb_results;
+    if (!obb_model_->predict(image, &obb_results)) return false;
+    for (const auto& o : obb_results) {
+        // 旋转框 → 轴对齐外接矩形：复用既有 bbox 事件契约（保持契约不变）
+        float xmin = 0.f, ymin = 0.f, xmax = 0.f, ymax = 0.f;
+        rotated_rect_bounds(o.rotated_box, &xmin, &ymin, &xmax, &ymax);
+        DetectionBox box;
+        box.x = xmin; box.y = ymin; box.w = xmax - xmin; box.h = ymax - ymin;
+        box.score = o.score;
+        box.label_id = o.label_id;
+        box.label_name = (o.label_id >= 0 && static_cast<size_t>(o.label_id) < cfg_.labels.size())
+                             ? cfg_.labels[static_cast<size_t>(o.label_id)]
+                             : std::to_string(o.label_id);
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_iseg(const ImageData& image, InferResult* result) {
+    if (!iseg_model_ || !result) return false;
+    std::vector<InstanceSegResult> seg_results;
+    if (!iseg_model_->predict(image, &seg_results)) return false;
+    for (const auto& s : seg_results) {
+        // 掩码不入事件（带宽/契约），只送实例框；语义见批次文档
+        DetectionBox box;
+        box.x = s.box.x; box.y = s.box.y; box.w = s.box.width; box.h = s.box.height;
+        box.score = s.score;
+        box.label_id = s.label_id;
+        box.label_name = (s.label_id >= 0 && static_cast<size_t>(s.label_id) < cfg_.labels.size())
+                             ? cfg_.labels[static_cast<size_t>(s.label_id)]
+                             : std::to_string(s.label_id);
+        result->boxes.push_back(std::move(box));
     }
     return true;
 }

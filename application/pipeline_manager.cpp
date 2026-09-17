@@ -24,10 +24,10 @@ PipelineManager::~PipelineManager() {
 // ── 模型工厂（prototype 缓存 + clone 共享 Runtime） ──
 
 std::unique_ptr<InferenceEngine> PipelineManager::create_engine(const ModelConfig& cfg) {
-    // classification / pedestrian_attribute / ocr / lpr 目前直接独立加载（SDK 的模型支持 clone()，
-    // 可后续接入 prototype 共享 Runtime；此处保守保持独立加载）
-    if (cfg.type == "classification" || cfg.type == "pedestrian_attribute" ||
-        cfg.type == "ocr" || cfg.type == "lpr") {
+    // classification / obb / iseg / pedestrian_attribute / ocr / lpr 目前直接独立加载
+    // （SDK 的模型支持 clone()，可后续接入 prototype 共享 Runtime；此处保守保持独立加载）
+    if (cfg.type == "classification" || cfg.type == "obb" || cfg.type == "iseg" ||
+        cfg.type == "pedestrian_attribute" || cfg.type == "ocr" || cfg.type == "lpr") {
         auto eng = std::make_unique<InferenceEngine>();
         eng->load(cfg);
         return eng;

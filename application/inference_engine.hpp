@@ -6,6 +6,8 @@
 
 #include "csrc/vision/detection/ultralytics_det.h"
 #include "csrc/vision/classification/classification.h"
+#include "csrc/vision/obb/ultralytics_obb.h"
+#include "csrc/vision/iseg/ultralytics_seg.h"
 #include "csrc/vision/face/face_det/scrfd.h"
 #include "csrc/vision/pipeline/pedestrian_attribute.h"
 #include "csrc/vision/ocr/ppocr.h"
@@ -37,7 +39,7 @@ struct FaceKeypoint {
 
 struct InferResult {
     std::string model_name;
-    std::string type;                 // detection / classification / face_detection / pedestrian_attribute
+    std::string type;                 // detection / classification / face_detection / pedestrian_attribute / ocr / lpr / obb / iseg
     std::vector<DetectionBox> boxes;
     // 仅人脸：每个 box 对应一组关键点
     std::vector<std::vector<FaceKeypoint>> keypoints;
@@ -95,6 +97,8 @@ private:
 
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> det_model_;
     std::unique_ptr<modeldeploy::vision::classification::Classification> cls_model_;
+    std::unique_ptr<modeldeploy::vision::detection::UltralyticsObb> obb_model_;
+    std::unique_ptr<modeldeploy::vision::detection::UltralyticsSeg> iseg_model_;
     std::unique_ptr<modeldeploy::vision::face::Scrfd> face_model_;
     std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::unique_ptr<modeldeploy::vision::ocr::PaddleOCR> ocr_model_;
@@ -103,6 +107,8 @@ private:
 
     bool infer_detection(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_classification(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_obb(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_iseg(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_face(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_ocr(const modeldeploy::vision::ImageData& image, InferResult* result);

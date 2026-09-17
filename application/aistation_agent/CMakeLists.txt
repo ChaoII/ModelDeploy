@@ -42,6 +42,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_inference_attribute.cpp
             tests/test_inference_ocr.cpp
             tests/test_inference_lpr.cpp
+            tests/test_inference_obb_iseg.cpp
             tests/test_infer_group_hotswap.cpp
             tests/test_model_leak.cpp
             tests/test_port_util.cpp

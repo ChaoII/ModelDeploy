@@ -31,7 +31,10 @@ nlohmann::json detect_capabilities(int max_channels) {
     platform = "nvidia";
 #endif
 
-    json families = json::array({"det", "cls", "face", "pedestrian_attribute", "ocr", "lpr", "tracking"});
+    // 模型族上报须与实际接线一致：obb/iseg 已接入推理与事件（见 pipeline/inference_engine），
+    // 名称与云端场景目录 catalog.py 的声明（type="obb"/"iseg"，model_families=["obb"]/["iseg"]）对齐。
+    json families = json::array({"det", "cls", "face", "pedestrian_attribute", "ocr", "lpr",
+                                 "tracking", "obb", "iseg"});
 
     json decode = json::array({"h264", "h265"});
     json encode = json::array({"h264"});

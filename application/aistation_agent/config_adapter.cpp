@@ -9,6 +9,12 @@ std::string normalize_model_type(const std::string& type) {
     if (type == "cls" || type == "classification") return "classification";
     if (type == "face" || type == "face_detection") return "face_detection";
     if (type == "ped_attr" || type == "pedestrian_attribute") return "pedestrian_attribute";
+    // 旋转目标（场景目录 OBB_DET 声明 type="obb"）
+    if (type == "obb" || type == "obb_det" || type == "rotated_detection") return "obb";
+    // 实例分割（场景目录 I_SEG 声明 type="iseg"；云端编排关键词映射可能给出 "seg"）
+    if (type == "iseg" || type == "seg" || type == "instance_seg" ||
+        type == "instance_segmentation")
+        return "iseg";
     return type;
 }
 
