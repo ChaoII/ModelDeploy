@@ -194,6 +194,7 @@ void AgentRuntime::on_created(const std::string& task_id, const AdaptedTask& t) 
     meta.task_id_num = task_id_num;
     meta.algorithm_type = t.algorithm_type;
     meta.alarm_interval_sec = t.alarm_interval_sec;
+    meta.max_embeddings = t.max_embeddings;
     meta.schedule = t.schedule;
     meta.roi_polygon = t.roi_polygon;
 

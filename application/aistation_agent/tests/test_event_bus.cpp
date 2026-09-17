@@ -8,6 +8,7 @@
 #include <vector>
 #include "agent_util.hpp"
 #include "capability.hpp"
+#include "config_adapter.hpp"
 #include "event_bus.hpp"
 #include "nlohmann/json.hpp"
 
@@ -480,4 +481,87 @@ TEST_CASE("embedding payload worst-case is bounded", "[agent][events]") {
     REQUIRE(encoded_bytes < 24 * 1024);
     REQUIRE(raw_bytes > 100 * 1024);
     REQUIRE(raw_bytes > 4 * encoded_bytes);
+}
+
+// 端到端：任务配置顶层 `max_embeddings: 3` → 单事件最多 3 个对象携带嵌入
+TEST_CASE("EventBus honors config max_embeddings", "[agent][events]") {
+    ConfigAdapter adapter(nullptr);
+    std::string err;
+    auto cfg = nlohmann::json::parse(R"({
+      "task_id": 123,
+      "camera": {"id": 7, "name": "北门", "url": "rtsp://cam/1"},
+      "models": [{"name": "det", "type": "det",
+                  "path": "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx"}],
+      "max_embeddings": 3
+    })");
+    AdaptedTask t;
+    REQUIRE(adapter.from_json(cfg, &t, &err));
+    REQUIRE(t.max_embeddings == 3);
+
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta;
+    meta.task_id_num = 1;
+    meta.alarm_interval_sec = 0;
+    meta.max_embeddings = t.max_embeddings;
+    bus.register_task("t", meta);
+
+    std::vector<DetectionBox> boxes;
+    for (int i = 0; i < 6; ++i) {
+        DetectionBox b = box("face", 0, 0.5f + 0.05f * static_cast<float>(i));
+        b.embedding = {1.0f};
+        boxes.push_back(b);
+    }
+    bus.on_detections("t", boxes, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    const auto j = got[0].to_json();
+    REQUIRE(j["objects"].size() == 6);
+    int with_embedding = 0;
+    for (const auto& o : j["objects"]) {
+        if (o.contains("embedding")) ++with_embedding;
+    }
+    REQUIRE(with_embedding == 3);
+    // 保留置信度最高的 3 个（i=3..5），低分的 3 个不带嵌入
+    REQUIRE_FALSE(j["objects"][0].contains("embedding"));
+    REQUIRE(j["objects"][3].contains("embedding"));
+    REQUIRE(j["objects"][5].contains("embedding"));
+}
+
+// 端到端：配置 `max_embeddings: 0` → 禁用嵌入（全部对象不带 embedding）
+TEST_CASE("EventBus disables embeddings when config max_embeddings is zero", "[agent][events]") {
+    ConfigAdapter adapter(nullptr);
+    std::string err;
+    auto cfg = nlohmann::json::parse(R"({
+      "task_id": 123,
+      "camera": {"id": 7, "name": "北门", "url": "rtsp://cam/1"},
+      "models": [{"name": "det", "type": "det",
+                  "path": "test_data/test_models/onnx/yolo11n/yolo11n_nms.onnx"}],
+      "max_embeddings": 0
+    })");
+    AdaptedTask t;
+    REQUIRE(adapter.from_json(cfg, &t, &err));
+    REQUIRE(t.max_embeddings == 0);
+
+    EventBus bus;
+    std::vector<DetectionEvent> got;
+    bus.set_sink([&](const DetectionEvent& e) { got.push_back(e); });
+    EventMeta meta;
+    meta.task_id_num = 1;
+    meta.alarm_interval_sec = 0;
+    meta.max_embeddings = t.max_embeddings;
+    bus.register_task("t", meta);
+
+    std::vector<DetectionBox> boxes;
+    for (int i = 0; i < 4; ++i) {
+        DetectionBox b = box("face", 0, 0.5f + 0.05f * static_cast<float>(i));
+        b.embedding = {1.0f};
+        boxes.push_back(b);
+    }
+    bus.on_detections("t", boxes, 640, 640, 1.0);
+    REQUIRE(got.size() == 1);
+    const auto j = got[0].to_json();
+    for (const auto& o : j["objects"]) {
+        REQUIRE_FALSE(o.contains("embedding"));
+    }
 }

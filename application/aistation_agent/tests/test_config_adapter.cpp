@@ -256,6 +256,37 @@ TEST_CASE("ConfigAdapter parses heartbeat_sec", "[agent][config]") {
     REQUIRE(out2.heartbeat_sec == 5);   // 默认 5s
 }
 
+TEST_CASE("ConfigAdapter parses max_embeddings", "[agent][config]") {
+    ConfigAdapter adapter(nullptr);
+    std::string err;
+
+    // 键存在：原样解析
+    json j = make_task_json();
+    j["max_embeddings"] = 3;
+    AdaptedTask out;
+    REQUIRE(adapter.from_json(j, &out, &err));
+    REQUIRE(out.max_embeddings == 3);
+
+    // 键缺失：缺省 8（对齐 EventMeta::max_embeddings）
+    json j2 = make_task_json();
+    AdaptedTask out2;
+    REQUIRE(adapter.from_json(j2, &out2, &err));
+    REQUIRE(out2.max_embeddings == 8);
+
+    // 越界：夹紧到 [0, 64]（0 = 禁用嵌入）
+    json j3 = make_task_json();
+    j3["max_embeddings"] = 999;
+    AdaptedTask out3;
+    REQUIRE(adapter.from_json(j3, &out3, &err));
+    REQUIRE(out3.max_embeddings == 64);
+
+    json j4 = make_task_json();
+    j4["max_embeddings"] = -5;
+    AdaptedTask out4;
+    REQUIRE(adapter.from_json(j4, &out4, &err));
+    REQUIRE(out4.max_embeddings == 0);
+}
+
 TEST_CASE("ConfigAdapter parses schedule, roi polygon, snapshot and normalizes broker", "[agent][config]") {
     ConfigAdapter adapter;
     AdaptedTask t;

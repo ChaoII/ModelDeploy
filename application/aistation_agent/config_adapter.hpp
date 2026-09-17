@@ -45,6 +45,7 @@ struct AdaptedTask {
     std::string algorithm_type;            // AIStation 提供，原样带回
     int alarm_interval_sec = 0;
     int heartbeat_sec = 5;                 // 静默期心跳间隔(秒)，<=0 禁用
+    int max_embeddings = 8;                // 单事件人脸嵌入 Top-N 上限（云端顶层键），<=0 禁用嵌入
     EventPublishConfig events;
     std::string tenant = "default";
     aistation::Schedule schedule;                              // 布控时段（空=全天）

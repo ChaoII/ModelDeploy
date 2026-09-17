@@ -215,6 +215,9 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
     // events
     out->alarm_interval_sec = j.value("alarm_interval_sec", 0);
     out->heartbeat_sec = j.value("heartbeat_sec", 5);
+    // 单事件人脸嵌入 Top-N 上限（云端顶层 int）：缺省 8（对齐 EventMeta::max_embeddings），
+    // 夹紧到 [0, 64]（与云端 resolve_max_embeddings 口径一致）；<=0 表示禁用嵌入。
+    out->max_embeddings = std::clamp(j.value("max_embeddings", 8), 0, 64);
     if (j.contains("algorithm_type") && j["algorithm_type"].is_string())
         out->algorithm_type = j["algorithm_type"].get<std::string>();
     if (j.contains("tenant") && j["tenant"].is_string()) out->tenant = j["tenant"].get<std::string>();
