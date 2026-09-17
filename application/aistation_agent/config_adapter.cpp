@@ -160,8 +160,9 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
                        std::clamp(j["prompt_point"]["y"].get<float>(), 0.f, 1.f)};
     }
 
-    // 人脸检测器复用：目录 FACE_REC/STRANGER 的 pipeline 为 [face_detection, face_rec] 两条独立
-    // 模型，而 Agent 的 face_rec 是「检测 + 嵌入」复合模型。若 face_rec 条目未显式给出 det_url/
+    // 人脸检测器复用：目录 FACE_REC/STRANGER 的 pipeline 为 [face_detection, face_rec]、
+    // FACE_LANDMARK 为 [face_detection, face_landmark] 两条独立模型，而 Agent 的
+    // face_rec/face_landmark 是「检测 + 次级模型」复合模型。若这些条目未显式给出 det_url/
     // det_path，则复用同一任务中 face_detection 条目的模型路径作为检测器（SCRFD）。
     std::string shared_face_det;
     if (j.contains("models") && j["models"].is_array()) {
@@ -181,11 +182,14 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
     if (!j.contains("models") || !j["models"].is_array() || j["models"].empty())
         return fail("at least one model required");
     for (const auto& mo : j["models"]) {
-        // face_rec 缺检测器路径：注入同任务的 face_detection 模型路径（复合模型补齐）
+        // face_rec/face_landmark 缺检测器路径：注入同任务 face_detection 模型路径（复合模型补齐）
         json mo_eff = mo;
         const bool is_face_rec = mo.is_object() && mo.contains("type") && mo["type"].is_string() &&
             normalize_model_type(mo["type"].get<std::string>()) == "face_rec";
-        if (is_face_rec && !shared_face_det.empty() &&
+        const bool is_face_landmark = mo.is_object() && mo.contains("type") &&
+            mo["type"].is_string() &&
+            normalize_model_type(mo["type"].get<std::string>()) == "face_landmark";
+        if ((is_face_rec || is_face_landmark) && !shared_face_det.empty() &&
             !mo.contains("det_url") && !mo.contains("det_path")) {
             mo_eff["det_url"] = shared_face_det;
         }
@@ -323,6 +327,28 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         // 未给显式嵌入键时，url|path 即嵌入模型（云侧 face_rec 角色的主模型）
         if (m.rec_path.empty()) {
             if (!resolve_first({"url", "path"}, &m.rec_path)) return false;
+        }
+    } else if (m.type == "face_landmark") {
+        // 人脸关键点复合模型：det（SCRFD，逐脸检测）+ landmark（2d106det，逐脸 106 点）。
+        // 口径与 face_rec 对齐：det_url→path（检测器），landmark_url|url|path→rec_path（关键点模型）。
+        // 无检测器时不写 rec_path，path 保持关键点模型（旧「整帧」口径，向后兼容）。
+        std::string det, lmk;
+        if (!resolve_first({"det_url", "det_path", "detector_url", "detector_path"}, &det))
+            return false;
+        if (!resolve_first({"landmark_url", "landmark_path", "lmk_url", "lmk_path",
+                            "rec_url", "rec_path"}, &lmk))
+            return false;
+        if (lmk.empty()) {
+            if (!resolve_first({"url", "path"}, &lmk)) return false;
+        }
+        if (!det.empty()) {
+            // 复合口径：缺关键点模型必须显式失败（不把检测器当关键点模型加载）
+            if (lmk.empty())
+                return fail("model.landmark_url/url (face landmark) required for " + m.name);
+            m.path = det;
+            m.rec_path = lmk;
+        } else {
+            m.path = lmk;
         }
     } else if (m.type == "face_attr") {
         // 人脸性别/年龄复合模型：det（SCRFD）+ cls（性别）+ rec（年龄）

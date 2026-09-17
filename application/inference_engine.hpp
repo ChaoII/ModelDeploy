@@ -133,7 +133,10 @@ private:
     // sem：语义分割（整帧占比 → attributes{类别名: 占比}）
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsSem> sem_model_;
     // face_landmark：人脸关键点（InsightFace 2d106，106 点；与 pose 共用 keypoints 契约）
+    // 复合口径：lm_det_model_ = SCRFD 逐脸检测器，face_landmark_model_ = 2d106det（输入人脸裁剪图）；
+    // 无检测器（旧配置）时 face_landmark_model_ 直接对整帧估计（向后兼容）。
     std::unique_ptr<modeldeploy::vision::landmark::FaceLandmark> face_landmark_model_;
+    std::unique_ptr<modeldeploy::vision::face::Scrfd> lm_det_model_;
     // barcode：条码/二维码原生解码（ZXing，无 DNN 权重）
     std::unique_ptr<modeldeploy::vision::barcode::BarcodeDetector> barcode_detector_;
     // sam：交互式分割（FastSAM-s；prompt_point 命中掩码 → 单个 segment 对象）

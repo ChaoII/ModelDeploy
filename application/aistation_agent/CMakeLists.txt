@@ -47,6 +47,7 @@ if (BUILD_AISTATION_AGENT_TESTS)
             tests/test_inference_face_attr_depth.cpp
             tests/test_inference_sem_landmark_doc_barcode.cpp
             tests/test_inference_sam_face_rec.cpp
+            tests/test_inference_face_landmark_composite.cpp
             tests/test_classification_event.cpp
             tests/test_infer_group_hotswap.cpp
             tests/test_model_leak.cpp

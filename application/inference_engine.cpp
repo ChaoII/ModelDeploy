@@ -259,13 +259,31 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             if (cfg_.input_size.size() == 2)
                 sem_model_->get_preprocessor().set_size(cfg_.input_size);
         } else if (cfg.type == "face_landmark") {
-            // 人脸关键点（InsightFace 2d106det，106 点）：输入为人脸裁剪图，输出 keypoints 事件字段
-            face_landmark_model_ = std::make_unique<landmark::FaceLandmark>(cfg.path, opt);
+            // 人脸关键点复合模型（InsightFace 2d106det，106 点；输入为人脸裁剪图）：
+            // 复合口径 path=SCRFD 检测器、rec_path=关键点模型（见 config_adapter）；无 rec_path 时
+            // path 即关键点模型（旧「整帧」口径，向后兼容）。
+            const bool composite = !cfg.rec_path.empty();
+            const std::string lmk_path = composite ? cfg.rec_path : cfg.path;
+            face_landmark_model_ = std::make_unique<landmark::FaceLandmark>(lmk_path, opt);
             if (!face_landmark_model_->is_initialized()) {
-                std::cerr << "[InferenceEngine] FaceLandmark model init failed: " << cfg.path
+                std::cerr << "[InferenceEngine] FaceLandmark model init failed: " << lmk_path
                           << std::endl;
                 face_landmark_model_.reset();
                 return false;
+            }
+            if (composite) {
+                // 检测器失败时不静默退回整帧（避免对整帧输出无意义 106 点）
+                lm_det_model_ = std::make_unique<face::Scrfd>(cfg.path, opt);
+                if (!lm_det_model_->is_initialized()) {
+                    std::cerr << "[InferenceEngine] FaceLandmark detector init failed: "
+                              << cfg.path << std::endl;
+                    lm_det_model_.reset();
+                    face_landmark_model_.reset();
+                    return false;
+                }
+                if (cfg_.input_size.size() == 2)
+                    lm_det_model_->get_preprocessor().set_size(cfg_.input_size);
+                lm_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
             }
         } else if (cfg.type == "doc") {
             // 文档/表格：与 OCR 同口径（det 主模型 + cls 方向分类 + rec 识别 + 字典），
@@ -467,6 +485,7 @@ void InferenceEngine::unload() {
     depth_model_.reset();
     sem_model_.reset();
     face_landmark_model_.reset();
+    lm_det_model_.reset();
     barcode_detector_.reset();
     sam_model_.reset();
     fr_det_model_.reset();
@@ -837,12 +856,55 @@ bool InferenceEngine::infer_face_landmark(const ImageData& image, InferResult* r
     // landmark 预处走 image.asMat（packed CPU):NV12（硬解/摄像头帧）先转 BGR，避免越界
     ImageData frame = to_packed_bgr(image);
     if (frame.empty()) return false;
+
+    if (lm_det_model_) {
+        // ── 逐脸复合口径：SCRFD 检测 → 逐脸裁剪 → 2d106det → 关键点回映原图 ──
+        // 坐标映射说明（关键）：
+        //   InsightFaceLandmark 的前处理以「传入图像」坐标系建立仿射 M（整图 → 192×192），
+        //   后处理用 inv_M 把 192 域关键点逆变换回**传入图像**坐标系。
+        //   因此对裁剪图 crop=(cx,cy,cw,ch) 推理所得关键点 (kx,ky) 是裁剪图局部坐标，
+        //   回映公式：full = (cx + kx, cy + ky)（cx,cy 为裁剪矩形左上角原图像素坐标）。
+        //   事件层随后按**原帧**宽高归一化（event_bus.cpp on_detections），所以这里必须回映到
+        //   原图像素坐标——绝不能把裁剪图当成原图去归一化，否则关键点会随裁剪尺寸缩小。
+        std::vector<KeyPointsResult> faces;
+        if (!lm_det_model_->predict(frame, &faces)) return false;
+        const float thresh = cfg_.confidence_threshold;
+        const float W = static_cast<float>(frame.width());
+        const float H = static_cast<float>(frame.height());
+        for (const auto& f : faces) {
+            if (f.score < thresh) continue;
+            if (!(f.box.width > 1.f && f.box.height > 1.f)) continue;
+            // 防御性裁剪到帧内：越界 rect 会破坏偏移映射（裁剪坐标必须以真实裁剪起点为准）
+            const float x1 = std::max(0.f, f.box.x);
+            const float y1 = std::max(0.f, f.box.y);
+            const float x2 = std::min(W, f.box.x + f.box.width);
+            const float y2 = std::min(H, f.box.y + f.box.height);
+            if (x2 - x1 < 2.f || y2 - y1 < 2.f) continue;
+            ImageData face = frame.crop({x1, y1, x2 - x1, y2 - y1});
+            if (face.empty()) continue;
+            std::vector<KeyPointsResult> lms;
+            if (!face_landmark_model_->predict(face, &lms) || lms.empty()) continue;
+            if (lms[0].keypoints.empty()) continue;
+            DetectionBox box;
+            // 承载框沿用检测框（非裁剪框），关键点为回映后的原图像素坐标
+            box.x = f.box.x; box.y = f.box.y;
+            box.w = f.box.width; box.h = f.box.height;
+            box.score = f.score; box.label_id = f.label_id;
+            box.label_name = "face";
+            box.keypoints.reserve(lms[0].keypoints.size());
+            for (const auto& k : lms[0].keypoints)
+                box.keypoints.push_back({k.x + x1, k.y + y1, k.z});
+            result->boxes.push_back(std::move(box));
+        }
+        return true;
+    }
+
+    // ── 旧「整帧」口径（仅关键点模型、无检测器；向后兼容）──
+    // SDK 契约：输入即人脸裁剪图，输出 106 点与该输入同坐标系（事件侧归一化）。
     std::vector<KeyPointsResult> lms;
     if (!face_landmark_model_->predict(frame, &lms)) return false;
     for (const auto& f : lms) {
         if (f.keypoints.empty()) continue;
-        // SDK 契约：输入即人脸裁剪图，输出 106 点与该输入同坐标系（事件侧归一化）。
-        // 承载框沿用 SDK 返回的 box（=整帧），label 固定 "face"（非空，供节流/过滤）。
         DetectionBox box;
         box.x = f.box.x; box.y = f.box.y;
         box.w = f.box.width; box.h = f.box.height;
